@@ -68,19 +68,19 @@ impl MergeStrategy for MergeStrategyLedger {
 
         let res = new_records
             .with_column(
-                &self.vocab.operation_type_column,
+                self.vocab.operation_type_column(),
                 // TODO: Cast to `u8` after Spark is updated
                 // See: https://github.com/kamu-data/kamu-cli/issues/445
                 lit(odf::metadata::OperationType::Append as i32),
             )
             .int_err()?
-            .columns_to_front(&[&self.vocab.operation_type_column])
+            .columns_to_front(&[self.vocab.operation_type_column()])
             .int_err()?;
 
         Ok(res)
     }
 
     fn sort_order(&self) -> Vec<SortExpr> {
-        vec![col(Column::from_name(&self.vocab.event_time_column)).sort(true, true)]
+        vec![col(Column::from_name(self.vocab.event_time_column())).sort(true, true)]
     }
 }

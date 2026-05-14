@@ -10,11 +10,12 @@
 use std::convert::TryFrom;
 
 use ::flatbuffers;
+use multiformats::Multicodec;
 
 pub use super::convertors_generated::*;
 use super::proxies_generated as fbgen;
-use crate::dtos::*;
-use crate::formats::Multicodec;
+use crate::dtos::dataset::MetadataBlock;
+use crate::dtos::engine::*;
 use crate::serde::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

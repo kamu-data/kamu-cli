@@ -65,13 +65,13 @@ pub fn preprocess_default(
     opts: &SchemaInferenceOpts,
 ) -> Result<DataFrameExt, datafusion::error::DataFusionError> {
     let df = if read_step.schema().is_none() && opts.rename_on_conflict_with_system_column {
-        let mut system_cols = vec![&vocab.offset_column, &vocab.system_time_column];
+        let mut system_cols = vec![vocab.offset_column(), vocab.system_time_column()];
 
         match merge_strategy {
             odf::metadata::MergeStrategy::Append(_)
             | odf::metadata::MergeStrategy::Ledger(_)
             | odf::metadata::MergeStrategy::Snapshot(_) => {
-                system_cols.push(&vocab.operation_type_column);
+                system_cols.push(vocab.operation_type_column());
             }
             odf::metadata::MergeStrategy::ChangelogStream(_)
             | odf::metadata::MergeStrategy::UpsertStream(_) => (),
@@ -82,7 +82,7 @@ pub fn preprocess_default(
 
         for field in df.schema().fields() {
             let col_orig = col(Column::from_name(field.name()));
-            if system_cols.contains(&field.name()) {
+            if system_cols.contains(&field.name().as_str()) {
                 let new_name = format!("_{}", field.name());
 
                 tracing::debug!(
@@ -109,7 +109,7 @@ pub fn preprocess_default(
 
         for field in df.schema().fields() {
             let col_orig = col(Column::from_name(field.name()));
-            if *field.name() != vocab.event_time_column {
+            if *field.name() != vocab.event_time_column() {
                 select.push(col_orig);
                 continue;
             }

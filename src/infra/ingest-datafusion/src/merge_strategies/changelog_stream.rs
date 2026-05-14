@@ -38,7 +38,8 @@ impl MergeStrategyChangelogStream {
         new.select(
             self.primary_key
                 .iter()
-                .chain([&self.vocab.operation_type_column])
+                .map(String::as_str)
+                .chain([self.vocab.operation_type_column()])
                 .map(|name| col(Column::from_name(name)))
                 .collect(),
         )
@@ -67,7 +68,7 @@ impl MergeStrategy for MergeStrategyChangelogStream {
             .iter()
             .map(|c| col(Column::from_name(c)).sort(true, true))
             .chain(std::iter::once(
-                col(Column::from_name(&self.vocab.operation_type_column)).sort(true, true),
+                col(Column::from_name(self.vocab.operation_type_column())).sort(true, true),
             ))
             .collect()
     }

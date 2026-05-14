@@ -158,7 +158,7 @@ where
     let ctx = SessionContext::new();
     let strat = MergeStrategySnapshot::new(
         odf::metadata::DatasetVocabulary {
-            event_time_column: "year".to_string(),
+            event_time_column: Some("year".into()),
             ..Default::default()
         },
         odf::metadata::MergeStrategySnapshot {
@@ -278,7 +278,7 @@ where
 
     let strat = MergeStrategySnapshot::new(
         odf::metadata::DatasetVocabulary {
-            event_time_column: "year".to_string(),
+            event_time_column: Some("year".into()),
             ..Default::default()
         },
         odf::metadata::MergeStrategySnapshot {
@@ -405,7 +405,7 @@ async fn test_snapshot_merge_input_carries_event_time() {
 
     let strat = MergeStrategySnapshot::new(
         odf::metadata::DatasetVocabulary {
-            event_time_column: "year".to_string(),
+            event_time_column: Some("year".into()),
             ..Default::default()
         },
         odf::metadata::MergeStrategySnapshot {

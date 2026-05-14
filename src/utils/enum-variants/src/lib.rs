@@ -61,7 +61,7 @@ macro_rules! impl_enum_with_variants {
 // TODO: Make a derive macro
 #[macro_export]
 macro_rules! impl_enum_variant {
-    ($enum_type:ident :: $variant:ident ( $variant_type:ident )) => {
+    ($enum_type:ident :: $variant:ident ( $variant_type:path )) => {
         impl Into<$enum_type> for $variant_type {
             #[inline]
             fn into(self) -> $enum_type {

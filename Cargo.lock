@@ -2656,6 +2656,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "bytesize"
+version = "2.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "49e78e506b9d7633710dab98996f22f95f3d0f488e8f1aa162830556ed9fc14d"
+dependencies = [
+ "serde_core",
+]
+
+[[package]]
 name = "bzip2"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10426,6 +10435,7 @@ dependencies = [
  "serde_json",
  "serde_with",
  "serde_yaml_ng",
+ "setty",
  "sha3 0.10.9",
  "sqlx",
  "ssi-caips",
@@ -12892,6 +12902,8 @@ version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "85f9060dfd72e7e76f409c65e11e15717af76de34d4cc421248b05939ed6fa6e"
 dependencies = [
+ "async-graphql",
+ "bytesize",
  "chrono",
  "duration-string",
  "html-escape",

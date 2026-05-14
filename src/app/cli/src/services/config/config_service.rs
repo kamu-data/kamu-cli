@@ -10,7 +10,7 @@
 use std::path::PathBuf;
 
 use internal_error::*;
-use odf::metadata::serde::yaml::Manifest;
+use odf::metadata::serde::yaml::legacy::Manifest;
 use setty::format::Format;
 
 use crate::config::models::*;

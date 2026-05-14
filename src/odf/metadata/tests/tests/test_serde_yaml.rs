@@ -8,20 +8,29 @@
 // by the Apache License, Version 2.0.
 
 use std::assert_matches;
+use std::collections::BTreeMap;
 use std::convert::TryFrom;
 
-use ::serde::{Deserialize, Serialize};
 use chrono::prelude::*;
 use indoc::indoc;
-use opendatafabric_metadata::ext::*;
-use opendatafabric_metadata::serde::yaml::*;
+use opendatafabric_metadata::auth::*;
+use opendatafabric_metadata::config::*;
+use opendatafabric_metadata::data::ext::*;
+use opendatafabric_metadata::data::*;
+use opendatafabric_metadata::dataset::*;
+use opendatafabric_metadata::errors::ValidationError;
+use opendatafabric_metadata::legacy::*;
+use opendatafabric_metadata::resource::*;
+use opendatafabric_metadata::serde::yaml::IntoDto;
+use opendatafabric_metadata::serde::{yaml as serde, *};
+use opendatafabric_metadata::source::*;
 use opendatafabric_metadata::*;
+use serde_json::json;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
 fn serde_enum_tagging() {
-    #[derive(Deserialize, Serialize, Debug)]
-    struct Wrapper(#[serde(with = "ReadStepDef")] ReadStep);
-
     let value = ReadStep::NdJson(ReadStepNdJson {
         encoding: Some("utf-8".to_string()),
         ..Default::default()
@@ -29,7 +38,7 @@ fn serde_enum_tagging() {
 
     // Check produces PascalCase tags on serialize
     assert_eq!(
-        serde_yaml::to_string(&Wrapper(value.clone())).unwrap(),
+        serde_yaml::to_string(&serde::source::ReadStep::from(value.clone())).unwrap(),
         indoc::indoc!(
             "
             kind: NdJson
@@ -39,95 +48,225 @@ fn serde_enum_tagging() {
     );
 
     // Check deserialize with exact tag match
-    let de_value = serde_yaml::from_str::<Wrapper>(indoc::indoc!(
+    let de_value: serde::source::ReadStep = serde_yaml::from_str(indoc::indoc!(
         "
         kind: NdJson
         encoding: utf-8
         "
     ))
     .unwrap();
-    assert_eq!(de_value.0, value);
+    assert_eq!(de_value.into_dto().unwrap(), value);
 
     // Check deserialize with old camelCase tag
-    let de_value = serde_yaml::from_str::<Wrapper>(indoc::indoc!(
+    let de_value: serde::source::ReadStep = serde_yaml::from_str(indoc::indoc!(
         "
         kind: ndJson
         encoding: utf-8
         "
     ))
     .unwrap();
-    assert_eq!(de_value.0, value);
+    assert_eq!(de_value.into_dto().unwrap(), value);
 
     // Check deserialize with lowercase tag
-    let de_value = serde_yaml::from_str::<Wrapper>(indoc::indoc!(
+    let de_value: serde::source::ReadStep = serde_yaml::from_str(indoc::indoc!(
         "
         kind: ndjson
         encoding: utf-8
         "
     ))
     .unwrap();
-    assert_eq!(de_value.0, value);
+    assert_eq!(de_value.into_dto().unwrap(), value);
 
     // Check rejects other case permutations
-    assert_matches!(
-        serde_yaml::from_str::<Wrapper>(indoc::indoc!(
-            "
-            kind: nDjson
-            encoding: utf-8
-            "
-        )),
-        Err(_)
-    );
+    serde_yaml::from_str::<serde::source::ReadStep>(indoc::indoc!(
+        "
+        kind: nDjson
+        encoding: utf-8
+        "
+    ))
+    .map(serde::IntoDto::into_dto)
+    .expect_err("Should fail");
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
 fn serde_string_enum_names() {
-    #[derive(Deserialize, Serialize, Debug)]
-    struct Wrapper {
-        #[serde(with = "SourceOrderingDef")]
-        kind: SourceOrdering,
-    }
-
     let value = SourceOrdering::ByEventTime;
 
     // Check produces PascalCase values on serialize as in spec schemas
     assert_eq!(
-        serde_yaml::to_string(&Wrapper { kind: value }).unwrap(),
+        serde_yaml::to_string(&serde::source::SourceOrdering::from(value)).unwrap(),
         indoc::indoc!(
             "
-            kind: ByEventTime
+            ByEventTime
             "
         )
     );
 
     // Can deserialize from camelCase
-    let de_value = serde_yaml::from_str::<Wrapper>(indoc::indoc!(
+    let de_value: serde::source::SourceOrdering = serde_yaml::from_str(indoc::indoc!(
         "
-        kind: byEventTime
+        byEventTime
         "
     ))
     .unwrap();
-    assert_eq!(de_value.kind, value);
+    assert_eq!(de_value.into_dto().unwrap(), value);
 
     // Can deserialize from lowercase
-    let de_value = serde_yaml::from_str::<Wrapper>(indoc::indoc!(
+    let de_value: serde::source::SourceOrdering = serde_yaml::from_str(indoc::indoc!(
         "
-        kind: byeventtime
+        byeventtime
         "
     ))
     .unwrap();
-    assert_eq!(de_value.kind, value);
+    assert_eq!(de_value.into_dto().unwrap(), value);
 
     // Check rejects other case permutations
-    assert_matches!(
-        serde_yaml::from_str::<Wrapper>(indoc::indoc!(
-            "
-            kind: bYeventtime
-            "
-        )),
-        Err(_)
+    serde_yaml::from_str::<serde::source::SourceOrdering>(indoc::indoc!(
+        "
+        bYeventtime
+        "
+    ))
+    .map(serde::IntoDto::into_dto)
+    .expect_err("Should fail");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_serde_maps() {
+    // String -> Struct
+    let data = indoc!(
+        r#"
+        password:
+          value: swordfish
+        tls:
+          value: aabbcc
+          contentEncoding: base64
+        username:
+          value: 'true'
+        "#
+    );
+
+    let val = serde_yaml::from_str::<serde::config::Secrets>(data)
+        .unwrap()
+        .into_dto()
+        .unwrap();
+
+    pretty_assertions::assert_eq!(
+        val,
+        Secrets {
+            entries: BTreeMap::from_iter([
+                (
+                    "password".to_string(),
+                    Secret {
+                        value: "swordfish".into(),
+                        content_encoding: None
+                    }
+                ),
+                (
+                    "username".to_string(),
+                    Secret {
+                        value: "true".into(),
+                        content_encoding: None
+                    }
+                ),
+                (
+                    "tls".to_string(),
+                    Secret {
+                        value: "aabbcc".into(),
+                        content_encoding: Some("base64".into())
+                    }
+                )
+            ])
+        }
+    );
+
+    pretty_assertions::assert_eq!(
+        serde_yaml::to_string(&serde::config::Secrets::from(val)).unwrap(),
+        data
+    );
+
+    // String -> Struct + FromString
+    let data = indoc!(
+        r#"
+        password: swordfish
+        "#
+    );
+
+    let val = serde_yaml::from_str::<serde::config::Secrets>(data)
+        .unwrap()
+        .into_dto()
+        .unwrap();
+
+    pretty_assertions::assert_eq!(
+        val,
+        Secrets {
+            entries: BTreeMap::from_iter([(
+                "password".to_string(),
+                Secret {
+                    value: "swordfish".into(),
+                    content_encoding: None
+                }
+            )])
+        }
+    );
+
+    pretty_assertions::assert_eq!(
+        serde_yaml::to_string(&serde::config::Secrets::from(val)).unwrap(),
+        indoc!(
+            r#"
+            password:
+              value: swordfish
+            "#
+        )
+    );
+
+    // String -> AnyJson
+    let data = indoc!(
+        r#"
+        arrow.apache.org/offsetBitWidth: 32
+        opendatafabric.org/description: foobar
+        opendatafabric.org/type:
+          kind: ObjectLink
+          linkType:
+            kind: Multihash
+        "#
+    );
+
+    let val = serde_yaml::from_str::<serde::data::ExtraAttributes>(data)
+        .unwrap()
+        .into_dto()
+        .unwrap();
+
+    pretty_assertions::assert_eq!(
+        val,
+        ExtraAttributes {
+            entries: BTreeMap::from_iter([
+                ("arrow.apache.org/offsetBitWidth".to_string(), json!(32)),
+                (
+                    "opendatafabric.org/description".to_string(),
+                    json!("foobar")
+                ),
+                (
+                    "opendatafabric.org/type".to_string(),
+                    json!({
+                        "kind": "ObjectLink",
+                        "linkType": { "kind": "Multihash" }
+                    })
+                )
+            ])
+        }
+    );
+
+    pretty_assertions::assert_eq!(
+        serde_yaml::to_string(&serde::data::ExtraAttributes::from(val)).unwrap(),
+        data
     );
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
 fn serde_set_data_schema() {
@@ -155,7 +294,7 @@ fn serde_set_data_schema() {
         event,
     };
 
-    let actual_data = YamlMetadataBlockSerializer
+    let actual_data = serde::YamlMetadataBlockSerializer
         .write_manifest(&expected_block)
         .unwrap();
 
@@ -203,7 +342,7 @@ fn serde_set_data_schema() {
 
     pretty_assertions::assert_eq!(expected_data, std::str::from_utf8(&actual_data).unwrap());
 
-    let actual_block = YamlMetadataBlockDeserializer
+    let actual_block = serde::YamlMetadataBlockDeserializer
         .read_manifest(&actual_data)
         .unwrap();
 
@@ -219,6 +358,8 @@ fn serde_set_data_schema() {
 
     assert_eq!(expected_schema, actual_schema);
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[cfg(feature = "arrow")]
 #[test]
@@ -240,7 +381,7 @@ fn serde_set_data_schema_legacy() {
         event,
     };
 
-    let actual_data = YamlMetadataBlockSerializer
+    let actual_data = serde::YamlMetadataBlockSerializer
         .write_manifest(&expected_block)
         .unwrap();
 
@@ -260,7 +401,7 @@ fn serde_set_data_schema_legacy() {
 
     assert_eq!(expected_data, std::str::from_utf8(&actual_data).unwrap());
 
-    let actual_block = YamlMetadataBlockDeserializer
+    let actual_block = serde::YamlMetadataBlockDeserializer
         .read_manifest(&actual_data)
         .unwrap();
 
@@ -276,12 +417,14 @@ fn serde_set_data_schema_legacy() {
     assert_eq!(expected_schema, actual_schema);
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[ignore = "Requires improving validation. See https://github.com/open-data-fabric/open-data-fabric/issues/112"]
 #[test]
 fn serde_set_data_schema_validation() {
     // Valid
     assert_matches!(
-        YamlMetadataEventDeserializer.read_manifest(indoc!(
+        serde::YamlMetadataEventDeserializer.read_manifest(indoc!(
             br#"
             kind: MetadataEvent
             version: 1
@@ -299,7 +442,7 @@ fn serde_set_data_schema_validation() {
 
     // Invalid bit width
     assert_matches!(
-        YamlMetadataEventDeserializer.read_manifest(indoc!(
+        serde::YamlMetadataEventDeserializer.read_manifest(indoc!(
             br#"
             kind: MetadataEvent
             version: 1
@@ -319,7 +462,7 @@ fn serde_set_data_schema_validation() {
 
     // Invalid arrow encoding type
     assert_matches!(
-        YamlMetadataEventDeserializer.read_manifest(indoc!(
+        serde::YamlMetadataEventDeserializer.read_manifest(indoc!(
             br#"
             kind: MetadataEvent
             version: 1
@@ -338,6 +481,8 @@ fn serde_set_data_schema_validation() {
         Err(_)
     );
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
 fn serde_dataset_snapshot_root() {
@@ -414,18 +559,20 @@ fn serde_dataset_snapshot_root() {
         })],
     };
 
-    let actual = YamlDatasetSnapshotDeserializer
+    let actual = serde::YamlDatasetSnapshotDeserializer
         .read_manifest(data.as_bytes())
         .unwrap();
 
     assert_eq!(expected, actual);
 
-    let data2 = YamlDatasetSnapshotSerializer
+    let data2 = serde::YamlDatasetSnapshotSerializer
         .write_manifest(&actual)
         .unwrap();
 
     assert_eq!(data, std::str::from_utf8(&data2).unwrap());
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
 fn serde_dataset_snapshot_derivative() {
@@ -476,18 +623,20 @@ fn serde_dataset_snapshot_derivative() {
         })],
     };
 
-    let actual = YamlDatasetSnapshotDeserializer
+    let actual = serde::YamlDatasetSnapshotDeserializer
         .read_manifest(data.as_bytes())
         .unwrap();
 
     assert_eq!(expected, actual);
 
-    let data2 = YamlDatasetSnapshotSerializer
+    let data2 = serde::YamlDatasetSnapshotSerializer
         .write_manifest(&actual)
         .unwrap();
 
     assert_eq!(data, std::str::from_utf8(&data2).unwrap());
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
 fn serde_dataset_snapshot_derivative_with_multi_tenant_ref() {
@@ -534,18 +683,20 @@ fn serde_dataset_snapshot_derivative_with_multi_tenant_ref() {
         })],
     };
 
-    let actual = YamlDatasetSnapshotDeserializer
+    let actual = serde::YamlDatasetSnapshotDeserializer
         .read_manifest(data.as_bytes())
         .unwrap();
 
     assert_eq!(expected, actual);
 
-    let data2 = YamlDatasetSnapshotSerializer
+    let data2 = serde::YamlDatasetSnapshotSerializer
         .write_manifest(&actual)
         .unwrap();
 
     assert_eq!(data, std::str::from_utf8(&data2).unwrap());
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
 fn serde_metadata_block() {
@@ -617,16 +768,20 @@ fn serde_metadata_block() {
         "
     );
 
-    let actual = YamlMetadataBlockSerializer.write_manifest(&block).unwrap();
+    let actual = serde::YamlMetadataBlockSerializer
+        .write_manifest(&block)
+        .unwrap();
 
     assert_eq!(expected, std::str::from_utf8(&actual).unwrap());
 
-    let de_block = YamlMetadataBlockDeserializer
+    let de_block = serde::YamlMetadataBlockDeserializer
         .read_manifest(expected.as_bytes())
         .unwrap();
 
     assert_eq!(block, de_block);
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
 fn serde_metadata_block_obsolete_version() {
@@ -669,12 +824,14 @@ fn serde_metadata_block_obsolete_version() {
         supported_version_range: METADATA_BLOCK_SUPPORTED_VERSION_RANGE,
     });
 
-    let actual_error = YamlMetadataBlockDeserializer
+    let actual_error = serde::YamlMetadataBlockDeserializer
         .read_manifest(data.as_bytes())
         .unwrap_err();
 
     assert_eq!(expected_error.to_string(), actual_error.to_string());
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
 fn serde_fetch_step_files_glob() {
@@ -688,10 +845,10 @@ fn serde_fetch_step_files_glob() {
         "
     );
 
-    #[derive(Serialize, Deserialize)]
-    struct Helper(#[serde(with = "FetchStepDef")] FetchStep);
-    let hlp: Helper = serde_yaml::from_str(data).unwrap();
-    let actual = hlp.0;
+    let actual = serde_yaml::from_str::<serde::legacy::FetchStep>(data)
+        .unwrap()
+        .into_dto()
+        .unwrap();
 
     let expected = FetchStep::FilesGlob(FetchStepFilesGlob {
         path: "/opt/x/*.txt".to_owned(),
@@ -702,8 +859,13 @@ fn serde_fetch_step_files_glob() {
 
     assert_eq!(expected, actual);
 
-    assert_eq!(serde_yaml::to_string(&Helper(actual)).unwrap(), data);
+    assert_eq!(
+        serde_yaml::to_string(&serde::legacy::FetchStep::from(actual)).unwrap(),
+        data
+    );
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
 fn serde_transform() {
@@ -721,10 +883,10 @@ fn serde_transform() {
         "
     );
 
-    #[derive(Serialize, Deserialize)]
-    struct Helper(#[serde(with = "TransformDef")] Transform);
-    let hlp: Helper = serde_yaml::from_str(data).unwrap();
-    let actual = hlp.0;
+    let actual = serde_yaml::from_str::<serde::dataset::Transform>(data)
+        .unwrap()
+        .into_dto()
+        .unwrap();
 
     let expected = Transform::Sql(TransformSql {
         engine: "flink".to_owned(),
@@ -742,8 +904,13 @@ fn serde_transform() {
 
     assert_eq!(expected, actual);
 
-    assert_eq!(serde_yaml::to_string(&Helper(actual)).unwrap(), data);
+    assert_eq!(
+        serde_yaml::to_string(&serde::dataset::Transform::from(actual)).unwrap(),
+        data
+    );
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
 fn serde_enum_short_form() {
@@ -763,12 +930,11 @@ fn serde_enum_short_form() {
         "
     );
 
-    #[derive(Debug, Serialize, Deserialize)]
-    struct Helper(#[serde(with = "DataSchemaDef")] DataSchema);
-
     // Deserializes fine
-    let hlp: Helper = serde_yaml::from_str(data).unwrap();
-    let actual = hlp.0;
+    let actual = serde_yaml::from_str::<serde::data::DataSchema>(data)
+        .unwrap()
+        .into_dto()
+        .unwrap();
 
     let expected = DataSchema::new(vec![
         DataField::new(
@@ -798,7 +964,7 @@ fn serde_enum_short_form() {
 
     // Serialization expands to long form, but does not include defaults
     pretty_assertions::assert_eq!(
-        serde_yaml::to_string(&Helper(actual)).unwrap(),
+        serde_yaml::to_string(&serde::data::DataSchema::from(actual)).unwrap(),
         indoc!(
             "
             fields:
@@ -826,6 +992,463 @@ fn serde_enum_short_form() {
         "
     );
 
-    let res = serde_yaml::from_str::<Helper>(data);
+    let res = serde_yaml::from_str::<serde::data::DataSchema>(data).map(serde::IntoDto::into_dto);
     assert_matches!(res, Err(e) if e.to_string().contains("unknown variant `Invalid`"));
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_serde_resource_generics() {
+    use ::serde::de::IgnoredAny as Ignore;
+
+    let data = indoc!(
+        r#"
+        $schema: https://opendatafabric.org/schemas/config/v1alpha1/SecretSet
+        headers:
+          name: my-secret
+        spec:
+          secrets:
+            tls:
+              value: <cert>
+        "#
+    );
+
+    // Read only header ignoring the rest
+    let val = serde_yaml::from_str::<serde::resource::Resource<Ignore>>(data)
+        .unwrap()
+        .into_dto()
+        .unwrap();
+
+    pretty_assertions::assert_eq!(
+        val,
+        Resource {
+            schema: SecretSet::schema().clone(),
+            headers: ResourceHeaders {
+                id: None,
+                name: "my-secret".parse().unwrap(),
+                account: None,
+                labels: None,
+                annotations: None,
+                generation: None,
+                created_at: None,
+                updated_at: None,
+                deleted_at: None,
+            },
+            spec: Ignore,
+            status: None,
+        }
+    );
+
+    // Read & write typed spec
+    let val = serde_yaml::from_str::<serde::resource::Resource<serde::config::SecretSetSpec>>(data)
+        .unwrap()
+        .into_dto()
+        .unwrap();
+
+    pretty_assertions::assert_eq!(
+        val,
+        Resource {
+            schema: SecretSet::schema().clone(),
+            headers: ResourceHeaders {
+                id: None,
+                name: "my-secret".parse().unwrap(),
+                account: None,
+                labels: None,
+                annotations: None,
+                generation: None,
+                created_at: None,
+                updated_at: None,
+                deleted_at: None,
+            },
+            spec: SecretSetSpec {
+                secrets: Secrets {
+                    entries: BTreeMap::from_iter([(
+                        "tls".to_string(),
+                        Secret {
+                            value: "<cert>".into(),
+                            content_encoding: None,
+                        }
+                    )]),
+                }
+            },
+            status: None,
+        }
+    );
+
+    pretty_assertions::assert_eq!(
+        serde_yaml::to_string(
+            &serde::resource::Resource::<serde::config::SecretSetSpec>::from(val)
+        )
+        .unwrap(),
+        data
+    );
+
+    // Read & write generic spec
+    let val = serde_yaml::from_str::<serde::resource::Resource<serde_json::Value>>(data)
+        .unwrap()
+        .into_dto()
+        .unwrap();
+
+    pretty_assertions::assert_eq!(
+        val,
+        Resource {
+            schema: SecretSet::schema().clone(),
+            headers: ResourceHeaders {
+                id: None,
+                name: "my-secret".parse().unwrap(),
+                account: None,
+                labels: None,
+                annotations: None,
+                generation: None,
+                created_at: None,
+                updated_at: None,
+                deleted_at: None,
+            },
+            spec: json!({
+                "secrets": {
+                    "tls": {
+                        "value": "<cert>",
+                    }
+                }
+            }),
+            status: None,
+        }
+    );
+
+    pretty_assertions::assert_eq!(
+        serde_yaml::to_string(&serde::resource::Resource::<serde_json::Value>::from(val)).unwrap(),
+        data
+    );
+
+    // Read & write typed spec - all fields
+    let data = indoc!(
+        r#"
+        $schema: https://opendatafabric.org/schemas/config/v1alpha1/SecretSet
+        headers:
+          id: aa-12345
+          name: my-secret
+          account:
+            name: sergiimk
+          labels:
+            nested:
+              a: x
+              b: y
+            string: foo
+          annotations:
+            nested:
+              a: x
+              b: y
+            string: foo
+          generation: 1
+          createdAt: 2026-01-01T00:00:00Z
+          updatedAt: 2026-01-01T00:00:00Z
+          deletedAt: 2026-01-01T00:00:00Z
+        spec:
+          secrets:
+            tls:
+              value: <cert>
+        status:
+          phase: Ready
+          observedGeneration: 1
+          reconciledAt: 2026-01-01T00:00:00Z
+          conditions:
+            https://opendatafabric.org/core/v1/Bool:
+              value: true
+            https://opendatafabric.org/core/v1/Nested:
+              value:
+                a: x
+                b: y
+            https://opendatafabric.org/core/v1/Str:
+              lastTransitionTime: 2026-01-01T00:00:00Z
+              observedGeneration: 1
+              value: foo
+        "#
+    );
+
+    let val = serde_yaml::from_str::<serde::resource::Resource<serde::config::SecretSetSpec>>(data)
+        .unwrap()
+        .into_dto()
+        .unwrap();
+
+    pretty_assertions::assert_eq!(
+        val,
+        Resource {
+            schema: SecretSet::schema().clone(),
+            headers: ResourceHeaders {
+                id: Some("aa-12345".parse().unwrap()),
+                name: "my-secret".parse().unwrap(),
+                account: Some("sergiimk".parse().unwrap()),
+                labels: Some(ResourceLabels {
+                    entries: BTreeMap::from_iter([
+                        ("string".parse().unwrap(), json!("foo")),
+                        ("nested".parse().unwrap(), json!({"a": "x", "b": "y"}))
+                    ])
+                }),
+                annotations: Some(ResourceAnnotations {
+                    entries: BTreeMap::from_iter([
+                        ("string".parse().unwrap(), json!("foo")),
+                        ("nested".parse().unwrap(), json!({"a": "x", "b": "y"}))
+                    ])
+                }),
+                generation: Some(1),
+                created_at: Some("2026-01-01T00:00:00Z".parse().unwrap()),
+                updated_at: Some("2026-01-01T00:00:00Z".parse().unwrap()),
+                deleted_at: Some("2026-01-01T00:00:00Z".parse().unwrap()),
+            },
+            spec: SecretSetSpec {
+                secrets: Secrets {
+                    entries: BTreeMap::from_iter([(
+                        "tls".to_string(),
+                        Secret {
+                            value: "<cert>".into(),
+                            content_encoding: None,
+                        }
+                    )]),
+                }
+            },
+            status: Some(ResourceStatus {
+                phase: ResourcePhase::Ready,
+                observed_generation: Some(1),
+                reconciled_at: Some("2026-01-01T00:00:00Z".parse().unwrap()),
+                conditions: Some(ResourceConditions {
+                    entries: BTreeMap::from_iter([
+                        (
+                            "https://opendatafabric.org/core/v1/Str".parse().unwrap(),
+                            json!({
+                                "value": "foo",
+                                "observedGeneration": 1,
+                                "lastTransitionTime": "2026-01-01T00:00:00Z",
+                            })
+                        ),
+                        (
+                            "https://opendatafabric.org/core/v1/Bool".parse().unwrap(),
+                            json!({"value": true})
+                        ),
+                        (
+                            "https://opendatafabric.org/core/v1/Nested".parse().unwrap(),
+                            json!({"value": {"a": "x", "b": "y"}})
+                        )
+                    ])
+                }),
+            }),
+        }
+    );
+
+    pretty_assertions::assert_eq!(
+        serde_yaml::to_string(
+            &serde::resource::Resource::<serde::config::SecretSetSpec>::from(val)
+        )
+        .unwrap(),
+        data
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_serde_resource_short_forms() {
+    #[serde_with::serde_as]
+    #[derive(Debug, PartialEq, Eq, ::serde::Serialize, ::serde::Deserialize)]
+    struct MySpec {
+        #[serde_as(as = "serde::config::Secrets")]
+        secrets: Secrets,
+        #[serde_as(as = "serde::config::Variables")]
+        variables: Variables,
+    }
+
+    impl IntoDto for MySpec {
+        type Dto = Self;
+        fn into_dto(self) -> Result<Self::Dto, ValidationError> {
+            Ok(self)
+        }
+    }
+
+    let data = indoc!(
+        r#"
+        $schema: https://kamu.dev/schemas/core/v1/MyResource
+        headers:
+          name: my-thing
+          account: sergiimk
+        spec:
+          secrets:
+            tls: <cert>
+          variables:
+            poolSize: '10'
+        "#
+    );
+
+    let val = serde_yaml::from_str::<serde::resource::Resource<MySpec>>(data)
+        .unwrap()
+        .into_dto()
+        .unwrap();
+
+    pretty_assertions::assert_eq!(
+        val,
+        Resource {
+            schema: "https://kamu.dev/schemas/core/v1/MyResource"
+                .parse()
+                .unwrap(),
+            headers: ResourceHeaders {
+                id: None,
+                name: "my-thing".parse().unwrap(),
+                account: Some("sergiimk".parse().unwrap()),
+                labels: None,
+                annotations: None,
+                generation: None,
+                created_at: None,
+                updated_at: None,
+                deleted_at: None,
+            },
+            spec: MySpec {
+                secrets: Secrets {
+                    entries: BTreeMap::from_iter([(
+                        "tls".to_string(),
+                        Secret {
+                            value: "<cert>".into(),
+                            content_encoding: None,
+                        }
+                    )]),
+                },
+                variables: Variables {
+                    entries: BTreeMap::from_iter([(
+                        "poolSize".to_string(),
+                        Variable { value: "10".into() }
+                    )]),
+                }
+            },
+            status: None,
+        }
+    );
+
+    pretty_assertions::assert_eq!(
+        serde_yaml::to_string(&serde::resource::Resource::<MySpec>::from(val)).unwrap(),
+        indoc!(
+            r#"
+            $schema: https://kamu.dev/schemas/core/v1/MyResource
+            headers:
+              name: my-thing
+              account:
+                name: sergiimk
+            spec:
+              secrets:
+                tls:
+                  value: <cert>
+              variables:
+                poolSize:
+                  value: '10'
+            "#
+        )
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_serde_resource_ref() {
+    let data = indoc!(
+        r#"
+        $schema: https://opendatafabric.org/schemas/auth/v1alpha1/Relations
+        headers:
+          name: alice-bob
+        spec:
+          relations:
+            - subject:
+                type: Account
+                name: alice
+              relation: role
+              value: maintainer
+              object:
+                type: Dataset
+                account: bob
+                name: bobs-dataset
+          attributes:
+            - object: Dataset:bob/bobs-dataset # Short form of `{ type: Dataset, account: bob, name: bobs-dataset }`
+              name: allowPublicRead
+              value: true
+        "#
+    );
+
+    let val = serde_yaml::from_str::<serde::resource::Resource<serde::auth::RelationsSpec>>(data)
+        .unwrap()
+        .into_dto()
+        .unwrap();
+
+    pretty_assertions::assert_eq!(
+        val,
+        Resource {
+            schema: Relations::schema().clone(),
+            headers: ResourceHeaders {
+                id: None,
+                name: "alice-bob".parse().unwrap(),
+                account: None,
+                labels: None,
+                annotations: None,
+                generation: None,
+                created_at: None,
+                updated_at: None,
+                deleted_at: None,
+            },
+            spec: RelationsSpec {
+                relations: Some(vec![Relation {
+                    subject: ResourceRef::Name {
+                        account: None,
+                        typ: TypeRef::Name("Account".parse().unwrap()),
+                        name: "alice".parse().unwrap(),
+                    },
+                    relation: "role".to_string(),
+                    value: Some(json!("maintainer")),
+                    object: ResourceRef::Name {
+                        account: Some(AccountRef::Name("bob".parse().unwrap())),
+                        typ: TypeRef::Name("Dataset".parse().unwrap()),
+                        name: "bobs-dataset".parse().unwrap(),
+                    },
+                }]),
+                attributes: Some(vec![Attribute {
+                    object: ResourceRef::Name {
+                        account: Some(AccountRef::Name("bob".parse().unwrap())),
+                        typ: TypeRef::Name("Dataset".parse().unwrap()),
+                        name: "bobs-dataset".parse().unwrap(),
+                    },
+                    name: "allowPublicRead".to_string(),
+                    value: json!(true),
+                },],),
+            },
+            status: None,
+        }
+    );
+
+    pretty_assertions::assert_eq!(
+        serde_yaml::to_string(&serde::resource::Resource::<serde::auth::RelationsSpec>::from(val))
+            .unwrap(),
+        indoc!(
+            r#"
+            $schema: https://opendatafabric.org/schemas/auth/v1alpha1/Relations
+            headers:
+              name: alice-bob
+            spec:
+              relations:
+              - subject:
+                  type: Account
+                  name: alice
+                relation: role
+                value: maintainer
+                object:
+                  account:
+                    name: bob
+                  type: Dataset
+                  name: bobs-dataset
+              attributes:
+              - object:
+                  account:
+                    name: bob
+                  type: Dataset
+                  name: bobs-dataset
+                name: allowPublicRead
+                value: true
+            "#
+        )
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

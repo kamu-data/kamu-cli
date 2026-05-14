@@ -246,10 +246,10 @@ async fn test_dataset_metadata(
                 vocab: Some(vocab),
             }
         })
-            if vocab.offset_column == "offset"
-                && vocab.operation_type_column == "op"
-                && vocab.system_time_column == "system_time"
-                && vocab.event_time_column == "match_time"
+            if vocab.offset_column() == "offset"
+                && vocab.operation_type_column() == "op"
+                && vocab.system_time_column() == "system_time"
+                && vocab.event_time_column() == "match_time"
                 && refs == expected_refs
                 && dataset_id == expected_dataset_id
     );

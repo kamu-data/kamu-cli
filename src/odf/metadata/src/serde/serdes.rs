@@ -14,15 +14,11 @@ use chrono::{DateTime, Utc};
 use thiserror::Error;
 
 use super::Buffer;
-use crate::{
-    DatasetSnapshot,
-    MetadataBlock,
-    OperationType,
-    RawQueryRequest,
-    RawQueryResponse,
-    TransformRequest,
-    TransformResponse,
-};
+use crate::data::OperationType;
+use crate::dataset::MetadataBlock;
+use crate::engine::{RawQueryRequest, RawQueryResponse, TransformRequest, TransformResponse};
+use crate::errors::ValidationError;
+use crate::legacy::DatasetSnapshot;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // MetadataBlockVersion
@@ -138,6 +134,8 @@ pub enum Error {
     },
     #[error(transparent)]
     UnsupportedVersion(UnsupportedVersionError),
+    #[error(transparent)]
+    Validation(#[from] ValidationError),
 }
 
 impl Error {
@@ -199,33 +197,6 @@ impl Display for UnsupportedVersionError {
         }
 
         Ok(())
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// OperationType
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl serde::Serialize for OperationType {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_u8(*self as u8)
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for OperationType {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let value = u8::deserialize(deserializer)?;
-
-        OperationType::try_from(value).map_err(|e| {
-            let error_message = e.to_string();
-            serde::de::Error::custom(error_message)
-        })
     }
 }
 

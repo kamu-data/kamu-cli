@@ -20,6 +20,34 @@ simple_string_scalar!(Email, email_utils::Email, parse);
 simple_string_scalar!(AccountPassword, kamu_accounts::Password, try_new);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone)]
+pub struct AccountRef(odf::metadata::auth::AccountRef);
+
+#[Object]
+impl AccountRef {
+    pub async fn id(&self) -> Option<AccountID<'_>> {
+        self.0.id().map(Into::into)
+    }
+
+    pub async fn name(&self) -> Option<AccountName<'_>> {
+        self.0.name().map(Into::into)
+    }
+}
+
+impl From<odf::metadata::auth::AccountRef> for AccountRef {
+    fn from(value: odf::metadata::auth::AccountRef) -> Self {
+        Self(value)
+    }
+}
+
+impl From<AccountRef> for odf::metadata::auth::AccountRef {
+    fn from(value: AccountRef) -> Self {
+        value.0
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // AccountDisplayName
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

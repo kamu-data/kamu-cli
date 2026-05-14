@@ -9,7 +9,10 @@
 
 #![cfg(feature = "engine-rpc")]
 
-mod grpc_client;
-pub use grpc_client::*;
+// Combine this module's types with generated DTOs
+pub use crate::dtos::engine::*;
 
+mod grpc_client;
 pub mod grpc_generated;
+
+pub use grpc_client::*;

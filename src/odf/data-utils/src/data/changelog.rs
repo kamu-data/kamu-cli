@@ -77,7 +77,7 @@ pub fn project(
                         .collect(),
                 )
                 .order_by(vec![
-                    col(Column::from_name(&vocab.offset_column)).sort(false, false),
+                    col(Column::from_name(vocab.offset_column())).sort(false, false),
                 ])
                 .build()?
                 .alias(rank_col),
@@ -86,7 +86,7 @@ pub fn project(
             col(Column::from_name(rank_col)).eq(lit(1)).and(
                 // TODO: Cast to `u8` after Spark is updated
                 // See: https://github.com/kamu-data/kamu-cli/issues/445
-                col(Column::from_name(&vocab.operation_type_column))
+                col(Column::from_name(vocab.operation_type_column()))
                     .not_eq(lit(OperationType::Retract as i32)),
             ),
         )?
