@@ -400,6 +400,7 @@ pub async fn test_delete_all_entries(catalog: &Catalog) {
         .unwrap();
     let resource_a = make_secret_set_resource(catalog).await;
     let resource_b = make_secret_set_resource(catalog).await;
+    let resource_c = make_secret_set_resource(catalog).await;
 
     repo.replace_entries(&resource_a, 1, &[make_entry("K1", b"a-gen1")])
         .await
@@ -413,16 +414,23 @@ pub async fn test_delete_all_entries(catalog: &Catalog) {
     repo.replace_entries(&resource_b, 1, &[make_entry("K1", b"b-gen1")])
         .await
         .unwrap();
+    repo.replace_entries(&resource_c, 1, &[make_entry("K1", b"c-gen1")])
+        .await
+        .unwrap();
 
-    repo.delete_all_entries(&resource_a).await.unwrap();
+    // Delete both resource_a and resource_b in a single call
+    repo.delete_all_entries(&[resource_a, resource_b])
+        .await
+        .unwrap();
 
     assert!(repo.get_entries(&resource_a, 1).await.unwrap().is_empty());
     assert!(repo.get_entries(&resource_a, 2).await.unwrap().is_empty());
     assert!(repo.get_entries(&resource_a, 3).await.unwrap().is_empty());
+    assert!(repo.get_entries(&resource_b, 1).await.unwrap().is_empty());
 
-    let b_entries = repo.get_entries(&resource_b, 1).await.unwrap();
-    assert_eq!(1, b_entries.len());
-    assert_eq!(b_entries[0].value, b"b-gen1");
+    let c_entries = repo.get_entries(&resource_c, 1).await.unwrap();
+    assert_eq!(1, c_entries.len());
+    assert_eq!(c_entries[0].value, b"c-gen1");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

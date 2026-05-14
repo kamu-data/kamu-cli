@@ -282,18 +282,22 @@ impl SecretSetProjectionRepository for PostgresSecretSetProjectionRepository {
         Ok(())
     }
 
-    async fn delete_all_entries(&self, resource_uid: &ResourceUID) -> Result<(), InternalError> {
+    async fn delete_all_entries(&self, resource_uids: &[ResourceUID]) -> Result<(), InternalError> {
+        if resource_uids.is_empty() {
+            return Ok(());
+        }
+
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
-        let resource_uid: &uuid::Uuid = resource_uid.as_ref();
+        let uids: Vec<uuid::Uuid> = resource_uids.iter().map(|uid| *uid.as_ref()).collect();
 
         sqlx::query!(
             r#"
             DELETE FROM config_secret_set_entries
-            WHERE resource_uid = $1
+                WHERE resource_uid = ANY($1::uuid[])
             "#,
-            resource_uid,
+            &uids,
         )
         .execute(&mut *connection_mut)
         .await

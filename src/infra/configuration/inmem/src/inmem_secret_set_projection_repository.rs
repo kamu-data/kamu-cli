@@ -145,12 +145,12 @@ impl SecretSetProjectionRepository for InMemorySecretSetProjectionRepository {
 
     async fn delete_all_entries(
         &self,
-        resource_uid: &kamu_resources::ResourceUID,
+        resource_uids: &[kamu_resources::ResourceUID],
     ) -> Result<(), InternalError> {
         let mut guard = self.state.lock().unwrap();
         guard
             .entries_by_resource_uid_generation
-            .retain(|(stored_resource_uid, _), _| stored_resource_uid != resource_uid);
+            .retain(|(stored_resource_uid, _), _| !resource_uids.contains(stored_resource_uid));
         Ok(())
     }
 }

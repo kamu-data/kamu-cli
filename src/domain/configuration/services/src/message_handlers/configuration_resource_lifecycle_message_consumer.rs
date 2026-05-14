@@ -15,7 +15,11 @@ use kamu_configuration::{
     VariableSetProjectionRepository,
     VariableSetResource,
 };
-use kamu_resources::{MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE, ResourceLifecycleMessage};
+use kamu_resources::{
+    MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
+    ResourceLifecycleMessage,
+    ResourceUID,
+};
 use messaging_outbox::{
     InitialConsumerBoundary,
     MessageConsumer,
@@ -93,20 +97,29 @@ impl MessageConsumerT<ResourceLifecycleMessage> for ConfigurationResourceLifecyc
                 }
             }
             ResourceLifecycleMessage::Deleted(deleted_message) => {
-                match deleted_message.resource.kind.as_str() {
+                debug_assert!(
+                    !deleted_message.resources.is_empty(),
+                    "deleted message must contain at least one resource"
+                );
+
+                match deleted_message.resources[0].kind.as_str() {
                     VariableSetResource::RESOURCE_TYPE => {
                         let repo = target_catalog
                             .get_one::<dyn VariableSetProjectionRepository>()
                             .map_err(ErrorIntoInternal::int_err)?;
 
-                        repo.delete_all_entries(&deleted_message.resource.uid).await
+                        let uids: Vec<ResourceUID> =
+                            deleted_message.resources.iter().map(|r| r.uid).collect();
+                        repo.delete_all_entries(&uids).await
                     }
                     SecretSetResource::RESOURCE_TYPE => {
                         let repo = target_catalog
                             .get_one::<dyn SecretSetProjectionRepository>()
                             .map_err(ErrorIntoInternal::int_err)?;
 
-                        repo.delete_all_entries(&deleted_message.resource.uid).await
+                        let uids: Vec<ResourceUID> =
+                            deleted_message.resources.iter().map(|r| r.uid).collect();
+                        repo.delete_all_entries(&uids).await
                     }
                     _ => Ok(()),
                 }

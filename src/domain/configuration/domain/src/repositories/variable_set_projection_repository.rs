@@ -53,7 +53,7 @@ pub trait VariableSetProjectionRepository: Send + Sync {
         resource_generation: u64,
     ) -> Result<(), InternalError>;
 
-    async fn delete_all_entries(&self, resource_uid: &ResourceUID) -> Result<(), InternalError>;
+    async fn delete_all_entries(&self, resource_uids: &[ResourceUID]) -> Result<(), InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

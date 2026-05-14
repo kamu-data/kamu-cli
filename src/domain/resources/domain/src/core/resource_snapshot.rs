@@ -43,6 +43,19 @@ impl ResourceSnapshot {
     pub fn basic_status(&self) -> Option<ResourceStatus> {
         self.status.as_ref().and_then(ResourceStatus::from_json)
     }
+
+    pub fn check_homogeneous(snapshots: &[ResourceSnapshot]) -> bool {
+        if snapshots.is_empty() {
+            return true;
+        }
+
+        let first_kind = &snapshots[0].kind;
+        let first_api_version = &snapshots[0].api_version;
+
+        snapshots.iter().all(|snapshot| {
+            snapshot.kind == *first_kind && snapshot.api_version == *first_api_version
+        })
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

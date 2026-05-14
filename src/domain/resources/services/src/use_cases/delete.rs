@@ -9,6 +9,7 @@
 
 use std::collections::HashSet;
 
+use chrono::{DateTime, Utc};
 use internal_error::ErrorIntoInternal;
 use kamu_resources::{MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE, ResourceLifecycleMessage};
 use messaging_outbox::{Outbox, OutboxExt};
@@ -113,21 +114,7 @@ where
             )),
         }?;
 
-        // TODO: batch?
-        for resource in resources {
-            self.outbox
-                .post_message(
-                    MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
-                    ResourceLifecycleMessage::deleted(
-                        now,
-                        resource
-                            .make_resource_snapshot()
-                            .map_err(DeleteResourcesError::Internal)?,
-                    ),
-                )
-                .await
-                .map_err(DeleteResourcesError::Internal)?;
-        }
+        self.notify_resources_deleted(now, resources).await?;
 
         Ok(())
     }
@@ -155,6 +142,31 @@ where
                 })
             })
             .collect()
+    }
+
+    async fn notify_resources_deleted(
+        &self,
+        now: DateTime<Utc>,
+        resources: Vec<R>,
+    ) -> Result<(), DeleteResourcesError> {
+        let resource_snashots = resources
+            .into_iter()
+            .map(|resource| {
+                resource
+                    .make_resource_snapshot()
+                    .map_err(DeleteResourcesError::Internal)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        self.outbox
+            .post_message(
+                MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
+                ResourceLifecycleMessage::deleted(now, resource_snashots),
+            )
+            .await
+            .map_err(DeleteResourcesError::Internal)?;
+
+        Ok(())
     }
 }
 

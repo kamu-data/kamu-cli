@@ -261,22 +261,30 @@ impl VariableSetProjectionRepository for SqliteVariableSetProjectionRepository {
         Ok(())
     }
 
-    async fn delete_all_entries(&self, resource_uid: &ResourceUID) -> Result<(), InternalError> {
+    async fn delete_all_entries(&self, resource_uids: &[ResourceUID]) -> Result<(), InternalError> {
+        if resource_uids.is_empty() {
+            return Ok(());
+        }
+
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
-        let resource_uid: &uuid::Uuid = resource_uid.as_ref();
+        let uids: Vec<uuid::Uuid> = resource_uids.iter().map(|uid| *uid.as_ref()).collect();
 
-        sqlx::query!(
-            r#"
-            DELETE FROM config_variable_set_entries
-            WHERE resource_uid = $1
-            "#,
-            resource_uid,
-        )
-        .execute(&mut *connection_mut)
-        .await
-        .int_err()?;
+        let mut query_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
+            "DELETE FROM config_variable_set_entries WHERE resource_uid IN (",
+        );
+        let mut separated = query_builder.separated(", ");
+        for uid in &uids {
+            separated.push_bind(*uid);
+        }
+        query_builder.push(")");
+
+        query_builder
+            .build()
+            .execute(&mut *connection_mut)
+            .await
+            .int_err()?;
 
         Ok(())
     }
