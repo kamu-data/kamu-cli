@@ -144,11 +144,11 @@ impl DatasetEnvVarMutationAdapter for DatasetEnvVarMutationAdapterImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl DatasetEnvVarMutationAdapterImpl {
-    fn legacy_variable_set_resource_name(dataset_id: &odf::DatasetID) -> String {
+    pub fn legacy_variable_set_resource_name(dataset_id: &odf::DatasetID) -> String {
         format!("legacy-vars-{}", dataset_id.as_multibase())
     }
 
-    fn legacy_secret_set_resource_name(dataset_id: &odf::DatasetID) -> String {
+    pub fn legacy_secret_set_resource_name(dataset_id: &odf::DatasetID) -> String {
         format!("legacy-secrets-{}", dataset_id.as_multibase())
     }
 
@@ -328,6 +328,7 @@ impl DatasetEnvVarMutationAdapterImpl {
 
     async fn delete_variable(
         &self,
+        dataset_id: &odf::DatasetID,
         resource_uid: kamu_resources::ResourceUID,
         key: &str,
     ) -> Result<(), DeleteDatasetEnvVarError> {
@@ -358,6 +359,11 @@ impl DatasetEnvVarMutationAdapterImpl {
                 })
                 .await
                 .int_err()?;
+            // Remove the binding now that the managed resource is gone
+            self.variable_set_binding_repo
+                .replace_bindings(dataset_id, &[])
+                .await
+                .int_err()?;
         } else {
             let metadata = ResourceMetadataInput {
                 account: snapshot.metadata.account,
@@ -384,6 +390,7 @@ impl DatasetEnvVarMutationAdapterImpl {
 
     async fn delete_secret(
         &self,
+        dataset_id: &odf::DatasetID,
         resource_uid: kamu_resources::ResourceUID,
         key: &str,
     ) -> Result<(), DeleteDatasetEnvVarError> {
@@ -412,6 +419,11 @@ impl DatasetEnvVarMutationAdapterImpl {
                     account_id: snapshot.metadata.account.clone(),
                     uids: vec![resource_uid],
                 })
+                .await
+                .int_err()?;
+            // Remove the binding now that the managed resource is gone
+            self.secret_set_binding_repo
+                .replace_bindings(dataset_id, &[])
                 .await
                 .int_err()?;
         } else {
@@ -453,7 +465,7 @@ impl DatasetEnvVarMutationAdapterImpl {
     ) -> Result<bool, InternalError> {
         match self.find_secret(dataset_id, key).await? {
             Some((resource_uid, key)) => self
-                .delete_secret(resource_uid, &key)
+                .delete_secret(dataset_id, resource_uid, &key)
                 .await
                 .map_err(|e| match e {
                     DeleteDatasetEnvVarError::NotFound(e) => e.int_err(),
@@ -473,7 +485,7 @@ impl DatasetEnvVarMutationAdapterImpl {
     ) -> Result<bool, InternalError> {
         match self.find_variable(dataset_id, key).await? {
             Some((resource_uid, key)) => self
-                .delete_variable(resource_uid, &key)
+                .delete_variable(dataset_id, resource_uid, &key)
                 .await
                 .map_err(|e| match e {
                     DeleteDatasetEnvVarError::NotFound(e) => e.int_err(),

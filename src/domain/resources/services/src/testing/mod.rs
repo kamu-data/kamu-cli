@@ -7,22 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources as domain;
-pub use messaging_outbox;
+mod base_resource_service_harness;
 
-#[cfg(feature = "testing")]
-pub mod testing;
-
-mod crud_dispatchers;
-mod dependencies;
-mod event_stores;
-mod message_handlers;
-mod resources;
-mod services;
-mod use_cases;
-
-pub use crud_dispatchers::*;
-pub use dependencies::*;
-pub use event_stores::*;
-pub use services::*;
-pub use use_cases::*;
+pub use base_resource_service_harness::*;
