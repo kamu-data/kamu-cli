@@ -1,5 +1,16 @@
 # GitHub Copilot Instructions for Kamu CLI Project
 
+## Overview
+
+This file provides guidance for working with the Kamu CLI codebase. It covers:
+
+1. **Code Quality and Linting**: Formatting and Clippy validation requirements
+2. **Code Style**: Rust formatting conventions and project-specific patterns
+3. **Testing**: Test execution and interface design principles
+4. **Specialized Guidance**: Links to focused skill files for complex workflows
+5. **Event Modeling Style**: Patterns for domain event design
+6. **Changelog**: When and how to update the changelog
+
 ## Code Quality and Linting
 
 This project uses Rust with Clippy for linting and code quality checks. When performing any code analysis, validation, or after making code changes, you should:
@@ -23,13 +34,14 @@ This project uses Rust with Clippy for linting and code quality checks. When per
 - This project uses `cargo nextest` for running tests
 - Run tests with `cargo nextest run` when making changes that could affect functionality
 - Ensure all tests pass before considering changes complete
-- Tests should never refer internal methods or fields directly; use public interfaces for testing
+- Tests should never refer to private methods or fields directly; use public interfaces for testing
 
 ## Specialized Guidance
 
 Codex agents should start with `AGENTS.md` and load repo-local skills from `.agents/skills/` only when the task needs them. Copilot users can continue using this file directly; the skills are optional focused references, not required for basic editing.
 
 Specialized skill topics:
+
 - Repository test-suite wiring: `.agents/skills/kamu-repository-tests`
 - SQLx, migrations, and database validation: `.agents/skills/kamu-sqlx-database-work`
 - GraphQL API and schema work: `.agents/skills/kamu-graphql-api`

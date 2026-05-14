@@ -16,7 +16,7 @@ For a full PR, update `CHANGELOG.md` under `[Unreleased]`:
 - `### Fixed` for bug fixes.
 - Write an end-user-facing summary.
 
-Do not require changelog updates for incremental IDE/local work.
+Do not require changelog updates for incremental IDE/local work (small exploratory edits, refactoring in progress, or work-in-progress changes not yet ready for PR submission).
 
 ## Branches
 
@@ -26,15 +26,27 @@ Do not require changelog updates for incremental IDE/local work.
 
 ## Release Procedure
 
+### Preparation Phase
+
 1. Start from a release branch or existing feature branch.
-2. Run `cargo update` for minor releases.
-3. Run `cargo upgrade --dry-run --incompatible` and decide whether to perform or ticket major upgrades.
-4. Run `cargo deny check`.
-5. Bump with `make release-patch`, `make release-minor`, or `make release-major`.
-6. Create a dated changelog entry.
-7. Create PR, wait for checks, merge normally.
-8. Tag `master` with `git tag vX.Y.Z`.
-9. Push with `git push origin tag vX.Y.Z`.
+2. Update dependencies:
+    - For **minor/patch releases**: Run `cargo update` to update within compatible version ranges.
+    - For **major releases**: Run `cargo upgrade --dry-run --incompatible` and decide whether to perform or ticket major upgrades.
+3. Run `cargo deny check` to verify license and security compliance.
+
+### Version Bump Phase
+
+4. Bump version using the appropriate command:
+    - `make release-patch` for bug fixes (0.0.X)
+    - `make release-minor` for new features (0.X.0)
+    - `make release-major` for breaking changes (X.0.0)
+5. Create a dated changelog entry documenting all changes.
+
+### Publication Phase
+
+6. Create PR, wait for checks, merge normally.
+7. After merge, tag `master` with `git tag vX.Y.Z`.
+8. Push the tag with `git push origin tag vX.Y.Z`.
 
 GitHub Actions creates the GitHub release from the tag.
 

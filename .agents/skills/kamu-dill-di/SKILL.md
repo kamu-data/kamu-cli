@@ -7,6 +7,16 @@ description: Dill dependency-injection patterns for Kamu CLI. Use when defining 
 
 `dill` is the lightweight Rust DI container used throughout this repo. Components are registered in a `Catalog` and resolved on demand.
 
+## Overview
+
+This skill covers five key aspects of dill usage:
+
+1. **Defining Components**: How to mark structs or impl blocks for DI injection
+2. **Scopes**: Controlling whether components are transient (new per request) or singletons (shared)
+3. **Registration**: Adding components, values, and builders to a catalog
+4. **Chaining Catalogs**: Creating child catalogs that inherit and override parent registrations
+5. **Resolving Components**: Looking up components from the catalog at runtime
+
 ## Defining a Component
 
 When putting `#[dill::component]` on the struct, Dill generates a constructor that injects declared parameters from the catalog.
@@ -87,7 +97,7 @@ let child = CatalogBuilder::new_chained(&base_catalog)
     .build();
 ```
 
-The parent catalog's singletons remain alive as long as the parent `Catalog` object is kept alive. Dropping the parent while child catalogs are still in use will invalidate their inherited singletons.
+The parent catalog's singletons remain alive as long as the parent `Catalog` object is kept alive. Dropping the parent while child catalogs are still in use will cause the child catalogs to panic when attempting to access inherited singletons.
 
 ## Resolving Components
 
@@ -99,4 +109,4 @@ let svc = catalog.get_one::<MyService>().unwrap();
 let store = catalog.get_one::<dyn MyStore>().unwrap();
 ```
 
-`get_one` returns an `Arc<T>`. The resolved `Arc` keeps the component alive independently of the catalog that produced it.
+`get_one` returns `Result<Arc<T>, CatalogError>`. If the component is not registered in the catalog (or any parent catalog in the chain), it returns an error. The resolved `Arc` keeps the component alive independently of the catalog that produced it.
