@@ -9,8 +9,6 @@
 
 use std::collections::HashMap;
 
-use crate::data::query_types::ProofType;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Request
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -19,9 +17,8 @@ use crate::data::query_types::ProofType;
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 #[into_params(parameter_in = Query)]
 pub struct SignEip712QueryParams {
-    // TODO: Molecule: Phase 3: stricter type?
     /// DID of the managed key to sign with
-    pub key: String,
+    pub key: odf::metadata::DidOdf,
 
     /// Include a node proof over the resulting signature
     #[serde(default)]
@@ -29,22 +26,25 @@ pub struct SignEip712QueryParams {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Request (schema)
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, serde::Deserialize, serde::Serialize, utoipa::ToSchema)]
+#[derive(Debug, serde::Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct Eip712TypedDataRequestBody {
-    pub domain: Eip712Domain,
+#[schema(as = Eip712TypedData)]
+pub struct Eip712TypedDataSchema {
+    pub domain: Eip712DomainSchema,
     pub primary_type: String,
-    pub types: HashMap<String, Vec<Eip712TypeDetails>>,
+    pub types: HashMap<String, Vec<Eip712TypeDetailsSchema>>,
     #[schema(value_type = Object)]
     pub message: serde_json::Map<String, serde_json::Value>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, serde::Deserialize, serde::Serialize, utoipa::ToSchema)]
+#[derive(Debug, serde::Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct Eip712Domain {
+pub struct Eip712DomainSchema {
     pub name: String,
     pub version: String,
     pub chain_id: u64,
@@ -53,34 +53,11 @@ pub struct Eip712Domain {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, serde::Deserialize, serde::Serialize, utoipa::ToSchema)]
+#[derive(Debug, serde::Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct Eip712TypeDetails {
+pub struct Eip712TypeDetailsSchema {
     pub name: String,
     pub r#type: String,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Response
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct SignEip712Response {
-    pub r#type: ProofType,
-    pub signature: odf::metadata::Signature,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub proof: Option<SignEip712Proof>,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct SignEip712Proof {
-    pub r#type: ProofType,
-    pub verification_method: String,
-    pub signature: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

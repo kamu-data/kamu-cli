@@ -26,7 +26,7 @@ pub const DEFAULT_DID_MULTIBASE_ENCODING: Multibase = Multibase::Base58Btc;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Decentralized identifier that follows W3C [`did:key` method](https://w3c-ccg.github.io/did-method-key/)
-#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct DidKey {
     public_key: [u8; MAX_DID_KEY_LEN],
 }
@@ -165,7 +165,7 @@ impl serde::de::Visitor<'_> for DidKeyVisitor {
     type Value = DidKey;
 
     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-        formatter.write_str("a canonical DID")
+        formatter.write_str("a canonical DID key")
     }
 
     fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Self::Value, E> {

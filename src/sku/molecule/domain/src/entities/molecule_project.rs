@@ -39,8 +39,6 @@ pub struct OclId(String);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: Molecule: Phase 3: is this TODO still needed?
-// TODO: revisit after IPNFT-less projects changes.
 #[derive(Debug, Clone)]
 pub struct MoleculeProject {
     /// System time when this project was created/updated

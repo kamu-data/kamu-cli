@@ -13,7 +13,7 @@ pub const SAMPLE_DID_SECRET_KEY_ENCRYPTION_KEY: &str = "QfnEDcnUtGSW2pwVXaFPvZOw
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(setty::Config, setty::Default)]
+#[derive(setty::Config, setty::Default, zeroize::ZeroizeOnDrop)]
 pub struct DidSecretEncryptionConfig {
     #[config(default = false)]
     pub enabled: bool,
@@ -22,7 +22,7 @@ pub struct DidSecretEncryptionConfig {
     /// includes both uppercase and lowercase Latin letters (A-Z, a-z) and
     /// digits (0-9).
     ///
-    /// To generate use:
+    /// To generate, use:
     /// ```sh
     /// tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 32; echo
     /// ```
