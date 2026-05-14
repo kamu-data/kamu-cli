@@ -52,6 +52,4 @@ paste = { version = "1", default-features = false }
 
 [dev-dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
-oop = "0.0.2"
-test-log = { version = "0.2", features = ["trace"] }
 tokio = { version = "1", default-features = false }
