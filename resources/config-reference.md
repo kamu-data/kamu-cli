@@ -716,7 +716,7 @@ The encryption key must be a 32-character alphanumeric string, which
 includes both uppercase and lowercase Latin letters (A-Z, a-z) and
 digits (0-9).
 
-To generate use:
+To generate, use:
 ```sh
 tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 32; echo
 ```
@@ -1309,19 +1309,10 @@ the resources (for authenticated clients)
 
 ## `IdentityConfig`
 
-<table>
-<thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
-<tbody>
-<tr>
-<td><code>privateKey</code></td>
-<td><a href="#privatekey"><code>PrivateKey</code></a></td>
-<td><code class="language-json">null</code></td>
-<td>
+Private keys used to sign API responses.
+Supported algorithms: `ed25519`, `secp256k1`.
 
-Private key used to sign API responses.
-Currently only `ed25519` keys are supported.
-
-To generate use:
+To generate, use:
 
     dd if=/dev/urandom bs=1 count=32 status=none |
         base64 -w0 |
@@ -1335,7 +1326,20 @@ The command above:
 - converts default base64 encoding to base64url and removes padding
 - prepends a multibase prefix
 
-</td>
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+<tbody>
+<tr>
+<td><code>privateKey</code></td>
+<td><a href="#privatekey"><code>PrivateKey</code></a></td>
+<td><code class="language-json">null</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>secp256k1PrivateKey</code></td>
+<td><a href="#secp256k1signer"><code>Secp256k1Signer</code></a></td>
+<td><code class="language-json">null</code></td>
+<td></td>
 </tr>
 </tbody>
 </table>
@@ -1738,6 +1742,10 @@ Base type: `string`
 </tr>
 </tbody>
 </table>
+
+## `Secp256k1Signer`
+
+Base type: `string`
 
 ## `SourceConfig`
 
