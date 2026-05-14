@@ -7,6 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+// Re-exports
+pub mod utils {
+    pub use crypto_eip712_utils::*;
+}
+
 pub mod common;
 pub mod entities;
 pub mod use_cases;

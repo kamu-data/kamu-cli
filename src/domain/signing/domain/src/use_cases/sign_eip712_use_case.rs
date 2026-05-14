@@ -32,8 +32,9 @@ pub struct SignEip712UseCaseOptions {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
 pub struct SignEip712Response {
     pub r#type: ProofType,
     pub verification_method: odf::metadata::DidKey,
@@ -42,7 +43,7 @@ pub struct SignEip712Response {
     pub proof: Option<SignEip712Proof>,
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct SignEip712Proof {

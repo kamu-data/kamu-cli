@@ -23,7 +23,7 @@ use kamu_accounts::{
 };
 use kamu_auth_rebac::RebacService;
 use kamu_datasets::DatasetActionAuthorizer;
-use kamu_molecule_domain::MOLECULE_ORG_ACCOUNTS;
+use kamu_molecule_domain::{MOLECULE_DEV_ORG_ACCOUNT_NAME, MOLECULE_ORG_ACCOUNT_NAME};
 use kamu_signing::common::ProofType;
 use kamu_signing::entities::IdentityConfig;
 use kamu_signing::use_cases::{
@@ -49,6 +49,54 @@ pub struct SignEip712UseCaseImpl {
 }
 
 impl SignEip712UseCaseImpl {
+    // Public only for tests
+    pub fn has_access_by_account_name(
+        subject_account_name: &str,
+        target_account_name: &str,
+    ) -> bool {
+        // 1. We always have access only for our own account
+        if subject_account_name == target_account_name {
+            return true;
+        }
+        // TODO: HACK: SEC: subject account has permissions to target account
+        //                  Currently only allowing cross-account access
+        //                  for and `molecule` / `molecule.dev`.
+        //
+        //                  See: https://github.com/kamu-data/kamu-node/issues/233
+
+        // 2. Molecule account can access to any own project accounts
+
+        // NOTE: Dragons here... You'd better take a look at the tests.
+        match subject_account_name {
+            MOLECULE_ORG_ACCOUNT_NAME => {
+                let Some(s) = target_account_name.strip_prefix(subject_account_name) else {
+                    return false;
+                };
+
+                let Some(s) = s.strip_prefix(".dev") else {
+                    return true;
+                };
+
+                if s.is_empty() {
+                    // Edge-case: molecule.dev is not a project account
+                    return false;
+                }
+
+                s.strip_prefix(".").is_none()
+            }
+
+            MOLECULE_DEV_ORG_ACCOUNT_NAME => {
+                let Some(s) = target_account_name.strip_prefix(subject_account_name) else {
+                    return false;
+                };
+
+                s.strip_prefix(".").is_some()
+            }
+
+            _ => false,
+        }
+    }
+
     async fn get_secret_key_for_dataset(
         &self,
         dataset_id: odf::DatasetID,
@@ -126,23 +174,10 @@ impl SignEip712UseCaseImpl {
             return Ok(true);
         }
 
-        // TODO: HACK: SEC: subject account has permissions to target account
-        //                  Currently only allowing cross-account access
-        //                  for and `molecule` / `molecule.dev`.
-        //
-        //                  See: https://github.com/kamu-data/kamu-node/issues/233
-
-        // 2. Molecule account can access to any own project accounts
-        let subject_name = &logged_account.account_name;
-
-        if MOLECULE_ORG_ACCOUNTS.contains(&subject_name.as_str())
-            && account.account_name.starts_with(subject_name.as_str())
-        {
-            return Ok(true);
-        }
-
-        // 3. Overwise, access only for an own account
-        Ok(account.id == logged_account.account_id)
+        Ok(Self::has_access_by_account_name(
+            &logged_account.account_name,
+            &account.account_name,
+        ))
     }
 
     async fn get_secret_key(

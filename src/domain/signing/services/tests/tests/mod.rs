@@ -7,11 +7,4 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-// Re-exports
-pub use alloy::primitives::b256;
-
-mod eip712_typed_data;
-mod secp256k1;
-
-pub use eip712_typed_data::*;
-pub use secp256k1::*;
+mod test_sign_eip712_use_case_impl;

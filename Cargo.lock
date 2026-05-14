@@ -9113,15 +9113,29 @@ name = "kamu-signing-services"
 version = "0.260.2"
 dependencies = [
  "async-trait",
+ "bon",
  "crypto-eip712-utils",
+ "database-common",
  "dill",
+ "init-on-startup",
  "internal-error",
  "kamu-accounts",
+ "kamu-accounts-inmem",
+ "kamu-accounts-services",
  "kamu-auth-rebac",
+ "kamu-auth-rebac-inmem",
+ "kamu-auth-rebac-services",
  "kamu-datasets",
+ "kamu-datasets-services",
  "kamu-molecule-domain",
  "kamu-signing",
+ "messaging-outbox",
  "opendatafabric",
+ "pretty_assertions",
+ "serde_json",
+ "test-log",
+ "time-source",
+ "tokio",
 ]
 
 [[package]]

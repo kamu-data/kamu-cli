@@ -144,6 +144,27 @@ impl serde::Serialize for Secp256k1Signature {
     }
 }
 
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for Secp256k1Signature {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct Visitor;
+
+        impl serde::de::Visitor<'_> for Visitor {
+            type Value = Secp256k1Signature;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a secp256k1 signature")
+            }
+
+            fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Self::Value, E> {
+                v.parse().map_err(serde::de::Error::custom)
+            }
+        }
+
+        deserializer.deserialize_string(Visitor)
+    }
+}
+
 #[cfg(feature = "utoipa")]
 impl utoipa::ToSchema for Secp256k1Signature {}
 
@@ -229,6 +250,27 @@ impl std::fmt::Display for Secp256k1VerifyingKey {
 impl serde::Serialize for Secp256k1VerifyingKey {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.collect_str(self.as_encoded_stack_buf().as_str())
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for Secp256k1VerifyingKey {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct Visitor;
+
+        impl serde::de::Visitor<'_> for Visitor {
+            type Value = Secp256k1VerifyingKey;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a secp256k1 verifying key")
+            }
+
+            fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Self::Value, E> {
+                Self::Value::from_sec1_bytes_str(v).map_err(serde::de::Error::custom)
+            }
+        }
+
+        deserializer.deserialize_string(Visitor)
     }
 }
 
