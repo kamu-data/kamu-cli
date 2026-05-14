@@ -8,8 +8,7 @@
 // by the Apache License, Version 2.0.
 
 // Re-exports
-pub use alloy::primitives::{B256, b256, keccak256};
-pub use k256::ecdsa::SigningKey;
+pub use alloy::primitives::b256;
 
 mod eip712_typed_data;
 mod secp256k1;

@@ -11,18 +11,10 @@ use axum::extract::{Extension, Query};
 use axum::response::Json;
 use database_common_macros::transactional_handler;
 use http_common::{ApiError, ApiErrorResponse};
-use internal_error::ResultIntoInternal;
-use kamu_accounts::{DidEntity, DidSecretKeyRepository, GetDidSecretKeyError};
-use odf::metadata::ed25519::Signer;
+use kamu_signing::use_cases::SignEip712Response;
 
-use super::sign_eip712_types::{
-    Eip712TypedDataRequestBody,
-    SignEip712QueryParams,
-    SignEip712Response,
-};
+use super::sign_eip712_types::{Eip712TypedDataSchema, SignEip712QueryParams};
 use crate::data::query_handler::ResponseSigningNotConfigured;
-use crate::data::query_types::{IdentityConfig, ProofType};
-use crate::data::sign::SignEip712Proof;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -38,12 +30,10 @@ use crate::data::sign::SignEip712Proof;
     post,
     path = "/sign/eip712",
     params(SignEip712QueryParams),
-    request_body = Eip712TypedDataRequestBody,
+    request_body = Eip712TypedDataSchema,
     responses(
         (status = OK, body = SignEip712Response),
-        (status = BAD_REQUEST, body = ApiErrorResponse),
-        (status = UNAUTHORIZED, body = ApiErrorResponse),
-        (status = FORBIDDEN, body = ApiErrorResponse),
+        (status = NOT_FOUND, body = ApiErrorResponse),
     ),
     tag = "odf-sign",
     security(
@@ -55,104 +45,33 @@ use crate::data::sign::SignEip712Proof;
 pub async fn sign_eip712_handler(
     Extension(catalog): Extension<dill::Catalog>,
     Query(params): Query<SignEip712QueryParams>,
-    Json(request): Json<Eip712TypedDataRequestBody>,
+    Json(request): Json<crypto_eip712_utils::Eip712TypedData>,
 ) -> Result<Json<SignEip712Response>, ApiError> {
-    use kamu_accounts::*;
+    use kamu_signing::use_cases::*;
 
     tracing::debug!(params = ?params, request = ?request, "EIP-712 sign request");
 
-    let identity = catalog.get_one::<IdentityConfig>().ok();
-    let did_secret_key_repo = catalog.get_one::<dyn DidSecretKeyRepository>().unwrap();
-    let did_secret_encryption_config = catalog.get_one::<DidSecretEncryptionConfig>().unwrap();
+    let use_case = catalog.get_one::<dyn SignEip712UseCase>().unwrap();
 
-    let Some(identity) = identity else {
-        Err(ApiError::not_implemented(ResponseSigningNotConfigured))?
-    };
-
-    let Some(encryption_key) = did_secret_encryption_config.get_encryption_key() else {
-        return Err(ApiError::not_implemented(ResponseSigningNotConfigured));
-    };
-
-    let Some(secret_key) = get_secret_key(&params.key, did_secret_key_repo.as_ref())
+    use_case
+        .execute(
+            params.key,
+            request,
+            SignEip712UseCaseOptions::builder()
+                .include_node_proof(params.include_node_proof)
+                .build(),
+        )
         .await
-        .int_err()?
-    else {
-        return Err(ApiError::not_found_without_reason());
-    };
-
-    // TODO: Molecule: Phase 3: remove back to json conversion
-    let request_as_json = serde_json::to_value(request).int_err()?;
-    let typed_data = crypto_eip712_utils::Eip712TypedData::from_json(request_as_json)?;
-    let signature = {
-        // TODO: SEC: Molecule: Phase 3: auth checks:
-        // - molecule account can only access its own keys and projects
-        // - while others can only access their own account and their own datasets
-        let ed25519_private_key = secret_key
-            .get_decrypted_private_key(encryption_key)
-            .int_err()?;
-        // TODO: SEC: Molecule: Phase 3: PK zeroing after usage
-
-        let request_hash = typed_data.signing_hash_with_eip191_prefix()?;
-
-        // TODO: Molecule: Phase 3: add verification key to response?
-        // let _verification_key =
-        // odf::metadata::DidKey::new_ed25519(&private_key.verifying_key());
-
-        ed25519_private_key.sign(request_hash.as_slice())
-    };
-
-    let proof_response_node = if params.include_node_proof {
-        let proof = signature.to_bytes();
-        let proof_hash = crypto_eip712_utils::keccak256(proof.as_slice());
-
-        let signature = crypto_eip712_utils::sign_prefixed(
-            &identity.secp256k1_private_key,
-            proof_hash.as_slice(),
-        )?;
-
-        Some(SignEip712Proof {
-            r#type: ProofType::EcdsaSecp256k1Signature2019,
-            verification_method: crypto_eip712_utils::verification_key_prefixed(
-                &identity.secp256k1_private_key,
-            ),
-            signature,
+        .map(Json)
+        .map_err(|e| match e {
+            SignEip712UseCaseError::NotConfigured => {
+                ApiError::not_implemented(ResponseSigningNotConfigured)
+            }
+            SignEip712UseCaseError::SecretKeyNotFound { .. } => {
+                ApiError::not_found_without_reason()
+            }
+            SignEip712UseCaseError::Internal(e) => e.into(),
         })
-    } else {
-        None
-    };
-
-    Ok(Json(SignEip712Response {
-        r#type: ProofType::Ed25519Signature2020,
-        signature: signature.into(),
-        proof: proof_response_node,
-    }))
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Helpers
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-async fn get_secret_key(
-    key: &str,
-    repo: &dyn DidSecretKeyRepository,
-) -> Result<Option<kamu_accounts::DidSecretKey>, GetDidSecretKeyError> {
-    // 1. Try for an account
-    let account = DidEntity::new_account(key);
-
-    match repo.get_did_secret_key(&account).await {
-        Ok(key) => return Ok(Some(key)),
-        Err(GetDidSecretKeyError::NotFound(_)) => { /* continue */ }
-        Err(e) => return Err(e),
-    }
-
-    // 2. Try for a dataset
-    let dataset = DidEntity::new_dataset(key);
-
-    match repo.get_did_secret_key(&dataset).await {
-        Ok(key) => Ok(Some(key)),
-        Err(GetDidSecretKeyError::NotFound(_)) => Ok(None),
-        Err(e) => Err(e),
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

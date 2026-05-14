@@ -24,6 +24,9 @@ doctest = false
 [features]
 default = []
 
+schemars = ["dep:schemars"]
+serde = ["dep:serde", "nutype/serde"]
+utoipa = ["dep:utoipa"]
 
 [dependencies]
 internal-error = { workspace = true }
@@ -33,17 +36,25 @@ internal-error = { workspace = true }
 alloy = { version = "1", default-features = false, features = [
     "dyn-abi",
     "eip712",
+    "signer-local",
+    "signers",
 ] }
-k256 = { version = "0.13", default-features = true, features = ["ecdsa-core", "ecdsa"] }
-nutype = { version = "0.6", default-features = false, features = [
-    "serde"
-] }
-serde = { version = "1", features = ["derive"], default-features = false }
+const-hex = { version = "1", default-features = true, features = [] }
+nutype = { version = "0.7", default-features = false, features = [] }
 serde_json = { version = "1", default-features = false }
+zeroize = { version = "1", default-features = false, features = [] }
 
+# Optional
+schemars = { optional = true, version = "1", default-features = false, features = [] }
+serde = { optional = true, version = "1", features = ["derive"], default-features = false }
+utoipa = { optional = true, version = "5", default-features = false, features = [] }
 
 [dev-dependencies]
-eyre = { version = "0", default-features = false }
+eyre = { version = "0", default-features = false, features = [
+    "auto-install",
+    "track-caller",
+] }
+indoc = { version = "2", default-features = false }
 pretty_assertions = { version = "1", default-features = false, features = [
     "std",
     "unstable",

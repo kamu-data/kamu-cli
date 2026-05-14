@@ -135,12 +135,14 @@ pub async fn verify_handler(
 }
 
 async fn verify(catalog: Catalog, request: VerifyRequest) -> Result<VerifyResponse, ApiError> {
+    use kamu_signing::common::ProofType;
+
     // 1. Validate request
     match request.proof.r#type {
-        query::ProofType::Ed25519Signature2020 => {}
-        query::ProofType::EcdsaSecp256k1Signature2019 => {
+        ProofType::Ed25519Signature2020 => {}
+        ProofType::EcdsaSecp256k1Signature2019 => {
             // TODO: Molecule: Phase 3: implement
-            unimplemented!()
+            return Err(ApiError::not_implemented_without_reason());
         }
     }
 

@@ -189,7 +189,9 @@ pub async fn query_handler_impl(
         body.include.insert(Include::Schema);
     }
 
-    let identity = catalog.get_one::<IdentityConfig>().ok();
+    let identity = catalog
+        .get_one::<kamu_signing::entities::IdentityConfig>()
+        .ok();
     let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
 
     let res = query_svc
@@ -281,8 +283,8 @@ pub async fn query_handler_impl(
             sub_queries: Some(sub_queries),
             commitment: Some(commitment),
             proof: Some(Proof {
-                r#type: ProofType::Ed25519Signature2020,
-                verification_method: identity.did(),
+                r#type: kamu_signing::common::ProofType::Ed25519Signature2020,
+                verification_method: identity.ed25519_private_key.verifying_key(),
                 proof_value: signature.into(),
             }),
         }
