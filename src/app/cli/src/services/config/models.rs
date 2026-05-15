@@ -565,7 +565,7 @@ pub struct AwsIamTokenPasswordPolicyConfig {
 // Identity
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Private keys used to sign API responses.
+/// Private keys are used to sign API responses.
 /// Supported algorithms: `ed25519`, `secp256k1`.
 #[derive(setty::Config, setty::Default)]
 pub struct IdentityConfig {

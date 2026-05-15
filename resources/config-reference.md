@@ -1309,22 +1309,8 @@ the resources (for authenticated clients)
 
 ## `IdentityConfig`
 
-Private keys used to sign API responses.
+Private keys are used to sign API responses.
 Supported algorithms: `ed25519`, `secp256k1`.
-
-To generate, use:
-
-    dd if=/dev/urandom bs=1 count=32 status=none |
-        base64 -w0 |
-        tr '+/' '-_' |
-        tr -d '=' |
-        (echo -n u && cat)
-
-The command above:
-- reads 32 random bytes
-- base64-encodes them
-- converts default base64 encoding to base64url and removes padding
-- prepends a multibase prefix
 
 <table>
 <thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
@@ -1333,13 +1319,39 @@ The command above:
 <td><code>privateKey</code></td>
 <td><a href="#privatekey"><code>PrivateKey</code></a></td>
 <td><code class="language-json">null</code></td>
-<td></td>
+<td>
+
+To generate, use:
+
+```sh
+dd if=/dev/urandom bs=1 count=32 status=none |
+    base64 -w0 |
+    tr '+/' '-_' |
+    tr -d '=' |
+    (echo -n u && cat)
+```
+
+The command above:
+- Reads 32 random bytes
+- base64-encodes them
+- Converts default base64 encoding to base64url and removes padding
+- Prepends a multibase prefix
+
+</td>
 </tr>
 <tr>
 <td><code>secp256k1PrivateKey</code></td>
 <td><a href="#secp256k1signer"><code>Secp256k1Signer</code></a></td>
 <td><code class="language-json">null</code></td>
-<td></td>
+<td>
+
+Secp256k1 private key used to sign EIP-712 typed data.
+
+```sh
+cast wallet new
+```
+
+</td>
 </tr>
 </tbody>
 </table>
