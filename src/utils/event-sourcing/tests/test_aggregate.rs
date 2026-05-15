@@ -119,8 +119,35 @@ async fn test_aggregate_debug() {
     let store = CalcEventStore::new(vec![CalcEvents::Add(1), CalcEvents::Add(1)]);
     let actual = format!("{:?}", Calc::load((), &store).await.unwrap());
     assert_eq!(
-        "Calc(Aggregate { query: (), state: CalcState(2), pending_events: [], \
-         last_stored_event_id: Some(1) })",
+        "Calc(Aggregate { query: (), loaded_state: Some(CalcState(2)), modified_state: None, \
+         pending_events: [], last_stored_event_id: Some(1) })",
         actual
     );
+}
+
+#[test]
+fn test_aggregate_revert_clears_pending_events_for_new_aggregate() {
+    let mut aggregate =
+        Aggregate::<CalcState, CalcEventStore>::new((), CalcEvents::Add(10)).unwrap();
+
+    assert!(aggregate.has_updates());
+
+    aggregate.revert();
+
+    assert!(!aggregate.has_updates());
+}
+
+#[tokio::test]
+async fn test_aggregate_revert_restores_loaded_state() {
+    let store = CalcEventStore::new(vec![CalcEvents::Add(10), CalcEvents::Sub(6)]);
+    let mut aggregate = Calc::load((), &store).await.unwrap();
+
+    aggregate.apply(CalcEvents::Add(3)).unwrap();
+    assert_eq!(aggregate.as_ref().0, 7);
+    assert!(aggregate.has_updates());
+
+    aggregate.revert();
+
+    assert_eq!(aggregate.as_ref().0, 4);
+    assert!(!aggregate.has_updates());
 }

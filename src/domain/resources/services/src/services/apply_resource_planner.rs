@@ -246,10 +246,14 @@ impl<R> PlannedApplyResource<R>
 where
     R: ReconcilableEventSourcedResource,
 {
-    fn into_public_plan(self) -> ApplyResourcePlan<R> {
+    fn into_public_plan(mut self) -> ApplyResourcePlan<R> {
+        let uid = *self.resource.uid();
+        let state = self.resource.as_ref().clone();
+        self.resource.revert();
+
         ApplyResourcePlan {
-            uid: *self.resource.uid(),
-            state: self.resource.into(),
+            uid,
+            state,
             action: self.action,
             reconciliation_required: self.reconciliation_required,
             executable: self.executable,
