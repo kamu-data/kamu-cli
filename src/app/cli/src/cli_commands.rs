@@ -169,6 +169,7 @@ pub fn get_command(
                 c.args,
                 c.output_format,
                 c.spec,
+                c.revealed,
                 c.ignore_not_found,
                 c.max_results,
                 c.unbounded,

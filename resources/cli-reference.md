@@ -789,6 +789,7 @@ Returns manifest representation of a resource
   Possible values: `json`, `name`, `yaml`
 
 * `--spec` — Return an apply-compatible spec manifest instead of the full resource view
+* `--revealed` — Show actual secret values in the output (decrypts encrypted fields). Cannot be used with `-o name`
 * `--ignore-not-found` — Exit successfully when the resource does not exist
 * `--max-results <N>` — Maximum number of resources resolved by expanding selectors
 

@@ -56,6 +56,9 @@ pub struct GetResourceCommand {
     spec: bool,
 
     #[dill::component(explicit)]
+    revealed: bool,
+
+    #[dill::component(explicit)]
     ignore_not_found: bool,
 
     #[dill::component(explicit)]
@@ -78,6 +81,14 @@ impl GetResourceCommand {
             } else {
                 Some(self.max_results.get())
             },
+        }
+    }
+
+    fn spec_view_mode(&self) -> kamu_resources_facade::SpecViewMode {
+        if self.revealed {
+            kamu_resources_facade::SpecViewMode::Revealed
+        } else {
+            kamu_resources_facade::SpecViewMode::Encrypted
         }
     }
 
@@ -223,7 +234,7 @@ impl GetResourceCommand {
                                 .collect(),
                         },
                         format,
-                        kamu_resources_facade::SpecViewMode::Encrypted,
+                        self.spec_view_mode(),
                     )
                     .await?;
 
@@ -260,7 +271,7 @@ impl GetResourceCommand {
                                 .map(|(_, target)| ResourceRef::ById(target.uid))
                                 .collect(),
                         },
-                        kamu_resources_facade::SpecViewMode::Encrypted,
+                        self.spec_view_mode(),
                     )
                     .await?;
 
@@ -378,6 +389,9 @@ impl Command for GetResourceCommand {
             return Err(CLIError::usage_error(
                 "`--spec` cannot be used with `-o name`",
             ));
+        }
+        if self.revealed && self.output_format == GetOutputFormat::Name {
+            eprintln!("Warning: `--revealed` has no effect with `-o name`");
         }
         Ok(())
     }
