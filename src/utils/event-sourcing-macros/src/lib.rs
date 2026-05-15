@@ -191,6 +191,11 @@ pub fn derive_aggregate(tokens: proc_macro::TokenStream) -> proc_macro::TokenStr
             }
 
             #[inline]
+            pub fn revert(&mut self) {
+                self.0.revert()
+            }
+
+            #[inline]
             pub fn last_stored_event_id(&self) -> Option<EventID> {
                 self.0.last_stored_event_id()
             }

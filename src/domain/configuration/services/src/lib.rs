@@ -17,6 +17,7 @@ mod message_handlers;
 mod reconcilers;
 mod resource_crud_dispatchers;
 mod resources;
+pub mod sanitizers;
 
 pub use dataset_env_var_mutation_adapter::*;
 pub use dataset_env_var_resolver::*;
@@ -24,3 +25,4 @@ pub use dependencies::*;
 pub use reconcilers::*;
 pub use resource_crud_dispatchers::*;
 pub use resources::*;
+pub use sanitizers::*;

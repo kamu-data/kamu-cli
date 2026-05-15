@@ -896,7 +896,7 @@ impl DatasetEnvVarsHarness {
         let catalog_dataset_env_vars = {
             let mut b = dill::CatalogBuilder::new_chained(&base_gql_resource_harness.catalog_base);
 
-            b.add_value(DatasetEnvVarsConfig::sample())
+            b.add_value(SecretsEncryptionConfig::sample())
                 .add::<DatasetEnvVarCompatServiceImpl>();
 
             b.build()

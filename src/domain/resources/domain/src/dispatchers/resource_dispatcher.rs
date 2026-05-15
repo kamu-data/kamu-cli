@@ -12,7 +12,7 @@ use std::sync::Arc;
 use dill::Catalog;
 use internal_error::{InternalError, ResultIntoInternal};
 
-use crate::{ResourceDescriptor, ResourceSnapshot};
+use crate::ResourceDescriptor;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -25,12 +25,13 @@ pub struct ResourceDispatcherMeta {
 
 pub fn get_resource_dispatcher_from_catalog<TDispatcher: ?Sized + 'static>(
     target_catalog: &Catalog,
-    resource: &ResourceSnapshot,
+    kind: &str,
+    api_version: &str,
     dispatcher_name: &str,
 ) -> Result<Arc<TDispatcher>, InternalError> {
     let mut dispatchers =
         target_catalog.builders_for_with_meta::<TDispatcher, _>(|meta: &ResourceDispatcherMeta| {
-            meta.descriptor.matches_snapshot(resource)
+            meta.descriptor.resource_type == kind && meta.descriptor.api_version == api_version
         });
 
     dispatchers
@@ -38,9 +39,8 @@ pub fn get_resource_dispatcher_from_catalog<TDispatcher: ?Sized + 'static>(
         .map(|builder| {
             if dispatchers.next().is_some() {
                 return Err(InternalError::new(format!(
-                    "Duplicate {dispatcher_name} registered for resource_type='{}', \
-                     api_version='{}'",
-                    resource.kind, resource.api_version
+                    "Duplicate {dispatcher_name} registered for resource_type='{kind}', \
+                     api_version='{api_version}'",
                 )));
             }
 
@@ -49,8 +49,8 @@ pub fn get_resource_dispatcher_from_catalog<TDispatcher: ?Sized + 'static>(
         .transpose()?
         .ok_or_else(|| {
             InternalError::new(format!(
-                "No {dispatcher_name} registered for resource_type='{}', api_version='{}'",
-                resource.kind, resource.api_version
+                "No {dispatcher_name} registered for resource_type='{kind}', \
+                 api_version='{api_version}'",
             ))
         })
 }

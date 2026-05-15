@@ -26,8 +26,70 @@ macro_rules! declare_apply_resource_use_case {
                 std::sync::Arc<dyn kamu_resources::ResourceAggregateLoader<$resource>>,
             resource_persistence_service:
                 std::sync::Arc<dyn kamu_resources::ResourcePersistenceService<$resource>>,
+            resource_spec_sanitizer:
+                Option<std::sync::Arc<dyn kamu_resources::ResourceSpecSanitizer<$resource>>>,
             outbox: std::sync::Arc<dyn $crate::messaging_outbox::Outbox>,
             time_source: std::sync::Arc<dyn time_source::SystemTimeSource>,
+        }
+
+        impl $use_case {
+            async fn sanitize_params(
+                &self,
+                params: kamu_resources::ApplyResourceParams<$resource>,
+            ) -> Result<
+                kamu_resources::ApplyResourceParams<$resource>,
+                kamu_resources::ApplyResourceUseCaseError<$resource>,
+            > {
+                // If no sanitizer is provided, return the original params
+                let Some(sanitizer) = &self.resource_spec_sanitizer else {
+                    return Ok(params);
+                };
+
+                // Find the resource UID if not provided
+                let maybe_resource_uid = match params.uid {
+                    Some(uid) => Some(uid),
+                    None => self
+                        .generic_resource_query_service
+                        .find_resource_uid_by_name(
+                            &params.metadata.account,
+                            <$resource as kamu_resources::ResourceDescriptorProvider>::DESCRIPTOR
+                                .resource_type,
+                            &params.metadata.name,
+                        )
+                        .await
+                        .map_err(kamu_resources::ApplyResourceUseCaseError::Internal)?,
+                };
+
+                // Load the current spec if the resource exists to provide it to the sanitizer for comparison
+                let current_spec = if let Some(uid) = maybe_resource_uid {
+                    self.typed_resource_query_service
+                        .ensure_resource_uid_matches_type(&uid)
+                        .await
+                        .map_err(kamu_resources::ApplyResourceUseCaseError::from)?;
+
+                    let resource = self
+                        .resource_aggregate_loader
+                        .load(&uid)
+                        .await
+                        .map_err(kamu_resources::ResourceLoadError)
+                        .map_err(kamu_resources::ApplyResourceUseCaseError::LoadFailed)?;
+
+                    Some(
+                        <$resource as kamu_resources::DeclarativeResource>::spec(&resource)
+                            .clone(),
+                    )
+                } else {
+                    None
+                };
+
+                // Sanitize the new spec using the current spec for comparison
+                let spec = sanitizer
+                    .sanitize_new_spec(params.spec, current_spec.as_ref())
+                    .await
+                    .map_err(kamu_resources::ApplyResourceUseCaseError::Internal)?;
+
+                Ok(kamu_resources::ApplyResourceParams { spec, ..params })
+            }
         }
 
         #[async_trait::async_trait]
@@ -56,6 +118,8 @@ macro_rules! declare_apply_resource_use_case {
                 kamu_resources::ApplyResourcePlanningDecision<$resource>,
                 kamu_resources::ApplyResourceUseCaseError<$resource>,
             > {
+                let params = self.sanitize_params(params).await?;
+
                 let planner = $crate::ApplyResourcePlanner::<$resource>::new(
                     self.generic_resource_query_service.as_ref(),
                     self.typed_resource_query_service.as_ref(),
@@ -73,6 +137,8 @@ macro_rules! declare_apply_resource_use_case {
                 kamu_resources::ApplyResourceApplicationDecision<$resource>,
                 kamu_resources::ApplyResourceUseCaseError<$resource>,
             > {
+                let params = self.sanitize_params(params).await?;
+
                 let planner = $crate::ApplyResourcePlanner::<$resource>::new(
                     self.generic_resource_query_service.as_ref(),
                     self.typed_resource_query_service.as_ref(),

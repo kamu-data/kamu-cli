@@ -999,6 +999,11 @@ pub struct Get {
     #[arg(long)]
     pub spec: bool,
 
+    /// Show actual secret values in the output (decrypts encrypted fields).
+    /// Cannot be used with `-o name`.
+    #[arg(long)]
+    pub revealed: bool,
+
     /// Exit successfully when the resource does not exist
     #[arg(long)]
     pub ignore_not_found: bool,

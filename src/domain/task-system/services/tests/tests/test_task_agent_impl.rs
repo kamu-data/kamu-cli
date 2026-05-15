@@ -16,7 +16,7 @@ use kamu::utils::ipfs_wrapper::IpfsClient;
 use kamu::*;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_core::{DidGeneratorDefault, TenancyConfig};
-use kamu_datasets::DatasetEnvVarsConfig;
+use kamu_datasets::SecretsEncryptionConfig;
 use kamu_datasets_inmem::InMemoryDatasetDependencyRepository;
 use kamu_datasets_services::{DatasetEnvVarServiceNull, DependencyGraphServiceImpl};
 use kamu_task_system::*;
@@ -211,7 +211,7 @@ impl TaskAgentHarness {
             .add_value(TaskAgentConfig::new(chrono::Duration::seconds(1)))
             .add::<ProbeTaskPlanner>()
             .add::<ProbeTaskRunner>()
-            .add_value(DatasetEnvVarsConfig::sample());
+            .add_value(SecretsEncryptionConfig::sample());
 
         NoOpDatabasePlugin::init_database_components(&mut b);
 

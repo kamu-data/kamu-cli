@@ -8,7 +8,9 @@
 // by the Apache License, Version 2.0.
 
 mod secret_set;
+mod secret_set_spec_view;
 mod variable_set;
 
 pub use secret_set::*;
+pub use secret_set_spec_view::*;
 pub use variable_set::*;

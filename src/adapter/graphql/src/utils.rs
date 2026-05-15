@@ -11,7 +11,7 @@ use async_graphql::{Context, ErrorExtensionValues, ErrorExtensions};
 use internal_error::*;
 use kamu_accounts::{CurrentAccountSubject, GetAccessTokenError, LoggedAccount};
 use kamu_core::TenancyConfig;
-use kamu_datasets::{DatasetAction, DatasetEnvVarsConfig};
+use kamu_datasets::{DatasetAction, SecretsEncryptionConfig};
 use kamu_task_system as ts;
 
 use crate::data_loader::{AccountEntityDataLoader, DatasetHandleDataLoader};
@@ -153,10 +153,10 @@ pub(crate) async fn get_task(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn ensure_dataset_env_vars_enabled(ctx: &Context<'_>) -> Result<(), GqlError> {
-    let dataset_env_vars_config = from_catalog_n!(ctx, DatasetEnvVarsConfig);
+pub(crate) fn ensure_secrets_encryption_enabled(ctx: &Context<'_>) -> Result<(), GqlError> {
+    let secrets_encryption_config = from_catalog_n!(ctx, SecretsEncryptionConfig);
 
-    if dataset_env_vars_config.is_enabled() {
+    if secrets_encryption_config.is_enabled() {
         Ok(())
     } else {
         Err(GqlError::gql("API is unavailable"))

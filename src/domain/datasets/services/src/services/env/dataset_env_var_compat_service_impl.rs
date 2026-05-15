@@ -20,9 +20,9 @@ use kamu_datasets::{
     DatasetEnvVarService,
     DatasetEnvVarUpsertResult,
     DatasetEnvVarValue,
-    DatasetEnvVarsConfig,
     DeleteDatasetEnvVarError,
     GetDatasetEnvVarError,
+    SecretsEncryptionConfig,
 };
 use secrecy::{ExposeSecret, SecretString};
 
@@ -31,7 +31,7 @@ use secrecy::{ExposeSecret, SecretString};
 pub struct DatasetEnvVarCompatServiceImpl {
     resolver: Arc<dyn DatasetEnvVarResolver>,
     mutation_adapter: Arc<dyn DatasetEnvVarMutationAdapter>,
-    dataset_env_var_encryption_key: Option<SecretString>,
+    secrets_encryption_key: Option<SecretString>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -43,12 +43,12 @@ impl DatasetEnvVarCompatServiceImpl {
     pub fn new(
         resolver: Arc<dyn DatasetEnvVarResolver>,
         mutation_adapter: Arc<dyn DatasetEnvVarMutationAdapter>,
-        dataset_env_var_config: Arc<DatasetEnvVarsConfig>,
+        secrets_encryption_config: Arc<SecretsEncryptionConfig>,
     ) -> Self {
         Self {
             resolver,
             mutation_adapter,
-            dataset_env_var_encryption_key: dataset_env_var_config
+            secrets_encryption_key: secrets_encryption_config
                 .encryption_key
                 .as_ref()
                 .map(|k| SecretString::from(k.clone())),
@@ -64,7 +64,7 @@ impl DatasetEnvVarService for DatasetEnvVarCompatServiceImpl {
         &self,
         dataset_env_var: &DatasetEnvVar,
     ) -> Result<String, InternalError> {
-        if let Some(ref key) = self.dataset_env_var_encryption_key {
+        if let Some(ref key) = self.secrets_encryption_key {
             dataset_env_var
                 .get_exposed_decrypted_value(key.expose_secret())
                 .int_err()

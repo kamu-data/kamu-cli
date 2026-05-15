@@ -7,14 +7,19 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::{ResourceDescriptor, ResourcePresentationDefinition};
+use internal_error::InternalError;
+
+use crate::DeclarativeResource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub trait ResourcePresentationDispatcher: Send + Sync {
-    fn descriptor(&self) -> ResourceDescriptor;
-
-    fn presentation(&self) -> ResourcePresentationDefinition;
+#[async_trait::async_trait]
+pub trait ResourceSpecSanitizer<R: DeclarativeResource>: Send + Sync {
+    async fn sanitize_new_spec(
+        &self,
+        new_spec: R::Spec,
+        maybe_current_spec: Option<&R::Spec>,
+    ) -> Result<R::Spec, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

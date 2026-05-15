@@ -10,6 +10,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use chrono::{DateTime, Utc};
 use crypto_utils::{AesGcmEncryptor, Encryptor};
 use internal_error::ResultIntoInternal;
 use kamu_configuration::{
@@ -21,8 +22,9 @@ use kamu_configuration::{
     SecretSetResource,
     SecretSetStats,
 };
-use kamu_datasets::DatasetEnvVarsConfig;
+use kamu_datasets::SecretsEncryptionConfig;
 use kamu_resources::{DeclarativeResource, ReconcilableResource, Reconciler};
+use odf::AccountID;
 use secrecy::{ExposeSecret, SecretString};
 use time_source::SystemTimeSource;
 use uuid::Uuid;
@@ -36,7 +38,7 @@ use crate::PreviousConfigurationEntry;
 pub struct SecretSetReconcilerImpl {
     secret_set_projection_repository: Arc<dyn SecretSetProjectionRepository>,
     time_source: Arc<dyn SystemTimeSource>,
-    dataset_env_var_config: Arc<DatasetEnvVarsConfig>,
+    secrets_encryption_config: Arc<SecretsEncryptionConfig>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -60,35 +62,15 @@ impl Reconciler<SecretSetResource> for SecretSetReconcilerImpl {
             .load_previous_entries_by_key(&resource_uid, resource_generation)
             .await?;
 
-        let encryption_key = SecretString::from(
-            self.dataset_env_var_config
-                .encryption_key
-                .as_ref()
-                .unwrap()
-                .clone(),
-        );
-        let encryptor = AesGcmEncryptor::try_new(encryption_key.expose_secret()).int_err()?;
+        let encryptor = self.create_encryptor()?;
 
-        let mut entries = Vec::with_capacity(total);
-        for (key, secret) in &resource.spec().secrets {
-            let (value, secret_nonce) = encryptor
-                .encrypt_bytes(secret.literal_value().as_bytes())
-                .int_err()?;
-            let (entry_id, created_at) = previous_entries_by_key
-                .get(key)
-                .map(|entry| (entry.entry_id, entry.created_at))
-                .unwrap_or_else(|| (Uuid::new_v4(), now));
-
-            entries.push(SecretSetEntry {
-                entry_id,
-                account_id: account_id.clone(),
-                key: key.clone(),
-                value,
-                secret_nonce,
-                created_at,
-                updated_at: now,
-            });
-        }
+        let entries = self.build_secret_entries(
+            &encryptor,
+            &resource.spec().secrets,
+            &previous_entries_by_key,
+            account_id,
+            now,
+        )?;
 
         self.secret_set_projection_repository
             .replace_entries(&resource_uid, resource_generation, &entries)
@@ -142,6 +124,57 @@ impl SecretSetReconcilerImpl {
                 )
             })
             .collect())
+    }
+
+    fn create_encryptor(&self) -> Result<AesGcmEncryptor, SecretSetReconcileError> {
+        let encryption_key = SecretString::from(
+            self.secrets_encryption_config
+                .encryption_key
+                .as_ref()
+                .unwrap()
+                .clone(),
+        );
+        AesGcmEncryptor::try_new(encryption_key.expose_secret())
+            .int_err()
+            .map_err(SecretSetReconcileError::Internal)
+    }
+
+    fn build_secret_entries(
+        &self,
+        encryptor: &AesGcmEncryptor,
+        secrets: &std::collections::BTreeMap<String, kamu_configuration::SecretSpec>,
+        previous_entries_by_key: &HashMap<String, PreviousConfigurationEntry>,
+        account_id: &AccountID,
+        now: DateTime<Utc>,
+    ) -> Result<Vec<SecretSetEntry>, SecretSetReconcileError> {
+        let mut entries = Vec::with_capacity(secrets.len());
+
+        for (key, secret) in secrets {
+            let plaintext = secret
+                .decrypt_plaintext_bytes(encryptor)
+                .map_err(SecretSetReconcileError::Internal)?;
+            let (value, secret_nonce) = encryptor
+                .encrypt_bytes(&plaintext)
+                .int_err()
+                .map_err(SecretSetReconcileError::Internal)?;
+
+            let (entry_id, created_at) = previous_entries_by_key
+                .get(key)
+                .map(|entry| (entry.entry_id, entry.created_at))
+                .unwrap_or_else(|| (Uuid::new_v4(), now));
+
+            entries.push(SecretSetEntry {
+                entry_id,
+                account_id: account_id.clone(),
+                key: key.clone(),
+                value,
+                secret_nonce,
+                created_at,
+                updated_at: now,
+            });
+        }
+
+        Ok(entries)
     }
 }
 

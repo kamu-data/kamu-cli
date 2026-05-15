@@ -43,6 +43,7 @@ kamu-resources-services = { workspace = true }
 odf = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
+base64 = { version = "0.22", default-features = false, features = ["std"] }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 dill = { version = "0.15", default-features = false }
 paste = { version = "1", default-features = false }

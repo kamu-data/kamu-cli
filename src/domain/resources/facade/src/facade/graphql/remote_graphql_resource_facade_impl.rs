@@ -57,6 +57,7 @@ use crate::{
     ResourcesSummaryRequest,
     SearchResourceIdentitiesRequest,
     SearchResourceIdentitiesResponse,
+    SpecViewMode,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -692,19 +693,23 @@ impl RemoteGraphqlResourceFacadeImpl {
         ))
     }
 
-    fn get_resource_query(selector: &ResourceSelector) -> Result<String, GetResourceError> {
+    fn get_resource_query(
+        selector: &ResourceSelector,
+        spec_view_mode: SpecViewMode,
+    ) -> Result<String, GetResourceError> {
         let selector_str = Self::selector_input(
             &selector.kind,
             selector.api_version.as_deref(),
             &selector.resource_ref,
             selector.account.as_ref(),
         )?;
+        let revealed = spec_view_mode == SpecViewMode::Revealed;
 
         Ok(format!(
             r#"
             query {{
               resources {{
-                resource(selector: {selector_str}) {{
+                resource(selector: {selector_str}, revealed: {revealed}) {{
                   {fields}
                 }}
               }}
@@ -714,14 +719,18 @@ impl RemoteGraphqlResourceFacadeImpl {
         ))
     }
 
-    fn get_resources_query(selector: &ResourceBatchSelector) -> Result<String, BatchResourceError> {
+    fn get_resources_query(
+        selector: &ResourceBatchSelector,
+        spec_view_mode: SpecViewMode,
+    ) -> Result<String, BatchResourceError> {
         let selector_str = Self::batch_selector_input(selector)?;
+        let revealed = spec_view_mode == SpecViewMode::Revealed;
 
         Ok(format!(
             r#"
             query {{
               resources {{
-                resources(selector: {selector_str}) {{
+                resources(selector: {selector_str}, revealed: {revealed}) {{
                   {fields}
                 }}
               }}
@@ -782,6 +791,7 @@ impl RemoteGraphqlResourceFacadeImpl {
     fn render_manifest_query(
         selector: &ResourceSelector,
         format: ResourceManifestFormat,
+        spec_view_mode: SpecViewMode,
     ) -> Result<String, RenderResourceManifestError> {
         let selector_str = Self::selector_input(
             &selector.kind,
@@ -791,6 +801,7 @@ impl RemoteGraphqlResourceFacadeImpl {
         )
         .map_err(RenderResourceManifestError::Internal)?;
         let format = format.to_string();
+        let revealed = spec_view_mode == SpecViewMode::Revealed;
 
         Ok(format!(
             r#"
@@ -799,6 +810,7 @@ impl RemoteGraphqlResourceFacadeImpl {
                 renderManifest(
                   selector: {selector_str}
                   format: {format}
+                  revealed: {revealed}
                 ) {{
                   manifest
                   format
@@ -812,9 +824,11 @@ impl RemoteGraphqlResourceFacadeImpl {
     fn render_manifests_query(
         selector: &ResourceBatchSelector,
         format: ResourceManifestFormat,
+        spec_view_mode: SpecViewMode,
     ) -> Result<String, BatchResourceError> {
         let selector_str = Self::batch_selector_input(selector)?;
         let format = format.to_string();
+        let revealed = spec_view_mode == SpecViewMode::Revealed;
 
         Ok(format!(
             r#"
@@ -823,6 +837,7 @@ impl RemoteGraphqlResourceFacadeImpl {
                 renderManifests(
                   selector: {selector_str}
                   format: {format}
+                  revealed: {revealed}
                 ) {{
                   {fields}
                 }}
@@ -1238,8 +1253,9 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
     async fn get(
         &self,
         selector: ResourceSelector,
+        spec_view_mode: SpecViewMode,
     ) -> Result<kamu_resources::ResourceView, GetResourceError> {
-        let query = Self::get_resource_query(&selector)?;
+        let query = Self::get_resource_query(&selector, spec_view_mode)?;
 
         let response: fragments::GetResourceQueryDataFragment =
             self.execute_graphql(&query).await?;
@@ -1254,6 +1270,7 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
     async fn get_many(
         &self,
         selector: ResourceBatchSelector,
+        spec_view_mode: SpecViewMode,
     ) -> Result<
         BatchResourceResponse<domain::ResourceView, ResourceLookupProblem>,
         BatchResourceError,
@@ -1265,7 +1282,7 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
             });
         }
 
-        let query = Self::get_resources_query(&selector)?;
+        let query = Self::get_resources_query(&selector, spec_view_mode)?;
 
         let response: fragments::BatchGetResourcesQueryDataFragment =
             self.execute_graphql(&query).await?;
@@ -1404,8 +1421,9 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
         &self,
         selector: ResourceSelector,
         format: ResourceManifestFormat,
+        spec_view_mode: SpecViewMode,
     ) -> Result<RenderResourceManifestResult, RenderResourceManifestError> {
-        let query = Self::render_manifest_query(&selector, format)?;
+        let query = Self::render_manifest_query(&selector, format, spec_view_mode)?;
 
         let response: fragments::RenderManifestQueryDataFragment = self
             .execute_graphql(&query)
@@ -1424,6 +1442,7 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
         &self,
         selector: ResourceBatchSelector,
         format: ResourceManifestFormat,
+        spec_view_mode: SpecViewMode,
     ) -> Result<
         BatchResourceResponse<RenderResourceManifestResult, ResourceLookupProblem>,
         BatchResourceError,
@@ -1435,7 +1454,7 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
             });
         }
 
-        let query = Self::render_manifests_query(&selector, format)?;
+        let query = Self::render_manifests_query(&selector, format, spec_view_mode)?;
 
         let response: fragments::BatchRenderManifestsQueryDataFragment =
             self.execute_graphql(&query).await?;

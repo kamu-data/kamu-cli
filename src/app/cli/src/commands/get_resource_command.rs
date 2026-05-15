@@ -56,6 +56,9 @@ pub struct GetResourceCommand {
     spec: bool,
 
     #[dill::component(explicit)]
+    revealed: bool,
+
+    #[dill::component(explicit)]
     ignore_not_found: bool,
 
     #[dill::component(explicit)]
@@ -78,6 +81,14 @@ impl GetResourceCommand {
             } else {
                 Some(self.max_results.get())
             },
+        }
+    }
+
+    fn spec_view_mode(&self) -> kamu_resources_facade::SpecViewMode {
+        if self.revealed {
+            kamu_resources_facade::SpecViewMode::Revealed
+        } else {
+            kamu_resources_facade::SpecViewMode::Encrypted
         }
     }
 
@@ -223,6 +234,7 @@ impl GetResourceCommand {
                                 .collect(),
                         },
                         format,
+                        self.spec_view_mode(),
                     )
                     .await?;
 
@@ -249,15 +261,18 @@ impl GetResourceCommand {
         for ((kind, api_version), entries) in Self::group_targets_by_descriptor(targets) {
             for chunk in entries.chunks(Self::MATERIALIZATION_BATCH_SIZE) {
                 let result = resource_facade
-                    .get_many(ResourceBatchSelector {
-                        account: None,
-                        kind: kind.clone(),
-                        api_version: Some(api_version.clone()),
-                        resource_refs: chunk
-                            .iter()
-                            .map(|(_, target)| ResourceRef::ById(target.uid))
-                            .collect(),
-                    })
+                    .get_many(
+                        ResourceBatchSelector {
+                            account: None,
+                            kind: kind.clone(),
+                            api_version: Some(api_version.clone()),
+                            resource_refs: chunk
+                                .iter()
+                                .map(|(_, target)| ResourceRef::ById(target.uid))
+                                .collect(),
+                        },
+                        self.spec_view_mode(),
+                    )
                     .await?;
 
                 self.handle_get_resource_problems(result.problems)?;
@@ -374,6 +389,9 @@ impl Command for GetResourceCommand {
             return Err(CLIError::usage_error(
                 "`--spec` cannot be used with `-o name`",
             ));
+        }
+        if self.revealed && self.output_format == GetOutputFormat::Name {
+            eprintln!("Warning: `--revealed` has no effect with `-o name`");
         }
         Ok(())
     }

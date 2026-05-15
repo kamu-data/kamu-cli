@@ -15,7 +15,6 @@ pub use kamu_configuration_services::testing::BaseConfigurationServiceHarness;
 use kamu_datasets::{
     DatasetEnvVarMutationAdapter,
     DatasetEnvVarResolver,
-    DatasetEnvVarsConfig,
     UpsertDatasetEnvVarStatus,
 };
 use kamu_datasets_inmem::InMemoryDatasetEntryRepository;
@@ -37,8 +36,7 @@ impl DatasetEnvVarServiceHarness {
         let base = BaseConfigurationServiceHarness::new();
 
         let mut b = CatalogBuilder::new_chained(base.catalog());
-        b.add::<InMemoryDatasetEntryRepository>()
-            .add_value(DatasetEnvVarsConfig::sample());
+        b.add::<InMemoryDatasetEntryRepository>();
 
         let catalog = b.build();
 

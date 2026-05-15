@@ -7,6 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::BTreeMap;
+use std::sync::Arc;
+
 use chrono::Utc;
 use database_common::NoOpDatabasePlugin;
 use dill::CatalogBuilder;
@@ -14,6 +17,7 @@ use kamu_resources::{
     GenericResourceQueryService,
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
     ResourceLifecycleMessage,
+    ResourceMetadataInput,
     ResourceUID,
 };
 use kamu_resources_inmem::{InMemoryRawResourceEventStore, InMemoryResourceRepository};
@@ -58,6 +62,10 @@ impl BaseResourceServiceHarness {
         &self.catalog
     }
 
+    pub fn generic_query_svc(&self) -> Arc<dyn GenericResourceQueryService> {
+        self.catalog.get_one().unwrap()
+    }
+
     pub async fn allocate_resource_uid(&self) -> ResourceUID {
         self.catalog
             .get_one::<dyn GenericResourceQueryService>()
@@ -65,6 +73,16 @@ impl BaseResourceServiceHarness {
             .allocate_uid()
             .await
             .unwrap()
+    }
+
+    pub fn make_metadata(account_id: odf::AccountID, name: &str) -> ResourceMetadataInput {
+        ResourceMetadataInput {
+            account: account_id,
+            name: name.to_string(),
+            description: None,
+            labels: BTreeMap::new(),
+            annotations: BTreeMap::new(),
+        }
     }
 
     pub async fn resource_uid_by_name(

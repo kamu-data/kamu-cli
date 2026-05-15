@@ -896,24 +896,24 @@ pub fn register_config_in_catalog(
     ));
     //
 
-    // Dataset env vars configuration
-    catalog_builder.add_value(config.dataset_env_vars.clone());
+    // Secrets encryption configuration
+    catalog_builder.add_value(config.secrets_encryption.clone());
 
-    match &config.dataset_env_vars.encryption_key {
+    match &config.secrets_encryption.encryption_key {
         None => {
-            if config.dataset_env_vars.enabled {
-                panic!("Dataset env vars encryption key is required");
+            if config.secrets_encryption.enabled {
+                panic!("Secrets encryption key is required");
             } else {
-                warn!("Dataset env vars configuration is missing. Feature will be disabled");
+                warn!("Secrets encryption configuration is missing. Feature will be disabled");
             }
             catalog_builder.add::<kamu_datasets_services::DatasetKeyValueServiceSysEnv>();
             catalog_builder.add::<kamu_datasets_services::DatasetEnvVarServiceNull>();
         }
         Some(encryption_key) => {
-            if config.dataset_env_vars.enabled {
+            if config.secrets_encryption.enabled {
                 assert!(
                     AesGcmEncryptor::try_new(encryption_key).is_ok(),
-                    "Invalid dataset env var encryption key",
+                    "Invalid secrets encryption key",
                 );
                 catalog_builder.add::<kamu_datasets_services::DatasetKeyValueServiceImpl>();
                 catalog_builder.add::<kamu_datasets_services::DatasetEnvVarCompatServiceImpl>();

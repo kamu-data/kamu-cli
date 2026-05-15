@@ -21,14 +21,6 @@
 <td>Database connection configuration</td>
 </tr>
 <tr>
-<td><code>datasetEnvVars</code></td>
-<td><a href="#datasetenvvarsconfig"><code>DatasetEnvVarsConfig</code></a></td>
-<td><pre><code class="language-json">{
-  &quot;enabled&quot;: false
-}</code></pre></td>
-<td>Dataset environment variables configuration</td>
-</tr>
-<tr>
 <td><code>didEncryption</code></td>
 <td><a href="#didsecretencryptionconfig"><code>DidSecretEncryptionConfig</code></a></td>
 <td><pre><code class="language-json">{
@@ -171,6 +163,14 @@
   }
 }</code></pre></td>
 <td>Search configuration</td>
+</tr>
+<tr>
+<td><code>secretsEncryption</code></td>
+<td><a href="#secretsencryptionconfig"><code>SecretsEncryptionConfig</code></a></td>
+<td><pre><code class="language-json">{
+  &quot;enabled&quot;: false
+}</code></pre></td>
+<td>Secrets encryption configuration</td>
 </tr>
 <tr>
 <td><code>source</code></td>
@@ -635,40 +635,6 @@ Base type: `string`
 <td><a href="#databasecredentialsourceconfig"><code>DatabaseCredentialSourceConfig</code></a></td>
 <td></td>
 <td></td>
-</tr>
-</tbody>
-</table>
-
-## `DatasetEnvVarsConfig`
-
-<table>
-<thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
-<tbody>
-<tr>
-<td><code>enabled</code></td>
-<td><code>boolean</code></td>
-<td><code class="language-json">false</code></td>
-<td></td>
-</tr>
-<tr>
-<td><code>encryptionKey</code></td>
-<td><code>string</code></td>
-<td><code class="language-json">null</code></td>
-<td>
-
-Represents the encryption key for the dataset env vars. This field is
-required if `enabled` is `true` or `None`.
-
-The encryption key must be a 32-character alphanumeric string, which
-includes both uppercase and lowercase Latin letters (A-Z, a-z) and
-digits (0-9).
-
-To generate use:
-```sh
-tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 32; echo
-```
-
-</td>
 </tr>
 </tbody>
 </table>
@@ -1713,6 +1679,40 @@ Base type: `string`
 <td><a href="#durationstring"><code>DurationString</code></a></td>
 <td><code class="language-json">&quot;30s&quot;</code></td>
 <td></td>
+</tr>
+</tbody>
+</table>
+
+## `SecretsEncryptionConfig`
+
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+<tbody>
+<tr>
+<td><code>enabled</code></td>
+<td><code>boolean</code></td>
+<td><code class="language-json">false</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>encryptionKey</code></td>
+<td><code>string</code></td>
+<td><code class="language-json">null</code></td>
+<td>
+
+Represents the encryption key for secrets. This field is required if
+`enabled` is `true` or `None`.
+
+The encryption key must be a 32-character alphanumeric string, which
+includes both uppercase and lowercase Latin letters (A-Z, a-z) and
+digits (0-9).
+
+To generate use:
+```sh
+tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 32; echo
+```
+
+</td>
 </tr>
 </tbody>
 </table>

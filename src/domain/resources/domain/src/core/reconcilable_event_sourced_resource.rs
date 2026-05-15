@@ -64,6 +64,10 @@ pub trait ReconcilableEventSourcedResource:
             .map_err(Self::LifecycleError::invariant_violation)
     }
 
+    fn revert(&mut self) {
+        self.aggregate_mut().revert();
+    }
+
     fn make_created_event(
         now: DateTime<Utc>,
         uid: ResourceUID,

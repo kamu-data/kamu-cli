@@ -9,6 +9,8 @@
 
 use std::collections::BTreeMap;
 
+use crypto_utils::Encryptor;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_resources::{ResourceLinterSpec, ResourceValidateSpec, ResourceWarning};
 use serde::{Deserialize, Serialize};
 
@@ -25,6 +27,7 @@ pub struct SecretSetSpec {
 pub enum SecretSpec {
     Literal(String),
     Value(SecretValueSpec),
+    Encrypted(EncryptedSecretSpec),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -33,12 +36,69 @@ pub struct SecretValueSpec {
     pub value: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct EncryptedSecretSpec {
+    pub encrypted: String,
+    pub nonce: String,
+}
+
 impl SecretSpec {
     pub fn literal_value(&self) -> &str {
         match self {
             Self::Literal(value) => value,
             Self::Value(value) => &value.value,
+            Self::Encrypted(_) => panic!("literal_value() called on encrypted secret"),
         }
+    }
+
+    pub fn is_encrypted(&self) -> bool {
+        matches!(self, Self::Encrypted(_))
+    }
+
+    pub fn as_encrypted(&self) -> Option<&EncryptedSecretSpec> {
+        match self {
+            Self::Encrypted(e) => Some(e),
+            _ => None,
+        }
+    }
+
+    pub fn decrypt_plaintext_bytes(
+        &self,
+        encryptor: &dyn Encryptor,
+    ) -> Result<Vec<u8>, InternalError> {
+        match self {
+            Self::Encrypted(encrypted) => encrypted.decrypt_plaintext_bytes(encryptor),
+            Self::Literal(_) | Self::Value(_) => Ok(self.literal_value().as_bytes().to_vec()),
+        }
+    }
+}
+
+impl EncryptedSecretSpec {
+    fn decode_encrypted_bytes(&self) -> Result<Vec<u8>, InternalError> {
+        use base64::Engine;
+        use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+
+        BASE64_STANDARD.decode(&self.encrypted).int_err()
+    }
+
+    fn decode_nonce_bytes(&self) -> Result<Vec<u8>, InternalError> {
+        use base64::Engine;
+        use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+
+        BASE64_STANDARD.decode(&self.nonce).int_err()
+    }
+
+    pub fn decrypt_plaintext_bytes(
+        &self,
+        encryptor: &dyn Encryptor,
+    ) -> Result<Vec<u8>, InternalError> {
+        let encrypted_bytes = self.decode_encrypted_bytes()?;
+        let nonce_bytes = self.decode_nonce_bytes()?;
+
+        encryptor
+            .decrypt_bytes(&encrypted_bytes, &nonce_bytes)
+            .int_err()
     }
 }
 
@@ -47,6 +107,7 @@ impl SecretSpec {
 impl SecretSetSpec {
     pub const MAX_SECRETS: usize = 256;
     pub const MAX_SECRET_VALUE_LEN: usize = 16 * 1024;
+    pub const ENCRYPTED_SECRET_NONCE_LEN: usize = 12;
     pub const WARNING_SECRET_VALUE_LEN: usize = 1024;
     pub const RESERVED_SECRET_PREFIX: &str = "KAMU_";
 
@@ -63,6 +124,59 @@ impl SecretSetSpec {
         }
 
         chars.all(|c| c == '_' || c.is_ascii_alphabetic() || c.is_ascii_digit())
+    }
+
+    fn validate_encrypted_secret(
+        name: &str,
+        secret: &EncryptedSecretSpec,
+    ) -> Result<(), SecretSetSpecValidationError> {
+        if secret.encrypted.is_empty() {
+            return Err(SecretSetSpecValidationError::InvalidEncryptedSecret {
+                name: name.to_string(),
+                reason: "encrypted value is empty".to_string(),
+            });
+        }
+
+        let encrypted_bytes = secret.decode_encrypted_bytes().map_err(|_| {
+            SecretSetSpecValidationError::InvalidEncryptedSecret {
+                name: name.to_string(),
+                reason: "encrypted value is not valid base64".to_string(),
+            }
+        })?;
+
+        if encrypted_bytes.is_empty() {
+            return Err(SecretSetSpecValidationError::InvalidEncryptedSecret {
+                name: name.to_string(),
+                reason: "encrypted value decodes to empty bytes".to_string(),
+            });
+        }
+
+        if secret.nonce.is_empty() {
+            return Err(SecretSetSpecValidationError::InvalidEncryptedSecret {
+                name: name.to_string(),
+                reason: "nonce is empty".to_string(),
+            });
+        }
+
+        let nonce_bytes = secret.decode_nonce_bytes().map_err(|_| {
+            SecretSetSpecValidationError::InvalidEncryptedSecret {
+                name: name.to_string(),
+                reason: "nonce is not valid base64".to_string(),
+            }
+        })?;
+
+        if nonce_bytes.len() != Self::ENCRYPTED_SECRET_NONCE_LEN {
+            return Err(SecretSetSpecValidationError::InvalidEncryptedSecret {
+                name: name.to_string(),
+                reason: format!(
+                    "nonce must decode to {expected} bytes, got {actual}",
+                    expected = Self::ENCRYPTED_SECRET_NONCE_LEN,
+                    actual = nonce_bytes.len()
+                ),
+            });
+        }
+
+        Ok(())
     }
 }
 
@@ -84,11 +198,16 @@ impl ResourceValidateSpec for SecretSetSpec {
         }
 
         for (name, secret) in &self.secrets {
-            let value = secret.literal_value();
-
             if !Self::is_valid_secret_name(name) {
                 return Err(SecretSetSpecValidationError::InvalidSecretName { name: name.clone() });
             }
+
+            if let SecretSpec::Encrypted(encrypted_secret) = secret {
+                Self::validate_encrypted_secret(name, encrypted_secret)?;
+                continue;
+            }
+
+            let value = secret.literal_value();
 
             if value.is_empty() {
                 return Err(SecretSetSpecValidationError::EmptySecretValue { name: name.clone() });
@@ -114,8 +233,6 @@ impl ResourceLinterSpec for SecretSetSpec {
         let mut warnings = Vec::new();
 
         for (name, secret) in &self.secrets {
-            let value = secret.literal_value();
-
             if name.starts_with(Self::RESERVED_SECRET_PREFIX) {
                 warnings.push(ResourceWarning {
                     code: Self::WARNING_CODE_RESERVED_SECRET_PREFIX,
@@ -138,20 +255,25 @@ impl ResourceLinterSpec for SecretSetSpec {
                 });
             }
 
-            if value.len() > Self::WARNING_SECRET_VALUE_LEN {
-                warnings.push(ResourceWarning {
-                    code: Self::WARNING_CODE_LONG_SECRET_VALUE,
-                    path: Some(match secret {
-                        SecretSpec::Literal(_) => format!("spec.secrets.{name}"),
-                        SecretSpec::Value(_) => format!("spec.secrets.{name}.value"),
-                    }),
-                    message: format!(
-                        "Secret '{name}' value is unusually long: got {actual}, warning threshold \
-                         is {threshold}",
-                        actual = value.len(),
-                        threshold = Self::WARNING_SECRET_VALUE_LEN
-                    ),
-                });
+            if !secret.is_encrypted() {
+                let value = secret.literal_value();
+
+                if value.len() > Self::WARNING_SECRET_VALUE_LEN {
+                    warnings.push(ResourceWarning {
+                        code: Self::WARNING_CODE_LONG_SECRET_VALUE,
+                        path: Some(match secret {
+                            SecretSpec::Literal(_) => format!("spec.secrets.{name}"),
+                            SecretSpec::Value(_) => format!("spec.secrets.{name}.value"),
+                            SecretSpec::Encrypted(_) => unreachable!(),
+                        }),
+                        message: format!(
+                            "Secret '{name}' value is unusually long: got {actual}, warning \
+                             threshold is {threshold}",
+                            actual = value.len(),
+                            threshold = Self::WARNING_SECRET_VALUE_LEN
+                        ),
+                    });
+                }
             }
         }
 
@@ -182,6 +304,9 @@ pub enum SecretSetSpecValidationError {
         max: usize,
     },
 
+    #[error("secret '{name}' has invalid encrypted value: {reason}")]
+    InvalidEncryptedSecret { name: String, reason: String },
+
     #[error("description is too long: got {actual}, max is {max}")]
     DescriptionTooLong { actual: usize, max: usize },
 }
@@ -190,7 +315,15 @@ pub enum SecretSetSpecValidationError {
 
 #[cfg(test)]
 mod tests {
-    use super::{SecretSetSpec, SecretSpec, SecretValueSpec};
+    use super::{
+        EncryptedSecretSpec,
+        SecretSetSpec,
+        SecretSetSpecValidationError,
+        SecretSpec,
+        SecretValueSpec,
+    };
+
+    const VALID_ENCRYPTED_SECRET_NONCE: &str = "bm9uY2UxMjM0NTY3";
 
     #[test]
     fn deserializes_scalar_secret_syntax() {
@@ -442,6 +575,151 @@ mod tests {
 
         let warnings = spec.lint_warnings();
         assert_eq!(warnings.len(), 0);
+    }
+
+    #[test]
+    fn deserializes_encrypted_secret_syntax() {
+        let spec: SecretSetSpec = serde_json::from_value(serde_json::json!({
+            "secrets": {
+                "API_TOKEN": {
+                    "encrypted": "dGVzdA==",
+                    "nonce": VALID_ENCRYPTED_SECRET_NONCE,
+                },
+            }
+        }))
+        .unwrap();
+
+        assert_eq!(
+            spec,
+            SecretSetSpec {
+                secrets: [(
+                    "API_TOKEN".to_string(),
+                    SecretSpec::Encrypted(EncryptedSecretSpec {
+                        encrypted: "dGVzdA==".to_string(),
+                        nonce: VALID_ENCRYPTED_SECRET_NONCE.to_string(),
+                    }),
+                )]
+                .into_iter()
+                .collect(),
+            }
+        );
+    }
+
+    #[test]
+    fn serializes_encrypted_secret_syntax() {
+        let value = serde_json::to_value(SecretSetSpec {
+            secrets: [(
+                "API_TOKEN".to_string(),
+                SecretSpec::Encrypted(EncryptedSecretSpec {
+                    encrypted: "dGVzdA==".to_string(),
+                    nonce: VALID_ENCRYPTED_SECRET_NONCE.to_string(),
+                }),
+            )]
+            .into_iter()
+            .collect(),
+        })
+        .unwrap();
+
+        assert_eq!(
+            value,
+            serde_json::json!({
+                "secrets": {
+                    "API_TOKEN": {
+                        "encrypted": "dGVzdA==",
+                        "nonce": VALID_ENCRYPTED_SECRET_NONCE,
+                    },
+                }
+            })
+        );
+    }
+
+    #[test]
+    fn validate_accepts_encrypted_variant() {
+        use kamu_resources::ResourceValidateSpec;
+
+        let spec = SecretSetSpec {
+            secrets: [(
+                "API_TOKEN".to_string(),
+                SecretSpec::Encrypted(EncryptedSecretSpec {
+                    encrypted: "dGVzdA==".to_string(),
+                    nonce: VALID_ENCRYPTED_SECRET_NONCE.to_string(),
+                }),
+            )]
+            .into_iter()
+            .collect(),
+        };
+
+        assert!(spec.validate().is_ok());
+    }
+
+    #[test]
+    fn validate_rejects_invalid_encrypted_secret() {
+        use kamu_resources::ResourceValidateSpec;
+
+        let spec = SecretSetSpec {
+            secrets: [(
+                "API_TOKEN".to_string(),
+                SecretSpec::Encrypted(EncryptedSecretSpec {
+                    encrypted: "not-base64!".to_string(),
+                    nonce: VALID_ENCRYPTED_SECRET_NONCE.to_string(),
+                }),
+            )]
+            .into_iter()
+            .collect(),
+        };
+
+        assert!(matches!(
+            spec.validate(),
+            Err(SecretSetSpecValidationError::InvalidEncryptedSecret { .. })
+        ));
+    }
+
+    #[test]
+    fn validate_rejects_invalid_encrypted_nonce_len() {
+        use kamu_resources::ResourceValidateSpec;
+
+        let spec = SecretSetSpec {
+            secrets: [(
+                "API_TOKEN".to_string(),
+                SecretSpec::Encrypted(EncryptedSecretSpec {
+                    encrypted: "dGVzdA==".to_string(),
+                    nonce: "bm9uY2U=".to_string(),
+                }),
+            )]
+            .into_iter()
+            .collect(),
+        };
+
+        assert!(matches!(
+            spec.validate(),
+            Err(SecretSetSpecValidationError::InvalidEncryptedSecret { .. })
+        ));
+    }
+
+    #[test]
+    fn lint_skips_value_length_for_encrypted() {
+        use kamu_resources::ResourceLinterSpec;
+
+        // A ciphertext exceeding WARNING_SECRET_VALUE_LEN if treated as plaintext
+        let long_ciphertext = "x".repeat(SecretSetSpec::WARNING_SECRET_VALUE_LEN + 1);
+        let spec = SecretSetSpec {
+            secrets: [(
+                "API_TOKEN".to_string(),
+                SecretSpec::Encrypted(EncryptedSecretSpec {
+                    encrypted: long_ciphertext,
+                    nonce: VALID_ENCRYPTED_SECRET_NONCE.to_string(),
+                }),
+            )]
+            .into_iter()
+            .collect(),
+        };
+
+        let warnings = spec.lint_warnings();
+        assert!(
+            warnings
+                .iter()
+                .all(|w| w.code != SecretSetSpec::WARNING_CODE_LONG_SECRET_VALUE)
+        );
     }
 }
 

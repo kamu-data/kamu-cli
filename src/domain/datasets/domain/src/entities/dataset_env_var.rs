@@ -14,7 +14,7 @@ use secrecy::{ExposeSecret, SecretString};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub const SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY: &str = "QfnEDcnUtGSW2pwVXaFPvZOwxyFm2BOC";
+pub const SAMPLE_SECRETS_ENCRYPTION_KEY: &str = "QfnEDcnUtGSW2pwVXaFPvZOwxyFm2BOC";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -125,12 +125,12 @@ impl DatasetEnvVarValue {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(setty::Config, setty::Default)]
-pub struct DatasetEnvVarsConfig {
+pub struct SecretsEncryptionConfig {
     #[config(default = false)]
     pub enabled: bool,
 
-    /// Represents the encryption key for the dataset env vars. This field is
-    /// required if `enabled` is `true` or `None`.
+    /// Represents the encryption key for secrets. This field is required if
+    /// `enabled` is `true` or `None`.
     ///
     /// The encryption key must be a 32-character alphanumeric string, which
     /// includes both uppercase and lowercase Latin letters (A-Z, a-z) and
@@ -143,11 +143,11 @@ pub struct DatasetEnvVarsConfig {
     pub encryption_key: Option<String>,
 }
 
-impl DatasetEnvVarsConfig {
+impl SecretsEncryptionConfig {
     pub fn sample() -> Self {
         Self {
             enabled: true,
-            encryption_key: Some(SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY.to_string()),
+            encryption_key: Some(SAMPLE_SECRETS_ENCRYPTION_KEY.to_string()),
         }
     }
 
@@ -166,7 +166,7 @@ mod tests {
     use chrono::Utc;
     use secrecy::SecretString;
 
-    use crate::{DatasetEnvVar, SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY};
+    use crate::{DatasetEnvVar, SAMPLE_SECRETS_ENCRYPTION_KEY};
 
     #[test]
     fn test_secret_env_var_generation() {
@@ -176,12 +176,12 @@ mod tests {
             Utc::now(),
             &crate::DatasetEnvVarValue::Secret(SecretString::from(secret_value.to_string())),
             &odf::DatasetID::new_seeded_ed25519(b"foo"),
-            SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY,
+            SAMPLE_SECRETS_ENCRYPTION_KEY,
         )
         .unwrap();
 
         let original_value = new_env_var
-            .get_exposed_decrypted_value(SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY)
+            .get_exposed_decrypted_value(SAMPLE_SECRETS_ENCRYPTION_KEY)
             .unwrap();
         assert_eq!(secret_value, original_value.as_str());
     }
@@ -194,12 +194,12 @@ mod tests {
             Utc::now(),
             &crate::DatasetEnvVarValue::Regular(value.to_string()),
             &odf::DatasetID::new_seeded_ed25519(b"foo"),
-            SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY,
+            SAMPLE_SECRETS_ENCRYPTION_KEY,
         )
         .unwrap();
 
         let original_value = new_env_var
-            .get_exposed_decrypted_value(SAMPLE_DATASET_ENV_VAR_ENCRYPTION_KEY)
+            .get_exposed_decrypted_value(SAMPLE_SECRETS_ENCRYPTION_KEY)
             .unwrap();
         assert_eq!(value, original_value.as_str());
     }
