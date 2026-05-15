@@ -7,20 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
-use dill::CatalogBuilder;
-use kamu_configuration::{SecretSetResource, SecretSetSpec, SecretSpec, SecretValueSpec};
+use kamu_configuration::{SecretSetSpec, SecretSpec, SecretValueSpec};
 use kamu_configuration_services::testing::BaseConfigurationServiceHarness;
-use kamu_datasets::SecretsEncryptionConfig;
-use kamu_resources::{ApplyResourceApplicationDecision, ApplyResourceParams, ApplyResourceUseCase};
+use kamu_resources::{ApplyResourceApplicationDecision, ApplyResourceParams};
 use kamu_resources_services::testing::BaseResourceServiceHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_apply_secret_set_encrypts_literal_values() {
-    let harness = SecretSetSanitizerHarness::new();
+    let harness = BaseConfigurationServiceHarness::new();
     let (_, account_id) = odf::AccountID::new_generated_ed25519();
 
     let spec = SecretSetSpec {
@@ -41,7 +37,7 @@ async fn test_apply_secret_set_encrypts_literal_values() {
     };
 
     let decision = harness
-        .apply_use_case()
+        .apply_secret_use_case()
         .apply(ApplyResourceParams {
             uid: None,
             metadata: BaseResourceServiceHarness::make_metadata(account_id, "test-secrets"),
@@ -92,7 +88,7 @@ async fn test_apply_secret_set_encrypts_literal_values() {
 
 #[test_log::test(tokio::test)]
 async fn test_apply_secret_set_already_encrypted_passes_through_idempotently() {
-    let harness = SecretSetSanitizerHarness::new();
+    let harness = BaseConfigurationServiceHarness::new();
     let (_, account_id) = odf::AccountID::new_generated_ed25519();
 
     // First apply with a Literal value to produce an encrypted snapshot
@@ -106,7 +102,7 @@ async fn test_apply_secret_set_already_encrypted_passes_through_idempotently() {
     };
 
     let decision = harness
-        .apply_use_case()
+        .apply_secret_use_case()
         .apply(ApplyResourceParams {
             uid: None,
             metadata: BaseResourceServiceHarness::make_metadata(account_id.clone(), "test-secrets"),
@@ -142,7 +138,7 @@ async fn test_apply_secret_set_already_encrypted_passes_through_idempotently() {
     // Re-apply the already-encrypted spec — the sanitizer must pass it through
     // unchanged
     let decision2 = harness
-        .apply_use_case()
+        .apply_secret_use_case()
         .apply(ApplyResourceParams {
             uid: Some(uid),
             metadata: BaseResourceServiceHarness::make_metadata(account_id, "test-secrets"),
@@ -182,30 +178,6 @@ async fn test_apply_secret_set_already_encrypted_passes_through_idempotently() {
         encrypted_spec.secrets["API_TOKEN"].as_encrypted(),
         "ciphertext must be unchanged after idempotent re-apply"
     );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[oop::extend(BaseConfigurationServiceHarness, base)]
-struct SecretSetSanitizerHarness {
-    base: BaseConfigurationServiceHarness,
-    catalog: dill::Catalog,
-}
-
-impl SecretSetSanitizerHarness {
-    fn new() -> Self {
-        let base = BaseConfigurationServiceHarness::new();
-
-        let mut b = CatalogBuilder::new_chained(base.catalog());
-        b.add_value(SecretsEncryptionConfig::sample());
-
-        let catalog = b.build();
-        Self { base, catalog }
-    }
-
-    fn apply_use_case(&self) -> Arc<dyn ApplyResourceUseCase<SecretSetResource>> {
-        self.catalog.get_one().unwrap()
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

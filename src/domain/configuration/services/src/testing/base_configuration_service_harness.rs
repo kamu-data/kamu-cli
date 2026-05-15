@@ -15,6 +15,7 @@ use kamu_configuration::{
     DatasetSecretSetBindingRepository,
     DatasetVariableSetBindingRepository,
     SecretSetProjectionRepository,
+    SecretSetResource,
     VariableSetProjectionRepository,
 };
 use kamu_configuration_inmem::{
@@ -23,7 +24,8 @@ use kamu_configuration_inmem::{
     InMemorySecretSetProjectionRepository,
     InMemoryVariableSetProjectionRepository,
 };
-use kamu_resources::ResourceUID;
+use kamu_datasets::SecretsEncryptionConfig;
+use kamu_resources::{ApplyResourceUseCase, ResourceUID};
 use kamu_resources_services::testing::BaseResourceServiceHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -44,7 +46,8 @@ impl BaseConfigurationServiceHarness {
 
         let mut b = CatalogBuilder::new_chained(base.catalog());
 
-        b.add::<InMemoryVariableSetProjectionRepository>()
+        b.add_value(SecretsEncryptionConfig::sample())
+            .add::<InMemoryVariableSetProjectionRepository>()
             .add::<InMemorySecretSetProjectionRepository>()
             .add::<InMemoryDatasetVariableSetBindingRepository>()
             .add::<InMemoryDatasetSecretSetBindingRepository>();
@@ -73,6 +76,10 @@ impl BaseConfigurationServiceHarness {
     }
 
     pub fn secret_set_projection_repo(&self) -> Arc<dyn SecretSetProjectionRepository> {
+        self.catalog.get_one().unwrap()
+    }
+
+    pub fn apply_secret_use_case(&self) -> Arc<dyn ApplyResourceUseCase<SecretSetResource>> {
         self.catalog.get_one().unwrap()
     }
 
