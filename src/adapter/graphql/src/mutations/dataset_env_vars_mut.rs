@@ -33,7 +33,7 @@ impl<'a> DatasetEnvVarsMut<'a> {
         ctx: &Context<'_>,
         dataset_request_state: &'a DatasetRequestState,
     ) -> Result<Self> {
-        utils::ensure_dataset_env_vars_enabled(ctx)?;
+        utils::ensure_secrets_encryption_enabled(ctx)?;
         utils::check_dataset_maintain_access(ctx, dataset_request_state).await?;
 
         Ok(Self {

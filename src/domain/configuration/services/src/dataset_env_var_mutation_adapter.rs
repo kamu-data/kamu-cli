@@ -32,9 +32,9 @@ use kamu_datasets::{
     DatasetEnvVarNotFoundError,
     DatasetEnvVarUpsertResult,
     DatasetEnvVarValue,
-    DatasetEnvVarsConfig,
     DeleteDatasetEnvVarError,
     GetDatasetEntryError,
+    SecretsEncryptionConfig,
     UpsertDatasetEnvVarStatus,
 };
 use kamu_resources::{
@@ -76,7 +76,7 @@ pub struct DatasetEnvVarMutationAdapterImpl {
     secret_set_projection_repo: Arc<dyn SecretSetProjectionRepository>,
     variable_set_binding_repo: Arc<dyn DatasetVariableSetBindingRepository>,
     secret_set_binding_repo: Arc<dyn DatasetSecretSetBindingRepository>,
-    dataset_env_var_config: Arc<DatasetEnvVarsConfig>,
+    secrets_encryption_config: Arc<SecretsEncryptionConfig>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -301,7 +301,7 @@ impl DatasetEnvVarMutationAdapterImpl {
             .int_err()?;
 
         let encryption_key = self
-            .dataset_env_var_config
+            .secrets_encryption_config
             .encryption_key
             .as_deref()
             .unwrap_or("");
@@ -643,7 +643,7 @@ impl DatasetEnvVarMutationAdapterImpl {
         resource_uid: &kamu_resources::ResourceUID,
     ) -> Result<BTreeMap<String, String>, InternalError> {
         let encryption_key = self
-            .dataset_env_var_config
+            .secrets_encryption_config
             .encryption_key
             .as_deref()
             .unwrap_or("");

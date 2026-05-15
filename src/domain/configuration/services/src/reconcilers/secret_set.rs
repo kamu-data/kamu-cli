@@ -21,7 +21,7 @@ use kamu_configuration::{
     SecretSetResource,
     SecretSetStats,
 };
-use kamu_datasets::DatasetEnvVarsConfig;
+use kamu_datasets::SecretsEncryptionConfig;
 use kamu_resources::{DeclarativeResource, ReconcilableResource, Reconciler};
 use secrecy::{ExposeSecret, SecretString};
 use time_source::SystemTimeSource;
@@ -36,7 +36,7 @@ use crate::PreviousConfigurationEntry;
 pub struct SecretSetReconcilerImpl {
     secret_set_projection_repository: Arc<dyn SecretSetProjectionRepository>,
     time_source: Arc<dyn SystemTimeSource>,
-    dataset_env_var_config: Arc<DatasetEnvVarsConfig>,
+    secrets_encryption_config: Arc<SecretsEncryptionConfig>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -61,7 +61,7 @@ impl Reconciler<SecretSetResource> for SecretSetReconcilerImpl {
             .await?;
 
         let encryption_key = SecretString::from(
-            self.dataset_env_var_config
+            self.secrets_encryption_config
                 .encryption_key
                 .as_ref()
                 .unwrap()

@@ -20,7 +20,7 @@ use internal_error::ResultIntoInternal;
 use kamu::domain::{FileUploadLimitConfig, TenancyConfig};
 use kamu_accounts::{AuthConfig, PredefinedAccountsConfig};
 use kamu_accounts_services::PasswordPolicyConfig;
-use kamu_datasets::DatasetEnvVarsConfig;
+use kamu_datasets::SecretsEncryptionConfig;
 
 use super::{CLIError, Command};
 use crate::OutputConfig;
@@ -33,7 +33,7 @@ pub struct UICommand {
     tenancy_config: TenancyConfig,
     predefined_accounts_config: Arc<PredefinedAccountsConfig>,
     file_upload_limit_config: Arc<FileUploadLimitConfig>,
-    dataset_env_vars_config: Arc<DatasetEnvVarsConfig>,
+    secrets_encryption_config: Arc<SecretsEncryptionConfig>,
     auth_config: Arc<AuthConfig>,
     output_config: Arc<OutputConfig>,
     password_policy_config: Arc<PasswordPolicyConfig>,
@@ -65,7 +65,7 @@ impl Command for UICommand {
             self.current_account_name.clone(),
             self.predefined_accounts_config.as_ref(),
             self.file_upload_limit_config.as_ref(),
-            self.dataset_env_vars_config.is_enabled(),
+            self.secrets_encryption_config.is_enabled(),
             self.auth_config.allow_anonymous,
             self.address,
             self.port,

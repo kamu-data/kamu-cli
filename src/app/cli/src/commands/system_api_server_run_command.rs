@@ -18,7 +18,7 @@ use kamu::domain::{FileUploadLimitConfig, TenancyConfig};
 use kamu_accounts::*;
 use kamu_accounts_services::{PasswordLoginCredentials, PasswordPolicyConfig};
 use kamu_adapter_oauth::*;
-use kamu_datasets::DatasetEnvVarsConfig;
+use kamu_datasets::SecretsEncryptionConfig;
 use tracing::Instrument;
 
 use super::{CLIError, Command};
@@ -33,7 +33,7 @@ pub struct APIServerRunCommand {
     output_config: Arc<OutputConfig>,
     predefined_accounts_config: Arc<PredefinedAccountsConfig>,
     file_upload_limit_config: Arc<FileUploadLimitConfig>,
-    dataset_env_vars_config: Arc<DatasetEnvVarsConfig>,
+    secrets_encryption_config: Arc<SecretsEncryptionConfig>,
     auth_config: Arc<AuthConfig>,
     account_subject: Arc<CurrentAccountSubject>,
     github_auth_config: Arc<GithubAuthenticationConfig>,
@@ -135,7 +135,7 @@ impl Command for APIServerRunCommand {
             self.address,
             self.port,
             self.file_upload_limit_config.as_ref(),
-            self.dataset_env_vars_config.is_enabled(),
+            self.secrets_encryption_config.is_enabled(),
             self.auth_config.allow_anonymous,
             self.external_address,
             self.e2e_output_data_path.as_ref(),

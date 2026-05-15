@@ -377,23 +377,6 @@
       ],
       "type": "object"
     },
-    "DatasetEnvVarsConfig": {
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "default": false,
-          "type": "boolean"
-        },
-        "encryptionKey": {
-          "description": "Represents the encryption key for the dataset env vars. This field is\nrequired if `enabled` is `true` or `None`.\n\nThe encryption key must be a 32-character alphanumeric string, which\nincludes both uppercase and lowercase Latin letters (A-Z, a-z) and\ndigits (0-9).\n\nTo generate use:\n```sh\ntr -dc 'A-Za-z0-9' < /dev/urandom | head -c 32; echo\n```",
-          "type": [
-            "string",
-            "null"
-          ]
-        }
-      },
-      "type": "object"
-    },
     "DidSecretEncryptionConfig": {
       "additionalProperties": false,
       "properties": {
@@ -1177,6 +1160,23 @@
         }
       ]
     },
+    "SecretsEncryptionConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "default": false,
+          "type": "boolean"
+        },
+        "encryptionKey": {
+          "description": "Represents the encryption key for secrets. This field is required if\n`enabled` is `true` or `None`.\n\nThe encryption key must be a 32-character alphanumeric string, which\nincludes both uppercase and lowercase Latin letters (A-Z, a-z) and\ndigits (0-9).\n\nTo generate use:\n```sh\ntr -dc 'A-Za-z0-9' < /dev/urandom | head -c 32; echo\n```",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
     "SourceConfig": {
       "additionalProperties": false,
       "properties": {
@@ -1293,13 +1293,6 @@
         }
       ],
       "description": "Database connection configuration"
-    },
-    "datasetEnvVars": {
-      "$ref": "#/$defs/DatasetEnvVarsConfig",
-      "default": {
-        "enabled": false
-      },
-      "description": "Dataset environment variables configuration"
     },
     "didEncryption": {
       "$ref": "#/$defs/DidSecretEncryptionConfig",
@@ -1434,6 +1427,13 @@
         }
       },
       "description": "Search configuration"
+    },
+    "secretsEncryption": {
+      "$ref": "#/$defs/SecretsEncryptionConfig",
+      "default": {
+        "enabled": false
+      },
+      "description": "Secrets encryption configuration"
     },
     "source": {
       "$ref": "#/$defs/SourceConfig",

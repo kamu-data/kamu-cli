@@ -12,7 +12,7 @@ use std::path::Path;
 
 use kamu::utils::docker_images;
 use kamu_accounts::*;
-use kamu_datasets::DatasetEnvVarsConfig;
+use kamu_datasets::SecretsEncryptionConfig;
 use setty::types::DurationString;
 use url::Url;
 
@@ -25,9 +25,9 @@ pub struct CLIConfig {
     /// Database connection configuration
     pub database: Option<DatabaseConfig>,
 
-    /// Dataset environment variables configuration
+    /// Secrets encryption configuration
     #[config(default)]
-    pub dataset_env_vars: DatasetEnvVarsConfig,
+    pub secrets_encryption: SecretsEncryptionConfig,
 
     /// Engine configuration
     #[config(default)]
