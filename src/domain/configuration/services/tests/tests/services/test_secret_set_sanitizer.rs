@@ -9,7 +9,7 @@
 
 use kamu_configuration::{SecretSetSpec, SecretSpec, SecretValueSpec};
 use kamu_configuration_services::testing::BaseConfigurationServiceHarness;
-use kamu_resources::{ApplyResourceApplicationDecision, ApplyResourceParams};
+use kamu_resources::{ApplyResourceApplicationDecision, ApplyResourceOutcome, ApplyResourceParams};
 use kamu_resources_services::testing::BaseResourceServiceHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -148,7 +148,9 @@ async fn test_apply_secret_set_already_encrypted_passes_through_idempotently() {
         .unwrap();
 
     match &decision2 {
-        ApplyResourceApplicationDecision::Applied(_) => {}
+        ApplyResourceApplicationDecision::Applied(result) => {
+            assert_eq!(result.outcome, ApplyResourceOutcome::Untouched);
+        }
         ApplyResourceApplicationDecision::Rejected(r) => {
             panic!("second apply was rejected unexpectedly: {}", r.message)
         }
@@ -178,6 +180,81 @@ async fn test_apply_secret_set_already_encrypted_passes_through_idempotently() {
         encrypted_spec.secrets["API_TOKEN"].as_encrypted(),
         "ciphertext must be unchanged after idempotent re-apply"
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_apply_secret_set_same_plaintext_is_untouched() {
+    let harness = BaseConfigurationServiceHarness::new();
+    let (_, account_id) = odf::AccountID::new_generated_ed25519();
+
+    let spec = SecretSetSpec {
+        secrets: [(
+            "API_TOKEN".to_string(),
+            SecretSpec::Literal("original-value".to_string()),
+        )]
+        .into_iter()
+        .collect(),
+    };
+
+    let decision = harness
+        .apply_secret_use_case()
+        .apply(ApplyResourceParams {
+            uid: None,
+            metadata: BaseResourceServiceHarness::make_metadata(account_id.clone(), "test-secrets"),
+            spec: spec.clone(),
+        })
+        .await
+        .unwrap();
+
+    let uid = match decision {
+        ApplyResourceApplicationDecision::Applied(result) => result.uid,
+        ApplyResourceApplicationDecision::Rejected(r) => {
+            panic!("first apply was rejected: {}", r.message)
+        }
+    };
+
+    let snapshot = harness
+        .generic_query_svc()
+        .get_snapshot_by_uid(&uid)
+        .await
+        .unwrap()
+        .unwrap();
+
+    let stored_spec: SecretSetSpec =
+        serde_json::from_value(snapshot.spec).expect("spec must deserialize");
+
+    let decision2 = harness
+        .apply_secret_use_case()
+        .apply(ApplyResourceParams {
+            uid: Some(uid),
+            metadata: BaseResourceServiceHarness::make_metadata(account_id, "test-secrets"),
+            spec,
+        })
+        .await
+        .unwrap();
+
+    match decision2 {
+        ApplyResourceApplicationDecision::Applied(result) => {
+            assert_eq!(result.outcome, ApplyResourceOutcome::Untouched);
+        }
+        ApplyResourceApplicationDecision::Rejected(r) => {
+            panic!("second apply was rejected unexpectedly: {}", r.message)
+        }
+    }
+
+    let snapshot2 = harness
+        .generic_query_svc()
+        .get_snapshot_by_uid(&uid)
+        .await
+        .unwrap()
+        .unwrap();
+
+    let stored_spec2: SecretSetSpec =
+        serde_json::from_value(snapshot2.spec).expect("spec must deserialize");
+
+    assert_eq!(stored_spec2, stored_spec);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

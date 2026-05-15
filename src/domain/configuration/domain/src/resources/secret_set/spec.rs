@@ -9,6 +9,8 @@
 
 use std::collections::BTreeMap;
 
+use crypto_utils::Encryptor;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_resources::{ResourceLinterSpec, ResourceValidateSpec, ResourceWarning};
 use serde::{Deserialize, Serialize};
 
@@ -60,6 +62,44 @@ impl SecretSpec {
             _ => None,
         }
     }
+
+    pub fn decrypt_plaintext_bytes(
+        &self,
+        encryptor: &dyn Encryptor,
+    ) -> Result<Vec<u8>, InternalError> {
+        match self {
+            Self::Encrypted(encrypted) => encrypted.decrypt_plaintext_bytes(encryptor),
+            Self::Literal(_) | Self::Value(_) => Ok(self.literal_value().as_bytes().to_vec()),
+        }
+    }
+}
+
+impl EncryptedSecretSpec {
+    fn decode_encrypted_bytes(&self) -> Result<Vec<u8>, InternalError> {
+        use base64::Engine;
+        use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+
+        BASE64_STANDARD.decode(&self.encrypted).int_err()
+    }
+
+    fn decode_nonce_bytes(&self) -> Result<Vec<u8>, InternalError> {
+        use base64::Engine;
+        use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+
+        BASE64_STANDARD.decode(&self.nonce).int_err()
+    }
+
+    pub fn decrypt_plaintext_bytes(
+        &self,
+        encryptor: &dyn Encryptor,
+    ) -> Result<Vec<u8>, InternalError> {
+        let encrypted_bytes = self.decode_encrypted_bytes()?;
+        let nonce_bytes = self.decode_nonce_bytes()?;
+
+        encryptor
+            .decrypt_bytes(&encrypted_bytes, &nonce_bytes)
+            .int_err()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -90,9 +130,6 @@ impl SecretSetSpec {
         name: &str,
         secret: &EncryptedSecretSpec,
     ) -> Result<(), SecretSetSpecValidationError> {
-        use base64::Engine;
-        use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
-
         if secret.encrypted.is_empty() {
             return Err(SecretSetSpecValidationError::InvalidEncryptedSecret {
                 name: name.to_string(),
@@ -100,7 +137,7 @@ impl SecretSetSpec {
             });
         }
 
-        let encrypted_bytes = BASE64_STANDARD.decode(&secret.encrypted).map_err(|_| {
+        let encrypted_bytes = secret.decode_encrypted_bytes().map_err(|_| {
             SecretSetSpecValidationError::InvalidEncryptedSecret {
                 name: name.to_string(),
                 reason: "encrypted value is not valid base64".to_string(),
@@ -121,7 +158,7 @@ impl SecretSetSpec {
             });
         }
 
-        let nonce_bytes = BASE64_STANDARD.decode(&secret.nonce).map_err(|_| {
+        let nonce_bytes = secret.decode_nonce_bytes().map_err(|_| {
             SecretSetSpecValidationError::InvalidEncryptedSecret {
                 name: name.to_string(),
                 reason: "nonce is not valid base64".to_string(),

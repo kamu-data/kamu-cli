@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use base64::Engine;
 use crypto_utils::{AesGcmEncryptor, Encryptor};
-use internal_error::ResultIntoInternal;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_configuration::{EncryptedSecretSpec, SecretSetResource, SecretSetSpec, SecretSpec};
 use kamu_datasets::SecretsEncryptionConfig;
 use kamu_resources::ResourceSpecSanitizer;
@@ -29,10 +29,11 @@ pub struct SecretSetSpecSanitizer {
 
 #[async_trait::async_trait]
 impl ResourceSpecSanitizer<SecretSetResource> for SecretSetSpecSanitizer {
-    async fn sanitize(
+    async fn sanitize_new_spec(
         &self,
-        mut spec: SecretSetSpec,
-    ) -> Result<SecretSetSpec, internal_error::InternalError> {
+        mut new_spec: SecretSetSpec,
+        maybe_current_spec: Option<&SecretSetSpec>,
+    ) -> Result<SecretSetSpec, InternalError> {
         use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 
         let encryption_key = SecretString::from(
@@ -44,19 +45,49 @@ impl ResourceSpecSanitizer<SecretSetResource> for SecretSetSpecSanitizer {
         );
         let encryptor = AesGcmEncryptor::try_new(encryption_key.expose_secret()).int_err()?;
 
-        for secret in spec.secrets.values_mut() {
-            if secret.is_encrypted() {
+        for (name, new_secret) in &mut new_spec.secrets {
+            if new_secret.is_encrypted() {
                 continue;
             }
-            let plaintext = secret.literal_value().as_bytes();
-            let (encrypted_bytes, nonce_bytes) = encryptor.encrypt_bytes(plaintext).int_err()?;
-            *secret = SecretSpec::Encrypted(EncryptedSecretSpec {
+            let new_plaintext = new_secret.literal_value();
+
+            // If the new plaintext matches the current secret (after decryption), keep the
+            // current encrypted value to avoid unnecessary changes
+            if let Some(current_secret) = maybe_current_spec.and_then(|s| s.secrets.get(name))
+                && Self::matches_current_plaintext(current_secret, new_plaintext, &encryptor)?
+            {
+                *new_secret = current_secret.clone();
+                continue;
+            }
+
+            // The secret value is new or has changed, encrypt it
+            let (encrypted_bytes, nonce_bytes) = encryptor
+                .encrypt_bytes(new_plaintext.as_bytes())
+                .int_err()?;
+            *new_secret = SecretSpec::Encrypted(EncryptedSecretSpec {
                 encrypted: BASE64_STANDARD.encode(&encrypted_bytes),
                 nonce: BASE64_STANDARD.encode(&nonce_bytes),
             });
         }
 
-        Ok(spec)
+        Ok(new_spec)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl SecretSetSpecSanitizer {
+    fn matches_current_plaintext(
+        current_secret: &SecretSpec,
+        new_plaintext: &str,
+        encryptor: &AesGcmEncryptor,
+    ) -> Result<bool, InternalError> {
+        let Some(current_encrypted) = current_secret.as_encrypted() else {
+            return Ok(false);
+        };
+
+        let decrypted_current = current_encrypted.decrypt_plaintext_bytes(encryptor)?;
+        Ok(decrypted_current == new_plaintext.as_bytes())
     }
 }
 

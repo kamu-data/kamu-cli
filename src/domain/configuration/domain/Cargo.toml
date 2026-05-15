@@ -27,6 +27,7 @@ sqlx = ["dep:sqlx"]
 
 
 [dependencies]
+crypto-utils = { workspace = true }
 event-sourcing = { workspace = true }
 internal-error = { workspace = true }
 kamu-resources = { workspace = true }

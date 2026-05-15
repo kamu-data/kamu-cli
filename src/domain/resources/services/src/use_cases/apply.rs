@@ -33,21 +33,62 @@ macro_rules! declare_apply_resource_use_case {
         }
 
         impl $use_case {
-            async fn sanitize_spec(
+            async fn sanitize_params(
                 &self,
-                spec: <$resource as kamu_resources::DeclarativeResource>::Spec,
+                params: kamu_resources::ApplyResourceParams<$resource>,
             ) -> Result<
-                <$resource as kamu_resources::DeclarativeResource>::Spec,
+                kamu_resources::ApplyResourceParams<$resource>,
                 kamu_resources::ApplyResourceUseCaseError<$resource>,
             > {
-                if let Some(sanitizer) = &self.resource_spec_sanitizer {
-                    sanitizer
-                        .sanitize(spec)
+                // If no sanitizer is provided, return the original params
+                let Some(sanitizer) = &self.resource_spec_sanitizer else {
+                    return Ok(params);
+                };
+
+                // Find the resource UID if not provided
+                let maybe_resource_uid = match params.uid {
+                    Some(uid) => Some(uid),
+                    None => self
+                        .generic_resource_query_service
+                        .find_resource_uid_by_name(
+                            &params.metadata.account,
+                            <$resource as kamu_resources::ResourceDescriptorProvider>::DESCRIPTOR
+                                .resource_type,
+                            &params.metadata.name,
+                        )
                         .await
-                        .map_err(kamu_resources::ApplyResourceUseCaseError::Internal)
+                        .map_err(kamu_resources::ApplyResourceUseCaseError::Internal)?,
+                };
+
+                // Load the current spec if the resource exists to provide it to the sanitizer for comparison
+                let current_spec = if let Some(uid) = maybe_resource_uid {
+                    self.typed_resource_query_service
+                        .ensure_resource_uid_matches_type(&uid)
+                        .await
+                        .map_err(kamu_resources::ApplyResourceUseCaseError::from)?;
+
+                    let resource = self
+                        .resource_aggregate_loader
+                        .load(&uid)
+                        .await
+                        .map_err(kamu_resources::ResourceLoadError)
+                        .map_err(kamu_resources::ApplyResourceUseCaseError::LoadFailed)?;
+
+                    Some(
+                        <$resource as kamu_resources::DeclarativeResource>::spec(&resource)
+                            .clone(),
+                    )
                 } else {
-                    Ok(spec)
-                }
+                    None
+                };
+
+                // Sanitize the new spec using the current spec for comparison
+                let spec = sanitizer
+                    .sanitize_new_spec(params.spec, current_spec.as_ref())
+                    .await
+                    .map_err(kamu_resources::ApplyResourceUseCaseError::Internal)?;
+
+                Ok(kamu_resources::ApplyResourceParams { spec, ..params })
             }
         }
 
@@ -77,11 +118,7 @@ macro_rules! declare_apply_resource_use_case {
                 kamu_resources::ApplyResourcePlanningDecision<$resource>,
                 kamu_resources::ApplyResourceUseCaseError<$resource>,
             > {
-                let sanitized_spec = self.sanitize_spec(params.spec).await?;
-                let params = kamu_resources::ApplyResourceParams {
-                    spec: sanitized_spec,
-                    ..params
-                };
+                let params = self.sanitize_params(params).await?;
 
                 let planner = $crate::ApplyResourcePlanner::<$resource>::new(
                     self.generic_resource_query_service.as_ref(),
@@ -100,11 +137,7 @@ macro_rules! declare_apply_resource_use_case {
                 kamu_resources::ApplyResourceApplicationDecision<$resource>,
                 kamu_resources::ApplyResourceUseCaseError<$resource>,
             > {
-                let sanitized_spec = self.sanitize_spec(params.spec).await?;
-                let params = kamu_resources::ApplyResourceParams {
-                    spec: sanitized_spec,
-                    ..params
-                };
+                let params = self.sanitize_params(params).await?;
 
                 let planner = $crate::ApplyResourcePlanner::<$resource>::new(
                     self.generic_resource_query_service.as_ref(),

@@ -139,30 +139,6 @@ impl SecretSetReconcilerImpl {
             .map_err(SecretSetReconcileError::Internal)
     }
 
-    fn extract_plaintext(
-        &self,
-        secret: &kamu_configuration::SecretSpec,
-        encryptor: &AesGcmEncryptor,
-    ) -> Result<Vec<u8>, SecretSetReconcileError> {
-        use base64::Engine;
-        use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
-        use kamu_configuration::SecretSpec;
-
-        match secret {
-            SecretSpec::Encrypted(enc) => {
-                let encrypted_bytes = BASE64_STANDARD.decode(&enc.encrypted).int_err()?;
-                let nonce_bytes = BASE64_STANDARD.decode(&enc.nonce).int_err()?;
-                let plaintext = encryptor
-                    .decrypt_bytes(&encrypted_bytes, &nonce_bytes)
-                    .int_err()?;
-                Ok(plaintext)
-            }
-            SecretSpec::Literal(_) | SecretSpec::Value(_) => {
-                Ok(secret.literal_value().as_bytes().to_vec())
-            }
-        }
-    }
-
     fn build_secret_entries(
         &self,
         encryptor: &AesGcmEncryptor,
@@ -174,7 +150,9 @@ impl SecretSetReconcilerImpl {
         let mut entries = Vec::with_capacity(secrets.len());
 
         for (key, secret) in secrets {
-            let plaintext = self.extract_plaintext(secret, encryptor)?;
+            let plaintext = secret
+                .decrypt_plaintext_bytes(encryptor)
+                .map_err(SecretSetReconcileError::Internal)?;
             let (value, secret_nonce) = encryptor
                 .encrypt_bytes(&plaintext)
                 .int_err()
