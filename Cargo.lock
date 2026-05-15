@@ -8135,6 +8135,7 @@ name = "kamu-configuration-services"
 version = "0.262.0"
 dependencies = [
  "async-trait",
+ "base64",
  "chrono",
  "crypto-utils",
  "database-common",

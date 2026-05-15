@@ -150,6 +150,7 @@ interface "ResourceRepository" <<i>>
 interface "ResourceSelectionResolutionService" <<i>>
 interface "ResourceSelectionSyntaxService" <<i>>
 interface "ResourceSelectorResolutionService" <<i>>
+interface "ResourceSpecSanitizer" <<i>>
 interface "ResourceSummaryService" <<i>>
 interface "SchemaService" <<i>>
 interface "SearchEntitySchemaProvider" <<i>>
@@ -385,6 +386,7 @@ class "SecretSetResourceCrudDispatcher"
 class "SecretSetResourceLifecycleDispatcher"
 class "SecretSetResourcePersistenceServiceImpl"
 class "SecretSetResourcePresentationDispatcher"
+class "SecretSetSpecSanitizer"
 class "SecretSetTypedResourceQueryServiceImpl"
 class "SecretsEncryptionConfig" <<singleton>>
 class "SessionAuthAnonymous"
@@ -927,6 +929,8 @@ class "WsSmartTransferProtocolClient"
 "VariableSetResourcePersistenceServiceImpl"  --> "ResourceRepository"
 "TypedResourceQueryService" <|-- "VariableSetTypedResourceQueryServiceImpl"
 "VariableSetTypedResourceQueryServiceImpl"  --> "ResourceRepository"
+"ResourceSpecSanitizer" <|-- "SecretSetSpecSanitizer"
+"SecretSetSpecSanitizer"  --> "SecretsEncryptionConfig"
 "DatasetSecretSetBindingRepository" <|-- "SqliteDatasetSecretSetBindingRepository"
 "SqliteDatasetSecretSetBindingRepository"  --> "TransactionRefT"
 "DatasetVariableSetBindingRepository" <|-- "SqliteDatasetVariableSetBindingRepository"

@@ -7,7 +7,5 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod dataset_env_var_service_harness;
-mod test_dataset_env_var_mutation_adapter;
-mod test_dataset_env_var_resolver;
-mod test_secret_set_sanitizer;
+mod secret_set;
+pub use secret_set::*;
