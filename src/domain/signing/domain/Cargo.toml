@@ -24,12 +24,14 @@ doctest = false
 [features]
 default = []
 
-utoipa = ["dep:utoipa"]
-
+schemars = ["crypto-eip712-utils/schemars"]
+utoipa = ["dep:utoipa", "crypto-eip712-utils/utoipa"]
 
 [dependencies]
 internal-error = { workspace = true }
-crypto-eip712-utils = { workspace = true }
+crypto-eip712-utils = { workspace = true, default-features = false, features = [
+    "serde"
+] }
 odf = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
