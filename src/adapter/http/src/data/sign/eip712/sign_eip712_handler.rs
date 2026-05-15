@@ -45,7 +45,7 @@ use crate::data::query_handler::ResponseSigningNotConfigured;
 pub async fn sign_eip712_handler(
     Extension(catalog): Extension<dill::Catalog>,
     Query(params): Query<SignEip712QueryParams>,
-    Json(request): Json<crypto_eip712_utils::Eip712TypedData>,
+    Json(request): Json<kamu_signing::utils::Eip712TypedData>,
 ) -> Result<Json<SignEip712Response>, ApiError> {
     use kamu_signing::use_cases::*;
 

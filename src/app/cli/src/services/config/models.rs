@@ -561,27 +561,33 @@ pub struct AwsSecretDatabasePasswordPolicyConfig {
 
 /// Private keys used to sign API responses.
 /// Supported algorithms: `ed25519`, `secp256k1`.
-///
-/// To generate, use:
-///
-///     dd if=/dev/urandom bs=1 count=32 status=none |
-///         base64 -w0 |
-///         tr '+/' '-_' |
-///         tr -d '=' |
-///         (echo -n u && cat)
-///
-/// The command above:
-/// - reads 32 random bytes
-/// - base64-encodes them
-/// - converts default base64 encoding to base64url and removes padding
-/// - prepends a multibase prefix
 #[derive(setty::Config, setty::Default)]
 pub struct IdentityConfig {
+    /// To generate, use:
+    ///
+    /// ```sh
+    /// dd if=/dev/urandom bs=1 count=32 status=none |
+    ///     base64 -w0 |
+    ///     tr '+/' '-_' |
+    ///     tr -d '=' |
+    ///     (echo -n u && cat)
+    /// ```
+    ///
+    /// The command above:
+    /// - Reads 32 random bytes
+    /// - base64-encodes them
+    /// - Converts default base64 encoding to base64url and removes padding
+    /// - Prepends a multibase prefix
     #[config(combine(replace))]
     pub private_key: Option<odf::metadata::PrivateKey>,
 
+    /// Secp256k1 private key used to sign EIP-712 typed data.
+    ///
+    /// ```sh
+    /// cast wallet new
+    /// ```
     #[config(combine(replace))]
-    pub secp256k1_private_key: Option<crypto_eip712_utils::Secp256k1Signer>,
+    pub secp256k1_private_key: Option<kamu_signing::utils::Secp256k1Signer>,
 }
 
 impl IdentityConfig {
