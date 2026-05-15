@@ -34,10 +34,6 @@ impl ResourceDescriptor {
             api_version,
         }
     }
-
-    pub fn matches_snapshot(&self, snapshot: &crate::ResourceSnapshot) -> bool {
-        self.resource_type == snapshot.kind && self.api_version == snapshot.api_version
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

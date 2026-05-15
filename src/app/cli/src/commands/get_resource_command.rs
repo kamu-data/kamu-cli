@@ -223,6 +223,7 @@ impl GetResourceCommand {
                                 .collect(),
                         },
                         format,
+                        kamu_resources_facade::SpecViewMode::Encrypted,
                     )
                     .await?;
 
@@ -249,15 +250,18 @@ impl GetResourceCommand {
         for ((kind, api_version), entries) in Self::group_targets_by_descriptor(targets) {
             for chunk in entries.chunks(Self::MATERIALIZATION_BATCH_SIZE) {
                 let result = resource_facade
-                    .get_many(ResourceBatchSelector {
-                        account: None,
-                        kind: kind.clone(),
-                        api_version: Some(api_version.clone()),
-                        resource_refs: chunk
-                            .iter()
-                            .map(|(_, target)| ResourceRef::ById(target.uid))
-                            .collect(),
-                    })
+                    .get_many(
+                        ResourceBatchSelector {
+                            account: None,
+                            kind: kind.clone(),
+                            api_version: Some(api_version.clone()),
+                            resource_refs: chunk
+                                .iter()
+                                .map(|(_, target)| ResourceRef::ById(target.uid))
+                                .collect(),
+                        },
+                        kamu_resources_facade::SpecViewMode::Encrypted,
+                    )
                     .await?;
 
                 self.handle_get_resource_problems(result.problems)?;

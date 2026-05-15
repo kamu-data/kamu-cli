@@ -4067,11 +4067,11 @@ type Resources {
 	"""
 	Returns a resource by selector, if found
 	"""
-	resource(selector: ResourceSelectorInput!): Resource
+	resource(selector: ResourceSelectorInput!, revealed: Boolean! = false): Resource
 	"""
 	Returns resources by selectors
 	"""
-	resources(selector: ResourceBatchSelectorInput!): BatchResourcesResult!
+	resources(selector: ResourceBatchSelectorInput!, revealed: Boolean! = false): BatchResourcesResult!
 	"""
 	Returns resource identity by selector, if found
 	"""
@@ -4103,11 +4103,11 @@ type Resources {
 	"""
 	Renders a canonical manifest representation from a stored resource
 	"""
-	renderManifest(selector: ResourceSelectorInput!, format: ResourceManifestFormat!): ResourceRenderManifestResult!
+	renderManifest(selector: ResourceSelectorInput!, format: ResourceManifestFormat!, revealed: Boolean! = false): ResourceRenderManifestResult!
 	"""
 	Renders canonical manifest representations from stored resources
 	"""
-	renderManifests(selector: ResourceBatchSelectorInput!, format: ResourceManifestFormat!): BatchResourceManifestsResult!
+	renderManifests(selector: ResourceBatchSelectorInput!, format: ResourceManifestFormat!, revealed: Boolean! = false): BatchResourceManifestsResult!
 }
 
 type ResourcesMut {

@@ -60,32 +60,34 @@ impl MessageConsumerT<ResourceLifecycleMessage> for ResourceLifecycleMessageCons
 
         match message {
             ResourceLifecycleMessage::Applied(applied_message) => {
+                let resource = &applied_message.resource;
                 let dispatcher = get_resource_lifecycle_dispatcher_from_catalog(
                     target_catalog,
-                    &applied_message.resource,
+                    &resource.kind,
+                    &resource.api_version,
                 )?;
 
-                dispatcher.handle_applied(&applied_message.resource).await
+                dispatcher.handle_applied(resource).await
             }
             ResourceLifecycleMessage::ReconciliationSucceeded(succeeded_message) => {
+                let resource = &succeeded_message.resource;
                 let dispatcher = get_resource_lifecycle_dispatcher_from_catalog(
                     target_catalog,
-                    &succeeded_message.resource,
+                    &resource.kind,
+                    &resource.api_version,
                 )?;
 
-                dispatcher
-                    .handle_reconciliation_succeeded(&succeeded_message.resource)
-                    .await
+                dispatcher.handle_reconciliation_succeeded(resource).await
             }
             ResourceLifecycleMessage::ReconciliationFailed(failed_message) => {
+                let resource = &failed_message.resource;
                 let dispatcher = get_resource_lifecycle_dispatcher_from_catalog(
                     target_catalog,
-                    &failed_message.resource,
+                    &resource.kind,
+                    &resource.api_version,
                 )?;
 
-                dispatcher
-                    .handle_reconciliation_failed(&failed_message.resource)
-                    .await
+                dispatcher.handle_reconciliation_failed(resource).await
             }
             ResourceLifecycleMessage::Deleted(deleted_message) => {
                 debug_assert!(
@@ -93,9 +95,11 @@ impl MessageConsumerT<ResourceLifecycleMessage> for ResourceLifecycleMessageCons
                     "deleted message must contain at least one resource"
                 );
 
+                let first = &deleted_message.resources[0];
                 let dispatcher = get_resource_lifecycle_dispatcher_from_catalog(
                     target_catalog,
-                    &deleted_message.resources[0],
+                    &first.kind,
+                    &first.api_version,
                 )?;
 
                 for resource in &deleted_message.resources {

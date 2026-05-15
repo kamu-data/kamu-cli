@@ -49,11 +49,16 @@ pub trait ResourceFacade: Send + Sync {
         request: ResourcesSummaryRequest,
     ) -> Result<ResourcesSummary, ResourcesSummaryError>;
 
-    async fn get(&self, selector: ResourceSelector) -> Result<ResourceView, GetResourceError>;
+    async fn get(
+        &self,
+        selector: ResourceSelector,
+        spec_view_mode: SpecViewMode,
+    ) -> Result<ResourceView, GetResourceError>;
 
     async fn get_many(
         &self,
         selector: ResourceBatchSelector,
+        spec_view_mode: SpecViewMode,
     ) -> Result<BatchResourceResponse<ResourceView, ResourceLookupProblem>, BatchResourceError>;
 
     async fn get_identity(
@@ -73,12 +78,14 @@ pub trait ResourceFacade: Send + Sync {
         &self,
         selector: ResourceSelector,
         format: ResourceManifestFormat,
+        spec_view_mode: SpecViewMode,
     ) -> Result<RenderResourceManifestResult, RenderResourceManifestError>;
 
     async fn render_manifests(
         &self,
         selector: ResourceBatchSelector,
         format: ResourceManifestFormat,
+        spec_view_mode: SpecViewMode,
     ) -> Result<
         BatchResourceResponse<RenderResourceManifestResult, ResourceLookupProblem>,
         BatchResourceError,
@@ -258,6 +265,15 @@ pub struct ResourcesSummaryRequest {
 pub struct RenderResourceManifestResult {
     pub manifest: String,
     pub format: ResourceManifestFormat,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SpecViewMode {
+    #[default]
+    Encrypted,
+    Revealed,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -101,6 +101,7 @@ impl Resources {
         &self,
         ctx: &Context<'_>,
         selector: ResourceSelectorInput,
+        #[graphql(default)] revealed: bool,
     ) -> Result<Option<Resource>> {
         let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
 
@@ -111,13 +112,18 @@ impl Resources {
             account,
         } = selector;
 
+        let spec_view_mode = Self::spec_view_mode_from_revealed(revealed);
+
         match resource_facade
-            .get(kamu_resources_facade::ResourceSelector {
-                account: account.map(ResourceAccountSelectorInput::into_manifest_account),
-                kind: kind.into_resource_type(),
-                api_version,
-                resource_ref: resource_ref.into(),
-            })
+            .get(
+                kamu_resources_facade::ResourceSelector {
+                    account: account.map(ResourceAccountSelectorInput::into_manifest_account),
+                    kind: kind.into_resource_type(),
+                    api_version,
+                    resource_ref: resource_ref.into(),
+                },
+                spec_view_mode,
+            )
             .await
         {
             Ok(resource) => Ok(Some(resource.into())),
@@ -148,6 +154,7 @@ impl Resources {
         &self,
         ctx: &Context<'_>,
         selector: ResourceBatchSelectorInput,
+        #[graphql(default)] revealed: bool,
     ) -> Result<BatchResourcesResult> {
         let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
 
@@ -158,13 +165,18 @@ impl Resources {
             account,
         } = selector;
 
+        let spec_view_mode = Self::spec_view_mode_from_revealed(revealed);
+
         resource_facade
-            .get_many(kamu_resources_facade::ResourceBatchSelector {
-                account: account.map(ResourceAccountSelectorInput::into_manifest_account),
-                kind: kind.into_resource_type(),
-                api_version,
-                resource_refs: resource_refs.into_iter().map(Into::into).collect(),
-            })
+            .get_many(
+                kamu_resources_facade::ResourceBatchSelector {
+                    account: account.map(ResourceAccountSelectorInput::into_manifest_account),
+                    kind: kind.into_resource_type(),
+                    api_version,
+                    resource_refs: resource_refs.into_iter().map(Into::into).collect(),
+                },
+                spec_view_mode,
+            )
             .await
             .map(Into::into)
             .map_err(map_batch_resource_error)
@@ -414,6 +426,7 @@ impl Resources {
         ctx: &Context<'_>,
         selector: ResourceSelectorInput,
         format: ResourceManifestFormat,
+        #[graphql(default)] revealed: bool,
     ) -> Result<ResourceRenderManifestResult> {
         let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
 
@@ -424,6 +437,8 @@ impl Resources {
             account,
         } = selector;
 
+        let spec_view_mode = Self::spec_view_mode_from_revealed(revealed);
+
         let rendered = resource_facade
             .render_manifest(
                 kamu_resources_facade::ResourceSelector {
@@ -433,6 +448,7 @@ impl Resources {
                     resource_ref: resource_ref.into(),
                 },
                 format.into(),
+                spec_view_mode,
             )
             .await
             .map_err(map_render_resource_manifest_error)?;
@@ -451,6 +467,7 @@ impl Resources {
         ctx: &Context<'_>,
         selector: ResourceBatchSelectorInput,
         format: ResourceManifestFormat,
+        #[graphql(default)] revealed: bool,
     ) -> Result<BatchResourceManifestsResult> {
         let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
 
@@ -461,6 +478,8 @@ impl Resources {
             account,
         } = selector;
 
+        let spec_view_mode = Self::spec_view_mode_from_revealed(revealed);
+
         resource_facade
             .render_manifests(
                 kamu_resources_facade::ResourceBatchSelector {
@@ -470,10 +489,23 @@ impl Resources {
                     resource_refs: resource_refs.into_iter().map(Into::into).collect(),
                 },
                 format.into(),
+                spec_view_mode,
             )
             .await
             .map(Into::into)
             .map_err(map_batch_resource_error)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl Resources {
+    fn spec_view_mode_from_revealed(revealed: bool) -> kamu_resources_facade::SpecViewMode {
+        if revealed {
+            kamu_resources_facade::SpecViewMode::Revealed
+        } else {
+            kamu_resources_facade::SpecViewMode::Encrypted
+        }
     }
 }
 

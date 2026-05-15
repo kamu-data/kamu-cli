@@ -77,26 +77,58 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         Ok(ResourcesSummary { resource_counts })
     }
 
-    async fn get(&self, selector: ResourceSelector) -> Result<ResourceView, GetResourceError> {
-        self.resolve_resource_view::<GetResourceError>(selector)
-            .await
+    async fn get(
+        &self,
+        selector: ResourceSelector,
+        spec_view_mode: SpecViewMode,
+    ) -> Result<ResourceView, GetResourceError> {
+        let mut view = self
+            .resolve_resource_view::<GetResourceError>(selector)
+            .await?;
+
+        if let Some(d) =
+            self.try_resolve_spec_view_dispatcher(&view.kind, &view.api_version, spec_view_mode)
+        {
+            view.spec = d.reveal_spec(view.spec).map_err(GetResourceError::from)?;
+        }
+
+        Ok(view)
     }
 
     async fn get_many(
         &self,
         selector: ResourceBatchSelector,
+        spec_view_mode: SpecViewMode,
     ) -> Result<BatchResourceResponse<ResourceView, ResourceLookupProblem>, BatchResourceError>
     {
         let (indexed_resources, problems) = self.resolve_multiple_resource_views(selector).await?;
 
-        Ok(BatchResourceResponse {
-            successes: indexed_resources
-                .into_iter()
-                .map(|resource| BatchResourceSuccess {
+        let maybe_spec_view_dispatcher = if let Some(first_resource) = indexed_resources.first() {
+            self.try_resolve_spec_view_dispatcher(
+                &first_resource.item.kind,
+                &first_resource.item.api_version,
+                spec_view_mode,
+            )
+        } else {
+            None
+        };
+
+        let successes = indexed_resources
+            .into_iter()
+            .map(|resource| {
+                let mut view = resource.item;
+                if let Some(ref d) = maybe_spec_view_dispatcher {
+                    view.spec = d.reveal_spec(view.spec).map_err(BatchResourceError::from)?;
+                }
+                Ok(BatchResourceSuccess {
                     request_index: resource.request_index,
-                    item: resource.item,
+                    item: view,
                 })
-                .collect(),
+            })
+            .collect::<Result<Vec<_>, BatchResourceError>>()?;
+
+        Ok(BatchResourceResponse {
+            successes,
             problems,
         })
     }
@@ -185,10 +217,19 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         &self,
         selector: ResourceSelector,
         format: ResourceManifestFormat,
+        spec_view_mode: SpecViewMode,
     ) -> Result<RenderResourceManifestResult, RenderResourceManifestError> {
-        let view = self
+        let mut view = self
             .resolve_resource_view::<RenderResourceManifestError>(selector)
             .await?;
+
+        if let Some(d) =
+            self.try_resolve_spec_view_dispatcher(&view.kind, &view.api_version, spec_view_mode)
+        {
+            view.spec = d
+                .reveal_spec(view.spec)
+                .map_err(RenderResourceManifestError::from)?;
+        }
 
         let manifest = resource_view_to_manifest(view);
         let manifest =
@@ -201,18 +242,31 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         &self,
         selector: ResourceBatchSelector,
         format: ResourceManifestFormat,
+        spec_view_mode: SpecViewMode,
     ) -> Result<
         BatchResourceResponse<RenderResourceManifestResult, ResourceLookupProblem>,
         BatchResourceError,
     > {
-        let (indexed_resources, get_problems) =
-            self.resolve_multiple_resource_views(selector).await?;
+        let (indexed_resources, problems) = self.resolve_multiple_resource_views(selector).await?;
+
+        let maybe_spec_view_dispatcher = if let Some(first_resource) = indexed_resources.first() {
+            self.try_resolve_spec_view_dispatcher(
+                &first_resource.item.kind,
+                &first_resource.item.api_version,
+                spec_view_mode,
+            )
+        } else {
+            None
+        };
 
         let mut successes = Vec::new();
-        let problems = get_problems;
 
         for resource in indexed_resources {
-            let manifest = resource_view_to_manifest(resource.item);
+            let mut view = resource.item;
+            if let Some(ref d) = maybe_spec_view_dispatcher {
+                view.spec = d.reveal_spec(view.spec).map_err(BatchResourceError::from)?;
+            }
+            let manifest = resource_view_to_manifest(view);
             let manifest =
                 serialize_manifest(&manifest, format).map_err(BatchResourceError::Internal)?;
 
@@ -914,6 +968,19 @@ impl LocalResourceFacadeImpl {
         }
 
         Ok(())
+    }
+
+    fn try_resolve_spec_view_dispatcher(
+        &self,
+        kind: &str,
+        api_version: &str,
+        spec_view_mode: SpecViewMode,
+    ) -> Option<Arc<dyn ResourceSpecViewDispatcher>> {
+        if spec_view_mode == SpecViewMode::Revealed {
+            get_resource_spec_view_dispatcher_from_catalog(&self.catalog, kind, api_version)
+        } else {
+            None
+        }
     }
 }
 

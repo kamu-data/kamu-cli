@@ -12,40 +12,33 @@ use std::sync::Arc;
 use dill::Catalog;
 use internal_error::InternalError;
 
-use crate::{ResourceSnapshot, get_resource_dispatcher_from_catalog};
+use crate::{ResourceDescriptor, get_resource_dispatcher_from_catalog};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[async_trait::async_trait]
-pub trait ResourceLifecycleEventDispatcher: Send + Sync {
-    async fn handle_applied(&self, resource: &ResourceSnapshot) -> Result<(), InternalError>;
+pub trait ResourceSpecViewDispatcher: Send + Sync {
+    fn descriptor(&self) -> ResourceDescriptor;
 
-    async fn handle_reconciliation_succeeded(
-        &self,
-        resource: &ResourceSnapshot,
-    ) -> Result<(), InternalError>;
-
-    async fn handle_reconciliation_failed(
-        &self,
-        resource: &ResourceSnapshot,
-    ) -> Result<(), InternalError>;
-
-    async fn handle_deleted(&self, resource: &ResourceSnapshot) -> Result<(), InternalError>;
+    fn reveal_spec(&self, spec: serde_json::Value) -> Result<serde_json::Value, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn get_resource_lifecycle_dispatcher_from_catalog(
-    target_catalog: &Catalog,
+/// Returns the spec view dispatcher for the given resource kind, or
+/// `None` if none is registered. Absence is normal for resource types that have
+/// no sensitive fields.
+pub fn get_resource_spec_view_dispatcher_from_catalog(
+    catalog: &Catalog,
     kind: &str,
     api_version: &str,
-) -> Result<Arc<dyn ResourceLifecycleEventDispatcher>, InternalError> {
+) -> Option<Arc<dyn ResourceSpecViewDispatcher>> {
     get_resource_dispatcher_from_catalog(
-        target_catalog,
+        catalog,
         kind,
         api_version,
-        "resource lifecycle dispatcher",
+        "resource spec view dispatcher",
     )
+    .ok()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

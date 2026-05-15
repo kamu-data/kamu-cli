@@ -7,17 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
-use dill::Catalog;
-use internal_error::InternalError;
-
-use crate::{
-    ResourceDescriptor,
-    ResourcePresentationDefinition,
-    ResourceSnapshot,
-    get_resource_dispatcher_from_catalog,
-};
+use crate::{ResourceDescriptor, ResourcePresentationDefinition};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -25,19 +15,6 @@ pub trait ResourcePresentationDispatcher: Send + Sync {
     fn descriptor(&self) -> ResourceDescriptor;
 
     fn presentation(&self) -> ResourcePresentationDefinition;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub fn get_resource_presentation_dispatcher_from_catalog(
-    target_catalog: &Catalog,
-    resource: &ResourceSnapshot,
-) -> Result<Arc<dyn ResourcePresentationDispatcher>, InternalError> {
-    get_resource_dispatcher_from_catalog(
-        target_catalog,
-        resource,
-        "resource presentation dispatcher",
-    )
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
