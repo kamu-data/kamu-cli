@@ -12,3 +12,4 @@ mod test_dataset_env_var_mutation_adapter;
 mod test_dataset_env_var_resolver;
 mod test_secret_set_reconciler;
 mod test_secret_set_sanitizer;
+mod test_secret_set_spec_view_dispatcher;

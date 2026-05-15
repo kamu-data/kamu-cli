@@ -151,6 +151,7 @@ interface "ResourceSelectionResolutionService" <<i>>
 interface "ResourceSelectionSyntaxService" <<i>>
 interface "ResourceSelectorResolutionService" <<i>>
 interface "ResourceSpecSanitizer" <<i>>
+interface "ResourceSpecViewDispatcher" <<i>>
 interface "ResourceSummaryService" <<i>>
 interface "SchemaService" <<i>>
 interface "SearchEntitySchemaProvider" <<i>>
@@ -387,6 +388,7 @@ class "SecretSetResourceLifecycleDispatcher"
 class "SecretSetResourcePersistenceServiceImpl"
 class "SecretSetResourcePresentationDispatcher"
 class "SecretSetSpecSanitizer"
+class "SecretSetSpecViewDispatcher"
 class "SecretSetTypedResourceQueryServiceImpl"
 class "SecretsEncryptionConfig" <<singleton>>
 class "SessionAuthAnonymous"
@@ -858,6 +860,8 @@ class "WsSmartTransferProtocolClient"
 "SecretSetResourceCrudDispatcher"  --> "GetResourceByUidUseCase"
 "SecretSetResourceCrudDispatcher"  --> "ListResourcesByKindUseCase"
 "ResourcePresentationDispatcher" <|-- "SecretSetResourcePresentationDispatcher"
+"ResourceSpecViewDispatcher" <|-- "SecretSetSpecViewDispatcher"
+"SecretSetSpecViewDispatcher"  --> "SecretsEncryptionConfig"
 "ResourceCrudDispatcher" <|-- "VariableSetResourceCrudDispatcher"
 "VariableSetResourceCrudDispatcher"  --> "GenericResourceQueryService"
 "VariableSetResourceCrudDispatcher"  --> "ApplyResourceUseCase"
