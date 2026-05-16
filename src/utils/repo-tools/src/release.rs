@@ -163,9 +163,7 @@ fn update_config_reference(path: &Path, new_version: &Version) {
 
     let re = regex::Regex::new(r#"kamu-cli&#x2F;\d+\.\d+\.\d+"#).unwrap();
     let new_text = re
-        .replace_all(&text, |_: &Captures| {
-            format!("kamu-cli&#x2F;{new_version}")
-        })
+        .replace_all(&text, |_: &Captures| format!("kamu-cli&#x2F;{new_version}"))
         .to_string();
 
     pretty_assertions::assert_ne!(text, new_text);
