@@ -38,50 +38,54 @@ where
 impl ExtraAttributes {
     pub fn new() -> Self {
         Self {
-            attributes: serde_json::Map::new(),
+            entries: std::collections::BTreeMap::new(),
         }
     }
 
     pub fn new_from_json(value: serde_json::Value) -> Result<Self, ExtraAttributesInvalidInput> {
-        let serde_json::Value::Object(attributes) = value else {
+        let serde_json::Value::Object(json_map) = value else {
             return Err(ExtraAttributesInvalidInput { value });
         };
 
-        Ok(Self { attributes })
+        Ok(Self {
+            // TODO: Avoid reallocation
+            entries: std::collections::BTreeMap::from_iter(json_map),
+        })
     }
 
     pub fn into_json(self) -> serde_json::Value {
-        serde_json::Value::Object(self.attributes)
+        // TODO: Avoid reallocation
+        serde_json::Value::Object(serde_json::Map::from_iter(self.entries))
     }
 
     pub fn contains_key(&self, key: &str) -> bool {
-        self.attributes.contains_key(key)
+        self.entries.contains_key(key)
     }
 
     pub fn get<T>(&self) -> Result<Option<T>, serde_json::Error>
     where
         T: Attribute,
     {
-        if !T::KEYS.iter().any(|k| self.attributes.contains_key(*k)) {
+        if !T::KEYS.iter().any(|k| self.entries.contains_key(*k)) {
             return Ok(None);
         }
 
         // TODO: PERF: Avoid cloning
-        let json = serde_json::Value::Object(self.attributes.clone());
+        let json = serde_json::Value::Object(serde_json::Map::from_iter(self.entries.clone()));
         let val = serde_json::from_value(json)?;
         Ok(Some(val))
     }
 
     pub fn insert<T: IntoAttribute>(&mut self, value: T) {
         let attr = value.into_attribute();
-        let serde_json::Value::Object(mut other) = serde_json::to_value(attr).unwrap() else {
+        let serde_json::Value::Object(other) = serde_json::to_value(attr).unwrap() else {
             panic!(
                 "{} must serialize to object to use merge",
                 std::any::type_name::<T>()
             );
         };
 
-        self.attributes.append(&mut other);
+        self.entries.extend(other);
     }
 
     pub fn with<T: IntoAttribute>(mut self, value: T) -> Self {
@@ -90,28 +94,27 @@ impl ExtraAttributes {
     }
 
     pub fn insert_json(&mut self, value: serde_json::Value) {
-        let serde_json::Value::Object(mut other) = value else {
+        let serde_json::Value::Object(other) = value else {
             panic!("Value must be an object");
         };
 
-        self.attributes.append(&mut other);
+        self.entries.extend(other);
     }
 
     pub fn remove<T: Attribute>(&mut self) {
-        self.attributes
-            .retain(|k, _| !T::KEYS.contains(&k.as_str()));
+        self.entries.retain(|k, _| !T::KEYS.contains(&k.as_str()));
     }
 
     pub fn retain<F>(mut self, fun: F) -> Self
     where
         F: FnMut(&String, &mut serde_json::Value) -> bool,
     {
-        self.attributes.retain(fun);
+        self.entries.retain(fun);
         self
     }
 
     pub fn map_empty(self) -> Option<Self> {
-        if self.attributes.is_empty() {
+        if self.entries.is_empty() {
             None
         } else {
             Some(self)
@@ -123,7 +126,7 @@ impl ExtraAttributes {
 impl Default for ExtraAttributes {
     fn default() -> Self {
         Self {
-            attributes: Default::default(),
+            entries: Default::default(),
         }
     }
 }

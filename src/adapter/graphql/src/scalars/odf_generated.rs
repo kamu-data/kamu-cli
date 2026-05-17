@@ -26,6 +26,28 @@ use crate::queries::Dataset;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Reference to an account.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#accountref-schema
+#[derive(SimpleObject, Debug, Clone)]
+pub struct AccountRef {
+    /// DID of an account.
+    pub id: Option<String>,
+    /// Name of an account.
+    pub name: Option<String>,
+}
+
+impl From<odf::metadata::AccountRef> for AccountRef {
+    fn from(v: odf::metadata::AccountRef) -> Self {
+        Self {
+            id: v.id.map(Into::into),
+            name: v.name.map(Into::into),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Indicates that data has been ingested into a root dataset.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#adddata-schema
@@ -188,27 +210,10 @@ impl From<odf::metadata::Checkpoint> for Checkpoint {
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#compressionformat-schema
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
+#[graphql(remote = "odf::metadata::CompressionFormat")]
 pub enum CompressionFormat {
     Gzip,
     Zip,
-}
-
-impl From<odf::metadata::CompressionFormat> for CompressionFormat {
-    fn from(v: odf::metadata::CompressionFormat) -> Self {
-        match v {
-            odf::metadata::CompressionFormat::Gzip => Self::Gzip,
-            odf::metadata::CompressionFormat::Zip => Self::Zip,
-        }
-    }
-}
-
-impl Into<odf::metadata::CompressionFormat> for CompressionFormat {
-    fn into(self) -> odf::metadata::CompressionFormat {
-        match self {
-            Self::Gzip => odf::metadata::CompressionFormat::Gzip,
-            Self::Zip => odf::metadata::CompressionFormat::Zip,
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -245,27 +250,10 @@ impl From<odf::metadata::DataSlice> for DataSlice {
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#datasetkind-schema
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
+#[graphql(remote = "odf::metadata::DatasetKind")]
 pub enum DatasetKind {
     Root,
     Derivative,
-}
-
-impl From<odf::metadata::DatasetKind> for DatasetKind {
-    fn from(v: odf::metadata::DatasetKind) -> Self {
-        match v {
-            odf::metadata::DatasetKind::Root => Self::Root,
-            odf::metadata::DatasetKind::Derivative => Self::Derivative,
-        }
-    }
-}
-
-impl Into<odf::metadata::DatasetKind> for DatasetKind {
-    fn into(self) -> odf::metadata::DatasetKind {
-        match self {
-            Self::Root => odf::metadata::DatasetKind::Root,
-            Self::Derivative => odf::metadata::DatasetKind::Derivative,
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -555,40 +543,19 @@ impl From<odf::metadata::ExecuteTransformInput> for ExecuteTransformInput {
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#extraattributes-schema
 
-#[nutype::nutype(derive(AsRef, Clone, Debug, Into))]
-pub struct ExtraAttributes(serde_json::Map<String, serde_json::Value>);
-impl Default for ExtraAttributes {
-    fn default() -> Self {
-        Self::new(Default::default())
-    }
-}
-impl From<odf::metadata::ExtraAttributes> for ExtraAttributes {
-    fn from(value: odf::metadata::ExtraAttributes) -> Self {
-        Self::new(value.attributes)
-    }
-}
+#[nutype::nutype(derive(AsRef, Clone, Debug, From, Into))]
+pub struct ExtraAttributes(odf::metadata::ExtraAttributes);
+
 #[async_graphql::Scalar]
 impl async_graphql::ScalarType for ExtraAttributes {
-    fn parse(gql_value: async_graphql::Value) -> async_graphql::InputValueResult<Self> {
-        let async_graphql::Value::Object(gql_map) = &gql_value else {
-            return Err(async_graphql::InputValueError::custom(format!(
-                "Invalid ExtraAttributes value: '{gql_value}'"
-            )));
-        };
-        let json_value = serde_json::to_value(gql_map)?;
-
-        let serde_json::Value::Object(json_map) = json_value else {
-            unreachable!()
-        };
-
-        Ok(Self::new(json_map))
+    fn parse(value: async_graphql::Value) -> async_graphql::InputValueResult<Self> {
+        let value: odf::metadata::serde::yaml::ExtraAttributes = async_graphql::from_value(value)?;
+        Ok(Self::new(value.into()))
     }
 
     fn to_value(&self) -> async_graphql::Value {
-        match async_graphql::Value::from_json(serde_json::Value::Object(self.as_ref().clone())) {
-            Ok(v) => v,
-            Err(e) => unreachable!("{e}"),
-        }
+        let value: odf::metadata::serde::yaml::ExtraAttributes = self.as_ref().clone().into();
+        async_graphql::to_value(&value).unwrap()
     }
 }
 
@@ -1027,30 +994,11 @@ impl From<odf::metadata::MetadataEvent> for MetadataEvent {
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#mqttqos-schema
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
+#[graphql(remote = "odf::metadata::MqttQos")]
 pub enum MqttQos {
     AtMostOnce,
     AtLeastOnce,
     ExactlyOnce,
-}
-
-impl From<odf::metadata::MqttQos> for MqttQos {
-    fn from(v: odf::metadata::MqttQos) -> Self {
-        match v {
-            odf::metadata::MqttQos::AtMostOnce => Self::AtMostOnce,
-            odf::metadata::MqttQos::AtLeastOnce => Self::AtLeastOnce,
-            odf::metadata::MqttQos::ExactlyOnce => Self::ExactlyOnce,
-        }
-    }
-}
-
-impl Into<odf::metadata::MqttQos> for MqttQos {
-    fn into(self) -> odf::metadata::MqttQos {
-        match self {
-            Self::AtMostOnce => odf::metadata::MqttQos::AtMostOnce,
-            Self::AtLeastOnce => odf::metadata::MqttQos::AtLeastOnce,
-            Self::ExactlyOnce => odf::metadata::MqttQos::ExactlyOnce,
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1801,6 +1749,320 @@ impl From<odf::metadata::RequestHeader> for RequestHeader {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Top-level container for resources that specifies the type and version of the
+/// resource it's specifying and carries identity, ownership, and status
+/// information.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#resource-schema
+#[derive(SimpleObject, Debug, Clone)]
+pub struct Resource {
+    /// Defines a bounded context that this resource belongs to. Context is
+    /// usually composed of a domain and a version e.g. `opendatafabric.org/v1`.
+    pub context: String,
+    /// Type name of the resource which is unique within a given context.
+    pub kind: String,
+    /// Container for identity and ownership information of a resource.
+    pub header: ResourceHeader,
+    /// Specifies the desired state of a resource.
+    pub spec: serde_json::Value,
+    /// Resource lifecycle and reconciliation inforamtion.
+    pub status: Option<ResourceStatus>,
+}
+
+impl From<odf::metadata::Resource<serde_json::Value>> for Resource {
+    fn from(v: odf::metadata::Resource<serde_json::Value>) -> Self {
+        Self {
+            context: v.context.into(),
+            kind: v.kind.into(),
+            header: v.header.into(),
+            spec: v.spec.into(),
+            status: v.status.map(Into::into),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Annotations is an unstructured key value map stored with a resource that may
+/// be set by external tools to store and retrieve arbitrary metadata. Unlike
+/// labels, annotations are not indexed and cannot be queried by.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#resourceannotations-schema
+
+#[nutype::nutype(derive(AsRef, Clone, Debug, From, Into))]
+pub struct ResourceAnnotations(odf::metadata::ResourceAnnotations);
+
+#[async_graphql::Scalar]
+impl async_graphql::ScalarType for ResourceAnnotations {
+    fn parse(value: async_graphql::Value) -> async_graphql::InputValueResult<Self> {
+        let value: odf::metadata::serde::yaml::ResourceAnnotations =
+            async_graphql::from_value(value)?;
+        Ok(Self::new(value.into()))
+    }
+
+    fn to_value(&self) -> async_graphql::Value {
+        let value: odf::metadata::serde::yaml::ResourceAnnotations = self.as_ref().clone().into();
+        async_graphql::to_value(&value).unwrap()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Generic contdition that can be added by contollers to provide additional
+/// information about the state of a resource.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#resourcecondition-schema
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ResourceCondition {
+    /// Value of the condition.
+    pub value: serde_json::Value,
+    /// Contains a programmatic identifier indicating the reason for the
+    /// condition's last transition. Producers of specific condition types may
+    /// define expected values and meanings for this field, and whether the
+    /// values are considered a guaranteed API. The value should be a CamelCase
+    /// string. This field may not be empty.
+    pub reason: Option<String>,
+    /// Human readable message indicating details about the transition.
+    pub message: Option<String>,
+    /// Time when condition transitioned from one status to another.
+    pub last_transition_time: Option<DateTime<Utc>>,
+    /// Resource generation that was last processed by the controller that added
+    /// this condition.
+    pub observed_generation: Option<u64>,
+}
+
+impl From<odf::metadata::ResourceCondition> for ResourceCondition {
+    fn from(v: odf::metadata::ResourceCondition) -> Self {
+        Self {
+            value: v.value.into(),
+            reason: v.reason.map(Into::into),
+            message: v.message.map(Into::into),
+            last_transition_time: v.last_transition_time.map(Into::into),
+            observed_generation: v.observed_generation.map(Into::into),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Container of feneric contditions that can be added by contollers to provide
+/// additional information about the state of a resource. Keys uniquely identify
+/// the condition and should be in the form of
+/// `{controller-name}/{condition-name}`.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#resourceconditions-schema
+
+#[nutype::nutype(derive(AsRef, Clone, Debug, From, Into))]
+pub struct ResourceConditions(odf::metadata::ResourceConditions);
+
+#[async_graphql::Scalar]
+impl async_graphql::ScalarType for ResourceConditions {
+    fn parse(value: async_graphql::Value) -> async_graphql::InputValueResult<Self> {
+        let value: odf::metadata::serde::yaml::ResourceConditions =
+            async_graphql::from_value(value)?;
+        Ok(Self::new(value.into()))
+    }
+
+    fn to_value(&self) -> async_graphql::Value {
+        let value: odf::metadata::serde::yaml::ResourceConditions = self.as_ref().clone().into();
+        async_graphql::to_value(&value).unwrap()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Container for identity and ownership information of a resource.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#resourceheader-schema
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ResourceHeader {
+    /// Unique identifier of a resource within entire ODF node. Automatically
+    /// assigned upon resource creation.
+    pub id: Option<String>,
+    /// Symbolic name of a resource that identifies it within a scope of an
+    /// onwing account.
+    pub name: String,
+    /// Reference to an account that owns the resource.
+    pub account: Option<AccountRef>,
+    /// Map of string keys and values that can be used to organize, categorize,
+    /// and query resources.
+    pub labels: Option<ResourceLabels>,
+    /// Annotations is an unstructured key value map stored with a resource that
+    /// may be set by external tools to store and retrieve arbitrary metadata.
+    /// Unlike labels, annotations are not indexed and cannot be queried by.
+    pub annotations: Option<ResourceAnnotations>,
+}
+
+impl From<odf::metadata::ResourceHeader> for ResourceHeader {
+    fn from(v: odf::metadata::ResourceHeader) -> Self {
+        Self {
+            id: v.id.map(Into::into),
+            name: v.name.into(),
+            account: v.account.map(Into::into),
+            labels: v.labels.map(Into::into),
+            annotations: v.annotations.map(Into::into),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Map of string keys and values that can be used to organize, categorize, and
+/// query resources.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#resourcelabels-schema
+
+#[nutype::nutype(derive(AsRef, Clone, Debug, From, Into))]
+pub struct ResourceLabels(odf::metadata::ResourceLabels);
+
+#[async_graphql::Scalar]
+impl async_graphql::ScalarType for ResourceLabels {
+    fn parse(value: async_graphql::Value) -> async_graphql::InputValueResult<Self> {
+        let value: odf::metadata::serde::yaml::ResourceLabels = async_graphql::from_value(value)?;
+        Ok(Self::new(value.into()))
+    }
+
+    fn to_value(&self) -> async_graphql::Value {
+        let value: odf::metadata::serde::yaml::ResourceLabels = self.as_ref().clone().into();
+        async_graphql::to_value(&value).unwrap()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Represents the lifecycle stage of a resource.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#resourcephase-schema
+#[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
+#[graphql(remote = "odf::metadata::ResourcePhase")]
+pub enum ResourcePhase {
+    Pending,
+    Reconciling,
+    Ready,
+    Degraded,
+    Failed,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Reference to another resource.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#resourceref-schema
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ResourceRef {
+    /// ID of a resource.
+    pub id: Option<String>,
+    /// Name of a resource.
+    pub name: Option<String>,
+    /// Reference to an account that owns the target resource.
+    pub account: Option<AccountRef>,
+}
+
+impl From<odf::metadata::ResourceRef> for ResourceRef {
+    fn from(v: odf::metadata::ResourceRef) -> Self {
+        Self {
+            id: v.id.map(Into::into),
+            name: v.name.map(Into::into),
+            account: v.account.map(Into::into),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Resource lifecycle and reconciliation inforamtion.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#resourcestatus-schema
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ResourceStatus {
+    /// Represents the lifecycle stage of a resource.
+    pub phase: ResourcePhase,
+    /// Resource generation that was last processed by the controller that added
+    /// this condition.
+    pub observed_generation: Option<u64>,
+    /// Detailed conditions describing the state of the resource that are added
+    /// by controllers.
+    pub conditions: Option<ResourceConditions>,
+}
+
+impl From<odf::metadata::ResourceStatus> for ResourceStatus {
+    fn from(v: odf::metadata::ResourceStatus) -> Self {
+        Self {
+            phase: v.phase.into(),
+            observed_generation: v.observed_generation.map(Into::into),
+            conditions: v.conditions.map(Into::into),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Individual secret in raw or encrypted form.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#secret-schema
+#[derive(SimpleObject, Debug, Clone)]
+pub struct Secret {
+    /// A secret value in raw or encoded form.
+    pub value: String,
+    /// Represents the encoding of the value. Typically will be `jwe` after a
+    /// raw secret gets encrypted.
+    pub content_encoding: Option<String>,
+}
+
+impl From<odf::metadata::Secret> for Secret {
+    fn from(v: odf::metadata::Secret) -> Self {
+        Self {
+            value: v.value.into(),
+            content_encoding: v.content_encoding.map(Into::into),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Defines a set of secrets stored and managed by the ODF node and accessible
+/// via embedded sercets provider.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#secretset-schema
+#[derive(SimpleObject, Debug, Clone)]
+pub struct SecretSet {
+    /// Key value pairs of secrets.
+    pub secrets: Secrets,
+}
+
+impl From<odf::metadata::SecretSet> for SecretSet {
+    fn from(v: odf::metadata::SecretSet) -> Self {
+        Self {
+            secrets: v.secrets.into(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Container for key-value secrets. Every key must be a string. Values may be
+/// strings with raw unencrypted data or objects that signify the encoding.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#secrets-schema
+
+#[nutype::nutype(derive(AsRef, Clone, Debug, From, Into))]
+pub struct Secrets(odf::metadata::Secrets);
+
+#[async_graphql::Scalar]
+impl async_graphql::ScalarType for Secrets {
+    fn parse(value: async_graphql::Value) -> async_graphql::InputValueResult<Self> {
+        let value: odf::metadata::serde::yaml::Secrets = async_graphql::from_value(value)?;
+        Ok(Self::new(value.into()))
+    }
+
+    fn to_value(&self) -> async_graphql::Value {
+        let value: odf::metadata::serde::yaml::Secrets = self.as_ref().clone().into();
+        async_graphql::to_value(&value).unwrap()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Establishes the identity of the dataset. Always the first metadata event in
 /// the chain.
 ///
@@ -2044,27 +2306,10 @@ impl From<odf::metadata::SourceCachingForever> for SourceCachingForever {
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#sourceordering-schema
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
+#[graphql(remote = "odf::metadata::SourceOrdering")]
 pub enum SourceOrdering {
     ByEventTime,
     ByName,
-}
-
-impl From<odf::metadata::SourceOrdering> for SourceOrdering {
-    fn from(v: odf::metadata::SourceOrdering) -> Self {
-        match v {
-            odf::metadata::SourceOrdering::ByEventTime => Self::ByEventTime,
-            odf::metadata::SourceOrdering::ByName => Self::ByName,
-        }
-    }
-}
-
-impl Into<odf::metadata::SourceOrdering> for SourceOrdering {
-    fn into(self) -> odf::metadata::SourceOrdering {
-        match self {
-            Self::ByEventTime => odf::metadata::SourceOrdering::ByEventTime,
-            Self::ByName => odf::metadata::SourceOrdering::ByName,
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2462,6 +2707,72 @@ impl From<odf::metadata::TransformResponseSuccess> for TransformResponseSuccess 
             new_offset_interval: v.new_offset_interval.map(Into::into),
             new_watermark: v.new_watermark.map(Into::into),
         }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Individual variable.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#variable-schema
+#[derive(SimpleObject, Debug, Clone)]
+pub struct Variable {
+    /// A value in raw or encoded form.
+    pub value: String,
+    /// Represents the encoding of the value. For example binary values can have
+    /// `base64` encoding
+    pub content_encoding: Option<String>,
+}
+
+impl From<odf::metadata::Variable> for Variable {
+    fn from(v: odf::metadata::Variable) -> Self {
+        Self {
+            value: v.value.into(),
+            content_encoding: v.content_encoding.map(Into::into),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Defines a set of variables stored and managed by the ODF node and accessible
+/// via embedded variables provider.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#variableset-schema
+#[derive(SimpleObject, Debug, Clone)]
+pub struct VariableSet {
+    /// Key value pairs of variables.
+    pub variables: Variables,
+}
+
+impl From<odf::metadata::VariableSet> for VariableSet {
+    fn from(v: odf::metadata::VariableSet) -> Self {
+        Self {
+            variables: v.variables.into(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Container for key-value variables. Every key must be a string. Values may be
+/// raw strings or objects that incorporate the encoding.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#variables-schema
+
+#[nutype::nutype(derive(AsRef, Clone, Debug, From, Into))]
+pub struct Variables(odf::metadata::Variables);
+
+#[async_graphql::Scalar]
+impl async_graphql::ScalarType for Variables {
+    fn parse(value: async_graphql::Value) -> async_graphql::InputValueResult<Self> {
+        let value: odf::metadata::serde::yaml::Variables = async_graphql::from_value(value)?;
+        Ok(Self::new(value.into()))
+    }
+
+    fn to_value(&self) -> async_graphql::Value {
+        let value: odf::metadata::serde::yaml::Variables = self.as_ref().clone().into();
+        async_graphql::to_value(&value).unwrap()
     }
 }
 

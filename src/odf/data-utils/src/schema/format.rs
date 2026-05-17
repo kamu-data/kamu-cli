@@ -20,8 +20,9 @@ pub fn write_schema_odf_json(
     output: &mut dyn Write,
     schema: &odf_metadata::DataSchema,
 ) -> Result<(), std::io::Error> {
-    let mut serializer = serde_json::Serializer::new(output);
-    odf_metadata::serde::yaml::DataSchemaDef::serialize(schema, &mut serializer)?;
+    // TODO: PERF: Avoid conversions and expensive cloning
+    let schema = odf_metadata::serde::yaml::DataSchema::from(schema.clone());
+    serde_json::to_writer(output, &schema)?;
     Ok(())
 }
 
@@ -36,8 +37,9 @@ pub fn write_schema_odf_yaml(
     output: &mut dyn Write,
     schema: &odf_metadata::DataSchema,
 ) -> Result<(), serde_yaml::Error> {
-    let mut serializer = serde_yaml::Serializer::new(output);
-    odf_metadata::serde::yaml::DataSchemaDef::serialize(schema, &mut serializer)?;
+    // TODO: PERF: Avoid conversions and expensive cloning
+    let schema = odf_metadata::serde::yaml::DataSchema::from(schema.clone());
+    serde_yaml::to_writer(output, &schema)?;
     Ok(())
 }
 

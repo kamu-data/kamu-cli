@@ -25,7 +25,7 @@ pub enum DataTypeExt {
     ObjectLink(DataTypeExtObjectLink),
 
     #[serde(untagged)]
-    Core(#[serde_as(as = "crate::serde::yaml::DataTypeDef")] DataType),
+    Core(#[serde_as(as = "crate::serde::yaml::DataType")] DataType),
 }
 
 impl DataTypeExt {

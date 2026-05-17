@@ -27,6 +27,19 @@ use crate::identity::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Reference to an account.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#accountref-schema
+#[derive(Clone, Debug, Eq, PartialEq, Default)]
+pub struct AccountRef {
+    /// DID of an account.
+    pub id: Option<String>,
+    /// Name of an account.
+    pub name: Option<String>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Indicates that data has been ingested into a root dataset.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#adddata-schema
@@ -759,7 +772,7 @@ pub struct ExecuteTransformInput {
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#extraattributes-schema
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ExtraAttributes {
-    pub attributes: serde_json::Map<String, serde_json::Value>,
+    pub entries: std::collections::BTreeMap<String, serde_json::Value>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -881,6 +894,24 @@ pub struct FetchStepUrl {
     pub cache: Option<SourceCaching>,
     /// Headers to pass during the request (e.g. HTTP Authorization)
     pub headers: Option<Vec<RequestHeader>>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// An object that wraps the metadata resources providing versioning and type
+/// identification. All root-level resources are wrapped with a manifest when
+/// serialized to disk.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#manifest-schema
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Manifest<ContentT> {
+    /// Type of the resource.
+    pub kind: String,
+    /// Major version number of the resource contained in this manifest. It
+    /// provides the mechanism for introducing compatibility breaking changes.
+    pub version: i32,
+    /// Resource data.
+    pub content: ContentT,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1758,6 +1789,196 @@ pub struct RequestHeader {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Top-level container for resources that specifies the type and version of the
+/// resource it's specifying and carries identity, ownership, and status
+/// information.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#resource-schema
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Resource<SpecT> {
+    /// Defines a bounded context that this resource belongs to. Context is
+    /// usually composed of a domain and a version e.g. `opendatafabric.org/v1`.
+    pub context: String,
+    /// Type name of the resource which is unique within a given context.
+    pub kind: String,
+    /// Container for identity and ownership information of a resource.
+    pub header: ResourceHeader,
+    /// Specifies the desired state of a resource.
+    pub spec: SpecT,
+    /// Resource lifecycle and reconciliation inforamtion.
+    pub status: Option<ResourceStatus>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Annotations is an unstructured key value map stored with a resource that may
+/// be set by external tools to store and retrieve arbitrary metadata. Unlike
+/// labels, annotations are not indexed and cannot be queried by.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#resourceannotations-schema
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct ResourceAnnotations {
+    pub entries: std::collections::BTreeMap<String, serde_json::Value>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Generic contdition that can be added by contollers to provide additional
+/// information about the state of a resource.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#resourcecondition-schema
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ResourceCondition {
+    /// Value of the condition.
+    pub value: serde_json::Value,
+    /// Contains a programmatic identifier indicating the reason for the
+    /// condition's last transition. Producers of specific condition types may
+    /// define expected values and meanings for this field, and whether the
+    /// values are considered a guaranteed API. The value should be a CamelCase
+    /// string. This field may not be empty.
+    pub reason: Option<String>,
+    /// Human readable message indicating details about the transition.
+    pub message: Option<String>,
+    /// Time when condition transitioned from one status to another.
+    pub last_transition_time: Option<DateTime<Utc>>,
+    /// Resource generation that was last processed by the controller that added
+    /// this condition.
+    pub observed_generation: Option<u64>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Container of feneric contditions that can be added by contollers to provide
+/// additional information about the state of a resource. Keys uniquely identify
+/// the condition and should be in the form of
+/// `{controller-name}/{condition-name}`.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#resourceconditions-schema
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct ResourceConditions {
+    pub entries: std::collections::BTreeMap<String, ResourceCondition>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Container for identity and ownership information of a resource.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#resourceheader-schema
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ResourceHeader {
+    /// Unique identifier of a resource within entire ODF node. Automatically
+    /// assigned upon resource creation.
+    pub id: Option<String>,
+    /// Symbolic name of a resource that identifies it within a scope of an
+    /// onwing account.
+    pub name: String,
+    /// Reference to an account that owns the resource.
+    pub account: Option<AccountRef>,
+    /// Map of string keys and values that can be used to organize, categorize,
+    /// and query resources.
+    pub labels: Option<ResourceLabels>,
+    /// Annotations is an unstructured key value map stored with a resource that
+    /// may be set by external tools to store and retrieve arbitrary metadata.
+    /// Unlike labels, annotations are not indexed and cannot be queried by.
+    pub annotations: Option<ResourceAnnotations>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Map of string keys and values that can be used to organize, categorize, and
+/// query resources.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#resourcelabels-schema
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct ResourceLabels {
+    pub entries: std::collections::BTreeMap<String, serde_json::Value>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Represents the lifecycle stage of a resource.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#resourcephase-schema
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum ResourcePhase {
+    Pending,
+    Reconciling,
+    Ready,
+    Degraded,
+    Failed,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Reference to another resource.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#resourceref-schema
+#[derive(Clone, Debug, Eq, PartialEq, Default)]
+pub struct ResourceRef {
+    /// ID of a resource.
+    pub id: Option<String>,
+    /// Name of a resource.
+    pub name: Option<String>,
+    /// Reference to an account that owns the target resource.
+    pub account: Option<AccountRef>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Resource lifecycle and reconciliation inforamtion.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#resourcestatus-schema
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ResourceStatus {
+    /// Represents the lifecycle stage of a resource.
+    pub phase: ResourcePhase,
+    /// Resource generation that was last processed by the controller that added
+    /// this condition.
+    pub observed_generation: Option<u64>,
+    /// Detailed conditions describing the state of the resource that are added
+    /// by controllers.
+    pub conditions: Option<ResourceConditions>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Individual secret in raw or encrypted form.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#secret-schema
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Secret {
+    /// A secret value in raw or encoded form.
+    pub value: String,
+    /// Represents the encoding of the value. Typically will be `jwe` after a
+    /// raw secret gets encrypted.
+    pub content_encoding: Option<String>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Defines a set of secrets stored and managed by the ODF node and accessible
+/// via embedded sercets provider.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#secretset-schema
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SecretSet {
+    /// Key value pairs of secrets.
+    pub secrets: Secrets,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Container for key-value secrets. Every key must be a string. Values may be
+/// strings with raw unencrypted data or objects that signify the encoding.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#secrets-schema
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Secrets {
+    pub entries: std::collections::BTreeMap<String, Secret>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Establishes the identity of the dataset. Always the first metadata event in
 /// the chain.
 ///
@@ -2150,6 +2371,43 @@ pub struct TransformResponseSuccess {
     pub new_offset_interval: Option<OffsetInterval>,
     /// Watermark advanced by the transaction, if any.
     pub new_watermark: Option<DateTime<Utc>>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Individual variable.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#variable-schema
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Variable {
+    /// A value in raw or encoded form.
+    pub value: String,
+    /// Represents the encoding of the value. For example binary values can have
+    /// `base64` encoding
+    pub content_encoding: Option<String>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Defines a set of variables stored and managed by the ODF node and accessible
+/// via embedded variables provider.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#variableset-schema
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct VariableSet {
+    /// Key value pairs of variables.
+    pub variables: Variables,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Container for key-value variables. Every key must be a string. Values may be
+/// raw strings or objects that incorporate the encoding.
+///
+/// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#variables-schema
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Variables {
+    pub entries: std::collections::BTreeMap<String, Variable>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

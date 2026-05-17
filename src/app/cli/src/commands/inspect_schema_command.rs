@@ -254,10 +254,10 @@ impl InspectSchemaCommand {
         self.indent(depth);
         println!("{}", console::style("extra:").dim());
 
-        let mut buf = Vec::new();
-        let mut serializer = serde_yaml::Serializer::new(&mut buf);
-        odf::metadata::serde::yaml::ExtraAttributesDef::serialize(extra, &mut serializer).unwrap();
-        let yaml_string = String::from_utf8(buf).unwrap();
+        let yaml_string = serde_yaml::to_string(
+            &odf::metadata::serde::yaml::ExtraAttributes::from(extra.clone()),
+        )
+        .unwrap();
 
         let mut sep = String::new();
         sep.push('\n');

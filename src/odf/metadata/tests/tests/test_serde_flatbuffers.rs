@@ -7,12 +7,154 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::BTreeMap;
+
 use chrono::prelude::*;
 use digest::Digest;
 use opendatafabric_metadata::schema::ext::*;
-use opendatafabric_metadata::serde::flatbuffers::*;
+use opendatafabric_metadata::serde::flatbuffers::{proxies_generated as fb, *};
 use opendatafabric_metadata::serde::*;
 use opendatafabric_metadata::*;
+use serde_json::json;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_flatbuffers_maps() {
+    // String -> Struct
+    let expected = Secrets {
+        entries: BTreeMap::from_iter([
+            (
+                "password".to_string(),
+                Secret {
+                    value: "swordfish".into(),
+                    content_encoding: None,
+                },
+            ),
+            (
+                "tls".to_string(),
+                Secret {
+                    value: "aabbcc".into(),
+                    content_encoding: Some("base64".into()),
+                },
+            ),
+        ]),
+    };
+
+    let mut fb = ::flatbuffers::FlatBufferBuilder::new();
+    let offset = expected.serialize(&mut fb);
+    fb.finish(offset, None);
+    let data = fb.finished_data();
+
+    let actual = Secrets::deserialize(::flatbuffers::root::<fb::Secrets>(data).unwrap());
+
+    pretty_assertions::assert_eq!(expected, actual);
+
+    // String -> AnyJson
+    let expected = ResourceLabels {
+        entries: BTreeMap::from_iter([
+            ("string".to_string(), json!("foo")),
+            ("nested".to_string(), json!({"a": "x", "b": "y"})),
+        ]),
+    };
+
+    let mut fb = ::flatbuffers::FlatBufferBuilder::new();
+    let offset = expected.serialize(&mut fb);
+    fb.finish(offset, None);
+    let data = fb.finished_data();
+
+    let actual =
+        ResourceLabels::deserialize(::flatbuffers::root::<fb::ResourceLabels>(data).unwrap());
+
+    pretty_assertions::assert_eq!(expected, actual);
+
+    // String -> AnyJson (json-encoded-string)
+    let expected = ExtraAttributes {
+        entries: BTreeMap::from_iter([
+            ("arrow.apache.org/offsetBitWidth".to_string(), json!(32)),
+            (
+                "opendatafabric.org/description".to_string(),
+                json!("foobar"),
+            ),
+            (
+                "opendatafabric.org/type".to_string(),
+                json!({
+                    "kind": "ObjectLink",
+                    "linkType": { "kind": "Multihash" }
+                }),
+            ),
+        ]),
+    };
+
+    let mut fb = ::flatbuffers::FlatBufferBuilder::new();
+    let offset = expected.serialize(&mut fb);
+    fb.finish(offset, None);
+    let data = fb.finished_data();
+
+    let actual =
+        ExtraAttributes::deserialize(::flatbuffers::root::<fb::ExtraAttributes>(data).unwrap());
+
+    pretty_assertions::assert_eq!(expected, actual);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_flatbuffers_any_json_property() {
+    // String
+    let expected = ResourceCondition {
+        value: json!("some"),
+        reason: None,
+        message: None,
+        last_transition_time: None,
+        observed_generation: None,
+    };
+
+    let mut fb = ::flatbuffers::FlatBufferBuilder::new();
+    let offset = expected.serialize(&mut fb);
+    fb.finish(offset, None);
+    let data = fb.finished_data();
+
+    let actual =
+        ResourceCondition::deserialize(::flatbuffers::root::<fb::ResourceCondition>(data).unwrap());
+    pretty_assertions::assert_eq!(expected, actual);
+
+    // Int
+    let expected = ResourceCondition {
+        value: json!(123),
+        reason: None,
+        message: None,
+        last_transition_time: None,
+        observed_generation: None,
+    };
+
+    let mut fb = ::flatbuffers::FlatBufferBuilder::new();
+    let offset = expected.serialize(&mut fb);
+    fb.finish(offset, None);
+    let data = fb.finished_data();
+
+    let actual =
+        ResourceCondition::deserialize(::flatbuffers::root::<fb::ResourceCondition>(data).unwrap());
+    pretty_assertions::assert_eq!(expected, actual);
+
+    // Nested
+    let expected = ResourceCondition {
+        value: json!({"a": "x", "b": "y"}),
+        reason: None,
+        message: None,
+        last_transition_time: None,
+        observed_generation: None,
+    };
+
+    let mut fb = ::flatbuffers::FlatBufferBuilder::new();
+    let offset = expected.serialize(&mut fb);
+    fb.finish(offset, None);
+    let data = fb.finished_data();
+
+    let actual =
+        ResourceCondition::deserialize(::flatbuffers::root::<fb::ResourceCondition>(data).unwrap());
+    pretty_assertions::assert_eq!(expected, actual);
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

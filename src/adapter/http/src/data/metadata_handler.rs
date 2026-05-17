@@ -83,17 +83,17 @@ pub struct DatasetMetadataResponse {
 #[derive(Debug, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Output {
-    #[serde_as(as = "Option<odf::serde::yaml::SetAttachmentsDef>")]
+    #[serde_as(as = "Option<odf::metadata::serde::yaml::SetAttachments>")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Object)]
     pub attachments: Option<odf::metadata::SetAttachments>,
 
-    #[serde_as(as = "Option<odf::serde::yaml::SetInfoDef>")]
+    #[serde_as(as = "Option<odf::metadata::serde::yaml::SetInfo>")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Object)]
     pub info: Option<odf::metadata::SetInfo>,
 
-    #[serde_as(as = "Option<odf::serde::yaml::SetLicenseDef>")]
+    #[serde_as(as = "Option<odf::metadata::serde::yaml::SetLicense>")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Object)]
     pub license: Option<odf::metadata::SetLicense>,
@@ -110,12 +110,12 @@ pub struct Output {
     #[schema(value_type = query_types::SchemaFormat)]
     pub schema_format: Option<query_types::SchemaFormat>,
 
-    #[serde_as(as = "Option<odf::serde::yaml::SeedDef>")]
+    #[serde_as(as = "Option<odf::metadata::serde::yaml::Seed>")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Object)]
     pub seed: Option<odf::metadata::Seed>,
 
-    #[serde_as(as = "Option<odf::serde::yaml::DatasetVocabularyDef>")]
+    #[serde_as(as = "Option<odf::metadata::serde::yaml::DatasetVocabulary>")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Object)]
     pub vocab: Option<odf::metadata::DatasetVocabulary>,

@@ -19,19 +19,17 @@ impl async_graphql::ScalarType for DataSchemaInput {
             return Err(invalid_input_error(&gql_value));
         };
 
-        let Ok(schema) = odf::serde::yaml::DataSchemaDef::deserialize(json_value) else {
+        let Ok(schema) = serde_json::from_value::<odf::serde::yaml::DataSchema>(json_value) else {
             return Err(invalid_input_error(&gql_value));
         };
 
-        Ok(Self::new(schema))
+        Ok(Self::new(schema.into()))
     }
 
     fn to_value(&self) -> async_graphql::Value {
-        let value: serde_json::Value = odf::serde::yaml::DataSchemaDef::serialize(
-            self.as_ref(),
-            serde_json::value::Serializer,
-        )
-        .unwrap();
+        // TODO: PERF: Avoid cloning
+        let value = serde_json::to_value(odf::serde::yaml::DataSchema::from(self.as_ref().clone()))
+            .unwrap();
 
         async_graphql::Value::from_json(value).unwrap()
     }

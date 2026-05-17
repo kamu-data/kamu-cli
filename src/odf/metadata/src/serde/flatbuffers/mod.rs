@@ -10,7 +10,7 @@
 mod convertors_generated;
 
 #[allow(dead_code, unused_imports)]
-mod proxies_generated;
+pub mod proxies_generated;
 
 mod serdes;
 pub use serdes::*;

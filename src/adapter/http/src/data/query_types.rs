@@ -513,8 +513,9 @@ impl Schema {
                 serde_json::to_value(arrow_schema).unwrap()
             }
             SchemaFormat::OdfJson => {
-                odf::serde::yaml::DataSchemaDef::serialize(schema, serde_json::value::Serializer)
-                    .unwrap()
+                // TODO: PERF: Avoid cloning
+                let schema = odf::serde::yaml::DataSchema::from(schema.clone());
+                serde_json::to_value(schema).unwrap()
             }
             SchemaFormat::OdfYaml => {
                 serde_json::Value::String(format::format_schema_odf_yaml(schema))
