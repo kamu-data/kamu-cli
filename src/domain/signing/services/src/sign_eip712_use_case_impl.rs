@@ -177,15 +177,22 @@ impl SignEip712UseCaseImpl {
         &self,
         key: odf::metadata::DidOdf,
     ) -> Result<DidSecretKey, SignEip712UseCaseError> {
-        let dataset_id = key.into();
+        let (dataset_key, account_key) = tokio::try_join!(
+            self.get_secret_key_for_dataset(key.into()),
+            self.get_secret_key_for_account(key.into()),
+        )?;
 
-        if let Some(key) = self.get_secret_key_for_dataset(dataset_id).await? {
+        if dataset_key.is_some() && account_key.is_some() {
+            return Err("Unexpected situation: both keys have been found"
+                .int_err()
+                .into());
+        }
+
+        if let Some(key) = dataset_key {
             return Ok(key);
         }
 
-        let account_id = key.into();
-
-        if let Some(key) = self.get_secret_key_for_account(account_id).await? {
+        if let Some(key) = account_key {
             return Ok(key);
         }
 

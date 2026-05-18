@@ -37,6 +37,7 @@ odf = { workspace = true, default-features = false, features = [] }
 
 async-trait = { version = "0.1", default-features = false }
 dill = { version = "0.15", default-features = false }
+tokio = { version = "1", default-features = false }
 
 
 [dev-dependencies]
