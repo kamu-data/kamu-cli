@@ -127,11 +127,13 @@ impl DatasetRequestState {
     ) -> Result<&HashSet<DatasetAction>> {
         self.allowed_dataset_actions
             .get_or_try_init(|| async {
+                use kamu_datasets::DatasetActionAuthorizerExt;
+
                 let dataset_action_authorizer =
                     from_catalog_n!(ctx, dyn kamu_datasets::DatasetActionAuthorizer);
 
                 let allowed_actions = dataset_action_authorizer
-                    .get_allowed_actions(&self.dataset_handle.id)
+                    .get_allowed_actions_for_exist_dataset(&self.dataset_handle.id)
                     .await?;
 
                 Ok(allowed_actions)

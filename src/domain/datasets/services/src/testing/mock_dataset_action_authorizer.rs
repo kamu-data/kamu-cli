@@ -18,6 +18,7 @@ use kamu_datasets::{
     DatasetAction,
     DatasetActionAuthorizer,
     DatasetActionUnauthorizedError,
+    GetAllowedActionsError,
 };
 use mockall::Predicate;
 use mockall::predicate::{always, eq, function};
@@ -38,7 +39,7 @@ mockall::mock! {
         async fn get_allowed_actions(
             &self,
             dataset_id: &odf::DatasetID,
-        ) -> Result<HashSet<DatasetAction>, InternalError>;
+        ) -> Result<HashSet<DatasetAction>, GetAllowedActionsError>;
 
         async fn filter_datasets_allowing(
             &self,
@@ -162,7 +163,7 @@ impl MockDatasetActionAuthorizer {
         success: bool,
     ) -> Self {
         let expected_dataset_id = expected_dataset_id.clone();
-        self.expect_check_action_allowed_internal(
+        self.expect_check_action_allowed_unauthorized_internal(
             function(move |dataset_id| *dataset_id == expected_dataset_id),
             DatasetAction::Read,
             times,
@@ -177,7 +178,7 @@ impl MockDatasetActionAuthorizer {
         success: bool,
     ) -> Self {
         let expected_dataset_id = expected_dataset_id.clone();
-        self.expect_check_action_allowed_internal(
+        self.expect_check_action_allowed_unauthorized_internal(
             function(move |dataset_id| *dataset_id == expected_dataset_id),
             DatasetAction::Write,
             times,
@@ -192,7 +193,7 @@ impl MockDatasetActionAuthorizer {
         success: bool,
     ) -> Self {
         let expected_dataset_id = expected_dataset_id.clone();
-        self.expect_check_action_allowed_internal(
+        self.expect_check_action_allowed_unauthorized_internal(
             function(move |dataset_id| *dataset_id == expected_dataset_id),
             DatasetAction::Maintain,
             times,
@@ -207,7 +208,7 @@ impl MockDatasetActionAuthorizer {
         success: bool,
     ) -> Self {
         let expected_dataset_id = expected_dataset_id.clone();
-        self.expect_check_action_allowed_internal(
+        self.expect_check_action_allowed_unauthorized_internal(
             function(move |dataset_id| *dataset_id == expected_dataset_id),
             DatasetAction::Own,
             times,
@@ -216,15 +217,55 @@ impl MockDatasetActionAuthorizer {
     }
 
     pub fn expect_check_read_a_dataset(self, times: usize, success: bool) -> Self {
-        self.expect_check_action_allowed_internal(always(), DatasetAction::Read, times, success)
+        self.expect_check_action_allowed_unauthorized_internal(
+            always(),
+            DatasetAction::Read,
+            times,
+            success,
+        )
     }
 
     pub fn expect_check_write_a_dataset(self, times: usize, success: bool) -> Self {
-        self.expect_check_action_allowed_internal(always(), DatasetAction::Write, times, success)
+        self.expect_check_action_allowed_unauthorized_internal(
+            always(),
+            DatasetAction::Write,
+            times,
+            success,
+        )
     }
 
-    fn expect_check_action_allowed_internal<P>(
-        mut self,
+    pub fn expect_check_write_not_found_dataset(
+        self,
+        expected_dataset_id: &odf::DatasetID,
+        times: usize,
+        success: bool,
+    ) -> Self {
+        let expected_dataset_id = expected_dataset_id.clone();
+        self.expect_check_action_allowed_not_found_internal(
+            function(move |dataset_id| *dataset_id == expected_dataset_id),
+            DatasetAction::Write,
+            times,
+            success,
+        )
+    }
+
+    pub fn expect_check_maintain_not_found_dataset(
+        self,
+        expected_dataset_id: &odf::DatasetID,
+        times: usize,
+        success: bool,
+    ) -> Self {
+        let expected_dataset_id = expected_dataset_id.clone();
+        self.expect_check_action_allowed_not_found_internal(
+            function(move |dataset_id| *dataset_id == expected_dataset_id),
+            DatasetAction::Maintain,
+            times,
+            success,
+        )
+    }
+
+    pub fn expect_check_action_allowed_unauthorized_internal<P>(
+        self,
         dataset_id_predicate: P,
         action: DatasetAction,
         times: usize,
@@ -232,6 +273,56 @@ impl MockDatasetActionAuthorizer {
     ) -> Self
     where
         P: Predicate<odf::DatasetID> + Sync + Send + 'static,
+    {
+        self.expect_check_action_allowed_internal(
+            dataset_id_predicate,
+            |dataset_id, action| {
+                DatasetActionUnauthorizedError::not_enough_permissions(
+                    dataset_id.as_local_ref(),
+                    action,
+                )
+            },
+            action,
+            times,
+            success,
+        )
+    }
+
+    pub fn expect_check_action_allowed_not_found_internal<P>(
+        self,
+        dataset_id_predicate: P,
+        action: DatasetAction,
+        times: usize,
+        success: bool,
+    ) -> Self
+    where
+        P: Predicate<odf::DatasetID> + Sync + Send + 'static,
+    {
+        self.expect_check_action_allowed_internal(
+            dataset_id_predicate,
+            |dataset_id, _action| {
+                DatasetActionUnauthorizedError::NotFound(dataset_id.as_local_ref().into())
+            },
+            action,
+            times,
+            success,
+        )
+    }
+
+    fn expect_check_action_allowed_internal<P, E>(
+        mut self,
+        dataset_id_predicate: P,
+        error_callback: E,
+        action: DatasetAction,
+        times: usize,
+        success: bool,
+    ) -> Self
+    where
+        P: Predicate<odf::DatasetID> + Sync + Send + 'static,
+        E: Fn(&odf::DatasetID, DatasetAction) -> DatasetActionUnauthorizedError
+            + Sync
+            + Send
+            + 'static,
     {
         if times > 0 {
             self.expect_check_action_allowed()
@@ -241,10 +332,7 @@ impl MockDatasetActionAuthorizer {
                     if success {
                         Ok(())
                     } else {
-                        Err(DatasetActionUnauthorizedError::not_enough_permissions(
-                            dataset_id.as_local_ref(),
-                            action,
-                        ))
+                        Err(error_callback(dataset_id, action))
                     }
                 });
         } else {

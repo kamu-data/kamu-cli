@@ -9,7 +9,6 @@
 
 use internal_error::{ErrorIntoInternal, InternalError};
 use odf_metadata as odf;
-use thiserror::Error;
 
 use crate::{DatasetUnresolvedIdError, GetStoredDatasetError};
 
@@ -38,7 +37,7 @@ pub struct ResolveDatasetHandlesByRefsResponse {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Error, Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum DatasetRefUnresolvedError {
     #[error(transparent)]
     NotFound(#[from] DatasetNotFoundError),
@@ -62,7 +61,7 @@ impl From<GetStoredDatasetError> for DatasetRefUnresolvedError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Error, Clone, PartialEq, Eq, Debug)]
+#[derive(thiserror::Error, Clone, PartialEq, Eq, Debug)]
 #[error("Dataset not found: {dataset_ref}")]
 pub struct DatasetNotFoundError {
     pub dataset_ref: odf::DatasetRef,
@@ -79,6 +78,12 @@ impl From<DatasetUnresolvedIdError> for DatasetNotFoundError {
         Self {
             dataset_ref: value.dataset_id.as_local_ref(),
         }
+    }
+}
+
+impl From<odf::DatasetRef> for DatasetNotFoundError {
+    fn from(dataset_ref: odf::DatasetRef) -> Self {
+        Self { dataset_ref }
     }
 }
 
