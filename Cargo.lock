@@ -7826,12 +7826,15 @@ name = "kamu-auth-rebac"
 version = "0.260.2"
 dependencies = [
  "async-trait",
+ "indoc 2.0.7",
  "internal-error",
  "itertools 0.14.0",
  "kamu-accounts",
  "kamu-datasets",
  "messaging-outbox",
  "opendatafabric",
+ "pretty_assertions",
+ "rstest",
  "serde",
  "sqlx",
  "strum",

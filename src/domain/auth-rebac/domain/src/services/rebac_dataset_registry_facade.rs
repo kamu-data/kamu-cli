@@ -91,28 +91,41 @@ pub struct ClassifyDatasetRefsByAccessResponse {
 }
 
 impl ClassifyDatasetRefsByAccessResponse {
-    pub fn try_get_error_message(&self, skip_missing: bool) -> Option<String> {
+    pub fn try_get_user_error_report(&self, skip_missing: bool) -> Option<String> {
         let have_missing = !(self.not_found.is_empty() && self.forbidden.is_empty());
-        let have_missing_to_report = !have_missing && !skip_missing;
+        let have_missing_to_report = have_missing && !skip_missing;
 
-        if !have_missing_to_report {
+        if self.insufficient.is_empty() && !have_missing_to_report {
             return None;
         }
 
-        let error_msg = format!(
-            "Dataset access error: not_found [{}]; insufficient access level [{}]; unresolved: \
-             [{}].",
-            itertools::join(self.not_found.iter().map(|(r, _)| r), ","),
+        let unresolved = if skip_missing {
+            String::new()
+        } else {
+            // NOTE: We are preparing a report for the user, so the forbidden items are not
+            //       found ones
+            let not_found_iter = self.not_found.iter().map(|(r, _)| r);
+            let forbidden_iter = self.forbidden.iter().map(|(r, _)| r);
+
+            itertools::join(not_found_iter.chain(forbidden_iter), ",")
+        };
+
+        let report = indoc::formatdoc!(
+            r#"
+            Dataset access error:
+            - insufficient access level: [{}]
+            - unresolved: [{}]
+            "#,
             itertools::join(
                 self.insufficient
                     .iter()
-                    .map(|(r, h)| format!("{r}({})", h.alias)),
+                    .map(|(_, h)| format!("{}", h.alias)),
                 ","
             ),
-            itertools::join(self.forbidden.iter().map(|(r, _)| r), ",")
+            unresolved
         );
 
-        Some(error_msg)
+        Some(report)
     }
 }
 
