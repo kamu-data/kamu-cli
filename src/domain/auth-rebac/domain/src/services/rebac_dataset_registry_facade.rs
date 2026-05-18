@@ -92,14 +92,17 @@ pub struct ClassifyDatasetRefsByAccessResponse {
 
 impl ClassifyDatasetRefsByAccessResponse {
     pub fn try_get_error_message(&self, skip_missing: bool) -> Option<String> {
-        let have_forbidden_to_report = !self.forbidden.is_empty() && !skip_missing;
+        let have_missing = !(self.not_found.is_empty() && self.forbidden.is_empty());
+        let have_missing_to_report = !have_missing && !skip_missing;
 
-        if self.insufficient.is_empty() && !have_forbidden_to_report {
+        if !have_missing_to_report {
             return None;
         }
 
         let error_msg = format!(
-            "Dataset access error: insufficient access level [{}]; unresolved: [{}].",
+            "Dataset access error: not_found [{}]; insufficient access level [{}]; unresolved: \
+             [{}].",
+            itertools::join(self.not_found.iter().map(|(r, _)| r), ","),
             itertools::join(
                 self.insufficient
                     .iter()
