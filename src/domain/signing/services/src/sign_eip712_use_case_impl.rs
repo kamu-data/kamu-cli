@@ -21,7 +21,7 @@ use kamu_accounts::{
     GetDidSecretKeyError,
     LoggedAccount,
 };
-use kamu_auth_rebac::RebacService;
+use kamu_accounts_services::utils::AccountAuthorizationHelper;
 use kamu_datasets::DatasetActionAuthorizer;
 use kamu_molecule_domain::{MOLECULE_DEV_ORG_ACCOUNT_NAME, MOLECULE_ORG_ACCOUNT_NAME};
 use kamu_signing::common::ProofType;
@@ -44,7 +44,7 @@ pub struct SignEip712UseCaseImpl {
     dataset_action_authorizer: Arc<dyn DatasetActionAuthorizer>,
     current_account_subject: Arc<CurrentAccountSubject>,
     account_service: Arc<dyn AccountService>,
-    rebac_service: Arc<dyn RebacService>,
+    account_authorization_helper: Arc<dyn AccountAuthorizationHelper>,
     identity_config: Option<IdentityConfig>,
 }
 
@@ -162,15 +162,8 @@ impl SignEip712UseCaseImpl {
         logged_account: &LoggedAccount,
         account: &Account,
     ) -> Result<bool, InternalError> {
-        use kamu_auth_rebac::RebacServiceExt;
-
-        // 1. Admin can access any account
-        if self
-            .rebac_service
-            .is_account_admin(&logged_account.account_id)
-            .await
-            .int_err()?
-        {
+        // Admin can access any account
+        if self.account_authorization_helper.is_admin().await? {
             return Ok(true);
         }
 
@@ -184,15 +177,22 @@ impl SignEip712UseCaseImpl {
         &self,
         key: odf::metadata::DidOdf,
     ) -> Result<DidSecretKey, SignEip712UseCaseError> {
-        let dataset_id = key.into();
+        let (dataset_key, account_key) = tokio::try_join!(
+            self.get_secret_key_for_dataset(key.into()),
+            self.get_secret_key_for_account(key.into()),
+        )?;
 
-        if let Some(key) = self.get_secret_key_for_dataset(dataset_id).await? {
+        if dataset_key.is_some() && account_key.is_some() {
+            return Err("Unexpected situation: both keys have been found"
+                .int_err()
+                .into());
+        }
+
+        if let Some(key) = dataset_key {
             return Ok(key);
         }
 
-        let account_id = key.into();
-
-        if let Some(key) = self.get_secret_key_for_account(account_id).await? {
+        if let Some(key) = account_key {
             return Ok(key);
         }
 

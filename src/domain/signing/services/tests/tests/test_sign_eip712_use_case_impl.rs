@@ -24,6 +24,7 @@ use kamu_accounts::{
     SAMPLE_DID_SECRET_KEY_ENCRYPTION_KEY,
 };
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
+use kamu_accounts_services::utils::AccountAuthorizationHelperImpl;
 use kamu_accounts_services::{
     AccountServiceImpl,
     CreateAccountUseCaseImpl,
@@ -77,12 +78,14 @@ fn test_has_access_by_name_matrix() {
         (MOLECULE, MOLECULE_DEV, false),
         (MOLECULE, MOLECULE_DEV_PROJECT, false),
         (MOLECULE, "molecule.devops", true),
+        (MOLECULE, "molecule.dev.probe8503325863", false),
         // molecule.dev
         (MOLECULE_DEV, MOLECULE_DEV, true),
         (MOLECULE_DEV, MOLECULE_DEV_PROJECT, true),
         (MOLECULE_DEV, MOLECULE, false),
         (MOLECULE_DEV, MOLECULE_PROJECT, false),
         (MOLECULE_DEV, "molecule.devops", false),
+        (MOLECULE_DEV, "molecule.dev.probe8503325863", true),
     ] {
         let actual = f(subject_account_name, target_account_name);
 
@@ -572,6 +575,7 @@ impl SignEip712UseCaseHarness {
             .add::<AccountServiceImpl>()
             .add::<UpdateAccountUseCaseImpl>()
             .add::<CreateAccountUseCaseImpl>()
+            .add::<AccountAuthorizationHelperImpl>()
             .add::<RebacServiceImpl>()
             .add::<InMemoryRebacRepository>()
             .add_value(DefaultAccountProperties::default())
