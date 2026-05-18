@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::assert_matches::assert_matches;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -52,6 +51,7 @@ use messaging_outbox::{
     OutboxImmediateImpl,
     register_message_dispatcher,
 };
+use pretty_assertions::assert_matches;
 use time_source::SystemTimeSourceDefault;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -649,6 +649,31 @@ async fn test_multi_datasets_matrix() {
             ),
         );
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_nobody_cannot_read_not_found_dataset() {
+    let not_found_dataset_id = odf::DatasetID::new_seeded_ed25519(b"not_found_dataset_id");
+    let not_found_dataset_ref = not_found_dataset_id.as_local_ref();
+
+    let harness =
+        DatasetAuthorizerHarness::new(CurrentAccountSubjectTestHelper::logged("owner"), false)
+            .await;
+
+    assert_single_dataset!(
+        setup:
+            harness,
+            dataset_id = not_found_dataset_id,
+        expected:
+            read_result = Err(DatasetActionUnauthorizedError::NotFound(e))
+                if e.dataset_ref == not_found_dataset_ref,
+            write_result = Err(DatasetActionUnauthorizedError::NotFound(e))
+                if e.dataset_ref == not_found_dataset_ref,
+            allowed_actions_result = Ok(actual_actions)
+                if actual_actions.is_empty()
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

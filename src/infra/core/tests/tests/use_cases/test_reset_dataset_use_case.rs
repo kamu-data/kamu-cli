@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::assert_matches::assert_matches;
 use std::sync::Arc;
 
 use kamu::testing::{BaseUseCaseHarness, BaseUseCaseHarnessOptions};
@@ -16,6 +15,7 @@ use kamu_core::*;
 use kamu_datasets::ResolvedDataset;
 use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
 use odf::metadata::testing::MetadataFactory;
+use pretty_assertions::assert_matches;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -57,6 +57,26 @@ async fn test_reset_success() {
             .num_blocks(ResolvedDataset::from_created(&foo))
             .await,
         2
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
+async fn test_try_reset_not_found_dataset() {
+    let harness =
+        ResetUseCaseHarness::new(MockDatasetActionAuthorizer::new(), MockDidGenerator::new());
+
+    let not_found_dataset_handle =
+        odf::metadata::testing::handle(&"user", &"not-found-dataset", odf::DatasetKind::Root);
+
+    assert_matches!(
+        harness
+            .use_case
+            .execute(&not_found_dataset_handle, None, None)
+            .await,
+        Err(ResetError::NotFound(e))
+            if e.dataset_ref == not_found_dataset_handle.as_local_ref()
     );
 }
 

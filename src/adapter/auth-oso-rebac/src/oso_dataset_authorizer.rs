@@ -19,7 +19,7 @@ use tokio::try_join;
 
 use crate::dataset_resource::*;
 use crate::user_actor::*;
-use crate::{KamuAuthOso, OsoResourceServiceImpl};
+use crate::{GetDatasetResourceError, KamuAuthOso, OsoResourceServiceImpl};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -49,14 +49,18 @@ impl OsoDatasetAuthorizer {
     async fn dataset_resource(
         &self,
         dataset_id: &odf::DatasetID,
-    ) -> Result<DatasetResource, InternalError> {
-        let dataset_resource = self
-            .oso_resource_service
-            .dataset_resource(dataset_id)
-            .await
-            .int_err()?;
+    ) -> Result<Option<DatasetResource>, InternalError> {
+        match self.oso_resource_service.dataset_resource(dataset_id).await {
+            Ok(dataset_resource) => Ok(Some(dataset_resource)),
+            Err(e) => {
+                use GetDatasetResourceError as E;
 
-        Ok(dataset_resource)
+                match e {
+                    E::NotFound(_) => Ok(None),
+                    e @ E::Internal(_) => Err(e.int_err()),
+                }
+            }
+        }
     }
 }
 
@@ -72,6 +76,12 @@ impl DatasetActionAuthorizer for OsoDatasetAuthorizer {
     ) -> Result<(), DatasetActionUnauthorizedError> {
         let (user_actor, dataset_resource) =
             try_join!(self.user_actor(), self.dataset_resource(dataset_id))?;
+
+        let Some(dataset_resource) = dataset_resource else {
+            return Err(DatasetActionUnauthorizedError::NotFound(
+                dataset_id.as_local_ref().into(),
+            ));
+        };
 
         match self
             .kamu_auth_oso

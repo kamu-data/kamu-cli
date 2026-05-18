@@ -9,7 +9,6 @@
 
 use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_datasets::DatasetActionUnauthorizedError;
-use thiserror::Error;
 
 use crate::{ResetExecutionError, ResetPlanningError, ResetResult};
 
@@ -27,7 +26,7 @@ pub trait ResetDatasetUseCase: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Error)]
+#[derive(thiserror::Error, Debug)]
 pub enum ResetError {
     #[error(transparent)]
     NotFound(#[from] odf::DatasetNotFoundError),
