@@ -10,8 +10,7 @@
 use std::borrow::Cow;
 use std::collections::HashSet;
 
-use dill::*;
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -257,6 +256,9 @@ impl oso::ToPolar for DatasetAction {
 #[derive(Debug, Error)]
 pub enum DatasetActionUnauthorizedError {
     #[error(transparent)]
+    NotFound(#[from] odf::DatasetNotFoundError),
+
+    #[error(transparent)]
     Access(
         #[from]
         #[backtrace]
@@ -359,10 +361,12 @@ where
         dataset_id: &odf::DatasetID,
         action: DatasetAction,
     ) -> Result<bool, InternalError> {
+        use DatasetActionUnauthorizedError as E;
+
         match self.check_action_allowed(dataset_id, action).await {
             Ok(()) => Ok(true),
-            Err(DatasetActionUnauthorizedError::Access(_)) => Ok(false),
-            Err(DatasetActionUnauthorizedError::Internal(err)) => Err(err),
+            Err(E::NotFound(_) | E::Access(_)) => Ok(false),
+            Err(e @ E::Internal(_)) => Err(e.int_err()),
         }
     }
 
@@ -423,8 +427,8 @@ impl From<ClassifyByAllowanceResponse> for ClassifyByAllowanceIdsResponse {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component]
-#[interface(dyn DatasetActionAuthorizer)]
+#[dill::component]
+#[dill::interface(dyn DatasetActionAuthorizer)]
 pub struct AlwaysHappyDatasetActionAuthorizer {}
 
 #[async_trait::async_trait]

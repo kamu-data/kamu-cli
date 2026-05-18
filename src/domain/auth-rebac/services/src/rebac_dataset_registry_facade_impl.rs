@@ -66,6 +66,7 @@ impl RebacDatasetRegistryFacade for RebacDatasetRegistryFacadeImpl {
                 use DatasetActionUnauthorizedError as SourceError;
 
                 match e {
+                    SourceError::NotFound(e) => Error::NotFound(e),
                     SourceError::Access(e) => Error::Access(e),
                     e @ SourceError::Internal(_) => Error::Internal(e.int_err()),
                 }
@@ -105,6 +106,7 @@ impl RebacDatasetRegistryFacade for RebacDatasetRegistryFacadeImpl {
                 };
 
                 match e {
+                    SourceError::NotFound(e) => Error::NotFound(e),
                     SourceError::Access(e) => Error::Access(e),
                     e @ SourceError::Internal(_) => Error::Internal(e.int_err()),
                 }

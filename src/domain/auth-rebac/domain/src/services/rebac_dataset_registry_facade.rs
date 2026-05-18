@@ -165,6 +165,9 @@ impl From<odf::dataset::DatasetRefUnresolvedError> for RebacDatasetRefUnresolved
 #[derive(Error, Debug)]
 pub enum RebacDatasetIdUnresolvedError {
     #[error(transparent)]
+    NotFound(#[from] odf::DatasetNotFoundError),
+
+    #[error(transparent)]
     Access(
         #[from]
         #[backtrace]
