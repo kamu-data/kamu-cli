@@ -192,27 +192,29 @@ impl RebacDatasetRegistryFacade for RebacDatasetRegistryFacadeImpl {
         dataset_refs: &[&odf::DatasetRef],
         action: DatasetAction,
     ) -> Result<ClassifyDatasetRefsByAccessResponse, InternalError> {
+        use kamu_datasets::DatasetActionAuthorizerExt;
+
         // The next work will be done using handles, so we need to get them first.
         let handles_resolution = self
             .dataset_registry
             .resolve_dataset_handles_by_refs(dataset_refs)
             .await?;
 
-        // If no datasets, then access to them cannot exist.
-        let mut forbidden = handles_resolution
+        let not_found = handles_resolution
             .unresolved_refs
             .into_iter()
             .map(|(dataset_ref, e)| (dataset_ref, e.into()))
             .collect::<Vec<_>>();
 
-        // Next sort according to allowed actions
+        // Next sort, according to allowed actions
+        let mut forbidden = Vec::new();
         let mut insufficient = Vec::new();
         let mut allowed = Vec::new();
 
         for (dataset_ref, dataset_handle) in handles_resolution.resolved_handles {
             let allowed_actions = self
                 .dataset_action_authorizer
-                .get_allowed_actions(&dataset_handle.id)
+                .get_allowed_actions_for_exist_dataset(&dataset_handle.id)
                 .await?;
 
             match DatasetAction::resolve_access(&allowed_actions, action) {
@@ -230,6 +232,7 @@ impl RebacDatasetRegistryFacade for RebacDatasetRegistryFacadeImpl {
         }
 
         Ok(ClassifyDatasetRefsByAccessResponse {
+            not_found,
             forbidden,
             insufficient,
             allowed,

@@ -64,11 +64,17 @@ async fn test_reset_success() {
 
 #[tokio::test]
 async fn test_try_reset_not_found_dataset() {
-    let harness =
-        ResetUseCaseHarness::new(MockDatasetActionAuthorizer::new(), MockDidGenerator::new());
-
     let not_found_dataset_handle =
         odf::metadata::testing::handle(&"user", &"not-found-dataset", odf::DatasetKind::Root);
+
+    let harness = ResetUseCaseHarness::new(
+        MockDatasetActionAuthorizer::new().expect_check_maintain_not_found_dataset(
+            &not_found_dataset_handle.id,
+            1,
+            false,
+        ),
+        MockDidGenerator::new(),
+    );
 
     assert_matches!(
         harness
@@ -76,7 +82,7 @@ async fn test_try_reset_not_found_dataset() {
             .execute(&not_found_dataset_handle, None, None)
             .await,
         Err(ResetError::NotFound(e))
-            if e.dataset_ref == not_found_dataset_handle.as_local_ref()
+            if e.dataset_ref == not_found_dataset_handle.id.as_local_ref()
     );
 }
 

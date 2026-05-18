@@ -11,7 +11,6 @@ use std::collections::HashMap;
 
 use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_datasets::{DatasetAction, DatasetActionNotEnoughPermissionsError, ResolvedDataset};
-use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -85,6 +84,7 @@ impl ClassifyDatasetRefsByAllowanceResponse {
 
 #[derive(Debug)]
 pub struct ClassifyDatasetRefsByAccessResponse {
+    pub not_found: Vec<(odf::DatasetRef, odf::DatasetRefUnresolvedError)>,
     pub forbidden: Vec<(odf::DatasetRef, RebacDatasetRefUnresolvedError)>,
     pub insufficient: Vec<(odf::DatasetRef, odf::DatasetHandle)>,
     pub allowed: Vec<(odf::DatasetRef, odf::DatasetHandle)>,
@@ -117,7 +117,7 @@ impl ClassifyDatasetRefsByAccessResponse {
 // Errors
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Error, Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum RebacDatasetRefUnresolvedError {
     #[error(transparent)]
     NotFound(#[from] odf::DatasetNotFoundError),
@@ -162,7 +162,7 @@ impl From<odf::dataset::DatasetRefUnresolvedError> for RebacDatasetRefUnresolved
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Error, Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum RebacDatasetIdUnresolvedError {
     #[error(transparent)]
     NotFound(#[from] odf::DatasetNotFoundError),

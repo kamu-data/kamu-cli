@@ -46,13 +46,18 @@ async fn test_set_watermark_success() {
 
 #[tokio::test]
 async fn test_try_set_watermark_for_not_found_dataset() {
+    let not_found_dataset_handle =
+        odf::metadata::testing::handle(&"user", &"not-found-dataset", odf::DatasetKind::Root);
+
     let harness = SetWatermarkUseCaseHarness::new(
-        MockDatasetActionAuthorizer::new(),
+        MockDatasetActionAuthorizer::new().expect_check_write_not_found_dataset(
+            &not_found_dataset_handle.id,
+            1,
+            false,
+        ),
         MockDidGenerator::new(),
     );
 
-    let not_found_dataset_handle =
-        odf::metadata::testing::handle(&"user", &"not-found-dataset", odf::DatasetKind::Root);
     let new_watermark = Utc::now();
 
     assert_matches!(
@@ -61,7 +66,7 @@ async fn test_try_set_watermark_for_not_found_dataset() {
             .execute(&not_found_dataset_handle, new_watermark)
             .await,
         Err(SetWatermarkError::NotFound(e))
-            if e.dataset_ref == not_found_dataset_handle.as_local_ref()
+            if e.dataset_ref == not_found_dataset_handle.id.as_local_ref()
     );
 }
 

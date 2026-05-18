@@ -39,6 +39,7 @@ use kamu_datasets::{
     DatasetActionAuthorizer,
     DatasetActionUnauthorizedError,
     DatasetLifecycleMessage,
+    GetAllowedActionsError,
     MESSAGE_PRODUCER_KAMU_DATASET_SERVICE,
 };
 use kamu_datasets_inmem::InMemoryDatasetEntryRepository;
@@ -51,7 +52,7 @@ use messaging_outbox::{
     OutboxImmediateImpl,
     register_message_dispatcher,
 };
-use pretty_assertions::assert_matches;
+use pretty_assertions::{assert_eq, assert_matches};
 use time_source::SystemTimeSourceDefault;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -562,7 +563,7 @@ async fn test_multi_datasets_matrix() {
             .create_public_datasets(&[&alice_public_dataset_2_handle, &bob_public_dataset_4_handle])
             .await;
 
-        pretty_assertions::assert_eq!(
+        assert_eq!(
             {
                 let mut expected = expected_results.read_filter_datasets_allowing_result;
                 expected.sort_by(|left, right| left.id.cmp(&right.id));
@@ -578,7 +579,7 @@ async fn test_multi_datasets_matrix() {
                 actual
             }
         );
-        pretty_assertions::assert_eq!(
+        assert_eq!(
             {
                 let mut expected = expected_results.write_filter_datasets_allowing_result;
                 expected.sort_by(|left, right| left.id.cmp(&right.id));
@@ -595,7 +596,7 @@ async fn test_multi_datasets_matrix() {
             }
         );
 
-        pretty_assertions::assert_eq!(
+        assert_eq!(
             expected_results.read_classify_dataset_handles_by_allowance_result,
             ClassifyByAllowanceIdsResponseTestHelper::report(
                 harness
@@ -610,7 +611,7 @@ async fn test_multi_datasets_matrix() {
                 &dataset_handle_map
             ),
         );
-        pretty_assertions::assert_eq!(
+        assert_eq!(
             expected_results.write_classify_dataset_handles_by_allowance_result,
             ClassifyByAllowanceIdsResponseTestHelper::report(
                 harness
@@ -626,7 +627,7 @@ async fn test_multi_datasets_matrix() {
             ),
         );
 
-        pretty_assertions::assert_eq!(
+        assert_eq!(
             expected_results.read_classify_dataset_ids_by_allowance_result,
             ClassifyByAllowanceIdsResponseTestHelper::report(
                 harness
@@ -637,7 +638,7 @@ async fn test_multi_datasets_matrix() {
                 &dataset_handle_map
             ),
         );
-        pretty_assertions::assert_eq!(
+        assert_eq!(
             expected_results.write_classify_dataset_ids_by_allowance_result,
             ClassifyByAllowanceIdsResponseTestHelper::report(
                 harness
@@ -671,8 +672,8 @@ async fn test_nobody_cannot_read_not_found_dataset() {
                 if e.dataset_ref == not_found_dataset_ref,
             write_result = Err(DatasetActionUnauthorizedError::NotFound(e))
                 if e.dataset_ref == not_found_dataset_ref,
-            allowed_actions_result = Ok(actual_actions)
-                if actual_actions.is_empty()
+            allowed_actions_result = Err(GetAllowedActionsError::NotFound(e))
+                if e.dataset_ref == not_found_dataset_ref
     );
 }
 
