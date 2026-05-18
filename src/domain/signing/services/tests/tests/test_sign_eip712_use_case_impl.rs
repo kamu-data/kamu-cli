@@ -24,6 +24,7 @@ use kamu_accounts::{
     SAMPLE_DID_SECRET_KEY_ENCRYPTION_KEY,
 };
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
+use kamu_accounts_services::utils::AccountAuthorizationHelperImpl;
 use kamu_accounts_services::{
     AccountServiceImpl,
     CreateAccountUseCaseImpl,
@@ -574,6 +575,7 @@ impl SignEip712UseCaseHarness {
             .add::<AccountServiceImpl>()
             .add::<UpdateAccountUseCaseImpl>()
             .add::<CreateAccountUseCaseImpl>()
+            .add::<AccountAuthorizationHelperImpl>()
             .add::<RebacServiceImpl>()
             .add::<InMemoryRebacRepository>()
             .add_value(DefaultAccountProperties::default())
