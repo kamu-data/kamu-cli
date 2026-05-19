@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::assert_matches::assert_matches;
+use std::assert_matches;
 use std::str::FromStr;
 
 use kamu_auth_rebac::{AccountToDatasetRelation, RELATION_GROUP_SEPARATOR, Relation};

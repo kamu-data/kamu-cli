@@ -2,8 +2,8 @@ IMAGE_PLATFORMS = linux/amd64,linux/arm64
 IMAGE_REPO = ghcr.io/kamu-data
 KAMU_VERSION = $(shell cargo metadata --format-version 1 | jq -r '.packages[] | select( .name == "kamu") | .version')
 
-# Keep in sync with versions of Jupyter and Minio in docker-compose.yml
-DEMO_VERSION = 0.17.9
+# Keep in sync with versions of Jupyter and Rustfs in docker-compose.yml
+DEMO_VERSION = 0.18.0
 
 #########################################################################################
 
@@ -66,33 +66,33 @@ jupyter-multi-arch: all-examples
 #########################################################################################
 
 # Build image for local testing purposes
-.PHONY: minio
-minio:
+.PHONY: rustfs
+rustfs:
 	docker build \
-		-f Dockerfile.minio \
-		-t $(IMAGE_REPO)/kamu-cli-demo-minio:$(DEMO_VERSION) \
+		-f Dockerfile.rustfs \
+		-t $(IMAGE_REPO)/kamu-cli-demo-rustfs:$(DEMO_VERSION) \
 		.
 
 # Build and push multi-arch image
-.PHONY: minio-multi-arch
-minio-multi-arch:
+.PHONY: rustfs-multi-arch
+rustfs-multi-arch:
 	docker buildx build \
-		-f Dockerfile.minio \
+		-f Dockerfile.rustfs \
 		--push \
 		--platform $(IMAGE_PLATFORMS) \
-		-t $(IMAGE_REPO)/kamu-cli-demo-minio:$(DEMO_VERSION) \
+		-t $(IMAGE_REPO)/kamu-cli-demo-rustfs:$(DEMO_VERSION) \
 		.
 
 #########################################################################################
 
-.PHONY: minio-data
-minio-data:
-	rm -rf minio-data && \
-		mkdir -p minio-data/kamu-hub && \
-		mkdir minio-data/tmp && \
-		cd minio-data/tmp && \
+.PHONY: data
+data:
+	rm -rf data && \
+		mkdir -p data/kamu-hub && \
+		mkdir data/tmp && \
+		cd data/tmp && \
 		kamu init && \
-		kamu repo add kamu-hub file:///$(shell pwd)/minio-data/kamu-hub && \
+		kamu repo add kamu-hub file:///$(shell pwd)/data/kamu-hub && \
 		kamu repo list && \
 		kamu add -r "../../user-home/01 - Kamu Basics (COVID-19 example)/datasets/" && \
 		kamu pull --all && \
@@ -126,4 +126,4 @@ podman-images/:
 
 .PHONY: clean
 clean:
-	rm -rf minio-data podman-images tmp
+	rm -rf data podman-images tmp

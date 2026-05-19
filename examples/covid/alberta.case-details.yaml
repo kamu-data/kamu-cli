@@ -22,13 +22,31 @@ content:
         kind: Csv
         header: true
         schema:
-          - id BIGINT
-          - date_reported TIMESTAMP
-          - zone STRING
-          - gender STRING
-          - age_group STRING
-          - case_status STRING
-          - case_type STRING
+          fields:
+            - name: id
+              type: int64
+            - name: date_reported
+              type: timestamp
+            - name: zone
+              type:
+                kind: option
+                inner: string
+            - name: gender
+              type:
+                kind: option
+                inner: string
+            - name: age_group
+              type:
+                kind: option
+                inner: string
+            - name: case_status
+              type:
+                kind: option
+                inner: string
+            - name: case_type
+              type:
+                kind: option
+                inner: string
       # How to combine newly-ingested data with data that is already in the dataset
       merge:
         kind: Ledger

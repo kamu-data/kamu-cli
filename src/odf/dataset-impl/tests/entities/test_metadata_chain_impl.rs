@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::assert_matches::assert_matches;
+use std::assert_matches;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
@@ -1516,7 +1516,7 @@ async fn test_append_push_source_evolution() {
             MetadataFactory::metadata_block(AddPushSource {
                 source_name: SourceState::DEFAULT_SOURCE_NAME.to_string(),
                 read: ReadStepNdJson {
-                    schema: Some(vec!["foo STRING".to_string()]),
+                    schema: Some(DataSchema::new(vec![DataField::string("foo")])),
                     ..Default::default()
                 }
                 .into(),
@@ -1544,6 +1544,82 @@ async fn test_append_push_source_evolution() {
         res,
         Err(AppendError::InvalidBlock(
             AppendValidationError::InvalidEvent(_)
+        ))
+    );
+}
+
+#[test_log::test(tokio::test)]
+async fn test_append_push_polling_source_fails_on_two_source_schemas() {
+    let tmp_dir = tempfile::tempdir().unwrap();
+    let chain = init_chain(tmp_dir.path());
+
+    let head = chain
+        .append(
+            MetadataFactory::metadata_block(MetadataFactory::seed(odf::DatasetKind::Root).build())
+                .build(),
+            AppendOpts::default(),
+        )
+        .await
+        .unwrap();
+
+    // 0: Push source fails if both schemas are present
+    let res = chain
+        .append(
+            MetadataFactory::metadata_block(AddPushSource {
+                source_name: SourceState::DEFAULT_SOURCE_NAME.to_string(),
+                read: ReadStepNdJson {
+                    schema: Some(DataSchema::new(vec![DataField::string("foo")])),
+                    ddl_schema: Some(vec!["foo STRING".to_owned()]),
+                    ..Default::default()
+                }
+                .into(),
+                preprocess: None,
+                merge: MergeStrategyAppend {}.into(),
+            })
+            .prev(&head, 0)
+            .build(),
+            AppendOpts::default(),
+        )
+        .await;
+
+    assert_matches!(
+        res,
+        Err(AppendError::InvalidBlock(
+            AppendValidationError::InvalidEvent(..)
+        ))
+    );
+
+    // 1: Polling source fails if both schemas are present
+    let res = chain
+        .append(
+            MetadataFactory::metadata_block(SetPollingSource {
+                fetch: FetchStepUrl {
+                    url: "https://example.com".parse().unwrap(),
+                    event_time: None,
+                    cache: None,
+                    headers: None,
+                }
+                .into(),
+                prepare: None,
+                read: ReadStepNdJson {
+                    schema: Some(DataSchema::new(vec![DataField::string("foo")])),
+                    ddl_schema: Some(vec!["foo STRING".to_owned()]),
+                    ..Default::default()
+                }
+                .into(),
+                preprocess: None,
+                merge: MergeStrategyAppend {}.into(),
+            })
+            .prev(&head, 0)
+            .build(),
+            AppendOpts::default(),
+        )
+        .await;
+
+    assert_matches!(
+        res,
+        Err(AppendError::InvalidBlock(
+            AppendValidationError::InvalidEvent(..)
         ))
     );
 }

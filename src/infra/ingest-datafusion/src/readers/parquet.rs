@@ -21,17 +21,33 @@ use crate::*;
 
 pub struct ReaderParquet {
     ctx: SessionContext,
-    schema: Option<SchemaRef>,
+    conf: odf::metadata::ReadStepParquet,
+    schema_arrow: Option<SchemaRef>,
 }
 
 impl ReaderParquet {
-    pub async fn new(
+    pub fn new(
         ctx: SessionContext,
         conf: odf::metadata::ReadStepParquet,
+        to_arrow_settings: &odf::schema::ToArrowSettings,
     ) -> Result<Self, ReadError> {
+        assert!(
+            conf.ddl_schema.is_none(),
+            "DDL schema must be normalized before into ODF before creating a reader"
+        );
+
+        let schema_arrow = conf
+            .schema
+            .as_ref()
+            .map(|s| s.to_arrow(to_arrow_settings))
+            .transpose()
+            .int_err()?
+            .map(std::sync::Arc::new);
+
         Ok(Self {
-            schema: super::from_ddl_schema(&ctx, conf.schema.as_ref()).await?,
             ctx,
+            conf,
+            schema_arrow,
         })
     }
 }
@@ -40,14 +56,18 @@ impl ReaderParquet {
 
 #[async_trait::async_trait]
 impl Reader for ReaderParquet {
-    async fn input_schema(&self) -> Option<SchemaRef> {
-        self.schema.clone()
+    fn schema(&self) -> Option<&odf::schema::DataSchema> {
+        self.conf.schema.as_ref()
+    }
+
+    fn schema_arrow(&self) -> Option<&SchemaRef> {
+        self.schema_arrow.as_ref()
     }
 
     #[tracing::instrument(level = "info", name = "ReaderParquet::read", skip_all)]
     async fn read(&self, path: &Path) -> Result<DataFrameExt, ReadError> {
         let options = ParquetReadOptions {
-            schema: self.schema.as_deref(),
+            schema: self.schema_arrow.as_deref(),
             file_extension: path.extension().and_then(|s| s.to_str()).unwrap_or(""),
             table_partition_cols: Vec::new(),
             parquet_pruning: None,

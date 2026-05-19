@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#![feature(iter_intersperse)]
-
 // Re-exports
 pub use kamu_auth_rebac as domain;
 

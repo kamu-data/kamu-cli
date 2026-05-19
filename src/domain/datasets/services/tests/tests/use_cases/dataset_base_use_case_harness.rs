@@ -266,10 +266,9 @@ impl DatasetBaseUseCaseHarness {
 
         // Build new blocks with hashes
         let mut prev_block_hash = head;
-        let mut prev_block_sequence_number = head_block.sequence_number;
 
         let mut new_hashed_blocks = VecDeque::with_capacity(events.len());
-        for event in events {
+        for (prev_block_sequence_number, event) in (head_block.sequence_number..).zip(events) {
             let block = odf::MetadataBlock {
                 prev_block_hash: Some(prev_block_hash),
                 sequence_number: prev_block_sequence_number + 1,
@@ -280,7 +279,6 @@ impl DatasetBaseUseCaseHarness {
             new_hashed_blocks.push_back((hash.clone(), block));
 
             prev_block_hash = hash;
-            prev_block_sequence_number += 1;
         }
 
         // Execute append use case

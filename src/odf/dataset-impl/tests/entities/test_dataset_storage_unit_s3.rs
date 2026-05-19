@@ -10,7 +10,6 @@
 use std::sync::Arc;
 
 use opendatafabric_dataset_impl::{DatasetStorageUnitS3, S3RegistryCache};
-use s3_utils::S3Context;
 use test_utils::LocalS3Server;
 use time_source::SystemTimeSourceDefault;
 
@@ -24,13 +23,11 @@ struct S3StorageUnitHarness {
 }
 
 impl S3StorageUnitHarness {
-    pub async fn create(s3: &LocalS3Server, registry_caching: bool) -> Self {
-        let s3_context = S3Context::from_url(&s3.url).await;
-
+    pub fn create(s3: &LocalS3Server, registry_caching: bool) -> Self {
         let mut b = dill::CatalogBuilder::new();
 
         b.add::<SystemTimeSourceDefault>()
-            .add_builder(DatasetStorageUnitS3::builder(s3_context))
+            .add_builder(DatasetStorageUnitS3::builder(s3.ctx.clone()))
             .add_builder(odf::dataset::DatasetS3BuilderDefault::builder(None));
 
         if registry_caching {
@@ -52,7 +49,7 @@ impl S3StorageUnitHarness {
 #[tokio::test]
 async fn test_store_dataset() {
     let s3 = LocalS3Server::new().await;
-    let harness = S3StorageUnitHarness::create(&s3, false).await;
+    let harness = S3StorageUnitHarness::create(&s3, false);
 
     test_dataset_storage_unit_shared::test_store_dataset(harness.storage_unit.as_ref()).await;
 }
@@ -63,7 +60,7 @@ async fn test_store_dataset() {
 #[tokio::test]
 async fn test_delete_dataset() {
     let s3 = LocalS3Server::new().await;
-    let harness = S3StorageUnitHarness::create(&s3, false).await;
+    let harness = S3StorageUnitHarness::create(&s3, false);
 
     test_dataset_storage_unit_shared::test_delete_dataset(harness.storage_unit.as_ref()).await;
 }
@@ -74,7 +71,7 @@ async fn test_delete_dataset() {
 #[tokio::test]
 async fn test_iterate_datasets() {
     let s3 = LocalS3Server::new().await;
-    let harness = S3StorageUnitHarness::create(&s3, false).await;
+    let harness = S3StorageUnitHarness::create(&s3, false);
 
     test_dataset_storage_unit_shared::test_iterate_datasets(harness.storage_unit.as_ref()).await;
 }

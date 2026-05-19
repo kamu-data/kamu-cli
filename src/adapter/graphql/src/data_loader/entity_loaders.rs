@@ -24,13 +24,18 @@ use kamu_datasets::{DatasetAction, DatasetRegistry, ResolvedDataset};
 // AccountEntityLoader
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Holds a *weak* reference to the catalog so that `DataLoader`'s internally
+/// spawned tokio batch tasks do not keep a strong `Arc` count on the
+/// transaction's `CatalogImpl` (and thus on `TransactionRefT`).  Without
+/// this, a spawned batch task that outlives `schema.execute()` would
+/// prevent `Arc::try_unwrap` from succeeding during `commit_transaction`.
 pub struct AccountEntityLoader {
-    account_service: Arc<dyn AccountService>,
+    catalog: dill::CatalogWeakRef,
 }
 
 impl AccountEntityLoader {
-    pub fn new(account_service: Arc<dyn AccountService>) -> Self {
-        Self { account_service }
+    pub fn new(catalog: dill::CatalogWeakRef) -> Self {
+        Self { catalog }
     }
 }
 
@@ -47,9 +52,14 @@ impl Loader<odf::AccountID> for AccountEntityLoader {
         &self,
         keys: &[odf::AccountID],
     ) -> Result<HashMap<odf::AccountID, Self::Value>, Self::Error> {
+        let catalog = self.catalog.upgrade();
+        let account_service = catalog.get_one::<dyn AccountService>().unwrap();
         let key_refs: Vec<&odf::AccountID> = keys.iter().collect();
 
-        let lookup = self.account_service.get_accounts_by_ids(&key_refs).await?;
+        let lookup = account_service
+            .get_accounts_by_ids(&key_refs)
+            .await
+            .map_err(Arc::new)?;
 
         let mut result = HashMap::with_capacity(lookup.found.len());
         for account in lookup.found {
@@ -73,12 +83,14 @@ impl Loader<odf::AccountName> for AccountEntityLoader {
         &self,
         keys: &[odf::AccountName],
     ) -> Result<HashMap<odf::AccountName, Self::Value>, Self::Error> {
+        let catalog = self.catalog.upgrade();
+        let account_service = catalog.get_one::<dyn AccountService>().unwrap();
         let key_refs: Vec<&odf::AccountName> = keys.iter().collect();
 
-        let lookup = self
-            .account_service
+        let lookup = account_service
             .get_accounts_by_names(&key_refs)
-            .await?;
+            .await
+            .map_err(Arc::new)?;
 
         Ok(lookup
             .found
@@ -92,20 +104,14 @@ impl Loader<odf::AccountName> for AccountEntityLoader {
 // DatasetHandleLoader
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// See [`AccountEntityLoader`] for why this holds a weak catalog reference.
 pub struct DatasetHandleLoader {
-    rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
-    dataset_registry: Arc<dyn DatasetRegistry>,
+    catalog: dill::CatalogWeakRef,
 }
 
 impl DatasetHandleLoader {
-    pub fn new(
-        rebac_dataset_registry_facade: Arc<dyn RebacDatasetRegistryFacade>,
-        dataset_registry: Arc<dyn DatasetRegistry>,
-    ) -> Self {
-        Self {
-            rebac_dataset_registry_facade,
-            dataset_registry,
-        }
+    pub fn new(catalog: dill::CatalogWeakRef) -> Self {
+        Self { catalog }
     }
 }
 
@@ -122,13 +128,15 @@ impl Loader<odf::DatasetRef> for DatasetHandleLoader {
         &self,
         keys: &[odf::DatasetRef],
     ) -> Result<HashMap<odf::DatasetRef, Self::Value>, Self::Error> {
+        let catalog = self.catalog.upgrade();
+        let rebac_facade = catalog.get_one::<dyn RebacDatasetRegistryFacade>().unwrap();
         let dataset_refs: Vec<&odf::DatasetRef> = keys.iter().collect();
 
-        let resolution = self
-            .rebac_dataset_registry_facade
+        let resolution = rebac_facade
             .classify_dataset_refs_by_allowance(&dataset_refs, DatasetAction::Read)
             .await
-            .int_err()?;
+            .int_err()
+            .map_err(Arc::new)?;
 
         Ok(resolution.accessible_resolved_refs.into_iter().collect())
     }
@@ -151,22 +159,25 @@ impl Loader<AccessCheckedDatasetRef> for DatasetHandleLoader {
         &self,
         keys: &[AccessCheckedDatasetRef],
     ) -> Result<HashMap<AccessCheckedDatasetRef, Self::Value>, Self::Error> {
-        let dataset_refs: Vec<&_> = keys.iter().map(AsRef::as_ref).collect();
+        let catalog = self.catalog.upgrade();
+        let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
+        let dataset_refs: Vec<&odf::DatasetRef> = keys.iter().map(AsRef::as_ref).collect();
 
-        let resolution = self
-            .dataset_registry
+        let resolution = dataset_registry
             .resolve_dataset_handles_by_refs(&dataset_refs)
             .await
-            .int_err()?;
+            .int_err()
+            .map_err(Arc::new)?;
+
         let futures_iter = resolution
             .resolved_handles
             .into_iter()
-            .map(|(dataset_ref, dataset_handle)| async move {
-                let resolved_dataset = self
-                    .dataset_registry
-                    .get_dataset_by_handle(&dataset_handle)
-                    .await;
-                (AccessCheckedDatasetRef::new(dataset_ref), resolved_dataset)
+            .map(|(dataset_ref, dataset_handle)| {
+                let dr = Arc::clone(&dataset_registry);
+                async move {
+                    let resolved_dataset = dr.get_dataset_by_handle(&dataset_handle).await;
+                    (AccessCheckedDatasetRef::new(dataset_ref), resolved_dataset)
+                }
             })
             .collect::<Vec<_>>();
         let resolved_dataset_pairs = futures::future::join_all(futures_iter).await;

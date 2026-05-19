@@ -38,13 +38,13 @@ uninlined_format_args = "allow"
 
 
 [dependencies]
-arrow = { version = "57", default-features = false }
+arrow = { version = "58", default-features = false }
 async-trait = "0.1"
 aws-config = "1"
 aws-credential-types = "1"
 clap = { version = "4", features = ["derive"] }
 chrono = { version = "0.4" }
-datafusion = { version = "52", features = [
+datafusion = { version = "53", features = [
     "crypto_expressions",
     "datetime_expressions",
     "encoding_expressions",
@@ -56,14 +56,14 @@ datafusion = { version = "52", features = [
     "unicode_expressions",
     "compression",
 ] }
-datafusion-common = { version = "52", default-features = false }
+datafusion-common = { version = "53", default-features = false }
 dirs = "6"
 futures = "0.3"
 log = "0.4"
-object_store = { version = "0.12", features = ["aws", "gcp", "http"] }
+object_store = { version = "0.13", features = ["aws", "gcp", "http"] }
 parking_lot = { version = "0.12" }
-parquet = { version = "57", default-features = false }
-rustyline = "17"
+parquet = { version = "58", default-features = false }
+rustyline = "18"
 tokio = { version = "1", features = [
     "macros",
     "rt",

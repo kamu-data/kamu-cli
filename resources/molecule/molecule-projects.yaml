@@ -16,13 +16,9 @@ content:
       - name: system_time
         type:
           kind: Timestamp
-          unit: Millisecond
-          timezone: UTC
       - name: event_time
         type:
           kind: Timestamp
-          unit: Millisecond
-          timezone: UTC
       - name: ocl_id
         type:
           kind: String
@@ -43,12 +39,25 @@ content:
     read:
       kind: NdJson
       schema:
-      - op INT NOT NULL
-      - ocl_id STRING NOT NULL
-      - symbol STRING NOT NULL
-      - odf_account_id STRING NOT NULL
-      - odf_data_room_dataset_id STRING NOT NULL
-      - odf_announcements_dataset_id STRING NOT NULL
+        fields:
+        - name: op
+          type:
+            kind: Int32
+        - name: ocl_id
+          type:
+            kind: String
+        - name: symbol
+          type:
+            kind: String
+        - name: odf_account_id
+          type:
+            kind: String
+        - name: odf_data_room_dataset_id
+          type:
+            kind: String
+        - name: odf_announcements_dataset_id
+          type:
+            kind: String
     merge:
       kind: ChangelogStream
       primaryKey:

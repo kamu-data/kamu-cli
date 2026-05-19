@@ -7,7 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::io::Write;
+
+use flate2::Compression;
+use flate2::write::GzEncoder;
 use kamu_search::SearchIndexUpdateOperation;
+use reqwest::Method;
+use reqwest::header::{CONTENT_ENCODING, CONTENT_TYPE};
 
 use super::*;
 use crate::ElasticsearchClientConfig;
@@ -25,7 +31,10 @@ const ES_SHARD_READY_TIMEOUT: std::time::Duration = std::time::Duration::from_se
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct ElasticsearchClient {
-    client: elasticsearch::Elasticsearch,
+    client: reqwest::Client,
+    base_url: String,
+    password: Option<String>,
+    enable_compression: bool,
 }
 
 #[common_macros::method_names_consts]
@@ -33,21 +42,10 @@ impl ElasticsearchClient {
     #[tracing::instrument(level = "info", name = ElasticsearchClient_init, skip_all)]
     pub fn init(config: &ElasticsearchClientConfig) -> Result<Self, ElasticsearchClientBuildError> {
         tracing::info!(config = ?config, "Initializing Elasticsearch client");
-        use elasticsearch::http::transport::{SingleNodeConnectionPool, TransportBuilder};
 
-        let pool = SingleNodeConnectionPool::new(config.url.clone());
-
-        let mut builder = TransportBuilder::new(pool)
-            .disable_proxy() // often desirable in k8s
-            .timeout(std::time::Duration::from_secs(config.timeout_secs))
-            .request_body_compression(config.enable_compression);
-
-        if let Some(password) = &config.password {
-            builder = builder.auth(elasticsearch::auth::Credentials::Basic(
-                DEFAULT_ELASTICSEARCH_USER.into(),
-                password.clone(),
-            ));
-        }
+        let mut builder = reqwest::ClientBuilder::new()
+            .no_proxy() // often desirable in k8s
+            .timeout(std::time::Duration::from_secs(config.timeout_secs));
 
         // Configure TLS certificate if provided
         if let Some(ca_cert_path) = &config.ca_cert_pem_path {
@@ -59,23 +57,27 @@ impl ElasticsearchClient {
                 }
             })?;
 
-            let cert = elasticsearch::cert::Certificate::from_pem(&cert_pem)?;
-            builder =
-                builder.cert_validation(elasticsearch::cert::CertificateValidation::Full(cert));
+            let cert = reqwest::Certificate::from_pem(&cert_pem)
+                .map_err(ElasticsearchClientBuildError::InvalidCertificate)?;
+            builder = builder.add_root_certificate(cert);
         }
 
-        let transport = builder.build()?;
-        let client = elasticsearch::Elasticsearch::new(transport);
-        Ok(Self { client })
+        let client = builder
+            .build()
+            .map_err(ElasticsearchClientBuildError::Build)?;
+
+        Ok(Self {
+            client,
+            base_url: config.url.as_str().trim_end_matches('/').to_owned(),
+            password: config.password.clone(),
+            enable_compression: config.enable_compression,
+        })
     }
 
     #[tracing::instrument(level = "debug", name = ElasticsearchClient_cluster_health, skip_all)]
     pub async fn cluster_health(&self) -> Result<serde_json::Value, ElasticsearchClientError> {
         let response = self
-            .client
-            .cluster()
-            .health(elasticsearch::cluster::ClusterHealthParts::None)
-            .send()
+            .send_request(Method::GET, "/_cluster/health", RequestPayload::None)
             .await?;
 
         let response = ensure_client_response(response).await?;
@@ -86,15 +88,12 @@ impl ElasticsearchClient {
     #[tracing::instrument(level = "debug", name = ElasticsearchClient_total_documents, skip_all)]
     pub async fn total_documents(&self) -> Result<u64, ElasticsearchClientError> {
         let response = self
-            .client
-            .count(elasticsearch::CountParts::None)
-            .send()
+            .send_request(Method::GET, "/_count", RequestPayload::None)
             .await?;
 
         let response = ensure_client_response(response).await?;
-        let body: es_client::CountResponse = response.json().await?;
-        let count = body.count;
-        Ok(count)
+        let body: CountResponse = response.json().await?;
+        Ok(body.count)
     }
 
     #[tracing::instrument(
@@ -108,16 +107,16 @@ impl ElasticsearchClient {
         index_name: &str,
     ) -> Result<u64, ElasticsearchClientError> {
         let response = self
-            .client
-            .count(elasticsearch::CountParts::Index(&[index_name]))
-            .send()
+            .send_request(
+                Method::GET,
+                &format!("/{index_name}/_count"),
+                RequestPayload::None,
+            )
             .await?;
 
         let response = ensure_client_response(response).await?;
-
         let body: CountResponse = response.json().await?;
-        let count = body.count;
-        Ok(count)
+        Ok(body.count)
     }
 
     #[tracing::instrument(level = "debug", name = ElasticsearchClient_search, skip_all)]
@@ -125,7 +124,7 @@ impl ElasticsearchClient {
         &self,
         req_body: serde_json::Value,
         index_names: &[&str],
-    ) -> Result<es_client::SearchResponse, ElasticsearchClientError> {
+    ) -> Result<SearchResponse, ElasticsearchClientError> {
         tracing::debug!(
             index_names = ?index_names,
             req_body = Self::sanitize_json_for_logging(&req_body, MAX_LOG_SIZE_CHARS),
@@ -138,10 +137,11 @@ impl ElasticsearchClient {
 
         // Send request to Elasticsearch
         let response = self
-            .client
-            .search(elasticsearch::SearchParts::Index(index_names))
-            .body(req_body)
-            .send()
+            .send_request(
+                Method::POST,
+                &format!("/{}/_search", index_names.join(",")),
+                RequestPayload::Json(&req_body),
+            )
             .await?;
 
         // Obtain and log a raw response
@@ -157,7 +157,7 @@ impl ElasticsearchClient {
         );*/
 
         // Try interpreting the response
-        let search_response: SearchResponse = serde_json::from_value(body).unwrap();
+        let search_response: SearchResponse = serde_json::from_value(body)?;
         Ok(search_response)
     }
 
@@ -167,15 +167,18 @@ impl ElasticsearchClient {
         index_name: &str,
         id: &str,
     ) -> Result<Option<serde_json::Value>, ElasticsearchClientError> {
-        use elasticsearch::GetParts;
+        let safe_id = urlencoding::encode(id);
+
         let response = self
-            .client
-            .get(GetParts::IndexId(index_name, id))
-            .send()
+            .send_request(
+                Method::GET,
+                &format!("/{index_name}/_doc/{safe_id}"),
+                RequestPayload::None,
+            )
             .await?;
 
         // 404 means document does not exist
-        if response.status_code().as_u16() == 404 {
+        if response.status() == reqwest::StatusCode::NOT_FOUND {
             return Ok(None);
         }
 
@@ -193,14 +196,12 @@ impl ElasticsearchClient {
         &self,
         prefix: &str,
     ) -> Result<Vec<String>, ElasticsearchClientError> {
-        use elasticsearch::indices::IndicesGetParts;
-
-        let pattern = format!("{prefix}*",);
         let response = self
-            .client
-            .indices()
-            .get(IndicesGetParts::Index(&[&pattern]))
-            .send()
+            .send_request(
+                Method::GET,
+                &format!("/{prefix}*/_mapping"),
+                RequestPayload::None,
+            )
             .await?;
 
         let response = ensure_client_response(response).await?;
@@ -221,15 +222,18 @@ impl ElasticsearchClient {
         &self,
         index_names: &[&str],
     ) -> Result<(), ElasticsearchClientError> {
-        use elasticsearch::indices::IndicesRefreshParts;
+        if index_names.is_empty() {
+            return Ok(());
+        }
 
         tracing::debug!(index_names = ?index_names, "Refreshing Elasticsearch indices");
 
         let response = self
-            .client
-            .indices()
-            .refresh(IndicesRefreshParts::Index(index_names))
-            .send()
+            .send_request(
+                Method::POST,
+                &format!("/{}/_refresh", index_names.join(",")),
+                RequestPayload::None,
+            )
             .await?;
 
         let _ = ensure_client_response(response).await?;
@@ -245,14 +249,11 @@ impl ElasticsearchClient {
         tracing::info!(index_name, body = ?body, "Creating Elasticsearch index");
 
         let response = self
-            .client
-            .indices()
-            .create(elasticsearch::indices::IndicesCreateParts::Index(
-                index_name,
-            ))
-            .wait_for_active_shards("1")
-            .body(body)
-            .send()
+            .send_request(
+                Method::PUT,
+                &format!("/{index_name}?wait_for_active_shards=1"),
+                RequestPayload::Json(&body),
+            )
             .await?;
 
         let _ = ensure_client_response(response).await?;
@@ -291,15 +292,18 @@ impl ElasticsearchClient {
         &self,
         index_names: &[&str],
     ) -> Result<(), ElasticsearchClientError> {
+        if index_names.is_empty() {
+            return Ok(());
+        }
+
         tracing::info!(index_names = ?index_names, "Deleting Elasticsearch indices");
 
-        use elasticsearch::indices::IndicesDeleteParts;
-
         let response = self
-            .client
-            .indices()
-            .delete(IndicesDeleteParts::Index(index_names))
-            .send()
+            .send_request(
+                Method::DELETE,
+                &format!("/{}", index_names.join(",")),
+                RequestPayload::None,
+            )
             .await?;
 
         let _ = ensure_client_response(response).await?;
@@ -312,12 +316,11 @@ impl ElasticsearchClient {
         index_name: &str,
     ) -> Result<serde_json::Value, ElasticsearchClientError> {
         let response = self
-            .client
-            .indices()
-            .get_mapping(elasticsearch::indices::IndicesGetMappingParts::Index(&[
-                index_name,
-            ]))
-            .send()
+            .send_request(
+                Method::GET,
+                &format!("/{index_name}/_mapping"),
+                RequestPayload::None,
+            )
             .await?;
         let response = ensure_client_response(response).await?;
 
@@ -333,7 +336,6 @@ impl ElasticsearchClient {
         //        }
         //    }
         // }
-
         let body: serde_json::Value = response.json().await?;
         let index_settings = &body[index_name]["mappings"]["_meta"];
         Ok(index_settings.clone())
@@ -346,18 +348,17 @@ impl ElasticsearchClient {
         to_index: &str,
         maybe_filter_json: Option<serde_json::Value>,
     ) -> Result<(), ElasticsearchClientError> {
-        use elasticsearch::indices::IndicesExistsAliasParts;
-
-        // Check if alias exists
-        // Removing non-existing alias may cause an error
+        // Check if alias exists.
+        // Removing non-existing alias may cause an error.
         let alias_exists = {
             let resp = self
-                .client
-                .indices()
-                .exists_alias(IndicesExistsAliasParts::Name(&[alias_name]))
-                .send()
+                .send_request(
+                    Method::HEAD,
+                    &format!("/_alias/{alias_name}"),
+                    RequestPayload::None,
+                )
                 .await?;
-            resp.status_code() == 200
+            resp.status() == reqwest::StatusCode::OK
         };
 
         // Build add alias action
@@ -370,14 +371,14 @@ impl ElasticsearchClient {
             add_command_json["filter"] = filter_json;
         }
 
-        // Existing alias? Remove + Add new
+        // Existing alias? Remove + add new.
         let actions = if alias_exists {
             serde_json::json!([
                 { "remove": { "index": "*", "alias": alias_name } },
                 { "add": add_command_json }
             ])
         } else {
-            // New alias? Just Add
+            // New alias? Just add.
             serde_json::json!([
                 { "add": add_command_json }
             ])
@@ -394,11 +395,7 @@ impl ElasticsearchClient {
         );
 
         let response = self
-            .client
-            .indices()
-            .update_aliases()
-            .body(body)
-            .send()
+            .send_request(Method::POST, "/_aliases", RequestPayload::Json(&body))
             .await?;
 
         let _ = ensure_client_response(response).await?;
@@ -410,25 +407,22 @@ impl ElasticsearchClient {
         Ok(())
     }
 
-    /// Wait until alias is visible in cluster state.
     async fn wait_for_alias(&self, alias_name: &str) -> Result<(), ElasticsearchClientError> {
-        use elasticsearch::indices::IndicesExistsAliasParts;
-
+        // Wait until alias is visible in cluster state.
         self.retry_transient("wait_for_alias", ES_PROPAGATION_TIMEOUT, || async {
             let resp = self
-                .client
-                .indices()
-                .exists_alias(IndicesExistsAliasParts::Name(&[alias_name]))
-                .send()
+                .send_request(
+                    Method::HEAD,
+                    &format!("/_alias/{alias_name}"),
+                    RequestPayload::None,
+                )
                 .await?;
 
-            match resp.status_code() {
-                elasticsearch::http::StatusCode::OK => Ok(()),
-                elasticsearch::http::StatusCode::NOT_FOUND => {
-                    Err(ElasticsearchClientError::IndexNotFound {
-                        index: alias_name.to_owned(),
-                    })
-                }
+            match resp.status() {
+                reqwest::StatusCode::OK => Ok(()),
+                reqwest::StatusCode::NOT_FOUND => Err(ElasticsearchClientError::IndexNotFound {
+                    index: alias_name.to_owned(),
+                }),
                 _ => {
                     let _ = ensure_client_response(resp).await?;
                     Ok(())
@@ -443,17 +437,16 @@ impl ElasticsearchClient {
         &self,
         alias_name: &str,
     ) -> Result<Vec<String>, ElasticsearchClientError> {
-        use elasticsearch::indices::IndicesGetAliasParts;
-
         let response = self
-            .client
-            .indices()
-            .get_alias(IndicesGetAliasParts::Name(&[alias_name]))
-            .send()
+            .send_request(
+                Method::GET,
+                &format!("/_alias/{alias_name}"),
+                RequestPayload::None,
+            )
             .await?;
 
         // 404 means alias does not exist
-        if response.status_code().as_u16() == 404 {
+        if response.status() == reqwest::StatusCode::NOT_FOUND {
             return Ok(vec![]);
         }
 
@@ -501,14 +494,13 @@ impl ElasticsearchClient {
         );
 
         let response = self
-            .client
-            .reindex()
-            .body(body)
-            .wait_for_completion(true) // block until done for now
-            .refresh(true) // refresh dest so new alias sees all docs
-            .send()
+            .send_request(
+                Method::POST,
+                "/_reindex?wait_for_completion=true&refresh=true",
+                RequestPayload::Json(&body),
+            )
             .await
-            .map_err(|e| ElasticsearchReindexError::Client(e.into()))?;
+            .map_err(ElasticsearchReindexError::Client)?;
 
         let response = ensure_client_response(response)
             .await
@@ -532,7 +524,9 @@ impl ElasticsearchClient {
             failures: Vec<serde_json::Value>,
         }
 
-        let summary = serde_json::from_value::<ReindexSummary>(value).unwrap();
+        let summary = serde_json::from_value::<ReindexSummary>(value)
+            .map_err(ElasticsearchClientError::from)
+            .map_err(ElasticsearchReindexError::Client)?;
 
         // Check for failures
         if !summary.failures.is_empty() {
@@ -562,49 +556,23 @@ impl ElasticsearchClient {
         index_name: &str,
         operations: Vec<SearchIndexUpdateOperation>,
     ) -> Result<(), ElasticsearchClientError> {
-        use elasticsearch::BulkParts;
-
         if operations.is_empty() {
             return Ok(());
         }
 
-        let mut body: Vec<elasticsearch::BulkOperation<serde_json::Value>> =
-            Vec::with_capacity(operations.len());
-
-        for op in operations {
-            match op {
-                SearchIndexUpdateOperation::Index { id, doc } => {
-                    body.push(elasticsearch::BulkOperation::index(doc).id(id).into());
-                }
-                SearchIndexUpdateOperation::Update {
-                    id,
-                    doc: partial_doc,
-                } => {
-                    body.push(
-                        elasticsearch::BulkOperation::update(
-                            id,
-                            serde_json::json!({"doc": partial_doc}),
-                        )
-                        .into(),
-                    );
-                }
-                SearchIndexUpdateOperation::Delete { id } => {
-                    body.push(elasticsearch::BulkOperation::delete(id).into());
-                }
-            }
-        }
-
         tracing::debug!(
             index_name,
-            num_operations = body.len(),
+            num_operations = operations.len(),
             "Executing bulk update operation"
         );
 
+        let bulk_body = build_bulk_request_body(operations)?;
         let response = self
-            .client
-            .bulk(BulkParts::Index(index_name))
-            .body(body)
-            .send()
+            .send_request(
+                Method::POST,
+                &format!("/{index_name}/_bulk"),
+                RequestPayload::Ndjson(bulk_body),
+            )
             .await?;
 
         handle_bulk_response(response, index_name, "update").await
@@ -674,7 +642,7 @@ impl ElasticsearchClient {
                 ..
             } => {
                 // 503 + typical error types for shard unavailability
-                if *status == elasticsearch::http::StatusCode::SERVICE_UNAVAILABLE {
+                if *status == reqwest::StatusCode::SERVICE_UNAVAILABLE {
                     if error_type == "search_phase_execution_exception"
                         || error_type == "no_shard_available_action_exception"
                     {
@@ -693,7 +661,6 @@ impl ElasticsearchClient {
                 }
                 false
             }
-
             _ => false,
         }
     }
@@ -743,6 +710,68 @@ impl ElasticsearchClient {
             json_str
         }
     }
+
+    async fn send_request(
+        &self,
+        method: Method,
+        path: &str,
+        payload: RequestPayload<'_>,
+    ) -> Result<reqwest::Response, ElasticsearchClientError> {
+        let mut builder = self.client.request(method, self.request_url(path));
+
+        if let Some(password) = &self.password {
+            builder = builder.basic_auth(DEFAULT_ELASTICSEARCH_USER, Some(password));
+        }
+
+        builder = match payload {
+            RequestPayload::None => builder,
+            RequestPayload::Json(value) => {
+                let body = serde_json::to_vec(value)?;
+                self.attach_body(builder, body, "application/json")?
+            }
+            RequestPayload::Ndjson(body) => {
+                self.attach_body(builder, body, "application/x-ndjson")?
+            }
+        };
+
+        builder
+            .send()
+            .await
+            .map_err(ElasticsearchClientError::Transport)
+    }
+
+    fn attach_body(
+        &self,
+        builder: reqwest::RequestBuilder,
+        body: Vec<u8>,
+        content_type: &'static str,
+    ) -> Result<reqwest::RequestBuilder, ElasticsearchClientError> {
+        let body = if self.enable_compression {
+            compress_body(&body)?
+        } else {
+            body
+        };
+
+        let builder = builder.header(CONTENT_TYPE, content_type);
+
+        if self.enable_compression {
+            Ok(builder.header(CONTENT_ENCODING, "gzip").body(body))
+        } else {
+            Ok(builder.body(body))
+        }
+    }
+
+    fn request_url(&self, path: &str) -> String {
+        format!("{}{}", self.base_url, path)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+enum RequestPayload<'a> {
+    None,
+    Json(&'a serde_json::Value),
+    Ndjson(Vec<u8>),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -764,7 +793,7 @@ pub enum ElasticsearchReindexError {
 #[derive(Debug, thiserror::Error)]
 pub enum ElasticsearchClientBuildError {
     #[error("transport error building Elasticsearch client: {0}")]
-    Build(#[from] elasticsearch::http::transport::BuildError),
+    Build(reqwest::Error),
 
     #[error("failed to read CA certificate from {path}: {source}")]
     CertificateRead {
@@ -773,7 +802,7 @@ pub enum ElasticsearchClientBuildError {
     },
 
     #[error("invalid certificate format: {0}")]
-    InvalidCertificate(#[from] elasticsearch::Error),
+    InvalidCertificate(reqwest::Error),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -781,11 +810,17 @@ pub enum ElasticsearchClientBuildError {
 #[derive(Debug, thiserror::Error)]
 pub enum ElasticsearchClientError {
     #[error("transport error communicating to Elasticsearch: {0}")]
-    Transport(#[from] elasticsearch::Error),
+    Transport(#[from] reqwest::Error),
+
+    #[error("failed to serialize Elasticsearch request/response payload: {0}")]
+    Serialization(#[from] serde_json::Error),
+
+    #[error("failed to compress Elasticsearch request body: {0}")]
+    Compression(#[from] std::io::Error),
 
     #[error("Elasticsearch error {status} ({error_type}): {reason}")]
     BadResponse {
-        status: elasticsearch::http::StatusCode,
+        status: reqwest::StatusCode,
         error_type: String,
         reason: String,
         body: serde_json::Value,
@@ -804,7 +839,7 @@ struct BulkResponse {
 }
 
 async fn handle_bulk_response(
-    response: elasticsearch::http::response::Response,
+    response: reqwest::Response,
     index_name: &str,
     operation_name: &str,
 ) -> Result<(), ElasticsearchClientError> {
@@ -818,7 +853,7 @@ async fn handle_bulk_response(
             "Bulk {operation_name} completed with errors"
         );
         return Err(ElasticsearchClientError::BadResponse {
-            status: elasticsearch::http::StatusCode::from_u16(500).unwrap(),
+            status: reqwest::StatusCode::INTERNAL_SERVER_ERROR,
             error_type: format!("bulk_{operation_name}_errors"),
             reason: format!("Some documents failed to {operation_name}"),
             body: serde_json::json!({ "items": bulk_result.items }),
@@ -835,16 +870,21 @@ async fn handle_bulk_response(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn ensure_client_response(
-    resp: elasticsearch::http::response::Response,
-) -> Result<elasticsearch::http::response::Response, ElasticsearchClientError> {
-    let status = resp.status_code();
+    resp: reqwest::Response,
+) -> Result<reqwest::Response, ElasticsearchClientError> {
+    let status = resp.status();
     if status.is_success() {
         return Ok(resp);
     }
 
     let body_text = resp.text().await.unwrap_or_default();
-    // println!("Elasticsearch error response body: {body_text}" );
 
+    Err(parse_error_response(status, &body_text))
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn parse_error_response(status: reqwest::StatusCode, body_text: &str) -> ElasticsearchClientError {
     #[derive(serde::Deserialize)]
     struct EsErrorRoot {
         error: EsErrorDetail,
@@ -858,11 +898,11 @@ async fn ensure_client_response(
     }
 
     // Try JSON first
-    if let Ok(parsed) = serde_json::from_str::<EsErrorRoot>(&body_text) {
+    if let Ok(parsed) = serde_json::from_str::<EsErrorRoot>(body_text) {
         let error_type = parsed.error.type_;
         let reason = parsed.error.reason;
-        let body_json = serde_json::from_str::<serde_json::Value>(&body_text)
-            .unwrap_or(serde_json::Value::Null);
+        let body_json =
+            serde_json::from_str::<serde_json::Value>(body_text).unwrap_or(serde_json::Value::Null);
 
         // Special case: index_not_found
         const INDEX_NOT_FOUND_ERROR_TYPE: &str = "index_not_found_exception";
@@ -872,24 +912,120 @@ async fn ensure_client_response(
                 .unwrap_or_default()
                 .to_string();
 
-            return Err(ElasticsearchClientError::IndexNotFound { index });
+            return ElasticsearchClientError::IndexNotFound { index };
         }
 
-        return Err(ElasticsearchClientError::BadResponse {
+        return ElasticsearchClientError::BadResponse {
             status,
             error_type,
             reason,
             body: body_json,
-        });
+        };
     }
 
-    // If it wasn’t JSON, still return a structured error
-    Err(ElasticsearchClientError::BadResponse {
+    // If it wasn't JSON, still return a structured error
+    ElasticsearchClientError::BadResponse {
         status,
         error_type: "non_json_error".to_string(),
-        reason: body_text.clone(),
-        body: serde_json::Value::String(body_text),
-    })
+        reason: body_text.to_string(),
+        body: serde_json::Value::String(body_text.to_string()),
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn build_bulk_request_body(
+    operations: Vec<SearchIndexUpdateOperation>,
+) -> Result<Vec<u8>, ElasticsearchClientError> {
+    let mut body = Vec::new();
+
+    for op in operations {
+        match op {
+            SearchIndexUpdateOperation::Index { id, doc } => {
+                body.extend(serde_json::to_vec(&serde_json::json!({
+                    "index": { "_id": id }
+                }))?);
+                body.push(b'\n');
+                body.extend(serde_json::to_vec(&doc)?);
+                body.push(b'\n');
+            }
+            SearchIndexUpdateOperation::Update { id, doc } => {
+                body.extend(serde_json::to_vec(&serde_json::json!({
+                    "update": { "_id": id }
+                }))?);
+                body.push(b'\n');
+                body.extend(serde_json::to_vec(&serde_json::json!({
+                    "doc": doc
+                }))?);
+                body.push(b'\n');
+            }
+            SearchIndexUpdateOperation::Delete { id } => {
+                body.extend(serde_json::to_vec(&serde_json::json!({
+                    "delete": { "_id": id }
+                }))?);
+                body.push(b'\n');
+            }
+        }
+    }
+
+    Ok(body)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn compress_body(body: &[u8]) -> Result<Vec<u8>, std::io::Error> {
+    let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+    encoder.write_all(body)?;
+    encoder.finish()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_build_bulk_request_body_uses_ndjson_and_trailing_newline() {
+        let body = build_bulk_request_body(vec![
+            SearchIndexUpdateOperation::Index {
+                id: "doc-1".to_string(),
+                doc: serde_json::json!({"foo":"bar"}),
+            },
+            SearchIndexUpdateOperation::Update {
+                id: "doc-2".to_string(),
+                doc: serde_json::json!({"baz":"qux"}),
+            },
+            SearchIndexUpdateOperation::Delete {
+                id: "doc-3".to_string(),
+            },
+        ])
+        .unwrap();
+
+        let body = String::from_utf8(body).unwrap();
+        assert!(body.ends_with('\n'));
+
+        let lines: Vec<_> = body.lines().collect();
+        assert_eq!(lines.len(), 5);
+        assert_eq!(lines[0], r#"{"index":{"_id":"doc-1"}}"#);
+        assert_eq!(lines[1], r#"{"foo":"bar"}"#);
+        assert_eq!(lines[2], r#"{"update":{"_id":"doc-2"}}"#);
+        assert_eq!(lines[3], r#"{"doc":{"baz":"qux"}}"#);
+        assert_eq!(lines[4], r#"{"delete":{"_id":"doc-3"}}"#);
+    }
+
+    #[test]
+    fn test_parse_error_response_maps_index_not_found() {
+        let err = parse_error_response(
+            reqwest::StatusCode::NOT_FOUND,
+            r#"{"error":{"type":"index_not_found_exception","reason":"missing","index":"foo"}}"#,
+        );
+
+        assert!(matches!(
+            err,
+            ElasticsearchClientError::IndexNotFound { index } if index == "foo"
+        ));
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

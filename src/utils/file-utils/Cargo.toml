@@ -22,4 +22,5 @@ doctest = false
 
 
 [dependencies]
+fs_extra = "1.3"
 serde = { version = "1", default-features = false, features = ["derive"] }

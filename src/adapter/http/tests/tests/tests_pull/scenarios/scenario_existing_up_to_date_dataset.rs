@@ -12,11 +12,10 @@ use odf::metadata::testing::MetadataFactory;
 
 use crate::harness::{
     ClientSideHarness,
+    DatasetTransferScope,
     ServerSideHarness,
     commit_add_data_event,
-    copy_dataset_files,
-    make_dataset_ref,
-    write_dataset_alias,
+    write_lfs_dataset_alias,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -24,8 +23,8 @@ use crate::harness::{
 pub(crate) struct SmartPullExistingUpToDateDatasetScenario<TServerHarness: ServerSideHarness> {
     pub client_harness: ClientSideHarness,
     pub server_harness: TServerHarness,
-    pub server_dataset_layout: DatasetLayout,
     pub client_dataset_layout: DatasetLayout,
+    pub server_dataset_handle: odf::DatasetHandle,
     pub server_dataset_ref: odf::DatasetRefRemote,
 }
 
@@ -35,6 +34,7 @@ impl<TServerHarness: ServerSideHarness> SmartPullExistingUpToDateDatasetScenario
         server_harness: TServerHarness,
     ) -> Self {
         let server_account_name = server_harness.operating_account_name();
+        let dataset_fixture = server_harness.dataset_fixture();
 
         let create_dataset_from_snapshot =
             server_harness.cli_create_dataset_from_snapshot_use_case();
@@ -55,13 +55,9 @@ impl<TServerHarness: ServerSideHarness> SmartPullExistingUpToDateDatasetScenario
             .await
             .unwrap();
 
-        let server_dataset_layout =
-            server_harness.dataset_layout(&server_create_result.dataset_handle);
-
         let server_commit_result = commit_add_data_event(
             server_harness.cli_dataset_registry().as_ref(),
-            &make_dataset_ref(server_account_name.as_ref(), "foo"),
-            &server_dataset_layout,
+            &server_create_result.dataset_handle,
             None,
         )
         .await;
@@ -70,10 +66,17 @@ impl<TServerHarness: ServerSideHarness> SmartPullExistingUpToDateDatasetScenario
             client_harness.dataset_layout(&server_create_result.dataset_handle.id);
 
         // Hard folder synchronization
-        copy_dataset_files(&server_dataset_layout, &client_dataset_layout).unwrap();
+        dataset_fixture
+            .download_dataset_to(
+                &server_create_result.dataset_handle,
+                &client_dataset_layout,
+                DatasetTransferScope::Full,
+            )
+            .await
+            .unwrap();
 
         let foo_name = odf::DatasetName::new_unchecked("foo");
-        write_dataset_alias(
+        write_lfs_dataset_alias(
             &client_dataset_layout,
             &odf::DatasetAlias::new(client_harness.operating_account_name(), foo_name.clone()),
         )
@@ -109,8 +112,8 @@ impl<TServerHarness: ServerSideHarness> SmartPullExistingUpToDateDatasetScenario
         Self {
             client_harness,
             server_harness,
-            server_dataset_layout,
             client_dataset_layout,
+            server_dataset_handle: server_create_result.dataset_handle,
             server_dataset_ref,
         }
     }

@@ -643,7 +643,7 @@ fn assert_execute_command_result<'a>(
                     "Expected found regex match:\n'{re}'\nUnexpected output:\n{stderr}",
                 );
 
-                panic!("Expected found regex match:\n'{re}'\nUnexpected output:\n{stderr}",);
+                panic!("Expected found regex match:\n'{re}'\nUnexpected output:\n{stderr}");
             }
         }
     }

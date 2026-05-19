@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::assert_matches::assert_matches;
+use std::assert_matches;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
@@ -748,8 +748,7 @@ impl PullUseCaseHarness {
         let dst_path = self.remote_tmp_dir.path().join(dataset_name);
 
         tokio::fs::create_dir_all(&dst_path).await.unwrap();
-        let copy_options = fs_extra::dir::CopyOptions::new().content_only(true);
-        fs_extra::dir::copy(src_path, dst_path, &copy_options).unwrap();
+        file_utils::copy_dir_contents_recursively(&src_path, &dst_path).unwrap();
     }
 
     async fn index_dataset_dependencies(&self) {

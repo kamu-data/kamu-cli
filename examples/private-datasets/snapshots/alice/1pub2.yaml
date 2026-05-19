@@ -9,10 +9,15 @@ content:
       read:
         kind: NdJson
         schema:
-          - "match_time TIMESTAMP"
-          - "match_id BIGINT"
-          - "player_id STRING"
-          - "score BIGINT"
+          fields:
+            - name: match_time
+              type: timestamp
+            - name: match_id
+              type: int64
+            - name: player_id
+              type: string
+            - name: score
+              type: int64
       merge:
         kind: Ledger
         primaryKey:

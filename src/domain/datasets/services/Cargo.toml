@@ -42,7 +42,7 @@ kamu-datasets = { workspace = true }
 kamu-search = { workspace = true }
 messaging-outbox = { workspace = true }
 mockall = { optional = true, version = "0.14" }
-odf = { workspace = true, features = ["http", "lfs", "s3"] }
+odf = { workspace = true, features = ["dataset", "http", "lfs", "s3"] }
 s3-utils = { workspace = true }
 time-source = { workspace = true }
 
@@ -53,13 +53,11 @@ cheap-clone = { version = "0.3", default-features = false, features = [
     "alloc",
 ] }
 chrono = { version = "0.4", default-features = false }
-datafusion = { version = "52", default-features = false, features = [
-    "nested_expressions",
-] }
+datafusion = { version = "53", default-features = false, features = ["nested_expressions"] }
 dill = { version = "0.15", default-features = false }
 futures = { version = "0.3", default-features = false }
 itertools = { version = "0.14", default-features = false }
-nutype = { version = "0.6", default-features = false }
+nutype = { version = "0.7", default-features = false }
 petgraph = { version = "0.8", default-features = false, features = [
     "stable_graph",
 ] }
@@ -96,7 +94,7 @@ kamu-search-services = { workspace = true }
 odf = { workspace = true, features = ["testing"] }
 test-utils = { workspace = true }
 
-arrow = { version = "57", default-features = false }
+arrow = { version = "58", default-features = false }
 bon = { version = "3", default-features = false }
 indoc = "2"
 mockall = "0.14"
@@ -108,7 +106,7 @@ pretty_assertions = { version = "1", default-features = false, features = [
 ] }
 rstest = { version = "0.26", default-features = false, features = [] }
 serde_json = "1"
-sha2 = { version = "0.10", default-features = false }
+sha2 = { version = "0.11", default-features = false }
 tempfile = "3"
 test-log = { version = "0.2", features = ["trace"] }
 test-group = { version = "1" }

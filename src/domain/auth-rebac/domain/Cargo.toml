@@ -36,7 +36,7 @@ async-trait = "0.1"
 indoc = { version = "2", default-features = false }
 itertools = { version = "0.14", default-features = false }
 serde = { version = "1", features = ["derive"] }
-strum = { version = "0.27", features = ["derive"] }
+strum = { version = "0.28", features = ["derive"] }
 thiserror = { version = "2", default-features = false, features = ["std"] }
 
 # Optional

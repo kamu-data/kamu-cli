@@ -30,6 +30,15 @@ pub struct ObjectStoreBuilderS3 {
 
     #[dill::component(explicit)]
     allow_http: bool,
+
+    // TODO: Inject credentials?
+    // For tests only
+    #[dill::component(explicit)]
+    access_key: Option<String>,
+
+    // For tests only
+    #[dill::component(explicit)]
+    secret_key: Option<String>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -52,7 +61,15 @@ impl ObjectStoreBuilder for ObjectStoreBuilderS3 {
             "Building object store",
         );
 
-        let mut s3_builder = AmazonS3Builder::from_env()
+        let mut s3_builder = if let Some(secret_key) = &self.secret_key {
+            AmazonS3Builder::new()
+                .with_access_key_id(self.access_key.as_ref().unwrap())
+                .with_secret_access_key(secret_key)
+        } else {
+            AmazonS3Builder::from_env()
+        };
+
+        s3_builder = s3_builder
             .with_bucket_name(self.s3_context.bucket())
             .with_allow_http(self.allow_http);
 

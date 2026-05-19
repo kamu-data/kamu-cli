@@ -38,16 +38,6 @@ where
         skip_all,
         fields(%location, kind = std::any::type_name::<S>()),
     )]
-    async fn put(&self, location: &Path, payload: PutPayload) -> Result<PutResult> {
-        self.0.put(location, payload).await
-    }
-
-    #[tracing::instrument(
-        level = "debug",
-        name = "ObjectStore::put",
-        skip_all,
-        fields(%location, kind = std::any::type_name::<S>()),
-    )]
     async fn put_opts(
         &self,
         location: &Path,
@@ -55,16 +45,6 @@ where
         opts: PutOptions,
     ) -> Result<PutResult> {
         self.0.put_opts(location, payload, opts).await
-    }
-
-    #[tracing::instrument(
-        level = "debug",
-        name = "ObjectStore::put_multipart",
-        skip_all,
-        fields(%location, kind = std::any::type_name::<S>()),
-    )]
-    async fn put_multipart(&self, location: &Path) -> Result<Box<dyn MultipartUpload>> {
-        self.0.put_multipart(location).await
     }
 
     #[tracing::instrument(
@@ -87,28 +67,8 @@ where
         skip_all,
         fields(%location, kind = std::any::type_name::<S>()),
     )]
-    async fn get(&self, location: &Path) -> Result<GetResult> {
-        self.0.get(location).await
-    }
-
-    #[tracing::instrument(
-        level = "debug",
-        name = "ObjectStore::get",
-        skip_all,
-        fields(%location, kind = std::any::type_name::<S>()),
-    )]
     async fn get_opts(&self, location: &Path, options: GetOptions) -> Result<GetResult> {
         self.0.get_opts(location, options).await
-    }
-
-    #[tracing::instrument(
-        level = "debug",
-        name = "ObjectStore::get_range",
-        skip_all,
-        fields(%location, ?range, kind = std::any::type_name::<S>()),
-    )]
-    async fn get_range(&self, location: &Path, range: Range<u64>) -> Result<Bytes> {
-        self.0.get_range(location, range).await
     }
 
     #[tracing::instrument(
@@ -123,34 +83,14 @@ where
 
     #[tracing::instrument(
         level = "debug",
-        name = "ObjectStore::head",
-        skip_all,
-        fields(%location, kind = std::any::type_name::<S>()),
-    )]
-    async fn head(&self, location: &Path) -> Result<ObjectMeta> {
-        self.0.head(location).await
-    }
-
-    #[tracing::instrument(
-        level = "debug",
-        name = "ObjectStore::delete",
-        skip_all,
-        fields(%location, kind = std::any::type_name::<S>()),
-    )]
-    async fn delete(&self, location: &Path) -> Result<()> {
-        self.0.delete(location).await
-    }
-
-    #[tracing::instrument(
-        level = "debug",
         name = "ObjectStore::delete_stream",
         skip_all,
         fields(kind = std::any::type_name::<S>()),
     )]
-    fn delete_stream<'a>(
-        &'a self,
-        locations: BoxStream<'a, Result<Path>>,
-    ) -> BoxStream<'a, Result<Path>> {
+    fn delete_stream(
+        &self,
+        locations: BoxStream<'static, Result<Path>>,
+    ) -> BoxStream<'static, Result<Path>> {
         self.0.delete_stream(locations)
     }
 
@@ -194,8 +134,8 @@ where
         skip_all,
         fields(%from, %to, kind = std::any::type_name::<S>()),
     )]
-    async fn copy(&self, from: &Path, to: &Path) -> Result<()> {
-        self.0.copy(from, to).await
+    async fn copy_opts(&self, from: &Path, to: &Path, options: CopyOptions) -> Result<()> {
+        self.0.copy_opts(from, to, options).await
     }
 
     #[tracing::instrument(
@@ -204,28 +144,8 @@ where
         skip_all,
         fields(%from, %to, kind = std::any::type_name::<S>()),
     )]
-    async fn rename(&self, from: &Path, to: &Path) -> Result<()> {
-        self.0.rename(from, to).await
-    }
-
-    #[tracing::instrument(
-        level = "debug",
-        name = "ObjectStore::copy_if_not_exists",
-        skip_all,
-        fields(%from, %to, kind = std::any::type_name::<S>()),
-    )]
-    async fn copy_if_not_exists(&self, from: &Path, to: &Path) -> Result<()> {
-        self.0.copy_if_not_exists(from, to).await
-    }
-
-    #[tracing::instrument(
-        level = "debug",
-        name = "ObjectStore::rename_if_not_exists",
-        skip_all,
-        fields(%from, %to, kind = std::any::type_name::<S>()),
-    )]
-    async fn rename_if_not_exists(&self, from: &Path, to: &Path) -> Result<()> {
-        self.0.rename_if_not_exists(from, to).await
+    async fn rename_opts(&self, from: &Path, to: &Path, options: RenameOptions) -> Result<()> {
+        self.0.rename_opts(from, to, options).await
     }
 }
 

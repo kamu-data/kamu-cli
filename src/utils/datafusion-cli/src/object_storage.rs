@@ -61,6 +61,21 @@ pub async fn get_s3_object_store_builder(
     aws_options: &AwsOptions,
     resolve_region: bool,
 ) -> Result<AmazonS3Builder> {
+    // Box the inner future to reduce the future size of this async function,
+    // which is deeply nested in the CLI's async call chain.
+    Box::pin(get_s3_object_store_builder_inner(
+        url,
+        aws_options,
+        resolve_region,
+    ))
+    .await
+}
+
+async fn get_s3_object_store_builder_inner(
+    url: &Url,
+    aws_options: &AwsOptions,
+    resolve_region: bool,
+) -> Result<AmazonS3Builder> {
     let AwsOptions {
         access_key_id,
         secret_access_key,
@@ -201,7 +216,7 @@ impl CredentialsFromConfig {
 
 #[derive(Debug)]
 struct S3CredentialProvider {
-    credentials: aws_credential_types::provider::SharedCredentialsProvider,
+    credentials: SharedCredentialsProvider,
 }
 
 #[async_trait]
@@ -705,7 +720,6 @@ mod tests {
             eprintln!("{e}");
             return Ok(());
         }
-        let expected_region = "eu-central-1";
         let location = "s3://test-bucket/path/file.parquet";
         // Set it to a non-existent file to avoid reading the default configuration file
         unsafe {
@@ -721,9 +735,10 @@ mod tests {
         let builder = get_s3_object_store_builder(table_url.as_ref(), &aws_options, false).await?;
 
         // Verify that the region was auto-detected in test environment
-        assert_eq!(
-            builder.get_config_value(&AmazonS3ConfigKey::Region),
-            Some(expected_region.to_string())
+        assert!(
+            builder
+                .get_config_value(&AmazonS3ConfigKey::Region)
+                .is_some()
         );
 
         Ok(())

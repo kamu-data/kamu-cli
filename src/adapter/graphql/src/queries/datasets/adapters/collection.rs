@@ -30,22 +30,31 @@ pub struct Collection<'a> {
 impl Collection<'_> {
     pub fn dataset_snapshot(
         alias: odf::DatasetAlias,
-        extra_columns: Vec<ColumnInput>,
+        extra_schema: Option<DataSchemaInput>,
+        extra_columns: Option<Vec<ColumnInput>>,
         extra_events: Vec<odf::MetadataEvent>,
     ) -> Result<odf::DatasetSnapshot, odf::schema::InvalidSchema> {
-        use kamu_datasets::{DatasetColumn, DatasetSnapshots};
+        let extra_schema = if let Some(extra_schema) = extra_schema {
+            if extra_columns.is_some() {
+                return Err(odf::schema::MalformedSchema::new(
+                    "Cannot specify both `extraSchema` and `extraColumns`",
+                )
+                .into());
+            }
+            extra_schema.into_inner()
+        } else if let Some(extra_columns) = extra_columns {
+            odf::utils::schema::parse::parse_ddl_to_odf_schema(
+                &extra_columns
+                    .into_iter()
+                    .map(|c| format!("{} {}", c.name, c.data_type.ddl))
+                    .collect::<Vec<String>>()
+                    .join(", "),
+            )?
+        } else {
+            odf::schema::DataSchema::new_empty()
+        };
 
-        DatasetSnapshots::collection(
-            alias,
-            extra_columns
-                .into_iter()
-                .map(|c| DatasetColumn {
-                    name: c.name,
-                    data_type_ddl: c.data_type.ddl,
-                })
-                .collect(),
-            extra_events,
-        )
+        kamu_datasets::DatasetSnapshots::collection(alias, extra_schema.fields, extra_events)
     }
 }
 
@@ -124,7 +133,16 @@ impl CollectionProjection<'_> {
     pub async fn entries(
         &self,
         ctx: &Context<'_>,
+        #[graphql(desc = "Return only entries whose path starts with this prefix")]
         path_prefix: Option<CollectionPath<'static>>,
+        #[graphql(
+            desc = "Return only a single entry after reaching a certain path depth. For example \
+                    given enties `/a, /b, /dir/c, /dir/d` at depth 1 it will return `/a, /b`, \
+                    /dir/b` - the first two as actual entries at depth 1, and the last one as an \
+                    indicator that there is one or more entries under `/dir`. Using the \
+                    combination of `pathPrefix` and `maxDepth` you can walk entries as a \
+                    directory hierarchy."
+        )]
         max_depth: Option<usize>,
         page: Option<usize>,
         per_page: Option<usize>,

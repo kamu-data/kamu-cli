@@ -6,7 +6,7 @@ EXAMPLES_BUCKET_URL=${EXAMPLES_BUCKET_URL:-"s3://example/"}
 
 set -euo pipefail
 
-# Preparing to work with Minio
+# Preparing to work with RustFS
 export AWS_ACCESS_KEY_ID=kamu
 export AWS_SECRET_ACCESS_KEY=password
 export AWS_ENDPOINT_URL=http://localhost:9000
@@ -15,7 +15,7 @@ export AWS_SESSION_TOKEN=
 BUCKETS=("example" "contrib")
 S3_AWS_DIR=./s3-aws/
 
-# In order for Minio to see the data in our buckets, we have to load it through its API
+# In order for RustFS to see the data in our buckets, we have to load it through its API
 for i in "${!BUCKETS[@]}"; do
     BUCKET="${BUCKETS[$i]}"
 

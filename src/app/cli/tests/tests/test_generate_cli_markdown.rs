@@ -74,7 +74,7 @@ fn build_command_markdown(
 
     // Write the markdown heading
 
-    writeln!(buffer, "## `{}`\n", command_path.join(" "),)?;
+    writeln!(buffer, "## `{}`\n", command_path.join(" "))?;
 
     if let Some(long_about) = command.get_long_about() {
         writeln!(buffer, "{long_about}\n")?;
@@ -221,7 +221,7 @@ fn write_arg_markdown(buffer: &mut String, arg: &clap::Arg) -> fmt::Result {
                 "unexpected non-positional Arg with neither short nor long name: {arg:?}"
             );
 
-            write!(buffer, "`<{value_name}>`",)?;
+            write!(buffer, "`<{value_name}>`")?;
         }
     }
 

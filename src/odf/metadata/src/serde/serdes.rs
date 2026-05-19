@@ -11,7 +11,6 @@ use std::backtrace::Backtrace;
 use std::fmt::Display;
 
 use chrono::{DateTime, Utc};
-use prost::bytes;
 use thiserror::Error;
 
 use super::Buffer;

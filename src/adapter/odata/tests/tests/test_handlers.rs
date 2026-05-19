@@ -53,7 +53,7 @@ use super::test_api_server::TestAPIServer;
 macro_rules! await_client_server_flow {
     ($api_server_handle: expr, $client_handle: expr) => {
         tokio::select! {
-            _ = tokio::time::sleep(std::time::Duration::from_secs(60)) => panic!("test timeout!"),
+            _ = tokio::time::sleep(std::time::Duration::from_mins(1)) => panic!("test timeout!"),
             _ = $api_server_handle => panic!("server-side aborted"),
             _ = $client_handle => {} // Pass, do nothing
         }
@@ -140,8 +140,8 @@ async fn test_metadata_handler() {
                 <Property Name="op" Type="Edm.Int32" Nullable="false"/>
                 <Property Name="system_time" Type="Edm.DateTimeOffset" Nullable="false"/>
                 <Property Name="date" Type="Edm.DateTimeOffset" Nullable="false"/>
-                <Property Name="city" Type="Edm.String" Nullable="true"/>
-                <Property Name="population" Type="Edm.Int64" Nullable="true"/>
+                <Property Name="city" Type="Edm.String" Nullable="false"/>
+                <Property Name="population" Type="Edm.Int64" Nullable="false"/>
                 </EntityType>
                 <EntityContainer Name="default" m:IsDefaultEntityContainer="true">
                 <EntitySet Name="foo.bar" EntityType="default.foo.bar"/>
@@ -493,12 +493,11 @@ impl TestHarness {
                         MetadataFactory::add_push_source()
                             .read(odf::metadata::ReadStepCsv {
                                 header: Some(true),
-                                schema: Some(
-                                    ["date TIMESTAMP", "city STRING", "population BIGINT"]
-                                        .iter()
-                                        .map(|s| (*s).to_string())
-                                        .collect(),
-                                ),
+                                schema: Some(odf::schema::DataSchema::new(vec![
+                                    odf::schema::DataField::timestamp_millis_utc("date"),
+                                    odf::schema::DataField::string("city"),
+                                    odf::schema::DataField::i64("population"),
+                                ])),
                                 ..odf::metadata::ReadStepCsv::default()
                             })
                             .merge(odf::metadata::MergeStrategyAppend {})

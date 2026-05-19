@@ -16,13 +16,9 @@ content:
       - name: system_time
         type:
           kind: Timestamp
-          unit: Millisecond
-          timezone: UTC
       - name: event_time
         type:
           kind: Timestamp
-          unit: Millisecond
-          timezone: UTC
       - name: path
         type:
           kind: String
@@ -95,19 +91,80 @@ content:
     read:
       kind: NdJson
       schema:
-      - op INT
-      - event_time TIMESTAMP
-      - path STRING
-      - ref STRING
-      - molecule_change_by STRING
-      - molecule_access_level STRING
-      - content_type STRING
-      - content_hash STRING
-      - content_length INT
-      - description STRING
-      - categories ARRAY<STRING>
-      - tags ARRAY<STRING>
-      - version INT
+        fields:
+        - name: op
+          type:
+            kind: Option
+            inner:
+              kind: Int32
+        - name: event_time
+          type:
+            kind: Option
+            inner:
+              kind: Timestamp
+        - name: path
+          type:
+            kind: Option
+            inner:
+              kind: String
+        - name: ref
+          type:
+            kind: Option
+            inner:
+              kind: String
+        - name: molecule_change_by
+          type:
+            kind: Option
+            inner:
+              kind: String
+        - name: molecule_access_level
+          type:
+            kind: Option
+            inner:
+              kind: String
+        - name: content_type
+          type:
+            kind: Option
+            inner:
+              kind: String
+        - name: content_hash
+          type:
+            kind: Option
+            inner:
+              kind: String
+        - name: content_length
+          type:
+            kind: Option
+            inner:
+              kind: Int32
+        - name: description
+          type:
+            kind: Option
+            inner:
+              kind: String
+        - name: categories
+          type:
+            kind: Option
+            inner:
+              kind: List
+              itemType:
+                kind: Option
+                inner:
+                  kind: String
+        - name: tags
+          type:
+            kind: Option
+            inner:
+              kind: List
+              itemType:
+                kind: Option
+                inner:
+                  kind: String
+        - name: version
+          type:
+            kind: Option
+            inner:
+              kind: Int32
     merge:
       kind: ChangelogStream
       primaryKey:

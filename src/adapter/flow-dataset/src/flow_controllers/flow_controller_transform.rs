@@ -11,9 +11,11 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
+use kamu_adapter_task_dataset as ats;
 use kamu_core::PullResult;
 use kamu_datasets::DatasetIncrementQueryService;
-use {kamu_adapter_task_dataset as ats, kamu_flow_system as fs, kamu_task_system as ts};
+use kamu_flow_system as fs;
+use kamu_task_system as ts;
 
 use crate::{
     DATASET_RESOURCE_TYPE,

@@ -16,13 +16,9 @@ content:
       - name: system_time
         type:
           kind: Timestamp
-          unit: Millisecond
-          timezone: UTC
       - name: event_time
         type:
           kind: Timestamp
-          unit: Millisecond
-          timezone: UTC
       - name: activity_type
         type:
           kind: String
@@ -75,20 +71,63 @@ content:
     read:
       kind: NdJson
       schema:
-      - event_time TIMESTAMP
-      - activity_type STRING NOT NULL
-      - ocl_id STRING NOT NULL
-      - path STRING NOT NULL
-      - ref STRING NOT NULL
-      - version INT UNSIGNED NOT NULL
-      - molecule_change_by STRING NOT NULL
-      - molecule_access_level STRING NOT NULL
-      - content_type STRING
-      - content_length BIGINT UNSIGNED NOT NULL
-      - content_hash STRING NOT NULL
-      - description STRING
-      - categories Array<STRING> NOT NULL
-      - tags Array<STRING> NOT NULL
+        fields:
+        - name: event_time
+          type:
+            kind: Option
+            inner:
+              kind: Timestamp
+        - name: activity_type
+          type:
+            kind: String
+        - name: ocl_id
+          type:
+            kind: String
+        - name: path
+          type:
+            kind: String
+        - name: ref
+          type:
+            kind: String
+        - name: version
+          type:
+            kind: UInt32
+        - name: molecule_change_by
+          type:
+            kind: String
+        - name: molecule_access_level
+          type:
+            kind: String
+        - name: content_type
+          type:
+            kind: Option
+            inner:
+              kind: String
+        - name: content_length
+          type:
+            kind: UInt64
+        - name: content_hash
+          type:
+            kind: String
+        - name: description
+          type:
+            kind: Option
+            inner:
+              kind: String
+        - name: categories
+          type:
+            kind: List
+            itemType:
+              kind: Option
+              inner:
+                kind: String
+        - name: tags
+          type:
+            kind: List
+            itemType:
+              kind: Option
+              inner:
+                kind: String
     merge:
       kind: Append
   - kind: SetInfo

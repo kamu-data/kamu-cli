@@ -8,10 +8,10 @@
 // by the Apache License, Version 2.0.
 
 mod http_file_server;
+mod local_s3_server;
 // macro_rules' macros are always exported to the crate root
 pub mod macros;
-mod minio_server;
 pub mod test_docker_images;
 
 pub use http_file_server::*;
-pub use minio_server::*;
+pub use local_s3_server::*;

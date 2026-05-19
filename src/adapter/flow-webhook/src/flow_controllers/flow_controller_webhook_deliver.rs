@@ -21,9 +21,11 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use internal_error::InternalError;
 use kamu_adapter_flow_dataset::{DATASET_RESOURCE_TYPE, DatasetResourceUpdateDetails};
+use kamu_adapter_task_webhook as atw;
 use kamu_datasets::DatasetEntryService;
+use kamu_flow_system as fs;
+use kamu_task_system as ts;
 use kamu_webhooks::{ResultIntoInternal, WebhookEventType, WebhookEventTypeCatalog};
-use {kamu_adapter_task_webhook as atw, kamu_flow_system as fs, kamu_task_system as ts};
 
 use crate::{
     DatasetUpdatedWebhookSensor,
@@ -62,7 +64,7 @@ impl FlowControllerWebhookDeliver {
             self.build_dataset_ref_updated_payload(flow, input_dataset_id)
                 .await
         } else {
-            panic!("FlowControllerWebhookDeliver does not support event type: {event_type}",);
+            panic!("FlowControllerWebhookDeliver does not support event type: {event_type}");
         }
     }
 

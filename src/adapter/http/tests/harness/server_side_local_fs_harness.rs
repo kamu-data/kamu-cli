@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use std::net::SocketAddr;
-use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -53,13 +52,14 @@ use kamu_datasets_inmem::{
 use kamu_datasets_services::utils::CreateDatasetUseCaseHelper;
 use kamu_datasets_services::*;
 use messaging_outbox::{Outbox, OutboxImmediateImpl, register_message_dispatcher};
-use odf::dataset::DatasetLayout;
 use tempfile::TempDir;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
 use url::Url;
 
 use super::{
+    LocalFsDatasetFixture,
     SERVER_ACCOUNT_NAME,
+    ServerSideDatasetFixture,
     ServerSideHarness,
     ServerSideHarnessOptions,
     TestAPIServer,
@@ -81,6 +81,17 @@ pub(crate) struct ServerSideLocalFsHarness {
 }
 
 impl ServerSideLocalFsHarness {
+    fn internal_datasets_folder_path(&self) -> std::path::PathBuf {
+        self.tempdir.path().join("datasets")
+    }
+
+    pub fn base_catalog(&self) -> &dill::Catalog {
+        &self.base_catalog
+    }
+
+    pub fn server_account(&self) -> &Account {
+        &self.account
+    }
     pub async fn new(options: ServerSideHarnessOptions) -> Self {
         let tempdir = tempfile::tempdir().unwrap();
 
@@ -222,21 +233,9 @@ impl ServerSideLocalFsHarness {
             account,
         }
     }
-
-    fn internal_datasets_folder_path(&self) -> PathBuf {
-        self.tempdir.path().join("datasets")
-    }
-
-    pub fn base_catalog(&self) -> &dill::Catalog {
-        &self.base_catalog
-    }
-
-    pub fn server_account(&self) -> &Account {
-        &self.account
-    }
 }
 
-#[async_trait::async_trait]
+#[async_trait::async_trait(?Send)]
 impl ServerSideHarness for ServerSideLocalFsHarness {
     fn server_account_id(&self) -> odf::AccountID {
         match self.options.tenancy_config {
@@ -338,15 +337,14 @@ impl ServerSideHarness for ServerSideLocalFsHarness {
         .unwrap()
     }
 
-    fn dataset_layout(&self, dataset_handle: &odf::DatasetHandle) -> DatasetLayout {
-        let root_path = self
-            .internal_datasets_folder_path()
-            .join(dataset_handle.id.as_multibase().to_stack_string());
-        DatasetLayout::new(root_path.as_path())
-    }
-
     fn system_time_source(&self) -> &SystemTimeSourceStub {
         &self.time_source
+    }
+
+    fn dataset_fixture(&self) -> Arc<dyn ServerSideDatasetFixture> {
+        Arc::new(LocalFsDatasetFixture::new(
+            self.internal_datasets_folder_path(),
+        ))
     }
 
     async fn api_server_run(self) -> Result<(), InternalError> {

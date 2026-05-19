@@ -71,10 +71,13 @@ impl SearchServiceRemoteImpl {
     ) -> Result<Vec<SearchRemoteResultDataset>, SearchRemoteError> {
         let mut datasets = Vec::new();
 
-        let mut s3_context = S3Context::from_url(url).await;
-        if let Some(metrics) = &self.maybe_s3_metrics {
-            s3_context = s3_context.with_metrics(metrics.clone());
-        }
+        let s3_context = S3Context::builder()
+            .with_url(url)
+            .maybe(self.maybe_s3_metrics.as_ref(), |b, v| {
+                b.with_metrics(v.clone())
+            })
+            .build()
+            .await;
 
         let folders_common_prefixes = s3_context.bucket_list_folders().await?;
 
