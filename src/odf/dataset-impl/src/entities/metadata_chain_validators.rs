@@ -345,6 +345,14 @@ impl<'a> ValidateAddPushSourceVisitor<'a> {
                     validate_transform(&block.event, transform)?;
                 }
 
+                // Should not provide deprecated DDL and ODF schema at the same time
+                if e.read.schema().is_some() && e.read.ddl_schema().is_some() {
+                    invalid_event!(
+                        block.event.clone(),
+                        "Cannot specify both DDL and ODF schemas at once"
+                    );
+                }
+
                 Ok(Some(Self { new_source: e }))
             }
             _ => Ok(None),
@@ -435,6 +443,14 @@ impl<'a> ValidateSetPollingSourceVisitor<'a> {
                     && f.node_url.is_none()
                 {
                     invalid_event!(e.clone(), "Eth source must specify chainId or nodeUrl")
+                }
+
+                // Should not provide deprecated DDL and ODF schema at the same time
+                if e.read.schema().is_some() && e.read.ddl_schema().is_some() {
+                    invalid_event!(
+                        block.event.clone(),
+                        "Cannot specify both DDL and ODF schemas at once"
+                    );
                 }
 
                 Ok(Some(Self { new_source: e }))

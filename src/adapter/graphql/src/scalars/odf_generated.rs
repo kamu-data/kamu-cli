@@ -17,6 +17,8 @@
 #![allow(clippy::all)]
 #![allow(clippy::pedantic)]
 
+use std::sync::Arc;
+
 use chrono::{DateTime, Utc};
 
 use crate::prelude::*;
@@ -1291,7 +1293,12 @@ impl From<odf::metadata::RawQueryResponseSuccess> for RawQueryResponseSuccess {
 /// Defines how raw data should be read into the structured form.
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstep-schema
-#[derive(Union, Debug, Clone)]
+#[derive(Interface, Debug, Clone)]
+#[graphql(field(
+    name = "schema",
+    ty = "Option<crate::prelude::DataSchema>",
+    arg(name = "format", ty = "Option<DataSchemaFormat>"),
+))]
 pub enum ReadStep {
     Csv(ReadStepCsv),
     GeoJson(ReadStepGeoJson),
@@ -1322,13 +1329,14 @@ impl From<odf::metadata::ReadStep> for ReadStep {
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepcsv-schema
 #[derive(SimpleObject, Debug, Clone)]
+#[graphql(complex)]
 pub struct ReadStepCsv {
-    /// A DDL-formatted schema. Schema can be used to coerce values into more
-    /// appropriate data types.
+    /// DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values
+    /// into more appropriate data types.
     ///
     /// Examples:
     /// - ["date TIMESTAMP","city STRING","population INT"]
-    pub schema: Option<Vec<String>>,
+    pub ddl_schema: Option<Vec<String>>,
     /// Sets a single character as a separator for each field and value.
     ///
     /// Defaults to: ","
@@ -1372,22 +1380,59 @@ pub struct ReadStepCsv {
     ///
     /// Defaults to: "rfc3339"
     pub timestamp_format: Option<String>,
+
+    #[graphql(skip)]
+    pub schema: Option<Arc<odf::schema::DataSchema>>,
 }
 
 impl From<odf::metadata::ReadStepCsv> for ReadStepCsv {
     fn from(v: odf::metadata::ReadStepCsv) -> Self {
+        let odf::metadata::ReadStepCsv {
+            ddl_schema,
+            separator,
+            encoding,
+            quote,
+            escape,
+            header,
+            infer_schema,
+            null_value,
+            date_format,
+            timestamp_format,
+            schema,
+        } = v;
+
         Self {
-            schema: v.schema.map(|v| v.into_iter().map(Into::into).collect()),
-            separator: v.separator.map(Into::into),
-            encoding: v.encoding.map(Into::into),
-            quote: v.quote.map(Into::into),
-            escape: v.escape.map(Into::into),
-            header: v.header.map(Into::into),
-            infer_schema: v.infer_schema.map(Into::into),
-            null_value: v.null_value.map(Into::into),
-            date_format: v.date_format.map(Into::into),
-            timestamp_format: v.timestamp_format.map(Into::into),
+            ddl_schema,
+            separator,
+            encoding,
+            quote,
+            escape,
+            header,
+            infer_schema,
+            null_value,
+            date_format,
+            timestamp_format,
+            schema: schema.map(Arc::new),
         }
+    }
+}
+
+#[ComplexObject]
+impl ReadStepCsv {
+    /// Schema used to coerce values into more appropriate data types.
+    async fn schema(&self, format: Option<DataSchemaFormat>) -> Option<crate::prelude::DataSchema> {
+        self.schema
+            .clone()
+            .or_else(|| {
+                self.ddl_schema.as_ref().and_then(|s| {
+                    odf::utils::schema::parse::parse_ddl_to_odf_schema(&s.join(", "))
+                        .ok()
+                        .map(Arc::new)
+                })
+            })
+            .map(|s| {
+                crate::prelude::DataSchema::new(s, format.unwrap_or(DataSchemaFormat::OdfJson))
+            })
     }
 }
 
@@ -1397,22 +1442,51 @@ impl From<odf::metadata::ReadStepCsv> for ReadStepCsv {
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepesrishapefile-schema
 #[derive(SimpleObject, Debug, Clone)]
+#[graphql(complex)]
 pub struct ReadStepEsriShapefile {
-    /// A DDL-formatted schema. Schema can be used to coerce values into more
-    /// appropriate data types.
-    pub schema: Option<Vec<String>>,
+    /// DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values
+    /// into more appropriate data types.
+    pub ddl_schema: Option<Vec<String>>,
     /// If the ZIP archive contains multiple shapefiles use this field to
     /// specify a sub-path to the desired `.shp` file. Can contain glob patterns
     /// to act as a filter.
     pub sub_path: Option<String>,
+
+    #[graphql(skip)]
+    pub schema: Option<Arc<odf::schema::DataSchema>>,
 }
 
 impl From<odf::metadata::ReadStepEsriShapefile> for ReadStepEsriShapefile {
     fn from(v: odf::metadata::ReadStepEsriShapefile) -> Self {
+        let odf::metadata::ReadStepEsriShapefile {
+            ddl_schema,
+            sub_path,
+            schema,
+        } = v;
         Self {
-            schema: v.schema.map(|v| v.into_iter().map(Into::into).collect()),
-            sub_path: v.sub_path.map(Into::into),
+            ddl_schema,
+            sub_path,
+            schema: schema.map(Arc::new),
         }
+    }
+}
+
+#[ComplexObject]
+impl ReadStepEsriShapefile {
+    /// Schema used to coerce values into more appropriate data types.
+    async fn schema(&self, format: Option<DataSchemaFormat>) -> Option<crate::prelude::DataSchema> {
+        self.schema
+            .clone()
+            .or_else(|| {
+                self.ddl_schema.as_ref().and_then(|s| {
+                    odf::utils::schema::parse::parse_ddl_to_odf_schema(&s.join(", "))
+                        .ok()
+                        .map(Arc::new)
+                })
+            })
+            .map(|s| {
+                crate::prelude::DataSchema::new(s, format.unwrap_or(DataSchemaFormat::OdfJson))
+            })
     }
 }
 
@@ -1425,17 +1499,42 @@ impl From<odf::metadata::ReadStepEsriShapefile> for ReadStepEsriShapefile {
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepgeojson-schema
 #[derive(SimpleObject, Debug, Clone)]
+#[graphql(complex)]
 pub struct ReadStepGeoJson {
-    /// A DDL-formatted schema. Schema can be used to coerce values into more
-    /// appropriate data types.
-    pub schema: Option<Vec<String>>,
+    /// DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values
+    /// into more appropriate data types.
+    pub ddl_schema: Option<Vec<String>>,
+
+    #[graphql(skip)]
+    pub schema: Option<Arc<odf::schema::DataSchema>>,
 }
 
 impl From<odf::metadata::ReadStepGeoJson> for ReadStepGeoJson {
     fn from(v: odf::metadata::ReadStepGeoJson) -> Self {
+        let odf::metadata::ReadStepGeoJson { ddl_schema, schema } = v;
         Self {
-            schema: v.schema.map(|v| v.into_iter().map(Into::into).collect()),
+            ddl_schema,
+            schema: schema.map(Arc::new),
         }
+    }
+}
+
+#[ComplexObject]
+impl ReadStepGeoJson {
+    /// Schema used to coerce values into more appropriate data types.
+    async fn schema(&self, format: Option<DataSchemaFormat>) -> Option<crate::prelude::DataSchema> {
+        self.schema
+            .clone()
+            .or_else(|| {
+                self.ddl_schema.as_ref().and_then(|s| {
+                    odf::utils::schema::parse::parse_ddl_to_odf_schema(&s.join(", "))
+                        .ok()
+                        .map(Arc::new)
+                })
+            })
+            .map(|s| {
+                crate::prelude::DataSchema::new(s, format.unwrap_or(DataSchemaFormat::OdfJson))
+            })
     }
 }
 
@@ -1445,14 +1544,15 @@ impl From<odf::metadata::ReadStepGeoJson> for ReadStepGeoJson {
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepjson-schema
 #[derive(SimpleObject, Debug, Clone)]
+#[graphql(complex)]
 pub struct ReadStepJson {
     /// Path in the form of `a.b.c` to a sub-element of the root JSON object
     /// that is an array or objects. If not specified it is assumed that the
     /// root element is an array.
     pub sub_path: Option<String>,
-    /// A DDL-formatted schema. Schema can be used to coerce values into more
-    /// appropriate data types.
-    pub schema: Option<Vec<String>>,
+    /// DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values
+    /// into more appropriate data types.
+    pub ddl_schema: Option<Vec<String>>,
     /// Sets the string that indicates a date format. The `rfc3339` is the only
     /// required format, the other format strings are implementation-specific.
     ///
@@ -1468,17 +1568,49 @@ pub struct ReadStepJson {
     ///
     /// Defaults to: "rfc3339"
     pub timestamp_format: Option<String>,
+
+    #[graphql(skip)]
+    pub schema: Option<Arc<odf::schema::DataSchema>>,
 }
 
 impl From<odf::metadata::ReadStepJson> for ReadStepJson {
     fn from(v: odf::metadata::ReadStepJson) -> Self {
+        let odf::metadata::ReadStepJson {
+            sub_path,
+            ddl_schema,
+            date_format,
+            encoding,
+            timestamp_format,
+            schema,
+        } = v;
+
         Self {
-            sub_path: v.sub_path.map(Into::into),
-            schema: v.schema.map(|v| v.into_iter().map(Into::into).collect()),
-            date_format: v.date_format.map(Into::into),
-            encoding: v.encoding.map(Into::into),
-            timestamp_format: v.timestamp_format.map(Into::into),
+            sub_path,
+            ddl_schema,
+            date_format,
+            encoding,
+            timestamp_format,
+            schema: schema.map(Arc::new),
         }
+    }
+}
+
+#[ComplexObject]
+impl ReadStepJson {
+    /// Schema used to coerce values into more appropriate data types.
+    async fn schema(&self, format: Option<DataSchemaFormat>) -> Option<crate::prelude::DataSchema> {
+        self.schema
+            .clone()
+            .or_else(|| {
+                self.ddl_schema.as_ref().and_then(|s| {
+                    odf::utils::schema::parse::parse_ddl_to_odf_schema(&s.join(", "))
+                        .ok()
+                        .map(Arc::new)
+                })
+            })
+            .map(|s| {
+                crate::prelude::DataSchema::new(s, format.unwrap_or(DataSchemaFormat::OdfJson))
+            })
     }
 }
 
@@ -1490,17 +1622,42 @@ impl From<odf::metadata::ReadStepJson> for ReadStepJson {
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepndgeojson-schema
 #[derive(SimpleObject, Debug, Clone)]
+#[graphql(complex)]
 pub struct ReadStepNdGeoJson {
-    /// A DDL-formatted schema. Schema can be used to coerce values into more
-    /// appropriate data types.
-    pub schema: Option<Vec<String>>,
+    /// DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values
+    /// into more appropriate data types.
+    pub ddl_schema: Option<Vec<String>>,
+
+    #[graphql(skip)]
+    pub schema: Option<Arc<odf::schema::DataSchema>>,
 }
 
 impl From<odf::metadata::ReadStepNdGeoJson> for ReadStepNdGeoJson {
     fn from(v: odf::metadata::ReadStepNdGeoJson) -> Self {
+        let odf::metadata::ReadStepNdGeoJson { ddl_schema, schema } = v;
         Self {
-            schema: v.schema.map(|v| v.into_iter().map(Into::into).collect()),
+            ddl_schema,
+            schema: schema.map(Arc::new),
         }
+    }
+}
+
+#[ComplexObject]
+impl ReadStepNdGeoJson {
+    /// Schema used to coerce values into more appropriate data types.
+    async fn schema(&self, format: Option<DataSchemaFormat>) -> Option<crate::prelude::DataSchema> {
+        self.schema
+            .clone()
+            .or_else(|| {
+                self.ddl_schema.as_ref().and_then(|s| {
+                    odf::utils::schema::parse::parse_ddl_to_odf_schema(&s.join(", "))
+                        .ok()
+                        .map(Arc::new)
+                })
+            })
+            .map(|s| {
+                crate::prelude::DataSchema::new(s, format.unwrap_or(DataSchemaFormat::OdfJson))
+            })
     }
 }
 
@@ -1511,10 +1668,11 @@ impl From<odf::metadata::ReadStepNdGeoJson> for ReadStepNdGeoJson {
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepndjson-schema
 #[derive(SimpleObject, Debug, Clone)]
+#[graphql(complex)]
 pub struct ReadStepNdJson {
-    /// A DDL-formatted schema. Schema can be used to coerce values into more
-    /// appropriate data types.
-    pub schema: Option<Vec<String>>,
+    /// DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values
+    /// into more appropriate data types.
+    pub ddl_schema: Option<Vec<String>>,
     /// Sets the string that indicates a date format. The `rfc3339` is the only
     /// required format, the other format strings are implementation-specific.
     ///
@@ -1530,16 +1688,47 @@ pub struct ReadStepNdJson {
     ///
     /// Defaults to: "rfc3339"
     pub timestamp_format: Option<String>,
+
+    #[graphql(skip)]
+    pub schema: Option<Arc<odf::schema::DataSchema>>,
 }
 
 impl From<odf::metadata::ReadStepNdJson> for ReadStepNdJson {
     fn from(v: odf::metadata::ReadStepNdJson) -> Self {
+        let odf::metadata::ReadStepNdJson {
+            ddl_schema,
+            date_format,
+            encoding,
+            timestamp_format,
+            schema,
+        } = v;
+
         Self {
-            schema: v.schema.map(|v| v.into_iter().map(Into::into).collect()),
-            date_format: v.date_format.map(Into::into),
-            encoding: v.encoding.map(Into::into),
-            timestamp_format: v.timestamp_format.map(Into::into),
+            ddl_schema,
+            date_format,
+            encoding,
+            timestamp_format,
+            schema: schema.map(Arc::new),
         }
+    }
+}
+
+#[ComplexObject]
+impl ReadStepNdJson {
+    /// Schema used to coerce values into more appropriate data types.
+    async fn schema(&self, format: Option<DataSchemaFormat>) -> Option<crate::prelude::DataSchema> {
+        self.schema
+            .clone()
+            .or_else(|| {
+                self.ddl_schema.as_ref().and_then(|s| {
+                    odf::utils::schema::parse::parse_ddl_to_odf_schema(&s.join(", "))
+                        .ok()
+                        .map(Arc::new)
+                })
+            })
+            .map(|s| {
+                crate::prelude::DataSchema::new(s, format.unwrap_or(DataSchemaFormat::OdfJson))
+            })
     }
 }
 
@@ -1549,17 +1738,42 @@ impl From<odf::metadata::ReadStepNdJson> for ReadStepNdJson {
 ///
 /// See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepparquet-schema
 #[derive(SimpleObject, Debug, Clone)]
+#[graphql(complex)]
 pub struct ReadStepParquet {
-    /// A DDL-formatted schema. Schema can be used to coerce values into more
-    /// appropriate data types.
-    pub schema: Option<Vec<String>>,
+    /// DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values
+    /// into more appropriate data types.
+    pub ddl_schema: Option<Vec<String>>,
+
+    #[graphql(skip)]
+    pub schema: Option<Arc<odf::schema::DataSchema>>,
 }
 
 impl From<odf::metadata::ReadStepParquet> for ReadStepParquet {
     fn from(v: odf::metadata::ReadStepParquet) -> Self {
+        let odf::metadata::ReadStepParquet { ddl_schema, schema } = v;
         Self {
-            schema: v.schema.map(|v| v.into_iter().map(Into::into).collect()),
+            ddl_schema,
+            schema: schema.map(Arc::new),
         }
+    }
+}
+
+#[ComplexObject]
+impl ReadStepParquet {
+    /// Schema used to coerce values into more appropriate data types.
+    async fn schema(&self, format: Option<DataSchemaFormat>) -> Option<crate::prelude::DataSchema> {
+        self.schema
+            .clone()
+            .or_else(|| {
+                self.ddl_schema.as_ref().and_then(|s| {
+                    odf::utils::schema::parse::parse_ddl_to_odf_schema(&s.join(", "))
+                        .ok()
+                        .map(Arc::new)
+                })
+            })
+            .map(|s| {
+                crate::prelude::DataSchema::new(s, format.unwrap_or(DataSchemaFormat::OdfJson))
+            })
     }
 }
 
@@ -1644,7 +1858,7 @@ impl SetDataSchema {
     async fn schema(&self, format: Option<DataSchemaFormat>) -> crate::prelude::DataSchema {
         crate::prelude::DataSchema::new(
             self.schema.clone(),
-            format.unwrap_or(DataSchemaFormat::ParquetJson),
+            format.unwrap_or(DataSchemaFormat::OdfJson),
         )
     }
 }

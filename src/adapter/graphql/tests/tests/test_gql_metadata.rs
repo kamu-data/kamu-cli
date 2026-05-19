@@ -54,7 +54,9 @@ async fn test_current_push_sources() {
             MetadataFactory::add_push_source()
                 .source_name("source1")
                 .read(odf::metadata::ReadStepCsv {
-                    schema: Some(vec!["foo STRING".to_string()]),
+                    schema: Some(odf::schema::DataSchema::new(vec![
+                        odf::schema::DataField::string("foo"),
+                    ])),
                     ..Default::default()
                 })
                 .build()
@@ -69,7 +71,9 @@ async fn test_current_push_sources() {
             MetadataFactory::add_push_source()
                 .source_name("source2")
                 .read(odf::metadata::ReadStepNdJson {
-                    schema: Some(vec!["foo STRING".to_string()]),
+                    schema: Some(odf::schema::DataSchema::new(vec![
+                        odf::schema::DataField::string("foo"),
+                    ])),
                     ..Default::default()
                 })
                 .build()
@@ -146,7 +150,9 @@ async fn test_current_push_source_blocks() {
             MetadataFactory::add_push_source()
                 .source_name("source1")
                 .read(odf::metadata::ReadStepCsv {
-                    schema: Some(vec!["foo STRING".to_string()]),
+                    schema: Some(odf::schema::DataSchema::new(vec![
+                        odf::schema::DataField::string("foo"),
+                    ])),
                     ..Default::default()
                 })
                 .build()
@@ -161,7 +167,9 @@ async fn test_current_push_source_blocks() {
             MetadataFactory::add_push_source()
                 .source_name("source2")
                 .read(odf::metadata::ReadStepNdJson {
-                    schema: Some(vec!["foo STRING".to_string()]),
+                    schema: Some(odf::schema::DataSchema::new(vec![
+                        odf::schema::DataField::string("foo"),
+                    ])),
                     ..Default::default()
                 })
                 .build()
@@ -230,7 +238,9 @@ async fn test_current_polling_source() {
         .commit_event(
             MetadataFactory::set_polling_source()
                 .read(odf::metadata::ReadStepCsv {
-                    schema: Some(vec!["foo STRING".to_string()]),
+                    schema: Some(odf::schema::DataSchema::new(vec![
+                        odf::schema::DataField::string("foo"),
+                    ])),
                     ..Default::default()
                 })
                 .build()
@@ -280,7 +290,9 @@ async fn test_current_polling_source_block() {
         .commit_event(
             MetadataFactory::set_polling_source()
                 .read(odf::metadata::ReadStepCsv {
-                    schema: Some(vec!["foo STRING".to_string()]),
+                    schema: Some(odf::schema::DataSchema::new(vec![
+                        odf::schema::DataField::string("foo"),
+                    ])),
                     ..Default::default()
                 })
                 .build()
@@ -411,7 +423,9 @@ async fn test_multiple_metadata_block() {
             MetadataFactory::add_push_source()
                 .source_name("source1")
                 .read(odf::metadata::ReadStepCsv {
-                    schema: Some(vec!["foo STRING".to_string()]),
+                    schema: Some(odf::schema::DataSchema::new(vec![
+                        odf::schema::DataField::string("foo"),
+                    ])),
                     ..Default::default()
                 })
                 .build()
@@ -426,7 +440,9 @@ async fn test_multiple_metadata_block() {
             MetadataFactory::add_push_source()
                 .source_name("source2")
                 .read(odf::metadata::ReadStepNdJson {
-                    schema: Some(vec!["foo STRING".to_string()]),
+                    schema: Some(odf::schema::DataSchema::new(vec![
+                        odf::schema::DataField::string("foo"),
+                    ])),
                     ..Default::default()
                 })
                 .build()
@@ -501,7 +517,9 @@ async fn test_metadata_blocks_in_range() {
             MetadataFactory::add_push_source()
                 .source_name("source1")
                 .read(odf::metadata::ReadStepCsv {
-                    schema: Some(vec!["foo STRING".to_string()]),
+                    schema: Some(odf::schema::DataSchema::new(vec![
+                        odf::schema::DataField::string("foo"),
+                    ])),
                     ..Default::default()
                 })
                 .build()
@@ -516,7 +534,9 @@ async fn test_metadata_blocks_in_range() {
             MetadataFactory::add_push_source()
                 .source_name("source2")
                 .read(odf::metadata::ReadStepNdJson {
-                    schema: Some(vec!["foo STRING".to_string()]),
+                    schema: Some(odf::schema::DataSchema::new(vec![
+                        odf::schema::DataField::string("foo"),
+                    ])),
                     ..Default::default()
                 })
                 .build()

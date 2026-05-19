@@ -138,7 +138,7 @@ impl InspectQueryCommand {
                             .alias
                             .clone()
                             .unwrap_or_else(|| dataset_handle.alias.to_string());
-                        writeln!(output, "{} {}", style("Query:").dim(), style(alias).bold(),)?;
+                        writeln!(output, "{} {}", style("Query:").dim(), style(alias).bold())?;
                         for line in query.query.trim_end().split('\n') {
                             writeln!(output, "  {line}")?;
                         }

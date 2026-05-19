@@ -18,7 +18,7 @@
 use std::ops::AddAssign;
 use std::str::FromStr;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::atomic::{AtomicU8, AtomicU64, Ordering};
 use std::time::Duration;
 use std::{cmp, fmt};
 
@@ -31,8 +31,10 @@ use datafusion::common::instant::Instant;
 use datafusion::error::DataFusionError;
 use datafusion::execution::object_store::{DefaultObjectStoreRegistry, ObjectStoreRegistry};
 use futures::stream::{BoxStream, Stream};
+use futures::{StreamExt, TryStreamExt};
 use object_store::path::Path;
 use object_store::{
+    CopyOptions,
     GetOptions,
     GetRange,
     GetResult,
@@ -40,6 +42,7 @@ use object_store::{
     MultipartUpload,
     ObjectMeta,
     ObjectStore,
+    ObjectStoreExt,
     PutMultipartOptions,
     PutOptions,
     PutPayload,
@@ -50,28 +53,25 @@ use parking_lot::{Mutex, RwLock};
 use url::Url;
 
 /// A stream wrapper that measures the time until the first response(item or end
-/// of stream) is yielded
+/// of stream) is yielded.
+///
+/// The timer starts on the first `poll_next` call (not at stream creation) to
+/// avoid measuring unrelated work between stream creation and first poll.
+/// Duration is stored as nanoseconds in an `AtomicU64` (0 = not yet set).
 struct TimeToFirstItemStream<S> {
     inner: S,
-    start: Instant,
-    request_index: usize,
-    requests: Arc<Mutex<Vec<RequestDetails>>>,
-    first_item_yielded: bool,
+    start: Option<Instant>,
+    request_duration: Arc<AtomicU64>,
+    duration_recorded: bool,
 }
 
 impl<S> TimeToFirstItemStream<S> {
-    fn new(
-        inner: S,
-        start: Instant,
-        request_index: usize,
-        requests: Arc<Mutex<Vec<RequestDetails>>>,
-    ) -> Self {
+    fn new(inner: S, request_duration: Arc<AtomicU64>) -> Self {
         Self {
             inner,
-            start,
-            request_index,
-            requests,
-            first_item_yielded: false,
+            start: None,
+            request_duration,
+            duration_recorded: false,
         }
     }
 }
@@ -86,16 +86,14 @@ where
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Self::Item>> {
+        let start = *self.start.get_or_insert_with(Instant::now);
+
         let poll_result = std::pin::Pin::new(&mut self.inner).poll_next(cx);
 
-        if !self.first_item_yielded && poll_result.is_ready() {
-            self.first_item_yielded = true;
-            let elapsed = self.start.elapsed();
-
-            let mut requests = self.requests.lock();
-            if let Some(request) = requests.get_mut(self.request_index) {
-                request.duration = Some(elapsed);
-            }
+        if !self.duration_recorded && poll_result.is_ready() {
+            self.duration_recorded = true;
+            let nanos = start.elapsed().as_nanos() as u64;
+            self.request_duration.store(nanos, Ordering::Release);
         }
 
         poll_result
@@ -117,7 +115,7 @@ pub enum InstrumentedObjectStoreMode {
 }
 
 impl fmt::Display for InstrumentedObjectStoreMode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{self:?}")
     }
 }
@@ -197,7 +195,7 @@ impl InstrumentedObjectStore {
             op: Operation::Put,
             path: location.clone(),
             timestamp,
-            duration: Some(elapsed),
+            duration_nanos: Arc::new(AtomicU64::new(elapsed.as_nanos() as u64)),
             size: Some(size),
             range: None,
             extra_display: None,
@@ -220,7 +218,7 @@ impl InstrumentedObjectStore {
             op: Operation::Put,
             path: location.clone(),
             timestamp,
-            duration: Some(elapsed),
+            duration_nanos: Arc::new(AtomicU64::new(elapsed.as_nanos() as u64)),
             size: None,
             range: None,
             extra_display: None,
@@ -237,16 +235,26 @@ impl InstrumentedObjectStore {
         let timestamp = Utc::now();
         let range = options.range.clone();
 
+        let head = options.head;
         let start = Instant::now();
         let ret = self.inner.get_opts(location, options).await?;
         let elapsed = start.elapsed();
 
+        let (op, size) = if head {
+            (Operation::Head, None)
+        } else {
+            (
+                Operation::Get,
+                Some((ret.range.end - ret.range.start) as usize),
+            )
+        };
+
         self.requests.lock().push(RequestDetails {
-            op: Operation::Get,
+            op,
             path: location.clone(),
             timestamp,
-            duration: Some(elapsed),
-            size: Some((ret.range.end - ret.range.start) as usize),
+            duration_nanos: Arc::new(AtomicU64::new(elapsed.as_nanos() as u64)),
+            size,
             range,
             extra_display: None,
         });
@@ -254,52 +262,48 @@ impl InstrumentedObjectStore {
         Ok(ret)
     }
 
-    async fn instrumented_delete(&self, location: &Path) -> Result<()> {
+    fn instrumented_delete_stream(
+        &self,
+        locations: BoxStream<'static, Result<Path>>,
+    ) -> BoxStream<'static, Result<Path>> {
+        let requests_captured = Arc::clone(&self.requests);
+
         let timestamp = Utc::now();
         let start = Instant::now();
-        self.inner.delete(location).await?;
-        let elapsed = start.elapsed();
+        self.inner
+            .delete_stream(locations)
+            .and_then(move |location| {
+                let elapsed = start.elapsed();
+                requests_captured.lock().push(RequestDetails {
+                    op: Operation::Delete,
+                    path: location.clone(),
+                    timestamp,
+                    duration_nanos: Arc::new(AtomicU64::new(elapsed.as_nanos() as u64)),
+                    size: None,
+                    range: None,
+                    extra_display: None,
+                });
+                futures::future::ok(location)
+            })
+            .boxed()
+    }
 
+    fn instrumented_list(&self, prefix: Option<&Path>) -> BoxStream<'static, Result<ObjectMeta>> {
+        let timestamp = Utc::now();
+        let inner_stream = self.inner.list(prefix);
+
+        let duration_nanos = Arc::new(AtomicU64::new(0));
         self.requests.lock().push(RequestDetails {
-            op: Operation::Delete,
-            path: location.clone(),
+            op: Operation::List,
+            path: prefix.cloned().unwrap_or_else(|| Path::from("")),
             timestamp,
-            duration: Some(elapsed),
+            duration_nanos: Arc::clone(&duration_nanos),
             size: None,
             range: None,
             extra_display: None,
         });
 
-        Ok(())
-    }
-
-    fn instrumented_list(&self, prefix: Option<&Path>) -> BoxStream<'static, Result<ObjectMeta>> {
-        let timestamp = Utc::now();
-        let start = Instant::now();
-        let inner_stream = self.inner.list(prefix);
-
-        let request_index = {
-            let mut requests = self.requests.lock();
-            requests.push(RequestDetails {
-                op: Operation::List,
-                path: prefix.cloned().unwrap_or_else(|| Path::from("")),
-                timestamp,
-                duration: None,
-                size: None,
-                range: None,
-                extra_display: None,
-            });
-            requests.len() - 1
-        };
-
-        let wrapped_stream = TimeToFirstItemStream::new(
-            inner_stream,
-            start,
-            request_index,
-            Arc::clone(&self.requests),
-        );
-
-        Box::pin(wrapped_stream)
+        Box::pin(TimeToFirstItemStream::new(inner_stream, duration_nanos))
     }
 
     async fn instrumented_list_with_delimiter(&self, prefix: Option<&Path>) -> Result<ListResult> {
@@ -312,7 +316,7 @@ impl InstrumentedObjectStore {
             op: Operation::List,
             path: prefix.cloned().unwrap_or_else(|| Path::from("")),
             timestamp,
-            duration: Some(elapsed),
+            duration_nanos: Arc::new(AtomicU64::new(elapsed.as_nanos() as u64)),
             size: None,
             range: None,
             extra_display: None,
@@ -331,7 +335,7 @@ impl InstrumentedObjectStore {
             op: Operation::Copy,
             path: from.clone(),
             timestamp,
-            duration: Some(elapsed),
+            duration_nanos: Arc::new(AtomicU64::new(elapsed.as_nanos() as u64)),
             size: None,
             range: None,
             extra_display: Some(format!("copy_to: {to}")),
@@ -350,7 +354,7 @@ impl InstrumentedObjectStore {
             op: Operation::Copy,
             path: from.clone(),
             timestamp,
-            duration: Some(elapsed),
+            duration_nanos: Arc::new(AtomicU64::new(elapsed.as_nanos() as u64)),
             size: None,
             range: None,
             extra_display: Some(format!("copy_to: {to}")),
@@ -358,29 +362,10 @@ impl InstrumentedObjectStore {
 
         Ok(())
     }
-
-    async fn instrumented_head(&self, location: &Path) -> Result<ObjectMeta> {
-        let timestamp = Utc::now();
-        let start = Instant::now();
-        let ret = self.inner.head(location).await?;
-        let elapsed = start.elapsed();
-
-        self.requests.lock().push(RequestDetails {
-            op: Operation::Head,
-            path: location.clone(),
-            timestamp,
-            duration: Some(elapsed),
-            size: None,
-            range: None,
-            extra_display: None,
-        });
-
-        Ok(ret)
-    }
 }
 
 impl fmt::Display for InstrumentedObjectStore {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mode: InstrumentedObjectStoreMode = self.instrument_mode.load(Ordering::Relaxed).into();
         write!(
             f,
@@ -425,12 +410,15 @@ impl ObjectStore for InstrumentedObjectStore {
         self.inner.get_opts(location, options).await
     }
 
-    async fn delete(&self, location: &Path) -> Result<()> {
+    fn delete_stream(
+        &self,
+        locations: BoxStream<'static, Result<Path>>,
+    ) -> BoxStream<'static, Result<Path>> {
         if self.enabled() {
-            return self.instrumented_delete(location).await;
+            return self.instrumented_delete_stream(locations);
         }
 
-        self.inner.delete(location).await
+        self.inner.delete_stream(locations)
     }
 
     fn list(&self, prefix: Option<&Path>) -> BoxStream<'static, Result<ObjectMeta>> {
@@ -449,28 +437,17 @@ impl ObjectStore for InstrumentedObjectStore {
         self.inner.list_with_delimiter(prefix).await
     }
 
-    async fn copy(&self, from: &Path, to: &Path) -> Result<()> {
+    async fn copy_opts(&self, from: &Path, to: &Path, options: CopyOptions) -> Result<()> {
         if self.enabled() {
-            return self.instrumented_copy(from, to).await;
+            return match options.mode {
+                object_store::CopyMode::Create => {
+                    self.instrumented_copy_if_not_exists(from, to).await
+                }
+                object_store::CopyMode::Overwrite => self.instrumented_copy(from, to).await,
+            };
         }
 
-        self.inner.copy(from, to).await
-    }
-
-    async fn copy_if_not_exists(&self, from: &Path, to: &Path) -> Result<()> {
-        if self.enabled() {
-            return self.instrumented_copy_if_not_exists(from, to).await;
-        }
-
-        self.inner.copy_if_not_exists(from, to).await
-    }
-
-    async fn head(&self, location: &Path) -> Result<ObjectMeta> {
-        if self.enabled() {
-            return self.instrumented_head(location).await;
-        }
-
-        self.inner.head(location).await
+        self.inner.copy_opts(from, to, options).await
     }
 }
 
@@ -486,33 +463,58 @@ pub enum Operation {
 }
 
 impl fmt::Display for Operation {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{self:?}")
     }
 }
 
 /// Holds profiling details about individual requests made through an
 /// [`InstrumentedObjectStore`]
-#[derive(Debug)]
 pub struct RequestDetails {
     op: Operation,
     path: Path,
     timestamp: chrono::DateTime<Utc>,
-    duration: Option<Duration>,
+    /// Duration stored as nanoseconds in an AtomicU64. 0 means not yet set.
+    duration_nanos: Arc<AtomicU64>,
     size: Option<usize>,
     range: Option<GetRange>,
     extra_display: Option<String>,
 }
 
+impl fmt::Debug for RequestDetails {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RequestDetails")
+            .field("op", &self.op)
+            .field("path", &self.path)
+            .field("timestamp", &self.timestamp)
+            .field("duration", &self.duration())
+            .field("size", &self.size)
+            .field("range", &self.range)
+            .field("extra_display", &self.extra_display)
+            .finish()
+    }
+}
+
+impl RequestDetails {
+    fn duration(&self) -> Option<Duration> {
+        let nanos = self.duration_nanos.load(Ordering::Acquire);
+        if nanos == 0 {
+            None
+        } else {
+            Some(Duration::from_nanos(nanos))
+        }
+    }
+}
+
 impl fmt::Display for RequestDetails {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut output_parts = vec![format!(
             "{} operation={:?}",
             self.timestamp.to_rfc3339(),
             self.op
         )];
 
-        if let Some(d) = self.duration {
+        if let Some(d) = self.duration() {
             output_parts.push(format!("duration={:.6}s", d.as_secs_f32()));
         }
         if let Some(s) = self.size {
@@ -697,7 +699,7 @@ impl RequestSummary {
     }
     fn push(&mut self, request: &RequestDetails) {
         self.count += 1;
-        if let Some(dur) = request.duration {
+        if let Some(dur) = request.duration() {
             self.duration_stats.get_or_insert_default().push(dur)
         }
         if let Some(size) = request.size {
@@ -911,7 +913,7 @@ mod tests {
         let request = requests.pop().unwrap();
         assert_eq!(request.op, Operation::Get);
         assert_eq!(request.path, path);
-        assert!(request.duration.is_some());
+        assert!(request.duration().is_some());
         assert_eq!(request.size, Some(9));
         assert_eq!(request.range, None);
         assert!(request.extra_display.is_none());
@@ -940,7 +942,7 @@ mod tests {
         let request = requests.pop().unwrap();
         assert_eq!(request.op, Operation::Delete);
         assert_eq!(request.path, path);
-        assert!(request.duration.is_some());
+        assert!(request.duration().is_some());
         assert!(request.size.is_none());
         assert!(request.range.is_none());
         assert!(request.extra_display.is_none());
@@ -958,17 +960,55 @@ mod tests {
         instrumented.set_instrument_mode(InstrumentedObjectStoreMode::Trace);
         assert!(instrumented.requests.lock().is_empty());
         let mut stream = instrumented.list(Some(&path));
-        // Consume at least one item from the stream to trigger duration measurement
+        // Sleep between stream creation and first poll to verify the timer
+        // starts on first poll, not at stream creation.
+        let delay = Duration::from_millis(50);
+        tokio::time::sleep(delay).await;
         let _ = stream.next().await;
         assert_eq!(instrumented.requests.lock().len(), 1);
 
         let request = instrumented.take_requests().pop().unwrap();
         assert_eq!(request.op, Operation::List);
         assert_eq!(request.path, path);
-        assert!(request.duration.is_some());
+        let duration = request
+            .duration()
+            .expect("duration should be set after consuming stream");
+        assert!(
+            duration < delay,
+            "duration {duration:?} should exclude the {delay:?} sleep before first poll"
+        );
         assert!(request.size.is_none());
         assert!(request.range.is_none());
         assert!(request.extra_display.is_none());
+    }
+
+    #[tokio::test]
+    async fn time_to_first_item_stream_captures_inner_latency() {
+        let inner_delay = Duration::from_millis(50);
+        let inner_stream = futures::stream::once(async move {
+            tokio::time::sleep(inner_delay).await;
+            Ok(ObjectMeta {
+                location: Path::from("test"),
+                last_modified: Utc::now(),
+                size: 0,
+                e_tag: None,
+                version: None,
+            })
+        })
+        .boxed();
+
+        let duration_nanos = Arc::new(AtomicU64::new(0));
+        let mut stream = Box::pin(TimeToFirstItemStream::new(
+            inner_stream,
+            Arc::clone(&duration_nanos),
+        ));
+        let _ = stream.next().await;
+
+        let recorded = Duration::from_nanos(duration_nanos.load(Ordering::Acquire));
+        assert!(
+            recorded >= inner_delay,
+            "recorded duration {recorded:?} should be >= inner stream delay {inner_delay:?}"
+        );
     }
 
     #[tokio::test]
@@ -988,7 +1028,7 @@ mod tests {
         let request = instrumented.take_requests().pop().unwrap();
         assert_eq!(request.op, Operation::List);
         assert_eq!(request.path, path);
-        assert!(request.duration.is_some());
+        assert!(request.duration().is_some());
         assert!(request.size.is_none());
         assert!(request.range.is_none());
         assert!(request.extra_display.is_none());
@@ -1019,7 +1059,7 @@ mod tests {
         let request = instrumented.take_requests().pop().unwrap();
         assert_eq!(request.op, Operation::Put);
         assert_eq!(request.path, path);
-        assert!(request.duration.is_some());
+        assert!(request.duration().is_some());
         assert_eq!(request.size.unwrap(), size);
         assert!(request.range.is_none());
         assert!(request.extra_display.is_none());
@@ -1054,7 +1094,7 @@ mod tests {
         let request = instrumented.take_requests().pop().unwrap();
         assert_eq!(request.op, Operation::Put);
         assert_eq!(request.path, path);
-        assert!(request.duration.is_some());
+        assert!(request.duration().is_some());
         assert!(request.size.is_none());
         assert!(request.range.is_none());
         assert!(request.extra_display.is_none());
@@ -1082,7 +1122,7 @@ mod tests {
         let request = requests.pop().unwrap();
         assert_eq!(request.op, Operation::Copy);
         assert_eq!(request.path, path);
-        assert!(request.duration.is_some());
+        assert!(request.duration().is_some());
         assert!(request.size.is_none());
         assert!(request.range.is_none());
         assert_eq!(
@@ -1121,7 +1161,7 @@ mod tests {
         let request = requests.pop().unwrap();
         assert_eq!(request.op, Operation::Copy);
         assert_eq!(request.path, path);
-        assert!(request.duration.is_some());
+        assert!(request.duration().is_some());
         assert!(request.size.is_none());
         assert!(request.range.is_none());
         assert_eq!(
@@ -1151,7 +1191,7 @@ mod tests {
         let request = requests.pop().unwrap();
         assert_eq!(request.op, Operation::Head);
         assert_eq!(request.path, path);
-        assert!(request.duration.is_some());
+        assert!(request.duration().is_some());
         assert!(request.size.is_none());
         assert!(request.range.is_none());
         assert!(request.extra_display.is_none());
@@ -1163,7 +1203,7 @@ mod tests {
             op: Operation::Get,
             path: Path::from("test"),
             timestamp: chrono::DateTime::from_timestamp(0, 0).unwrap(),
-            duration: Some(Duration::new(5, 0)),
+            duration_nanos: Arc::new(AtomicU64::new(Duration::new(5, 0).as_nanos() as u64)),
             size: Some(10),
             range: Some((..10).into()),
             extra_display: Some(String::from("extra info")),
@@ -1191,7 +1231,7 @@ mod tests {
             op: Operation::Get,
             path: Path::from("test1"),
             timestamp: chrono::DateTime::from_timestamp(0, 0).unwrap(),
-            duration: Some(Duration::from_secs(5)),
+            duration_nanos: Arc::new(AtomicU64::new(Duration::from_secs(5).as_nanos() as u64)),
             size: Some(100),
             range: None,
             extra_display: None,
@@ -1211,7 +1251,7 @@ mod tests {
             op: Operation::Get,
             path: Path::from("test2"),
             timestamp: chrono::DateTime::from_timestamp(1, 0).unwrap(),
-            duration: Some(Duration::from_secs(8)),
+            duration_nanos: Arc::new(AtomicU64::new(Duration::from_secs(8).as_nanos() as u64)),
             size: Some(150),
             range: None,
             extra_display: None,
@@ -1220,7 +1260,7 @@ mod tests {
             op: Operation::Get,
             path: Path::from("test3"),
             timestamp: chrono::DateTime::from_timestamp(2, 0).unwrap(),
-            duration: Some(Duration::from_secs(2)),
+            duration_nanos: Arc::new(AtomicU64::new(Duration::from_secs(2).as_nanos() as u64)),
             size: Some(50),
             range: None,
             extra_display: None,
@@ -1239,7 +1279,7 @@ mod tests {
             op: Operation::Put,
             path: Path::from("test4"),
             timestamp: chrono::DateTime::from_timestamp(3, 0).unwrap(),
-            duration: Some(Duration::from_millis(200)),
+            duration_nanos: Arc::new(AtomicU64::new(Duration::from_millis(200).as_nanos() as u64)),
             size: Some(75),
             range: None,
             extra_display: None,
@@ -1264,7 +1304,7 @@ mod tests {
             op: Operation::Get,
             path: Path::from("test1"),
             timestamp: chrono::DateTime::from_timestamp(0, 0).unwrap(),
-            duration: Some(Duration::from_secs(3)),
+            duration_nanos: Arc::new(AtomicU64::new(Duration::from_secs(3).as_nanos() as u64)),
             size: None,
             range: None,
             extra_display: None,
@@ -1286,7 +1326,7 @@ mod tests {
             op: Operation::Get,
             path: Path::from("test1"),
             timestamp: chrono::DateTime::from_timestamp(0, 0).unwrap(),
-            duration: None,
+            duration_nanos: Arc::new(AtomicU64::new(0)),
             size: Some(200),
             range: None,
             extra_display: None,
@@ -1308,7 +1348,7 @@ mod tests {
             op: Operation::Get,
             path: Path::from("test1"),
             timestamp: chrono::DateTime::from_timestamp(0, 0).unwrap(),
-            duration: None,
+            duration_nanos: Arc::new(AtomicU64::new(0)),
             size: None,
             range: None,
             extra_display: None,

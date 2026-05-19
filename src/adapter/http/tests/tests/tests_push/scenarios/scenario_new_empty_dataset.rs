@@ -18,7 +18,6 @@ use crate::harness::{ClientSideHarness, ServerSideHarness, make_dataset_ref};
 pub(crate) struct SmartPushNewEmptyDatasetScenario<TServerHarness: ServerSideHarness> {
     pub client_harness: ClientSideHarness,
     pub server_harness: TServerHarness,
-    pub server_dataset_layout: DatasetLayout,
     pub client_dataset_layout: DatasetLayout,
     pub server_dataset_ref: odf::DatasetRefRemote,
     pub client_dataset_ref: odf::DatasetRef,
@@ -53,12 +52,6 @@ impl<TServerHarness: ServerSideHarness> SmartPushNewEmptyDatasetScenario<TServer
 
         let foo_name = odf::DatasetName::new_unchecked("foo");
 
-        let server_dataset_layout = server_harness.dataset_layout(&odf::DatasetHandle::new(
-            client_create_result.dataset_handle.id.clone(),
-            odf::DatasetAlias::new(server_account_name.clone(), foo_name.clone()),
-            odf::DatasetKind::Root,
-        ));
-
         let client_dataset_ref = make_dataset_ref(client_account_name.as_ref(), "foo");
 
         let server_alias = odf::DatasetAlias::new(server_account_name, foo_name.clone());
@@ -68,7 +61,6 @@ impl<TServerHarness: ServerSideHarness> SmartPushNewEmptyDatasetScenario<TServer
         Self {
             client_harness,
             server_harness,
-            server_dataset_layout,
             client_dataset_layout,
             server_dataset_ref,
             client_dataset_ref,

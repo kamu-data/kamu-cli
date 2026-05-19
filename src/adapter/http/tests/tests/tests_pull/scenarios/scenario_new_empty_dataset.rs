@@ -18,7 +18,6 @@ use crate::harness::{ClientSideHarness, ServerSideHarness};
 pub(crate) struct SmartPullNewEmptyDatasetScenario<TServerHarness: ServerSideHarness> {
     pub client_harness: ClientSideHarness,
     pub server_harness: TServerHarness,
-    pub server_dataset_layout: DatasetLayout,
     pub client_dataset_layout: DatasetLayout,
     pub server_dataset_ref: odf::DatasetRefRemote,
     pub server_create_result: CreateDatasetResult,
@@ -48,9 +47,6 @@ impl<TServerHarness: ServerSideHarness> SmartPullNewEmptyDatasetScenario<TServer
             .await
             .unwrap();
 
-        let server_dataset_layout =
-            server_harness.dataset_layout(&server_create_result.dataset_handle);
-
         let client_dataset_layout =
             client_harness.dataset_layout(&server_create_result.dataset_handle.id);
 
@@ -62,7 +58,6 @@ impl<TServerHarness: ServerSideHarness> SmartPullNewEmptyDatasetScenario<TServer
         Self {
             client_harness,
             server_harness,
-            server_dataset_layout,
             client_dataset_layout,
             server_dataset_ref,
             server_create_result,

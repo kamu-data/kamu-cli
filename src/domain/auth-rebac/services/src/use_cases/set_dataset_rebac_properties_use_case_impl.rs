@@ -31,28 +31,35 @@ impl SetDatasetRebacPropertiesUseCase for SetDatasetRebacPropertiesUseCaseImpl {
         dataset_id: &odf::DatasetID,
         properties: DatasetProperties,
     ) -> Result<(), SetDatasetRebacPropertiesError> {
+        let mut changed = false;
+
         for (name, value) in [
             DatasetPropertyName::allows_public_read(properties.allows_public_read),
             DatasetPropertyName::allows_anonymous_read(properties.allows_anonymous_read),
         ] {
-            self.rebac_service
+            let mutation_result = self
+                .rebac_service
                 .set_dataset_property(dataset_id, name, &value)
                 .await
                 .int_err()?;
+
+            changed |= mutation_result.is_changed();
         }
 
-        self.outbox
-            .post_message(
-                MESSAGE_PRODUCER_KAMU_REBAC_DATASET_PROPERTIES_SERVICE,
-                RebacDatasetPropertiesMessage::modified(
-                    dataset_id.clone(),
-                    self.rebac_service
-                        .get_dataset_properties(dataset_id)
-                        .await
-                        .int_err()?,
-                ),
-            )
-            .await?;
+        if changed {
+            self.outbox
+                .post_message(
+                    MESSAGE_PRODUCER_KAMU_REBAC_DATASET_PROPERTIES_SERVICE,
+                    RebacDatasetPropertiesMessage::modified(
+                        dataset_id.clone(),
+                        self.rebac_service
+                            .get_dataset_properties(dataset_id)
+                            .await
+                            .int_err()?,
+                    ),
+                )
+                .await?;
+        }
 
         Ok(())
     }

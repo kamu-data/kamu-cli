@@ -9,12 +9,11 @@
 
 use std::sync::Arc;
 
-use datafusion::arrow::datatypes::Schema;
-use datafusion::common::DFSchema;
-use datafusion::parquet::schema::types::{SchemaDescriptor, Type};
+use arrow::datatypes::Schema;
+use parquet::schema::types::{SchemaDescriptor, Type};
 
 pub fn arrow_schema_to_parquet_schema(arrow_schema: &Schema) -> Arc<Type> {
-    let parquet_schema = datafusion::parquet::arrow::ArrowSchemaConverter::new()
+    let parquet_schema = parquet::arrow::ArrowSchemaConverter::new()
         .convert(arrow_schema)
         .unwrap();
     parquet_schema.root_schema_ptr()
@@ -22,11 +21,11 @@ pub fn arrow_schema_to_parquet_schema(arrow_schema: &Schema) -> Arc<Type> {
 
 pub fn parquet_schema_to_arrow_schema(parquet_schema: Arc<Type>) -> Arc<Schema> {
     let schema_desc = SchemaDescriptor::new(parquet_schema);
-    let arrow_schema =
-        datafusion::parquet::arrow::parquet_to_arrow_schema(&schema_desc, None).unwrap();
+    let arrow_schema = parquet::arrow::parquet_to_arrow_schema(&schema_desc, None).unwrap();
     Arc::new(arrow_schema)
 }
 
-pub fn dataframe_schema_to_parquet_schema(df_schema: &DFSchema) -> Arc<Type> {
+#[cfg(feature = "datafusion")]
+pub fn dataframe_schema_to_parquet_schema(df_schema: &datafusion::common::DFSchema) -> Arc<Type> {
     arrow_schema_to_parquet_schema(df_schema.inner())
 }

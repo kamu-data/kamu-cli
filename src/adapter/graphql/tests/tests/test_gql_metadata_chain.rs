@@ -60,6 +60,26 @@ async fn test_metadata_chain_events() {
             )
             .await
             .unwrap();
+
+        create_result
+            .dataset
+            .commit_event(
+                MetadataFactory::add_push_source()
+                    .read(odf::metadata::ReadStepNdJson {
+                        schema: Some(odf::schema::DataSchema::new(vec![
+                            odf::schema::DataField::timestamp_millis_utc("date"),
+                            odf::schema::DataField::string("city"),
+                            odf::schema::DataField::i64("population"),
+                        ])),
+                        ..Default::default()
+                    })
+                    .build()
+                    .into(),
+                odf::dataset::CommitOpts::default(),
+            )
+            .await
+            .unwrap();
+
         create_result
             .dataset
             .commit_event(
@@ -105,6 +125,15 @@ async fn test_metadata_chain_events() {
                                                 content
                                             }
                                         }
+                                        ... on AddPushSource {
+                                            sourceName
+                                            read {
+                                                schema {
+                                                    format
+                                                    content
+                                                }
+                                            }
+                                        }
                                         ... on AddData {
                                             prevOffset
                                             newData {
@@ -131,11 +160,16 @@ async fn test_metadata_chain_events() {
         .await;
     assert!(res.is_ok(), "{res:?}");
 
-    let expected_schema = r#"{"name": "arrow_schema", "type": "struct", "fields": [{"name": "city", "repetition": "REQUIRED", "type": "BYTE_ARRAY", "logicalType": "STRING"}, {"name": "population", "repetition": "REQUIRED", "type": "INT64"}]}"#;
+    let data = res.data.into_json().unwrap();
+
+    let source_schema = &data["datasets"]["byId"]["metadata"]["chain"]["blocks"]["nodes"][1]
+        ["event"]["read"]["schema"]["content"];
+    let data_schema = &data["datasets"]["byId"]["metadata"]["chain"]["blocks"]["nodes"][2]["event"]
+        ["schema"]["content"];
 
     assert_eq!(
-        res.data,
-        value!({
+        data,
+        serde_json::json!({
             "datasets": {
                 "byId": {
                     "metadata": {
@@ -154,10 +188,21 @@ async fn test_metadata_chain_events() {
                                     }
                                 }, {
                                     "event": {
+                                        "__typename": "AddPushSource",
+                                        "sourceName": "default",
+                                        "read": {
+                                            "schema": {
+                                                "format": "ODF_JSON",
+                                                "content": source_schema,
+                                            }
+                                        }
+                                    }
+                                }, {
+                                    "event": {
                                         "__typename": "SetDataSchema",
                                         "schema": {
-                                            "format": "PARQUET_JSON",
-                                            "content": expected_schema,
+                                            "format": "ODF_JSON",
+                                            "content": data_schema,
                                         }
                                     }
                                 }, {
@@ -172,6 +217,238 @@ async fn test_metadata_chain_events() {
                     }
                 }
             }
+        })
+    );
+
+    let source_schema: serde_json::Value =
+        serde_json::from_str(source_schema.as_str().unwrap()).unwrap();
+    let data_schema: serde_json::Value =
+        serde_json::from_str(data_schema.as_str().unwrap()).unwrap();
+
+    assert_eq!(
+        source_schema,
+        serde_json::json!({
+            "fields":  [
+               {
+                   "name": "date",
+                   "type": {
+                       "kind": "Timestamp",
+                   },
+               },
+               {
+                   "name": "city",
+                   "type": {
+                       "kind": "String",
+                   },
+               },
+               {
+                   "name": "population",
+                   "type": {
+                       "kind": "Int64",
+                   },
+               },
+           ],
+        })
+    );
+
+    assert_eq!(
+        data_schema,
+        serde_json::json!({
+            "fields":  [
+               {
+                   "name": "city",
+                   "type": {
+                       "kind": "String",
+                   },
+               },
+               {
+                   "name": "population",
+                   "type": {
+                       "kind": "Int64",
+                   },
+               },
+           ],
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_metadata_chain_legacy_source_schema() {
+    let harness = GraphQLMetadataChainHarness::new(TenancyConfig::SingleTenant).await;
+
+    // Prepare phase
+    let dataset_id = {
+        let create_dataset = harness
+            .catalog_authorized
+            .get_one::<dyn CreateDatasetUseCase>()
+            .unwrap();
+
+        let create_result = create_dataset
+            .execute(
+                &"foo".try_into().unwrap(),
+                odf::dataset::make_seed_block(
+                    harness.did_generator.generate_dataset_id().0,
+                    odf::DatasetKind::Root,
+                    Utc::now(),
+                ),
+                Default::default(),
+            )
+            .await
+            .unwrap();
+
+        create_result
+            .dataset
+            .commit_event(
+                MetadataFactory::add_push_source()
+                    .read(odf::metadata::ReadStepNdJson {
+                        ddl_schema: Some(vec![
+                            "date TIMESTAMP".to_string(),
+                            "city STRING".to_string(),
+                            "population BIGINT".to_string(),
+                        ]),
+                        ..Default::default()
+                    })
+                    .build()
+                    .into(),
+                odf::dataset::CommitOpts::default(),
+            )
+            .await
+            .unwrap();
+
+        create_result.dataset_handle.id
+    };
+
+    let request_code = indoc!(
+        r#"
+        {
+            datasets {
+                byId (datasetId: "<id>") {
+                    metadata {
+                        chain {
+                            blocks (
+                                page: 0,
+                                perPage: 10,
+                            ) {
+                                nodes {
+                                    event {
+                                        __typename
+                                        ... on Seed {
+                                            datasetId
+                                            datasetKind
+                                        }
+                                        ... on AddPushSource {
+                                            sourceName
+                                            read {
+                                                ... on ReadStepNdJson {
+                                                    ddlSchema
+                                                }
+                                                schema {
+                                                    format
+                                                    content
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        "#
+    )
+    .replace("<id>", &dataset_id.to_string());
+
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(request_code.clone()))
+        .await;
+    assert!(res.is_ok(), "{res:?}");
+
+    let data = res.data.into_json().unwrap();
+
+    let source_schema_ddl = &data["datasets"]["byId"]["metadata"]["chain"]["blocks"]["nodes"][0]
+        ["event"]["read"]["ddlSchema"];
+    let source_schema_odf = &data["datasets"]["byId"]["metadata"]["chain"]["blocks"]["nodes"][0]
+        ["event"]["read"]["schema"]["content"];
+
+    assert_eq!(
+        data,
+        serde_json::json!({
+            "datasets": {
+                "byId": {
+                    "metadata": {
+                        "chain": {
+                            "blocks": {
+                                "nodes": [{
+                                    "event": {
+                                        "__typename": "AddPushSource",
+                                        "sourceName": "default",
+                                        "read": {
+                                            "ddlSchema": source_schema_ddl,
+                                            "schema": {
+                                                "format": "ODF_JSON",
+                                                "content": source_schema_odf,
+                                            }
+                                        }
+                                    }
+                                }, {
+                                    "event": {
+                                        "__typename": "Seed",
+                                        "datasetId": dataset_id.to_string(),
+                                        "datasetKind": "ROOT",
+                                    }
+                                }]
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    );
+
+    let source_schema_odf: serde_json::Value =
+        serde_json::from_str(source_schema_odf.as_str().unwrap()).unwrap();
+
+    assert_eq!(
+        *source_schema_ddl,
+        serde_json::json!(["date TIMESTAMP", "city STRING", "population BIGINT"]),
+    );
+
+    assert_eq!(
+        source_schema_odf,
+        serde_json::json!({
+            "fields":  [
+                {
+                    "name": "date",
+                    "type": {
+                        "kind": "Option",
+                        "inner": {
+                            "kind": "Timestamp",
+                        },
+                    }
+                },
+                {
+                    "name": "city",
+                    "type": {
+                        "kind": "Option",
+                        "inner": {
+                            "kind": "String",
+                        },
+                    }
+                },
+                {
+                    "name": "population",
+                    "type": {
+                        "kind": "Option",
+                        "inner": {
+                            "kind": "Int64",
+                        },
+                    }
+                },
+           ],
         })
     );
 }

@@ -30,17 +30,20 @@ impl DeleteDatasetRebacPropertiesUseCase for DeleteDatasetRebacPropertiesUseCase
         &self,
         dataset_id: &odf::DatasetID,
     ) -> Result<(), DeleteDatasetRebacPropertiesError> {
-        self.rebac_service
+        let mutation_result = self
+            .rebac_service
             .delete_dataset_properties(dataset_id)
             .await
             .int_err()?;
 
-        self.outbox
-            .post_message(
-                MESSAGE_PRODUCER_KAMU_REBAC_DATASET_PROPERTIES_SERVICE,
-                RebacDatasetPropertiesMessage::deleted(dataset_id.clone()),
-            )
-            .await?;
+        if mutation_result.is_changed() {
+            self.outbox
+                .post_message(
+                    MESSAGE_PRODUCER_KAMU_REBAC_DATASET_PROPERTIES_SERVICE,
+                    RebacDatasetPropertiesMessage::deleted(dataset_id.clone()),
+                )
+                .await?;
+        }
 
         Ok(())
     }

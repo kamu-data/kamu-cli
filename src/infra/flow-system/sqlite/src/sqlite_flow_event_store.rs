@@ -38,6 +38,48 @@ impl SqliteFlowEventStore {
         }
     }
 
+    fn flow_order_clause(order: &FlowOrder) -> String {
+        let mut clauses = Vec::with_capacity(order.rules.len());
+
+        for rule in &order.rules {
+            match (rule.field, rule.direction) {
+                // SQLite stores flow status as text. Lexical descending order already matches
+                // the semantic queue order: waiting, running, retrying, finished.
+                (FlowOrderField::Status, FlowOrderDirection::Asc) => {
+                    clauses.push("flow_status DESC".to_string());
+                }
+                (FlowOrderField::Status, FlowOrderDirection::Desc) => {
+                    clauses.push("flow_status ASC".to_string());
+                }
+                (FlowOrderField::LastEventTime, FlowOrderDirection::Asc) => {
+                    clauses.push("last_event_id ASC".to_string());
+                }
+                (FlowOrderField::LastEventTime, FlowOrderDirection::Desc) => {
+                    clauses.push("last_event_id DESC".to_string());
+                }
+                (FlowOrderField::ScheduledForActivationAt, FlowOrderDirection::Asc) => clauses
+                    .push(
+                        "scheduled_for_activation_at IS NULL ASC, scheduled_for_activation_at ASC"
+                            .to_string(),
+                    ),
+                (FlowOrderField::ScheduledForActivationAt, FlowOrderDirection::Desc) => clauses
+                    .push(
+                        "scheduled_for_activation_at IS NOT NULL DESC, \
+                         scheduled_for_activation_at DESC"
+                            .to_string(),
+                    ),
+                (FlowOrderField::FlowId, FlowOrderDirection::Asc) => {
+                    clauses.push("flow_id ASC".to_string());
+                }
+                (FlowOrderField::FlowId, FlowOrderDirection::Desc) => {
+                    clauses.push("flow_id DESC".to_string());
+                }
+            }
+        }
+
+        clauses.join(", ")
+    }
+
     async fn register_flow(
         &self,
         tr: &mut database_common::TransactionGuard<'_, Sqlite>,
@@ -581,6 +623,7 @@ impl FlowEventStore for SqliteFlowEventStore {
         &self,
         flow_scope_query: FlowScopeQuery,
         filters: &FlowFilters,
+        order: &FlowOrder,
         pagination: PaginationOpts,
     ) -> FlowIDStream<'_> {
         let maybe_initiators = filters
@@ -590,6 +633,7 @@ impl FlowEventStore for SqliteFlowEventStore {
 
         let maybe_by_flow_types = filters.by_flow_types.clone();
         let maybe_by_flow_statuses = filters.by_flow_statuses.clone();
+        let order_clause = Self::flow_order_clause(order);
 
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
@@ -620,7 +664,7 @@ impl FlowEventStore for SqliteFlowEventStore {
                     AND ($1 = 0 OR flow_type IN ({}))
                     AND ($2 = 0 OR flow_status IN ({}))
                     AND ($3 = 0 OR initiator IN ({}))
-                ORDER BY flow_status DESC, last_event_id DESC
+                ORDER BY {order_clause}
                 LIMIT $4 OFFSET $5
                 "#,
                 maybe_by_flow_types.as_ref()
@@ -820,6 +864,7 @@ impl FlowEventStore for SqliteFlowEventStore {
     fn get_all_flow_ids(
         &self,
         filters: &FlowFilters,
+        order: &FlowOrder,
         pagination: PaginationOpts,
     ) -> FlowIDStream<'_> {
         let maybe_by_flow_statuses = filters.by_flow_statuses.clone();
@@ -830,6 +875,7 @@ impl FlowEventStore for SqliteFlowEventStore {
             .map(Self::prepare_initiator_filter);
 
         let maybe_by_flow_types = filters.by_flow_types.clone();
+        let order_clause = Self::flow_order_clause(order);
 
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
@@ -855,7 +901,7 @@ impl FlowEventStore for SqliteFlowEventStore {
                     ($1 = 0 OR flow_type IN ({}))
                     AND ($2 = 0 OR flow_status IN ({}))
                     AND ($3 = 0 OR initiator IN ({}))
-                ORDER BY flow_id DESC
+                ORDER BY {order_clause}
                 LIMIT $4 OFFSET $5
                 "#,
                 maybe_by_flow_types.as_ref()

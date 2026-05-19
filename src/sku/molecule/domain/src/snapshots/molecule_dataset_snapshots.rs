@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_datasets::{DatasetColumn, DatasetSnapshots};
+use kamu_datasets::DatasetSnapshots;
 use odf::schema::{DataField, DataSchema, DataType};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -45,19 +45,14 @@ impl MoleculeDatasetSnapshots {
                 odf::metadata::AddPushSource {
                     source_name: "default".to_string(),
                     read: odf::metadata::ReadStepNdJson {
-                        schema: Some(
-                            [
-                                "op INT NOT NULL",
-                                "ocl_id STRING NOT NULL",
-                                "symbol STRING NOT NULL",
-                                "odf_account_id STRING NOT NULL",
-                                "odf_data_room_dataset_id STRING NOT NULL",
-                                "odf_announcements_dataset_id STRING NOT NULL",
-                            ]
-                            .into_iter()
-                            .map(str::to_string)
-                            .collect(),
-                        ),
+                        schema: Some(DataSchema::new(vec![
+                            DataField::i32("op"),
+                            DataField::string("ocl_id"),
+                            DataField::string("symbol"),
+                            DataField::string("odf_account_id"),
+                            DataField::string("odf_data_room_dataset_id"),
+                            DataField::string("odf_announcements_dataset_id"),
+                        ])),
                         ..Default::default()
                     }
                     .into(),
@@ -129,16 +124,16 @@ impl MoleculeDatasetSnapshots {
             alias,
             vec![
                 // Extra columns
-                DatasetColumn::string(COLUMN_NAME_CHANGE_BY),
+                DataField::string(COLUMN_NAME_CHANGE_BY).optional(),
                 // Denormalized values from the latest file state
-                DatasetColumn::string(COLUMN_NAME_ACCESS_LEVEL),
-                DatasetColumn::string(COLUMN_NAME_CONTENT_TYPE),
-                DatasetColumn::string(COLUMN_NAME_CONTENT_HASH),
-                DatasetColumn::int(COLUMN_NAME_CONTENT_LENGTH),
-                DatasetColumn::string(COLUMN_NAME_DESCRIPTION),
-                DatasetColumn::string_array(COLUMN_NAME_CATEGORIES),
-                DatasetColumn::string_array(COLUMN_NAME_TAGS),
-                DatasetColumn::int(COLUMN_NAME_VERSION),
+                DataField::string(COLUMN_NAME_ACCESS_LEVEL).optional(),
+                DataField::string(COLUMN_NAME_CONTENT_TYPE).optional(),
+                DataField::string(COLUMN_NAME_CONTENT_HASH).optional(),
+                DataField::i32(COLUMN_NAME_CONTENT_LENGTH).optional(), // NOTE: i32 instead of u64 for legacy reasons
+                DataField::string(COLUMN_NAME_DESCRIPTION).optional(),
+                DataField::list(COLUMN_NAME_CATEGORIES, DataType::string().optional()).optional(),
+                DataField::list(COLUMN_NAME_TAGS, DataType::string().optional()).optional(),
+                DataField::i32(COLUMN_NAME_VERSION).optional(),
             ],
             Vec::new(),
         )
@@ -162,16 +157,16 @@ impl MoleculeDatasetSnapshots {
             alias,
             vec![
                 // Extra columns
-                DatasetColumn::string(COLUMN_NAME_ACCESS_LEVEL),
-                DatasetColumn::string(COLUMN_NAME_CHANGE_BY),
-                DatasetColumn::string(COLUMN_NAME_DESCRIPTION),
+                DataField::string(COLUMN_NAME_ACCESS_LEVEL).optional(),
+                DataField::string(COLUMN_NAME_CHANGE_BY).optional(),
+                DataField::string(COLUMN_NAME_DESCRIPTION).optional(),
                 // Extended metadata
-                DatasetColumn::string_array(COLUMN_NAME_CATEGORIES),
-                DatasetColumn::string_array(COLUMN_NAME_TAGS),
+                DataField::list(COLUMN_NAME_CATEGORIES, DataType::string().optional()).optional(),
+                DataField::list(COLUMN_NAME_TAGS, DataType::string().optional()).optional(),
                 // Semantic search
-                DatasetColumn::string(COLUMN_NAME_CONTENT_TEXT),
+                DataField::string(COLUMN_NAME_CONTENT_TEXT).optional(),
                 // E2EE
-                DatasetColumn::string(COLUMN_NAME_ENCRYPTION_METADATA),
+                DataField::string(COLUMN_NAME_ENCRYPTION_METADATA).optional(),
             ],
             Vec::new(),
         )
@@ -211,22 +206,17 @@ impl MoleculeDatasetSnapshots {
                 odf::metadata::AddPushSource {
                     source_name: "default".to_string(),
                     read: odf::metadata::ReadStepNdJson {
-                        schema: Some(
-                            [
-                                "op INT NOT NULL",
-                                "announcement_id STRING NOT NULL",
-                                "headline STRING NOT NULL",
-                                "body STRING NOT NULL",
-                                "attachments Array<STRING> NOT NULL",
-                                "molecule_access_level STRING NOT NULL",
-                                "molecule_change_by STRING NOT NULL",
-                                "categories Array<STRING> NOT NULL",
-                                "tags Array<STRING> NOT NULL",
-                            ]
-                            .into_iter()
-                            .map(str::to_string)
-                            .collect(),
-                        ),
+                        schema: Some(DataSchema::new(vec![
+                            DataField::i32("op"),
+                            DataField::string("announcement_id"),
+                            DataField::string("headline"),
+                            DataField::string("body"),
+                            DataField::list("attachments", DataType::string().optional()),
+                            DataField::string("molecule_access_level"),
+                            DataField::string("molecule_change_by"),
+                            DataField::list("categories", DataType::string().optional()),
+                            DataField::list("tags", DataType::string().optional()),
+                        ])),
                         ..Default::default()
                     }
                     .into(),
@@ -313,24 +303,19 @@ impl MoleculeDatasetSnapshots {
                 odf::metadata::AddPushSource {
                     source_name: "default".to_string(),
                     read: odf::metadata::ReadStepNdJson {
-                        schema: Some(
-                            [
-                                "op INT NOT NULL",
-                                "event_time TIMESTAMP",
-                                "ocl_id STRING NOT NULL",
-                                "announcement_id STRING NOT NULL",
-                                "headline STRING NOT NULL",
-                                "body STRING NOT NULL",
-                                "attachments Array<STRING> NOT NULL",
-                                "molecule_access_level STRING NOT NULL",
-                                "molecule_change_by STRING NOT NULL",
-                                "categories Array<STRING> NOT NULL",
-                                "tags Array<STRING> NOT NULL",
-                            ]
-                                .into_iter()
-                                .map(str::to_string)
-                                .collect(),
-                        ),
+                        schema: Some(DataSchema::new(vec![
+                            DataField::i32("op"),
+                            DataField::timestamp_millis_utc("event_time").optional(),
+                            DataField::string("ocl_id"),
+                            DataField::string("announcement_id"),
+                            DataField::string("headline"),
+                            DataField::string("body"),
+                            DataField::list("attachments", DataType::string().optional()),
+                            DataField::string("molecule_access_level"),
+                            DataField::string("molecule_change_by"),
+                            DataField::list("categories", DataType::string().optional()),
+                            DataField::list("tags", DataType::string().optional()),
+                        ])),
                         ..Default::default()
                     }
                         .into(),
@@ -416,27 +401,22 @@ impl MoleculeDatasetSnapshots {
                 odf::metadata::AddPushSource {
                     source_name: "default".to_string(),
                     read: odf::metadata::ReadStepNdJson {
-                        schema: Some(
-                            [
-                                "event_time TIMESTAMP",
-                                "activity_type STRING NOT NULL",
-                                "ocl_id STRING NOT NULL",
-                                "path STRING NOT NULL",
-                                "ref STRING NOT NULL",
-                                "version INT UNSIGNED NOT NULL",
-                                "molecule_change_by STRING NOT NULL",
-                                "molecule_access_level STRING NOT NULL",
-                                "content_type STRING",
-                                "content_length BIGINT UNSIGNED NOT NULL",
-                                "content_hash STRING NOT NULL",
-                                "description STRING",
-                                "categories Array<STRING> NOT NULL",
-                                "tags Array<STRING> NOT NULL",
-                            ]
-                            .into_iter()
-                            .map(str::to_string)
-                            .collect(),
-                        ),
+                        schema: Some(DataSchema::new(vec![
+                                DataField::timestamp_millis_utc("event_time").optional(),
+                                DataField::string("activity_type"),
+                                DataField::string("ocl_id"),
+                                DataField::string("path"),
+                                DataField::string("ref"),
+                                DataField::u32("version"),
+                                DataField::string("molecule_change_by"),
+                                DataField::string("molecule_access_level"),
+                                DataField::string("content_type").optional(),
+                                DataField::u64("content_length"),
+                                DataField::string("content_hash"),
+                                DataField::string("description").optional(),
+                                DataField::list("categories", DataType::string().optional()),
+                                DataField::list("tags", DataType::string().optional()),
+                        ])),
                         ..Default::default()
                     }
                     .into(),

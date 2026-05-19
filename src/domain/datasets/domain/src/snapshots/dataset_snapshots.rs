@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::DatasetColumn;
+use odf::schema::{DataField, DataSchema};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -16,17 +16,9 @@ pub struct DatasetSnapshots {}
 impl DatasetSnapshots {
     pub fn collection(
         alias: odf::DatasetAlias,
-        extra_columns: Vec<DatasetColumn>,
+        extra_columns: Vec<DataField>,
         extra_events: Vec<odf::MetadataEvent>,
     ) -> Result<odf::DatasetSnapshot, odf::schema::InvalidSchema> {
-        let extra_columns_ddl: Vec<String> = extra_columns
-            .into_iter()
-            .map(|c| format!("{} {}", c.name, c.data_type_ddl))
-            .collect();
-
-        let extra_columns_schema =
-            odf::utils::schema::parse::parse_ddl_to_odf_schema(&extra_columns_ddl.join(", "))?;
-
         let schema = odf::schema::DataSchema::builder()
             .with_changelog_system_fields(odf::metadata::DatasetVocabulary::default(), None)
             .extend([
@@ -38,25 +30,24 @@ impl DatasetSnapshots {
                     .type_ext(odf::schema::ext::DataTypeExt::did())
                     .description("DID that references another dataset"),
             ])
-            .extend(extra_columns_schema.fields)
+            .extend(extra_columns.clone())
             .extra(odf::schema::ext::DatasetArchetype::Collection)
             .build()?;
 
         let push_source = odf::metadata::AddPushSource {
             source_name: "default".into(),
             read: odf::metadata::ReadStep::NdJson(odf::metadata::ReadStepNdJson {
-                schema: Some(
+                schema: Some(DataSchema::new(
                     [
-                        "op INT",
-                        "event_time TIMESTAMP",
-                        "path STRING",
-                        "ref STRING",
+                        DataField::i32("op").optional(),
+                        DataField::timestamp_millis_utc("event_time").optional(),
+                        DataField::string("path").optional(),
+                        DataField::string("ref").optional(),
                     ]
                     .into_iter()
-                    .map(str::to_string)
-                    .chain(extra_columns_ddl)
+                    .chain(extra_columns)
                     .collect(),
-                ),
+                )),
                 ..Default::default()
             }),
             preprocess: None,
@@ -82,17 +73,9 @@ impl DatasetSnapshots {
 
     pub fn versioned_file(
         alias: odf::DatasetAlias,
-        extra_columns: Vec<DatasetColumn>,
+        extra_columns: Vec<DataField>,
         extra_events: Vec<odf::MetadataEvent>,
     ) -> Result<odf::DatasetSnapshot, odf::schema::InvalidSchema> {
-        let extra_columns_ddl: Vec<String> = extra_columns
-            .into_iter()
-            .map(|c| format!("{} {}", c.name, c.data_type_ddl))
-            .collect();
-
-        let extra_columns_schema =
-            odf::utils::schema::parse::parse_ddl_to_odf_schema(&extra_columns_ddl.join(", "))?;
-
         let schema = odf::schema::DataSchema::builder()
             .with_changelog_system_fields(odf::metadata::DatasetVocabulary::default(), None)
             .extend([
@@ -110,26 +93,25 @@ impl DatasetSnapshots {
                     .optional()
                     .description("Media type associated with the linked object"),
             ])
-            .extend(extra_columns_schema.fields)
+            .extend(extra_columns.clone())
             .extra(odf::schema::ext::DatasetArchetype::VersionedFile)
             .build()?;
 
         let push_source = odf::metadata::AddPushSource {
             source_name: "default".into(),
             read: odf::metadata::ReadStep::NdJson(odf::metadata::ReadStepNdJson {
-                schema: Some(
+                schema: Some(DataSchema::new(
                     [
-                        "event_time TIMESTAMP",
-                        "version INT",
-                        "content_hash STRING",
-                        "content_length BIGINT",
-                        "content_type STRING",
+                        DataField::timestamp_millis_utc("event_time").optional(),
+                        DataField::i32("version").optional(),
+                        DataField::string("content_hash").optional(),
+                        DataField::i64("content_length").optional(),
+                        DataField::string("content_type").optional(),
                     ]
                     .into_iter()
-                    .map(str::to_string)
-                    .chain(extra_columns_ddl)
+                    .chain(extra_columns)
                     .collect(),
-                ),
+                )),
                 ..Default::default()
             }),
             preprocess: None,

@@ -139,7 +139,7 @@ impl std::fmt::Display for TestDatasetOutboxListener {
             for msg in &guard.dataset_lifecycle_messages {
                 match msg {
                     DatasetLifecycleMessage::Created(created_msg) => {
-                        writeln!(f, "  Created {{",)?;
+                        writeln!(f, "  Created {{")?;
                         writeln!(f, "    Dataset ID: {}", created_msg.dataset_id)?;
                         writeln!(f, "    Dataset Name: {}", created_msg.dataset_name)?;
                         writeln!(f, "    Owner: {}", created_msg.owner_account_id)?;
@@ -147,7 +147,7 @@ impl std::fmt::Display for TestDatasetOutboxListener {
                         writeln!(f, "  }}")?;
                     }
                     DatasetLifecycleMessage::Renamed(renamed_msg) => {
-                        writeln!(f, "  Renamed {{",)?;
+                        writeln!(f, "  Renamed {{")?;
                         writeln!(f, "    Dataset ID: {}", renamed_msg.dataset_id)?;
                         writeln!(
                             f,
@@ -157,7 +157,7 @@ impl std::fmt::Display for TestDatasetOutboxListener {
                         writeln!(f, "  }}")?;
                     }
                     DatasetLifecycleMessage::Deleted(deleted_msg) => {
-                        writeln!(f, "  Deleted {{",)?;
+                        writeln!(f, "  Deleted {{")?;
                         writeln!(f, "    Dataset ID: {}", deleted_msg.dataset_id)?;
                         writeln!(f, "  }}")?;
                     }
@@ -175,7 +175,7 @@ impl std::fmt::Display for TestDatasetOutboxListener {
             for msg in &guard.dataset_reference_messages {
                 match msg {
                     DatasetReferenceMessage::Updated(msg) => {
-                        writeln!(f, "  Ref Updated {{",)?;
+                        writeln!(f, "  Ref Updated {{")?;
                         writeln!(f, "    Dataset ID: {}", msg.dataset_id)?;
                         writeln!(f, "    Ref: {}", msg.block_ref)?;
                         writeln!(f, "    Prev Head: {:?}", msg.maybe_prev_block_hash)?;
@@ -196,7 +196,7 @@ impl std::fmt::Display for TestDatasetOutboxListener {
             for msg in &guard.dataset_dependency_messages {
                 match msg {
                     DatasetDependenciesMessage::Updated(msg) => {
-                        writeln!(f, "  Deps Updated {{",)?;
+                        writeln!(f, "  Deps Updated {{")?;
                         writeln!(f, "    Dataset ID: {}", msg.dataset_id)?;
                         writeln!(
                             f,
@@ -232,7 +232,7 @@ impl std::fmt::Display for TestDatasetOutboxListener {
             for msg in &guard.dataset_key_blocks_messages {
                 match msg {
                     DatasetKeyBlocksMessage::Appended(msg) => {
-                        writeln!(f, "  Key Blocks Appended {{",)?;
+                        writeln!(f, "  Key Blocks Appended {{")?;
                         writeln!(f, "    Dataset ID: {}", msg.dataset_id)?;
                         writeln!(f, "    Ref: {}", msg.block_ref)?;
                         writeln!(f, "    Key Block Tail: {}", msg.tail_key_block_hash)?;

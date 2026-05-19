@@ -17,8 +17,7 @@ use test_utils::LocalS3Server;
 #[tokio::test]
 async fn test_basics_s3() {
     let s3 = LocalS3Server::new().await;
-    let s3_context = s3_utils::S3Context::from_url(&s3.url).await;
-    let repo = NamedObjectRepositoryS3::new(s3_context);
+    let repo = NamedObjectRepositoryS3::new(s3.ctx.clone());
 
     test_named_object_repository_shared::test_named_repository_operations(&repo).await;
 }

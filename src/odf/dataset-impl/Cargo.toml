@@ -46,11 +46,13 @@ time-source = { workspace = true }
 async-stream = "0.3"
 async-trait = "0.1"
 bytes = "1"
-cheap-clone = { version = "0.3", default-features = false, features = ["alloc"] }
+cheap-clone = { version = "0.3", default-features = false, features = [
+    "alloc",
+] }
 chrono = { version = "0.4", default-features = false }
 dill = { version = "0.15", default-features = false }
 futures = { version = "0.3", default-features = false }
-hickory-resolver = "0.25"
+hickory-resolver = "0.26"
 http = { version = "1", default-features = false }
 mockall = { optional = true, version = "0.14", default-features = false }
 regex = { version = "1", default-features = false }
@@ -63,10 +65,16 @@ url = { version = "2", default-features = false }
 
 
 [dev-dependencies]
-odf = { workspace = true, features = ["arrow", "lfs", "s3", "testing"] }
+odf = { workspace = true, features = [
+    "arrow",
+    "dataset",
+    "lfs",
+    "s3",
+    "testing",
+] }
 test-utils = { workspace = true }
 
-arrow = { version = "57", default-features = false }
+arrow = { version = "58", default-features = false }
 futures = "0.3"
 mockall = { version = "0.14", default-features = false }
 serde_json = { version = "1", default-features = false }

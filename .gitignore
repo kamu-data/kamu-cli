@@ -8,3 +8,4 @@ target/
 .env
 /kamu.sqlite.db*
 .local/
+.codex

@@ -7,116 +7,38 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::path::Path;
+use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
-use std::{fs, io};
 
 use datafusion::arrow::array::{Array, RecordBatch, UInt64Array};
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
+use file_utils::OwnedFile;
 use kamu::testing::ParquetWriterHelper;
-use kamu_datasets::{DatasetRegistry, DatasetRegistryExt};
-use odf::dataset::DatasetLayout;
-use odf::metadata::testing::{AddDataBuilder, MetadataFactory};
-use odf::storage::ObjectRepository as _;
-use odf::storage::lfs::ObjectRepositoryLocalFSSha3;
+use kamu_datasets::DatasetRegistry;
+use odf::dataset::{AddDataParams, CheckpointRef};
+use odf::metadata::OffsetInterval;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn copy_folder_recursively(src: &Path, dst: &Path) -> io::Result<()> {
-    if src.exists() {
-        fs::create_dir_all(dst)?;
-        let copy_options = fs_extra::dir::CopyOptions::new().content_only(true);
-        fs_extra::dir::copy(src, dst, &copy_options).unwrap();
-    }
-    Ok(())
-}
+pub(crate) const PROTOCOL_TRANSFER_SUBDIRS: [&str; 4] = ["blocks", "checkpoints", "data", "refs"];
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn copy_dataset_files(
-    src_layout: &DatasetLayout,
-    dst_layout: &DatasetLayout,
-) -> io::Result<()> {
-    // Don't copy `info`
-    copy_folder_recursively(&src_layout.blocks_dir, &dst_layout.blocks_dir)?;
-    copy_folder_recursively(&src_layout.checkpoints_dir, &dst_layout.checkpoints_dir)?;
-    copy_folder_recursively(&src_layout.data_dir, &dst_layout.data_dir)?;
-    copy_folder_recursively(&src_layout.refs_dir, &dst_layout.refs_dir)?;
-    Ok(())
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) async fn write_dataset_alias(dataset_layout: &DatasetLayout, alias: &odf::DatasetAlias) {
-    if !dataset_layout.info_dir.is_dir() {
-        std::fs::create_dir_all(dataset_layout.info_dir.clone()).unwrap();
-    }
-
-    use tokio::io::AsyncWriteExt;
-
-    let alias_path = dataset_layout.info_dir.join("alias");
-    let mut alias_file = tokio::fs::File::create(alias_path).await.unwrap();
-
-    alias_file
-        .write_all(alias.to_string().as_bytes())
-        .await
-        .unwrap();
-    alias_file.flush().await.unwrap();
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) async fn create_random_data(
-    dataset_layout: &DatasetLayout,
-    prev_offset: Option<u64>,
-    prev_checkpoint: Option<odf::Multihash>,
-) -> AddDataBuilder {
-    let (d_hash, d_size) = create_random_parquet_file(
-        &dataset_layout.data_dir,
-        10,
-        prev_offset.map_or(0, |offset| offset + 1),
-    )
-    .await;
-
-    let (c_hash, c_size) = create_random_file(&dataset_layout.checkpoints_dir).await;
-
-    MetadataFactory::add_data()
-        .prev_checkpoint(prev_checkpoint)
-        .prev_offset(prev_offset)
-        .new_data_physical_hash(d_hash)
-        .new_data_size(d_size as u64)
-        .new_checkpoint_physical_hash(c_hash)
-        .new_checkpoint_size(c_size as u64)
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-async fn create_random_file(root: &Path) -> (odf::Multihash, usize) {
+fn create_random_file(path: PathBuf) -> OwnedFile {
     use rand::RngCore;
 
     let mut data = [0u8; 32];
     rand::rng().fill_bytes(&mut data);
 
-    std::fs::create_dir_all(root).unwrap();
+    std::fs::write(&path, data).unwrap();
 
-    let repo = ObjectRepositoryLocalFSSha3::new(root);
-    let hash = repo
-        .insert_bytes(&data, odf::storage::InsertOpts::default())
-        .await
-        .unwrap()
-        .hash;
-
-    (hash, data.len())
+    OwnedFile::new(path)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn create_random_parquet_file(
-    root: &Path,
-    num_records: usize,
-    start_offset: u64,
-) -> (odf::Multihash, usize) {
+fn create_random_parquet_file(path: PathBuf, offset_interval: &OffsetInterval) -> OwnedFile {
     use rand::RngCore;
 
     let schema = Arc::new(Schema::new(vec![
@@ -124,11 +46,11 @@ async fn create_random_parquet_file(
         Field::new("a", DataType::UInt64, false),
     ]));
 
-    let mut column_a: Vec<u64> = Vec::with_capacity(num_records);
-    let mut column_offset: Vec<u64> = Vec::with_capacity(num_records);
-    for index in 0..num_records {
+    let mut column_a: Vec<u64> = Vec::with_capacity(offset_interval.len());
+    let mut column_offset: Vec<u64> = Vec::with_capacity(offset_interval.len());
+    for index in 0..offset_interval.len() {
         column_a.push(rand::rng().next_u64());
-        column_offset.push(start_offset + (index as u64));
+        column_offset.push(offset_interval.start + (index as u64));
     }
 
     let a: Arc<dyn Array> = Arc::new(UInt64Array::from(column_a));
@@ -139,32 +61,21 @@ async fn create_random_parquet_file(
     )
     .unwrap();
 
-    std::fs::create_dir_all(root).unwrap();
-    let tmp_data_path = root.join("data");
-    ParquetWriterHelper::from_record_batch(&tmp_data_path, &record_batch).unwrap();
+    ParquetWriterHelper::from_record_batch(&path, &record_batch).unwrap();
 
-    let repo = ObjectRepositoryLocalFSSha3::new(root);
-    let hash = repo
-        .insert_file_move(&tmp_data_path, odf::storage::InsertOpts::default())
-        .await
-        .unwrap()
-        .hash;
-
-    (hash, num_records)
+    OwnedFile::new(path)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) async fn commit_add_data_event(
     dataset_registry: &dyn DatasetRegistry,
-    dataset_ref: &odf::DatasetRef,
-    dataset_layout: &DatasetLayout,
+    dataset_handle: &odf::DatasetHandle,
     prev_data_block_hash: Option<odf::Multihash>,
 ) -> odf::dataset::CommitResult {
-    let resolved_dataset = dataset_registry
-        .get_dataset_by_ref(dataset_ref)
-        .await
-        .unwrap();
+    let tempdir = tempfile::tempdir().unwrap();
+
+    let resolved_dataset = dataset_registry.get_dataset_by_handle(dataset_handle).await;
 
     let (prev_offset, prev_checkpoint) = if let Some(prev_data_block_hash) = prev_data_block_hash {
         let prev_data_block = resolved_dataset
@@ -183,13 +94,30 @@ pub(crate) async fn commit_add_data_event(
         (None, None)
     };
 
-    let random_data = create_random_data(dataset_layout, prev_offset, prev_checkpoint)
-        .await
-        .build();
+    let num_records = 10;
+    let new_offset_interval = OffsetInterval {
+        start: prev_offset.map_or(0, |offset| offset + 1),
+        end: prev_offset.map_or(0, |offset| offset + 1) + num_records - 1,
+    };
+
+    let data = create_random_parquet_file(tempdir.path().join("data"), &new_offset_interval);
+
+    let checkpoint = create_random_file(tempdir.path().join("checkpoint"));
+
+    let add_data = AddDataParams {
+        prev_checkpoint,
+        prev_offset,
+        new_offset_interval: Some(new_offset_interval),
+        new_linked_objects: None,
+        new_watermark: None,
+        new_source_state: None,
+    };
 
     resolved_dataset
-        .commit_event(
-            odf::MetadataEvent::AddData(random_data),
+        .commit_add_data(
+            add_data,
+            Some(data),
+            Some(CheckpointRef::New(checkpoint)),
             odf::dataset::CommitOpts::default(),
         )
         .await

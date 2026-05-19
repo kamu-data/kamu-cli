@@ -9,7 +9,8 @@
 
 use std::convert::TryFrom;
 
-use {ed25519_dalek as ed25519, unsigned_varint as uvar};
+use ed25519_dalek as ed25519;
+use unsigned_varint as uvar;
 
 use super::*;
 use crate::stack_string::StackString;

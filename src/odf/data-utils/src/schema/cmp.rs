@@ -9,7 +9,7 @@
 
 use std::sync::Arc;
 
-use datafusion::arrow::datatypes::{Field, Schema};
+use arrow::datatypes::{Field, Schema};
 
 /// Compare schemas optionally performing some normalization
 pub fn assert_schemas_equal(lhs: &Schema, rhs: &Schema, ignore_nullability: bool) {

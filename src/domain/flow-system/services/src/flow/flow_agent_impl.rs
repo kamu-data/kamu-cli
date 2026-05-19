@@ -145,6 +145,7 @@ impl FlowAgentImpl {
             let waiting_flow_ids: Vec<_> = flow_event_store
                 .get_all_flow_ids(
                     &waiting_filters,
+                    &FlowOrder::creation_time_desc(),
                     PaginationOpts {
                         offset: processed_waiting_flows,
                         limit: 100,

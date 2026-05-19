@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+#![cfg(feature = "datafusion")]
+
 use std::sync::Arc;
 
 use arrow_schema::SchemaRef;
@@ -205,7 +207,7 @@ fn convert_sql_to_odf_data_type(
         | SqlDataType::HugeInt
         | SqlDataType::UHugeInt
         | SqlDataType::UBigInt
-        | SqlDataType::TimestampNtz
+        | SqlDataType::TimestampNtz(_)
         | SqlDataType::TsVector
         | SqlDataType::TsQuery => {
             return Err(UnsupportedSchema::new(format!(

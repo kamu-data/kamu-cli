@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#![feature(assert_matches)]
-
 mod tests;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -149,6 +147,8 @@ macro_rules! test_message_failing_consumer {
     };
 }
 
-pub(crate) use {test_message_consumer, test_message_failing_consumer, test_message_type};
+pub(crate) use test_message_consumer;
+pub(crate) use test_message_failing_consumer;
+pub(crate) use test_message_type;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

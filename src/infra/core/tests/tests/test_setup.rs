@@ -18,17 +18,16 @@ use test_utils::test_docker_images;
 async fn test_setup_pull_images() {
     let container_runtime = ContainerRuntime::default();
 
-    // Disabled for disk space issue
-    /*container_runtime
-        .ensure_image(docker_images::SPARK, None)
-        .await
-        .unwrap();
-    container_runtime
-        .ensure_image(docker_images::FLINK, None)
-        .await
-        .unwrap();*/
-    // Disabled for disk space issue
-    // See: https://github.com/kamu-data/kamu-cli/issues/599
+    // TODO: Disabled due to disk space issue
+    // See: https://github.com/kamu-data/kamu-cli/issues/1624
+    // container_runtime
+    //     .ensure_image(docker_images::SPARK, None)
+    //     .await
+    //     .unwrap();
+    // container_runtime
+    //     .ensure_image(docker_images::FLINK, None)
+    //     .await
+    //     .unwrap();
     // container_runtime
     //     .ensure_image(docker_images::RISINGWAVE, None)
     //     .await
@@ -42,7 +41,7 @@ async fn test_setup_pull_images() {
         .await
         .unwrap();
     container_runtime
-        .ensure_image(test_docker_images::MINIO, None)
+        .ensure_image(test_docker_images::RUSTFS, None)
         .await
         .unwrap();
 

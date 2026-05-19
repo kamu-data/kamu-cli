@@ -1452,7 +1452,7 @@ fn rename_account_request(account_name: &str, new_account_name: &str) -> async_g
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn login_via_password_request(account_name: &str, password: &str) -> async_graphql::Request {
-    let credentials = format!(r#"{{"login": "{account_name}", "password": "{password}"}}"#,);
+    let credentials = format!(r#"{{"login": "{account_name}", "password": "{password}"}}"#);
 
     async_graphql::Request::new(indoc!(
         r#"

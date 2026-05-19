@@ -74,8 +74,8 @@ async fn test_data_push_ingest_handler() {
                       REQUIRED INT32 op;
                       REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                       REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
-                      OPTIONAL BYTE_ARRAY city (STRING);
-                      OPTIONAL INT64 population;
+                      REQUIRED BYTE_ARRAY city (STRING);
+                      REQUIRED INT64 population;
                     }
                    "#
                 ),
@@ -99,11 +99,11 @@ async fn test_data_push_ingest_handler() {
                 odf::metadata::AddPushSource {
                     source_name: "source2".to_string(),
                     read: odf::metadata::ReadStepNdJson {
-                        schema: Some(vec![
-                            "event_time TIMESTAMP".to_owned(),
-                            "city STRING".to_owned(),
-                            "population BIGINT".to_owned(),
-                        ]),
+                        schema: Some(odf::schema::DataSchema::new(vec![
+                            odf::schema::DataField::timestamp_millis_utc("event_time"),
+                            odf::schema::DataField::string("city"),
+                            odf::schema::DataField::i64("population"),
+                        ])),
                         ..Default::default()
                     }
                     .into(),
@@ -189,8 +189,8 @@ async fn test_data_push_ingest_handler() {
                       REQUIRED INT32 op;
                       REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                       REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
-                      OPTIONAL BYTE_ARRAY city (STRING);
-                      OPTIONAL INT64 population;
+                      REQUIRED BYTE_ARRAY city (STRING);
+                      REQUIRED INT64 population;
                     }
                    "#
                 ),
@@ -252,8 +252,8 @@ async fn test_data_push_ingest_handler() {
                       REQUIRED INT32 op;
                       REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                       REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
-                      OPTIONAL BYTE_ARRAY city (STRING);
-                      OPTIONAL INT64 population;
+                      REQUIRED BYTE_ARRAY city (STRING);
+                      REQUIRED INT64 population;
                     }
                    "#
                 ),
@@ -431,8 +431,8 @@ async fn test_data_push_ingest_upload_token_with_initial_source() {
                       REQUIRED INT32 op;
                       REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                       REQUIRED INT64 event_time (TIMESTAMP(MILLIS,true));
-                      OPTIONAL BYTE_ARRAY city (STRING);
-                      OPTIONAL INT64 population;
+                      REQUIRED BYTE_ARRAY city (STRING);
+                      REQUIRED INT64 population;
                     }
                    "#
                 ),
@@ -661,11 +661,11 @@ impl DataIngestHarness {
                             odf::metadata::AddPushSource {
                                 source_name: "source1".to_string(),
                                 read: odf::metadata::ReadStepNdJson {
-                                    schema: Some(vec![
-                                        "event_time TIMESTAMP".to_owned(),
-                                        "city STRING".to_owned(),
-                                        "population BIGINT".to_owned(),
-                                    ]),
+                                    schema: Some(odf::schema::DataSchema::new(vec![
+                                        odf::schema::DataField::timestamp_millis_utc("event_time"),
+                                        odf::schema::DataField::string("city"),
+                                        odf::schema::DataField::i64("population"),
+                                    ])),
                                     ..Default::default()
                                 }
                                 .into(),

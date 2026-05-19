@@ -51,6 +51,7 @@ pub trait FlowEventStore: EventStore<FlowState> {
         &self,
         flow_scope_query: FlowScopeQuery,
         filters: &FlowFilters,
+        order: &FlowOrder,
         pagination: PaginationOpts,
     ) -> FlowIDStream<'_>;
 
@@ -75,6 +76,7 @@ pub trait FlowEventStore: EventStore<FlowState> {
     fn get_all_flow_ids(
         &self,
         filters: &FlowFilters,
+        order: &FlowOrder,
         pagination: PaginationOpts,
     ) -> FlowIDStream<'_>;
 
@@ -93,6 +95,86 @@ pub struct FlowFilters {
     pub by_flow_statuses: Option<Vec<FlowStatus>>,
     pub by_initiator: Option<InitiatorFilter>,
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FlowOrder {
+    pub rules: Vec<FlowOrderRule>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FlowOrderRule {
+    pub field: FlowOrderField,
+    pub direction: FlowOrderDirection,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum FlowOrderField {
+    Status,
+    LastEventTime,
+    ScheduledForActivationAt,
+    FlowId,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum FlowOrderDirection {
+    Asc,
+    Desc,
+}
+
+impl FlowOrder {
+    pub fn queued() -> Self {
+        Self {
+            rules: vec![
+                FlowOrderRule {
+                    field: FlowOrderField::Status,
+                    direction: FlowOrderDirection::Asc,
+                },
+                FlowOrderRule {
+                    field: FlowOrderField::LastEventTime,
+                    direction: FlowOrderDirection::Desc,
+                },
+                FlowOrderRule {
+                    field: FlowOrderField::FlowId,
+                    direction: FlowOrderDirection::Desc,
+                },
+            ],
+        }
+    }
+
+    pub fn scheduled_activation() -> Self {
+        Self {
+            rules: vec![
+                FlowOrderRule {
+                    field: FlowOrderField::ScheduledForActivationAt,
+                    direction: FlowOrderDirection::Asc,
+                },
+                FlowOrderRule {
+                    field: FlowOrderField::FlowId,
+                    direction: FlowOrderDirection::Asc,
+                },
+            ],
+        }
+    }
+
+    pub fn creation_time_desc() -> Self {
+        Self {
+            rules: vec![FlowOrderRule {
+                field: FlowOrderField::FlowId,
+                direction: FlowOrderDirection::Desc,
+            }],
+        }
+    }
+}
+
+impl Default for FlowOrder {
+    fn default() -> Self {
+        Self::queued()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
 pub enum InitiatorFilter {
