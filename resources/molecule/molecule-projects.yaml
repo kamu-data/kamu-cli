@@ -19,13 +19,7 @@ content:
       - name: event_time
         type:
           kind: Timestamp
-      - name: account_id
-        type:
-          kind: String
       - name: ocl_id
-        type:
-          kind: String
-      - name: ipnft_uid
         type:
           kind: String
       - name: symbol
