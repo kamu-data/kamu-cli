@@ -124,7 +124,7 @@ impl ElasticsearchClient {
         &self,
         req_body: serde_json::Value,
         index_names: &[&str],
-    ) -> Result<es_client::SearchResponse, ElasticsearchClientError> {
+    ) -> Result<SearchResponse, ElasticsearchClientError> {
         tracing::debug!(
             index_names = ?index_names,
             req_body = Self::sanitize_json_for_logging(&req_body, MAX_LOG_SIZE_CHARS),
@@ -167,10 +167,12 @@ impl ElasticsearchClient {
         index_name: &str,
         id: &str,
     ) -> Result<Option<serde_json::Value>, ElasticsearchClientError> {
+        let safe_id = urlencoding::encode(id);
+
         let response = self
             .send_request(
                 Method::GET,
-                &format!("/{index_name}/_doc/{id}"),
+                &format!("/{index_name}/_doc/{safe_id}"),
                 RequestPayload::None,
             )
             .await?;
