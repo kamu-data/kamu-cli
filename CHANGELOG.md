@@ -7,13 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 <!--
 Recommendation: for ease of reading, use the following format:
 
-## [0.263.0] - 2026-05-16
+## [x.y.z or Unreleased] - <date>
 ### Added
 ### Changed
 ### Fixed
 -->
 
-## Unreleased
+## [0.263.0] - 2026-05-16
 ### Added
 - **Breaking:** The `read.schema` field now expects an ODF schema, replacing DDL schema with our unified format
   - DDL source schema can still be specified via `read.ddlSchema` but we recommend upgrading your datasets
