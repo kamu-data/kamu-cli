@@ -31,7 +31,7 @@ impl MoleculeFindProjectAnnouncementUseCase for MoleculeFindProjectAnnouncementU
         level = "debug",
         name = MoleculeFindProjectAnnouncementUseCaseImpl_execute
         skip_all,
-        fields(ipnft_uid = %molecule_project.ipnft_uid, id = %id)
+        fields(ocl_id = %molecule_project.ocl_id, id = %id)
     )]
     async fn execute(
         &self,

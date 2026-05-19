@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::InternalError;
+use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_datasets::DatasetActionUnauthorizedError;
 use thiserror::Error;
 
@@ -107,9 +107,12 @@ impl From<odf::DatasetRefUnresolvedError> for GetLineageError {
 
 impl From<DatasetActionUnauthorizedError> for GetLineageError {
     fn from(v: DatasetActionUnauthorizedError) -> Self {
+        use DatasetActionUnauthorizedError as E;
+
         match v {
-            DatasetActionUnauthorizedError::Access(e) => Self::Access(e),
-            DatasetActionUnauthorizedError::Internal(e) => Self::Internal(e),
+            E::NotFound(e) => Self::NotFound(e),
+            E::Access(e) => Self::Access(e),
+            e @ E::Internal(_) => Self::Internal(e.int_err()),
         }
     }
 }

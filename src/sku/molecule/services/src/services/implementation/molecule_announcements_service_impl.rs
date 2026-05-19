@@ -77,7 +77,7 @@ impl MoleculeAnnouncementsService for MoleculeAnnouncementsServiceImpl {
         level = "debug",
         name = MoleculeAnnouncementsServiceImpl_project_reader,
         skip_all,
-        fields(molecule_project_id = %molecule_project.ipnft_uid)
+        fields(ocl_id = %molecule_project.ocl_id, dataset_id = %molecule_project.announcements_dataset_id)
     )]
     async fn project_reader(
         &self,
@@ -92,7 +92,7 @@ impl MoleculeAnnouncementsService for MoleculeAnnouncementsServiceImpl {
         level = "debug",
         name = MoleculeAnnouncementsServiceImpl_project_writer,
         skip_all,
-        fields(molecule_project_id = %molecule_project.ipnft_uid)
+        fields(ocl_id = %molecule_project.ocl_id)
     )]
     async fn project_writer(
         &self,

@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use kamu_auth_rebac::RebacDatasetRefUnresolvedError;
 use kamu_core::QueryError;
+use kamu_molecule_domain::OclId;
 use odf::utils::data::DataFrameExt;
 
 use crate::{MoleculeDatasetReader, MoleculeDatasetWriter};
@@ -39,16 +40,16 @@ pub trait MoleculeProjectsReader: Send + Sync {
 
     async fn changelog_projection_data_frame(&self) -> Result<Option<DataFrameExt>, QueryError> {
         self.raw_reader()
-            .changelog_projection_data_frame_by("account_id")
+            .changelog_projection_data_frame_by("ocl_id")
             .await
     }
 
-    async fn changelog_entry_by_ipnft_uid(
+    async fn changelog_entry_by_ocl_id(
         &self,
-        ipnft_uid: &str,
+        ocl_id: &OclId,
     ) -> Result<Option<serde_json::Value>, QueryError> {
         self.raw_reader()
-            .changelog_projection_entry_by("account_id", "ipnft_uid", ipnft_uid)
+            .changelog_projection_entry_by("ocl_id", "ocl_id", ocl_id.as_ref())
             .await
     }
 }

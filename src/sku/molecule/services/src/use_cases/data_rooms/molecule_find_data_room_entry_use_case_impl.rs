@@ -46,7 +46,7 @@ impl MoleculeFindDataRoomEntryUseCase for MoleculeFindDataRoomEntryUseCaseImpl {
         level = "debug",
         name = MoleculeFindDataRoomEntryUseCaseImpl_execute_find_by_path,
         skip_all,
-        fields(ipnft_uid = %molecule_project.ipnft_uid, as_of = ?as_of, path = %path)
+        fields(ocl_id = %molecule_project.ocl_id, as_of = ?as_of, path = %path)
     )]
     async fn execute_find_by_path(
         &self,
@@ -72,7 +72,7 @@ impl MoleculeFindDataRoomEntryUseCase for MoleculeFindDataRoomEntryUseCaseImpl {
         level = "debug",
         name = MoleculeFindDataRoomEntryUseCaseImpl_execute_find_by_ref,
         skip_all,
-        fields(ipnft_uid = %molecule_project.ipnft_uid, as_of = ?as_of, r#ref = ?r#ref)
+        fields(ocl_id = %molecule_project.ocl_id, as_of = ?as_of, r#ref = ?r#ref)
     )]
     async fn execute_find_by_ref(
         &self,
@@ -98,7 +98,7 @@ impl MoleculeFindDataRoomEntryUseCase for MoleculeFindDataRoomEntryUseCaseImpl {
         level = "debug",
         name = MoleculeFindDataRoomEntryUseCaseImpl_execute_find_by_refs,
         skip_all,
-        fields(ipnft_uid = %molecule_project.ipnft_uid, as_of = ?as_of, refs = %format_utils::format_collection(refs), as_of_event_time = ?as_of_event_time)
+        fields(ocl_id = %molecule_project.ocl_id, as_of = ?as_of, refs = %format_utils::format_collection(refs), as_of_event_time = ?as_of_event_time)
     )]
     async fn execute_find_by_refs(
         &self,

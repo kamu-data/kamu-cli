@@ -402,7 +402,7 @@
           "type": "boolean"
         },
         "encryptionKey": {
-          "description": "The encryption key must be a 32-character alphanumeric string, which\nincludes both uppercase and lowercase Latin letters (A-Z, a-z) and\ndigits (0-9).\n\nTo generate use:\n```sh\ntr -dc 'A-Za-z0-9' < /dev/urandom | head -c 32; echo\n```",
+          "description": "The encryption key must be a 32-character alphanumeric string, which\nincludes both uppercase and lowercase Latin letters (A-Z, a-z) and\ndigits (0-9).\n\nTo generate, use:\n```sh\ntr -dc 'A-Za-z0-9' < /dev/urandom | head -c 32; echo\n```",
           "type": [
             "string",
             "null"
@@ -854,6 +854,7 @@
     },
     "IdentityConfig": {
       "additionalProperties": false,
+      "description": "Private keys are used to sign API responses.\nSupported algorithms: `ed25519`, `secp256k1`.",
       "properties": {
         "privateKey": {
           "anyOf": [
@@ -865,7 +866,19 @@
             }
           ],
           "combine": "replace",
-          "description": "Private key used to sign API responses.\nCurrently only `ed25519` keys are supported.\n\nTo generate use:\n\n    dd if=/dev/urandom bs=1 count=32 status=none |\n        base64 -w0 |\n        tr '+/' '-_' |\n        tr -d '=' |\n        (echo -n u && cat)\n\nThe command above:\n- reads 32 random bytes\n- base64-encodes them\n- converts default base64 encoding to base64url and removes padding\n- prepends a multibase prefix"
+          "description": "To generate, use:\n\n```sh\ndd if=/dev/urandom bs=1 count=32 status=none |\n    base64 -w0 |\n    tr '+/' '-_' |\n    tr -d '=' |\n    (echo -n u && cat)\n```\n\nThe command above:\n- Reads 32 random bytes\n- base64-encodes them\n- Converts default base64 encoding to base64url and removes padding\n- Prepends a multibase prefix"
+        },
+        "secp256k1PrivateKey": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Secp256k1Signer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "combine": "replace",
+          "description": "Secp256k1 private key used to sign EIP-712 typed data.\n\n```sh\ncast wallet new\n```"
         }
       },
       "type": "object"
@@ -1176,6 +1189,9 @@
           "type": "object"
         }
       ]
+    },
+    "Secp256k1Signer": {
+      "type": "string"
     },
     "SourceConfig": {
       "additionalProperties": false,

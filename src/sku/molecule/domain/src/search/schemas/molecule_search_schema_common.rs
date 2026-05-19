@@ -13,7 +13,7 @@ pub mod fields {
     pub const EVENT_TIME: &str = "event_time";
     pub const SYSTEM_TIME: &str = "system_time";
     pub const MOLECULE_ACCOUNT_ID: &str = "molecule_account_id";
-    pub const IPNFT_UID: &str = "ipnft_uid";
+    pub const OCL_ID: &str = "ocl_id";
 
     pub const PATH: &str = "path";
     pub const REF: &str = "ref";
@@ -54,8 +54,8 @@ pub mod field_definitions {
         role: SearchSchemaFieldRole::Keyword,
     };
 
-    pub const IPNFT_UID: SearchSchemaField = SearchSchemaField {
-        path: fields::IPNFT_UID,
+    pub const OCL_ID: SearchSchemaField = SearchSchemaField {
+        path: fields::OCL_ID,
         role: SearchSchemaFieldRole::Keyword,
     };
 

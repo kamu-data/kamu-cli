@@ -597,6 +597,8 @@ pub fn configure_base_catalog(
 
     kamu_auth_web3_services::register_dependencies(&mut b);
 
+    kamu_signing_services::register_dependencies(&mut b);
+
     kamu_molecule_services::register_dependencies(
         &mut b,
         kamu_molecule_services::MoleculeDomainDependenciesOptions {
