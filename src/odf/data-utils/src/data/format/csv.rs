@@ -11,7 +11,7 @@ use std::io::Write;
 
 use arrow::array::AsArray;
 use arrow::datatypes::DataType;
-use datafusion::arrow::record_batch::RecordBatch;
+use arrow::record_batch::RecordBatch;
 
 use super::*;
 

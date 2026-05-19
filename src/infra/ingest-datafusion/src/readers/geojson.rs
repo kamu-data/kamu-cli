@@ -20,28 +20,30 @@ use crate::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct ReaderGeoJson {
-    temp_path: PathBuf,
     inner: ReaderNdJson,
+    temp_path: PathBuf,
 }
 
 impl ReaderGeoJson {
     // TODO: This is an ugly API that leaves it to the caller to clean up our temp
     // file mess. Ideally we should not produce any temp files at all and stream in
     // all data.
-    pub async fn new(
+    pub fn new(
         ctx: SessionContext,
         conf: odf::metadata::ReadStepGeoJson,
+        to_arrow_settings: &odf::schema::ToArrowSettings,
         temp_path: impl Into<PathBuf>,
     ) -> Result<Self, ReadError> {
         let inner_conf = odf::metadata::ReadStepNdJson {
             schema: conf.schema,
+            ddl_schema: conf.ddl_schema,
             date_format: None,
             encoding: None,
             timestamp_format: None,
         };
 
         Ok(Self {
-            inner: ReaderNdJson::new(ctx, inner_conf).await?,
+            inner: ReaderNdJson::new(ctx, inner_conf, to_arrow_settings)?,
             temp_path: temp_path.into(),
         })
     }
@@ -101,8 +103,12 @@ impl ReaderGeoJson {
 
 #[async_trait::async_trait]
 impl Reader for ReaderGeoJson {
-    async fn input_schema(&self) -> Option<SchemaRef> {
-        self.inner.input_schema().await
+    fn schema(&self) -> Option<&odf::schema::DataSchema> {
+        self.inner.schema()
+    }
+
+    fn schema_arrow(&self) -> Option<&SchemaRef> {
+        self.inner.schema_arrow()
     }
 
     #[tracing::instrument(level = "info", name = "ReaderGeoJson::read", skip_all)]

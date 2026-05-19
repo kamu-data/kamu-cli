@@ -84,7 +84,8 @@ pub enum DatasetActionAccess {
 
 #[test]
 fn test_dataset_action_resolve_access() {
-    use {DatasetAction as Action, DatasetActionAccess as Access};
+    use DatasetAction as Action;
+    use DatasetActionAccess as Access;
 
     struct FixtureSubTest {
         current_action: Action,

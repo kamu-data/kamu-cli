@@ -28,7 +28,6 @@ use kamu_datasets::{DatasetActionAuthorizer, DatasetRegistry, ResolvedDataset};
 use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
 use odf::dataset::testing::create_test_dataset_from_snapshot;
 use odf::metadata::testing::MetadataFactory;
-use s3_utils::S3Context;
 use test_utils::LocalS3Server;
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
 
@@ -182,20 +181,21 @@ pub(crate) fn create_base_catalog_with_local_workspace(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) async fn create_base_catalog_with_s3_workspace(
+pub(crate) fn create_base_catalog_with_s3_workspace(
     s3: &LocalS3Server,
     dataset_action_authorizer: MockDatasetActionAuthorizer,
 ) -> dill::Catalog {
     let base_catalog = create_base_catalog(dataset_action_authorizer);
 
-    let s3_context = S3Context::from_url(&s3.url).await;
-
     dill::CatalogBuilder::new_chained(&base_catalog)
-        .add_builder(odf::dataset::DatasetStorageUnitS3::builder(
-            s3_context.clone(),
-        ))
+        .add_builder(odf::dataset::DatasetStorageUnitS3::builder(s3.ctx.clone()))
         .add_builder(odf::dataset::DatasetS3BuilderDefault::builder(None))
-        .add_builder(ObjectStoreBuilderS3::builder(s3_context, true))
+        .add_builder(ObjectStoreBuilderS3::builder(
+            s3.ctx.clone(),
+            true,
+            Some(s3.access_key.clone()),
+            Some(s3.secret_key.clone()),
+        ))
         .build()
 }
 

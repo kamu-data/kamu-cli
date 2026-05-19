@@ -23,7 +23,10 @@ use odf::utils::data::DataFrameExt;
 pub trait Reader: Send + Sync {
     /// Returns schema that the input will be coerced into, if such schema
     /// is defined explicitly.
-    async fn input_schema(&self) -> Option<SchemaRef>;
+    fn schema(&self) -> Option<&odf::schema::DataSchema>;
+
+    /// Returns schema converted to Arrow
+    fn schema_arrow(&self) -> Option<&SchemaRef>;
 
     /// Returns a [DataFrame] with a logical plan set up to read the data.
     ///

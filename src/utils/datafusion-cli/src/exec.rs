@@ -199,6 +199,7 @@ pub async fn exec_from_repl(
             }
             Err(ReadlineError::Interrupted) => {
                 println!("^C");
+                rl.helper().unwrap().reset_hint();
                 continue;
             }
             Err(ReadlineError::Eof) => {
@@ -273,8 +274,7 @@ impl StatementExecutor {
         let options = task_ctx.session_config().options();
 
         // Track memory usage for the query result if it's bounded
-        let mut reservation =
-            MemoryConsumer::new("DataFusion-Cli").register(task_ctx.memory_pool());
+        let reservation = MemoryConsumer::new("DataFusion-Cli").register(task_ctx.memory_pool());
 
         if physical_plan.boundedness().is_unbounded() {
             if physical_plan.pipeline_behavior() == EmissionType::Final {
@@ -304,7 +304,7 @@ impl StatementExecutor {
                 let curr_num_rows = batch.num_rows();
                 // Stop collecting results if the number of rows exceeds the limit
                 // results batch should include the last batch that exceeds the limit
-                if row_count < max_rows + curr_num_rows {
+                if row_count < max_rows.saturating_add(curr_num_rows) {
                     // Try to grow the reservation to accommodate the batch in memory
                     reservation.try_grow(get_record_batch_memory_size(&batch))?;
                     results.push(batch);
@@ -524,6 +524,7 @@ pub(crate) async fn register_object_store_and_config_extensions(
 mod tests {
     use datafusion::common::plan_err;
     use datafusion::prelude::SessionContext;
+    use datafusion_common::assert_contains;
     use url::Url;
 
     use super::*;
@@ -738,7 +739,7 @@ mod tests {
         let err = create_external_table_test(location, &sql)
             .await
             .unwrap_err();
-        assert!(err.to_string().contains("os error 2"));
+        assert_contains!(err.to_string(), "os error 2");
 
         // for service_account_key
         let sql = format!(
@@ -747,9 +748,8 @@ mod tests {
         );
         let err = create_external_table_test(location, &sql)
             .await
-            .unwrap_err()
-            .to_string();
-        assert!(err.contains("No RSA key found in pem file"), "{err}");
+            .unwrap_err();
+        assert_contains!(err.to_string(), "Error reading pem file: no items found");
 
         // for application_credentials_path
         let sql = format!(
@@ -760,7 +760,7 @@ mod tests {
         let err = create_external_table_test(location, &sql)
             .await
             .unwrap_err();
-        assert!(err.to_string().contains("os error 2"));
+        assert_contains!(err.to_string(), "os error 2");
 
         Ok(())
     }

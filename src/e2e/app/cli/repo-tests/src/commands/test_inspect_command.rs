@@ -182,9 +182,9 @@ pub async fn test_inspect_schema(kamu: KamuCliPuppet) {
               REQUIRED INT32 op;
               REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
               REQUIRED INT64 match_time (TIMESTAMP(MILLIS,true));
-              OPTIONAL INT64 match_id;
-              OPTIONAL BYTE_ARRAY player_id (STRING);
-              OPTIONAL INT64 score;
+              REQUIRED INT64 match_id;
+              REQUIRED BYTE_ARRAY player_id (STRING);
+              REQUIRED INT64 score;
             }
             "#
         )),

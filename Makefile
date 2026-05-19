@@ -518,16 +518,17 @@ test-setup:
 # Run all tests excluding databases & search using nextest and configured concurrency limits
 .PHONY: test
 test:
-	$(TEST_LOG_PARAMS) cargo nextest run -E 'not (test(::database::) | test(::elasticsearch::))'
+	$(TEST_LOG_PARAMS) cargo nextest run -E 'not (test(::database::) | test(::elasticsearch::) | test(::examples::))'
 
+# TODO: Update example tests to support running with executable from target dir if release is not installed
 .PHONY: test-full
 test-full:
-	$(TEST_LOG_PARAMS) cargo nextest run
+	$(TEST_LOG_PARAMS) cargo nextest run -E 'not (test(::examples::))'
 
 # Run all tests excluding the heavy engines and databases
 .PHONY: test-fast
 test-fast:
-	$(TEST_LOG_PARAMS) cargo nextest run -E 'not (test(::spark::) | test(::flink::) | test(::database::) | test(::elasticsearch::))'
+	$(TEST_LOG_PARAMS) cargo nextest run -E 'not (test(::spark::) | test(::flink::) | test(::risingwave::) | test(::database::) | test(::elasticsearch::) | test(::examples::))'
 
 .PHONY: test-e2e
 test-e2e:
@@ -540,6 +541,11 @@ test-database:
 .PHONY: test-elasticsearch
 test-elasticsearch:
 	$(TEST_LOG_PARAMS) cargo nextest run -E 'test(::elasticsearch::)'
+
+# Note: These tests currently require `kamu` to be installed
+.PHONY: test-examples
+test-examples:
+	$(TEST_LOG_PARAMS) cargo nextest run -p kamu-cli-e2e-example-tests -E 'test(::examples::)'
 
 ###############################################################################
 # Benchmarking

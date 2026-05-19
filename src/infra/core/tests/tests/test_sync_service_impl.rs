@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::assert_matches::assert_matches;
+use std::assert_matches;
 use std::path::Path;
 use std::str::FromStr;
 
@@ -656,6 +656,8 @@ async fn test_sync_to_from_local_fs() {
 #[test_log::test(tokio::test)]
 async fn test_sync_to_from_s3() {
     let s3 = LocalS3Server::new().await;
+    s3.set_credentials_env_vars();
+
     let tmp_workspace_dir_foo = tempfile::tempdir().unwrap();
     let tmp_workspace_dir_bar = tempfile::tempdir().unwrap();
 

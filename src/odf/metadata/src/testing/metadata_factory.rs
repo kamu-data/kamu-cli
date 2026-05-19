@@ -131,15 +131,10 @@ impl SetInfoBuilder {
     }
 
     pub fn keyword(mut self, keyword: &str) -> Self {
-        if self.v.keywords.is_none() {
-            self.v.keywords = Some(vec![String::from(keyword)]);
-        } else {
-            self.v
-                .keywords
-                .as_mut()
-                .unwrap()
-                .push(String::from(keyword));
-        }
+        self.v
+            .keywords
+            .get_or_insert_with(Vec::new)
+            .push(keyword.to_string());
         self
     }
 
@@ -254,7 +249,7 @@ impl SetPollingSourceBuilder {
                     headers: None,
                 }),
                 prepare: None,
-                read: ReadStep::GeoJson(ReadStepGeoJson { schema: None }),
+                read: ReadStep::GeoJson(ReadStepGeoJson::default()),
                 preprocess: None,
                 merge: MergeStrategy::Append(MergeStrategyAppend {}),
             },
@@ -349,10 +344,10 @@ impl AddPushSourceBuilder {
 
     pub fn some_read(self) -> Self {
         self.read(ReadStepNdJson {
-            schema: Some(vec![
-                "city STRING".to_string(),
-                "population BIGINT".to_string(),
-            ]),
+            schema: Some(DataSchema::new(vec![
+                DataField::string("city"),
+                DataField::i64("population"),
+            ])),
             ..Default::default()
         })
     }

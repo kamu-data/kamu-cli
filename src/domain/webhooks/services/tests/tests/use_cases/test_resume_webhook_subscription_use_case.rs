@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::assert_matches::assert_matches;
+use std::assert_matches;
 use std::sync::Arc;
 
 use dill::*;
@@ -42,7 +42,7 @@ async fn test_resume_success() {
     subscription.pause().unwrap();
 
     let res = harness.use_case.execute(&mut subscription).await;
-    assert!(res.is_ok(), "Failed to resume subscription: {res:?}",);
+    assert!(res.is_ok(), "Failed to resume subscription: {res:?}");
     assert_eq!(subscription.status(), WebhookSubscriptionStatus::Enabled);
 }
 
@@ -66,10 +66,10 @@ async fn test_resume_idempotence() {
     subscription.pause().unwrap();
 
     let res = harness.use_case.execute(&mut subscription).await;
-    assert!(res.is_ok(), "Failed to resume subscription: {res:?}",);
+    assert!(res.is_ok(), "Failed to resume subscription: {res:?}");
 
     let res = harness.use_case.execute(&mut subscription).await;
-    assert!(res.is_ok(), "Second resume not ignored: {res:?}",);
+    assert!(res.is_ok(), "Second resume not ignored: {res:?}");
     assert_eq!(subscription.status(), WebhookSubscriptionStatus::Enabled);
 }
 

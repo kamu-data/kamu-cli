@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::assert_matches::assert_matches;
+use std::assert_matches;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -118,10 +118,10 @@ async fn test_engine_io_common<
                 .fetch_file(&src_path)
                 .read(odf::metadata::ReadStepCsv {
                     header: Some(true),
-                    schema: Some(vec![
-                        "city STRING".to_string(),
-                        "population INT".to_string(),
-                    ]),
+                    schema: Some(odf::schema::DataSchema::new(vec![
+                        odf::schema::DataField::string("city"),
+                        odf::schema::DataField::i32("population"),
+                    ])),
                     ..odf::metadata::ReadStepCsv::default()
                 })
                 .merge(odf::metadata::MergeStrategySnapshot {
@@ -332,17 +332,13 @@ async fn test_engine_io_s3_to_local_file_mount_proxy() {
     std::fs::create_dir(&run_info_dir).unwrap();
     std::fs::create_dir(&cache_dir).unwrap();
 
-    let s3_context = s3_utils::S3Context::from_url(&s3.url).await;
-
     let mut b = dill::CatalogBuilder::new();
     b.add::<DidGeneratorDefault>()
         .add::<SystemTimeSourceDefault>()
         .add::<AlwaysHappyDatasetActionAuthorizer>()
         .add_value(CurrentAccountSubject::new_test())
         .add_value(TenancyConfig::SingleTenant)
-        .add_builder(odf::dataset::DatasetStorageUnitS3::builder(
-            s3_context.clone(),
-        ))
+        .add_builder(odf::dataset::DatasetStorageUnitS3::builder(s3.ctx.clone()))
         .add_builder(odf::dataset::DatasetS3BuilderDefault::builder(None));
 
     database_common::NoOpDatabasePlugin::init_database_components(&mut b);
@@ -358,7 +354,12 @@ async fn test_engine_io_s3_to_local_file_mount_proxy() {
             Arc::new(ObjectStoreBuilderLocalFs::new()),
             // Note that DataFusion ingest will use S3 object store directly, but transform engine
             // will use the IO proxying
-            Arc::new(ObjectStoreBuilderS3::new(s3_context, true)),
+            Arc::new(ObjectStoreBuilderS3::new(
+                s3.ctx.clone(),
+                true,
+                Some(s3.access_key.clone()),
+                Some(s3.secret_key.clone()),
+            )),
         ],
         storage_unit,
         did_generator,

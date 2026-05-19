@@ -163,7 +163,7 @@ type AccountFlowProcesses {
 }
 
 type AccountFlowRuns {
-	listFlows(page: Int, perPage: Int, filters: AccountFlowFilters): FlowConnection!
+	listFlows(page: Int, perPage: Int, filters: AccountFlowFilters, order: FlowRunOrder): FlowConnection!
 	listDatasetsWithFlow: DatasetConnection!
 }
 
@@ -733,7 +733,16 @@ type CollectionProjection {
 	Returns the state of entries as they existed at a specified point in
 	time
 	"""
-	entries(pathPrefix: CollectionPath, maxDepth: Int, page: Int, perPage: Int): CollectionEntryConnection!
+	entries(
+		"""
+		Return only entries whose path starts with this prefix
+		"""
+		pathPrefix: CollectionPath,
+		"""
+		Return only a single entry after reaching a certain path depth. For example given enties `/a, /b, /dir/c, /dir/d` at depth 1 it will return `/a, /b`, /dir/b` - the first two as actual entries at depth 1, and the last one as an indicator that there is one or more entries under `/dir`. Using the combination of `pathPrefix` and `maxDepth` you can walk entries as a directory hierarchy.
+		"""
+		maxDepth: Int,		page: Int,		perPage: Int
+	): CollectionEntryConnection!
 	"""
 	Find entries that link to specified DIDs
 	"""
@@ -1081,6 +1090,8 @@ enum DataSchemaFormat {
 	PARQUET_JSON
 }
 
+scalar DataSchemaInput
+
 """
 Describes a slice of data added to a dataset or produced via transformation
 
@@ -1383,7 +1394,7 @@ type DatasetFlowProcesses {
 
 type DatasetFlowRuns {
 	getFlow(flowId: FlowID!): GetFlowResult!
-	listFlows(page: Int, perPage: Int, filters: DatasetFlowFilters): FlowConnection!
+	listFlows(page: Int, perPage: Int, filters: DatasetFlowFilters, order: FlowRunOrder): FlowConnection!
 	listFlowInitiators: AccountConnection!
 }
 
@@ -1765,9 +1776,13 @@ type DatasetsMut {
 		"""
 		datasetAlias: DatasetAlias!,
 		"""
-		Additional user-defined columns
+		DEPRECATED: Additional user-defined columns
 		"""
 		extraColumns: [ColumnInput!],
+		"""
+		User-defined schema that will be merged with base
+		"""
+		extraSchema: DataSchemaInput,
 		"""
 		Extra metadata events (e.g. to populate readme)
 		"""
@@ -1792,9 +1807,13 @@ type DatasetsMut {
 		"""
 		datasetAlias: DatasetAlias!,
 		"""
-		Additional user-defined columns
+		DEPRECATED Additional user-defined columns
 		"""
 		extraColumns: [ColumnInput!],
+		"""
+		User-defined schema that will be merged with base
+		"""
+		extraSchema: DataSchemaInput,
 		"""
 		Extra metadata events (e.g. to populate readme)
 		"""
@@ -2723,6 +2742,19 @@ input FlowRetryPolicyInput {
 	maxAttempts: Int!
 	minDelay: TimeDeltaInput!
 	backoffType: FlowRetryBackoffType!
+}
+
+enum FlowRunOrder {
+	"""
+	Queue-oriented ordering:
+	- by status: waiting, running, retrying, finished
+	- by most recent activity
+	"""
+	QUEUE
+	"""
+	Earliest scheduled activation first.
+	"""
+	SCHEDULED_FOR_ACTIVATION
 }
 
 union FlowStartCondition = FlowStartConditionSchedule | FlowStartConditionThrottling | FlowStartConditionReactive | FlowStartConditionExecutor
@@ -4013,22 +4045,24 @@ Defines how raw data should be read into the structured form.
 
 See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstep-schema
 """
-union ReadStep = ReadStepCsv | ReadStepGeoJson | ReadStepEsriShapefile | ReadStepParquet | ReadStepJson | ReadStepNdJson | ReadStepNdGeoJson
+interface ReadStep {
+	schema(format: DataSchemaFormat): DataSchema
+}
 
 """
 Reader for comma-separated files.
 
 See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepcsv-schema
 """
-type ReadStepCsv {
+type ReadStepCsv implements ReadStep {
 	"""
-	A DDL-formatted schema. Schema can be used to coerce values into more
-	appropriate data types.
+	DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values
+	into more appropriate data types.
 	
 	Examples:
 	- ["date TIMESTAMP","city STRING","population INT"]
 	"""
-	schema: [String!]
+	ddlSchema: [String!]
 	"""
 	Sets a single character as a separator for each field and value.
 	
@@ -4090,6 +4124,10 @@ type ReadStepCsv {
 	Defaults to: "rfc3339"
 	"""
 	timestampFormat: String
+	"""
+	Schema used to coerce values into more appropriate data types.
+	"""
+	schema(format: DataSchemaFormat): DataSchema
 }
 
 """
@@ -4097,18 +4135,22 @@ Reader for ESRI Shapefile format.
 
 See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepesrishapefile-schema
 """
-type ReadStepEsriShapefile {
+type ReadStepEsriShapefile implements ReadStep {
 	"""
-	A DDL-formatted schema. Schema can be used to coerce values into more
-	appropriate data types.
+	DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values
+	into more appropriate data types.
 	"""
-	schema: [String!]
+	ddlSchema: [String!]
 	"""
 	If the ZIP archive contains multiple shapefiles use this field to
 	specify a sub-path to the desired `.shp` file. Can contain glob patterns
 	to act as a filter.
 	"""
 	subPath: String
+	"""
+	Schema used to coerce values into more appropriate data types.
+	"""
+	schema(format: DataSchemaFormat): DataSchema
 }
 
 """
@@ -4119,12 +4161,16 @@ own column.
 
 See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepgeojson-schema
 """
-type ReadStepGeoJson {
+type ReadStepGeoJson implements ReadStep {
 	"""
-	A DDL-formatted schema. Schema can be used to coerce values into more
-	appropriate data types.
+	DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values
+	into more appropriate data types.
 	"""
-	schema: [String!]
+	ddlSchema: [String!]
+	"""
+	Schema used to coerce values into more appropriate data types.
+	"""
+	schema(format: DataSchemaFormat): DataSchema
 }
 
 """
@@ -4132,7 +4178,7 @@ Reader for JSON files that contain an array of objects within them.
 
 See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepjson-schema
 """
-type ReadStepJson {
+type ReadStepJson implements ReadStep {
 	"""
 	Path in the form of `a.b.c` to a sub-element of the root JSON object
 	that is an array or objects. If not specified it is assumed that the
@@ -4140,10 +4186,10 @@ type ReadStepJson {
 	"""
 	subPath: String
 	"""
-	A DDL-formatted schema. Schema can be used to coerce values into more
-	appropriate data types.
+	DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values
+	into more appropriate data types.
 	"""
-	schema: [String!]
+	ddlSchema: [String!]
 	"""
 	Sets the string that indicates a date format. The `rfc3339` is the only
 	required format, the other format strings are implementation-specific.
@@ -4165,6 +4211,10 @@ type ReadStepJson {
 	Defaults to: "rfc3339"
 	"""
 	timestampFormat: String
+	"""
+	Schema used to coerce values into more appropriate data types.
+	"""
+	schema(format: DataSchemaFormat): DataSchema
 }
 
 """
@@ -4174,12 +4224,16 @@ every individual feature object to appear on its own line.
 
 See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepndgeojson-schema
 """
-type ReadStepNdGeoJson {
+type ReadStepNdGeoJson implements ReadStep {
 	"""
-	A DDL-formatted schema. Schema can be used to coerce values into more
-	appropriate data types.
+	DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values
+	into more appropriate data types.
 	"""
-	schema: [String!]
+	ddlSchema: [String!]
+	"""
+	Schema used to coerce values into more appropriate data types.
+	"""
+	schema(format: DataSchemaFormat): DataSchema
 }
 
 """
@@ -4188,12 +4242,12 @@ same schema.
 
 See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepndjson-schema
 """
-type ReadStepNdJson {
+type ReadStepNdJson implements ReadStep {
 	"""
-	A DDL-formatted schema. Schema can be used to coerce values into more
-	appropriate data types.
+	DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values
+	into more appropriate data types.
 	"""
-	schema: [String!]
+	ddlSchema: [String!]
 	"""
 	Sets the string that indicates a date format. The `rfc3339` is the only
 	required format, the other format strings are implementation-specific.
@@ -4215,6 +4269,10 @@ type ReadStepNdJson {
 	Defaults to: "rfc3339"
 	"""
 	timestampFormat: String
+	"""
+	Schema used to coerce values into more appropriate data types.
+	"""
+	schema(format: DataSchemaFormat): DataSchema
 }
 
 """
@@ -4222,12 +4280,16 @@ Reader for Apache Parquet format.
 
 See: https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#readstepparquet-schema
 """
-type ReadStepParquet {
+type ReadStepParquet implements ReadStep {
 	"""
-	A DDL-formatted schema. Schema can be used to coerce values into more
-	appropriate data types.
+	DEPRECATED: A DDL-formatted schema. Schema can be used to coerce values
+	into more appropriate data types.
 	"""
-	schema: [String!]
+	ddlSchema: [String!]
+	"""
+	Schema used to coerce values into more appropriate data types.
+	"""
+	schema(format: DataSchemaFormat): DataSchema
 }
 
 interface RemoveWebhookSubscriptionResult {

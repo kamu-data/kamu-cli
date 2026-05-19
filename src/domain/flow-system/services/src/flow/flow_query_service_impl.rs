@@ -30,6 +30,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
     #[tracing::instrument(level = "debug", name = FlowQueryServiceImpl_list_all_flows, skip_all)]
     async fn list_all_flows(
         &self,
+        order: FlowOrder,
         pagination: PaginationOpts,
     ) -> Result<FlowStateListing, InternalError> {
         let empty_filters = FlowFilters::default();
@@ -40,7 +41,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
 
         let all_flows: Vec<_> = self
             .flow_event_store
-            .get_all_flow_ids(&empty_filters, pagination)
+            .get_all_flow_ids(&empty_filters, &order, pagination)
             .try_collect()
             .await?;
         let matched_stream = self.flow_event_store.get_stream(all_flows);
@@ -56,9 +57,16 @@ impl FlowQueryService for FlowQueryServiceImpl {
         &self,
         scope_query: FlowScopeQuery,
         filters: FlowFilters,
+        order: FlowOrder,
         pagination: PaginationOpts,
     ) -> Result<FlowStateListing, InternalError> {
-        tracing::debug!(?scope_query, ?filters, ?pagination, "Listing scoped flows");
+        tracing::debug!(
+            ?scope_query,
+            ?filters,
+            ?order,
+            ?pagination,
+            "Listing scoped flows"
+        );
 
         let total_count = self
             .flow_event_store
@@ -67,7 +75,7 @@ impl FlowQueryService for FlowQueryServiceImpl {
 
         let relevant_flow_ids: Vec<_> = self
             .flow_event_store
-            .get_all_flow_ids_matching_scope_query(scope_query, &filters, pagination)
+            .get_all_flow_ids_matching_scope_query(scope_query, &filters, &order, pagination)
             .try_collect()
             .await?;
 

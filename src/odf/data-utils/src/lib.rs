@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#![feature(assert_matches)]
-
 pub mod data;
 pub mod schema;
 #[cfg(any(feature = "testing", test))]

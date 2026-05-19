@@ -7,11 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#![feature(assert_matches)]
 #![feature(error_generic_member_access)]
 #![feature(never_type)]
 
-use std::assert_matches::assert_matches;
+use std::assert_matches;
 use std::backtrace::Backtrace;
 use std::error::Error;
 

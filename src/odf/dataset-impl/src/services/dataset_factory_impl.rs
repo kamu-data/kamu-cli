@@ -181,11 +181,14 @@ impl DatasetFactoryImpl {
         //             Perhaps in future we should create a cache of S3Contexts keyed
         //             by an endpoint.
 
+        use s3_utils::S3ContextBuilder;
+
         use super::DatasetS3BuilderDefault;
-        let mut s3_context = S3Context::from_url(&base_url).await;
-        if let Some(metrics) = maybe_s3_metrics {
-            s3_context = s3_context.with_metrics(metrics);
-        }
+        let s3_context = S3Context::builder()
+            .with_url(&base_url)
+            .maybe(maybe_s3_metrics, S3ContextBuilder::with_metrics)
+            .build()
+            .await;
 
         DatasetImpl::new(
             MetadataChainImpl::new(
@@ -293,19 +296,20 @@ impl DatasetFactoryImpl {
     async fn resolve_ipns_dnslink(&self, domain: &str) -> Result<String, InternalError> {
         use hickory_resolver::Resolver;
         use hickory_resolver::config::ResolverConfig;
-        use hickory_resolver::name_server::TokioConnectionProvider;
+        use hickory_resolver::net::runtime::TokioRuntimeProvider;
 
         let r = Resolver::builder_with_config(
             ResolverConfig::default(),
-            TokioConnectionProvider::default(),
+            TokioRuntimeProvider::default(),
         )
-        .build();
+        .build()
+        .unwrap();
         let query = format!("_dnslink.{domain}");
         let result = r.txt_lookup(&query).await.int_err()?;
 
         let dnslink_re = regex::Regex::new(r"_?dnslink=/ipfs/(.*)").unwrap();
 
-        for record in result {
+        for record in result.answers() {
             let data = record.to_string();
             tracing::debug!(%data, "Observed TXT record");
 

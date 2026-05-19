@@ -99,10 +99,8 @@ impl RebacDatasetRegistryFacade for RebacDatasetRegistryFacadeImpl {
             .check_action_allowed(&dataset_handle.id, action)
             .await
             .map_err(|e| {
-                use {
-                    DatasetActionUnauthorizedError as SourceError,
-                    RebacDatasetIdUnresolvedError as Error,
-                };
+                use DatasetActionUnauthorizedError as SourceError;
+                use RebacDatasetIdUnresolvedError as Error;
 
                 match e {
                     SourceError::Access(e) => Error::Access(e),

@@ -10,7 +10,7 @@
 use std::io::ErrorKind;
 
 use arrow::error::ArrowError;
-use datafusion::arrow::record_batch::RecordBatch;
+use arrow::record_batch::RecordBatch;
 use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -65,7 +65,7 @@ pub fn get_flow_controller_from_catalog(
         .transpose()
         .int_err()?
         .ok_or_else(|| {
-            InternalError::new(format!("Flow controller for type '{flow_type}' not found",))
+            InternalError::new(format!("Flow controller for type '{flow_type}' not found"))
         })
 }
 

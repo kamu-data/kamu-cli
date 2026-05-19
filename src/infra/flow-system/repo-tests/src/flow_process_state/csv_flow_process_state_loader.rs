@@ -114,7 +114,7 @@ impl CsvFlowProcessStateLoader {
             "WebhookSubscription" => {
                 let subscription_id = if let Some(ref sub_label) = record.subscription_label {
                     // Generate a deterministic UUID based on subscription label
-                    let uuid_bytes = format!("sub-{sub_label}",).into_bytes();
+                    let uuid_bytes = format!("sub-{sub_label}").into_bytes();
                     let mut uuid_array = [0u8; 16];
                     for (i, byte) in uuid_bytes.iter().take(16).enumerate() {
                         uuid_array[i] = *byte;
@@ -193,7 +193,7 @@ impl CsvFlowProcessStateLoader {
             "INGEST" => FLOW_TYPE_DATASET_INGEST.to_string(),
             "EXECUTE_TRANSFORM" => FLOW_TYPE_DATASET_TRANSFORM.to_string(),
             "WEBHOOK_DELIVER" => FLOW_TYPE_WEBHOOK_DELIVER.to_string(),
-            _ => panic!("Unknown flow type: {csv_flow_type}",),
+            _ => panic!("Unknown flow type: {csv_flow_type}"),
         }
     }
 
@@ -331,7 +331,7 @@ impl CsvFlowProcessStateLoader {
                     // triggered by the consecutive
                     // failures. No additional action needed.
                 }
-                _ => panic!("Unknown auto stopped reason: {auto_stopped_reason}",),
+                _ => panic!("Unknown auto stopped reason: {auto_stopped_reason}"),
             }
         }
     }

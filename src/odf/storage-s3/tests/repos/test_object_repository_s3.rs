@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::assert_matches::assert_matches;
+use std::assert_matches;
 use std::convert::TryFrom;
 
 use odf_metadata::*;
@@ -16,7 +16,7 @@ use odf_storage::testing::test_object_repository_shared::ExternalUrlTestOptions;
 use odf_storage::*;
 use opendatafabric_storage_s3::*;
 use s3_utils::S3Context;
-use test_utils::{LocalS3Server, TEST_BUCKET_NAME};
+use test_utils::LocalS3Server;
 use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -26,11 +26,13 @@ use url::Url;
 async fn test_protocol() {
     let s3 = LocalS3Server::new().await;
 
-    // TODO: Reconsider this - we should not be modifying global env from tests
-    unsafe {
-        std::env::set_var("AWS_SECRET_ACCESS_KEY", "BAD_KEY");
-    }
-    let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await);
+    let repo = ObjectRepositoryS3Sha3::new(
+        S3Context::builder()
+            .with_url(&s3.url)
+            .with_credentials_from_keys(&s3.access_key, "BAD_KEY")
+            .build()
+            .await,
+    );
 
     assert_matches!(repo.protocol(), ObjectRepositoryProtocol::S3);
 }
@@ -43,11 +45,13 @@ async fn test_protocol() {
 async fn test_unauthorized() {
     let s3 = LocalS3Server::new().await;
 
-    // TODO: Reconsider this - we should not be modifying global env from tests
-    unsafe {
-        std::env::set_var("AWS_SECRET_ACCESS_KEY", "BAD_KEY");
-    }
-    let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await);
+    let repo = ObjectRepositoryS3Sha3::new(
+        S3Context::builder()
+            .with_url(&s3.url)
+            .with_credentials_from_keys(&s3.access_key, "BAD_KEY")
+            .build()
+            .await,
+    );
 
     assert_matches!(
         repo.insert_bytes(b"foo", InsertOpts::default()).await,
@@ -61,7 +65,7 @@ async fn test_unauthorized() {
 #[test_log::test(tokio::test)]
 async fn test_insert_bytes() {
     let s3 = LocalS3Server::new().await;
-    let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await);
+    let repo = ObjectRepositoryS3Sha3::new(s3.ctx.clone());
 
     test_object_repository_shared::test_insert_bytes(&repo).await;
 }
@@ -72,7 +76,7 @@ async fn test_insert_bytes() {
 #[test_log::test(tokio::test)]
 async fn test_insert_bytes_long() {
     let s3 = LocalS3Server::new().await;
-    let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await);
+    let repo = ObjectRepositoryS3Sha3::new(s3.ctx.clone());
 
     use rand::RngCore;
 
@@ -97,7 +101,7 @@ async fn test_insert_bytes_long() {
 #[test_log::test(tokio::test)]
 async fn test_insert_stream() {
     let s3 = LocalS3Server::new().await;
-    let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await);
+    let repo = ObjectRepositoryS3Sha3::new(s3.ctx.clone());
 
     let hash_foobar = Multihash::from_digest_sha3_256(b"foobar");
 
@@ -136,7 +140,7 @@ async fn test_insert_stream() {
 #[test_log::test(tokio::test)]
 async fn test_insert_stream_long() {
     let s3 = LocalS3Server::new().await;
-    let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await);
+    let repo = ObjectRepositoryS3Sha3::new(s3.ctx.clone());
 
     use rand::RngCore;
 
@@ -172,7 +176,7 @@ async fn test_insert_stream_long() {
 #[test_log::test(tokio::test)]
 async fn test_delete() {
     let s3 = LocalS3Server::new().await;
-    let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await);
+    let repo = ObjectRepositoryS3Sha3::new(s3.ctx.clone());
 
     test_object_repository_shared::test_delete(&repo).await;
 }
@@ -183,7 +187,7 @@ async fn test_delete() {
 #[test_log::test(tokio::test)]
 async fn test_insert_precomputed() {
     let s3 = LocalS3Server::new().await;
-    let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await);
+    let repo = ObjectRepositoryS3Sha3::new(s3.ctx.clone());
 
     test_object_repository_shared::test_insert_precomputed(&repo).await;
 }
@@ -194,7 +198,7 @@ async fn test_insert_precomputed() {
 #[test_log::test(tokio::test)]
 async fn test_insert_expect() {
     let s3 = LocalS3Server::new().await;
-    let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await);
+    let repo = ObjectRepositoryS3Sha3::new(s3.ctx.clone());
 
     test_object_repository_shared::test_insert_expect(&repo).await;
 }
@@ -205,13 +209,12 @@ async fn test_insert_expect() {
 #[test_log::test(tokio::test)]
 async fn test_external_urls() {
     let s3 = LocalS3Server::new().await;
-    let repo = ObjectRepositoryS3Sha3::new(S3Context::from_url(&s3.url).await);
+    let repo = ObjectRepositoryS3Sha3::new(s3.ctx.clone());
 
     let hash_foo = Multihash::from_digest_sha3_256(b"foo");
 
     let expected_external_download_url = {
-        let mut url =
-            Url::parse(&format!("http://127.0.0.1/{TEST_BUCKET_NAME}/{hash_foo}")).unwrap();
+        let mut url = Url::parse(&format!("http://127.0.0.1/{}/{hash_foo}", s3.bucket)).unwrap();
         url.set_port(s3.url.port()).unwrap();
         url
     };

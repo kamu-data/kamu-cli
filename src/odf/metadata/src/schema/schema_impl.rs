@@ -43,6 +43,14 @@ impl DataSchema {
     pub fn field_by_name(&self, name: &str) -> Option<&DataField> {
         self.fields.iter().find(|f| f.name == name)
     }
+
+    /// Removes fields that match their default values
+    pub fn normalize(self) -> Self {
+        Self {
+            fields: self.fields.into_iter().map(DataField::normalize).collect(),
+            ..self
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -119,16 +127,23 @@ impl DataSchemaBuilder {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl DataField {
-    pub fn new(name: impl Into<String>, data_type: DataType) -> Self {
+    pub fn new(name: impl Into<String>, data_type: impl Into<DataType>) -> Self {
         Self {
             name: name.into(),
-            r#type: data_type,
+            r#type: data_type.into(),
             extra: None,
         }
     }
 
     pub fn is_optional(&self) -> bool {
         matches!(&self.r#type, DataType::Option(_))
+    }
+
+    pub fn normalize(self) -> Self {
+        Self {
+            r#type: self.r#type.normalize(),
+            ..self
+        }
     }
 }
 
@@ -275,6 +290,39 @@ impl DataField {
 // DataType
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+impl DataType {
+    pub fn normalize(self) -> Self {
+        match self {
+            DataType::Binary(v) => DataType::Binary(v.normalize()),
+            DataType::Bool(v) => DataType::Bool(v.normalize()),
+            DataType::Date(v) => DataType::Date(v.normalize()),
+            DataType::Decimal(v) => DataType::Decimal(v.normalize()),
+            DataType::Duration(v) => DataType::Duration(v.normalize()),
+            DataType::Float16(v) => DataType::Float16(v.normalize()),
+            DataType::Float32(v) => DataType::Float32(v.normalize()),
+            DataType::Float64(v) => DataType::Float64(v.normalize()),
+            DataType::Int8(v) => DataType::Int8(v.normalize()),
+            DataType::Int16(v) => DataType::Int16(v.normalize()),
+            DataType::Int32(v) => DataType::Int32(v.normalize()),
+            DataType::Int64(v) => DataType::Int64(v.normalize()),
+            DataType::UInt8(v) => DataType::UInt8(v.normalize()),
+            DataType::UInt16(v) => DataType::UInt16(v.normalize()),
+            DataType::UInt32(v) => DataType::UInt32(v.normalize()),
+            DataType::UInt64(v) => DataType::UInt64(v.normalize()),
+            DataType::List(v) => DataType::List(v.normalize()),
+            DataType::Map(v) => DataType::Map(v.normalize()),
+            DataType::Null(v) => DataType::Null(v.normalize()),
+            DataType::Option(v) => DataType::Option(v.normalize()),
+            DataType::Struct(v) => DataType::Struct(v.normalize()),
+            DataType::Time(v) => DataType::Time(v.normalize()),
+            DataType::Timestamp(v) => DataType::Timestamp(v.normalize()),
+            DataType::String(v) => DataType::String(v.normalize()),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // Builder interface
 impl DataType {
     pub fn binary() -> Self {
@@ -290,9 +338,8 @@ impl DataType {
         Self::Decimal(DataTypeDecimal { precision, scale })
     }
     pub fn duration_millis() -> Self {
-        Self::Duration(DataTypeDuration {
-            unit: TimeUnit::Millisecond,
-        })
+        debug_assert_eq!(DataTypeDuration::default_unit(), TimeUnit::Millisecond);
+        Self::Duration(DataTypeDuration { unit: None })
     }
     pub fn i8() -> Self {
         Self::Int8(DataTypeInt8 {})
@@ -345,13 +392,16 @@ impl DataType {
     }
     pub fn time_millis() -> Self {
         Self::Time(DataTypeTime {
-            unit: TimeUnit::Millisecond,
+            unit: Some(TimeUnit::Millisecond),
         })
     }
     pub fn timestamp_millis_utc() -> Self {
+        debug_assert_eq!(DataTypeTimestamp::default_unit(), TimeUnit::Millisecond);
+        debug_assert_eq!(DataTypeTimestamp::default_timezone(), "UTC");
+
         Self::Timestamp(DataTypeTimestamp {
-            unit: TimeUnit::Millisecond,
-            timezone: Some("UTC".into()),
+            unit: None,
+            timezone: None,
         })
     }
     pub fn structure(fields: Vec<DataField>) -> Self {
@@ -373,6 +423,163 @@ impl DataType {
             DataType::Option(t) => *t.inner,
             _ => self,
         }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl DataTypeBinary {
+    pub fn normalize(self) -> Self {
+        self
+    }
+}
+impl DataTypeBool {
+    pub fn normalize(self) -> Self {
+        self
+    }
+}
+impl DataTypeDate {
+    pub fn normalize(self) -> Self {
+        self
+    }
+}
+impl DataTypeDecimal {
+    pub fn normalize(self) -> Self {
+        self
+    }
+}
+impl DataTypeDuration {
+    pub fn normalize(self) -> Self {
+        Self {
+            unit: if self.unit == Some(Self::default_unit()) {
+                None
+            } else {
+                self.unit
+            },
+        }
+    }
+}
+impl DataTypeFloat16 {
+    pub fn normalize(self) -> Self {
+        self
+    }
+}
+impl DataTypeFloat32 {
+    pub fn normalize(self) -> Self {
+        self
+    }
+}
+impl DataTypeFloat64 {
+    pub fn normalize(self) -> Self {
+        self
+    }
+}
+impl DataTypeInt8 {
+    pub fn normalize(self) -> Self {
+        self
+    }
+}
+impl DataTypeInt16 {
+    pub fn normalize(self) -> Self {
+        self
+    }
+}
+impl DataTypeInt32 {
+    pub fn normalize(self) -> Self {
+        self
+    }
+}
+impl DataTypeInt64 {
+    pub fn normalize(self) -> Self {
+        self
+    }
+}
+impl DataTypeUInt8 {
+    pub fn normalize(self) -> Self {
+        self
+    }
+}
+impl DataTypeUInt16 {
+    pub fn normalize(self) -> Self {
+        self
+    }
+}
+impl DataTypeUInt32 {
+    pub fn normalize(self) -> Self {
+        self
+    }
+}
+impl DataTypeUInt64 {
+    pub fn normalize(self) -> Self {
+        self
+    }
+}
+impl DataTypeList {
+    pub fn normalize(self) -> Self {
+        Self {
+            item_type: Box::new(self.item_type.normalize()),
+            ..self
+        }
+    }
+}
+impl DataTypeMap {
+    pub fn normalize(self) -> Self {
+        Self {
+            key_type: Box::new(self.key_type.normalize()),
+            value_type: Box::new(self.value_type.normalize()),
+            ..self
+        }
+    }
+}
+impl DataTypeNull {
+    pub fn normalize(self) -> Self {
+        self
+    }
+}
+impl DataTypeOption {
+    pub fn normalize(self) -> Self {
+        Self {
+            inner: Box::new(self.inner.normalize()),
+        }
+    }
+}
+impl DataTypeStruct {
+    pub fn normalize(self) -> Self {
+        Self {
+            fields: self.fields.into_iter().map(DataField::normalize).collect(),
+        }
+    }
+}
+impl DataTypeTime {
+    pub fn normalize(self) -> Self {
+        Self {
+            unit: if self.unit == Some(Self::default_unit()) {
+                None
+            } else {
+                self.unit
+            },
+        }
+    }
+}
+impl DataTypeTimestamp {
+    pub fn normalize(self) -> Self {
+        Self {
+            unit: if self.unit == Some(Self::default_unit()) {
+                None
+            } else {
+                self.unit
+            },
+            timezone: if self.timezone.as_deref() == Some(Self::default_timezone()) {
+                None
+            } else {
+                self.timezone
+            },
+        }
+    }
+}
+impl DataTypeString {
+    pub fn normalize(self) -> Self {
+        self
     }
 }
 

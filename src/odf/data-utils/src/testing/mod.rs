@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+#![cfg(feature = "datafusion")]
+
 use std::sync::Arc;
 
 use datafusion::arrow::array::RecordBatch;
@@ -148,9 +150,14 @@ pub fn assert_odf_schema_eq(
     actual: &odf_metadata::DataSchema,
     expected: &odf_metadata::DataSchema,
 ) {
-    let actual_yaml = crate::schema::format::format_schema_odf_yaml(actual);
-    let expected_yaml = crate::schema::format::format_schema_odf_yaml(expected);
-    assert_eq!(expected_yaml, actual_yaml);
+    // Note: Eq comparison accounts for default property equivalence
+    if actual != expected {
+        let actual_yaml =
+            crate::schema::format::format_schema_odf_yaml(&actual.clone().normalize());
+        let expected_yaml =
+            crate::schema::format::format_schema_odf_yaml(&expected.clone().normalize());
+        assert_eq!(expected_yaml, actual_yaml);
+    }
 }
 
 pub fn assert_schema_eq(schema: &DFSchema, expected: &str) {

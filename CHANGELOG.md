@@ -5,10 +5,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 <!--
-Recommendation: for ease of reading, use the following order:
-- Added
-- Changed
-- Fixed
+Recommendation: for ease of reading, use the following format:
+
+## [x.y.z or Unreleased] - <date>
+### Added
+### Changed
+### Fixed
 -->
 
 ## [Molecule-specific]
@@ -19,6 +21,72 @@ Recommendation: for ease of reading, use the following order:
 - GQL: `molecule` area: use `BigInt` for `ipnft_token_id` 
 - Allow `molecule` and `molecule.dev` accounts separation
 - GQL: `MoleculeMut::create_project()`: generate lowercase project account name.
+
+## [0.263.0] - 2026-05-16
+### Added
+- **Breaking:** The `read.schema` field now expects an ODF schema, replacing DDL schema with our unified format
+  - DDL source schema can still be specified via `read.ddlSchema` but we recommend upgrading your datasets
+  - GQL endpoints support reading ODF source schema
+  - GQL `ReadStep::schema` now returns ODF schema, converting from `ddlSchema` if necessary
+  - GQL `createCollection` and `createVersionedFile` endpoints now support `extraSchema` field that accepts ODF schema, the `extraColumns` field was deprecated in its favor
+- GQL `Collection::entries` now support `maxDepth` for navigating entries as directory hierarchy
+### Changed
+- Added support for "short form" unions in ODF manifests:
+  ```yaml
+  fields:
+    - name: foo
+      type:
+        kind: String
+  
+  # Is equivalent to
+  fields:
+    - name: foo
+      type: String
+  ```
+- The `Timestamp`, `Time`, `Duration` ODF types now default to `Millisecond` precision and `UTC` time zone
+- GQL `ReadStep` union is now an `interface`, providing easy access to `schema`
+- GQL `SetDataSchema::schema` now defaults to `ODF_JSON` format instead of `PARQUET_JSON`
+
+## [0.262.0] - 2026-04-22
+### Changed
+- Updated default RisingWave engine image that fixes Parquet compatibility bug
+
+## [0.261.1] - 2026-03-30
+### Changed
+- Minio usage replaced with RustFS
+- Large rework of smart transfer protocol tests:
+    - polymorphic upload/download and comparison behavior depending 
+      on the server's storage technology (lfs vs S3/RustFS)
+- ODF feature slicing improved
+- Dependency updates:
+  - Datafusion 52 -> 53
+  - AWS API unpinned, using the latest version
+  - sha2 0.10 => 0.11
+  - cron 0.15 => 0.16
+  - async-openai 0.33 => 0.34
+  - shapefile 0.7 => 0.8
+  - rustyline 17 => 18
+  - toml 1.0 => 1.1 (unpinned)
+- Elasticsearch: got rid of Rust client in favor of direct REST API calls
+
+## [0.261.0] - 2026-03-19
+### Added
+- Implemented flexible flow listing ordering at service level + 2 high-level ordering modes in GQL API.
+### Changed
+- ReBAC relation and dataset property updates now suppress redundant outbox messages and downstream dataset search reindexing when the effective authorization state remains unchanged.
+- Extended test coverage for ReBac use cases and services
+- Several major dependency upgrades:
+   - alloy 1.5 -> 1.7
+   - async-openai 0.32 -> 0.33
+   - geojson 0.24 -> 1.0
+   - jsonschema 0.40 -> 0.45
+   - tokio-tungstenite 0.28 -> 0.29
+   - toml 0.8 -> 1.0
+   - strum 0.27 -> 0.28
+   - ssi-caips 0.2 -> 0.3
+   - vergen 8.3 -> 9.1
+   - zip 3 -> 8.2
+- Latest Rust nightly toolchain (March 19th, 2026)   
 
 ## [0.260.2] - 2026-03-04
 ### Changed

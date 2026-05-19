@@ -12,12 +12,19 @@ content:
         kind: Csv
         header: true
         schema:
-          - "event_time TIMESTAMP"
-          - "symbol STRING"
-          - "quantity BIGINT"
-          - "price DOUBLE"
-          - "settlement DOUBLE"
-          - "currency STRING"
+          fields:
+            - name: event_time
+              type: timestamp
+            - name: symbol
+              type: string
+            - name: quantity
+              type: int64
+            - name: price
+              type: float64
+            - name: settlement
+              type: float64
+            - name: currency
+              type: string
       merge:
         kind: Ledger
         primaryKey:
