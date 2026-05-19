@@ -21,10 +21,10 @@ pub async fn test_repository_pull_aliases_commands(kamu: KamuCliPuppet) {
                 odf::metadata::AddPushSource {
                     source_name: odf::metadata::SourceState::DEFAULT_SOURCE_NAME.to_string(),
                     read: odf::metadata::ReadStepNdJson {
-                        schema: Some(vec![
-                            "event_time TIMESTAMP".to_owned(),
-                            "foo_string STRING".to_owned(),
-                        ]),
+                        schema: Some(odf::schema::DataSchema::new(vec![
+                            odf::schema::DataField::timestamp_millis_utc("event_time"),
+                            odf::schema::DataField::string("foo_string"),
+                        ])),
                         ..Default::default()
                     }
                     .into(),
@@ -108,10 +108,10 @@ pub async fn test_repository_push_aliases_commands(kamu: KamuCliPuppet) {
                 odf::metadata::AddPushSource {
                     source_name: odf::metadata::SourceState::DEFAULT_SOURCE_NAME.to_string(),
                     read: odf::metadata::ReadStepNdJson {
-                        schema: Some(vec![
-                            "event_time TIMESTAMP".to_owned(),
-                            "foo_string STRING".to_owned(),
-                        ]),
+                        schema: Some(odf::schema::DataSchema::new(vec![
+                            odf::schema::DataField::timestamp_millis_utc("event_time"),
+                            odf::schema::DataField::string("foo_string"),
+                        ])),
                         ..Default::default()
                     }
                     .into(),

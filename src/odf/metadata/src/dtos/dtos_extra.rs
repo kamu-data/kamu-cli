@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#![expect(clippy::derivable_impls)]
-
 use std::collections::HashMap;
 use std::fmt::Display;
 
@@ -99,19 +97,6 @@ impl ExecuteTransformInput {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// SetInfo
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl Default for SetInfo {
-    fn default() -> Self {
-        Self {
-            description: None,
-            keywords: None,
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // SetTransform
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -141,17 +126,6 @@ impl Transform {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // SetVocab
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl Default for SetVocab {
-    fn default() -> Self {
-        Self {
-            offset_column: None,
-            operation_type_column: None,
-            system_time_column: None,
-            event_time_column: None,
-        }
-    }
-}
 
 impl From<SetVocab> for DatasetVocabulary {
     fn from(v: SetVocab) -> Self {
@@ -192,7 +166,19 @@ impl Default for DatasetVocabulary {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl ReadStep {
-    pub fn schema(&self) -> Option<&Vec<String>> {
+    pub fn ddl_schema(&self) -> Option<&Vec<String>> {
+        match self {
+            ReadStep::Csv(v) => v.ddl_schema.as_ref(),
+            ReadStep::Json(v) => v.ddl_schema.as_ref(),
+            ReadStep::NdJson(v) => v.ddl_schema.as_ref(),
+            ReadStep::GeoJson(v) => v.ddl_schema.as_ref(),
+            ReadStep::NdGeoJson(v) => v.ddl_schema.as_ref(),
+            ReadStep::EsriShapefile(v) => v.ddl_schema.as_ref(),
+            ReadStep::Parquet(v) => v.ddl_schema.as_ref(),
+        }
+    }
+
+    pub fn schema(&self) -> Option<&DataSchema> {
         match self {
             ReadStep::Csv(v) => v.schema.as_ref(),
             ReadStep::Json(v) => v.schema.as_ref(),
@@ -203,56 +189,37 @@ impl ReadStep {
             ReadStep::Parquet(v) => v.schema.as_ref(),
         }
     }
-}
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// ReadStepCsv
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl Default for ReadStepCsv {
-    fn default() -> Self {
-        Self {
-            schema: None,
-            separator: None,
-            encoding: None,
-            quote: None,
-            escape: None,
-            header: None,
-            infer_schema: None,
-            null_value: None,
-            date_format: None,
-            timestamp_format: None,
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// ReadStepJson
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl Default for ReadStepJson {
-    fn default() -> Self {
-        Self {
-            sub_path: None,
-            schema: None,
-            date_format: None,
-            encoding: None,
-            timestamp_format: None,
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// ReadStepNdJson
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl Default for ReadStepNdJson {
-    fn default() -> Self {
-        Self {
-            schema: None,
-            date_format: None,
-            encoding: None,
-            timestamp_format: None,
+    pub fn set_schema(&mut self, schema: DataSchema) {
+        match self {
+            ReadStep::Csv(v) => {
+                v.ddl_schema = None;
+                v.schema = Some(schema);
+            }
+            ReadStep::Json(v) => {
+                v.ddl_schema = None;
+                v.schema = Some(schema);
+            }
+            ReadStep::NdJson(v) => {
+                v.ddl_schema = None;
+                v.schema = Some(schema);
+            }
+            ReadStep::GeoJson(v) => {
+                v.ddl_schema = None;
+                v.schema = Some(schema);
+            }
+            ReadStep::NdGeoJson(v) => {
+                v.ddl_schema = None;
+                v.schema = Some(schema);
+            }
+            ReadStep::EsriShapefile(v) => {
+                v.ddl_schema = None;
+                v.schema = Some(schema);
+            }
+            ReadStep::Parquet(v) => {
+                v.ddl_schema = None;
+                v.schema = Some(schema);
+            }
         }
     }
 }
@@ -269,19 +236,6 @@ impl MergeStrategy {
             MergeStrategy::Snapshot(s) => Some(s.primary_key),
             MergeStrategy::ChangelogStream(c) => Some(c.primary_key),
             MergeStrategy::UpsertStream(u) => Some(u.primary_key),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// ReadStepEsriShapefile
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl Default for ReadStepEsriShapefile {
-    fn default() -> Self {
-        Self {
-            schema: None,
-            sub_path: None,
         }
     }
 }

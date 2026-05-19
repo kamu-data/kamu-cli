@@ -212,17 +212,12 @@ impl UpdateVersionFileCaseHarness {
         let push_source = odf::metadata::AddPushSource {
             source_name: "default".into(),
             read: odf::metadata::ReadStep::NdJson(odf::metadata::ReadStepNdJson {
-                schema: Some(
-                    [
-                        "version INT",
-                        "content_hash STRING",
-                        "content_length BIGINT",
-                        "content_type STRING",
-                    ]
-                    .into_iter()
-                    .map(str::to_string)
-                    .collect(),
-                ),
+                schema: Some(odf::schema::DataSchema::new(vec![
+                    odf::schema::DataField::i32("version"),
+                    odf::schema::DataField::string("content_hash"),
+                    odf::schema::DataField::i64("content_length"),
+                    odf::schema::DataField::string("content_type"),
+                ])),
                 ..Default::default()
             }),
             preprocess: None,

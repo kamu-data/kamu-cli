@@ -82,19 +82,14 @@ impl ViewCollectionEntriesUseCase for ViewCollectionEntriesUseCaseImpl {
             df
         };
 
-        let df = match path_prefix {
-            None => df,
-            Some(path_prefix) => df
-                .filter(
-                    datafusion::functions::string::starts_with()
-                        .call(vec![col("path"), lit(path_prefix.as_str())]),
-                )
-                .int_err()?,
-        };
-
-        let df = match max_depth {
-            None => df,
-            Some(_) => unimplemented!(),
+        let df = if let Some(path_prefix) = path_prefix {
+            df.filter(
+                datafusion::functions::string::starts_with()
+                    .call(vec![col("path"), lit(path_prefix.as_str())]),
+            )
+            .int_err()?
+        } else {
+            df
         };
 
         // Project changelog into a state
@@ -104,6 +99,43 @@ impl ViewCollectionEntriesUseCase for ViewCollectionEntriesUseCaseImpl {
             &odf::metadata::DatasetVocabulary::default(),
         )
         .int_err()?;
+
+        // Filter by max depth
+        // TODO: PERF: This implementation is quite inefficient.
+        let df = if let Some(max_depth) = max_depth {
+            let sort_expr = col("path").sort(true, false);
+
+            let aggr_exprs = df
+                .schema()
+                .fields()
+                .iter()
+                .map(|f| {
+                    datafusion::functions_aggregate::expr_fn::first_value(
+                        col(f.name()),
+                        vec![sort_expr.clone()],
+                    )
+                    .alias(f.name())
+                })
+                .collect();
+
+            let df = df
+                .with_column(
+                    "__path_trimmed",
+                    datafusion::functions::unicode::substr_index().call(vec![
+                        col("path"),
+                        lit("/"),
+                        lit(i64::try_from(max_depth + 1).unwrap()),
+                    ]),
+                )
+                .int_err()?;
+
+            df.aggregate(vec![col("__path_trimmed")], aggr_exprs)
+                .int_err()?
+                .without_columns(&["__path_trimmed"])
+                .int_err()?
+        } else {
+            df
+        };
 
         let total_count = df.clone().count().await.int_err()?;
         let df = df.sort(vec![col("path").sort(true, false)]).int_err()?;

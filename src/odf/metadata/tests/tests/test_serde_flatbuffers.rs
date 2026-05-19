@@ -16,7 +16,7 @@ use opendatafabric_metadata::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn get_test_events() -> [(MetadataEvent, &'static str); 9] {
+fn get_test_events() -> [(MetadataEvent, &'static str); 10] {
     [
         (
             MetadataEvent::AddData(AddData {
@@ -86,7 +86,8 @@ fn get_test_events() -> [(MetadataEvent, &'static str); 9] {
                     sub_path: None,
                 })]),
                 read: ReadStep::GeoJson(ReadStepGeoJson {
-                    schema: Some(vec!["a: INT".to_owned(), "b: INT".to_owned()]),
+                    ddl_schema: Some(vec!["a: INT".to_owned(), "b: INT".to_owned()]),
+                    ..Default::default()
                 }),
                 preprocess: Some(Transform::Sql(TransformSql {
                     engine: "spark".to_owned(),
@@ -100,6 +101,40 @@ fn get_test_events() -> [(MetadataEvent, &'static str); 9] {
                 }),
             }),
             "18cc1680b3d36f63358b59d469d76dcbf71ddac3ea66a693ce4158cfc5dfb28d",
+        ),
+        (
+            MetadataEvent::SetPollingSource(SetPollingSource {
+                fetch: FetchStep::FilesGlob(FetchStepFilesGlob {
+                    path: "./*.csv".to_owned(),
+                    event_time: Some(EventTimeSource::FromMetadata(
+                        EventTimeSourceFromMetadata {},
+                    )),
+                    cache: Some(SourceCaching::Forever(SourceCachingForever {})),
+                    order: Some(SourceOrdering::ByName),
+                }),
+                prepare: Some(vec![PrepStep::Decompress(PrepStepDecompress {
+                    format: CompressionFormat::Gzip,
+                    sub_path: None,
+                })]),
+                read: ReadStep::GeoJson(ReadStepGeoJson {
+                    schema: Some(DataSchema::new(vec![
+                        DataField::i32("a"),
+                        DataField::i32("b"),
+                    ])),
+                    ..Default::default()
+                }),
+                preprocess: Some(Transform::Sql(TransformSql {
+                    engine: "spark".to_owned(),
+                    version: Some("1.0.0".to_owned()),
+                    query: Some("SELECT * FROM input".to_owned()),
+                    queries: None,
+                    temporal_tables: None,
+                })),
+                merge: MergeStrategy::Ledger(MergeStrategyLedger {
+                    primary_key: vec!["a".to_owned()],
+                }),
+            }),
+            "39cfd70254179a7cdea4263f951b8acbdc2b8a20dc0c1c4c572ab6da2dd9b28a",
         ),
         (
             MetadataEvent::AddData(AddData {

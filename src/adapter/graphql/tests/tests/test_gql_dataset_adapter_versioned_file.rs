@@ -451,11 +451,11 @@ async fn test_versioned_file_extra_data() {
         .execute_authorized_query(
             async_graphql::Request::new(indoc!(
                 r#"
-                mutation ($datasetAlias: DatasetAlias!, $extraColumns: [ColumnInput]) {
+                mutation ($datasetAlias: DatasetAlias!, $extraSchema: DataSchemaInput) {
                     datasets {
                         createVersionedFile(
                             datasetAlias: $datasetAlias,
-                            extraColumns: $extraColumns,
+                            extraSchema: $extraSchema,
                             datasetVisibility: PUBLIC,
                         ) {
                             message
@@ -471,17 +471,19 @@ async fn test_versioned_file_extra_data() {
             ))
             .variables(async_graphql::Variables::from_json(json!({
                 "datasetAlias": "x",
-                "extraColumns": [{
-                    "name": "foo",
-                    "type": {
-                        "ddl": "string",
-                    }
-                }, {
-                    "name": "bar",
-                    "type": {
-                        "ddl": "int",
-                    }
-                }]
+                "extraSchema": {
+                    "fields": [{
+                        "name": "foo",
+                        "type": {
+                            "kind": "string",
+                        }
+                    }, {
+                        "name": "bar",
+                        "type": {
+                            "kind": "int32",
+                        }
+                    }]
+                }
             }))),
         )
         .await;
@@ -675,6 +677,161 @@ async fn test_versioned_file_extra_data() {
             "extraData": {
                 "foo": "mega",
                 "bar": 321,
+            },
+        })
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_versioned_file_extra_data_legacy_ddl() {
+    let harness = GraphQLDatasetsHarness::builder()
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .outbox_provider(OutboxProvider::Immediate {
+            force_immediate: true,
+        })
+        .build()
+        .await;
+
+    // Create a versioned file dataset
+    let res = harness
+        .execute_authorized_query(
+            async_graphql::Request::new(indoc!(
+                r#"
+                mutation ($datasetAlias: DatasetAlias!, $extraColumns: [ColumnInput]) {
+                    datasets {
+                        createVersionedFile(
+                            datasetAlias: $datasetAlias,
+                            extraColumns: $extraColumns,
+                            datasetVisibility: PUBLIC,
+                        ) {
+                            message
+                            ... on CreateDatasetResultSuccess {
+                                dataset {
+                                    id
+                                }
+                            }
+                        }
+                    }
+                }
+                "#
+            ))
+            .variables(async_graphql::Variables::from_json(json!({
+                "datasetAlias": "x",
+                "extraColumns": [{
+                    "name": "foo",
+                    "type": {
+                        "ddl": "string",
+                    }
+                }, {
+                    "name": "bar",
+                    "type": {
+                        "ddl": "int",
+                    }
+                }]
+            }))),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    let did = res.data.into_json().unwrap()["datasets"]["createVersionedFile"]["dataset"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    // Upload the first version
+    let res = harness
+        .execute_authorized_query(
+            async_graphql::Request::new(indoc!(
+                r#"
+                mutation ($datasetId: DatasetID!, $content: Base64Usnp!, $extraData: ExtraData!) {
+                    datasets {
+                        byId(datasetId: $datasetId) {
+                            asVersionedFile {
+                                uploadNewVersion(content: $content, extraData: $extraData) {
+                                    isSuccess
+                                    message
+                                    ... on UpdateVersionSuccess {
+                                        newVersion
+                                        contentHash
+                                        newHead
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                "#
+            ))
+            .variables(async_graphql::Variables::from_json(json!({
+                "datasetId": &did,
+                "content": base64usnp_encode(b"hello"),
+                "extraData": {
+                    "foo": "extra",
+                    "bar": 123,
+                }
+            }))),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    let upload_result = res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]
+        ["uploadNewVersion"]
+        .clone();
+    let head_v1 = &upload_result["newHead"];
+    pretty_assertions::assert_eq!(
+        upload_result,
+        json!({
+            "isSuccess": true,
+            "message": "",
+            "newVersion": 1,
+            "contentHash": odf::Multihash::from_digest_sha3_256(b"hello"),
+            "newHead": head_v1,
+        })
+    );
+
+    // Read back the latest content
+    let res = harness
+        .execute_authorized_query(
+            async_graphql::Request::new(indoc!(
+                r#"
+                query ($datasetId: DatasetID!) {
+                    datasets {
+                        byId(datasetId: $datasetId) {
+                            asVersionedFile {
+                                latest {
+                                    version
+                                    contentType
+                                    contentHash
+                                    content
+                                    extraData
+                                }
+                            }
+                        }
+                    }
+                }
+                "#
+            ))
+            .variables(async_graphql::Variables::from_json(json!({
+                "datasetId": &did,
+            }))),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    let entry =
+        res.data.into_json().unwrap()["datasets"]["byId"]["asVersionedFile"]["latest"].clone();
+    pretty_assertions::assert_eq!(
+        entry,
+        json!({
+            "version": 1,
+            "contentHash": odf::Multihash::from_digest_sha3_256(b"hello"),
+            "contentType": "application/octet-stream",
+            "content": base64usnp_encode(b"hello"),
+            "extraData": {
+                "foo": "extra",
+                "bar": 123,
             },
         })
     );

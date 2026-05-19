@@ -27,7 +27,7 @@ use crate::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 macro_rules! implement_serde_as {
-    ($dto:ty, $impl:ty, $impl_name:literal) => {
+    ($dto:ty, $impl:ty) => {
         impl ::serde_with::SerializeAs<$dto> for $impl {
             fn serialize_as<S>(source: &$dto, serializer: S) -> Result<S::Ok, S::Error>
             where
@@ -46,6 +46,101 @@ macro_rules! implement_serde_as {
             }
         }
     };
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+macro_rules! implement_serde_as_short_form_union {
+    ($dto:ty, $impl:ty) => {
+        impl ::serde_with::SerializeAs<$dto> for $impl {
+            fn serialize_as<S>(source: &$dto, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: Serializer,
+            {
+                <$impl>::serialize(source, serializer)
+            }
+        }
+
+        impl<'de> serde_with::DeserializeAs<'de, $dto> for $impl {
+            fn deserialize_as<D>(deserializer: D) -> Result<$dto, D::Error>
+            where
+                D: Deserializer<'de>,
+            {
+                struct EnumOrShortForm;
+
+                impl<'de> ::serde::de::Visitor<'de> for EnumOrShortForm {
+                    type Value = $dto;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                        formatter.write_str("Tagged enum of short-form type name")
+                    }
+
+                    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+                    where
+                        E: ::serde::de::Error,
+                    {
+                        let map = ShortFormUnionToMap::new(value);
+                        self.visit_map(map)
+                    }
+
+                    fn visit_map<M>(self, map: M) -> Result<Self::Value, M::Error>
+                    where
+                        M: ::serde::de::MapAccess<'de>,
+                    {
+                        <$impl>::deserialize(::serde::de::value::MapAccessDeserializer::new(map))
+                    }
+                }
+
+                deserializer.deserialize_any(EnumOrShortForm)
+            }
+        }
+    };
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Helper to expand the `"typename"` string into `{"kind": "typename"}` map
+/// form
+struct ShortFormUnionToMap<'a, Err> {
+    typename: Option<&'a str>,
+    phantom: std::marker::PhantomData<Err>,
+}
+
+impl<'a, Err> ShortFormUnionToMap<'a, Err> {
+    fn new(typename: &'a str) -> Self {
+        Self {
+            typename: Some(typename),
+            phantom: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<'a, 'de, Err> ::serde::de::MapAccess<'de> for ShortFormUnionToMap<'a, Err>
+where
+    Err: ::serde::de::Error,
+{
+    type Error = Err;
+
+    fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error>
+    where
+        K: ::serde::de::DeserializeSeed<'de>,
+    {
+        if self.typename.is_some() {
+            seed.deserialize(::serde::de::value::StrDeserializer::new("kind"))
+                .map(Some)
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn next_value_seed<V>(&mut self, seed: V) -> Result<V::Value, Self::Error>
+    where
+        V: ::serde::de::DeserializeSeed<'de>,
+    {
+        seed.deserialize(::serde::de::value::StrDeserializer::new(
+            self.typename.take().unwrap(),
+        ))
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -77,7 +172,7 @@ pub struct AddDataDef {
     pub extra: Option<ExtraAttributes>,
 }
 
-implement_serde_as!(AddData, AddDataDef, "AddDataDef");
+implement_serde_as!(AddData, AddDataDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // AddPushSource
@@ -100,7 +195,7 @@ pub struct AddPushSourceDef {
     pub merge: MergeStrategy,
 }
 
-implement_serde_as!(AddPushSource, AddPushSourceDef, "AddPushSourceDef");
+implement_serde_as!(AddPushSource, AddPushSourceDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // AttachmentEmbedded
@@ -117,11 +212,7 @@ pub struct AttachmentEmbeddedDef {
     pub content: String,
 }
 
-implement_serde_as!(
-    AttachmentEmbedded,
-    AttachmentEmbeddedDef,
-    "AttachmentEmbeddedDef"
-);
+implement_serde_as!(AttachmentEmbedded, AttachmentEmbeddedDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Attachments
@@ -137,7 +228,7 @@ pub enum AttachmentsDef {
     Embedded(#[serde_as(as = "AttachmentsEmbeddedDef")] AttachmentsEmbedded),
 }
 
-implement_serde_as!(Attachments, AttachmentsDef, "AttachmentsDef");
+implement_serde_as!(Attachments, AttachmentsDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // AttachmentsEmbedded
@@ -154,11 +245,7 @@ pub struct AttachmentsEmbeddedDef {
     pub items: Vec<AttachmentEmbedded>,
 }
 
-implement_serde_as!(
-    AttachmentsEmbedded,
-    AttachmentsEmbeddedDef,
-    "AttachmentsEmbeddedDef"
-);
+implement_serde_as!(AttachmentsEmbedded, AttachmentsEmbeddedDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Checkpoint
@@ -175,7 +262,7 @@ pub struct CheckpointDef {
     pub size: u64,
 }
 
-implement_serde_as!(Checkpoint, CheckpointDef, "CheckpointDef");
+implement_serde_as!(Checkpoint, CheckpointDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // CompressionFormat
@@ -192,11 +279,7 @@ pub enum CompressionFormatDef {
     Zip,
 }
 
-implement_serde_as!(
-    CompressionFormat,
-    CompressionFormatDef,
-    "CompressionFormatDef"
-);
+implement_serde_as!(CompressionFormat, CompressionFormatDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DataField
@@ -217,7 +300,7 @@ pub struct DataFieldDef {
     pub extra: Option<ExtraAttributes>,
 }
 
-implement_serde_as!(DataField, DataFieldDef, "DataFieldDef");
+implement_serde_as!(DataField, DataFieldDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DataSchema
@@ -237,7 +320,7 @@ pub struct DataSchemaDef {
     pub extra: Option<ExtraAttributes>,
 }
 
-implement_serde_as!(DataSchema, DataSchemaDef, "DataSchemaDef");
+implement_serde_as!(DataSchema, DataSchemaDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DataSlice
@@ -257,7 +340,7 @@ pub struct DataSliceDef {
     pub size: u64,
 }
 
-implement_serde_as!(DataSlice, DataSliceDef, "DataSliceDef");
+implement_serde_as!(DataSlice, DataSliceDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DataType
@@ -319,7 +402,7 @@ pub enum DataTypeDef {
     String(#[serde_as(as = "DataTypeStringDef")] DataTypeString),
 }
 
-implement_serde_as!(DataType, DataTypeDef, "DataTypeDef");
+implement_serde_as_short_form_union!(DataType, DataTypeDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DataTypeBinary
@@ -335,7 +418,7 @@ pub struct DataTypeBinaryDef {
     pub fixed_length: Option<u64>,
 }
 
-implement_serde_as!(DataTypeBinary, DataTypeBinaryDef, "DataTypeBinaryDef");
+implement_serde_as!(DataTypeBinary, DataTypeBinaryDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DataTypeBool
@@ -349,7 +432,7 @@ implement_serde_as!(DataTypeBinary, DataTypeBinaryDef, "DataTypeBinaryDef");
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DataTypeBoolDef {}
 
-implement_serde_as!(DataTypeBool, DataTypeBoolDef, "DataTypeBoolDef");
+implement_serde_as!(DataTypeBool, DataTypeBoolDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DataTypeDate
@@ -363,7 +446,7 @@ implement_serde_as!(DataTypeBool, DataTypeBoolDef, "DataTypeBoolDef");
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DataTypeDateDef {}
 
-implement_serde_as!(DataTypeDate, DataTypeDateDef, "DataTypeDateDef");
+implement_serde_as!(DataTypeDate, DataTypeDateDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DataTypeDecimal
@@ -380,7 +463,7 @@ pub struct DataTypeDecimalDef {
     pub scale: i32,
 }
 
-implement_serde_as!(DataTypeDecimal, DataTypeDecimalDef, "DataTypeDecimalDef");
+implement_serde_as!(DataTypeDecimal, DataTypeDecimalDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DataTypeDuration
@@ -393,11 +476,12 @@ implement_serde_as!(DataTypeDecimal, DataTypeDecimalDef, "DataTypeDecimalDef");
 #[serde(remote = "DataTypeDuration")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DataTypeDurationDef {
-    #[serde_as(as = "TimeUnitDef")]
-    pub unit: TimeUnit,
+    #[serde_as(as = "Option<TimeUnitDef>")]
+    #[serde(default)]
+    pub unit: Option<TimeUnit>,
 }
 
-implement_serde_as!(DataTypeDuration, DataTypeDurationDef, "DataTypeDurationDef");
+implement_serde_as!(DataTypeDuration, DataTypeDurationDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DataTypeFloat16
@@ -411,7 +495,7 @@ implement_serde_as!(DataTypeDuration, DataTypeDurationDef, "DataTypeDurationDef"
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DataTypeFloat16Def {}
 
-implement_serde_as!(DataTypeFloat16, DataTypeFloat16Def, "DataTypeFloat16Def");
+implement_serde_as!(DataTypeFloat16, DataTypeFloat16Def);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DataTypeFloat32
@@ -425,7 +509,7 @@ implement_serde_as!(DataTypeFloat16, DataTypeFloat16Def, "DataTypeFloat16Def");
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DataTypeFloat32Def {}
 
-implement_serde_as!(DataTypeFloat32, DataTypeFloat32Def, "DataTypeFloat32Def");
+implement_serde_as!(DataTypeFloat32, DataTypeFloat32Def);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DataTypeFloat64
@@ -439,7 +523,7 @@ implement_serde_as!(DataTypeFloat32, DataTypeFloat32Def, "DataTypeFloat32Def");
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DataTypeFloat64Def {}
 
-implement_serde_as!(DataTypeFloat64, DataTypeFloat64Def, "DataTypeFloat64Def");
+implement_serde_as!(DataTypeFloat64, DataTypeFloat64Def);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DataTypeInt16
@@ -453,7 +537,7 @@ implement_serde_as!(DataTypeFloat64, DataTypeFloat64Def, "DataTypeFloat64Def");
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DataTypeInt16Def {}
 
-implement_serde_as!(DataTypeInt16, DataTypeInt16Def, "DataTypeInt16Def");
+implement_serde_as!(DataTypeInt16, DataTypeInt16Def);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DataTypeInt32
@@ -467,7 +551,7 @@ implement_serde_as!(DataTypeInt16, DataTypeInt16Def, "DataTypeInt16Def");
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DataTypeInt32Def {}
 
-implement_serde_as!(DataTypeInt32, DataTypeInt32Def, "DataTypeInt32Def");
+implement_serde_as!(DataTypeInt32, DataTypeInt32Def);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DataTypeInt64
@@ -481,7 +565,7 @@ implement_serde_as!(DataTypeInt32, DataTypeInt32Def, "DataTypeInt32Def");
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DataTypeInt64Def {}
 
-implement_serde_as!(DataTypeInt64, DataTypeInt64Def, "DataTypeInt64Def");
+implement_serde_as!(DataTypeInt64, DataTypeInt64Def);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DataTypeInt8
@@ -495,7 +579,7 @@ implement_serde_as!(DataTypeInt64, DataTypeInt64Def, "DataTypeInt64Def");
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DataTypeInt8Def {}
 
-implement_serde_as!(DataTypeInt8, DataTypeInt8Def, "DataTypeInt8Def");
+implement_serde_as!(DataTypeInt8, DataTypeInt8Def);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DataTypeList
@@ -513,7 +597,7 @@ pub struct DataTypeListDef {
     pub fixed_length: Option<u64>,
 }
 
-implement_serde_as!(DataTypeList, DataTypeListDef, "DataTypeListDef");
+implement_serde_as!(DataTypeList, DataTypeListDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DataTypeMap
@@ -533,7 +617,7 @@ pub struct DataTypeMapDef {
     pub keys_sorted: Option<bool>,
 }
 
-implement_serde_as!(DataTypeMap, DataTypeMapDef, "DataTypeMapDef");
+implement_serde_as!(DataTypeMap, DataTypeMapDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DataTypeNull
@@ -547,7 +631,7 @@ implement_serde_as!(DataTypeMap, DataTypeMapDef, "DataTypeMapDef");
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DataTypeNullDef {}
 
-implement_serde_as!(DataTypeNull, DataTypeNullDef, "DataTypeNullDef");
+implement_serde_as!(DataTypeNull, DataTypeNullDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DataTypeOption
@@ -564,7 +648,7 @@ pub struct DataTypeOptionDef {
     pub inner: Box<DataType>,
 }
 
-implement_serde_as!(DataTypeOption, DataTypeOptionDef, "DataTypeOptionDef");
+implement_serde_as!(DataTypeOption, DataTypeOptionDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DataTypeString
@@ -578,7 +662,7 @@ implement_serde_as!(DataTypeOption, DataTypeOptionDef, "DataTypeOptionDef");
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DataTypeStringDef {}
 
-implement_serde_as!(DataTypeString, DataTypeStringDef, "DataTypeStringDef");
+implement_serde_as!(DataTypeString, DataTypeStringDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DataTypeStruct
@@ -595,7 +679,7 @@ pub struct DataTypeStructDef {
     pub fields: Vec<DataField>,
 }
 
-implement_serde_as!(DataTypeStruct, DataTypeStructDef, "DataTypeStructDef");
+implement_serde_as!(DataTypeStruct, DataTypeStructDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DataTypeTime
@@ -608,11 +692,12 @@ implement_serde_as!(DataTypeStruct, DataTypeStructDef, "DataTypeStructDef");
 #[serde(remote = "DataTypeTime")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DataTypeTimeDef {
-    #[serde_as(as = "TimeUnitDef")]
-    pub unit: TimeUnit,
+    #[serde_as(as = "Option<TimeUnitDef>")]
+    #[serde(default)]
+    pub unit: Option<TimeUnit>,
 }
 
-implement_serde_as!(DataTypeTime, DataTypeTimeDef, "DataTypeTimeDef");
+implement_serde_as!(DataTypeTime, DataTypeTimeDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DataTypeTimestamp
@@ -625,16 +710,13 @@ implement_serde_as!(DataTypeTime, DataTypeTimeDef, "DataTypeTimeDef");
 #[serde(remote = "DataTypeTimestamp")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DataTypeTimestampDef {
-    #[serde_as(as = "TimeUnitDef")]
-    pub unit: TimeUnit,
+    #[serde_as(as = "Option<TimeUnitDef>")]
+    #[serde(default)]
+    pub unit: Option<TimeUnit>,
     pub timezone: Option<String>,
 }
 
-implement_serde_as!(
-    DataTypeTimestamp,
-    DataTypeTimestampDef,
-    "DataTypeTimestampDef"
-);
+implement_serde_as!(DataTypeTimestamp, DataTypeTimestampDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DataTypeUInt16
@@ -648,7 +730,7 @@ implement_serde_as!(
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DataTypeUInt16Def {}
 
-implement_serde_as!(DataTypeUInt16, DataTypeUInt16Def, "DataTypeUInt16Def");
+implement_serde_as!(DataTypeUInt16, DataTypeUInt16Def);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DataTypeUInt32
@@ -662,7 +744,7 @@ implement_serde_as!(DataTypeUInt16, DataTypeUInt16Def, "DataTypeUInt16Def");
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DataTypeUInt32Def {}
 
-implement_serde_as!(DataTypeUInt32, DataTypeUInt32Def, "DataTypeUInt32Def");
+implement_serde_as!(DataTypeUInt32, DataTypeUInt32Def);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DataTypeUInt64
@@ -676,7 +758,7 @@ implement_serde_as!(DataTypeUInt32, DataTypeUInt32Def, "DataTypeUInt32Def");
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DataTypeUInt64Def {}
 
-implement_serde_as!(DataTypeUInt64, DataTypeUInt64Def, "DataTypeUInt64Def");
+implement_serde_as!(DataTypeUInt64, DataTypeUInt64Def);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DataTypeUInt8
@@ -690,7 +772,7 @@ implement_serde_as!(DataTypeUInt64, DataTypeUInt64Def, "DataTypeUInt64Def");
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DataTypeUInt8Def {}
 
-implement_serde_as!(DataTypeUInt8, DataTypeUInt8Def, "DataTypeUInt8Def");
+implement_serde_as!(DataTypeUInt8, DataTypeUInt8Def);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DatasetKind
@@ -707,7 +789,7 @@ pub enum DatasetKindDef {
     Derivative,
 }
 
-implement_serde_as!(DatasetKind, DatasetKindDef, "DatasetKindDef");
+implement_serde_as!(DatasetKind, DatasetKindDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DatasetSnapshot
@@ -727,7 +809,7 @@ pub struct DatasetSnapshotDef {
     pub metadata: Vec<MetadataEvent>,
 }
 
-implement_serde_as!(DatasetSnapshot, DatasetSnapshotDef, "DatasetSnapshotDef");
+implement_serde_as!(DatasetSnapshot, DatasetSnapshotDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DatasetVocabulary
@@ -746,11 +828,7 @@ pub struct DatasetVocabularyDef {
     pub event_time_column: String,
 }
 
-implement_serde_as!(
-    DatasetVocabulary,
-    DatasetVocabularyDef,
-    "DatasetVocabularyDef"
-);
+implement_serde_as!(DatasetVocabulary, DatasetVocabularyDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DisablePollingSource
@@ -764,11 +842,7 @@ implement_serde_as!(
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DisablePollingSourceDef {}
 
-implement_serde_as!(
-    DisablePollingSource,
-    DisablePollingSourceDef,
-    "DisablePollingSourceDef"
-);
+implement_serde_as!(DisablePollingSource, DisablePollingSourceDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // DisablePushSource
@@ -784,11 +858,7 @@ pub struct DisablePushSourceDef {
     pub source_name: String,
 }
 
-implement_serde_as!(
-    DisablePushSource,
-    DisablePushSourceDef,
-    "DisablePushSourceDef"
-);
+implement_serde_as!(DisablePushSource, DisablePushSourceDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // EnvVar
@@ -805,7 +875,7 @@ pub struct EnvVarDef {
     pub value: Option<String>,
 }
 
-implement_serde_as!(EnvVar, EnvVarDef, "EnvVarDef");
+implement_serde_as!(EnvVar, EnvVarDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // EventTimeSource
@@ -827,7 +897,7 @@ pub enum EventTimeSourceDef {
     ),
 }
 
-implement_serde_as!(EventTimeSource, EventTimeSourceDef, "EventTimeSourceDef");
+implement_serde_as_short_form_union!(EventTimeSource, EventTimeSourceDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // EventTimeSourceFromMetadata
@@ -841,11 +911,7 @@ implement_serde_as!(EventTimeSource, EventTimeSourceDef, "EventTimeSourceDef");
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct EventTimeSourceFromMetadataDef {}
 
-implement_serde_as!(
-    EventTimeSourceFromMetadata,
-    EventTimeSourceFromMetadataDef,
-    "EventTimeSourceFromMetadataDef"
-);
+implement_serde_as!(EventTimeSourceFromMetadata, EventTimeSourceFromMetadataDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // EventTimeSourceFromPath
@@ -862,11 +928,7 @@ pub struct EventTimeSourceFromPathDef {
     pub timestamp_format: Option<String>,
 }
 
-implement_serde_as!(
-    EventTimeSourceFromPath,
-    EventTimeSourceFromPathDef,
-    "EventTimeSourceFromPathDef"
-);
+implement_serde_as!(EventTimeSourceFromPath, EventTimeSourceFromPathDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // EventTimeSourceFromSystemTime
@@ -882,8 +944,7 @@ pub struct EventTimeSourceFromSystemTimeDef {}
 
 implement_serde_as!(
     EventTimeSourceFromSystemTime,
-    EventTimeSourceFromSystemTimeDef,
-    "EventTimeSourceFromSystemTimeDef"
+    EventTimeSourceFromSystemTimeDef
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -911,7 +972,7 @@ pub struct ExecuteTransformDef {
     pub new_watermark: Option<DateTime<Utc>>,
 }
 
-implement_serde_as!(ExecuteTransform, ExecuteTransformDef, "ExecuteTransformDef");
+implement_serde_as!(ExecuteTransform, ExecuteTransformDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // ExecuteTransformInput
@@ -931,11 +992,7 @@ pub struct ExecuteTransformInputDef {
     pub new_offset: Option<u64>,
 }
 
-implement_serde_as!(
-    ExecuteTransformInput,
-    ExecuteTransformInputDef,
-    "ExecuteTransformInputDef"
-);
+implement_serde_as!(ExecuteTransformInput, ExecuteTransformInputDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // ExtraAttributes
@@ -952,7 +1009,7 @@ pub struct ExtraAttributesDef {
     pub attributes: serde_json::Map<String, serde_json::Value>,
 }
 
-implement_serde_as!(ExtraAttributes, ExtraAttributesDef, "ExtraAttributesDef");
+implement_serde_as!(ExtraAttributes, ExtraAttributesDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // FetchStep
@@ -976,7 +1033,7 @@ pub enum FetchStepDef {
     EthereumLogs(#[serde_as(as = "FetchStepEthereumLogsDef")] FetchStepEthereumLogs),
 }
 
-implement_serde_as!(FetchStep, FetchStepDef, "FetchStepDef");
+implement_serde_as!(FetchStep, FetchStepDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // FetchStepContainer
@@ -997,11 +1054,7 @@ pub struct FetchStepContainerDef {
     pub env: Option<Vec<EnvVar>>,
 }
 
-implement_serde_as!(
-    FetchStepContainer,
-    FetchStepContainerDef,
-    "FetchStepContainerDef"
-);
+implement_serde_as!(FetchStepContainer, FetchStepContainerDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // FetchStepEthereumLogs
@@ -1020,11 +1073,7 @@ pub struct FetchStepEthereumLogsDef {
     pub signature: Option<String>,
 }
 
-implement_serde_as!(
-    FetchStepEthereumLogs,
-    FetchStepEthereumLogsDef,
-    "FetchStepEthereumLogsDef"
-);
+implement_serde_as!(FetchStepEthereumLogs, FetchStepEthereumLogsDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // FetchStepFilesGlob
@@ -1049,11 +1098,7 @@ pub struct FetchStepFilesGlobDef {
     pub order: Option<SourceOrdering>,
 }
 
-implement_serde_as!(
-    FetchStepFilesGlob,
-    FetchStepFilesGlobDef,
-    "FetchStepFilesGlobDef"
-);
+implement_serde_as!(FetchStepFilesGlob, FetchStepFilesGlobDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // FetchStepMqtt
@@ -1074,7 +1119,7 @@ pub struct FetchStepMqttDef {
     pub topics: Vec<MqttTopicSubscription>,
 }
 
-implement_serde_as!(FetchStepMqtt, FetchStepMqttDef, "FetchStepMqttDef");
+implement_serde_as!(FetchStepMqtt, FetchStepMqttDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // FetchStepUrl
@@ -1099,7 +1144,7 @@ pub struct FetchStepUrlDef {
     pub headers: Option<Vec<RequestHeader>>,
 }
 
-implement_serde_as!(FetchStepUrl, FetchStepUrlDef, "FetchStepUrlDef");
+implement_serde_as!(FetchStepUrl, FetchStepUrlDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // MergeStrategy
@@ -1125,7 +1170,7 @@ pub enum MergeStrategyDef {
     UpsertStream(#[serde_as(as = "MergeStrategyUpsertStreamDef")] MergeStrategyUpsertStream),
 }
 
-implement_serde_as!(MergeStrategy, MergeStrategyDef, "MergeStrategyDef");
+implement_serde_as!(MergeStrategy, MergeStrategyDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // MergeStrategyAppend
@@ -1139,11 +1184,7 @@ implement_serde_as!(MergeStrategy, MergeStrategyDef, "MergeStrategyDef");
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct MergeStrategyAppendDef {}
 
-implement_serde_as!(
-    MergeStrategyAppend,
-    MergeStrategyAppendDef,
-    "MergeStrategyAppendDef"
-);
+implement_serde_as!(MergeStrategyAppend, MergeStrategyAppendDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // MergeStrategyChangelogStream
@@ -1161,8 +1202,7 @@ pub struct MergeStrategyChangelogStreamDef {
 
 implement_serde_as!(
     MergeStrategyChangelogStream,
-    MergeStrategyChangelogStreamDef,
-    "MergeStrategyChangelogStreamDef"
+    MergeStrategyChangelogStreamDef
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1179,11 +1219,7 @@ pub struct MergeStrategyLedgerDef {
     pub primary_key: Vec<String>,
 }
 
-implement_serde_as!(
-    MergeStrategyLedger,
-    MergeStrategyLedgerDef,
-    "MergeStrategyLedgerDef"
-);
+implement_serde_as!(MergeStrategyLedger, MergeStrategyLedgerDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // MergeStrategySnapshot
@@ -1200,11 +1236,7 @@ pub struct MergeStrategySnapshotDef {
     pub compare_columns: Option<Vec<String>>,
 }
 
-implement_serde_as!(
-    MergeStrategySnapshot,
-    MergeStrategySnapshotDef,
-    "MergeStrategySnapshotDef"
-);
+implement_serde_as!(MergeStrategySnapshot, MergeStrategySnapshotDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // MergeStrategyUpsertStream
@@ -1220,11 +1252,7 @@ pub struct MergeStrategyUpsertStreamDef {
     pub primary_key: Vec<String>,
 }
 
-implement_serde_as!(
-    MergeStrategyUpsertStream,
-    MergeStrategyUpsertStreamDef,
-    "MergeStrategyUpsertStreamDef"
-);
+implement_serde_as!(MergeStrategyUpsertStream, MergeStrategyUpsertStreamDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // MetadataBlock
@@ -1245,7 +1273,7 @@ pub struct MetadataBlockDef {
     pub event: MetadataEvent,
 }
 
-implement_serde_as!(MetadataBlock, MetadataBlockDef, "MetadataBlockDef");
+implement_serde_as!(MetadataBlock, MetadataBlockDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // MetadataEvent
@@ -1285,7 +1313,7 @@ pub enum MetadataEventDef {
     DisablePollingSource(#[serde_as(as = "DisablePollingSourceDef")] DisablePollingSource),
 }
 
-implement_serde_as!(MetadataEvent, MetadataEventDef, "MetadataEventDef");
+implement_serde_as!(MetadataEvent, MetadataEventDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // MqttQos
@@ -1304,7 +1332,7 @@ pub enum MqttQosDef {
     ExactlyOnce,
 }
 
-implement_serde_as!(MqttQos, MqttQosDef, "MqttQosDef");
+implement_serde_as!(MqttQos, MqttQosDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // MqttTopicSubscription
@@ -1323,11 +1351,7 @@ pub struct MqttTopicSubscriptionDef {
     pub qos: Option<MqttQos>,
 }
 
-implement_serde_as!(
-    MqttTopicSubscription,
-    MqttTopicSubscriptionDef,
-    "MqttTopicSubscriptionDef"
-);
+implement_serde_as!(MqttTopicSubscription, MqttTopicSubscriptionDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // OffsetInterval
@@ -1344,7 +1368,7 @@ pub struct OffsetIntervalDef {
     pub end: u64,
 }
 
-implement_serde_as!(OffsetInterval, OffsetIntervalDef, "OffsetIntervalDef");
+implement_serde_as!(OffsetInterval, OffsetIntervalDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // PrepStep
@@ -1362,7 +1386,7 @@ pub enum PrepStepDef {
     Pipe(#[serde_as(as = "PrepStepPipeDef")] PrepStepPipe),
 }
 
-implement_serde_as!(PrepStep, PrepStepDef, "PrepStepDef");
+implement_serde_as!(PrepStep, PrepStepDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // PrepStepDecompress
@@ -1380,11 +1404,7 @@ pub struct PrepStepDecompressDef {
     pub sub_path: Option<String>,
 }
 
-implement_serde_as!(
-    PrepStepDecompress,
-    PrepStepDecompressDef,
-    "PrepStepDecompressDef"
-);
+implement_serde_as!(PrepStepDecompress, PrepStepDecompressDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // PrepStepPipe
@@ -1400,7 +1420,7 @@ pub struct PrepStepPipeDef {
     pub command: Vec<String>,
 }
 
-implement_serde_as!(PrepStepPipe, PrepStepPipeDef, "PrepStepPipeDef");
+implement_serde_as!(PrepStepPipe, PrepStepPipeDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // RawQueryRequest
@@ -1419,7 +1439,7 @@ pub struct RawQueryRequestDef {
     pub output_data_path: PathBuf,
 }
 
-implement_serde_as!(RawQueryRequest, RawQueryRequestDef, "RawQueryRequestDef");
+implement_serde_as!(RawQueryRequest, RawQueryRequestDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // RawQueryResponse
@@ -1443,7 +1463,7 @@ pub enum RawQueryResponseDef {
     ),
 }
 
-implement_serde_as!(RawQueryResponse, RawQueryResponseDef, "RawQueryResponseDef");
+implement_serde_as!(RawQueryResponse, RawQueryResponseDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // RawQueryResponseInternalError
@@ -1462,8 +1482,7 @@ pub struct RawQueryResponseInternalErrorDef {
 
 implement_serde_as!(
     RawQueryResponseInternalError,
-    RawQueryResponseInternalErrorDef,
-    "RawQueryResponseInternalErrorDef"
+    RawQueryResponseInternalErrorDef
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1482,8 +1501,7 @@ pub struct RawQueryResponseInvalidQueryDef {
 
 implement_serde_as!(
     RawQueryResponseInvalidQuery,
-    RawQueryResponseInvalidQueryDef,
-    "RawQueryResponseInvalidQueryDef"
+    RawQueryResponseInvalidQueryDef
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1498,11 +1516,7 @@ implement_serde_as!(
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct RawQueryResponseProgressDef {}
 
-implement_serde_as!(
-    RawQueryResponseProgress,
-    RawQueryResponseProgressDef,
-    "RawQueryResponseProgressDef"
-);
+implement_serde_as!(RawQueryResponseProgress, RawQueryResponseProgressDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // RawQueryResponseSuccess
@@ -1518,11 +1532,7 @@ pub struct RawQueryResponseSuccessDef {
     pub num_records: u64,
 }
 
-implement_serde_as!(
-    RawQueryResponseSuccess,
-    RawQueryResponseSuccessDef,
-    "RawQueryResponseSuccessDef"
-);
+implement_serde_as!(RawQueryResponseSuccess, RawQueryResponseSuccessDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // ReadStep
@@ -1550,7 +1560,7 @@ pub enum ReadStepDef {
     NdGeoJson(#[serde_as(as = "ReadStepNdGeoJsonDef")] ReadStepNdGeoJson),
 }
 
-implement_serde_as!(ReadStep, ReadStepDef, "ReadStepDef");
+implement_serde_as!(ReadStep, ReadStepDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // ReadStepCsv
@@ -1563,7 +1573,7 @@ implement_serde_as!(ReadStep, ReadStepDef, "ReadStepDef");
 #[serde(remote = "ReadStepCsv")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ReadStepCsvDef {
-    pub schema: Option<Vec<String>>,
+    pub ddl_schema: Option<Vec<String>>,
     pub separator: Option<String>,
     pub encoding: Option<String>,
     pub quote: Option<String>,
@@ -1573,9 +1583,12 @@ pub struct ReadStepCsvDef {
     pub null_value: Option<String>,
     pub date_format: Option<String>,
     pub timestamp_format: Option<String>,
+    #[serde_as(as = "Option<DataSchemaDef>")]
+    #[serde(default)]
+    pub schema: Option<DataSchema>,
 }
 
-implement_serde_as!(ReadStepCsv, ReadStepCsvDef, "ReadStepCsvDef");
+implement_serde_as!(ReadStepCsv, ReadStepCsvDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // ReadStepEsriShapefile
@@ -1588,15 +1601,14 @@ implement_serde_as!(ReadStepCsv, ReadStepCsvDef, "ReadStepCsvDef");
 #[serde(remote = "ReadStepEsriShapefile")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ReadStepEsriShapefileDef {
-    pub schema: Option<Vec<String>>,
+    pub ddl_schema: Option<Vec<String>>,
     pub sub_path: Option<String>,
+    #[serde_as(as = "Option<DataSchemaDef>")]
+    #[serde(default)]
+    pub schema: Option<DataSchema>,
 }
 
-implement_serde_as!(
-    ReadStepEsriShapefile,
-    ReadStepEsriShapefileDef,
-    "ReadStepEsriShapefileDef"
-);
+implement_serde_as!(ReadStepEsriShapefile, ReadStepEsriShapefileDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // ReadStepGeoJson
@@ -1609,10 +1621,13 @@ implement_serde_as!(
 #[serde(remote = "ReadStepGeoJson")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ReadStepGeoJsonDef {
-    pub schema: Option<Vec<String>>,
+    pub ddl_schema: Option<Vec<String>>,
+    #[serde_as(as = "Option<DataSchemaDef>")]
+    #[serde(default)]
+    pub schema: Option<DataSchema>,
 }
 
-implement_serde_as!(ReadStepGeoJson, ReadStepGeoJsonDef, "ReadStepGeoJsonDef");
+implement_serde_as!(ReadStepGeoJson, ReadStepGeoJsonDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // ReadStepJson
@@ -1626,13 +1641,16 @@ implement_serde_as!(ReadStepGeoJson, ReadStepGeoJsonDef, "ReadStepGeoJsonDef");
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ReadStepJsonDef {
     pub sub_path: Option<String>,
-    pub schema: Option<Vec<String>>,
+    pub ddl_schema: Option<Vec<String>>,
     pub date_format: Option<String>,
     pub encoding: Option<String>,
     pub timestamp_format: Option<String>,
+    #[serde_as(as = "Option<DataSchemaDef>")]
+    #[serde(default)]
+    pub schema: Option<DataSchema>,
 }
 
-implement_serde_as!(ReadStepJson, ReadStepJsonDef, "ReadStepJsonDef");
+implement_serde_as!(ReadStepJson, ReadStepJsonDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // ReadStepNdGeoJson
@@ -1645,14 +1663,13 @@ implement_serde_as!(ReadStepJson, ReadStepJsonDef, "ReadStepJsonDef");
 #[serde(remote = "ReadStepNdGeoJson")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ReadStepNdGeoJsonDef {
-    pub schema: Option<Vec<String>>,
+    pub ddl_schema: Option<Vec<String>>,
+    #[serde_as(as = "Option<DataSchemaDef>")]
+    #[serde(default)]
+    pub schema: Option<DataSchema>,
 }
 
-implement_serde_as!(
-    ReadStepNdGeoJson,
-    ReadStepNdGeoJsonDef,
-    "ReadStepNdGeoJsonDef"
-);
+implement_serde_as!(ReadStepNdGeoJson, ReadStepNdGeoJsonDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // ReadStepNdJson
@@ -1665,13 +1682,16 @@ implement_serde_as!(
 #[serde(remote = "ReadStepNdJson")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ReadStepNdJsonDef {
-    pub schema: Option<Vec<String>>,
+    pub ddl_schema: Option<Vec<String>>,
     pub date_format: Option<String>,
     pub encoding: Option<String>,
     pub timestamp_format: Option<String>,
+    #[serde_as(as = "Option<DataSchemaDef>")]
+    #[serde(default)]
+    pub schema: Option<DataSchema>,
 }
 
-implement_serde_as!(ReadStepNdJson, ReadStepNdJsonDef, "ReadStepNdJsonDef");
+implement_serde_as!(ReadStepNdJson, ReadStepNdJsonDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // ReadStepParquet
@@ -1684,10 +1704,13 @@ implement_serde_as!(ReadStepNdJson, ReadStepNdJsonDef, "ReadStepNdJsonDef");
 #[serde(remote = "ReadStepParquet")]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ReadStepParquetDef {
-    pub schema: Option<Vec<String>>,
+    pub ddl_schema: Option<Vec<String>>,
+    #[serde_as(as = "Option<DataSchemaDef>")]
+    #[serde(default)]
+    pub schema: Option<DataSchema>,
 }
 
-implement_serde_as!(ReadStepParquet, ReadStepParquetDef, "ReadStepParquetDef");
+implement_serde_as!(ReadStepParquet, ReadStepParquetDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // RequestHeader
@@ -1704,7 +1727,7 @@ pub struct RequestHeaderDef {
     pub value: String,
 }
 
-implement_serde_as!(RequestHeader, RequestHeaderDef, "RequestHeaderDef");
+implement_serde_as!(RequestHeader, RequestHeaderDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Seed
@@ -1722,7 +1745,7 @@ pub struct SeedDef {
     pub dataset_kind: DatasetKind,
 }
 
-implement_serde_as!(Seed, SeedDef, "SeedDef");
+implement_serde_as!(Seed, SeedDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // SetAttachments
@@ -1739,7 +1762,7 @@ pub struct SetAttachmentsDef {
     pub attachments: Attachments,
 }
 
-implement_serde_as!(SetAttachments, SetAttachmentsDef, "SetAttachmentsDef");
+implement_serde_as!(SetAttachments, SetAttachmentsDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // SetDataSchema
@@ -1760,7 +1783,7 @@ pub struct SetDataSchemaDef {
     pub schema: Option<DataSchema>,
 }
 
-implement_serde_as!(SetDataSchema, SetDataSchemaDef, "SetDataSchemaDef");
+implement_serde_as!(SetDataSchema, SetDataSchemaDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // SetInfo
@@ -1777,7 +1800,7 @@ pub struct SetInfoDef {
     pub keywords: Option<Vec<String>>,
 }
 
-implement_serde_as!(SetInfo, SetInfoDef, "SetInfoDef");
+implement_serde_as!(SetInfo, SetInfoDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // SetLicense
@@ -1796,7 +1819,7 @@ pub struct SetLicenseDef {
     pub website_url: String,
 }
 
-implement_serde_as!(SetLicense, SetLicenseDef, "SetLicenseDef");
+implement_serde_as!(SetLicense, SetLicenseDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // SetPollingSource
@@ -1823,7 +1846,7 @@ pub struct SetPollingSourceDef {
     pub merge: MergeStrategy,
 }
 
-implement_serde_as!(SetPollingSource, SetPollingSourceDef, "SetPollingSourceDef");
+implement_serde_as!(SetPollingSource, SetPollingSourceDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // SetTransform
@@ -1842,7 +1865,7 @@ pub struct SetTransformDef {
     pub transform: Transform,
 }
 
-implement_serde_as!(SetTransform, SetTransformDef, "SetTransformDef");
+implement_serde_as!(SetTransform, SetTransformDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // SetVocab
@@ -1861,7 +1884,7 @@ pub struct SetVocabDef {
     pub event_time_column: Option<String>,
 }
 
-implement_serde_as!(SetVocab, SetVocabDef, "SetVocabDef");
+implement_serde_as!(SetVocab, SetVocabDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // SourceCaching
@@ -1877,7 +1900,7 @@ pub enum SourceCachingDef {
     Forever(#[serde_as(as = "SourceCachingForeverDef")] SourceCachingForever),
 }
 
-implement_serde_as!(SourceCaching, SourceCachingDef, "SourceCachingDef");
+implement_serde_as_short_form_union!(SourceCaching, SourceCachingDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // SourceCachingForever
@@ -1891,11 +1914,7 @@ implement_serde_as!(SourceCaching, SourceCachingDef, "SourceCachingDef");
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct SourceCachingForeverDef {}
 
-implement_serde_as!(
-    SourceCachingForever,
-    SourceCachingForeverDef,
-    "SourceCachingForeverDef"
-);
+implement_serde_as!(SourceCachingForever, SourceCachingForeverDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // SourceOrdering
@@ -1912,7 +1931,7 @@ pub enum SourceOrderingDef {
     ByName,
 }
 
-implement_serde_as!(SourceOrdering, SourceOrderingDef, "SourceOrderingDef");
+implement_serde_as!(SourceOrdering, SourceOrderingDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // SourceState
@@ -1930,7 +1949,7 @@ pub struct SourceStateDef {
     pub value: String,
 }
 
-implement_serde_as!(SourceState, SourceStateDef, "SourceStateDef");
+implement_serde_as!(SourceState, SourceStateDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // SqlQueryStep
@@ -1947,7 +1966,7 @@ pub struct SqlQueryStepDef {
     pub query: String,
 }
 
-implement_serde_as!(SqlQueryStep, SqlQueryStepDef, "SqlQueryStepDef");
+implement_serde_as!(SqlQueryStep, SqlQueryStepDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // TemporalTable
@@ -1964,7 +1983,7 @@ pub struct TemporalTableDef {
     pub primary_key: Vec<String>,
 }
 
-implement_serde_as!(TemporalTable, TemporalTableDef, "TemporalTableDef");
+implement_serde_as!(TemporalTable, TemporalTableDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // TimeUnit
@@ -1985,7 +2004,7 @@ pub enum TimeUnitDef {
     Nanosecond,
 }
 
-implement_serde_as!(TimeUnit, TimeUnitDef, "TimeUnitDef");
+implement_serde_as!(TimeUnit, TimeUnitDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Transform
@@ -2001,7 +2020,7 @@ pub enum TransformDef {
     Sql(#[serde_as(as = "TransformSqlDef")] TransformSql),
 }
 
-implement_serde_as!(Transform, TransformDef, "TransformDef");
+implement_serde_as!(Transform, TransformDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // TransformSql
@@ -2025,7 +2044,7 @@ pub struct TransformSqlDef {
     pub temporal_tables: Option<Vec<TemporalTable>>,
 }
 
-implement_serde_as!(TransformSql, TransformSqlDef, "TransformSqlDef");
+implement_serde_as!(TransformSql, TransformSqlDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // TransformInput
@@ -2042,7 +2061,7 @@ pub struct TransformInputDef {
     pub alias: Option<String>,
 }
 
-implement_serde_as!(TransformInput, TransformInputDef, "TransformInputDef");
+implement_serde_as!(TransformInput, TransformInputDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // TransformRequest
@@ -2071,7 +2090,7 @@ pub struct TransformRequestDef {
     pub new_data_path: PathBuf,
 }
 
-implement_serde_as!(TransformRequest, TransformRequestDef, "TransformRequestDef");
+implement_serde_as!(TransformRequest, TransformRequestDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // TransformRequestInput
@@ -2098,11 +2117,7 @@ pub struct TransformRequestInputDef {
     pub explicit_watermarks: Vec<Watermark>,
 }
 
-implement_serde_as!(
-    TransformRequestInput,
-    TransformRequestInputDef,
-    "TransformRequestInputDef"
-);
+implement_serde_as!(TransformRequestInput, TransformRequestInputDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // TransformResponse
@@ -2128,11 +2143,7 @@ pub enum TransformResponseDef {
     ),
 }
 
-implement_serde_as!(
-    TransformResponse,
-    TransformResponseDef,
-    "TransformResponseDef"
-);
+implement_serde_as!(TransformResponse, TransformResponseDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // TransformResponseInternalError
@@ -2151,8 +2162,7 @@ pub struct TransformResponseInternalErrorDef {
 
 implement_serde_as!(
     TransformResponseInternalError,
-    TransformResponseInternalErrorDef,
-    "TransformResponseInternalErrorDef"
+    TransformResponseInternalErrorDef
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2171,8 +2181,7 @@ pub struct TransformResponseInvalidQueryDef {
 
 implement_serde_as!(
     TransformResponseInvalidQuery,
-    TransformResponseInvalidQueryDef,
-    "TransformResponseInvalidQueryDef"
+    TransformResponseInvalidQueryDef
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2187,11 +2196,7 @@ implement_serde_as!(
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct TransformResponseProgressDef {}
 
-implement_serde_as!(
-    TransformResponseProgress,
-    TransformResponseProgressDef,
-    "TransformResponseProgressDef"
-);
+implement_serde_as!(TransformResponseProgress, TransformResponseProgressDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // TransformResponseSuccess
@@ -2211,11 +2216,7 @@ pub struct TransformResponseSuccessDef {
     pub new_watermark: Option<DateTime<Utc>>,
 }
 
-implement_serde_as!(
-    TransformResponseSuccess,
-    TransformResponseSuccessDef,
-    "TransformResponseSuccessDef"
-);
+implement_serde_as!(TransformResponseSuccess, TransformResponseSuccessDef);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Watermark
@@ -2234,4 +2235,4 @@ pub struct WatermarkDef {
     pub event_time: DateTime<Utc>,
 }
 
-implement_serde_as!(Watermark, WatermarkDef, "WatermarkDef");
+implement_serde_as!(Watermark, WatermarkDef);

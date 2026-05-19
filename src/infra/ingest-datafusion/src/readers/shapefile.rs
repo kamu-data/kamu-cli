@@ -20,31 +20,33 @@ use crate::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct ReaderEsriShapefile {
+    inner: ReaderNdJson,
     sub_path: Option<String>,
     temp_path: PathBuf,
-    inner: ReaderNdJson,
 }
 
 impl ReaderEsriShapefile {
     // TODO: This is an ugly API that leaves it to the caller to clean up our temp
     // file mess. Ideally we should not produce any temp files at all and stream in
     // all data.
-    pub async fn new(
+    pub fn new(
         ctx: SessionContext,
         conf: odf::metadata::ReadStepEsriShapefile,
+        to_arrow_settings: &odf::schema::ToArrowSettings,
         temp_path: impl Into<PathBuf>,
     ) -> Result<Self, ReadError> {
         let inner_conf = odf::metadata::ReadStepNdJson {
             schema: conf.schema,
+            ddl_schema: conf.ddl_schema,
             date_format: None,
             encoding: None,
             timestamp_format: None,
         };
 
         Ok(Self {
+            inner: ReaderNdJson::new(ctx, inner_conf, to_arrow_settings)?,
             sub_path: conf.sub_path,
             temp_path: temp_path.into(),
-            inner: ReaderNdJson::new(ctx, inner_conf).await?,
         })
     }
 
@@ -227,8 +229,12 @@ impl ReaderEsriShapefile {
 
 #[async_trait::async_trait]
 impl Reader for ReaderEsriShapefile {
-    async fn input_schema(&self) -> Option<SchemaRef> {
-        self.inner.input_schema().await
+    fn schema(&self) -> Option<&odf::schema::DataSchema> {
+        self.inner.schema()
+    }
+
+    fn schema_arrow(&self) -> Option<&SchemaRef> {
+        self.inner.schema_arrow()
     }
 
     #[tracing::instrument(level = "info", name = "ReaderEsriShapefile::read", skip_all)]

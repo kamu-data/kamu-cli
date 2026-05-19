@@ -215,9 +215,9 @@ async fn test_pull_reset_derivative(kamu: KamuCliPuppet) {
           REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
           REQUIRED INT64 match_time (TIMESTAMP(MILLIS,true));
           REQUIRED INT64 place (INTEGER(64,false));
-          OPTIONAL INT64 match_id;
-          OPTIONAL BYTE_ARRAY player_id (STRING);
-          OPTIONAL INT64 score;
+          REQUIRED INT64 match_id;
+          REQUIRED BYTE_ARRAY player_id (STRING);
+          REQUIRED INT64 score;
         }
         "#
     );

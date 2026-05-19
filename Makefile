@@ -532,7 +532,7 @@ test-full:
 # Run all tests excluding the heavy engines and databases
 .PHONY: test-fast
 test-fast:
-	$(TEST_LOG_PARAMS) cargo nextest run -E 'not (test(::spark::) | test(::flink::)| test(::risingwave::) | test(::database::) | test(::elasticsearch::) | test(::examples::))'
+	$(TEST_LOG_PARAMS) cargo nextest run -E 'not (test(::spark::) | test(::flink::) | test(::risingwave::) | test(::database::) | test(::elasticsearch::) | test(::examples::))'
 
 .PHONY: test-e2e
 test-e2e:

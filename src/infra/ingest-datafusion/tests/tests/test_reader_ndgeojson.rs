@@ -10,6 +10,7 @@
 use datafusion::prelude::SessionContext;
 use indoc::indoc;
 use kamu_ingest_datafusion::*;
+use odf::schema::*;
 
 use super::test_reader_common;
 
@@ -24,16 +25,17 @@ async fn test_read_ndgeojson_with_schema() {
         ReaderNdGeoJson::new(
             SessionContext::new(),
             odf::metadata::ReadStepNdGeoJson {
-                schema: Some(vec![
-                    "id int not null".to_string(),
-                    "zipcode string not null".to_string(),
-                    "name string not null".to_string(),
-                    "geometry string not null".to_string(),
-                ]),
+                schema: Some(DataSchema::new(vec![
+                    DataField::i32("id"),
+                    DataField::string("zipcode"),
+                    DataField::string("name"),
+                    DataField::string("geometry"),
+                ])),
+                ..Default::default()
             },
+            &ToArrowSettings::default(),
             temp_dir.path().join("reader-tmp")
         )
-        .await
         .unwrap(),
         indoc!(
             r#"
@@ -77,10 +79,11 @@ async fn test_read_ndgeojson_infer_schema() {
             SessionContext::new(),
             odf::metadata::ReadStepNdGeoJson {
                 schema: None,
+                ..Default::default()
             },
+            &ToArrowSettings::default(),
             temp_dir.path().join("reader-tmp"),
         )
-        .await
         .unwrap(),
         indoc!(
             r#"

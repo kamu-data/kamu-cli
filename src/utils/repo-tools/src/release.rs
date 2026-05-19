@@ -78,6 +78,7 @@ fn main() {
     update_openapi_schema(Path::new("resources/openapi-mt.json"), &new_version);
 
     update_config_schema(Path::new("resources/config-schema.json"), &new_version);
+    update_config_reference(Path::new("resources/config-reference.md"), &new_version);
 
     update_web_ui_version_for_release(Path::new(".github/workflows/release.yaml"));
 }
@@ -155,6 +156,18 @@ fn update_config_schema(path: &Path, new_version: &Version) {
 
     pretty_assertions::assert_ne!(text, new_text);
     std::fs::write(path, new_text).expect("Failed to write to schema file");
+}
+
+fn update_config_reference(path: &Path, new_version: &Version) {
+    let text = std::fs::read_to_string(path).expect("Could not read the config reference file");
+
+    let re = regex::Regex::new(r#"kamu-cli&#x2F;\d+\.\d+\.\d+"#).unwrap();
+    let new_text = re
+        .replace_all(&text, |_: &Captures| format!("kamu-cli&#x2F;{new_version}"))
+        .to_string();
+
+    pretty_assertions::assert_ne!(text, new_text);
+    std::fs::write(path, new_text).expect("Failed to write to config reference file");
 }
 
 fn update_license_text(

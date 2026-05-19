@@ -12,14 +12,23 @@ content:
         kind: Csv
         header: true
         schema:
-          - Date TIMESTAMP
-          - Symbol STRING
-          - AdjClose DOUBLE
-          - Close DOUBLE
-          - High DOUBLE
-          - Low DOUBLE
-          - Open DOUBLE
-          - Volume DOUBLE
+          fields:
+            - name: Date
+              type: timestamp
+            - name: Symbol
+              type: string
+            - name: AdjClose
+              type: float64
+            - name: Close
+              type: float64
+            - name: High
+              type: float64
+            - name: Low
+              type: float64
+            - name: Open
+              type: float64
+            - name: Volume
+              type: float64
       preprocess:
         kind: Sql
         engine: datafusion

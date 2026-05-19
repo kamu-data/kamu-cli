@@ -22,21 +22,35 @@ use crate::*;
 
 pub struct ReaderCsv {
     ctx: SessionContext,
-    schema: Option<SchemaRef>,
     conf: odf::metadata::ReadStepCsv,
+    schema_arrow: Option<SchemaRef>,
 }
 
 impl ReaderCsv {
     const DEFAULT_INFER_SCHEMA_ROWS: usize = 1000;
 
-    pub async fn new(
+    pub fn new(
         ctx: SessionContext,
         conf: odf::metadata::ReadStepCsv,
+        to_arrow_settings: &odf::schema::ToArrowSettings,
     ) -> Result<Self, ReadError> {
+        assert!(
+            conf.ddl_schema.is_none(),
+            "DDL schema must be normalized before into ODF before creating a reader"
+        );
+
+        let schema_arrow = conf
+            .schema
+            .as_ref()
+            .map(|s| s.to_arrow(to_arrow_settings))
+            .transpose()
+            .int_err()?
+            .map(std::sync::Arc::new);
+
         Ok(Self {
-            schema: super::from_ddl_schema(&ctx, conf.schema.as_ref()).await?,
             ctx,
             conf,
+            schema_arrow,
         })
     }
 }
@@ -45,69 +59,57 @@ impl ReaderCsv {
 
 #[async_trait::async_trait]
 impl Reader for ReaderCsv {
-    async fn input_schema(&self) -> Option<SchemaRef> {
-        self.schema.clone()
+    fn schema(&self) -> Option<&odf::schema::DataSchema> {
+        self.conf.schema.as_ref()
+    }
+
+    fn schema_arrow(&self) -> Option<&SchemaRef> {
+        self.schema_arrow.as_ref()
     }
 
     #[tracing::instrument(level = "info", name = "ReaderCsv::read", skip_all)]
     async fn read(&self, path: &Path) -> Result<DataFrameExt, ReadError> {
         // TODO: Move this to reader construction phase
-        let delimiter = match &self.conf.separator {
-            Some(v) if !v.is_empty() => {
-                if v.len() > 1 {
-                    return Err("Csv.separator supports only single-character ascii values"
-                        .int_err()
-                        .into());
-                }
-                v.as_bytes()[0]
-            }
-            _ => b',',
-        };
-        let quote = match &self.conf.quote {
-            Some(v) if !v.is_empty() => {
-                if v.len() > 1 {
-                    Err(unsupported!(
-                        "Csv.quote supports only single-character ascii values, got: {}",
-                        v
-                    ))
-                } else {
-                    Ok(v.as_bytes()[0])
-                }
-            }
-            _ => Ok(b'"'),
+        let delimiter = match self.conf.separator() {
+            v if v.len() == 1 => Ok(v.as_bytes()[0]),
+            _ => Err(unsupported!(
+                "Csv.separator supports only single-character ascii values"
+            )),
         }?;
-        let escape = match &self.conf.escape {
-            Some(v) if !v.is_empty() => {
-                if v.len() > 1 {
-                    Err(unsupported!(
-                        "Csv.escape supports only single-character ascii values, got: {}",
-                        v
-                    ))
-                } else {
-                    Ok(Some(v.as_bytes()[0]))
-                }
-            }
-            _ => Ok(None),
+        let quote = match self.conf.quote() {
+            v if v.len() == 1 => Ok(v.as_bytes()[0]),
+            v => Err(unsupported!(
+                "Csv.quote supports only single-character ascii values, got: {}",
+                v
+            )),
         }?;
-        match self.conf.encoding.as_deref() {
-            None | Some("utf8") => Ok(()),
-            Some(v) => Err(unsupported!("Unsupported Csv.encoding: {}", v)),
+        let escape = match self.conf.escape() {
+            "" => Ok(None),
+            v if v.len() == 1 => Ok(Some(v.as_bytes()[0])),
+            v => Err(unsupported!(
+                "Csv.escape supports only single-character ascii values, got: {}",
+                v
+            )),
         }?;
-        match self.conf.null_value.as_deref() {
-            None | Some("") => Ok(()),
-            Some(v) => Err(unsupported!("Unsupported Csv.nullValue: {}", v)),
+        match self.conf.encoding() {
+            "utf8" => Ok(()),
+            v => Err(unsupported!("Unsupported Csv.encoding: {}", v)),
         }?;
-        match self.conf.date_format.as_deref() {
-            None | Some("rfc3339") => Ok(()),
-            Some(v) => Err(unsupported!("Unsupported Csv.dateFormat: {}", v)),
+        match self.conf.null_value() {
+            "" => Ok(()),
+            v => Err(unsupported!("Unsupported Csv.nullValue: {}", v)),
         }?;
-        match self.conf.timestamp_format.as_deref() {
-            None | Some("rfc3339") => Ok(()),
-            Some(v) => Err(unsupported!("Unsupported Csv.timestampFormat: {}", v)),
+        match self.conf.date_format() {
+            "rfc3339" => Ok(()),
+            v => Err(unsupported!("Unsupported Csv.dateFormat: {}", v)),
+        }?;
+        match self.conf.timestamp_format() {
+            "rfc3339" => Ok(()),
+            v => Err(unsupported!("Unsupported Csv.timestampFormat: {}", v)),
         }?;
 
         let options = CsvReadOptions {
-            schema: self.schema.as_deref(),
+            schema: self.schema_arrow.as_deref(),
             delimiter,
             terminator: None,
             comment: None,

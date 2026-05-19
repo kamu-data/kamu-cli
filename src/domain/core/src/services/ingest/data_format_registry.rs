@@ -31,6 +31,7 @@ pub trait DataFormatRegistry: Send + Sync {
         &self,
         ctx: SessionContext,
         conf: odf::metadata::ReadStep,
+        to_arrow_settings: odf::schema::ToArrowSettings,
         temp_path: PathBuf,
     ) -> Result<Arc<dyn Reader>, ReadError>;
 
@@ -45,7 +46,7 @@ pub trait DataFormatRegistry: Send + Sync {
 
     fn get_best_effort_config(
         &self,
-        schema: Option<Vec<String>>,
+        schema: Option<odf::schema::DataSchema>,
         media_type: &MediaType,
     ) -> Result<odf::metadata::ReadStep, UnsupportedMediaTypeError>;
 }

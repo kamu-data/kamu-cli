@@ -800,9 +800,13 @@ pub async fn test_trigger_flow_ingest(mut kamu_api_server_client: KamuApiServerC
                 kind: Csv
                 header: true
                 schema:
-                  - event_time TIMESTAMP
-                  - city STRING
-                  - population BIGINT
+                  fields:
+                    - name: event_time
+                      type: Timestamp
+                    - name: city
+                      type: String
+                    - name: population
+                      type: Int64
               merge:
                 kind: Ledger
                 primaryKey:
@@ -1349,9 +1353,13 @@ pub async fn test_flow_planning_failure(mut kamu_api_server_client: KamuApiServe
             kind: Csv
             header: true
             schema:
-              - event_time TIMESTAMP
-              - city STRING
-              - population BIGINT
+              fields:
+              - name: event_time
+                type: Timestamp
+              - name: city
+                type: String
+              - name: population
+                type: Int64
           merge:
             kind: Ledger
             primaryKey:

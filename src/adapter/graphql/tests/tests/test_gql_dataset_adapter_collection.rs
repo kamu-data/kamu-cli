@@ -300,17 +300,19 @@ async fn test_collection_extra_data() {
     let did = harness
         .create_collection(
             "x",
-            Some(json!([{
-                "name": "foo",
-                "type": {
-                    "ddl": "string",
-                }
-            }, {
-                "name": "bar",
-                "type": {
-                    "ddl": "int",
-                }
-            }])),
+            Some(json!({
+                "fields": [{
+                    "name": "foo",
+                    "type": {
+                        "kind": "string",
+                    }
+                }, {
+                    "name": "bar",
+                    "type": {
+                        "kind": "int32",
+                    }
+                }]
+            })),
         )
         .await;
 
@@ -427,6 +429,98 @@ async fn test_collection_extra_data() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_collection_extra_data_legacy_ddl() {
+    let harness = GraphQLDatasetsHarness::builder()
+        .tenancy_config(TenancyConfig::MultiTenant)
+        .outbox_provider(OutboxProvider::Immediate {
+            force_immediate: true,
+        })
+        .build()
+        .await;
+
+    // Create empty datasets to link to
+    let linked = harness.create_root_dataset("foo").await.dataset_handle.id;
+
+    // Create collection dataset
+    let res = harness
+        .execute_authorized_query(
+            async_graphql::Request::new(indoc!(
+                r#"
+                    mutation ($datasetAlias: DatasetAlias!, $extraColumns: [ColumnInput]) {
+                        datasets {
+                            createCollection(
+                                datasetAlias: $datasetAlias,
+                                extraColumns: $extraColumns,
+                                datasetVisibility: PRIVATE,
+                            ) {
+                                message
+                                ... on CreateDatasetResultSuccess {
+                                    dataset {
+                                        id
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    "#
+            ))
+            .variables(async_graphql::Variables::from_json(json!({
+                "datasetAlias": "x",
+                "extraColumns": [{
+                    "name": "foo",
+                    "type": {
+                        "ddl": "string",
+                    }
+                }, {
+                    "name": "bar",
+                    "type": {
+                        "ddl": "int",
+                    }
+                }],
+            }))),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    let id = res.data.into_json().unwrap()["datasets"]["createCollection"]["dataset"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let did = odf::DatasetID::from_did_str(&id).unwrap();
+
+    // Entries are empty
+    assert_eq!(harness.list_entries(&did).await, json!([]));
+
+    // Add first entry
+    harness
+        .update_entries(
+            &did,
+            json![{
+                "add": {
+                    "entry": {
+                        "path": "/foo",
+                        "ref": linked,
+                        "extraData": {"foo": "aaa", "bar": 111},
+                    }
+                }
+            }],
+        )
+        .await;
+
+    assert_eq!(
+        harness.list_entries(&did).await,
+        json!([{
+            "path": "/foo",
+            "ref": linked,
+            "extraData": {"foo": "aaa", "bar": 111}
+        }])
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_collection_path_prefix_and_max_depth() {
     let harness = GraphQLDatasetsHarness::builder()
         .tenancy_config(TenancyConfig::MultiTenant)
@@ -449,7 +543,7 @@ async fn test_collection_path_prefix_and_max_depth() {
                 {
                     "add": {
                         "entry": {
-                            "path": "/a",
+                            "path": "/0a",
                             "ref": linked,
                         }
                     }
@@ -457,7 +551,7 @@ async fn test_collection_path_prefix_and_max_depth() {
                 {
                     "add": {
                         "entry": {
-                            "path": "/1/b",
+                            "path": "/0b/1a",
                             "ref": linked,
                         }
                     }
@@ -465,78 +559,156 @@ async fn test_collection_path_prefix_and_max_depth() {
                 {
                     "add": {
                         "entry": {
-                            "path": "/1/2/c",
+                            "path": "/0b/1b/2a",
                             "ref": linked,
                         }
                     }
-                }
+                },
+                {
+                    "add": {
+                        "entry": {
+                            "path": "/0b/1b/2b",
+                            "ref": linked,
+                        }
+                    }
+                },
+                {
+                    "add": {
+                        "entry": {
+                            "path": "/0b/1c/2a",
+                            "ref": linked,
+                        }
+                    }
+                },
+                {
+                    "add": {
+                        "entry": {
+                            "path": "/0b/1c/2b",
+                            "ref": linked,
+                        }
+                    }
+                },
             ]),
         )
         .await;
 
+    let as_entries = |paths: &[&str]| -> serde_json::Value {
+        let entries = paths.iter().map(|p| {
+            json!({
+                "path": p,
+                "ref": linked,
+                "extraData": {},
+            })
+        });
+
+        serde_json::Value::Array(entries.collect())
+    };
+
+    // List all
     assert_eq!(
         harness.list_entries(&did).await,
-        json!([
-            {
-                "path": "/1/2/c",
-                "ref": linked,
-                "extraData": {},
-            },
-            {
-                "path": "/1/b",
-                "ref": linked,
-                "extraData": {},
-            },
-            {
-                "path": "/a",
-                "ref": linked,
-                "extraData": {},
-            },
+        as_entries(&[
+            "/0a",
+            "/0b/1a",
+            "/0b/1b/2a",
+            "/0b/1b/2b",
+            "/0b/1c/2a",
+            "/0b/1c/2b",
         ])
     );
 
-    // With prefix
+    // Path prefix
     assert_eq!(
-        harness.list_entries_ext(&did, Some("/1/"), None).await,
-        json!([
-            {
-                "path": "/1/2/c",
-                "ref": linked,
-                "extraData": {},
-            },
-            {
-                "path": "/1/b",
-                "ref": linked,
-                "extraData": {},
-            },
-        ])
+        harness.list_entries_ext(&did, Some("/0b/"), None).await,
+        as_entries(&["/0b/1a", "/0b/1b/2a", "/0b/1b/2b", "/0b/1c/2a", "/0b/1c/2b"])
     );
 
     assert_eq!(
-        harness.list_entries_ext(&did, Some("/1/2/"), None).await,
-        json!([
-            {
-                "path": "/1/2/c",
-                "ref": linked,
-                "extraData": {},
-            },
-        ])
+        harness.list_entries_ext(&did, Some("/0b/1b/"), None).await,
+        as_entries(&["/0b/1b/2a", "/0b/1b/2b"])
     );
 
     assert_eq!(
-        harness.list_entries_ext(&did, Some("/1/2/c"), None).await,
-        json!([
-            {
-                "path": "/1/2/c",
-                "ref": linked,
-                "extraData": {},
-            },
-        ])
+        harness.list_entries_ext(&did, Some("/0a"), None).await,
+        as_entries(&["/0a"])
     );
 
     assert_eq!(
-        harness.list_entries_ext(&did, Some("/1/2/3/"), None).await,
+        harness
+            .list_entries_ext(&did, Some("/0b/1b/2a"), None)
+            .await,
+        as_entries(&["/0b/1b/2a"])
+    );
+
+    assert_eq!(
+        harness
+            .list_entries_ext(&did, Some("/0b/1b/2a/"), None)
+            .await,
         json!([])
+    );
+
+    // Max depth limit
+    assert_eq!(
+        harness.list_entries_ext(&did, None, Some(0)).await,
+        as_entries(&[
+            "/0a",
+            // "/0b/1a",
+            // "/0b/1b/2a",
+            // "/0b/1b/2b",
+            // "/0b/1c/2a",
+            // "/0b/1c/2b",
+        ])
+    );
+
+    assert_eq!(
+        harness.list_entries_ext(&did, None, Some(1)).await,
+        as_entries(&[
+            "/0a",
+            "/0b/1a",
+            // "/0b/1b/2a",
+            // "/0b/1b/2b",
+            // "/0b/1c/2a",
+            // "/0b/1c/2b",
+        ])
+    );
+
+    assert_eq!(
+        harness.list_entries_ext(&did, None, Some(2)).await,
+        as_entries(&[
+            "/0a",
+            "/0b/1a",
+            "/0b/1b/2a",
+            // "/0b/1b/2b",
+            "/0b/1c/2a",
+            // "/0b/1c/2b",
+        ])
+    );
+
+    // Max depth AND prefix
+    assert_eq!(
+        harness.list_entries_ext(&did, Some("/0b/"), Some(2)).await,
+        as_entries(&[
+            // "/0a",
+            "/0b/1a",
+            "/0b/1b/2a",
+            // "/0b/1b/2b",
+            "/0b/1c/2a",
+            // "/0b/1c/2b",
+        ])
+    );
+
+    assert_eq!(
+        harness
+            .list_entries_ext(&did, Some("/0b/1b/"), Some(3))
+            .await,
+        as_entries(&[
+            // "/0a",
+            // "/0b/1a",
+            "/0b/1b/2a",
+            "/0b/1b/2b",
+            // "/0b/1c/2a",
+            // "/0b/1c/2b",
+        ])
     );
 }
 
@@ -913,17 +1085,17 @@ impl GraphQLDatasetsHarness {
     pub async fn create_collection(
         &self,
         alias: &str,
-        extra_columns: Option<serde_json::Value>,
+        extra_schema: Option<serde_json::Value>,
     ) -> odf::DatasetID {
         let res = self
             .execute_authorized_query(
                 async_graphql::Request::new(indoc!(
                     r#"
-                    mutation ($datasetAlias: DatasetAlias!, $extraColumns: [ColumnInput]) {
+                    mutation ($datasetAlias: DatasetAlias!, $extraSchema: DataSchemaInput) {
                         datasets {
                             createCollection(
                                 datasetAlias: $datasetAlias,
-                                extraColumns: $extraColumns,
+                                extraSchema: $extraSchema,
                                 datasetVisibility: PRIVATE,
                             ) {
                                 message
@@ -939,7 +1111,7 @@ impl GraphQLDatasetsHarness {
                 ))
                 .variables(async_graphql::Variables::from_json(json!({
                     "datasetAlias": alias,
-                    "extraColumns": extra_columns,
+                    "extraSchema": extra_schema,
                 }))),
             )
             .await;

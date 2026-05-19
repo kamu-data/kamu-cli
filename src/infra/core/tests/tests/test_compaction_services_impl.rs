@@ -133,8 +133,8 @@ async fn test_dataset_compact() {
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   REQUIRED INT64 date (TIMESTAMP(MILLIS,true));
-                  OPTIONAL BYTE_ARRAY city (STRING);
-                  OPTIONAL INT64 population;
+                  REQUIRED BYTE_ARRAY city (STRING);
+                  REQUIRED INT64 population;
                 }
                 "#
             ),
@@ -389,8 +389,8 @@ async fn test_dataset_compaction_watermark_only_blocks() {
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   REQUIRED INT64 date (TIMESTAMP(MILLIS,true));
-                  OPTIONAL BYTE_ARRAY city (STRING);
-                  OPTIONAL INT64 population;
+                  REQUIRED BYTE_ARRAY city (STRING);
+                  REQUIRED INT64 population;
                 }
                 "#
             ),
@@ -552,8 +552,8 @@ async fn test_dataset_compaction_limits() {
                       REQUIRED INT32 op;
                       REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                       REQUIRED INT64 date (TIMESTAMP(MILLIS,true));
-                      OPTIONAL BYTE_ARRAY city (STRING);
-                      OPTIONAL INT64 population;
+                      REQUIRED BYTE_ARRAY city (STRING);
+                      REQUIRED INT64 population;
                     }
                     "#
                 ),
@@ -706,8 +706,8 @@ async fn test_dataset_compaction_keep_all_non_data_blocks() {
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   REQUIRED INT64 date (TIMESTAMP(MILLIS,true));
-                  OPTIONAL BYTE_ARRAY city (STRING);
-                  OPTIONAL INT64 population;
+                  REQUIRED BYTE_ARRAY city (STRING);
+                  REQUIRED INT64 population;
                 }
                 "#
             ),
@@ -816,8 +816,8 @@ async fn test_large_dataset_compact() {
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   REQUIRED INT64 date (TIMESTAMP(MILLIS,true));
-                  OPTIONAL BYTE_ARRAY city (STRING);
-                  OPTIONAL INT64 population;
+                  REQUIRED BYTE_ARRAY city (STRING);
+                  REQUIRED INT64 population;
                 }
                 "#
             ),
@@ -866,8 +866,8 @@ async fn test_large_dataset_compact() {
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   REQUIRED INT64 date (TIMESTAMP(MILLIS,true));
-                  OPTIONAL BYTE_ARRAY city (STRING);
-                  OPTIONAL INT64 population;
+                  REQUIRED BYTE_ARRAY city (STRING);
+                  REQUIRED INT64 population;
                 }
                 "#
             ),
@@ -1165,8 +1165,8 @@ async fn test_hard_compaction_with_schema_migration() {
                 DataField::i32("op"),
                 DataField::timestamp_millis_utc("system_time"),
                 DataField::timestamp_millis_utc("date"),
-                DataField::string("city").optional(), // Poor ingest inference
-                DataField::i64("population").optional(), // Poor ingest inference
+                DataField::string("city"),
+                DataField::i64("population"),
                 DataField::string("census_url").optional(),
             ]))
             .into(),
@@ -1185,17 +1185,12 @@ async fn test_hard_compaction_with_schema_migration() {
                 source_name: SourceState::DEFAULT_SOURCE_NAME.to_string(),
                 read: ReadStepCsv {
                     header: Some(true),
-                    schema: Some(
-                        [
-                            "date TIMESTAMP",
-                            "city STRING",
-                            "population BIGINT",
-                            "census_url STRING",
-                        ]
-                        .iter()
-                        .map(|s| (*s).to_string())
-                        .collect(),
-                    ),
+                    schema: Some(odf::schema::DataSchema::new(vec![
+                        odf::schema::DataField::timestamp_millis_utc("date"),
+                        odf::schema::DataField::string("city"),
+                        odf::schema::DataField::i64("population"),
+                        odf::schema::DataField::string("census_url").optional(),
+                    ])),
                     ..Default::default()
                 }
                 .into(),
@@ -1280,8 +1275,8 @@ async fn test_hard_compaction_with_schema_migration() {
                   REQUIRED INT32 op;
                   REQUIRED INT64 system_time (TIMESTAMP(MILLIS,true));
                   REQUIRED INT64 date (TIMESTAMP(MILLIS,true));
-                  OPTIONAL BYTE_ARRAY city (STRING);
-                  OPTIONAL INT64 population;
+                  REQUIRED BYTE_ARRAY city (STRING);
+                  REQUIRED INT64 population;
                   OPTIONAL BYTE_ARRAY census_url (STRING);
                 }
                 "#
@@ -1567,12 +1562,11 @@ impl CompactTestHarness {
                         MetadataFactory::add_push_source()
                             .read(odf::metadata::ReadStepCsv {
                                 header: Some(true),
-                                schema: Some(
-                                    ["date TIMESTAMP", "city STRING", "population BIGINT"]
-                                        .iter()
-                                        .map(|s| (*s).to_string())
-                                        .collect(),
-                                ),
+                                schema: Some(odf::schema::DataSchema::new(vec![
+                                    odf::schema::DataField::timestamp_millis_utc("date"),
+                                    odf::schema::DataField::string("city"),
+                                    odf::schema::DataField::i64("population"),
+                                ])),
                                 ..odf::metadata::ReadStepCsv::default()
                             })
                             .merge(odf::metadata::MergeStrategyLedger {
