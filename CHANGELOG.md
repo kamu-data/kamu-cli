@@ -13,6 +13,15 @@ Recommendation: for ease of reading, use the following format:
 ### Fixed
 -->
 
+## [Molecule-specific]
+### Added
+- GQL: `BigInt` scalar
+- GQL: Added new methods to remove/restore project: `MoleculeMut:disable_project()` and `MoleculeMut:enable_project()
+### Changed
+- GQL: `molecule` area: use `BigInt` for `ipnft_token_id` 
+- Allow `molecule` and `molecule.dev` accounts separation
+- GQL: `MoleculeMut::create_project()`: generate lowercase project account name.
+
 ## [0.263.0] - 2026-05-16
 ### Added
 - **Breaking:** The `read.schema` field now expects an ODF schema, replacing DDL schema with our unified format

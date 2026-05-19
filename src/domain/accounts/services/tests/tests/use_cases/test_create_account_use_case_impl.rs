@@ -18,6 +18,7 @@ use kamu_accounts::{
     AccountLifecycleMessage,
     CreateAccountUseCase,
     CreateAccountUseCaseOptions,
+    DidPkhAccountIdentity,
     MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
     PredefinedAccountsConfig,
 };
@@ -111,13 +112,8 @@ async fn test_create_wallet_accounts() {
     let mut mock_outbox = MockOutbox::new();
 
     for did_pkh in &did_pkhs {
-        // E.g. 0xbf9a00755BB7d2E904b5F569095220c54E742E07
-        let wallet_address = did_pkh.wallet_address();
-        expect_outbox_account_created_once(
-            &mut mock_outbox,
-            AccountDisplayName::from(wallet_address),
-            format!("{wallet_address}@example.com").parse().unwrap(),
-        );
+        let identity = DidPkhAccountIdentity::from_did_pkh(did_pkh).unwrap();
+        expect_outbox_account_created_once(&mut mock_outbox, identity.display_name, identity.email);
     }
 
     let harness = CreateAccountUseCaseImplHarness::new(mock_outbox).await;

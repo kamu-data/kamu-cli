@@ -20,6 +20,7 @@ mod dataset_mut;
 mod datasets_mut;
 mod flows_mut;
 mod metadata_chain_mut;
+pub(crate) mod molecule_mut;
 mod webhooks_mut;
 
 pub(crate) use account_access_token_mut::*;

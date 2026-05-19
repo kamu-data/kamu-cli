@@ -38,6 +38,9 @@ pub struct CreateDatasetUseCaseHelper {
     dataset_storage_unit_writer: Arc<dyn odf::DatasetStorageUnitWriter>,
     time_source: Arc<dyn SystemTimeSource>,
     outbox: Arc<dyn Outbox>,
+
+    // TODO: This is here temporarily - using Lazy to avoid modifying all tests
+    account_svc: dill::Lazy<Arc<dyn kamu_accounts::AccountService>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -46,7 +49,7 @@ impl CreateDatasetUseCaseHelper {
     /// Given a raw alias under which user wants to create a dataset and user's
     /// credentials determine the target account under which dataset will be
     /// created and whether user has permissions to do so
-    pub fn resolve_alias_target(
+    pub async fn resolve_alias_target(
         &self,
         raw_alias: &odf::DatasetAlias,
         subject: &LoggedAccount,
@@ -67,13 +70,33 @@ impl CreateDatasetUseCaseHelper {
                     && *account_name != subject.account_name
                 {
                     // Creating dataset for account different that the subject
-                    // TODO: check organization permissions
+                    //
+                    // TODO: HACK: SEC: Validate subject account has permissions to create datasets
+                    // in target account e.g. by checking `member-of` relationship for
+                    // organizations. Currently only allowing cross-account creation for `kamu` and
+                    // `molecule` / `molecule.dev`.
                     //
                     // See: https://github.com/kamu-data/kamu-node/issues/233
-                    Err(odf::AccessError::Unauthorized(
-                        format!("Cannot create a dataset in account {account_name}").into(),
-                    )
-                    .into())
+                    if let Some(account) = self
+                        .account_svc
+                        .get()
+                        .int_err()?
+                        .account_by_name(account_name)
+                        .await?
+                        && (subject.account_name == "kamu"
+                            || subject.account_name == "molecule"
+                            || subject.account_name == "molecule.dev")
+                        && account
+                            .account_name
+                            .starts_with(subject.account_name.as_str())
+                    {
+                        Ok((CanonicalDatasetAlias::new(raw_alias.clone()), account.id))
+                    } else {
+                        Err(odf::AccessError::Unauthorized(
+                            format!("Cannot create a dataset in account {account_name}").into(),
+                        )
+                        .into())
+                    }
                 } else {
                     Ok((
                         CanonicalDatasetAlias::new(odf::DatasetAlias::new(

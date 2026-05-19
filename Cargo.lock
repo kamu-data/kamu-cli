@@ -3099,6 +3099,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3d52eff69cd5e647efe296129160853a42795992097e8af39800e1060caeea9b"
 
 [[package]]
+name = "constcat"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "136d3e02915a2cea4d74caa8681e2d44b1c3254bdbf17d11d41d587ff858832c"
+
+[[package]]
 name = "container-runtime"
 version = "0.263.0"
 dependencies = [
@@ -3622,7 +3628,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ccc2776f0c61eca1ca32528f85548abd1a4be8fb53d1b21c013e4f18da1e7090"
 dependencies = [
  "data-encoding",
- "syn 1.0.109",
+ "syn 2.0.117",
 ]
 
 [[package]]
@@ -6084,7 +6090,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.5.10",
+ "socket2 0.6.3",
  "tokio",
  "tower-service",
  "tracing",
@@ -6922,6 +6928,7 @@ dependencies = [
  "base32",
  "bon",
  "chrono",
+ "constcat",
  "crc32fast",
  "crypto-utils",
  "database-common",
@@ -6935,11 +6942,12 @@ dependencies = [
  "mockall",
  "nutype",
  "opendatafabric",
+ "pretty_assertions",
  "rand 0.9.4",
  "random-strings",
  "reusable",
+ "rstest",
  "schemars 1.2.1",
- "secrecy",
  "serde",
  "serde_json",
  "serde_with",
@@ -7325,7 +7333,13 @@ dependencies = [
  "kamu-flow-system",
  "kamu-flow-system-inmem",
  "kamu-flow-system-services",
+ "kamu-messaging-outbox-inmem",
+ "kamu-molecule-domain",
+ "kamu-molecule-services",
  "kamu-search",
+ "kamu-search-cache-inmem",
+ "kamu-search-elasticsearch",
+ "kamu-search-services",
  "kamu-task-system",
  "kamu-task-system-inmem",
  "kamu-task-system-services",
@@ -7805,6 +7819,7 @@ dependencies = [
  "kamu-messaging-outbox-inmem",
  "kamu-messaging-outbox-postgres",
  "kamu-messaging-outbox-sqlite",
+ "kamu-molecule-services",
  "kamu-search",
  "kamu-search-cache-inmem",
  "kamu-search-cache-postgres",
@@ -8560,6 +8575,70 @@ dependencies = [
  "test-log",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "kamu-molecule-domain"
+version = "0.263.0"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "chrono",
+ "database-common",
+ "file-utils",
+ "format-utils",
+ "indoc 2.0.7",
+ "internal-error",
+ "kamu-accounts",
+ "kamu-auth-rebac",
+ "kamu-core",
+ "kamu-datasets",
+ "kamu-search",
+ "messaging-outbox",
+ "nonempty",
+ "num-bigint",
+ "opendatafabric",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "thiserror 2.0.18",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "kamu-molecule-services"
+version = "0.263.0"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "chrono",
+ "common-macros",
+ "database-common",
+ "datafusion",
+ "dill",
+ "file-utils",
+ "format-utils",
+ "futures",
+ "indoc 2.0.7",
+ "internal-error",
+ "kamu-accounts",
+ "kamu-auth-rebac",
+ "kamu-core",
+ "kamu-datasets",
+ "kamu-datasets-services",
+ "kamu-molecule-domain",
+ "kamu-search",
+ "messaging-outbox",
+ "nonempty",
+ "num-bigint",
+ "opendatafabric",
+ "serde_json",
+ "thiserror 2.0.18",
+ "time-source",
+ "tokio",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -11473,7 +11552,7 @@ dependencies = [
  "quinn-udp",
  "rustc-hash",
  "rustls 0.23.39",
- "socket2 0.5.10",
+ "socket2 0.6.3",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
@@ -11510,7 +11589,7 @@ dependencies = [
  "cfg_aliases",
  "libc",
  "once_cell",
- "socket2 0.5.10",
+ "socket2 0.6.3",
  "tracing",
  "windows-sys 0.60.2",
 ]
@@ -12792,6 +12871,12 @@ dependencies = [
  "cpufeatures 0.2.17",
  "digest 0.10.7",
 ]
+
+[[package]]
+name = "sha1_smol"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bbfa15b3dddfee50a0fff136974b3e1bde555604ba463834a7eb7deb6417705d"
 
 [[package]]
 name = "sha2"
@@ -14665,6 +14750,7 @@ dependencies = [
  "getrandom 0.4.2",
  "js-sys",
  "serde_core",
+ "sha1_smol",
  "wasm-bindgen",
 ]
 
@@ -15025,7 +15111,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
