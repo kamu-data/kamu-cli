@@ -230,10 +230,8 @@ macro_rules! __simple_string_scalar_scalar_type {
     };
 }
 
-pub(crate) use {
-    __simple_string_scalar_general,
-    __simple_string_scalar_scalar_type,
-    simple_string_scalar,
-};
+pub(crate) use __simple_string_scalar_general;
+pub(crate) use __simple_string_scalar_scalar_type;
+pub(crate) use simple_string_scalar;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
