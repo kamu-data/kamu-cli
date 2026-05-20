@@ -101,7 +101,16 @@ where
             return self.plan_create_resource(params, now).await;
         };
 
-        self.ensure_resource_uid_matches_type(&uid).await?;
+        // When UID is provided, first check if the resource exists and matches type.
+        // If the resource doesn't exist (ResourceUIDNotFound), treat as create.
+        if let Err(err) = self.ensure_resource_uid_matches_type(&uid).await {
+            if let ApplyResourceUseCaseError::ResourceUIDNotFound(_) = err {
+                // UID provided but doesn't exist in store - treat as create
+                return self.plan_create_resource(params, now).await;
+            }
+            // Other errors (type mismatch, etc.) should propagate
+            return Err(err);
+        }
 
         let resource = self
             .resource_aggregate_loader

@@ -24,7 +24,7 @@ use kamu_resources::{
 };
 use kamu_resources_services::testing::BaseResourceServiceHarness;
 
-use crate::tests::utils::harness_helpers::{make_account_id, make_uid};
+use crate::tests::utils::harness_helpers::{make_account_id, make_fresh_aggregate};
 use crate::tests::utils::{
     TestResource,
     TestResourceReconciler,
@@ -40,7 +40,7 @@ use crate::tests::utils::{
 async fn test_create_resource_persists_snapshot_and_events() {
     let harness = ResourcePersistenceServiceHarness::new();
     let account_id = make_account_id();
-    let (uid, mut agg) = harness.create_fresh_aggregate(account_id, "res-a");
+    let (uid, mut agg) = make_fresh_aggregate(account_id, "res-a");
 
     harness.persistence_svc().create(&mut agg).await.unwrap();
 
@@ -67,11 +67,11 @@ async fn test_create_duplicate_uid_returns_error() {
     let harness = ResourcePersistenceServiceHarness::new();
     let account_id = make_account_id();
 
-    let (_, mut agg) = harness.create_fresh_aggregate(account_id.clone(), "res-a");
+    let (_, mut agg) = make_fresh_aggregate(account_id.clone(), "res-a");
     harness.persistence_svc().create(&mut agg).await.unwrap();
 
     // Same account + kind + name but a fresh UID — repository duplicate check fires
-    let (_, mut agg2) = harness.create_fresh_aggregate(account_id, "res-a");
+    let (_, mut agg2) = make_fresh_aggregate(account_id, "res-a");
     let result = harness.persistence_svc().create(&mut agg2).await;
 
     assert!(
@@ -86,7 +86,7 @@ async fn test_create_duplicate_uid_returns_error() {
 async fn test_save_resource_updates_snapshot() {
     let harness = ResourcePersistenceServiceHarness::new();
     let account_id = make_account_id();
-    let (uid, mut agg) = harness.create_fresh_aggregate(account_id, "res-a");
+    let (uid, mut agg) = make_fresh_aggregate(account_id, "res-a");
     harness.persistence_svc().create(&mut agg).await.unwrap();
 
     let mut loaded = harness.aggregate_loader().load(&uid).await.unwrap();
@@ -114,7 +114,7 @@ async fn test_save_resource_updates_snapshot() {
 async fn test_delete_resource_marks_deleted() {
     let harness = ResourcePersistenceServiceHarness::new();
     let account_id = make_account_id();
-    let (uid, mut agg) = harness.create_fresh_aggregate(account_id, "res-a");
+    let (uid, mut agg) = make_fresh_aggregate(account_id, "res-a");
     harness.persistence_svc().create(&mut agg).await.unwrap();
 
     let mut loaded = harness.aggregate_loader().load(&uid).await.unwrap();
@@ -145,9 +145,9 @@ async fn test_delete_many_resources_batch() {
     let harness = ResourcePersistenceServiceHarness::new();
     let account_id = make_account_id();
 
-    let (uid_a, mut agg_a) = harness.create_fresh_aggregate(account_id.clone(), "res-a");
-    let (uid_b, mut agg_b) = harness.create_fresh_aggregate(account_id.clone(), "res-b");
-    let (uid_c, mut agg_c) = harness.create_fresh_aggregate(account_id, "res-c");
+    let (uid_a, mut agg_a) = make_fresh_aggregate(account_id.clone(), "res-a");
+    let (uid_b, mut agg_b) = make_fresh_aggregate(account_id.clone(), "res-b");
+    let (uid_c, mut agg_c) = make_fresh_aggregate(account_id, "res-c");
 
     harness.persistence_svc().create(&mut agg_a).await.unwrap();
     harness.persistence_svc().create(&mut agg_b).await.unwrap();
@@ -185,7 +185,7 @@ async fn test_delete_many_resources_batch() {
 async fn test_concurrent_modification_detected() {
     let harness = ResourcePersistenceServiceHarness::new();
     let account_id = make_account_id();
-    let (uid, mut agg) = harness.create_fresh_aggregate(account_id, "res-a");
+    let (uid, mut agg) = make_fresh_aggregate(account_id, "res-a");
     harness.persistence_svc().create(&mut agg).await.unwrap();
 
     // Load the same aggregate into two independent instances
@@ -277,20 +277,6 @@ impl ResourcePersistenceServiceHarness {
             .await
             .unwrap()
             .is_none()
-    }
-
-    fn create_fresh_aggregate(
-        &self,
-        account_id: odf::AccountID,
-        name: &str,
-    ) -> (ResourceUID, TestResource) {
-        let uid = make_uid();
-        let metadata = BaseResourceServiceHarness::make_metadata_input(account_id, name);
-        let spec = TestResourceSpec {
-            value: name.to_string(),
-        };
-        let agg = TestResource::try_create(Utc::now(), uid, metadata, spec).unwrap();
-        (uid, agg)
     }
 }
 

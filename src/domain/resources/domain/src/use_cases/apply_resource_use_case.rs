@@ -47,6 +47,7 @@ pub struct ApplyResourceParams<R: DeclarativeResource> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug)]
 pub enum ApplyResourcePlanningDecision<R: DeclarativeResource> {
     Planned(ApplyResourcePlan<R>),
     Rejected(ApplyResourceRejection),
@@ -54,6 +55,7 @@ pub enum ApplyResourcePlanningDecision<R: DeclarativeResource> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug)]
 pub enum ApplyResourceApplicationDecision<R: DeclarativeResource> {
     Applied(ApplyResourceResult<R>),
     Rejected(ApplyResourceRejection),
@@ -61,6 +63,7 @@ pub enum ApplyResourceApplicationDecision<R: DeclarativeResource> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug)]
 pub struct ApplyResourcePlan<R: DeclarativeResource> {
     pub uid: ResourceUID,
     pub state: R::ResourceState,
@@ -80,6 +83,7 @@ pub enum ApplyResourceAction {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug)]
 pub struct ApplyResourceResult<R: DeclarativeResource> {
     pub uid: ResourceUID,
     pub state: R::ResourceState,

@@ -22,7 +22,7 @@ use kamu_resources::{
     ResourceUID,
 };
 use kamu_resources_inmem::{InMemoryRawResourceEventStore, InMemoryResourceRepository};
-use messaging_outbox::{ConsumerFilter, Outbox, OutboxImmediateImpl, register_message_dispatcher};
+use messaging_outbox::{Outbox, OutboxProvider, register_message_dispatcher};
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -32,17 +32,38 @@ use time_source::{SystemTimeSource, SystemTimeSourceStub};
 /// for any harness that exercises the resource service layer.
 pub struct BaseResourceServiceHarness {
     catalog: dill::Catalog,
+    generic_query_svc: Arc<dyn GenericResourceQueryService>,
+    resource_repo: Arc<dyn ResourceRepository>,
+    outbox: Arc<dyn Outbox>,
+    time_source: Arc<dyn SystemTimeSource>,
+}
+
+pub struct BaseResourceServiceHarnessOpts {
+    pub outbox_provider: OutboxProvider,
+}
+
+impl Default for BaseResourceServiceHarnessOpts {
+    fn default() -> Self {
+        Self {
+            outbox_provider: OutboxProvider::Immediate {
+                force_immediate: true,
+            },
+        }
+    }
 }
 
 impl BaseResourceServiceHarness {
     pub fn new() -> Self {
+        Self::new_with_opts(BaseResourceServiceHarnessOpts::default())
+    }
+
+    pub fn new_with_opts(opts: BaseResourceServiceHarnessOpts) -> Self {
         let mut b = CatalogBuilder::new();
 
         b.add_value(SystemTimeSourceStub::new_set(Utc::now()))
             .bind::<dyn SystemTimeSource, SystemTimeSourceStub>();
 
-        b.add_builder(OutboxImmediateImpl::builder(ConsumerFilter::AllConsumers))
-            .bind::<dyn Outbox, OutboxImmediateImpl>();
+        opts.outbox_provider.embed_into_catalog(&mut b);
 
         b.add::<InMemoryResourceRepository>()
             .add::<InMemoryRawResourceEventStore>();
@@ -56,28 +77,45 @@ impl BaseResourceServiceHarness {
             MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
         );
 
-        Self { catalog: b.build() }
+        let catalog = b.build();
+
+        let generic_query_svc = catalog.get_one().unwrap();
+        let resource_repo = catalog.get_one().unwrap();
+
+        let outbox = catalog.get_one().unwrap();
+        let time_source = catalog.get_one().unwrap();
+
+        Self {
+            catalog,
+            generic_query_svc,
+            resource_repo,
+            outbox,
+            time_source,
+        }
     }
 
     pub fn catalog(&self) -> &dill::Catalog {
         &self.catalog
     }
 
-    pub fn generic_query_svc(&self) -> Arc<dyn GenericResourceQueryService> {
-        self.catalog.get_one().unwrap()
+    pub fn generic_query_svc(&self) -> &dyn GenericResourceQueryService {
+        self.generic_query_svc.as_ref()
     }
 
-    pub fn resource_repo(&self) -> Arc<dyn ResourceRepository> {
-        self.catalog.get_one().unwrap()
+    pub fn outbox(&self) -> &dyn Outbox {
+        self.outbox.as_ref()
+    }
+
+    pub fn time_source(&self) -> &dyn SystemTimeSource {
+        self.time_source.as_ref()
+    }
+
+    pub fn resource_repo(&self) -> &dyn ResourceRepository {
+        self.resource_repo.as_ref()
     }
 
     pub async fn allocate_resource_uid(&self) -> ResourceUID {
-        self.catalog
-            .get_one::<dyn GenericResourceQueryService>()
-            .unwrap()
-            .allocate_uid()
-            .await
-            .unwrap()
+        self.generic_query_svc.allocate_uid().await.unwrap()
     }
 
     pub fn make_metadata_input(account_id: odf::AccountID, name: &str) -> ResourceMetadataInput {
@@ -96,10 +134,7 @@ impl BaseResourceServiceHarness {
         kind: &str,
         name: &str,
     ) -> Option<ResourceUID> {
-        use kamu_resources::GenericResourceQueryService;
-        self.catalog
-            .get_one::<dyn GenericResourceQueryService>()
-            .unwrap()
+        self.generic_query_svc
             .find_resource_uid_by_name(account_id, kind, &name.to_string())
             .await
             .unwrap()
