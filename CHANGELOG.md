@@ -22,6 +22,10 @@ Recommendation: for ease of reading, use the following format:
 - Allow `molecule` and `molecule.dev` accounts separation
 - GQL: `MoleculeMut::create_project()`: generate lowercase project account name.
 
+## [0.263.1] - 2026-05-20
+### Fixed
+- Elasticsearch: added ID escaping for API requests
+
 ## [0.263.0] - 2026-05-16
 ### Added
 - **Breaking:** The `read.schema` field now expects an ODF schema, replacing DDL schema with our unified format
