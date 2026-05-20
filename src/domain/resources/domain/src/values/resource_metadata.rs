@@ -34,6 +34,24 @@ pub struct ResourceMetadata {
 }
 
 impl ResourceMetadata {
+    pub fn new_minimal(
+        now: DateTime<Utc>,
+        account: odf::AccountID,
+        name: impl Into<ResourceName>,
+    ) -> Self {
+        Self {
+            account,
+            name: name.into(),
+            description: None,
+            labels: BTreeMap::new(),
+            annotations: BTreeMap::new(),
+            generation: 0,
+            created_at: now,
+            updated_at: now,
+            deleted_at: None,
+        }
+    }
+
     pub fn from_input(now: DateTime<Utc>, input: ResourceMetadataInput) -> Self {
         Self {
             account: input.account,

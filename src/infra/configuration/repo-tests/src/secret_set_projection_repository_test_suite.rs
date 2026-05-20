@@ -37,27 +37,18 @@ fn make_entry(key: &str, value: &[u8]) -> SecretSetEntry {
 }
 
 async fn make_secret_set_resource(catalog: &Catalog) -> ResourceUID {
-    use std::collections::BTreeMap;
-
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
     let secret_set_id = ResourceUID::new(uuid::Uuid::new_v4());
-    let now = Utc::now();
 
     repo.create_resource(&ResourceSnapshot {
         uid: secret_set_id,
         kind: SecretSetResource::RESOURCE_TYPE.to_string(),
         api_version: SecretSetResource::API_VERSION.to_string(),
-        metadata: ResourceMetadata {
-            account: odf::AccountID::new_seeded_ed25519(b"test-account"),
-            name: secret_set_id.to_string(),
-            description: None,
-            labels: BTreeMap::new(),
-            annotations: BTreeMap::new(),
-            generation: 0,
-            created_at: now,
-            updated_at: now,
-            deleted_at: None,
-        },
+        metadata: ResourceMetadata::new_minimal(
+            Utc::now(),
+            odf::AccountID::new_seeded_ed25519(b"test-account"),
+            secret_set_id.to_string(),
+        ),
         spec: serde_json::to_value(SecretSetSpec {
             secrets: [(
                 "PLACEHOLDER".to_string(),

@@ -26,72 +26,6 @@ use crate::tests::utils::harness_helpers::{
 use crate::tests::utils::{TestResourceEventStore, register_test_resource_resource_service_layer};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Harness
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-struct RawResourceEventStoreBridgeHarness {
-    catalog: dill::Catalog,
-}
-
-impl RawResourceEventStoreBridgeHarness {
-    fn new() -> Self {
-        let mut b = CatalogBuilder::new();
-        b.add::<InMemoryRawResourceEventStore>();
-        NoOpDatabasePlugin::init_database_components(&mut b);
-        register_test_resource_resource_service_layer(&mut b);
-        Self { catalog: b.build() }
-    }
-
-    fn bridge(&self) -> Arc<dyn TestResourceEventStore> {
-        self.catalog.get_one().unwrap()
-    }
-
-    fn raw_store(&self) -> Arc<dyn ResourceRawEventStore> {
-        self.catalog.get_one().unwrap()
-    }
-
-    async fn get_events_for(&self, uid: ResourceUID) -> Vec<TestEvent> {
-        self.bridge()
-            .get_events(&uid, GetEventsOpts::default())
-            .map(|r| r.unwrap().1)
-            .collect()
-            .await
-    }
-
-    async fn get_last_event_id(&self, uid: ResourceUID) -> event_sourcing::EventID {
-        self.bridge()
-            .get_events(&uid, GetEventsOpts::default())
-            .collect::<Vec<_>>()
-            .await
-            .into_iter()
-            .last()
-            .unwrap()
-            .unwrap()
-            .0
-    }
-
-    async fn save_events(
-        &self,
-        uid: ResourceUID,
-        events: Vec<TestEvent>,
-    ) -> event_sourcing::EventID {
-        self.bridge().save_events(&uid, None, events).await.unwrap()
-    }
-
-    async fn save_events_after(
-        &self,
-        uid: ResourceUID,
-        prev_id: event_sourcing::EventID,
-        events: Vec<TestEvent>,
-    ) -> event_sourcing::EventID {
-        self.bridge()
-            .save_events(&uid, Some(prev_id), events)
-            .await
-            .unwrap()
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Tests
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -279,6 +213,72 @@ async fn test_get_events_multi_streams_per_uid() {
 
     assert_eq!(by_uid[&uid_a].len(), 2);
     assert_eq!(by_uid[&uid_b].len(), 3);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Harness
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct RawResourceEventStoreBridgeHarness {
+    catalog: dill::Catalog,
+}
+
+impl RawResourceEventStoreBridgeHarness {
+    fn new() -> Self {
+        let mut b = CatalogBuilder::new();
+        b.add::<InMemoryRawResourceEventStore>();
+        NoOpDatabasePlugin::init_database_components(&mut b);
+        register_test_resource_resource_service_layer(&mut b);
+        Self { catalog: b.build() }
+    }
+
+    fn bridge(&self) -> Arc<dyn TestResourceEventStore> {
+        self.catalog.get_one().unwrap()
+    }
+
+    fn raw_store(&self) -> Arc<dyn ResourceRawEventStore> {
+        self.catalog.get_one().unwrap()
+    }
+
+    async fn get_events_for(&self, uid: ResourceUID) -> Vec<TestEvent> {
+        self.bridge()
+            .get_events(&uid, GetEventsOpts::default())
+            .map(|r| r.unwrap().1)
+            .collect()
+            .await
+    }
+
+    async fn get_last_event_id(&self, uid: ResourceUID) -> event_sourcing::EventID {
+        self.bridge()
+            .get_events(&uid, GetEventsOpts::default())
+            .collect::<Vec<_>>()
+            .await
+            .into_iter()
+            .last()
+            .unwrap()
+            .unwrap()
+            .0
+    }
+
+    async fn save_events(
+        &self,
+        uid: ResourceUID,
+        events: Vec<TestEvent>,
+    ) -> event_sourcing::EventID {
+        self.bridge().save_events(&uid, None, events).await.unwrap()
+    }
+
+    async fn save_events_after(
+        &self,
+        uid: ResourceUID,
+        prev_id: event_sourcing::EventID,
+        events: Vec<TestEvent>,
+    ) -> event_sourcing::EventID {
+        self.bridge()
+            .save_events(&uid, Some(prev_id), events)
+            .await
+            .unwrap()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
