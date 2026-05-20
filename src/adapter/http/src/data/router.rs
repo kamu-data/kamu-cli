@@ -19,6 +19,7 @@ pub fn root_router() -> OpenApiRouter {
             super::query_handler::query_handler_post
         ))
         .routes(routes!(super::verify_handler::verify_handler))
+        .merge(super::sign::root_router())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

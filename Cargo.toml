@@ -4,6 +4,7 @@ members = [
     "src/utils/async-utils",
     "src/utils/common-macros",
     "src/utils/container-runtime",
+    "src/utils/crypto-eip712-utils",
     "src/utils/crypto-utils",
     "src/utils/database-common",
     "src/utils/database-common-macros",
@@ -44,6 +45,7 @@ members = [
     "src/domain/accounts/domain",
     "src/domain/auth-rebac/domain",
     "src/domain/auth-web3/domain",
+    "src/domain/signing/domain",
     "src/domain/core",
     "src/domain/datasets/domain",
     "src/domain/flow-system/domain",
@@ -54,6 +56,7 @@ members = [
     "src/domain/accounts/services",
     "src/domain/auth-rebac/services",
     "src/domain/auth-web3/services",
+    "src/domain/signing/services",
     "src/domain/datasets/services",
     "src/domain/flow-system/services",
     "src/domain/search/services",
@@ -137,6 +140,9 @@ members = [
     "src/e2e/app/cli/mysql",
     "src/e2e/app/cli/sqlite",
 ]
+exclude = [
+    "src/sandbox"
+]
 resolver = "3"
 
 
@@ -148,6 +154,7 @@ kamu-cli = { version = "0.263.0", path = "src/app/cli", default-features = false
 async-utils = { version = "0.263.0", path = "src/utils/async-utils", default-features = false }
 common-macros = { version = "0.263.0", path = "src/utils/common-macros", default-features = false }
 container-runtime = { version = "0.263.0", path = "src/utils/container-runtime", default-features = false }
+crypto-eip712-utils = { version = "0.263.0", path = "src/utils/crypto-eip712-utils", default-features = false }
 crypto-utils = { version = "0.263.0", path = "src/utils/crypto-utils", default-features = false }
 database-common = { version = "0.263.0", path = "src/utils/database-common", default-features = false }
 database-common-macros = { version = "0.263.0", path = "src/utils/database-common-macros", default-features = false }
@@ -177,6 +184,7 @@ tracing-perfetto = { version = "0.263.0", path = "src/utils/tracing-perfetto", d
 kamu-accounts = { version = "0.263.0", path = "src/domain/accounts/domain", default-features = false }
 kamu-auth-rebac = { version = "0.263.0", path = "src/domain/auth-rebac/domain", default-features = false }
 kamu-auth-web3 = { version = "0.263.0", path = "src/domain/auth-web3/domain", default-features = false }
+kamu-signing = { version = "0.263.0", path = "src/domain/signing/domain", default-features = false }
 kamu-core = { version = "0.263.0", path = "src/domain/core", default-features = false }
 kamu-datasets = { version = "0.263.0", path = "src/domain/datasets/domain", default-features = false }
 kamu-flow-system = { version = "0.263.0", path = "src/domain/flow-system/domain", default-features = false }
@@ -200,6 +208,7 @@ odf-storage-s3 = { version = "0.263.0", path = "src/odf/storage-s3", default-fea
 kamu-accounts-services = { version = "0.263.0", path = "src/domain/accounts/services", default-features = false }
 kamu-auth-rebac-services = { version = "0.263.0", path = "src/domain/auth-rebac/services", default-features = false }
 kamu-auth-web3-services = { version = "0.263.0", path = "src/domain/auth-web3/services", default-features = false }
+kamu-signing-services = { version = "0.263.0", path = "src/domain/signing/services", default-features = false }
 kamu-datasets-services = { version = "0.263.0", path = "src/domain/datasets/services", default-features = false, features = [
     "lfs",
     "s3",

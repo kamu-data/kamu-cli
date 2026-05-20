@@ -32,7 +32,6 @@ use kamu_auth_rebac_services::{
     RebacServiceImpl,
 };
 use messaging_outbox::DummyOutboxImpl;
-use odf::metadata::{DidKey, DidOdf};
 use pretty_assertions::{assert_eq, assert_matches};
 use time_source::SystemTimeSourceDefault;
 
@@ -175,9 +174,8 @@ async fn test_did_secret_key_generation() {
         .get_decrypted_private_key(SAMPLE_DID_SECRET_KEY_ENCRYPTION_KEY)
         .unwrap();
 
-    let public_key = original_value.verifying_key().to_bytes();
-    let did_odf =
-        DidOdf::from(DidKey::new(odf::metadata::Multicodec::Ed25519Pub, &public_key).unwrap());
+    let public_key = original_value.verifying_key();
+    let did_odf = odf::metadata::DidOdf::from(public_key);
 
     assert_eq!(account_did.1.as_did_odf(), Some(&did_odf));
 }

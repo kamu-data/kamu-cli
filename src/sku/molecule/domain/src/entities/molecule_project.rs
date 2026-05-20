@@ -7,12 +7,38 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::LazyLock;
+
 use chrono::{DateTime, Utc};
 use internal_error::{InternalError, ResultIntoInternal};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: revisit after IPNFT-less projects changes.
+#[nutype::nutype(
+    sanitize(lowercase),
+    validate(len_char_min = 2),
+    derive(Debug, Display, AsRef, Clone, Serialize, Deserialize, Eq, PartialEq)
+)]
+pub struct Symbol(String);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// TODO: Molecule: Phase 3: store as [u8; 32]?
+
+static OCL_ID_REGEX: LazyLock<regex::Regex> =
+    LazyLock::new(|| regex::Regex::new(r"^0x[0-9a-f]{64}$").unwrap());
+
+/// OCL (On-Chain Labs) ID.
+///
+/// Format: bytes32 hex (0x-prefixed, 64 lowercase hex chars).
+#[nutype::nutype(
+    validate(regex = OCL_ID_REGEX),
+    derive(Debug, Display, AsRef, Clone, Serialize, Deserialize, Eq, PartialEq, Hash, FromStr)
+)]
+pub struct OclId(String);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Clone)]
 pub struct MoleculeProject {
     /// System time when this project was created/updated
@@ -20,6 +46,12 @@ pub struct MoleculeProject {
 
     /// Event time when this project was created/updated
     pub event_time: DateTime<Utc>,
+
+    /// Unique OCL (On-Chain Labs) ID.
+    pub ocl_id: OclId,
+
+    /// Symbolic name of the project
+    pub symbol: Symbol,
 
     /// Account ID associated with this project
     pub account_id: odf::AccountID,
@@ -29,43 +61,20 @@ pub struct MoleculeProject {
 
     /// Dataset ID for announcements
     pub announcements_dataset_id: odf::DatasetID,
-
-    /// Symbolic name of the project
-    pub ipnft_symbol: String,
-
-    // TODO: typing
-    /// Unique ID of the IPNFT as `{ipnftAddress}_{ipnftTokenId}`
-    pub ipnft_uid: String,
-
-    /// Address of the IPNFT contract
-    pub ipnft_address: String,
-
-    // NOTE: For backward compatibility (and existing projects),
-    //       we continue using BigInt type, which is wider than needed U256.
-    /// Token ID withing the IPNFT contract
-    pub ipnft_token_id: num_bigint::BigInt,
 }
 
 impl MoleculeProject {
     pub fn from_json(record: serde_json::Value) -> Result<Self, InternalError> {
         let entry: MoleculeProjectChangelogEntry = serde_json::from_value(record).int_err()?;
 
-        let ipnft_token_id = entry
-            .payload
-            .ipnft_token_id
-            .parse()
-            .map_err(|e| InternalError::new(format!("Invalid BigInt: {e}")))?;
-
         Ok(Self {
             system_time: entry.system_columns.timestamp_columns.system_time,
             event_time: entry.system_columns.timestamp_columns.event_time,
-            ipnft_symbol: entry.payload.ipnft_symbol,
-            ipnft_uid: entry.payload.ipnft_uid,
-            ipnft_address: entry.payload.ipnft_address,
-            ipnft_token_id,
-            account_id: entry.payload.account_id,
-            data_room_dataset_id: entry.payload.data_room_dataset_id,
-            announcements_dataset_id: entry.payload.announcements_dataset_id,
+            ocl_id: entry.payload.ocl_id,
+            symbol: entry.payload.symbol,
+            account_id: entry.payload.odf_account_id,
+            data_room_dataset_id: entry.payload.odf_data_room_dataset_id,
+            announcements_dataset_id: entry.payload.odf_announcements_dataset_id,
         })
     }
 
@@ -74,21 +83,14 @@ impl MoleculeProject {
         system_time: DateTime<Utc>,
         event_time: DateTime<Utc>,
     ) -> Result<Self, InternalError> {
-        let ipnft_token_id = payload
-            .ipnft_token_id
-            .parse()
-            .map_err(|e| InternalError::new(format!("Invalid BigInt: {e}")))?;
-
         Ok(Self {
             system_time,
             event_time,
-            ipnft_symbol: payload.ipnft_symbol,
-            ipnft_uid: payload.ipnft_uid,
-            ipnft_address: payload.ipnft_address,
-            ipnft_token_id,
-            account_id: payload.account_id,
-            data_room_dataset_id: payload.data_room_dataset_id,
-            announcements_dataset_id: payload.announcements_dataset_id,
+            ocl_id: payload.ocl_id,
+            symbol: payload.symbol,
+            account_id: payload.odf_account_id,
+            data_room_dataset_id: payload.odf_data_room_dataset_id,
+            announcements_dataset_id: payload.odf_announcements_dataset_id,
         })
     }
 }
@@ -105,19 +107,11 @@ pub type MoleculeProjectChangelogInsertionRecord =
 
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct MoleculeProjectPayloadRecord {
-    pub ipnft_symbol: String,
-
-    pub ipnft_uid: String,
-
-    pub ipnft_address: String,
-
-    pub ipnft_token_id: String,
-
-    pub account_id: odf::AccountID,
-
-    pub data_room_dataset_id: odf::DatasetID,
-
-    pub announcements_dataset_id: odf::DatasetID,
+    pub ocl_id: OclId,
+    pub symbol: Symbol,
+    pub odf_account_id: odf::AccountID,
+    pub odf_data_room_dataset_id: odf::DatasetID,
+    pub odf_announcements_dataset_id: odf::DatasetID,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
