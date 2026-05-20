@@ -51,5 +51,19 @@ paste = { version = "1", default-features = false }
 
 
 [dev-dependencies]
-chrono = { version = "0.4", default-features = false, features = ["clock"] }
-tokio = { version = "1", default-features = false }
+kamu-resources-services       = { workspace = true, features = ["testing"] }
+kamu-resources-inmem          = { workspace = true }
+kamu-messaging-outbox-inmem   = { workspace = true }
+database-common               = { workspace = true }
+database-common-macros        = { workspace = true }
+messaging-outbox              = { workspace = true }
+time-source                   = { workspace = true }
+event-sourcing                = { workspace = true }
+odf                           = { workspace = true }
+kamu-resources                = { workspace = true }
+
+mockall           = { version = "0.14", default-features = false }
+oop               = "0.0.2"
+test-log          = { version = "0.2", features = ["trace"] }
+tokio             = { version = "1", default-features = false, features = ["rt", "macros"] }
+pretty_assertions = { version = "1", default-features = false, features = ["std", "unstable"] }
