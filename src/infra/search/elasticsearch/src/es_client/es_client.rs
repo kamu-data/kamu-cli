@@ -183,7 +183,7 @@ impl ElasticsearchClient {
         }
 
         let response = ensure_client_response(response).await?;
-        let body: es_client::GetDocumentByIdResponse = response.json().await?;
+        let body: GetDocumentByIdResponse = response.json().await?;
         if body.found {
             Ok(body.source)
         } else {
@@ -587,7 +587,7 @@ impl ElasticsearchClient {
     ) -> Result<T, ElasticsearchClientError>
     where
         F: FnMut() -> Fut,
-        Fut: std::future::Future<Output = Result<T, ElasticsearchClientError>>,
+        Fut: Future<Output = Result<T, ElasticsearchClientError>>,
     {
         let deadline = std::time::Instant::now() + timeout;
         let mut attempt_index: u32 = 0;
