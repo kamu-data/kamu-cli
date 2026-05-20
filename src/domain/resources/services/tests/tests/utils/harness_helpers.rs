@@ -11,6 +11,7 @@ use chrono::Utc;
 use kamu_resources::{
     ApplyResourceParams,
     ReconcilableResource,
+    ReconcilableResourceEvent,
     ResourceEventCreated,
     ResourceEventSpecUpdated,
     ResourceUID,
@@ -65,7 +66,7 @@ pub fn make_fresh_aggregate(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub type TestEvent = kamu_resources::ReconcilableResourceEvent<TestResourceSpec, (), String>;
+pub type TestEvent = ReconcilableResourceEvent<TestResourceSpec, (), String>;
 
 pub fn make_created_event(uid: ResourceUID, name: &str, value: &str) -> TestEvent {
     let account_id = make_account_id();

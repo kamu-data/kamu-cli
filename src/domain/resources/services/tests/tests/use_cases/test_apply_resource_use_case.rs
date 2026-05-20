@@ -13,8 +13,17 @@ use kamu_resources::{
     ApplyResourceOutcome,
     ApplyResourceParams,
     ApplyResourcePlanningDecision,
+    ApplyResourceUseCase,
+    ResourceConditionStatus,
+    ResourceConditionType,
+    ResourcePhase,
+    ResourceSpecSanitizer,
 };
-use kamu_resources_services::testing::BaseResourceServiceHarness;
+use kamu_resources_services::testing::{
+    BaseResourceServiceHarness,
+    BaseResourceServiceHarnessOpts,
+};
+use messaging_outbox::OutboxProvider;
 
 use crate::tests::use_cases::resource_use_case_base_harness::{
     ResourceUseCaseBaseHarness,
@@ -51,6 +60,37 @@ async fn test_apply_end_to_end_create_and_retrieve() {
 
     let snapshot = harness.get_snapshot_by_uid(&result.uid).await.unwrap();
     pretty_assertions::assert_eq!(snapshot.spec, serde_json::json!({ "value": "res-a" }));
+
+    // Default harness uses Immediate outbox — auto-reconcile runs synchronously
+    // after apply, so the resource must already be Ready at this point.
+    let status = snapshot.basic_status().unwrap();
+    assert_eq!(status.phase, ResourcePhase::Ready);
+    assert_eq!(status.observed_generation, 1);
+    assert!(
+        snapshot.last_reconciled_at.is_some(),
+        "last_reconciled_at must be populated after auto-reconcile"
+    );
+    BaseResourceServiceHarness::assert_condition(
+        &status,
+        ResourceConditionType::Ready,
+        ResourceConditionStatus::True,
+        Some("Reconciled"),
+        None,
+    );
+    BaseResourceServiceHarness::assert_condition(
+        &status,
+        ResourceConditionType::Accepted,
+        ResourceConditionStatus::True,
+        None,
+        None,
+    );
+    BaseResourceServiceHarness::assert_condition(
+        &status,
+        ResourceConditionType::Reconciling,
+        ResourceConditionStatus::False,
+        Some("Idle"),
+        None,
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -181,12 +221,11 @@ async fn test_apply_rejected_when_sanitized_spec_fails_validation() {
     // Build a catalog on top of the harness's catalog with the clearing sanitizer.
     let mut b = dill::CatalogBuilder::new_chained(harness.catalog());
     b.add_value(TestResourceSpecClearingSanitizer)
-        .bind::<dyn kamu_resources::ResourceSpecSanitizer<crate::tests::utils::TestResource>, TestResourceSpecClearingSanitizer>();
+        .bind::<dyn ResourceSpecSanitizer<crate::tests::utils::TestResource>, TestResourceSpecClearingSanitizer>();
     let catalog = b.build();
 
-    let apply_svc: Arc<
-        dyn kamu_resources::ApplyResourceUseCase<crate::tests::utils::TestResource>,
-    > = catalog.get_one().unwrap();
+    let apply_svc: Arc<dyn ApplyResourceUseCase<crate::tests::utils::TestResource>> =
+        catalog.get_one().unwrap();
 
     let account_id = make_account_id();
     let decision = apply_svc
@@ -195,6 +234,102 @@ async fn test_apply_rejected_when_sanitized_spec_fails_validation() {
         .unwrap();
 
     pretty_assertions::assert_matches!(decision, ApplyResourceApplicationDecision::Rejected(_));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Tests: status assertions
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_apply_create_initial_status_is_pending() {
+    // With a Dispatching outbox the Applied message is queued but not processed,
+    // so auto-reconcile does not run. The resource must be in Pending phase with
+    // generation=1 and observed_generation=0 immediately after apply.
+    let harness = ResourceUseCaseBaseHarness::new_with_opts(ResourceUseCaseBaseHarnessOpts {
+        base_opts: BaseResourceServiceHarnessOpts {
+            outbox_provider: OutboxProvider::Dispatching,
+        },
+        ..Default::default()
+    });
+    let account_id = make_account_id();
+
+    let result = harness
+        .apply_test_uc()
+        .apply(make_params(account_id, "res-a", "res-a"))
+        .await
+        .unwrap()
+        .expect_applied();
+
+    let snapshot = harness.get_snapshot_by_uid(&result.uid).await.unwrap();
+    let status = snapshot.basic_status().unwrap();
+
+    assert_eq!(status.phase, ResourcePhase::Pending);
+    assert_eq!(snapshot.metadata.generation, 1);
+    assert_eq!(status.observed_generation, 0);
+    assert!(
+        snapshot.last_reconciled_at.is_none(),
+        "last_reconciled_at must be absent before first reconcile"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_apply_update_resets_status_to_pending() {
+    // Verifies that a spec update bumps generation and resets the resource back
+    // to Pending, while observed_generation remains at the previously reconciled
+    // generation until the next reconcile cycle.
+    let harness = ResourceUseCaseBaseHarness::new_with_opts(ResourceUseCaseBaseHarnessOpts {
+        base_opts: BaseResourceServiceHarnessOpts {
+            outbox_provider: OutboxProvider::Dispatching,
+        },
+        ..Default::default()
+    });
+    let account_id = make_account_id();
+
+    // Create + reconcile → gen=1, observed_gen=1, phase=Ready
+    let uid = harness.apply_and_get_uid(account_id.clone(), "res-a").await;
+    harness.reconcile_test_uc().execute(&uid).await.unwrap();
+    harness.flush_outbox().await;
+
+    let snapshot = harness.get_snapshot_by_uid(&uid).await.unwrap();
+    let status = snapshot.basic_status().unwrap();
+    assert_eq!(status.phase, ResourcePhase::Ready);
+    BaseResourceServiceHarness::assert_condition(
+        &status,
+        ResourceConditionType::Ready,
+        ResourceConditionStatus::True,
+        Some("Reconciled"),
+        None,
+    );
+
+    // Spec update → gen bumped to 2, phase reset to Pending
+    let update_params = ApplyResourceParams {
+        uid: Some(uid),
+        metadata: BaseResourceServiceHarness::make_metadata_input(account_id, "res-a"),
+        spec: TestResourceSpec {
+            value: "updated".to_string(),
+        },
+    };
+    harness
+        .apply_test_uc()
+        .apply(update_params)
+        .await
+        .unwrap()
+        .expect_applied();
+
+    let snapshot = harness.get_snapshot_by_uid(&uid).await.unwrap();
+    let status = snapshot.basic_status().unwrap();
+
+    assert_eq!(status.phase, ResourcePhase::Pending);
+    assert_eq!(snapshot.metadata.generation, 2);
+    // reset_pending_from_spec creates a fresh ResourceStatus, so
+    // observed_generation resets to 0 on every spec update —
+    // needs_reconciliation() is still true (0 < 2).
+    assert_eq!(
+        status.observed_generation, 0,
+        "observed_generation must be reset to 0 by the spec update"
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

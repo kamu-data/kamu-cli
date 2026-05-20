@@ -7,6 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
+
+use kamu_resources::Reconciler;
+
 use crate::tests::utils::{TestResource, TestResourceReconcileError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -14,11 +19,11 @@ use crate::tests::utils::{TestResource, TestResourceReconcileError};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component(pub)]
-#[dill::interface(dyn kamu_resources::Reconciler<TestResource>)]
+#[dill::interface(dyn Reconciler<TestResource>)]
 pub struct TestResourceReconciler;
 
 #[async_trait::async_trait]
-impl kamu_resources::Reconciler<TestResource> for TestResourceReconciler {
+impl Reconciler<TestResource> for TestResourceReconciler {
     async fn reconcile(&self, _resource: &TestResource) -> Result<(), TestResourceReconcileError> {
         Ok(())
     }
@@ -29,16 +34,34 @@ impl kamu_resources::Reconciler<TestResource> for TestResourceReconciler {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component(pub)]
-#[dill::interface(dyn kamu_resources::Reconciler<TestResource>)]
+#[dill::interface(dyn Reconciler<TestResource>)]
 pub struct TestResourceFailingReconciler;
 
 #[async_trait::async_trait]
-impl kamu_resources::Reconciler<TestResource> for TestResourceFailingReconciler {
+impl Reconciler<TestResource> for TestResourceFailingReconciler {
     async fn reconcile(&self, _resource: &TestResource) -> Result<(), TestResourceReconcileError> {
         use internal_error::ErrorIntoInternal;
         Err(TestResourceReconcileError::Internal(
             "simulated reconcile failure".int_err(),
         ))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TestResourceCountingReconciler
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Not a #[dill::component] — always registered via add_value() so that the
+// Arc<AtomicU32> owned by the test is shared across all catalog resolutions.
+pub struct TestResourceCountingReconciler {
+    pub call_count: Arc<AtomicU32>,
+}
+
+#[async_trait::async_trait]
+impl Reconciler<TestResource> for TestResourceCountingReconciler {
+    async fn reconcile(&self, _resource: &TestResource) -> Result<(), TestResourceReconcileError> {
+        self.call_count.fetch_add(1, Ordering::SeqCst);
+        Ok(())
     }
 }
 
@@ -49,6 +72,7 @@ pub enum TestResourceReconcilerProvider {
     #[default]
     Stub,
     Failing,
+    Counting(Arc<AtomicU32>),
 }
 
 impl TestResourceReconcilerProvider {
@@ -59,6 +83,12 @@ impl TestResourceReconcilerProvider {
             }
             TestResourceReconcilerProvider::Failing => {
                 b.add::<TestResourceFailingReconciler>();
+            }
+            TestResourceReconcilerProvider::Counting(counter) => {
+                b.add_value(TestResourceCountingReconciler {
+                    call_count: counter,
+                })
+                .bind::<dyn Reconciler<TestResource>, TestResourceCountingReconciler>();
             }
         }
     }

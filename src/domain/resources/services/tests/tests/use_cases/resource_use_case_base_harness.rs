@@ -17,6 +17,7 @@ use kamu_resources::{
     DeleteAccountResourcesUseCase,
     DeleteResourcesUseCase,
     ReconcileResourceUseCase,
+    ResourceSpecSanitizer,
     ResourceUID,
 };
 use kamu_resources_services::testing::{
@@ -78,6 +79,19 @@ impl ResourceUseCaseBaseHarness {
         })
     }
 
+    pub fn new_with_mock_outbox_and_reconciler(
+        mock_outbox: MockOutbox,
+        reconciler_provider: TestResourceReconcilerProvider,
+    ) -> Self {
+        Self::new_with_opts(ResourceUseCaseBaseHarnessOpts {
+            base_opts: BaseResourceServiceHarnessOpts {
+                outbox_provider: OutboxProvider::Mock(mock_outbox),
+            },
+            reconciler_provider,
+            with_sanitizer: false,
+        })
+    }
+
     pub fn new_with_opts(opts: ResourceUseCaseBaseHarnessOpts) -> Self {
         let base = BaseResourceServiceHarness::new_with_opts(opts.base_opts);
 
@@ -90,7 +104,7 @@ impl ResourceUseCaseBaseHarness {
             b.add_value(TestResourceSpecSanitizer {
                 suffix: "-sanitized".to_string(),
             })
-            .bind::<dyn kamu_resources::ResourceSpecSanitizer<TestResource>, TestResourceSpecSanitizer>();
+            .bind::<dyn ResourceSpecSanitizer<TestResource>, TestResourceSpecSanitizer>();
         }
 
         let catalog = b.build();
@@ -120,6 +134,13 @@ impl ResourceUseCaseBaseHarness {
 
     pub fn outbox_agent(&self) -> Arc<dyn OutboxAgent> {
         self.catalog.get_one().unwrap()
+    }
+
+    pub async fn flush_outbox(&self) {
+        self.outbox_agent()
+            .run_single_iteration_only()
+            .await
+            .unwrap();
     }
 
     pub async fn delete_resources(&self, account_id: odf::AccountID, uids: Vec<ResourceUID>) {

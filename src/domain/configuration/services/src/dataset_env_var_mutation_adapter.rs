@@ -40,9 +40,11 @@ use kamu_datasets::{
 use kamu_resources::{
     ApplyManifestApplicationDecision,
     GenericResourceQueryService,
+    ResourceCrudDispatcher,
     ResourceCrudDispatcherApplyRequest,
     ResourceCrudDispatcherDeleteRequest,
     ResourceMetadataInput,
+    ResourceUID,
     UnsupportedResourceDescriptorError,
 };
 use kamu_resources_services::get_resource_crud_dispatcher_by_kind;
@@ -152,10 +154,7 @@ impl DatasetEnvVarMutationAdapterImpl {
         format!("legacy-secrets-{}", dataset_id.as_multibase())
     }
 
-    fn get_dispatcher<E>(
-        &self,
-        resource_type: &str,
-    ) -> Result<Arc<dyn kamu_resources::ResourceCrudDispatcher>, E>
+    fn get_dispatcher<E>(&self, resource_type: &str) -> Result<Arc<dyn ResourceCrudDispatcher>, E>
     where
         E: From<InternalError>,
     {
@@ -166,10 +165,10 @@ impl DatasetEnvVarMutationAdapterImpl {
 
     async fn apply_and_handle_rejection<E>(
         &self,
-        dispatcher: &Arc<dyn kamu_resources::ResourceCrudDispatcher>,
+        dispatcher: &Arc<dyn ResourceCrudDispatcher>,
         request: ResourceCrudDispatcherApplyRequest,
         resource_type_name: &str,
-    ) -> Result<kamu_resources::ResourceUID, E>
+    ) -> Result<ResourceUID, E>
     where
         E: From<InternalError>,
     {
@@ -329,7 +328,7 @@ impl DatasetEnvVarMutationAdapterImpl {
     async fn delete_variable(
         &self,
         dataset_id: &odf::DatasetID,
-        resource_uid: kamu_resources::ResourceUID,
+        resource_uid: ResourceUID,
         key: &str,
     ) -> Result<(), DeleteDatasetEnvVarError> {
         let snapshot = self
@@ -391,7 +390,7 @@ impl DatasetEnvVarMutationAdapterImpl {
     async fn delete_secret(
         &self,
         dataset_id: &odf::DatasetID,
-        resource_uid: kamu_resources::ResourceUID,
+        resource_uid: ResourceUID,
         key: &str,
     ) -> Result<(), DeleteDatasetEnvVarError> {
         let snapshot = self
@@ -500,7 +499,7 @@ impl DatasetEnvVarMutationAdapterImpl {
         &self,
         dataset_id: &odf::DatasetID,
         key: &str,
-    ) -> Result<Option<(kamu_resources::ResourceUID, String)>, InternalError> {
+    ) -> Result<Option<(ResourceUID, String)>, InternalError> {
         let bindings = self
             .secret_set_binding_repo
             .list_bindings(dataset_id)
@@ -536,7 +535,7 @@ impl DatasetEnvVarMutationAdapterImpl {
         &self,
         dataset_id: &odf::DatasetID,
         key: &str,
-    ) -> Result<Option<(kamu_resources::ResourceUID, String)>, InternalError> {
+    ) -> Result<Option<(ResourceUID, String)>, InternalError> {
         let bindings = self
             .variable_set_binding_repo
             .list_bindings(dataset_id)
@@ -573,13 +572,7 @@ impl DatasetEnvVarMutationAdapterImpl {
         &self,
         account_id: &odf::AccountID,
         resource_name: &str,
-    ) -> Result<
-        (
-            Option<kamu_resources::ResourceUID>,
-            BTreeMap<String, VariableSpec>,
-        ),
-        InternalError,
-    > {
+    ) -> Result<(Option<ResourceUID>, BTreeMap<String, VariableSpec>), InternalError> {
         let uid = self
             .generic_resource_query_service
             .find_resource_uid_by_name(
@@ -608,13 +601,7 @@ impl DatasetEnvVarMutationAdapterImpl {
         &self,
         account_id: &odf::AccountID,
         resource_name: &str,
-    ) -> Result<
-        (
-            Option<kamu_resources::ResourceUID>,
-            BTreeMap<String, SecretSpec>,
-        ),
-        InternalError,
-    > {
+    ) -> Result<(Option<ResourceUID>, BTreeMap<String, SecretSpec>), InternalError> {
         let uid = self
             .generic_resource_query_service
             .find_resource_uid_by_name(
@@ -640,7 +627,7 @@ impl DatasetEnvVarMutationAdapterImpl {
 
     async fn decrypt_secret_entries(
         &self,
-        resource_uid: &kamu_resources::ResourceUID,
+        resource_uid: &ResourceUID,
     ) -> Result<BTreeMap<String, String>, InternalError> {
         let encryption_key = self
             .secrets_encryption_config

@@ -16,10 +16,14 @@ use dill::CatalogBuilder;
 use kamu_resources::{
     GenericResourceQueryService,
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
+    ResourceConditionStatus,
+    ResourceConditionType,
     ResourceLifecycleMessage,
     ResourceLifecycleMessageOutcome,
     ResourceMetadataInput,
     ResourceRepository,
+    ResourceSnapshot,
+    ResourceStatus,
     ResourceUID,
 };
 use kamu_resources_inmem::{InMemoryRawResourceEventStore, InMemoryResourceRepository};
@@ -134,10 +138,7 @@ impl BaseResourceServiceHarness {
         }
     }
 
-    pub async fn get_snapshot_by_uid(
-        &self,
-        uid: &ResourceUID,
-    ) -> Option<kamu_resources::ResourceSnapshot> {
+    pub async fn get_snapshot_by_uid(&self, uid: &ResourceUID) -> Option<ResourceSnapshot> {
         self.generic_query_svc
             .get_snapshot_by_uid(uid)
             .await
@@ -192,6 +193,77 @@ impl BaseResourceServiceHarness {
                     )
             })
             .returning(|_, _, _| Ok(()));
+    }
+
+    pub fn expect_reconciliation_succeeded_message(mock_outbox: &mut MockOutbox, n: usize) {
+        mock_outbox
+            .expect_post_message_as_json()
+            .times(n)
+            .withf(move |producer, message, _version| {
+                producer == MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE
+                    && matches!(
+                        serde_json::from_value::<ResourceLifecycleMessage>(message.clone())
+                            .unwrap(),
+                        ResourceLifecycleMessage::ReconciliationSucceeded(_)
+                    )
+            })
+            .returning(|_, _, _| Ok(()));
+    }
+
+    pub fn expect_reconciliation_failed_message(mock_outbox: &mut MockOutbox, n: usize) {
+        mock_outbox
+            .expect_post_message_as_json()
+            .times(n)
+            .withf(move |producer, message, _version| {
+                producer == MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE
+                    && matches!(
+                        serde_json::from_value::<ResourceLifecycleMessage>(message.clone())
+                            .unwrap(),
+                        ResourceLifecycleMessage::ReconciliationFailed(_)
+                    )
+            })
+            .returning(|_, _, _| Ok(()));
+    }
+
+    /// Assert that a condition of `type_` is present in `status` and has the
+    /// expected `status` value.  Optionally assert `reason` and whether a
+    /// non-None `message` is present.
+    #[track_caller]
+    pub fn assert_condition(
+        resource_status: &ResourceStatus,
+        type_: ResourceConditionType,
+        expected_status: ResourceConditionStatus,
+        expected_reason: Option<&str>,
+        expect_message: Option<bool>,
+    ) {
+        let cond = resource_status
+            .conditions
+            .iter()
+            .find(|c| c.type_ == type_)
+            .unwrap_or_else(|| panic!("{type_:?} condition must be present in status"));
+
+        assert_eq!(
+            cond.status, expected_status,
+            "{type_:?} condition status mismatch"
+        );
+
+        if let Some(reason) = expected_reason {
+            assert_eq!(cond.reason, reason, "{type_:?} condition reason mismatch");
+        }
+
+        if let Some(should_have_message) = expect_message {
+            if should_have_message {
+                assert!(
+                    cond.message.is_some(),
+                    "{type_:?} condition must carry a message"
+                );
+            } else {
+                assert!(
+                    cond.message.is_none(),
+                    "{type_:?} condition must not carry a message"
+                );
+            }
+        }
     }
 }
 

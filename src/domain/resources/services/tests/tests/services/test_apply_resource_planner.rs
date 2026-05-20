@@ -17,9 +17,11 @@ use kamu_resources::{
     ApplyResourceParams,
     ApplyResourcePlanningDecision,
     ApplyResourceUseCase,
+    ApplyResourceUseCaseError,
     ResourceAggregateLoader,
     ResourceMetadata,
     ResourceSnapshot,
+    ResourceUID,
     TypedResourceQueryService,
 };
 use kamu_resources_services::ApplyResourcePlanner;
@@ -222,16 +224,14 @@ impl ApplyResourcePlannerHarness {
     async fn plan_result(
         &self,
         params: ApplyResourceParams<TestResource>,
-    ) -> Result<
-        ApplyResourcePlanningDecision<TestResource>,
-        kamu_resources::ApplyResourceUseCaseError<TestResource>,
-    > {
+    ) -> Result<ApplyResourcePlanningDecision<TestResource>, ApplyResourceUseCaseError<TestResource>>
+    {
         self.make_planner().plan(params).await
     }
 
     fn make_apply_params(
         &self,
-        uid: Option<kamu_resources::ResourceUID>,
+        uid: Option<ResourceUID>,
         account_id: odf::AccountID,
         name: &str,
         value: impl Into<String>,
@@ -245,11 +245,7 @@ impl ApplyResourcePlannerHarness {
         }
     }
 
-    async fn apply_and_get_uid(
-        &self,
-        account_id: odf::AccountID,
-        name: &str,
-    ) -> kamu_resources::ResourceUID {
+    async fn apply_and_get_uid(&self, account_id: odf::AccountID, name: &str) -> ResourceUID {
         let params = make_resource_params(account_id, name);
         match self.apply_svc.apply(params).await.unwrap() {
             ApplyResourceApplicationDecision::Applied(result) => result.uid,

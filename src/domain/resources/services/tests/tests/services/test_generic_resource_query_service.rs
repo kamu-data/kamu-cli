@@ -8,7 +8,13 @@
 // by the Apache License, Version 2.0.
 
 use chrono::Utc;
-use kamu_resources::{FindOwnedResourceError, ResourceMetadata, ResourceSnapshot, ResourceUID};
+use kamu_resources::{
+    FindOwnedResourceError,
+    FindOwnedSnapshotsOutcome,
+    ResourceMetadata,
+    ResourceSnapshot,
+    ResourceUID,
+};
 use kamu_resources_services::testing::BaseResourceServiceHarness;
 
 use crate::tests::utils::make_account_id;
@@ -437,7 +443,7 @@ impl GenericResourceQueryServiceHarness {
         kind: &'static str,
         api_version: &'static str,
         uids: &[ResourceUID],
-    ) -> kamu_resources::FindOwnedSnapshotsOutcome {
+    ) -> FindOwnedSnapshotsOutcome {
         self.generic_query_svc()
             .find_owned_snapshots(account_id, kind, api_version, uids)
             .await

@@ -13,15 +13,20 @@ use crypto_utils::AesGcmEncryptor;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_configuration::{SecretSetResource, SecretSetSpec, SecretSpec};
 use kamu_datasets::SecretsEncryptionConfig;
-use kamu_resources::{ResourceDescriptor, ResourceDescriptorProvider, ResourceSpecViewDispatcher};
+use kamu_resources::{
+    ResourceDescriptor,
+    ResourceDescriptorProvider,
+    ResourceDispatcherMeta,
+    ResourceSpecViewDispatcher,
+};
 use secrecy::{ExposeSecret, SecretString};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component]
 #[dill::interface(dyn ResourceSpecViewDispatcher)]
-#[dill::meta(kamu_resources::ResourceDispatcherMeta {
-    descriptor: <SecretSetResource as kamu_resources::ResourceDescriptorProvider>::DESCRIPTOR,
+#[dill::meta(ResourceDispatcherMeta {
+    descriptor: <SecretSetResource as ResourceDescriptorProvider>::DESCRIPTOR,
 })]
 pub struct SecretSetSpecViewDispatcher {
     secrets_encryption_config: Arc<SecretsEncryptionConfig>,

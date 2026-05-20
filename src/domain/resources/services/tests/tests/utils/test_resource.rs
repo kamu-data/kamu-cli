@@ -198,7 +198,7 @@ pub enum TestResourceReconcileError {
     Internal(#[from] internal_error::InternalError),
 }
 
-impl kamu_resources::ResourceReconcileError for TestResourceReconcileError {
+impl ResourceReconcileError for TestResourceReconcileError {
     fn reason_code(&self) -> &'static str {
         match self {
             Self::ConcurrentModification(_) => "concurrent_modification",
@@ -279,7 +279,7 @@ pub struct TestResourceSpecSanitizer {
 }
 
 #[async_trait::async_trait]
-impl kamu_resources::ResourceSpecSanitizer<TestResource> for TestResourceSpecSanitizer {
+impl ResourceSpecSanitizer<TestResource> for TestResourceSpecSanitizer {
     async fn sanitize_new_spec(
         &self,
         mut new_spec: TestResourceSpec,
@@ -295,7 +295,7 @@ impl kamu_resources::ResourceSpecSanitizer<TestResource> for TestResourceSpecSan
 pub struct TestResourceSpecClearingSanitizer;
 
 #[async_trait::async_trait]
-impl kamu_resources::ResourceSpecSanitizer<TestResource> for TestResourceSpecClearingSanitizer {
+impl ResourceSpecSanitizer<TestResource> for TestResourceSpecClearingSanitizer {
     async fn sanitize_new_spec(
         &self,
         mut new_spec: TestResourceSpec,

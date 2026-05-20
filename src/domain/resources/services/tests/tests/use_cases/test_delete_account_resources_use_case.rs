@@ -7,7 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources::{MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE, ResourceLifecycleMessage};
+use kamu_resources::{
+    MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
+    ResourceLifecycleMessage,
+    ResourceUID,
+};
 use kamu_resources_services::testing::BaseResourceServiceHarness;
 use messaging_outbox::MockOutbox;
 
@@ -160,7 +164,7 @@ async fn test_delete_account_message_carries_correct_snapshot_data() {
 
     BaseResourceServiceHarness::expect_applied_messages(&mut mock_outbox, 1, None);
 
-    let uid_cell = std::sync::Arc::new(std::sync::Mutex::new(None::<kamu_resources::ResourceUID>));
+    let uid_cell = std::sync::Arc::new(std::sync::Mutex::new(None::<ResourceUID>));
     let uid_cell_clone = uid_cell.clone();
 
     mock_outbox

@@ -23,7 +23,7 @@ use kamu_configuration::{
     SecretSetStats,
 };
 use kamu_datasets::SecretsEncryptionConfig;
-use kamu_resources::{DeclarativeResource, ReconcilableResource, Reconciler};
+use kamu_resources::{DeclarativeResource, ReconcilableResource, Reconciler, ResourceUID};
 use odf::AccountID;
 use secrecy::{ExposeSecret, SecretString};
 use time_source::SystemTimeSource;
@@ -99,7 +99,7 @@ impl Reconciler<SecretSetResource> for SecretSetReconcilerImpl {
 impl SecretSetReconcilerImpl {
     async fn load_previous_entries_by_key(
         &self,
-        resource_uid: &kamu_resources::ResourceUID,
+        resource_uid: &ResourceUID,
         resource_generation: u64,
     ) -> Result<HashMap<String, PreviousConfigurationEntry>, SecretSetReconcileError> {
         if resource_generation == 0 {

@@ -19,7 +19,7 @@ use kamu_configuration::{
     VariableSetResource,
     VariableSetStats,
 };
-use kamu_resources::{DeclarativeResource, ReconcilableResource, Reconciler};
+use kamu_resources::{DeclarativeResource, ReconcilableResource, Reconciler, ResourceUID};
 use time_source::SystemTimeSource;
 use uuid::Uuid;
 
@@ -103,7 +103,7 @@ impl Reconciler<VariableSetResource> for VariableSetReconcilerImpl {
 impl VariableSetReconcilerImpl {
     async fn load_previous_entries_by_key(
         &self,
-        resource_uid: &kamu_resources::ResourceUID,
+        resource_uid: &ResourceUID,
         resource_generation: u64,
     ) -> Result<HashMap<String, PreviousConfigurationEntry>, VariableSetReconcileError> {
         if resource_generation == 0 {
