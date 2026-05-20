@@ -18,6 +18,7 @@ use kamu_resources::{
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
     ResourceLifecycleMessage,
     ResourceMetadataInput,
+    ResourceRepository,
     ResourceUID,
 };
 use kamu_resources_inmem::{InMemoryRawResourceEventStore, InMemoryResourceRepository};
@@ -66,6 +67,10 @@ impl BaseResourceServiceHarness {
         self.catalog.get_one().unwrap()
     }
 
+    pub fn resource_repo(&self) -> Arc<dyn ResourceRepository> {
+        self.catalog.get_one().unwrap()
+    }
+
     pub async fn allocate_resource_uid(&self) -> ResourceUID {
         self.catalog
             .get_one::<dyn GenericResourceQueryService>()
@@ -75,7 +80,7 @@ impl BaseResourceServiceHarness {
             .unwrap()
     }
 
-    pub fn make_metadata(account_id: odf::AccountID, name: &str) -> ResourceMetadataInput {
+    pub fn make_metadata_input(account_id: odf::AccountID, name: &str) -> ResourceMetadataInput {
         ResourceMetadataInput {
             account: account_id,
             name: name.to_string(),

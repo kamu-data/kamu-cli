@@ -26,15 +26,13 @@ pub fn make_account_id() -> odf::AccountID {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Remove when tests would use this actually
-#[expect(dead_code)]
 pub fn make_resource_params(
     account_id: odf::AccountID,
     name: &str,
 ) -> ApplyResourceParams<TestResource> {
     ApplyResourceParams {
         uid: None,
-        metadata: BaseResourceServiceHarness::make_metadata(account_id, name),
+        metadata: BaseResourceServiceHarness::make_metadata_input(account_id, name),
         spec: TestResourceSpec {
             value: name.to_string(),
         },
@@ -56,7 +54,7 @@ pub fn make_created_event(uid: ResourceUID, name: &str, value: &str) -> TestEven
     TestEvent::Created(ResourceEventCreated {
         event_time: Utc::now(),
         uid,
-        metadata: BaseResourceServiceHarness::make_metadata(account_id, name),
+        metadata: BaseResourceServiceHarness::make_metadata_input(account_id, name),
         spec: TestResourceSpec {
             value: value.to_string(),
         },

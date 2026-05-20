@@ -8,3 +8,4 @@
 // by the Apache License, Version 2.0.
 
 mod test_generic_resource_query_service;
+mod test_typed_resource_query_service;

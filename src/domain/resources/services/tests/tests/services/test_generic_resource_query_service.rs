@@ -7,99 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
 use chrono::Utc;
-use dill::CatalogBuilder;
-use kamu_resources::{
-    FindOwnedResourceError,
-    GenericResourceQueryService,
-    ResourceMetadata,
-    ResourceRepository,
-    ResourceSnapshot,
-    ResourceUID,
-};
+use kamu_resources::{FindOwnedResourceError, ResourceMetadata, ResourceSnapshot, ResourceUID};
 use kamu_resources_services::testing::BaseResourceServiceHarness;
 
 use crate::tests::utils::harness_helpers::make_account_id;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Harness
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-struct GenericResourceQueryServiceHarness {
-    catalog: dill::Catalog,
-}
-
-impl GenericResourceQueryServiceHarness {
-    fn new() -> Self {
-        let base = BaseResourceServiceHarness::new();
-        let catalog = CatalogBuilder::new_chained(base.catalog()).build();
-        Self { catalog }
-    }
-
-    fn generic_query_svc(&self) -> Arc<dyn GenericResourceQueryService> {
-        self.catalog.get_one().unwrap()
-    }
-
-    fn resource_repo(&self) -> Arc<dyn ResourceRepository> {
-        self.catalog.get_one().unwrap()
-    }
-
-    async fn insert_snapshot(
-        &self,
-        uid: ResourceUID,
-        owner_account_id: odf::AccountID,
-        kind: &str,
-        api_version: &str,
-        name: &str,
-    ) {
-        let snapshot = ResourceSnapshot {
-            uid,
-            kind: kind.to_string(),
-            api_version: api_version.to_string(),
-            metadata: ResourceMetadata::new_minimal(Utc::now(), owner_account_id, name),
-            spec: serde_json::json!({"value": name}),
-            status: None,
-            last_reconciled_at: None,
-            last_event_id: None,
-        };
-
-        self.resource_repo()
-            .create_resource(&snapshot)
-            .await
-            .unwrap();
-    }
-
-    async fn find_owned_snapshot(
-        &self,
-        account_id: &odf::AccountID,
-        kind: &'static str,
-        api_version: &'static str,
-        uid: ResourceUID,
-    ) -> Result<Option<ResourceSnapshot>, FindOwnedResourceError> {
-        self.generic_query_svc()
-            .find_owned_snapshot(account_id, kind, api_version, uid)
-            .await
-    }
-
-    async fn find_owned_snapshots(
-        &self,
-        account_id: &odf::AccountID,
-        kind: &'static str,
-        api_version: &'static str,
-        uids: &[ResourceUID],
-    ) -> kamu_resources::FindOwnedSnapshotsOutcome {
-        self.generic_query_svc()
-            .find_owned_snapshots(account_id, kind, api_version, uids)
-            .await
-            .unwrap()
-    }
-
-    async fn allocate_uid(&self) -> ResourceUID {
-        self.generic_query_svc().allocate_uid().await.unwrap()
-    }
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // find_owned_snapshot tests
@@ -465,6 +377,76 @@ async fn test_find_owned_snapshots_mixed_outcomes() {
     assert_eq!(outcome.access_denied, vec![uid_access_denied]);
 
     assert_eq!(outcome.not_found, vec![uid_not_found]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Harness
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[oop::extend(BaseResourceServiceHarness, base)]
+struct GenericResourceQueryServiceHarness {
+    base: BaseResourceServiceHarness,
+}
+
+impl GenericResourceQueryServiceHarness {
+    fn new() -> Self {
+        let base = BaseResourceServiceHarness::new();
+        Self { base }
+    }
+
+    async fn insert_snapshot(
+        &self,
+        uid: ResourceUID,
+        owner_account_id: odf::AccountID,
+        kind: &str,
+        api_version: &str,
+        name: &str,
+    ) {
+        let snapshot = ResourceSnapshot {
+            uid,
+            kind: kind.to_string(),
+            api_version: api_version.to_string(),
+            metadata: ResourceMetadata::new_minimal(Utc::now(), owner_account_id, name),
+            spec: serde_json::json!({"value": name}),
+            status: None,
+            last_reconciled_at: None,
+            last_event_id: None,
+        };
+
+        self.resource_repo()
+            .create_resource(&snapshot)
+            .await
+            .unwrap();
+    }
+
+    async fn find_owned_snapshot(
+        &self,
+        account_id: &odf::AccountID,
+        kind: &'static str,
+        api_version: &'static str,
+        uid: ResourceUID,
+    ) -> Result<Option<ResourceSnapshot>, FindOwnedResourceError> {
+        self.generic_query_svc()
+            .find_owned_snapshot(account_id, kind, api_version, uid)
+            .await
+    }
+
+    async fn find_owned_snapshots(
+        &self,
+        account_id: &odf::AccountID,
+        kind: &'static str,
+        api_version: &'static str,
+        uids: &[ResourceUID],
+    ) -> kamu_resources::FindOwnedSnapshotsOutcome {
+        self.generic_query_svc()
+            .find_owned_snapshots(account_id, kind, api_version, uids)
+            .await
+            .unwrap()
+    }
+
+    async fn allocate_uid(&self) -> ResourceUID {
+        self.generic_query_svc().allocate_uid().await.unwrap()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

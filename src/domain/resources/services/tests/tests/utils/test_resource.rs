@@ -274,7 +274,8 @@ kamu_resources::impl_reconcilable_event_sourced_resource!(
 // TestResourceReconciler
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[allow(dead_code)]
+#[dill::component(pub)]
+#[dill::interface(dyn kamu_resources::Reconciler<TestResource>)]
 pub struct TestResourceReconciler;
 
 #[async_trait::async_trait]

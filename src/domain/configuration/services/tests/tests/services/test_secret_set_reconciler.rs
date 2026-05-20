@@ -41,7 +41,7 @@ async fn test_reconcile_secret_set_decrypts_and_reprojects_values() {
         .apply_secret_use_case()
         .apply(ApplyResourceParams {
             uid: None,
-            metadata: BaseResourceServiceHarness::make_metadata(account_id, "test-secrets"),
+            metadata: BaseResourceServiceHarness::make_metadata_input(account_id, "test-secrets"),
             spec,
         })
         .await
