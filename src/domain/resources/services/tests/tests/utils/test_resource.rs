@@ -271,17 +271,38 @@ kamu_resources::impl_reconcilable_event_sourced_resource!(
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// TestResourceReconciler
+// TestResourceSpecSanitizer
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[dill::component(pub)]
-#[dill::interface(dyn kamu_resources::Reconciler<TestResource>)]
-pub struct TestResourceReconciler;
+pub struct TestResourceSpecSanitizer {
+    pub suffix: String,
+}
 
 #[async_trait::async_trait]
-impl kamu_resources::Reconciler<TestResource> for TestResourceReconciler {
-    async fn reconcile(&self, _resource: &TestResource) -> Result<(), TestResourceReconcileError> {
-        Ok(())
+impl kamu_resources::ResourceSpecSanitizer<TestResource> for TestResourceSpecSanitizer {
+    async fn sanitize_new_spec(
+        &self,
+        mut new_spec: TestResourceSpec,
+        _maybe_current_spec: Option<&TestResourceSpec>,
+    ) -> Result<TestResourceSpec, internal_error::InternalError> {
+        new_spec.value.push_str(&self.suffix);
+        Ok(new_spec)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub struct TestResourceSpecClearingSanitizer;
+
+#[async_trait::async_trait]
+impl kamu_resources::ResourceSpecSanitizer<TestResource> for TestResourceSpecClearingSanitizer {
+    async fn sanitize_new_spec(
+        &self,
+        mut new_spec: TestResourceSpec,
+        _maybe_current_spec: Option<&TestResourceSpec>,
+    ) -> Result<TestResourceSpec, internal_error::InternalError> {
+        new_spec.value.clear();
+        Ok(new_spec)
     }
 }
 
@@ -295,5 +316,14 @@ kamu_resources_services::declare_resource_service_layer!(
     resource = crate::tests::utils::TestResource,
     state_model = crate::tests::utils::TestResourceStateModel
 );
+
+kamu_resources_services::declare_resource_crud_dispatcher!(
+    dispatcher = TestResourceCrudDispatcher,
+    resource = crate::tests::utils::TestResource
+);
+
+pub fn register_test_resource_crud_dispatcher(catalog_builder: &mut dill::CatalogBuilder) {
+    catalog_builder.add::<TestResourceCrudDispatcher>();
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

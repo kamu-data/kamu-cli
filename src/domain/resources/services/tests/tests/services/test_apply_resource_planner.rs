@@ -25,11 +25,13 @@ use kamu_resources::{
 use kamu_resources_services::ApplyResourcePlanner;
 use kamu_resources_services::testing::BaseResourceServiceHarness;
 
-use crate::tests::utils::harness_helpers::{make_account_id, make_resource_params, make_uid};
 use crate::tests::utils::{
     TestResource,
     TestResourceReconciler,
     TestResourceSpec,
+    make_account_id,
+    make_resource_params,
+    make_uid,
     register_test_resource_resource_service_layer,
 };
 
@@ -59,13 +61,7 @@ async fn test_plan_create_with_uid_hint_not_yet_saved() {
     let account_id = make_account_id();
     let uid = make_uid();
 
-    let params = ApplyResourceParams {
-        uid: Some(uid),
-        metadata: BaseResourceServiceHarness::make_metadata_input(account_id, "res-a"),
-        spec: TestResourceSpec {
-            value: "res-a".to_string(),
-        },
-    };
+    let params = harness.make_apply_params(Some(uid), account_id, "res-a", "res-a");
 
     let decision = harness.plan(params).await;
 
@@ -84,13 +80,7 @@ async fn test_plan_update_with_spec_change() {
 
     let uid = harness.apply_and_get_uid(account_id.clone(), "res-a").await;
 
-    let params = ApplyResourceParams {
-        uid: Some(uid),
-        metadata: BaseResourceServiceHarness::make_metadata_input(account_id, "res-a"),
-        spec: TestResourceSpec {
-            value: "changed-value".to_string(),
-        },
-    };
+    let params = harness.make_apply_params(Some(uid), account_id.clone(), "res-a", "changed-value");
 
     let decision = harness.plan(params).await;
 
@@ -109,13 +99,7 @@ async fn test_plan_untouched_no_changes() {
 
     let uid = harness.apply_and_get_uid(account_id.clone(), "res-a").await;
 
-    let params = ApplyResourceParams {
-        uid: Some(uid),
-        metadata: BaseResourceServiceHarness::make_metadata_input(account_id, "res-a"),
-        spec: TestResourceSpec {
-            value: "res-a".to_string(),
-        },
-    };
+    let params = harness.make_apply_params(Some(uid), account_id.clone(), "res-a", "res-a");
 
     let decision = harness.plan(params).await;
 
@@ -135,13 +119,7 @@ async fn test_plan_update_via_name_lookup() {
     harness.apply_and_get_uid(account_id.clone(), "res-a").await;
 
     // Plan with same name but no UID — planner resolves via name lookup
-    let params = ApplyResourceParams {
-        uid: None,
-        metadata: BaseResourceServiceHarness::make_metadata_input(account_id, "res-a"),
-        spec: TestResourceSpec {
-            value: "new-value".to_string(),
-        },
-    };
+    let params = harness.make_apply_params(None, account_id, "res-a", "new-value");
 
     let decision = harness.plan(params).await;
 
@@ -179,13 +157,7 @@ async fn test_plan_type_mismatch_rejects() {
         .await
         .unwrap();
 
-    let params = ApplyResourceParams {
-        uid: Some(uid),
-        metadata: BaseResourceServiceHarness::make_metadata_input(account_id, "res-a"),
-        spec: TestResourceSpec {
-            value: "val".to_string(),
-        },
-    };
+    let params = harness.make_apply_params(Some(uid), account_id, "res-a", "val");
 
     let result = harness.plan_result(params).await;
 
@@ -255,6 +227,22 @@ impl ApplyResourcePlannerHarness {
         kamu_resources::ApplyResourceUseCaseError<TestResource>,
     > {
         self.make_planner().plan(params).await
+    }
+
+    fn make_apply_params(
+        &self,
+        uid: Option<kamu_resources::ResourceUID>,
+        account_id: odf::AccountID,
+        name: &str,
+        value: impl Into<String>,
+    ) -> ApplyResourceParams<TestResource> {
+        ApplyResourceParams {
+            uid,
+            metadata: BaseResourceServiceHarness::make_metadata_input(account_id, name),
+            spec: TestResourceSpec {
+                value: value.into(),
+            },
+        }
     }
 
     async fn apply_and_get_uid(

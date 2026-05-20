@@ -11,7 +11,7 @@ use chrono::Utc;
 use kamu_resources::{FindOwnedResourceError, ResourceMetadata, ResourceSnapshot, ResourceUID};
 use kamu_resources_services::testing::BaseResourceServiceHarness;
 
-use crate::tests::utils::harness_helpers::make_account_id;
+use crate::tests::utils::make_account_id;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // find_owned_snapshot tests

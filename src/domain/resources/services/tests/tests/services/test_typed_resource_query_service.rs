@@ -22,10 +22,11 @@ use kamu_resources::{
 };
 use kamu_resources_services::testing::BaseResourceServiceHarness;
 
-use crate::tests::utils::harness_helpers::{make_account_id, make_resource_params};
 use crate::tests::utils::{
     TestResource,
     TestResourceReconciler,
+    make_account_id,
+    make_resource_params,
     register_test_resource_resource_service_layer,
 };
 

@@ -61,6 +61,17 @@ pub enum ApplyResourceApplicationDecision<R: DeclarativeResource> {
     Rejected(ApplyResourceRejection),
 }
 
+impl<R: DeclarativeResource> ApplyResourceApplicationDecision<R> {
+    pub fn expect_applied(self) -> ApplyResourceResult<R> {
+        match self {
+            Self::Applied(result) => result,
+            Self::Rejected(rejection) => {
+                panic!("Expected Applied decision, got Rejected: {rejection:?}")
+            }
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]

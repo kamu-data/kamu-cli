@@ -24,11 +24,12 @@ use kamu_resources::{
 };
 use kamu_resources_services::testing::BaseResourceServiceHarness;
 
-use crate::tests::utils::harness_helpers::{make_account_id, make_fresh_aggregate};
 use crate::tests::utils::{
     TestResource,
     TestResourceReconciler,
     TestResourceSpec,
+    make_account_id,
+    make_fresh_aggregate,
     register_test_resource_resource_service_layer,
 };
 
@@ -52,7 +53,7 @@ async fn test_create_resource_persists_snapshot_and_events() {
     let snapshot = harness.find_snapshot(&uid).await;
     assert_eq!(snapshot.uid, uid);
     assert_eq!(snapshot.metadata.name.as_str(), "res-a");
-    assert_eq!(snapshot.spec["value"], "res-a");
+    pretty_assertions::assert_eq!(snapshot.spec, serde_json::json!({ "value": "res-a" }));
     assert!(
         snapshot.last_event_id.is_some(),
         "snapshot must record last event id"
@@ -104,7 +105,7 @@ async fn test_save_resource_updates_snapshot() {
     assert_eq!(reloaded.spec().value, "updated");
 
     let snapshot = harness.find_snapshot(&uid).await;
-    assert_eq!(snapshot.spec["value"], "updated");
+    pretty_assertions::assert_eq!(snapshot.spec, serde_json::json!({ "value": "updated" }));
     assert_eq!(snapshot.last_event_id, reloaded.last_stored_event_id());
 }
 

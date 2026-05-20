@@ -7,8 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-pub mod utils;
+mod resource_use_case_base_harness;
 
-mod event_stores;
-mod services;
-mod use_cases;
+mod test_apply_resource_use_case;
+mod test_delete_account_resources_use_case;
+mod test_delete_resources_use_case;
+mod test_reconcile_resource_use_case;

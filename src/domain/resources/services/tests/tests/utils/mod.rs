@@ -7,9 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-pub mod harness_helpers;
-pub mod test_resource;
+mod harness_helpers;
+mod test_resource;
+mod test_resource_reconciler;
 
-#[allow(unused_imports)]
 pub use harness_helpers::*;
 pub use test_resource::*;
+pub use test_resource_reconciler::*;

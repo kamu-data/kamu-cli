@@ -17,13 +17,14 @@ use kamu_resources::{ResourceRawEvent, ResourceRawEventQuery, ResourceRawEventSt
 use kamu_resources_inmem::InMemoryRawResourceEventStore;
 use tokio_stream::StreamExt;
 
-use crate::tests::utils::harness_helpers::{
+use crate::tests::utils::{
     TestEvent,
+    TestResourceEventStore,
     make_created_event,
     make_spec_updated_event,
     make_uid,
+    register_test_resource_resource_service_layer,
 };
-use crate::tests::utils::{TestResourceEventStore, register_test_resource_resource_service_layer};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Tests

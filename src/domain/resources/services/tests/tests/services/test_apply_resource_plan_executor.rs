@@ -11,12 +11,9 @@ use std::sync::Arc;
 
 use dill::CatalogBuilder;
 use kamu_resources::{
-    ApplyResourceApplicationDecision,
     ApplyResourceOutcome,
     ApplyResourceParams,
-    MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
     ResourceAggregateLoader,
-    ResourceLifecycleMessage,
     ResourceLifecycleMessageOutcome,
     ResourcePersistenceService,
     TypedResourceQueryService,
@@ -33,11 +30,12 @@ use kamu_resources_services::{
 };
 use messaging_outbox::{MockOutbox, OutboxProvider};
 
-use crate::tests::utils::harness_helpers::{make_account_id, make_fresh_aggregate};
 use crate::tests::utils::{
     TestResource,
     TestResourceReconciler,
     TestResourceSpec,
+    make_account_id,
+    make_fresh_aggregate,
     register_test_resource_resource_service_layer,
 };
 
@@ -48,18 +46,11 @@ use crate::tests::utils::{
 #[test_log::test(tokio::test)]
 async fn test_execute_create_returns_applied_created() {
     let mut mock_outbox = MockOutbox::new();
-    mock_outbox
-        .expect_post_message_as_json()
-        .times(1)
-        .withf(|producer, message, _version| {
-            producer == MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE
-                && matches!(
-                    serde_json::from_value::<ResourceLifecycleMessage>(message.clone()).unwrap(),
-                    ResourceLifecycleMessage::Applied(ref m)
-                        if m.outcome == ResourceLifecycleMessageOutcome::Created
-                )
-        })
-        .returning(|_, _, _| Ok(()));
+    BaseResourceServiceHarness::expect_applied_messages(
+        &mut mock_outbox,
+        1,
+        Some(ResourceLifecycleMessageOutcome::Created),
+    );
 
     let harness = ApplyResourcePlanExecutorHarness::new(mock_outbox);
     let account_id = make_account_id();
@@ -76,9 +67,7 @@ async fn test_execute_create_returns_applied_created() {
 
     let result = harness.make_executor().execute(plan).await.unwrap();
 
-    let ApplyResourceApplicationDecision::Applied(ref applied) = result else {
-        panic!("expected Applied, got Rejected");
-    };
+    let applied = result.expect_applied();
     assert_eq!(applied.outcome, ApplyResourceOutcome::Created);
 }
 
@@ -88,11 +77,16 @@ async fn test_execute_create_returns_applied_created() {
 async fn test_execute_update_returns_applied_updated() {
     let mut mock_outbox = MockOutbox::new();
     // One message for the initial create, one for the update
-    mock_outbox
-        .expect_post_message_as_json()
-        .times(2)
-        .withf(|producer, _, _| producer == MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE)
-        .returning(|_, _, _| Ok(()));
+    BaseResourceServiceHarness::expect_applied_messages(
+        &mut mock_outbox,
+        1,
+        Some(ResourceLifecycleMessageOutcome::Created),
+    );
+    BaseResourceServiceHarness::expect_applied_messages(
+        &mut mock_outbox,
+        1,
+        Some(ResourceLifecycleMessageOutcome::Updated),
+    );
 
     let harness = ApplyResourcePlanExecutorHarness::new(mock_outbox);
     let account_id = make_account_id();
@@ -122,9 +116,7 @@ async fn test_execute_update_returns_applied_updated() {
 
     let result = harness.make_executor().execute(update_plan).await.unwrap();
 
-    let ApplyResourceApplicationDecision::Applied(ref applied) = result else {
-        panic!("expected Applied, got Rejected");
-    };
+    let applied = result.expect_applied();
     assert_eq!(applied.outcome, ApplyResourceOutcome::Updated);
 }
 
@@ -135,11 +127,11 @@ async fn test_execute_untouched_returns_applied_no_outbox_call() {
     let mut mock_outbox = MockOutbox::new();
     // Exactly one outbox call: for the initial create. None for the untouched
     // re-plan.
-    mock_outbox
-        .expect_post_message_as_json()
-        .times(1)
-        .withf(|producer, _, _| producer == MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE)
-        .returning(|_, _, _| Ok(()));
+    BaseResourceServiceHarness::expect_applied_messages(
+        &mut mock_outbox,
+        1,
+        Some(ResourceLifecycleMessageOutcome::Created),
+    );
 
     let harness = ApplyResourcePlanExecutorHarness::new(mock_outbox);
     let account_id = make_account_id();
@@ -173,10 +165,9 @@ async fn test_execute_untouched_returns_applied_no_outbox_call() {
         .await
         .unwrap();
 
-    let ApplyResourceApplicationDecision::Applied(ref applied) = result else {
-        panic!("expected Applied, got Rejected");
-    };
+    let applied = result.expect_applied();
     assert_eq!(applied.outcome, ApplyResourceOutcome::Untouched);
+
     // MockOutbox verifies at drop that post_message_as_json was called exactly
     // once (from create)
 }
@@ -188,18 +179,11 @@ async fn test_execute_create_duplicate_retries_as_update() {
     // One message from the retry-as-update path (the initial direct persist
     // goes straight to the store, not through the executor, so no create msg)
     let mut mock_outbox = MockOutbox::new();
-    mock_outbox
-        .expect_post_message_as_json()
-        .times(1)
-        .withf(|producer, message, _| {
-            producer == MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE
-                && matches!(
-                    serde_json::from_value::<ResourceLifecycleMessage>(message.clone()).unwrap(),
-                    ResourceLifecycleMessage::Applied(ref m)
-                        if m.outcome == ResourceLifecycleMessageOutcome::Updated
-                )
-        })
-        .returning(|_, _, _| Ok(()));
+    BaseResourceServiceHarness::expect_applied_messages(
+        &mut mock_outbox,
+        1,
+        Some(ResourceLifecycleMessageOutcome::Updated),
+    );
 
     let harness = ApplyResourcePlanExecutorHarness::new(mock_outbox);
     let account_id = make_account_id();
@@ -229,9 +213,7 @@ async fn test_execute_create_duplicate_retries_as_update() {
 
     let result = harness.make_executor().execute(create_plan).await.unwrap();
 
-    let ApplyResourceApplicationDecision::Applied(ref applied) = result else {
-        panic!("expected Applied, got Rejected");
-    };
+    let applied = result.expect_applied();
     assert_eq!(applied.outcome, ApplyResourceOutcome::Updated);
 }
 

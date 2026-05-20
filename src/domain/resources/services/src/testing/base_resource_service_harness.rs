@@ -17,12 +17,13 @@ use kamu_resources::{
     GenericResourceQueryService,
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
     ResourceLifecycleMessage,
+    ResourceLifecycleMessageOutcome,
     ResourceMetadataInput,
     ResourceRepository,
     ResourceUID,
 };
 use kamu_resources_inmem::{InMemoryRawResourceEventStore, InMemoryResourceRepository};
-use messaging_outbox::{Outbox, OutboxProvider, register_message_dispatcher};
+use messaging_outbox::{MockOutbox, Outbox, OutboxProvider, register_message_dispatcher};
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -63,7 +64,12 @@ impl BaseResourceServiceHarness {
         b.add_value(SystemTimeSourceStub::new_set(Utc::now()))
             .bind::<dyn SystemTimeSource, SystemTimeSourceStub>();
 
+        let needs_bridge = matches!(opts.outbox_provider, OutboxProvider::Dispatching);
         opts.outbox_provider.embed_into_catalog(&mut b);
+
+        if needs_bridge {
+            b.add::<kamu_messaging_outbox_inmem::InMemoryOutboxMessageBridge>();
+        }
 
         b.add::<InMemoryResourceRepository>()
             .add::<InMemoryRawResourceEventStore>();
@@ -128,6 +134,16 @@ impl BaseResourceServiceHarness {
         }
     }
 
+    pub async fn get_snapshot_by_uid(
+        &self,
+        uid: &ResourceUID,
+    ) -> Option<kamu_resources::ResourceSnapshot> {
+        self.generic_query_svc
+            .get_snapshot_by_uid(uid)
+            .await
+            .unwrap()
+    }
+
     pub async fn resource_uid_by_name(
         &self,
         account_id: &odf::AccountID,
@@ -138,6 +154,44 @@ impl BaseResourceServiceHarness {
             .find_resource_uid_by_name(account_id, kind, &name.to_string())
             .await
             .unwrap()
+    }
+
+    pub fn expect_applied_messages(
+        mock_outbox: &mut MockOutbox,
+        n: usize,
+        outcome: Option<ResourceLifecycleMessageOutcome>,
+    ) {
+        mock_outbox
+            .expect_post_message_as_json()
+            .times(n)
+            .withf(move |producer, message, _version| {
+                producer == MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE
+                    && match serde_json::from_value::<ResourceLifecycleMessage>(message.clone())
+                        .unwrap()
+                    {
+                        ResourceLifecycleMessage::Applied(ref m) => {
+                            outcome.as_ref().is_none_or(|o| &m.outcome == o)
+                        }
+                        _ => false,
+                    }
+            })
+            .returning(|_, _, _| Ok(()));
+    }
+
+    pub fn expect_deleted_message(mock_outbox: &mut MockOutbox, expected_resource_count: usize) {
+        mock_outbox
+            .expect_post_message_as_json()
+            .times(1)
+            .withf(move |producer, message, _version| {
+                producer == MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE
+                    && matches!(
+                        serde_json::from_value::<ResourceLifecycleMessage>(message.clone())
+                            .unwrap(),
+                        ResourceLifecycleMessage::Deleted(ref m)
+                            if m.resources.len() == expected_resource_count
+                    )
+            })
+            .returning(|_, _, _| Ok(()));
     }
 }
 

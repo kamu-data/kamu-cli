@@ -23,7 +23,7 @@ doctest = false
 
 [features]
 default = []
-testing = ["dep:kamu-resources-inmem"]
+testing = ["dep:kamu-resources-inmem", "dep:kamu-messaging-outbox-inmem"]
 
 
 [dependencies]
@@ -35,6 +35,7 @@ time-source = { workspace = true }
 kamu-accounts = { workspace = true }
 kamu-resources = { workspace = true }
 kamu-resources-inmem = { workspace = true, optional = true }
+kamu-messaging-outbox-inmem = { workspace = true, optional = true }
 odf = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }

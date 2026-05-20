@@ -129,7 +129,9 @@ where
             )),
         }?;
 
-        self.notify_resources_deleted(now, resources).await?;
+        if !resources.is_empty() {
+            self.notify_resources_deleted(now, resources).await?;
+        }
 
         Ok(())
     }
