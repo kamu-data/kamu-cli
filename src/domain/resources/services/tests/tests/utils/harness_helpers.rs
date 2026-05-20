@@ -7,22 +7,26 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources::ApplyResourceParams;
+use chrono::Utc;
+use kamu_resources::{
+    ApplyResourceParams,
+    ResourceEventCreated,
+    ResourceEventSpecUpdated,
+    ResourceUID,
+};
 use kamu_resources_services::testing::BaseResourceServiceHarness;
 
 use crate::tests::utils::{TestResource, TestResourceSpec};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Remove when actually used in tests
-#[expect(dead_code)]
 pub fn make_account_id() -> odf::AccountID {
     odf::AccountID::new_generated_ed25519().1
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Remove when actually used in tests
+// Remove when tests would use this actually
 #[expect(dead_code)]
 pub fn make_resource_params(
     account_id: odf::AccountID,
@@ -35,6 +39,39 @@ pub fn make_resource_params(
             value: name.to_string(),
         },
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub fn make_uid() -> ResourceUID {
+    ResourceUID::new(uuid::Uuid::new_v4())
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub type TestEvent = kamu_resources::ReconcilableResourceEvent<TestResourceSpec, (), String>;
+
+pub fn make_created_event(uid: ResourceUID, name: &str, value: &str) -> TestEvent {
+    let account_id = make_account_id();
+    TestEvent::Created(ResourceEventCreated {
+        event_time: Utc::now(),
+        uid,
+        metadata: BaseResourceServiceHarness::make_metadata(account_id, name),
+        spec: TestResourceSpec {
+            value: value.to_string(),
+        },
+    })
+}
+
+pub fn make_spec_updated_event(uid: ResourceUID, value: &str) -> TestEvent {
+    TestEvent::SpecUpdated(ResourceEventSpecUpdated {
+        event_time: Utc::now(),
+        uid,
+        new_spec: TestResourceSpec {
+            value: value.to_string(),
+        },
+        new_generation: 2,
+    })
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
