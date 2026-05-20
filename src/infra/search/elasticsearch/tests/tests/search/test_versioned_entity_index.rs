@@ -27,6 +27,7 @@ use kamu_search_elasticsearch::testing::{
     EntityIndexEnsureOutcome,
     IndexVersionMetadata,
 };
+use pretty_assertions::assert_matches;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -389,6 +390,38 @@ async fn test_ensure_version_existence_detects_downgrade_attempt(
             ..
         }
     ));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_group::group(elasticsearch)]
+#[test_log::test(kamu_search_elasticsearch::test)]
+async fn test_find_document_by_id_returns_none_for_missing_document_with_url_unsafe_id(
+    ctx: Arc<ElasticsearchTestContext>,
+) {
+    let harness = VersionedEntityIndexHarness::new(ctx);
+
+    let schema =
+        VersionedEntityIndexHarness::schema(1, SearchEntitySchemaUpgradeMode::Reindex, V1_FIELDS);
+    let mappings = harness.mappings(&schema);
+    let index = harness.index(schema.version);
+
+    index
+        .ensure_version_existence(mappings, &schema)
+        .await
+        .unwrap();
+
+    assert_matches!(
+        harness
+            .es_ctx()
+            .client()
+            .find_document_by_id(
+                &index.index_name(),
+                "missing-index:/looks/like/a/unsafe:path"
+            )
+            .await,
+        Ok(None)
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
