@@ -80,14 +80,14 @@ pub fn make_created_event(uid: ResourceUID, name: &str, value: &str) -> TestEven
     })
 }
 
-pub fn make_spec_updated_event(uid: ResourceUID, value: &str) -> TestEvent {
+pub fn make_spec_updated_event(uid: ResourceUID, value: &str, new_generation: u64) -> TestEvent {
     TestEvent::SpecUpdated(ResourceEventSpecUpdated {
         event_time: Utc::now(),
         uid,
         new_spec: TestResourceSpec {
             value: value.to_string(),
         },
-        new_generation: 2,
+        new_generation,
     })
 }
 

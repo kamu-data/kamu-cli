@@ -134,6 +134,33 @@ async fn test_plan_update_via_name_lookup() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
+async fn test_plan_uid_hint_not_found_same_name_exists_plans_create() {
+    // UID hint is provided but doesn't exist in the store → planner falls back
+    // to plan_create_resource, which allocates a new UID without doing a name
+    // lookup. The result is action=Create even though a resource with the same
+    // name already exists. The name-collision is detected only later, at persist
+    // time, by the executor (see test_execute_create_duplicate_retries_as_update).
+    let harness = ApplyResourcePlannerHarness::new();
+    let account_id = make_account_id();
+
+    // Create a resource via the normal apply path so it exists by name.
+    harness.apply_and_get_uid(account_id.clone(), "res-a").await;
+
+    // Provide a UID that was never persisted — triggers the UID-not-found fallback.
+    let stale_uid = make_uid();
+    let params = harness.make_apply_params(Some(stale_uid), account_id, "res-a", "new-value");
+
+    let decision = harness.plan(params).await;
+
+    pretty_assertions::assert_matches!(
+        decision,
+        ApplyResourcePlanningDecision::Planned(plan) if plan.action == ApplyResourceAction::Create
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
 async fn test_plan_type_mismatch_rejects() {
     let harness = ApplyResourcePlannerHarness::new();
     let account_id = make_account_id();

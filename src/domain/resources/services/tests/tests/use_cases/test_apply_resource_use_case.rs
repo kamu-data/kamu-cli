@@ -13,11 +13,9 @@ use kamu_resources::{
     ApplyResourceOutcome,
     ApplyResourceParams,
     ApplyResourcePlanningDecision,
-    ApplyResourceUseCase,
     ResourceConditionStatus,
     ResourceConditionType,
     ResourcePhase,
-    ResourceSpecSanitizer,
 };
 use kamu_resources_services::testing::{
     BaseResourceServiceHarness,
@@ -28,6 +26,7 @@ use messaging_outbox::OutboxProvider;
 use crate::tests::use_cases::resource_use_case_base_harness::{
     ResourceUseCaseBaseHarness,
     ResourceUseCaseBaseHarnessOpts,
+    SanitizerKind,
 };
 use crate::tests::utils::{TestResourceSpec, make_account_id};
 
@@ -98,7 +97,7 @@ async fn test_apply_end_to_end_create_and_retrieve() {
 #[test_log::test(tokio::test)]
 async fn test_sanitizer_modifies_spec_on_create() {
     let harness = ResourceUseCaseBaseHarness::new_with_opts(ResourceUseCaseBaseHarnessOpts {
-        with_sanitizer: true,
+        sanitizer: SanitizerKind::Appending,
         ..Default::default()
     });
     let account_id = make_account_id();
@@ -125,7 +124,7 @@ async fn test_sanitizer_modifies_spec_on_create() {
 #[test_log::test(tokio::test)]
 async fn test_sanitizer_receives_current_spec_on_update() {
     let harness = ResourceUseCaseBaseHarness::new_with_opts(ResourceUseCaseBaseHarnessOpts {
-        with_sanitizer: true,
+        sanitizer: SanitizerKind::Appending,
         ..Default::default()
     });
     let account_id = make_account_id();
@@ -165,7 +164,7 @@ async fn test_sanitizer_modifies_spec_in_plan() {
     // plan() must also run sanitize_params() — the returned plan's state must
     // reflect the sanitized spec, not the raw input.
     let harness = ResourceUseCaseBaseHarness::new_with_opts(ResourceUseCaseBaseHarnessOpts {
-        with_sanitizer: true,
+        sanitizer: SanitizerKind::Appending,
         ..Default::default()
     });
     let account_id = make_account_id();
@@ -209,26 +208,14 @@ async fn test_no_sanitizer_passes_spec_unchanged() {
 async fn test_apply_rejected_when_sanitized_spec_fails_validation() {
     // A sanitizer that clears the value produces an empty string, which fails
     // TestResourceSpec validation → the use case must return Rejected, not panic.
-    use std::sync::Arc;
-
-    use crate::tests::utils::TestResourceSpecClearingSanitizer;
-
     let harness = ResourceUseCaseBaseHarness::new_with_opts(ResourceUseCaseBaseHarnessOpts {
-        with_sanitizer: false, // we'll wire the clearing sanitizer manually below
+        sanitizer: SanitizerKind::Clearing,
         ..Default::default()
     });
 
-    // Build a catalog on top of the harness's catalog with the clearing sanitizer.
-    let mut b = dill::CatalogBuilder::new_chained(harness.catalog());
-    b.add_value(TestResourceSpecClearingSanitizer)
-        .bind::<dyn ResourceSpecSanitizer<crate::tests::utils::TestResource>, TestResourceSpecClearingSanitizer>();
-    let catalog = b.build();
-
-    let apply_svc: Arc<dyn ApplyResourceUseCase<crate::tests::utils::TestResource>> =
-        catalog.get_one().unwrap();
-
     let account_id = make_account_id();
-    let decision = apply_svc
+    let decision = harness
+        .apply_test_uc()
         .apply(make_params(account_id, "res-a", "non-empty"))
         .await
         .unwrap();

@@ -30,6 +30,7 @@ use messaging_outbox::{MockOutbox, OutboxProvider};
 use super::resource_use_case_base_harness::{
     ResourceUseCaseBaseHarness,
     ResourceUseCaseBaseHarnessOpts,
+    SanitizerKind,
 };
 use crate::tests::utils::{TestResource, TestResourceReconcilerProvider, make_account_id};
 
@@ -382,7 +383,7 @@ impl ReconcileTestHarness {
                 outbox_provider: OutboxProvider::Dispatching,
             },
             reconciler_provider,
-            with_sanitizer: false,
+            sanitizer: SanitizerKind::None,
         });
 
         let catalog = base.catalog();

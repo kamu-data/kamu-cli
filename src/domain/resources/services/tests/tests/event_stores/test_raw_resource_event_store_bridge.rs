@@ -36,7 +36,7 @@ async fn test_save_and_get_events_round_trip() {
     let uid = make_uid();
 
     let created = make_created_event(uid, "res-a", "hello");
-    let updated = make_spec_updated_event(uid, "world");
+    let updated = make_spec_updated_event(uid, "world", 2);
 
     harness.save_events(uid, vec![created.clone()]).await;
 
@@ -163,7 +163,7 @@ async fn test_total_events_stored_counts_correctly() {
 
     let uid = make_uid();
     let created = make_created_event(uid, "res-count", "v1");
-    let updated = make_spec_updated_event(uid, "v2");
+    let updated = make_spec_updated_event(uid, "v2", 2);
 
     harness.save_events(uid, vec![created]).await;
 
@@ -188,7 +188,7 @@ async fn test_get_events_multi_streams_per_uid() {
         .await;
     let prev_a = harness.get_last_event_id(uid_a).await;
     harness
-        .save_events_after(uid_a, prev_a, vec![make_spec_updated_event(uid_a, "a2")])
+        .save_events_after(uid_a, prev_a, vec![make_spec_updated_event(uid_a, "a2", 2)])
         .await;
 
     harness
@@ -196,11 +196,15 @@ async fn test_get_events_multi_streams_per_uid() {
         .await;
     let prev_b = harness.get_last_event_id(uid_b).await;
     harness
-        .save_events_after(uid_b, prev_b, vec![make_spec_updated_event(uid_b, "b2")])
+        .save_events_after(uid_b, prev_b, vec![make_spec_updated_event(uid_b, "b2", 2)])
         .await;
     let prev_b2 = harness.get_last_event_id(uid_b).await;
     harness
-        .save_events_after(uid_b, prev_b2, vec![make_spec_updated_event(uid_b, "b3")])
+        .save_events_after(
+            uid_b,
+            prev_b2,
+            vec![make_spec_updated_event(uid_b, "b3", 3)],
+        )
         .await;
 
     let mut by_uid: std::collections::HashMap<ResourceUID, Vec<TestEvent>> =

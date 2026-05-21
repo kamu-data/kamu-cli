@@ -56,7 +56,7 @@ async fn test_execute_create_returns_applied_created() {
     let account_id = make_account_id();
 
     let plan = harness
-        .make_create_plan(
+        .make_plan(
             account_id,
             "res-a",
             TestResourceSpec {
@@ -93,7 +93,7 @@ async fn test_execute_update_returns_applied_updated() {
 
     // Create first
     let create_plan = harness
-        .make_create_plan(
+        .make_plan(
             account_id.clone(),
             "res-a",
             TestResourceSpec {
@@ -105,7 +105,7 @@ async fn test_execute_update_returns_applied_updated() {
 
     // Then update
     let update_plan = harness
-        .make_update_plan(
+        .make_plan(
             account_id,
             "res-a",
             TestResourceSpec {
@@ -138,7 +138,7 @@ async fn test_execute_untouched_returns_applied_no_outbox_call() {
 
     // Create the resource first (sends one outbox message)
     let create_plan = harness
-        .make_create_plan(
+        .make_plan(
             account_id.clone(),
             "res-a",
             TestResourceSpec {
@@ -150,7 +150,7 @@ async fn test_execute_untouched_returns_applied_no_outbox_call() {
 
     // Re-plan with identical spec — action = Untouched, no outbox call
     let untouched_plan = harness
-        .make_update_plan(
+        .make_plan(
             account_id,
             "res-a",
             TestResourceSpec {
@@ -197,12 +197,14 @@ async fn test_execute_create_duplicate_retries_as_update() {
         .await
         .unwrap();
 
-    // Plan a Create for the same name with no UID. Because the planner's
-    // plan_create path doesn't do a name lookup before allocating a UID, it
-    // produces a Create plan. The executor will hit Duplicate on persist and
-    // retry as Update.
+    // Plan a Create with uid=None and a fresh name (no prior UID hint).
+    // plan_create_resource allocates a new UID without doing a name lookup,
+    // so the plan carries action=Create. When the executor calls
+    // persistence_svc.create(), the store rejects it with Duplicate (same
+    // account + kind + name already exists). The executor then retries via
+    // the update path, which resolves the conflict by name lookup.
     let create_plan = harness
-        .make_create_plan(
+        .make_plan(
             account_id,
             "res-a",
             TestResourceSpec {
@@ -275,27 +277,7 @@ impl ApplyResourcePlanExecutorHarness {
         )
     }
 
-    async fn make_create_plan(
-        &self,
-        account_id: odf::AccountID,
-        name: &str,
-        spec: TestResourceSpec,
-    ) -> PlannedApplyResource<TestResource> {
-        let params = ApplyResourceParams {
-            uid: None,
-            metadata: BaseResourceServiceHarness::make_metadata_input(account_id, name),
-            spec,
-        };
-
-        match self.make_planner().plan_internal(params).await.unwrap() {
-            PlannedApplyResourceDecision::Planned(plan) => plan,
-            PlannedApplyResourceDecision::Rejected(r) => {
-                panic!("plan rejected: {:?}", r.message)
-            }
-        }
-    }
-
-    async fn make_update_plan(
+    async fn make_plan(
         &self,
         account_id: odf::AccountID,
         name: &str,

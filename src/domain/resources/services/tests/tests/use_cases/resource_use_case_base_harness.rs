@@ -30,6 +30,7 @@ use crate::tests::utils::{
     TestResource,
     TestResourceReconcilerProvider,
     TestResourceSpec,
+    TestResourceSpecClearingSanitizer,
     TestResourceSpecSanitizer,
     register_test_resource_crud_dispatcher,
     register_test_resource_resource_service_layer,
@@ -37,10 +38,20 @@ use crate::tests::utils::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Default)]
+pub enum SanitizerKind {
+    #[default]
+    None,
+    Appending,
+    Clearing,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct ResourceUseCaseBaseHarnessOpts {
     pub base_opts: BaseResourceServiceHarnessOpts,
     pub reconciler_provider: TestResourceReconcilerProvider,
-    pub with_sanitizer: bool,
+    pub sanitizer: SanitizerKind,
 }
 
 impl Default for ResourceUseCaseBaseHarnessOpts {
@@ -52,7 +63,7 @@ impl Default for ResourceUseCaseBaseHarnessOpts {
                 },
             },
             reconciler_provider: TestResourceReconcilerProvider::default(),
-            with_sanitizer: false,
+            sanitizer: SanitizerKind::None,
         }
     }
 }
@@ -88,7 +99,7 @@ impl ResourceUseCaseBaseHarness {
                 outbox_provider: OutboxProvider::Mock(mock_outbox),
             },
             reconciler_provider,
-            with_sanitizer: false,
+            sanitizer: SanitizerKind::None,
         })
     }
 
@@ -100,11 +111,18 @@ impl ResourceUseCaseBaseHarness {
         register_test_resource_crud_dispatcher(&mut b);
         opts.reconciler_provider.embed_into_catalog(&mut b);
 
-        if opts.with_sanitizer {
-            b.add_value(TestResourceSpecSanitizer {
-                suffix: "-sanitized".to_string(),
-            })
-            .bind::<dyn ResourceSpecSanitizer<TestResource>, TestResourceSpecSanitizer>();
+        match opts.sanitizer {
+            SanitizerKind::None => {}
+            SanitizerKind::Appending => {
+                b.add_value(TestResourceSpecSanitizer {
+                    suffix: "-sanitized".to_string(),
+                })
+                .bind::<dyn ResourceSpecSanitizer<TestResource>, TestResourceSpecSanitizer>();
+            }
+            SanitizerKind::Clearing => {
+                b.add_value(TestResourceSpecClearingSanitizer)
+                    .bind::<dyn ResourceSpecSanitizer<TestResource>, TestResourceSpecClearingSanitizer>();
+            }
         }
 
         let catalog = b.build();
