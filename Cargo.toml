@@ -140,9 +140,6 @@ members = [
     "src/e2e/app/cli/mysql",
     "src/e2e/app/cli/sqlite",
 ]
-exclude = [
-    "src/sandbox"
-]
 resolver = "3"
 
 
