@@ -10,7 +10,7 @@
 mod configuration_dataset_lifecycle_message_consumer;
 mod configuration_resource_lifecycle_message_consumer;
 
-pub(crate) use configuration_dataset_lifecycle_message_consumer::ConfigurationDatasetLifecycleMessageConsumer;
-pub(crate) use configuration_resource_lifecycle_message_consumer::ConfigurationResourceLifecycleMessageConsumer;
+pub use configuration_dataset_lifecycle_message_consumer::*;
+pub use configuration_resource_lifecycle_message_consumer::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -17,6 +17,7 @@ use kamu_configuration::{
     SecretSetProjectionRepository,
     SecretSetResource,
     VariableSetProjectionRepository,
+    VariableSetResource,
 };
 use kamu_configuration_inmem::{
     InMemoryDatasetSecretSetBindingRepository,
@@ -76,6 +77,10 @@ impl BaseConfigurationServiceHarness {
     }
 
     pub fn secret_set_projection_repo(&self) -> Arc<dyn SecretSetProjectionRepository> {
+        self.catalog.get_one().unwrap()
+    }
+
+    pub fn apply_variable_use_case(&self) -> Arc<dyn ApplyResourceUseCase<VariableSetResource>> {
         self.catalog.get_one().unwrap()
     }
 
