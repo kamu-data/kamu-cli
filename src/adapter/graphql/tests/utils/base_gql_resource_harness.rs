@@ -93,7 +93,7 @@ impl BaseGQLResourceHarness {
                 uid,
                 kind: kind.to_string(),
                 api_version: api_version.to_string(),
-                metadata: ResourceMetadata::new_minimal(Utc::now(), account_id.clone(), name),
+                metadata: ResourceMetadata::simple(Utc::now(), account_id.clone(), name),
                 spec,
                 status: None,
                 last_reconciled_at: None,

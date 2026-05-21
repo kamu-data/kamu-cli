@@ -32,7 +32,7 @@ fn make_test_snapshot(account_id: odf::AccountID, kind: &str, name: &str) -> Res
         uid: ResourceUID::new(uuid::Uuid::new_v4()),
         kind: kind.to_string(),
         api_version: "v1".to_string(),
-        metadata: ResourceMetadata::new_minimal(Utc::now(), account_id, name.to_ascii_lowercase()),
+        metadata: ResourceMetadata::simple(Utc::now(), account_id, name.to_ascii_lowercase()),
         spec: serde_json::json!({"key": "value"}),
         status: None,
         last_reconciled_at: None,

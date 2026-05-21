@@ -207,7 +207,7 @@ async fn create_resource(
             uid: resource_uid,
             kind: VariableSetResource::RESOURCE_TYPE.to_string(),
             api_version: VariableSetResource::API_VERSION.to_string(),
-            metadata: ResourceMetadata::new_minimal(
+            metadata: ResourceMetadata::simple(
                 Utc::now(),
                 account.id.clone(),
                 resource_uid.to_string(),

@@ -38,6 +38,8 @@ use kamu_resources::{
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
+use crate::{load_previous_resource_view, make_apply_manifest_changes};
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn decode_resource_spec<R>(
@@ -102,17 +104,8 @@ where
 
             let resource = typed_resource_state_to_view::<R>(state)?;
             let previous_resource =
-                super::resource_crud_dispatcher_diff_helpers::load_previous_resource_view(
-                    action,
-                    uid,
-                    generic_resource_query_service,
-                )
-                .await?;
-            let changes =
-                super::resource_crud_dispatcher_diff_helpers::make_apply_manifest_changes(
-                    previous_resource.as_ref(),
-                    &resource,
-                )?;
+                load_previous_resource_view(action, uid, generic_resource_query_service).await?;
+            let changes = make_apply_manifest_changes(previous_resource.as_ref(), &resource)?;
 
             ApplyManifestPlanningDecision::Planned(ApplyManifestPlan {
                 resource,

@@ -9,6 +9,7 @@
 
 pub mod utils;
 
+mod crud_dispatchers;
 mod event_stores;
 mod services;
 mod use_cases;

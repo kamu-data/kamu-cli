@@ -45,7 +45,7 @@ async fn make_variable_set_resource(catalog: &Catalog) -> ResourceUID {
         uid: variable_set_id,
         kind: VariableSetResource::RESOURCE_TYPE.to_string(),
         api_version: VariableSetResource::API_VERSION.to_string(),
-        metadata: ResourceMetadata::new_minimal(
+        metadata: ResourceMetadata::simple(
             Utc::now(),
             odf::AccountID::new_seeded_ed25519(b"test-account"),
             variable_set_id.to_string(),

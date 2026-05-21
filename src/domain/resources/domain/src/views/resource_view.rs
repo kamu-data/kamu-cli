@@ -64,6 +64,20 @@ pub struct ResourceViewMetadata {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl ResourceViewMetadata {
+    pub fn simple(now: DateTime<Utc>, uid: ResourceUID, name: impl Into<ResourceName>) -> Self {
+        Self {
+            uid,
+            name: name.into(),
+            description: None,
+            labels: BTreeMap::new(),
+            annotations: BTreeMap::new(),
+            generation: 0,
+            created_at: now,
+            updated_at: now,
+            deleted_at: None,
+        }
+    }
+
     pub fn from_owned(uid: ResourceUID, metadata: ResourceMetadata) -> Self {
         Self {
             uid,

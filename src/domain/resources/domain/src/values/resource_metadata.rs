@@ -34,7 +34,7 @@ pub struct ResourceMetadata {
 }
 
 impl ResourceMetadata {
-    pub fn new_minimal(
+    pub fn simple(
         now: DateTime<Utc>,
         account: odf::AccountID,
         name: impl Into<ResourceName>,

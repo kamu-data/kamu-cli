@@ -31,7 +31,7 @@ async fn make_resource(catalog: &Catalog, kind: &str) -> ResourceRawEventQuery {
         uid: id,
         kind: kind.to_string(),
         api_version: "v1".to_string(),
-        metadata: ResourceMetadata::new_minimal(
+        metadata: ResourceMetadata::simple(
             Utc::now(),
             odf::AccountID::new_seeded_ed25519(b"test-account"),
             id.to_string(),

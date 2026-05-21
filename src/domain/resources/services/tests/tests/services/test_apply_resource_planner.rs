@@ -146,11 +146,7 @@ async fn test_plan_type_mismatch_rejects() {
             uid,
             kind: "OtherKind".to_string(),
             api_version: "other.dev/v1".to_string(),
-            metadata: ResourceMetadata::new_minimal(
-                Utc::now(),
-                account_id.clone(),
-                "res_a".to_string(),
-            ),
+            metadata: ResourceMetadata::simple(Utc::now(), account_id.clone(), "res_a".to_string()),
             spec: serde_json::json!({}),
             status: None,
             last_reconciled_at: None,

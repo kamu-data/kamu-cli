@@ -44,7 +44,7 @@ async fn make_secret_set_resource(catalog: &Catalog) -> ResourceUID {
         uid: secret_set_id,
         kind: SecretSetResource::RESOURCE_TYPE.to_string(),
         api_version: SecretSetResource::API_VERSION.to_string(),
-        metadata: ResourceMetadata::new_minimal(
+        metadata: ResourceMetadata::simple(
             Utc::now(),
             odf::AccountID::new_seeded_ed25519(b"test-account"),
             secret_set_id.to_string(),
