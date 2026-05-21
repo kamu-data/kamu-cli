@@ -58,18 +58,18 @@ async fn test_plan_create_new_resource() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_plan_create_with_uid_hint_not_yet_saved() {
+async fn test_plan_with_unknown_uid_returns_not_found() {
     let harness = ApplyResourcePlannerHarness::new();
     let account_id = make_account_id();
     let uid = make_uid();
 
     let params = harness.make_apply_params(Some(uid), account_id, "res-a", "res-a");
 
-    let decision = harness.plan(params).await;
+    let result = harness.plan_result(params).await;
 
     pretty_assertions::assert_matches!(
-        decision,
-        ApplyResourcePlanningDecision::Planned(plan) if plan.action == ApplyResourceAction::Create
+        result,
+        Err(ApplyResourceUseCaseError::ResourceUIDNotFound(err)) if err.0 == uid
     );
 }
 
@@ -134,27 +134,20 @@ async fn test_plan_update_via_name_lookup() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_plan_uid_hint_not_found_same_name_exists_plans_create() {
-    // UID hint is provided but doesn't exist in the store → planner falls back
-    // to plan_create_resource, which allocates a new UID without doing a name
-    // lookup. The result is action=Create even though a resource with the same
-    // name already exists. The name-collision is detected only later, at persist
-    // time, by the executor (see test_execute_create_duplicate_retries_as_update).
+async fn test_plan_with_unknown_uid_returns_not_found_even_if_name_exists() {
     let harness = ApplyResourcePlannerHarness::new();
     let account_id = make_account_id();
 
-    // Create a resource via the normal apply path so it exists by name.
     harness.apply_and_get_uid(account_id.clone(), "res-a").await;
 
-    // Provide a UID that was never persisted — triggers the UID-not-found fallback.
     let stale_uid = make_uid();
     let params = harness.make_apply_params(Some(stale_uid), account_id, "res-a", "new-value");
 
-    let decision = harness.plan(params).await;
+    let result = harness.plan_result(params).await;
 
     pretty_assertions::assert_matches!(
-        decision,
-        ApplyResourcePlanningDecision::Planned(plan) if plan.action == ApplyResourceAction::Create
+        result,
+        Err(ApplyResourceUseCaseError::ResourceUIDNotFound(err)) if err.0 == stale_uid
     );
 }
 
