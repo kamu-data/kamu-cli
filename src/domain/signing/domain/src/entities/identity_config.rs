@@ -9,20 +9,34 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Private keys are used to sign API responses.
+/// Supported algorithms: `ed25519`, `secp256k1`.
 #[derive(Debug, Clone)]
 pub struct IdentityConfig {
     /// Root private key that corresponds to the `authority` and is used to sign
-    /// responses
+    /// responses.
     ///
     /// To generate, use:
-    ///
     /// ```sh
-    /// ssh-keygen -t ed25519 -C "coo@abc.com"
+    /// od -vN 32 -An -tx1 /dev/urandom | tr -d ' \n' && echo
+    /// ```
+    /// or
+    /// ```sh
+    /// openssl rand -hex 32
     /// ```
     pub ed25519_private_key: odf::metadata::PrivateKey,
 
     /// Secp256k1 private key used to sign EIP-712 typed data.
     ///
+    /// To generate, use:
+    /// ```sh
+    /// od -vN 32 -An -tx1 /dev/urandom | tr -d ' \n' && echo
+    /// ```
+    /// or
+    /// ```sh
+    /// openssl rand -hex 32
+    /// ```
+    /// or
     /// ```sh
     /// cast wallet new
     /// ```
