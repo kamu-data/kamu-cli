@@ -9,6 +9,8 @@
 
 use serde::Deserialize;
 
+use super::ResourceKindFragment;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Deserialize)]
@@ -113,15 +115,9 @@ pub(crate) struct ResourceIdentityConnectionFragment {
 pub(crate) struct ResourceIdentityFragment {
     pub id: kamu_resources::ResourceUID,
     pub api_version: String,
-    pub kind: ResourceIdentityKindFragment,
+    pub kind: ResourceKindFragment,
     pub canonical_kind_name: String,
     pub name: String,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct ResourceIdentityKindFragment {
-    pub value: String,
 }
 
 impl From<ResourceIdentityFragment> for kamu_resources::ResourceIdentityView {

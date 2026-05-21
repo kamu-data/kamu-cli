@@ -9,6 +9,8 @@
 
 use serde::Deserialize;
 
+use super::ResourceKindFragment;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Deserialize)]
@@ -33,11 +35,6 @@ pub(crate) struct ResourceKindDescriptorFragment {
     pub kind: ResourceKindFragment,
     pub api_version: String,
     pub list_columns: Vec<ResourceListColumnDescriptorFragment>,
-}
-
-#[derive(Debug, Deserialize)]
-pub(crate) struct ResourceKindFragment {
-    pub value: String,
 }
 
 #[derive(Debug, Deserialize)]

@@ -10,6 +10,8 @@
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
 
+use super::ResourceKindFragment;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Deserialize)]
@@ -61,12 +63,6 @@ pub(crate) struct ResourceSummaryFragment {
     pub updated_at: DateTime<Utc>,
     pub status: Option<ResourceStatusSummaryFragment>,
     pub list_values: Vec<ResourceListColumnValueViewFragment>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct ResourceKindFragment {
-    pub value: String,
 }
 
 #[derive(Debug, Deserialize)]

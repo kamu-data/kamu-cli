@@ -122,6 +122,34 @@ pub struct ResourceBatchSelectorInput {
     pub account: Option<ResourceAccountSelectorInput>,
 }
 
+impl From<ResourceSelectorInput> for kamu_resources_facade::ResourceSelector {
+    fn from(value: ResourceSelectorInput) -> Self {
+        Self {
+            account: value
+                .account
+                .map(ResourceAccountSelectorInput::into_manifest_account),
+            kind: value.kind.into_resource_type(),
+            api_version: value.api_version,
+            resource_ref: value.resource_ref.into(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl From<ResourceBatchSelectorInput> for kamu_resources_facade::ResourceBatchSelector {
+    fn from(value: ResourceBatchSelectorInput) -> Self {
+        Self {
+            account: value
+                .account
+                .map(ResourceAccountSelectorInput::into_manifest_account),
+            kind: value.kind.into_resource_type(),
+            api_version: value.api_version,
+            resource_refs: value.resource_refs.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(InputObject, Debug, Clone)]
@@ -568,8 +596,8 @@ pub struct ResourcesSummary {
     pub resource_counts: Vec<ResourceTypeCountSummary>,
 }
 
-impl ResourcesSummary {
-    pub fn from_domain(value: kamu_resources::ResourcesSummary) -> Self {
+impl From<kamu_resources::ResourcesSummary> for ResourcesSummary {
+    fn from(value: kamu_resources::ResourcesSummary) -> Self {
         Self {
             resource_counts: value.resource_counts.into_iter().map(Into::into).collect(),
         }

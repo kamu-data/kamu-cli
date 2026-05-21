@@ -13,6 +13,7 @@ mod get;
 mod identity;
 mod list;
 mod render_manifest;
+mod resource;
 mod summary;
 mod supported_kinds;
 
@@ -22,5 +23,6 @@ pub(crate) use get::*;
 pub(crate) use identity::*;
 pub(crate) use list::*;
 pub(crate) use render_manifest::*;
+pub(crate) use resource::*;
 pub(crate) use summary::*;
 pub(crate) use supported_kinds::*;

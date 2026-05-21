@@ -162,6 +162,15 @@ pub struct BatchResourceResponse<T, E> {
     pub problems: Vec<BatchResourceProblem<E>>,
 }
 
+impl<T, E> BatchResourceResponse<T, E> {
+    pub fn empty() -> Self {
+        Self {
+            successes: Vec::new(),
+            problems: Vec::new(),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct BatchResourceSuccess<T> {
     pub request_index: usize,
