@@ -11,5 +11,6 @@ pub mod utils;
 
 mod crud_dispatchers;
 mod event_stores;
+mod message_handlers;
 mod services;
 mod use_cases;
