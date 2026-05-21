@@ -28,5 +28,6 @@ pub use kamu_resources::{
     ResourceCrudDispatcherListRequest,
     UnsupportedResourceDescriptorError,
 };
+pub use resource_crud_dispatcher_diff_helpers::*;
 pub use resource_crud_dispatcher_helpers::*;
 pub use resource_crud_dispatcher_registry::*;

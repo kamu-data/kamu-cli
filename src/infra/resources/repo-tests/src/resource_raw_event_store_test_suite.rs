@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::BTreeMap;
-
 use chrono::Utc;
 use dill::Catalog;
 use event_sourcing::{EventID, GetEventsOpts, SaveEventsError, SaveEventsItem};
@@ -28,23 +26,16 @@ use kamu_resources::{
 async fn make_resource(catalog: &Catalog, kind: &str) -> ResourceRawEventQuery {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
     let id = ResourceUID::new(uuid::Uuid::new_v4());
-    let now = Utc::now();
 
     let snapshot = ResourceSnapshot {
         uid: id,
         kind: kind.to_string(),
         api_version: "v1".to_string(),
-        metadata: ResourceMetadata {
-            account: odf::AccountID::new_seeded_ed25519(b"test-account"),
-            name: id.to_string(),
-            description: None,
-            labels: BTreeMap::new(),
-            annotations: BTreeMap::new(),
-            generation: 0,
-            created_at: now,
-            updated_at: now,
-            deleted_at: None,
-        },
+        metadata: ResourceMetadata::simple(
+            Utc::now(),
+            odf::AccountID::new_seeded_ed25519(b"test-account"),
+            id.to_string(),
+        ),
         spec: serde_json::json!({}),
         status: None,
         last_reconciled_at: None,

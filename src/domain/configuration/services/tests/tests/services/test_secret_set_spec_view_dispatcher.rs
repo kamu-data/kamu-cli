@@ -45,7 +45,7 @@ async fn test_spec_view_dispatcher_reveals_encrypted_secrets_as_plaintext() {
         .apply_secret_use_case()
         .apply(ApplyResourceParams {
             uid: None,
-            metadata: BaseResourceServiceHarness::make_metadata(account_id, "test-secrets"),
+            metadata: BaseResourceServiceHarness::make_metadata_input(account_id, "test-secrets"),
             spec,
         })
         .await

@@ -47,6 +47,7 @@ pub struct ApplyResourceParams<R: DeclarativeResource> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug)]
 pub enum ApplyResourcePlanningDecision<R: DeclarativeResource> {
     Planned(ApplyResourcePlan<R>),
     Rejected(ApplyResourceRejection),
@@ -54,13 +55,26 @@ pub enum ApplyResourcePlanningDecision<R: DeclarativeResource> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug)]
 pub enum ApplyResourceApplicationDecision<R: DeclarativeResource> {
     Applied(ApplyResourceResult<R>),
     Rejected(ApplyResourceRejection),
 }
 
+impl<R: DeclarativeResource> ApplyResourceApplicationDecision<R> {
+    pub fn expect_applied(self) -> ApplyResourceResult<R> {
+        match self {
+            Self::Applied(result) => result,
+            Self::Rejected(rejection) => {
+                panic!("Expected Applied decision, got Rejected: {rejection:?}")
+            }
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug)]
 pub struct ApplyResourcePlan<R: DeclarativeResource> {
     pub uid: ResourceUID,
     pub state: R::ResourceState,
@@ -80,6 +94,7 @@ pub enum ApplyResourceAction {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug)]
 pub struct ApplyResourceResult<R: DeclarativeResource> {
     pub uid: ResourceUID,
     pub state: R::ResourceState,

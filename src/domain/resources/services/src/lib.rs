@@ -24,5 +24,6 @@ mod use_cases;
 pub use crud_dispatchers::*;
 pub use dependencies::*;
 pub use event_stores::*;
+pub use message_handlers::*;
 pub use services::*;
 pub use use_cases::*;

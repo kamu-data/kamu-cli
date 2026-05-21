@@ -207,17 +207,11 @@ async fn create_resource(
             uid: resource_uid,
             kind: VariableSetResource::RESOURCE_TYPE.to_string(),
             api_version: VariableSetResource::API_VERSION.to_string(),
-            metadata: ResourceMetadata {
-                account: account.id.clone(),
-                name: resource_uid.to_string(),
-                description: None,
-                labels: Default::default(),
-                annotations: Default::default(),
-                generation: 0,
-                created_at: Utc::now(),
-                updated_at: Utc::now(),
-                deleted_at: None,
-            },
+            metadata: ResourceMetadata::simple(
+                Utc::now(),
+                account.id.clone(),
+                resource_uid.to_string(),
+            ),
             spec: serde_json::to_value(VariableSetSpec {
                 variables: [(
                     "PLACEHOLDER".to_string(),

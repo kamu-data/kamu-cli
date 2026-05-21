@@ -50,7 +50,7 @@ pub(crate) async fn load_previous_resource_view(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn make_apply_manifest_changes(
+pub fn make_apply_manifest_changes(
     before: Option<&ResourceView>,
     after: &ResourceView,
 ) -> Result<Vec<ApplyManifestChange>, InternalError> {

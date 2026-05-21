@@ -66,12 +66,30 @@ pub enum ApplyManifestPlanningDecision {
     Rejected(ApplyManifestRejection),
 }
 
+impl ApplyManifestPlanningDecision {
+    pub fn expect_planned(self) -> ApplyManifestPlan {
+        let ApplyManifestPlanningDecision::Planned(plan) = self else {
+            panic!("expected Planned decision, got Rejected");
+        };
+        plan
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
 pub enum ApplyManifestApplicationDecision {
     Applied(ApplyManifestResult),
     Rejected(ApplyManifestRejection),
+}
+
+impl ApplyManifestApplicationDecision {
+    pub fn expect_applied(self) -> ApplyManifestResult {
+        let ApplyManifestApplicationDecision::Applied(result) = self else {
+            panic!("expected Applied decision, got Rejected");
+        };
+        result
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

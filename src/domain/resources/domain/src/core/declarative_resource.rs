@@ -41,7 +41,7 @@ pub trait DeclarativeResource:
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub trait DeclarativeResourceState: Send + Sync {
+pub trait DeclarativeResourceState: Send + Sync + std::fmt::Debug {
     type Spec: std::fmt::Debug + Send + Sync;
     type Status: ResourceStatusLike + std::fmt::Debug;
 

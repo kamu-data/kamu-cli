@@ -11,5 +11,5 @@ mod account_lifecycle_message_consumer;
 mod resource_lifecycle_message_consumer;
 mod resource_lifecycle_reconcile_dispatcher;
 
-pub(crate) use account_lifecycle_message_consumer::AccountLifecycleMessageConsumer;
-pub(crate) use resource_lifecycle_message_consumer::ResourceLifecycleMessageConsumer;
+pub use account_lifecycle_message_consumer::AccountLifecycleMessageConsumer;
+pub use resource_lifecycle_message_consumer::ResourceLifecycleMessageConsumer;
