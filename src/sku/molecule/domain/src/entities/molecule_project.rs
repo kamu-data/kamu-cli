@@ -16,7 +16,7 @@ use internal_error::{InternalError, ResultIntoInternal};
 
 #[nutype::nutype(
     sanitize(lowercase),
-    validate(len_char_min = 2),
+    validate(len_char_min = 1),
     derive(Debug, Display, AsRef, Clone, Serialize, Deserialize, Eq, PartialEq)
 )]
 pub struct Symbol(String);
