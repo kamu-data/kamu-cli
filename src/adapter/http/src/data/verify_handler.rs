@@ -141,7 +141,7 @@ async fn verify(catalog: Catalog, request: VerifyRequest) -> Result<VerifyRespon
     match request.proof.r#type {
         ProofType::Ed25519Signature2020 => {}
         ProofType::EcdsaSecp256k1Signature2019 => {
-            // TODO: Molecule: Phase 3: implement
+            // TODO: Implement
             return Err(ApiError::not_implemented_without_reason());
         }
     }
