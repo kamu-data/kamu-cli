@@ -40,6 +40,7 @@ pub struct SignEip712Response {
     pub verification_method: odf::metadata::DidKey,
     pub signature: odf::metadata::Signature,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "utoipa", schema(nullable = false))]
     pub proof: Option<SignEip712Proof>,
 }
 
