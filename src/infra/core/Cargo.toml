@@ -172,7 +172,9 @@ curl = { optional = true, version = "0.4", features = [
     "static-ssl",
 ] }
 curl-sys = { optional = true, version = "0.4" }
-datafusion-ethers = { optional = true, version = "53", features = ["eip712"] }
+datafusion-ethers = { optional = true, version = "53", features = [
+    "eip712",
+] }
 datafusion-functions-json = { optional = true, version = "0.53" }
 rumqttc = { optional = true, version = "0.25", default-features = false, features = [
 ] }
