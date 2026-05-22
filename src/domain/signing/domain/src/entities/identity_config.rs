@@ -11,7 +11,7 @@
 
 /// Private keys are used to sign API responses.
 /// Supported algorithms: `ed25519`, `secp256k1`.
-#[derive(Debug, Clone)]
+#[derive(setty::Config, setty::Default)]
 pub struct IdentityConfig {
     /// Root private key that corresponds to the `authority` and is used to sign
     /// responses.
@@ -24,7 +24,10 @@ pub struct IdentityConfig {
     /// ```sh
     /// openssl rand -hex 32
     /// ```
-    pub ed25519_private_key: odf::metadata::PrivateKey,
+    // Backward compatibility (alias)
+    #[serde(alias = "privateKey")]
+    #[config(combine(replace))]
+    pub ed25519_private_key: Option<odf::metadata::PrivateKey>,
 
     /// Secp256k1 private key used to sign EIP-712 typed data.
     ///
@@ -40,7 +43,8 @@ pub struct IdentityConfig {
     /// ```sh
     /// cast wallet new
     /// ```
-    pub secp256k1_private_key: crypto_eip712_utils::Secp256k1Signer,
+    #[config(combine(replace))]
+    pub secp256k1_private_key: Option<crypto_eip712_utils::Secp256k1Signer>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

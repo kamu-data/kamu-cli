@@ -586,16 +586,21 @@ impl SignEip712UseCaseHarness {
             ))
             .bind::<dyn messaging_outbox::Outbox, messaging_outbox::OutboxImmediateImpl>();
 
-        if has_identity_config {
-            // Label: "kamu-attester"
-            //        privateKey = uint256(keccak256(abi.encodePacked(label)))
-            let private_key =
-                b256!("0x42f3bebeb03afa3f14440c6837fa653a84e76bb74d62856227a97f3ee487b601");
+        {
+            let identity_config = if has_identity_config {
+                // Label: "kamu-attester"
+                //        privateKey = uint256(keccak256(abi.encodePacked(label)))
+                let private_key =
+                    b256!("0x42f3bebeb03afa3f14440c6837fa653a84e76bb74d62856227a97f3ee487b601");
 
-            let identity_config = IdentityConfig {
-                ed25519_private_key: odf::metadata::PrivateKey::from_bytes(&[123; _]),
-                secp256k1_private_key: Secp256k1Signer::from_bytes(&(private_key.0.into()))
-                    .unwrap(),
+                IdentityConfig {
+                    ed25519_private_key: Some(odf::metadata::PrivateKey::from_bytes(&[123; _])),
+                    secp256k1_private_key: Some(
+                        Secp256k1Signer::from_bytes(&(private_key.0.into())).unwrap(),
+                    ),
+                }
+            } else {
+                IdentityConfig::default()
             };
 
             b.add_value(identity_config);

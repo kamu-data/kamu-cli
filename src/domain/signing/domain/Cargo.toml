@@ -37,6 +37,7 @@ odf = { workspace = true }
 async-trait = { version = "0.1", default-features = false }
 bon = { version = "3", default-features = false }
 serde = { version = "1", features = ["derive"], default-features = false }
+setty = { version = "1.0", default-features = false }
 thiserror = { version = "2", default-features = false }
 
 # Optional

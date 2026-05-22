@@ -856,7 +856,7 @@
       "additionalProperties": false,
       "description": "Private keys are used to sign API responses.\nSupported algorithms: `ed25519`, `secp256k1`.",
       "properties": {
-        "privateKey": {
+        "ed25519PrivateKey": {
           "anyOf": [
             {
               "$ref": "#/$defs/PrivateKey"
@@ -866,7 +866,7 @@
             }
           ],
           "combine": "replace",
-          "description": "To generate, use:\n\n```sh\ndd if=/dev/urandom bs=1 count=32 status=none |\n    base64 -w0 |\n    tr '+/' '-_' |\n    tr -d '=' |\n    (echo -n u && cat)\n```\n\nThe command above:\n- Reads 32 random bytes\n- base64-encodes them\n- Converts default base64 encoding to base64url and removes padding\n- Prepends a multibase prefix"
+          "description": "Root private key that corresponds to the `authority` and is used to sign\nresponses.\n\nTo generate, use:\n```sh\nod -vN 32 -An -tx1 /dev/urandom | tr -d ' \\n' && echo\n```\nor\n```sh\nopenssl rand -hex 32\n```"
         },
         "secp256k1PrivateKey": {
           "anyOf": [
@@ -878,7 +878,7 @@
             }
           ],
           "combine": "replace",
-          "description": "Secp256k1 private key used to sign EIP-712 typed data.\n\n```sh\ncast wallet new\n```"
+          "description": "Secp256k1 private key used to sign EIP-712 typed data.\n\nTo generate, use:\n```sh\nod -vN 32 -An -tx1 /dev/urandom | tr -d ' \\n' && echo\n```\nor\n```sh\nopenssl rand -hex 32\n```\nor\n```sh\ncast wallet new\n```"
         }
       },
       "type": "object"

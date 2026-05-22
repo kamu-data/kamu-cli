@@ -42,11 +42,10 @@ impl Harness {
 
         let ed25519_private_key = odf::metadata::PrivateKey::from_bytes(&[123; _]);
         let identity_config = kamu_signing::entities::IdentityConfig {
-            ed25519_private_key: ed25519_private_key.clone(),
-            secp256k1_private_key: kamu_signing::utils::Secp256k1Signer::from_bytes(
-                &[124; _].into(),
-            )
-            .unwrap(),
+            ed25519_private_key: Some(ed25519_private_key.clone()),
+            secp256k1_private_key: Some(
+                kamu_signing::utils::Secp256k1Signer::from_bytes(&[124; _].into()).unwrap(),
+            ),
         };
 
         let catalog = dill::CatalogBuilder::new()

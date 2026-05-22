@@ -269,6 +269,7 @@ class "GetDatasetUpstreamDependenciesUseCaseImpl"
 class "GithubAuthenticationConfig" <<singleton>>
 class "GqlConfig" <<singleton>>
 class "HttpSourceConfig" <<singleton>>
+class "IdentityConfig" <<singleton>>
 class "Interact" <<singleton>>
 class "IpfsClient" <<singleton>>
 class "IpfsGateway" <<singleton>>
@@ -1082,7 +1083,7 @@ class "WsSmartTransferProtocolClient"
 "SignEip712UseCaseImpl"  --> "DatasetActionAuthorizer"
 "SignEip712UseCaseImpl"  --> "CurrentAccountSubject"
 "SignEip712UseCaseImpl"  --> "DidSecretEncryptionConfig"
-"SignEip712UseCaseImpl" "?" --> "IdentityConfig"
+"SignEip712UseCaseImpl"  --> "IdentityConfig"
 "TaskEventStore" <|-- "SqliteTaskEventStore"
 "SqliteTaskEventStore"  --> "TransactionRefT"
 "WebhookDeliveryRepository" <|-- "SqliteWebhookDeliveryRepository"
