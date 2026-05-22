@@ -108,7 +108,7 @@ impl CreateAccountUseCaseImpl {
         Ok(())
     }
 
-    async fn save_private_key(
+    async fn maybe_save_private_key(
         &self,
         account_id: &odf::AccountID,
         key: odf::metadata::SigningKey,
@@ -161,10 +161,6 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
     ) -> Result<Account, CreateAccountError> {
         self.save_account(account, password).await?;
 
-        // Generate a new private key.
-        let (private_key, _) = odf::AccountID::new_generated_ed25519();
-        self.save_private_key(&account.id, private_key).await?;
-
         if !quiet {
             self.notify_account_created(account).await?;
         }
@@ -205,7 +201,8 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
         };
 
         self.save_account(&account, &password).await?;
-        self.save_private_key(&account.id, account_key).await?;
+        self.maybe_save_private_key(&account.id, account_key)
+            .await?;
 
         self.notify_account_created(&account).await?;
 
