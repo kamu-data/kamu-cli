@@ -53,24 +53,24 @@ use crate::mutations::{
     map_get_content_args_error,
 };
 use crate::prelude::*;
-use crate::queries::molecule::v2::{
+use crate::queries::molecule::v3::{
     MoleculeAccessLevel,
     MoleculeCategory,
     MoleculeDataRoomEntry,
     MoleculeEncryptionMetadataInput,
-    MoleculeProjectV2,
+    MoleculeProject,
     MoleculeTag,
 };
 use crate::utils::{ContentSource, get_content_args};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct MoleculeDataRoomMutV2 {
-    project: Arc<MoleculeProjectV2>,
+pub struct MoleculeDataRoomMut {
+    project: Arc<MoleculeProject>,
 }
 
-impl MoleculeDataRoomMutV2 {
-    pub fn new(project: Arc<MoleculeProjectV2>) -> Self {
+impl MoleculeDataRoomMut {
+    pub fn new(project: Arc<MoleculeProject>) -> Self {
         Self { project }
     }
 
@@ -207,7 +207,7 @@ impl MoleculeDataRoomMutV2 {
         {
             let data_room_activity_record = MoleculeDataRoomActivityPayloadRecord {
                 activity_type: MoleculeDataRoomFileActivityType::Added,
-                ipnft_uid: self.project.entity.ipnft_uid.clone(),
+                ocl_id: self.project.entity.ocl_id.clone(),
                 path,
                 r#ref: versioned_file_dataset_id,
                 version: versioned_file_entry.version,
@@ -348,7 +348,7 @@ impl MoleculeDataRoomMutV2 {
         {
             let data_room_activity_record = MoleculeDataRoomActivityPayloadRecord {
                 activity_type: MoleculeDataRoomFileActivityType::Updated,
-                ipnft_uid: self.project.entity.ipnft_uid.clone(),
+                ocl_id: self.project.entity.ocl_id.clone(),
                 path: updated_data_room_entry.path.clone(),
                 r#ref: existing_data_room_entry.reference,
                 version: versioned_file_entry.version,
@@ -449,7 +449,7 @@ impl MoleculeDataRoomMutV2 {
 
         let data_room_activity_record = MoleculeDataRoomActivityPayloadRecord {
             activity_type,
-            ipnft_uid: self.project.entity.ipnft_uid.clone(),
+            ocl_id: self.project.entity.ocl_id.clone(),
             // SAFETY: All paths should be normalized after v2 migration
             path: CollectionPathV2::from_v1_unchecked(collection_entry_record.path).into(),
             r#ref: collection_entry_record.reference,
@@ -496,12 +496,12 @@ impl MoleculeDataRoomMutV2 {
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
-impl MoleculeDataRoomMutV2 {
+impl MoleculeDataRoomMut {
     /// Allows creating a file, upload a new version, and link a file into the
     /// data room via a single transaction. Uploads a new version of content
     /// in-band, so should be used only for very small files.
     #[graphql(guard = "LoggedInGuard")]
-    #[tracing::instrument(level = "info", name = MoleculeDataRoomMutV2_upload_file, skip_all)]
+    #[tracing::instrument(level = "info", name = MoleculeDataRoomMut_upload_file, skip_all)]
     async fn upload_file(
         &self,
         ctx: &Context<'_>,
@@ -564,7 +564,7 @@ impl MoleculeDataRoomMutV2 {
 
     /// Starts the process of uploading a file to the data room.
     #[graphql(guard = "LoggedInGuard")]
-    #[tracing::instrument(level = "info", name = MoleculeDataRoomMutV2_start_upload_file, skip_all)]
+    #[tracing::instrument(level = "info", name = MoleculeDataRoomMut_start_upload_file, skip_all)]
     async fn start_upload_file(
         &self,
         ctx: &Context<'_>,
@@ -611,7 +611,7 @@ impl MoleculeDataRoomMutV2 {
     /// Allows creating a file, upload a new version, and link a file into the
     /// data room via a single transaction.
     #[graphql(guard = "LoggedInGuard")]
-    #[tracing::instrument(level = "info", name = MoleculeDataRoomMutV2_finish_upload_file, skip_all)]
+    #[tracing::instrument(level = "info", name = MoleculeDataRoomMut_finish_upload_file, skip_all)]
     async fn finish_upload_file(
         &self,
         ctx: &Context<'_>,
@@ -670,7 +670,7 @@ impl MoleculeDataRoomMutV2 {
     }
 
     /// Moves an entry in the data room.
-    #[tracing::instrument(level = "info", name = MoleculeDataRoomMutV2_move_entry, skip_all)]
+    #[tracing::instrument(level = "info", name = MoleculeDataRoomMut_move_entry, skip_all)]
     async fn move_entry(
         &self,
         ctx: &Context<'_>,
@@ -766,7 +766,7 @@ impl MoleculeDataRoomMutV2 {
     }
 
     /// Removes an entry from the data room.
-    #[tracing::instrument(level = "info", name = MoleculeDataRoomMutV2_remove_entry, skip_all)]
+    #[tracing::instrument(level = "info", name = MoleculeDataRoomMut_remove_entry, skip_all)]
     async fn remove_entry(
         &self,
         ctx: &Context<'_>,
@@ -832,7 +832,7 @@ impl MoleculeDataRoomMutV2 {
     }
 
     /// Updates the metadata of a file in the data room.
-    #[tracing::instrument(level = "info", name = MoleculeDataRoomMutV2_update_file_metadata, skip_all)]
+    #[tracing::instrument(level = "info", name = MoleculeDataRoomMut_update_file_metadata, skip_all)]
     async fn update_file_metadata(
         &self,
         ctx: &Context<'_>,
@@ -980,7 +980,7 @@ impl MoleculeDataRoomMutV2 {
         {
             let data_room_activity_record = MoleculeDataRoomActivityPayloadRecord {
                 activity_type: MoleculeDataRoomFileActivityType::Updated,
-                ipnft_uid: self.project.entity.ipnft_uid.clone(),
+                ocl_id: self.project.entity.ocl_id.clone(),
                 path: updated_data_room_entry.path.clone(),
                 r#ref: updated_data_room_entry.reference.clone(),
                 version: updated_versioned_file_entry.version,
