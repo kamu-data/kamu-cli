@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use alloy_primitives::hex;
+use alloy::hex;
 use internal_error::{InternalError, ResultIntoInternal};
 use k256::ecdsa::SigningKey;
 
