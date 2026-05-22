@@ -8,33 +8,33 @@
 // by the Apache License, Version 2.0.
 
 use crate::prelude::*;
-use crate::queries::molecule::v2::{MoleculeAnnouncementEntry, MoleculeDataRoomEntry};
+use crate::queries::molecule::v3::{MoleculeAnnouncementEntry, MoleculeDataRoomEntry};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Union)]
-pub enum MoleculeActivityEventV2 {
-    FileAdded(MoleculeActivityFileAddedV2),
-    FileUpdated(MoleculeActivityFileUpdatedV2),
-    FileRemoved(MoleculeActivityFileRemovedV2),
-    Announcement(MoleculeActivityAnnouncementV2),
+pub enum MoleculeActivityEvent {
+    FileAdded(MoleculeActivityFileAdded),
+    FileUpdated(MoleculeActivityFileUpdated),
+    FileRemoved(MoleculeActivityFileRemoved),
+    Announcement(MoleculeActivityAnnouncement),
 }
 
-impl MoleculeActivityEventV2 {
+impl MoleculeActivityEvent {
     pub fn file_added(entry: MoleculeDataRoomEntry) -> Self {
-        Self::FileAdded(MoleculeActivityFileAddedV2 { entry })
+        Self::FileAdded(MoleculeActivityFileAdded { entry })
     }
 
     pub fn file_updated(entry: MoleculeDataRoomEntry) -> Self {
-        Self::FileUpdated(MoleculeActivityFileUpdatedV2 { entry })
+        Self::FileUpdated(MoleculeActivityFileUpdated { entry })
     }
 
     pub fn file_removed(entry: MoleculeDataRoomEntry) -> Self {
-        Self::FileRemoved(MoleculeActivityFileRemovedV2 { entry })
+        Self::FileRemoved(MoleculeActivityFileRemoved { entry })
     }
 
     pub fn announcement(announcement: MoleculeAnnouncementEntry) -> Self {
-        Self::Announcement(MoleculeActivityAnnouncementV2 { announcement })
+        Self::Announcement(MoleculeActivityAnnouncement { announcement })
     }
 
     #[expect(dead_code)]
@@ -49,29 +49,29 @@ impl MoleculeActivityEventV2 {
 }
 
 #[derive(SimpleObject)]
-pub struct MoleculeActivityFileAddedV2 {
+pub struct MoleculeActivityFileAdded {
     pub entry: MoleculeDataRoomEntry,
 }
 
 #[derive(SimpleObject)]
-pub struct MoleculeActivityFileUpdatedV2 {
+pub struct MoleculeActivityFileUpdated {
     pub entry: MoleculeDataRoomEntry,
 }
 
 #[derive(SimpleObject)]
-pub struct MoleculeActivityFileRemovedV2 {
+pub struct MoleculeActivityFileRemoved {
     pub entry: MoleculeDataRoomEntry,
 }
 
 #[derive(SimpleObject)]
-pub struct MoleculeActivityAnnouncementV2 {
+pub struct MoleculeActivityAnnouncement {
     pub announcement: MoleculeAnnouncementEntry,
 }
 
 page_based_stream_connection!(
-    MoleculeActivityEventV2,
-    MoleculeActivityEventV2Connection,
-    MoleculeActivityEventV2Edge
+    MoleculeActivityEvent,
+    MoleculeActivityEventConnection,
+    MoleculeActivityEventEdge
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

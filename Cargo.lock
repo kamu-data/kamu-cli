@@ -3143,6 +3143,15 @@ dependencies = [
 
 [[package]]
 name = "convert_case"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ec182b0ca2f35d8fc196cf3404988fd8b8c739a4d270ff118a398feb0cbec1ca"
+dependencies = [
+ "unicode-segmentation",
+]
+
+[[package]]
+name = "convert_case"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "633458d4ef8c78b72454de2d54fd6ab2e60f9e02be22f3c6104cdc8a4e0fceb9"
@@ -6940,7 +6949,7 @@ dependencies = [
  "kamu-search",
  "messaging-outbox",
  "mockall",
- "nutype",
+ "nutype 0.7.0",
  "opendatafabric",
  "pretty_assertions",
  "rand 0.9.4",
@@ -7169,7 +7178,7 @@ dependencies = [
  "kamu-auth-web3-inmem",
  "kamu-auth-web3-services",
  "kamu-core",
- "nutype",
+ "nutype 0.7.0",
  "opendatafabric",
  "pretty_assertions",
  "serde",
@@ -7348,7 +7357,7 @@ dependencies = [
  "kamu-webhooks-services",
  "messaging-outbox",
  "num-bigint",
- "nutype",
+ "nutype 0.7.0",
  "observability",
  "oop",
  "opendatafabric",
@@ -7655,7 +7664,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "internal-error",
- "nutype",
+ "nutype 0.7.0",
  "pretty_assertions",
  "regex",
  "siwe",
@@ -8243,7 +8252,7 @@ dependencies = [
  "kamu-search-services",
  "messaging-outbox",
  "mockall",
- "nutype",
+ "nutype 0.7.0",
  "oop",
  "opendatafabric",
  "paste",
@@ -8311,7 +8320,7 @@ dependencies = [
  "kamu-task-system",
  "messaging-outbox",
  "mockall",
- "nutype",
+ "nutype 0.7.0",
  "opendatafabric",
  "rand 0.9.4",
  "serde",
@@ -8596,8 +8605,9 @@ dependencies = [
  "kamu-search",
  "messaging-outbox",
  "nonempty",
- "num-bigint",
+ "nutype 0.6.2",
  "opendatafabric",
+ "regex",
  "serde",
  "serde_json",
  "serde_with",
@@ -8631,7 +8641,6 @@ dependencies = [
  "kamu-search",
  "messaging-outbox",
  "nonempty",
- "num-bigint",
  "opendatafabric",
  "serde_json",
  "thiserror 2.0.18",
@@ -8968,7 +8977,7 @@ dependencies = [
  "internal-error",
  "messaging-outbox",
  "mockall",
- "nutype",
+ "nutype 0.7.0",
  "opendatafabric",
  "secrecy",
  "serde",
@@ -9131,11 +9140,32 @@ dependencies = [
 
 [[package]]
 name = "kinded"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ce4bdbb2f423660b19f0e9f7115182214732d8dd5f840cd0a3aee3e22562f34c"
+dependencies = [
+ "kinded_macros 0.3.0",
+]
+
+[[package]]
+name = "kinded"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "53c48b3aa70f02a317f180f7d4e0834bbd2ffa293e352a132bb2ac9351736635"
 dependencies = [
- "kinded_macros",
+ "kinded_macros 0.5.0",
+]
+
+[[package]]
+name = "kinded_macros"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a13b4ddc5dcb32f45dac3d6f606da2a52fdb9964a18427e63cd5ef6c0d13288d"
+dependencies = [
+ "convert_case 0.6.0",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
 ]
 
 [[package]]
@@ -10061,11 +10091,36 @@ dependencies = [
 
 [[package]]
 name = "nutype"
+version = "0.6.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "70587a780088c67dad31bf722b875c5616096b4d8c0ded8b7de03294ffb9bbb5"
+dependencies = [
+ "nutype_macros 0.6.2",
+]
+
+[[package]]
+name = "nutype"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e3ae01f500e59a27e8c868297e15e268105d30ae06dee1ca194e025be29dee2a"
 dependencies = [
- "nutype_macros",
+ "nutype_macros 0.7.0",
+]
+
+[[package]]
+name = "nutype_macros"
+version = "0.6.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "148934b975faeddd8f0679d7cf11280b50c4c5495d6fe72bdaf07c932874b404"
+dependencies = [
+ "cfg-if",
+ "kinded 0.3.0",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "rustc_version 0.4.1",
+ "syn 2.0.117",
+ "urlencoding",
 ]
 
 [[package]]
@@ -10075,7 +10130,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "48a6a6ddc63e6d0cd6b77af9aabae24601b39ad543d29bff88c4761c1fc34700"
 dependencies = [
  "cfg-if",
- "kinded",
+ "kinded 0.5.0",
  "proc-macro2",
  "quote",
  "regex",

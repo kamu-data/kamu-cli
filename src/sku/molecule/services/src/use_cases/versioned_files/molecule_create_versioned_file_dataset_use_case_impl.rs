@@ -82,7 +82,7 @@ impl MoleculeCreateVersionedFileDatasetUseCase for MoleculeCreateVersionedFileDa
             .build_new_file_dataset_alias(molecule_project, &path)
             .await;
 
-        let versioned_file_snapshot = MoleculeDatasetSnapshots::versioned_file_v2(alias);
+        let versioned_file_snapshot = MoleculeDatasetSnapshots::versioned_file(alias);
 
         let (versioned_file_dataset, _) = {
             let create_versioned_file_res = self

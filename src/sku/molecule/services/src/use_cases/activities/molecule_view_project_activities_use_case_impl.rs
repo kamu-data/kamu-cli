@@ -256,7 +256,7 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
                     offset,
                     activity_type,
                     entry,
-                    molecule_project.ipnft_uid.clone(),
+                    molecule_project.ocl_id.clone(),
                 ),
             ));
         }
@@ -347,10 +347,10 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
         let filter = {
             let mut and_clauses = vec![];
 
-            // ipnft_uid equality
+            // ocl_id equality
             and_clauses.push(field_eq_str(
-                molecule_schema::fields::IPNFT_UID,
-                &molecule_project.ipnft_uid,
+                molecule_schema::fields::OCL_ID,
+                molecule_project.ocl_id.as_ref(),
             ));
 
             // filters by categories, tags, access levels

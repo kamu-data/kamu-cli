@@ -9,47 +9,44 @@
 
 use std::sync::Arc;
 
-use crate::mutations::molecule_mut::v2::{
-    MoleculeAnnouncementsDatasetMutV2,
-    MoleculeDataRoomMutV2,
-};
+use crate::mutations::molecule_mut::v3::{MoleculeAnnouncementsDatasetMut, MoleculeDataRoomMut};
 use crate::prelude::*;
-use crate::queries::molecule::v2::MoleculeProjectV2;
+use crate::queries::molecule::v3::MoleculeProject;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct MoleculeProjectMutV2 {
-    pub project: Arc<MoleculeProjectV2>,
+pub struct MoleculeProjectMut {
+    pub project: Arc<MoleculeProject>,
 }
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
-impl MoleculeProjectMutV2 {
+impl MoleculeProjectMut {
     /// Strongly typed data room mutator
-    #[tracing::instrument(level = "info", name = MoleculeProjectMutV2_data_room, skip_all)]
-    async fn data_room(&self) -> Result<MoleculeDataRoomMutV2> {
+    #[tracing::instrument(level = "info", name = MoleculeProjectMut_data_room, skip_all)]
+    async fn data_room(&self) -> Result<MoleculeDataRoomMut> {
         // Note: access control is enforced in use cases via ReBAC
-        Ok(MoleculeDataRoomMutV2::new(self.project.clone()))
+        Ok(MoleculeDataRoomMut::new(self.project.clone()))
     }
 
     /// Strongly typed announcements mutator
-    #[tracing::instrument(level = "info", name = MoleculeProjectMutV2_announcements, skip_all)]
-    async fn announcements(&self) -> Result<MoleculeAnnouncementsDatasetMutV2> {
-        Ok(MoleculeAnnouncementsDatasetMutV2::new(self.project.clone()))
+    #[tracing::instrument(level = "info", name = MoleculeProjectMut_announcements, skip_all)]
+    async fn announcements(&self) -> Result<MoleculeAnnouncementsDatasetMut> {
+        Ok(MoleculeAnnouncementsDatasetMut::new(self.project.clone()))
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct MoleculeProjectMutationResultV2 {
+pub struct MoleculeProjectMutationResult {
     message: String,
-    project: MoleculeProjectMutV2,
+    project: MoleculeProjectMut,
 }
 
-impl MoleculeProjectMutationResultV2 {
+impl MoleculeProjectMutationResult {
     pub fn from_entity(entity: kamu_molecule_domain::MoleculeProject, message: String) -> Self {
         Self {
-            project: MoleculeProjectMutV2::from_entity(entity),
+            project: MoleculeProjectMut::from_entity(entity),
             message,
         }
     }
@@ -57,8 +54,8 @@ impl MoleculeProjectMutationResultV2 {
 
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
-impl MoleculeProjectMutationResultV2 {
-    async fn project(&self) -> &MoleculeProjectMutV2 {
+impl MoleculeProjectMutationResult {
+    async fn project(&self) -> &MoleculeProjectMut {
         &self.project
     }
 
@@ -67,10 +64,10 @@ impl MoleculeProjectMutationResultV2 {
     }
 }
 
-impl MoleculeProjectMutV2 {
+impl MoleculeProjectMut {
     pub fn from_entity(entity: kamu_molecule_domain::MoleculeProject) -> Self {
         Self {
-            project: Arc::new(MoleculeProjectV2::new(entity)),
+            project: Arc::new(MoleculeProject::new(entity)),
         }
     }
 }

@@ -16,15 +16,15 @@ use crate::MoleculeAccessLevelRule;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn molecule_fields_filter(
-    by_ipnft_uids: Option<Vec<String>>,
+    by_ocl_ids: Option<Vec<String>>,
     by_tags: Option<Vec<String>>,
     by_categories: Option<Vec<String>>,
 ) -> Option<kamu_datasets::ExtraDataFieldsFilter> {
     use kamu_datasets::ExtraDataFieldFilter as Filter;
 
-    let maybe_ipnft_uids_filter = by_ipnft_uids.and_then(|values| {
+    let maybe_ocl_ids_filter = by_ocl_ids.and_then(|values| {
         NonEmpty::from_vec(values).map(|values| Filter {
-            field_name: "ipnft_uid".to_string(),
+            field_name: "ocl_id".to_string(),
             values,
             is_array: false,
         })
@@ -44,7 +44,7 @@ pub fn molecule_fields_filter(
         })
     });
 
-    let filters = maybe_ipnft_uids_filter
+    let filters = maybe_ocl_ids_filter
         .into_iter()
         .chain(maybe_tags_filter)
         .chain(maybe_categories_filter)
@@ -63,7 +63,7 @@ pub fn normalize_access_level_rules(
         && let Some(access_levels) = NonEmpty::from_vec(access_levels)
     {
         rules.push(MoleculeAccessLevelRule {
-            ipnft_uid: None,
+            ocl_id: None,
             access_levels: access_levels.into(),
         });
     }
@@ -90,7 +90,7 @@ pub fn normalize_access_level_rules(
 
         if let Some(existing_rule) = deduplicated_rules
             .iter_mut()
-            .find(|existing_rule| existing_rule.ipnft_uid == rule.ipnft_uid)
+            .find(|existing_rule| existing_rule.ocl_id == rule.ocl_id)
         {
             let mut existing_levels = existing_rule
                 .access_levels
@@ -108,7 +108,7 @@ pub fn normalize_access_level_rules(
             }
         } else {
             deduplicated_rules.push(MoleculeAccessLevelRule {
-                ipnft_uid: rule.ipnft_uid,
+                ocl_id: rule.ocl_id,
                 access_levels: unique_access_levels,
             });
         }
@@ -122,22 +122,26 @@ pub fn normalize_access_level_rules(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::OclId;
 
     #[test]
-    fn normalize_access_level_rules_dedups_and_merges_by_ipnft() {
+    fn normalize_access_level_rules_dedups_and_merges_by_ocl_id() {
+        let ocl_id = "0x0000000000000000000000000000000000000000000000000000000000000000"
+            .parse::<OclId>()
+            .unwrap();
         let rules = normalize_access_level_rules(
             Some(vec!["public".to_string(), "public".to_string()]),
             Some(vec![
                 MoleculeAccessLevelRule {
-                    ipnft_uid: None,
+                    ocl_id: None,
                     access_levels: vec!["private".to_string(), "public".to_string()],
                 },
                 MoleculeAccessLevelRule {
-                    ipnft_uid: Some("ipnft-1".to_string()),
+                    ocl_id: Some(ocl_id.clone()),
                     access_levels: vec!["project".to_string()],
                 },
                 MoleculeAccessLevelRule {
-                    ipnft_uid: Some("ipnft-1".to_string()),
+                    ocl_id: Some(ocl_id.clone()),
                     access_levels: vec!["team".to_string(), "project".to_string()],
                 },
             ]),
@@ -147,14 +151,16 @@ mod tests {
             rules,
             vec![
                 MoleculeAccessLevelRule {
-                    ipnft_uid: None,
+                    ocl_id: None,
                     access_levels: vec!["public".to_string(), "private".to_string()],
                 },
                 MoleculeAccessLevelRule {
-                    ipnft_uid: Some("ipnft-1".to_string()),
+                    ocl_id: Some(ocl_id),
                     access_levels: vec!["project".to_string(), "team".to_string()],
                 }
             ]
         );
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

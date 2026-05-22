@@ -14,12 +14,12 @@ use crate::search::schemas::molecule_search_schema_common as molecule_schema;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub const SCHEMA_NAME: &str = "molecule-projects";
-const SCHEMA_VERSION: u32 = 2;
+const SCHEMA_VERSION: u32 = 3;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub mod fields {
-    pub const IPNFT_SYMBOL: &str = "ipnft_symbol";
+    pub const SYMBOL: &str = "symbol";
     pub const PROJECT_ACCOUNT_ID: &str = "project_account_id";
 }
 
@@ -30,14 +30,14 @@ const SCHEMA_FIELDS: &[SearchSchemaField] = &[
     molecule_schema::field_definitions::SYSTEM_TIME,
     molecule_schema::field_definitions::MOLECULE_ACCOUNT_ID,
     SearchSchemaField {
-        path: fields::IPNFT_SYMBOL,
+        path: fields::SYMBOL,
         role: SearchSchemaFieldRole::Identifier {
             hierarchical: false,
             enable_edge_ngrams: true,
             enable_inner_ngrams: true,
         },
     },
-    molecule_schema::field_definitions::IPNFT_UID,
+    molecule_schema::field_definitions::OCL_ID,
     SearchSchemaField {
         path: fields::PROJECT_ACCOUNT_ID,
         role: SearchSchemaFieldRole::Keyword,
@@ -51,7 +51,7 @@ pub const SCHEMA: SearchEntitySchema = SearchEntitySchema {
     version: SCHEMA_VERSION,
     upgrade_mode: SearchEntitySchemaUpgradeMode::BreakingRecreate,
     fields: SCHEMA_FIELDS,
-    title_field: fields::IPNFT_SYMBOL,
+    title_field: fields::SYMBOL,
     flags: SearchEntitySchemaFlags {
         enable_banning: true,
         enable_security: true,
