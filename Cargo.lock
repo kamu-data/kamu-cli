@@ -9079,6 +9079,7 @@ dependencies = [
  "opendatafabric",
  "pretty_assertions",
  "serde",
+ "setty",
  "thiserror 2.0.18",
  "utoipa",
 ]

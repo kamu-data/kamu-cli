@@ -132,7 +132,7 @@ kamu-auth-web3-services = { workspace = true }
 kamu-auth-web3-sqlite = { workspace = true }
 
 kamu-signing = { workspace = true, default-features = false, features = [
-    "schemars"
+    "schemars",
 ] }
 kamu-signing-services = { workspace = true }
 

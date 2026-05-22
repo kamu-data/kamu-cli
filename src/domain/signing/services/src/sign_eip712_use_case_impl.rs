@@ -45,7 +45,7 @@ pub struct SignEip712UseCaseImpl {
     current_account_subject: Arc<CurrentAccountSubject>,
     account_service: Arc<dyn AccountService>,
     account_authorization_helper: Arc<dyn AccountAuthorizationHelper>,
-    identity_config: Option<IdentityConfig>,
+    identity_config: IdentityConfig,
 }
 
 impl SignEip712UseCaseImpl {
@@ -213,7 +213,7 @@ impl SignEip712UseCase for SignEip712UseCaseImpl {
         let Some(encryption_key) = self.did_secret_encryption_config.get_encryption_key() else {
             return Err(SignEip712UseCaseError::NotConfigured);
         };
-        let Some(identity_config) = self.identity_config.as_ref() else {
+        let Some(secp256k1_private_key) = &self.identity_config.secp256k1_private_key else {
             return Err(SignEip712UseCaseError::NotConfigured);
         };
 
@@ -238,14 +238,12 @@ impl SignEip712UseCase for SignEip712UseCaseImpl {
             signature: signature.into(),
             //
             proof: if options.include_node_proof {
-                let signer = &identity_config.secp256k1_private_key;
-
                 let proof = signature.to_bytes();
-                let signature = signer.sign(proof.as_slice()).int_err()?;
+                let signature = secp256k1_private_key.sign(proof.as_slice()).int_err()?;
 
                 Some(SignEip712Proof {
                     r#type: ProofType::EcdsaSecp256k1Signature2019,
-                    verification_method: signer.verification_key(),
+                    verification_method: secp256k1_private_key.verification_key(),
                     signature,
                 })
             } else {
