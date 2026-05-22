@@ -33,12 +33,16 @@ internal-error = { workspace = true }
 
 # TODO: Molecule: Phase 3: update to alloy@2 crate.
 #                 Blocked by datafusion-ethers & duplicate deps
-alloy = { version = "1", default-features = false, features = [
+# NOTE: We use alloy sub-crates instead of the meta-crate to avoid pulling in optional dependencies
+#       that get included anyway due to an old known issue:
+#       Details: https://github.com/rust-lang/cargo/issues/10801
+alloy-core = { version = "1", default-features = false, features = [
+    "std",
     "dyn-abi",
     "eip712",
-    "signer-local",
-    "signers",
 ] }
+alloy-signer = { version = "1", default-features = false }
+alloy-signer-local = { version = "1", default-features = false }
 const-hex = { version = "1", default-features = true, features = [] }
 nutype = { version = "0.7", default-features = false, features = [] }
 serde_json = { version = "1", default-features = false }

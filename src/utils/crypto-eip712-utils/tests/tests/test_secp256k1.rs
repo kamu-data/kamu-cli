@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use alloy::primitives::b256;
+use alloy_core::primitives::b256;
 use crypto_eip712_utils::{Secp256k1Signature, Secp256k1Signer, Secp256k1VerifyingKey};
 use pretty_assertions::assert_eq;
 use serde_json::json;
