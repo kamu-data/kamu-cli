@@ -69,8 +69,6 @@ const ADMIN: &str = "admin";
 
 #[test]
 fn test_has_access_by_name_matrix() {
-    let f = SignEip712UseCaseImpl::has_access_by_account_name;
-
     for (subject_account_name, target_account_name, expected) in [
         // molecule
         (MOLECULE, MOLECULE, true),
@@ -87,7 +85,10 @@ fn test_has_access_by_name_matrix() {
         (MOLECULE_DEV, "molecule.devops", false),
         (MOLECULE_DEV, "molecule.dev.probe8503325863", true),
     ] {
-        let actual = f(subject_account_name, target_account_name);
+        let actual = SignEip712UseCaseImpl::has_access_by_account_name(
+            subject_account_name,
+            target_account_name,
+        );
 
         assert_eq!(
             expected, actual,
@@ -647,7 +648,6 @@ impl SignEip712UseCaseHarness {
                 [5; _],
             ),
             // Accounts
-            // NOTE: for InMemoryDidSecretKeyRepository we rewrite keys with pregenerated values
             (
                 DidEntity::new_account(molecule_account_id().to_string()),
                 [6; _],
