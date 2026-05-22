@@ -17,6 +17,11 @@ use std::collections::HashMap;
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 #[into_params(parameter_in = Query)]
 pub struct SignEip712QueryParams {
+    // NOTE: Workaround for:
+    //       - Nested `ToSchema` types referenced in an `IntoParams` structure is not included in
+    //         `#/components/schemas/`
+    //         https://github.com/juhaku/utoipa/issues/1388
+    #[param(inline)]
     /// DID of the managed key to sign with
     pub key: odf::metadata::DidOdf,
 
