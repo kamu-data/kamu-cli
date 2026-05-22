@@ -853,14 +853,7 @@
       "SignEip712Response": {
         "properties": {
           "proof": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/SignEip712Proof"
-              }
-            ]
+            "$ref": "#/components/schemas/SignEip712Proof"
           },
           "signature": {
             "$ref": "#/components/schemas/Signature"
