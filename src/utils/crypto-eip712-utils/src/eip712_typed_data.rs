@@ -7,8 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use alloy::dyn_abi::TypedData as AlloyEip712TypedData;
-use alloy::primitives::B256;
+use alloy_core::dyn_abi::TypedData as AlloyEip712TypedData;
+use alloy_core::primitives::B256;
 use internal_error::{InternalError, ResultIntoInternal};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
