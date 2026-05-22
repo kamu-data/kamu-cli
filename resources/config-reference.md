@@ -1294,26 +1294,22 @@ Supported algorithms: `ed25519`, `secp256k1`.
 <thead><tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
 <tbody>
 <tr>
-<td><code>privateKey</code></td>
+<td><code>ed25519PrivateKey</code></td>
 <td><a href="#privatekey"><code>PrivateKey</code></a></td>
 <td><code class="language-json">null</code></td>
 <td>
 
+Root private key that corresponds to the `authority` and is used to sign
+responses.
+
 To generate, use:
-
 ```sh
-dd if=/dev/urandom bs=1 count=32 status=none |
-    base64 -w0 |
-    tr '+/' '-_' |
-    tr -d '=' |
-    (echo -n u && cat)
+od -vN 32 -An -tx1 /dev/urandom | tr -d ' \n' && echo
 ```
-
-The command above:
-- Reads 32 random bytes
-- base64-encodes them
-- Converts default base64 encoding to base64url and removes padding
-- Prepends a multibase prefix
+or
+```sh
+openssl rand -hex 32
+```
 
 </td>
 </tr>
@@ -1325,6 +1321,15 @@ The command above:
 
 Secp256k1 private key used to sign EIP-712 typed data.
 
+To generate, use:
+```sh
+od -vN 32 -An -tx1 /dev/urandom | tr -d ' \n' && echo
+```
+or
+```sh
+openssl rand -hex 32
+```
+or
 ```sh
 cast wallet new
 ```

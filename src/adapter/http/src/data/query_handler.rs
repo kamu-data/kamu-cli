@@ -179,6 +179,15 @@ pub async fn query_handler_impl(
 ) -> Result<Json<QueryResponse>, ApiError> {
     tracing::debug!(request = ?body, "Query");
 
+    let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
+    let identity_config = catalog
+        .get_one::<kamu_signing::entities::IdentityConfig>()
+        .unwrap();
+
+    let Some(ed25519_private_key) = &identity_config.ed25519_private_key else {
+        return Err(ApiError::not_implemented(ResponseSigningNotConfigured));
+    };
+
     // Automatically add `Input` if proof is requested, as proof depends on input
     // for verifiability
     if body.include.contains(&Include::Proof) {
@@ -188,11 +197,6 @@ pub async fn query_handler_impl(
     if body.schema_format.is_some() {
         body.include.insert(Include::Schema);
     }
-
-    let identity = catalog
-        .get_one::<kamu_signing::entities::IdentityConfig>()
-        .ok();
-    let query_svc = catalog.get_one::<dyn QueryService>().unwrap();
 
     let res = query_svc
         .sql_statement(&body.query, body.to_options())
@@ -257,7 +261,7 @@ pub async fn query_handler_impl(
             commitment: None,
             proof: None,
         }
-    } else if let Some(identity) = identity {
+    } else {
         use odf::metadata::ed25519::Signer;
 
         let sub_queries = Vec::new();
@@ -273,9 +277,7 @@ pub async fn query_handler_impl(
             )),
         };
 
-        let signature = identity
-            .ed25519_private_key
-            .sign(&to_canonical_json(&commitment));
+        let signature = ed25519_private_key.sign(&to_canonical_json(&commitment));
 
         QueryResponse {
             input,
@@ -284,12 +286,10 @@ pub async fn query_handler_impl(
             commitment: Some(commitment),
             proof: Some(Proof {
                 r#type: kamu_signing::common::ProofType::Ed25519Signature2020,
-                verification_method: identity.ed25519_private_key.verifying_key(),
+                verification_method: ed25519_private_key.verifying_key(),
                 proof_value: signature.into(),
             }),
         }
-    } else {
-        Err(ApiError::not_implemented(ResponseSigningNotConfigured))?
     };
 
     Ok(Json(response))
