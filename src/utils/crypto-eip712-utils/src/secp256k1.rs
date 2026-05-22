@@ -7,9 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use alloy::primitives::{Address, B256, Signature, keccak256};
-use alloy::signers::k256::ecdsa::{SigningKey, VerifyingKey};
-use alloy::signers::local::LocalSigner;
+use alloy_core::primitives::{Address, B256, Signature, keccak256};
+use alloy_signer::k256::ecdsa::{SigningKey, VerifyingKey};
+use alloy_signer_local::LocalSigner;
 use internal_error::{InternalError, ResultIntoInternal};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -31,7 +31,7 @@ impl Secp256k1Signer {
     }
 
     pub fn sign_prehash(&self, hash: &B256) -> Result<Secp256k1Signature, InternalError> {
-        use alloy::signers::SignerSync;
+        use alloy_signer::SignerSync;
 
         let signature = self.0.sign_hash_sync(hash).int_err()?;
 
@@ -216,7 +216,7 @@ impl Secp256k1VerifyingKey {
     ) -> Result<(), InternalError> {
         use std::ops::Deref;
 
-        use alloy::signers::k256::ecdsa::signature::hazmat::PrehashVerifier;
+        use alloy_signer::k256::ecdsa::signature::hazmat::PrehashVerifier;
 
         let signature = signature.to_k256().int_err()?;
 
