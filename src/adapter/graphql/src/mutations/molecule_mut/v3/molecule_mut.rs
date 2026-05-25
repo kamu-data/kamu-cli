@@ -180,6 +180,8 @@ impl CreateProjectSuccess {
 
 #[derive(SimpleObject)]
 #[graphql(complex)]
+// NOTE: Backward compatibility (rename)
+#[graphql(name = "CreateProjectErrorConflict")]
 pub struct CreateProjectProjectConflictError {
     project: MoleculeProject,
 }
