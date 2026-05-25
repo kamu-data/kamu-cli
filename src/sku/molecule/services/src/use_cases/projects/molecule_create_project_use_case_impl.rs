@@ -10,10 +10,11 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use internal_error::ResultIntoInternal;
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_accounts::{
     AccountService,
     AccountServiceExt,
+    CreateAccountError,
     CreateAccountUseCase,
     CreateAccountUseCaseOptions,
     LoggedAccount,
@@ -58,7 +59,7 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
         ocl_id: OclId,
         symbol: Symbol,
     ) -> Result<MoleculeProject, MoleculeCreateProjectError> {
-        // Gain write access to projects dataset
+        // Gain write access to `projects` dataset
         let projects_writer = self
             .projects_service
             .writer(&molecule_subject.account_name, true)
@@ -91,7 +92,7 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
             // If any record found, it's a conflict
             let records = df.collect_json_aos().await.int_err()?;
             if let Some(record) = records.into_iter().next() {
-                return Err(MoleculeCreateProjectError::Conflict {
+                return Err(MoleculeCreateProjectError::ConflictProject {
                     project: MoleculeProject::from_json(record)?,
                 });
             }
@@ -127,7 +128,20 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
                         .build(),
                 )
                 .await
-                .int_err()?
+                .map_err(|e| {
+                    use CreateAccountError as E;
+
+                    match e {
+                        CreateAccountError::Duplicate(e) => {
+                            MoleculeCreateProjectError::ConflictAccount {
+                                // NOTE: clone() to make a borrow checker a bit happier
+                                project_account_name: project_account_name.clone(),
+                                account_duplicate_field: e.account_field,
+                            }
+                        }
+                        e @ E::Internal(_) => e.int_err().into(),
+                    }
+                })?
         };
 
         // Create `data-room` dataset

@@ -9,7 +9,7 @@
 
 use chrono::{DateTime, Utc};
 use internal_error::InternalError;
-use kamu_accounts::LoggedAccount;
+use kamu_accounts::{AccountDuplicateField, LoggedAccount};
 
 use crate::{MoleculeGetDatasetError, MoleculeProject, OclId, Symbol};
 
@@ -31,7 +31,13 @@ pub trait MoleculeCreateProjectUseCase: Send + Sync {
 #[derive(thiserror::Error, Debug)]
 pub enum MoleculeCreateProjectError {
     #[error("Project with the same OCL ID or symbol already exists")]
-    Conflict { project: MoleculeProject },
+    ConflictProject { project: MoleculeProject },
+
+    #[error("Project account '{project_account_name}' already exists")]
+    ConflictAccount {
+        project_account_name: odf::AccountName,
+        account_duplicate_field: AccountDuplicateField,
+    },
 
     #[error(transparent)]
     Access(

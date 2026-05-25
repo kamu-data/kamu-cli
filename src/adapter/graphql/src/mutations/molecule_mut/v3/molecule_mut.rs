@@ -38,7 +38,9 @@ impl MoleculeMutV3 {
         let (time_source, create_project_uc) =
             from_catalog_n!(ctx, dyn SystemTimeSource, dyn MoleculeCreateProjectUseCase);
 
-        let project = match create_project_uc
+        use MoleculeCreateProjectError as E;
+
+        match create_project_uc
             .execute(
                 &molecule_subject,
                 Some(time_source.now()),
@@ -47,22 +49,29 @@ impl MoleculeMutV3 {
             )
             .await
         {
-            Ok(project_entity) => MoleculeProject::new(project_entity),
-            Err(MoleculeCreateProjectError::Conflict { project }) => {
-                let project = MoleculeProject::new(project);
-                return Ok(CreateProjectResult::Conflict(CreateProjectErrorConflict {
+            Ok(project_entity) => {
+                let project = MoleculeProject::new(project_entity);
+                Ok(CreateProjectResult::Success(CreateProjectSuccess {
                     project,
-                }));
+                }))
             }
-            Err(MoleculeCreateProjectError::Access(e)) => return Err(GqlError::Access(e)),
-            Err(e @ MoleculeCreateProjectError::Internal(_)) => {
-                return Err(e.int_err().into());
+            Err(E::ConflictProject { project }) => {
+                let project = MoleculeProject::new(project);
+                Ok(CreateProjectResult::ConflictProject(
+                    CreateProjectProjectConflictError { project },
+                ))
             }
-        };
-
-        Ok(CreateProjectResult::Success(CreateProjectSuccess {
-            project,
-        }))
+            Err(E::ConflictAccount {
+                project_account_name,
+                ..
+            }) => Ok(CreateProjectResult::ConflictAccount(
+                CreateProjectAccountConflictError {
+                    project_account_name: project_account_name.into(),
+                },
+            )),
+            Err(E::Access(e)) => Err(e.into()),
+            Err(e @ E::Internal(_)) => Err(e.int_err().into()),
+        }
     }
 
     /// Retracts a project from the `projects` dataset.
@@ -148,7 +157,8 @@ impl MoleculeMutV3 {
 )]
 pub enum CreateProjectResult {
     Success(CreateProjectSuccess),
-    Conflict(CreateProjectErrorConflict),
+    ConflictProject(CreateProjectProjectConflictError),
+    ConflictAccount(CreateProjectAccountConflictError),
 }
 
 #[derive(SimpleObject)]
@@ -156,11 +166,13 @@ pub enum CreateProjectResult {
 pub struct CreateProjectSuccess {
     pub project: MoleculeProject,
 }
+
 #[ComplexObject]
 impl CreateProjectSuccess {
     async fn is_success(&self) -> bool {
         true
     }
+
     async fn message(&self) -> String {
         String::new()
     }
@@ -168,18 +180,40 @@ impl CreateProjectSuccess {
 
 #[derive(SimpleObject)]
 #[graphql(complex)]
-pub struct CreateProjectErrorConflict {
+pub struct CreateProjectProjectConflictError {
     project: MoleculeProject,
 }
+
 #[ComplexObject]
-impl CreateProjectErrorConflict {
+impl CreateProjectProjectConflictError {
     async fn is_success(&self) -> bool {
         false
     }
+
     async fn message(&self) -> String {
         format!(
             "Conflict with existing project {} ({})",
             self.project.entity.symbol, self.project.entity.ocl_id,
+        )
+    }
+}
+
+#[derive(SimpleObject)]
+#[graphql(complex)]
+pub struct CreateProjectAccountConflictError {
+    project_account_name: AccountName<'static>,
+}
+
+#[ComplexObject]
+impl CreateProjectAccountConflictError {
+    async fn is_success(&self) -> bool {
+        false
+    }
+
+    async fn message(&self) -> String {
+        format!(
+            "Conflict with existing project account '{}'",
+            self.project_account_name,
         )
     }
 }

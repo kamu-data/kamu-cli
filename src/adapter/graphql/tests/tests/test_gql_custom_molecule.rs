@@ -901,7 +901,7 @@ async fn test_molecule_provision_project(search_variant: GraphQLMoleculeHarnessS
         json!({
             "isSuccess": false,
             "message": format!("Conflict with existing project vitafast ({OCL_ID_1})"),
-            "__typename": "CreateProjectErrorConflict",
+            "__typename": "CreateProjectProjectConflictError",
         }),
     );
 
@@ -921,7 +921,50 @@ async fn test_molecule_provision_project(search_variant: GraphQLMoleculeHarnessS
         json!({
             "isSuccess": false,
             "message": format!("Conflict with existing project vitafast ({OCL_ID_1})"),
-            "__typename": "CreateProjectErrorConflict",
+            "__typename": "CreateProjectProjectConflictError",
+        }),
+    );
+
+    // Ensure errors on project account name collision
+    let res = harness
+        .execute_authorized_query(
+            async_graphql::Request::new(indoc!(
+                r#"
+                mutation ($newAccountName: AccountName!) {
+                  accounts {
+                    createAccount(accountName: $newAccountName) {
+                      ... on CreateAccountSuccess {
+                        message
+                      }
+                    }
+                  }
+                }
+                "#
+            ))
+            .variables(async_graphql::Variables::from_json(json!({
+                "newAccountName": "molecule.account",
+            }))),
+        )
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+
+    let res = harness
+        .execute_authorized_query(async_graphql::Request::new(CREATE_PROJECT).variables(
+            async_graphql::Variables::from_json(json!({
+                "symbol": "account",
+                "oclId": OCL_ID_2,
+            })),
+        ))
+        .await;
+
+    assert!(res.is_ok(), "{res:#?}");
+    pretty_assertions::assert_eq!(
+        res.data.into_json().unwrap()["molecule"]["v3"]["createProject"],
+        json!({
+            "isSuccess": false,
+            "message": "Conflict with existing project account 'molecule.account'",
+            "__typename": "CreateProjectAccountConflictError",
         }),
     );
 
@@ -1236,7 +1279,7 @@ async fn test_molecule_cannot_recreate_disabled_project_with_same_symbol(
         json!({
             "isSuccess": false,
             "message": format!("Conflict with existing project vitafast ({OCL_ID_1})"),
-            "__typename": "CreateProjectErrorConflict",
+            "__typename": "CreateProjectProjectConflictError",
         }),
     );
 }

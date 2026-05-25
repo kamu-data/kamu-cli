@@ -962,7 +962,13 @@ type CreateDatasetResultSuccess implements CreateDatasetResult & CreateDatasetFr
 	message: String!
 }
 
-type CreateProjectErrorConflict implements CreateProjectResult {
+type CreateProjectAccountConflictError implements CreateProjectResult {
+	projectAccountName: AccountName!
+	isSuccess: Boolean!
+	message: String!
+}
+
+type CreateProjectProjectConflictError implements CreateProjectResult {
 	project: MoleculeProject!
 	isSuccess: Boolean!
 	message: String!
