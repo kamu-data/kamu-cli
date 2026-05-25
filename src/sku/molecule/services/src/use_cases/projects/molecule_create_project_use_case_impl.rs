@@ -10,10 +10,11 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use internal_error::ResultIntoInternal;
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_accounts::{
     AccountService,
     AccountServiceExt,
+    CreateAccountError,
     CreateAccountUseCase,
     CreateAccountUseCaseOptions,
     LoggedAccount,
@@ -49,18 +50,16 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
         level = "info",
         name = MoleculeCreateProjectUseCaseImpl_execute,
         skip_all,
-        fields(ipnft_symbol, ipnft_uid)
+        fields(ocl_id, symbol)
     )]
     async fn execute(
         &self,
         molecule_subject: &LoggedAccount,
         source_event_time: Option<DateTime<Utc>>,
-        mut ipnft_symbol: String,
-        ipnft_uid: String,
-        ipnft_address: String,
-        ipnft_token_id: num_bigint::BigInt,
+        ocl_id: OclId,
+        symbol: Symbol,
     ) -> Result<MoleculeProject, MoleculeCreateProjectError> {
-        // Gain write access to projects dataset
+        // Gain write access to `projects` dataset
         let projects_writer = self
             .projects_service
             .writer(&molecule_subject.account_name, true)
@@ -76,17 +75,13 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
 
         use datafusion::prelude::*;
 
-        // Normalize symbol to lowercase
-        ipnft_symbol.make_ascii_lowercase();
-        let lowercase_ipnft_symbol = ipnft_symbol;
-
         // Check for conflicts
         if let Some(df) = maybe_raw_ledger_df {
             let df = df
                 .filter(
-                    col("ipnft_uid")
-                        .eq(lit(&ipnft_uid))
-                        .or(lower(col("ipnft_symbol")).eq(lit(&lowercase_ipnft_symbol))),
+                    col("ocl_id")
+                        .eq(lit(ocl_id.as_ref()))
+                        .or(lower(col("symbol")).eq(lit(symbol.as_ref()))),
                 )
                 .int_err()?
                 .sort(vec![col("offset").sort(false, false)])
@@ -97,7 +92,7 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
             // If any record found, it's a conflict
             let records = df.collect_json_aos().await.int_err()?;
             if let Some(record) = records.into_iter().next() {
-                return Err(MoleculeCreateProjectError::Conflict {
+                return Err(MoleculeCreateProjectError::ConflictProject {
                     project: MoleculeProject::from_json(record)?,
                 });
             }
@@ -111,41 +106,46 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
             .unwrap();
 
         let project_account_name: odf::AccountName =
-            format!("{}.{lowercase_ipnft_symbol}", molecule_account.account_name)
+            format!("{}.{symbol}", molecule_account.account_name)
                 .parse()
                 .int_err()?;
+        let project_account = {
+            let display_name = format!("Project account: {symbol}");
+            let project_email = format!("support+{project_account_name}@kamu.dev")
+                .parse()
+                .unwrap();
+            let avatar_url =
+                "https://avatars.githubusercontent.com/u/37688345?s=200&v=4".to_string();
 
-        let project_email = format!("support+{project_account_name}@kamu.dev")
-            .parse()
-            .unwrap();
-
-        // TODO: Remove tolerance to accounts that already exist after we have account
-        // deletion api? Reusing existing accounts may be a security threat via
-        // name squatting.
-        let project_account = if let Some(acc) = self
-            .account_service
-            .account_by_name(&project_account_name)
-            .await
-            .int_err()?
-        {
-            acc
-        } else {
-            // TODO: Set avatar and display name?
-            // https://avatars.githubusercontent.com/u/37688345?s=200&amp;v=4
             self.create_account_use_case
                 .execute_derived(
                     &molecule_account,
                     &project_account_name,
                     CreateAccountUseCaseOptions::builder()
-                        .maybe_email(Some(project_email))
+                        .display_name(display_name)
+                        .email(project_email)
+                        .avatar_url(avatar_url)
                         .build(),
                 )
                 .await
-                .int_err()?
+                .map_err(|e| {
+                    use CreateAccountError as E;
+
+                    match e {
+                        CreateAccountError::Duplicate(e) => {
+                            MoleculeCreateProjectError::ConflictAccount {
+                                // NOTE: clone() to make a borrow checker a bit happier
+                                project_account_name: project_account_name.clone(),
+                                account_duplicate_field: e.account_field,
+                            }
+                        }
+                        e @ E::Internal(_) => e.int_err().into(),
+                    }
+                })?
         };
 
         // Create `data-room` dataset
-        let snapshot = MoleculeDatasetSnapshots::data_room_v2(project_account_name.clone());
+        let snapshot = MoleculeDatasetSnapshots::data_room(project_account_name.clone());
         let data_room_create_res = self
             .create_dataset_from_snapshot_use_case
             .execute(
@@ -158,7 +158,7 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
             .int_err()?;
 
         // Create `announcements` dataset
-        let snapshot = MoleculeDatasetSnapshots::announcements_v2(project_account_name);
+        let snapshot = MoleculeDatasetSnapshots::announcements(project_account_name);
         let announcements_create_res = self
             .create_dataset_from_snapshot_use_case
             .execute(
@@ -191,13 +191,11 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
 
         // Add project entry
         let project_payload = MoleculeProjectPayloadRecord {
-            account_id: project_account.id.clone(),
-            ipnft_symbol: lowercase_ipnft_symbol.clone(),
-            ipnft_address,
-            ipnft_token_id: ipnft_token_id.to_string(),
-            ipnft_uid: ipnft_uid.clone(),
-            data_room_dataset_id: data_room_create_res.dataset_handle.id,
-            announcements_dataset_id: announcements_create_res.dataset_handle.id,
+            ocl_id: ocl_id.clone(),
+            symbol: symbol.clone(),
+            odf_account_id: project_account.id.clone(),
+            odf_data_room_dataset_id: data_room_create_res.dataset_handle.id,
+            odf_announcements_dataset_id: announcements_create_res.dataset_handle.id,
         };
 
         let new_changelog_record = MoleculeProjectChangelogInsertionRecord {
@@ -230,8 +228,8 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
                             insertion_system_time,
                             molecule_subject.account_id.clone(),
                             project_account.id,
-                            ipnft_uid.clone(),
-                            lowercase_ipnft_symbol.clone(),
+                            ocl_id,
+                            symbol,
                         ),
                     )
                     .await
