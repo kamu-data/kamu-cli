@@ -108,31 +108,22 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
             format!("{}.{symbol}", molecule_account.account_name)
                 .parse()
                 .int_err()?;
+        let project_account = {
+            let display_name = format!("Project account: {symbol}");
+            let project_email = format!("support+{project_account_name}@kamu.dev")
+                .parse()
+                .unwrap();
+            let avatar_url =
+                "https://avatars.githubusercontent.com/u/37688345?s=200&v=4".to_string();
 
-        let project_email = format!("support+{project_account_name}@kamu.dev")
-            .parse()
-            .unwrap();
-
-        // TODO: Molecule: Phase 3: looks we are ready
-        // TODO: Remove tolerance to accounts that already exist after we have account
-        // deletion api? Reusing existing accounts may be a security threat via
-        // name squatting.
-        let project_account = if let Some(acc) = self
-            .account_service
-            .account_by_name(&project_account_name)
-            .await
-            .int_err()?
-        {
-            acc
-        } else {
-            // TODO: Set avatar and display name?
-            // https://avatars.githubusercontent.com/u/37688345?s=200&amp;v=4
             self.create_account_use_case
                 .execute_derived(
                     &molecule_account,
                     &project_account_name,
                     CreateAccountUseCaseOptions::builder()
-                        .maybe_email(Some(project_email))
+                        .display_name(display_name)
+                        .email(project_email)
+                        .avatar_url(avatar_url)
                         .build(),
                 )
                 .await

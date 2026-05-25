@@ -194,7 +194,7 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
             email,
             display_name: account_name.to_string(),
             account_type: AccountType::User,
-            avatar_url: None,
+            avatar_url: options.avatar_url,
             registered_at: self.time_source.now(),
             provider: AccountProvider::Password.to_string(),
             provider_identity_key: String::from(account_name.as_str()),
