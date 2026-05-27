@@ -13,6 +13,10 @@ Recommendation: for ease of reading, use the following format:
 ### Fixed
 -->
 
+## [0.263.2] - 2026-05-27
+### Fixed
+- S3 PutObject hangup issue when invoked from /ingest API
+
 ## [0.263.1] - 2026-05-20
 ### Fixed
 - Elasticsearch: added ID escaping for API requests
