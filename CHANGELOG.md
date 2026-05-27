@@ -13,6 +13,12 @@ Recommendation: for ease of reading, use the following format:
 ### Fixed
 -->
 
+## [Unreleased]
+### Added
+- Tracing will report when DB transaction is dropped without commit or rollback
+- Tracing will report when HTTP request is aborted e.g. due to client disconnecting before receiving a response
+- New `/system/probe` HTTP endpoint to simplify E2E testing of observability stack, panic reporting, and transaction handling
+
 ## [0.263.2] - 2026-05-27
 ### Fixed
 - S3 PutObject hangup issue when invoked from /ingest API

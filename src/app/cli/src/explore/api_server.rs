@@ -146,22 +146,22 @@ impl APIServer {
         )
         .merge(graphql_router)
         .nest(
-                match tenancy_config {
-                    TenancyConfig::MultiTenant => "/{account_name}/{dataset_name}",
-                    TenancyConfig::SingleTenant => "/{dataset_name}",
-                },
-                kamu_adapter_http::add_dataset_resolver_layer(
-                    OpenApiRouter::new()
-                        .merge(kamu_adapter_http::data::dataset_router())
-                        .merge(kamu_adapter_http::smart_transfer_protocol_router())
-                        .layer(DatasetAuthorizationLayer::default()),
-                    tenancy_config,
-                ),
-            )
-            .route(
-                "/system/probe",
-                axum::routing::get(kamu_adapter_http::system::probe_handler),
-            );
+            match tenancy_config {
+                TenancyConfig::MultiTenant => "/{account_name}/{dataset_name}",
+                TenancyConfig::SingleTenant => "/{dataset_name}",
+            },
+            kamu_adapter_http::add_dataset_resolver_layer(
+                OpenApiRouter::new()
+                    .merge(kamu_adapter_http::data::dataset_router())
+                    .merge(kamu_adapter_http::smart_transfer_protocol_router())
+                    .layer(DatasetAuthorizationLayer::default()),
+                tenancy_config,
+            ),
+        )
+        .route(
+            "/system/probe",
+            axum::routing::get(kamu_adapter_http::system::probe_handler),
+        );
 
         if !allow_anonymous {
             router = router.layer(kamu_adapter_http::AuthPolicyLayer::new());
