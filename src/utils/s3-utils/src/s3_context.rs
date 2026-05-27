@@ -326,6 +326,8 @@ impl S3Context {
         // reports exact bounds and bypasses the chunked encoding path entirely.
         // For sizes above MULTIPART_THRESHOLD we split into parts to avoid
         // allocating a single oversized buffer on a memory-constrained node.
+        //
+        // See: https://github.com/awslabs/aws-sdk-rust/issues/1030
         if size <= MULTIPART_THRESHOLD {
             tracing::debug!(
                 %key,

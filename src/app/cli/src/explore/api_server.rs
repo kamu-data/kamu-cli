@@ -157,6 +157,10 @@ impl APIServer {
                         .layer(DatasetAuthorizationLayer::default()),
                     tenancy_config,
                 ),
+            )
+            .route(
+                "/system/probe",
+                axum::routing::get(kamu_adapter_http::system::probe_handler),
             );
 
         if !allow_anonymous {
