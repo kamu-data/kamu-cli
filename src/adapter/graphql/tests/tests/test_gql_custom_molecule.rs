@@ -901,7 +901,7 @@ async fn test_molecule_provision_project(search_variant: GraphQLMoleculeHarnessS
         json!({
             "isSuccess": false,
             "message": format!("Conflict with existing project vitafast ({OCL_ID_1})"),
-            "__typename": "CreateProjectProjectConflictError",
+            "__typename": "CreateProjectErrorConflict",
         }),
     );
 
@@ -921,7 +921,7 @@ async fn test_molecule_provision_project(search_variant: GraphQLMoleculeHarnessS
         json!({
             "isSuccess": false,
             "message": format!("Conflict with existing project vitafast ({OCL_ID_1})"),
-            "__typename": "CreateProjectProjectConflictError",
+            "__typename": "CreateProjectErrorConflict",
         }),
     );
 
@@ -1279,7 +1279,7 @@ async fn test_molecule_cannot_recreate_disabled_project_with_same_symbol(
         json!({
             "isSuccess": false,
             "message": format!("Conflict with existing project vitafast ({OCL_ID_1})"),
-            "__typename": "CreateProjectProjectConflictError",
+            "__typename": "CreateProjectErrorConflict",
         }),
     );
 }
