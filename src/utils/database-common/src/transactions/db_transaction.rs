@@ -21,7 +21,9 @@ use internal_error::*;
 /// locking. Despite its async nature, this lock must be held only for the
 /// duration of the DB query and released when passing control into other
 /// components. Transaction is obtained from the connection pool upon first use
-/// unless `open()` method is called beforehand.
+/// or when calling [`TransactionRef::begin()`]. For a typical use in
+/// repositories, a DB-specific implementation should inject a typed
+/// [`TransactionRefT`] instance directly.
 #[derive(Debug, Clone)]
 pub struct TransactionRef {
     inner: Arc<dyn TransactionStateErased + 'static>,
@@ -39,9 +41,12 @@ impl TransactionRef {
     /// this - it's only occasionally useful for testing transactions without
     /// downcasting to specific DB type.
     pub async fn begin(&self) -> Result<bool, InternalError> {
-        Arc::clone(&self.inner).begin().await
+        self.inner.begin().await
     }
 
+    /// Performs dynamic downcasting into a DB-specific type. Typically you
+    /// should be able to inject [`TransactionRefT`] directly without the need
+    /// for manual downcasting.
     pub fn downcast<DB: sqlx::Database>(self) -> TransactionRefT<DB> {
         let inner_any = self.inner as Arc<dyn Any + Send + Sync>;
         let inner_typed = inner_any.downcast::<TransactionState<DB>>().unwrap();
@@ -69,7 +74,8 @@ impl<DB: sqlx::Database> From<TransactionRefT<DB>> for TransactionRef {
 /// components simultaneously, but can be used from only one place at a time via
 /// locking. Despite its async nature, this lock must be held only for the
 /// duration of the DB query and released when passing control into other
-/// components.
+/// components. Transaction is obtained from the connection pool upon first use
+/// or when calling [`TransactionRef::begin()`].
 #[derive(Debug)]
 pub struct TransactionRefT<DB: sqlx::Database> {
     inner: Arc<TransactionState<DB>>,
@@ -167,7 +173,7 @@ trait TransactionStateErased: std::fmt::Debug + Any + Send + Sync {
     /// transaction if it's not already started. You probably should not call
     /// this - it's only occasionally useful for testing transactions without
     /// downcasting to specific DB type.
-    async fn begin(self: Arc<Self>) -> Result<bool, InternalError>;
+    async fn begin(&self) -> Result<bool, InternalError>;
 }
 
 #[async_trait::async_trait]
@@ -182,9 +188,10 @@ impl<DB: sqlx::Database> TransactionStateErased for TransactionState<DB> {
         catalog_builder.add_value(TransactionRef { inner: self });
     }
 
-    async fn begin(self: Arc<Self>) -> Result<bool, InternalError> {
-        let tx = TransactionRefT { inner: self };
-        tx.begin().await
+    async fn begin(&self) -> Result<bool, InternalError> {
+        let guard = self.maybe_transaction.lock().await;
+        let mut guard = TransactionGuard::new(self, guard);
+        guard.begin().await
     }
 }
 
