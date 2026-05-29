@@ -13,7 +13,7 @@ Recommendation: for ease of reading, use the following format:
 ### Fixed
 -->
 
-## [Unreleased]
+## [0.263.3] - 2026-05-29
 ### Added
 - Tracing will report when DB transaction is dropped without commit or rollback
 - Tracing will report when HTTP request is aborted e.g. due to client disconnecting before receiving a response
