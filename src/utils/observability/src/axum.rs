@@ -46,6 +46,7 @@ impl<S, B> tower::Service<http::Request<B>> for HttpTraceService<S>
 where
     S: tower::Service<http::Request<B>, Response = http::Response<Body>>,
     S::Future: Send + 'static,
+    <S as tower::Service<http::Request<B>>>::Error: std::error::Error,
     B: Send + 'static,
 {
     type Response = S::Response;
@@ -128,6 +129,7 @@ pin_project_lite::pin_project! {
 impl<F, E> Future for HttpTraceFuture<F>
 where
     F: Future<Output = Result<http::Response<Body>, E>>,
+    E: std::error::Error,
 {
     type Output = F::Output;
 
@@ -140,13 +142,24 @@ where
             Poll::Ready(result) => {
                 *this.done = true;
                 let processing_time = this.start.elapsed();
-                if let Ok(response) = &result {
-                    tracing::info!(
-                        status = response.status().as_u16(),
-                        headers = ?response.headers(),
+                match &result {
+                    Ok(resp) if !resp.status().is_server_error() => tracing::info!(
+                        status = resp.status().as_u16(),
+                        headers = ?resp.headers(),
                         processing_time = %DurationInMillis(processing_time),
                         "HTTP response",
-                    );
+                    ),
+                    Ok(resp) => tracing::error!(
+                        status = resp.status().as_u16(),
+                        headers = ?resp.headers(),
+                        processing_time = %DurationInMillis(processing_time),
+                        "HTTP response",
+                    ),
+                    Err(err) => tracing::error!(
+                        error = ?err,
+                        error_msg = %err,
+                        "HTTP unhandled error",
+                    ),
                 }
                 Poll::Ready(result)
             }

@@ -151,6 +151,11 @@ fn init_otel_tracer(cfg: &Config) -> (opentelemetry_sdk::trace::SdkTracer, OtlpG
         .build()
         .unwrap();
 
+    // We wrap the stock exporter with the one that filters out `trace_id`
+    // attributes that we add for logging. We don't want them to appear in OTEL data
+    // as they cause `Duplicated tag` warnings.
+    let otel_exporter = crate::tracing::FilteringExporter(otel_exporter);
+
     let tracer_provider = opentelemetry_sdk::trace::SdkTracerProvider::builder()
         .with_batch_exporter(otel_exporter)
         .with_max_events_per_span(cfg.span_limits.max_events_per_span)
