@@ -11,7 +11,7 @@
 
 #[derive(Debug, Clone)]
 pub struct ResourceWarning {
-    pub code: &'static str,
+    pub code: String,
     pub path: Option<String>,
     pub message: String,
 }

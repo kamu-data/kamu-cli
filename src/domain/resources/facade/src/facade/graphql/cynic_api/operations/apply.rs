@@ -118,7 +118,7 @@ pub(crate) struct ResourceApplyWarning {
 impl From<ResourceApplyWarning> for domain::ResourceWarning {
     fn from(value: ResourceApplyWarning) -> Self {
         Self {
-            code: Box::leak(value.code.into_boxed_str()),
+            code: value.code,
             path: value.path,
             message: value.message,
         }

@@ -67,8 +67,8 @@ impl ListAllVariables {
 
 pub(crate) fn graphql_page_params(offset: usize, limit: usize) -> (i32, i32) {
     const LIST_PAGE_SIZE: usize = 100;
+    let page = offset.checked_div(limit).unwrap_or(0);
     let per_page = if limit == 0 { LIST_PAGE_SIZE } else { limit };
-    let page = offset.checked_div(per_page).unwrap_or(0);
     // GraphQL Int is i32; page counts are always small so this will not overflow
     #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
     (page as i32, per_page as i32)
