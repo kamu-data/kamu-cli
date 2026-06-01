@@ -122,7 +122,7 @@ impl ResourceLinterSpec for VariableSetSpec {
 
             if name.starts_with(Self::RESERVED_VARIABLE_PREFIX) {
                 warnings.push(ResourceWarning {
-                    code: Self::WARNING_CODE_RESERVED_VARIABLE_PREFIX,
+                    code: Self::WARNING_CODE_RESERVED_VARIABLE_PREFIX.to_string(),
                     path: Some(format!("spec.variables.{name}")),
                     message: format!(
                         "Variable '{name}' uses reserved '{prefix}' prefix",
@@ -133,7 +133,7 @@ impl ResourceLinterSpec for VariableSetSpec {
 
             if name.chars().any(|c| c.is_ascii_lowercase()) {
                 warnings.push(ResourceWarning {
-                    code: Self::WARNING_CODE_LOWERCASE_VARIABLE_NAME,
+                    code: Self::WARNING_CODE_LOWERCASE_VARIABLE_NAME.to_string(),
                     path: Some(format!("spec.variables.{name}")),
                     message: format!(
                         "Variable '{name}' uses lowercase letters; prefer uppercase names like \
@@ -145,7 +145,7 @@ impl ResourceLinterSpec for VariableSetSpec {
 
             if value.len() > Self::WARNING_VARIABLE_VALUE_LEN {
                 warnings.push(ResourceWarning {
-                    code: Self::WARNING_CODE_LONG_VARIABLE_VALUE,
+                    code: Self::WARNING_CODE_LONG_VARIABLE_VALUE.to_string(),
                     path: Some(match variable {
                         VariableSpec::Literal(_) => format!("spec.variables.{name}"),
                         VariableSpec::Value(_) => format!("spec.variables.{name}.value"),

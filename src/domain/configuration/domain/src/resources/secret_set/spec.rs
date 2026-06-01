@@ -235,7 +235,7 @@ impl ResourceLinterSpec for SecretSetSpec {
         for (name, secret) in &self.secrets {
             if name.starts_with(Self::RESERVED_SECRET_PREFIX) {
                 warnings.push(ResourceWarning {
-                    code: Self::WARNING_CODE_RESERVED_SECRET_PREFIX,
+                    code: Self::WARNING_CODE_RESERVED_SECRET_PREFIX.to_string(),
                     path: Some(format!("spec.secrets.{name}")),
                     message: format!(
                         "Secret '{name}' uses reserved '{prefix}' prefix",
@@ -246,7 +246,7 @@ impl ResourceLinterSpec for SecretSetSpec {
 
             if name.chars().any(|c| c.is_ascii_lowercase()) {
                 warnings.push(ResourceWarning {
-                    code: Self::WARNING_CODE_LOWERCASE_SECRET_NAME,
+                    code: Self::WARNING_CODE_LOWERCASE_SECRET_NAME.to_string(),
                     path: Some(format!("spec.secrets.{name}")),
                     message: format!(
                         "Secret '{name}' uses lowercase letters; prefer uppercase names like '{}'",
@@ -260,7 +260,7 @@ impl ResourceLinterSpec for SecretSetSpec {
 
                 if value.len() > Self::WARNING_SECRET_VALUE_LEN {
                     warnings.push(ResourceWarning {
-                        code: Self::WARNING_CODE_LONG_SECRET_VALUE,
+                        code: Self::WARNING_CODE_LONG_SECRET_VALUE.to_string(),
                         path: Some(match secret {
                             SecretSpec::Literal(_) => format!("spec.secrets.{name}"),
                             SecretSpec::Value(_) => format!("spec.secrets.{name}.value"),

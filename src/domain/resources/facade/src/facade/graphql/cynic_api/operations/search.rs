@@ -43,7 +43,7 @@ pub(crate) struct SearchIdentitiesVariables {
 impl SearchIdentitiesVariables {
     pub(crate) fn new(request: &SearchResourceIdentitiesRequest) -> Result<Self, InternalError> {
         let (page, per_page) =
-            graphql_page_params(request.pagination.offset, request.pagination.limit);
+            graphql_page_params(request.pagination.offset, request.pagination.limit)?;
         Ok(Self {
             query: request.try_into()?,
             page,

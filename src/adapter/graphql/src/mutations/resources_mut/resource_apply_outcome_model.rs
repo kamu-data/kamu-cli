@@ -126,7 +126,7 @@ impl From<kamu_resources::ApplyManifestRejection> for ResourceApplyRejection {
 
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceApplyWarning {
-    pub code: &'static str,
+    pub code: String,
     pub path: Option<String>,
     pub message: String,
 }

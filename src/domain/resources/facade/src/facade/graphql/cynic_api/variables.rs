@@ -29,7 +29,7 @@ impl ListByKindVariables {
         offset: usize,
         limit: usize,
     ) -> Result<Self, InternalError> {
-        let (page, per_page) = graphql_page_params(offset, limit);
+        let (page, per_page) = graphql_page_params(offset, limit)?;
         Ok(Self {
             kind: ResourceKindInput::custom(kind.to_string()),
             account: account.map(TryInto::try_into).transpose()?,
@@ -54,7 +54,7 @@ impl ListAllVariables {
         offset: usize,
         limit: usize,
     ) -> Result<Self, InternalError> {
-        let (page, per_page) = graphql_page_params(offset, limit);
+        let (page, per_page) = graphql_page_params(offset, limit)?;
         Ok(Self {
             account: account.map(TryInto::try_into).transpose()?,
             page,
@@ -65,13 +65,26 @@ impl ListAllVariables {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn graphql_page_params(offset: usize, limit: usize) -> (i32, i32) {
+pub(crate) fn graphql_page_params(
+    offset: usize,
+    limit: usize,
+) -> Result<(i32, i32), InternalError> {
     const LIST_PAGE_SIZE: usize = 100;
     let page = offset.checked_div(limit).unwrap_or(0);
     let per_page = if limit == 0 { LIST_PAGE_SIZE } else { limit };
-    // GraphQL Int is i32; page counts are always small so this will not overflow
-    #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
-    (page as i32, per_page as i32)
+
+    Ok((
+        i32::try_from(page).map_err(|_| {
+            InternalError::new(format!(
+                "Remote resource list page {page} exceeds GraphQL Int"
+            ))
+        })?,
+        i32::try_from(per_page).map_err(|_| {
+            InternalError::new(format!(
+                "Remote resource list per_page {per_page} exceeds GraphQL Int"
+            ))
+        })?,
+    ))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
