@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod cynic_api;
 mod error_mapper;
 pub(crate) mod fragments;
 mod query_builder;

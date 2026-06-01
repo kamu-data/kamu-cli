@@ -39,6 +39,7 @@ odf = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false, features = ["serde"] }
+cynic = { version = "3", default-features = false }
 dill = { version = "0.15", default-features = false }
 paste = { version = "1", default-features = false }
 serde = { version = "1.0", features = ["derive"] }
@@ -49,3 +50,7 @@ strum = { version = "0.28", default-features = false, features = ["derive"] }
 url = { version = "2", default-features = false }
 
 mockall = { optional = true, version = "0.14", default-features = false }
+
+
+[build-dependencies]
+cynic-codegen = { version = "3", default-features = false }

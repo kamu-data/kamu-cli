@@ -15,52 +15,6 @@ use super::ResourceKindFragment;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct GetResourceIdentityQueryDataFragment {
-    pub resources: GetResourceIdentityFieldFragment,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct GetResourceIdentityFieldFragment {
-    pub resource_identity: Option<ResourceIdentityFragment>,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct BatchGetResourceIdentitiesQueryDataFragment {
-    pub resources: BatchGetResourceIdentitiesFieldFragment,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct BatchGetResourceIdentitiesFieldFragment {
-    pub resource_identities: BatchResourceIdentitiesResultFragment,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct BatchResourceIdentitiesResultFragment {
-    pub identities: Vec<BatchResourceIdentitySuccessFragment>,
-    pub problems: Vec<super::BatchResourceProblemFragment>,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct BatchResourceIdentitySuccessFragment {
-    pub request_index: usize,
-    pub identity: ResourceIdentityFragment,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub(crate) struct ListIdentitiesByKindQueryDataFragment {
     pub resources: ListIdentitiesByKindResourcesFragment,
 }

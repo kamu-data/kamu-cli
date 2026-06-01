@@ -64,14 +64,34 @@ impl GraphqlHttpClient {
     where
         T: serde::de::DeserializeOwned,
     {
+        let body = serde_json::to_vec(&serde_json::json!({ "query": query })).int_err()?;
+
+        self.execute_body(body).await
+    }
+
+    pub async fn execute_operation<T, V>(
+        &self,
+        operation: cynic::Operation<T, V>,
+    ) -> Result<T, GraphqlHttpRequestError>
+    where
+        T: serde::de::DeserializeOwned,
+        V: serde::Serialize,
+    {
+        let body = serde_json::to_vec(&operation).int_err()?;
+
+        self.execute_body(body).await
+    }
+
+    async fn execute_body<T>(&self, body: Vec<u8>) -> Result<T, GraphqlHttpRequestError>
+    where
+        T: serde::de::DeserializeOwned,
+    {
         let span = tracing::info_span!(
             "GraphqlHttpClient_execute",
             endpoint = %self.endpoint_url,
             has_access_token = self.maybe_access_token.is_some(),
             http_status = field::Empty,
         );
-
-        let body = serde_json::to_vec(&serde_json::json!({ "query": query })).int_err()?;
 
         let mut request = self
             .http_client

@@ -13,7 +13,6 @@ use kamu_resources as domain;
 use kamu_resources::{
     ResourceIdentityView,
     ResourceKindDescriptor,
-    ResourceListColumnDescriptor,
     ResourceListColumnValue,
     ResourceListColumnValueView,
     ResourcePhaseCounts,
@@ -24,7 +23,7 @@ use kamu_resources::{
 };
 use url::Url;
 
-use super::{error_mapper, fragments, query_builder};
+use super::{cynic_api, error_mapper, fragments, query_builder};
 use crate::{
     ApplyManifestError,
     ApplyManifestRequest,
@@ -244,41 +243,18 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
     async fn list_supported_kinds(
         &self,
     ) -> Result<Vec<ResourceKindDescriptor>, ListSupportedResourceKindsError> {
-        let response: fragments::SupportedKindsQueryDataFragment = self
-            .execute_graphql(query_builder::SUPPORTED_KINDS_QUERY)
+        let response: cynic_api::supported_kinds::SupportedKindsQuery = self
+            .graphql_client
+            .execute_operation(cynic_api::supported_kinds::build_operation())
             .await?;
 
-        Ok(response
+        response
             .resources
             .supported_kinds
             .into_iter()
-            .map(|item| {
-                Ok(ResourceKindDescriptor {
-                    name: item.name,
-                    short_names: item.short_names,
-                    kind: item.kind.value,
-                    api_version: item.api_version,
-                    list_columns: item
-                        .list_columns
-                        .into_iter()
-                        .map(|column| {
-                            Ok(ResourceListColumnDescriptor {
-                                key: column.key,
-                                header: column.header,
-                                data_type: query_builder::parse_enum(
-                                    &column.data_type,
-                                    "list column data type",
-                                )?,
-                                visibility: query_builder::parse_enum(
-                                    &column.visibility,
-                                    "list column visibility",
-                                )?,
-                            })
-                        })
-                        .collect::<Result<Vec<_>, InternalError>>()?,
-                })
-            })
-            .collect::<Result<Vec<_>, InternalError>>()?)
+            .map(TryInto::try_into)
+            .collect::<Result<Vec<_>, InternalError>>()
+            .map_err(Into::into)
     }
 
     async fn summary(
@@ -318,10 +294,13 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
         selector: ResourceSelector,
         spec_view_mode: SpecViewMode,
     ) -> Result<domain::ResourceView, GetResourceError> {
-        let query = query_builder::get_resource_query(&selector, spec_view_mode)?;
+        let variables =
+            cynic_api::variables::ResourceSelectorVariables::new(&selector, spec_view_mode)?;
 
-        let response: fragments::GetResourceQueryDataFragment =
-            self.execute_graphql(&query).await?;
+        let response: cynic_api::get_resource::GetResourceQuery = self
+            .graphql_client
+            .execute_operation(cynic_api::get_resource::build_operation(variables))
+            .await?;
 
         let Some(resource) = response.resources.resource else {
             return Err(error_mapper::not_found_error(&selector));
@@ -342,10 +321,13 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
             return Ok(BatchResourceResponse::empty());
         }
 
-        let query = query_builder::get_resources_query(&selector, spec_view_mode)?;
+        let variables =
+            cynic_api::variables::ResourceBatchSelectorVariables::new(&selector, spec_view_mode)?;
 
-        let response: fragments::BatchGetResourcesQueryDataFragment =
-            self.execute_graphql(&query).await?;
+        let response: cynic_api::get_resources::GetResourcesQuery = self
+            .graphql_client
+            .execute_operation(cynic_api::get_resources::build_operation(variables))
+            .await?;
         let batch_result = response.resources.resources;
 
         let successes = batch_result
@@ -353,7 +335,12 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
             .into_iter()
             .map(|success| {
                 Ok(BatchResourceSuccess {
-                    request_index: success.request_index,
+                    request_index: usize::try_from(success.request_index).map_err(|_| {
+                        BatchResourceError::Internal(InternalError::new(format!(
+                            "Remote resource success index {} cannot be converted to usize",
+                            success.request_index
+                        )))
+                    })?,
                     item: success
                         .resource
                         .try_into()
@@ -375,10 +362,12 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
         &self,
         selector: ResourceSelector,
     ) -> Result<ResourceIdentityView, GetResourceError> {
-        let query = query_builder::get_resource_identity_query(&selector)?;
+        let variables = cynic_api::variables::ResourceIdentitySelectorVariables::new(&selector)?;
 
-        let response: fragments::GetResourceIdentityQueryDataFragment =
-            self.execute_graphql(&query).await?;
+        let response: cynic_api::identity::GetResourceIdentityQuery = self
+            .graphql_client
+            .execute_operation(cynic_api::identity::build_identity_operation(variables))
+            .await?;
 
         let Some(identity) = response.resources.resource_identity else {
             return Err(error_mapper::not_found_error(&selector));
@@ -398,20 +387,30 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
             return Ok(BatchResourceResponse::empty());
         }
 
-        let query = query_builder::get_resource_identities_query(&selector)?;
+        let variables =
+            cynic_api::variables::ResourceIdentityBatchSelectorVariables::new(&selector)?;
 
-        let response: fragments::BatchGetResourceIdentitiesQueryDataFragment =
-            self.execute_graphql(&query).await?;
+        let response: cynic_api::identity::GetResourceIdentitiesQuery = self
+            .graphql_client
+            .execute_operation(cynic_api::identity::build_identities_operation(variables))
+            .await?;
         let batch_result = response.resources.resource_identities;
 
         let successes = batch_result
             .identities
             .into_iter()
-            .map(|success| BatchResourceSuccess {
-                request_index: success.request_index,
-                item: success.identity.into(),
+            .map(|success| {
+                Ok(BatchResourceSuccess {
+                    request_index: usize::try_from(success.request_index).map_err(|_| {
+                        BatchResourceError::Internal(InternalError::new(format!(
+                            "Remote identity success index {} cannot be converted to usize",
+                            success.request_index
+                        )))
+                    })?,
+                    item: success.identity.into(),
+                })
             })
-            .collect();
+            .collect::<Result<Vec<_>, BatchResourceError>>()?;
 
         let problems =
             error_mapper::collect_batch_problems(&selector, batch_result.problems, "identity")?;
@@ -428,19 +427,24 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
         format: ResourceManifestFormat,
         spec_view_mode: SpecViewMode,
     ) -> Result<RenderResourceManifestResult, RenderResourceManifestError> {
-        let query = query_builder::render_manifest_query(&selector, format, spec_view_mode)?;
+        let variables = cynic_api::variables::RenderResourceManifestVariables::new(
+            &selector,
+            format,
+            spec_view_mode,
+        )
+        .map_err(RenderResourceManifestError::Internal)?;
 
-        let response: fragments::RenderManifestQueryDataFragment = self
-            .execute_graphql(&query)
+        let response: cynic_api::render_manifest::RenderManifestQuery = self
+            .graphql_client
+            .execute_operation(cynic_api::render_manifest::build_manifest_operation(
+                variables,
+            ))
             .await
             .map_err(|error| error_mapper::map_render_manifest_remote_error(&selector, error))?;
 
         let rendered = response.resources.render_manifest;
 
-        Ok(RenderResourceManifestResult {
-            manifest: rendered.manifest,
-            format: rendered.format.into(),
-        })
+        Ok(rendered.into())
     }
 
     async fn render_manifests(
@@ -456,23 +460,36 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
             return Ok(BatchResourceResponse::empty());
         }
 
-        let query = query_builder::render_manifests_query(&selector, format, spec_view_mode)?;
+        let variables = cynic_api::variables::RenderResourceManifestsVariables::new(
+            &selector,
+            format,
+            spec_view_mode,
+        )
+        .map_err(BatchResourceError::Internal)?;
 
-        let response: fragments::BatchRenderManifestsQueryDataFragment =
-            self.execute_graphql(&query).await?;
+        let response: cynic_api::render_manifest::RenderManifestsQuery = self
+            .graphql_client
+            .execute_operation(cynic_api::render_manifest::build_manifests_operation(
+                variables,
+            ))
+            .await?;
         let batch_result = response.resources.render_manifests;
 
         let successes = batch_result
             .manifests
             .into_iter()
-            .map(|success| BatchResourceSuccess {
-                request_index: success.request_index,
-                item: RenderResourceManifestResult {
-                    manifest: success.manifest.manifest,
-                    format: success.manifest.format.into(),
-                },
+            .map(|success| {
+                Ok(BatchResourceSuccess {
+                    request_index: usize::try_from(success.request_index).map_err(|_| {
+                        BatchResourceError::Internal(InternalError::new(format!(
+                            "Remote manifest success index {} cannot be converted to usize",
+                            success.request_index
+                        )))
+                    })?,
+                    item: success.manifest.into(),
+                })
             })
-            .collect();
+            .collect::<Result<Vec<_>, BatchResourceError>>()?;
 
         let problems =
             error_mapper::collect_batch_problems(&selector, batch_result.problems, "manifest")?;

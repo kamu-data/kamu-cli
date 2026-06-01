@@ -7,25 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use serde::Deserialize;
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct BatchResourceProblemFragment {
-    pub request_index: usize,
-    pub code: BatchResourceProblemCodeFragment,
-    pub message: String,
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub(crate) enum BatchResourceProblemCodeFragment {
-    UidNotFound,
-    NameNotFound,
-    ApiVersionMismatch,
-    KindMismatch,
+fn main() {
+    println!("cargo:rerun-if-changed=../../../../resources/schema.gql");
+
+    cynic_codegen::register_schema("kamu")
+        .from_sdl_file("../../../../resources/schema.gql")
+        .unwrap()
+        .as_default()
+        .unwrap();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
