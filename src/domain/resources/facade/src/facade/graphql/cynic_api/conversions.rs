@@ -1,5 +1,14 @@
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_resources as domain;
+use kamu_resources::{
+    ResourceListColumnValue,
+    ResourceListColumnValueView,
+    ResourcePhaseCounts,
+    ResourceStatusSummaryView,
+    ResourceSummaryView,
+    ResourceTypeCountSummary,
+    ResourcesSummary,
+};
 
 use super::{fragments, supported_kinds};
 
@@ -102,5 +111,109 @@ impl From<fragments::ResourceRenderManifestResult> for crate::RenderResourceMani
             manifest: value.manifest,
             format: value.format.into(),
         }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl TryFrom<fragments::ResourceSummary> for ResourceSummaryView {
+    type Error = InternalError;
+
+    fn try_from(value: fragments::ResourceSummary) -> Result<Self, Self::Error> {
+        let status = value
+            .status
+            .map(|s| {
+                Ok(ResourceStatusSummaryView {
+                    phase: s
+                        .phase
+                        .as_deref()
+                        .map(|p| super::super::query_builder::parse_enum(p, "resource phase"))
+                        .transpose()?,
+                    observed_generation: s
+                        .observed_generation
+                        .map(|g| u64::try_from(g).int_err())
+                        .transpose()?,
+                    ready: s.ready,
+                })
+            })
+            .transpose()?;
+
+        let list_values = value
+            .list_values
+            .into_iter()
+            .map(|v| {
+                let key = v.key;
+                let col_value = match (v.string_value, v.uint64_value, v.bool_value) {
+                    (Some(s), None, None) => ResourceListColumnValue::String(s),
+                    (None, Some(n), None) => {
+                        ResourceListColumnValue::UInt64(u64::try_from(n).int_err()?)
+                    }
+                    (None, None, Some(b)) => ResourceListColumnValue::Bool(b),
+                    (None, None, None) => {
+                        return Err(InternalError::new(format!(
+                            "Missing list value payload for key '{key}'",
+                        )));
+                    }
+                    _ => {
+                        return Err(InternalError::new(format!(
+                            "Ambiguous list value payload for key '{key}'",
+                        )));
+                    }
+                };
+                Ok(ResourceListColumnValueView {
+                    key,
+                    value: col_value,
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(ResourceSummaryView {
+            kind: value.kind.value,
+            api_version: value.api_version,
+            uid: value.id,
+            name: value.name,
+            description: value.description,
+            generation: u64::try_from(value.generation).int_err()?,
+            created_at: value.created_at,
+            updated_at: value.updated_at,
+            status,
+            list_values,
+        })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl TryFrom<fragments::ResourcesSummary> for ResourcesSummary {
+    type Error = InternalError;
+
+    fn try_from(value: fragments::ResourcesSummary) -> Result<Self, Self::Error> {
+        Ok(Self {
+            resource_counts: value
+                .resource_counts
+                .into_iter()
+                .map(TryInto::try_into)
+                .collect::<Result<Vec<_>, _>>()?,
+        })
+    }
+}
+
+impl TryFrom<fragments::ResourceTypeCountSummary> for ResourceTypeCountSummary {
+    type Error = InternalError;
+
+    fn try_from(value: fragments::ResourceTypeCountSummary) -> Result<Self, Self::Error> {
+        Ok(Self {
+            kind: value.kind,
+            name: value.name,
+            api_version: value.api_version,
+            total_count: u64::try_from(value.total_count).int_err()?,
+            phase_counts: ResourcePhaseCounts {
+                pending: u64::try_from(value.phase_counts.pending).int_err()?,
+                reconciling: u64::try_from(value.phase_counts.reconciling).int_err()?,
+                ready: u64::try_from(value.phase_counts.ready).int_err()?,
+                degraded: u64::try_from(value.phase_counts.degraded).int_err()?,
+                failed: u64::try_from(value.phase_counts.failed).int_err()?,
+            },
+        })
     }
 }

@@ -5,6 +5,86 @@ use super::schema;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
+pub(crate) struct ResourceSummary {
+    pub id: kamu_resources::ResourceUID,
+    pub api_version: String,
+    pub kind: ResourceKind,
+    pub name: String,
+    pub description: Option<String>,
+    pub generation: i32,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub status: Option<ResourceStatusSummary>,
+    pub list_values: Vec<ResourceListColumnValueView>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
+pub(crate) struct ResourceStatusSummary {
+    pub phase: Option<String>,
+    pub observed_generation: Option<i32>,
+    pub ready: Option<bool>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
+pub(crate) struct ResourceListColumnValueView {
+    pub key: String,
+    pub string_value: Option<String>,
+    pub uint64_value: Option<i32>,
+    pub bool_value: Option<bool>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
+pub(crate) struct ResourceConnection {
+    pub nodes: Vec<ResourceSummary>,
+    pub total_count: i32,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
+pub(crate) struct ResourceIdentityConnection {
+    pub nodes: Vec<ResourceIdentity>,
+    pub total_count: i32,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
+pub(crate) struct ResourcesSummary {
+    pub resource_counts: Vec<ResourceTypeCountSummary>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
+pub(crate) struct ResourceTypeCountSummary {
+    pub kind: String,
+    pub name: String,
+    pub api_version: String,
+    pub total_count: i32,
+    pub phase_counts: ResourcePhaseCounts,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
+pub(crate) struct ResourcePhaseCounts {
+    pub pending: i32,
+    pub reconciling: i32,
+    pub ready: i32,
+    pub degraded: i32,
+    pub failed: i32,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct Resource {
     pub api_version: String,
     pub kind: ResourceKind,

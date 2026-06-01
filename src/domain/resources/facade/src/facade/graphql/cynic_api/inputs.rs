@@ -2,7 +2,12 @@ use kamu_resources as domain;
 
 use super::scalars::AccountName;
 use super::schema;
-use crate::{ResourceBatchSelector, ResourceRef, ResourceSelector};
+use crate::{
+    ResourceBatchSelector,
+    ResourceRef,
+    ResourceSelector,
+    SearchResourceIdentitiesRequest,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -127,6 +132,34 @@ impl TryFrom<&ResourceBatchSelector> for ResourceBatchSelectorInput {
             kind: ResourceKindInput::custom(value.kind.clone()),
             api_version: value.api_version.clone(),
             refs: value.resource_refs.iter().map(Into::into).collect(),
+            account: value.account.as_ref().map(TryInto::try_into).transpose()?,
+        })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::InputObject, Debug, Clone)]
+#[cynic(graphql_type = "SearchResourceIdentitiesInput")]
+pub(crate) struct SearchResourceIdentitiesInput {
+    pub kinds: Vec<ResourceKindInput>,
+    pub names: Option<Vec<String>>,
+    pub name_pattern: Option<String>,
+    pub account: Option<ResourceAccountSelectorInput>,
+}
+
+impl TryFrom<&SearchResourceIdentitiesRequest> for SearchResourceIdentitiesInput {
+    type Error = internal_error::InternalError;
+
+    fn try_from(value: &SearchResourceIdentitiesRequest) -> Result<Self, Self::Error> {
+        Ok(Self {
+            kinds: value
+                .kinds
+                .iter()
+                .map(|k| ResourceKindInput::custom(k.clone()))
+                .collect(),
+            names: value.exact_names.clone(),
+            name_pattern: value.name_pattern.clone(),
             account: value.account.as_ref().map(TryInto::try_into).transpose()?,
         })
     }
