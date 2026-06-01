@@ -1,3 +1,12 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_resources as domain;
 use kamu_resources::{
@@ -10,7 +19,21 @@ use kamu_resources::{
     ResourcesSummary,
 };
 
-use super::{fragments, supported_kinds};
+use crate::facade::graphql::cynic_api::fragments;
+use crate::facade::graphql::cynic_api::operations::supported_kinds;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn parse_enum<T>(value: &str, field_name: &str) -> Result<T, InternalError>
+where
+    T: std::str::FromStr,
+{
+    value.parse().map_err(|_| {
+        InternalError::new(format!(
+            "Unsupported {field_name} '{value}' in remote resource list",
+        ))
+    })
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -41,14 +64,8 @@ impl TryFrom<supported_kinds::ResourceListColumnDescriptor>
         Ok(Self {
             key: value.key,
             header: value.header,
-            data_type: super::super::query_builder::parse_enum(
-                &value.data_type,
-                "list column data type",
-            )?,
-            visibility: super::super::query_builder::parse_enum(
-                &value.visibility,
-                "list column visibility",
-            )?,
+            data_type: parse_enum(&value.data_type, "list column data type")?,
+            visibility: parse_enum(&value.visibility, "list column visibility")?,
         })
     }
 }
@@ -127,7 +144,7 @@ impl TryFrom<fragments::ResourceSummary> for ResourceSummaryView {
                     phase: s
                         .phase
                         .as_deref()
-                        .map(|p| super::super::query_builder::parse_enum(p, "resource phase"))
+                        .map(|p| parse_enum(p, "resource phase"))
                         .transpose()?,
                     observed_generation: s
                         .observed_generation
@@ -217,3 +234,5 @@ impl TryFrom<fragments::ResourceTypeCountSummary> for ResourceTypeCountSummary {
         })
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

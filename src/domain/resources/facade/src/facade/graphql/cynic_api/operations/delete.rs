@@ -9,21 +9,12 @@
 
 use cynic::MutationBuilder;
 
-use super::fragments::BatchResourceProblem;
-use super::inputs::{ResourceBatchSelectorInput, ResourceSelectorInput};
-use super::schema;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(cynic::QueryVariables, Debug, Clone)]
-pub(crate) struct DeleteVariables {
-    pub selector: ResourceSelectorInput,
-}
-
-#[derive(cynic::QueryVariables, Debug, Clone)]
-pub(crate) struct DeleteManyVariables {
-    pub selector: ResourceBatchSelectorInput,
-}
+use crate::facade::graphql::cynic_api::fragments::BatchResourceProblem;
+use crate::facade::graphql::cynic_api::inputs::{
+    ResourceBatchSelectorInput,
+    ResourceSelectorInput,
+};
+use crate::facade::graphql::cynic_api::schema;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -62,8 +53,6 @@ pub(crate) struct ResourceDeleteResult {
     pub resource_id: kamu_resources::ResourceUID,
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct ResourceDeleteManyResult {
     pub resources: Vec<ResourceDeleteSuccess>,
@@ -74,6 +63,18 @@ pub(crate) struct ResourceDeleteManyResult {
 pub(crate) struct ResourceDeleteSuccess {
     pub request_index: i32,
     pub resource_id: kamu_resources::ResourceUID,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::QueryVariables, Debug, Clone)]
+pub(crate) struct DeleteVariables {
+    pub selector: ResourceSelectorInput,
+}
+
+#[derive(cynic::QueryVariables, Debug, Clone)]
+pub(crate) struct DeleteManyVariables {
+    pub selector: ResourceBatchSelectorInput,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

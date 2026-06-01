@@ -1,8 +1,20 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
 use cynic::QueryBuilder;
 
-use super::fragments::{ResourceConnection, ResourceIdentityConnection};
-use super::schema;
-use super::variables::{
+use crate::facade::graphql::cynic_api::fragments::{
+    ResourceConnection,
+    ResourceIdentityConnection,
+};
+use crate::facade::graphql::cynic_api::schema;
+use crate::facade::graphql::cynic_api::variables::{
     ListAllVariables,
     ListAllVariablesFields,
     ListByKindVariables,
@@ -24,12 +36,6 @@ pub(crate) struct ListByKindResources {
     pub list_by_kind: ResourceConnection,
 }
 
-pub(crate) fn build_list_by_kind_operation(
-    variables: ListByKindVariables,
-) -> cynic::Operation<ListByKindQuery, ListByKindVariables> {
-    ListByKindQuery::build(variables)
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
@@ -43,12 +49,6 @@ pub(crate) struct ListAllQuery {
 pub(crate) struct ListAllResources {
     #[arguments(account: $account, page: $page, perPage: $per_page)]
     pub list_all: ResourceConnection,
-}
-
-pub(crate) fn build_list_all_operation(
-    variables: ListAllVariables,
-) -> cynic::Operation<ListAllQuery, ListAllVariables> {
-    ListAllQuery::build(variables)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -66,12 +66,6 @@ pub(crate) struct ListIdentitiesByKindResources {
     pub list_identities_by_kind: ResourceIdentityConnection,
 }
 
-pub(crate) fn build_list_identities_by_kind_operation(
-    variables: ListByKindVariables,
-) -> cynic::Operation<ListIdentitiesByKindQuery, ListByKindVariables> {
-    ListIdentitiesByKindQuery::build(variables)
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
@@ -87,8 +81,30 @@ pub(crate) struct ListAllIdentitiesResources {
     pub list_all_identities: ResourceIdentityConnection,
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn build_list_by_kind_operation(
+    variables: ListByKindVariables,
+) -> cynic::Operation<ListByKindQuery, ListByKindVariables> {
+    ListByKindQuery::build(variables)
+}
+
+pub(crate) fn build_list_all_operation(
+    variables: ListAllVariables,
+) -> cynic::Operation<ListAllQuery, ListAllVariables> {
+    ListAllQuery::build(variables)
+}
+
+pub(crate) fn build_list_identities_by_kind_operation(
+    variables: ListByKindVariables,
+) -> cynic::Operation<ListIdentitiesByKindQuery, ListByKindVariables> {
+    ListIdentitiesByKindQuery::build(variables)
+}
+
 pub(crate) fn build_list_all_identities_operation(
     variables: ListAllVariables,
 ) -> cynic::Operation<ListAllIdentitiesQuery, ListAllVariables> {
     ListAllIdentitiesQuery::build(variables)
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

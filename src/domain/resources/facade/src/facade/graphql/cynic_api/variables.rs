@@ -1,137 +1,16 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
 use internal_error::InternalError;
 
-use super::fragments::ResourceManifestFormat;
-use super::inputs::{
-    ResourceAccountSelectorInput,
-    ResourceBatchSelectorInput,
-    ResourceKindInput,
-    ResourceSelectorInput,
-    SearchResourceIdentitiesInput,
-};
-use super::schema;
-use crate::{
-    ApplyManifestRequest,
-    ResourceBatchSelector,
-    ResourceSelector,
-    SearchResourceIdentitiesRequest,
-    SpecViewMode,
-};
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(cynic::QueryVariables, Debug, Clone)]
-pub(crate) struct ResourceSelectorVariables {
-    pub selector: ResourceSelectorInput,
-    pub revealed: bool,
-}
-
-impl ResourceSelectorVariables {
-    pub(crate) fn new(
-        selector: &ResourceSelector,
-        spec_view_mode: SpecViewMode,
-    ) -> Result<Self, InternalError> {
-        Ok(Self {
-            selector: selector.try_into()?,
-            revealed: spec_view_mode == SpecViewMode::Revealed,
-        })
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(cynic::QueryVariables, Debug, Clone)]
-pub(crate) struct ResourceBatchSelectorVariables {
-    pub selector: ResourceBatchSelectorInput,
-    pub revealed: bool,
-}
-
-impl ResourceBatchSelectorVariables {
-    pub(crate) fn new(
-        selector: &ResourceBatchSelector,
-        spec_view_mode: SpecViewMode,
-    ) -> Result<Self, InternalError> {
-        Ok(Self {
-            selector: selector.try_into()?,
-            revealed: spec_view_mode == SpecViewMode::Revealed,
-        })
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(cynic::QueryVariables, Debug, Clone)]
-pub(crate) struct ResourceIdentitySelectorVariables {
-    pub selector: ResourceSelectorInput,
-}
-
-impl ResourceIdentitySelectorVariables {
-    pub(crate) fn new(selector: &ResourceSelector) -> Result<Self, InternalError> {
-        Ok(Self {
-            selector: selector.try_into()?,
-        })
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(cynic::QueryVariables, Debug, Clone)]
-pub(crate) struct ResourceIdentityBatchSelectorVariables {
-    pub selector: ResourceBatchSelectorInput,
-}
-
-impl ResourceIdentityBatchSelectorVariables {
-    pub(crate) fn new(selector: &ResourceBatchSelector) -> Result<Self, InternalError> {
-        Ok(Self {
-            selector: selector.try_into()?,
-        })
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(cynic::QueryVariables, Debug, Clone)]
-pub(crate) struct RenderResourceManifestVariables {
-    pub selector: ResourceSelectorInput,
-    pub format: ResourceManifestFormat,
-    pub revealed: bool,
-}
-
-impl RenderResourceManifestVariables {
-    pub(crate) fn new(
-        selector: &ResourceSelector,
-        format: crate::ResourceManifestFormat,
-        spec_view_mode: SpecViewMode,
-    ) -> Result<Self, InternalError> {
-        Ok(Self {
-            selector: selector.try_into()?,
-            format: format.into(),
-            revealed: spec_view_mode == SpecViewMode::Revealed,
-        })
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(cynic::QueryVariables, Debug, Clone)]
-pub(crate) struct RenderResourceManifestsVariables {
-    pub selector: ResourceBatchSelectorInput,
-    pub format: ResourceManifestFormat,
-    pub revealed: bool,
-}
-
-impl RenderResourceManifestsVariables {
-    pub(crate) fn new(
-        selector: &ResourceBatchSelector,
-        format: crate::ResourceManifestFormat,
-        spec_view_mode: SpecViewMode,
-    ) -> Result<Self, InternalError> {
-        Ok(Self {
-            selector: selector.try_into()?,
-            format: format.into(),
-            revealed: spec_view_mode == SpecViewMode::Revealed,
-        })
-    }
-}
+use crate::facade::graphql::cynic_api::inputs::{ResourceAccountSelectorInput, ResourceKindInput};
+use crate::facade::graphql::cynic_api::schema;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -186,62 +65,12 @@ impl ListAllVariables {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(cynic::QueryVariables, Debug, Clone)]
-pub(crate) struct SearchIdentitiesVariables {
-    pub query: SearchResourceIdentitiesInput,
-    pub page: i32,
-    pub per_page: i32,
-}
-
-impl SearchIdentitiesVariables {
-    pub(crate) fn new(request: &SearchResourceIdentitiesRequest) -> Result<Self, InternalError> {
-        let (page, per_page) =
-            graphql_page_params(request.pagination.offset, request.pagination.limit);
-        Ok(Self {
-            query: request.try_into()?,
-            page,
-            per_page,
-        })
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(cynic::QueryVariables, Debug, Clone)]
-pub(crate) struct ApplyManifestVariables {
-    pub manifest: String,
-    pub format: ResourceManifestFormat,
-    pub dry_run: Option<bool>,
-}
-
-impl From<&ApplyManifestRequest> for ApplyManifestVariables {
-    fn from(value: &ApplyManifestRequest) -> Self {
-        Self {
-            manifest: value.manifest.clone(),
-            format: value.format.into(),
-            dry_run: None,
-        }
-    }
-}
-
-impl ApplyManifestVariables {
-    pub(crate) fn new(request: &ApplyManifestRequest, dry_run: bool) -> Self {
-        let mut vars: Self = request.into();
-        vars.dry_run = Some(dry_run);
-        vars
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-const LIST_PAGE_SIZE: usize = 100;
-
-fn graphql_page_params(offset: usize, limit: usize) -> (i32, i32) {
+pub(crate) fn graphql_page_params(offset: usize, limit: usize) -> (i32, i32) {
+    const LIST_PAGE_SIZE: usize = 100;
     let per_page = if limit == 0 { LIST_PAGE_SIZE } else { limit };
     let page = offset.checked_div(per_page).unwrap_or(0);
     // GraphQL Int is i32; page counts are always small so this will not overflow
+    #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
     (page as i32, per_page as i32)
 }
 

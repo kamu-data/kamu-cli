@@ -11,9 +11,9 @@ use cynic::MutationBuilder;
 use internal_error::InternalError;
 use kamu_resources as domain;
 
-use super::fragments::Resource;
-use super::schema;
-use super::variables::{ApplyManifestVariables, ApplyManifestVariablesFields};
+use crate::ApplyManifestRequest;
+use crate::facade::graphql::cynic_api::fragments::{Resource, ResourceManifestFormat};
+use crate::facade::graphql::cynic_api::schema;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -50,8 +50,6 @@ pub(crate) struct ResourceApplySuccess {
     pub changes: Vec<ResourceApplyChange>,
     pub warnings: Vec<ResourceApplyWarning>,
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::Enum, Debug, Clone, Copy)]
 pub(crate) enum ResourceApplyOperation {
@@ -225,6 +223,33 @@ impl ResourceApplyOutcome {
                 ));
             }
         })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::QueryVariables, Debug, Clone)]
+pub(crate) struct ApplyManifestVariables {
+    pub manifest: String,
+    pub format: ResourceManifestFormat,
+    pub dry_run: Option<bool>,
+}
+
+impl From<&ApplyManifestRequest> for ApplyManifestVariables {
+    fn from(value: &ApplyManifestRequest) -> Self {
+        Self {
+            manifest: value.manifest.clone(),
+            format: value.format.into(),
+            dry_run: None,
+        }
+    }
+}
+
+impl ApplyManifestVariables {
+    pub(crate) fn new(request: &ApplyManifestRequest, dry_run: bool) -> Self {
+        let mut vars: Self = request.into();
+        vars.dry_run = Some(dry_run);
+        vars
     }
 }
 

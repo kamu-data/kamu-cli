@@ -9,7 +9,6 @@
 
 mod cynic_api;
 mod error_mapper;
-mod query_builder;
 mod remote_graphql_resource_facade_impl;
 
 pub use remote_graphql_resource_facade_impl::*;
