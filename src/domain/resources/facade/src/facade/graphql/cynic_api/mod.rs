@@ -3,6 +3,7 @@ pub(crate) mod schema {}
 
 pub(crate) mod apply;
 pub(crate) mod conversions;
+pub(crate) mod delete;
 pub(crate) mod fragments;
 pub(crate) mod get_resource;
 pub(crate) mod get_resources;

@@ -7,13 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use graphql_http::{GraphqlHttpClient, GraphqlHttpRequestError};
+use graphql_http::GraphqlHttpClient;
 use internal_error::InternalError;
 use kamu_resources as domain;
 use kamu_resources::{ResourceIdentityView, ResourceKindDescriptor, ResourcesSummary};
 use url::Url;
 
-use super::{cynic_api, error_mapper, fragments, query_builder};
+use super::{cynic_api, error_mapper};
 use crate::{
     ApplyManifestError,
     ApplyManifestRequest,
@@ -57,13 +57,6 @@ impl RemoteGraphqlResourceFacadeImpl {
         Self {
             graphql_client: GraphqlHttpClient::from_backend_url(backend_url, maybe_access_token),
         }
-    }
-
-    async fn execute_graphql<T>(&self, query: &str) -> Result<T, GraphqlHttpRequestError>
-    where
-        T: serde::de::DeserializeOwned,
-    {
-        self.graphql_client.execute(query).await
     }
 }
 
@@ -497,10 +490,15 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
         &self,
         selector: ResourceSelector,
     ) -> Result<domain::ResourceUID, DeleteResourceError> {
-        let query = query_builder::delete_resource_query(&selector)?;
+        let variables = cynic_api::delete::DeleteVariables {
+            selector: (&selector)
+                .try_into()
+                .map_err(DeleteResourceError::Internal)?,
+        };
 
-        let response: fragments::DeleteMutationDataFragment = self
-            .execute_graphql(&query)
+        let response: cynic_api::delete::DeleteMutation = self
+            .graphql_client
+            .execute_operation(cynic_api::delete::build_delete_operation(variables))
             .await
             .map_err(|error| error_mapper::map_delete_remote_error(&selector, error))?;
 
@@ -516,20 +514,33 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
             return Ok(BatchResourceResponse::empty());
         }
 
-        let query = query_builder::delete_resources_query(&selector)?;
+        let variables = cynic_api::delete::DeleteManyVariables {
+            selector: (&selector)
+                .try_into()
+                .map_err(BatchResourceError::Internal)?,
+        };
 
-        let response: fragments::DeleteManyMutationDataFragment =
-            self.execute_graphql(&query).await?;
+        let response: cynic_api::delete::DeleteManyMutation = self
+            .graphql_client
+            .execute_operation(cynic_api::delete::build_delete_many_operation(variables))
+            .await?;
         let batch_result = response.resources.delete_many;
 
         let successes = batch_result
             .resources
             .into_iter()
-            .map(|success| BatchResourceSuccess {
-                request_index: success.request_index,
-                item: success.resource_id,
+            .map(|success| {
+                Ok(BatchResourceSuccess {
+                    request_index: usize::try_from(success.request_index).map_err(|_| {
+                        BatchResourceError::Internal(InternalError::new(format!(
+                            "Remote delete success index {} cannot be converted to usize",
+                            success.request_index
+                        )))
+                    })?,
+                    item: success.resource_id,
+                })
             })
-            .collect();
+            .collect::<Result<Vec<_>, BatchResourceError>>()?;
 
         let problems =
             error_mapper::collect_batch_problems(&selector, batch_result.problems, "delete")?;

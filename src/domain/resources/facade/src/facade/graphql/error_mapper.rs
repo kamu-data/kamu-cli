@@ -12,7 +12,7 @@ use internal_error::InternalError;
 use kamu_resources as domain;
 use kamu_resources::{ResourceAPIVersionMismatchError, ResourceUIDNotFoundError};
 
-use super::{cynic_api, fragments};
+use super::cynic_api;
 use crate::{
     BatchResourceError,
     BatchResourceProblem,
@@ -141,37 +141,6 @@ pub(super) enum BatchResourceProblemCode {
     NameNotFound,
     ApiVersionMismatch,
     KindMismatch,
-}
-
-impl BatchResourceProblemLike for fragments::BatchResourceProblemFragment {
-    fn request_index(&self) -> Result<usize, BatchResourceError> {
-        Ok(self.request_index)
-    }
-
-    fn code(&self) -> BatchResourceProblemCode {
-        match self.code {
-            fragments::BatchResourceProblemCodeFragment::UidNotFound => {
-                BatchResourceProblemCode::UidNotFound
-            }
-            fragments::BatchResourceProblemCodeFragment::NameNotFound => {
-                BatchResourceProblemCode::NameNotFound
-            }
-            fragments::BatchResourceProblemCodeFragment::ApiVersionMismatch => {
-                BatchResourceProblemCode::ApiVersionMismatch
-            }
-            fragments::BatchResourceProblemCodeFragment::KindMismatch => {
-                BatchResourceProblemCode::KindMismatch
-            }
-        }
-    }
-
-    fn code_debug(&self) -> String {
-        format!("{:?}", self.code)
-    }
-
-    fn message(&self) -> &str {
-        &self.message
-    }
 }
 
 impl BatchResourceProblemLike for cynic_api::fragments::BatchResourceProblem {
