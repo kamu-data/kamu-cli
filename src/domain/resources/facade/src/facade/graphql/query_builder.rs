@@ -18,75 +18,9 @@ use crate::{
     ResourceBatchSelector,
     ResourceRef,
     ResourceSelector,
-    SearchResourceIdentitiesRequest,
 };
 
-pub(super) const LIST_PAGE_SIZE: usize = 100;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(super) fn summary_query(
-    account: Option<&domain::ResourceManifestAccount>,
-) -> Result<String, InternalError> {
-    let summary_field = match account_selector_input(account)? {
-        None => "summary".to_string(),
-        Some(account_arg) => format!("summary({account_arg})"),
-    };
-
-    Ok(format!(
-        r#"
-        query {{
-          resources {{
-            {summary_field} {{
-              resourceCounts {{
-                kind
-                name
-                apiVersion
-                totalCount
-                phaseCounts {{
-                  pending
-                  reconciling
-                  ready
-                  degraded
-                  failed
-                }}
-              }}
-            }}
-          }}
-        }}
-        "#
-    ))
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Field selections
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(super) const LIST_FIELDS: &str = r#"
-    nodes {
-      id
-      apiVersion
-      kind {
-        value
-      }
-      name
-      description
-      generation
-      createdAt
-      updatedAt
-      status {
-        phase
-        observedGeneration
-        ready
-      }
-      listValues {
-        key
-        stringValue
-        uint64Value
-        boolValue
-      }
-    }
-"#;
 
 pub(super) const BATCH_DELETE_FIELDS: &str = r#"
     resources {
@@ -97,19 +31,6 @@ pub(super) const BATCH_DELETE_FIELDS: &str = r#"
       requestIndex
       code
       message
-    }
-"#;
-
-pub(super) const IDENTITY_LIST_FIELDS: &str = r#"
-    totalCount
-    nodes {
-      id
-      apiVersion
-      kind {
-        value
-      }
-      canonicalKindName
-      name
     }
 "#;
 
@@ -230,14 +151,6 @@ pub(super) fn resource_refs_input(resource_refs: &[ResourceRef]) -> Result<Strin
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(super) fn graphql_page_params(offset: usize, limit: usize) -> (usize, usize) {
-    let page = offset.checked_div(limit).unwrap_or(0);
-    let per_page = if limit == 0 { LIST_PAGE_SIZE } else { limit };
-    (page, per_page)
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 pub(super) fn parse_enum<T>(value: &str, field_name: &str) -> Result<T, InternalError>
 where
     T: std::str::FromStr,
@@ -305,162 +218,6 @@ pub(super) fn apply_manifest_query(
                 category
                 message
               }}
-            }}
-          }}
-        }}
-        "#
-    ))
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(super) fn list_resources_query(
-    kind: &str,
-    page: usize,
-    per_page: usize,
-    account: Option<&domain::ResourceManifestAccount>,
-) -> Result<String, InternalError> {
-    let kind = serde_json::to_string(kind).int_err()?;
-    let account_arg = account_selector_input(account)?
-        .map(|s| format!("{s}, "))
-        .unwrap_or_default();
-
-    Ok(format!(
-        r#"
-        query {{
-          resources {{
-            listByKind(kind: {{ custom: {kind} }}, {account_arg}page: {page}, perPage: {per_page}) {{
-              {LIST_FIELDS}
-            }}
-          }}
-        }}
-        "#
-    ))
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(super) fn list_all_resources_query(
-    page: usize,
-    per_page: usize,
-    account: Option<&domain::ResourceManifestAccount>,
-) -> Result<String, InternalError> {
-    let account_arg = account_selector_input(account)?
-        .map(|s| format!("{s}, "))
-        .unwrap_or_default();
-
-    Ok(format!(
-        r#"
-        query {{
-          resources {{
-            listAll({account_arg}page: {page}, perPage: {per_page}) {{
-              {LIST_FIELDS}
-            }}
-          }}
-        }}
-        "#
-    ))
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(super) fn list_resource_identities_query(
-    kind: &str,
-    page: usize,
-    per_page: usize,
-    account: Option<&domain::ResourceManifestAccount>,
-) -> Result<String, InternalError> {
-    let kind = serde_json::to_string(kind).int_err()?;
-    let account_arg = account_selector_input(account)?
-        .map(|s| format!("{s}, "))
-        .unwrap_or_default();
-
-    Ok(format!(
-        r#"
-        query {{
-          resources {{
-            listIdentitiesByKind(kind: {{ custom: {kind} }}, {account_arg}page: {page}, perPage: {per_page}) {{
-              {IDENTITY_LIST_FIELDS}
-            }}
-          }}
-        }}
-        "#
-    ))
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(super) fn list_all_resource_identities_query(
-    page: usize,
-    per_page: usize,
-    account: Option<&domain::ResourceManifestAccount>,
-) -> Result<String, InternalError> {
-    let account_arg = account_selector_input(account)?
-        .map(|s| format!("{s}, "))
-        .unwrap_or_default();
-
-    Ok(format!(
-        r#"
-        query {{
-          resources {{
-            listAllIdentities({account_arg}page: {page}, perPage: {per_page}) {{
-              {IDENTITY_LIST_FIELDS}
-            }}
-          }}
-        }}
-        "#
-    ))
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(super) fn search_resource_identities_query(
-    request: &SearchResourceIdentitiesRequest,
-    page: usize,
-    per_page: usize,
-) -> Result<String, InternalError> {
-    let kinds = request
-        .kinds
-        .iter()
-        .map(|kind| {
-            Ok(format!(
-                "{{ custom: {} }}",
-                serde_json::to_string(kind).int_err()?
-            ))
-        })
-        .collect::<Result<Vec<_>, InternalError>>()?
-        .join(", ");
-
-    let names = request
-        .exact_names
-        .as_ref()
-        .map(|names| serde_json::to_string(names).int_err())
-        .transpose()?;
-    let name_pattern = request
-        .name_pattern
-        .as_ref()
-        .map(|pattern| serde_json::to_string(pattern).int_err())
-        .transpose()?;
-    let account = account_selector_input(request.account.as_ref())?
-        .map(|account| format!("account: {account},"))
-        .unwrap_or_default();
-    let names = names
-        .map(|names| format!("names: {names},"))
-        .unwrap_or_default();
-    let name_pattern = name_pattern
-        .map(|name_pattern| format!("namePattern: {name_pattern},"))
-        .unwrap_or_default();
-
-    Ok(format!(
-        r#"
-        query {{
-          resources {{
-            searchIdentities(
-              query: {{ kinds: [{kinds}], {names}{name_pattern}{account} }},
-              page: {page},
-              perPage: {per_page}
-            ) {{
-              {IDENTITY_LIST_FIELDS}
             }}
           }}
         }}

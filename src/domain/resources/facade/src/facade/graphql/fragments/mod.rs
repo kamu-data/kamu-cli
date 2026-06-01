@@ -10,15 +10,9 @@
 mod apply;
 mod delete;
 mod get;
-mod identity;
-mod list;
 mod resource;
-mod summary;
 
 pub(crate) use apply::*;
 pub(crate) use delete::*;
 pub(crate) use get::*;
-pub(crate) use identity::*;
-pub(crate) use list::*;
 pub(crate) use resource::*;
-pub(crate) use summary::*;

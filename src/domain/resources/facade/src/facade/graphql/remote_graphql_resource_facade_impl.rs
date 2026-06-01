@@ -10,17 +10,7 @@
 use graphql_http::{GraphqlHttpClient, GraphqlHttpRequestError};
 use internal_error::InternalError;
 use kamu_resources as domain;
-use kamu_resources::{
-    ResourceIdentityView,
-    ResourceKindDescriptor,
-    ResourceListColumnValue,
-    ResourceListColumnValueView,
-    ResourcePhaseCounts,
-    ResourceStatusSummaryView,
-    ResourceSummaryView,
-    ResourceTypeCountSummary,
-    ResourcesSummary,
-};
+use kamu_resources::{ResourceIdentityView, ResourceKindDescriptor, ResourcesSummary};
 use url::Url;
 
 use super::{cynic_api, error_mapper, fragments, query_builder};
@@ -75,165 +65,6 @@ impl RemoteGraphqlResourceFacadeImpl {
     {
         self.graphql_client.execute(query).await
     }
-
-    fn resource_summary_from_fragment<E>(
-        fragment: fragments::ResourceSummaryFragment,
-    ) -> Result<ResourceSummaryView, E>
-    where
-        E: From<InternalError>,
-    {
-        let status = match fragment.status {
-            Some(status) => Some(ResourceStatusSummaryView {
-                phase: status
-                    .phase
-                    .as_deref()
-                    .map(|phase| query_builder::parse_enum(phase, "resource phase"))
-                    .transpose()?,
-                observed_generation: status.observed_generation,
-                ready: status.ready,
-            }),
-            None => None,
-        };
-
-        let list_values = fragment
-            .list_values
-            .into_iter()
-            .map(|value| {
-                let key = value.key;
-                let value = match (value.string_value, value.uint64_value, value.bool_value) {
-                    (Some(value), None, None) => ResourceListColumnValue::String(value),
-                    (None, Some(value), None) => ResourceListColumnValue::UInt64(value),
-                    (None, None, Some(value)) => ResourceListColumnValue::Bool(value),
-                    (None, None, None) => {
-                        return Err(E::from(InternalError::new(format!(
-                            "Missing list value payload for key '{key}'",
-                        ))));
-                    }
-                    _ => {
-                        return Err(E::from(InternalError::new(format!(
-                            "Ambiguous list value payload for key '{key}'",
-                        ))));
-                    }
-                };
-
-                Ok(ResourceListColumnValueView { key, value })
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-
-        Ok(ResourceSummaryView {
-            kind: fragment.kind.value,
-            api_version: fragment.api_version,
-            uid: fragment.id,
-            name: fragment.name,
-            description: fragment.description,
-            generation: fragment.generation,
-            created_at: fragment.created_at,
-            updated_at: fragment.updated_at,
-            status,
-            list_values,
-        })
-    }
-
-    async fn list_resource_summaries<E>(
-        &self,
-        query_kind: RemoteListQuery<'_>,
-        account: Option<&domain::ResourceManifestAccount>,
-        offset: usize,
-        limit: usize,
-    ) -> Result<Vec<ResourceSummaryView>, E>
-    where
-        E: From<GraphqlHttpRequestError> + From<InternalError>,
-    {
-        let (page, per_page) = query_builder::graphql_page_params(offset, limit);
-
-        let query = match query_kind {
-            RemoteListQuery::ByKind(kind) => {
-                query_builder::list_resources_query(kind, page, per_page, account)
-                    .map_err(E::from)?
-            }
-            RemoteListQuery::All => {
-                query_builder::list_all_resources_query(page, per_page, account).map_err(E::from)?
-            }
-        };
-
-        let nodes = match query_kind {
-            RemoteListQuery::ByKind(_) => {
-                let response: fragments::ListByKindQueryDataFragment =
-                    self.execute_graphql(&query).await?;
-                response.resources.list_by_kind.nodes
-            }
-            RemoteListQuery::All => {
-                let response: fragments::ListAllQueryDataFragment =
-                    self.execute_graphql(&query).await?;
-                response.resources.list_all.nodes
-            }
-        };
-
-        nodes
-            .into_iter()
-            .map(Self::resource_summary_from_fragment::<E>)
-            .collect()
-    }
-
-    async fn list_resource_identities<E>(
-        &self,
-        query_kind: RemoteListQuery<'_>,
-        account: Option<&domain::ResourceManifestAccount>,
-        offset: usize,
-        limit: usize,
-    ) -> Result<Vec<ResourceIdentityView>, E>
-    where
-        E: From<GraphqlHttpRequestError> + From<InternalError>,
-    {
-        let (page, per_page) = query_builder::graphql_page_params(offset, limit);
-
-        let query = match query_kind {
-            RemoteListQuery::ByKind(kind) => {
-                query_builder::list_resource_identities_query(kind, page, per_page, account)
-                    .map_err(E::from)?
-            }
-            RemoteListQuery::All => {
-                query_builder::list_all_resource_identities_query(page, per_page, account)
-                    .map_err(E::from)?
-            }
-        };
-
-        let nodes = match query_kind {
-            RemoteListQuery::ByKind(_) => {
-                let response: fragments::ListIdentitiesByKindQueryDataFragment =
-                    self.execute_graphql(&query).await?;
-                response.resources.list_identities_by_kind.nodes
-            }
-            RemoteListQuery::All => {
-                let response: fragments::ListAllIdentitiesQueryDataFragment =
-                    self.execute_graphql(&query).await?;
-                response.resources.list_all_identities.nodes
-            }
-        };
-
-        Ok(nodes.into_iter().map(Into::into).collect())
-    }
-
-    async fn search_resource_identities<E>(
-        &self,
-        request: &SearchResourceIdentitiesRequest,
-    ) -> Result<SearchResourceIdentitiesResponse, E>
-    where
-        E: From<GraphqlHttpRequestError> + From<InternalError>,
-    {
-        let (page, per_page) =
-            query_builder::graphql_page_params(request.pagination.offset, request.pagination.limit);
-        let query = query_builder::search_resource_identities_query(request, page, per_page)
-            .map_err(E::from)?;
-        let response: fragments::SearchIdentitiesQueryDataFragment =
-            self.execute_graphql(&query).await?;
-        let connection = response.resources.search_identities;
-
-        Ok(SearchResourceIdentitiesResponse {
-            items: connection.nodes.into_iter().map(Into::into).collect(),
-            total_count: connection.total_count,
-        })
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -261,32 +92,25 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
         &self,
         request: ResourcesSummaryRequest,
     ) -> Result<ResourcesSummary, ResourcesSummaryError> {
-        let query = query_builder::summary_query(request.account.as_ref())
-            .map_err(ResourcesSummaryError::Internal)?;
+        let variables = cynic_api::summary::SummaryVariables {
+            account: request
+                .account
+                .as_ref()
+                .map(TryInto::try_into)
+                .transpose()
+                .map_err(ResourcesSummaryError::Internal)?,
+        };
 
-        let response: fragments::SummaryQueryDataFragment = self.execute_graphql(&query).await?;
+        let response: cynic_api::summary::SummaryQuery = self
+            .graphql_client
+            .execute_operation(cynic_api::summary::build_operation(variables))
+            .await?;
 
-        Ok(ResourcesSummary {
-            resource_counts: response
-                .resources
-                .summary
-                .resource_counts
-                .into_iter()
-                .map(|item| ResourceTypeCountSummary {
-                    kind: item.kind,
-                    name: item.name,
-                    api_version: item.api_version,
-                    total_count: item.total_count,
-                    phase_counts: ResourcePhaseCounts {
-                        pending: item.phase_counts.pending,
-                        reconciling: item.phase_counts.reconciling,
-                        ready: item.phase_counts.ready,
-                        degraded: item.phase_counts.degraded,
-                        failed: item.phase_counts.failed,
-                    },
-                })
-                .collect(),
-        })
+        response
+            .resources
+            .summary
+            .try_into()
+            .map_err(ResourcesSummaryError::Internal)
     }
 
     async fn get(
@@ -504,60 +328,133 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
         &self,
         request: ListResourcesRequest,
     ) -> Result<Vec<domain::ResourceSummaryView>, ListResourcesError> {
-        self.list_resource_summaries::<ListResourcesError>(
-            RemoteListQuery::ByKind(&request.kind),
+        let variables = cynic_api::variables::ListByKindVariables::new(
+            &request.kind,
             request.account.as_ref(),
             request.pagination.offset,
             request.pagination.limit,
         )
-        .await
+        .map_err(ListResourcesError::Internal)?;
+
+        let response: cynic_api::list::ListByKindQuery = self
+            .graphql_client
+            .execute_operation(cynic_api::list::build_list_by_kind_operation(variables))
+            .await?;
+
+        response
+            .resources
+            .list_by_kind
+            .nodes
+            .into_iter()
+            .map(TryInto::try_into)
+            .collect::<Result<Vec<_>, InternalError>>()
+            .map_err(ListResourcesError::Internal)
     }
 
     async fn list_identities(
         &self,
         request: ListResourceIdentitiesRequest,
     ) -> Result<Vec<ResourceIdentityView>, ListResourcesError> {
-        self.list_resource_identities::<ListResourcesError>(
-            RemoteListQuery::ByKind(&request.kind),
+        let variables = cynic_api::variables::ListByKindVariables::new(
+            &request.kind,
             request.account.as_ref(),
             request.pagination.offset,
             request.pagination.limit,
         )
-        .await
+        .map_err(ListResourcesError::Internal)?;
+
+        let response: cynic_api::list::ListIdentitiesByKindQuery = self
+            .graphql_client
+            .execute_operation(cynic_api::list::build_list_identities_by_kind_operation(
+                variables,
+            ))
+            .await?;
+
+        Ok(response
+            .resources
+            .list_identities_by_kind
+            .nodes
+            .into_iter()
+            .map(Into::into)
+            .collect())
     }
 
     async fn search_identities(
         &self,
         request: SearchResourceIdentitiesRequest,
     ) -> Result<SearchResourceIdentitiesResponse, ListResourcesError> {
-        self.search_resource_identities::<ListResourcesError>(&request)
-            .await
+        let variables = cynic_api::variables::SearchIdentitiesVariables::new(&request)
+            .map_err(ListResourcesError::Internal)?;
+
+        let response: cynic_api::search::SearchIdentitiesQuery = self
+            .graphql_client
+            .execute_operation(cynic_api::search::build_operation(variables))
+            .await?;
+
+        let connection = response.resources.search_identities;
+
+        Ok(SearchResourceIdentitiesResponse {
+            items: connection.nodes.into_iter().map(Into::into).collect(),
+            total_count: usize::try_from(connection.total_count).map_err(|_| {
+                ListResourcesError::Internal(InternalError::new(format!(
+                    "Remote search total_count {} cannot be converted to usize",
+                    connection.total_count
+                )))
+            })?,
+        })
     }
 
     async fn list_all(
         &self,
         request: ListAllResourcesRequest,
     ) -> Result<Vec<domain::ResourceSummaryView>, ListAllResourcesError> {
-        self.list_resource_summaries::<ListAllResourcesError>(
-            RemoteListQuery::All,
+        let variables = cynic_api::variables::ListAllVariables::new(
             request.account.as_ref(),
             request.pagination.offset,
             request.pagination.limit,
         )
-        .await
+        .map_err(ListAllResourcesError::Internal)?;
+
+        let response: cynic_api::list::ListAllQuery = self
+            .graphql_client
+            .execute_operation(cynic_api::list::build_list_all_operation(variables))
+            .await?;
+
+        response
+            .resources
+            .list_all
+            .nodes
+            .into_iter()
+            .map(TryInto::try_into)
+            .collect::<Result<Vec<_>, InternalError>>()
+            .map_err(ListAllResourcesError::Internal)
     }
 
     async fn list_all_identities(
         &self,
         request: ListAllResourceIdentitiesRequest,
     ) -> Result<Vec<ResourceIdentityView>, ListAllResourcesError> {
-        self.list_resource_identities::<ListAllResourcesError>(
-            RemoteListQuery::All,
+        let variables = cynic_api::variables::ListAllVariables::new(
             request.account.as_ref(),
             request.pagination.offset,
             request.pagination.limit,
         )
-        .await
+        .map_err(ListAllResourcesError::Internal)?;
+
+        let response: cynic_api::list::ListAllIdentitiesQuery = self
+            .graphql_client
+            .execute_operation(cynic_api::list::build_list_all_identities_operation(
+                variables,
+            ))
+            .await?;
+
+        Ok(response
+            .resources
+            .list_all_identities
+            .nodes
+            .into_iter()
+            .map(Into::into)
+            .collect())
     }
 
     async fn plan_apply_manifest(
@@ -636,14 +533,6 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
             problems,
         })
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, Copy)]
-enum RemoteListQuery<'a> {
-    ByKind(&'a str),
-    All,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
