@@ -71,7 +71,7 @@ pub(crate) fn collect_manifest_metadata_warnings(
         .is_none_or(|description| description.trim().is_empty())
     {
         warnings.push(ResourceWarning {
-            code: WARNING_CODE_MISSING_DESCRIPTION,
+            code: WARNING_CODE_MISSING_DESCRIPTION.to_string(),
             path: Some("metadata.description".to_string()),
             message: "Resource has no description".to_string(),
         });

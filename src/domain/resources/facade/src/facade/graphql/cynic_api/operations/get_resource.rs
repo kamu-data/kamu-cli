@@ -1,0 +1,61 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+use cynic::QueryBuilder;
+use internal_error::InternalError;
+
+use crate::facade::graphql::cynic_api::fragments::Resource;
+use crate::facade::graphql::cynic_api::inputs::ResourceSelectorInput;
+use crate::facade::graphql::cynic_api::schema;
+use crate::{ResourceSelector, SpecViewMode};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
+#[cynic(graphql_type = "Query", variables = "ResourceSelectorVariables")]
+pub(crate) struct GetResourceQuery {
+    pub resources: Resources,
+}
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
+#[cynic(variables = "ResourceSelectorVariables")]
+pub(crate) struct Resources {
+    #[arguments(selector: $selector, revealed: $revealed)]
+    pub resource: Option<Resource>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::QueryVariables, Debug, Clone)]
+pub(crate) struct ResourceSelectorVariables {
+    pub selector: ResourceSelectorInput,
+    pub revealed: bool,
+}
+
+impl ResourceSelectorVariables {
+    pub(crate) fn new(
+        selector: &ResourceSelector,
+        spec_view_mode: SpecViewMode,
+    ) -> Result<Self, InternalError> {
+        Ok(Self {
+            selector: selector.try_into()?,
+            revealed: spec_view_mode == SpecViewMode::Revealed,
+        })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn build_operation(
+    variables: ResourceSelectorVariables,
+) -> cynic::Operation<GetResourceQuery, ResourceSelectorVariables> {
+    GetResourceQuery::build(variables)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -12,7 +12,7 @@ use internal_error::InternalError;
 use kamu_resources as domain;
 use kamu_resources::{ResourceAPIVersionMismatchError, ResourceUIDNotFoundError};
 
-use super::fragments;
+use super::cynic_api;
 use crate::{
     BatchResourceError,
     BatchResourceProblem,
@@ -46,22 +46,18 @@ pub(super) fn not_found_error(selector: &ResourceSelector) -> GetResourceError {
 
 pub(super) fn collect_batch_problems(
     selector: &ResourceBatchSelector,
-    problems: Vec<fragments::BatchResourceProblemFragment>,
+    problems: Vec<impl BatchResourceProblemLike>,
     context: &str,
 ) -> Result<Vec<BatchResourceProblem<ResourceLookupProblem>>, BatchResourceError> {
     problems
         .into_iter()
         .map(|problem| {
-            let resource_ref = selector
-                .resource_refs
-                .get(problem.request_index)
-                .ok_or_else(|| {
-                    BatchResourceError::Internal(InternalError::new(format!(
-                        "Remote {context} problem index {} is out of bounds",
-                        problem.request_index
-                    )))
-                })?;
-            let request_index = problem.request_index;
+            let request_index = problem.request_index()?;
+            let resource_ref = selector.resource_refs.get(request_index).ok_or_else(|| {
+                BatchResourceError::Internal(InternalError::new(format!(
+                    "Remote {context} problem index {request_index} is out of bounds",
+                )))
+            })?;
             let error = batch_resource_problem_error(
                 &problem,
                 &selector.kind,
@@ -79,20 +75,19 @@ pub(super) fn collect_batch_problems(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(super) fn batch_resource_problem_error(
-    problem: &fragments::BatchResourceProblemFragment,
+    problem: &impl BatchResourceProblemLike,
     kind: &str,
     resource_ref: &ResourceRef,
     expected_api_version: Option<&str>,
 ) -> Result<ResourceLookupProblem, BatchResourceError> {
-    use fragments::BatchResourceProblemCodeFragment as Code;
-    Ok(match &problem.code {
-        Code::UidNotFound => match resource_ref {
+    Ok(match problem.code() {
+        BatchResourceProblemCode::UidNotFound => match resource_ref {
             ResourceRef::ById(uid) => {
                 ResourceLookupProblem::UIDNotFound(ResourceUIDNotFoundError(*uid))
             }
             ResourceRef::ByName(_) => return Err(malformed_remote_problem(problem)),
         },
-        Code::NameNotFound => match resource_ref {
+        BatchResourceProblemCode::NameNotFound => match resource_ref {
             ResourceRef::ByName(name) => {
                 ResourceLookupProblem::NameNotFound(domain::ResourceNameNotFoundError {
                     kind: kind.to_string(),
@@ -101,11 +96,11 @@ pub(super) fn batch_resource_problem_error(
             }
             ResourceRef::ById(_) => return Err(malformed_remote_problem(problem)),
         },
-        Code::ApiVersionMismatch => {
+        BatchResourceProblemCode::ApiVersionMismatch => {
             let Some(expected_api_version) = expected_api_version else {
                 return Err(malformed_remote_problem(problem));
             };
-            let Some(actual_api_version) = parse_actual_api_version(&problem.message) else {
+            let Some(actual_api_version) = parse_actual_api_version(problem.message()) else {
                 return Err(malformed_remote_problem(problem));
             };
 
@@ -114,9 +109,9 @@ pub(super) fn batch_resource_problem_error(
                 actual_api_version,
             })
         }
-        Code::KindMismatch => match resource_ref {
+        BatchResourceProblemCode::KindMismatch => match resource_ref {
             ResourceRef::ById(uid) => {
-                let Some(actual_kind) = parse_actual_kind(*uid, kind, &problem.message) else {
+                let Some(actual_kind) = parse_actual_kind(*uid, kind, problem.message()) else {
                     return Err(malformed_remote_problem(problem));
                 };
 
@@ -133,12 +128,64 @@ pub(super) fn batch_resource_problem_error(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn malformed_remote_problem(
-    problem: &fragments::BatchResourceProblemFragment,
-) -> BatchResourceError {
+pub(super) trait BatchResourceProblemLike {
+    fn request_index(&self) -> Result<usize, BatchResourceError>;
+    fn code(&self) -> BatchResourceProblemCode;
+    fn code_debug(&self) -> String;
+    fn message(&self) -> &str;
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(super) enum BatchResourceProblemCode {
+    UidNotFound,
+    NameNotFound,
+    ApiVersionMismatch,
+    KindMismatch,
+}
+
+impl BatchResourceProblemLike for cynic_api::fragments::BatchResourceProblem {
+    fn request_index(&self) -> Result<usize, BatchResourceError> {
+        usize::try_from(self.request_index).map_err(|_| {
+            BatchResourceError::Internal(InternalError::new(format!(
+                "Remote resource problem index {} cannot be converted to usize",
+                self.request_index
+            )))
+        })
+    }
+
+    fn code(&self) -> BatchResourceProblemCode {
+        match self.code {
+            cynic_api::fragments::BatchResourceProblemCode::UidNotFound => {
+                BatchResourceProblemCode::UidNotFound
+            }
+            cynic_api::fragments::BatchResourceProblemCode::NameNotFound => {
+                BatchResourceProblemCode::NameNotFound
+            }
+            cynic_api::fragments::BatchResourceProblemCode::ApiVersionMismatch => {
+                BatchResourceProblemCode::ApiVersionMismatch
+            }
+            cynic_api::fragments::BatchResourceProblemCode::KindMismatch => {
+                BatchResourceProblemCode::KindMismatch
+            }
+        }
+    }
+
+    fn code_debug(&self) -> String {
+        format!("{:?}", self.code)
+    }
+
+    fn message(&self) -> &str {
+        &self.message
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn malformed_remote_problem(problem: &impl BatchResourceProblemLike) -> BatchResourceError {
     BatchResourceError::Internal(InternalError::new(format!(
-        "Malformed remote resource problem: code={:?}, message={}",
-        problem.code, problem.message
+        "Malformed remote resource problem: code={}, message={}",
+        problem.code_debug(),
+        problem.message()
     )))
 }
 

@@ -28,6 +28,7 @@ default = []
 [dependencies]
 async-graphql = { version = "7", default-features = false }
 axum = { version = "0.8", default-features = false }
+cynic = { version = "3", default-features = false }
 http = { version = "1", default-features = false }
 internal-error = { workspace = true }
 reqwest = { version = "0.12", default-features = false, features = [

@@ -7,8 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod cynic_api;
-mod error_mapper;
-mod remote_graphql_resource_facade_impl;
+#[cynic::schema("kamu")]
+pub(crate) mod schema {}
 
-pub use remote_graphql_resource_facade_impl::*;
+pub(crate) mod conversions;
+pub(crate) mod fragments;
+pub(crate) mod inputs;
+pub(crate) mod operations;
+pub(crate) mod scalars;
+pub(crate) mod variables;

@@ -9,11 +9,14 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone)]
-pub struct ResourceWarning {
-    pub code: String,
-    pub path: Option<String>,
-    pub message: String,
+fn main() {
+    println!("cargo:rerun-if-changed=../../../../resources/schema.gql");
+
+    cynic_codegen::register_schema("kamu")
+        .from_sdl_file("../../../../resources/schema.gql")
+        .unwrap()
+        .as_default()
+        .unwrap();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

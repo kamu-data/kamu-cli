@@ -46,7 +46,7 @@ impl ResourceLinterSpec for TestResourceSpec {
         let mut warnings = Vec::new();
         if self.value.len() > 64 {
             warnings.push(ResourceWarning {
-                code: "value_too_long",
+                code: "value_too_long".to_string(),
                 path: Some("spec.value".to_string()),
                 message: "value exceeds recommended length".to_string(),
             });
