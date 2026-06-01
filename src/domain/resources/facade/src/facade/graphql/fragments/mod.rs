@@ -7,12 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod apply;
 mod delete;
 mod get;
-mod resource;
 
-pub(crate) use apply::*;
 pub(crate) use delete::*;
 pub(crate) use get::*;
-pub(crate) use resource::*;

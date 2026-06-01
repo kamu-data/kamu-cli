@@ -11,8 +11,6 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu_resources as domain;
 
 use crate::{
-    ApplyManifestError,
-    ApplyManifestRequest,
     BatchResourceError,
     DeleteResourceError,
     ResourceBatchSelector,
@@ -164,67 +162,6 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Query / mutation builders
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(super) fn apply_manifest_query(
-    request: &ApplyManifestRequest,
-    dry_run: bool,
-) -> Result<String, ApplyManifestError> {
-    let manifest = serde_json::to_string(&request.manifest).int_err()?;
-    let format = request.format.to_string();
-
-    Ok(format!(
-        r#"
-        mutation {{
-          resources {{
-            applyManifest(manifest: {manifest}, format: {format}, dryRun: {dry_run}) {{
-              __typename
-              ... on ResourceApplySuccess {{
-                operation
-                resource {{
-                  apiVersion
-                  kind {{
-                    value
-                  }}
-                  metadata {{
-                    id
-                    accountId
-                    name
-                    description
-                    labels
-                    annotations
-                    generation
-                    createdAt
-                    updatedAt
-                    deletedAt
-                    lastReconciledAt
-                  }}
-                  spec
-                  status
-                }}
-                changes {{
-                  kind
-                  path
-                  before
-                  after
-                }}
-                warnings {{
-                  code
-                  path
-                  message
-                }}
-              }}
-              ... on ResourceApplyRejection {{
-                category
-                message
-              }}
-            }}
-          }}
-        }}
-        "#
-    ))
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(super) fn delete_resource_query(

@@ -461,9 +461,12 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
         &self,
         request: ApplyManifestRequest,
     ) -> Result<domain::ApplyManifestPlanningDecision, ApplyManifestError> {
-        let query = query_builder::apply_manifest_query(&request, true)?;
-        let response: fragments::ApplyManifestMutationDataFragment =
-            self.execute_graphql(&query).await?;
+        let variables = cynic_api::variables::ApplyManifestVariables::new(&request, true);
+
+        let response: cynic_api::apply::ApplyManifestMutation = self
+            .graphql_client
+            .execute_operation(cynic_api::apply::build_operation(variables))
+            .await?;
 
         response
             .resources
@@ -476,9 +479,12 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
         &self,
         request: ApplyManifestRequest,
     ) -> Result<domain::ApplyManifestApplicationDecision, ApplyManifestError> {
-        let query = query_builder::apply_manifest_query(&request, false)?;
-        let response: fragments::ApplyManifestMutationDataFragment =
-            self.execute_graphql(&query).await?;
+        let variables = cynic_api::variables::ApplyManifestVariables::new(&request, false);
+
+        let response: cynic_api::apply::ApplyManifestMutation = self
+            .graphql_client
+            .execute_operation(cynic_api::apply::build_operation(variables))
+            .await?;
 
         response
             .resources

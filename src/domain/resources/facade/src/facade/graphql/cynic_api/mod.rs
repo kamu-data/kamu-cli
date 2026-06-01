@@ -1,6 +1,7 @@
 #[cynic::schema("kamu")]
 pub(crate) mod schema {}
 
+pub(crate) mod apply;
 pub(crate) mod conversions;
 pub(crate) mod fragments;
 pub(crate) mod get_resource;

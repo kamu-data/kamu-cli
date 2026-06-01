@@ -10,6 +10,7 @@ use super::inputs::{
 };
 use super::schema;
 use crate::{
+    ApplyManifestRequest,
     ResourceBatchSelector,
     ResourceSelector,
     SearchResourceIdentitiesRequest,
@@ -201,6 +202,35 @@ impl SearchIdentitiesVariables {
             page,
             per_page,
         })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::QueryVariables, Debug, Clone)]
+pub(crate) struct ApplyManifestVariables {
+    pub manifest: String,
+    pub format: ResourceManifestFormat,
+    pub dry_run: Option<bool>,
+}
+
+impl From<&ApplyManifestRequest> for ApplyManifestVariables {
+    fn from(value: &ApplyManifestRequest) -> Self {
+        Self {
+            manifest: value.manifest.clone(),
+            format: value.format.into(),
+            dry_run: None,
+        }
+    }
+}
+
+impl ApplyManifestVariables {
+    pub(crate) fn new(request: &ApplyManifestRequest, dry_run: bool) -> Self {
+        let mut vars: Self = request.into();
+        vars.dry_run = Some(dry_run);
+        vars
     }
 }
 
