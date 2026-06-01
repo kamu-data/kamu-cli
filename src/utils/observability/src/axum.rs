@@ -8,121 +8,172 @@
 // by the Apache License, Version 2.0.
 
 use std::any::Any;
+use std::future::Future;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+use std::time::Instant;
 
 use axum::body::Body;
 use http::{Response, StatusCode, Uri, header};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn http_layer() -> tower_http::trace::TraceLayer<
-    tower_http::classify::SharedClassifier<tower_http::classify::ServerErrorsAsFailures>,
-    MakeSpan,
-    OnRequest,
-    OnResponse,
-> {
-    tower_http::trace::TraceLayer::new_for_http()
-        .on_request(OnRequest)
-        .on_response(OnResponse)
-        .make_span_with(MakeSpan)
+pub fn http_layer() -> HttpTraceLayer {
+    HttpTraceLayer
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone, Debug)]
-pub struct OnRequest;
+#[derive(Clone)]
+pub struct HttpTraceLayer;
 
-impl<B> tower_http::trace::OnRequest<B> for OnRequest {
-    fn on_request(&mut self, request: &http::Request<B>, _: &tracing::Span) {
-        tracing::info!(
-            method = %request.method(),
-            uri = %request.uri(),
-            version = ?request.version(),
-            headers = ?request.headers(),
-            "HTTP request",
-        );
+impl<S> tower::Layer<S> for HttpTraceLayer {
+    type Service = HttpTraceService<S>;
+
+    fn layer(&self, inner: S) -> Self::Service {
+        HttpTraceService { inner }
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Clone, Debug)]
-pub struct OnResponse;
+#[derive(Clone)]
+pub struct HttpTraceService<S> {
+    inner: S,
+}
 
-impl<B> tower_http::trace::OnResponse<B> for OnResponse {
-    fn on_response(
-        self,
-        response: &http::Response<B>,
-        latency: std::time::Duration,
-        _span: &tracing::Span,
-    ) {
-        tracing::info!(
-            status = response.status().as_u16(),
-            headers = ?response.headers(),
-            latency = %Latency(latency),
-            "HTTP response"
-        );
+impl<S, B> tower::Service<http::Request<B>> for HttpTraceService<S>
+where
+    S: tower::Service<http::Request<B>, Response = http::Response<Body>>,
+    S::Future: Send + 'static,
+    <S as tower::Service<http::Request<B>>>::Error: std::error::Error,
+    B: Send + 'static,
+{
+    type Response = S::Response;
+    type Error = S::Error;
+    type Future = HttpTraceFuture<S::Future>;
+
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.inner.poll_ready(cx)
+    }
+
+    fn call(&mut self, request: http::Request<B>) -> Self::Future {
+        let span = {
+            let method = request.method();
+            let route = RouteOrUri::from(&request);
+
+            let span = crate::tracing::root_span!(
+                "Http::request",
+                method = %method,
+                route = %route,
+                "otel.name" = tracing::field::Empty,
+            );
+
+            #[cfg(feature = "opentelemetry")]
+            {
+                crate::tracing::include_otel_trace_id(&span);
+                span.record("otel.name", format!("{method} {route}"));
+            }
+
+            {
+                let _enter = span.enter();
+                tracing::info!(
+                    uri = %request.uri(),
+                    version = ?request.version(),
+                    headers = ?request.headers(),
+                    "HTTP request",
+                );
+            }
+
+            span
+        };
+
+        let future = self.inner.call(request);
+        let start = Instant::now();
+
+        HttpTraceFuture {
+            inner: future,
+            span,
+            start,
+            done: false,
+        }
     }
 }
 
-struct Latency(std::time::Duration);
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl std::fmt::Display for Latency {
+pin_project_lite::pin_project! {
+    pub struct HttpTraceFuture<F> {
+        #[pin]
+        inner: F,
+        span: tracing::Span,
+        start: Instant,
+        // Set to true once we've logged the response, to suppress the drop guard.
+        done: bool,
+    }
+
+    impl<F> PinnedDrop for HttpTraceFuture<F> {
+        fn drop(this: Pin<&mut Self>) {
+            if !this.done {
+                let _enter = this.span.enter();
+                let processing_time = this.start.elapsed();
+                tracing::warn!(
+                    processing_time = %DurationInMillis(processing_time),
+                    "HTTP abort",
+                );
+            }
+        }
+    }
+}
+
+impl<F, E> Future for HttpTraceFuture<F>
+where
+    F: Future<Output = Result<http::Response<Body>, E>>,
+    E: std::error::Error,
+{
+    type Output = F::Output;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.project();
+        let _enter = this.span.enter();
+
+        match this.inner.poll(cx) {
+            Poll::Pending => Poll::Pending,
+            Poll::Ready(result) => {
+                *this.done = true;
+                let processing_time = this.start.elapsed();
+                match &result {
+                    Ok(resp) if !resp.status().is_server_error() => tracing::info!(
+                        status = resp.status().as_u16(),
+                        headers = ?resp.headers(),
+                        processing_time = %DurationInMillis(processing_time),
+                        "HTTP response",
+                    ),
+                    Ok(resp) => tracing::error!(
+                        status = resp.status().as_u16(),
+                        headers = ?resp.headers(),
+                        processing_time = %DurationInMillis(processing_time),
+                        "HTTP response",
+                    ),
+                    Err(err) => tracing::error!(
+                        error = ?err,
+                        error_msg = %err,
+                        "HTTP unhandled error",
+                    ),
+                }
+                Poll::Ready(result)
+            }
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct DurationInMillis(std::time::Duration);
+
+impl std::fmt::Display for DurationInMillis {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} ms", self.0.as_millis())
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone)]
-pub struct MakeSpan;
-
-impl<B> tower_http::trace::MakeSpan<B> for MakeSpan {
-    // TODO: Trace linking across requests
-    fn make_span(&mut self, request: &http::Request<B>) -> tracing::Span {
-        let method = request.method();
-        let route = RouteOrUri::from(request);
-
-        let span = crate::tracing::root_span!(
-            "Http::request",
-            %method,
-            %route,
-            "otel.name" = tracing::field::Empty,
-        );
-
-        #[cfg(feature = "opentelemetry")]
-        {
-            crate::tracing::include_otel_trace_id(&span);
-
-            span.record(
-                "otel.name",
-                tracing::field::display(SpanName::new(method, route)),
-            );
-        }
-
-        span
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[cfg(feature = "opentelemetry")]
-struct SpanName<'a> {
-    method: &'a http::Method,
-    route: RouteOrUri<'a>,
-}
-
-#[cfg(feature = "opentelemetry")]
-impl<'a> SpanName<'a> {
-    fn new(method: &'a http::Method, route: RouteOrUri<'a>) -> Self {
-        Self { method, route }
-    }
-}
-
-#[cfg(feature = "opentelemetry")]
-impl std::fmt::Display for SpanName<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} {}", self.method, self.route)
     }
 }
 

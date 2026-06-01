@@ -13,6 +13,20 @@ Recommendation: for ease of reading, use the following format:
 ### Fixed
 -->
 
+## [0.263.3] - 2026-05-29
+### Added
+- Tracing will report when DB transaction is dropped without commit or rollback
+- Tracing will report when HTTP request is aborted e.g. due to client disconnecting before receiving a response
+- New `/system/probe` HTTP endpoint to simplify E2E testing of observability stack, panic reporting, and transaction handling
+
+## [0.263.2] - 2026-05-27
+### Fixed
+- S3 PutObject hangup issue when invoked from /ingest API
+
+## [0.263.1] - 2026-05-20
+### Fixed
+- Elasticsearch: added ID escaping for API requests
+
 ## [0.263.0] - 2026-05-16
 ### Added
 - **Breaking:** The `read.schema` field now expects an ODF schema, replacing DDL schema with our unified format

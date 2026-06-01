@@ -14,17 +14,38 @@ use async_utils::AsyncReadObj;
 use aws_config::BehaviorVersion;
 use aws_sdk_s3::Client;
 use aws_sdk_s3::error::SdkError;
+use aws_sdk_s3::operation::complete_multipart_upload::CompleteMultipartUploadError;
 use aws_sdk_s3::operation::create_bucket::{CreateBucketError, CreateBucketOutput};
+use aws_sdk_s3::operation::create_multipart_upload::CreateMultipartUploadError;
 use aws_sdk_s3::operation::delete_object::{DeleteObjectError, DeleteObjectOutput};
 use aws_sdk_s3::operation::get_object::{GetObjectError, GetObjectOutput};
 use aws_sdk_s3::operation::head_object::{HeadObjectError, HeadObjectOutput};
 use aws_sdk_s3::operation::put_object::{PutObjectError, PutObjectOutput};
+use aws_sdk_s3::operation::upload_part::UploadPartError;
 use aws_sdk_s3::presigning::{PresignedRequest, PresigningConfig};
-use aws_sdk_s3::types::{CommonPrefix, Delete, ObjectCannedAcl, ObjectIdentifier};
+use aws_sdk_s3::types::{
+    CommonPrefix,
+    CompletedMultipartUpload,
+    CompletedPart,
+    Delete,
+    ObjectCannedAcl,
+    ObjectIdentifier,
+};
 use internal_error::{InternalError, ResultIntoInternal, *};
 use url::Url;
 
 use crate::S3Metrics;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Objects at or below this size are uploaded in a single buffered PUT.
+// Above this threshold we switch to multipart upload to avoid allocating
+// a single large buffer on memory-constrained nodes.
+const MULTIPART_THRESHOLD: u64 = 256 * 1024 * 1024; // 256 MiB
+
+// Size of each multipart part. AWS requires all parts except the last to be
+// at least 5 MiB; 256 MiB keeps the part count low for large objects.
+const MULTIPART_PART_SIZE: u64 = 256 * 1024 * 1024; // 256 MiB
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -297,25 +318,183 @@ impl S3Context {
         reader: Box<AsyncReadObj>,
         size: u64,
     ) -> Result<PutObjectOutput, SdkError<PutObjectError>> {
-        self.api_call("put_object(stream)", || async {
-            use aws_smithy_types::body::SdkBody;
-            use aws_smithy_types::byte_stream::ByteStream;
+        // Using a streaming body via reqwest/SdkBody bridge is broken with
+        // aws-sdk-s3 >=1.119 (SDK wraps streaming bodies in AwsChunkedBody for
+        // checksum trailing headers and requires an exact size_hint to compute
+        // the encoded Content-Length, but reqwest::Body::wrap_stream never reports
+        // one). We work around this by reading into an in-memory buffer, which
+        // reports exact bounds and bypasses the chunked encoding path entirely.
+        // For sizes above MULTIPART_THRESHOLD we split into parts to avoid
+        // allocating a single oversized buffer on a memory-constrained node.
+        //
+        // See: https://github.com/awslabs/aws-sdk-rust/issues/1030
+        if size <= MULTIPART_THRESHOLD {
+            tracing::debug!(
+                %key,
+                size,
+                threshold = MULTIPART_THRESHOLD,
+                "Uploading object as single PUT"
+            );
+            use tokio::io::AsyncReadExt;
+            let mut buf = Vec::with_capacity(usize::try_from(size).unwrap());
+            reader
+                .take(size)
+                .read_to_end(&mut buf)
+                .await
+                .map_err(SdkError::construction_failure)?;
+            self.put_object(key, &buf).await
+        } else {
+            tracing::debug!(
+                %key,
+                size,
+                threshold = MULTIPART_THRESHOLD,
+                part_size = MULTIPART_PART_SIZE,
+                num_parts = size.div_ceil(MULTIPART_PART_SIZE),
+                "Uploading object via multipart upload"
+            );
+            self.put_object_stream_multipart(key, reader, size).await
+        }
+    }
 
-            // FIXME: https://github.com/awslabs/aws-sdk-rust/issues/1030
-            let stream = tokio_util::io::ReaderStream::new(reader);
-            let body = reqwest::Body::wrap_stream(stream);
-            let byte_stream = ByteStream::new(SdkBody::from_body_1_x(body));
+    async fn put_object_stream_multipart(
+        &self,
+        key: String,
+        mut reader: Box<AsyncReadObj>,
+        size: u64,
+    ) -> Result<PutObjectOutput, SdkError<PutObjectError>> {
+        use tokio::io::AsyncReadExt;
 
+        let upload_id = self
+            .api_call("create_multipart_upload", || async {
+                self.client
+                    .create_multipart_upload()
+                    .bucket(self.shared_state.bucket.clone())
+                    .key(key.clone())
+                    .send()
+                    .await
+            })
+            .await
+            .map_err(|e: SdkError<CreateMultipartUploadError>| {
+                tracing::error!(error = %e, %key, "Failed to create multipart upload");
+                SdkError::construction_failure(e.to_string())
+            })?
+            .upload_id
+            .ok_or_else(|| SdkError::construction_failure("S3 did not return an upload_id"))?;
+
+        tracing::debug!(%key, %upload_id, "Multipart upload created");
+
+        let mut parts: Vec<CompletedPart> = Vec::new();
+        let mut bytes_remaining = size;
+        let mut part_number: i32 = 1;
+
+        // Parts are uploaded sequentially to bound memory usage to one part
+        // buffer at a time (MULTIPART_PART_SIZE). Concurrent uploads would
+        // require holding multiple part buffers in memory simultaneously, which
+        // is unacceptable on memory-constrained nodes.
+        let result: Result<(), SdkError<PutObjectError>> = async {
+            while bytes_remaining > 0 {
+                let part_size = bytes_remaining.min(MULTIPART_PART_SIZE);
+                let mut buf = vec![0u8; usize::try_from(part_size).unwrap()];
+                reader
+                    .read_exact(&mut buf)
+                    .await
+                    .map_err(SdkError::construction_failure)?;
+                bytes_remaining -= part_size;
+
+                tracing::debug!(
+                    %key,
+                    %upload_id,
+                    part_number,
+                    part_size,
+                    bytes_remaining,
+                    "Uploading part"
+                );
+
+                let e_tag = self
+                    .api_call("upload_part", || async {
+                        self.client
+                            .upload_part()
+                            .bucket(self.shared_state.bucket.clone())
+                            .key(key.clone())
+                            .upload_id(upload_id.clone())
+                            .part_number(part_number)
+                            .content_length(i64::try_from(part_size).unwrap())
+                            .body(buf.into())
+                            .send()
+                            .await
+                    })
+                    .await
+                    .map_err(|e: SdkError<UploadPartError>| {
+                        tracing::error!(
+                            error = %e,
+                            %key,
+                            %upload_id,
+                            part_number,
+                            "Failed to upload part"
+                        );
+                        SdkError::construction_failure(e.to_string())
+                    })?
+                    .e_tag
+                    .ok_or_else(|| {
+                        SdkError::construction_failure("S3 did not return an ETag for part")
+                    })?;
+
+                tracing::debug!(%key, %upload_id, part_number, %e_tag, "Part uploaded");
+
+                parts.push(
+                    CompletedPart::builder()
+                        .part_number(part_number)
+                        .e_tag(e_tag)
+                        .build(),
+                );
+                part_number += 1;
+            }
+            Ok(())
+        }
+        .await;
+
+        if let Err(part_err) = result {
+            tracing::debug!(%key, %upload_id, "Aborting multipart upload after part failure");
+            // Best-effort abort; ignore any error from it
+            let abort_result = self
+                .api_call("abort_multipart_upload", || async {
+                    self.client
+                        .abort_multipart_upload()
+                        .bucket(self.shared_state.bucket.clone())
+                        .key(key.clone())
+                        .upload_id(upload_id.clone())
+                        .send()
+                        .await
+                })
+                .await;
+            if let Err(e) = abort_result {
+                tracing::warn!(error = %e, %key, %upload_id, "Failed to abort multipart upload");
+            }
+            return Err(part_err);
+        }
+
+        tracing::debug!(%key, %upload_id, num_parts = parts.len(), "Completing multipart upload");
+
+        self.api_call("complete_multipart_upload", || async {
             self.client
-                .put_object()
+                .complete_multipart_upload()
                 .bucket(self.shared_state.bucket.clone())
-                .key(key)
-                .body(byte_stream)
-                .content_length(i64::try_from(size).unwrap())
+                .key(key.clone())
+                .upload_id(upload_id.clone())
+                .multipart_upload(
+                    CompletedMultipartUpload::builder()
+                        .set_parts(Some(parts.clone()))
+                        .build(),
+                )
                 .send()
                 .await
         })
         .await
+        .map(|_| PutObjectOutput::builder().build())
+        .map_err(|e: SdkError<CompleteMultipartUploadError>| {
+            tracing::error!(error = %e, %key, %upload_id, "Failed to complete multipart upload");
+            SdkError::construction_failure(e.to_string())
+        })
     }
 
     pub async fn delete_object(

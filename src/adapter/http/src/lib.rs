@@ -24,6 +24,7 @@ pub mod openapi;
 pub mod platform;
 mod simple_protocol;
 pub mod smart_protocol;
+pub mod system;
 mod ws_common;
 
 pub type SmartTransferProtocolClientWs =

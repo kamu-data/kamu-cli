@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::HashSet;
-use std::future::Future;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -18,7 +17,7 @@ use crypto_utils::AesGcmEncryptor;
 use database_common::DatabaseTransactionRunner;
 use dill::*;
 use init_on_startup::{JobSelector, RunStartupJobsOptions};
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::*;
 use kamu::domain::*;
 use kamu::*;
 use kamu_accounts::*;
@@ -298,37 +297,39 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             .as_ref()
             .unwrap_or(&wrapped_base_catalog);
 
-        maybe_transactional(
-            is_transactional,
-            cli_catalog.clone(),
-            |maybe_transactional_cli_catalog: Catalog| async move {
-                let command_builder = cli_commands::get_command(
-                    work_catalog,
-                    &maybe_transactional_cli_catalog,
-                    args,
-                    current_account,
-                )?;
+        let tx_runner = DatabaseTransactionRunner::new(cli_catalog.clone());
 
-                let command = command_builder
-                    .get(&maybe_transactional_cli_catalog)
-                    .int_err()?;
+        tx_runner
+            .maybe_transactional(
+                is_transactional,
+                |maybe_transactional_cli_catalog: Catalog| async move {
+                    let command_builder = cli_commands::get_command(
+                        work_catalog,
+                        &maybe_transactional_cli_catalog,
+                        args,
+                        current_account,
+                    )?;
 
-                command.validate_args().await?;
+                    let command = command_builder
+                        .get(&maybe_transactional_cli_catalog)
+                        .int_err()?;
 
-                let command_name = command.name();
+                    command.validate_args().await?;
 
-                command
-                    .run()
-                    .instrument(tracing::info_span!(
-                        "Running command",
-                        %is_transactional,
-                        %command_name,
-                    ))
-                    .await
-            },
-        )
-        .instrument(tracing::debug_span!("app::run_command"))
-        .await?;
+                    let command_name = command.name();
+
+                    command
+                        .run()
+                        .instrument(tracing::info_span!(
+                            "Running command",
+                            %is_transactional,
+                            %command_name,
+                        ))
+                        .await
+                },
+            )
+            .instrument(tracing::debug_span!("app::run_command"))
+            .await?;
 
         if is_outbox_processing_required {
             // Process the Outbox messages while they are present
@@ -389,29 +390,6 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
     }
 
     command_result
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-async fn maybe_transactional<F, RF, RT, RE>(
-    transactional: bool,
-    catalog: Catalog,
-    f: F,
-) -> Result<RT, RE>
-where
-    F: FnOnce(Catalog) -> RF,
-    RF: Future<Output = Result<RT, RE>>,
-    RE: From<InternalError>,
-{
-    if !transactional {
-        f(catalog).await
-    } else {
-        let transaction_runner = DatabaseTransactionRunner::new(catalog);
-
-        transaction_runner
-            .transactional(|transaction_catalog| async move { f(transaction_catalog).await })
-            .await
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
