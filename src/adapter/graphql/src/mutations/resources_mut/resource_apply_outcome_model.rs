@@ -16,6 +16,33 @@ use crate::queries::Resource;
 pub enum ResourceApplyOutcome {
     Success(ResourceApplySuccess),
     Rejection(ResourceApplyRejection),
+    Error(ResourceApplyError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Structured error returned when the manifest cannot be applied due to a
+/// client-visible problem (malformed input, invalid spec, unknown kind, etc.).
+/// Unlike `ResourceApplyRejection` (which represents a domain-level policy
+/// decision), this represents input validation / parsing failures.
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ResourceApplyError {
+    pub code: ResourceApplyErrorCode,
+    pub message: String,
+}
+
+#[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ResourceApplyErrorCode {
+    /// The manifest text could not be parsed (malformed JSON/YAML).
+    ParseManifest,
+    /// The resource kind / apiVersion is not supported.
+    UnsupportedDescriptor,
+    /// The `metadata.account` field refers to an account that does not exist.
+    BadAccount,
+    /// A metadata field value (e.g. name) is invalid.
+    InvalidMetadata,
+    /// The `spec` failed domain validation (e.g. empty variables map).
+    InvalidSpec,
 }
 
 impl From<kamu_resources::ApplyManifestPlanningDecision> for ResourceApplyOutcome {

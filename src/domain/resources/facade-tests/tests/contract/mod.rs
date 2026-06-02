@@ -17,5 +17,6 @@ pub mod get_identity;
 pub mod list_all;
 pub mod list_search;
 pub mod render_manifest;
+pub mod spec_view_mode;
 pub mod summary;
 pub mod supported_kinds;

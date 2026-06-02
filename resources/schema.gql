@@ -3894,13 +3894,47 @@ enum ResourceApplyChangeKind {
 	SPEC
 }
 
+"""
+Structured error returned when the manifest cannot be applied due to a
+client-visible problem (malformed input, invalid spec, unknown kind, etc.).
+Unlike `ResourceApplyRejection` (which represents a domain-level policy
+decision), this represents input validation / parsing failures.
+"""
+type ResourceApplyError {
+	code: ResourceApplyErrorCode!
+	message: String!
+}
+
+enum ResourceApplyErrorCode {
+	"""
+	The manifest text could not be parsed (malformed JSON/YAML).
+	"""
+	PARSE_MANIFEST
+	"""
+	The resource kind / apiVersion is not supported.
+	"""
+	UNSUPPORTED_DESCRIPTOR
+	"""
+	The `metadata.account` field refers to an account that does not exist.
+	"""
+	BAD_ACCOUNT
+	"""
+	A metadata field value (e.g. name) is invalid.
+	"""
+	INVALID_METADATA
+	"""
+	The `spec` failed domain validation (e.g. empty variables map).
+	"""
+	INVALID_SPEC
+}
+
 enum ResourceApplyOperation {
 	CREATED
 	UPDATED
 	UNTOUCHED
 }
 
-union ResourceApplyOutcome = ResourceApplySuccess | ResourceApplyRejection
+union ResourceApplyOutcome = ResourceApplySuccess | ResourceApplyRejection | ResourceApplyError
 
 type ResourceApplyRejection {
 	category: ResourceApplyRejectionCategory!

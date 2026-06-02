@@ -188,6 +188,88 @@ pub async fn test_delete_missing_uid_returns_not_found(h: &impl FacadeContractHa
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// RF-135
+// Deleting a resource in one account must not affect a resource with the
+// same name in another account.
+contract_test!(
+    delete_is_account_scoped,
+    super::test_delete_is_account_scoped
+);
+
+pub async fn test_delete_is_account_scoped(h: &impl FacadeContractHarness) {
+    let alice_uid = create_resource(h, "scoped-del").await;
+
+    // Create same-named resource for Bob.
+    let bob_uid = {
+        let facade = h.facade_for(TestAccount::Bob);
+        let manifest = variable_set_manifest_json("scoped-del", None, &[("K", "v")]);
+        let decision = facade
+            .apply_manifest(ApplyManifestRequest {
+                format: ResourceManifestFormat::Json,
+                manifest,
+            })
+            .await
+            .unwrap();
+        assert_applied_outcome(&decision, ApplyResourceOutcome::Created)
+            .metadata
+            .uid
+    };
+
+    // Delete Alice's resource.
+    let alice_facade = h.facade_for(TestAccount::Alice);
+    let deleted_uid = alice_facade.delete(by_name("scoped-del")).await.unwrap();
+    assert_eq!(deleted_uid, alice_uid);
+
+    // Alice's resource must be gone.
+    let alice_get = alice_facade
+        .get(by_name("scoped-del"), SpecViewMode::Encrypted)
+        .await;
+    assert!(
+        matches!(alice_get, Err(GetResourceError::LookupProblem(_))),
+        "Alice's resource must be gone after delete"
+    );
+
+    // Bob's resource must still exist.
+    let bob_facade = h.facade_for(TestAccount::Bob);
+    let bob_view = bob_facade
+        .get(by_name("scoped-del"), SpecViewMode::Encrypted)
+        .await
+        .expect("Bob's resource must survive Alice's delete");
+    assert_eq!(bob_view.metadata.uid, bob_uid);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-136
+// Deleting the same resource twice: second call must return a not-found error.
+contract_test!(
+    repeated_delete_is_deterministic,
+    super::test_repeated_delete_is_deterministic
+);
+
+pub async fn test_repeated_delete_is_deterministic(h: &impl FacadeContractHarness) {
+    let uid = create_resource(h, "repeat-del").await;
+    let facade = h.facade_for(TestAccount::Alice);
+
+    // First delete succeeds.
+    let deleted = facade.delete(by_id(&uid)).await.unwrap();
+    assert_eq!(deleted, uid);
+
+    // Second delete must return not-found.
+    let result = facade.delete(by_id(&uid)).await;
+    assert!(
+        matches!(
+            result,
+            Err(DeleteResourceError::LookupProblem(
+                ResourceLookupProblem::UIDNotFound(_)
+            ))
+        ),
+        "second delete must return UIDNotFound, got: {result:?}"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // RF-134
 contract_test!(
     delete_wrong_api_version_returns_mismatch,

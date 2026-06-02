@@ -10,10 +10,12 @@
 use kamu_resources::ApplyResourceOutcome;
 use kamu_resources_facade::{
     ApplyManifestRequest,
+    GetResourceError,
     ResourceBatchSelector,
     ResourceLookupProblem,
     ResourceManifestFormat,
     ResourceRef,
+    ResourceSelector,
     SpecViewMode,
 };
 use pretty_assertions::assert_eq;
@@ -409,6 +411,183 @@ pub async fn test_render_manifests_mixed_successes_problems(h: &impl FacadeContr
         problem_by_index[&2],
         ResourceLookupProblem::UIDNotFound(_)
     ));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-058
+contract_test!(
+    delete_many_all_successes,
+    super::test_delete_many_all_successes
+);
+
+pub async fn test_delete_many_all_successes(h: &impl FacadeContractHarness) {
+    let uid_a = create_resource(h, "del-many-a").await;
+    let uid_b = create_resource(h, "del-many-b").await;
+    let uid_c = create_resource(h, "del-many-c").await;
+    let facade = h.facade_for(TestAccount::Alice);
+
+    let response = facade
+        .delete_many(ResourceBatchSelector {
+            account: None,
+            kind: VARIABLE_SET_KIND.to_string(),
+            api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
+            resource_refs: vec![
+                ResourceRef::ByName("del-many-a".to_string()), // idx 0
+                ResourceRef::ById(uid_b),                      // idx 1
+                ResourceRef::ByName("del-many-c".to_string()), // idx 2
+            ],
+        })
+        .await
+        .unwrap();
+
+    assert_batch_indexes(&response, &[0, 1, 2], &[]);
+
+    let deleted_by_index: std::collections::HashMap<usize, kamu_resources::ResourceUID> = response
+        .successes
+        .into_iter()
+        .map(|s| (s.request_index, s.item))
+        .collect();
+
+    assert_eq!(deleted_by_index[&0], uid_a, "idx 0 must return uid_a");
+    assert_eq!(deleted_by_index[&1], uid_b, "idx 1 must return uid_b");
+    assert_eq!(deleted_by_index[&2], uid_c, "idx 2 must return uid_c");
+
+    // All three resources must be gone
+    for (name, uid) in [
+        ("del-many-a", uid_a),
+        ("del-many-b", uid_b),
+        ("del-many-c", uid_c),
+    ] {
+        let get = facade
+            .get(
+                ResourceSelector {
+                    account: None,
+                    kind: VARIABLE_SET_KIND.to_string(),
+                    api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
+                    resource_ref: ResourceRef::ByName(name.to_string()),
+                },
+                SpecViewMode::Encrypted,
+            )
+            .await;
+        assert!(
+            matches!(get, Err(GetResourceError::LookupProblem(_))),
+            "deleted resource '{name}' (uid={uid}) must not be found after delete_many"
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-059
+contract_test!(
+    delete_many_mixed_successes_problems,
+    super::test_delete_many_mixed_successes_problems
+);
+
+pub async fn test_delete_many_mixed_successes_problems(h: &impl FacadeContractHarness) {
+    let uid_existing = create_resource(h, "del-mix-exists").await;
+    let absent_uid = kamu_resources::ResourceUID::new(uuid::Uuid::new_v4());
+    let facade = h.facade_for(TestAccount::Alice);
+
+    let response = facade
+        .delete_many(ResourceBatchSelector {
+            account: None,
+            kind: VARIABLE_SET_KIND.to_string(),
+            api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
+            resource_refs: vec![
+                ResourceRef::ByName("del-mix-exists".to_string()), // idx 0 — exists
+                ResourceRef::ByName("del-mix-missing".to_string()), // idx 1 — missing name
+                ResourceRef::ById(absent_uid),                     // idx 2 — missing uid
+            ],
+        })
+        .await
+        .unwrap();
+
+    assert_batch_indexes(&response, &[0], &[1, 2]);
+    assert_eq!(
+        response.successes[0].item, uid_existing,
+        "success must return the deleted uid"
+    );
+
+    let problem_by_index: std::collections::HashMap<
+        usize,
+        &kamu_resources_facade::ResourceLookupProblem,
+    > = response
+        .problems
+        .iter()
+        .map(|p| (p.request_index, &p.error))
+        .collect();
+
+    assert!(
+        matches!(problem_by_index[&1], ResourceLookupProblem::NameNotFound(_)),
+        "idx 1 must be NameNotFound"
+    );
+    assert!(
+        matches!(problem_by_index[&2], ResourceLookupProblem::UIDNotFound(_)),
+        "idx 2 must be UIDNotFound"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-060
+// delete_many with duplicate refs: document the current behavior.
+// The contract is that both occurrences succeed if the resource is resolved
+// before deletion (pre-resolution deduplication), OR the first succeeds and
+// the second returns NameNotFound.  We assert whichever branch fires and verify
+// it is identical for local and remote.
+contract_test!(
+    delete_many_duplicate_refs_is_deterministic,
+    super::test_delete_many_duplicate_refs_is_deterministic
+);
+
+pub async fn test_delete_many_duplicate_refs_is_deterministic(h: &impl FacadeContractHarness) {
+    let uid = create_resource(h, "del-dup-ref").await;
+    let facade = h.facade_for(TestAccount::Alice);
+
+    let response = facade
+        .delete_many(ResourceBatchSelector {
+            account: None,
+            kind: VARIABLE_SET_KIND.to_string(),
+            api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
+            resource_refs: vec![
+                ResourceRef::ByName("del-dup-ref".to_string()), // idx 0
+                ResourceRef::ByName("del-dup-ref".to_string()), // idx 1 — duplicate
+            ],
+        })
+        .await
+        .unwrap();
+
+    // Acceptable contracts:
+    // A) Both succeed (pre-resolution, same UID returned twice)
+    // B) First succeeds, second is NameNotFound
+    // Either way: no request index is lost.
+    let total = response.successes.len() + response.problems.len();
+    assert_eq!(total, 2, "all request indexes must be accounted for");
+
+    if response.successes.len() == 2 {
+        // Contract A: both succeed, same UID
+        for s in &response.successes {
+            assert_eq!(
+                s.item, uid,
+                "duplicate delete_many success must refer to same uid"
+            );
+        }
+    } else {
+        // Contract B: first succeeds, second fails
+        assert_eq!(response.successes.len(), 1);
+        assert_eq!(response.problems.len(), 1);
+        assert_eq!(response.successes[0].item, uid);
+        assert!(
+            matches!(
+                &response.problems[0].error,
+                ResourceLookupProblem::NameNotFound(_)
+            ),
+            "second duplicate must be NameNotFound, got: {:?}",
+            response.problems[0].error
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

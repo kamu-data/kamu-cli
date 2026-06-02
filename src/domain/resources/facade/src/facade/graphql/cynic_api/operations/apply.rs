@@ -37,6 +37,7 @@ pub(crate) struct ApplyManifestResourcesMut {
 pub(crate) enum ResourceApplyOutcome {
     ResourceApplySuccess(ResourceApplySuccess),
     ResourceApplyRejection(ResourceApplyRejection),
+    ResourceApplyError(ResourceApplyError),
     #[cynic(fallback)]
     Unknown,
 }
@@ -167,13 +168,64 @@ impl From<ResourceApplyRejectionCategory> for domain::ApplyResourceRejectionCate
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
+pub(crate) struct ResourceApplyError {
+    pub code: ResourceApplyErrorCode,
+    pub message: String,
+}
+
+#[derive(cynic::Enum, Debug, Clone, Copy)]
+pub(crate) enum ResourceApplyErrorCode {
+    ParseManifest,
+    UnsupportedDescriptor,
+    BadAccount,
+    InvalidMetadata,
+    InvalidSpec,
+}
+
+impl From<ResourceApplyError> for crate::ApplyManifestError {
+    fn from(value: ResourceApplyError) -> Self {
+        use kamu_resources::ResourceInvalidSpecError;
+
+        use crate::facade::resource_facade_errors::ParseResourceManifestError;
+        match value.code {
+            ResourceApplyErrorCode::ParseManifest => {
+                Self::ParseManifest(ParseResourceManifestError {
+                    message: value.message,
+                })
+            }
+            ResourceApplyErrorCode::InvalidSpec => Self::InvalidSpec(ResourceInvalidSpecError {
+                kind: String::new(),
+                api_version: String::new(),
+                message: value.message,
+            }),
+            // UnsupportedDescriptor, BadAccount, InvalidMetadata don't have
+            // plain-message constructors — surface them as internal errors so
+            // the caller still gets a strongly-typed Err rather than a
+            // RemoteRequest catch-all.
+            ResourceApplyErrorCode::UnsupportedDescriptor
+            | ResourceApplyErrorCode::BadAccount
+            | ResourceApplyErrorCode::InvalidMetadata => {
+                Self::Internal(internal_error::InternalError::new(value.message))
+            }
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl ResourceApplyOutcome {
     pub(crate) fn try_into_planning_decision(
         self,
-    ) -> Result<domain::ApplyManifestPlanningDecision, InternalError> {
+    ) -> Result<domain::ApplyManifestPlanningDecision, crate::ApplyManifestError> {
         Ok(match self {
             Self::ResourceApplySuccess(success) => {
-                let resource = success.resource.try_into()?;
+                let resource = success
+                    .resource
+                    .try_into()
+                    .map_err(crate::ApplyManifestError::Internal)?;
                 let outcome = success.operation.into();
                 let changes = success.changes.into_iter().map(Into::into).collect();
                 let warnings = success.warnings.into_iter().map(Into::into).collect();
@@ -191,20 +243,24 @@ impl ResourceApplyOutcome {
             Self::ResourceApplyRejection(rejection) => {
                 domain::ApplyManifestPlanningDecision::Rejected(rejection.into())
             }
+            Self::ResourceApplyError(error) => return Err(error.into()),
             Self::Unknown => {
-                return Err(InternalError::new(
+                return Err(crate::ApplyManifestError::Internal(InternalError::new(
                     "Remote apply returned an unrecognized ResourceApplyOutcome variant",
-                ));
+                )));
             }
         })
     }
 
     pub(crate) fn try_into_application_decision(
         self,
-    ) -> Result<domain::ApplyManifestApplicationDecision, InternalError> {
+    ) -> Result<domain::ApplyManifestApplicationDecision, crate::ApplyManifestError> {
         Ok(match self {
             Self::ResourceApplySuccess(success) => {
-                let resource = success.resource.try_into()?;
+                let resource = success
+                    .resource
+                    .try_into()
+                    .map_err(crate::ApplyManifestError::Internal)?;
                 let outcome = success.operation.into();
                 let warnings = success.warnings.into_iter().map(Into::into).collect();
 
@@ -217,10 +273,11 @@ impl ResourceApplyOutcome {
             Self::ResourceApplyRejection(rejection) => {
                 domain::ApplyManifestApplicationDecision::Rejected(rejection.into())
             }
+            Self::ResourceApplyError(error) => return Err(error.into()),
             Self::Unknown => {
-                return Err(InternalError::new(
+                return Err(crate::ApplyManifestError::Internal(InternalError::new(
                     "Remote apply returned an unrecognized ResourceApplyOutcome variant",
-                ));
+                )));
             }
         })
     }

@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::mutations::ResourceApplyOutcome;
+use crate::mutations::{ResourceApplyError, ResourceApplyErrorCode, ResourceApplyOutcome};
 use crate::prelude::*;
 use crate::queries::{
     BatchResourceProblem,
@@ -42,7 +42,7 @@ impl ResourcesMut {
             manifest,
         };
 
-        let result = if dry_run.unwrap_or(false) {
+        let outcome_result = if dry_run.unwrap_or(false) {
             resource_facade
                 .plan_apply_manifest(request)
                 .await
@@ -52,10 +52,12 @@ impl ResourcesMut {
                 .apply_manifest(request)
                 .await
                 .map(ResourceApplyOutcome::from)
-        }
-        .map_err(map_apply_resource_error)?;
+        };
 
-        Ok(result)
+        match outcome_result {
+            Ok(outcome) => Ok(outcome),
+            Err(err) => map_apply_resource_error(err),
+        }
     }
 
     #[tracing::instrument(level = "info", name = ResourcesMut_delete, skip_all, fields(?selector))]
@@ -245,23 +247,36 @@ pub struct ResourceDeleteManySuccess {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn map_apply_resource_error(error: kamu_resources_facade::ApplyManifestError) -> GqlError {
+fn map_apply_resource_error(
+    error: kamu_resources_facade::ApplyManifestError,
+) -> Result<ResourceApplyOutcome, GqlError> {
     use kamu_resources_facade::ApplyManifestError as E;
 
+    let apply_error = |code, message: String| {
+        Ok(ResourceApplyOutcome::Error(ResourceApplyError {
+            code,
+            message,
+        }))
+    };
+
     match error {
-        E::ParseManifest(error) => GqlError::gql(error.to_string()),
-        E::UnsupportedDescriptor(_) => GqlError::gql("Unsupported resource kind"),
-        E::BadAccount(error) => map_resolve_manifest_account_error(error),
-        E::InvalidMetadata(error) => GqlError::gql(error.to_string()),
-        E::InvalidSpec(error) => GqlError::gql(error.to_string()),
-        E::UIDNotFound(error) => GqlError::gql(error.to_string()),
-        E::TypeMismatch(error) => GqlError::gql(error.to_string()),
+        E::ParseManifest(e) => apply_error(ResourceApplyErrorCode::ParseManifest, e.to_string()),
+        E::UnsupportedDescriptor(e) => {
+            apply_error(ResourceApplyErrorCode::UnsupportedDescriptor, e.to_string())
+        }
+        E::BadAccount(e) => apply_error(ResourceApplyErrorCode::BadAccount, e.to_string()),
+        E::InvalidMetadata(e) => {
+            apply_error(ResourceApplyErrorCode::InvalidMetadata, e.to_string())
+        }
+        E::InvalidSpec(e) => apply_error(ResourceApplyErrorCode::InvalidSpec, e.to_string()),
+        E::UIDNotFound(error) => Err(GqlError::gql(error.to_string())),
+        E::TypeMismatch(error) => Err(GqlError::gql(error.to_string())),
         E::ConcurrentModification(error) => {
             tracing::error!(error = ?error, "Resource apply_manifest concurrent modification");
-            GqlError::gql("Resource was modified concurrently")
+            Err(GqlError::gql("Resource was modified concurrently"))
         }
-        E::RemoteRequest(error) => error.int_err().into(),
-        E::Internal(error) => error.into(),
+        E::RemoteRequest(error) => Err(error.int_err().into()),
+        E::Internal(error) => Err(error.into()),
     }
 }
 

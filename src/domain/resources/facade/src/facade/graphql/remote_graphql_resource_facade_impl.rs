@@ -416,7 +416,6 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
             .resources
             .apply_manifest
             .try_into_planning_decision()
-            .map_err(Into::into)
     }
 
     async fn apply_manifest(
@@ -436,7 +435,6 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
             .resources
             .apply_manifest
             .try_into_application_decision()
-            .map_err(Into::into)
     }
 
     async fn delete(

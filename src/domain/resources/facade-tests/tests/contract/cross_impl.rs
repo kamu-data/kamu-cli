@@ -18,7 +18,7 @@
 //! shared in-memory storage, so writes through local are visible remotely and
 //! vice-versa.
 
-use kamu_resources::ApplyResourceOutcome;
+use kamu_resources::{ApplyManifestPlanningDecision, ApplyResourceOutcome};
 use kamu_resources_facade::{
     ApplyManifestRequest,
     ResourceBatchSelector,
@@ -194,6 +194,110 @@ pub async fn test_batch_equivalence(h: &impl FacadeContractHarness) {
         .unwrap();
     assert_batch_indexes(&render_resp, &[0], &[1, 2]);
     assert!(!render_resp.successes[0].item.manifest.is_empty());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-155: local and remote produce equivalent apply decisions.
+//
+// Runs create → update → untouched → rejection through the facade and asserts
+// that each operation produces the expected decision variant.  Because the
+// `contract_test!` macro runs the same function against both harnesses, this
+// implicitly verifies that local and remote agree on every step.
+contract_test!(apply_equivalence, super::test_apply_equivalence);
+
+pub async fn test_apply_equivalence(h: &impl FacadeContractHarness) {
+    let facade = h.facade_for(TestAccount::Alice);
+
+    // --- Create ---
+    let create_manifest = variable_set_manifest_json("cross-apply-eq", None, &[("X", "1")]);
+    let create_decision = facade
+        .apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: create_manifest,
+        })
+        .await
+        .unwrap();
+    assert_applied_outcome(&create_decision, ApplyResourceOutcome::Created);
+
+    // --- Update ---
+    let update_manifest = variable_set_manifest_json("cross-apply-eq", None, &[("X", "2")]);
+    let update_decision = facade
+        .apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: update_manifest.clone(),
+        })
+        .await
+        .unwrap();
+    assert_applied_outcome(&update_decision, ApplyResourceOutcome::Updated);
+
+    // --- Untouched (same manifest re-applied) ---
+    let untouched_decision = facade
+        .apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: update_manifest,
+        })
+        .await
+        .unwrap();
+    assert_applied_outcome(&untouched_decision, ApplyResourceOutcome::Untouched);
+
+    // --- Plan: untouched round-trip ---
+    let plan_manifest = variable_set_manifest_json("cross-apply-eq", None, &[("X", "2")]);
+    let plan_decision = facade
+        .plan_apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: plan_manifest,
+        })
+        .await
+        .unwrap();
+    assert!(
+        matches!(
+            plan_decision,
+            ApplyManifestPlanningDecision::Planned(ref p)
+            if p.outcome == ApplyResourceOutcome::Untouched
+        ),
+        "expected Planned(Unchanged), got: {plan_decision:?}"
+    );
+
+    // --- Rejection (spec-invalid: empty variables) ---
+    // Empty variables fails VariableSetSpec::validate() at decode time, so both
+    // apply and plan return Err(InvalidSpec) rather than Ok(Rejected(...)).
+    let reject_manifest = indoc::indoc!(
+        r#"{
+            "apiVersion": "kamu.dev/v1alpha1",
+            "kind": "VariableSet",
+            "metadata": {"name": "cross-apply-eq-rejected"},
+            "spec": {"variables": {}}
+        }"#
+    )
+    .to_string();
+    let reject_result = facade
+        .apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: reject_manifest.clone(),
+        })
+        .await;
+    assert!(
+        matches!(
+            reject_result,
+            Err(kamu_resources_facade::ApplyManifestError::InvalidSpec(_))
+        ),
+        "apply: expected Err(InvalidSpec), got: {reject_result:?}"
+    );
+
+    let plan_reject_result = facade
+        .plan_apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: reject_manifest,
+        })
+        .await;
+    assert!(
+        matches!(
+            plan_reject_result,
+            Err(kamu_resources_facade::ApplyManifestError::InvalidSpec(_))
+        ),
+        "plan: expected Err(InvalidSpec), got: {plan_reject_result:?}"
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

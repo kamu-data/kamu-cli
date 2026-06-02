@@ -9,6 +9,7 @@
 
 use kamu_resources::{ApplyManifestPlanningDecision, ApplyResourceOutcome};
 use kamu_resources_facade::{
+    ApplyManifestError,
     ApplyManifestRequest,
     GetResourceError,
     ResourceManifestFormat,
@@ -27,6 +28,7 @@ use crate::helpers::{
     assert_planning_outcome,
     assert_resource_view_fields,
     variable_set_manifest_json,
+    variable_set_manifest_yaml,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -217,6 +219,282 @@ pub async fn test_apply_idempotent(h: &impl FacadeContractHarness) {
     assert_eq!(
         second.metadata.generation, generation,
         "generation must not change on no-op apply"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-011
+contract_test!(apply_create_yaml, super::test_apply_create_yaml);
+
+pub async fn test_apply_create_yaml(h: &impl FacadeContractHarness) {
+    let facade = h.facade_for(TestAccount::Alice);
+    let manifest_yaml = variable_set_manifest_yaml("yaml-vars", None, &[("KEY1", "val1")]);
+
+    let decision = facade
+        .apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Yaml,
+            manifest: manifest_yaml,
+        })
+        .await
+        .unwrap();
+
+    let view = assert_applied_outcome(&decision, ApplyResourceOutcome::Created);
+    assert_resource_view_fields(
+        view,
+        VARIABLE_SET_KIND,
+        VARIABLE_SET_API_VERSION,
+        "yaml-vars",
+    );
+    assert_eq!(view.metadata.generation, 1, "initial generation must be 1");
+
+    // Semantic equivalence: same resource via get, just like after JSON apply
+    let fetched = facade
+        .get(
+            make_selector(VARIABLE_SET_KIND, VARIABLE_SET_API_VERSION, "yaml-vars"),
+            SpecViewMode::Encrypted,
+        )
+        .await
+        .unwrap();
+    assert_eq!(fetched.metadata.uid, view.metadata.uid);
+    assert_resource_view_fields(
+        &fetched,
+        VARIABLE_SET_KIND,
+        VARIABLE_SET_API_VERSION,
+        "yaml-vars",
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-012
+contract_test!(plan_update, super::test_plan_update);
+
+pub async fn test_plan_update(h: &impl FacadeContractHarness) {
+    let facade = h.facade_for(TestAccount::Alice);
+
+    // Create first
+    facade
+        .apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: variable_set_manifest_json("plan-upd-vars", None, &[("A", "1")]),
+        })
+        .await
+        .unwrap();
+
+    // Plan an update with changed spec
+    let decision = facade
+        .plan_apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: variable_set_manifest_json("plan-upd-vars", None, &[("A", "1"), ("B", "2")]),
+        })
+        .await
+        .unwrap();
+
+    assert_planning_outcome(&decision, ApplyResourceOutcome::Updated);
+
+    let ApplyManifestPlanningDecision::Planned(plan) = &decision else {
+        unreachable!()
+    };
+    // The spec change must appear among the reported changes
+    assert!(
+        plan.changes
+            .iter()
+            .any(|c| matches!(c.kind, kamu_resources::ApplyManifestChangeKind::Spec)),
+        "plan must report a spec change"
+    );
+    // Resource in store must remain unchanged (no side effect)
+    let stored = facade
+        .get(
+            make_selector(VARIABLE_SET_KIND, VARIABLE_SET_API_VERSION, "plan-upd-vars"),
+            SpecViewMode::Encrypted,
+        )
+        .await
+        .unwrap();
+    let stored_spec: serde_json::Value = stored.spec;
+    assert!(
+        stored_spec["variables"]["B"].is_null(),
+        "planning must not persist the update"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-013
+contract_test!(plan_unchanged, super::test_plan_unchanged);
+
+pub async fn test_plan_unchanged(h: &impl FacadeContractHarness) {
+    let facade = h.facade_for(TestAccount::Alice);
+    let manifest = variable_set_manifest_json("plan-same-vars", None, &[("X", "42")]);
+
+    facade
+        .apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: manifest.clone(),
+        })
+        .await
+        .unwrap();
+
+    let decision = facade
+        .plan_apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest,
+        })
+        .await
+        .unwrap();
+
+    assert_planning_outcome(&decision, ApplyResourceOutcome::Untouched);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-014
+contract_test!(
+    plan_rejects_malformed_manifest,
+    super::test_plan_rejects_malformed_manifest
+);
+
+pub async fn test_plan_rejects_malformed_manifest(h: &impl FacadeContractHarness) {
+    let facade = h.facade_for(TestAccount::Alice);
+
+    let result = facade
+        .plan_apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: "not valid json {{{".to_string(),
+        })
+        .await;
+
+    assert!(
+        matches!(result, Err(ApplyManifestError::ParseManifest(_))),
+        "malformed JSON must produce ParseManifest error, got: {result:?}"
+    );
+
+    let result_yaml = facade
+        .plan_apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Yaml,
+            manifest: ": : invalid yaml \t\0".to_string(),
+        })
+        .await;
+
+    assert!(
+        matches!(result_yaml, Err(ApplyManifestError::ParseManifest(_))),
+        "malformed YAML must produce ParseManifest error, got: {result_yaml:?}"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-015
+contract_test!(
+    plan_rejects_schema_invalid_manifest,
+    super::test_plan_rejects_schema_invalid_manifest
+);
+
+pub async fn test_plan_rejects_schema_invalid_manifest(h: &impl FacadeContractHarness) {
+    let facade = h.facade_for(TestAccount::Alice);
+
+    // Missing `spec` field entirely — fails spec deserialization
+    let bad_manifest = serde_json::json!({
+        "apiVersion": VARIABLE_SET_API_VERSION,
+        "kind": VARIABLE_SET_KIND,
+        "metadata": {"name": "schema-invalid-vars"}
+        // no "spec"
+    })
+    .to_string();
+
+    let result = facade
+        .plan_apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: bad_manifest,
+        })
+        .await;
+
+    assert!(
+        matches!(
+            result,
+            Err(ApplyManifestError::ParseManifest(_)
+                | ApplyManifestError::InvalidSpec(_)
+                | ApplyManifestError::InvalidMetadata(_))
+        ),
+        "schema-invalid manifest must fail with parse/spec/metadata error, got: {result:?}"
+    );
+
+    // No resource should have been persisted
+    let get = facade
+        .get(
+            make_selector(
+                VARIABLE_SET_KIND,
+                VARIABLE_SET_API_VERSION,
+                "schema-invalid-vars",
+            ),
+            SpecViewMode::Encrypted,
+        )
+        .await;
+    assert!(
+        matches!(get, Err(GetResourceError::LookupProblem(_))),
+        "resource must not exist after schema-invalid plan"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-016 / RF-025
+// VariableSetResource rejects business-invalid specs. An empty variables map
+// fails VariableSetSpec::validate() at parse time, surfaced as InvalidSpec.
+contract_test!(
+    apply_rejects_business_invalid_spec,
+    super::test_apply_rejects_business_invalid_spec
+);
+
+pub async fn test_apply_rejects_business_invalid_spec(h: &impl FacadeContractHarness) {
+    let facade = h.facade_for(TestAccount::Alice);
+
+    // Empty variables map fails VariableSetSpec::validate() at spec decode time;
+    // the facade surfaces this as ApplyManifestError::InvalidSpec.
+    let empty_vars = serde_json::json!({
+        "apiVersion": VARIABLE_SET_API_VERSION,
+        "kind": VARIABLE_SET_KIND,
+        "metadata": {"name": "biz-invalid-vars"},
+        "spec": {"variables": {}}
+    })
+    .to_string();
+
+    let plan_result = facade
+        .plan_apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: empty_vars.clone(),
+        })
+        .await;
+    assert!(
+        matches!(plan_result, Err(ApplyManifestError::InvalidSpec(_))),
+        "plan with empty variables must return Err(InvalidSpec), got: {plan_result:?}"
+    );
+
+    let apply_result = facade
+        .apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: empty_vars,
+        })
+        .await;
+    assert!(
+        matches!(apply_result, Err(ApplyManifestError::InvalidSpec(_))),
+        "apply with empty variables must return Err(InvalidSpec), got: {apply_result:?}"
+    );
+
+    // Resource must not have been created
+    let get = facade
+        .get(
+            make_selector(
+                VARIABLE_SET_KIND,
+                VARIABLE_SET_API_VERSION,
+                "biz-invalid-vars",
+            ),
+            SpecViewMode::Encrypted,
+        )
+        .await;
+    assert!(
+        matches!(get, Err(GetResourceError::LookupProblem(_))),
+        "resource must not exist after rejected apply"
     );
 }
 

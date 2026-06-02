@@ -72,7 +72,6 @@ pub fn variable_set_manifest_json(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Builds a `VariableSet` manifest YAML string.
-#[expect(dead_code)]
 pub fn variable_set_manifest_yaml(
     name: &str,
     account: Option<&str>,
@@ -87,15 +86,14 @@ pub fn variable_set_manifest_yaml(
         ),
         None => String::new(),
     };
+    // Each variable entry must appear at 4-space indent under `variables:`.
+    // The outer formatdoc! strips the 8-space common indent from the template
+    // body, but {variables_section} is a string interpolation — its content is
+    // NOT re-indented by formatdoc!.  We therefore pre-indent each line by the
+    // exact 4 spaces we want in the final YAML output.
     let variables_section: String = vars
         .iter()
-        .map(|(k, v)| {
-            indoc::formatdoc!(
-                "
-                    {k}:
-                      value: {v}"
-            )
-        })
+        .map(|(k, v)| format!("    {k}:\n      value: {v}"))
         .collect::<Vec<_>>()
         .join("\n");
     let api = VARIABLE_SET_API_VERSION;
