@@ -62,7 +62,7 @@ impl TryFrom<fragments::Resource> for domain::ResourceView {
                 description: value.metadata.description,
                 labels,
                 annotations,
-                generation: value.metadata.generation,
+                generation: value.metadata.generation.into(),
                 created_at: value.metadata.created_at,
                 updated_at: value.metadata.updated_at,
                 deleted_at: value.metadata.deleted_at,
@@ -107,7 +107,7 @@ impl TryFrom<fragments::ResourceSummary> for domain::ResourceSummaryView {
     fn try_from(value: fragments::ResourceSummary) -> Result<Self, Self::Error> {
         let status = value.status.map(|s| domain::ResourceStatusSummaryView {
             phase: s.phase.map(Into::into),
-            observed_generation: s.observed_generation,
+            observed_generation: s.observed_generation.map(Into::into),
             ready: s.ready,
         });
 
@@ -118,7 +118,7 @@ impl TryFrom<fragments::ResourceSummary> for domain::ResourceSummaryView {
                 let key = v.key;
                 let col_value = match (v.string_value, v.uint64_value, v.bool_value) {
                     (Some(s), None, None) => domain::ResourceListColumnValue::String(s),
-                    (None, Some(n), None) => domain::ResourceListColumnValue::UInt64(n),
+                    (None, Some(n), None) => domain::ResourceListColumnValue::UInt64(n.into()),
                     (None, None, Some(b)) => domain::ResourceListColumnValue::Bool(b),
                     (None, None, None) => {
                         return Err(InternalError::new(format!(
@@ -144,7 +144,7 @@ impl TryFrom<fragments::ResourceSummary> for domain::ResourceSummaryView {
             uid: value.id,
             name: value.name,
             description: value.description,
-            generation: value.generation,
+            generation: value.generation.into(),
             created_at: value.created_at,
             updated_at: value.updated_at,
             status,
@@ -177,13 +177,13 @@ impl TryFrom<fragments::ResourceTypeCountSummary> for domain::ResourceTypeCountS
             kind: value.kind,
             name: value.name,
             api_version: value.api_version,
-            total_count: value.total_count,
+            total_count: value.total_count.into(),
             phase_counts: domain::ResourcePhaseCounts {
-                pending: value.phase_counts.pending,
-                reconciling: value.phase_counts.reconciling,
-                ready: value.phase_counts.ready,
-                degraded: value.phase_counts.degraded,
-                failed: value.phase_counts.failed,
+                pending: value.phase_counts.pending.into(),
+                reconciling: value.phase_counts.reconciling.into(),
+                ready: value.phase_counts.ready.into(),
+                degraded: value.phase_counts.degraded.into(),
+                failed: value.phase_counts.failed.into(),
             },
         })
     }

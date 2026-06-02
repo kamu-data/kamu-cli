@@ -1,0 +1,60 @@
+[package]
+name = "kamu-resources-facade-tests"
+description = "Contract tests for the ResourceFacade trait - validates local and remote implementations"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lints]
+workspace = true
+
+
+[lib]
+doctest = false
+
+
+[dev-dependencies]
+database-common = { workspace = true }
+init-on-startup = { workspace = true }
+kamu-accounts = { workspace = true, features = ["testing"] }
+kamu-accounts-inmem = { workspace = true }
+kamu-accounts-services = { workspace = true }
+kamu-adapter-auth-oso-rebac = { workspace = true }
+kamu-adapter-graphql = { workspace = true }
+kamu-auth-rebac = { workspace = true }
+kamu-auth-rebac-inmem = { workspace = true }
+kamu-auth-rebac-services = { workspace = true }
+kamu-configuration = { workspace = true }
+kamu-configuration-inmem = { workspace = true }
+kamu-configuration-services = { workspace = true }
+kamu-datasets = { workspace = true }
+kamu-resources = { workspace = true }
+kamu-resources-facade = { workspace = true }
+kamu-resources-inmem = { workspace = true }
+kamu-resources-services = { workspace = true }
+messaging-outbox = { workspace = true }
+kamu-messaging-outbox-inmem = { workspace = true }
+odf = { workspace = true }
+time-source = { workspace = true }
+
+async-graphql = { version = "7", default-features = false, features = ["chrono", "url"] }
+dill = { version = "0.15", default-features = false }
+indoc = "2"
+strum = { version = "0.28", default-features = false, features = ["derive"] }
+async-graphql-axum = "7"
+async-trait = { version = "0.1", default-features = false }
+axum = { version = "0.8" }
+pretty_assertions = { version = "1" }
+serde_json = { version = "1" }
+serde_yaml = { package = "serde_yaml_ng", version = "0.10", default-features = false }
+test-log = { version = "0.2", features = ["trace"] }
+tokio = { version = "1", default-features = false, features = ["rt-multi-thread", "macros", "net"] }
+url = { version = "2", default-features = false }

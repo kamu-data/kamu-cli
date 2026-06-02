@@ -9,6 +9,7 @@
 
 use chrono::{DateTime, Utc};
 
+use crate::facade::graphql::cynic_api::scalars::Uint64;
 use crate::facade::graphql::cynic_api::schema;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -20,7 +21,7 @@ pub(crate) struct ResourceSummary {
     pub kind: ResourceKind,
     pub name: String,
     pub description: Option<String>,
-    pub generation: u64,
+    pub generation: Uint64,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub status: Option<ResourceStatusSummary>,
@@ -32,7 +33,7 @@ pub(crate) struct ResourceSummary {
 #[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct ResourceStatusSummary {
     pub phase: Option<ResourcePhase>,
-    pub observed_generation: Option<u64>,
+    pub observed_generation: Option<Uint64>,
     pub ready: Option<bool>,
 }
 
@@ -65,7 +66,7 @@ impl From<ResourcePhase> for kamu_resources::ResourcePhase {
 pub(crate) struct ResourceListColumnValueView {
     pub key: String,
     pub string_value: Option<String>,
-    pub uint64_value: Option<u64>,
+    pub uint64_value: Option<Uint64>,
     pub bool_value: Option<bool>,
 }
 
@@ -98,7 +99,7 @@ pub(crate) struct ResourceTypeCountSummary {
     pub kind: String,
     pub name: String,
     pub api_version: String,
-    pub total_count: u64,
+    pub total_count: Uint64,
     pub phase_counts: ResourcePhaseCounts,
 }
 
@@ -106,11 +107,11 @@ pub(crate) struct ResourceTypeCountSummary {
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct ResourcePhaseCounts {
-    pub pending: u64,
-    pub reconciling: u64,
-    pub ready: u64,
-    pub degraded: u64,
-    pub failed: u64,
+    pub pending: Uint64,
+    pub reconciling: Uint64,
+    pub ready: Uint64,
+    pub degraded: Uint64,
+    pub failed: Uint64,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -141,7 +142,7 @@ pub(crate) struct ResourceMetadata {
     pub description: Option<String>,
     pub labels: serde_json::Value,
     pub annotations: serde_json::Value,
-    pub generation: u64,
+    pub generation: Uint64,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub deleted_at: Option<DateTime<Utc>>,

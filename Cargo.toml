@@ -61,6 +61,7 @@ members = [
     "src/domain/datasets/services",
     "src/domain/flow-system/services",
     "src/domain/resources/facade",
+    "src/domain/resources/facade-tests",
     "src/domain/resources/services",
     "src/domain/search/services",
     "src/domain/storage/services",
@@ -224,6 +225,7 @@ kamu-datasets-services = { version = "0.263.3", path = "src/domain/datasets/serv
 ] }
 kamu-flow-system-services = { version = "0.263.3", path = "src/domain/flow-system/services", default-features = false }
 kamu-resources-facade = { version = "0.263.3", path = "src/domain/resources/facade", default-features = false }
+kamu-resources-facade-tests = { version = "0.263.3", path = "src/domain/resources/facade-tests", default-features = false }
 kamu-resources-services = { version = "0.263.3", path = "src/domain/resources/services", default-features = false }
 kamu-search-services = { version = "0.263.3", path = "src/domain/search/services", default-features = false }
 kamu-storage-services = { version = "0.263.3", path = "src/domain/storage/services", default-features = false }
