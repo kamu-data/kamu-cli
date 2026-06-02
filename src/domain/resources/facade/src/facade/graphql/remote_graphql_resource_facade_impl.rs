@@ -115,11 +115,7 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
             .execute_operation(Operation::build_operation(variables))
             .await?;
 
-        let Some(resource) = response.resources.resource else {
-            return Err(outcome_mapper::not_found_error(&selector));
-        };
-
-        resource.try_into().map_err(GetResourceError::Internal)
+        outcome_mapper::map_get_resource_outcome(response.resources.resource)
     }
 
     async fn get_many(
@@ -187,11 +183,7 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
             .execute_operation(Operation::build_identity_operation(variables))
             .await?;
 
-        let Some(identity) = response.resources.resource_identity else {
-            return Err(outcome_mapper::not_found_error(&selector));
-        };
-
-        Ok(identity.into())
+        outcome_mapper::map_get_identity_outcome(response.resources.resource_identity)
     }
 
     async fn get_identities(

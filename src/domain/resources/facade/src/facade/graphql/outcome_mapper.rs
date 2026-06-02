@@ -23,7 +23,6 @@ use crate::{
     ResourceKindMismatchError,
     ResourceLookupProblem,
     ResourceRef,
-    ResourceSelector,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -63,22 +62,6 @@ where
             })
         })
         .collect()
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(super) fn not_found_error(selector: &ResourceSelector) -> GetResourceError {
-    match &selector.resource_ref {
-        ResourceRef::ById(uid) => GetResourceError::LookupProblem(
-            ResourceLookupProblem::UIDNotFound(domain::ResourceUIDNotFoundError(*uid)),
-        ),
-        ResourceRef::ByName(name) => GetResourceError::LookupProblem(
-            ResourceLookupProblem::NameNotFound(domain::ResourceNameNotFoundError {
-                kind: selector.kind.clone(),
-                name: name.clone(),
-            }),
-        ),
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -279,6 +262,78 @@ fn malformed_remote_problem(problem: &impl BatchResourceProblemLike) -> BatchRes
         problem.code_debug(),
         problem.message()
     )))
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(super) fn map_get_resource_outcome(
+    outcome: cynic_api::operations::get_resource::ResourceGetOutcome,
+) -> Result<domain::ResourceView, GetResourceError> {
+    use cynic_api::operations::get_resource::ResourceGetOutcome as O;
+    match outcome {
+        O::Resource(r) => r.try_into().map_err(GetResourceError::Internal),
+        O::ResourceUIDNotFoundProblem(p) => Err(GetResourceError::LookupProblem(
+            ResourceLookupProblem::UIDNotFound(domain::ResourceUIDNotFoundError(p.uid)),
+        )),
+        O::ResourceNameNotFoundProblem(p) => Err(GetResourceError::LookupProblem(
+            ResourceLookupProblem::NameNotFound(domain::ResourceNameNotFoundError {
+                kind: p.kind,
+                name: p.name,
+            }),
+        )),
+        O::ResourceApiVersionMismatchProblem(p) => Err(GetResourceError::LookupProblem(
+            ResourceLookupProblem::ApiVersionMismatch(domain::ResourceAPIVersionMismatchError {
+                expected_api_version: p.expected_api_version,
+                actual_api_version: p.actual_api_version,
+            }),
+        )),
+        O::ResourceKindMismatchProblem(p) => Err(GetResourceError::LookupProblem(
+            ResourceLookupProblem::KindMismatch(ResourceKindMismatchError {
+                uid: p.uid,
+                expected_kind: p.expected_kind,
+                actual_kind: p.actual_kind,
+            }),
+        )),
+        O::Unknown => Err(GetResourceError::Internal(InternalError::new(
+            "Remote get returned an unrecognized ResourceGetOutcome variant",
+        ))),
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(super) fn map_get_identity_outcome(
+    outcome: cynic_api::operations::identity::ResourceGetIdentityOutcome,
+) -> Result<domain::ResourceIdentityView, GetResourceError> {
+    use cynic_api::operations::identity::ResourceGetIdentityOutcome as O;
+    match outcome {
+        O::ResourceIdentity(i) => Ok(i.into()),
+        O::ResourceUIDNotFoundProblem(p) => Err(GetResourceError::LookupProblem(
+            ResourceLookupProblem::UIDNotFound(domain::ResourceUIDNotFoundError(p.uid)),
+        )),
+        O::ResourceNameNotFoundProblem(p) => Err(GetResourceError::LookupProblem(
+            ResourceLookupProblem::NameNotFound(domain::ResourceNameNotFoundError {
+                kind: p.kind,
+                name: p.name,
+            }),
+        )),
+        O::ResourceApiVersionMismatchProblem(p) => Err(GetResourceError::LookupProblem(
+            ResourceLookupProblem::ApiVersionMismatch(domain::ResourceAPIVersionMismatchError {
+                expected_api_version: p.expected_api_version,
+                actual_api_version: p.actual_api_version,
+            }),
+        )),
+        O::ResourceKindMismatchProblem(p) => Err(GetResourceError::LookupProblem(
+            ResourceLookupProblem::KindMismatch(ResourceKindMismatchError {
+                uid: p.uid,
+                expected_kind: p.expected_kind,
+                actual_kind: p.actual_kind,
+            }),
+        )),
+        O::Unknown => Err(GetResourceError::Internal(InternalError::new(
+            "Remote get_identity returned an unrecognized ResourceGetIdentityOutcome variant",
+        ))),
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

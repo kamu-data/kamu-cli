@@ -3975,6 +3975,10 @@ type ResourceEdge {
 	node: ResourceSummary!
 }
 
+union ResourceGetIdentityOutcome = ResourceIdentity | ResourceUIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceApiVersionMismatchProblem | ResourceKindMismatchProblem
+
+union ResourceGetOutcome = Resource | ResourceUIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceApiVersionMismatchProblem | ResourceKindMismatchProblem
+
 scalar ResourceID
 
 type ResourceIdentity {
@@ -4158,7 +4162,7 @@ type Resources {
 	"""
 	Returns a resource by selector, if found
 	"""
-	resource(selector: ResourceSelectorInput!, revealed: Boolean! = false): Resource
+	resource(selector: ResourceSelectorInput!, revealed: Boolean! = false): ResourceGetOutcome!
 	"""
 	Returns resources by selectors
 	"""
@@ -4166,7 +4170,7 @@ type Resources {
 	"""
 	Returns resource identity by selector, if found
 	"""
-	resourceIdentity(selector: ResourceSelectorInput!): ResourceIdentity
+	resourceIdentity(selector: ResourceSelectorInput!): ResourceGetIdentityOutcome!
 	"""
 	Returns resource identities by selectors
 	"""

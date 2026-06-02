@@ -27,7 +27,48 @@ pub(crate) struct GetResourceQuery {
 #[cynic(graphql_type = "Resources", variables = "ResourceSelectorVariables")]
 pub(crate) struct GetResourceResources {
     #[arguments(selector: $selector, revealed: $revealed)]
-    pub resource: Option<Resource>,
+    pub resource: ResourceGetOutcome,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::InlineFragments, Debug, Clone)]
+pub(crate) enum ResourceGetOutcome {
+    Resource(Resource),
+    ResourceUIDNotFoundProblem(GetResourceUIDNotFoundProblem),
+    ResourceNameNotFoundProblem(GetResourceNameNotFoundProblem),
+    ResourceApiVersionMismatchProblem(GetResourceApiVersionMismatchProblem),
+    ResourceKindMismatchProblem(GetResourceKindMismatchProblem),
+    #[cynic(fallback)]
+    Unknown,
+}
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
+#[cynic(graphql_type = "ResourceUIDNotFoundProblem")]
+pub(crate) struct GetResourceUIDNotFoundProblem {
+    pub uid: kamu_resources::ResourceUID,
+}
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
+#[cynic(graphql_type = "ResourceNameNotFoundProblem")]
+pub(crate) struct GetResourceNameNotFoundProblem {
+    pub kind: String,
+    pub name: String,
+}
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
+#[cynic(graphql_type = "ResourceApiVersionMismatchProblem")]
+pub(crate) struct GetResourceApiVersionMismatchProblem {
+    pub expected_api_version: String,
+    pub actual_api_version: String,
+}
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
+#[cynic(graphql_type = "ResourceKindMismatchProblem")]
+pub(crate) struct GetResourceKindMismatchProblem {
+    pub uid: kamu_resources::ResourceUID,
+    pub expected_kind: String,
+    pub actual_kind: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

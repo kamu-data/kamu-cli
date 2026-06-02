@@ -95,18 +95,10 @@ async fn create_resource(
 
 // RF-140: single-resource lookup error taxonomy is consistent across get,
 // get_identity, render_manifest, and delete.
-// Local only: the GQL schema for single-item get/get_identity does not expose a
-// typed error union, so ApiVersionMismatch and KindMismatch arrive as generic
-// RemoteRequest errors on the remote harness.  render_manifest and delete use
-// typed result unions and are covered by their own contract tests on both
-// harnesses.
-mod single_resource_lookup_taxonomy {
-    #[test_log::test(tokio::test)]
-    async fn local() {
-        let h = crate::harness::LocalFacadeHarness::new().await;
-        super::test_single_resource_lookup_taxonomy(&h).await;
-    }
-}
+contract_test!(
+    single_resource_lookup_taxonomy,
+    super::test_single_resource_lookup_taxonomy
+);
 
 pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness) {
     let uid = create_resource(h, "taxonomy-single").await;

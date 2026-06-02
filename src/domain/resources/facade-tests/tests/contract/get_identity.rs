@@ -246,18 +246,10 @@ pub async fn test_get_missing_uid_returns_not_found(h: &impl FacadeContractHarne
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // RF-036
-// Local only: the GQL schema for the single-item `get`/`get_identity` path does
-// not expose a typed error union, so the remote facade surfaces type-mismatch
-// errors as generic RemoteRequest errors rather than LookupProblem variants.
-// The mismatch taxonomy for single-item gets is therefore only verified against
-// the local harness.
-mod get_wrong_api_version_returns_mismatch {
-    #[test_log::test(tokio::test)]
-    async fn local() {
-        let h = crate::harness::LocalFacadeHarness::new().await;
-        super::test_get_wrong_api_version_returns_mismatch(&h).await;
-    }
-}
+contract_test!(
+    get_wrong_api_version_returns_mismatch,
+    super::test_get_wrong_api_version_returns_mismatch
+);
 
 pub async fn test_get_wrong_api_version_returns_mismatch(h: &impl FacadeContractHarness) {
     let uid = create_test_resource(h, "api-ver-mismatch-test").await;
@@ -297,14 +289,11 @@ pub async fn test_get_wrong_api_version_returns_mismatch(h: &impl FacadeContract
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// RF-037 — local only for the same reason as RF-036.
-mod get_wrong_kind_returns_kind_mismatch {
-    #[test_log::test(tokio::test)]
-    async fn local() {
-        let h = crate::harness::LocalFacadeHarness::new().await;
-        super::test_get_wrong_kind_returns_kind_mismatch(&h).await;
-    }
-}
+// RF-037
+contract_test!(
+    get_wrong_kind_returns_kind_mismatch,
+    super::test_get_wrong_kind_returns_kind_mismatch
+);
 
 pub async fn test_get_wrong_kind_returns_kind_mismatch(h: &impl FacadeContractHarness) {
     use crate::helpers::{SECRET_SET_API_VERSION, SECRET_SET_KIND};

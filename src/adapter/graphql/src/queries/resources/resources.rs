@@ -108,17 +108,17 @@ impl Resources {
         ctx: &Context<'_>,
         selector: ResourceSelectorInput,
         #[graphql(default)] revealed: bool,
-    ) -> Result<Option<Resource>> {
+    ) -> Result<ResourceGetOutcome> {
         let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
 
         let spec_view_mode = Self::spec_view_mode_from_revealed(revealed);
 
         match resource_facade.get(selector.into(), spec_view_mode).await {
-            Ok(resource) => Ok(Some(resource.into())),
-            Err(e) => {
-                map_get_resource_error(e)?;
-                Ok(None)
+            Ok(resource) => Ok(ResourceGetOutcome::Success(resource.into())),
+            Err(kamu_resources_facade::GetResourceError::LookupProblem(problem)) => {
+                Ok(ResourceGetOutcome::from_lookup_problem(problem))
             }
+            Err(error) => Err(map_get_resource_non_lookup_error(error)),
         }
     }
 
@@ -149,15 +149,15 @@ impl Resources {
         &self,
         ctx: &Context<'_>,
         selector: ResourceSelectorInput,
-    ) -> Result<Option<ResourceIdentity>> {
+    ) -> Result<ResourceGetIdentityOutcome> {
         let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
 
         match resource_facade.get_identity(selector.into()).await {
-            Ok(identity) => Ok(Some(identity.into())),
-            Err(e) => {
-                map_get_resource_error(e)?;
-                Ok(None)
+            Ok(identity) => Ok(ResourceGetIdentityOutcome::Success(identity.into())),
+            Err(kamu_resources_facade::GetResourceError::LookupProblem(problem)) => {
+                Ok(ResourceGetIdentityOutcome::from_lookup_problem(problem))
             }
+            Err(error) => Err(map_get_resource_non_lookup_error(error)),
         }
     }
 
@@ -405,16 +405,101 @@ impl Resources {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn map_get_resource_error(error: kamu_resources_facade::GetResourceError) -> Result<()> {
-    use kamu_resources_facade::{GetResourceError as E, ResourceLookupProblem as P};
+fn map_get_resource_non_lookup_error(error: kamu_resources_facade::GetResourceError) -> GqlError {
+    use kamu_resources_facade::GetResourceError as E;
 
     match error {
-        E::LookupProblem(P::UIDNotFound(_) | P::NameNotFound(_)) => Ok(()),
-        E::LookupProblem(problem) => Err(GqlError::gql(problem.to_string())),
-        E::UnsupportedDescriptor(_) => Err(GqlError::gql("Unsupported resource kind")),
-        E::BadAccount(error) => Err(map_resolve_manifest_account_error(error)),
-        E::RemoteRequest(error) => Err(error.int_err().into()),
-        E::Internal(error) => Err(error.into()),
+        E::LookupProblem(_) => unreachable!("LookupProblem is handled as a union arm"),
+        E::UnsupportedDescriptor(_) => GqlError::gql("Unsupported resource kind"),
+        E::BadAccount(error) => map_resolve_manifest_account_error(error),
+        E::RemoteRequest(error) => error.int_err().into(),
+        E::Internal(error) => error.into(),
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Union, Debug, Clone)]
+pub enum ResourceGetOutcome {
+    Success(Resource),
+    UidNotFound(ResourceUIDNotFoundProblem),
+    NameNotFound(ResourceNameNotFoundProblem),
+    ApiVersionMismatch(ResourceApiVersionMismatchProblem),
+    KindMismatch(ResourceKindMismatchProblem),
+}
+
+impl ResourceGetOutcome {
+    fn from_lookup_problem(
+        problem: kamu_resources_facade::ResourceLookupProblem,
+    ) -> ResourceGetOutcome {
+        use kamu_resources_facade::ResourceLookupProblem as P;
+        match problem {
+            P::UIDNotFound(e) => Self::UidNotFound(ResourceUIDNotFoundProblem {
+                uid: e.0.into(),
+                message: e.to_string(),
+            }),
+            P::NameNotFound(e) => Self::NameNotFound(ResourceNameNotFoundProblem {
+                kind: e.kind.clone(),
+                name: e.name.clone(),
+                message: e.to_string(),
+            }),
+            P::ApiVersionMismatch(e) => {
+                Self::ApiVersionMismatch(ResourceApiVersionMismatchProblem {
+                    expected_api_version: e.expected_api_version.clone(),
+                    actual_api_version: e.actual_api_version.clone(),
+                    message: e.to_string(),
+                })
+            }
+            P::KindMismatch(e) => Self::KindMismatch(ResourceKindMismatchProblem {
+                uid: e.uid.into(),
+                expected_kind: e.expected_kind.clone(),
+                actual_kind: e.actual_kind.clone(),
+                message: e.to_string(),
+            }),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Union, Debug, Clone)]
+pub enum ResourceGetIdentityOutcome {
+    Success(ResourceIdentity),
+    UidNotFound(ResourceUIDNotFoundProblem),
+    NameNotFound(ResourceNameNotFoundProblem),
+    ApiVersionMismatch(ResourceApiVersionMismatchProblem),
+    KindMismatch(ResourceKindMismatchProblem),
+}
+
+impl ResourceGetIdentityOutcome {
+    fn from_lookup_problem(
+        problem: kamu_resources_facade::ResourceLookupProblem,
+    ) -> ResourceGetIdentityOutcome {
+        use kamu_resources_facade::ResourceLookupProblem as P;
+        match problem {
+            P::UIDNotFound(e) => Self::UidNotFound(ResourceUIDNotFoundProblem {
+                uid: e.0.into(),
+                message: e.to_string(),
+            }),
+            P::NameNotFound(e) => Self::NameNotFound(ResourceNameNotFoundProblem {
+                kind: e.kind.clone(),
+                name: e.name.clone(),
+                message: e.to_string(),
+            }),
+            P::ApiVersionMismatch(e) => {
+                Self::ApiVersionMismatch(ResourceApiVersionMismatchProblem {
+                    expected_api_version: e.expected_api_version.clone(),
+                    actual_api_version: e.actual_api_version.clone(),
+                    message: e.to_string(),
+                })
+            }
+            P::KindMismatch(e) => Self::KindMismatch(ResourceKindMismatchProblem {
+                uid: e.uid.into(),
+                expected_kind: e.expected_kind.clone(),
+                actual_kind: e.actual_kind.clone(),
+                message: e.to_string(),
+            }),
+        }
     }
 }
 
