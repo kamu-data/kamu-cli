@@ -18,9 +18,9 @@ use crate::mutations::{
 };
 use crate::prelude::*;
 use crate::queries::{
-    BatchResourceIdentitiesResult,
-    BatchResourceManifestsResult,
-    BatchResourcesResult,
+    BatchResourceIdentitiesOutcome,
+    BatchResourceManifestsOutcome,
+    BatchResourcesOutcome,
     Resource,
     ResourceAccountSelectorInput,
     ResourceBadAccountProblem,
@@ -138,16 +138,24 @@ impl Resources {
         ctx: &Context<'_>,
         selector: ResourceBatchSelectorInput,
         #[graphql(default)] revealed: bool,
-    ) -> Result<BatchResourcesResult> {
+    ) -> Result<BatchResourcesOutcome> {
         let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
 
         let spec_view_mode = Self::spec_view_mode_from_revealed(revealed);
 
-        resource_facade
+        match resource_facade
             .get_many(selector.into(), spec_view_mode)
             .await
-            .map(Into::into)
-            .map_err(map_batch_resource_error)
+        {
+            Ok(response) => Ok(BatchResourcesOutcome::Success(response.into())),
+            Err(kamu_resources_facade::BatchResourceError::UnsupportedDescriptor(e)) => {
+                Ok(BatchResourcesOutcome::UnsupportedDescriptor(e.into()))
+            }
+            Err(kamu_resources_facade::BatchResourceError::BadAccount(e)) => Ok(
+                BatchResourcesOutcome::BadAccount(map_bad_account_problem(e)?),
+            ),
+            Err(e) => Err(map_batch_resource_error(e)),
+        }
     }
 
     /// Returns resource identity by selector, if found
@@ -182,14 +190,19 @@ impl Resources {
         &self,
         ctx: &Context<'_>,
         selector: ResourceBatchSelectorInput,
-    ) -> Result<BatchResourceIdentitiesResult> {
+    ) -> Result<BatchResourceIdentitiesOutcome> {
         let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
 
-        resource_facade
-            .get_identities(selector.into())
-            .await
-            .map(Into::into)
-            .map_err(map_batch_resource_error)
+        match resource_facade.get_identities(selector.into()).await {
+            Ok(response) => Ok(BatchResourceIdentitiesOutcome::Success(response.into())),
+            Err(kamu_resources_facade::BatchResourceError::UnsupportedDescriptor(e)) => Ok(
+                BatchResourceIdentitiesOutcome::UnsupportedDescriptor(e.into()),
+            ),
+            Err(kamu_resources_facade::BatchResourceError::BadAccount(e)) => Ok(
+                BatchResourceIdentitiesOutcome::BadAccount(map_bad_account_problem(e)?),
+            ),
+            Err(e) => Err(map_batch_resource_error(e)),
+        }
     }
 
     /// Returns resources of the specified kind
@@ -441,16 +454,24 @@ impl Resources {
         selector: ResourceBatchSelectorInput,
         format: ResourceManifestFormat,
         #[graphql(default)] revealed: bool,
-    ) -> Result<BatchResourceManifestsResult> {
+    ) -> Result<BatchResourceManifestsOutcome> {
         let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
 
         let spec_view_mode = Self::spec_view_mode_from_revealed(revealed);
 
-        resource_facade
+        match resource_facade
             .render_manifests(selector.into(), format.into(), spec_view_mode)
             .await
-            .map(Into::into)
-            .map_err(map_batch_resource_error)
+        {
+            Ok(response) => Ok(BatchResourceManifestsOutcome::Success(response.into())),
+            Err(kamu_resources_facade::BatchResourceError::UnsupportedDescriptor(e)) => Ok(
+                BatchResourceManifestsOutcome::UnsupportedDescriptor(e.into()),
+            ),
+            Err(kamu_resources_facade::BatchResourceError::BadAccount(e)) => Ok(
+                BatchResourceManifestsOutcome::BadAccount(map_bad_account_problem(e)?),
+            ),
+            Err(e) => Err(map_batch_resource_error(e)),
+        }
     }
 }
 
@@ -735,7 +756,7 @@ pub(crate) fn map_resolve_manifest_account_error(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn map_bad_account_problem(
+pub(crate) fn map_bad_account_problem(
     error: kamu_resources_facade::ResolveManifestAccountError,
 ) -> Result<ResourceBadAccountProblem> {
     use kamu_resources_facade::ResolveManifestAccountError as E;

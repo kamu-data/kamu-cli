@@ -19,11 +19,13 @@ use pretty_assertions::assert_eq;
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
 use crate::helpers::{
+    SECRET_SET_KIND,
     VARIABLE_SET_API_VERSION,
     VARIABLE_SET_KIND,
     apply_manifest_and_get_uid,
     normalize_identity_views,
     normalize_summary_views,
+    secret_set_manifest_json,
     sorted_identity_names,
     variable_set_manifest_json,
 };
@@ -459,6 +461,73 @@ pub async fn test_search_pagination_and_total_count(h: &impl FacadeContractHarne
 
     assert_eq!(response.total_count, 3);
     assert_eq!(response.items.len(), 1);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-093
+contract_test!(search_multi_kind, super::test_search_multi_kind);
+
+pub async fn test_search_multi_kind(h: &impl FacadeContractHarness) {
+    // Create one VariableSet and one SecretSet with a shared name prefix
+    apply_manifest_and_get_uid(
+        h,
+        TestAccount::Alice,
+        variable_set_manifest_json("multi-kind-vs", None, &[("K", "v")]),
+    )
+    .await;
+    apply_manifest_and_get_uid(
+        h,
+        TestAccount::Alice,
+        secret_set_manifest_json("multi-kind-ss", None, &[("K", "v")]),
+    )
+    .await;
+    // A third resource that must not appear in results
+    apply_manifest_and_get_uid(
+        h,
+        TestAccount::Alice,
+        variable_set_manifest_json("other-resource", None, &[("K", "v")]),
+    )
+    .await;
+
+    let facade = h.facade_for(TestAccount::Alice);
+    let response = facade
+        .search_identities(SearchResourceIdentitiesRequest {
+            kinds: vec![VARIABLE_SET_KIND.to_string(), SECRET_SET_KIND.to_string()],
+            exact_names: None,
+            name_pattern: Some("multi-kind-%".to_string()),
+            account: None,
+            pagination: PaginationOpts::from_max_results(1000),
+        })
+        .await
+        .unwrap();
+
+    assert_eq!(
+        response.total_count, 2,
+        "must find exactly the two multi-kind resources"
+    );
+
+    let names = sorted_identity_names(response.items.clone());
+    assert!(
+        names.contains(&"multi-kind-vs".to_string()),
+        "VariableSet resource must appear in multi-kind search"
+    );
+    assert!(
+        names.contains(&"multi-kind-ss".to_string()),
+        "SecretSet resource must appear in multi-kind search"
+    );
+
+    // Both kinds must be represented in the result
+    let kinds: std::collections::HashSet<_> =
+        response.items.iter().map(|i| i.kind.as_str()).collect();
+    assert!(
+        kinds.contains(VARIABLE_SET_KIND),
+        "result must include VariableSet kind"
+    );
+    assert!(
+        kinds.contains(SECRET_SET_KIND),
+        "result must include SecretSet kind"
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

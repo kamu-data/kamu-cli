@@ -383,6 +383,13 @@ impl From<kamu_resources::ResourceView> for Resource {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Union, Debug, Clone)]
+pub enum BatchResourcesOutcome {
+    Success(BatchResourcesResult),
+    UnsupportedDescriptor(ResourceUnsupportedDescriptorProblem),
+    BadAccount(ResourceBadAccountProblem),
+}
+
 #[derive(SimpleObject, Debug, Clone)]
 pub struct BatchResourcesResult {
     pub resources: Vec<BatchResourceSuccess>,
@@ -414,6 +421,13 @@ pub struct BatchResourceSuccess {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Union, Debug, Clone)]
+pub enum BatchResourceManifestsOutcome {
+    Success(BatchResourceManifestsResult),
+    UnsupportedDescriptor(ResourceUnsupportedDescriptorProblem),
+    BadAccount(ResourceBadAccountProblem),
+}
 
 #[derive(SimpleObject, Debug, Clone)]
 pub struct BatchResourceManifestsResult {
@@ -472,6 +486,13 @@ impl From<kamu_resources::ResourceIdentityView> for ResourceIdentity {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Union, Debug, Clone)]
+pub enum BatchResourceIdentitiesOutcome {
+    Success(BatchResourceIdentitiesResult),
+    UnsupportedDescriptor(ResourceUnsupportedDescriptorProblem),
+    BadAccount(ResourceBadAccountProblem),
+}
 
 #[derive(SimpleObject, Debug, Clone)]
 pub struct BatchResourceIdentitiesResult {

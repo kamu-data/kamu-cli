@@ -105,7 +105,16 @@ pub(crate) struct RenderManifestsQuery {
 )]
 pub(crate) struct RenderManifestsResources {
     #[arguments(selector: $selector, format: $format, revealed: $revealed)]
-    pub render_manifests: BatchResourceManifestsResult,
+    pub render_manifests: BatchResourceManifestsOutcome,
+}
+
+#[derive(cynic::InlineFragments, Debug, Clone)]
+pub(crate) enum BatchResourceManifestsOutcome {
+    BatchResourceManifestsResult(BatchResourceManifestsResult),
+    ResourceUnsupportedDescriptorProblem(ResourceUnsupportedDescriptorProblem),
+    ResourceBadAccountProblem(ResourceBadAccountProblem),
+    #[cynic(fallback)]
+    Unknown,
 }
 
 #[derive(cynic::QueryFragment, Debug, Clone)]

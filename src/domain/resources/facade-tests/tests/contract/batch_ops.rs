@@ -10,6 +10,7 @@
 use kamu_resources::ApplyResourceOutcome;
 use kamu_resources_facade::{
     ApplyManifestRequest,
+    BatchResourceError,
     GetResourceError,
     ResourceBatchSelector,
     ResourceLookupProblem,
@@ -588,6 +589,64 @@ pub async fn test_delete_many_duplicate_refs_is_deterministic(h: &impl FacadeCon
             response.problems[0].error
         );
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-061
+// Unsupported kind must produce a batch-level
+// Err(BatchResourceError::UnsupportedDescriptor), not Ok with per-item
+// problems.  The CRUD dispatcher registry rejects the kind before any refs are
+// processed, for all four batch APIs.
+contract_test!(
+    batch_apis_reject_unsupported_kind,
+    super::test_batch_apis_reject_unsupported_kind
+);
+
+pub async fn test_batch_apis_reject_unsupported_kind(h: &impl FacadeContractHarness) {
+    let uid = create_resource(h, "batch-bad-kind-base").await;
+    let facade = h.facade_for(TestAccount::Alice);
+    let bad_kind = "NoSuchResourceKindXYZ";
+
+    let selector = ResourceBatchSelector {
+        account: None,
+        kind: bad_kind.to_string(),
+        api_version: None,
+        resource_refs: vec![ResourceRef::ById(uid)],
+    };
+
+    let gm = facade
+        .get_many(selector.clone(), SpecViewMode::Encrypted)
+        .await;
+    assert!(
+        matches!(gm, Err(BatchResourceError::UnsupportedDescriptor(_))),
+        "get_many: unsupported kind must be a batch-level UnsupportedDescriptor, got: {gm:?}"
+    );
+
+    let gi = facade.get_identities(selector.clone()).await;
+    assert!(
+        matches!(gi, Err(BatchResourceError::UnsupportedDescriptor(_))),
+        "get_identities: unsupported kind must be a batch-level UnsupportedDescriptor, got: {gi:?}"
+    );
+
+    let rm = facade
+        .render_manifests(
+            selector.clone(),
+            ResourceManifestFormat::Json,
+            SpecViewMode::Encrypted,
+        )
+        .await;
+    assert!(
+        matches!(rm, Err(BatchResourceError::UnsupportedDescriptor(_))),
+        "render_manifests: unsupported kind must be a batch-level UnsupportedDescriptor, got: \
+         {rm:?}"
+    );
+
+    let dm = facade.delete_many(selector.clone()).await;
+    assert!(
+        matches!(dm, Err(BatchResourceError::UnsupportedDescriptor(_))),
+        "delete_many: unsupported kind must be a batch-level UnsupportedDescriptor, got: {dm:?}"
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

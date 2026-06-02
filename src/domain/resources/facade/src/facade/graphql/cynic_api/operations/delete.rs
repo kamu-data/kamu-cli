@@ -9,7 +9,11 @@
 
 use cynic::MutationBuilder;
 
-use crate::facade::graphql::cynic_api::fragments::BatchResourceProblem;
+use crate::facade::graphql::cynic_api::fragments::{
+    BatchResourceProblem,
+    ResourceBadAccountProblem,
+    ResourceUnsupportedDescriptorProblem,
+};
 use crate::facade::graphql::cynic_api::inputs::{
     ResourceBatchSelectorInput,
     ResourceSelectorInput,
@@ -43,10 +47,19 @@ pub(crate) struct DeleteManyMutation {
 #[cynic(graphql_type = "ResourcesMut", variables = "DeleteManyVariables")]
 pub(crate) struct ResourcesMutDeleteMany {
     #[arguments(selector: $selector)]
-    pub delete_many: ResourceDeleteManyResult,
+    pub delete_many: ResourceDeleteManyOutcome,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::InlineFragments, Debug, Clone)]
+pub(crate) enum ResourceDeleteManyOutcome {
+    ResourceDeleteManyResult(ResourceDeleteManyResult),
+    ResourceUnsupportedDescriptorProblem(ResourceUnsupportedDescriptorProblem),
+    ResourceBadAccountProblem(ResourceBadAccountProblem),
+    #[cynic(fallback)]
+    Unknown,
+}
 
 #[derive(cynic::InlineFragments, Debug, Clone)]
 pub(crate) enum ResourceDeleteOutcome {
@@ -55,6 +68,7 @@ pub(crate) enum ResourceDeleteOutcome {
     ResourceNameNotFoundProblem(ResourceNameNotFoundProblem),
     ResourceApiVersionMismatchProblem(ResourceApiVersionMismatchProblem),
     ResourceKindMismatchProblem(ResourceKindMismatchProblem),
+    ResourceUnsupportedDescriptorProblem(ResourceUnsupportedDescriptorProblem),
     #[cynic(fallback)]
     Unknown,
 }

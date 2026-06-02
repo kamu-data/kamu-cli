@@ -105,7 +105,16 @@ pub(crate) struct GetResourceIdentitiesQuery {
 )]
 pub(crate) struct ResourceIdentitiesResources {
     #[arguments(selector: $selector)]
-    pub resource_identities: BatchResourceIdentitiesResult,
+    pub resource_identities: BatchResourceIdentitiesOutcome,
+}
+
+#[derive(cynic::InlineFragments, Debug, Clone)]
+pub(crate) enum BatchResourceIdentitiesOutcome {
+    BatchResourceIdentitiesResult(BatchResourceIdentitiesResult),
+    ResourceUnsupportedDescriptorProblem(ResourceUnsupportedDescriptorProblem),
+    ResourceBadAccountProblem(ResourceBadAccountProblem),
+    #[cynic(fallback)]
+    Unknown,
 }
 
 #[derive(cynic::QueryFragment, Debug, Clone)]

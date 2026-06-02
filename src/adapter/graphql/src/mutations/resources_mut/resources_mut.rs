@@ -12,10 +12,13 @@ use crate::prelude::*;
 use crate::queries::{
     BatchResourceProblem,
     ResourceAccountSelectorInput,
+    ResourceBadAccountProblem,
     ResourceBatchSelectorInput,
     ResourceKind,
     ResourceManifestFormat,
     ResourceSelectorInput,
+    ResourceUnsupportedDescriptorProblem,
+    map_bad_account_problem,
     map_resolve_manifest_account_error,
 };
 
@@ -93,6 +96,9 @@ impl ResourcesMut {
             Err(kamu_resources_facade::DeleteResourceError::LookupProblem(problem)) => {
                 Ok(ResourceDeleteOutcome::from_lookup_problem(problem))
             }
+            Err(kamu_resources_facade::DeleteResourceError::UnsupportedDescriptor(e)) => {
+                Ok(ResourceDeleteOutcome::UnsupportedDescriptor(e.into()))
+            }
             Err(error) => Err(map_delete_resource_error(error)),
         }
     }
@@ -103,7 +109,7 @@ impl ResourcesMut {
         &self,
         ctx: &Context<'_>,
         selector: ResourceBatchSelectorInput,
-    ) -> Result<ResourceDeleteManyResult> {
+    ) -> Result<ResourceDeleteManyOutcome> {
         let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
 
         let ResourceBatchSelectorInput {
@@ -114,7 +120,7 @@ impl ResourcesMut {
         } = selector;
         let kind = kind.into_resource_type();
 
-        resource_facade
+        match resource_facade
             .delete_many(kamu_resources_facade::ResourceBatchSelector {
                 account: account.map(ResourceAccountSelectorInput::into_manifest_account),
                 kind,
@@ -122,8 +128,16 @@ impl ResourcesMut {
                 resource_refs: resource_refs.into_iter().map(Into::into).collect(),
             })
             .await
-            .map(Into::into)
-            .map_err(map_batch_delete_resource_error)
+        {
+            Ok(response) => Ok(ResourceDeleteManyOutcome::Success(response.into())),
+            Err(kamu_resources_facade::BatchResourceError::UnsupportedDescriptor(e)) => {
+                Ok(ResourceDeleteManyOutcome::UnsupportedDescriptor(e.into()))
+            }
+            Err(kamu_resources_facade::BatchResourceError::BadAccount(e)) => Ok(
+                ResourceDeleteManyOutcome::BadAccount(map_bad_account_problem(e)?),
+            ),
+            Err(e) => Err(map_batch_delete_resource_error(e)),
+        }
     }
 }
 
@@ -136,6 +150,7 @@ pub enum ResourceDeleteOutcome {
     NameNotFound(ResourceNameNotFoundProblem),
     ApiVersionMismatch(ResourceApiVersionMismatchProblem),
     KindMismatch(ResourceKindMismatchProblem),
+    UnsupportedDescriptor(ResourceUnsupportedDescriptorProblem),
 }
 
 impl ResourceDeleteOutcome {
@@ -209,6 +224,13 @@ pub struct ResourceKindMismatchProblem {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Union, Debug, Clone)]
+pub enum ResourceDeleteManyOutcome {
+    Success(ResourceDeleteManyResult),
+    UnsupportedDescriptor(ResourceUnsupportedDescriptorProblem),
+    BadAccount(ResourceBadAccountProblem),
+}
 
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceDeleteManyResult {

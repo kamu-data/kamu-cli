@@ -567,6 +567,8 @@ Base64-encoded binary data (url-safe, no padding)
 """
 scalar Base64Usnp
 
+union BatchResourceIdentitiesOutcome = BatchResourceIdentitiesResult | ResourceUnsupportedDescriptorProblem | ResourceBadAccountProblem
+
 type BatchResourceIdentitiesResult {
 	identities: [BatchResourceIdentitySuccess!]!
 	problems: [BatchResourceProblem!]!
@@ -581,6 +583,8 @@ type BatchResourceManifestSuccess {
 	requestIndex: Int!
 	manifest: ResourceRenderManifestResult!
 }
+
+union BatchResourceManifestsOutcome = BatchResourceManifestsResult | ResourceUnsupportedDescriptorProblem | ResourceBadAccountProblem
 
 type BatchResourceManifestsResult {
 	manifests: [BatchResourceManifestSuccess!]!
@@ -606,6 +610,8 @@ type BatchResourceSuccess {
 	requestIndex: Int!
 	resource: Resource!
 }
+
+union BatchResourcesOutcome = BatchResourcesResult | ResourceUnsupportedDescriptorProblem | ResourceBadAccountProblem
 
 type BatchResourcesResult {
 	resources: [BatchResourceSuccess!]!
@@ -4005,6 +4011,8 @@ type ResourceConnection {
 	edges: [ResourceEdge!]!
 }
 
+union ResourceDeleteManyOutcome = ResourceDeleteManyResult | ResourceUnsupportedDescriptorProblem | ResourceBadAccountProblem
+
 type ResourceDeleteManyResult {
 	resources: [ResourceDeleteManySuccess!]!
 	problems: [BatchResourceProblem!]!
@@ -4015,7 +4023,7 @@ type ResourceDeleteManySuccess {
 	resourceId: ResourceID!
 }
 
-union ResourceDeleteOutcome = ResourceDeleteSuccess | ResourceUIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceApiVersionMismatchProblem | ResourceKindMismatchProblem
+union ResourceDeleteOutcome = ResourceDeleteSuccess | ResourceUIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceApiVersionMismatchProblem | ResourceKindMismatchProblem | ResourceUnsupportedDescriptorProblem
 
 type ResourceDeleteSuccess {
 	resourceId: ResourceID!
@@ -4242,7 +4250,7 @@ type Resources {
 	"""
 	Returns resources by selectors
 	"""
-	resources(selector: ResourceBatchSelectorInput!, revealed: Boolean! = false): BatchResourcesResult!
+	resources(selector: ResourceBatchSelectorInput!, revealed: Boolean! = false): BatchResourcesOutcome!
 	"""
 	Returns resource identity by selector, if found
 	"""
@@ -4250,7 +4258,7 @@ type Resources {
 	"""
 	Returns resource identities by selectors
 	"""
-	resourceIdentities(selector: ResourceBatchSelectorInput!): BatchResourceIdentitiesResult!
+	resourceIdentities(selector: ResourceBatchSelectorInput!): BatchResourceIdentitiesOutcome!
 	"""
 	Returns resources of the specified kind
 	"""
@@ -4278,13 +4286,13 @@ type Resources {
 	"""
 	Renders canonical manifest representations from stored resources
 	"""
-	renderManifests(selector: ResourceBatchSelectorInput!, format: ResourceManifestFormat!, revealed: Boolean! = false): BatchResourceManifestsResult!
+	renderManifests(selector: ResourceBatchSelectorInput!, format: ResourceManifestFormat!, revealed: Boolean! = false): BatchResourceManifestsOutcome!
 }
 
 type ResourcesMut {
 	applyManifest(manifest: String!, format: ResourceManifestFormat!, dryRun: Boolean): ResourceApplyOutcome!
 	delete(selector: ResourceSelectorInput!): ResourceDeleteOutcome!
-	deleteMany(selector: ResourceBatchSelectorInput!): ResourceDeleteManyResult!
+	deleteMany(selector: ResourceBatchSelectorInput!): ResourceDeleteManyOutcome!
 }
 
 type ResourcesSummary {

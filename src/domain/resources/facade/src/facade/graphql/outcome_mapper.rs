@@ -14,6 +14,7 @@ use crate::facade::graphql::cynic_api;
 use crate::{
     BatchResourceError,
     BatchResourceProblem,
+    BatchResourceResponse,
     BatchResourceSuccess,
     DeleteResourceError,
     GetResourceError,
@@ -602,8 +603,182 @@ pub(super) fn map_delete_outcome(
                 actual_kind: p.actual_kind,
             }),
         )),
+        O::ResourceUnsupportedDescriptorProblem(problem) => {
+            Err(unsupported_descriptor_problem_error(problem).into())
+        }
         O::Unknown => Err(DeleteResourceError::Internal(InternalError::new(
             "Remote delete returned an unrecognized ResourceDeleteOutcome variant",
+        ))),
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(super) fn map_batch_get_resources_outcome(
+    outcome: cynic_api::operations::get_resources::BatchResourcesOutcome,
+    selector: &ResourceBatchSelector,
+) -> Result<BatchResourceResponse<domain::ResourceView, ResourceLookupProblem>, BatchResourceError>
+{
+    use cynic_api::operations::get_resources::BatchResourcesOutcome as O;
+    match outcome {
+        O::BatchResourcesResult(batch) => {
+            let successes = collect_batch_successes(
+                selector.resource_refs.len(),
+                batch.resources,
+                "resource",
+                |s| {
+                    Ok((
+                        s.request_index,
+                        s.resource
+                            .try_into()
+                            .map_err(BatchResourceError::Internal)?,
+                    ))
+                },
+            )?;
+            let problems = collect_batch_problems(selector, batch.problems, "resource")?;
+            validate_batch_response_indexes(
+                &successes,
+                &problems,
+                selector.resource_refs.len(),
+                "resource",
+            )?;
+            Ok(BatchResourceResponse {
+                successes,
+                problems,
+            })
+        }
+        O::ResourceUnsupportedDescriptorProblem(problem) => {
+            Err(unsupported_descriptor_problem_error(problem).into())
+        }
+        O::ResourceBadAccountProblem(problem) => Err(BatchResourceError::BadAccount(
+            bad_account_problem_error(problem).map_err(BatchResourceError::Internal)?,
+        )),
+        O::Unknown => Err(BatchResourceError::Internal(InternalError::new(
+            "Remote get_many returned an unrecognized BatchResourcesOutcome variant",
+        ))),
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(super) fn map_batch_get_identities_outcome(
+    outcome: cynic_api::operations::identity::BatchResourceIdentitiesOutcome,
+    selector: &ResourceBatchSelector,
+) -> Result<
+    BatchResourceResponse<domain::ResourceIdentityView, ResourceLookupProblem>,
+    BatchResourceError,
+> {
+    use cynic_api::operations::identity::BatchResourceIdentitiesOutcome as O;
+    match outcome {
+        O::BatchResourceIdentitiesResult(batch) => {
+            let successes = collect_batch_successes(
+                selector.resource_refs.len(),
+                batch.identities,
+                "identity",
+                |s| Ok((s.request_index, s.identity.into())),
+            )?;
+            let problems = collect_batch_problems(selector, batch.problems, "identity")?;
+            validate_batch_response_indexes(
+                &successes,
+                &problems,
+                selector.resource_refs.len(),
+                "identity",
+            )?;
+            Ok(BatchResourceResponse {
+                successes,
+                problems,
+            })
+        }
+        O::ResourceUnsupportedDescriptorProblem(problem) => {
+            Err(unsupported_descriptor_problem_error(problem).into())
+        }
+        O::ResourceBadAccountProblem(problem) => Err(BatchResourceError::BadAccount(
+            bad_account_problem_error(problem).map_err(BatchResourceError::Internal)?,
+        )),
+        O::Unknown => Err(BatchResourceError::Internal(InternalError::new(
+            "Remote get_identities returned an unrecognized BatchResourceIdentitiesOutcome variant",
+        ))),
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(super) fn map_batch_render_manifests_outcome(
+    outcome: cynic_api::operations::render_manifest::BatchResourceManifestsOutcome,
+    selector: &ResourceBatchSelector,
+) -> Result<
+    BatchResourceResponse<RenderResourceManifestResult, ResourceLookupProblem>,
+    BatchResourceError,
+> {
+    use cynic_api::operations::render_manifest::BatchResourceManifestsOutcome as O;
+    match outcome {
+        O::BatchResourceManifestsResult(batch) => {
+            let successes = collect_batch_successes(
+                selector.resource_refs.len(),
+                batch.manifests,
+                "manifest",
+                |s| Ok((s.request_index, s.manifest.into())),
+            )?;
+            let problems = collect_batch_problems(selector, batch.problems, "manifest")?;
+            validate_batch_response_indexes(
+                &successes,
+                &problems,
+                selector.resource_refs.len(),
+                "manifest",
+            )?;
+            Ok(BatchResourceResponse {
+                successes,
+                problems,
+            })
+        }
+        O::ResourceUnsupportedDescriptorProblem(problem) => {
+            Err(unsupported_descriptor_problem_error(problem).into())
+        }
+        O::ResourceBadAccountProblem(problem) => Err(BatchResourceError::BadAccount(
+            bad_account_problem_error(problem).map_err(BatchResourceError::Internal)?,
+        )),
+        O::Unknown => Err(BatchResourceError::Internal(InternalError::new(
+            "Remote render_manifests returned an unrecognized BatchResourceManifestsOutcome \
+             variant",
+        ))),
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(super) fn map_batch_delete_many_outcome(
+    outcome: cynic_api::operations::delete::ResourceDeleteManyOutcome,
+    selector: &ResourceBatchSelector,
+) -> Result<BatchResourceResponse<domain::ResourceUID, ResourceLookupProblem>, BatchResourceError> {
+    use cynic_api::operations::delete::ResourceDeleteManyOutcome as O;
+    match outcome {
+        O::ResourceDeleteManyResult(batch) => {
+            let successes = collect_batch_successes(
+                selector.resource_refs.len(),
+                batch.resources,
+                "delete",
+                |s| Ok((s.request_index, s.resource_id)),
+            )?;
+            let problems = collect_batch_problems(selector, batch.problems, "delete")?;
+            validate_batch_response_indexes(
+                &successes,
+                &problems,
+                selector.resource_refs.len(),
+                "delete",
+            )?;
+            Ok(BatchResourceResponse {
+                successes,
+                problems,
+            })
+        }
+        O::ResourceUnsupportedDescriptorProblem(problem) => {
+            Err(unsupported_descriptor_problem_error(problem).into())
+        }
+        O::ResourceBadAccountProblem(problem) => Err(BatchResourceError::BadAccount(
+            bad_account_problem_error(problem).map_err(BatchResourceError::Internal)?,
+        )),
+        O::Unknown => Err(BatchResourceError::Internal(InternalError::new(
+            "Remote delete_many returned an unrecognized ResourceDeleteManyOutcome variant",
         ))),
     }
 }

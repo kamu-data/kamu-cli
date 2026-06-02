@@ -201,13 +201,16 @@ impl From<ResourceApplyError> for crate::ApplyManifestError {
                 api_version: String::new(),
                 message: value.message,
             }),
-            // UnsupportedDescriptor, BadAccount, InvalidMetadata don't have
-            // plain-message constructors — surface them as internal errors so
-            // the caller still gets a strongly-typed Err rather than a
-            // RemoteRequest catch-all.
-            ResourceApplyErrorCode::UnsupportedDescriptor
-            | ResourceApplyErrorCode::BadAccount
-            | ResourceApplyErrorCode::InvalidMetadata => {
+            ResourceApplyErrorCode::UnsupportedDescriptor => Self::UnsupportedDescriptor(
+                kamu_resources::UnsupportedResourceDescriptorError::NotFound {
+                    kind: value.message,
+                    api_version: String::new(),
+                },
+            ),
+            // BadAccount and InvalidMetadata don't have plain-message constructors —
+            // surface them as internal errors so the caller still gets a strongly-typed
+            // Err rather than a RemoteRequest catch-all.
+            ResourceApplyErrorCode::BadAccount | ResourceApplyErrorCode::InvalidMetadata => {
                 Self::Internal(internal_error::InternalError::new(value.message))
             }
         }
