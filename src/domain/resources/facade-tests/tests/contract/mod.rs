@@ -7,12 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+pub mod account_scoping;
 pub mod apply_manifest;
 pub mod batch_ops;
 pub mod cross_impl;
 pub mod delete;
 pub mod error_taxonomy;
 pub mod get_identity;
+pub mod list_all;
 pub mod list_search;
 pub mod render_manifest;
 pub mod summary;

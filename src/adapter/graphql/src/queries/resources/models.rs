@@ -49,23 +49,17 @@ impl ResourceKindInput {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(OneofObject, Debug, Clone)]
-pub enum ResourceAccountSelectorInput {
-    ById(AccountID<'static>),
-    ByName(AccountName<'static>),
+#[derive(InputObject, Debug, Clone)]
+pub struct ResourceAccountSelectorInput {
+    pub by_id: Option<AccountID<'static>>,
+    pub by_name: Option<AccountName<'static>>,
 }
 
 impl ResourceAccountSelectorInput {
     pub fn into_manifest_account(self) -> kamu_resources::ResourceManifestAccount {
-        match self {
-            Self::ById(id) => kamu_resources::ResourceManifestAccount {
-                id: Some(id.into()),
-                name: None,
-            },
-            Self::ByName(name) => kamu_resources::ResourceManifestAccount {
-                id: None,
-                name: Some(name.to_string()),
-            },
+        kamu_resources::ResourceManifestAccount {
+            id: self.by_id.map(Into::into),
+            name: self.by_name.map(|name| name.to_string()),
         }
     }
 }
@@ -209,6 +203,138 @@ impl From<kamu_resources::ResourceKindDescriptor> for ResourceKindDescriptor {
             kind: ResourceKind::new(value.kind),
             api_version: value.api_version,
             list_columns: value.list_columns.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ResourceUnsupportedDescriptorProblem {
+    pub code: ResourceUnsupportedDescriptorProblemCode,
+    pub kind: String,
+    pub api_version: String,
+    pub message: String,
+}
+
+impl From<kamu_resources::UnsupportedResourceDescriptorError>
+    for ResourceUnsupportedDescriptorProblem
+{
+    fn from(value: kamu_resources::UnsupportedResourceDescriptorError) -> Self {
+        use kamu_resources::UnsupportedResourceDescriptorError as E;
+
+        let message = value.to_string();
+        match value {
+            E::NotFound { kind, api_version } => Self {
+                code: ResourceUnsupportedDescriptorProblemCode::NotFound,
+                kind,
+                api_version,
+                message,
+            },
+            E::Duplicate { kind, api_version } => Self {
+                code: ResourceUnsupportedDescriptorProblemCode::Duplicate,
+                kind,
+                api_version,
+                message,
+            },
+        }
+    }
+}
+
+#[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ResourceUnsupportedDescriptorProblemCode {
+    NotFound,
+    Duplicate,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ResourceBadAccountProblem {
+    pub code: ResourceBadAccountProblemCode,
+    pub account_id: Option<AccountID<'static>>,
+    pub account_name: Option<AccountName<'static>>,
+    pub expected_name: Option<AccountName<'static>>,
+    pub actual_name: Option<AccountName<'static>>,
+    pub message: String,
+}
+
+impl From<kamu_resources_facade::ResolveManifestAccountError> for ResourceBadAccountProblem {
+    fn from(value: kamu_resources_facade::ResolveManifestAccountError) -> Self {
+        use kamu_resources_facade::ResolveManifestAccountError as E;
+
+        let message = value.to_string();
+        match value {
+            E::EmptySelector => Self {
+                code: ResourceBadAccountProblemCode::EmptySelector,
+                account_id: None,
+                account_name: None,
+                expected_name: None,
+                actual_name: None,
+                message,
+            },
+            E::AccountNotFoundById(error) => Self {
+                code: ResourceBadAccountProblemCode::AccountNotFoundById,
+                account_id: Some(error.account_id.into()),
+                account_name: None,
+                expected_name: None,
+                actual_name: None,
+                message,
+            },
+            E::AccountNotFoundByName(error) => Self {
+                code: ResourceBadAccountProblemCode::AccountNotFoundByName,
+                account_id: None,
+                account_name: Some(error.account_name.into()),
+                expected_name: None,
+                actual_name: None,
+                message,
+            },
+            E::IdNameMismatch {
+                account_id,
+                expected_name,
+                actual_name,
+            } => Self {
+                code: ResourceBadAccountProblemCode::IdNameMismatch,
+                account_id: Some(account_id.into()),
+                account_name: None,
+                expected_name: Some(expected_name.into()),
+                actual_name: Some(actual_name.into()),
+                message,
+            },
+            E::AnonymousSubject | E::Access(_) | E::Internal(_) => Self {
+                code: ResourceBadAccountProblemCode::Other,
+                account_id: None,
+                account_name: None,
+                expected_name: None,
+                actual_name: None,
+                message,
+            },
+        }
+    }
+}
+
+#[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ResourceBadAccountProblemCode {
+    EmptySelector,
+    AccountNotFoundById,
+    AccountNotFoundByName,
+    IdNameMismatch,
+    Other,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ResourceInvalidSearchQueryProblem {
+    pub message: String,
+}
+
+impl From<kamu_resources_facade::InvalidResourceSearchQueryError>
+    for ResourceInvalidSearchQueryProblem
+{
+    fn from(value: kamu_resources_facade::InvalidResourceSearchQueryError) -> Self {
+        Self {
+            message: value.to_string(),
         }
     }
 }
@@ -436,6 +562,7 @@ impl BatchResourceProblemCode {
 pub struct ResourceMetadata {
     pub id: ResourceID,
     pub account_id: AccountID<'static>,
+    pub account_name: Option<AccountName<'static>>,
     pub name: String,
     pub description: Option<String>,
     pub labels: serde_json::Value,
@@ -455,6 +582,7 @@ impl From<kamu_resources::ResourceView> for ResourceMetadata {
         Self {
             id: value.metadata.uid.into(),
             account_id: value.account.id.into(),
+            account_name: value.account.name.map(Into::into),
             name: value.metadata.name.clone(),
             description: value.metadata.description,
             labels,

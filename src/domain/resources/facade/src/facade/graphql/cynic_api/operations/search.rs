@@ -11,7 +11,12 @@ use cynic::QueryBuilder;
 use internal_error::InternalError;
 
 use crate::SearchResourceIdentitiesRequest;
-use crate::facade::graphql::cynic_api::fragments::ResourceIdentityConnection;
+use crate::facade::graphql::cynic_api::fragments::{
+    ResourceBadAccountProblem,
+    ResourceIdentityConnection,
+    ResourceInvalidSearchQueryProblem,
+    ResourceUnsupportedDescriptorProblem,
+};
 use crate::facade::graphql::cynic_api::inputs::SearchResourceIdentitiesInput;
 use crate::facade::graphql::cynic_api::schema;
 
@@ -27,7 +32,19 @@ pub(crate) struct SearchIdentitiesQuery {
 #[cynic(graphql_type = "Resources", variables = "SearchIdentitiesVariables")]
 pub(crate) struct SearchIdentitiesResources {
     #[arguments(query: $query, page: $page, perPage: $per_page)]
-    pub search_identities: ResourceIdentityConnection,
+    pub search_identities: ResourceIdentityListOutcome,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::InlineFragments, Debug, Clone)]
+pub(crate) enum ResourceIdentityListOutcome {
+    ResourceIdentityConnection(ResourceIdentityConnection),
+    ResourceUnsupportedDescriptorProblem(ResourceUnsupportedDescriptorProblem),
+    ResourceBadAccountProblem(ResourceBadAccountProblem),
+    ResourceInvalidSearchQueryProblem(ResourceInvalidSearchQueryProblem),
+    #[cynic(fallback)]
+    Unknown,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

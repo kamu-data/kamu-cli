@@ -9,7 +9,7 @@
 
 use chrono::{DateTime, Utc};
 
-use crate::facade::graphql::cynic_api::scalars::Uint64;
+use crate::facade::graphql::cynic_api::scalars::{AccountName, Uint64};
 use crate::facade::graphql::cynic_api::schema;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -95,6 +95,48 @@ pub(crate) struct ResourcesSummary {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
+pub(crate) struct ResourceUnsupportedDescriptorProblem {
+    pub code: ResourceUnsupportedDescriptorProblemCode,
+    pub kind: String,
+    pub api_version: String,
+}
+
+#[derive(cynic::Enum, Debug, Clone, Copy)]
+pub(crate) enum ResourceUnsupportedDescriptorProblemCode {
+    NotFound,
+    Duplicate,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
+pub(crate) struct ResourceBadAccountProblem {
+    pub code: ResourceBadAccountProblemCode,
+    pub account_id: Option<odf::AccountID>,
+    pub account_name: Option<AccountName>,
+    pub expected_name: Option<AccountName>,
+    pub actual_name: Option<AccountName>,
+}
+
+#[derive(cynic::Enum, Debug, Clone, Copy)]
+pub(crate) enum ResourceBadAccountProblemCode {
+    EmptySelector,
+    AccountNotFoundById,
+    AccountNotFoundByName,
+    IdNameMismatch,
+    Other,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
+pub(crate) struct ResourceInvalidSearchQueryProblem {
+    pub message: String,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct ResourceTypeCountSummary {
     pub kind: String,
     pub name: String,
@@ -138,6 +180,7 @@ pub(crate) struct ResourceKind {
 pub(crate) struct ResourceMetadata {
     pub id: kamu_resources::ResourceUID,
     pub account_id: odf::AccountID,
+    pub account_name: Option<AccountName>,
     pub name: String,
     pub description: Option<String>,
     pub labels: serde_json::Value,

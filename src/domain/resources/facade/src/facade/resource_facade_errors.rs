@@ -178,11 +178,20 @@ pub enum ListResourcesError {
     BadAccount(#[from] ResolveManifestAccountError),
 
     #[error(transparent)]
+    InvalidSearchQuery(#[from] InvalidResourceSearchQueryError),
+
+    #[error(transparent)]
     RemoteRequest(#[from] GraphqlHttpRequestError),
 
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+#[error("Resource identity search requires exact names or a name pattern")]
+pub struct InvalidResourceSearchQueryError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -3870,7 +3870,7 @@ type Resource {
 	status: JSON
 }
 
-input ResourceAccountSelectorInput @oneOf {
+input ResourceAccountSelectorInput {
 	byId: AccountID
 	byName: AccountName
 }
@@ -3927,6 +3927,23 @@ type ResourceApplyWarning {
 	message: String!
 }
 
+type ResourceBadAccountProblem {
+	code: ResourceBadAccountProblemCode!
+	accountId: AccountID
+	accountName: AccountName
+	expectedName: AccountName
+	actualName: AccountName
+	message: String!
+}
+
+enum ResourceBadAccountProblemCode {
+	EMPTY_SELECTOR
+	ACCOUNT_NOT_FOUND_BY_ID
+	ACCOUNT_NOT_FOUND_BY_NAME
+	ID_NAME_MISMATCH
+	OTHER
+}
+
 input ResourceBatchSelectorInput {
 	kind: ResourceKindInput!
 	apiVersion: String
@@ -3975,9 +3992,9 @@ type ResourceEdge {
 	node: ResourceSummary!
 }
 
-union ResourceGetIdentityOutcome = ResourceIdentity | ResourceUIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceApiVersionMismatchProblem | ResourceKindMismatchProblem
+union ResourceGetIdentityOutcome = ResourceIdentity | ResourceUIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceApiVersionMismatchProblem | ResourceKindMismatchProblem | ResourceUnsupportedDescriptorProblem | ResourceBadAccountProblem
 
-union ResourceGetOutcome = Resource | ResourceUIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceApiVersionMismatchProblem | ResourceKindMismatchProblem
+union ResourceGetOutcome = Resource | ResourceUIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceApiVersionMismatchProblem | ResourceKindMismatchProblem | ResourceUnsupportedDescriptorProblem | ResourceBadAccountProblem
 
 scalar ResourceID
 
@@ -4009,6 +4026,14 @@ type ResourceIdentityEdge {
 	node: ResourceIdentity!
 }
 
+union ResourceIdentityListAllOutcome = ResourceIdentityConnection | ResourceBadAccountProblem
+
+union ResourceIdentityListOutcome = ResourceIdentityConnection | ResourceUnsupportedDescriptorProblem | ResourceBadAccountProblem | ResourceInvalidSearchQueryProblem
+
+type ResourceInvalidSearchQueryProblem {
+	message: String!
+}
+
 type ResourceKind {
 	value: String!
 }
@@ -4031,6 +4056,8 @@ type ResourceKindMismatchProblem {
 	actualKind: String!
 	message: String!
 }
+
+union ResourceListAllOutcome = ResourceConnection | ResourceBadAccountProblem
 
 enum ResourceListColumnDataType {
 	STRING
@@ -4057,6 +4084,8 @@ enum ResourceListColumnVisibility {
 	WIDE_ONLY
 }
 
+union ResourceListOutcome = ResourceConnection | ResourceUnsupportedDescriptorProblem | ResourceBadAccountProblem
+
 enum ResourceManifestFormat {
 	JSON
 	YAML
@@ -4065,6 +4094,7 @@ enum ResourceManifestFormat {
 type ResourceMetadata {
 	id: ResourceID!
 	accountId: AccountID!
+	accountName: AccountName
 	name: String!
 	description: String
 	labels: JSON!
@@ -4103,7 +4133,7 @@ input ResourceRefInput @oneOf {
 	byName: ResourceByNameSelectorInput
 }
 
-union ResourceRenderManifestOutcome = ResourceRenderManifestResult | ResourceUIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceApiVersionMismatchProblem | ResourceKindMismatchProblem
+union ResourceRenderManifestOutcome = ResourceRenderManifestResult | ResourceUIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceApiVersionMismatchProblem | ResourceKindMismatchProblem | ResourceUnsupportedDescriptorProblem | ResourceBadAccountProblem
 
 type ResourceRenderManifestResult {
 	manifest: String!
@@ -4149,6 +4179,18 @@ type ResourceUIDNotFoundProblem {
 	message: String!
 }
 
+type ResourceUnsupportedDescriptorProblem {
+	code: ResourceUnsupportedDescriptorProblemCode!
+	kind: String!
+	apiVersion: String!
+	message: String!
+}
+
+enum ResourceUnsupportedDescriptorProblemCode {
+	NOT_FOUND
+	DUPLICATE
+}
+
 type Resources {
 	"""
 	Returns resource kinds supported by the current server
@@ -4158,7 +4200,7 @@ type Resources {
 	Returns a summary-oriented dashboard for the current or specified
 	subject
 	"""
-	summary(account: ResourceAccountSelectorInput): ResourcesSummary!
+	summary(account: ResourceAccountSelectorInput): ResourcesSummaryOutcome!
 	"""
 	Returns a resource by selector, if found
 	"""
@@ -4178,23 +4220,23 @@ type Resources {
 	"""
 	Returns resources of the specified kind
 	"""
-	listByKind(kind: ResourceKindInput!, account: ResourceAccountSelectorInput, page: Int, perPage: Int): ResourceConnection!
+	listByKind(kind: ResourceKindInput!, account: ResourceAccountSelectorInput, page: Int, perPage: Int): ResourceListOutcome!
 	"""
 	Returns resource identities of the specified kind
 	"""
-	listIdentitiesByKind(kind: ResourceKindInput!, account: ResourceAccountSelectorInput, page: Int, perPage: Int): ResourceIdentityConnection!
+	listIdentitiesByKind(kind: ResourceKindInput!, account: ResourceAccountSelectorInput, page: Int, perPage: Int): ResourceIdentityListOutcome!
 	"""
 	Searches resource identities across the specified exact kinds
 	"""
-	searchIdentities(query: SearchResourceIdentitiesInput!, page: Int, perPage: Int): ResourceIdentityConnection!
+	searchIdentities(query: SearchResourceIdentitiesInput!, page: Int, perPage: Int): ResourceIdentityListOutcome!
 	"""
 	Returns resources across all kinds
 	"""
-	listAll(account: ResourceAccountSelectorInput, page: Int, perPage: Int): ResourceConnection!
+	listAll(account: ResourceAccountSelectorInput, page: Int, perPage: Int): ResourceListAllOutcome!
 	"""
 	Returns resource identities across all kinds
 	"""
-	listAllIdentities(account: ResourceAccountSelectorInput, page: Int, perPage: Int): ResourceIdentityConnection!
+	listAllIdentities(account: ResourceAccountSelectorInput, page: Int, perPage: Int): ResourceIdentityListAllOutcome!
 	"""
 	Renders a canonical manifest representation from a stored resource
 	"""
@@ -4214,6 +4256,8 @@ type ResourcesMut {
 type ResourcesSummary {
 	resourceCounts: [ResourceTypeCountSummary!]!
 }
+
+union ResourcesSummaryOutcome = ResourcesSummary | ResourceBadAccountProblem
 
 type RestProtocolDesc {
 	tailUrl: String!

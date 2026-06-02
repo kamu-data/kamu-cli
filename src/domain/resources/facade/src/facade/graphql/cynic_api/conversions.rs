@@ -54,7 +54,10 @@ impl TryFrom<fragments::Resource> for domain::ResourceView {
             api_version: value.api_version,
             account: domain::ResourceViewAccount {
                 id: value.metadata.account_id,
-                name: None,
+                name: value
+                    .metadata
+                    .account_name
+                    .map(|name| odf::AccountName::new_unchecked(&name.0)),
             },
             metadata: domain::ResourceViewMetadata {
                 uid: value.metadata.id,

@@ -8,6 +8,11 @@
 // by the Apache License, Version 2.0.
 
 use kamu_configuration::{SecretSetResource, VariableSetResource};
+use kamu_resources::{ApplyResourceOutcome, ResourceUID};
+use kamu_resources_facade::{ApplyManifestRequest, ResourceManifestFormat};
+
+use crate::harness::{FacadeContractHarness, TestAccount};
+use crate::helpers::assert_applied_outcome;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -110,11 +115,44 @@ pub fn variable_set_manifest_yaml(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub fn sorted_identity_names(mut items: Vec<kamu_resources::ResourceIdentityView>) -> Vec<String> {
+    crate::helpers::normalize_identity_views(&mut items);
+    items.into_iter().map(|item| item.name).collect()
+}
+
+pub fn total_kind_count(summary: kamu_resources::ResourcesSummary, kind: &str) -> u64 {
+    summary
+        .resource_counts
+        .into_iter()
+        .find(|count| count.kind == kind)
+        .map_or(0, |count| count.total_count)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn apply_manifest_and_get_uid(
+    h: &impl FacadeContractHarness,
+    account: TestAccount,
+    manifest: String,
+) -> ResourceUID {
+    let decision = h
+        .facade_for(account)
+        .apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest,
+        })
+        .await
+        .unwrap();
+    let view = assert_applied_outcome(&decision, ApplyResourceOutcome::Created);
+    view.metadata.uid
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Builds a `SecretSet` manifest JSON string.
 ///
 /// Each secret is emitted as `{"value": "<v>"}` — the untagged `Value`
 /// variant of `SecretSpec`.
-#[expect(dead_code)]
 pub fn secret_set_manifest_json(
     name: &str,
     account: Option<&str>,

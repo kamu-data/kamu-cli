@@ -38,24 +38,19 @@ impl ResourceKindInput {
 
 #[derive(cynic::InputObject, Debug, Clone)]
 #[cynic(graphql_type = "ResourceAccountSelectorInput")]
-pub(crate) enum ResourceAccountSelectorInput {
-    ById(odf::AccountID),
-    ByName(AccountName),
+pub(crate) struct ResourceAccountSelectorInput {
+    pub by_id: Option<odf::AccountID>,
+    pub by_name: Option<AccountName>,
 }
 
 impl TryFrom<&domain::ResourceManifestAccount> for ResourceAccountSelectorInput {
     type Error = internal_error::InternalError;
 
     fn try_from(value: &domain::ResourceManifestAccount) -> Result<Self, Self::Error> {
-        if let Some(id) = &value.id {
-            Ok(Self::ById(id.clone()))
-        } else if let Some(name) = &value.name {
-            Ok(Self::ByName(AccountName(name.clone())))
-        } else {
-            Err(internal_error::InternalError::new(
-                "Remote resource request account selector must contain either id or name",
-            ))
-        }
+        Ok(Self {
+            by_id: value.id.clone(),
+            by_name: value.name.clone().map(AccountName),
+        })
     }
 }
 

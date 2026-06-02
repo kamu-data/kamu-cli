@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use graphql_http::GraphqlHttpClient;
-use internal_error::InternalError;
 use kamu_resources as domain;
 use url::Url;
 
@@ -94,11 +93,7 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
             .execute_operation(Operation::build_operation(variables))
             .await?;
 
-        response
-            .resources
-            .summary
-            .try_into()
-            .map_err(ResourcesSummaryError::Internal)
+        outcome_mapper::map_summary_outcome(response.resources.summary)
     }
 
     async fn get(
@@ -317,14 +312,7 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
             .execute_operation(Operation::build_list_by_kind_operation(variables))
             .await?;
 
-        response
-            .resources
-            .list_by_kind
-            .nodes
-            .into_iter()
-            .map(TryInto::try_into)
-            .collect::<Result<Vec<_>, InternalError>>()
-            .map_err(ListResourcesError::Internal)
+        outcome_mapper::map_list_outcome(response.resources.list_by_kind)
     }
 
     async fn list_identities(
@@ -347,13 +335,7 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
             ))
             .await?;
 
-        Ok(response
-            .resources
-            .list_identities_by_kind
-            .nodes
-            .into_iter()
-            .map(Into::into)
-            .collect())
+        outcome_mapper::map_list_identities_outcome(response.resources.list_identities_by_kind)
     }
 
     async fn search_identities(
@@ -361,6 +343,10 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
         request: SearchResourceIdentitiesRequest,
     ) -> Result<SearchResourceIdentitiesResponse, ListResourcesError> {
         use cynic_api::operations::search as SearchOperation;
+
+        if request.exact_names.is_none() && request.name_pattern.is_none() {
+            return Err(crate::InvalidResourceSearchQueryError.into());
+        }
 
         let variables = SearchOperation::SearchIdentitiesVariables::new(&request)
             .map_err(ListResourcesError::Internal)?;
@@ -370,17 +356,7 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
             .execute_operation(SearchOperation::build_operation(variables))
             .await?;
 
-        let connection = response.resources.search_identities;
-
-        Ok(SearchResourceIdentitiesResponse {
-            items: connection.nodes.into_iter().map(Into::into).collect(),
-            total_count: usize::try_from(connection.total_count).map_err(|_| {
-                ListResourcesError::Internal(InternalError::new(format!(
-                    "Remote search total_count {} cannot be converted to usize",
-                    connection.total_count
-                )))
-            })?,
-        })
+        outcome_mapper::map_search_identities_outcome(response.resources.search_identities)
     }
 
     async fn list_all(
@@ -400,14 +376,7 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
             .execute_operation(Operation::build_list_all_operation(variables))
             .await?;
 
-        response
-            .resources
-            .list_all
-            .nodes
-            .into_iter()
-            .map(TryInto::try_into)
-            .collect::<Result<Vec<_>, InternalError>>()
-            .map_err(ListAllResourcesError::Internal)
+        outcome_mapper::map_list_all_outcome(response.resources.list_all)
     }
 
     async fn list_all_identities(
@@ -427,13 +396,7 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
             .execute_operation(Operation::build_list_all_identities_operation(variables))
             .await?;
 
-        Ok(response
-            .resources
-            .list_all_identities
-            .nodes
-            .into_iter()
-            .map(Into::into)
-            .collect())
+        outcome_mapper::map_list_all_identities_outcome(response.resources.list_all_identities)
     }
 
     async fn plan_apply_manifest(

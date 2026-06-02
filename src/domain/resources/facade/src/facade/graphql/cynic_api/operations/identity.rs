@@ -10,7 +10,12 @@
 use cynic::QueryBuilder;
 use internal_error::InternalError;
 
-use crate::facade::graphql::cynic_api::fragments::{BatchResourceProblem, ResourceIdentity};
+use crate::facade::graphql::cynic_api::fragments::{
+    BatchResourceProblem,
+    ResourceBadAccountProblem,
+    ResourceIdentity,
+    ResourceUnsupportedDescriptorProblem,
+};
 use crate::facade::graphql::cynic_api::inputs::{
     ResourceBatchSelectorInput,
     ResourceSelectorInput,
@@ -48,6 +53,8 @@ pub(crate) enum ResourceGetIdentityOutcome {
     ResourceNameNotFoundProblem(GetIdentityNameNotFoundProblem),
     ResourceApiVersionMismatchProblem(GetIdentityApiVersionMismatchProblem),
     ResourceKindMismatchProblem(GetIdentityKindMismatchProblem),
+    ResourceUnsupportedDescriptorProblem(ResourceUnsupportedDescriptorProblem),
+    ResourceBadAccountProblem(ResourceBadAccountProblem),
     #[cynic(fallback)]
     Unknown,
 }

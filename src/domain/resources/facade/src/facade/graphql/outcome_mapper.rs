@@ -17,12 +17,16 @@ use crate::{
     BatchResourceSuccess,
     DeleteResourceError,
     GetResourceError,
+    ListAllResourcesError,
+    ListResourcesError,
     RenderResourceManifestError,
     RenderResourceManifestResult,
     ResourceBatchSelector,
     ResourceKindMismatchError,
     ResourceLookupProblem,
     ResourceRef,
+    ResourcesSummaryError,
+    SearchResourceIdentitiesResponse,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -266,6 +270,226 @@ fn malformed_remote_problem(problem: &impl BatchResourceProblemLike) -> BatchRes
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+fn unsupported_descriptor_problem_error(
+    problem: cynic_api::fragments::ResourceUnsupportedDescriptorProblem,
+) -> domain::UnsupportedResourceDescriptorError {
+    use cynic_api::fragments::ResourceUnsupportedDescriptorProblemCode as C;
+
+    match problem.code {
+        C::NotFound => domain::UnsupportedResourceDescriptorError::NotFound {
+            kind: problem.kind,
+            api_version: problem.api_version,
+        },
+        C::Duplicate => domain::UnsupportedResourceDescriptorError::Duplicate {
+            kind: problem.kind,
+            api_version: problem.api_version,
+        },
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn bad_account_problem_error(
+    problem: cynic_api::fragments::ResourceBadAccountProblem,
+) -> Result<crate::ResolveManifestAccountError, InternalError> {
+    use cynic_api::fragments::ResourceBadAccountProblemCode as C;
+
+    Ok(match problem.code {
+        C::EmptySelector => crate::ResolveManifestAccountError::EmptySelector,
+        C::AccountNotFoundById => crate::ResolveManifestAccountError::AccountNotFoundById(
+            kamu_accounts::AccountNotFoundByIdError {
+                account_id: problem.account_id.ok_or_else(|| {
+                    InternalError::new("Malformed remote bad account problem: missing account_id")
+                })?,
+            },
+        ),
+        C::AccountNotFoundByName => crate::ResolveManifestAccountError::AccountNotFoundByName(
+            kamu_accounts::AccountNotFoundByNameError {
+                account_name: account_name_from_problem(problem.account_name, "account_name")?,
+            },
+        ),
+        C::IdNameMismatch => crate::ResolveManifestAccountError::IdNameMismatch {
+            account_id: problem.account_id.ok_or_else(|| {
+                InternalError::new("Malformed remote bad account problem: missing account_id")
+            })?,
+            expected_name: account_name_from_problem(problem.expected_name, "expected_name")?,
+            actual_name: account_name_from_problem(problem.actual_name, "actual_name")?,
+        },
+        C::Other => {
+            return Err(InternalError::new(
+                "Remote returned non-user account resolution failure as a typed problem",
+            ));
+        }
+    })
+}
+
+fn account_name_from_problem(
+    value: Option<cynic_api::scalars::AccountName>,
+    field: &str,
+) -> Result<odf::AccountName, InternalError> {
+    value
+        .map(|name| odf::AccountName::new_unchecked(&name.0))
+        .ok_or_else(|| {
+            InternalError::new(format!(
+                "Malformed remote bad account problem: missing {field}"
+            ))
+        })
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(super) fn map_summary_outcome(
+    outcome: cynic_api::operations::summary::ResourcesSummaryOutcome,
+) -> Result<domain::ResourcesSummary, ResourcesSummaryError> {
+    use cynic_api::operations::summary::ResourcesSummaryOutcome as O;
+
+    match outcome {
+        O::ResourcesSummary(summary) => summary.try_into().map_err(ResourcesSummaryError::Internal),
+        O::ResourceBadAccountProblem(problem) => Err(ResourcesSummaryError::BadAccount(
+            bad_account_problem_error(problem).map_err(ResourcesSummaryError::Internal)?,
+        )),
+        O::Unknown => Err(ResourcesSummaryError::Internal(InternalError::new(
+            "Remote summary returned an unrecognized ResourcesSummaryOutcome variant",
+        ))),
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(super) fn map_list_outcome(
+    outcome: cynic_api::operations::list::ResourceListOutcome,
+) -> Result<Vec<domain::ResourceSummaryView>, ListResourcesError> {
+    use cynic_api::operations::list::ResourceListOutcome as O;
+
+    match outcome {
+        O::ResourceConnection(connection) => connection
+            .nodes
+            .into_iter()
+            .map(TryInto::try_into)
+            .collect::<Result<Vec<_>, InternalError>>()
+            .map_err(ListResourcesError::Internal),
+        O::ResourceUnsupportedDescriptorProblem(problem) => {
+            Err(unsupported_descriptor_problem_error(problem).into())
+        }
+        O::ResourceBadAccountProblem(problem) => Err(ListResourcesError::BadAccount(
+            bad_account_problem_error(problem).map_err(ListResourcesError::Internal)?,
+        )),
+        O::Unknown => Err(ListResourcesError::Internal(InternalError::new(
+            "Remote list returned an unrecognized ResourceListOutcome variant",
+        ))),
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(super) fn map_list_all_outcome(
+    outcome: cynic_api::operations::list::ResourceListAllOutcome,
+) -> Result<Vec<domain::ResourceSummaryView>, ListAllResourcesError> {
+    use cynic_api::operations::list::ResourceListAllOutcome as O;
+
+    match outcome {
+        O::ResourceConnection(connection) => connection
+            .nodes
+            .into_iter()
+            .map(TryInto::try_into)
+            .collect::<Result<Vec<_>, InternalError>>()
+            .map_err(ListAllResourcesError::Internal),
+        O::ResourceBadAccountProblem(problem) => Err(ListAllResourcesError::BadAccount(
+            bad_account_problem_error(problem).map_err(ListAllResourcesError::Internal)?,
+        )),
+        O::Unknown => Err(ListAllResourcesError::Internal(InternalError::new(
+            "Remote list_all returned an unrecognized ResourceListAllOutcome variant",
+        ))),
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(super) fn map_list_identities_outcome(
+    outcome: cynic_api::operations::list::ResourceIdentityListOutcome,
+) -> Result<Vec<domain::ResourceIdentityView>, ListResourcesError> {
+    use cynic_api::operations::list::ResourceIdentityListOutcome as O;
+
+    match outcome {
+        O::ResourceIdentityConnection(connection) => {
+            Ok(connection.nodes.into_iter().map(Into::into).collect())
+        }
+        O::ResourceUnsupportedDescriptorProblem(problem) => {
+            Err(unsupported_descriptor_problem_error(problem).into())
+        }
+        O::ResourceBadAccountProblem(problem) => Err(ListResourcesError::BadAccount(
+            bad_account_problem_error(problem).map_err(ListResourcesError::Internal)?,
+        )),
+        O::ResourceInvalidSearchQueryProblem(problem) => {
+            drop(problem.message);
+            Err(crate::InvalidResourceSearchQueryError.into())
+        }
+        O::Unknown => Err(ListResourcesError::Internal(InternalError::new(
+            "Remote list_identities returned an unrecognized ResourceIdentityListOutcome variant",
+        ))),
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(super) fn map_list_all_identities_outcome(
+    outcome: cynic_api::operations::list::ResourceIdentityListAllOutcome,
+) -> Result<Vec<domain::ResourceIdentityView>, ListAllResourcesError> {
+    use cynic_api::operations::list::ResourceIdentityListAllOutcome as O;
+
+    match outcome {
+        O::ResourceIdentityConnection(connection) => {
+            Ok(connection.nodes.into_iter().map(Into::into).collect())
+        }
+        O::ResourceBadAccountProblem(problem) => Err(ListAllResourcesError::BadAccount(
+            bad_account_problem_error(problem).map_err(ListAllResourcesError::Internal)?,
+        )),
+        O::Unknown => Err(ListAllResourcesError::Internal(InternalError::new(
+            "Remote list_all_identities returned an unrecognized ResourceIdentityListAllOutcome \
+             variant",
+        ))),
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(super) fn map_search_identities_outcome(
+    outcome: cynic_api::operations::search::ResourceIdentityListOutcome,
+) -> Result<SearchResourceIdentitiesResponse, ListResourcesError> {
+    use cynic_api::operations::search::ResourceIdentityListOutcome as O;
+
+    match outcome {
+        O::ResourceIdentityConnection(connection) => {
+            let total_count = usize::try_from(connection.total_count).map_err(|_| {
+                ListResourcesError::Internal(InternalError::new(format!(
+                    "Remote search total_count {} cannot be converted to usize",
+                    connection.total_count
+                )))
+            })?;
+
+            Ok(SearchResourceIdentitiesResponse {
+                items: connection.nodes.into_iter().map(Into::into).collect(),
+                total_count,
+            })
+        }
+        O::ResourceUnsupportedDescriptorProblem(problem) => {
+            Err(unsupported_descriptor_problem_error(problem).into())
+        }
+        O::ResourceBadAccountProblem(problem) => Err(ListResourcesError::BadAccount(
+            bad_account_problem_error(problem).map_err(ListResourcesError::Internal)?,
+        )),
+        O::ResourceInvalidSearchQueryProblem(problem) => {
+            drop(problem.message);
+            Err(crate::InvalidResourceSearchQueryError.into())
+        }
+        O::Unknown => Err(ListResourcesError::Internal(InternalError::new(
+            "Remote search returned an unrecognized ResourceIdentityListOutcome variant",
+        ))),
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub(super) fn map_get_resource_outcome(
     outcome: cynic_api::operations::get_resource::ResourceGetOutcome,
 ) -> Result<domain::ResourceView, GetResourceError> {
@@ -293,6 +517,12 @@ pub(super) fn map_get_resource_outcome(
                 expected_kind: p.expected_kind,
                 actual_kind: p.actual_kind,
             }),
+        )),
+        O::ResourceUnsupportedDescriptorProblem(problem) => {
+            Err(unsupported_descriptor_problem_error(problem).into())
+        }
+        O::ResourceBadAccountProblem(problem) => Err(GetResourceError::BadAccount(
+            bad_account_problem_error(problem).map_err(GetResourceError::Internal)?,
         )),
         O::Unknown => Err(GetResourceError::Internal(InternalError::new(
             "Remote get returned an unrecognized ResourceGetOutcome variant",
@@ -329,6 +559,12 @@ pub(super) fn map_get_identity_outcome(
                 expected_kind: p.expected_kind,
                 actual_kind: p.actual_kind,
             }),
+        )),
+        O::ResourceUnsupportedDescriptorProblem(problem) => {
+            Err(unsupported_descriptor_problem_error(problem).into())
+        }
+        O::ResourceBadAccountProblem(problem) => Err(GetResourceError::BadAccount(
+            bad_account_problem_error(problem).map_err(GetResourceError::Internal)?,
         )),
         O::Unknown => Err(GetResourceError::Internal(InternalError::new(
             "Remote get_identity returned an unrecognized ResourceGetIdentityOutcome variant",
@@ -401,6 +637,12 @@ pub(super) fn map_render_manifest_outcome(
                 expected_kind: p.expected_kind,
                 actual_kind: p.actual_kind,
             }),
+        )),
+        O::ResourceUnsupportedDescriptorProblem(problem) => {
+            Err(unsupported_descriptor_problem_error(problem).into())
+        }
+        O::ResourceBadAccountProblem(problem) => Err(RenderResourceManifestError::BadAccount(
+            bad_account_problem_error(problem).map_err(RenderResourceManifestError::Internal)?,
         )),
         O::Unknown => Err(RenderResourceManifestError::Internal(InternalError::new(
             "Remote render_manifest returned an unrecognized ResourceRenderManifestOutcome variant",

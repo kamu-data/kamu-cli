@@ -10,8 +10,11 @@
 use cynic::QueryBuilder;
 
 use crate::facade::graphql::cynic_api::fragments::{
+    ResourceBadAccountProblem,
     ResourceConnection,
     ResourceIdentityConnection,
+    ResourceInvalidSearchQueryProblem,
+    ResourceUnsupportedDescriptorProblem,
 };
 use crate::facade::graphql::cynic_api::schema;
 use crate::facade::graphql::cynic_api::variables::{
@@ -33,7 +36,7 @@ pub(crate) struct ListByKindQuery {
 #[cynic(graphql_type = "Resources", variables = "ListByKindVariables")]
 pub(crate) struct ListByKindResources {
     #[arguments(kind: $kind, account: $account, page: $page, perPage: $per_page)]
-    pub list_by_kind: ResourceConnection,
+    pub list_by_kind: ResourceListOutcome,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -48,7 +51,7 @@ pub(crate) struct ListAllQuery {
 #[cynic(graphql_type = "Resources", variables = "ListAllVariables")]
 pub(crate) struct ListAllResources {
     #[arguments(account: $account, page: $page, perPage: $per_page)]
-    pub list_all: ResourceConnection,
+    pub list_all: ResourceListAllOutcome,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -63,7 +66,7 @@ pub(crate) struct ListIdentitiesByKindQuery {
 #[cynic(graphql_type = "Resources", variables = "ListByKindVariables")]
 pub(crate) struct ListIdentitiesByKindResources {
     #[arguments(kind: $kind, account: $account, page: $page, perPage: $per_page)]
-    pub list_identities_by_kind: ResourceIdentityConnection,
+    pub list_identities_by_kind: ResourceIdentityListOutcome,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -78,7 +81,50 @@ pub(crate) struct ListAllIdentitiesQuery {
 #[cynic(graphql_type = "Resources", variables = "ListAllVariables")]
 pub(crate) struct ListAllIdentitiesResources {
     #[arguments(account: $account, page: $page, perPage: $per_page)]
-    pub list_all_identities: ResourceIdentityConnection,
+    pub list_all_identities: ResourceIdentityListAllOutcome,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::InlineFragments, Debug, Clone)]
+pub(crate) enum ResourceListOutcome {
+    ResourceConnection(ResourceConnection),
+    ResourceUnsupportedDescriptorProblem(ResourceUnsupportedDescriptorProblem),
+    ResourceBadAccountProblem(ResourceBadAccountProblem),
+    #[cynic(fallback)]
+    Unknown,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::InlineFragments, Debug, Clone)]
+pub(crate) enum ResourceListAllOutcome {
+    ResourceConnection(ResourceConnection),
+    ResourceBadAccountProblem(ResourceBadAccountProblem),
+    #[cynic(fallback)]
+    Unknown,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::InlineFragments, Debug, Clone)]
+pub(crate) enum ResourceIdentityListOutcome {
+    ResourceIdentityConnection(ResourceIdentityConnection),
+    ResourceUnsupportedDescriptorProblem(ResourceUnsupportedDescriptorProblem),
+    ResourceBadAccountProblem(ResourceBadAccountProblem),
+    ResourceInvalidSearchQueryProblem(ResourceInvalidSearchQueryProblem),
+    #[cynic(fallback)]
+    Unknown,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::InlineFragments, Debug, Clone)]
+pub(crate) enum ResourceIdentityListAllOutcome {
+    ResourceIdentityConnection(ResourceIdentityConnection),
+    ResourceBadAccountProblem(ResourceBadAccountProblem),
+    #[cynic(fallback)]
+    Unknown,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

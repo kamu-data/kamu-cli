@@ -329,6 +329,10 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         &self,
         request: SearchResourceIdentitiesRequest,
     ) -> Result<SearchResourceIdentitiesResponse, ListResourcesError> {
+        if request.exact_names.is_none() && request.name_pattern.is_none() {
+            return Err(InvalidResourceSearchQueryError.into());
+        }
+
         let target_account = self
             .resource_account_resolver
             .resolve_target_account(request.account.as_ref())
