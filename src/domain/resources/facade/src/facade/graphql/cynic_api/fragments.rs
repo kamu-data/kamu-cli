@@ -20,7 +20,7 @@ pub(crate) struct ResourceSummary {
     pub kind: ResourceKind,
     pub name: String,
     pub description: Option<String>,
-    pub generation: i32,
+    pub generation: u64,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub status: Option<ResourceStatusSummary>,
@@ -32,7 +32,7 @@ pub(crate) struct ResourceSummary {
 #[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct ResourceStatusSummary {
     pub phase: Option<String>,
-    pub observed_generation: Option<i32>,
+    pub observed_generation: Option<u64>,
     pub ready: Option<bool>,
 }
 
@@ -42,7 +42,7 @@ pub(crate) struct ResourceStatusSummary {
 pub(crate) struct ResourceListColumnValueView {
     pub key: String,
     pub string_value: Option<String>,
-    pub uint64_value: Option<i32>,
+    pub uint64_value: Option<u64>,
     pub bool_value: Option<bool>,
 }
 
@@ -75,7 +75,7 @@ pub(crate) struct ResourceTypeCountSummary {
     pub kind: String,
     pub name: String,
     pub api_version: String,
-    pub total_count: i32,
+    pub total_count: u64,
     pub phase_counts: ResourcePhaseCounts,
 }
 
@@ -83,11 +83,11 @@ pub(crate) struct ResourceTypeCountSummary {
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct ResourcePhaseCounts {
-    pub pending: i32,
-    pub reconciling: i32,
-    pub ready: i32,
-    pub degraded: i32,
-    pub failed: i32,
+    pub pending: u64,
+    pub reconciling: u64,
+    pub ready: u64,
+    pub degraded: u64,
+    pub failed: u64,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -118,7 +118,7 @@ pub(crate) struct ResourceMetadata {
     pub description: Option<String>,
     pub labels: serde_json::Value,
     pub annotations: serde_json::Value,
-    pub generation: i32,
+    pub generation: u64,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub deleted_at: Option<DateTime<Utc>>,
@@ -178,6 +178,8 @@ pub(crate) struct BatchResourceProblem {
     pub request_index: i32,
     pub code: BatchResourceProblemCode,
     pub message: String,
+    pub actual_api_version: Option<String>,
+    pub actual_kind: Option<String>,
 }
 
 #[derive(cynic::Enum, Debug, Clone, Copy)]

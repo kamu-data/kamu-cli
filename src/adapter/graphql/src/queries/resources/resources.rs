@@ -10,6 +10,11 @@
 use database_common::PaginationOpts;
 
 use crate::LoggedInGuard;
+use crate::mutations::{
+    ResourceApiVersionMismatchProblem,
+    ResourceNameNotFoundProblem,
+    ResourceUIDNotFoundProblem,
+};
 use crate::prelude::*;
 use crate::queries::{
     BatchResourceIdentitiesResult,
@@ -341,20 +346,26 @@ impl Resources {
         selector: ResourceSelectorInput,
         format: ResourceManifestFormat,
         #[graphql(default)] revealed: bool,
-    ) -> Result<ResourceRenderManifestResult> {
+    ) -> Result<ResourceRenderManifestOutcome> {
         let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
 
         let spec_view_mode = Self::spec_view_mode_from_revealed(revealed);
 
-        let rendered = resource_facade
+        match resource_facade
             .render_manifest(selector.into(), format.into(), spec_view_mode)
             .await
-            .map_err(map_render_resource_manifest_error)?;
-
-        Ok(ResourceRenderManifestResult {
-            manifest: rendered.manifest,
-            format: rendered.format.into(),
-        })
+        {
+            Ok(rendered) => Ok(ResourceRenderManifestOutcome::Success(
+                ResourceRenderManifestResult {
+                    manifest: rendered.manifest,
+                    format: rendered.format.into(),
+                },
+            )),
+            Err(kamu_resources_facade::RenderResourceManifestError::LookupProblem(problem)) => {
+                Ok(ResourceRenderManifestOutcome::from_lookup_problem(problem))
+            }
+            Err(error) => Err(map_render_resource_manifest_error(error)),
+        }
     }
 
     /// Renders canonical manifest representations from stored resources
@@ -416,9 +427,52 @@ fn map_render_resource_manifest_error(
     match error {
         E::UnsupportedDescriptor(_) => GqlError::gql("Unsupported resource kind"),
         E::BadAccount(error) => map_resolve_manifest_account_error(error),
-        E::LookupProblem(problem) => GqlError::gql(problem.to_string()),
+        E::LookupProblem(_) => unreachable!("LookupProblem is handled as a union arm"),
         E::RemoteRequest(error) => error.int_err().into(),
         E::Internal(error) => error.into(),
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Union, Debug, Clone)]
+pub enum ResourceRenderManifestOutcome {
+    Success(ResourceRenderManifestResult),
+    UidNotFound(ResourceUIDNotFoundProblem),
+    NameNotFound(ResourceNameNotFoundProblem),
+    ApiVersionMismatch(ResourceApiVersionMismatchProblem),
+}
+
+impl ResourceRenderManifestOutcome {
+    fn from_lookup_problem(
+        problem: kamu_resources_facade::ResourceLookupProblem,
+    ) -> ResourceRenderManifestOutcome {
+        use kamu_resources_facade::ResourceLookupProblem as P;
+        match problem {
+            P::UIDNotFound(e) => Self::UidNotFound(ResourceUIDNotFoundProblem {
+                uid: e.0.into(),
+                message: e.to_string(),
+            }),
+            P::NameNotFound(e) => Self::NameNotFound(ResourceNameNotFoundProblem {
+                kind: e.kind.clone(),
+                name: e.name.clone(),
+                message: e.to_string(),
+            }),
+            P::ApiVersionMismatch(e) => {
+                Self::ApiVersionMismatch(ResourceApiVersionMismatchProblem {
+                    expected_api_version: e.expected_api_version.clone(),
+                    actual_api_version: e.actual_api_version.clone(),
+                    message: e.to_string(),
+                })
+            }
+            P::KindMismatch(e) => {
+                unreachable!(
+                    "render_manifest does not perform kind lookup; got unexpected KindMismatch \
+                     for uid {}",
+                    e.uid
+                )
+            }
+        }
     }
 }
 

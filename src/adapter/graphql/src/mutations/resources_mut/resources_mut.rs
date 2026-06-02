@@ -64,7 +64,7 @@ impl ResourcesMut {
         &self,
         ctx: &Context<'_>,
         selector: ResourceSelectorInput,
-    ) -> Result<ResourceDeleteResult> {
+    ) -> Result<ResourceDeleteOutcome> {
         let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
 
         let ResourceSelectorInput {
@@ -75,7 +75,7 @@ impl ResourcesMut {
         } = selector;
         let kind = kind.into_resource_type();
 
-        let resource_id = resource_facade
+        match resource_facade
             .delete(kamu_resources_facade::ResourceSelector {
                 kind: kind.clone(),
                 account: account.map(ResourceAccountSelectorInput::into_manifest_account),
@@ -83,12 +83,16 @@ impl ResourcesMut {
                 resource_ref: resource_ref.into(),
             })
             .await
-            .map_err(map_delete_resource_error)?;
-
-        Ok(ResourceDeleteResult {
-            resource_id: resource_id.into(),
-            kind: ResourceKind::new(kind).into(),
-        })
+        {
+            Ok(resource_id) => Ok(ResourceDeleteOutcome::Success(ResourceDeleteSuccess {
+                resource_id: resource_id.into(),
+                kind: ResourceKind::new(kind).into(),
+            })),
+            Err(kamu_resources_facade::DeleteResourceError::LookupProblem(problem)) => {
+                Ok(ResourceDeleteOutcome::from_lookup_problem(problem))
+            }
+            Err(error) => Err(map_delete_resource_error(error)),
+        }
     }
 
     #[tracing::instrument(level = "info", name = ResourcesMut_delete_many, skip_all, fields(selector_count = selector.resource_refs.len()))]
@@ -123,8 +127,51 @@ impl ResourcesMut {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Union, Debug, Clone)]
+pub enum ResourceDeleteOutcome {
+    Success(ResourceDeleteSuccess),
+    UidNotFound(ResourceUIDNotFoundProblem),
+    NameNotFound(ResourceNameNotFoundProblem),
+    ApiVersionMismatch(ResourceApiVersionMismatchProblem),
+    KindMismatch(ResourceKindMismatchProblem),
+}
+
+impl ResourceDeleteOutcome {
+    fn from_lookup_problem(
+        problem: kamu_resources_facade::ResourceLookupProblem,
+    ) -> ResourceDeleteOutcome {
+        use kamu_resources_facade::ResourceLookupProblem as P;
+        match problem {
+            P::UIDNotFound(e) => Self::UidNotFound(ResourceUIDNotFoundProblem {
+                uid: e.0.into(),
+                message: e.to_string(),
+            }),
+            P::NameNotFound(e) => Self::NameNotFound(ResourceNameNotFoundProblem {
+                kind: e.kind.clone(),
+                name: e.name.clone(),
+                message: e.to_string(),
+            }),
+            P::ApiVersionMismatch(e) => {
+                Self::ApiVersionMismatch(ResourceApiVersionMismatchProblem {
+                    expected_api_version: e.expected_api_version.clone(),
+                    actual_api_version: e.actual_api_version.clone(),
+                    message: e.to_string(),
+                })
+            }
+            P::KindMismatch(e) => Self::KindMismatch(ResourceKindMismatchProblem {
+                uid: e.uid.into(),
+                expected_kind: e.expected_kind.clone(),
+                actual_kind: e.actual_kind.clone(),
+                message: e.to_string(),
+            }),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(SimpleObject, Debug, Clone)]
-pub struct ResourceDeleteResult {
+pub struct ResourceDeleteSuccess {
     pub resource_id: ResourceID,
     pub kind: Option<ResourceKind>,
 }
@@ -132,8 +179,38 @@ pub struct ResourceDeleteResult {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject, Debug, Clone)]
+pub struct ResourceUIDNotFoundProblem {
+    pub uid: ResourceID,
+    pub message: String,
+}
+
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ResourceNameNotFoundProblem {
+    pub kind: String,
+    pub name: String,
+    pub message: String,
+}
+
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ResourceApiVersionMismatchProblem {
+    pub expected_api_version: String,
+    pub actual_api_version: String,
+    pub message: String,
+}
+
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ResourceKindMismatchProblem {
+    pub uid: ResourceID,
+    pub expected_kind: String,
+    pub actual_kind: String,
+    pub message: String,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceDeleteManyResult {
-    pub resources: Vec<ResourceDeleteSuccess>,
+    pub resources: Vec<ResourceDeleteManySuccess>,
     pub problems: Vec<BatchResourceProblem>,
 }
 
@@ -148,7 +225,7 @@ impl From<BatchDeleteResourcesResponse> for ResourceDeleteManyResult {
             resources: value
                 .successes
                 .into_iter()
-                .map(|success| ResourceDeleteSuccess {
+                .map(|success| ResourceDeleteManySuccess {
                     request_index: success.request_index,
                     resource_id: success.item.into(),
                 })
@@ -161,7 +238,7 @@ impl From<BatchDeleteResourcesResponse> for ResourceDeleteManyResult {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject, Debug, Clone)]
-pub struct ResourceDeleteSuccess {
+pub struct ResourceDeleteManySuccess {
     pub request_index: usize,
     pub resource_id: ResourceID,
 }
@@ -209,7 +286,7 @@ fn map_delete_resource_error(error: kamu_resources_facade::DeleteResourceError) 
     match error {
         E::UnsupportedDescriptor(_) => GqlError::gql("Unsupported resource kind"),
         E::BadAccount(error) => map_resolve_manifest_account_error(error),
-        E::LookupProblem(problem) => GqlError::gql(problem.to_string()),
+        E::LookupProblem(_) => unreachable!("LookupProblem is handled as a union arm"),
         E::RemoteRequest(error) => error.int_err().into(),
         E::Internal(error) => error.into(),
     }

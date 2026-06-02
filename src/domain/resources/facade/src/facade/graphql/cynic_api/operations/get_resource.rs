@@ -20,12 +20,12 @@ use crate::{ResourceSelector, SpecViewMode};
 #[derive(cynic::QueryFragment, Debug, Clone)]
 #[cynic(graphql_type = "Query", variables = "ResourceSelectorVariables")]
 pub(crate) struct GetResourceQuery {
-    pub resources: Resources,
+    pub resources: GetResourceResources,
 }
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
-#[cynic(variables = "ResourceSelectorVariables")]
-pub(crate) struct Resources {
+#[cynic(graphql_type = "Resources", variables = "ResourceSelectorVariables")]
+pub(crate) struct GetResourceResources {
     #[arguments(selector: $selector, revealed: $revealed)]
     pub resource: Option<Resource>,
 }

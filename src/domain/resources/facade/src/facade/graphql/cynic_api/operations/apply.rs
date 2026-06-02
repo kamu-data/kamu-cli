@@ -20,12 +20,12 @@ use crate::facade::graphql::cynic_api::schema;
 #[derive(cynic::QueryFragment, Debug, Clone)]
 #[cynic(graphql_type = "Mutation", variables = "ApplyManifestVariables")]
 pub(crate) struct ApplyManifestMutation {
-    pub resources: ResourcesMut,
+    pub resources: ApplyManifestResourcesMut,
 }
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
 #[cynic(graphql_type = "ResourcesMut", variables = "ApplyManifestVariables")]
-pub(crate) struct ResourcesMut {
+pub(crate) struct ApplyManifestResourcesMut {
     #[arguments(manifest: $manifest, format: $format, dryRun: $dry_run)]
     pub apply_manifest: ResourceApplyOutcome,
 }
@@ -168,7 +168,7 @@ impl From<ResourceApplyRejectionCategory> for domain::ApplyResourceRejectionCate
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl ResourceApplyOutcome {
-    pub(crate) fn into_planning_decision(
+    pub(crate) fn try_into_planning_decision(
         self,
     ) -> Result<domain::ApplyManifestPlanningDecision, InternalError> {
         Ok(match self {
@@ -199,7 +199,7 @@ impl ResourceApplyOutcome {
         })
     }
 
-    pub(crate) fn into_application_decision(
+    pub(crate) fn try_into_application_decision(
         self,
     ) -> Result<domain::ApplyManifestApplicationDecision, InternalError> {
         Ok(match self {
@@ -232,24 +232,16 @@ impl ResourceApplyOutcome {
 pub(crate) struct ApplyManifestVariables {
     pub manifest: String,
     pub format: ResourceManifestFormat,
-    pub dry_run: Option<bool>,
-}
-
-impl From<&ApplyManifestRequest> for ApplyManifestVariables {
-    fn from(value: &ApplyManifestRequest) -> Self {
-        Self {
-            manifest: value.manifest.clone(),
-            format: value.format.into(),
-            dry_run: None,
-        }
-    }
+    pub dry_run: bool,
 }
 
 impl ApplyManifestVariables {
-    pub(crate) fn new(request: &ApplyManifestRequest, dry_run: bool) -> Self {
-        let mut vars: Self = request.into();
-        vars.dry_run = Some(dry_run);
-        vars
+    pub(crate) fn new(request: ApplyManifestRequest, dry_run: bool) -> Self {
+        Self {
+            manifest: request.manifest,
+            format: request.format.into(),
+            dry_run,
+        }
     }
 }
 
@@ -259,6 +251,56 @@ pub(crate) fn build_operation(
     variables: ApplyManifestVariables,
 ) -> cynic::Operation<ApplyManifestMutation, ApplyManifestVariables> {
     ApplyManifestMutation::build(variables)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::facade::graphql::cynic_api::fragments::ResourceManifestFormat;
+
+    fn test_variables() -> ApplyManifestVariables {
+        ApplyManifestVariables {
+            manifest: String::new(),
+            format: ResourceManifestFormat::Yaml,
+            dry_run: false,
+        }
+    }
+
+    #[test]
+    fn apply_manifest_operation_selects_required_union_arms() {
+        let op = build_operation(test_variables());
+        let query = &op.query;
+        assert!(
+            query.contains("ResourceApplySuccess"),
+            "missing success arm"
+        );
+        assert!(
+            query.contains("ResourceApplyRejection"),
+            "missing rejection arm"
+        );
+        assert!(query.contains("resource"), "missing resource field");
+        assert!(query.contains("spec"), "missing spec field");
+    }
+
+    #[test]
+    fn apply_unknown_outcome_returns_internal_error_for_planning() {
+        let result = ResourceApplyOutcome::Unknown.try_into_planning_decision();
+        assert!(
+            result.is_err(),
+            "expected InternalError for Unknown outcome"
+        );
+    }
+
+    #[test]
+    fn apply_unknown_outcome_returns_internal_error_for_application() {
+        let result = ResourceApplyOutcome::Unknown.try_into_application_decision();
+        assert!(
+            result.is_err(),
+            "expected InternalError for Unknown outcome"
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

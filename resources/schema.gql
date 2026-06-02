@@ -591,6 +591,8 @@ type BatchResourceProblem {
 	requestIndex: Int!
 	code: BatchResourceProblemCode!
 	message: String!
+	actualApiVersion: String
+	actualKind: String
 }
 
 enum BatchResourceProblemCode {
@@ -3873,6 +3875,12 @@ input ResourceAccountSelectorInput @oneOf {
 	byName: AccountName
 }
 
+type ResourceApiVersionMismatchProblem {
+	expectedApiVersion: String!
+	actualApiVersion: String!
+	message: String!
+}
+
 type ResourceApplyChange {
 	kind: ResourceApplyChangeKind!
 	path: String!
@@ -3952,18 +3960,20 @@ type ResourceConnection {
 }
 
 type ResourceDeleteManyResult {
-	resources: [ResourceDeleteSuccess!]!
+	resources: [ResourceDeleteManySuccess!]!
 	problems: [BatchResourceProblem!]!
 }
 
-type ResourceDeleteResult {
-	resourceId: ResourceID!
-	kind: ResourceKind
-}
-
-type ResourceDeleteSuccess {
+type ResourceDeleteManySuccess {
 	requestIndex: Int!
 	resourceId: ResourceID!
+}
+
+union ResourceDeleteOutcome = ResourceDeleteSuccess | ResourceUIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceApiVersionMismatchProblem | ResourceKindMismatchProblem
+
+type ResourceDeleteSuccess {
+	resourceId: ResourceID!
+	kind: ResourceKind
 }
 
 type ResourceEdge {
@@ -4018,6 +4028,13 @@ input ResourceKindInput @oneOf {
 	custom: String
 }
 
+type ResourceKindMismatchProblem {
+	uid: ResourceID!
+	expectedKind: String!
+	actualKind: String!
+	message: String!
+}
+
 type ResourceListColumnDescriptor {
 	key: String!
 	header: String!
@@ -4028,7 +4045,7 @@ type ResourceListColumnDescriptor {
 type ResourceListColumnValueView {
 	key: String!
 	stringValue: String
-	uint64Value: Int
+	uint64Value: Uint64
 	boolValue: Boolean
 }
 
@@ -4044,25 +4061,33 @@ type ResourceMetadata {
 	description: String
 	labels: JSON!
 	annotations: JSON!
-	generation: Int!
+	generation: Uint64!
 	createdAt: DateTime!
 	updatedAt: DateTime!
 	deletedAt: DateTime
 	lastReconciledAt: DateTime
 }
 
+type ResourceNameNotFoundProblem {
+	kind: String!
+	name: String!
+	message: String!
+}
+
 type ResourcePhaseCounts {
-	pending: Int!
-	reconciling: Int!
-	ready: Int!
-	degraded: Int!
-	failed: Int!
+	pending: Uint64!
+	reconciling: Uint64!
+	ready: Uint64!
+	degraded: Uint64!
+	failed: Uint64!
 }
 
 input ResourceRefInput @oneOf {
 	byId: ResourceID
 	byName: ResourceByNameSelectorInput
 }
+
+union ResourceRenderManifestOutcome = ResourceRenderManifestResult | ResourceUIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceApiVersionMismatchProblem
 
 type ResourceRenderManifestResult {
 	manifest: String!
@@ -4078,7 +4103,7 @@ input ResourceSelectorInput {
 
 type ResourceStatusSummary {
 	phase: String
-	observedGeneration: Int
+	observedGeneration: Uint64
 	ready: Boolean
 }
 
@@ -4088,7 +4113,7 @@ type ResourceSummary {
 	kind: ResourceKind!
 	name: String!
 	description: String
-	generation: Int!
+	generation: Uint64!
 	createdAt: DateTime!
 	updatedAt: DateTime!
 	status: ResourceStatusSummary
@@ -4099,8 +4124,13 @@ type ResourceTypeCountSummary {
 	kind: String!
 	name: String!
 	apiVersion: String!
-	totalCount: Int!
+	totalCount: Uint64!
 	phaseCounts: ResourcePhaseCounts!
+}
+
+type ResourceUIDNotFoundProblem {
+	uid: ResourceID!
+	message: String!
 }
 
 type Resources {
@@ -4152,7 +4182,7 @@ type Resources {
 	"""
 	Renders a canonical manifest representation from a stored resource
 	"""
-	renderManifest(selector: ResourceSelectorInput!, format: ResourceManifestFormat!, revealed: Boolean! = false): ResourceRenderManifestResult!
+	renderManifest(selector: ResourceSelectorInput!, format: ResourceManifestFormat!, revealed: Boolean! = false): ResourceRenderManifestOutcome!
 	"""
 	Renders canonical manifest representations from stored resources
 	"""
@@ -4161,7 +4191,7 @@ type Resources {
 
 type ResourcesMut {
 	applyManifest(manifest: String!, format: ResourceManifestFormat!, dryRun: Boolean): ResourceApplyOutcome!
-	delete(selector: ResourceSelectorInput!): ResourceDeleteResult!
+	delete(selector: ResourceSelectorInput!): ResourceDeleteOutcome!
 	deleteMany(selector: ResourceBatchSelectorInput!): ResourceDeleteManyResult!
 }
 
@@ -4788,6 +4818,8 @@ type TriggerFlowSuccess implements TriggerFlowResult {
 }
 
 scalar URL
+
+scalar Uint64
 
 interface UnsetRoleResult {
 	message: String!

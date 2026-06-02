@@ -42,7 +42,39 @@ pub(crate) struct RenderManifestQuery {
 )]
 pub(crate) struct RenderManifestResources {
     #[arguments(selector: $selector, format: $format, revealed: $revealed)]
-    pub render_manifest: ResourceRenderManifestResult,
+    pub render_manifest: ResourceRenderManifestOutcome,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::InlineFragments, Debug, Clone)]
+pub(crate) enum ResourceRenderManifestOutcome {
+    ResourceRenderManifestResult(ResourceRenderManifestResult),
+    ResourceUIDNotFoundProblem(RenderResourceUIDNotFoundProblem),
+    ResourceNameNotFoundProblem(RenderResourceNameNotFoundProblem),
+    ResourceApiVersionMismatchProblem(RenderResourceApiVersionMismatchProblem),
+    #[cynic(fallback)]
+    Unknown,
+}
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
+#[cynic(graphql_type = "ResourceUIDNotFoundProblem")]
+pub(crate) struct RenderResourceUIDNotFoundProblem {
+    pub uid: kamu_resources::ResourceUID,
+}
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
+#[cynic(graphql_type = "ResourceNameNotFoundProblem")]
+pub(crate) struct RenderResourceNameNotFoundProblem {
+    pub kind: String,
+    pub name: String,
+}
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
+#[cynic(graphql_type = "ResourceApiVersionMismatchProblem")]
+pub(crate) struct RenderResourceApiVersionMismatchProblem {
+    pub expected_api_version: String,
+    pub actual_api_version: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

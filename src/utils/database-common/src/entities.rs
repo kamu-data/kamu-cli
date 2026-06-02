@@ -14,7 +14,7 @@ use std::marker::PhantomData;
 use std::pin::Pin;
 
 use futures::{Stream, TryStream, TryStreamExt};
-use internal_error::InternalError;
+use internal_error::{InternalError, ResultIntoInternal as _};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -43,6 +43,36 @@ impl PaginationOpts {
         let rest = total.saturating_sub(self.offset);
 
         self.limit.min(rest)
+    }
+
+    /// Converts to GraphQL `page`/`perPage` parameters (zero-based page index).
+    ///
+    /// The GraphQL API uses page-based pagination, while internally we use
+    /// offset/limit. Since the server computes `offset = page * perPage`, only
+    /// page-aligned offsets can be represented. `PaginationOpts` values passed
+    /// here always originate from [`Self::from_page`], so this invariant holds
+    /// by construction.
+    ///
+    /// `limit == 0` is treated as "first page with default page size".
+    pub fn as_page_params(&self, default_page_size: usize) -> Result<(i32, i32), InternalError> {
+        let per_page = if self.limit == 0 {
+            default_page_size
+        } else {
+            self.limit
+        };
+
+        debug_assert!(
+            self.offset.is_multiple_of(per_page),
+            "GraphQL pagination requires a page-aligned offset (offset={}, per_page={per_page})",
+            self.offset,
+        );
+
+        let page = self.offset / per_page;
+
+        Ok((
+            i32::try_from(page).int_err()?,
+            i32::try_from(per_page).int_err()?,
+        ))
     }
 }
 

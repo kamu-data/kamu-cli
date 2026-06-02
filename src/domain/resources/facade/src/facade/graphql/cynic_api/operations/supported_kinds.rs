@@ -9,6 +9,7 @@
 
 use cynic::QueryBuilder;
 
+use crate::facade::graphql::cynic_api::fragments::ResourceKind;
 use crate::facade::graphql::cynic_api::schema;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -16,11 +17,12 @@ use crate::facade::graphql::cynic_api::schema;
 #[derive(cynic::QueryFragment, Debug, Clone)]
 #[cynic(graphql_type = "Query")]
 pub(crate) struct SupportedKindsQuery {
-    pub resources: Resources,
+    pub resources: SupportedKindsResources,
 }
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
-pub(crate) struct Resources {
+#[cynic(graphql_type = "Resources")]
+pub(crate) struct SupportedKindsResources {
     pub supported_kinds: Vec<ResourceKindDescriptor>,
 }
 
@@ -31,11 +33,6 @@ pub(crate) struct ResourceKindDescriptor {
     pub kind: ResourceKind,
     pub api_version: String,
     pub list_columns: Vec<ResourceListColumnDescriptor>,
-}
-
-#[derive(cynic::QueryFragment, Debug, Clone)]
-pub(crate) struct ResourceKind {
-    pub value: String,
 }
 
 #[derive(cynic::QueryFragment, Debug, Clone)]

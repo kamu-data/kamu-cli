@@ -12,7 +12,7 @@ use database_common::PaginationOpts;
 use kamu_configuration::{SecretSetResource, VariableSetResource};
 
 use crate::prelude::*;
-use crate::scalars::{AccountID, AccountName};
+use crate::scalars::{AccountID, AccountName, UInt64};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Type aliases for cleaner From implementations
@@ -418,15 +418,28 @@ pub struct BatchResourceProblem {
     pub request_index: usize,
     pub code: BatchResourceProblemCode,
     pub message: String,
+    pub actual_api_version: Option<String>,
+    pub actual_kind: Option<String>,
 }
 
 impl From<BatchGetResourceProblem> for BatchResourceProblem {
     fn from(value: BatchGetResourceProblem) -> Self {
+        use kamu_resources_facade::ResourceLookupProblem as P;
         let code = BatchResourceProblemCode::from_lookup_problem(&value.error);
+        let actual_api_version = match &value.error {
+            P::ApiVersionMismatch(e) => Some(e.actual_api_version.clone()),
+            _ => None,
+        };
+        let actual_kind = match &value.error {
+            P::KindMismatch(e) => Some(e.actual_kind.clone()),
+            _ => None,
+        };
         Self {
             request_index: value.request_index,
             message: value.error.to_string(),
             code,
+            actual_api_version,
+            actual_kind,
         }
     }
 }
@@ -461,7 +474,7 @@ pub struct ResourceMetadata {
     pub description: Option<String>,
     pub labels: serde_json::Value,
     pub annotations: serde_json::Value,
-    pub generation: u64,
+    pub generation: UInt64,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub deleted_at: Option<DateTime<Utc>>,
@@ -480,7 +493,7 @@ impl From<kamu_resources::ResourceView> for ResourceMetadata {
             description: value.metadata.description,
             labels,
             annotations,
-            generation: value.metadata.generation,
+            generation: value.metadata.generation.into(),
             created_at: value.metadata.created_at,
             updated_at: value.metadata.updated_at,
             deleted_at: value.metadata.deleted_at,
@@ -498,7 +511,7 @@ pub struct ResourceSummary {
     pub kind: ResourceKind,
     pub name: String,
     pub description: Option<String>,
-    pub generation: u64,
+    pub generation: UInt64,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub status: Option<ResourceStatusSummary>,
@@ -513,7 +526,7 @@ impl From<kamu_resources::ResourceSummaryView> for ResourceSummary {
             kind: ResourceKind::new(value.kind),
             name: value.name.clone(),
             description: value.description,
-            generation: value.generation,
+            generation: value.generation.into(),
             created_at: value.created_at,
             updated_at: value.updated_at,
             status: value.status.map(Into::into),
@@ -549,7 +562,7 @@ impl From<kamu_resources::ResourceListColumnDescriptor> for ResourceListColumnDe
 pub struct ResourceListColumnValueView {
     pub key: String,
     pub string_value: Option<String>,
-    pub uint64_value: Option<u64>,
+    pub uint64_value: Option<UInt64>,
     pub bool_value: Option<bool>,
 }
 
@@ -564,7 +577,7 @@ impl From<kamu_resources::ResourceListColumnValueView> for ResourceListColumnVal
         Self {
             key: value.key,
             string_value,
-            uint64_value,
+            uint64_value: uint64_value.map(Into::into),
             bool_value,
         }
     }
@@ -575,7 +588,7 @@ impl From<kamu_resources::ResourceListColumnValueView> for ResourceListColumnVal
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceStatusSummary {
     pub phase: Option<String>,
-    pub observed_generation: Option<u64>,
+    pub observed_generation: Option<UInt64>,
     pub ready: Option<bool>,
 }
 
@@ -583,7 +596,7 @@ impl From<kamu_resources::ResourceStatusSummaryView> for ResourceStatusSummary {
     fn from(value: kamu_resources::ResourceStatusSummaryView) -> Self {
         Self {
             phase: value.phase.map(|phase| phase.to_string()),
-            observed_generation: value.observed_generation,
+            observed_generation: value.observed_generation.map(Into::into),
             ready: value.ready,
         }
     }
@@ -611,7 +624,7 @@ pub struct ResourceTypeCountSummary {
     pub kind: String,
     pub name: String,
     pub api_version: String,
-    pub total_count: u64,
+    pub total_count: UInt64,
     pub phase_counts: ResourcePhaseCounts,
 }
 
@@ -621,7 +634,7 @@ impl From<kamu_resources::ResourceTypeCountSummary> for ResourceTypeCountSummary
             kind: value.kind,
             name: value.name,
             api_version: value.api_version,
-            total_count: value.total_count,
+            total_count: value.total_count.into(),
             phase_counts: value.phase_counts.into(),
         }
     }
@@ -631,21 +644,21 @@ impl From<kamu_resources::ResourceTypeCountSummary> for ResourceTypeCountSummary
 
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourcePhaseCounts {
-    pub pending: u64,
-    pub reconciling: u64,
-    pub ready: u64,
-    pub degraded: u64,
-    pub failed: u64,
+    pub pending: UInt64,
+    pub reconciling: UInt64,
+    pub ready: UInt64,
+    pub degraded: UInt64,
+    pub failed: UInt64,
 }
 
 impl From<kamu_resources::ResourcePhaseCounts> for ResourcePhaseCounts {
     fn from(value: kamu_resources::ResourcePhaseCounts) -> Self {
         Self {
-            pending: value.pending,
-            reconciling: value.reconciling,
-            ready: value.ready,
-            degraded: value.degraded,
-            failed: value.failed,
+            pending: value.pending.into(),
+            reconciling: value.reconciling.into(),
+            ready: value.ready.into(),
+            degraded: value.degraded.into(),
+            failed: value.failed.into(),
         }
     }
 }

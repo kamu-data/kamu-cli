@@ -30,15 +30,18 @@ pub(crate) enum ResourceBuiltinKind {
 
 #[derive(cynic::InputObject, Debug, Clone)]
 #[cynic(graphql_type = "ResourceKindInput")]
-#[allow(dead_code)]
 pub(crate) enum ResourceKindInput {
     Builtin(ResourceBuiltinKind),
     Custom(String),
 }
 
 impl ResourceKindInput {
-    pub(crate) fn custom(kind: String) -> Self {
-        Self::Custom(kind)
+    pub(crate) fn from_kind(kind: &str) -> Self {
+        match kind {
+            "SecretSet" => Self::Builtin(ResourceBuiltinKind::SecretSet),
+            "VariableSet" => Self::Builtin(ResourceBuiltinKind::VariableSet),
+            _ => Self::Custom(kind.to_string()),
+        }
     }
 }
 
@@ -114,7 +117,7 @@ impl TryFrom<&ResourceSelector> for ResourceSelectorInput {
 
     fn try_from(value: &ResourceSelector) -> Result<Self, Self::Error> {
         Ok(Self {
-            kind: ResourceKindInput::custom(value.kind.clone()),
+            kind: ResourceKindInput::from_kind(&value.kind),
             api_version: value.api_version.clone(),
             ref_: (&value.resource_ref).into(),
             account: value.account.as_ref().map(TryInto::try_into).transpose()?,
@@ -138,7 +141,7 @@ impl TryFrom<&ResourceBatchSelector> for ResourceBatchSelectorInput {
 
     fn try_from(value: &ResourceBatchSelector) -> Result<Self, Self::Error> {
         Ok(Self {
-            kind: ResourceKindInput::custom(value.kind.clone()),
+            kind: ResourceKindInput::from_kind(&value.kind),
             api_version: value.api_version.clone(),
             refs: value.resource_refs.iter().map(Into::into).collect(),
             account: value.account.as_ref().map(TryInto::try_into).transpose()?,
@@ -165,7 +168,7 @@ impl TryFrom<&SearchResourceIdentitiesRequest> for SearchResourceIdentitiesInput
             kinds: value
                 .kinds
                 .iter()
-                .map(|k| ResourceKindInput::custom(k.clone()))
+                .map(|k| ResourceKindInput::from_kind(k))
                 .collect(),
             names: value.exact_names.clone(),
             name_pattern: value.name_pattern.clone(),

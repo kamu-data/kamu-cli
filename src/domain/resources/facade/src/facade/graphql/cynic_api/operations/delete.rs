@@ -28,7 +28,7 @@ pub(crate) struct DeleteMutation {
 #[cynic(graphql_type = "ResourcesMut", variables = "DeleteVariables")]
 pub(crate) struct ResourcesMutDelete {
     #[arguments(selector: $selector)]
-    pub delete: ResourceDeleteResult,
+    pub delete: ResourceDeleteOutcome,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -48,19 +48,56 @@ pub(crate) struct ResourcesMutDeleteMany {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(cynic::QueryFragment, Debug, Clone)]
-pub(crate) struct ResourceDeleteResult {
-    pub resource_id: kamu_resources::ResourceUID,
-}
-
-#[derive(cynic::QueryFragment, Debug, Clone)]
-pub(crate) struct ResourceDeleteManyResult {
-    pub resources: Vec<ResourceDeleteSuccess>,
-    pub problems: Vec<BatchResourceProblem>,
+#[derive(cynic::InlineFragments, Debug, Clone)]
+pub(crate) enum ResourceDeleteOutcome {
+    ResourceDeleteSuccess(ResourceDeleteSuccess),
+    ResourceUIDNotFoundProblem(ResourceUIDNotFoundProblem),
+    ResourceNameNotFoundProblem(ResourceNameNotFoundProblem),
+    ResourceApiVersionMismatchProblem(ResourceApiVersionMismatchProblem),
+    ResourceKindMismatchProblem(ResourceKindMismatchProblem),
+    #[cynic(fallback)]
+    Unknown,
 }
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct ResourceDeleteSuccess {
+    pub resource_id: kamu_resources::ResourceUID,
+}
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
+pub(crate) struct ResourceUIDNotFoundProblem {
+    pub uid: kamu_resources::ResourceUID,
+}
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
+pub(crate) struct ResourceNameNotFoundProblem {
+    pub kind: String,
+    pub name: String,
+}
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
+pub(crate) struct ResourceApiVersionMismatchProblem {
+    pub expected_api_version: String,
+    pub actual_api_version: String,
+}
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
+pub(crate) struct ResourceKindMismatchProblem {
+    pub uid: kamu_resources::ResourceUID,
+    pub expected_kind: String,
+    pub actual_kind: String,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
+pub(crate) struct ResourceDeleteManyResult {
+    pub resources: Vec<ResourceDeleteManySuccess>,
+    pub problems: Vec<BatchResourceProblem>,
+}
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
+pub(crate) struct ResourceDeleteManySuccess {
     pub request_index: i32,
     pub resource_id: kamu_resources::ResourceUID,
 }

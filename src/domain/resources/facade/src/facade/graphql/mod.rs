@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod cynic_api;
-mod error_mapper;
+mod outcome_mapper;
 mod remote_graphql_resource_facade_impl;
 
 pub use remote_graphql_resource_facade_impl::*;

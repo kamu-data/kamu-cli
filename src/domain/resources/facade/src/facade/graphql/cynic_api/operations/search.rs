@@ -14,7 +14,6 @@ use crate::SearchResourceIdentitiesRequest;
 use crate::facade::graphql::cynic_api::fragments::ResourceIdentityConnection;
 use crate::facade::graphql::cynic_api::inputs::SearchResourceIdentitiesInput;
 use crate::facade::graphql::cynic_api::schema;
-use crate::facade::graphql::cynic_api::variables::graphql_page_params;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -42,14 +41,15 @@ pub(crate) struct SearchIdentitiesVariables {
 
 impl SearchIdentitiesVariables {
     pub(crate) fn new(request: &SearchResourceIdentitiesRequest) -> Result<Self, InternalError> {
-        let (page, per_page) =
-            graphql_page_params(request.pagination.offset, request.pagination.limit)?;
+        let (page, per_page) = request.pagination.as_page_params(Self::DEFAULT_PAGE_SIZE)?;
         Ok(Self {
             query: request.try_into()?,
             page,
             per_page,
         })
     }
+
+    const DEFAULT_PAGE_SIZE: usize = 100;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

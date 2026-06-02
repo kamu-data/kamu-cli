@@ -20,12 +20,15 @@ use crate::{ResourceBatchSelector, SpecViewMode};
 #[derive(cynic::QueryFragment, Debug, Clone)]
 #[cynic(graphql_type = "Query", variables = "ResourceBatchSelectorVariables")]
 pub(crate) struct GetResourcesQuery {
-    pub resources: Resources,
+    pub resources: GetResourcesResources,
 }
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
-#[cynic(variables = "ResourceBatchSelectorVariables")]
-pub(crate) struct Resources {
+#[cynic(
+    graphql_type = "Resources",
+    variables = "ResourceBatchSelectorVariables"
+)]
+pub(crate) struct GetResourcesResources {
     #[arguments(selector: $selector, revealed: $revealed)]
     pub resources: BatchResourcesResult,
 }
