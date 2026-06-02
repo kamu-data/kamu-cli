@@ -8916,6 +8916,7 @@ dependencies = [
  "time-source",
  "tokio",
  "url",
+ "uuid",
 ]
 
 [[package]]

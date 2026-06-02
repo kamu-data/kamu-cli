@@ -10,6 +10,9 @@
 use kamu_resources::ApplyResourceOutcome;
 use kamu_resources_facade::{
     ApplyManifestRequest,
+    GetResourceError,
+    ResourceKindMismatchError,
+    ResourceLookupProblem,
     ResourceManifestFormat,
     ResourceRef,
     ResourceSelector,
@@ -160,6 +163,195 @@ pub async fn test_get_identity_by_uid(h: &impl FacadeContractHarness) {
     assert_eq!(identity_by_name.name, identity_by_uid.name);
     assert_eq!(identity_by_name.kind, identity_by_uid.kind);
     assert_eq!(identity_by_name.api_version, identity_by_uid.api_version);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-034
+contract_test!(
+    get_missing_name_returns_not_found,
+    super::test_get_missing_name_returns_not_found
+);
+
+pub async fn test_get_missing_name_returns_not_found(h: &impl FacadeContractHarness) {
+    let facade = h.facade_for(TestAccount::Alice);
+
+    let get_result = facade
+        .get(
+            by_name_selector("no-such-resource"),
+            SpecViewMode::Encrypted,
+        )
+        .await;
+    assert!(
+        matches!(
+            get_result,
+            Err(GetResourceError::LookupProblem(
+                ResourceLookupProblem::NameNotFound(_)
+            ))
+        ),
+        "expected NameNotFound, got: {get_result:?}"
+    );
+
+    let identity_result = facade
+        .get_identity(by_name_selector("no-such-resource"))
+        .await;
+    assert!(
+        matches!(
+            identity_result,
+            Err(GetResourceError::LookupProblem(
+                ResourceLookupProblem::NameNotFound(_)
+            ))
+        ),
+        "expected NameNotFound from get_identity, got: {identity_result:?}"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-035
+contract_test!(
+    get_missing_uid_returns_not_found,
+    super::test_get_missing_uid_returns_not_found
+);
+
+pub async fn test_get_missing_uid_returns_not_found(h: &impl FacadeContractHarness) {
+    let facade = h.facade_for(TestAccount::Alice);
+    let absent_uid = kamu_resources::ResourceUID::new(uuid::Uuid::new_v4());
+
+    let get_result = facade
+        .get(by_id_selector(&absent_uid), SpecViewMode::Encrypted)
+        .await;
+    assert!(
+        matches!(
+            get_result,
+            Err(GetResourceError::LookupProblem(
+                ResourceLookupProblem::UIDNotFound(_)
+            ))
+        ),
+        "expected UIDNotFound, got: {get_result:?}"
+    );
+
+    let identity_result = facade.get_identity(by_id_selector(&absent_uid)).await;
+    assert!(
+        matches!(
+            identity_result,
+            Err(GetResourceError::LookupProblem(
+                ResourceLookupProblem::UIDNotFound(_)
+            ))
+        ),
+        "expected UIDNotFound from get_identity, got: {identity_result:?}"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-036
+// Local only: the GQL schema for the single-item `get`/`get_identity` path does
+// not expose a typed error union, so the remote facade surfaces type-mismatch
+// errors as generic RemoteRequest errors rather than LookupProblem variants.
+// The mismatch taxonomy for single-item gets is therefore only verified against
+// the local harness.
+mod get_wrong_api_version_returns_mismatch {
+    #[test_log::test(tokio::test)]
+    async fn local() {
+        let h = crate::harness::LocalFacadeHarness::new().await;
+        super::test_get_wrong_api_version_returns_mismatch(&h).await;
+    }
+}
+
+pub async fn test_get_wrong_api_version_returns_mismatch(h: &impl FacadeContractHarness) {
+    let uid = create_test_resource(h, "api-ver-mismatch-test").await;
+    let facade = h.facade_for(TestAccount::Alice);
+
+    let wrong_version_selector = ResourceSelector {
+        account: None,
+        kind: VARIABLE_SET_KIND.to_string(),
+        api_version: Some("v0.never.existed".to_string()),
+        resource_ref: ResourceRef::ById(uid),
+    };
+
+    let result = facade
+        .get(wrong_version_selector.clone(), SpecViewMode::Encrypted)
+        .await;
+    assert!(
+        matches!(
+            result,
+            Err(GetResourceError::LookupProblem(
+                ResourceLookupProblem::ApiVersionMismatch(_)
+            ))
+        ),
+        "expected ApiVersionMismatch, got: {result:?}"
+    );
+
+    let identity_result = facade.get_identity(wrong_version_selector).await;
+    assert!(
+        matches!(
+            identity_result,
+            Err(GetResourceError::LookupProblem(
+                ResourceLookupProblem::ApiVersionMismatch(_)
+            ))
+        ),
+        "expected ApiVersionMismatch from get_identity, got: {identity_result:?}"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-037 — local only for the same reason as RF-036.
+mod get_wrong_kind_returns_kind_mismatch {
+    #[test_log::test(tokio::test)]
+    async fn local() {
+        let h = crate::harness::LocalFacadeHarness::new().await;
+        super::test_get_wrong_kind_returns_kind_mismatch(&h).await;
+    }
+}
+
+pub async fn test_get_wrong_kind_returns_kind_mismatch(h: &impl FacadeContractHarness) {
+    use crate::helpers::{SECRET_SET_API_VERSION, SECRET_SET_KIND};
+
+    let uid = create_test_resource(h, "kind-mismatch-test").await;
+    let facade = h.facade_for(TestAccount::Alice);
+
+    let wrong_kind_selector = ResourceSelector {
+        account: None,
+        kind: SECRET_SET_KIND.to_string(),
+        api_version: Some(SECRET_SET_API_VERSION.to_string()),
+        resource_ref: ResourceRef::ById(uid),
+    };
+
+    let result = facade
+        .get(wrong_kind_selector.clone(), SpecViewMode::Encrypted)
+        .await;
+    match &result {
+        Err(GetResourceError::LookupProblem(ResourceLookupProblem::KindMismatch(
+            ResourceKindMismatchError {
+                expected_kind,
+                actual_kind,
+                ..
+            },
+        ))) => {
+            assert_eq!(
+                expected_kind, SECRET_SET_KIND,
+                "expected_kind must be the requested kind"
+            );
+            assert_eq!(
+                actual_kind, VARIABLE_SET_KIND,
+                "actual_kind must be the stored kind"
+            );
+        }
+        other => panic!("expected KindMismatch, got: {other:?}"),
+    }
+
+    let identity_result = facade.get_identity(wrong_kind_selector).await;
+    assert!(
+        matches!(
+            identity_result,
+            Err(GetResourceError::LookupProblem(
+                ResourceLookupProblem::KindMismatch(_)
+            ))
+        ),
+        "expected KindMismatch from get_identity, got: {identity_result:?}"
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

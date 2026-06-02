@@ -58,3 +58,4 @@ serde_yaml = { package = "serde_yaml_ng", version = "0.10", default-features = f
 test-log = { version = "0.2", features = ["trace"] }
 tokio = { version = "1", default-features = false, features = ["rt-multi-thread", "macros", "net"] }
 url = { version = "2", default-features = false }
+uuid = { version = "1", features = ["v4"] }

@@ -11,8 +11,10 @@ use database_common::PaginationOpts;
 use kamu_resources::ApplyResourceOutcome;
 use kamu_resources_facade::{
     ApplyManifestRequest,
+    DeleteResourceError,
     GetResourceError,
     ListResourcesRequest,
+    ResourceLookupProblem,
     ResourceManifestFormat,
     ResourceRef,
     ResourceSelector,
@@ -23,6 +25,8 @@ use pretty_assertions::assert_eq;
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
 use crate::helpers::{
+    SECRET_SET_API_VERSION,
+    SECRET_SET_KIND,
     VARIABLE_SET_API_VERSION,
     VARIABLE_SET_KIND,
     assert_applied_outcome,
@@ -110,6 +114,122 @@ pub async fn test_delete_by_name(h: &impl FacadeContractHarness) {
     assert!(
         !list.iter().any(|s| s.uid == uid),
         "deleted resource must not appear in list"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-131
+contract_test!(delete_by_uid, super::test_delete_by_uid);
+
+pub async fn test_delete_by_uid(h: &impl FacadeContractHarness) {
+    let uid = create_resource(h, "del-uid-test").await;
+    let facade = h.facade_for(TestAccount::Alice);
+
+    let deleted_uid = facade.delete(by_id(&uid)).await.unwrap();
+
+    assert_eq!(deleted_uid, uid, "deleted uid must match created uid");
+
+    let get_by_name = facade
+        .get(by_name("del-uid-test"), SpecViewMode::Encrypted)
+        .await;
+    assert!(
+        matches!(get_by_name, Err(GetResourceError::LookupProblem(_))),
+        "resource must not be found by name after delete by uid"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-132
+contract_test!(
+    delete_missing_name_returns_not_found,
+    super::test_delete_missing_name_returns_not_found
+);
+
+pub async fn test_delete_missing_name_returns_not_found(h: &impl FacadeContractHarness) {
+    let facade = h.facade_for(TestAccount::Alice);
+
+    let result = facade.delete(by_name("no-such-delete")).await;
+    assert!(
+        matches!(
+            result,
+            Err(DeleteResourceError::LookupProblem(
+                ResourceLookupProblem::NameNotFound(_)
+            ))
+        ),
+        "expected NameNotFound, got: {result:?}"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-133
+contract_test!(
+    delete_missing_uid_returns_not_found,
+    super::test_delete_missing_uid_returns_not_found
+);
+
+pub async fn test_delete_missing_uid_returns_not_found(h: &impl FacadeContractHarness) {
+    let facade = h.facade_for(TestAccount::Alice);
+    let absent_uid = kamu_resources::ResourceUID::new(uuid::Uuid::new_v4());
+
+    let result = facade.delete(by_id(&absent_uid)).await;
+    assert!(
+        matches!(
+            result,
+            Err(DeleteResourceError::LookupProblem(
+                ResourceLookupProblem::UIDNotFound(_)
+            ))
+        ),
+        "expected UIDNotFound, got: {result:?}"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-134
+contract_test!(
+    delete_wrong_api_version_returns_mismatch,
+    super::test_delete_wrong_api_version_returns_mismatch
+);
+
+pub async fn test_delete_wrong_api_version_returns_mismatch(h: &impl FacadeContractHarness) {
+    let uid = create_resource(h, "del-api-ver").await;
+    let facade = h.facade_for(TestAccount::Alice);
+
+    let wrong_version = ResourceSelector {
+        account: None,
+        kind: VARIABLE_SET_KIND.to_string(),
+        api_version: Some("v0.never.existed".to_string()),
+        resource_ref: ResourceRef::ById(uid),
+    };
+    let result = facade.delete(wrong_version).await;
+    assert!(
+        matches!(
+            result,
+            Err(DeleteResourceError::LookupProblem(
+                ResourceLookupProblem::ApiVersionMismatch(_)
+            ))
+        ),
+        "expected ApiVersionMismatch, got: {result:?}"
+    );
+
+    let wrong_kind = ResourceSelector {
+        account: None,
+        kind: SECRET_SET_KIND.to_string(),
+        api_version: Some(SECRET_SET_API_VERSION.to_string()),
+        resource_ref: ResourceRef::ById(uid),
+    };
+    let result = facade.delete(wrong_kind).await;
+    assert!(
+        matches!(
+            result,
+            Err(DeleteResourceError::LookupProblem(
+                ResourceLookupProblem::KindMismatch(_)
+            ))
+        ),
+        "expected KindMismatch, got: {result:?}"
     );
 }
 
