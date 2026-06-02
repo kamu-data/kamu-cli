@@ -113,6 +113,49 @@ pub(super) fn collect_batch_problems(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub(super) fn validate_batch_response_indexes<T, E>(
+    successes: &[BatchResourceSuccess<T>],
+    problems: &[BatchResourceProblem<E>],
+    request_len: usize,
+    context: &str,
+) -> Result<(), BatchResourceError> {
+    let mut seen: std::collections::BTreeMap<usize, &str> = std::collections::BTreeMap::new();
+
+    for s in successes {
+        if s.request_index >= request_len {
+            return Err(BatchResourceError::Internal(InternalError::new(format!(
+                "Remote {context} success index {} is out of bounds",
+                s.request_index,
+            ))));
+        }
+        if seen.insert(s.request_index, "success").is_some() {
+            return Err(BatchResourceError::Internal(InternalError::new(format!(
+                "Remote {context} returned duplicate result index {}",
+                s.request_index,
+            ))));
+        }
+    }
+
+    for p in problems {
+        if p.request_index >= request_len {
+            return Err(BatchResourceError::Internal(InternalError::new(format!(
+                "Remote {context} problem index {} is out of bounds",
+                p.request_index,
+            ))));
+        }
+        if let Some(previous) = seen.insert(p.request_index, "problem") {
+            return Err(BatchResourceError::Internal(InternalError::new(format!(
+                "Remote {context} returned both {previous} and problem for index {}",
+                p.request_index,
+            ))));
+        }
+    }
+
+    Ok(())
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub(super) fn batch_resource_problem_error(
     problem: &impl BatchResourceProblemLike,
     kind: &str,
@@ -297,6 +340,13 @@ pub(super) fn map_render_manifest_outcome(
                 actual_api_version: p.actual_api_version,
             }),
         )),
+        O::ResourceKindMismatchProblem(p) => Err(RenderResourceManifestError::LookupProblem(
+            ResourceLookupProblem::KindMismatch(ResourceKindMismatchError {
+                uid: p.uid,
+                expected_kind: p.expected_kind,
+                actual_kind: p.actual_kind,
+            }),
+        )),
         O::Unknown => Err(RenderResourceManifestError::Internal(InternalError::new(
             "Remote render_manifest returned an unrecognized ResourceRenderManifestOutcome variant",
         ))),
@@ -410,6 +460,49 @@ mod tests {
         assert!(
             matches!(err, BatchResourceError::Internal(_)),
             "expected Internal error for duplicate index"
+        );
+    }
+
+    fn make_success(index: usize) -> crate::BatchResourceSuccess<()> {
+        crate::BatchResourceSuccess {
+            request_index: index,
+            item: (),
+        }
+    }
+
+    fn make_domain_problem(index: usize) -> crate::BatchResourceProblem<()> {
+        crate::BatchResourceProblem {
+            request_index: index,
+            error: (),
+        }
+    }
+
+    #[test]
+    fn validate_batch_response_indexes_happy_path() {
+        let successes = vec![make_success(0), make_success(2)];
+        let problems = vec![make_domain_problem(1)];
+        assert!(validate_batch_response_indexes(&successes, &problems, 3, "test").is_ok());
+    }
+
+    #[test]
+    fn validate_batch_response_indexes_overlap_is_error() {
+        let successes = vec![make_success(0)];
+        let problems = vec![make_domain_problem(0)];
+        let err = validate_batch_response_indexes(&successes, &problems, 2, "test").unwrap_err();
+        assert!(
+            matches!(err, BatchResourceError::Internal(_)),
+            "expected Internal error when success and problem share an index"
+        );
+    }
+
+    #[test]
+    fn validate_batch_response_indexes_duplicate_problem_index_is_error() {
+        let successes: Vec<crate::BatchResourceSuccess<()>> = vec![];
+        let problems = vec![make_domain_problem(0), make_domain_problem(0)];
+        let err = validate_batch_response_indexes(&successes, &problems, 2, "test").unwrap_err();
+        assert!(
+            matches!(err, BatchResourceError::Internal(_)),
+            "expected Internal error for duplicate problem index"
         );
     }
 }

@@ -31,9 +31,32 @@ pub(crate) struct ResourceSummary {
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct ResourceStatusSummary {
-    pub phase: Option<String>,
+    pub phase: Option<ResourcePhase>,
     pub observed_generation: Option<u64>,
     pub ready: Option<bool>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::Enum, Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ResourcePhase {
+    Pending,
+    Reconciling,
+    Ready,
+    Degraded,
+    Failed,
+}
+
+impl From<ResourcePhase> for kamu_resources::ResourcePhase {
+    fn from(value: ResourcePhase) -> Self {
+        match value {
+            ResourcePhase::Pending => Self::Pending,
+            ResourcePhase::Reconciling => Self::Reconciling,
+            ResourcePhase::Ready => Self::Ready,
+            ResourcePhase::Degraded => Self::Degraded,
+            ResourcePhase::Failed => Self::Failed,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -9,64 +9,32 @@
 
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_resources as domain;
-use kamu_resources::{
-    ResourceListColumnValue,
-    ResourceListColumnValueView,
-    ResourcePhaseCounts,
-    ResourceStatusSummaryView,
-    ResourceSummaryView,
-    ResourceTypeCountSummary,
-    ResourcesSummary,
-};
 
 use crate::facade::graphql::cynic_api::fragments;
 use crate::facade::graphql::cynic_api::operations::supported_kinds;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn parse_enum<T>(value: &str, field_name: &str) -> Result<T, InternalError>
-where
-    T: std::str::FromStr,
-{
-    value.parse().map_err(|_| {
-        InternalError::new(format!(
-            "Unsupported {field_name} '{value}' in remote resource list",
-        ))
-    })
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl TryFrom<supported_kinds::ResourceKindDescriptor> for domain::ResourceKindDescriptor {
-    type Error = InternalError;
-
-    fn try_from(value: supported_kinds::ResourceKindDescriptor) -> Result<Self, Self::Error> {
-        Ok(Self {
+impl From<supported_kinds::ResourceKindDescriptor> for domain::ResourceKindDescriptor {
+    fn from(value: supported_kinds::ResourceKindDescriptor) -> Self {
+        Self {
             name: value.name,
             short_names: value.short_names,
             kind: value.kind.value,
             api_version: value.api_version,
-            list_columns: value
-                .list_columns
-                .into_iter()
-                .map(TryInto::try_into)
-                .collect::<Result<Vec<_>, _>>()?,
-        })
+            list_columns: value.list_columns.into_iter().map(Into::into).collect(),
+        }
     }
 }
 
-impl TryFrom<supported_kinds::ResourceListColumnDescriptor>
-    for domain::ResourceListColumnDescriptor
-{
-    type Error = InternalError;
-
-    fn try_from(value: supported_kinds::ResourceListColumnDescriptor) -> Result<Self, Self::Error> {
-        Ok(Self {
+impl From<supported_kinds::ResourceListColumnDescriptor> for domain::ResourceListColumnDescriptor {
+    fn from(value: supported_kinds::ResourceListColumnDescriptor) -> Self {
+        Self {
             key: value.key,
             header: value.header,
-            data_type: parse_enum(&value.data_type, "list column data type")?,
-            visibility: parse_enum(&value.visibility, "list column visibility")?,
-        })
+            data_type: value.data_type.into(),
+            visibility: value.visibility.into(),
+        }
     }
 }
 
@@ -133,24 +101,15 @@ impl From<fragments::ResourceRenderManifestResult> for crate::RenderResourceMani
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl TryFrom<fragments::ResourceSummary> for ResourceSummaryView {
+impl TryFrom<fragments::ResourceSummary> for domain::ResourceSummaryView {
     type Error = InternalError;
 
     fn try_from(value: fragments::ResourceSummary) -> Result<Self, Self::Error> {
-        let status = value
-            .status
-            .map(|s| {
-                Ok(ResourceStatusSummaryView {
-                    phase: s
-                        .phase
-                        .as_deref()
-                        .map(|p| parse_enum(p, "resource phase"))
-                        .transpose()?,
-                    observed_generation: s.observed_generation,
-                    ready: s.ready,
-                })
-            })
-            .transpose()?;
+        let status = value.status.map(|s| domain::ResourceStatusSummaryView {
+            phase: s.phase.map(Into::into),
+            observed_generation: s.observed_generation,
+            ready: s.ready,
+        });
 
         let list_values = value
             .list_values
@@ -158,9 +117,9 @@ impl TryFrom<fragments::ResourceSummary> for ResourceSummaryView {
             .map(|v| {
                 let key = v.key;
                 let col_value = match (v.string_value, v.uint64_value, v.bool_value) {
-                    (Some(s), None, None) => ResourceListColumnValue::String(s),
-                    (None, Some(n), None) => ResourceListColumnValue::UInt64(n),
-                    (None, None, Some(b)) => ResourceListColumnValue::Bool(b),
+                    (Some(s), None, None) => domain::ResourceListColumnValue::String(s),
+                    (None, Some(n), None) => domain::ResourceListColumnValue::UInt64(n),
+                    (None, None, Some(b)) => domain::ResourceListColumnValue::Bool(b),
                     (None, None, None) => {
                         return Err(InternalError::new(format!(
                             "Missing list value payload for key '{key}'",
@@ -172,14 +131,14 @@ impl TryFrom<fragments::ResourceSummary> for ResourceSummaryView {
                         )));
                     }
                 };
-                Ok(ResourceListColumnValueView {
+                Ok(domain::ResourceListColumnValueView {
                     key,
                     value: col_value,
                 })
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        Ok(ResourceSummaryView {
+        Ok(domain::ResourceSummaryView {
             kind: value.kind.value,
             api_version: value.api_version,
             uid: value.id,
@@ -196,7 +155,7 @@ impl TryFrom<fragments::ResourceSummary> for ResourceSummaryView {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl TryFrom<fragments::ResourcesSummary> for ResourcesSummary {
+impl TryFrom<fragments::ResourcesSummary> for domain::ResourcesSummary {
     type Error = InternalError;
 
     fn try_from(value: fragments::ResourcesSummary) -> Result<Self, Self::Error> {
@@ -210,7 +169,7 @@ impl TryFrom<fragments::ResourcesSummary> for ResourcesSummary {
     }
 }
 
-impl TryFrom<fragments::ResourceTypeCountSummary> for ResourceTypeCountSummary {
+impl TryFrom<fragments::ResourceTypeCountSummary> for domain::ResourceTypeCountSummary {
     type Error = InternalError;
 
     fn try_from(value: fragments::ResourceTypeCountSummary) -> Result<Self, Self::Error> {
@@ -219,7 +178,7 @@ impl TryFrom<fragments::ResourceTypeCountSummary> for ResourceTypeCountSummary {
             name: value.name,
             api_version: value.api_version,
             total_count: value.total_count,
-            phase_counts: ResourcePhaseCounts {
+            phase_counts: domain::ResourcePhaseCounts {
                 pending: value.phase_counts.pending,
                 reconciling: value.phase_counts.reconciling,
                 ready: value.phase_counts.ready,

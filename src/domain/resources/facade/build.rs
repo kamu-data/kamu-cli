@@ -10,10 +10,17 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn main() {
-    println!("cargo:rerun-if-changed=../../../../resources/schema.gql");
+    let manifest_dir = std::path::PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
+
+    let schema_path = manifest_dir
+        .join("../../../../resources/schema.gql")
+        .canonicalize()
+        .unwrap();
+
+    println!("cargo:rerun-if-changed={}", schema_path.display());
 
     cynic_codegen::register_schema("kamu")
-        .from_sdl_file("../../../../resources/schema.gql")
+        .from_sdl_file(schema_path)
         .unwrap()
         .as_default()
         .unwrap();

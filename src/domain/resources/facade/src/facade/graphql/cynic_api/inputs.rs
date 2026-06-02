@@ -20,27 +20,16 @@ use crate::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(cynic::Enum, Debug, Clone, Copy)]
-pub(crate) enum ResourceBuiltinKind {
-    SecretSet,
-    VariableSet,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #[derive(cynic::InputObject, Debug, Clone)]
 #[cynic(graphql_type = "ResourceKindInput")]
-pub(crate) enum ResourceKindInput {
-    Builtin(ResourceBuiltinKind),
-    Custom(String),
+pub(crate) struct ResourceKindInput {
+    pub kind: String,
 }
 
 impl ResourceKindInput {
     pub(crate) fn from_kind(kind: &str) -> Self {
-        match kind {
-            "SecretSet" => Self::Builtin(ResourceBuiltinKind::SecretSet),
-            "VariableSet" => Self::Builtin(ResourceBuiltinKind::VariableSet),
-            _ => Self::Custom(kind.to_string()),
+        Self {
+            kind: kind.to_string(),
         }
     }
 }

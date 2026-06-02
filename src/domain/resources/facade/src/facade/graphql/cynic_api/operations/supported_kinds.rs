@@ -39,8 +39,45 @@ pub(crate) struct ResourceKindDescriptor {
 pub(crate) struct ResourceListColumnDescriptor {
     pub key: String,
     pub header: String,
-    pub data_type: String,
-    pub visibility: String,
+    pub data_type: ResourceListColumnDataType,
+    pub visibility: ResourceListColumnVisibility,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::Enum, Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ResourceListColumnDataType {
+    String,
+    #[cynic(rename = "U_INT_64")]
+    UInt64,
+    Bool,
+}
+
+impl From<ResourceListColumnDataType> for kamu_resources::ResourceListColumnDataType {
+    fn from(value: ResourceListColumnDataType) -> Self {
+        match value {
+            ResourceListColumnDataType::String => Self::String,
+            ResourceListColumnDataType::UInt64 => Self::UInt64,
+            ResourceListColumnDataType::Bool => Self::Bool,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::Enum, Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ResourceListColumnVisibility {
+    Default,
+    WideOnly,
+}
+
+impl From<ResourceListColumnVisibility> for kamu_resources::ResourceListColumnVisibility {
+    fn from(value: ResourceListColumnVisibility) -> Self {
+        match value {
+            ResourceListColumnVisibility::Default => Self::Default,
+            ResourceListColumnVisibility::WideOnly => Self::WideOnly,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

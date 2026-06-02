@@ -53,6 +53,7 @@ pub(crate) enum ResourceRenderManifestOutcome {
     ResourceUIDNotFoundProblem(RenderResourceUIDNotFoundProblem),
     ResourceNameNotFoundProblem(RenderResourceNameNotFoundProblem),
     ResourceApiVersionMismatchProblem(RenderResourceApiVersionMismatchProblem),
+    ResourceKindMismatchProblem(RenderResourceKindMismatchProblem),
     #[cynic(fallback)]
     Unknown,
 }
@@ -75,6 +76,14 @@ pub(crate) struct RenderResourceNameNotFoundProblem {
 pub(crate) struct RenderResourceApiVersionMismatchProblem {
     pub expected_api_version: String,
     pub actual_api_version: String,
+}
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
+#[cynic(graphql_type = "ResourceKindMismatchProblem")]
+pub(crate) struct RenderResourceKindMismatchProblem {
+    pub uid: kamu_resources::ResourceUID,
+    pub expected_kind: String,
+    pub actual_kind: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

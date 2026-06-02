@@ -12,6 +12,7 @@ use database_common::PaginationOpts;
 use crate::LoggedInGuard;
 use crate::mutations::{
     ResourceApiVersionMismatchProblem,
+    ResourceKindMismatchProblem,
     ResourceNameNotFoundProblem,
     ResourceUIDNotFoundProblem,
 };
@@ -441,6 +442,7 @@ pub enum ResourceRenderManifestOutcome {
     UidNotFound(ResourceUIDNotFoundProblem),
     NameNotFound(ResourceNameNotFoundProblem),
     ApiVersionMismatch(ResourceApiVersionMismatchProblem),
+    KindMismatch(ResourceKindMismatchProblem),
 }
 
 impl ResourceRenderManifestOutcome {
@@ -465,13 +467,12 @@ impl ResourceRenderManifestOutcome {
                     message: e.to_string(),
                 })
             }
-            P::KindMismatch(e) => {
-                unreachable!(
-                    "render_manifest does not perform kind lookup; got unexpected KindMismatch \
-                     for uid {}",
-                    e.uid
-                )
-            }
+            P::KindMismatch(e) => Self::KindMismatch(ResourceKindMismatchProblem {
+                uid: e.uid.into(),
+                expected_kind: e.expected_kind.clone(),
+                actual_kind: e.actual_kind.clone(),
+                message: e.to_string(),
+            }),
         }
     }
 }

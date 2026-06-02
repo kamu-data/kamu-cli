@@ -3934,11 +3934,6 @@ input ResourceBatchSelectorInput {
 	account: ResourceAccountSelectorInput
 }
 
-enum ResourceBuiltinKind {
-	SECRET_SET
-	VARIABLE_SET
-}
-
 input ResourceByNameSelectorInput {
 	name: String!
 }
@@ -4012,7 +4007,6 @@ type ResourceIdentityEdge {
 
 type ResourceKind {
 	value: String!
-	builtin: ResourceBuiltinKind
 }
 
 type ResourceKindDescriptor {
@@ -4023,9 +4017,8 @@ type ResourceKindDescriptor {
 	listColumns: [ResourceListColumnDescriptor!]!
 }
 
-input ResourceKindInput @oneOf {
-	builtin: ResourceBuiltinKind
-	custom: String
+input ResourceKindInput {
+	kind: String!
 }
 
 type ResourceKindMismatchProblem {
@@ -4035,11 +4028,17 @@ type ResourceKindMismatchProblem {
 	message: String!
 }
 
+enum ResourceListColumnDataType {
+	STRING
+	U_INT_64
+	BOOL
+}
+
 type ResourceListColumnDescriptor {
 	key: String!
 	header: String!
-	dataType: String!
-	visibility: String!
+	dataType: ResourceListColumnDataType!
+	visibility: ResourceListColumnVisibility!
 }
 
 type ResourceListColumnValueView {
@@ -4047,6 +4046,11 @@ type ResourceListColumnValueView {
 	stringValue: String
 	uint64Value: Uint64
 	boolValue: Boolean
+}
+
+enum ResourceListColumnVisibility {
+	DEFAULT
+	WIDE_ONLY
 }
 
 enum ResourceManifestFormat {
@@ -4074,6 +4078,14 @@ type ResourceNameNotFoundProblem {
 	message: String!
 }
 
+enum ResourcePhase {
+	PENDING
+	RECONCILING
+	READY
+	DEGRADED
+	FAILED
+}
+
 type ResourcePhaseCounts {
 	pending: Uint64!
 	reconciling: Uint64!
@@ -4087,7 +4099,7 @@ input ResourceRefInput @oneOf {
 	byName: ResourceByNameSelectorInput
 }
 
-union ResourceRenderManifestOutcome = ResourceRenderManifestResult | ResourceUIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceApiVersionMismatchProblem
+union ResourceRenderManifestOutcome = ResourceRenderManifestResult | ResourceUIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceApiVersionMismatchProblem | ResourceKindMismatchProblem
 
 type ResourceRenderManifestResult {
 	manifest: String!
@@ -4102,7 +4114,7 @@ input ResourceSelectorInput {
 }
 
 type ResourceStatusSummary {
-	phase: String
+	phase: ResourcePhase
 	observedGeneration: Uint64
 	ready: Boolean
 }

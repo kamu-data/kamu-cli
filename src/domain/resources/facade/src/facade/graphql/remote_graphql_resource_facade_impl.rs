@@ -72,13 +72,12 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
             .execute_operation(Operation::build_operation())
             .await?;
 
-        response
+        Ok(response
             .resources
             .supported_kinds
             .into_iter()
-            .map(TryInto::try_into)
-            .collect::<Result<Vec<_>, InternalError>>()
-            .map_err(Into::into)
+            .map(Into::into)
+            .collect())
     }
 
     async fn summary(
@@ -162,6 +161,13 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
         let problems =
             outcome_mapper::collect_batch_problems(&selector, batch_result.problems, "resource")?;
 
+        outcome_mapper::validate_batch_response_indexes(
+            &successes,
+            &problems,
+            selector.resource_refs.len(),
+            "resource",
+        )?;
+
         Ok(BatchResourceResponse {
             successes,
             problems,
@@ -218,6 +224,13 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
 
         let problems =
             outcome_mapper::collect_batch_problems(&selector, batch_result.problems, "identity")?;
+
+        outcome_mapper::validate_batch_response_indexes(
+            &successes,
+            &problems,
+            selector.resource_refs.len(),
+            "identity",
+        )?;
 
         Ok(BatchResourceResponse {
             successes,
@@ -280,6 +293,13 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
 
         let problems =
             outcome_mapper::collect_batch_problems(&selector, batch_result.problems, "manifest")?;
+
+        outcome_mapper::validate_batch_response_indexes(
+            &successes,
+            &problems,
+            selector.resource_refs.len(),
+            "manifest",
+        )?;
 
         Ok(BatchResourceResponse {
             successes,
@@ -517,6 +537,13 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
 
         let problems =
             outcome_mapper::collect_batch_problems(&selector, batch_result.problems, "delete")?;
+
+        outcome_mapper::validate_batch_response_indexes(
+            &successes,
+            &problems,
+            selector.resource_refs.len(),
+            "delete",
+        )?;
 
         Ok(BatchResourceResponse {
             successes,

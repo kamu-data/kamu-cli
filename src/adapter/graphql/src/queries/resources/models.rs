@@ -9,7 +9,6 @@
 
 use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
-use kamu_configuration::{SecretSetResource, VariableSetResource};
 
 use crate::prelude::*;
 use crate::scalars::{AccountID, AccountName, UInt64};
@@ -37,43 +36,14 @@ type BatchGetResourceProblem =
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ResourceBuiltinKind {
-    SecretSet,
-    VariableSet,
-}
-
-impl ResourceBuiltinKind {
-    pub fn as_resource_type(self) -> &'static str {
-        match self {
-            Self::SecretSet => SecretSetResource::RESOURCE_TYPE,
-            Self::VariableSet => VariableSetResource::RESOURCE_TYPE,
-        }
-    }
-
-    pub fn from_resource_type(value: &str) -> Option<Self> {
-        match value {
-            SecretSetResource::RESOURCE_TYPE => Some(Self::SecretSet),
-            VariableSetResource::RESOURCE_TYPE => Some(Self::VariableSet),
-            _ => None,
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(OneofObject, Debug, Clone)]
-pub enum ResourceKindInput {
-    Builtin(ResourceBuiltinKind),
-    Custom(String),
+#[derive(InputObject, Debug, Clone)]
+pub struct ResourceKindInput {
+    pub kind: String,
 }
 
 impl ResourceKindInput {
     pub fn into_resource_type(self) -> String {
-        match self {
-            Self::Builtin(kind) => kind.as_resource_type().to_string(),
-            Self::Custom(kind) => kind,
-        }
+        self.kind
     }
 }
 
@@ -210,16 +180,12 @@ pub struct ResourceByNameSelectorInput {
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct ResourceKind {
     pub value: String,
-    pub builtin: Option<ResourceBuiltinKind>,
 }
 
 impl ResourceKind {
     pub fn new(value: impl Into<String>) -> Self {
-        let value = value.into();
-
         Self {
-            builtin: ResourceBuiltinKind::from_resource_type(&value),
-            value,
+            value: value.into(),
         }
     }
 }
@@ -537,12 +503,31 @@ impl From<kamu_resources::ResourceSummaryView> for ResourceSummary {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
+#[graphql(remote = "kamu_resources::ResourceListColumnDataType")]
+pub enum ResourceListColumnDataType {
+    String,
+    UInt64,
+    Bool,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
+#[graphql(remote = "kamu_resources::ResourceListColumnVisibility")]
+pub enum ResourceListColumnVisibility {
+    Default,
+    WideOnly,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct ResourceListColumnDescriptor {
     pub key: String,
     pub header: String,
-    pub data_type: String,
-    pub visibility: String,
+    pub data_type: ResourceListColumnDataType,
+    pub visibility: ResourceListColumnVisibility,
 }
 
 impl From<kamu_resources::ResourceListColumnDescriptor> for ResourceListColumnDescriptor {
@@ -550,8 +535,8 @@ impl From<kamu_resources::ResourceListColumnDescriptor> for ResourceListColumnDe
         Self {
             key: value.key,
             header: value.header,
-            data_type: value.data_type.to_string(),
-            visibility: value.visibility.to_string(),
+            data_type: value.data_type.into(),
+            visibility: value.visibility.into(),
         }
     }
 }
@@ -585,9 +570,21 @@ impl From<kamu_resources::ResourceListColumnValueView> for ResourceListColumnVal
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
+#[graphql(remote = "kamu_resources::ResourcePhase")]
+pub enum ResourcePhase {
+    Pending,
+    Reconciling,
+    Ready,
+    Degraded,
+    Failed,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceStatusSummary {
-    pub phase: Option<String>,
+    pub phase: Option<ResourcePhase>,
     pub observed_generation: Option<UInt64>,
     pub ready: Option<bool>,
 }
@@ -595,7 +592,7 @@ pub struct ResourceStatusSummary {
 impl From<kamu_resources::ResourceStatusSummaryView> for ResourceStatusSummary {
     fn from(value: kamu_resources::ResourceStatusSummaryView) -> Self {
         Self {
-            phase: value.phase.map(|phase| phase.to_string()),
+            phase: value.phase.map(Into::into),
             observed_generation: value.observed_generation.map(Into::into),
             ready: value.ready,
         }
