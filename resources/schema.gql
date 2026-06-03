@@ -3944,7 +3944,6 @@ enum ResourceBadAccountProblemCode {
 	ACCOUNT_NOT_FOUND_BY_ID
 	ACCOUNT_NOT_FOUND_BY_NAME
 	ID_NAME_MISMATCH
-	OTHER
 }
 
 input ResourceBatchSelectorInput {

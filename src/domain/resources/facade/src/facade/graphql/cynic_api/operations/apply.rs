@@ -405,12 +405,6 @@ fn map_apply_problem(
                     expected_name: account_name(p.expected_name, "expected_name")?,
                     actual_name: account_name(p.actual_name, "actual_name")?,
                 },
-                BC::Other => {
-                    return Err(InternalError::new(
-                        "Remote returned non-user account resolution failure as a typed apply \
-                         problem",
-                    ));
-                }
             };
             Ok(crate::ApplyManifestError::BadAccount(err))
         }

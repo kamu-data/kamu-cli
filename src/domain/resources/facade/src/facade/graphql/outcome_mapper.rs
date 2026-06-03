@@ -210,11 +210,6 @@ fn bad_account_problem_error(
             expected_name: account_name_from_problem(problem.expected_name, "expected_name")?,
             actual_name: account_name_from_problem(problem.actual_name, "actual_name")?,
         },
-        C::Other => {
-            return Err(InternalError::new(
-                "Remote returned non-user account resolution failure as a typed problem",
-            ));
-        }
     })
 }
 

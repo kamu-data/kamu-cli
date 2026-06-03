@@ -301,14 +301,11 @@ impl From<kamu_resources_facade::ResolveManifestAccountError> for ResourceBadAcc
                 actual_name: Some(actual_name.into()),
                 message,
             },
-            E::AnonymousSubject | E::Access(_) | E::Internal(_) => Self {
-                code: ResourceBadAccountProblemCode::Other,
-                account_id: None,
-                account_name: None,
-                expected_name: None,
-                actual_name: None,
-                message,
-            },
+            // These are non-user-facing failures: map_bad_account_problem promotes them to
+            // GqlError before this From impl is ever called.
+            E::AnonymousSubject | E::Access(_) | E::Internal(_) => {
+                unreachable!("non-user account error must not reach ResourceBadAccountProblem")
+            }
         }
     }
 }
@@ -319,7 +316,6 @@ pub enum ResourceBadAccountProblemCode {
     AccountNotFoundById,
     AccountNotFoundByName,
     IdNameMismatch,
-    Other,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
