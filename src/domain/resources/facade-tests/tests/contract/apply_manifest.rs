@@ -91,181 +91,44 @@ pub async fn test_plan_create_json(h: &impl FacadeContractHarness) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// RF-020
-contract_test!(apply_create_json, super::test_apply_create_json);
-
-pub async fn test_apply_create_json(h: &impl FacadeContractHarness) {
-    let facade = h.facade_for(TestAccount::Alice);
-    let manifest = variable_set_manifest_json("alpha", None, &[("KEY1", "val1")]);
-
-    let decision = facade
-        .apply_manifest(ApplyManifestRequest {
-            format: ResourceManifestFormat::Json,
-            manifest,
-        })
-        .await
-        .unwrap();
-
-    let view = assert_applied_outcome(&decision, ApplyResourceOutcome::Created);
-    assert_resource_view_fields(view, VARIABLE_SET_KIND, VARIABLE_SET_API_VERSION, "alpha");
-    assert_eq!(view.metadata.generation, 1, "initial generation must be 1");
-
-    let uid = view.metadata.uid;
-
-    // Verify resource is readable via get
-    let fetched = facade
-        .get(
-            make_selector(VARIABLE_SET_KIND, VARIABLE_SET_API_VERSION, "alpha"),
-            SpecViewMode::Encrypted,
-        )
-        .await
-        .unwrap();
-    assert_eq!(fetched.metadata.uid, uid, "uid must match after apply");
-    assert_resource_view_fields(
-        &fetched,
-        VARIABLE_SET_KIND,
-        VARIABLE_SET_API_VERSION,
-        "alpha",
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// RF-022
-contract_test!(apply_update, super::test_apply_update);
-
-pub async fn test_apply_update(h: &impl FacadeContractHarness) {
-    let facade = h.facade_for(TestAccount::Alice);
-
-    // Create
-    let create_manifest = variable_set_manifest_json("upd-vars", None, &[("A", "1")]);
-    let create_decision = facade
-        .apply_manifest(ApplyManifestRequest {
-            format: ResourceManifestFormat::Json,
-            manifest: create_manifest,
-        })
-        .await
-        .unwrap();
-    let created = assert_applied_outcome(&create_decision, ApplyResourceOutcome::Created);
-    let original_uid = created.metadata.uid;
-
-    // Update spec
-    let update_manifest = variable_set_manifest_json("upd-vars", None, &[("A", "1"), ("B", "2")]);
-    let update_decision = facade
-        .apply_manifest(ApplyManifestRequest {
-            format: ResourceManifestFormat::Json,
-            manifest: update_manifest,
-        })
-        .await
-        .unwrap();
-    let updated = assert_applied_outcome(&update_decision, ApplyResourceOutcome::Updated);
-
-    // uid preserved
-    assert_eq!(
-        updated.metadata.uid, original_uid,
-        "uid must be preserved on update"
-    );
-    assert_eq!(
-        updated.metadata.name, "upd-vars",
-        "name must be preserved on update"
-    );
-    assert!(
-        updated.metadata.updated_at >= created.metadata.updated_at,
-        "updated_at must not be earlier after update"
-    );
-
-    // Verify via get
-    let fetched = facade
-        .get(
-            make_selector(VARIABLE_SET_KIND, VARIABLE_SET_API_VERSION, "upd-vars"),
-            SpecViewMode::Encrypted,
-        )
-        .await
-        .unwrap();
-    assert_eq!(fetched.metadata.uid, original_uid);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// RF-023
-contract_test!(apply_idempotent, super::test_apply_idempotent);
-
-pub async fn test_apply_idempotent(h: &impl FacadeContractHarness) {
-    let facade = h.facade_for(TestAccount::Alice);
-    let manifest = variable_set_manifest_json("idem-vars", None, &[("X", "42")]);
-
-    // First apply
-    let first_decision = facade
-        .apply_manifest(ApplyManifestRequest {
-            format: ResourceManifestFormat::Json,
-            manifest: manifest.clone(),
-        })
-        .await
-        .unwrap();
-    let first = assert_applied_outcome(&first_decision, ApplyResourceOutcome::Created);
-    let uid = first.metadata.uid;
-    let generation = first.metadata.generation;
-
-    // Second apply with identical manifest
-    let second_decision = facade
-        .apply_manifest(ApplyManifestRequest {
-            format: ResourceManifestFormat::Json,
-            manifest,
-        })
-        .await
-        .unwrap();
-    let second = assert_applied_outcome(&second_decision, ApplyResourceOutcome::Untouched);
-
-    assert_eq!(
-        second.metadata.uid, uid,
-        "uid must be preserved on no-op apply"
-    );
-    assert_eq!(
-        second.metadata.generation, generation,
-        "generation must not change on no-op apply"
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 // RF-011
-contract_test!(apply_create_yaml, super::test_apply_create_yaml);
+contract_test!(plan_create_yaml, super::test_plan_create_yaml);
 
-pub async fn test_apply_create_yaml(h: &impl FacadeContractHarness) {
+pub async fn test_plan_create_yaml(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
-    let manifest_yaml = variable_set_manifest_yaml("yaml-vars", None, &[("KEY1", "val1")]);
+    let manifest = variable_set_manifest_yaml("my-yaml-vars", None, &[("FOO", "bar")]);
 
     let decision = facade
-        .apply_manifest(ApplyManifestRequest {
+        .plan_apply_manifest(ApplyManifestRequest {
             format: ResourceManifestFormat::Yaml,
-            manifest: manifest_yaml,
+            manifest,
         })
         .await
         .unwrap();
 
-    let view = assert_applied_outcome(&decision, ApplyResourceOutcome::Created);
+    assert_planning_outcome(&decision, ApplyResourceOutcome::Created);
+
+    let ApplyManifestPlanningDecision::Planned(plan) = &decision else {
+        unreachable!()
+    };
+    assert!(plan.executable, "plan must be executable");
     assert_resource_view_fields(
-        view,
+        &plan.resource,
         VARIABLE_SET_KIND,
         VARIABLE_SET_API_VERSION,
-        "yaml-vars",
+        "my-yaml-vars",
     );
-    assert_eq!(view.metadata.generation, 1, "initial generation must be 1");
 
-    // Semantic equivalence: same resource via get, just like after JSON apply
-    let fetched = facade
+    // Verify no side effect - resource must not exist yet
+    let get_result = facade
         .get(
-            make_selector(VARIABLE_SET_KIND, VARIABLE_SET_API_VERSION, "yaml-vars"),
+            make_selector(VARIABLE_SET_KIND, VARIABLE_SET_API_VERSION, "my-yaml-vars"),
             SpecViewMode::Encrypted,
         )
-        .await
-        .unwrap();
-    assert_eq!(fetched.metadata.uid, view.metadata.uid);
-    assert_resource_view_fields(
-        &fetched,
-        VARIABLE_SET_KIND,
-        VARIABLE_SET_API_VERSION,
-        "yaml-vars",
+        .await;
+    assert!(
+        matches!(get_result, Err(GetResourceError::LookupProblem(_))),
+        "resource must not exist after planning"
     );
 }
 
@@ -527,6 +390,266 @@ pub async fn test_apply_rejects_business_invalid_spec(h: &impl FacadeContractHar
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// RF-020
+contract_test!(apply_create_json, super::test_apply_create_json);
+
+pub async fn test_apply_create_json(h: &impl FacadeContractHarness) {
+    let facade = h.facade_for(TestAccount::Alice);
+    let manifest = variable_set_manifest_json("alpha", None, &[("KEY1", "val1")]);
+
+    let decision = facade
+        .apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest,
+        })
+        .await
+        .unwrap();
+
+    let view = assert_applied_outcome(&decision, ApplyResourceOutcome::Created);
+    assert_resource_view_fields(view, VARIABLE_SET_KIND, VARIABLE_SET_API_VERSION, "alpha");
+    assert_eq!(view.metadata.generation, 1, "initial generation must be 1");
+
+    let uid = view.metadata.uid;
+
+    // Verify resource is readable via get
+    let fetched = facade
+        .get(
+            make_selector(VARIABLE_SET_KIND, VARIABLE_SET_API_VERSION, "alpha"),
+            SpecViewMode::Encrypted,
+        )
+        .await
+        .unwrap();
+    assert_eq!(fetched.metadata.uid, uid, "uid must match after apply");
+    assert_resource_view_fields(
+        &fetched,
+        VARIABLE_SET_KIND,
+        VARIABLE_SET_API_VERSION,
+        "alpha",
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-021
+contract_test!(apply_create_yaml, super::test_apply_create_yaml);
+
+pub async fn test_apply_create_yaml(h: &impl FacadeContractHarness) {
+    let facade = h.facade_for(TestAccount::Alice);
+    let manifest_yaml = variable_set_manifest_yaml("yaml-vars", None, &[("KEY1", "val1")]);
+
+    let decision = facade
+        .apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Yaml,
+            manifest: manifest_yaml,
+        })
+        .await
+        .unwrap();
+
+    let view = assert_applied_outcome(&decision, ApplyResourceOutcome::Created);
+    assert_resource_view_fields(
+        view,
+        VARIABLE_SET_KIND,
+        VARIABLE_SET_API_VERSION,
+        "yaml-vars",
+    );
+    assert_eq!(view.metadata.generation, 1, "initial generation must be 1");
+
+    // Semantic equivalence: same resource via get, just like after JSON apply
+    let fetched = facade
+        .get(
+            make_selector(VARIABLE_SET_KIND, VARIABLE_SET_API_VERSION, "yaml-vars"),
+            SpecViewMode::Encrypted,
+        )
+        .await
+        .unwrap();
+    assert_eq!(fetched.metadata.uid, view.metadata.uid);
+    assert_resource_view_fields(
+        &fetched,
+        VARIABLE_SET_KIND,
+        VARIABLE_SET_API_VERSION,
+        "yaml-vars",
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-022
+contract_test!(apply_update, super::test_apply_update);
+
+pub async fn test_apply_update(h: &impl FacadeContractHarness) {
+    let facade = h.facade_for(TestAccount::Alice);
+
+    // Create
+    let create_manifest = variable_set_manifest_json("upd-vars", None, &[("A", "1")]);
+    let create_decision = facade
+        .apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: create_manifest,
+        })
+        .await
+        .unwrap();
+    let created = assert_applied_outcome(&create_decision, ApplyResourceOutcome::Created);
+    let original_uid = created.metadata.uid;
+
+    // Update spec
+    let update_manifest = variable_set_manifest_json("upd-vars", None, &[("A", "1"), ("B", "2")]);
+    let update_decision = facade
+        .apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: update_manifest,
+        })
+        .await
+        .unwrap();
+    let updated = assert_applied_outcome(&update_decision, ApplyResourceOutcome::Updated);
+
+    // uid preserved
+    assert_eq!(
+        updated.metadata.uid, original_uid,
+        "uid must be preserved on update"
+    );
+    assert_eq!(
+        updated.metadata.name, "upd-vars",
+        "name must be preserved on update"
+    );
+    assert!(
+        updated.metadata.updated_at >= created.metadata.updated_at,
+        "updated_at must not be earlier after update"
+    );
+
+    // Verify via get
+    let fetched = facade
+        .get(
+            make_selector(VARIABLE_SET_KIND, VARIABLE_SET_API_VERSION, "upd-vars"),
+            SpecViewMode::Encrypted,
+        )
+        .await
+        .unwrap();
+    assert_eq!(fetched.metadata.uid, original_uid);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-023
+contract_test!(apply_idempotent, super::test_apply_idempotent);
+
+pub async fn test_apply_idempotent(h: &impl FacadeContractHarness) {
+    let facade = h.facade_for(TestAccount::Alice);
+    let manifest = variable_set_manifest_json("idem-vars", None, &[("X", "42")]);
+
+    // First apply
+    let first_decision = facade
+        .apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: manifest.clone(),
+        })
+        .await
+        .unwrap();
+    let first = assert_applied_outcome(&first_decision, ApplyResourceOutcome::Created);
+    let uid = first.metadata.uid;
+    let generation = first.metadata.generation;
+
+    // Second apply with identical manifest
+    let second_decision = facade
+        .apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest,
+        })
+        .await
+        .unwrap();
+    let second = assert_applied_outcome(&second_decision, ApplyResourceOutcome::Untouched);
+
+    assert_eq!(
+        second.metadata.uid, uid,
+        "uid must be preserved on no-op apply"
+    );
+    assert_eq!(
+        second.metadata.generation, generation,
+        "generation must not change on no-op apply"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-024 (deferred): apply rejects immutable field change.
+// Requires a resource kind with at least one immutable spec or metadata field
+// that the facade contract forbids changing after creation. No current resource
+// kind (VariableSet, SecretSet) has such a field. Add once a suitable kind
+// exists.
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-026
+contract_test!(
+    apply_rejects_duplicate_metadata_key,
+    super::test_apply_rejects_duplicate_metadata_key
+);
+
+pub async fn test_apply_rejects_duplicate_metadata_key(h: &impl FacadeContractHarness) {
+    let facade = h.facade_for(TestAccount::Alice);
+
+    // YAML: serde_yaml visits both duplicate key occurrences so the custom
+    // deserialize_string_entries visitor detects the second one and returns a
+    // parse error. Expected: Err(ParseManifest).
+    let yaml_with_dup_label = indoc::indoc!(
+        r#"
+        apiVersion: "kamu.dev/v1alpha1"
+        kind: VariableSet
+        metadata:
+          name: dup-label-yaml
+          labels:
+            env: prod
+            env: staging
+        spec:
+          variables:
+            KEY: value
+        "#
+    )
+    .to_string();
+
+    let yaml_result = facade
+        .apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Yaml,
+            manifest: yaml_with_dup_label,
+        })
+        .await;
+
+    assert!(
+        matches!(yaml_result, Err(ApplyManifestError::ParseManifest(_))),
+        "YAML with duplicate label key must fail with ParseManifest, got: {yaml_result:?}"
+    );
+
+    // JSON: serde_json silently keeps the last value for duplicate keys, so the
+    // manifest parses successfully and reaches domain validation, which then
+    // rejects the empty-after-dedup spec. This documents the behavioral
+    // difference between YAML and JSON duplicate-key handling.
+    let json_with_dup_label = serde_json::json!({
+        "apiVersion": VARIABLE_SET_API_VERSION,
+        "kind": VARIABLE_SET_KIND,
+        "metadata": {
+            "name": "dup-label-json",
+            "labels": {"env": "prod", "env": "staging"}
+        },
+        "spec": {"variables": {"KEY": "value"}}
+    })
+    .to_string();
+
+    // serde_json deduplicates silently, so apply succeeds (last value wins).
+    let json_result = facade
+        .apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: json_with_dup_label,
+        })
+        .await;
+
+    assert!(
+        json_result.is_ok(),
+        "JSON with duplicate label key is silently deduplicated by serde_json and must succeed, \
+         got: {json_result:?}"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // RF-143 / apply error taxonomy — InvalidMetadata
 // Empty resource name fails metadata validation before the use case runs.
 // Both local and remote facades must return Err(InvalidMetadata(_)) with the
@@ -618,6 +741,8 @@ pub async fn test_apply_invalid_spec_carries_kind_and_api_version(h: &impl Facad
         other => panic!("expected Err(InvalidSpec), got: {other:?}"),
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // RF-143 note: ImmutableFieldChanged, ReferencedObjectMissing, and
 // LifecycleRuleConflict rejection categories are defined in the schema but not

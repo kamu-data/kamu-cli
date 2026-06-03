@@ -409,62 +409,6 @@ pub async fn test_search_by_name_pattern(h: &impl FacadeContractHarness) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// RF-094
-contract_test!(
-    search_empty_criteria_returns_error,
-    super::test_search_empty_criteria_returns_error
-);
-
-pub async fn test_search_empty_criteria_returns_error(h: &impl FacadeContractHarness) {
-    let facade = h.facade_for(TestAccount::Alice);
-
-    let result = facade
-        .search_identities(SearchResourceIdentitiesRequest {
-            kinds: vec![VARIABLE_SET_KIND.to_string()],
-            exact_names: None,
-            name_pattern: None,
-            account: None,
-            pagination: PaginationOpts::from_max_results(1000),
-        })
-        .await;
-
-    assert!(matches!(
-        result,
-        Err(ListResourcesError::InvalidSearchQuery(_))
-    ));
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// RF-095
-contract_test!(
-    search_pagination_and_total_count,
-    super::test_search_pagination_and_total_count
-);
-
-pub async fn test_search_pagination_and_total_count(h: &impl FacadeContractHarness) {
-    for name in ["search-page-1", "search-page-2", "search-page-3"] {
-        create_resource(h, TestAccount::Alice, name).await;
-    }
-
-    let facade = h.facade_for(TestAccount::Alice);
-    let response = facade
-        .search_identities(SearchResourceIdentitiesRequest {
-            kinds: vec![VARIABLE_SET_KIND.to_string()],
-            exact_names: None,
-            name_pattern: Some("search-page-%".to_string()),
-            account: None,
-            pagination: PaginationOpts::from_page(1, 2),
-        })
-        .await
-        .unwrap();
-
-    assert_eq!(response.total_count, 3);
-    assert_eq!(response.items.len(), 1);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 // RF-093
 contract_test!(search_multi_kind, super::test_search_multi_kind);
 
@@ -528,6 +472,62 @@ pub async fn test_search_multi_kind(h: &impl FacadeContractHarness) {
         kinds.contains(SECRET_SET_KIND),
         "result must include SecretSet kind"
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-094
+contract_test!(
+    search_empty_criteria_returns_error,
+    super::test_search_empty_criteria_returns_error
+);
+
+pub async fn test_search_empty_criteria_returns_error(h: &impl FacadeContractHarness) {
+    let facade = h.facade_for(TestAccount::Alice);
+
+    let result = facade
+        .search_identities(SearchResourceIdentitiesRequest {
+            kinds: vec![VARIABLE_SET_KIND.to_string()],
+            exact_names: None,
+            name_pattern: None,
+            account: None,
+            pagination: PaginationOpts::from_max_results(1000),
+        })
+        .await;
+
+    assert!(matches!(
+        result,
+        Err(ListResourcesError::InvalidSearchQuery(_))
+    ));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-095
+contract_test!(
+    search_pagination_and_total_count,
+    super::test_search_pagination_and_total_count
+);
+
+pub async fn test_search_pagination_and_total_count(h: &impl FacadeContractHarness) {
+    for name in ["search-page-1", "search-page-2", "search-page-3"] {
+        create_resource(h, TestAccount::Alice, name).await;
+    }
+
+    let facade = h.facade_for(TestAccount::Alice);
+    let response = facade
+        .search_identities(SearchResourceIdentitiesRequest {
+            kinds: vec![VARIABLE_SET_KIND.to_string()],
+            exact_names: None,
+            name_pattern: Some("search-page-%".to_string()),
+            account: None,
+            pagination: PaginationOpts::from_page(1, 2),
+        })
+        .await
+        .unwrap();
+
+    assert_eq!(response.total_count, 3);
+    assert_eq!(response.items.len(), 1);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

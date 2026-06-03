@@ -166,6 +166,84 @@ pub async fn test_remote_created_readable_locally(h: &impl FacadeContractHarness
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// RF-153: local and remote produce equivalent rendered manifests.
+//
+// Creates through the local facade then renders via both facades in JSON and
+// YAML, asserting that the parsed values are semantically equal.
+contract_test!(
+    render_manifest_equivalence,
+    super::test_render_manifest_equivalence
+);
+
+pub async fn test_render_manifest_equivalence(h: &impl FacadeContractHarness) {
+    let local = h.local_facade_for(TestAccount::Alice);
+    let remote = h.facade_for(TestAccount::Alice);
+
+    local
+        .apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: variable_set_manifest_json("cross-render-eq", None, &[("X", "1")]),
+        })
+        .await
+        .unwrap();
+
+    let selector = by_name("cross-render-eq");
+
+    // JSON equivalence
+    let local_json = local
+        .render_manifest(
+            selector.clone(),
+            ResourceManifestFormat::Json,
+            SpecViewMode::Encrypted,
+        )
+        .await
+        .unwrap()
+        .manifest;
+    let remote_json = remote
+        .render_manifest(
+            selector.clone(),
+            ResourceManifestFormat::Json,
+            SpecViewMode::Encrypted,
+        )
+        .await
+        .unwrap()
+        .manifest;
+    let local_json_val: serde_json::Value = serde_json::from_str(&local_json).unwrap();
+    let remote_json_val: serde_json::Value = serde_json::from_str(&remote_json).unwrap();
+    assert_eq!(
+        local_json_val, remote_json_val,
+        "JSON renders must be semantically equal"
+    );
+
+    // YAML equivalence — re-parse via serde_yaml and compare as JSON values
+    let local_yaml = local
+        .render_manifest(
+            selector.clone(),
+            ResourceManifestFormat::Yaml,
+            SpecViewMode::Encrypted,
+        )
+        .await
+        .unwrap()
+        .manifest;
+    let remote_yaml = remote
+        .render_manifest(
+            selector.clone(),
+            ResourceManifestFormat::Yaml,
+            SpecViewMode::Encrypted,
+        )
+        .await
+        .unwrap()
+        .manifest;
+    let local_yaml_val: serde_json::Value = serde_yaml::from_str(&local_yaml).unwrap();
+    let remote_yaml_val: serde_json::Value = serde_yaml::from_str(&remote_yaml).unwrap();
+    assert_eq!(
+        local_yaml_val, remote_yaml_val,
+        "YAML renders must be semantically equal"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // RF-154
 // Runs representative mixed batch calls and verifies that both local and remote
 // produce equivalent normalized batch responses (same successes/problems by

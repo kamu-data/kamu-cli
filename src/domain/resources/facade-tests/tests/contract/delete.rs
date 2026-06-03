@@ -188,6 +188,53 @@ pub async fn test_delete_missing_uid_returns_not_found(h: &impl FacadeContractHa
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// RF-134
+contract_test!(
+    delete_wrong_api_version_returns_mismatch,
+    super::test_delete_wrong_api_version_returns_mismatch
+);
+
+pub async fn test_delete_wrong_api_version_returns_mismatch(h: &impl FacadeContractHarness) {
+    let uid = create_resource(h, "del-api-ver").await;
+    let facade = h.facade_for(TestAccount::Alice);
+
+    let wrong_version = ResourceSelector {
+        account: None,
+        kind: VARIABLE_SET_KIND.to_string(),
+        api_version: Some("v0.never.existed".to_string()),
+        resource_ref: ResourceRef::ById(uid),
+    };
+    let result = facade.delete(wrong_version).await;
+    assert!(
+        matches!(
+            result,
+            Err(DeleteResourceError::LookupProblem(
+                ResourceLookupProblem::ApiVersionMismatch(_)
+            ))
+        ),
+        "expected ApiVersionMismatch, got: {result:?}"
+    );
+
+    let wrong_kind = ResourceSelector {
+        account: None,
+        kind: SECRET_SET_KIND.to_string(),
+        api_version: Some(SECRET_SET_API_VERSION.to_string()),
+        resource_ref: ResourceRef::ById(uid),
+    };
+    let result = facade.delete(wrong_kind).await;
+    assert!(
+        matches!(
+            result,
+            Err(DeleteResourceError::LookupProblem(
+                ResourceLookupProblem::KindMismatch(_)
+            ))
+        ),
+        "expected KindMismatch, got: {result:?}"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // RF-135
 // Deleting a resource in one account must not affect a resource with the
 // same name in another account.
@@ -265,53 +312,6 @@ pub async fn test_repeated_delete_is_deterministic(h: &impl FacadeContractHarnes
             ))
         ),
         "second delete must return UIDNotFound, got: {result:?}"
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// RF-134
-contract_test!(
-    delete_wrong_api_version_returns_mismatch,
-    super::test_delete_wrong_api_version_returns_mismatch
-);
-
-pub async fn test_delete_wrong_api_version_returns_mismatch(h: &impl FacadeContractHarness) {
-    let uid = create_resource(h, "del-api-ver").await;
-    let facade = h.facade_for(TestAccount::Alice);
-
-    let wrong_version = ResourceSelector {
-        account: None,
-        kind: VARIABLE_SET_KIND.to_string(),
-        api_version: Some("v0.never.existed".to_string()),
-        resource_ref: ResourceRef::ById(uid),
-    };
-    let result = facade.delete(wrong_version).await;
-    assert!(
-        matches!(
-            result,
-            Err(DeleteResourceError::LookupProblem(
-                ResourceLookupProblem::ApiVersionMismatch(_)
-            ))
-        ),
-        "expected ApiVersionMismatch, got: {result:?}"
-    );
-
-    let wrong_kind = ResourceSelector {
-        account: None,
-        kind: SECRET_SET_KIND.to_string(),
-        api_version: Some(SECRET_SET_API_VERSION.to_string()),
-        resource_ref: ResourceRef::ById(uid),
-    };
-    let result = facade.delete(wrong_kind).await;
-    assert!(
-        matches!(
-            result,
-            Err(DeleteResourceError::LookupProblem(
-                ResourceLookupProblem::KindMismatch(_)
-            ))
-        ),
-        "expected KindMismatch, got: {result:?}"
     );
 }
 

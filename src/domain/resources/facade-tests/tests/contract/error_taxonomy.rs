@@ -377,83 +377,6 @@ pub async fn test_batch_lookup_taxonomy(h: &impl FacadeContractHarness) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// RF-143: apply rejection taxonomy
-//
-// Verifies that representative apply failures produce stable error variants on
-// both `plan_apply_manifest` and `apply_manifest`.
-//
-// Empty variables map deserializes successfully but fails
-// VariableSetSpec::validate() inside the lifecycle →
-// Ok(Rejected(BusinessValidationFailed)).
-contract_test!(
-    apply_rejection_taxonomy,
-    super::test_apply_rejection_taxonomy
-);
-
-pub async fn test_apply_rejection_taxonomy(h: &impl FacadeContractHarness) {
-    use kamu_resources::{
-        ApplyManifestApplicationDecision,
-        ApplyManifestPlanningDecision,
-        ApplyManifestRejection,
-        ApplyResourceRejectionCategory,
-    };
-
-    let facade = h.facade_for(TestAccount::Alice);
-
-    // Empty variables map deserializes correctly but fails
-    // VariableSetSpec::validate() inside the lifecycle; both plan and apply
-    // return Ok(Rejected(BusinessValidationFailed)).
-    let empty_vars_manifest = indoc::indoc!(
-        r#"{
-            "apiVersion": "kamu.dev/v1alpha1",
-            "kind": "VariableSet",
-            "metadata": {"name": "tax-biz-invalid"},
-            "spec": {"variables": {}}
-        }"#
-    )
-    .to_string();
-
-    let plan_result = facade
-        .plan_apply_manifest(ApplyManifestRequest {
-            format: ResourceManifestFormat::Json,
-            manifest: empty_vars_manifest.clone(),
-        })
-        .await;
-    assert!(
-        matches!(
-            plan_result,
-            Ok(ApplyManifestPlanningDecision::Rejected(
-                ApplyManifestRejection {
-                    category: ApplyResourceRejectionCategory::BusinessValidationFailed,
-                    ..
-                }
-            ))
-        ),
-        "plan: expected Ok(Rejected(BusinessValidationFailed)), got: {plan_result:?}"
-    );
-
-    let apply_result = facade
-        .apply_manifest(ApplyManifestRequest {
-            format: ResourceManifestFormat::Json,
-            manifest: empty_vars_manifest,
-        })
-        .await;
-    assert!(
-        matches!(
-            apply_result,
-            Ok(ApplyManifestApplicationDecision::Rejected(
-                ApplyManifestRejection {
-                    category: ApplyResourceRejectionCategory::BusinessValidationFailed,
-                    ..
-                }
-            ))
-        ),
-        "apply: expected Ok(Rejected(BusinessValidationFailed)), got: {apply_result:?}"
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 // RF-142: bad-account errors surface as typed `BadAccount` outcomes from every
 // account-accepting API — not as internal errors. This test is specifically
 // designed to catch GraphQL schema gaps like the single-delete case where
@@ -603,6 +526,83 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
     assert!(
         matches!(result, Err(ApplyManifestError::BadAccount(_))),
         "apply_manifest: expected BadAccount, got {result:?}"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-143: apply rejection taxonomy
+//
+// Verifies that representative apply failures produce stable error variants on
+// both `plan_apply_manifest` and `apply_manifest`.
+//
+// Empty variables map deserializes successfully but fails
+// VariableSetSpec::validate() inside the lifecycle →
+// Ok(Rejected(BusinessValidationFailed)).
+contract_test!(
+    apply_rejection_taxonomy,
+    super::test_apply_rejection_taxonomy
+);
+
+pub async fn test_apply_rejection_taxonomy(h: &impl FacadeContractHarness) {
+    use kamu_resources::{
+        ApplyManifestApplicationDecision,
+        ApplyManifestPlanningDecision,
+        ApplyManifestRejection,
+        ApplyResourceRejectionCategory,
+    };
+
+    let facade = h.facade_for(TestAccount::Alice);
+
+    // Empty variables map deserializes correctly but fails
+    // VariableSetSpec::validate() inside the lifecycle; both plan and apply
+    // return Ok(Rejected(BusinessValidationFailed)).
+    let empty_vars_manifest = indoc::indoc!(
+        r#"{
+            "apiVersion": "kamu.dev/v1alpha1",
+            "kind": "VariableSet",
+            "metadata": {"name": "tax-biz-invalid"},
+            "spec": {"variables": {}}
+        }"#
+    )
+    .to_string();
+
+    let plan_result = facade
+        .plan_apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: empty_vars_manifest.clone(),
+        })
+        .await;
+    assert!(
+        matches!(
+            plan_result,
+            Ok(ApplyManifestPlanningDecision::Rejected(
+                ApplyManifestRejection {
+                    category: ApplyResourceRejectionCategory::BusinessValidationFailed,
+                    ..
+                }
+            ))
+        ),
+        "plan: expected Ok(Rejected(BusinessValidationFailed)), got: {plan_result:?}"
+    );
+
+    let apply_result = facade
+        .apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: empty_vars_manifest,
+        })
+        .await;
+    assert!(
+        matches!(
+            apply_result,
+            Ok(ApplyManifestApplicationDecision::Rejected(
+                ApplyManifestRejection {
+                    category: ApplyResourceRejectionCategory::BusinessValidationFailed,
+                    ..
+                }
+            ))
+        ),
+        "apply: expected Ok(Rejected(BusinessValidationFailed)), got: {apply_result:?}"
     );
 }
 
