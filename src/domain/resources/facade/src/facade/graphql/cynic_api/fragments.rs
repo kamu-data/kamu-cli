@@ -288,18 +288,7 @@ impl From<ResourceManifestFormat> for crate::ResourceManifestFormat {
 #[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct BatchResourceProblem {
     pub request_index: i32,
-    pub code: BatchResourceProblemCode,
-    pub message: String,
-    pub actual_api_version: Option<String>,
-    pub actual_kind: Option<String>,
-}
-
-#[derive(cynic::Enum, Debug, Clone, Copy)]
-pub(crate) enum BatchResourceProblemCode {
-    UidNotFound,
-    NameNotFound,
-    ApiVersionMismatch,
-    KindMismatch,
+    pub problem: ResourceLookupProblem,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

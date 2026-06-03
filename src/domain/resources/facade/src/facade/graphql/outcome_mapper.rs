@@ -25,7 +25,6 @@ use crate::{
     ResourceBatchSelector,
     ResourceKindMismatchError,
     ResourceLookupProblem,
-    ResourceRef,
     ResourcesSummaryError,
     SearchResourceIdentitiesResponse,
 };
@@ -72,25 +71,30 @@ where
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(super) fn collect_batch_problems(
-    selector: &ResourceBatchSelector,
-    problems: Vec<impl BatchResourceProblemLike>,
+    problems: Vec<cynic_api::fragments::BatchResourceProblem>,
+    request_len: usize,
     context: &str,
 ) -> Result<Vec<BatchResourceProblem<ResourceLookupProblem>>, BatchResourceError> {
     problems
         .into_iter()
         .map(|problem| {
-            let request_index = problem.request_index()?;
-            let resource_ref = selector.resource_refs.get(request_index).ok_or_else(|| {
+            let request_index = usize::try_from(problem.request_index).map_err(|_| {
                 BatchResourceError::Internal(InternalError::new(format!(
-                    "Remote {context} problem index {request_index} is out of bounds",
+                    "Remote {context} problem index {} cannot be converted to usize",
+                    problem.request_index
                 )))
             })?;
-            let error = batch_resource_problem_error(
-                &problem,
-                &selector.kind,
-                resource_ref,
-                selector.api_version.as_deref(),
-            )?;
+            if request_index >= request_len {
+                return Err(BatchResourceError::Internal(InternalError::new(format!(
+                    "Remote {context} problem index {request_index} is out of bounds",
+                ))));
+            }
+            let error = map_batch_lookup_problem(problem.problem).ok_or_else(|| {
+                BatchResourceError::Internal(InternalError::new(format!(
+                    "Remote {context} problem at index {request_index} has unrecognized \
+                     ResourceLookupProblem variant",
+                )))
+            })?;
             Ok(BatchResourceProblem {
                 request_index,
                 error,
@@ -144,129 +148,19 @@ pub(super) fn validate_batch_response_indexes<T, E>(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(super) fn batch_resource_problem_error(
-    problem: &impl BatchResourceProblemLike,
-    kind: &str,
-    resource_ref: &ResourceRef,
-    expected_api_version: Option<&str>,
-) -> Result<ResourceLookupProblem, BatchResourceError> {
-    Ok(match problem.code() {
-        BatchResourceProblemCode::UidNotFound => match resource_ref {
-            ResourceRef::ById(uid) => {
-                ResourceLookupProblem::UIDNotFound(domain::ResourceUIDNotFoundError(*uid))
-            }
-            ResourceRef::ByName(_) => return Err(malformed_remote_problem(problem)),
-        },
-        BatchResourceProblemCode::NameNotFound => match resource_ref {
-            ResourceRef::ByName(name) => {
-                ResourceLookupProblem::NameNotFound(domain::ResourceNameNotFoundError {
-                    kind: kind.to_string(),
-                    name: name.clone(),
-                })
-            }
-            ResourceRef::ById(_) => return Err(malformed_remote_problem(problem)),
-        },
-        BatchResourceProblemCode::ApiVersionMismatch => {
-            let Some(expected_api_version) = expected_api_version else {
-                return Err(malformed_remote_problem(problem));
-            };
-            let Some(actual_api_version) = problem.actual_api_version() else {
-                return Err(malformed_remote_problem(problem));
-            };
-
-            ResourceLookupProblem::ApiVersionMismatch(domain::ResourceAPIVersionMismatchError {
-                expected_api_version: expected_api_version.to_string(),
-                actual_api_version: actual_api_version.to_string(),
-            })
-        }
-        BatchResourceProblemCode::KindMismatch => match resource_ref {
-            ResourceRef::ById(uid) => {
-                let Some(actual_kind) = problem.actual_kind() else {
-                    return Err(malformed_remote_problem(problem));
-                };
-
-                ResourceLookupProblem::KindMismatch(ResourceKindMismatchError {
-                    uid: *uid,
-                    expected_kind: kind.to_string(),
-                    actual_kind: actual_kind.to_string(),
-                })
-            }
-            ResourceRef::ByName(_) => return Err(malformed_remote_problem(problem)),
-        },
-    })
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(super) trait BatchResourceProblemLike {
-    fn request_index(&self) -> Result<usize, BatchResourceError>;
-    fn code(&self) -> BatchResourceProblemCode;
-    fn code_debug(&self) -> String;
-    fn message(&self) -> &str;
-    fn actual_api_version(&self) -> Option<&str>;
-    fn actual_kind(&self) -> Option<&str>;
-}
-
-#[derive(Debug, Clone, Copy)]
-pub(super) enum BatchResourceProblemCode {
-    UidNotFound,
-    NameNotFound,
-    ApiVersionMismatch,
-    KindMismatch,
-}
-
-impl BatchResourceProblemLike for cynic_api::fragments::BatchResourceProblem {
-    fn request_index(&self) -> Result<usize, BatchResourceError> {
-        usize::try_from(self.request_index).map_err(|_| {
-            BatchResourceError::Internal(InternalError::new(format!(
-                "Remote resource problem index {} cannot be converted to usize",
-                self.request_index
-            )))
-        })
+fn map_batch_lookup_problem(
+    problem: cynic_api::fragments::ResourceLookupProblem,
+) -> Option<ResourceLookupProblem> {
+    use cynic_api::fragments::ResourceLookupProblem as P;
+    match problem {
+        P::ResourceUIDNotFoundProblem(p) => Some(map_uid_not_found(p)),
+        P::ResourceNameNotFoundProblem(p) => Some(map_name_not_found(p)),
+        P::ResourceApiVersionMismatchProblem(p) => Some(map_api_version_mismatch(p)),
+        P::ResourceKindMismatchProblem(p) => Some(map_kind_mismatch(p)),
+        P::ResourceUnsupportedDescriptorProblem(_)
+        | P::ResourceBadAccountProblem(_)
+        | P::Unknown => None,
     }
-
-    fn code(&self) -> BatchResourceProblemCode {
-        match self.code {
-            cynic_api::fragments::BatchResourceProblemCode::UidNotFound => {
-                BatchResourceProblemCode::UidNotFound
-            }
-            cynic_api::fragments::BatchResourceProblemCode::NameNotFound => {
-                BatchResourceProblemCode::NameNotFound
-            }
-            cynic_api::fragments::BatchResourceProblemCode::ApiVersionMismatch => {
-                BatchResourceProblemCode::ApiVersionMismatch
-            }
-            cynic_api::fragments::BatchResourceProblemCode::KindMismatch => {
-                BatchResourceProblemCode::KindMismatch
-            }
-        }
-    }
-
-    fn code_debug(&self) -> String {
-        format!("{:?}", self.code)
-    }
-
-    fn message(&self) -> &str {
-        &self.message
-    }
-
-    fn actual_api_version(&self) -> Option<&str> {
-        self.actual_api_version.as_deref()
-    }
-
-    fn actual_kind(&self) -> Option<&str> {
-        self.actual_kind.as_deref()
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-fn malformed_remote_problem(problem: &impl BatchResourceProblemLike) -> BatchResourceError {
-    BatchResourceError::Internal(InternalError::new(format!(
-        "Malformed remote resource problem: code={}, message={}",
-        problem.code_debug(),
-        problem.message()
-    )))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -646,7 +540,8 @@ pub(super) fn map_batch_get_resources_outcome(
                     ))
                 },
             )?;
-            let problems = collect_batch_problems(selector, batch.problems, "resource")?;
+            let problems =
+                collect_batch_problems(batch.problems, selector.resource_refs.len(), "resource")?;
             validate_batch_response_indexes(
                 &successes,
                 &problems,
@@ -688,7 +583,8 @@ pub(super) fn map_batch_get_identities_outcome(
                 "identity",
                 |s| Ok((s.request_index, s.identity.into())),
             )?;
-            let problems = collect_batch_problems(selector, batch.problems, "identity")?;
+            let problems =
+                collect_batch_problems(batch.problems, selector.resource_refs.len(), "identity")?;
             validate_batch_response_indexes(
                 &successes,
                 &problems,
@@ -730,7 +626,8 @@ pub(super) fn map_batch_render_manifests_outcome(
                 "manifest",
                 |s| Ok((s.request_index, s.manifest.into())),
             )?;
-            let problems = collect_batch_problems(selector, batch.problems, "manifest")?;
+            let problems =
+                collect_batch_problems(batch.problems, selector.resource_refs.len(), "manifest")?;
             validate_batch_response_indexes(
                 &successes,
                 &problems,
@@ -770,7 +667,8 @@ pub(super) fn map_batch_delete_many_outcome(
                 "delete",
                 |s| Ok((s.request_index, s.resource_id)),
             )?;
-            let problems = collect_batch_problems(selector, batch.problems, "delete")?;
+            let problems =
+                collect_batch_problems(batch.problems, selector.resource_refs.len(), "delete")?;
             validate_batch_response_indexes(
                 &successes,
                 &problems,
@@ -824,43 +722,24 @@ mod tests {
     use super::*;
     use crate::facade::graphql::cynic_api::fragments::{
         BatchResourceProblem,
-        BatchResourceProblemCode,
+        ResourceLookupProblem as CynicResourceLookupProblem,
+        ResourceUIDNotFoundProblem,
     };
 
-    fn make_selector(refs: Vec<ResourceRef>) -> ResourceBatchSelector {
-        ResourceBatchSelector {
-            account: None,
-            kind: "TestKind".to_string(),
-            api_version: None,
-            resource_refs: refs,
-        }
-    }
-
-    fn uid_ref() -> ResourceRef {
+    fn uid_not_found_problem(index: i32) -> BatchResourceProblem {
         let uid: ResourceUID =
             serde_json::from_str("\"00000000-0000-0000-0000-000000000000\"").unwrap();
-        ResourceRef::ById(uid)
-    }
-
-    fn problem(index: i32, code: BatchResourceProblemCode) -> BatchResourceProblem {
         BatchResourceProblem {
             request_index: index,
-            code,
-            message: String::new(),
-            actual_api_version: None,
-            actual_kind: None,
+            problem: CynicResourceLookupProblem::ResourceUIDNotFoundProblem(
+                ResourceUIDNotFoundProblem { uid },
+            ),
         }
     }
 
     #[test]
     fn collect_batch_problems_negative_index_is_error() {
-        let selector = make_selector(vec![uid_ref()]);
-        let err = collect_batch_problems(
-            &selector,
-            vec![problem(-1, BatchResourceProblemCode::UidNotFound)],
-            "test",
-        )
-        .unwrap_err();
+        let err = collect_batch_problems(vec![uid_not_found_problem(-1)], 1, "test").unwrap_err();
         assert!(
             matches!(err, BatchResourceError::Internal(_)),
             "expected Internal error for negative problem index"
@@ -869,13 +748,7 @@ mod tests {
 
     #[test]
     fn collect_batch_problems_out_of_bounds_index_is_error() {
-        let selector = make_selector(vec![uid_ref()]);
-        let err = collect_batch_problems(
-            &selector,
-            vec![problem(5, BatchResourceProblemCode::UidNotFound)],
-            "test",
-        )
-        .unwrap_err();
+        let err = collect_batch_problems(vec![uid_not_found_problem(5)], 1, "test").unwrap_err();
         assert!(
             matches!(err, BatchResourceError::Internal(_)),
             "expected Internal error for out-of-bounds problem index"

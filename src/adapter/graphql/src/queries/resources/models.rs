@@ -628,50 +628,14 @@ pub struct BatchResourceIdentitySuccess {
 #[derive(SimpleObject, Debug, Clone)]
 pub struct BatchResourceProblem {
     pub request_index: usize,
-    pub code: BatchResourceProblemCode,
-    pub message: String,
-    pub actual_api_version: Option<String>,
-    pub actual_kind: Option<String>,
+    pub problem: ResourceLookupProblem,
 }
 
 impl From<BatchGetResourceProblem> for BatchResourceProblem {
     fn from(value: BatchGetResourceProblem) -> Self {
-        use kamu_resources_facade::ResourceLookupProblem as P;
-        let code = BatchResourceProblemCode::from_lookup_problem(&value.error);
-        let actual_api_version = match &value.error {
-            P::ApiVersionMismatch(e) => Some(e.actual_api_version.clone()),
-            _ => None,
-        };
-        let actual_kind = match &value.error {
-            P::KindMismatch(e) => Some(e.actual_kind.clone()),
-            _ => None,
-        };
         Self {
             request_index: value.request_index,
-            message: value.error.to_string(),
-            code,
-            actual_api_version,
-            actual_kind,
-        }
-    }
-}
-
-#[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
-pub enum BatchResourceProblemCode {
-    UidNotFound,
-    NameNotFound,
-    ApiVersionMismatch,
-    KindMismatch,
-}
-
-impl BatchResourceProblemCode {
-    fn from_lookup_problem(error: &kamu_resources_facade::ResourceLookupProblem) -> Self {
-        use kamu_resources_facade::ResourceLookupProblem as E;
-        match error {
-            E::UIDNotFound(_) => Self::UidNotFound,
-            E::NameNotFound(_) => Self::NameNotFound,
-            E::ApiVersionMismatch(_) => Self::ApiVersionMismatch,
-            E::KindMismatch(_) => Self::KindMismatch,
+            problem: value.error.into(),
         }
     }
 }

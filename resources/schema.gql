@@ -593,17 +593,7 @@ type BatchResourceManifestsResult {
 
 type BatchResourceProblem {
 	requestIndex: Int!
-	code: BatchResourceProblemCode!
-	message: String!
-	actualApiVersion: String
-	actualKind: String
-}
-
-enum BatchResourceProblemCode {
-	UID_NOT_FOUND
-	NAME_NOT_FOUND
-	API_VERSION_MISMATCH
-	KIND_MISMATCH
+	problem: ResourceLookupProblem!
 }
 
 type BatchResourceSuccess {
