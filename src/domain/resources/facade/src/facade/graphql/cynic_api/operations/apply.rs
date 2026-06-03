@@ -341,7 +341,7 @@ impl ResourceApplyOutcome {
 fn map_apply_problem(
     outcome: ResourceApplyOutcome,
 ) -> Result<crate::ApplyManifestError, InternalError> {
-    use crate::facade::graphql::cynic_api::fragments::ResourceUnsupportedDescriptorProblemCode as C;
+    use crate::facade::graphql::outcome_mapper;
     use crate::facade::resource_facade_errors::ParseResourceManifestError;
 
     match outcome {
@@ -351,63 +351,13 @@ fn map_apply_problem(
             ))
         }
         ResourceApplyOutcome::ResourceUnsupportedDescriptorProblem(p) => {
-            let error = match p.code {
-                C::NotFound => domain::UnsupportedResourceDescriptorError::NotFound {
-                    kind: p.kind,
-                    api_version: p.api_version,
-                },
-                C::Duplicate => domain::UnsupportedResourceDescriptorError::Duplicate {
-                    kind: p.kind,
-                    api_version: p.api_version,
-                },
-            };
-            Ok(crate::ApplyManifestError::UnsupportedDescriptor(error))
+            Ok(crate::ApplyManifestError::UnsupportedDescriptor(
+                outcome_mapper::unsupported_descriptor_problem_error(p),
+            ))
         }
-        ResourceApplyOutcome::ResourceBadAccountProblem(p) => {
-            use crate::facade::graphql::cynic_api::fragments::ResourceBadAccountProblemCode as BC;
-
-            let account_name =
-                |opt: Option<crate::facade::graphql::cynic_api::scalars::AccountName>,
-                 field: &str|
-                 -> Result<odf::AccountName, InternalError> {
-                    opt.map(|n| odf::AccountName::new_unchecked(&n.0))
-                        .ok_or_else(|| {
-                            InternalError::new(format!(
-                                "Malformed remote apply bad account problem: missing {field}"
-                            ))
-                        })
-                };
-
-            let err = match p.code {
-                BC::EmptySelector => crate::ResolveManifestAccountError::EmptySelector,
-                BC::AccountNotFoundById => crate::ResolveManifestAccountError::AccountNotFoundById(
-                    kamu_accounts::AccountNotFoundByIdError {
-                        account_id: p.account_id.ok_or_else(|| {
-                            InternalError::new(
-                                "Malformed remote apply bad account problem: missing account_id",
-                            )
-                        })?,
-                    },
-                ),
-                BC::AccountNotFoundByName => {
-                    crate::ResolveManifestAccountError::AccountNotFoundByName(
-                        kamu_accounts::AccountNotFoundByNameError {
-                            account_name: account_name(p.account_name, "account_name")?,
-                        },
-                    )
-                }
-                BC::IdNameMismatch => crate::ResolveManifestAccountError::IdNameMismatch {
-                    account_id: p.account_id.ok_or_else(|| {
-                        InternalError::new(
-                            "Malformed remote apply bad account problem: missing account_id",
-                        )
-                    })?,
-                    expected_name: account_name(p.expected_name, "expected_name")?,
-                    actual_name: account_name(p.actual_name, "actual_name")?,
-                },
-            };
-            Ok(crate::ApplyManifestError::BadAccount(err))
-        }
+        ResourceApplyOutcome::ResourceBadAccountProblem(p) => Ok(
+            crate::ApplyManifestError::BadAccount(outcome_mapper::bad_account_problem_error(p)?),
+        ),
         ResourceApplyOutcome::ResourceInvalidMetadataProblem(p) => Ok(p.into()),
         ResourceApplyOutcome::ResourceInvalidSpecProblem(p) => Ok(p.into()),
         ResourceApplyOutcome::Unknown => Err(InternalError::new(

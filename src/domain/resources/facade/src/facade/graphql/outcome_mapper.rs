@@ -165,7 +165,7 @@ fn map_batch_lookup_problem(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn unsupported_descriptor_problem_error(
+pub(crate) fn unsupported_descriptor_problem_error(
     problem: cynic_api::fragments::ResourceUnsupportedDescriptorProblem,
 ) -> domain::UnsupportedResourceDescriptorError {
     use cynic_api::fragments::ResourceUnsupportedDescriptorProblemCode as C;
@@ -184,7 +184,7 @@ fn unsupported_descriptor_problem_error(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn bad_account_problem_error(
+pub(crate) fn bad_account_problem_error(
     problem: cynic_api::fragments::ResourceBadAccountProblem,
 ) -> Result<crate::ResolveManifestAccountError, InternalError> {
     use cynic_api::fragments::ResourceBadAccountProblemCode as C;
