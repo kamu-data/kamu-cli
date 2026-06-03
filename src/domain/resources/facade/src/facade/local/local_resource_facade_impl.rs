@@ -86,11 +86,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .resolve_resource_view::<GetResourceError>(selector)
             .await?;
 
-        if let Some(d) =
-            self.try_resolve_spec_view_dispatcher(&view.kind, &view.api_version, spec_view_mode)
-        {
-            view.spec = d.reveal_spec(view.spec).map_err(GetResourceError::from)?;
-        }
+        self.apply_spec_view_mode::<GetResourceError>(&mut view, spec_view_mode)?;
 
         Ok(view)
     }
@@ -101,31 +97,21 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         spec_view_mode: SpecViewMode,
     ) -> Result<BatchResourceResponse<ResourceView, ResourceLookupProblem>, BatchResourceError>
     {
-        let (indexed_resources, problems) = self.resolve_multiple_resource_views(selector).await?;
+        let (mut indexed_resources, problems) =
+            self.resolve_multiple_resource_views(selector).await?;
 
-        let maybe_spec_view_dispatcher = if let Some(first_resource) = indexed_resources.first() {
-            self.try_resolve_spec_view_dispatcher(
-                &first_resource.item.kind,
-                &first_resource.item.api_version,
-                spec_view_mode,
-            )
-        } else {
-            None
-        };
+        self.apply_spec_view_mode_batch::<BatchResourceError>(
+            &mut indexed_resources,
+            spec_view_mode,
+        )?;
 
         let successes = indexed_resources
             .into_iter()
-            .map(|resource| {
-                let mut view = resource.item;
-                if let Some(ref d) = maybe_spec_view_dispatcher {
-                    view.spec = d.reveal_spec(view.spec).map_err(BatchResourceError::from)?;
-                }
-                Ok(BatchResourceSuccess {
-                    request_index: resource.request_index,
-                    item: view,
-                })
+            .map(|resource| BatchResourceSuccess {
+                request_index: resource.request_index,
+                item: resource.item,
             })
-            .collect::<Result<Vec<_>, BatchResourceError>>()?;
+            .collect();
 
         Ok(BatchResourceResponse {
             successes,
@@ -223,13 +209,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .resolve_resource_view::<RenderResourceManifestError>(selector)
             .await?;
 
-        if let Some(d) =
-            self.try_resolve_spec_view_dispatcher(&view.kind, &view.api_version, spec_view_mode)
-        {
-            view.spec = d
-                .reveal_spec(view.spec)
-                .map_err(RenderResourceManifestError::from)?;
-        }
+        self.apply_spec_view_mode::<RenderResourceManifestError>(&mut view, spec_view_mode)?;
 
         let manifest = resource_view_to_manifest(view);
         let manifest =
@@ -247,34 +227,26 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         BatchResourceResponse<RenderResourceManifestResult, ResourceLookupProblem>,
         BatchResourceError,
     > {
-        let (indexed_resources, problems) = self.resolve_multiple_resource_views(selector).await?;
+        let (mut indexed_resources, problems) =
+            self.resolve_multiple_resource_views(selector).await?;
 
-        let maybe_spec_view_dispatcher = if let Some(first_resource) = indexed_resources.first() {
-            self.try_resolve_spec_view_dispatcher(
-                &first_resource.item.kind,
-                &first_resource.item.api_version,
-                spec_view_mode,
-            )
-        } else {
-            None
-        };
+        self.apply_spec_view_mode_batch::<BatchResourceError>(
+            &mut indexed_resources,
+            spec_view_mode,
+        )?;
 
-        let mut successes = Vec::new();
-
-        for resource in indexed_resources {
-            let mut view = resource.item;
-            if let Some(ref d) = maybe_spec_view_dispatcher {
-                view.spec = d.reveal_spec(view.spec).map_err(BatchResourceError::from)?;
-            }
-            let manifest = resource_view_to_manifest(view);
-            let manifest =
-                serialize_manifest(&manifest, format).map_err(BatchResourceError::Internal)?;
-
-            successes.push(BatchResourceSuccess {
-                request_index: resource.request_index,
-                item: RenderResourceManifestResult { manifest, format },
-            });
-        }
+        let successes = indexed_resources
+            .into_iter()
+            .map(|resource| {
+                let manifest = resource_view_to_manifest(resource.item);
+                let manifest =
+                    serialize_manifest(&manifest, format).map_err(BatchResourceError::Internal)?;
+                Ok(BatchResourceSuccess {
+                    request_index: resource.request_index,
+                    item: RenderResourceManifestResult { manifest, format },
+                })
+            })
+            .collect::<Result<Vec<_>, BatchResourceError>>()?;
 
         Ok(BatchResourceResponse {
             successes,
@@ -410,44 +382,23 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         &self,
         request: ApplyManifestRequest,
     ) -> Result<ApplyManifestPlanningDecision, ApplyManifestError> {
-        let manifest = parse_manifest(request.format, &request.manifest)?;
+        let prepared = self.prepare_apply_manifest(request).await?;
 
-        let target_account = self
-            .resource_account_resolver
-            .resolve_target_account(manifest.metadata.account.as_ref())
-            .await?;
-
-        let dispatcher = get_resource_crud_dispatcher::<ApplyManifestError>(
-            &self.catalog,
-            &manifest.kind,
-            &manifest.api_version,
-        )?;
-
-        let metadata = make_metadata_input(&manifest, &target_account)?;
-        let metadata_warnings = collect_manifest_metadata_warnings(&manifest);
-
-        self.ensure_manifest_uid_is_accessible(
-            &manifest.kind,
-            &manifest.api_version,
-            &target_account.id,
-            manifest.metadata.uid,
-        )
-        .await?;
-
-        let plan = dispatcher
+        let plan = prepared
+            .dispatcher
             .plan_apply(ResourceCrudDispatcherApplyRequest {
-                uid: manifest.metadata.uid,
-                metadata,
-                spec: manifest.spec,
+                uid: prepared.uid,
+                metadata: prepared.metadata,
+                spec: prepared.spec,
             })
             .await?;
 
         Ok(match plan {
             ApplyManifestPlanningDecision::Planned(mut plan) => {
-                plan.warnings.splice(0..0, metadata_warnings);
+                plan.warnings.splice(0..0, prepared.metadata_warnings);
                 plan.resource.account = ResourceViewAccount {
-                    id: target_account.id,
-                    name: Some(target_account.name),
+                    id: prepared.target_account.id,
+                    name: Some(prepared.target_account.name),
                 };
 
                 ApplyManifestPlanningDecision::Planned(plan)
@@ -462,44 +413,23 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         &self,
         request: ApplyManifestRequest,
     ) -> Result<ApplyManifestApplicationDecision, ApplyManifestError> {
-        let manifest = parse_manifest(request.format, &request.manifest)?;
+        let prepared = self.prepare_apply_manifest(request).await?;
 
-        let target_account = self
-            .resource_account_resolver
-            .resolve_target_account(manifest.metadata.account.as_ref())
-            .await?;
-
-        let dispatcher = get_resource_crud_dispatcher::<ApplyManifestError>(
-            &self.catalog,
-            &manifest.kind,
-            &manifest.api_version,
-        )?;
-
-        let metadata = make_metadata_input(&manifest, &target_account)?;
-        let metadata_warnings = collect_manifest_metadata_warnings(&manifest);
-
-        self.ensure_manifest_uid_is_accessible(
-            &manifest.kind,
-            &manifest.api_version,
-            &target_account.id,
-            manifest.metadata.uid,
-        )
-        .await?;
-
-        let result = dispatcher
+        let result = prepared
+            .dispatcher
             .apply(ResourceCrudDispatcherApplyRequest {
-                uid: manifest.metadata.uid,
-                metadata,
-                spec: manifest.spec,
+                uid: prepared.uid,
+                metadata: prepared.metadata,
+                spec: prepared.spec,
             })
             .await?;
 
         Ok(match result {
             ApplyManifestApplicationDecision::Applied(mut result) => {
-                result.warnings.splice(0..0, metadata_warnings);
+                result.warnings.splice(0..0, prepared.metadata_warnings);
                 result.resource.account = ResourceViewAccount {
-                    id: target_account.id,
-                    name: Some(target_account.name),
+                    id: prepared.target_account.id,
+                    name: Some(prepared.target_account.name),
                 };
 
                 ApplyManifestApplicationDecision::Applied(result)
@@ -974,6 +904,86 @@ impl LocalResourceFacadeImpl {
         Ok(())
     }
 
+    fn apply_spec_view_mode<E>(
+        &self,
+        view: &mut ResourceView,
+        spec_view_mode: SpecViewMode,
+    ) -> Result<(), E>
+    where
+        E: From<InternalError>,
+    {
+        if let Some(d) =
+            self.try_resolve_spec_view_dispatcher(&view.kind, &view.api_version, spec_view_mode)
+        {
+            let spec = std::mem::replace(&mut view.spec, serde_json::Value::Null);
+            view.spec = d.reveal_spec(spec).map_err(E::from)?;
+        }
+        Ok(())
+    }
+
+    fn apply_spec_view_mode_batch<E>(
+        &self,
+        resources: &mut [IndexedResource<ResourceView>],
+        spec_view_mode: SpecViewMode,
+    ) -> Result<(), E>
+    where
+        E: From<InternalError>,
+    {
+        // Dispatcher is resolved once from the first item; all items in a batch share
+        // the same kind/api_version, so this avoids redundant catalog lookups.
+        // If multi-version batches become supported, resolve per item instead.
+        let maybe_dispatcher = resources.first().and_then(|r| {
+            self.try_resolve_spec_view_dispatcher(&r.item.kind, &r.item.api_version, spec_view_mode)
+        });
+
+        if let Some(d) = maybe_dispatcher {
+            for resource in resources.iter_mut() {
+                let spec = std::mem::replace(&mut resource.item.spec, serde_json::Value::Null);
+                resource.item.spec = d.reveal_spec(spec).map_err(E::from)?;
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn prepare_apply_manifest(
+        &self,
+        request: ApplyManifestRequest,
+    ) -> Result<PreparedApplyManifest, ApplyManifestError> {
+        let manifest = parse_manifest(request.format, &request.manifest)?;
+
+        let target_account = self
+            .resource_account_resolver
+            .resolve_target_account(manifest.metadata.account.as_ref())
+            .await?;
+
+        let dispatcher = get_resource_crud_dispatcher::<ApplyManifestError>(
+            &self.catalog,
+            &manifest.kind,
+            &manifest.api_version,
+        )?;
+
+        let metadata = make_metadata_input(&manifest, &target_account)?;
+        let metadata_warnings = collect_manifest_metadata_warnings(&manifest);
+
+        self.ensure_manifest_uid_is_accessible(
+            &manifest.kind,
+            &manifest.api_version,
+            &target_account.id,
+            manifest.metadata.uid,
+        )
+        .await?;
+
+        Ok(PreparedApplyManifest {
+            dispatcher,
+            uid: manifest.metadata.uid,
+            metadata,
+            metadata_warnings,
+            target_account,
+            spec: manifest.spec,
+        })
+    }
+
     fn try_resolve_spec_view_dispatcher(
         &self,
         kind: &str,
@@ -986,6 +996,17 @@ impl LocalResourceFacadeImpl {
             None
         }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct PreparedApplyManifest {
+    dispatcher: Arc<dyn ResourceCrudDispatcher>,
+    uid: Option<ResourceUID>,
+    metadata: ResourceMetadataInput,
+    metadata_warnings: Vec<ResourceWarning>,
+    target_account: ResolvedAccount,
+    spec: serde_json::Value,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
