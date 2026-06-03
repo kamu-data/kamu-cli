@@ -324,6 +324,8 @@ fn bad_account_problem_error(
     })
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 fn account_name_from_problem(
     value: Option<cynic_api::scalars::AccountName>,
     field: &str,
@@ -335,6 +337,48 @@ fn account_name_from_problem(
                 "Malformed remote bad account problem: missing {field}"
             ))
         })
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(super) fn map_uid_not_found(
+    p: cynic_api::fragments::ResourceUIDNotFoundProblem,
+) -> ResourceLookupProblem {
+    ResourceLookupProblem::UIDNotFound(domain::ResourceUIDNotFoundError(p.uid))
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(super) fn map_name_not_found(
+    p: cynic_api::fragments::ResourceNameNotFoundProblem,
+) -> ResourceLookupProblem {
+    ResourceLookupProblem::NameNotFound(domain::ResourceNameNotFoundError {
+        kind: p.kind,
+        name: p.name,
+    })
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(super) fn map_api_version_mismatch(
+    p: cynic_api::fragments::ResourceApiVersionMismatchProblem,
+) -> ResourceLookupProblem {
+    ResourceLookupProblem::ApiVersionMismatch(domain::ResourceAPIVersionMismatchError {
+        expected_api_version: p.expected_api_version,
+        actual_api_version: p.actual_api_version,
+    })
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(super) fn map_kind_mismatch(
+    p: cynic_api::fragments::ResourceKindMismatchProblem,
+) -> ResourceLookupProblem {
+    ResourceLookupProblem::KindMismatch(ResourceKindMismatchError {
+        uid: p.uid,
+        expected_kind: p.expected_kind,
+        actual_kind: p.actual_kind,
+    })
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -497,33 +541,23 @@ pub(super) fn map_get_resource_outcome(
     use cynic_api::operations::get_resource::ResourceGetOutcome as O;
     match outcome {
         O::Resource(r) => r.try_into().map_err(GetResourceError::Internal),
-        O::ResourceUIDNotFoundProblem(p) => Err(GetResourceError::LookupProblem(
-            ResourceLookupProblem::UIDNotFound(domain::ResourceUIDNotFoundError(p.uid)),
-        )),
-        O::ResourceNameNotFoundProblem(p) => Err(GetResourceError::LookupProblem(
-            ResourceLookupProblem::NameNotFound(domain::ResourceNameNotFoundError {
-                kind: p.kind,
-                name: p.name,
-            }),
-        )),
-        O::ResourceApiVersionMismatchProblem(p) => Err(GetResourceError::LookupProblem(
-            ResourceLookupProblem::ApiVersionMismatch(domain::ResourceAPIVersionMismatchError {
-                expected_api_version: p.expected_api_version,
-                actual_api_version: p.actual_api_version,
-            }),
-        )),
-        O::ResourceKindMismatchProblem(p) => Err(GetResourceError::LookupProblem(
-            ResourceLookupProblem::KindMismatch(ResourceKindMismatchError {
-                uid: p.uid,
-                expected_kind: p.expected_kind,
-                actual_kind: p.actual_kind,
-            }),
-        )),
-        O::ResourceUnsupportedDescriptorProblem(problem) => {
-            Err(unsupported_descriptor_problem_error(problem).into())
+        O::ResourceUIDNotFoundProblem(p) => {
+            Err(GetResourceError::LookupProblem(map_uid_not_found(p)))
         }
-        O::ResourceBadAccountProblem(problem) => Err(GetResourceError::BadAccount(
-            bad_account_problem_error(problem).map_err(GetResourceError::Internal)?,
+        O::ResourceNameNotFoundProblem(p) => {
+            Err(GetResourceError::LookupProblem(map_name_not_found(p)))
+        }
+        O::ResourceApiVersionMismatchProblem(p) => {
+            Err(GetResourceError::LookupProblem(map_api_version_mismatch(p)))
+        }
+        O::ResourceKindMismatchProblem(p) => {
+            Err(GetResourceError::LookupProblem(map_kind_mismatch(p)))
+        }
+        O::ResourceUnsupportedDescriptorProblem(p) => {
+            Err(unsupported_descriptor_problem_error(p).into())
+        }
+        O::ResourceBadAccountProblem(p) => Err(GetResourceError::BadAccount(
+            bad_account_problem_error(p).map_err(GetResourceError::Internal)?,
         )),
         O::Unknown => Err(GetResourceError::Internal(InternalError::new(
             "Remote get returned an unrecognized ResourceGetOutcome variant",
@@ -539,33 +573,23 @@ pub(super) fn map_get_identity_outcome(
     use cynic_api::operations::identity::ResourceGetIdentityOutcome as O;
     match outcome {
         O::ResourceIdentity(i) => Ok(i.into()),
-        O::ResourceUIDNotFoundProblem(p) => Err(GetResourceError::LookupProblem(
-            ResourceLookupProblem::UIDNotFound(domain::ResourceUIDNotFoundError(p.uid)),
-        )),
-        O::ResourceNameNotFoundProblem(p) => Err(GetResourceError::LookupProblem(
-            ResourceLookupProblem::NameNotFound(domain::ResourceNameNotFoundError {
-                kind: p.kind,
-                name: p.name,
-            }),
-        )),
-        O::ResourceApiVersionMismatchProblem(p) => Err(GetResourceError::LookupProblem(
-            ResourceLookupProblem::ApiVersionMismatch(domain::ResourceAPIVersionMismatchError {
-                expected_api_version: p.expected_api_version,
-                actual_api_version: p.actual_api_version,
-            }),
-        )),
-        O::ResourceKindMismatchProblem(p) => Err(GetResourceError::LookupProblem(
-            ResourceLookupProblem::KindMismatch(ResourceKindMismatchError {
-                uid: p.uid,
-                expected_kind: p.expected_kind,
-                actual_kind: p.actual_kind,
-            }),
-        )),
-        O::ResourceUnsupportedDescriptorProblem(problem) => {
-            Err(unsupported_descriptor_problem_error(problem).into())
+        O::ResourceUIDNotFoundProblem(p) => {
+            Err(GetResourceError::LookupProblem(map_uid_not_found(p)))
         }
-        O::ResourceBadAccountProblem(problem) => Err(GetResourceError::BadAccount(
-            bad_account_problem_error(problem).map_err(GetResourceError::Internal)?,
+        O::ResourceNameNotFoundProblem(p) => {
+            Err(GetResourceError::LookupProblem(map_name_not_found(p)))
+        }
+        O::ResourceApiVersionMismatchProblem(p) => {
+            Err(GetResourceError::LookupProblem(map_api_version_mismatch(p)))
+        }
+        O::ResourceKindMismatchProblem(p) => {
+            Err(GetResourceError::LookupProblem(map_kind_mismatch(p)))
+        }
+        O::ResourceUnsupportedDescriptorProblem(p) => {
+            Err(unsupported_descriptor_problem_error(p).into())
+        }
+        O::ResourceBadAccountProblem(p) => Err(GetResourceError::BadAccount(
+            bad_account_problem_error(p).map_err(GetResourceError::Internal)?,
         )),
         O::Unknown => Err(GetResourceError::Internal(InternalError::new(
             "Remote get_identity returned an unrecognized ResourceGetIdentityOutcome variant",
@@ -581,32 +605,22 @@ pub(super) fn map_delete_outcome(
     use cynic_api::operations::delete::ResourceDeleteOutcome as O;
     match outcome {
         O::ResourceDeleteSuccess(s) => Ok(s.resource_id),
-        O::ResourceUIDNotFoundProblem(p) => Err(DeleteResourceError::LookupProblem(
-            ResourceLookupProblem::UIDNotFound(domain::ResourceUIDNotFoundError(p.uid)),
-        )),
-        O::ResourceNameNotFoundProblem(p) => Err(DeleteResourceError::LookupProblem(
-            ResourceLookupProblem::NameNotFound(domain::ResourceNameNotFoundError {
-                kind: p.kind,
-                name: p.name,
-            }),
-        )),
-        O::ResourceApiVersionMismatchProblem(p) => Err(DeleteResourceError::LookupProblem(
-            ResourceLookupProblem::ApiVersionMismatch(domain::ResourceAPIVersionMismatchError {
-                expected_api_version: p.expected_api_version,
-                actual_api_version: p.actual_api_version,
-            }),
-        )),
-        O::ResourceKindMismatchProblem(p) => Err(DeleteResourceError::LookupProblem(
-            ResourceLookupProblem::KindMismatch(ResourceKindMismatchError {
-                uid: p.uid,
-                expected_kind: p.expected_kind,
-                actual_kind: p.actual_kind,
-            }),
-        )),
-        O::ResourceUnsupportedDescriptorProblem(problem) => {
-            Err(unsupported_descriptor_problem_error(problem).into())
+        O::ResourceUIDNotFoundProblem(p) => {
+            Err(DeleteResourceError::LookupProblem(map_uid_not_found(p)))
         }
-        O::ResourceBadAccountProblem(problem) => Err(bad_account_problem_error(problem)
+        O::ResourceNameNotFoundProblem(p) => {
+            Err(DeleteResourceError::LookupProblem(map_name_not_found(p)))
+        }
+        O::ResourceApiVersionMismatchProblem(p) => Err(DeleteResourceError::LookupProblem(
+            map_api_version_mismatch(p),
+        )),
+        O::ResourceKindMismatchProblem(p) => {
+            Err(DeleteResourceError::LookupProblem(map_kind_mismatch(p)))
+        }
+        O::ResourceUnsupportedDescriptorProblem(p) => {
+            Err(unsupported_descriptor_problem_error(p).into())
+        }
+        O::ResourceBadAccountProblem(p) => Err(bad_account_problem_error(p)
             .map_err(DeleteResourceError::Internal)?
             .into()),
         O::Unknown => Err(DeleteResourceError::Internal(InternalError::new(
@@ -795,32 +809,22 @@ pub(super) fn map_render_manifest_outcome(
     match outcome {
         O::ResourceRenderManifestResult(r) => Ok(r.into()),
         O::ResourceUIDNotFoundProblem(p) => Err(RenderResourceManifestError::LookupProblem(
-            ResourceLookupProblem::UIDNotFound(domain::ResourceUIDNotFoundError(p.uid)),
+            map_uid_not_found(p),
         )),
         O::ResourceNameNotFoundProblem(p) => Err(RenderResourceManifestError::LookupProblem(
-            ResourceLookupProblem::NameNotFound(domain::ResourceNameNotFoundError {
-                kind: p.kind,
-                name: p.name,
-            }),
+            map_name_not_found(p),
         )),
         O::ResourceApiVersionMismatchProblem(p) => Err(RenderResourceManifestError::LookupProblem(
-            ResourceLookupProblem::ApiVersionMismatch(domain::ResourceAPIVersionMismatchError {
-                expected_api_version: p.expected_api_version,
-                actual_api_version: p.actual_api_version,
-            }),
+            map_api_version_mismatch(p),
         )),
         O::ResourceKindMismatchProblem(p) => Err(RenderResourceManifestError::LookupProblem(
-            ResourceLookupProblem::KindMismatch(ResourceKindMismatchError {
-                uid: p.uid,
-                expected_kind: p.expected_kind,
-                actual_kind: p.actual_kind,
-            }),
+            map_kind_mismatch(p),
         )),
-        O::ResourceUnsupportedDescriptorProblem(problem) => {
-            Err(unsupported_descriptor_problem_error(problem).into())
+        O::ResourceUnsupportedDescriptorProblem(p) => {
+            Err(unsupported_descriptor_problem_error(p).into())
         }
-        O::ResourceBadAccountProblem(problem) => Err(RenderResourceManifestError::BadAccount(
-            bad_account_problem_error(problem).map_err(RenderResourceManifestError::Internal)?,
+        O::ResourceBadAccountProblem(p) => Err(RenderResourceManifestError::BadAccount(
+            bad_account_problem_error(p).map_err(RenderResourceManifestError::Internal)?,
         )),
         O::Unknown => Err(RenderResourceManifestError::Internal(InternalError::new(
             "Remote render_manifest returned an unrecognized ResourceRenderManifestOutcome variant",

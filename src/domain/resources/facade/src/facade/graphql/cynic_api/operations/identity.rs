@@ -12,8 +12,12 @@ use internal_error::InternalError;
 
 use crate::facade::graphql::cynic_api::fragments::{
     BatchResourceProblem,
+    ResourceApiVersionMismatchProblem,
     ResourceBadAccountProblem,
     ResourceIdentity,
+    ResourceKindMismatchProblem,
+    ResourceNameNotFoundProblem,
+    ResourceUIDNotFoundProblem,
     ResourceUnsupportedDescriptorProblem,
 };
 use crate::facade::graphql::cynic_api::inputs::{
@@ -49,42 +53,14 @@ pub(crate) struct ResourceIdentityResources {
 #[derive(cynic::InlineFragments, Debug, Clone)]
 pub(crate) enum ResourceGetIdentityOutcome {
     ResourceIdentity(ResourceIdentity),
-    ResourceUIDNotFoundProblem(GetIdentityUIDNotFoundProblem),
-    ResourceNameNotFoundProblem(GetIdentityNameNotFoundProblem),
-    ResourceApiVersionMismatchProblem(GetIdentityApiVersionMismatchProblem),
-    ResourceKindMismatchProblem(GetIdentityKindMismatchProblem),
+    ResourceUIDNotFoundProblem(ResourceUIDNotFoundProblem),
+    ResourceNameNotFoundProblem(ResourceNameNotFoundProblem),
+    ResourceApiVersionMismatchProblem(ResourceApiVersionMismatchProblem),
+    ResourceKindMismatchProblem(ResourceKindMismatchProblem),
     ResourceUnsupportedDescriptorProblem(ResourceUnsupportedDescriptorProblem),
     ResourceBadAccountProblem(ResourceBadAccountProblem),
     #[cynic(fallback)]
     Unknown,
-}
-
-#[derive(cynic::QueryFragment, Debug, Clone)]
-#[cynic(graphql_type = "ResourceUIDNotFoundProblem")]
-pub(crate) struct GetIdentityUIDNotFoundProblem {
-    pub uid: kamu_resources::ResourceUID,
-}
-
-#[derive(cynic::QueryFragment, Debug, Clone)]
-#[cynic(graphql_type = "ResourceNameNotFoundProblem")]
-pub(crate) struct GetIdentityNameNotFoundProblem {
-    pub kind: String,
-    pub name: String,
-}
-
-#[derive(cynic::QueryFragment, Debug, Clone)]
-#[cynic(graphql_type = "ResourceApiVersionMismatchProblem")]
-pub(crate) struct GetIdentityApiVersionMismatchProblem {
-    pub expected_api_version: String,
-    pub actual_api_version: String,
-}
-
-#[derive(cynic::QueryFragment, Debug, Clone)]
-#[cynic(graphql_type = "ResourceKindMismatchProblem")]
-pub(crate) struct GetIdentityKindMismatchProblem {
-    pub uid: kamu_resources::ResourceUID,
-    pub expected_kind: String,
-    pub actual_kind: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

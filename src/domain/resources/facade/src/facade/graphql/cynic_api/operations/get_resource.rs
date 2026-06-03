@@ -12,7 +12,11 @@ use internal_error::InternalError;
 
 use crate::facade::graphql::cynic_api::fragments::{
     Resource,
+    ResourceApiVersionMismatchProblem,
     ResourceBadAccountProblem,
+    ResourceKindMismatchProblem,
+    ResourceNameNotFoundProblem,
+    ResourceUIDNotFoundProblem,
     ResourceUnsupportedDescriptorProblem,
 };
 use crate::facade::graphql::cynic_api::inputs::ResourceSelectorInput;
@@ -39,42 +43,14 @@ pub(crate) struct GetResourceResources {
 #[derive(cynic::InlineFragments, Debug, Clone)]
 pub(crate) enum ResourceGetOutcome {
     Resource(Resource),
-    ResourceUIDNotFoundProblem(GetResourceUIDNotFoundProblem),
-    ResourceNameNotFoundProblem(GetResourceNameNotFoundProblem),
-    ResourceApiVersionMismatchProblem(GetResourceApiVersionMismatchProblem),
-    ResourceKindMismatchProblem(GetResourceKindMismatchProblem),
+    ResourceUIDNotFoundProblem(ResourceUIDNotFoundProblem),
+    ResourceNameNotFoundProblem(ResourceNameNotFoundProblem),
+    ResourceApiVersionMismatchProblem(ResourceApiVersionMismatchProblem),
+    ResourceKindMismatchProblem(ResourceKindMismatchProblem),
     ResourceUnsupportedDescriptorProblem(ResourceUnsupportedDescriptorProblem),
     ResourceBadAccountProblem(ResourceBadAccountProblem),
     #[cynic(fallback)]
     Unknown,
-}
-
-#[derive(cynic::QueryFragment, Debug, Clone)]
-#[cynic(graphql_type = "ResourceUIDNotFoundProblem")]
-pub(crate) struct GetResourceUIDNotFoundProblem {
-    pub uid: kamu_resources::ResourceUID,
-}
-
-#[derive(cynic::QueryFragment, Debug, Clone)]
-#[cynic(graphql_type = "ResourceNameNotFoundProblem")]
-pub(crate) struct GetResourceNameNotFoundProblem {
-    pub kind: String,
-    pub name: String,
-}
-
-#[derive(cynic::QueryFragment, Debug, Clone)]
-#[cynic(graphql_type = "ResourceApiVersionMismatchProblem")]
-pub(crate) struct GetResourceApiVersionMismatchProblem {
-    pub expected_api_version: String,
-    pub actual_api_version: String,
-}
-
-#[derive(cynic::QueryFragment, Debug, Clone)]
-#[cynic(graphql_type = "ResourceKindMismatchProblem")]
-pub(crate) struct GetResourceKindMismatchProblem {
-    pub uid: kamu_resources::ResourceUID,
-    pub expected_kind: String,
-    pub actual_kind: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

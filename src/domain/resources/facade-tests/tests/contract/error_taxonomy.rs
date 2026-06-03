@@ -7,23 +7,31 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-//! Error consistency tests (RF-140..141).
+//! Error consistency tests (RF-140..142..143).
 //!
-//! Validates that equivalent lookup failures produce equivalent
-//! `ResourceLookupProblem` variants across all single-resource APIs (RF-140)
-//! and batch APIs (RF-141).
+//! RF-140: equivalent lookup failures produce equivalent
+//! `ResourceLookupProblem` variants across all single-resource APIs.
+//! RF-141: batch APIs mirror the same per-item problem taxonomy.
+//! RF-142: bad-account errors are returned as typed outcomes from every
+//! account-accepting API (not demoted to internal errors).
 
-use kamu_resources::ApplyResourceOutcome;
+use database_common::PaginationOpts;
+use kamu_resources::{ApplyResourceOutcome, ResourceManifestAccount};
 use kamu_resources_facade::{
     ApplyManifestRequest,
+    BatchResourceError,
     DeleteResourceError,
     GetResourceError,
+    ListAllResourcesRequest,
+    ListResourcesRequest,
     RenderResourceManifestError,
     ResourceBatchSelector,
     ResourceLookupProblem,
     ResourceManifestFormat,
     ResourceRef,
     ResourceSelector,
+    ResourcesSummaryError,
+    ResourcesSummaryRequest,
     SpecViewMode,
 };
 
@@ -423,6 +431,145 @@ pub async fn test_apply_rejection_taxonomy(h: &impl FacadeContractHarness) {
         ),
         "apply: expected Err(InvalidSpec), got: {apply_result:?}"
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-142: bad-account errors surface as typed `BadAccount` outcomes from every
+// account-accepting API — not as internal errors. This test is specifically
+// designed to catch GraphQL schema gaps like the single-delete case where
+// `ResourceBadAccountProblem` was missing from `ResourceDeleteOutcome`.
+contract_test!(bad_account_taxonomy, super::test_bad_account_taxonomy);
+
+pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
+    let facade = h.facade_for(TestAccount::Alice);
+
+    let unknown_account = ResourceManifestAccount {
+        name: Some("unknown-resource-contract-account".to_string()),
+        id: None,
+    };
+
+    // --- get ---
+    let result = facade
+        .get(
+            ResourceSelector {
+                account: Some(unknown_account.clone()),
+                kind: VARIABLE_SET_KIND.to_string(),
+                api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
+                resource_ref: ResourceRef::ByName("bad-acct-get".to_string()),
+            },
+            SpecViewMode::Encrypted,
+        )
+        .await;
+    assert!(
+        matches!(result, Err(GetResourceError::BadAccount(_))),
+        "get: expected BadAccount, got {result:?}"
+    );
+
+    // --- get_many ---
+    let result = facade
+        .get_many(
+            ResourceBatchSelector {
+                account: Some(unknown_account.clone()),
+                kind: VARIABLE_SET_KIND.to_string(),
+                api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
+                resource_refs: vec![ResourceRef::ByName("bad-acct-get-many".to_string())],
+            },
+            SpecViewMode::Encrypted,
+        )
+        .await;
+    assert!(
+        matches!(result, Err(BatchResourceError::BadAccount(_))),
+        "get_many: expected BadAccount, got {result:?}"
+    );
+
+    // --- render_manifest ---
+    let result = facade
+        .render_manifest(
+            ResourceSelector {
+                account: Some(unknown_account.clone()),
+                kind: VARIABLE_SET_KIND.to_string(),
+                api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
+                resource_ref: ResourceRef::ByName("bad-acct-render".to_string()),
+            },
+            ResourceManifestFormat::Json,
+            SpecViewMode::Encrypted,
+        )
+        .await;
+    assert!(
+        matches!(result, Err(RenderResourceManifestError::BadAccount(_))),
+        "render_manifest: expected BadAccount, got {result:?}"
+    );
+
+    // --- delete ---
+    let result = facade
+        .delete(ResourceSelector {
+            account: Some(unknown_account.clone()),
+            kind: VARIABLE_SET_KIND.to_string(),
+            api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
+            resource_ref: ResourceRef::ByName("bad-acct-delete".to_string()),
+        })
+        .await;
+    assert!(
+        matches!(result, Err(DeleteResourceError::BadAccount(_))),
+        "delete: expected BadAccount, got {result:?}"
+    );
+
+    // --- delete_many ---
+    let result = facade
+        .delete_many(ResourceBatchSelector {
+            account: Some(unknown_account.clone()),
+            kind: VARIABLE_SET_KIND.to_string(),
+            api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
+            resource_refs: vec![ResourceRef::ByName("bad-acct-delete-many".to_string())],
+        })
+        .await;
+    assert!(
+        matches!(result, Err(BatchResourceError::BadAccount(_))),
+        "delete_many: expected BadAccount, got {result:?}"
+    );
+
+    // --- list ---
+    let result = facade
+        .list(ListResourcesRequest {
+            account: Some(unknown_account.clone()),
+            kind: VARIABLE_SET_KIND.to_string(),
+            pagination: PaginationOpts::from_max_results(1),
+        })
+        .await;
+    assert!(
+        result.is_err(),
+        "list: expected error for unknown account, got {result:?}"
+    );
+
+    // --- list_all ---
+    let result = facade
+        .list_all(ListAllResourcesRequest {
+            account: Some(unknown_account.clone()),
+            pagination: PaginationOpts::from_max_results(1),
+        })
+        .await;
+    assert!(
+        result.is_err(),
+        "list_all: expected error for unknown account, got {result:?}"
+    );
+
+    // --- summary ---
+    let result = facade
+        .summary(ResourcesSummaryRequest {
+            account: Some(unknown_account.clone()),
+        })
+        .await;
+    assert!(
+        matches!(result, Err(ResourcesSummaryError::BadAccount(_))),
+        "summary: expected BadAccount, got {result:?}"
+    );
+
+    // apply_manifest bad-account is intentionally excluded here: the remote
+    // facade currently maps it to Internal because ResourceApplyError is a
+    // lossy {code, message} shape. Fix is tracked under the GraphQL
+    // simplification plan step 5 (replace lossy apply errors with typed
+    // problem objects).
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

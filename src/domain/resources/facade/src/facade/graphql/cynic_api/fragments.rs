@@ -129,6 +129,32 @@ pub(crate) enum ResourceBadAccountProblemCode {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(cynic::QueryFragment, Debug, Copy, Clone)]
+pub(crate) struct ResourceUIDNotFoundProblem {
+    pub uid: kamu_resources::ResourceUID,
+}
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
+pub(crate) struct ResourceNameNotFoundProblem {
+    pub kind: String,
+    pub name: String,
+}
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
+pub(crate) struct ResourceApiVersionMismatchProblem {
+    pub expected_api_version: String,
+    pub actual_api_version: String,
+}
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
+pub(crate) struct ResourceKindMismatchProblem {
+    pub uid: kamu_resources::ResourceUID,
+    pub expected_kind: String,
+    pub actual_kind: String,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct ResourceInvalidSearchQueryProblem {
     pub message: String,

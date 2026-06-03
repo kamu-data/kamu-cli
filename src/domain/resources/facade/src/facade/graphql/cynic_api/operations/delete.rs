@@ -11,7 +11,11 @@ use cynic::MutationBuilder;
 
 use crate::facade::graphql::cynic_api::fragments::{
     BatchResourceProblem,
+    ResourceApiVersionMismatchProblem,
     ResourceBadAccountProblem,
+    ResourceKindMismatchProblem,
+    ResourceNameNotFoundProblem,
+    ResourceUIDNotFoundProblem,
     ResourceUnsupportedDescriptorProblem,
 };
 use crate::facade::graphql::cynic_api::inputs::{
@@ -77,30 +81,6 @@ pub(crate) enum ResourceDeleteOutcome {
 #[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct ResourceDeleteSuccess {
     pub resource_id: kamu_resources::ResourceUID,
-}
-
-#[derive(cynic::QueryFragment, Debug, Clone)]
-pub(crate) struct ResourceUIDNotFoundProblem {
-    pub uid: kamu_resources::ResourceUID,
-}
-
-#[derive(cynic::QueryFragment, Debug, Clone)]
-pub(crate) struct ResourceNameNotFoundProblem {
-    pub kind: String,
-    pub name: String,
-}
-
-#[derive(cynic::QueryFragment, Debug, Clone)]
-pub(crate) struct ResourceApiVersionMismatchProblem {
-    pub expected_api_version: String,
-    pub actual_api_version: String,
-}
-
-#[derive(cynic::QueryFragment, Debug, Clone)]
-pub(crate) struct ResourceKindMismatchProblem {
-    pub uid: kamu_resources::ResourceUID,
-    pub expected_kind: String,
-    pub actual_kind: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
