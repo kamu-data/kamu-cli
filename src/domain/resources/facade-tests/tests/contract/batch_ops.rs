@@ -19,7 +19,7 @@ use kamu_resources_facade::{
     ResourceSelector,
     SpecViewMode,
 };
-use pretty_assertions::assert_eq;
+use pretty_assertions::{assert_eq, assert_matches};
 
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
@@ -291,14 +291,8 @@ pub async fn test_get_identities_mirrors_get_many(h: &impl FacadeContractHarness
         .map(|p| (p.request_index, &p.error))
         .collect();
 
-    assert!(matches!(
-        problem_by_index[&1],
-        ResourceLookupProblem::NameNotFound(_)
-    ));
-    assert!(matches!(
-        problem_by_index[&2],
-        ResourceLookupProblem::UIDNotFound(_)
-    ));
+    assert_matches!(problem_by_index[&1], ResourceLookupProblem::NameNotFound(_));
+    assert_matches!(problem_by_index[&2], ResourceLookupProblem::UIDNotFound(_));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -404,14 +398,8 @@ pub async fn test_render_manifests_mixed_successes_problems(h: &impl FacadeContr
         .map(|p| (p.request_index, &p.error))
         .collect();
 
-    assert!(matches!(
-        problem_by_index[&1],
-        ResourceLookupProblem::NameNotFound(_)
-    ));
-    assert!(matches!(
-        problem_by_index[&2],
-        ResourceLookupProblem::UIDNotFound(_)
-    ));
+    assert_matches!(problem_by_index[&1], ResourceLookupProblem::NameNotFound(_));
+    assert_matches!(problem_by_index[&2], ResourceLookupProblem::UIDNotFound(_));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

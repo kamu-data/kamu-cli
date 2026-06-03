@@ -14,7 +14,7 @@ use kamu_resources_facade::{
     ListResourcesRequest,
     SearchResourceIdentitiesRequest,
 };
-use pretty_assertions::assert_eq;
+use pretty_assertions::{assert_eq, assert_matches};
 
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
@@ -495,10 +495,7 @@ pub async fn test_search_empty_criteria_returns_error(h: &impl FacadeContractHar
         })
         .await;
 
-    assert!(matches!(
-        result,
-        Err(ListResourcesError::InvalidSearchQuery(_))
-    ));
+    assert_matches!(result, Err(ListResourcesError::InvalidSearchQuery(_)));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

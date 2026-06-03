@@ -10,11 +10,14 @@
 use database_common::PaginationOpts;
 use kamu_resources::{ResourceManifestAccount, ResourceUID};
 use kamu_resources_facade::{
+    ApplyManifestError,
     ApplyManifestRequest,
     GetResourceError,
     ListAllResourceIdentitiesRequest,
+    ListAllResourcesError,
     ListAllResourcesRequest,
     ListResourceIdentitiesRequest,
+    ListResourcesError,
     ListResourcesRequest,
     ResourceBatchSelector,
     ResourceManifestFormat,
@@ -267,7 +270,10 @@ pub async fn test_account_name_id_mismatch_is_rejected(h: &impl FacadeContractHa
             manifest,
         })
         .await;
-    assert!(apply_result.is_err(), "mismatched account must be rejected");
+    assert!(
+        matches!(apply_result, Err(ApplyManifestError::BadAccount(_))),
+        "mismatched account must be rejected with BadAccount, got: {apply_result:?}"
+    );
 
     let get_result = h
         .facade_for(TestAccount::Alice)
@@ -318,8 +324,14 @@ pub async fn test_unknown_account_is_rejected(h: &impl FacadeContractHarness) {
         })
         .await;
 
-    assert!(by_name.is_err(), "unknown account name must be rejected");
-    assert!(by_id.is_err(), "unknown account id must be rejected");
+    assert!(
+        matches!(by_name, Err(ListResourcesError::BadAccount(_))),
+        "unknown account name must be rejected with BadAccount, got: {by_name:?}"
+    );
+    assert!(
+        matches!(by_id, Err(ListAllResourcesError::BadAccount(_))),
+        "unknown account id must be rejected with BadAccount, got: {by_id:?}"
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

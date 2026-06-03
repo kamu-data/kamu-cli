@@ -86,10 +86,7 @@ pub async fn test_summary_counts_resources(h: &impl FacadeContractHarness) {
         .map(|r| r.total_count)
         .expect("VariableSet kind must appear in summary");
 
-    assert!(
-        alice_vs_count >= 2,
-        "Alice must have at least 2 VariableSets"
-    );
+    assert_eq!(alice_vs_count, 2, "Alice must have exactly 2 VariableSets");
 
     // Bob's resources must not appear in Alice's summary
     let bob_facade = h.facade_for(TestAccount::Bob);
@@ -105,9 +102,7 @@ pub async fn test_summary_counts_resources(h: &impl FacadeContractHarness) {
         .map(|r| r.total_count)
         .unwrap_or(0);
 
-    assert!(bob_vs_count >= 1, "Bob must have at least 1 VariableSet");
-    // Cross-check: counts are independent
-    assert_ne!(alice_vs_count, 0, "alice count must be non-zero");
+    assert_eq!(bob_vs_count, 1, "Bob must have exactly 1 VariableSet");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -153,17 +148,8 @@ pub async fn test_summary_account_scoping(h: &impl FacadeContractHarness) {
         .map(|r| r.total_count)
         .unwrap_or(0);
 
-    assert!(alice_vs >= 1, "Alice must see her own resource in summary");
-    assert!(bob_vs >= 1, "Bob must see his own resource in summary");
-
-    // Alice's summary must not include Bob's resource names or vice-versa.
-    // Since each account has a unique resource created in this test and fresh
-    // accounts start empty, the counts must differ (Alice has at least one more
-    // or fewer than Bob, depending on prior state — but neither count can be
-    // 0). The strong isolation invariant is that Bob's summary never
-    // reflects Alice's resources: verified by the independent non-zero
-    // counts above and the fact that both facades use separate account
-    // contexts.
+    assert_eq!(alice_vs, 1, "Alice must have exactly 1 VariableSet");
+    assert_eq!(bob_vs, 1, "Bob must have exactly 1 VariableSet");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

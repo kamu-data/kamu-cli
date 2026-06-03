@@ -23,7 +23,9 @@ use kamu_resources_facade::{
     BatchResourceError,
     DeleteResourceError,
     GetResourceError,
+    ListAllResourcesError,
     ListAllResourcesRequest,
+    ListResourcesError,
     ListResourcesRequest,
     RenderResourceManifestError,
     ResourceBatchSelector,
@@ -35,6 +37,7 @@ use kamu_resources_facade::{
     ResourcesSummaryRequest,
     SpecViewMode,
 };
+use pretty_assertions::assert_matches;
 
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
@@ -120,25 +123,21 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
     let get = facade
         .get(by_name(missing_name), SpecViewMode::Encrypted)
         .await;
-    assert!(
-        matches!(
-            get,
-            Err(GetResourceError::LookupProblem(
-                ResourceLookupProblem::NameNotFound(_)
-            ))
-        ),
-        "get: expected NameNotFound, got {get:?}"
+    assert_matches!(
+        get,
+        Err(GetResourceError::LookupProblem(
+            ResourceLookupProblem::NameNotFound(_)
+        )),
+        "get: expected NameNotFound"
     );
 
     let get_id = facade.get_identity(by_name(missing_name)).await;
-    assert!(
-        matches!(
-            get_id,
-            Err(GetResourceError::LookupProblem(
-                ResourceLookupProblem::NameNotFound(_)
-            ))
-        ),
-        "get_identity: expected NameNotFound, got {get_id:?}"
+    assert_matches!(
+        get_id,
+        Err(GetResourceError::LookupProblem(
+            ResourceLookupProblem::NameNotFound(_)
+        )),
+        "get_identity: expected NameNotFound"
     );
 
     let render = facade
@@ -148,50 +147,42 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
             SpecViewMode::Encrypted,
         )
         .await;
-    assert!(
-        matches!(
-            render,
-            Err(RenderResourceManifestError::LookupProblem(
-                ResourceLookupProblem::NameNotFound(_)
-            ))
-        ),
-        "render_manifest: expected NameNotFound, got {render:?}"
+    assert_matches!(
+        render,
+        Err(RenderResourceManifestError::LookupProblem(
+            ResourceLookupProblem::NameNotFound(_)
+        )),
+        "render_manifest: expected NameNotFound"
     );
 
     let del = facade.delete(by_name(missing_name)).await;
-    assert!(
-        matches!(
-            del,
-            Err(DeleteResourceError::LookupProblem(
-                ResourceLookupProblem::NameNotFound(_)
-            ))
-        ),
-        "delete: expected NameNotFound, got {del:?}"
+    assert_matches!(
+        del,
+        Err(DeleteResourceError::LookupProblem(
+            ResourceLookupProblem::NameNotFound(_)
+        )),
+        "delete: expected NameNotFound"
     );
 
     // --- UIDNotFound ---
     let get = facade
         .get(by_id(&absent_uid), SpecViewMode::Encrypted)
         .await;
-    assert!(
-        matches!(
-            get,
-            Err(GetResourceError::LookupProblem(
-                ResourceLookupProblem::UIDNotFound(_)
-            ))
-        ),
-        "get: expected UIDNotFound, got {get:?}"
+    assert_matches!(
+        get,
+        Err(GetResourceError::LookupProblem(
+            ResourceLookupProblem::UIDNotFound(_)
+        )),
+        "get: expected UIDNotFound"
     );
 
     let get_id = facade.get_identity(by_id(&absent_uid)).await;
-    assert!(
-        matches!(
-            get_id,
-            Err(GetResourceError::LookupProblem(
-                ResourceLookupProblem::UIDNotFound(_)
-            ))
-        ),
-        "get_identity: expected UIDNotFound, got {get_id:?}"
+    assert_matches!(
+        get_id,
+        Err(GetResourceError::LookupProblem(
+            ResourceLookupProblem::UIDNotFound(_)
+        )),
+        "get_identity: expected UIDNotFound"
     );
 
     let render = facade
@@ -201,25 +192,21 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
             SpecViewMode::Encrypted,
         )
         .await;
-    assert!(
-        matches!(
-            render,
-            Err(RenderResourceManifestError::LookupProblem(
-                ResourceLookupProblem::UIDNotFound(_)
-            ))
-        ),
-        "render_manifest: expected UIDNotFound, got {render:?}"
+    assert_matches!(
+        render,
+        Err(RenderResourceManifestError::LookupProblem(
+            ResourceLookupProblem::UIDNotFound(_)
+        )),
+        "render_manifest: expected UIDNotFound"
     );
 
     let del = facade.delete(by_id(&absent_uid)).await;
-    assert!(
-        matches!(
-            del,
-            Err(DeleteResourceError::LookupProblem(
-                ResourceLookupProblem::UIDNotFound(_)
-            ))
-        ),
-        "delete: expected UIDNotFound, got {del:?}"
+    assert_matches!(
+        del,
+        Err(DeleteResourceError::LookupProblem(
+            ResourceLookupProblem::UIDNotFound(_)
+        )),
+        "delete: expected UIDNotFound"
     );
 
     // --- ApiVersionMismatch ---
@@ -233,25 +220,21 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
     let get = facade
         .get(wrong_version.clone(), SpecViewMode::Encrypted)
         .await;
-    assert!(
-        matches!(
-            get,
-            Err(GetResourceError::LookupProblem(
-                ResourceLookupProblem::ApiVersionMismatch(_)
-            ))
-        ),
-        "get: expected ApiVersionMismatch, got {get:?}"
+    assert_matches!(
+        get,
+        Err(GetResourceError::LookupProblem(
+            ResourceLookupProblem::ApiVersionMismatch(_)
+        )),
+        "get: expected ApiVersionMismatch"
     );
 
     let get_id = facade.get_identity(wrong_version.clone()).await;
-    assert!(
-        matches!(
-            get_id,
-            Err(GetResourceError::LookupProblem(
-                ResourceLookupProblem::ApiVersionMismatch(_)
-            ))
-        ),
-        "get_identity: expected ApiVersionMismatch, got {get_id:?}"
+    assert_matches!(
+        get_id,
+        Err(GetResourceError::LookupProblem(
+            ResourceLookupProblem::ApiVersionMismatch(_)
+        )),
+        "get_identity: expected ApiVersionMismatch"
     );
 
     let render = facade
@@ -261,25 +244,21 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
             SpecViewMode::Encrypted,
         )
         .await;
-    assert!(
-        matches!(
-            render,
-            Err(RenderResourceManifestError::LookupProblem(
-                ResourceLookupProblem::ApiVersionMismatch(_)
-            ))
-        ),
-        "render_manifest: expected ApiVersionMismatch, got {render:?}"
+    assert_matches!(
+        render,
+        Err(RenderResourceManifestError::LookupProblem(
+            ResourceLookupProblem::ApiVersionMismatch(_)
+        )),
+        "render_manifest: expected ApiVersionMismatch"
     );
 
     let del = facade.delete(wrong_version).await;
-    assert!(
-        matches!(
-            del,
-            Err(DeleteResourceError::LookupProblem(
-                ResourceLookupProblem::ApiVersionMismatch(_)
-            ))
-        ),
-        "delete: expected ApiVersionMismatch, got {del:?}"
+    assert_matches!(
+        del,
+        Err(DeleteResourceError::LookupProblem(
+            ResourceLookupProblem::ApiVersionMismatch(_)
+        )),
+        "delete: expected ApiVersionMismatch"
     );
 }
 
@@ -301,13 +280,10 @@ pub async fn test_batch_lookup_taxonomy(h: &impl FacadeContractHarness) {
         .await
         .unwrap();
     assert_eq!(resp.problems.len(), 1);
-    assert!(
-        matches!(
-            &resp.problems[0].error,
-            ResourceLookupProblem::NameNotFound(_)
-        ),
-        "get_many: expected NameNotFound problem, got {:?}",
-        resp.problems[0].error
+    assert_matches!(
+        &resp.problems[0].error,
+        ResourceLookupProblem::NameNotFound(_),
+        "get_many: expected NameNotFound problem"
     );
 
     // --- UIDNotFound in get_many ---
@@ -316,13 +292,10 @@ pub async fn test_batch_lookup_taxonomy(h: &impl FacadeContractHarness) {
         .await
         .unwrap();
     assert_eq!(resp.problems.len(), 1);
-    assert!(
-        matches!(
-            &resp.problems[0].error,
-            ResourceLookupProblem::UIDNotFound(_)
-        ),
-        "get_many: expected UIDNotFound problem, got {:?}",
-        resp.problems[0].error
+    assert_matches!(
+        &resp.problems[0].error,
+        ResourceLookupProblem::UIDNotFound(_),
+        "get_many: expected UIDNotFound problem"
     );
 
     // --- NameNotFound in get_identities ---
@@ -331,13 +304,10 @@ pub async fn test_batch_lookup_taxonomy(h: &impl FacadeContractHarness) {
         .await
         .unwrap();
     assert_eq!(resp.problems.len(), 1);
-    assert!(
-        matches!(
-            &resp.problems[0].error,
-            ResourceLookupProblem::NameNotFound(_)
-        ),
-        "get_identities: expected NameNotFound problem, got {:?}",
-        resp.problems[0].error
+    assert_matches!(
+        &resp.problems[0].error,
+        ResourceLookupProblem::NameNotFound(_),
+        "get_identities: expected NameNotFound problem"
     );
 
     // --- NameNotFound in render_manifests ---
@@ -350,13 +320,10 @@ pub async fn test_batch_lookup_taxonomy(h: &impl FacadeContractHarness) {
         .await
         .unwrap();
     assert_eq!(resp.problems.len(), 1);
-    assert!(
-        matches!(
-            &resp.problems[0].error,
-            ResourceLookupProblem::NameNotFound(_)
-        ),
-        "render_manifests: expected NameNotFound problem, got {:?}",
-        resp.problems[0].error
+    assert_matches!(
+        &resp.problems[0].error,
+        ResourceLookupProblem::NameNotFound(_),
+        "render_manifests: expected NameNotFound problem"
     );
 
     // --- NameNotFound in delete_many ---
@@ -365,13 +332,10 @@ pub async fn test_batch_lookup_taxonomy(h: &impl FacadeContractHarness) {
         .await
         .unwrap();
     assert_eq!(resp.problems.len(), 1);
-    assert!(
-        matches!(
-            &resp.problems[0].error,
-            ResourceLookupProblem::NameNotFound(_)
-        ),
-        "delete_many: expected NameNotFound problem, got {:?}",
-        resp.problems[0].error
+    assert_matches!(
+        &resp.problems[0].error,
+        ResourceLookupProblem::NameNotFound(_),
+        "delete_many: expected NameNotFound problem"
     );
 }
 
@@ -403,9 +367,10 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
             SpecViewMode::Encrypted,
         )
         .await;
-    assert!(
-        matches!(result, Err(GetResourceError::BadAccount(_))),
-        "get: expected BadAccount, got {result:?}"
+    assert_matches!(
+        result,
+        Err(GetResourceError::BadAccount(_)),
+        "get: expected BadAccount"
     );
 
     // --- get_many ---
@@ -420,9 +385,10 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
             SpecViewMode::Encrypted,
         )
         .await;
-    assert!(
-        matches!(result, Err(BatchResourceError::BadAccount(_))),
-        "get_many: expected BadAccount, got {result:?}"
+    assert_matches!(
+        result,
+        Err(BatchResourceError::BadAccount(_)),
+        "get_many: expected BadAccount"
     );
 
     // --- render_manifest ---
@@ -438,9 +404,10 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
             SpecViewMode::Encrypted,
         )
         .await;
-    assert!(
-        matches!(result, Err(RenderResourceManifestError::BadAccount(_))),
-        "render_manifest: expected BadAccount, got {result:?}"
+    assert_matches!(
+        result,
+        Err(RenderResourceManifestError::BadAccount(_)),
+        "render_manifest: expected BadAccount"
     );
 
     // --- delete ---
@@ -452,9 +419,10 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
             resource_ref: ResourceRef::ByName("bad-acct-delete".to_string()),
         })
         .await;
-    assert!(
-        matches!(result, Err(DeleteResourceError::BadAccount(_))),
-        "delete: expected BadAccount, got {result:?}"
+    assert_matches!(
+        result,
+        Err(DeleteResourceError::BadAccount(_)),
+        "delete: expected BadAccount"
     );
 
     // --- delete_many ---
@@ -466,9 +434,10 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
             resource_refs: vec![ResourceRef::ByName("bad-acct-delete-many".to_string())],
         })
         .await;
-    assert!(
-        matches!(result, Err(BatchResourceError::BadAccount(_))),
-        "delete_many: expected BadAccount, got {result:?}"
+    assert_matches!(
+        result,
+        Err(BatchResourceError::BadAccount(_)),
+        "delete_many: expected BadAccount"
     );
 
     // --- list ---
@@ -479,9 +448,10 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
             pagination: PaginationOpts::from_max_results(1),
         })
         .await;
-    assert!(
-        result.is_err(),
-        "list: expected error for unknown account, got {result:?}"
+    assert_matches!(
+        result,
+        Err(ListResourcesError::BadAccount(_)),
+        "list: expected BadAccount"
     );
 
     // --- list_all ---
@@ -491,9 +461,10 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
             pagination: PaginationOpts::from_max_results(1),
         })
         .await;
-    assert!(
-        result.is_err(),
-        "list_all: expected error for unknown account, got {result:?}"
+    assert_matches!(
+        result,
+        Err(ListAllResourcesError::BadAccount(_)),
+        "list_all: expected BadAccount"
     );
 
     // --- summary ---
@@ -502,9 +473,10 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
             account: Some(unknown_account.clone()),
         })
         .await;
-    assert!(
-        matches!(result, Err(ResourcesSummaryError::BadAccount(_))),
-        "summary: expected BadAccount, got {result:?}"
+    assert_matches!(
+        result,
+        Err(ResourcesSummaryError::BadAccount(_)),
+        "summary: expected BadAccount"
     );
 
     // --- apply_manifest ---
@@ -523,9 +495,10 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
             .to_string(),
         })
         .await;
-    assert!(
-        matches!(result, Err(ApplyManifestError::BadAccount(_))),
-        "apply_manifest: expected BadAccount, got {result:?}"
+    assert_matches!(
+        result,
+        Err(ApplyManifestError::BadAccount(_)),
+        "apply_manifest: expected BadAccount"
     );
 }
 
@@ -573,17 +546,15 @@ pub async fn test_apply_rejection_taxonomy(h: &impl FacadeContractHarness) {
             manifest: empty_vars_manifest.clone(),
         })
         .await;
-    assert!(
-        matches!(
-            plan_result,
-            Ok(ApplyManifestPlanningDecision::Rejected(
-                ApplyManifestRejection {
-                    category: ApplyResourceRejectionCategory::BusinessValidationFailed,
-                    ..
-                }
-            ))
-        ),
-        "plan: expected Ok(Rejected(BusinessValidationFailed)), got: {plan_result:?}"
+    assert_matches!(
+        plan_result,
+        Ok(ApplyManifestPlanningDecision::Rejected(
+            ApplyManifestRejection {
+                category: ApplyResourceRejectionCategory::BusinessValidationFailed,
+                ..
+            }
+        )),
+        "plan: expected Ok(Rejected(BusinessValidationFailed))"
     );
 
     let apply_result = facade
@@ -592,17 +563,15 @@ pub async fn test_apply_rejection_taxonomy(h: &impl FacadeContractHarness) {
             manifest: empty_vars_manifest,
         })
         .await;
-    assert!(
-        matches!(
-            apply_result,
-            Ok(ApplyManifestApplicationDecision::Rejected(
-                ApplyManifestRejection {
-                    category: ApplyResourceRejectionCategory::BusinessValidationFailed,
-                    ..
-                }
-            ))
-        ),
-        "apply: expected Ok(Rejected(BusinessValidationFailed)), got: {apply_result:?}"
+    assert_matches!(
+        apply_result,
+        Ok(ApplyManifestApplicationDecision::Rejected(
+            ApplyManifestRejection {
+                category: ApplyResourceRejectionCategory::BusinessValidationFailed,
+                ..
+            }
+        )),
+        "apply: expected Ok(Rejected(BusinessValidationFailed))"
     );
 }
 

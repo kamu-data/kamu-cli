@@ -32,7 +32,7 @@ use kamu_resources_facade::{
     ResourceSelector,
     SpecViewMode,
 };
-use pretty_assertions::assert_eq;
+use pretty_assertions::{assert_eq, assert_matches};
 
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
@@ -286,7 +286,7 @@ pub async fn test_batch_equivalence(h: &impl FacadeContractHarness) {
         .unwrap();
     assert_batch_indexes(&get_resp, &[0], &[1, 2]);
     assert_eq!(get_resp.successes[0].item.metadata.uid, uid_a);
-    assert!(matches!(
+    assert_matches!(
         &get_resp
             .problems
             .iter()
@@ -294,8 +294,8 @@ pub async fn test_batch_equivalence(h: &impl FacadeContractHarness) {
             .unwrap()
             .error,
         ResourceLookupProblem::NameNotFound(_)
-    ));
-    assert!(matches!(
+    );
+    assert_matches!(
         &get_resp
             .problems
             .iter()
@@ -303,7 +303,7 @@ pub async fn test_batch_equivalence(h: &impl FacadeContractHarness) {
             .unwrap()
             .error,
         ResourceLookupProblem::UIDNotFound(_)
-    ));
+    );
 
     // get_identities
     let id_resp = facade.get_identities(batch_selector.clone()).await.unwrap();
