@@ -38,6 +38,17 @@ pub trait FacadeContractHarness: Send + Sync {
     /// Returns a `ResourceFacade` scoped to the given account.
     fn facade_for(&self, account: TestAccount) -> Arc<dyn ResourceFacade>;
 
+    /// Returns a *local* `ResourceFacade` scoped to the given account.
+    ///
+    /// For the local harness this is identical to `facade_for`.  For the
+    /// remote harness it returns the underlying `LocalResourceFacadeImpl` that
+    /// shares the same in-memory store as the remote facade, enabling
+    /// cross-facade tests that write through one transport and read through
+    /// the other.
+    fn local_facade_for(&self, account: TestAccount) -> Arc<dyn ResourceFacade> {
+        self.facade_for(account)
+    }
+
     /// Returns the stable `AccountID` for the given fixture account.
     fn account_id(&self, account: TestAccount) -> odf::AccountID;
 

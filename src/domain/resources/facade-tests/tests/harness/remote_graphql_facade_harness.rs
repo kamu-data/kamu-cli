@@ -140,6 +140,10 @@ impl FacadeContractHarness for RemoteGraphqlFacadeHarness {
         ))
     }
 
+    fn local_facade_for(&self, account: TestAccount) -> Arc<dyn ResourceFacade> {
+        self.local.facade_for(account)
+    }
+
     fn account_id(&self, account: TestAccount) -> odf::AccountID {
         self.local.account_id(account)
     }

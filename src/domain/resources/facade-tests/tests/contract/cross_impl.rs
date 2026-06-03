@@ -9,14 +9,18 @@
 
 //! Cross-implementation equivalence tests (RF-150..155).
 //!
-//! These tests only make sense when run with the `RemoteGraphqlFacadeHarness`
-//! because they compare the local and remote facades side-by-side.  When run
-//! through the `contract_test!` macro with the `LocalFacadeHarness` the test
-//! simply applies through local and then reads back through local, which is
-//! already covered by the individual contract tests.  For the remote harness,
-//! the facade returned by `facade_for` is the *remote* facade backed by the
-//! shared in-memory storage, so writes through local are visible remotely and
-//! vice-versa.
+//! RF-151 and RF-152 are the core cross-facade tests: they write through one
+//! transport (local or remote) and read back through the other, proving that
+//! both facades operate against the same backing store.
+//!
+//! Each test uses `local_facade_for` for the local path and `facade_for` for
+//! the remote path.  When run against `LocalFacadeHarness` both methods return
+//! the same local facade, so the tests reduce to same-store round-trips
+//! (harmless and already covered elsewhere).  The meaningful assertion fires
+//! when the `contract_test!` macro runs the same function against
+//! `RemoteGraphqlFacadeHarness`, where `facade_for` returns the remote GraphQL
+//! facade and `local_facade_for` returns the underlying
+//! `LocalResourceFacadeImpl` that shares the same in-memory store.
 
 use kamu_resources::{ApplyManifestPlanningDecision, ApplyResourceOutcome};
 use kamu_resources_facade::{
@@ -75,34 +79,37 @@ pub async fn test_same_supported_kinds(h: &impl FacadeContractHarness) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// RF-151 / RF-152
-// When this test runs via the local harness, it uses the same storage for both
-// "create" and "read".  When it runs via the remote harness, `facade_for`
-// returns the remote facade, and the underlying store is the shared
-// in-memory store, so the resource is visible through the remote facade too.
+// RF-151: local-created resource is readable remotely.
+//
+// Creates a resource through the *local* facade and reads it back through the
+// *remote* facade.  For the local harness both facades are local, so this
+// reduces to a same-store round-trip (already covered elsewhere).  The
+// interesting case is the remote harness run, where the two facades use
+// different transports but share the same in-memory store.
 contract_test!(
-    resource_readable_after_create,
-    super::test_resource_readable_after_create
+    local_created_readable_remotely,
+    super::test_local_created_readable_remotely
 );
 
-pub async fn test_resource_readable_after_create(h: &impl FacadeContractHarness) {
-    let facade = h.facade_for(TestAccount::Alice);
-    let manifest = variable_set_manifest_json("cross-read-test", None, &[("X", "1")]);
+pub async fn test_local_created_readable_remotely(h: &impl FacadeContractHarness) {
+    let local = h.local_facade_for(TestAccount::Alice);
+    let remote = h.facade_for(TestAccount::Alice);
 
-    // Create through the facade
-    let create_decision = facade
-        .apply_manifest(ApplyManifestRequest {
-            format: ResourceManifestFormat::Json,
-            manifest,
-        })
-        .await
-        .unwrap();
-    let created = assert_applied_outcome(&create_decision, ApplyResourceOutcome::Created);
-    let uid = created.metadata.uid;
+    let uid = {
+        let d = local
+            .apply_manifest(ApplyManifestRequest {
+                format: ResourceManifestFormat::Json,
+                manifest: variable_set_manifest_json("cross-local-to-remote", None, &[("X", "1")]),
+            })
+            .await
+            .unwrap();
+        assert_applied_outcome(&d, ApplyResourceOutcome::Created)
+            .metadata
+            .uid
+    };
 
-    // Read back through the same facade
-    let view = facade
-        .get(by_name("cross-read-test"), SpecViewMode::Encrypted)
+    let view = remote
+        .get(by_name("cross-local-to-remote"), SpecViewMode::Encrypted)
         .await
         .unwrap();
 
@@ -110,7 +117,49 @@ pub async fn test_resource_readable_after_create(h: &impl FacadeContractHarness)
         &view,
         VARIABLE_SET_KIND,
         VARIABLE_SET_API_VERSION,
-        "cross-read-test",
+        "cross-local-to-remote",
+    );
+    assert_eq!(view.metadata.uid, uid);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-152: remote-created resource is readable locally.
+//
+// Mirror of RF-151: creates through the *remote* facade and reads back through
+// the *local* facade.
+contract_test!(
+    remote_created_readable_locally,
+    super::test_remote_created_readable_locally
+);
+
+pub async fn test_remote_created_readable_locally(h: &impl FacadeContractHarness) {
+    let local = h.local_facade_for(TestAccount::Alice);
+    let remote = h.facade_for(TestAccount::Alice);
+
+    let uid = {
+        let d = remote
+            .apply_manifest(ApplyManifestRequest {
+                format: ResourceManifestFormat::Json,
+                manifest: variable_set_manifest_json("cross-remote-to-local", None, &[("X", "1")]),
+            })
+            .await
+            .unwrap();
+        assert_applied_outcome(&d, ApplyResourceOutcome::Created)
+            .metadata
+            .uid
+    };
+
+    let view = local
+        .get(by_name("cross-remote-to-local"), SpecViewMode::Encrypted)
+        .await
+        .unwrap();
+
+    assert_resource_view_fields(
+        &view,
+        VARIABLE_SET_KIND,
+        VARIABLE_SET_API_VERSION,
+        "cross-remote-to-local",
     );
     assert_eq!(view.metadata.uid, uid);
 }
