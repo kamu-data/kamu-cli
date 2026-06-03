@@ -121,10 +121,6 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
         BatchResourceResponse<domain::ResourceView, ResourceLookupProblem>,
         BatchResourceError,
     > {
-        if selector.resource_refs.is_empty() {
-            return Ok(BatchResourceResponse::empty());
-        }
-
         use cynic_api::operations::get_resources as Operation;
 
         let variables = Operation::ResourceBatchSelectorVariables::new(&selector, spec_view_mode)?;
@@ -160,10 +156,6 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
         BatchResourceResponse<domain::ResourceIdentityView, ResourceLookupProblem>,
         BatchResourceError,
     > {
-        if selector.resource_refs.is_empty() {
-            return Ok(BatchResourceResponse::empty());
-        }
-
         use cynic_api::operations::identity as Operation;
 
         let variables = Operation::ResourceIdentityBatchSelectorVariables::new(&selector)?;
@@ -209,10 +201,6 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
         BatchResourceResponse<RenderResourceManifestResult, ResourceLookupProblem>,
         BatchResourceError,
     > {
-        if selector.resource_refs.is_empty() {
-            return Ok(BatchResourceResponse::empty());
-        }
-
         use cynic_api::operations::render_manifest as Operation;
 
         let variables =
@@ -399,10 +387,6 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
         selector: ResourceBatchSelector,
     ) -> Result<BatchResourceResponse<domain::ResourceUID, ResourceLookupProblem>, BatchResourceError>
     {
-        if selector.resource_refs.is_empty() {
-            return Ok(BatchResourceResponse::empty());
-        }
-
         use cynic_api::operations::delete as Operation;
 
         let variables = Operation::DeleteManyVariables {

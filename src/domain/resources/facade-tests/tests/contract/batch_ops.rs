@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources::ApplyResourceOutcome;
+use kamu_resources::{ApplyResourceOutcome, ResourceManifestAccount};
 use kamu_resources_facade::{
     ApplyManifestRequest,
     BatchResourceError,
@@ -212,6 +212,184 @@ pub async fn test_get_many_empty_refs(h: &impl FacadeContractHarness) {
 
     assert!(response.successes.is_empty(), "successes must be empty");
     assert!(response.problems.is_empty(), "problems must be empty");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-053A
+contract_test!(
+    get_many_empty_refs_validates_unsupported_kind,
+    super::test_get_many_empty_refs_validates_unsupported_kind
+);
+
+pub async fn test_get_many_empty_refs_validates_unsupported_kind(h: &impl FacadeContractHarness) {
+    let facade = h.facade_for(TestAccount::Alice);
+
+    let result = facade
+        .get_many(
+            ResourceBatchSelector {
+                account: None,
+                kind: "NoSuchResourceKindXYZ".to_string(),
+                api_version: None,
+                resource_refs: vec![],
+            },
+            SpecViewMode::Encrypted,
+        )
+        .await;
+
+    assert_matches!(
+        result,
+        Err(BatchResourceError::UnsupportedDescriptor(_)),
+        "empty batch with unsupported kind must still be rejected"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-053B
+contract_test!(
+    get_many_empty_refs_validates_bad_account,
+    super::test_get_many_empty_refs_validates_bad_account
+);
+
+pub async fn test_get_many_empty_refs_validates_bad_account(h: &impl FacadeContractHarness) {
+    let facade = h.facade_for(TestAccount::Alice);
+
+    let result = facade
+        .get_many(
+            ResourceBatchSelector {
+                account: Some(ResourceManifestAccount {
+                    name: Some("unknown-resource-contract-account".to_string()),
+                    id: None,
+                }),
+                kind: VARIABLE_SET_KIND.to_string(),
+                api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
+                resource_refs: vec![],
+            },
+            SpecViewMode::Encrypted,
+        )
+        .await;
+
+    assert_matches!(
+        result,
+        Err(BatchResourceError::BadAccount(_)),
+        "empty batch with bad account must still be rejected"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-053C
+contract_test!(
+    batch_empty_refs_validation_is_consistent,
+    super::test_batch_empty_refs_validation_is_consistent
+);
+
+pub async fn test_batch_empty_refs_validation_is_consistent(h: &impl FacadeContractHarness) {
+    let facade = h.facade_for(TestAccount::Alice);
+    let bad_kind = "NoSuchResourceKindXYZ";
+    let bad_account = Some(ResourceManifestAccount {
+        name: Some("unknown-resource-contract-account".to_string()),
+        id: None,
+    });
+
+    // get_identities: unsupported kind
+    let gi_kind = facade
+        .get_identities(ResourceBatchSelector {
+            account: None,
+            kind: bad_kind.to_string(),
+            api_version: None,
+            resource_refs: vec![],
+        })
+        .await;
+    assert_matches!(
+        gi_kind,
+        Err(BatchResourceError::UnsupportedDescriptor(_)),
+        "get_identities empty+bad kind must be rejected"
+    );
+
+    // get_identities: bad account
+    let gi_acct = facade
+        .get_identities(ResourceBatchSelector {
+            account: bad_account.clone(),
+            kind: VARIABLE_SET_KIND.to_string(),
+            api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
+            resource_refs: vec![],
+        })
+        .await;
+    assert_matches!(
+        gi_acct,
+        Err(BatchResourceError::BadAccount(_)),
+        "get_identities empty+bad account must be rejected"
+    );
+
+    // render_manifests: unsupported kind
+    let rm_kind = facade
+        .render_manifests(
+            ResourceBatchSelector {
+                account: None,
+                kind: bad_kind.to_string(),
+                api_version: None,
+                resource_refs: vec![],
+            },
+            ResourceManifestFormat::Json,
+            SpecViewMode::Encrypted,
+        )
+        .await;
+    assert_matches!(
+        rm_kind,
+        Err(BatchResourceError::UnsupportedDescriptor(_)),
+        "render_manifests empty+bad kind must be rejected"
+    );
+
+    // render_manifests: bad account
+    let rm_acct = facade
+        .render_manifests(
+            ResourceBatchSelector {
+                account: bad_account.clone(),
+                kind: VARIABLE_SET_KIND.to_string(),
+                api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
+                resource_refs: vec![],
+            },
+            ResourceManifestFormat::Json,
+            SpecViewMode::Encrypted,
+        )
+        .await;
+    assert_matches!(
+        rm_acct,
+        Err(BatchResourceError::BadAccount(_)),
+        "render_manifests empty+bad account must be rejected"
+    );
+
+    // delete_many: unsupported kind
+    let dm_kind = facade
+        .delete_many(ResourceBatchSelector {
+            account: None,
+            kind: bad_kind.to_string(),
+            api_version: None,
+            resource_refs: vec![],
+        })
+        .await;
+    assert_matches!(
+        dm_kind,
+        Err(BatchResourceError::UnsupportedDescriptor(_)),
+        "delete_many empty+bad kind must be rejected"
+    );
+
+    // delete_many: bad account
+    let dm_acct = facade
+        .delete_many(ResourceBatchSelector {
+            account: bad_account.clone(),
+            kind: VARIABLE_SET_KIND.to_string(),
+            api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
+            resource_refs: vec![],
+        })
+        .await;
+    assert_matches!(
+        dm_acct,
+        Err(BatchResourceError::BadAccount(_)),
+        "delete_many empty+bad account must be rejected"
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
