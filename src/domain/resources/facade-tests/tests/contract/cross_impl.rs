@@ -62,19 +62,20 @@ fn by_name(name: &str) -> ResourceSelector {
 contract_test!(same_supported_kinds, super::test_same_supported_kinds);
 
 pub async fn test_same_supported_kinds(h: &impl FacadeContractHarness) {
-    let facade = h.facade_for(TestAccount::Alice);
-    let mut descriptors = facade.list_supported_kinds().await.unwrap();
-    descriptors.sort_by(|a, b| a.kind.cmp(&b.kind));
+    let local = h.local_facade_for(TestAccount::Alice);
+    let remote = h.facade_for(TestAccount::Alice);
 
-    // Basic checks: we can list and they are non-empty.
-    // The full equivalence between local and remote is checked by the contract_test
-    // macro running the same test against both harnesses.
-    assert!(!descriptors.is_empty(), "descriptors must not be empty");
-    for d in &descriptors {
-        assert!(!d.kind.is_empty());
-        assert!(!d.name.is_empty());
-        assert!(!d.api_version.is_empty());
-    }
+    let mut local_kinds = local.list_supported_kinds().await.unwrap();
+    let mut remote_kinds = remote.list_supported_kinds().await.unwrap();
+
+    local_kinds.sort_by(|a, b| a.kind.cmp(&b.kind));
+    remote_kinds.sort_by(|a, b| a.kind.cmp(&b.kind));
+
+    assert!(!local_kinds.is_empty(), "descriptors must not be empty");
+    assert_eq!(
+        local_kinds, remote_kinds,
+        "local and remote must report identical supported kinds"
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -251,10 +252,12 @@ pub async fn test_render_manifest_equivalence(h: &impl FacadeContractHarness) {
 contract_test!(batch_equivalence, super::test_batch_equivalence);
 
 pub async fn test_batch_equivalence(h: &impl FacadeContractHarness) {
+    let local = h.local_facade_for(TestAccount::Alice);
+    let remote = h.facade_for(TestAccount::Alice);
+
     let uid_a = {
-        let facade = h.facade_for(TestAccount::Alice);
         let manifest = variable_set_manifest_json("cross-batch-a", None, &[("X", "1")]);
-        let d = facade
+        let d = local
             .apply_manifest(ApplyManifestRequest {
                 format: ResourceManifestFormat::Json,
                 manifest,
@@ -266,7 +269,6 @@ pub async fn test_batch_equivalence(h: &impl FacadeContractHarness) {
             .uid
     };
     let absent_uid = kamu_resources::ResourceUID::new(uuid::Uuid::new_v4());
-    let facade = h.facade_for(TestAccount::Alice);
 
     let batch_selector = ResourceBatchSelector {
         account: None,
@@ -279,15 +281,21 @@ pub async fn test_batch_equivalence(h: &impl FacadeContractHarness) {
         ],
     };
 
-    // get_many
-    let get_resp = facade
+    // get_many: both facades must return the same structure
+    let local_get = local
         .get_many(batch_selector.clone(), SpecViewMode::Encrypted)
         .await
         .unwrap();
-    assert_batch_indexes(&get_resp, &[0], &[1, 2]);
-    assert_eq!(get_resp.successes[0].item.metadata.uid, uid_a);
+    let remote_get = remote
+        .get_many(batch_selector.clone(), SpecViewMode::Encrypted)
+        .await
+        .unwrap();
+    assert_batch_indexes(&local_get, &[0], &[1, 2]);
+    assert_batch_indexes(&remote_get, &[0], &[1, 2]);
+    assert_eq!(local_get.successes[0].item.metadata.uid, uid_a);
+    assert_eq!(remote_get.successes[0].item.metadata.uid, uid_a);
     assert_matches!(
-        &get_resp
+        &local_get
             .problems
             .iter()
             .find(|p| p.request_index == 1)
@@ -296,7 +304,25 @@ pub async fn test_batch_equivalence(h: &impl FacadeContractHarness) {
         ResourceLookupProblem::NameNotFound(_)
     );
     assert_matches!(
-        &get_resp
+        &remote_get
+            .problems
+            .iter()
+            .find(|p| p.request_index == 1)
+            .unwrap()
+            .error,
+        ResourceLookupProblem::NameNotFound(_)
+    );
+    assert_matches!(
+        &local_get
+            .problems
+            .iter()
+            .find(|p| p.request_index == 2)
+            .unwrap()
+            .error,
+        ResourceLookupProblem::UIDNotFound(_)
+    );
+    assert_matches!(
+        &remote_get
             .problems
             .iter()
             .find(|p| p.request_index == 2)
@@ -305,13 +331,17 @@ pub async fn test_batch_equivalence(h: &impl FacadeContractHarness) {
         ResourceLookupProblem::UIDNotFound(_)
     );
 
-    // get_identities
-    let id_resp = facade.get_identities(batch_selector.clone()).await.unwrap();
-    assert_batch_indexes(&id_resp, &[0], &[1, 2]);
-    assert_eq!(id_resp.successes[0].item.uid, uid_a);
+    // get_identities: both facades must agree on success uid and problem indexes
+    let local_id = local.get_identities(batch_selector.clone()).await.unwrap();
+    let remote_id = remote.get_identities(batch_selector.clone()).await.unwrap();
+    assert_batch_indexes(&local_id, &[0], &[1, 2]);
+    assert_batch_indexes(&remote_id, &[0], &[1, 2]);
+    assert_eq!(local_id.successes[0].item.uid, uid_a);
+    assert_eq!(remote_id.successes[0].item.uid, uid_a);
 
-    // render_manifests
-    let render_resp = facade
+    // render_manifests: both facades must return a non-empty manifest for the found
+    // resource
+    let local_render = local
         .render_manifests(
             batch_selector.clone(),
             ResourceManifestFormat::Json,
@@ -319,71 +349,125 @@ pub async fn test_batch_equivalence(h: &impl FacadeContractHarness) {
         )
         .await
         .unwrap();
-    assert_batch_indexes(&render_resp, &[0], &[1, 2]);
-    assert!(!render_resp.successes[0].item.manifest.is_empty());
+    let remote_render = remote
+        .render_manifests(
+            batch_selector.clone(),
+            ResourceManifestFormat::Json,
+            SpecViewMode::Encrypted,
+        )
+        .await
+        .unwrap();
+    assert_batch_indexes(&local_render, &[0], &[1, 2]);
+    assert_batch_indexes(&remote_render, &[0], &[1, 2]);
+    let local_manifest: serde_json::Value =
+        serde_json::from_str(&local_render.successes[0].item.manifest).unwrap();
+    let remote_manifest: serde_json::Value =
+        serde_json::from_str(&remote_render.successes[0].item.manifest).unwrap();
+    assert_eq!(
+        local_manifest, remote_manifest,
+        "local and remote must render identical JSON manifests"
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // RF-155: local and remote produce equivalent apply decisions.
 //
-// Runs create → update → untouched → rejection through the facade and asserts
-// that each operation produces the expected decision variant.  Because the
-// `contract_test!` macro runs the same function against both harnesses, this
-// implicitly verifies that local and remote agree on every step.
+// Runs create → update → untouched → plan → rejection through *both* the local
+// and remote facades and directly compares decision variants at each step.
+// Separate resource names are used for the local and remote sequences to avoid
+// name collisions in the shared backing store (both facades write to the same
+// in-memory store in the remote harness).
 contract_test!(apply_equivalence, super::test_apply_equivalence);
 
 pub async fn test_apply_equivalence(h: &impl FacadeContractHarness) {
-    let facade = h.facade_for(TestAccount::Alice);
+    let local = h.local_facade_for(TestAccount::Alice);
+    let remote = h.facade_for(TestAccount::Alice);
 
     // --- Create ---
-    let create_manifest = variable_set_manifest_json("cross-apply-eq", None, &[("X", "1")]);
-    let create_decision = facade
+    let local_create = local
         .apply_manifest(ApplyManifestRequest {
             format: ResourceManifestFormat::Json,
-            manifest: create_manifest,
+            manifest: variable_set_manifest_json("cross-apply-eq-local", None, &[("X", "1")]),
         })
         .await
         .unwrap();
-    assert_applied_outcome(&create_decision, ApplyResourceOutcome::Created);
+    let remote_create = remote
+        .apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: variable_set_manifest_json("cross-apply-eq-remote", None, &[("X", "1")]),
+        })
+        .await
+        .unwrap();
+    assert_applied_outcome(&local_create, ApplyResourceOutcome::Created);
+    assert_applied_outcome(&remote_create, ApplyResourceOutcome::Created);
 
     // --- Update ---
-    let update_manifest = variable_set_manifest_json("cross-apply-eq", None, &[("X", "2")]);
-    let update_decision = facade
+    let local_update = local
         .apply_manifest(ApplyManifestRequest {
             format: ResourceManifestFormat::Json,
-            manifest: update_manifest.clone(),
+            manifest: variable_set_manifest_json("cross-apply-eq-local", None, &[("X", "2")]),
         })
         .await
         .unwrap();
-    assert_applied_outcome(&update_decision, ApplyResourceOutcome::Updated);
+    let remote_update = remote
+        .apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: variable_set_manifest_json("cross-apply-eq-remote", None, &[("X", "2")]),
+        })
+        .await
+        .unwrap();
+    assert_applied_outcome(&local_update, ApplyResourceOutcome::Updated);
+    assert_applied_outcome(&remote_update, ApplyResourceOutcome::Updated);
 
     // --- Untouched (same manifest re-applied) ---
-    let untouched_decision = facade
+    let local_untouched = local
         .apply_manifest(ApplyManifestRequest {
             format: ResourceManifestFormat::Json,
-            manifest: update_manifest,
+            manifest: variable_set_manifest_json("cross-apply-eq-local", None, &[("X", "2")]),
         })
         .await
         .unwrap();
-    assert_applied_outcome(&untouched_decision, ApplyResourceOutcome::Untouched);
+    let remote_untouched = remote
+        .apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: variable_set_manifest_json("cross-apply-eq-remote", None, &[("X", "2")]),
+        })
+        .await
+        .unwrap();
+    assert_applied_outcome(&local_untouched, ApplyResourceOutcome::Untouched);
+    assert_applied_outcome(&remote_untouched, ApplyResourceOutcome::Untouched);
 
     // --- Plan: untouched round-trip ---
-    let plan_manifest = variable_set_manifest_json("cross-apply-eq", None, &[("X", "2")]);
-    let plan_decision = facade
+    let local_plan = local
         .plan_apply_manifest(ApplyManifestRequest {
             format: ResourceManifestFormat::Json,
-            manifest: plan_manifest,
+            manifest: variable_set_manifest_json("cross-apply-eq-local", None, &[("X", "2")]),
+        })
+        .await
+        .unwrap();
+    let remote_plan = remote
+        .plan_apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: variable_set_manifest_json("cross-apply-eq-remote", None, &[("X", "2")]),
         })
         .await
         .unwrap();
     assert!(
         matches!(
-            plan_decision,
+            local_plan,
             ApplyManifestPlanningDecision::Planned(ref p)
             if p.outcome == ApplyResourceOutcome::Untouched
         ),
-        "expected Planned(Unchanged), got: {plan_decision:?}"
+        "local: expected Planned(Untouched), got: {local_plan:?}"
+    );
+    assert!(
+        matches!(
+            remote_plan,
+            ApplyManifestPlanningDecision::Planned(ref p)
+            if p.outcome == ApplyResourceOutcome::Untouched
+        ),
+        "remote: expected Planned(Untouched), got: {remote_plan:?}"
     );
 
     // --- Rejection (business validation: empty variables) ---
@@ -399,7 +483,13 @@ pub async fn test_apply_equivalence(h: &impl FacadeContractHarness) {
         }"#
     )
     .to_string();
-    let reject_result = facade
+    let local_reject = local
+        .apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: reject_manifest.clone(),
+        })
+        .await;
+    let remote_reject = remote
         .apply_manifest(ApplyManifestRequest {
             format: ResourceManifestFormat::Json,
             manifest: reject_manifest.clone(),
@@ -407,7 +497,7 @@ pub async fn test_apply_equivalence(h: &impl FacadeContractHarness) {
         .await;
     assert!(
         matches!(
-            reject_result,
+            local_reject,
             Ok(kamu_resources::ApplyManifestApplicationDecision::Rejected(
                 kamu_resources::ApplyManifestRejection {
                     category:
@@ -416,10 +506,29 @@ pub async fn test_apply_equivalence(h: &impl FacadeContractHarness) {
                 }
             ))
         ),
-        "apply: expected Ok(Rejected(BusinessValidationFailed)), got: {reject_result:?}"
+        "local apply: expected Ok(Rejected(BusinessValidationFailed)), got: {local_reject:?}"
+    );
+    assert!(
+        matches!(
+            remote_reject,
+            Ok(kamu_resources::ApplyManifestApplicationDecision::Rejected(
+                kamu_resources::ApplyManifestRejection {
+                    category:
+                        kamu_resources::ApplyResourceRejectionCategory::BusinessValidationFailed,
+                    ..
+                }
+            ))
+        ),
+        "remote apply: expected Ok(Rejected(BusinessValidationFailed)), got: {remote_reject:?}"
     );
 
-    let plan_reject_result = facade
+    let local_plan_reject = local
+        .plan_apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: reject_manifest.clone(),
+        })
+        .await;
+    let remote_plan_reject = remote
         .plan_apply_manifest(ApplyManifestRequest {
             format: ResourceManifestFormat::Json,
             manifest: reject_manifest,
@@ -427,7 +536,7 @@ pub async fn test_apply_equivalence(h: &impl FacadeContractHarness) {
         .await;
     assert!(
         matches!(
-            plan_reject_result,
+            local_plan_reject,
             Ok(kamu_resources::ApplyManifestPlanningDecision::Rejected(
                 kamu_resources::ApplyManifestRejection {
                     category:
@@ -436,7 +545,20 @@ pub async fn test_apply_equivalence(h: &impl FacadeContractHarness) {
                 }
             ))
         ),
-        "plan: expected Ok(Rejected(BusinessValidationFailed)), got: {plan_reject_result:?}"
+        "local plan: expected Ok(Rejected(BusinessValidationFailed)), got: {local_plan_reject:?}"
+    );
+    assert!(
+        matches!(
+            remote_plan_reject,
+            Ok(kamu_resources::ApplyManifestPlanningDecision::Rejected(
+                kamu_resources::ApplyManifestRejection {
+                    category:
+                        kamu_resources::ApplyResourceRejectionCategory::BusinessValidationFailed,
+                    ..
+                }
+            ))
+        ),
+        "remote plan: expected Ok(Rejected(BusinessValidationFailed)), got: {remote_plan_reject:?}"
     );
 }
 
