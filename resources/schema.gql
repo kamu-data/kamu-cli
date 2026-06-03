@@ -4023,7 +4023,7 @@ type ResourceDeleteManySuccess {
 	resourceId: ResourceID!
 }
 
-union ResourceDeleteOutcome = ResourceDeleteSuccess | ResourceUIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceApiVersionMismatchProblem | ResourceKindMismatchProblem | ResourceUnsupportedDescriptorProblem
+union ResourceDeleteOutcome = ResourceDeleteSuccess | ResourceUIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceApiVersionMismatchProblem | ResourceKindMismatchProblem | ResourceUnsupportedDescriptorProblem | ResourceBadAccountProblem
 
 type ResourceDeleteSuccess {
 	resourceId: ResourceID!

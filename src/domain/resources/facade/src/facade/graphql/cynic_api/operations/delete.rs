@@ -69,6 +69,7 @@ pub(crate) enum ResourceDeleteOutcome {
     ResourceApiVersionMismatchProblem(ResourceApiVersionMismatchProblem),
     ResourceKindMismatchProblem(ResourceKindMismatchProblem),
     ResourceUnsupportedDescriptorProblem(ResourceUnsupportedDescriptorProblem),
+    ResourceBadAccountProblem(ResourceBadAccountProblem),
     #[cynic(fallback)]
     Unknown,
 }

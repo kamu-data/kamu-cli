@@ -99,6 +99,9 @@ impl ResourcesMut {
             Err(kamu_resources_facade::DeleteResourceError::UnsupportedDescriptor(e)) => {
                 Ok(ResourceDeleteOutcome::UnsupportedDescriptor(e.into()))
             }
+            Err(kamu_resources_facade::DeleteResourceError::BadAccount(e)) => Ok(
+                ResourceDeleteOutcome::BadAccount(map_bad_account_problem(e)?),
+            ),
             Err(error) => Err(map_delete_resource_error(error)),
         }
     }
@@ -151,6 +154,7 @@ pub enum ResourceDeleteOutcome {
     ApiVersionMismatch(ResourceApiVersionMismatchProblem),
     KindMismatch(ResourceKindMismatchProblem),
     UnsupportedDescriptor(ResourceUnsupportedDescriptorProblem),
+    BadAccount(ResourceBadAccountProblem),
 }
 
 impl ResourceDeleteOutcome {
@@ -321,8 +325,10 @@ fn map_delete_resource_error(error: kamu_resources_facade::DeleteResourceError) 
     use kamu_resources_facade::DeleteResourceError as E;
 
     match error {
-        E::UnsupportedDescriptor(_) => GqlError::gql("Unsupported resource kind"),
-        E::BadAccount(error) => map_resolve_manifest_account_error(error),
+        E::UnsupportedDescriptor(_) => {
+            unreachable!("UnsupportedDescriptor is handled as a union arm")
+        }
+        E::BadAccount(_) => unreachable!("BadAccount is handled as a union arm"),
         E::LookupProblem(_) => unreachable!("LookupProblem is handled as a union arm"),
         E::RemoteRequest(error) => error.int_err().into(),
         E::Internal(error) => error.into(),

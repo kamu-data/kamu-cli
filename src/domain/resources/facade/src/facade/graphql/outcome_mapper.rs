@@ -606,6 +606,9 @@ pub(super) fn map_delete_outcome(
         O::ResourceUnsupportedDescriptorProblem(problem) => {
             Err(unsupported_descriptor_problem_error(problem).into())
         }
+        O::ResourceBadAccountProblem(problem) => Err(bad_account_problem_error(problem)
+            .map_err(DeleteResourceError::Internal)?
+            .into()),
         O::Unknown => Err(DeleteResourceError::Internal(InternalError::new(
             "Remote delete returned an unrecognized ResourceDeleteOutcome variant",
         ))),
