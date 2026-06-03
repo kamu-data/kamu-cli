@@ -23,17 +23,14 @@ use kamu_resources::{
     ResourceConditionStatus,
     ResourceConditionType,
     ResourceDescriptorProvider,
-    ResourceLinterSpec,
     ResourcePresentation,
     ResourceSnapshot,
     ResourceStatusLike,
     ResourceStatusSummaryView,
     ResourceSummaryView,
-    ResourceValidateSpec,
     ResourceView,
     ResourceViewAccount,
     ResourceViewMetadata,
-    ResourceWarning,
 };
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -46,38 +43,16 @@ pub fn decode_resource_spec<R>(
     kind: &str,
     api_version: &str,
     spec: serde_json::Value,
-) -> Result<DecodedResourceSpec<R::Spec>, ApplyResourceCrudDispatcherError>
+) -> Result<R::Spec, ApplyResourceCrudDispatcherError>
 where
     R: ReconcilableEventSourcedResource,
-    R::Spec: DeserializeOwned + ResourceValidateSpec + ResourceLinterSpec,
-    <R::Spec as ResourceValidateSpec>::ValidationError: std::fmt::Display,
+    R::Spec: DeserializeOwned,
 {
-    let spec: R::Spec = serde_json::from_value(spec).map_err(|e| {
-        ApplyResourceCrudDispatcherError::InvalidSpec {
-            kind: kind.to_string(),
-            api_version: api_version.to_string(),
-            message: e.to_string(),
-        }
-    })?;
-
-    spec.validate()
-        .map_err(|e| ApplyResourceCrudDispatcherError::InvalidSpec {
-            kind: kind.to_string(),
-            api_version: api_version.to_string(),
-            message: e.to_string(),
-        })?;
-
-    let warnings = spec.lint_warnings();
-
-    Ok(DecodedResourceSpec { spec, warnings })
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug)]
-pub struct DecodedResourceSpec<T> {
-    pub spec: T,
-    pub warnings: Vec<ResourceWarning>,
+    serde_json::from_value(spec).map_err(|e| ApplyResourceCrudDispatcherError::InvalidSpec {
+        kind: kind.to_string(),
+        api_version: api_version.to_string(),
+        message: e.to_string(),
+    })
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -85,7 +60,6 @@ pub struct DecodedResourceSpec<T> {
 pub async fn map_apply_resource_planning_decision<R>(
     decision: ApplyResourcePlanningDecision<R>,
     generic_resource_query_service: &dyn GenericResourceQueryService,
-    warnings: Vec<ResourceWarning>,
 ) -> Result<ApplyManifestPlanningDecision, InternalError>
 where
     R: ResourceDescriptorProvider + DeclarativeResource,
@@ -100,6 +74,7 @@ where
                 action,
                 reconciliation_required,
                 executable,
+                warnings,
             } = plan;
 
             let resource = typed_resource_state_to_view::<R>(state)?;
@@ -126,7 +101,6 @@ where
 
 pub fn map_apply_resource_application_decision<R>(
     decision: ApplyResourceApplicationDecision<R>,
-    warnings: Vec<ResourceWarning>,
 ) -> Result<ApplyManifestApplicationDecision, InternalError>
 where
     R: ResourceDescriptorProvider + DeclarativeResource,
@@ -135,7 +109,12 @@ where
 {
     Ok(match decision {
         ApplyResourceApplicationDecision::Applied(result) => {
-            let kamu_resources::ApplyResourceResult { state, outcome, .. } = result;
+            let kamu_resources::ApplyResourceResult {
+                state,
+                outcome,
+                warnings,
+                ..
+            } = result;
             let resource = typed_resource_state_to_view::<R>(state)?;
 
             ApplyManifestApplicationDecision::Applied(ApplyManifestResult {

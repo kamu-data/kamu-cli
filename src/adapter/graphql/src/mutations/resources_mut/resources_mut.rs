@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::mutations::{ResourceApplyError, ResourceApplyErrorCode, ResourceApplyOutcome};
+use crate::mutations::{ResourceApplyOutcome, ResourceApplyParseManifestProblem};
 use crate::prelude::*;
 use crate::queries::{
     BatchResourceProblem,
@@ -215,23 +215,16 @@ fn map_apply_resource_error(
 ) -> Result<ResourceApplyOutcome, GqlError> {
     use kamu_resources_facade::ApplyManifestError as E;
 
-    let apply_error = |code, message: String| {
-        Ok(ResourceApplyOutcome::Error(ResourceApplyError {
-            code,
-            message,
-        }))
-    };
-
     match error {
-        E::ParseManifest(e) => apply_error(ResourceApplyErrorCode::ParseManifest, e.to_string()),
-        E::UnsupportedDescriptor(e) => {
-            apply_error(ResourceApplyErrorCode::UnsupportedDescriptor, e.to_string())
-        }
-        E::BadAccount(e) => apply_error(ResourceApplyErrorCode::BadAccount, e.to_string()),
-        E::InvalidMetadata(e) => {
-            apply_error(ResourceApplyErrorCode::InvalidMetadata, e.to_string())
-        }
-        E::InvalidSpec(e) => apply_error(ResourceApplyErrorCode::InvalidSpec, e.to_string()),
+        E::ParseManifest(e) => Ok(ResourceApplyOutcome::ParseManifest(
+            ResourceApplyParseManifestProblem {
+                message: e.to_string(),
+            },
+        )),
+        E::UnsupportedDescriptor(e) => Ok(ResourceApplyOutcome::UnsupportedDescriptor(e.into())),
+        E::BadAccount(e) => map_bad_account_problem(e).map(ResourceApplyOutcome::BadAccount),
+        E::InvalidMetadata(e) => Ok(ResourceApplyOutcome::InvalidMetadata(e.into())),
+        E::InvalidSpec(e) => Ok(ResourceApplyOutcome::InvalidSpec(e.into())),
         E::UIDNotFound(error) => Err(GqlError::gql(error.to_string())),
         E::TypeMismatch(error) => Err(GqlError::gql(error.to_string())),
         E::ConcurrentModification(error) => {

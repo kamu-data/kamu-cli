@@ -29,6 +29,7 @@ use crate::domain::{
     ResourceDescriptorProvider,
     ResourceLifecycleMessage,
     ResourceLifecycleMessageOutcome,
+    ResourceLinterSpec,
     ResourceLoadError,
     ResourceMetadataInput,
     ResourceMetadataValidationError,
@@ -57,7 +58,7 @@ where
 impl<'a, R> ApplyResourcePlanExecutor<'a, R>
 where
     R: ReconcilableEventSourcedResource + ResourceDescriptorProvider,
-    R::Spec: Serialize + PartialEq + Clone + ResourceValidateSpec,
+    R::Spec: Serialize + PartialEq + Clone + ResourceValidateSpec + ResourceLinterSpec,
     R::Status: Serialize + ResourceStatusLike,
     R::LifecycleError: InvariantViolationOf<<R as DeclarativeResource>::ResourceState>
         + From<ResourceMetadataValidationError>
@@ -228,6 +229,7 @@ where
             uid: *plan.resource.uid(),
             state: plan.resource.into(),
             outcome: plan.action.into(),
+            warnings: plan.warnings,
         }
     }
 

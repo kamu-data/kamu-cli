@@ -12,7 +12,12 @@ use internal_error::InternalError;
 use kamu_resources as domain;
 
 use crate::ApplyManifestRequest;
-use crate::facade::graphql::cynic_api::fragments::{Resource, ResourceManifestFormat};
+use crate::facade::graphql::cynic_api::fragments::{
+    Resource,
+    ResourceBadAccountProblem,
+    ResourceManifestFormat,
+    ResourceUnsupportedDescriptorProblem,
+};
 use crate::facade::graphql::cynic_api::schema;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -37,7 +42,11 @@ pub(crate) struct ApplyManifestResourcesMut {
 pub(crate) enum ResourceApplyOutcome {
     ResourceApplySuccess(ResourceApplySuccess),
     ResourceApplyRejection(ResourceApplyRejection),
-    ResourceApplyError(ResourceApplyError),
+    ResourceApplyParseManifestProblem(ResourceApplyParseManifestProblem),
+    ResourceUnsupportedDescriptorProblem(ResourceUnsupportedDescriptorProblem),
+    ResourceBadAccountProblem(ResourceBadAccountProblem),
+    ResourceInvalidMetadataProblem(ResourceInvalidMetadataProblem),
+    ResourceInvalidSpecProblem(ResourceInvalidSpecProblem),
     #[cynic(fallback)]
     Unknown,
 }
@@ -168,52 +177,105 @@ impl From<ResourceApplyRejectionCategory> for domain::ApplyResourceRejectionCate
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(cynic::QueryFragment, Debug, Clone)]
+pub(crate) struct ResourceApplyParseManifestProblem {
+    pub message: String,
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
-pub(crate) struct ResourceApplyError {
-    pub code: ResourceApplyErrorCode,
+pub(crate) struct ResourceInvalidMetadataProblem {
+    pub code: ResourceMetadataValidationProblemCode,
     pub message: String,
 }
 
 #[derive(cynic::Enum, Debug, Clone, Copy)]
-pub(crate) enum ResourceApplyErrorCode {
-    ParseManifest,
-    UnsupportedDescriptor,
-    BadAccount,
-    InvalidMetadata,
-    InvalidSpec,
+pub(crate) enum ResourceMetadataValidationProblemCode {
+    EmptyName,
+    NameTooLong,
+    InvalidName,
+    DescriptionTooLong,
+    TooManyLabels,
+    InvalidLabelKey,
+    DuplicateLabelKey,
+    LabelValueTooLong,
+    TooManyAnnotations,
+    InvalidAnnotationKey,
+    DuplicateAnnotationKey,
+    AnnotationValueTooLong,
 }
 
-impl From<ResourceApplyError> for crate::ApplyManifestError {
-    fn from(value: ResourceApplyError) -> Self {
-        use kamu_resources::ResourceInvalidSpecError;
+impl From<ResourceInvalidMetadataProblem> for crate::ApplyManifestError {
+    fn from(value: ResourceInvalidMetadataProblem) -> Self {
+        use kamu_resources::ResourceMetadataValidationError as E;
 
-        use crate::facade::resource_facade_errors::ParseResourceManifestError;
-        match value.code {
-            ResourceApplyErrorCode::ParseManifest => {
-                Self::ParseManifest(ParseResourceManifestError {
-                    message: value.message,
-                })
+        let inner = match value.code {
+            ResourceMetadataValidationProblemCode::EmptyName => E::EmptyName,
+            ResourceMetadataValidationProblemCode::NameTooLong => {
+                E::NameTooLong { actual: 0, max: 0 }
             }
-            ResourceApplyErrorCode::InvalidSpec => Self::InvalidSpec(ResourceInvalidSpecError {
-                kind: String::new(),
-                api_version: String::new(),
-                message: value.message,
-            }),
-            ResourceApplyErrorCode::UnsupportedDescriptor => Self::UnsupportedDescriptor(
-                kamu_resources::UnsupportedResourceDescriptorError::NotFound {
-                    kind: value.message,
-                    api_version: String::new(),
-                },
-            ),
-            // BadAccount and InvalidMetadata don't have plain-message constructors —
-            // surface them as internal errors so the caller still gets a strongly-typed
-            // Err rather than a RemoteRequest catch-all.
-            ResourceApplyErrorCode::BadAccount | ResourceApplyErrorCode::InvalidMetadata => {
-                Self::Internal(internal_error::InternalError::new(value.message))
+            ResourceMetadataValidationProblemCode::InvalidName => E::InvalidName {
+                name: value.message.clone(),
+            },
+            ResourceMetadataValidationProblemCode::DescriptionTooLong => {
+                E::DescriptionTooLong { actual: 0, max: 0 }
             }
-        }
+            ResourceMetadataValidationProblemCode::TooManyLabels => {
+                E::TooManyLabels { actual: 0, max: 0 }
+            }
+            ResourceMetadataValidationProblemCode::InvalidLabelKey => E::InvalidLabelKey {
+                key: value.message.clone(),
+            },
+            ResourceMetadataValidationProblemCode::DuplicateLabelKey => E::DuplicateLabelKey {
+                key: value.message.clone(),
+            },
+            ResourceMetadataValidationProblemCode::LabelValueTooLong => E::LabelValueTooLong {
+                key: String::new(),
+                actual: 0,
+                max: 0,
+            },
+            ResourceMetadataValidationProblemCode::TooManyAnnotations => {
+                E::TooManyAnnotations { actual: 0, max: 0 }
+            }
+            ResourceMetadataValidationProblemCode::InvalidAnnotationKey => {
+                E::InvalidAnnotationKey {
+                    key: value.message.clone(),
+                }
+            }
+            ResourceMetadataValidationProblemCode::DuplicateAnnotationKey => {
+                E::DuplicateAnnotationKey {
+                    key: value.message.clone(),
+                }
+            }
+            ResourceMetadataValidationProblemCode::AnnotationValueTooLong => {
+                E::AnnotationValueTooLong {
+                    key: String::new(),
+                    actual: 0,
+                    max: 0,
+                }
+            }
+        };
+        Self::InvalidMetadata(inner)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
+pub(crate) struct ResourceInvalidSpecProblem {
+    pub kind: String,
+    pub api_version: String,
+    pub message: String,
+}
+
+impl From<ResourceInvalidSpecProblem> for crate::ApplyManifestError {
+    fn from(value: ResourceInvalidSpecProblem) -> Self {
+        Self::InvalidSpec(kamu_resources::ResourceInvalidSpecError {
+            kind: value.kind,
+            api_version: value.api_version,
+            message: value.message,
+        })
     }
 }
 
@@ -246,12 +308,7 @@ impl ResourceApplyOutcome {
             Self::ResourceApplyRejection(rejection) => {
                 domain::ApplyManifestPlanningDecision::Rejected(rejection.into())
             }
-            Self::ResourceApplyError(error) => return Err(error.into()),
-            Self::Unknown => {
-                return Err(crate::ApplyManifestError::Internal(InternalError::new(
-                    "Remote apply returned an unrecognized ResourceApplyOutcome variant",
-                )));
-            }
+            problem => return Err(map_apply_problem(problem)?),
         })
     }
 
@@ -276,13 +333,96 @@ impl ResourceApplyOutcome {
             Self::ResourceApplyRejection(rejection) => {
                 domain::ApplyManifestApplicationDecision::Rejected(rejection.into())
             }
-            Self::ResourceApplyError(error) => return Err(error.into()),
-            Self::Unknown => {
-                return Err(crate::ApplyManifestError::Internal(InternalError::new(
-                    "Remote apply returned an unrecognized ResourceApplyOutcome variant",
-                )));
-            }
+            problem => return Err(map_apply_problem(problem)?),
         })
+    }
+}
+
+fn map_apply_problem(
+    outcome: ResourceApplyOutcome,
+) -> Result<crate::ApplyManifestError, InternalError> {
+    use crate::facade::graphql::cynic_api::fragments::ResourceUnsupportedDescriptorProblemCode as C;
+    use crate::facade::resource_facade_errors::ParseResourceManifestError;
+
+    match outcome {
+        ResourceApplyOutcome::ResourceApplyParseManifestProblem(p) => {
+            Ok(crate::ApplyManifestError::ParseManifest(
+                ParseResourceManifestError { message: p.message },
+            ))
+        }
+        ResourceApplyOutcome::ResourceUnsupportedDescriptorProblem(p) => {
+            let error = match p.code {
+                C::NotFound => domain::UnsupportedResourceDescriptorError::NotFound {
+                    kind: p.kind,
+                    api_version: p.api_version,
+                },
+                C::Duplicate => domain::UnsupportedResourceDescriptorError::Duplicate {
+                    kind: p.kind,
+                    api_version: p.api_version,
+                },
+            };
+            Ok(crate::ApplyManifestError::UnsupportedDescriptor(error))
+        }
+        ResourceApplyOutcome::ResourceBadAccountProblem(p) => {
+            use crate::facade::graphql::cynic_api::fragments::ResourceBadAccountProblemCode as BC;
+
+            let account_name =
+                |opt: Option<crate::facade::graphql::cynic_api::scalars::AccountName>,
+                 field: &str|
+                 -> Result<odf::AccountName, InternalError> {
+                    opt.map(|n| odf::AccountName::new_unchecked(&n.0))
+                        .ok_or_else(|| {
+                            InternalError::new(format!(
+                                "Malformed remote apply bad account problem: missing {field}"
+                            ))
+                        })
+                };
+
+            let err = match p.code {
+                BC::EmptySelector => crate::ResolveManifestAccountError::EmptySelector,
+                BC::AccountNotFoundById => crate::ResolveManifestAccountError::AccountNotFoundById(
+                    kamu_accounts::AccountNotFoundByIdError {
+                        account_id: p.account_id.ok_or_else(|| {
+                            InternalError::new(
+                                "Malformed remote apply bad account problem: missing account_id",
+                            )
+                        })?,
+                    },
+                ),
+                BC::AccountNotFoundByName => {
+                    crate::ResolveManifestAccountError::AccountNotFoundByName(
+                        kamu_accounts::AccountNotFoundByNameError {
+                            account_name: account_name(p.account_name, "account_name")?,
+                        },
+                    )
+                }
+                BC::IdNameMismatch => crate::ResolveManifestAccountError::IdNameMismatch {
+                    account_id: p.account_id.ok_or_else(|| {
+                        InternalError::new(
+                            "Malformed remote apply bad account problem: missing account_id",
+                        )
+                    })?,
+                    expected_name: account_name(p.expected_name, "expected_name")?,
+                    actual_name: account_name(p.actual_name, "actual_name")?,
+                },
+                BC::Other => {
+                    return Err(InternalError::new(
+                        "Remote returned non-user account resolution failure as a typed apply \
+                         problem",
+                    ));
+                }
+            };
+            Ok(crate::ApplyManifestError::BadAccount(err))
+        }
+        ResourceApplyOutcome::ResourceInvalidMetadataProblem(p) => Ok(p.into()),
+        ResourceApplyOutcome::ResourceInvalidSpecProblem(p) => Ok(p.into()),
+        ResourceApplyOutcome::Unknown => Err(InternalError::new(
+            "Remote apply returned an unrecognized ResourceApplyOutcome variant",
+        )),
+        // Success and Rejection are handled by the caller — should not reach here
+        _ => Err(InternalError::new(
+            "map_apply_problem called with non-problem outcome variant",
+        )),
     }
 }
 

@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use crate::prelude::*;
-use crate::queries::Resource;
+use crate::queries::{Resource, ResourceBadAccountProblem, ResourceUnsupportedDescriptorProblem};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -16,33 +16,98 @@ use crate::queries::Resource;
 pub enum ResourceApplyOutcome {
     Success(ResourceApplySuccess),
     Rejection(ResourceApplyRejection),
-    Error(ResourceApplyError),
+    ParseManifest(ResourceApplyParseManifestProblem),
+    UnsupportedDescriptor(ResourceUnsupportedDescriptorProblem),
+    BadAccount(ResourceBadAccountProblem),
+    InvalidMetadata(ResourceInvalidMetadataProblem),
+    InvalidSpec(ResourceInvalidSpecProblem),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Structured error returned when the manifest cannot be applied due to a
-/// client-visible problem (malformed input, invalid spec, unknown kind, etc.).
-/// Unlike `ResourceApplyRejection` (which represents a domain-level policy
-/// decision), this represents input validation / parsing failures.
+/// The manifest text could not be parsed (malformed JSON/YAML).
 #[derive(SimpleObject, Debug, Clone)]
-pub struct ResourceApplyError {
-    pub code: ResourceApplyErrorCode,
+pub struct ResourceApplyParseManifestProblem {
+    pub message: String,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A metadata field value (e.g. name, label key) failed validation.
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ResourceInvalidMetadataProblem {
+    pub code: ResourceMetadataValidationProblemCode,
     pub message: String,
 }
 
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ResourceApplyErrorCode {
-    /// The manifest text could not be parsed (malformed JSON/YAML).
-    ParseManifest,
-    /// The resource kind / apiVersion is not supported.
-    UnsupportedDescriptor,
-    /// The `metadata.account` field refers to an account that does not exist.
-    BadAccount,
-    /// A metadata field value (e.g. name) is invalid.
-    InvalidMetadata,
-    /// The `spec` failed domain validation (e.g. empty variables map).
-    InvalidSpec,
+pub enum ResourceMetadataValidationProblemCode {
+    EmptyName,
+    NameTooLong,
+    InvalidName,
+    DescriptionTooLong,
+    TooManyLabels,
+    InvalidLabelKey,
+    DuplicateLabelKey,
+    LabelValueTooLong,
+    TooManyAnnotations,
+    InvalidAnnotationKey,
+    DuplicateAnnotationKey,
+    AnnotationValueTooLong,
+}
+
+impl From<kamu_resources::ResourceMetadataValidationError> for ResourceInvalidMetadataProblem {
+    fn from(value: kamu_resources::ResourceMetadataValidationError) -> Self {
+        use kamu_resources::ResourceMetadataValidationError as E;
+        let code = match &value {
+            E::EmptyName => ResourceMetadataValidationProblemCode::EmptyName,
+            E::NameTooLong { .. } => ResourceMetadataValidationProblemCode::NameTooLong,
+            E::InvalidName { .. } => ResourceMetadataValidationProblemCode::InvalidName,
+            E::DescriptionTooLong { .. } => {
+                ResourceMetadataValidationProblemCode::DescriptionTooLong
+            }
+            E::TooManyLabels { .. } => ResourceMetadataValidationProblemCode::TooManyLabels,
+            E::InvalidLabelKey { .. } => ResourceMetadataValidationProblemCode::InvalidLabelKey,
+            E::DuplicateLabelKey { .. } => ResourceMetadataValidationProblemCode::DuplicateLabelKey,
+            E::LabelValueTooLong { .. } => ResourceMetadataValidationProblemCode::LabelValueTooLong,
+            E::TooManyAnnotations { .. } => {
+                ResourceMetadataValidationProblemCode::TooManyAnnotations
+            }
+            E::InvalidAnnotationKey { .. } => {
+                ResourceMetadataValidationProblemCode::InvalidAnnotationKey
+            }
+            E::DuplicateAnnotationKey { .. } => {
+                ResourceMetadataValidationProblemCode::DuplicateAnnotationKey
+            }
+            E::AnnotationValueTooLong { .. } => {
+                ResourceMetadataValidationProblemCode::AnnotationValueTooLong
+            }
+        };
+        Self {
+            code,
+            message: value.to_string(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The `spec` field failed domain validation.
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ResourceInvalidSpecProblem {
+    pub kind: String,
+    pub api_version: String,
+    pub message: String,
+}
+
+impl From<kamu_resources::ResourceInvalidSpecError> for ResourceInvalidSpecProblem {
+    fn from(value: kamu_resources::ResourceInvalidSpecError) -> Self {
+        Self {
+            kind: value.kind,
+            api_version: value.api_version,
+            message: value.message,
+        }
+    }
 }
 
 impl From<kamu_resources::ApplyManifestPlanningDecision> for ResourceApplyOutcome {

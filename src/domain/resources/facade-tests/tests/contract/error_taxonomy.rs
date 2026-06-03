@@ -18,6 +18,7 @@
 use database_common::PaginationOpts;
 use kamu_resources::{ApplyResourceOutcome, ResourceManifestAccount};
 use kamu_resources_facade::{
+    ApplyManifestError,
     ApplyManifestRequest,
     BatchResourceError,
     DeleteResourceError,
@@ -381,19 +382,27 @@ pub async fn test_batch_lookup_taxonomy(h: &impl FacadeContractHarness) {
 // Verifies that representative apply failures produce stable error variants on
 // both `plan_apply_manifest` and `apply_manifest`.
 //
-// Empty variables map is caught at spec-decode time →
-// `ApplyManifestError::InvalidSpec`. This is a pre-planning validation error,
-// not a planning-level Rejected decision.
+// Empty variables map deserializes successfully but fails
+// VariableSetSpec::validate() inside the lifecycle →
+// Ok(Rejected(BusinessValidationFailed)).
 contract_test!(
     apply_rejection_taxonomy,
     super::test_apply_rejection_taxonomy
 );
 
 pub async fn test_apply_rejection_taxonomy(h: &impl FacadeContractHarness) {
+    use kamu_resources::{
+        ApplyManifestApplicationDecision,
+        ApplyManifestPlanningDecision,
+        ApplyManifestRejection,
+        ApplyResourceRejectionCategory,
+    };
+
     let facade = h.facade_for(TestAccount::Alice);
 
-    // Empty variables map fails VariableSetSpec::validate() at decode time;
-    // both plan and apply must return Err(InvalidSpec).
+    // Empty variables map deserializes correctly but fails
+    // VariableSetSpec::validate() inside the lifecycle; both plan and apply
+    // return Ok(Rejected(BusinessValidationFailed)).
     let empty_vars_manifest = indoc::indoc!(
         r#"{
             "apiVersion": "kamu.dev/v1alpha1",
@@ -413,9 +422,14 @@ pub async fn test_apply_rejection_taxonomy(h: &impl FacadeContractHarness) {
     assert!(
         matches!(
             plan_result,
-            Err(kamu_resources_facade::ApplyManifestError::InvalidSpec(_))
+            Ok(ApplyManifestPlanningDecision::Rejected(
+                ApplyManifestRejection {
+                    category: ApplyResourceRejectionCategory::BusinessValidationFailed,
+                    ..
+                }
+            ))
         ),
-        "plan: expected Err(InvalidSpec), got: {plan_result:?}"
+        "plan: expected Ok(Rejected(BusinessValidationFailed)), got: {plan_result:?}"
     );
 
     let apply_result = facade
@@ -427,9 +441,14 @@ pub async fn test_apply_rejection_taxonomy(h: &impl FacadeContractHarness) {
     assert!(
         matches!(
             apply_result,
-            Err(kamu_resources_facade::ApplyManifestError::InvalidSpec(_))
+            Ok(ApplyManifestApplicationDecision::Rejected(
+                ApplyManifestRejection {
+                    category: ApplyResourceRejectionCategory::BusinessValidationFailed,
+                    ..
+                }
+            ))
         ),
-        "apply: expected Err(InvalidSpec), got: {apply_result:?}"
+        "apply: expected Ok(Rejected(BusinessValidationFailed)), got: {apply_result:?}"
     );
 }
 
@@ -565,11 +584,26 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
         "summary: expected BadAccount, got {result:?}"
     );
 
-    // apply_manifest bad-account is intentionally excluded here: the remote
-    // facade currently maps it to Internal because ResourceApplyError is a
-    // lossy {code, message} shape. Fix is tracked under the GraphQL
-    // simplification plan step 5 (replace lossy apply errors with typed
-    // problem objects).
+    // --- apply_manifest ---
+    let result = facade
+        .apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: serde_json::json!({
+                "apiVersion": VARIABLE_SET_API_VERSION,
+                "kind": VARIABLE_SET_KIND,
+                "metadata": {
+                    "name": "bad-acct-apply",
+                    "account": { "name": "unknown-resource-contract-account" }
+                },
+                "spec": {"variables": {"KEY": {"value": "val"}}}
+            })
+            .to_string(),
+        })
+        .await;
+    assert!(
+        matches!(result, Err(ApplyManifestError::BadAccount(_))),
+        "apply_manifest: expected BadAccount, got {result:?}"
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -7,7 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources::{ApplyManifestPlanningDecision, ApplyResourceOutcome};
+use kamu_resources::{
+    ApplyManifestApplicationDecision,
+    ApplyManifestPlanningDecision,
+    ApplyResourceOutcome,
+};
 use kamu_resources_facade::{
     ApplyManifestError,
     ApplyManifestRequest,
@@ -440,17 +444,22 @@ pub async fn test_plan_rejects_schema_invalid_manifest(h: &impl FacadeContractHa
 
 // RF-016 / RF-025
 // VariableSetResource rejects business-invalid specs. An empty variables map
-// fails VariableSetSpec::validate() at parse time, surfaced as InvalidSpec.
+// deserializes successfully but fails VariableSetSpec::validate() inside the
+// lifecycle try_create/try_update_spec, producing a BusinessValidationFailed
+// rejection rather than an InvalidSpec error.
 contract_test!(
     apply_rejects_business_invalid_spec,
     super::test_apply_rejects_business_invalid_spec
 );
 
 pub async fn test_apply_rejects_business_invalid_spec(h: &impl FacadeContractHarness) {
+    use kamu_resources::{ApplyManifestRejection, ApplyResourceRejectionCategory};
+
     let facade = h.facade_for(TestAccount::Alice);
 
-    // Empty variables map fails VariableSetSpec::validate() at spec decode time;
-    // the facade surfaces this as ApplyManifestError::InvalidSpec.
+    // Empty variables map deserializes correctly but fails
+    // VariableSetSpec::validate() inside the lifecycle; the facade surfaces
+    // this as Ok(Rejected(BusinessValidationFailed)).
     let empty_vars = serde_json::json!({
         "apiVersion": VARIABLE_SET_API_VERSION,
         "kind": VARIABLE_SET_KIND,
@@ -466,8 +475,17 @@ pub async fn test_apply_rejects_business_invalid_spec(h: &impl FacadeContractHar
         })
         .await;
     assert!(
-        matches!(plan_result, Err(ApplyManifestError::InvalidSpec(_))),
-        "plan with empty variables must return Err(InvalidSpec), got: {plan_result:?}"
+        matches!(
+            plan_result,
+            Ok(ApplyManifestPlanningDecision::Rejected(
+                ApplyManifestRejection {
+                    category: ApplyResourceRejectionCategory::BusinessValidationFailed,
+                    ..
+                }
+            ))
+        ),
+        "plan with empty variables must return Ok(Rejected(BusinessValidationFailed)), got: \
+         {plan_result:?}"
     );
 
     let apply_result = facade
@@ -477,8 +495,17 @@ pub async fn test_apply_rejects_business_invalid_spec(h: &impl FacadeContractHar
         })
         .await;
     assert!(
-        matches!(apply_result, Err(ApplyManifestError::InvalidSpec(_))),
-        "apply with empty variables must return Err(InvalidSpec), got: {apply_result:?}"
+        matches!(
+            apply_result,
+            Ok(ApplyManifestApplicationDecision::Rejected(
+                ApplyManifestRejection {
+                    category: ApplyResourceRejectionCategory::BusinessValidationFailed,
+                    ..
+                }
+            ))
+        ),
+        "apply with empty variables must return Ok(Rejected(BusinessValidationFailed)), got: \
+         {apply_result:?}"
     );
 
     // Resource must not have been created
@@ -497,5 +524,107 @@ pub async fn test_apply_rejects_business_invalid_spec(h: &impl FacadeContractHar
         "resource must not exist after rejected apply"
     );
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-143 / apply error taxonomy — InvalidMetadata
+// Empty resource name fails metadata validation before the use case runs.
+// Both local and remote facades must return Err(InvalidMetadata(_)) with the
+// same variant identity (not demoted to Internal on the remote path).
+contract_test!(
+    apply_rejects_invalid_metadata,
+    super::test_apply_rejects_invalid_metadata
+);
+
+pub async fn test_apply_rejects_invalid_metadata(h: &impl FacadeContractHarness) {
+    let facade = h.facade_for(TestAccount::Alice);
+
+    let empty_name_manifest = serde_json::json!({
+        "apiVersion": VARIABLE_SET_API_VERSION,
+        "kind": VARIABLE_SET_KIND,
+        "metadata": {"name": ""},
+        "spec": {"variables": {"K": {"value": "v"}}}
+    })
+    .to_string();
+
+    let plan_result = facade
+        .plan_apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: empty_name_manifest.clone(),
+        })
+        .await;
+    assert!(
+        matches!(plan_result, Err(ApplyManifestError::InvalidMetadata(_))),
+        "plan with empty name must return Err(InvalidMetadata), got: {plan_result:?}"
+    );
+
+    let apply_result = facade
+        .apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: empty_name_manifest,
+        })
+        .await;
+    assert!(
+        matches!(apply_result, Err(ApplyManifestError::InvalidMetadata(_))),
+        "apply with empty name must return Err(InvalidMetadata), got: {apply_result:?}"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-143 / apply error taxonomy — InvalidSpec carries kind and api_version
+// Verifies that the remote facade reconstructs InvalidSpec with the correct
+// kind and api_version fields (previously both were empty strings on the
+// remote path due to the lossy ResourceApplyError shape).
+// Uses a spec where `variables` is a string instead of an object — this fails
+// JSON deserialization and therefore hits InvalidSpec, not
+// BusinessValidationFailed.
+contract_test!(
+    apply_invalid_spec_carries_kind_and_api_version,
+    super::test_apply_invalid_spec_carries_kind_and_api_version
+);
+
+pub async fn test_apply_invalid_spec_carries_kind_and_api_version(h: &impl FacadeContractHarness) {
+    let facade = h.facade_for(TestAccount::Alice);
+
+    // `variables` is a string, not an object — fails serde deserialization →
+    // InvalidSpec
+    let malformed_spec = serde_json::json!({
+        "apiVersion": VARIABLE_SET_API_VERSION,
+        "kind": VARIABLE_SET_KIND,
+        "metadata": {"name": "spec-kind-check"},
+        "spec": {"variables": "not-an-object"}
+    })
+    .to_string();
+
+    let result = facade
+        .apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: malformed_spec,
+        })
+        .await;
+
+    match result {
+        Err(ApplyManifestError::InvalidSpec(e)) => {
+            assert_eq!(
+                e.kind, VARIABLE_SET_KIND,
+                "InvalidSpec must carry the correct kind"
+            );
+            assert_eq!(
+                e.api_version, VARIABLE_SET_API_VERSION,
+                "InvalidSpec must carry the correct api_version"
+            );
+        }
+        other => panic!("expected Err(InvalidSpec), got: {other:?}"),
+    }
+}
+
+// RF-143 note: ImmutableFieldChanged, ReferencedObjectMissing, and
+// LifecycleRuleConflict rejection categories are defined in the schema but not
+// naturally triggerable through the current resource kinds (VariableSet,
+// SecretSet). BusinessValidationFailed is now triggerable via empty variables
+// (or empty secrets) — see apply_rejects_business_invalid_spec above. The
+// remaining three are deferred until a resource kind is added that can trigger
+// them.
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
+use kamu_resources::ResourceWarning;
 use serde::Serialize;
 use time_source::SystemTimeSource;
 
@@ -27,6 +28,7 @@ use crate::domain::{
     ReconcilableResource,
     ResourceAggregateLoader,
     ResourceDescriptorProvider,
+    ResourceLinterSpec,
     ResourceLoadError,
     ResourceMetadataInput,
     ResourceMetadataValidationError,
@@ -51,7 +53,7 @@ where
 impl<'a, R> ApplyResourcePlanner<'a, R>
 where
     R: ReconcilableEventSourcedResource + ResourceDescriptorProvider,
-    R::Spec: Serialize + PartialEq + Clone + ResourceValidateSpec,
+    R::Spec: Serialize + PartialEq + Clone + ResourceValidateSpec + ResourceLinterSpec,
     R::Status: Serialize + ResourceStatusLike,
     R::LifecycleError: InvariantViolationOf<<R as DeclarativeResource>::ResourceState>
         + From<ResourceMetadataValidationError>
@@ -163,6 +165,8 @@ where
                 }
             };
 
+        let warnings = resource.spec().lint_warnings();
+
         Ok(PlannedApplyResourceDecision::Planned(
             PlannedApplyResource {
                 reconciliation_required: resource.needs_reconciliation(),
@@ -170,6 +174,7 @@ where
                 action: ApplyResourceAction::Create,
                 executable: true,
                 planned_at: now,
+                warnings,
             },
         ))
     }
@@ -201,6 +206,8 @@ where
             ApplyResourceAction::Untouched
         };
 
+        let warnings = resource.spec().lint_warnings();
+
         Ok(PlannedApplyResourceDecision::Planned(
             PlannedApplyResource {
                 reconciliation_required: resource.needs_reconciliation(),
@@ -208,6 +215,7 @@ where
                 action,
                 executable: true,
                 planned_at: now,
+                warnings,
             },
         ))
     }
@@ -240,6 +248,7 @@ pub struct PlannedApplyResource<R: ReconcilableEventSourcedResource> {
     pub(crate) reconciliation_required: bool,
     pub(crate) executable: bool,
     pub(crate) planned_at: DateTime<Utc>,
+    pub(crate) warnings: Vec<ResourceWarning>,
 }
 
 impl<R> PlannedApplyResource<R>
@@ -257,6 +266,7 @@ where
             action: self.action,
             reconciliation_required: self.reconciliation_required,
             executable: self.executable,
+            warnings: self.warnings,
         }
     }
 }

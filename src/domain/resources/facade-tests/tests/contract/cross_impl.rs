@@ -259,9 +259,10 @@ pub async fn test_apply_equivalence(h: &impl FacadeContractHarness) {
         "expected Planned(Unchanged), got: {plan_decision:?}"
     );
 
-    // --- Rejection (spec-invalid: empty variables) ---
-    // Empty variables fails VariableSetSpec::validate() at decode time, so both
-    // apply and plan return Err(InvalidSpec) rather than Ok(Rejected(...)).
+    // --- Rejection (business validation: empty variables) ---
+    // Empty variables deserializes correctly but fails VariableSetSpec::validate()
+    // inside the lifecycle, so both apply and plan return
+    // Ok(Rejected(BusinessValidationFailed)).
     let reject_manifest = indoc::indoc!(
         r#"{
             "apiVersion": "kamu.dev/v1alpha1",
@@ -280,9 +281,15 @@ pub async fn test_apply_equivalence(h: &impl FacadeContractHarness) {
     assert!(
         matches!(
             reject_result,
-            Err(kamu_resources_facade::ApplyManifestError::InvalidSpec(_))
+            Ok(kamu_resources::ApplyManifestApplicationDecision::Rejected(
+                kamu_resources::ApplyManifestRejection {
+                    category:
+                        kamu_resources::ApplyResourceRejectionCategory::BusinessValidationFailed,
+                    ..
+                }
+            ))
         ),
-        "apply: expected Err(InvalidSpec), got: {reject_result:?}"
+        "apply: expected Ok(Rejected(BusinessValidationFailed)), got: {reject_result:?}"
     );
 
     let plan_reject_result = facade
@@ -294,9 +301,15 @@ pub async fn test_apply_equivalence(h: &impl FacadeContractHarness) {
     assert!(
         matches!(
             plan_reject_result,
-            Err(kamu_resources_facade::ApplyManifestError::InvalidSpec(_))
+            Ok(kamu_resources::ApplyManifestPlanningDecision::Rejected(
+                kamu_resources::ApplyManifestRejection {
+                    category:
+                        kamu_resources::ApplyResourceRejectionCategory::BusinessValidationFailed,
+                    ..
+                }
+            ))
         ),
-        "plan: expected Err(InvalidSpec), got: {plan_reject_result:?}"
+        "plan: expected Ok(Rejected(BusinessValidationFailed)), got: {plan_reject_result:?}"
     );
 }
 
