@@ -10,12 +10,6 @@
 use database_common::PaginationOpts;
 
 use crate::LoggedInGuard;
-use crate::mutations::{
-    ResourceApiVersionMismatchProblem,
-    ResourceKindMismatchProblem,
-    ResourceNameNotFoundProblem,
-    ResourceUIDNotFoundProblem,
-};
 use crate::prelude::*;
 use crate::queries::{
     BatchResourceIdentitiesOutcome,
@@ -31,6 +25,8 @@ use crate::queries::{
     ResourceInvalidSearchQueryProblem,
     ResourceKindDescriptor,
     ResourceKindInput,
+    ResourceLookupProblem,
+    ResourceLookupProblemResult,
     ResourceManifestFormat,
     ResourceRenderManifestResult,
     ResourceSelectorInput,
@@ -118,14 +114,16 @@ impl Resources {
         match resource_facade.get(selector.into(), spec_view_mode).await {
             Ok(resource) => Ok(ResourceGetOutcome::Success(resource.into())),
             Err(kamu_resources_facade::GetResourceError::LookupProblem(problem)) => {
-                Ok(ResourceGetOutcome::from_lookup_problem(problem))
+                Ok(ResourceGetOutcome::Problem(problem.into()))
             }
             Err(kamu_resources_facade::GetResourceError::UnsupportedDescriptor(error)) => {
-                Ok(ResourceGetOutcome::UnsupportedDescriptor(error.into()))
+                Ok(ResourceGetOutcome::Problem(error.into()))
             }
-            Err(kamu_resources_facade::GetResourceError::BadAccount(error)) => Ok(
-                ResourceGetOutcome::BadAccount(map_bad_account_problem(error)?),
-            ),
+            Err(kamu_resources_facade::GetResourceError::BadAccount(error)) => {
+                Ok(ResourceGetOutcome::Problem(ResourceLookupProblemResult {
+                    problem: ResourceLookupProblem::BadAccount(map_bad_account_problem(error)?),
+                }))
+            }
             Err(error) => Err(map_get_resource_non_lookup_error(error)),
         }
     }
@@ -171,13 +169,15 @@ impl Resources {
         match resource_facade.get_identity(selector.into()).await {
             Ok(identity) => Ok(ResourceGetIdentityOutcome::Success(identity.into())),
             Err(kamu_resources_facade::GetResourceError::LookupProblem(problem)) => {
-                Ok(ResourceGetIdentityOutcome::from_lookup_problem(problem))
+                Ok(ResourceGetIdentityOutcome::Problem(problem.into()))
             }
-            Err(kamu_resources_facade::GetResourceError::UnsupportedDescriptor(error)) => Ok(
-                ResourceGetIdentityOutcome::UnsupportedDescriptor(error.into()),
-            ),
+            Err(kamu_resources_facade::GetResourceError::UnsupportedDescriptor(error)) => {
+                Ok(ResourceGetIdentityOutcome::Problem(error.into()))
+            }
             Err(kamu_resources_facade::GetResourceError::BadAccount(error)) => Ok(
-                ResourceGetIdentityOutcome::BadAccount(map_bad_account_problem(error)?),
+                ResourceGetIdentityOutcome::Problem(ResourceLookupProblemResult {
+                    problem: ResourceLookupProblem::BadAccount(map_bad_account_problem(error)?),
+                }),
             ),
             Err(error) => Err(map_get_resource_non_lookup_error(error)),
         }
@@ -431,15 +431,15 @@ impl Resources {
                 },
             )),
             Err(kamu_resources_facade::RenderResourceManifestError::LookupProblem(problem)) => {
-                Ok(ResourceRenderManifestOutcome::from_lookup_problem(problem))
+                Ok(ResourceRenderManifestOutcome::Problem(problem.into()))
             }
             Err(kamu_resources_facade::RenderResourceManifestError::UnsupportedDescriptor(
                 error,
-            )) => Ok(ResourceRenderManifestOutcome::UnsupportedDescriptor(
-                error.into(),
-            )),
+            )) => Ok(ResourceRenderManifestOutcome::Problem(error.into())),
             Err(kamu_resources_facade::RenderResourceManifestError::BadAccount(error)) => Ok(
-                ResourceRenderManifestOutcome::BadAccount(map_bad_account_problem(error)?),
+                ResourceRenderManifestOutcome::Problem(ResourceLookupProblemResult {
+                    problem: ResourceLookupProblem::BadAccount(map_bad_account_problem(error)?),
+                }),
             ),
             Err(error) => Err(map_render_resource_manifest_error(error)),
         }
@@ -493,9 +493,9 @@ fn map_get_resource_non_lookup_error(error: kamu_resources_facade::GetResourceEr
     use kamu_resources_facade::GetResourceError as E;
 
     match error {
-        E::LookupProblem(_) => unreachable!("LookupProblem is handled as a union arm"),
-        E::UnsupportedDescriptor(_) => GqlError::gql("Unsupported resource kind"),
-        E::BadAccount(error) => map_resolve_manifest_account_error(error),
+        E::LookupProblem(_) | E::UnsupportedDescriptor(_) | E::BadAccount(_) => {
+            unreachable!("handled as union arm")
+        }
         E::RemoteRequest(error) => error.int_err().into(),
         E::Internal(error) => error.into(),
     }
@@ -549,44 +549,7 @@ pub enum ResourceIdentityListAllOutcome {
 #[derive(Union, Debug, Clone)]
 pub enum ResourceGetOutcome {
     Success(Resource),
-    UidNotFound(ResourceUIDNotFoundProblem),
-    NameNotFound(ResourceNameNotFoundProblem),
-    ApiVersionMismatch(ResourceApiVersionMismatchProblem),
-    KindMismatch(ResourceKindMismatchProblem),
-    UnsupportedDescriptor(ResourceUnsupportedDescriptorProblem),
-    BadAccount(ResourceBadAccountProblem),
-}
-
-impl ResourceGetOutcome {
-    fn from_lookup_problem(
-        problem: kamu_resources_facade::ResourceLookupProblem,
-    ) -> ResourceGetOutcome {
-        use kamu_resources_facade::ResourceLookupProblem as P;
-        match problem {
-            P::UIDNotFound(e) => Self::UidNotFound(ResourceUIDNotFoundProblem {
-                uid: e.0.into(),
-                message: e.to_string(),
-            }),
-            P::NameNotFound(e) => Self::NameNotFound(ResourceNameNotFoundProblem {
-                kind: e.kind.clone(),
-                name: e.name.clone(),
-                message: e.to_string(),
-            }),
-            P::ApiVersionMismatch(e) => {
-                Self::ApiVersionMismatch(ResourceApiVersionMismatchProblem {
-                    expected_api_version: e.expected_api_version.clone(),
-                    actual_api_version: e.actual_api_version.clone(),
-                    message: e.to_string(),
-                })
-            }
-            P::KindMismatch(e) => Self::KindMismatch(ResourceKindMismatchProblem {
-                uid: e.uid.into(),
-                expected_kind: e.expected_kind.clone(),
-                actual_kind: e.actual_kind.clone(),
-                message: e.to_string(),
-            }),
-        }
-    }
+    Problem(ResourceLookupProblemResult),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -594,44 +557,7 @@ impl ResourceGetOutcome {
 #[derive(Union, Debug, Clone)]
 pub enum ResourceGetIdentityOutcome {
     Success(ResourceIdentity),
-    UidNotFound(ResourceUIDNotFoundProblem),
-    NameNotFound(ResourceNameNotFoundProblem),
-    ApiVersionMismatch(ResourceApiVersionMismatchProblem),
-    KindMismatch(ResourceKindMismatchProblem),
-    UnsupportedDescriptor(ResourceUnsupportedDescriptorProblem),
-    BadAccount(ResourceBadAccountProblem),
-}
-
-impl ResourceGetIdentityOutcome {
-    fn from_lookup_problem(
-        problem: kamu_resources_facade::ResourceLookupProblem,
-    ) -> ResourceGetIdentityOutcome {
-        use kamu_resources_facade::ResourceLookupProblem as P;
-        match problem {
-            P::UIDNotFound(e) => Self::UidNotFound(ResourceUIDNotFoundProblem {
-                uid: e.0.into(),
-                message: e.to_string(),
-            }),
-            P::NameNotFound(e) => Self::NameNotFound(ResourceNameNotFoundProblem {
-                kind: e.kind.clone(),
-                name: e.name.clone(),
-                message: e.to_string(),
-            }),
-            P::ApiVersionMismatch(e) => {
-                Self::ApiVersionMismatch(ResourceApiVersionMismatchProblem {
-                    expected_api_version: e.expected_api_version.clone(),
-                    actual_api_version: e.actual_api_version.clone(),
-                    message: e.to_string(),
-                })
-            }
-            P::KindMismatch(e) => Self::KindMismatch(ResourceKindMismatchProblem {
-                uid: e.uid.into(),
-                expected_kind: e.expected_kind.clone(),
-                actual_kind: e.actual_kind.clone(),
-                message: e.to_string(),
-            }),
-        }
-    }
+    Problem(ResourceLookupProblemResult),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -642,9 +568,9 @@ fn map_render_resource_manifest_error(
     use kamu_resources_facade::RenderResourceManifestError as E;
 
     match error {
-        E::UnsupportedDescriptor(_) => GqlError::gql("Unsupported resource kind"),
-        E::BadAccount(error) => map_resolve_manifest_account_error(error),
-        E::LookupProblem(_) => unreachable!("LookupProblem is handled as a union arm"),
+        E::UnsupportedDescriptor(_) | E::BadAccount(_) | E::LookupProblem(_) => {
+            unreachable!("handled as union arm")
+        }
         E::RemoteRequest(error) => error.int_err().into(),
         E::Internal(error) => error.into(),
     }
@@ -655,44 +581,7 @@ fn map_render_resource_manifest_error(
 #[derive(Union, Debug, Clone)]
 pub enum ResourceRenderManifestOutcome {
     Success(ResourceRenderManifestResult),
-    UidNotFound(ResourceUIDNotFoundProblem),
-    NameNotFound(ResourceNameNotFoundProblem),
-    ApiVersionMismatch(ResourceApiVersionMismatchProblem),
-    KindMismatch(ResourceKindMismatchProblem),
-    UnsupportedDescriptor(ResourceUnsupportedDescriptorProblem),
-    BadAccount(ResourceBadAccountProblem),
-}
-
-impl ResourceRenderManifestOutcome {
-    fn from_lookup_problem(
-        problem: kamu_resources_facade::ResourceLookupProblem,
-    ) -> ResourceRenderManifestOutcome {
-        use kamu_resources_facade::ResourceLookupProblem as P;
-        match problem {
-            P::UIDNotFound(e) => Self::UidNotFound(ResourceUIDNotFoundProblem {
-                uid: e.0.into(),
-                message: e.to_string(),
-            }),
-            P::NameNotFound(e) => Self::NameNotFound(ResourceNameNotFoundProblem {
-                kind: e.kind.clone(),
-                name: e.name.clone(),
-                message: e.to_string(),
-            }),
-            P::ApiVersionMismatch(e) => {
-                Self::ApiVersionMismatch(ResourceApiVersionMismatchProblem {
-                    expected_api_version: e.expected_api_version.clone(),
-                    actual_api_version: e.actual_api_version.clone(),
-                    message: e.to_string(),
-                })
-            }
-            P::KindMismatch(e) => Self::KindMismatch(ResourceKindMismatchProblem {
-                uid: e.uid.into(),
-                expected_kind: e.expected_kind.clone(),
-                actual_kind: e.actual_kind.clone(),
-                message: e.to_string(),
-            }),
-        }
-    }
+    Problem(ResourceLookupProblemResult),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

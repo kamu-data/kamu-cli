@@ -155,6 +155,25 @@ pub(crate) struct ResourceKindMismatchProblem {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(cynic::InlineFragments, Debug, Clone)]
+pub(crate) enum ResourceLookupProblem {
+    ResourceUIDNotFoundProblem(ResourceUIDNotFoundProblem),
+    ResourceNameNotFoundProblem(ResourceNameNotFoundProblem),
+    ResourceApiVersionMismatchProblem(ResourceApiVersionMismatchProblem),
+    ResourceKindMismatchProblem(ResourceKindMismatchProblem),
+    ResourceUnsupportedDescriptorProblem(ResourceUnsupportedDescriptorProblem),
+    ResourceBadAccountProblem(ResourceBadAccountProblem),
+    #[cynic(fallback)]
+    Unknown,
+}
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
+pub(crate) struct ResourceLookupProblemResult {
+    pub problem: ResourceLookupProblem,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct ResourceInvalidSearchQueryProblem {
     pub message: String,

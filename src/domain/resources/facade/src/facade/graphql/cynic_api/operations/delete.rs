@@ -11,11 +11,8 @@ use cynic::MutationBuilder;
 
 use crate::facade::graphql::cynic_api::fragments::{
     BatchResourceProblem,
-    ResourceApiVersionMismatchProblem,
     ResourceBadAccountProblem,
-    ResourceKindMismatchProblem,
-    ResourceNameNotFoundProblem,
-    ResourceUIDNotFoundProblem,
+    ResourceLookupProblemResult,
     ResourceUnsupportedDescriptorProblem,
 };
 use crate::facade::graphql::cynic_api::inputs::{
@@ -68,12 +65,7 @@ pub(crate) enum ResourceDeleteManyOutcome {
 #[derive(cynic::InlineFragments, Debug, Clone)]
 pub(crate) enum ResourceDeleteOutcome {
     ResourceDeleteSuccess(ResourceDeleteSuccess),
-    ResourceUIDNotFoundProblem(ResourceUIDNotFoundProblem),
-    ResourceNameNotFoundProblem(ResourceNameNotFoundProblem),
-    ResourceApiVersionMismatchProblem(ResourceApiVersionMismatchProblem),
-    ResourceKindMismatchProblem(ResourceKindMismatchProblem),
-    ResourceUnsupportedDescriptorProblem(ResourceUnsupportedDescriptorProblem),
-    ResourceBadAccountProblem(ResourceBadAccountProblem),
+    ResourceLookupProblemResult(ResourceLookupProblemResult),
     #[cynic(fallback)]
     Unknown,
 }

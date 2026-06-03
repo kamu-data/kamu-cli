@@ -4023,7 +4023,7 @@ type ResourceDeleteManySuccess {
 	resourceId: ResourceID!
 }
 
-union ResourceDeleteOutcome = ResourceDeleteSuccess | ResourceUIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceApiVersionMismatchProblem | ResourceKindMismatchProblem | ResourceUnsupportedDescriptorProblem | ResourceBadAccountProblem
+union ResourceDeleteOutcome = ResourceDeleteSuccess | ResourceLookupProblemResult
 
 type ResourceDeleteSuccess {
 	resourceId: ResourceID!
@@ -4034,9 +4034,9 @@ type ResourceEdge {
 	node: ResourceSummary!
 }
 
-union ResourceGetIdentityOutcome = ResourceIdentity | ResourceUIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceApiVersionMismatchProblem | ResourceKindMismatchProblem | ResourceUnsupportedDescriptorProblem | ResourceBadAccountProblem
+union ResourceGetIdentityOutcome = ResourceIdentity | ResourceLookupProblemResult
 
-union ResourceGetOutcome = Resource | ResourceUIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceApiVersionMismatchProblem | ResourceKindMismatchProblem | ResourceUnsupportedDescriptorProblem | ResourceBadAccountProblem
+union ResourceGetOutcome = Resource | ResourceLookupProblemResult
 
 scalar ResourceID
 
@@ -4128,6 +4128,12 @@ enum ResourceListColumnVisibility {
 
 union ResourceListOutcome = ResourceConnection | ResourceUnsupportedDescriptorProblem | ResourceBadAccountProblem
 
+union ResourceLookupProblem = ResourceUIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceApiVersionMismatchProblem | ResourceKindMismatchProblem | ResourceUnsupportedDescriptorProblem | ResourceBadAccountProblem
+
+type ResourceLookupProblemResult {
+	problem: ResourceLookupProblem!
+}
+
 enum ResourceManifestFormat {
 	JSON
 	YAML
@@ -4175,7 +4181,7 @@ input ResourceRefInput @oneOf {
 	byName: ResourceByNameSelectorInput
 }
 
-union ResourceRenderManifestOutcome = ResourceRenderManifestResult | ResourceUIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceApiVersionMismatchProblem | ResourceKindMismatchProblem | ResourceUnsupportedDescriptorProblem | ResourceBadAccountProblem
+union ResourceRenderManifestOutcome = ResourceRenderManifestResult | ResourceLookupProblemResult
 
 type ResourceRenderManifestResult {
 	manifest: String!

@@ -15,6 +15,8 @@ use crate::queries::{
     ResourceBadAccountProblem,
     ResourceBatchSelectorInput,
     ResourceKind,
+    ResourceLookupProblem,
+    ResourceLookupProblemResult,
     ResourceManifestFormat,
     ResourceSelectorInput,
     ResourceUnsupportedDescriptorProblem,
@@ -94,13 +96,15 @@ impl ResourcesMut {
                 kind: ResourceKind::new(kind).into(),
             })),
             Err(kamu_resources_facade::DeleteResourceError::LookupProblem(problem)) => {
-                Ok(ResourceDeleteOutcome::from_lookup_problem(problem))
+                Ok(ResourceDeleteOutcome::Problem(problem.into()))
             }
             Err(kamu_resources_facade::DeleteResourceError::UnsupportedDescriptor(e)) => {
-                Ok(ResourceDeleteOutcome::UnsupportedDescriptor(e.into()))
+                Ok(ResourceDeleteOutcome::Problem(e.into()))
             }
             Err(kamu_resources_facade::DeleteResourceError::BadAccount(e)) => Ok(
-                ResourceDeleteOutcome::BadAccount(map_bad_account_problem(e)?),
+                ResourceDeleteOutcome::Problem(ResourceLookupProblemResult {
+                    problem: ResourceLookupProblem::BadAccount(map_bad_account_problem(e)?),
+                }),
             ),
             Err(error) => Err(map_delete_resource_error(error)),
         }
@@ -149,44 +153,7 @@ impl ResourcesMut {
 #[derive(Union, Debug, Clone)]
 pub enum ResourceDeleteOutcome {
     Success(ResourceDeleteSuccess),
-    UidNotFound(ResourceUIDNotFoundProblem),
-    NameNotFound(ResourceNameNotFoundProblem),
-    ApiVersionMismatch(ResourceApiVersionMismatchProblem),
-    KindMismatch(ResourceKindMismatchProblem),
-    UnsupportedDescriptor(ResourceUnsupportedDescriptorProblem),
-    BadAccount(ResourceBadAccountProblem),
-}
-
-impl ResourceDeleteOutcome {
-    fn from_lookup_problem(
-        problem: kamu_resources_facade::ResourceLookupProblem,
-    ) -> ResourceDeleteOutcome {
-        use kamu_resources_facade::ResourceLookupProblem as P;
-        match problem {
-            P::UIDNotFound(e) => Self::UidNotFound(ResourceUIDNotFoundProblem {
-                uid: e.0.into(),
-                message: e.to_string(),
-            }),
-            P::NameNotFound(e) => Self::NameNotFound(ResourceNameNotFoundProblem {
-                kind: e.kind.clone(),
-                name: e.name.clone(),
-                message: e.to_string(),
-            }),
-            P::ApiVersionMismatch(e) => {
-                Self::ApiVersionMismatch(ResourceApiVersionMismatchProblem {
-                    expected_api_version: e.expected_api_version.clone(),
-                    actual_api_version: e.actual_api_version.clone(),
-                    message: e.to_string(),
-                })
-            }
-            P::KindMismatch(e) => Self::KindMismatch(ResourceKindMismatchProblem {
-                uid: e.uid.into(),
-                expected_kind: e.expected_kind.clone(),
-                actual_kind: e.actual_kind.clone(),
-                message: e.to_string(),
-            }),
-        }
-    }
+    Problem(ResourceLookupProblemResult),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -195,36 +162,6 @@ impl ResourceDeleteOutcome {
 pub struct ResourceDeleteSuccess {
     pub resource_id: ResourceID,
     pub kind: Option<ResourceKind>,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject, Debug, Clone)]
-pub struct ResourceUIDNotFoundProblem {
-    pub uid: ResourceID,
-    pub message: String,
-}
-
-#[derive(SimpleObject, Debug, Clone)]
-pub struct ResourceNameNotFoundProblem {
-    pub kind: String,
-    pub name: String,
-    pub message: String,
-}
-
-#[derive(SimpleObject, Debug, Clone)]
-pub struct ResourceApiVersionMismatchProblem {
-    pub expected_api_version: String,
-    pub actual_api_version: String,
-    pub message: String,
-}
-
-#[derive(SimpleObject, Debug, Clone)]
-pub struct ResourceKindMismatchProblem {
-    pub uid: ResourceID,
-    pub expected_kind: String,
-    pub actual_kind: String,
-    pub message: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

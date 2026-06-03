@@ -12,13 +12,10 @@ use internal_error::InternalError;
 
 use crate::facade::graphql::cynic_api::fragments::{
     BatchResourceProblem,
-    ResourceApiVersionMismatchProblem,
     ResourceBadAccountProblem,
-    ResourceKindMismatchProblem,
+    ResourceLookupProblemResult,
     ResourceManifestFormat,
-    ResourceNameNotFoundProblem,
     ResourceRenderManifestResult,
-    ResourceUIDNotFoundProblem,
     ResourceUnsupportedDescriptorProblem,
 };
 use crate::facade::graphql::cynic_api::inputs::{
@@ -56,12 +53,7 @@ pub(crate) struct RenderManifestResources {
 #[derive(cynic::InlineFragments, Debug, Clone)]
 pub(crate) enum ResourceRenderManifestOutcome {
     ResourceRenderManifestResult(ResourceRenderManifestResult),
-    ResourceUIDNotFoundProblem(ResourceUIDNotFoundProblem),
-    ResourceNameNotFoundProblem(ResourceNameNotFoundProblem),
-    ResourceApiVersionMismatchProblem(ResourceApiVersionMismatchProblem),
-    ResourceKindMismatchProblem(ResourceKindMismatchProblem),
-    ResourceUnsupportedDescriptorProblem(ResourceUnsupportedDescriptorProblem),
-    ResourceBadAccountProblem(ResourceBadAccountProblem),
+    ResourceLookupProblemResult(ResourceLookupProblemResult),
     #[cynic(fallback)]
     Unknown,
 }

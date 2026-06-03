@@ -10,15 +10,7 @@
 use cynic::QueryBuilder;
 use internal_error::InternalError;
 
-use crate::facade::graphql::cynic_api::fragments::{
-    Resource,
-    ResourceApiVersionMismatchProblem,
-    ResourceBadAccountProblem,
-    ResourceKindMismatchProblem,
-    ResourceNameNotFoundProblem,
-    ResourceUIDNotFoundProblem,
-    ResourceUnsupportedDescriptorProblem,
-};
+use crate::facade::graphql::cynic_api::fragments::{Resource, ResourceLookupProblemResult};
 use crate::facade::graphql::cynic_api::inputs::ResourceSelectorInput;
 use crate::facade::graphql::cynic_api::schema;
 use crate::{ResourceSelector, SpecViewMode};
@@ -43,12 +35,7 @@ pub(crate) struct GetResourceResources {
 #[derive(cynic::InlineFragments, Debug, Clone)]
 pub(crate) enum ResourceGetOutcome {
     Resource(Resource),
-    ResourceUIDNotFoundProblem(ResourceUIDNotFoundProblem),
-    ResourceNameNotFoundProblem(ResourceNameNotFoundProblem),
-    ResourceApiVersionMismatchProblem(ResourceApiVersionMismatchProblem),
-    ResourceKindMismatchProblem(ResourceKindMismatchProblem),
-    ResourceUnsupportedDescriptorProblem(ResourceUnsupportedDescriptorProblem),
-    ResourceBadAccountProblem(ResourceBadAccountProblem),
+    ResourceLookupProblemResult(ResourceLookupProblemResult),
     #[cynic(fallback)]
     Unknown,
 }

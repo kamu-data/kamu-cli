@@ -590,6 +590,10 @@ resources:
 codegen-cli-reference:
 	$(TEST_LOG_PARAMS) cargo nextest run -E 'test(generate_reference_markdown)'
 
+.PHONY: codegen-graphql-schema
+codegen-graphql-schema:
+	$(TEST_LOG_PARAMS) cargo nextest run -E 'test(update_graphql_schema)'
+
 
 ###############################################################################
 # Codegen
