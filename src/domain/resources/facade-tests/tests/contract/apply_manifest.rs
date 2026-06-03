@@ -21,7 +21,7 @@ use kamu_resources_facade::{
     ResourceSelector,
     SpecViewMode,
 };
-use pretty_assertions::assert_eq;
+use pretty_assertions::{assert_eq, assert_matches};
 
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
@@ -618,22 +618,24 @@ pub async fn test_apply_rejects_duplicate_metadata_key(h: &impl FacadeContractHa
         "YAML with duplicate label key must fail with ParseManifest, got: {yaml_result:?}"
     );
 
-    // JSON: serde_json silently keeps the last value for duplicate keys, so the
-    // manifest parses successfully and reaches domain validation, which then
-    // rejects the empty-after-dedup spec. This documents the behavioral
-    // difference between YAML and JSON duplicate-key handling.
-    let json_with_dup_label = serde_json::json!({
-        "apiVersion": VARIABLE_SET_API_VERSION,
-        "kind": VARIABLE_SET_KIND,
-        "metadata": {
-            "name": "dup-label-json",
-            "labels": {"env": "prod", "env": "staging"}
-        },
-        "spec": {"variables": {"KEY": "value"}}
-    })
+    // JSON: use a raw string literal so the duplicate key reaches the parser
+    // as actual duplicate JSON object members (the serde_json::json! macro
+    // cannot preserve duplicates — it deduplicates at macro-expansion time).
+    // The custom deserializer detects the duplicate and returns a parse error,
+    // matching YAML behavior. Both formats are consistently rejected.
+    let json_with_dup_label = indoc::indoc!(
+        r#"{
+            "apiVersion": "kamu.dev/v1alpha1",
+            "kind": "VariableSet",
+            "metadata": {
+                "name": "dup-label-json",
+                "labels": {"env": "prod", "env": "staging"}
+            },
+            "spec": {"variables": {"KEY": "value"}}
+        }"#
+    )
     .to_string();
 
-    // serde_json deduplicates silently, so apply succeeds (last value wins).
     let json_result = facade
         .apply_manifest(ApplyManifestRequest {
             format: ResourceManifestFormat::Json,
@@ -641,10 +643,10 @@ pub async fn test_apply_rejects_duplicate_metadata_key(h: &impl FacadeContractHa
         })
         .await;
 
-    assert!(
-        json_result.is_ok(),
-        "JSON with duplicate label key is silently deduplicated by serde_json and must succeed, \
-         got: {json_result:?}"
+    assert_matches!(
+        json_result,
+        Err(ApplyManifestError::ParseManifest(_)),
+        "JSON with duplicate label key must fail with ParseManifest"
     );
 }
 
