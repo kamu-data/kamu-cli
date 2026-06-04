@@ -13,6 +13,15 @@ Recommendation: for ease of reading, use the following format:
 ### Fixed
 -->
 
+## [Unreleased]
+### Added
+- Uniqueness constraint for wallet accounts
+- HTTP endpoint for signing EIP-712 typed data
+- Identity: secondary Secp256k1 private key
+### Changed
+- `DatasetActionAuthorizer::check_action_allowed()` now returns an error if the dataset is not found
+- Optimization: vector ReBAC access classification is now performed in parallel
+
 ## [0.263.4] - 2026-06-01
 ### Fixed
 - `observability`: fixed build when using the crate as an external dependency

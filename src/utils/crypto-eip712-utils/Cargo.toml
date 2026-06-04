@@ -31,8 +31,6 @@ utoipa = ["dep:utoipa"]
 [dependencies]
 internal-error = { workspace = true }
 
-# TODO: Molecule: Phase 3: update to alloy@2 crate.
-#                 Blocked by datafusion-ethers & duplicate deps
 # NOTE: We use alloy sub-crates instead of the meta-crate to avoid pulling in optional dependencies
 #       that get included anyway due to an old known issue:
 #       Details: https://github.com/rust-lang/cargo/issues/10801
