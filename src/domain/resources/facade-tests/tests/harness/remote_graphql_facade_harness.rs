@@ -18,7 +18,7 @@ use kamu_resources_facade::{RemoteGraphqlResourceFacadeImpl, ResourceFacade};
 use strum::IntoEnumIterator;
 
 use super::facade_harness_trait::{FacadeContractHarness, TestAccount};
-use super::local_facade_harness::LocalFacadeHarness;
+use super::local_facade_harness::{LocalFacadeHarness, LocalFacadeHarnessOpts};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -30,7 +30,11 @@ pub struct RemoteGraphqlFacadeHarness {
 
 impl RemoteGraphqlFacadeHarness {
     pub async fn new() -> Self {
-        let local = LocalFacadeHarness::new().await;
+        Self::new_with_opts(LocalFacadeHarnessOpts::default()).await
+    }
+
+    pub async fn new_with_opts(opts: LocalFacadeHarnessOpts) -> Self {
+        let local = LocalFacadeHarness::new_with_opts(opts).await;
         let (server_addr, server_handle) = Self::start_test_server(&local).await;
 
         Self {
@@ -150,6 +154,10 @@ impl FacadeContractHarness for RemoteGraphqlFacadeHarness {
 
     fn account_name(&self, account: TestAccount) -> odf::AccountName {
         self.local.account_name(account)
+    }
+
+    async fn flush_outbox(&self) {
+        self.local.flush_outbox().await;
     }
 }
 

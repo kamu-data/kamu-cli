@@ -54,6 +54,14 @@ pub trait FacadeContractHarness: Send + Sync {
 
     /// Returns the stable `AccountName` for the given fixture account.
     fn account_name(&self, account: TestAccount) -> odf::AccountName;
+
+    /// Flush all pending outbox messages (no-op for Immediate mode).
+    ///
+    /// Only meaningful when the harness was constructed with
+    /// `OutboxProvider::Dispatching`.  Tests that need to observe intermediate
+    /// resource phases (e.g. RF-112) must call this after writes and before
+    /// reading phase-sensitive state.
+    async fn flush_outbox(&self) {}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

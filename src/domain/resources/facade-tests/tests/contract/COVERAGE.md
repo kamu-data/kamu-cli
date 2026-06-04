@@ -73,7 +73,7 @@ Each RF scenario from the original plan is listed with its status.
 | RF-103  | list_all.rs         | Active   | list_all empty account returns empty result                           |                                                                        |
 | RF-110  | summary.rs          | Active   | Summary for empty account                                             |                                                                        |
 | RF-111  | summary.rs          | Active   | Summary counts resources by kind                                      |                                                                        |
-| RF-112  | summary.rs          | Deferred | Summary phase counts                                                  | Requires status/phase projection to be solved first                    |
+| RF-112  | summary.rs          | Active   | Summary phase counts (pending → ready transition)                     | Reconciling is an internal transient not observable at facade granularity |
 | RF-113  | summary.rs          | Active   | Summary account scoping                                               |                                                                        |
 | RF-120  | account_scoping.rs  | Active   | Default account selector resolves to current account                  |                                                                        |
 | RF-121  | account_scoping.rs  | Active   | Account by name resolves correctly                                    |                                                                        |

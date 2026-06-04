@@ -50,7 +50,7 @@ use kamu_datasets::SecretsEncryptionConfig;
 use kamu_resources::{MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE, ResourceLifecycleMessage};
 use kamu_resources_facade::ResourceFacade;
 use kamu_resources_inmem::{InMemoryRawResourceEventStore, InMemoryResourceRepository};
-use messaging_outbox::{OutboxProvider, register_message_dispatcher};
+use messaging_outbox::{OutboxAgent, OutboxProvider, register_message_dispatcher};
 use strum::IntoEnumIterator;
 use time_source::SystemTimeSourceProvider;
 
@@ -58,14 +58,35 @@ use super::facade_harness_trait::{FacadeContractHarness, TestAccount};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub struct LocalFacadeHarnessOpts {
+    pub outbox_provider: OutboxProvider,
+}
+
+impl Default for LocalFacadeHarnessOpts {
+    fn default() -> Self {
+        Self {
+            outbox_provider: OutboxProvider::Immediate {
+                force_immediate: true,
+            },
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct LocalFacadeHarness {
     base_catalog: dill::Catalog,
     alice_account_id: odf::AccountID,
     bob_account_id: odf::AccountID,
+    outbox_agent: Option<Arc<dyn OutboxAgent>>,
 }
 
 impl LocalFacadeHarness {
     pub async fn new() -> Self {
+        Self::new_with_opts(LocalFacadeHarnessOpts::default()).await
+    }
+
+    pub async fn new_with_opts(opts: LocalFacadeHarnessOpts) -> Self {
         let subjects: Vec<(TestAccount, CurrentAccountSubject)> = TestAccount::iter()
             .map(|a| {
                 let subject = CurrentAccountSubject::new_test_with(&a);
@@ -88,17 +109,28 @@ impl LocalFacadeHarness {
             .account_id()
             .clone();
 
-        let base_catalog = Self::build_base_catalog(&subjects).await;
+        let is_dispatching = matches!(opts.outbox_provider, OutboxProvider::Dispatching);
+        let base_catalog = Self::build_base_catalog(&subjects, opts.outbox_provider).await;
+
+        let outbox_agent = if is_dispatching {
+            let agent = base_catalog.get_one::<dyn OutboxAgent>().unwrap();
+            agent.run_initialization().await.unwrap();
+            Some(agent)
+        } else {
+            None
+        };
 
         Self {
             base_catalog,
             alice_account_id,
             bob_account_id,
+            outbox_agent,
         }
     }
 
     async fn build_base_catalog(
         subjects: &[(TestAccount, CurrentAccountSubject)],
+        outbox_provider: OutboxProvider,
     ) -> dill::Catalog {
         let mut predefined_accounts_config = PredefinedAccountsConfig::new();
         for (_, subject) in subjects {
@@ -118,11 +150,12 @@ impl LocalFacadeHarness {
         // Database noop
         NoOpDatabasePlugin::init_database_components(&mut b);
 
-        // Outbox (immediate mode)
-        OutboxProvider::Immediate {
-            force_immediate: true,
+        // Outbox
+        let needs_bridge = matches!(outbox_provider, OutboxProvider::Dispatching);
+        outbox_provider.embed_into_catalog(&mut b);
+        if needs_bridge {
+            b.add::<kamu_messaging_outbox_inmem::InMemoryOutboxMessageBridge>();
         }
-        .embed_into_catalog(&mut b);
 
         // Accounts
         b.add::<InMemoryAccountRepository>()
@@ -185,6 +218,15 @@ impl LocalFacadeHarness {
         &self.base_catalog
     }
 
+    pub async fn flush_outbox(&self) {
+        self.outbox_agent
+            .as_ref()
+            .expect("flush_outbox requires Dispatching outbox mode")
+            .run_while_has_tasks()
+            .await
+            .unwrap();
+    }
+
     fn catalog_for_account(&self, account: TestAccount) -> dill::Catalog {
         let account_id = self.account_id(account);
         let subject = CurrentAccountSubject::logged(
@@ -219,6 +261,10 @@ impl FacadeContractHarness for LocalFacadeHarness {
 
     fn account_name(&self, account: TestAccount) -> odf::AccountName {
         odf::AccountName::new_unchecked(account.name())
+    }
+
+    async fn flush_outbox(&self) {
+        LocalFacadeHarness::flush_outbox(self).await;
     }
 }
 

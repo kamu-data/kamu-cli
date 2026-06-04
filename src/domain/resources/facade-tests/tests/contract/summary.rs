@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources::ApplyResourceOutcome;
+use kamu_resources::{ApplyResourceOutcome, ResourcePhaseCounts, ResourcesSummary};
 use kamu_resources_facade::{
     ApplyManifestRequest,
     ResourceManifestFormat,
@@ -107,11 +107,72 @@ pub async fn test_summary_counts_resources(h: &impl FacadeContractHarness) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// RF-112 (deferred): summary phase counts.
-// Requires controlled phase setup (pending, reconciling, ready, degraded,
-// failed) that is not yet achievable through facade-level operations alone.
-// Add once there is a test-accessible way to drive resources into specific
-// phases.
+// RF-112
+contract_test!(
+    summary_phase_counts,
+    super::test_summary_phase_counts,
+    messaging_outbox::OutboxProvider::Dispatching
+);
+
+pub async fn test_summary_phase_counts(h: &impl FacadeContractHarness) {
+    let facade = h.facade_for(TestAccount::Alice);
+
+    // Apply a resource without flushing the outbox — it stays in Pending.
+    let manifest = variable_set_manifest_json("phase-a", None, &[("K", "v")]);
+    let decision = facade
+        .apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest,
+        })
+        .await
+        .unwrap();
+    assert_applied_outcome(&decision, ApplyResourceOutcome::Created);
+
+    // Before flush: one resource in Pending, none in Ready.
+    let before = facade
+        .summary(ResourcesSummaryRequest { account: None })
+        .await
+        .unwrap();
+    let counts_before = vs_phase_counts(&before);
+    assert_eq!(
+        counts_before.pending, 1,
+        "resource must be Pending before reconciliation"
+    );
+    assert_eq!(
+        counts_before.ready, 0,
+        "no resources must be Ready before reconciliation"
+    );
+
+    // Flush outbox: Applied message is consumed, reconciler runs, resource
+    // transitions Pending → Reconciling → Ready within the same iteration.
+    // The Reconciling phase is a very short-lived internal transient that is
+    // not observable between two flush calls at facade granularity.
+    h.flush_outbox().await;
+
+    // After flush: resource is Ready, no longer Pending.
+    let after = facade
+        .summary(ResourcesSummaryRequest { account: None })
+        .await
+        .unwrap();
+    let counts_after = vs_phase_counts(&after);
+    assert_eq!(
+        counts_after.pending, 0,
+        "resource must no longer be Pending after reconciliation"
+    );
+    assert_eq!(
+        counts_after.ready, 1,
+        "resource must be Ready after reconciliation"
+    );
+}
+
+fn vs_phase_counts(summary: &ResourcesSummary) -> ResourcePhaseCounts {
+    summary
+        .resource_counts
+        .iter()
+        .find(|r| r.kind == VARIABLE_SET_KIND)
+        .map(|r| r.phase_counts.clone())
+        .unwrap_or_default()
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

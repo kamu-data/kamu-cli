@@ -15,6 +15,11 @@ mod helpers;
 
 /// Generates `<name>::local` and `<name>::remote` tokio test functions that
 /// run the given contract suite function against both harness implementations.
+///
+/// An optional third argument accepts a `messaging_outbox::OutboxProvider`
+/// expression; when supplied the harnesses are constructed with that provider
+/// instead of the default `Immediate` mode.  Use this for tests that need to
+/// observe intermediate resource phases (e.g. RF-112).
 #[macro_export]
 macro_rules! contract_test {
     ($mod_name:ident, $suite_fn:path) => {
@@ -28,6 +33,28 @@ macro_rules! contract_test {
             #[test_log::test(tokio::test)]
             async fn remote() {
                 let h = $crate::harness::RemoteGraphqlFacadeHarness::new().await;
+                $suite_fn(&h).await;
+            }
+        }
+    };
+
+    ($mod_name:ident, $suite_fn:path, $outbox:expr) => {
+        mod $mod_name {
+            #[test_log::test(tokio::test)]
+            async fn local() {
+                let opts = $crate::harness::LocalFacadeHarnessOpts {
+                    outbox_provider: $outbox,
+                };
+                let h = $crate::harness::LocalFacadeHarness::new_with_opts(opts).await;
+                $suite_fn(&h).await;
+            }
+
+            #[test_log::test(tokio::test)]
+            async fn remote() {
+                let opts = $crate::harness::LocalFacadeHarnessOpts {
+                    outbox_provider: $outbox,
+                };
+                let h = $crate::harness::RemoteGraphqlFacadeHarness::new_with_opts(opts).await;
                 $suite_fn(&h).await;
             }
         }
