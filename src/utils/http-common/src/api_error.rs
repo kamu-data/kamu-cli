@@ -111,6 +111,13 @@ impl ApiError {
         Self::new(source, http::StatusCode::NOT_IMPLEMENTED)
     }
 
+    pub fn not_implemented_without_reason() -> Self {
+        Self {
+            source: "Not Implemented".into(),
+            status_code: http::StatusCode::NOT_IMPLEMENTED,
+        }
+    }
+
     pub fn not_found_without_reason() -> Self {
         Self {
             source: "Not Found".into(),

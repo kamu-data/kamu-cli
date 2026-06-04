@@ -575,6 +575,8 @@ pub fn configure_base_catalog(
 
     kamu_auth_web3_services::register_dependencies(&mut b);
 
+    kamu_signing_services::register_dependencies(&mut b);
+
     explore::register_dependencies(&mut b);
 
     register_message_dispatcher::<AccountLifecycleMessage>(
@@ -674,6 +676,8 @@ pub fn configure_server_catalog(
     }
 
     b.add::<UploadServiceLocal>();
+
+    b.add_value(kamu_adapter_graphql::GqlFeatureFlags::new());
 
     register_message_dispatcher::<kamu_flow_system::FlowConfigurationUpdatedMessage>(
         &mut b,
@@ -795,10 +799,7 @@ pub fn register_config_in_catalog(
     catalog_builder.add_value(config.source.ethereum.to_infra_cfg());
 
     // Identity configuration
-    if let Some(identity_config) = config.identity.to_infra_cfg() {
-        catalog_builder.add_value(identity_config);
-    }
-    //
+    catalog_builder.add_value(config.identity.clone());
 
     // IPFS configuration
     catalog_builder.add_value(odf::dataset::IpfsGateway {

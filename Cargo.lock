@@ -154,7 +154,6 @@ dependencies = [
  "alloy-provider",
  "alloy-pubsub",
  "alloy-rpc-client",
- "alloy-rpc-types",
  "alloy-serde",
  "alloy-transport",
  "alloy-transport-http",
@@ -260,6 +259,7 @@ dependencies = [
  "alloy-primitives",
  "alloy-sol-type-parser",
  "alloy-sol-types",
+ "derive_more",
  "itoa",
  "serde",
  "serde_json",
@@ -560,18 +560,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "alloy-rpc-types"
-version = "1.8.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4faad925d3a669ffc15f43b3deec7fbdf2adeb28a4d6f9cf4bc661698c0f8f4b"
-dependencies = [
- "alloy-primitives",
- "alloy-rpc-types-eth",
- "alloy-serde",
- "serde",
-]
-
-[[package]]
 name = "alloy-rpc-types-any"
 version = "1.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -626,6 +614,22 @@ dependencies = [
  "either",
  "elliptic-curve",
  "k256",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "alloy-signer-local"
+version = "1.8.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f721f4bf2e4812e5505aaf5de16ef3065a8e26b9139ac885862d00b5a55a659a"
+dependencies = [
+ "alloy-consensus",
+ "alloy-network",
+ "alloy-primitives",
+ "alloy-signer",
+ "async-trait",
+ "k256",
+ "rand 0.8.6",
  "thiserror 2.0.18",
 ]
 
@@ -3099,6 +3103,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3d52eff69cd5e647efe296129160853a42795992097e8af39800e1060caeea9b"
 
 [[package]]
+name = "constcat"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "136d3e02915a2cea4d74caa8681e2d44b1c3254bdbf17d11d41d587ff858832c"
+
+[[package]]
 name = "container-runtime"
 version = "0.263.4"
 dependencies = [
@@ -3395,6 +3405,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "crypto-eip712-utils"
+version = "0.263.4"
+dependencies = [
+ "alloy-core",
+ "alloy-signer",
+ "alloy-signer-local",
+ "const-hex",
+ "eyre",
+ "indoc 2.0.7",
+ "internal-error",
+ "nutype",
+ "pretty_assertions",
+ "schemars 1.2.1",
+ "serde",
+ "serde_json",
+ "utoipa",
+ "zeroize",
+]
+
+[[package]]
 name = "crypto-utils"
 version = "0.263.4"
 dependencies = [
@@ -3622,7 +3652,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ccc2776f0c61eca1ca32528f85548abd1a4be8fb53d1b21c013e4f18da1e7090"
 dependencies = [
  "data-encoding",
- "syn 1.0.109",
+ "syn 2.0.117",
 ]
 
 [[package]]
@@ -3943,11 +3973,15 @@ checksum = "8de6ac0df1662b9148ad3c987978b32cbec7c772f199b1d53520c8fa764a87ee"
 
 [[package]]
 name = "datafusion-ethers"
-version = "53.0.0"
+version = "53.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "17bc5a1a763c5d8c6028ede75ba8af48344c18669d2b65b42ff44f28c5b8a8fe"
+checksum = "4e153f6313d9986fb25086473c023f455dfe5ff008eead6be1acd25bdd82c605"
 dependencies = [
- "alloy",
+ "alloy-core",
+ "alloy-network",
+ "alloy-provider",
+ "alloy-rpc-types-eth",
+ "alloy-transport",
  "async-stream",
  "async-trait",
  "datafusion",
@@ -4949,6 +4983,16 @@ dependencies = [
  "futures-core",
  "nom",
  "pin-project-lite",
+]
+
+[[package]]
+name = "eyre"
+version = "0.6.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7cd915d99f24784cdc19fd37ef22b97e3ff0ae756c7e492e9fbfe897d61e2aec"
+dependencies = [
+ "indenter",
+ "once_cell",
 ]
 
 [[package]]
@@ -6084,7 +6128,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.5.10",
+ "socket2 0.6.3",
  "tokio",
  "tower-service",
  "tracing",
@@ -6295,6 +6339,12 @@ dependencies = [
  "libflate",
  "zstd",
 ]
+
+[[package]]
+name = "indenter"
+version = "0.3.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "964de6e86d545b246d84badc0fef527924ace5134f30641c203ef52ba83f58d5"
 
 [[package]]
 name = "indexmap"
@@ -6922,6 +6972,7 @@ dependencies = [
  "base32",
  "bon",
  "chrono",
+ "constcat",
  "crc32fast",
  "crypto-utils",
  "database-common",
@@ -6935,11 +6986,12 @@ dependencies = [
  "mockall",
  "nutype",
  "opendatafabric",
+ "pretty_assertions",
  "rand 0.9.4",
  "random-strings",
  "reusable",
+ "rstest",
  "schemars 1.2.1",
- "secrecy",
  "serde",
  "serde_json",
  "serde_with",
@@ -6948,6 +7000,7 @@ dependencies = [
  "strum 0.28.0",
  "thiserror 2.0.18",
  "uuid",
+ "zeroize",
 ]
 
 [[package]]
@@ -7375,7 +7428,6 @@ dependencies = [
  "database-common-macros",
  "datafusion",
  "dill",
- "ed25519-dalek",
  "email-utils",
  "file-utils",
  "flate2",
@@ -7400,6 +7452,7 @@ dependencies = [
  "kamu-datasets-inmem",
  "kamu-datasets-services",
  "kamu-ingest-datafusion",
+ "kamu-signing",
  "messaging-outbox",
  "mockall",
  "observability",
@@ -7540,12 +7593,15 @@ name = "kamu-auth-rebac"
 version = "0.263.4"
 dependencies = [
  "async-trait",
+ "indoc 2.0.7",
  "internal-error",
  "itertools 0.14.0",
  "kamu-accounts",
  "kamu-datasets",
  "messaging-outbox",
  "opendatafabric",
+ "pretty_assertions",
+ "rstest",
  "serde",
  "sqlx",
  "strum 0.28.0",
@@ -7757,7 +7813,6 @@ dependencies = [
  "graphql-http",
  "hex",
  "http 1.4.0",
- "http-common",
  "humansize",
  "indicatif",
  "indoc 2.0.7",
@@ -7813,6 +7868,8 @@ dependencies = [
  "kamu-search-elasticsearch",
  "kamu-search-openai",
  "kamu-search-services",
+ "kamu-signing",
+ "kamu-signing-services",
  "kamu-task-system",
  "kamu-task-system-inmem",
  "kamu-task-system-postgres",
@@ -8747,6 +8804,51 @@ dependencies = [
  "time-source",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "kamu-signing"
+version = "0.263.4"
+dependencies = [
+ "async-trait",
+ "bon",
+ "crypto-eip712-utils",
+ "indoc 2.0.7",
+ "internal-error",
+ "opendatafabric",
+ "pretty_assertions",
+ "serde",
+ "setty",
+ "thiserror 2.0.18",
+ "utoipa",
+]
+
+[[package]]
+name = "kamu-signing-services"
+version = "0.263.4"
+dependencies = [
+ "async-trait",
+ "bon",
+ "crypto-eip712-utils",
+ "database-common",
+ "dill",
+ "init-on-startup",
+ "internal-error",
+ "kamu-accounts",
+ "kamu-accounts-inmem",
+ "kamu-accounts-services",
+ "kamu-auth-rebac-inmem",
+ "kamu-auth-rebac-services",
+ "kamu-datasets",
+ "kamu-datasets-services",
+ "kamu-signing",
+ "messaging-outbox",
+ "opendatafabric",
+ "pretty_assertions",
+ "serde_json",
+ "test-log",
+ "time-source",
+ "tokio",
 ]
 
 [[package]]
@@ -11477,7 +11579,7 @@ dependencies = [
  "quinn-udp",
  "rustc-hash",
  "rustls 0.23.39",
- "socket2 0.5.10",
+ "socket2 0.6.3",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
@@ -11514,7 +11616,7 @@ dependencies = [
  "cfg_aliases",
  "libc",
  "once_cell",
- "socket2 0.5.10",
+ "socket2 0.6.3",
  "tracing",
  "windows-sys 0.60.2",
 ]
@@ -12796,6 +12898,12 @@ dependencies = [
  "cpufeatures 0.2.17",
  "digest 0.10.7",
 ]
+
+[[package]]
+name = "sha1_smol"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bbfa15b3dddfee50a0fff136974b3e1bde555604ba463834a7eb7deb6417705d"
 
 [[package]]
 name = "sha2"
@@ -14669,6 +14777,7 @@ dependencies = [
  "getrandom 0.4.2",
  "js-sys",
  "serde_core",
+ "sha1_smol",
  "wasm-bindgen",
 ]
 
@@ -15029,7 +15138,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

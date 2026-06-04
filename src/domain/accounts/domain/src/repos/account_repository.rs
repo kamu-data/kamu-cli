@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::fmt::Display;
-
 use database_common::{EntityPageListing, EntityPageStream, EntityPageStreamer, PaginationOpts};
 use email_utils::Email;
 use internal_error::{InternalError, ResultIntoInternal};
@@ -152,32 +150,17 @@ pub enum CreateAccountError {
 }
 
 #[derive(Error, Debug)]
-#[error("Duplicate {account_field}")]
+#[error("Account already exists with the same '{account_field}'")]
 pub struct AccountErrorDuplicate {
     pub account_field: AccountDuplicateField,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, strum::Display)]
 pub enum AccountDuplicateField {
     Id,
     Name,
     Email,
     ProviderIdentityKey,
-}
-
-impl Display for AccountDuplicateField {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                Self::Id => "id",
-                Self::Name => "name",
-                Self::Email => "email",
-                Self::ProviderIdentityKey => "provider identity",
-            },
-        )
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
