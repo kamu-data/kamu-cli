@@ -3985,7 +3985,7 @@ type ResourceDeleteManySuccess {
 	resourceId: ResourceID!
 }
 
-union ResourceDeleteOutcome = ResourceDeleteSuccess | ResourceLookupProblemResult
+union ResourceDeleteOutcome = ResourceDeleteSuccess | ResourceSelectorProblemResult
 
 type ResourceDeleteSuccess {
 	resourceId: ResourceID!
@@ -3996,9 +3996,9 @@ type ResourceEdge {
 	node: ResourceSummary!
 }
 
-union ResourceGetIdentityOutcome = ResourceIdentity | ResourceLookupProblemResult
+union ResourceGetIdentityOutcome = ResourceIdentity | ResourceSelectorProblemResult
 
-union ResourceGetOutcome = Resource | ResourceLookupProblemResult
+union ResourceGetOutcome = Resource | ResourceSelectorProblemResult
 
 scalar ResourceID
 
@@ -4107,11 +4107,7 @@ enum ResourceListColumnVisibility {
 
 union ResourceListOutcome = ResourceConnection | ResourceUnsupportedDescriptorProblem | ResourceBadAccountProblem
 
-union ResourceLookupProblem = ResourceUIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceApiVersionMismatchProblem | ResourceKindMismatchProblem | ResourceUnsupportedDescriptorProblem | ResourceBadAccountProblem
-
-type ResourceLookupProblemResult {
-	problem: ResourceLookupProblem!
-}
+union ResourceLookupProblem = ResourceUIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceApiVersionMismatchProblem | ResourceKindMismatchProblem
 
 enum ResourceManifestFormat {
 	JSON
@@ -4175,7 +4171,7 @@ input ResourceRefInput @oneOf {
 	byName: ResourceByNameSelectorInput
 }
 
-union ResourceRenderManifestOutcome = ResourceRenderManifestResult | ResourceLookupProblemResult
+union ResourceRenderManifestOutcome = ResourceRenderManifestResult | ResourceSelectorProblemResult
 
 type ResourceRenderManifestResult {
 	manifest: String!
@@ -4187,6 +4183,12 @@ input ResourceSelectorInput {
 	apiVersion: String
 	ref: ResourceRefInput!
 	account: ResourceAccountSelectorInput
+}
+
+union ResourceSelectorProblem = ResourceUIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceApiVersionMismatchProblem | ResourceKindMismatchProblem | ResourceUnsupportedDescriptorProblem | ResourceBadAccountProblem
+
+type ResourceSelectorProblemResult {
+	problem: ResourceSelectorProblem!
 }
 
 type ResourceStatusSummary {

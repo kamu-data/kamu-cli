@@ -25,11 +25,11 @@ use crate::queries::{
     ResourceInvalidSearchQueryProblem,
     ResourceKindDescriptor,
     ResourceKindInput,
-    ResourceLookupProblem,
-    ResourceLookupProblemResult,
     ResourceManifestFormat,
     ResourceRenderManifestResult,
     ResourceSelectorInput,
+    ResourceSelectorProblem,
+    ResourceSelectorProblemResult,
     ResourceSummary,
     ResourceUnsupportedDescriptorProblem,
     ResourcesSummary,
@@ -120,8 +120,8 @@ impl Resources {
                 Ok(ResourceGetOutcome::Problem(error.into()))
             }
             Err(kamu_resources_facade::GetResourceError::BadAccount(error)) => {
-                Ok(ResourceGetOutcome::Problem(ResourceLookupProblemResult {
-                    problem: ResourceLookupProblem::BadAccount(map_bad_account_problem(error)?),
+                Ok(ResourceGetOutcome::Problem(ResourceSelectorProblemResult {
+                    problem: ResourceSelectorProblem::BadAccount(map_bad_account_problem(error)?),
                 }))
             }
             Err(error) => Err(map_get_resource_non_lookup_error(error)),
@@ -175,8 +175,8 @@ impl Resources {
                 Ok(ResourceGetIdentityOutcome::Problem(error.into()))
             }
             Err(kamu_resources_facade::GetResourceError::BadAccount(error)) => Ok(
-                ResourceGetIdentityOutcome::Problem(ResourceLookupProblemResult {
-                    problem: ResourceLookupProblem::BadAccount(map_bad_account_problem(error)?),
+                ResourceGetIdentityOutcome::Problem(ResourceSelectorProblemResult {
+                    problem: ResourceSelectorProblem::BadAccount(map_bad_account_problem(error)?),
                 }),
             ),
             Err(error) => Err(map_get_resource_non_lookup_error(error)),
@@ -437,8 +437,8 @@ impl Resources {
                 error,
             )) => Ok(ResourceRenderManifestOutcome::Problem(error.into())),
             Err(kamu_resources_facade::RenderResourceManifestError::BadAccount(error)) => Ok(
-                ResourceRenderManifestOutcome::Problem(ResourceLookupProblemResult {
-                    problem: ResourceLookupProblem::BadAccount(map_bad_account_problem(error)?),
+                ResourceRenderManifestOutcome::Problem(ResourceSelectorProblemResult {
+                    problem: ResourceSelectorProblem::BadAccount(map_bad_account_problem(error)?),
                 }),
             ),
             Err(error) => Err(map_render_resource_manifest_error(error)),
@@ -549,7 +549,7 @@ pub enum ResourceIdentityListAllOutcome {
 #[derive(Union, Debug, Clone)]
 pub enum ResourceGetOutcome {
     Success(Resource),
-    Problem(ResourceLookupProblemResult),
+    Problem(ResourceSelectorProblemResult),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -557,7 +557,7 @@ pub enum ResourceGetOutcome {
 #[derive(Union, Debug, Clone)]
 pub enum ResourceGetIdentityOutcome {
     Success(ResourceIdentity),
-    Problem(ResourceLookupProblemResult),
+    Problem(ResourceSelectorProblemResult),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -581,7 +581,7 @@ fn map_render_resource_manifest_error(
 #[derive(Union, Debug, Clone)]
 pub enum ResourceRenderManifestOutcome {
     Success(ResourceRenderManifestResult),
-    Problem(ResourceLookupProblemResult),
+    Problem(ResourceSelectorProblemResult),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -356,8 +356,6 @@ pub enum ResourceLookupProblem {
     NameNotFound(ResourceNameNotFoundProblem),
     ApiVersionMismatch(ResourceApiVersionMismatchProblem),
     KindMismatch(ResourceKindMismatchProblem),
-    UnsupportedDescriptor(ResourceUnsupportedDescriptorProblem),
-    BadAccount(ResourceBadAccountProblem),
 }
 
 impl From<kamu_resources_facade::ResourceLookupProblem> for ResourceLookupProblem {
@@ -390,7 +388,30 @@ impl From<kamu_resources_facade::ResourceLookupProblem> for ResourceLookupProble
     }
 }
 
-impl From<kamu_resources::UnsupportedResourceDescriptorError> for ResourceLookupProblem {
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Union, Debug, Clone)]
+pub enum ResourceSelectorProblem {
+    UidNotFound(ResourceUIDNotFoundProblem),
+    NameNotFound(ResourceNameNotFoundProblem),
+    ApiVersionMismatch(ResourceApiVersionMismatchProblem),
+    KindMismatch(ResourceKindMismatchProblem),
+    UnsupportedDescriptor(ResourceUnsupportedDescriptorProblem),
+    BadAccount(ResourceBadAccountProblem),
+}
+
+impl From<kamu_resources_facade::ResourceLookupProblem> for ResourceSelectorProblem {
+    fn from(value: kamu_resources_facade::ResourceLookupProblem) -> Self {
+        match ResourceLookupProblem::from(value) {
+            ResourceLookupProblem::UidNotFound(p) => Self::UidNotFound(p),
+            ResourceLookupProblem::NameNotFound(p) => Self::NameNotFound(p),
+            ResourceLookupProblem::ApiVersionMismatch(p) => Self::ApiVersionMismatch(p),
+            ResourceLookupProblem::KindMismatch(p) => Self::KindMismatch(p),
+        }
+    }
+}
+
+impl From<kamu_resources::UnsupportedResourceDescriptorError> for ResourceSelectorProblem {
     fn from(e: kamu_resources::UnsupportedResourceDescriptorError) -> Self {
         Self::UnsupportedDescriptor(e.into())
     }
@@ -399,11 +420,11 @@ impl From<kamu_resources::UnsupportedResourceDescriptorError> for ResourceLookup
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject, Debug, Clone)]
-pub struct ResourceLookupProblemResult {
-    pub problem: ResourceLookupProblem,
+pub struct ResourceSelectorProblemResult {
+    pub problem: ResourceSelectorProblem,
 }
 
-impl From<kamu_resources_facade::ResourceLookupProblem> for ResourceLookupProblemResult {
+impl From<kamu_resources_facade::ResourceLookupProblem> for ResourceSelectorProblemResult {
     fn from(value: kamu_resources_facade::ResourceLookupProblem) -> Self {
         Self {
             problem: value.into(),
@@ -411,7 +432,7 @@ impl From<kamu_resources_facade::ResourceLookupProblem> for ResourceLookupProble
     }
 }
 
-impl From<kamu_resources::UnsupportedResourceDescriptorError> for ResourceLookupProblemResult {
+impl From<kamu_resources::UnsupportedResourceDescriptorError> for ResourceSelectorProblemResult {
     fn from(e: kamu_resources::UnsupportedResourceDescriptorError) -> Self {
         Self { problem: e.into() }
     }

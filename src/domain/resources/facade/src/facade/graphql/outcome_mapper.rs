@@ -89,12 +89,7 @@ pub(super) fn collect_batch_problems(
                     "Remote {context} problem index {request_index} is out of bounds",
                 ))));
             }
-            let error = map_batch_lookup_problem(problem.problem).ok_or_else(|| {
-                BatchResourceError::Internal(InternalError::new(format!(
-                    "Remote {context} problem at index {request_index} has unrecognized \
-                     ResourceLookupProblem variant",
-                )))
-            })?;
+            let error = map_batch_lookup_problem(problem.problem)?;
             Ok(BatchResourceProblem {
                 request_index,
                 error,
@@ -150,16 +145,16 @@ pub(super) fn validate_batch_response_indexes<T, E>(
 
 fn map_batch_lookup_problem(
     problem: cynic_api::fragments::ResourceLookupProblem,
-) -> Option<ResourceLookupProblem> {
+) -> Result<ResourceLookupProblem, BatchResourceError> {
     use cynic_api::fragments::ResourceLookupProblem as P;
     match problem {
-        P::ResourceUIDNotFoundProblem(p) => Some(map_uid_not_found(p)),
-        P::ResourceNameNotFoundProblem(p) => Some(map_name_not_found(p)),
-        P::ResourceApiVersionMismatchProblem(p) => Some(map_api_version_mismatch(p)),
-        P::ResourceKindMismatchProblem(p) => Some(map_kind_mismatch(p)),
-        P::ResourceUnsupportedDescriptorProblem(_)
-        | P::ResourceBadAccountProblem(_)
-        | P::Unknown => None,
+        P::ResourceUIDNotFoundProblem(p) => Ok(map_uid_not_found(p)),
+        P::ResourceNameNotFoundProblem(p) => Ok(map_name_not_found(p)),
+        P::ResourceApiVersionMismatchProblem(p) => Ok(map_api_version_mismatch(p)),
+        P::ResourceKindMismatchProblem(p) => Ok(map_kind_mismatch(p)),
+        P::Unknown => Err(BatchResourceError::Internal(InternalError::new(
+            "Remote batch problem contains unrecognized ResourceLookupProblem variant",
+        ))),
     }
 }
 
@@ -270,8 +265,8 @@ pub(super) fn map_kind_mismatch(
     })
 }
 
-pub(super) fn map_lookup_problem_result<E, FLookup, FUnsupported, FBadAccount>(
-    result: cynic_api::fragments::ResourceLookupProblemResult,
+pub(super) fn map_selector_problem_result<E, FLookup, FUnsupported, FBadAccount>(
+    result: cynic_api::fragments::ResourceSelectorProblemResult,
     map_lookup: FLookup,
     map_unsupported: FUnsupported,
     map_bad_account: FBadAccount,
@@ -281,7 +276,7 @@ where
     FUnsupported: FnOnce(domain::UnsupportedResourceDescriptorError) -> E,
     FBadAccount: FnOnce(crate::ResolveManifestAccountError) -> E,
 {
-    use cynic_api::fragments::ResourceLookupProblem as P;
+    use cynic_api::fragments::ResourceSelectorProblem as P;
     match result.problem {
         P::ResourceUIDNotFoundProblem(p) => Ok(map_lookup(map_uid_not_found(p))),
         P::ResourceNameNotFoundProblem(p) => Ok(map_lookup(map_name_not_found(p))),
@@ -292,7 +287,7 @@ where
         }
         P::ResourceBadAccountProblem(p) => Ok(map_bad_account(bad_account_problem_error(p)?)),
         P::Unknown => Err(InternalError::new(
-            "Remote returned an unrecognized ResourceLookupProblem variant",
+            "Remote returned an unrecognized ResourceSelectorProblem variant",
         )),
     }
 }
@@ -457,7 +452,7 @@ pub(super) fn map_get_resource_outcome(
     use cynic_api::operations::get_resource::ResourceGetOutcome as O;
     match outcome {
         O::Resource(r) => r.try_into().map_err(GetResourceError::Internal),
-        O::ResourceLookupProblemResult(p) => Err(map_lookup_problem_result(
+        O::ResourceSelectorProblemResult(p) => Err(map_selector_problem_result(
             p,
             GetResourceError::LookupProblem,
             Into::into,
@@ -478,7 +473,7 @@ pub(super) fn map_get_identity_outcome(
     use cynic_api::operations::identity::ResourceGetIdentityOutcome as O;
     match outcome {
         O::ResourceIdentity(i) => Ok(i.into()),
-        O::ResourceLookupProblemResult(p) => Err(map_lookup_problem_result(
+        O::ResourceSelectorProblemResult(p) => Err(map_selector_problem_result(
             p,
             GetResourceError::LookupProblem,
             Into::into,
@@ -499,7 +494,7 @@ pub(super) fn map_delete_outcome(
     use cynic_api::operations::delete::ResourceDeleteOutcome as O;
     match outcome {
         O::ResourceDeleteSuccess(s) => Ok(s.resource_id),
-        O::ResourceLookupProblemResult(p) => Err(map_lookup_problem_result(
+        O::ResourceSelectorProblemResult(p) => Err(map_selector_problem_result(
             p,
             DeleteResourceError::LookupProblem,
             Into::into,
@@ -695,7 +690,7 @@ pub(super) fn map_render_manifest_outcome(
     use cynic_api::operations::render_manifest::ResourceRenderManifestOutcome as O;
     match outcome {
         O::ResourceRenderManifestResult(r) => Ok(r.into()),
-        O::ResourceLookupProblemResult(p) => Err(map_lookup_problem_result(
+        O::ResourceSelectorProblemResult(p) => Err(map_selector_problem_result(
             p,
             RenderResourceManifestError::LookupProblem,
             Into::into,

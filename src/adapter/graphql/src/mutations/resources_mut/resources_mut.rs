@@ -15,10 +15,10 @@ use crate::queries::{
     ResourceBadAccountProblem,
     ResourceBatchSelectorInput,
     ResourceKind,
-    ResourceLookupProblem,
-    ResourceLookupProblemResult,
     ResourceManifestFormat,
     ResourceSelectorInput,
+    ResourceSelectorProblem,
+    ResourceSelectorProblemResult,
     ResourceUnsupportedDescriptorProblem,
     map_bad_account_problem,
     map_resolve_manifest_account_error,
@@ -102,8 +102,8 @@ impl ResourcesMut {
                 Ok(ResourceDeleteOutcome::Problem(e.into()))
             }
             Err(kamu_resources_facade::DeleteResourceError::BadAccount(e)) => Ok(
-                ResourceDeleteOutcome::Problem(ResourceLookupProblemResult {
-                    problem: ResourceLookupProblem::BadAccount(map_bad_account_problem(e)?),
+                ResourceDeleteOutcome::Problem(ResourceSelectorProblemResult {
+                    problem: ResourceSelectorProblem::BadAccount(map_bad_account_problem(e)?),
                 }),
             ),
             Err(error) => Err(map_delete_resource_error(error)),
@@ -153,7 +153,7 @@ impl ResourcesMut {
 #[derive(Union, Debug, Clone)]
 pub enum ResourceDeleteOutcome {
     Success(ResourceDeleteSuccess),
-    Problem(ResourceLookupProblemResult),
+    Problem(ResourceSelectorProblemResult),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -160,6 +160,18 @@ pub(crate) enum ResourceLookupProblem {
     ResourceNameNotFoundProblem(ResourceNameNotFoundProblem),
     ResourceApiVersionMismatchProblem(ResourceApiVersionMismatchProblem),
     ResourceKindMismatchProblem(ResourceKindMismatchProblem),
+    #[cynic(fallback)]
+    Unknown,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::InlineFragments, Debug, Clone)]
+pub(crate) enum ResourceSelectorProblem {
+    ResourceUIDNotFoundProblem(ResourceUIDNotFoundProblem),
+    ResourceNameNotFoundProblem(ResourceNameNotFoundProblem),
+    ResourceApiVersionMismatchProblem(ResourceApiVersionMismatchProblem),
+    ResourceKindMismatchProblem(ResourceKindMismatchProblem),
     ResourceUnsupportedDescriptorProblem(ResourceUnsupportedDescriptorProblem),
     ResourceBadAccountProblem(ResourceBadAccountProblem),
     #[cynic(fallback)]
@@ -167,8 +179,8 @@ pub(crate) enum ResourceLookupProblem {
 }
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
-pub(crate) struct ResourceLookupProblemResult {
-    pub problem: ResourceLookupProblem,
+pub(crate) struct ResourceSelectorProblemResult {
+    pub problem: ResourceSelectorProblem,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
