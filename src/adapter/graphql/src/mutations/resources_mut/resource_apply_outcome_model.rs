@@ -58,34 +58,34 @@ pub enum ResourceMetadataValidationProblemCode {
 
 impl From<kamu_resources::ResourceMetadataValidationError> for ResourceInvalidMetadataProblem {
     fn from(value: kamu_resources::ResourceMetadataValidationError) -> Self {
-        use kamu_resources::ResourceMetadataValidationError as E;
-        let code = match &value {
-            E::EmptyName => ResourceMetadataValidationProblemCode::EmptyName,
-            E::NameTooLong { .. } => ResourceMetadataValidationProblemCode::NameTooLong,
-            E::InvalidName { .. } => ResourceMetadataValidationProblemCode::InvalidName,
-            E::DescriptionTooLong { .. } => {
-                ResourceMetadataValidationProblemCode::DescriptionTooLong
-            }
-            E::TooManyLabels { .. } => ResourceMetadataValidationProblemCode::TooManyLabels,
-            E::InvalidLabelKey { .. } => ResourceMetadataValidationProblemCode::InvalidLabelKey,
-            E::DuplicateLabelKey { .. } => ResourceMetadataValidationProblemCode::DuplicateLabelKey,
-            E::LabelValueTooLong { .. } => ResourceMetadataValidationProblemCode::LabelValueTooLong,
-            E::TooManyAnnotations { .. } => {
-                ResourceMetadataValidationProblemCode::TooManyAnnotations
-            }
-            E::InvalidAnnotationKey { .. } => {
-                ResourceMetadataValidationProblemCode::InvalidAnnotationKey
-            }
-            E::DuplicateAnnotationKey { .. } => {
+        kamu_resources_facade::ResourceInvalidMetadataError::from(value).into()
+    }
+}
+
+impl From<kamu_resources_facade::ResourceInvalidMetadataError> for ResourceInvalidMetadataProblem {
+    fn from(value: kamu_resources_facade::ResourceInvalidMetadataError) -> Self {
+        use kamu_resources_facade::ResourceMetadataValidationProblemCode as C;
+        let code = match value.code {
+            C::EmptyName => ResourceMetadataValidationProblemCode::EmptyName,
+            C::NameTooLong => ResourceMetadataValidationProblemCode::NameTooLong,
+            C::InvalidName => ResourceMetadataValidationProblemCode::InvalidName,
+            C::DescriptionTooLong => ResourceMetadataValidationProblemCode::DescriptionTooLong,
+            C::TooManyLabels => ResourceMetadataValidationProblemCode::TooManyLabels,
+            C::InvalidLabelKey => ResourceMetadataValidationProblemCode::InvalidLabelKey,
+            C::DuplicateLabelKey => ResourceMetadataValidationProblemCode::DuplicateLabelKey,
+            C::LabelValueTooLong => ResourceMetadataValidationProblemCode::LabelValueTooLong,
+            C::TooManyAnnotations => ResourceMetadataValidationProblemCode::TooManyAnnotations,
+            C::InvalidAnnotationKey => ResourceMetadataValidationProblemCode::InvalidAnnotationKey,
+            C::DuplicateAnnotationKey => {
                 ResourceMetadataValidationProblemCode::DuplicateAnnotationKey
             }
-            E::AnnotationValueTooLong { .. } => {
+            C::AnnotationValueTooLong => {
                 ResourceMetadataValidationProblemCode::AnnotationValueTooLong
             }
         };
         Self {
             code,
-            message: value.to_string(),
+            message: value.message,
         }
     }
 }

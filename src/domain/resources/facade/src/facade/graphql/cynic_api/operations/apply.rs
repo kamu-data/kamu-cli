@@ -206,57 +206,32 @@ pub(crate) enum ResourceMetadataValidationProblemCode {
     AnnotationValueTooLong,
 }
 
+impl From<ResourceMetadataValidationProblemCode> for crate::ResourceMetadataValidationProblemCode {
+    fn from(value: ResourceMetadataValidationProblemCode) -> Self {
+        use ResourceMetadataValidationProblemCode as C;
+        match value {
+            C::EmptyName => Self::EmptyName,
+            C::NameTooLong => Self::NameTooLong,
+            C::InvalidName => Self::InvalidName,
+            C::DescriptionTooLong => Self::DescriptionTooLong,
+            C::TooManyLabels => Self::TooManyLabels,
+            C::InvalidLabelKey => Self::InvalidLabelKey,
+            C::DuplicateLabelKey => Self::DuplicateLabelKey,
+            C::LabelValueTooLong => Self::LabelValueTooLong,
+            C::TooManyAnnotations => Self::TooManyAnnotations,
+            C::InvalidAnnotationKey => Self::InvalidAnnotationKey,
+            C::DuplicateAnnotationKey => Self::DuplicateAnnotationKey,
+            C::AnnotationValueTooLong => Self::AnnotationValueTooLong,
+        }
+    }
+}
+
 impl From<ResourceInvalidMetadataProblem> for crate::ApplyManifestError {
     fn from(value: ResourceInvalidMetadataProblem) -> Self {
-        use kamu_resources::ResourceMetadataValidationError as E;
-
-        let inner = match value.code {
-            ResourceMetadataValidationProblemCode::EmptyName => E::EmptyName,
-            ResourceMetadataValidationProblemCode::NameTooLong => {
-                E::NameTooLong { actual: 0, max: 0 }
-            }
-            ResourceMetadataValidationProblemCode::InvalidName => E::InvalidName {
-                name: value.message.clone(),
-            },
-            ResourceMetadataValidationProblemCode::DescriptionTooLong => {
-                E::DescriptionTooLong { actual: 0, max: 0 }
-            }
-            ResourceMetadataValidationProblemCode::TooManyLabels => {
-                E::TooManyLabels { actual: 0, max: 0 }
-            }
-            ResourceMetadataValidationProblemCode::InvalidLabelKey => E::InvalidLabelKey {
-                key: value.message.clone(),
-            },
-            ResourceMetadataValidationProblemCode::DuplicateLabelKey => E::DuplicateLabelKey {
-                key: value.message.clone(),
-            },
-            ResourceMetadataValidationProblemCode::LabelValueTooLong => E::LabelValueTooLong {
-                key: String::new(),
-                actual: 0,
-                max: 0,
-            },
-            ResourceMetadataValidationProblemCode::TooManyAnnotations => {
-                E::TooManyAnnotations { actual: 0, max: 0 }
-            }
-            ResourceMetadataValidationProblemCode::InvalidAnnotationKey => {
-                E::InvalidAnnotationKey {
-                    key: value.message.clone(),
-                }
-            }
-            ResourceMetadataValidationProblemCode::DuplicateAnnotationKey => {
-                E::DuplicateAnnotationKey {
-                    key: value.message.clone(),
-                }
-            }
-            ResourceMetadataValidationProblemCode::AnnotationValueTooLong => {
-                E::AnnotationValueTooLong {
-                    key: String::new(),
-                    actual: 0,
-                    max: 0,
-                }
-            }
-        };
-        Self::InvalidMetadata(inner)
+        Self::InvalidMetadata(crate::ResourceInvalidMetadataError {
+            code: value.code.into(),
+            message: value.message,
+        })
     }
 }
 

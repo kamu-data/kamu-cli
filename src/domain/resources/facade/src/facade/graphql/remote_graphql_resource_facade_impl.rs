@@ -186,8 +186,7 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
         let response: Operation::RenderManifestQuery = self
             .graphql_client
             .execute_operation(Operation::build_manifest_operation(variables))
-            .await
-            .map_err(RenderResourceManifestError::RemoteRequest)?;
+            .await?;
 
         outcome_mapper::map_render_manifest_outcome(response.resources.render_manifest)
     }
@@ -376,8 +375,7 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
         let response: Operation::DeleteMutation = self
             .graphql_client
             .execute_operation(Operation::build_delete_operation(variables))
-            .await
-            .map_err(DeleteResourceError::RemoteRequest)?;
+            .await?;
 
         outcome_mapper::map_delete_outcome(response.resources.delete)
     }
