@@ -7,15 +7,20 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::mutations::ResourceApplyOutcome;
+use crate::mutations::{ResourceApplyOutcome, ResourceApplyParseManifestProblem};
 use crate::prelude::*;
 use crate::queries::{
     BatchResourceProblem,
     ResourceAccountSelectorInput,
+    ResourceBadAccountProblem,
     ResourceBatchSelectorInput,
     ResourceKind,
     ResourceManifestFormat,
     ResourceSelectorInput,
+    ResourceSelectorProblem,
+    ResourceSelectorProblemResult,
+    ResourceUnsupportedDescriptorProblem,
+    map_bad_account_problem,
     map_resolve_manifest_account_error,
 };
 
@@ -42,7 +47,7 @@ impl ResourcesMut {
             manifest,
         };
 
-        let result = if dry_run.unwrap_or(false) {
+        let outcome_result = if dry_run.unwrap_or(false) {
             resource_facade
                 .plan_apply_manifest(request)
                 .await
@@ -52,10 +57,12 @@ impl ResourcesMut {
                 .apply_manifest(request)
                 .await
                 .map(ResourceApplyOutcome::from)
-        }
-        .map_err(map_apply_resource_error)?;
+        };
 
-        Ok(result)
+        match outcome_result {
+            Ok(outcome) => Ok(outcome),
+            Err(err) => map_apply_resource_error(err),
+        }
     }
 
     #[tracing::instrument(level = "info", name = ResourcesMut_delete, skip_all, fields(?selector))]
@@ -89,8 +96,16 @@ impl ResourcesMut {
                 kind: ResourceKind::new(kind).into(),
             })),
             Err(kamu_resources_facade::DeleteResourceError::LookupProblem(problem)) => {
-                Ok(ResourceDeleteOutcome::from_lookup_problem(problem))
+                Ok(ResourceDeleteOutcome::Problem(problem.into()))
             }
+            Err(kamu_resources_facade::DeleteResourceError::UnsupportedDescriptor(e)) => {
+                Ok(ResourceDeleteOutcome::Problem(e.into()))
+            }
+            Err(kamu_resources_facade::DeleteResourceError::BadAccount(e)) => Ok(
+                ResourceDeleteOutcome::Problem(ResourceSelectorProblemResult {
+                    problem: ResourceSelectorProblem::BadAccount(map_bad_account_problem(e)?),
+                }),
+            ),
             Err(error) => Err(map_delete_resource_error(error)),
         }
     }
@@ -101,7 +116,7 @@ impl ResourcesMut {
         &self,
         ctx: &Context<'_>,
         selector: ResourceBatchSelectorInput,
-    ) -> Result<ResourceDeleteManyResult> {
+    ) -> Result<ResourceDeleteManyOutcome> {
         let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
 
         let ResourceBatchSelectorInput {
@@ -112,7 +127,7 @@ impl ResourcesMut {
         } = selector;
         let kind = kind.into_resource_type();
 
-        resource_facade
+        match resource_facade
             .delete_many(kamu_resources_facade::ResourceBatchSelector {
                 account: account.map(ResourceAccountSelectorInput::into_manifest_account),
                 kind,
@@ -120,8 +135,16 @@ impl ResourcesMut {
                 resource_refs: resource_refs.into_iter().map(Into::into).collect(),
             })
             .await
-            .map(Into::into)
-            .map_err(map_batch_delete_resource_error)
+        {
+            Ok(response) => Ok(ResourceDeleteManyOutcome::Success(response.into())),
+            Err(kamu_resources_facade::BatchResourceError::UnsupportedDescriptor(e)) => {
+                Ok(ResourceDeleteManyOutcome::UnsupportedDescriptor(e.into()))
+            }
+            Err(kamu_resources_facade::BatchResourceError::BadAccount(e)) => Ok(
+                ResourceDeleteManyOutcome::BadAccount(map_bad_account_problem(e)?),
+            ),
+            Err(e) => Err(map_batch_delete_resource_error(e)),
+        }
     }
 }
 
@@ -130,42 +153,7 @@ impl ResourcesMut {
 #[derive(Union, Debug, Clone)]
 pub enum ResourceDeleteOutcome {
     Success(ResourceDeleteSuccess),
-    UidNotFound(ResourceUIDNotFoundProblem),
-    NameNotFound(ResourceNameNotFoundProblem),
-    ApiVersionMismatch(ResourceApiVersionMismatchProblem),
-    KindMismatch(ResourceKindMismatchProblem),
-}
-
-impl ResourceDeleteOutcome {
-    fn from_lookup_problem(
-        problem: kamu_resources_facade::ResourceLookupProblem,
-    ) -> ResourceDeleteOutcome {
-        use kamu_resources_facade::ResourceLookupProblem as P;
-        match problem {
-            P::UIDNotFound(e) => Self::UidNotFound(ResourceUIDNotFoundProblem {
-                uid: e.0.into(),
-                message: e.to_string(),
-            }),
-            P::NameNotFound(e) => Self::NameNotFound(ResourceNameNotFoundProblem {
-                kind: e.kind.clone(),
-                name: e.name.clone(),
-                message: e.to_string(),
-            }),
-            P::ApiVersionMismatch(e) => {
-                Self::ApiVersionMismatch(ResourceApiVersionMismatchProblem {
-                    expected_api_version: e.expected_api_version.clone(),
-                    actual_api_version: e.actual_api_version.clone(),
-                    message: e.to_string(),
-                })
-            }
-            P::KindMismatch(e) => Self::KindMismatch(ResourceKindMismatchProblem {
-                uid: e.uid.into(),
-                expected_kind: e.expected_kind.clone(),
-                actual_kind: e.actual_kind.clone(),
-                message: e.to_string(),
-            }),
-        }
-    }
+    Problem(ResourceSelectorProblemResult),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -178,35 +166,12 @@ pub struct ResourceDeleteSuccess {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Debug, Clone)]
-pub struct ResourceUIDNotFoundProblem {
-    pub uid: ResourceID,
-    pub message: String,
+#[derive(Union, Debug, Clone)]
+pub enum ResourceDeleteManyOutcome {
+    Success(ResourceDeleteManyResult),
+    UnsupportedDescriptor(ResourceUnsupportedDescriptorProblem),
+    BadAccount(ResourceBadAccountProblem),
 }
-
-#[derive(SimpleObject, Debug, Clone)]
-pub struct ResourceNameNotFoundProblem {
-    pub kind: String,
-    pub name: String,
-    pub message: String,
-}
-
-#[derive(SimpleObject, Debug, Clone)]
-pub struct ResourceApiVersionMismatchProblem {
-    pub expected_api_version: String,
-    pub actual_api_version: String,
-    pub message: String,
-}
-
-#[derive(SimpleObject, Debug, Clone)]
-pub struct ResourceKindMismatchProblem {
-    pub uid: ResourceID,
-    pub expected_kind: String,
-    pub actual_kind: String,
-    pub message: String,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceDeleteManyResult {
@@ -245,23 +210,29 @@ pub struct ResourceDeleteManySuccess {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn map_apply_resource_error(error: kamu_resources_facade::ApplyManifestError) -> GqlError {
+fn map_apply_resource_error(
+    error: kamu_resources_facade::ApplyManifestError,
+) -> Result<ResourceApplyOutcome, GqlError> {
     use kamu_resources_facade::ApplyManifestError as E;
 
     match error {
-        E::ParseManifest(error) => GqlError::gql(error.to_string()),
-        E::UnsupportedDescriptor(_) => GqlError::gql("Unsupported resource kind"),
-        E::BadAccount(error) => map_resolve_manifest_account_error(error),
-        E::InvalidMetadata(error) => GqlError::gql(error.to_string()),
-        E::InvalidSpec(error) => GqlError::gql(error.to_string()),
-        E::UIDNotFound(error) => GqlError::gql(error.to_string()),
-        E::TypeMismatch(error) => GqlError::gql(error.to_string()),
+        E::ParseManifest(e) => Ok(ResourceApplyOutcome::ParseManifest(
+            ResourceApplyParseManifestProblem {
+                message: e.to_string(),
+            },
+        )),
+        E::UnsupportedDescriptor(e) => Ok(ResourceApplyOutcome::UnsupportedDescriptor(e.into())),
+        E::BadAccount(e) => map_bad_account_problem(e).map(ResourceApplyOutcome::BadAccount),
+        E::InvalidMetadata(e) => Ok(ResourceApplyOutcome::InvalidMetadata(e.into())),
+        E::InvalidSpec(e) => Ok(ResourceApplyOutcome::InvalidSpec(e.into())),
+        E::UIDNotFound(error) => Err(GqlError::gql(error.to_string())),
+        E::TypeMismatch(error) => Err(GqlError::gql(error.to_string())),
         E::ConcurrentModification(error) => {
             tracing::error!(error = ?error, "Resource apply_manifest concurrent modification");
-            GqlError::gql("Resource was modified concurrently")
+            Err(GqlError::gql("Resource was modified concurrently"))
         }
-        E::RemoteRequest(error) => error.int_err().into(),
-        E::Internal(error) => error.into(),
+        E::RemoteRequest(error) => Err(error.int_err().into()),
+        E::Internal(error) => Err(error.into()),
     }
 }
 
@@ -284,8 +255,10 @@ fn map_delete_resource_error(error: kamu_resources_facade::DeleteResourceError) 
     use kamu_resources_facade::DeleteResourceError as E;
 
     match error {
-        E::UnsupportedDescriptor(_) => GqlError::gql("Unsupported resource kind"),
-        E::BadAccount(error) => map_resolve_manifest_account_error(error),
+        E::UnsupportedDescriptor(_) => {
+            unreachable!("UnsupportedDescriptor is handled as a union arm")
+        }
+        E::BadAccount(_) => unreachable!("BadAccount is handled as a union arm"),
         E::LookupProblem(_) => unreachable!("LookupProblem is handled as a union arm"),
         E::RemoteRequest(error) => error.int_err().into(),
         E::Internal(error) => error.into(),

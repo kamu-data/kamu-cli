@@ -52,8 +52,9 @@ async fn test_apply_rejects_invalid_json_shape() {
 
 #[test_log::test(tokio::test)]
 async fn test_apply_rejects_semantically_invalid_spec() {
-    // Empty value passes deserialization but fails
-    // ResourceValidateSpec::validate().
+    // Empty value deserializes correctly but fails MockResourceSpec::validate()
+    // inside the lifecycle, so the dispatcher returns
+    // Ok(Rejected(BusinessValidationFailed)).
     let harness = ResourceCrudDispatcherHarness::new();
 
     let request = ResourceCrudDispatcherHarness::make_apply_request_with_spec(
@@ -61,14 +62,19 @@ async fn test_apply_rejects_semantically_invalid_spec() {
         serde_json::json!({ "value": "" }),
     );
 
-    let err = harness.dispatcher().apply(request).await.unwrap_err();
+    let decision = harness.dispatcher().apply(request).await.unwrap();
 
-    let ApplyResourceCrudDispatcherError::InvalidSpec { message, .. } = &err else {
-        panic!("expected InvalidSpec, got: {err:?}");
+    let kamu_resources::ApplyManifestApplicationDecision::Rejected(rejection) = decision else {
+        panic!("expected Rejected decision, got: {decision:?}");
     };
+    assert_eq!(
+        rejection.category,
+        kamu_resources::ApplyResourceRejectionCategory::BusinessValidationFailed
+    );
     assert!(
-        message.contains("value must not be empty"),
-        "error message should mention the validation rule; got: {message}"
+        rejection.message.contains("value must not be empty"),
+        "rejection message should mention the validation rule; got: {}",
+        rejection.message
     );
 }
 
@@ -76,7 +82,9 @@ async fn test_apply_rejects_semantically_invalid_spec() {
 
 #[test_log::test(tokio::test)]
 async fn test_plan_apply_rejects_semantically_invalid_spec() {
-    // Confirms decode_resource_spec is equally guarded on the dry-run path.
+    // Empty value deserializes correctly but fails MockResourceSpec::validate()
+    // inside the lifecycle, so the dispatcher returns
+    // Ok(Rejected(BusinessValidationFailed)).
     let harness = ResourceCrudDispatcherHarness::new();
 
     let request = ResourceCrudDispatcherHarness::make_apply_request_with_spec(
@@ -84,11 +92,20 @@ async fn test_plan_apply_rejects_semantically_invalid_spec() {
         serde_json::json!({ "value": "" }),
     );
 
-    let err = harness.dispatcher().plan_apply(request).await.unwrap_err();
+    let decision = harness.dispatcher().plan_apply(request).await.unwrap();
 
     assert!(
-        matches!(err, ApplyResourceCrudDispatcherError::InvalidSpec { .. }),
-        "expected InvalidSpec error, got: {err:?}"
+        matches!(
+            decision,
+            kamu_resources::ApplyManifestPlanningDecision::Rejected(
+                kamu_resources::ApplyManifestRejection {
+                    category:
+                        kamu_resources::ApplyResourceRejectionCategory::BusinessValidationFailed,
+                    ..
+                }
+            )
+        ),
+        "expected Rejected(BusinessValidationFailed), got: {decision:?}"
     );
 }
 

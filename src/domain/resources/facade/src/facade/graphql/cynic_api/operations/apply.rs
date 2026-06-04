@@ -12,7 +12,12 @@ use internal_error::InternalError;
 use kamu_resources as domain;
 
 use crate::ApplyManifestRequest;
-use crate::facade::graphql::cynic_api::fragments::{Resource, ResourceManifestFormat};
+use crate::facade::graphql::cynic_api::fragments::{
+    Resource,
+    ResourceBadAccountProblem,
+    ResourceManifestFormat,
+    ResourceUnsupportedDescriptorProblem,
+};
 use crate::facade::graphql::cynic_api::schema;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -37,6 +42,11 @@ pub(crate) struct ApplyManifestResourcesMut {
 pub(crate) enum ResourceApplyOutcome {
     ResourceApplySuccess(ResourceApplySuccess),
     ResourceApplyRejection(ResourceApplyRejection),
+    ResourceApplyParseManifestProblem(ResourceApplyParseManifestProblem),
+    ResourceUnsupportedDescriptorProblem(ResourceUnsupportedDescriptorProblem),
+    ResourceBadAccountProblem(ResourceBadAccountProblem),
+    ResourceInvalidMetadataProblem(ResourceInvalidMetadataProblem),
+    ResourceInvalidSpecProblem(ResourceInvalidSpecProblem),
     #[cynic(fallback)]
     Unknown,
 }
@@ -167,13 +177,95 @@ impl From<ResourceApplyRejectionCategory> for domain::ApplyResourceRejectionCate
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(cynic::QueryFragment, Debug, Clone)]
+pub(crate) struct ResourceApplyParseManifestProblem {
+    pub message: String,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
+pub(crate) struct ResourceInvalidMetadataProblem {
+    pub code: ResourceMetadataValidationProblemCode,
+    pub message: String,
+}
+
+#[derive(cynic::Enum, Debug, Clone, Copy)]
+pub(crate) enum ResourceMetadataValidationProblemCode {
+    EmptyName,
+    NameTooLong,
+    InvalidName,
+    DescriptionTooLong,
+    TooManyLabels,
+    InvalidLabelKey,
+    DuplicateLabelKey,
+    LabelValueTooLong,
+    TooManyAnnotations,
+    InvalidAnnotationKey,
+    DuplicateAnnotationKey,
+    AnnotationValueTooLong,
+}
+
+impl From<ResourceMetadataValidationProblemCode> for crate::ResourceMetadataValidationProblemCode {
+    fn from(value: ResourceMetadataValidationProblemCode) -> Self {
+        use ResourceMetadataValidationProblemCode as C;
+        match value {
+            C::EmptyName => Self::EmptyName,
+            C::NameTooLong => Self::NameTooLong,
+            C::InvalidName => Self::InvalidName,
+            C::DescriptionTooLong => Self::DescriptionTooLong,
+            C::TooManyLabels => Self::TooManyLabels,
+            C::InvalidLabelKey => Self::InvalidLabelKey,
+            C::DuplicateLabelKey => Self::DuplicateLabelKey,
+            C::LabelValueTooLong => Self::LabelValueTooLong,
+            C::TooManyAnnotations => Self::TooManyAnnotations,
+            C::InvalidAnnotationKey => Self::InvalidAnnotationKey,
+            C::DuplicateAnnotationKey => Self::DuplicateAnnotationKey,
+            C::AnnotationValueTooLong => Self::AnnotationValueTooLong,
+        }
+    }
+}
+
+impl From<ResourceInvalidMetadataProblem> for crate::ApplyManifestError {
+    fn from(value: ResourceInvalidMetadataProblem) -> Self {
+        Self::InvalidMetadata(crate::ResourceInvalidMetadataError {
+            code: value.code.into(),
+            message: value.message,
+        })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
+pub(crate) struct ResourceInvalidSpecProblem {
+    pub kind: String,
+    pub api_version: String,
+    pub message: String,
+}
+
+impl From<ResourceInvalidSpecProblem> for crate::ApplyManifestError {
+    fn from(value: ResourceInvalidSpecProblem) -> Self {
+        Self::InvalidSpec(kamu_resources::ResourceInvalidSpecError {
+            kind: value.kind,
+            api_version: value.api_version,
+            message: value.message,
+        })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl ResourceApplyOutcome {
     pub(crate) fn try_into_planning_decision(
         self,
-    ) -> Result<domain::ApplyManifestPlanningDecision, InternalError> {
+    ) -> Result<domain::ApplyManifestPlanningDecision, crate::ApplyManifestError> {
         Ok(match self {
             Self::ResourceApplySuccess(success) => {
-                let resource = success.resource.try_into()?;
+                let resource = success
+                    .resource
+                    .try_into()
+                    .map_err(crate::ApplyManifestError::Internal)?;
                 let outcome = success.operation.into();
                 let changes = success.changes.into_iter().map(Into::into).collect();
                 let warnings = success.warnings.into_iter().map(Into::into).collect();
@@ -191,20 +283,19 @@ impl ResourceApplyOutcome {
             Self::ResourceApplyRejection(rejection) => {
                 domain::ApplyManifestPlanningDecision::Rejected(rejection.into())
             }
-            Self::Unknown => {
-                return Err(InternalError::new(
-                    "Remote apply returned an unrecognized ResourceApplyOutcome variant",
-                ));
-            }
+            problem => return Err(map_apply_problem(problem)?),
         })
     }
 
     pub(crate) fn try_into_application_decision(
         self,
-    ) -> Result<domain::ApplyManifestApplicationDecision, InternalError> {
+    ) -> Result<domain::ApplyManifestApplicationDecision, crate::ApplyManifestError> {
         Ok(match self {
             Self::ResourceApplySuccess(success) => {
-                let resource = success.resource.try_into()?;
+                let resource = success
+                    .resource
+                    .try_into()
+                    .map_err(crate::ApplyManifestError::Internal)?;
                 let outcome = success.operation.into();
                 let warnings = success.warnings.into_iter().map(Into::into).collect();
 
@@ -217,12 +308,40 @@ impl ResourceApplyOutcome {
             Self::ResourceApplyRejection(rejection) => {
                 domain::ApplyManifestApplicationDecision::Rejected(rejection.into())
             }
-            Self::Unknown => {
-                return Err(InternalError::new(
-                    "Remote apply returned an unrecognized ResourceApplyOutcome variant",
-                ));
-            }
+            problem => return Err(map_apply_problem(problem)?),
         })
+    }
+}
+
+fn map_apply_problem(
+    outcome: ResourceApplyOutcome,
+) -> Result<crate::ApplyManifestError, InternalError> {
+    use crate::facade::graphql::outcome_mapper;
+    use crate::facade::resource_facade_errors::ParseResourceManifestError;
+
+    match outcome {
+        ResourceApplyOutcome::ResourceApplyParseManifestProblem(p) => {
+            Ok(crate::ApplyManifestError::ParseManifest(
+                ParseResourceManifestError { message: p.message },
+            ))
+        }
+        ResourceApplyOutcome::ResourceUnsupportedDescriptorProblem(p) => {
+            Ok(crate::ApplyManifestError::UnsupportedDescriptor(
+                outcome_mapper::unsupported_descriptor_problem_error(p),
+            ))
+        }
+        ResourceApplyOutcome::ResourceBadAccountProblem(p) => Ok(
+            crate::ApplyManifestError::BadAccount(outcome_mapper::bad_account_problem_error(p)?),
+        ),
+        ResourceApplyOutcome::ResourceInvalidMetadataProblem(p) => Ok(p.into()),
+        ResourceApplyOutcome::ResourceInvalidSpecProblem(p) => Ok(p.into()),
+        ResourceApplyOutcome::Unknown => Err(InternalError::new(
+            "Remote apply returned an unrecognized ResourceApplyOutcome variant",
+        )),
+        // Success and Rejection are handled by the caller — should not reach here
+        _ => Err(InternalError::new(
+            "map_apply_problem called with non-problem outcome variant",
+        )),
     }
 }
 

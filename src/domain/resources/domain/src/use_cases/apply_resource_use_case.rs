@@ -19,6 +19,7 @@ use crate::{
     ResourceTypeMismatchError,
     ResourceUID,
     ResourceUIDNotFoundError,
+    ResourceWarning,
     TypedResourceQueryError,
 };
 
@@ -81,6 +82,7 @@ pub struct ApplyResourcePlan<R: DeclarativeResource> {
     pub action: ApplyResourceAction,
     pub reconciliation_required: bool,
     pub executable: bool,
+    pub warnings: Vec<ResourceWarning>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -99,6 +101,7 @@ pub struct ApplyResourceResult<R: DeclarativeResource> {
     pub uid: ResourceUID,
     pub state: R::ResourceState,
     pub outcome: ApplyResourceOutcome,
+    pub warnings: Vec<ResourceWarning>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -10,7 +10,13 @@
 use cynic::QueryBuilder;
 use internal_error::InternalError;
 
-use crate::facade::graphql::cynic_api::fragments::{BatchResourceProblem, ResourceIdentity};
+use crate::facade::graphql::cynic_api::fragments::{
+    BatchResourceProblem,
+    ResourceBadAccountProblem,
+    ResourceIdentity,
+    ResourceSelectorProblemResult,
+    ResourceUnsupportedDescriptorProblem,
+};
 use crate::facade::graphql::cynic_api::inputs::{
     ResourceBatchSelectorInput,
     ResourceSelectorInput,
@@ -36,7 +42,17 @@ pub(crate) struct GetResourceIdentityQuery {
 )]
 pub(crate) struct ResourceIdentityResources {
     #[arguments(selector: $selector)]
-    pub resource_identity: Option<ResourceIdentity>,
+    pub resource_identity: ResourceGetIdentityOutcome,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::InlineFragments, Debug, Clone)]
+pub(crate) enum ResourceGetIdentityOutcome {
+    ResourceIdentity(ResourceIdentity),
+    ResourceSelectorProblemResult(ResourceSelectorProblemResult),
+    #[cynic(fallback)]
+    Unknown,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -57,7 +73,16 @@ pub(crate) struct GetResourceIdentitiesQuery {
 )]
 pub(crate) struct ResourceIdentitiesResources {
     #[arguments(selector: $selector)]
-    pub resource_identities: BatchResourceIdentitiesResult,
+    pub resource_identities: BatchResourceIdentitiesOutcome,
+}
+
+#[derive(cynic::InlineFragments, Debug, Clone)]
+pub(crate) enum BatchResourceIdentitiesOutcome {
+    BatchResourceIdentitiesResult(BatchResourceIdentitiesResult),
+    ResourceUnsupportedDescriptorProblem(ResourceUnsupportedDescriptorProblem),
+    ResourceBadAccountProblem(ResourceBadAccountProblem),
+    #[cynic(fallback)]
+    Unknown,
 }
 
 #[derive(cynic::QueryFragment, Debug, Clone)]

@@ -287,7 +287,9 @@ impl From<ListResourcesError> for CLIError {
         use ListResourcesError as E;
 
         match e {
-            e @ (E::UnsupportedDescriptor(_) | E::BadAccount(_)) => Self::failure(e),
+            e @ (E::UnsupportedDescriptor(_) | E::BadAccount(_) | E::InvalidSearchQuery(_)) => {
+                Self::failure(e)
+            }
             E::RemoteRequest(err) => Self::from(err),
             E::Internal(err) => Self::critical(err),
         }

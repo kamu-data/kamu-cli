@@ -567,6 +567,8 @@ Base64-encoded binary data (url-safe, no padding)
 """
 scalar Base64Usnp
 
+union BatchResourceIdentitiesOutcome = BatchResourceIdentitiesResult | ResourceUnsupportedDescriptorProblem | ResourceBadAccountProblem
+
 type BatchResourceIdentitiesResult {
 	identities: [BatchResourceIdentitySuccess!]!
 	problems: [BatchResourceProblem!]!
@@ -582,6 +584,8 @@ type BatchResourceManifestSuccess {
 	manifest: ResourceRenderManifestResult!
 }
 
+union BatchResourceManifestsOutcome = BatchResourceManifestsResult | ResourceUnsupportedDescriptorProblem | ResourceBadAccountProblem
+
 type BatchResourceManifestsResult {
 	manifests: [BatchResourceManifestSuccess!]!
 	problems: [BatchResourceProblem!]!
@@ -589,23 +593,15 @@ type BatchResourceManifestsResult {
 
 type BatchResourceProblem {
 	requestIndex: Int!
-	code: BatchResourceProblemCode!
-	message: String!
-	actualApiVersion: String
-	actualKind: String
-}
-
-enum BatchResourceProblemCode {
-	UID_NOT_FOUND
-	NAME_NOT_FOUND
-	API_VERSION_MISMATCH
-	KIND_MISMATCH
+	problem: ResourceLookupProblem!
 }
 
 type BatchResourceSuccess {
 	requestIndex: Int!
 	resource: Resource!
 }
+
+union BatchResourcesOutcome = BatchResourcesResult | ResourceUnsupportedDescriptorProblem | ResourceBadAccountProblem
 
 type BatchResourcesResult {
 	resources: [BatchResourceSuccess!]!
@@ -3870,7 +3866,7 @@ type Resource {
 	status: JSON
 }
 
-input ResourceAccountSelectorInput @oneOf {
+input ResourceAccountSelectorInput {
 	byId: AccountID
 	byName: AccountName
 }
@@ -3900,7 +3896,14 @@ enum ResourceApplyOperation {
 	UNTOUCHED
 }
 
-union ResourceApplyOutcome = ResourceApplySuccess | ResourceApplyRejection
+union ResourceApplyOutcome = ResourceApplySuccess | ResourceApplyRejection | ResourceApplyParseManifestProblem | ResourceUnsupportedDescriptorProblem | ResourceBadAccountProblem | ResourceInvalidMetadataProblem | ResourceInvalidSpecProblem
+
+"""
+The manifest text could not be parsed (malformed JSON/YAML).
+"""
+type ResourceApplyParseManifestProblem {
+	message: String!
+}
 
 type ResourceApplyRejection {
 	category: ResourceApplyRejectionCategory!
@@ -3925,6 +3928,22 @@ type ResourceApplyWarning {
 	code: String!
 	path: String
 	message: String!
+}
+
+type ResourceBadAccountProblem {
+	code: ResourceBadAccountProblemCode!
+	accountId: AccountID
+	accountName: AccountName
+	expectedName: AccountName
+	actualName: AccountName
+	message: String!
+}
+
+enum ResourceBadAccountProblemCode {
+	EMPTY_SELECTOR
+	ACCOUNT_NOT_FOUND_BY_ID
+	ACCOUNT_NOT_FOUND_BY_NAME
+	ID_NAME_MISMATCH
 }
 
 input ResourceBatchSelectorInput {
@@ -3954,6 +3973,8 @@ type ResourceConnection {
 	edges: [ResourceEdge!]!
 }
 
+union ResourceDeleteManyOutcome = ResourceDeleteManyResult | ResourceUnsupportedDescriptorProblem | ResourceBadAccountProblem
+
 type ResourceDeleteManyResult {
 	resources: [ResourceDeleteManySuccess!]!
 	problems: [BatchResourceProblem!]!
@@ -3964,7 +3985,7 @@ type ResourceDeleteManySuccess {
 	resourceId: ResourceID!
 }
 
-union ResourceDeleteOutcome = ResourceDeleteSuccess | ResourceUIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceApiVersionMismatchProblem | ResourceKindMismatchProblem
+union ResourceDeleteOutcome = ResourceDeleteSuccess | ResourceSelectorProblemResult
 
 type ResourceDeleteSuccess {
 	resourceId: ResourceID!
@@ -3974,6 +3995,10 @@ type ResourceDeleteSuccess {
 type ResourceEdge {
 	node: ResourceSummary!
 }
+
+union ResourceGetIdentityOutcome = ResourceIdentity | ResourceSelectorProblemResult
+
+union ResourceGetOutcome = Resource | ResourceSelectorProblemResult
 
 scalar ResourceID
 
@@ -4005,6 +4030,31 @@ type ResourceIdentityEdge {
 	node: ResourceIdentity!
 }
 
+union ResourceIdentityListAllOutcome = ResourceIdentityConnection | ResourceBadAccountProblem
+
+union ResourceIdentityListOutcome = ResourceIdentityConnection | ResourceUnsupportedDescriptorProblem | ResourceBadAccountProblem | ResourceInvalidSearchQueryProblem
+
+"""
+A metadata field value (e.g. name, label key) failed validation.
+"""
+type ResourceInvalidMetadataProblem {
+	code: ResourceMetadataValidationProblemCode!
+	message: String!
+}
+
+type ResourceInvalidSearchQueryProblem {
+	message: String!
+}
+
+"""
+The `spec` field failed domain validation.
+"""
+type ResourceInvalidSpecProblem {
+	kind: String!
+	apiVersion: String!
+	message: String!
+}
+
 type ResourceKind {
 	value: String!
 }
@@ -4027,6 +4077,8 @@ type ResourceKindMismatchProblem {
 	actualKind: String!
 	message: String!
 }
+
+union ResourceListAllOutcome = ResourceConnection | ResourceBadAccountProblem
 
 enum ResourceListColumnDataType {
 	STRING
@@ -4053,6 +4105,10 @@ enum ResourceListColumnVisibility {
 	WIDE_ONLY
 }
 
+union ResourceListOutcome = ResourceConnection | ResourceUnsupportedDescriptorProblem | ResourceBadAccountProblem
+
+union ResourceLookupProblem = ResourceUIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceApiVersionMismatchProblem | ResourceKindMismatchProblem
+
 enum ResourceManifestFormat {
 	JSON
 	YAML
@@ -4061,6 +4117,7 @@ enum ResourceManifestFormat {
 type ResourceMetadata {
 	id: ResourceID!
 	accountId: AccountID!
+	accountName: AccountName
 	name: String!
 	description: String
 	labels: JSON!
@@ -4070,6 +4127,21 @@ type ResourceMetadata {
 	updatedAt: DateTime!
 	deletedAt: DateTime
 	lastReconciledAt: DateTime
+}
+
+enum ResourceMetadataValidationProblemCode {
+	EMPTY_NAME
+	NAME_TOO_LONG
+	INVALID_NAME
+	DESCRIPTION_TOO_LONG
+	TOO_MANY_LABELS
+	INVALID_LABEL_KEY
+	DUPLICATE_LABEL_KEY
+	LABEL_VALUE_TOO_LONG
+	TOO_MANY_ANNOTATIONS
+	INVALID_ANNOTATION_KEY
+	DUPLICATE_ANNOTATION_KEY
+	ANNOTATION_VALUE_TOO_LONG
 }
 
 type ResourceNameNotFoundProblem {
@@ -4099,7 +4171,7 @@ input ResourceRefInput @oneOf {
 	byName: ResourceByNameSelectorInput
 }
 
-union ResourceRenderManifestOutcome = ResourceRenderManifestResult | ResourceUIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceApiVersionMismatchProblem | ResourceKindMismatchProblem
+union ResourceRenderManifestOutcome = ResourceRenderManifestResult | ResourceSelectorProblemResult
 
 type ResourceRenderManifestResult {
 	manifest: String!
@@ -4111,6 +4183,12 @@ input ResourceSelectorInput {
 	apiVersion: String
 	ref: ResourceRefInput!
 	account: ResourceAccountSelectorInput
+}
+
+union ResourceSelectorProblem = ResourceUIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceApiVersionMismatchProblem | ResourceKindMismatchProblem | ResourceUnsupportedDescriptorProblem | ResourceBadAccountProblem
+
+type ResourceSelectorProblemResult {
+	problem: ResourceSelectorProblem!
 }
 
 type ResourceStatusSummary {
@@ -4145,6 +4223,18 @@ type ResourceUIDNotFoundProblem {
 	message: String!
 }
 
+type ResourceUnsupportedDescriptorProblem {
+	code: ResourceUnsupportedDescriptorProblemCode!
+	kind: String!
+	apiVersion: String!
+	message: String!
+}
+
+enum ResourceUnsupportedDescriptorProblemCode {
+	NOT_FOUND
+	DUPLICATE
+}
+
 type Resources {
 	"""
 	Returns resource kinds supported by the current server
@@ -4154,43 +4244,43 @@ type Resources {
 	Returns a summary-oriented dashboard for the current or specified
 	subject
 	"""
-	summary(account: ResourceAccountSelectorInput): ResourcesSummary!
+	summary(account: ResourceAccountSelectorInput): ResourcesSummaryOutcome!
 	"""
 	Returns a resource by selector, if found
 	"""
-	resource(selector: ResourceSelectorInput!, revealed: Boolean! = false): Resource
+	resource(selector: ResourceSelectorInput!, revealed: Boolean! = false): ResourceGetOutcome!
 	"""
 	Returns resources by selectors
 	"""
-	resources(selector: ResourceBatchSelectorInput!, revealed: Boolean! = false): BatchResourcesResult!
+	resources(selector: ResourceBatchSelectorInput!, revealed: Boolean! = false): BatchResourcesOutcome!
 	"""
 	Returns resource identity by selector, if found
 	"""
-	resourceIdentity(selector: ResourceSelectorInput!): ResourceIdentity
+	resourceIdentity(selector: ResourceSelectorInput!): ResourceGetIdentityOutcome!
 	"""
 	Returns resource identities by selectors
 	"""
-	resourceIdentities(selector: ResourceBatchSelectorInput!): BatchResourceIdentitiesResult!
+	resourceIdentities(selector: ResourceBatchSelectorInput!): BatchResourceIdentitiesOutcome!
 	"""
 	Returns resources of the specified kind
 	"""
-	listByKind(kind: ResourceKindInput!, account: ResourceAccountSelectorInput, page: Int, perPage: Int): ResourceConnection!
+	listByKind(kind: ResourceKindInput!, account: ResourceAccountSelectorInput, page: Int, perPage: Int): ResourceListOutcome!
 	"""
 	Returns resource identities of the specified kind
 	"""
-	listIdentitiesByKind(kind: ResourceKindInput!, account: ResourceAccountSelectorInput, page: Int, perPage: Int): ResourceIdentityConnection!
+	listIdentitiesByKind(kind: ResourceKindInput!, account: ResourceAccountSelectorInput, page: Int, perPage: Int): ResourceIdentityListOutcome!
 	"""
 	Searches resource identities across the specified exact kinds
 	"""
-	searchIdentities(query: SearchResourceIdentitiesInput!, page: Int, perPage: Int): ResourceIdentityConnection!
+	searchIdentities(query: SearchResourceIdentitiesInput!, page: Int, perPage: Int): ResourceIdentityListOutcome!
 	"""
 	Returns resources across all kinds
 	"""
-	listAll(account: ResourceAccountSelectorInput, page: Int, perPage: Int): ResourceConnection!
+	listAll(account: ResourceAccountSelectorInput, page: Int, perPage: Int): ResourceListAllOutcome!
 	"""
 	Returns resource identities across all kinds
 	"""
-	listAllIdentities(account: ResourceAccountSelectorInput, page: Int, perPage: Int): ResourceIdentityConnection!
+	listAllIdentities(account: ResourceAccountSelectorInput, page: Int, perPage: Int): ResourceIdentityListAllOutcome!
 	"""
 	Renders a canonical manifest representation from a stored resource
 	"""
@@ -4198,18 +4288,20 @@ type Resources {
 	"""
 	Renders canonical manifest representations from stored resources
 	"""
-	renderManifests(selector: ResourceBatchSelectorInput!, format: ResourceManifestFormat!, revealed: Boolean! = false): BatchResourceManifestsResult!
+	renderManifests(selector: ResourceBatchSelectorInput!, format: ResourceManifestFormat!, revealed: Boolean! = false): BatchResourceManifestsOutcome!
 }
 
 type ResourcesMut {
 	applyManifest(manifest: String!, format: ResourceManifestFormat!, dryRun: Boolean): ResourceApplyOutcome!
 	delete(selector: ResourceSelectorInput!): ResourceDeleteOutcome!
-	deleteMany(selector: ResourceBatchSelectorInput!): ResourceDeleteManyResult!
+	deleteMany(selector: ResourceBatchSelectorInput!): ResourceDeleteManyOutcome!
 }
 
 type ResourcesSummary {
 	resourceCounts: [ResourceTypeCountSummary!]!
 }
+
+union ResourcesSummaryOutcome = ResourcesSummary | ResourceBadAccountProblem
 
 type RestProtocolDesc {
 	tailUrl: String!

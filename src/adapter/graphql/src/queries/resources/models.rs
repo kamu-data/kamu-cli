@@ -49,23 +49,17 @@ impl ResourceKindInput {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(OneofObject, Debug, Clone)]
-pub enum ResourceAccountSelectorInput {
-    ById(AccountID<'static>),
-    ByName(AccountName<'static>),
+#[derive(InputObject, Debug, Clone)]
+pub struct ResourceAccountSelectorInput {
+    pub by_id: Option<AccountID<'static>>,
+    pub by_name: Option<AccountName<'static>>,
 }
 
 impl ResourceAccountSelectorInput {
     pub fn into_manifest_account(self) -> kamu_resources::ResourceManifestAccount {
-        match self {
-            Self::ById(id) => kamu_resources::ResourceManifestAccount {
-                id: Some(id.into()),
-                name: None,
-            },
-            Self::ByName(name) => kamu_resources::ResourceManifestAccount {
-                id: None,
-                name: Some(name.to_string()),
-            },
+        kamu_resources::ResourceManifestAccount {
+            id: self.by_id.map(Into::into),
+            name: self.by_name.map(|name| name.to_string()),
         }
     }
 }
@@ -215,6 +209,254 @@ impl From<kamu_resources::ResourceKindDescriptor> for ResourceKindDescriptor {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ResourceUnsupportedDescriptorProblem {
+    pub code: ResourceUnsupportedDescriptorProblemCode,
+    pub kind: String,
+    pub api_version: String,
+    pub message: String,
+}
+
+impl From<kamu_resources::UnsupportedResourceDescriptorError>
+    for ResourceUnsupportedDescriptorProblem
+{
+    fn from(value: kamu_resources::UnsupportedResourceDescriptorError) -> Self {
+        use kamu_resources::UnsupportedResourceDescriptorError as E;
+
+        let message = value.to_string();
+        match value {
+            E::NotFound { kind, api_version } => Self {
+                code: ResourceUnsupportedDescriptorProblemCode::NotFound,
+                kind,
+                api_version,
+                message,
+            },
+            E::Duplicate { kind, api_version } => Self {
+                code: ResourceUnsupportedDescriptorProblemCode::Duplicate,
+                kind,
+                api_version,
+                message,
+            },
+        }
+    }
+}
+
+#[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ResourceUnsupportedDescriptorProblemCode {
+    NotFound,
+    Duplicate,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ResourceBadAccountProblem {
+    pub code: ResourceBadAccountProblemCode,
+    pub account_id: Option<AccountID<'static>>,
+    pub account_name: Option<AccountName<'static>>,
+    pub expected_name: Option<AccountName<'static>>,
+    pub actual_name: Option<AccountName<'static>>,
+    pub message: String,
+}
+
+impl From<kamu_resources_facade::ResolveManifestAccountError> for ResourceBadAccountProblem {
+    fn from(value: kamu_resources_facade::ResolveManifestAccountError) -> Self {
+        use kamu_resources_facade::ResolveManifestAccountError as E;
+
+        let message = value.to_string();
+        match value {
+            E::EmptySelector => Self {
+                code: ResourceBadAccountProblemCode::EmptySelector,
+                account_id: None,
+                account_name: None,
+                expected_name: None,
+                actual_name: None,
+                message,
+            },
+            E::AccountNotFoundById(error) => Self {
+                code: ResourceBadAccountProblemCode::AccountNotFoundById,
+                account_id: Some(error.account_id.into()),
+                account_name: None,
+                expected_name: None,
+                actual_name: None,
+                message,
+            },
+            E::AccountNotFoundByName(error) => Self {
+                code: ResourceBadAccountProblemCode::AccountNotFoundByName,
+                account_id: None,
+                account_name: Some(error.account_name.into()),
+                expected_name: None,
+                actual_name: None,
+                message,
+            },
+            E::IdNameMismatch {
+                account_id,
+                expected_name,
+                actual_name,
+            } => Self {
+                code: ResourceBadAccountProblemCode::IdNameMismatch,
+                account_id: Some(account_id.into()),
+                account_name: None,
+                expected_name: Some(expected_name.into()),
+                actual_name: Some(actual_name.into()),
+                message,
+            },
+            // These are non-user-facing failures: map_bad_account_problem promotes them to
+            // GqlError before this From impl is ever called.
+            E::AnonymousSubject | E::Access(_) | E::Internal(_) => {
+                unreachable!("non-user account error must not reach ResourceBadAccountProblem")
+            }
+        }
+    }
+}
+
+#[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ResourceBadAccountProblemCode {
+    EmptySelector,
+    AccountNotFoundById,
+    AccountNotFoundByName,
+    IdNameMismatch,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ResourceUIDNotFoundProblem {
+    pub uid: ResourceID,
+    pub message: String,
+}
+
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ResourceNameNotFoundProblem {
+    pub kind: String,
+    pub name: String,
+    pub message: String,
+}
+
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ResourceApiVersionMismatchProblem {
+    pub expected_api_version: String,
+    pub actual_api_version: String,
+    pub message: String,
+}
+
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ResourceKindMismatchProblem {
+    pub uid: ResourceID,
+    pub expected_kind: String,
+    pub actual_kind: String,
+    pub message: String,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Union, Debug, Clone)]
+pub enum ResourceLookupProblem {
+    UidNotFound(ResourceUIDNotFoundProblem),
+    NameNotFound(ResourceNameNotFoundProblem),
+    ApiVersionMismatch(ResourceApiVersionMismatchProblem),
+    KindMismatch(ResourceKindMismatchProblem),
+}
+
+impl From<kamu_resources_facade::ResourceLookupProblem> for ResourceLookupProblem {
+    fn from(value: kamu_resources_facade::ResourceLookupProblem) -> Self {
+        use kamu_resources_facade::ResourceLookupProblem as P;
+        match value {
+            P::UIDNotFound(e) => Self::UidNotFound(ResourceUIDNotFoundProblem {
+                uid: e.0.into(),
+                message: e.to_string(),
+            }),
+            P::NameNotFound(e) => Self::NameNotFound(ResourceNameNotFoundProblem {
+                kind: e.kind.clone(),
+                name: e.name.clone(),
+                message: e.to_string(),
+            }),
+            P::ApiVersionMismatch(e) => {
+                Self::ApiVersionMismatch(ResourceApiVersionMismatchProblem {
+                    expected_api_version: e.expected_api_version.clone(),
+                    actual_api_version: e.actual_api_version.clone(),
+                    message: e.to_string(),
+                })
+            }
+            P::KindMismatch(e) => Self::KindMismatch(ResourceKindMismatchProblem {
+                uid: e.uid.into(),
+                expected_kind: e.expected_kind.clone(),
+                actual_kind: e.actual_kind.clone(),
+                message: e.to_string(),
+            }),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Union, Debug, Clone)]
+pub enum ResourceSelectorProblem {
+    UidNotFound(ResourceUIDNotFoundProblem),
+    NameNotFound(ResourceNameNotFoundProblem),
+    ApiVersionMismatch(ResourceApiVersionMismatchProblem),
+    KindMismatch(ResourceKindMismatchProblem),
+    UnsupportedDescriptor(ResourceUnsupportedDescriptorProblem),
+    BadAccount(ResourceBadAccountProblem),
+}
+
+impl From<kamu_resources_facade::ResourceLookupProblem> for ResourceSelectorProblem {
+    fn from(value: kamu_resources_facade::ResourceLookupProblem) -> Self {
+        match ResourceLookupProblem::from(value) {
+            ResourceLookupProblem::UidNotFound(p) => Self::UidNotFound(p),
+            ResourceLookupProblem::NameNotFound(p) => Self::NameNotFound(p),
+            ResourceLookupProblem::ApiVersionMismatch(p) => Self::ApiVersionMismatch(p),
+            ResourceLookupProblem::KindMismatch(p) => Self::KindMismatch(p),
+        }
+    }
+}
+
+impl From<kamu_resources::UnsupportedResourceDescriptorError> for ResourceSelectorProblem {
+    fn from(e: kamu_resources::UnsupportedResourceDescriptorError) -> Self {
+        Self::UnsupportedDescriptor(e.into())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ResourceSelectorProblemResult {
+    pub problem: ResourceSelectorProblem,
+}
+
+impl From<kamu_resources_facade::ResourceLookupProblem> for ResourceSelectorProblemResult {
+    fn from(value: kamu_resources_facade::ResourceLookupProblem) -> Self {
+        Self {
+            problem: value.into(),
+        }
+    }
+}
+
+impl From<kamu_resources::UnsupportedResourceDescriptorError> for ResourceSelectorProblemResult {
+    fn from(e: kamu_resources::UnsupportedResourceDescriptorError) -> Self {
+        Self { problem: e.into() }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ResourceInvalidSearchQueryProblem {
+    pub message: String,
+}
+
+impl From<kamu_resources_facade::InvalidResourceSearchQueryError>
+    for ResourceInvalidSearchQueryProblem
+{
+    fn from(value: kamu_resources_facade::InvalidResourceSearchQueryError) -> Self {
+        Self {
+            message: value.to_string(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
 #[graphql(remote = "kamu_resources_facade::ResourceManifestFormat")]
 pub enum ResourceManifestFormat {
@@ -257,6 +499,13 @@ impl From<kamu_resources::ResourceView> for Resource {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Union, Debug, Clone)]
+pub enum BatchResourcesOutcome {
+    Success(BatchResourcesResult),
+    UnsupportedDescriptor(ResourceUnsupportedDescriptorProblem),
+    BadAccount(ResourceBadAccountProblem),
+}
+
 #[derive(SimpleObject, Debug, Clone)]
 pub struct BatchResourcesResult {
     pub resources: Vec<BatchResourceSuccess>,
@@ -288,6 +537,13 @@ pub struct BatchResourceSuccess {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Union, Debug, Clone)]
+pub enum BatchResourceManifestsOutcome {
+    Success(BatchResourceManifestsResult),
+    UnsupportedDescriptor(ResourceUnsupportedDescriptorProblem),
+    BadAccount(ResourceBadAccountProblem),
+}
 
 #[derive(SimpleObject, Debug, Clone)]
 pub struct BatchResourceManifestsResult {
@@ -347,6 +603,13 @@ impl From<kamu_resources::ResourceIdentityView> for ResourceIdentity {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Union, Debug, Clone)]
+pub enum BatchResourceIdentitiesOutcome {
+    Success(BatchResourceIdentitiesResult),
+    UnsupportedDescriptor(ResourceUnsupportedDescriptorProblem),
+    BadAccount(ResourceBadAccountProblem),
+}
+
 #[derive(SimpleObject, Debug, Clone)]
 pub struct BatchResourceIdentitiesResult {
     pub identities: Vec<BatchResourceIdentitySuccess>,
@@ -382,50 +645,14 @@ pub struct BatchResourceIdentitySuccess {
 #[derive(SimpleObject, Debug, Clone)]
 pub struct BatchResourceProblem {
     pub request_index: usize,
-    pub code: BatchResourceProblemCode,
-    pub message: String,
-    pub actual_api_version: Option<String>,
-    pub actual_kind: Option<String>,
+    pub problem: ResourceLookupProblem,
 }
 
 impl From<BatchGetResourceProblem> for BatchResourceProblem {
     fn from(value: BatchGetResourceProblem) -> Self {
-        use kamu_resources_facade::ResourceLookupProblem as P;
-        let code = BatchResourceProblemCode::from_lookup_problem(&value.error);
-        let actual_api_version = match &value.error {
-            P::ApiVersionMismatch(e) => Some(e.actual_api_version.clone()),
-            _ => None,
-        };
-        let actual_kind = match &value.error {
-            P::KindMismatch(e) => Some(e.actual_kind.clone()),
-            _ => None,
-        };
         Self {
             request_index: value.request_index,
-            message: value.error.to_string(),
-            code,
-            actual_api_version,
-            actual_kind,
-        }
-    }
-}
-
-#[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
-pub enum BatchResourceProblemCode {
-    UidNotFound,
-    NameNotFound,
-    ApiVersionMismatch,
-    KindMismatch,
-}
-
-impl BatchResourceProblemCode {
-    fn from_lookup_problem(error: &kamu_resources_facade::ResourceLookupProblem) -> Self {
-        use kamu_resources_facade::ResourceLookupProblem as E;
-        match error {
-            E::UIDNotFound(_) => Self::UidNotFound,
-            E::NameNotFound(_) => Self::NameNotFound,
-            E::ApiVersionMismatch(_) => Self::ApiVersionMismatch,
-            E::KindMismatch(_) => Self::KindMismatch,
+            problem: value.error.into(),
         }
     }
 }
@@ -436,6 +663,7 @@ impl BatchResourceProblemCode {
 pub struct ResourceMetadata {
     pub id: ResourceID,
     pub account_id: AccountID<'static>,
+    pub account_name: Option<AccountName<'static>>,
     pub name: String,
     pub description: Option<String>,
     pub labels: serde_json::Value,
@@ -455,6 +683,7 @@ impl From<kamu_resources::ResourceView> for ResourceMetadata {
         Self {
             id: value.metadata.uid.into(),
             account_id: value.account.id.into(),
+            account_name: value.account.name.map(Into::into),
             name: value.metadata.name.clone(),
             description: value.metadata.description,
             labels,

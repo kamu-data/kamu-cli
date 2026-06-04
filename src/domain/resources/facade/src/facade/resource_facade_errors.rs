@@ -24,6 +24,56 @@ use kamu_resources::{
 };
 use thiserror::Error;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ResourceMetadataValidationProblemCode {
+    EmptyName,
+    NameTooLong,
+    InvalidName,
+    DescriptionTooLong,
+    TooManyLabels,
+    InvalidLabelKey,
+    DuplicateLabelKey,
+    LabelValueTooLong,
+    TooManyAnnotations,
+    InvalidAnnotationKey,
+    DuplicateAnnotationKey,
+    AnnotationValueTooLong,
+}
+
+#[derive(Debug, Error)]
+#[error("{message}")]
+pub struct ResourceInvalidMetadataError {
+    pub code: ResourceMetadataValidationProblemCode,
+    pub message: String,
+}
+
+impl From<ResourceMetadataValidationError> for ResourceInvalidMetadataError {
+    fn from(err: ResourceMetadataValidationError) -> Self {
+        use ResourceMetadataValidationError as E;
+        use ResourceMetadataValidationProblemCode as C;
+        let code = match &err {
+            E::EmptyName => C::EmptyName,
+            E::NameTooLong { .. } => C::NameTooLong,
+            E::InvalidName { .. } => C::InvalidName,
+            E::DescriptionTooLong { .. } => C::DescriptionTooLong,
+            E::TooManyLabels { .. } => C::TooManyLabels,
+            E::InvalidLabelKey { .. } => C::InvalidLabelKey,
+            E::DuplicateLabelKey { .. } => C::DuplicateLabelKey,
+            E::LabelValueTooLong { .. } => C::LabelValueTooLong,
+            E::TooManyAnnotations { .. } => C::TooManyAnnotations,
+            E::InvalidAnnotationKey { .. } => C::InvalidAnnotationKey,
+            E::DuplicateAnnotationKey { .. } => C::DuplicateAnnotationKey,
+            E::AnnotationValueTooLong { .. } => C::AnnotationValueTooLong,
+        };
+        Self {
+            code,
+            message: err.to_string(),
+        }
+    }
+}
+
 use crate::ResolveManifestAccountError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -178,11 +228,20 @@ pub enum ListResourcesError {
     BadAccount(#[from] ResolveManifestAccountError),
 
     #[error(transparent)]
+    InvalidSearchQuery(#[from] InvalidResourceSearchQueryError),
+
+    #[error(transparent)]
     RemoteRequest(#[from] GraphqlHttpRequestError),
 
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+#[error("Resource identity search requires exact names or a name pattern")]
+pub struct InvalidResourceSearchQueryError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -279,7 +338,7 @@ pub enum ApplyManifestError {
     BadAccount(#[from] ResolveManifestAccountError),
 
     #[error(transparent)]
-    InvalidMetadata(#[from] ResourceMetadataValidationError),
+    InvalidMetadata(#[from] ResourceInvalidMetadataError),
 
     #[error(transparent)]
     InvalidSpec(#[from] ResourceInvalidSpecError),
@@ -298,6 +357,12 @@ pub enum ApplyManifestError {
 
     #[error(transparent)]
     Internal(#[from] InternalError),
+}
+
+impl From<ResourceMetadataValidationError> for ApplyManifestError {
+    fn from(err: ResourceMetadataValidationError) -> Self {
+        Self::InvalidMetadata(err.into())
+    }
 }
 
 impl From<ApplyResourceCrudDispatcherError> for ApplyManifestError {

@@ -17,6 +17,7 @@ Small project-specific guidance for coding agents working in this repository.
 ```bash
 cargo nextest run -E 'test(test_name_here)'
 ```
+- Use `assert_matches!(expr, pattern)` directly — never wrap it as `assert!(matches!(expr, pattern))`. Either `std::assert_matches` or `pretty_assertions::assert_matches` is acceptable; use whichever is already imported in the file.
 
 ## Style
 

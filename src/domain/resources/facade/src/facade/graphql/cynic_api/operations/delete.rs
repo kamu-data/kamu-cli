@@ -9,7 +9,12 @@
 
 use cynic::MutationBuilder;
 
-use crate::facade::graphql::cynic_api::fragments::BatchResourceProblem;
+use crate::facade::graphql::cynic_api::fragments::{
+    BatchResourceProblem,
+    ResourceBadAccountProblem,
+    ResourceSelectorProblemResult,
+    ResourceUnsupportedDescriptorProblem,
+};
 use crate::facade::graphql::cynic_api::inputs::{
     ResourceBatchSelectorInput,
     ResourceSelectorInput,
@@ -43,18 +48,24 @@ pub(crate) struct DeleteManyMutation {
 #[cynic(graphql_type = "ResourcesMut", variables = "DeleteManyVariables")]
 pub(crate) struct ResourcesMutDeleteMany {
     #[arguments(selector: $selector)]
-    pub delete_many: ResourceDeleteManyResult,
+    pub delete_many: ResourceDeleteManyOutcome,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::InlineFragments, Debug, Clone)]
+pub(crate) enum ResourceDeleteManyOutcome {
+    ResourceDeleteManyResult(ResourceDeleteManyResult),
+    ResourceUnsupportedDescriptorProblem(ResourceUnsupportedDescriptorProblem),
+    ResourceBadAccountProblem(ResourceBadAccountProblem),
+    #[cynic(fallback)]
+    Unknown,
+}
+
+#[derive(cynic::InlineFragments, Debug, Clone)]
 pub(crate) enum ResourceDeleteOutcome {
     ResourceDeleteSuccess(ResourceDeleteSuccess),
-    ResourceUIDNotFoundProblem(ResourceUIDNotFoundProblem),
-    ResourceNameNotFoundProblem(ResourceNameNotFoundProblem),
-    ResourceApiVersionMismatchProblem(ResourceApiVersionMismatchProblem),
-    ResourceKindMismatchProblem(ResourceKindMismatchProblem),
+    ResourceSelectorProblemResult(ResourceSelectorProblemResult),
     #[cynic(fallback)]
     Unknown,
 }
@@ -62,30 +73,6 @@ pub(crate) enum ResourceDeleteOutcome {
 #[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct ResourceDeleteSuccess {
     pub resource_id: kamu_resources::ResourceUID,
-}
-
-#[derive(cynic::QueryFragment, Debug, Clone)]
-pub(crate) struct ResourceUIDNotFoundProblem {
-    pub uid: kamu_resources::ResourceUID,
-}
-
-#[derive(cynic::QueryFragment, Debug, Clone)]
-pub(crate) struct ResourceNameNotFoundProblem {
-    pub kind: String,
-    pub name: String,
-}
-
-#[derive(cynic::QueryFragment, Debug, Clone)]
-pub(crate) struct ResourceApiVersionMismatchProblem {
-    pub expected_api_version: String,
-    pub actual_api_version: String,
-}
-
-#[derive(cynic::QueryFragment, Debug, Clone)]
-pub(crate) struct ResourceKindMismatchProblem {
-    pub uid: kamu_resources::ResourceUID,
-    pub expected_kind: String,
-    pub actual_kind: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use crate::prelude::*;
-use crate::queries::Resource;
+use crate::queries::{Resource, ResourceBadAccountProblem, ResourceUnsupportedDescriptorProblem};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -16,6 +16,98 @@ use crate::queries::Resource;
 pub enum ResourceApplyOutcome {
     Success(ResourceApplySuccess),
     Rejection(ResourceApplyRejection),
+    ParseManifest(ResourceApplyParseManifestProblem),
+    UnsupportedDescriptor(ResourceUnsupportedDescriptorProblem),
+    BadAccount(ResourceBadAccountProblem),
+    InvalidMetadata(ResourceInvalidMetadataProblem),
+    InvalidSpec(ResourceInvalidSpecProblem),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The manifest text could not be parsed (malformed JSON/YAML).
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ResourceApplyParseManifestProblem {
+    pub message: String,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A metadata field value (e.g. name, label key) failed validation.
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ResourceInvalidMetadataProblem {
+    pub code: ResourceMetadataValidationProblemCode,
+    pub message: String,
+}
+
+#[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ResourceMetadataValidationProblemCode {
+    EmptyName,
+    NameTooLong,
+    InvalidName,
+    DescriptionTooLong,
+    TooManyLabels,
+    InvalidLabelKey,
+    DuplicateLabelKey,
+    LabelValueTooLong,
+    TooManyAnnotations,
+    InvalidAnnotationKey,
+    DuplicateAnnotationKey,
+    AnnotationValueTooLong,
+}
+
+impl From<kamu_resources::ResourceMetadataValidationError> for ResourceInvalidMetadataProblem {
+    fn from(value: kamu_resources::ResourceMetadataValidationError) -> Self {
+        kamu_resources_facade::ResourceInvalidMetadataError::from(value).into()
+    }
+}
+
+impl From<kamu_resources_facade::ResourceInvalidMetadataError> for ResourceInvalidMetadataProblem {
+    fn from(value: kamu_resources_facade::ResourceInvalidMetadataError) -> Self {
+        use kamu_resources_facade::ResourceMetadataValidationProblemCode as C;
+        let code = match value.code {
+            C::EmptyName => ResourceMetadataValidationProblemCode::EmptyName,
+            C::NameTooLong => ResourceMetadataValidationProblemCode::NameTooLong,
+            C::InvalidName => ResourceMetadataValidationProblemCode::InvalidName,
+            C::DescriptionTooLong => ResourceMetadataValidationProblemCode::DescriptionTooLong,
+            C::TooManyLabels => ResourceMetadataValidationProblemCode::TooManyLabels,
+            C::InvalidLabelKey => ResourceMetadataValidationProblemCode::InvalidLabelKey,
+            C::DuplicateLabelKey => ResourceMetadataValidationProblemCode::DuplicateLabelKey,
+            C::LabelValueTooLong => ResourceMetadataValidationProblemCode::LabelValueTooLong,
+            C::TooManyAnnotations => ResourceMetadataValidationProblemCode::TooManyAnnotations,
+            C::InvalidAnnotationKey => ResourceMetadataValidationProblemCode::InvalidAnnotationKey,
+            C::DuplicateAnnotationKey => {
+                ResourceMetadataValidationProblemCode::DuplicateAnnotationKey
+            }
+            C::AnnotationValueTooLong => {
+                ResourceMetadataValidationProblemCode::AnnotationValueTooLong
+            }
+        };
+        Self {
+            code,
+            message: value.message,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The `spec` field failed domain validation.
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ResourceInvalidSpecProblem {
+    pub kind: String,
+    pub api_version: String,
+    pub message: String,
+}
+
+impl From<kamu_resources::ResourceInvalidSpecError> for ResourceInvalidSpecProblem {
+    fn from(value: kamu_resources::ResourceInvalidSpecError) -> Self {
+        Self {
+            kind: value.kind,
+            api_version: value.api_version,
+            message: value.message,
+        }
+    }
 }
 
 impl From<kamu_resources::ApplyManifestPlanningDecision> for ResourceApplyOutcome {

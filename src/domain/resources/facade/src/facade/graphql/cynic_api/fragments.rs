@@ -9,6 +9,7 @@
 
 use chrono::{DateTime, Utc};
 
+use crate::facade::graphql::cynic_api::scalars::{AccountName, Uint64};
 use crate::facade::graphql::cynic_api::schema;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -20,7 +21,7 @@ pub(crate) struct ResourceSummary {
     pub kind: ResourceKind,
     pub name: String,
     pub description: Option<String>,
-    pub generation: u64,
+    pub generation: Uint64,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub status: Option<ResourceStatusSummary>,
@@ -32,7 +33,7 @@ pub(crate) struct ResourceSummary {
 #[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct ResourceStatusSummary {
     pub phase: Option<ResourcePhase>,
-    pub observed_generation: Option<u64>,
+    pub observed_generation: Option<Uint64>,
     pub ready: Option<bool>,
 }
 
@@ -65,7 +66,7 @@ impl From<ResourcePhase> for kamu_resources::ResourcePhase {
 pub(crate) struct ResourceListColumnValueView {
     pub key: String,
     pub string_value: Option<String>,
-    pub uint64_value: Option<u64>,
+    pub uint64_value: Option<Uint64>,
     pub bool_value: Option<bool>,
 }
 
@@ -94,11 +95,109 @@ pub(crate) struct ResourcesSummary {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
+pub(crate) struct ResourceUnsupportedDescriptorProblem {
+    pub code: ResourceUnsupportedDescriptorProblemCode,
+    pub kind: String,
+    pub api_version: String,
+}
+
+#[derive(cynic::Enum, Debug, Clone, Copy)]
+pub(crate) enum ResourceUnsupportedDescriptorProblemCode {
+    NotFound,
+    Duplicate,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
+pub(crate) struct ResourceBadAccountProblem {
+    pub code: ResourceBadAccountProblemCode,
+    pub account_id: Option<odf::AccountID>,
+    pub account_name: Option<AccountName>,
+    pub expected_name: Option<AccountName>,
+    pub actual_name: Option<AccountName>,
+}
+
+#[derive(cynic::Enum, Debug, Clone, Copy)]
+pub(crate) enum ResourceBadAccountProblemCode {
+    EmptySelector,
+    AccountNotFoundById,
+    AccountNotFoundByName,
+    IdNameMismatch,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::QueryFragment, Debug, Copy, Clone)]
+pub(crate) struct ResourceUIDNotFoundProblem {
+    pub uid: kamu_resources::ResourceUID,
+}
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
+pub(crate) struct ResourceNameNotFoundProblem {
+    pub kind: String,
+    pub name: String,
+}
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
+pub(crate) struct ResourceApiVersionMismatchProblem {
+    pub expected_api_version: String,
+    pub actual_api_version: String,
+}
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
+pub(crate) struct ResourceKindMismatchProblem {
+    pub uid: kamu_resources::ResourceUID,
+    pub expected_kind: String,
+    pub actual_kind: String,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::InlineFragments, Debug, Clone)]
+pub(crate) enum ResourceLookupProblem {
+    ResourceUIDNotFoundProblem(ResourceUIDNotFoundProblem),
+    ResourceNameNotFoundProblem(ResourceNameNotFoundProblem),
+    ResourceApiVersionMismatchProblem(ResourceApiVersionMismatchProblem),
+    ResourceKindMismatchProblem(ResourceKindMismatchProblem),
+    #[cynic(fallback)]
+    Unknown,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::InlineFragments, Debug, Clone)]
+pub(crate) enum ResourceSelectorProblem {
+    ResourceUIDNotFoundProblem(ResourceUIDNotFoundProblem),
+    ResourceNameNotFoundProblem(ResourceNameNotFoundProblem),
+    ResourceApiVersionMismatchProblem(ResourceApiVersionMismatchProblem),
+    ResourceKindMismatchProblem(ResourceKindMismatchProblem),
+    ResourceUnsupportedDescriptorProblem(ResourceUnsupportedDescriptorProblem),
+    ResourceBadAccountProblem(ResourceBadAccountProblem),
+    #[cynic(fallback)]
+    Unknown,
+}
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
+pub(crate) struct ResourceSelectorProblemResult {
+    pub problem: ResourceSelectorProblem,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
+pub(crate) struct ResourceInvalidSearchQueryProblem {
+    pub message: String,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct ResourceTypeCountSummary {
     pub kind: String,
     pub name: String,
     pub api_version: String,
-    pub total_count: u64,
+    pub total_count: Uint64,
     pub phase_counts: ResourcePhaseCounts,
 }
 
@@ -106,11 +205,11 @@ pub(crate) struct ResourceTypeCountSummary {
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct ResourcePhaseCounts {
-    pub pending: u64,
-    pub reconciling: u64,
-    pub ready: u64,
-    pub degraded: u64,
-    pub failed: u64,
+    pub pending: Uint64,
+    pub reconciling: Uint64,
+    pub ready: Uint64,
+    pub degraded: Uint64,
+    pub failed: Uint64,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -137,11 +236,12 @@ pub(crate) struct ResourceKind {
 pub(crate) struct ResourceMetadata {
     pub id: kamu_resources::ResourceUID,
     pub account_id: odf::AccountID,
+    pub account_name: Option<AccountName>,
     pub name: String,
     pub description: Option<String>,
     pub labels: serde_json::Value,
     pub annotations: serde_json::Value,
-    pub generation: u64,
+    pub generation: Uint64,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub deleted_at: Option<DateTime<Utc>>,
@@ -199,18 +299,7 @@ impl From<ResourceManifestFormat> for crate::ResourceManifestFormat {
 #[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct BatchResourceProblem {
     pub request_index: i32,
-    pub code: BatchResourceProblemCode,
-    pub message: String,
-    pub actual_api_version: Option<String>,
-    pub actual_kind: Option<String>,
-}
-
-#[derive(cynic::Enum, Debug, Clone, Copy)]
-pub(crate) enum BatchResourceProblemCode {
-    UidNotFound,
-    NameNotFound,
-    ApiVersionMismatch,
-    KindMismatch,
+    pub problem: ResourceLookupProblem,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

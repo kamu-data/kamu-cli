@@ -10,7 +10,7 @@
 use cynic::QueryBuilder;
 use internal_error::InternalError;
 
-use crate::facade::graphql::cynic_api::fragments::Resource;
+use crate::facade::graphql::cynic_api::fragments::{Resource, ResourceSelectorProblemResult};
 use crate::facade::graphql::cynic_api::inputs::ResourceSelectorInput;
 use crate::facade::graphql::cynic_api::schema;
 use crate::{ResourceSelector, SpecViewMode};
@@ -27,7 +27,17 @@ pub(crate) struct GetResourceQuery {
 #[cynic(graphql_type = "Resources", variables = "ResourceSelectorVariables")]
 pub(crate) struct GetResourceResources {
     #[arguments(selector: $selector, revealed: $revealed)]
-    pub resource: Option<Resource>,
+    pub resource: ResourceGetOutcome,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::InlineFragments, Debug, Clone)]
+pub(crate) enum ResourceGetOutcome {
+    Resource(Resource),
+    ResourceSelectorProblemResult(ResourceSelectorProblemResult),
+    #[cynic(fallback)]
+    Unknown,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -8878,6 +8878,47 @@ dependencies = [
 ]
 
 [[package]]
+name = "kamu-resources-facade-tests"
+version = "0.263.3"
+dependencies = [
+ "async-graphql",
+ "async-graphql-axum",
+ "async-trait",
+ "axum",
+ "database-common",
+ "dill",
+ "indoc 2.0.7",
+ "init-on-startup",
+ "kamu-accounts",
+ "kamu-accounts-inmem",
+ "kamu-accounts-services",
+ "kamu-adapter-graphql",
+ "kamu-auth-rebac",
+ "kamu-auth-rebac-inmem",
+ "kamu-auth-rebac-services",
+ "kamu-configuration",
+ "kamu-configuration-inmem",
+ "kamu-configuration-services",
+ "kamu-datasets",
+ "kamu-messaging-outbox-inmem",
+ "kamu-resources",
+ "kamu-resources-facade",
+ "kamu-resources-inmem",
+ "kamu-resources-services",
+ "messaging-outbox",
+ "opendatafabric",
+ "pretty_assertions",
+ "serde_json",
+ "serde_yaml_ng",
+ "strum 0.28.0",
+ "test-log",
+ "time-source",
+ "tokio",
+ "url",
+ "uuid",
+]
+
+[[package]]
 name = "kamu-resources-inmem"
 version = "0.263.3"
 dependencies = [

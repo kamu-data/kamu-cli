@@ -10,7 +10,12 @@
 use cynic::QueryBuilder;
 use internal_error::InternalError;
 
-use crate::facade::graphql::cynic_api::fragments::{BatchResourceProblem, Resource};
+use crate::facade::graphql::cynic_api::fragments::{
+    BatchResourceProblem,
+    Resource,
+    ResourceBadAccountProblem,
+    ResourceUnsupportedDescriptorProblem,
+};
 use crate::facade::graphql::cynic_api::inputs::ResourceBatchSelectorInput;
 use crate::facade::graphql::cynic_api::schema;
 use crate::{ResourceBatchSelector, SpecViewMode};
@@ -30,7 +35,16 @@ pub(crate) struct GetResourcesQuery {
 )]
 pub(crate) struct GetResourcesResources {
     #[arguments(selector: $selector, revealed: $revealed)]
-    pub resources: BatchResourcesResult,
+    pub resources: BatchResourcesOutcome,
+}
+
+#[derive(cynic::InlineFragments, Debug, Clone)]
+pub(crate) enum BatchResourcesOutcome {
+    BatchResourcesResult(BatchResourcesResult),
+    ResourceUnsupportedDescriptorProblem(ResourceUnsupportedDescriptorProblem),
+    ResourceBadAccountProblem(ResourceBadAccountProblem),
+    #[cynic(fallback)]
+    Unknown,
 }
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
