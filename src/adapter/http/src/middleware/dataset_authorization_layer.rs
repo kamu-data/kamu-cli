@@ -133,6 +133,8 @@ where
             let check_result: Result<CheckResult, InternalError> =
                 DatabaseTransactionRunner::new(catalog.clone())
                     .transactional(|transaction_catalog| async move {
+                        use kamu_datasets::DatasetActionAuthorizerExt;
+
                         let dataset_registry = transaction_catalog
                             .get_one::<dyn DatasetRegistry>()
                             .unwrap();
@@ -158,9 +160,8 @@ where
                                 }
                             }
                         };
-
                         let allowed_actions = dataset_action_authorizer
-                            .get_allowed_actions(&dataset_handle.id)
+                            .get_allowed_actions_for_exist_dataset(&dataset_handle.id)
                             .await?;
 
                         match DatasetAction::resolve_access(

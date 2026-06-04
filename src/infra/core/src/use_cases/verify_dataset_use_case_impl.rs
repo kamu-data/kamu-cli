@@ -124,7 +124,9 @@ impl VerifyDatasetUseCase for VerifyDatasetUseCaseImpl {
 
 fn map_unresolved_error(e: RebacDatasetIdUnresolvedError) -> VerificationError {
     use RebacDatasetIdUnresolvedError as E;
+
     match e {
+        E::NotFound(e) => VerificationError::DatasetNotFound(e),
         E::Access(e) => VerificationError::Access(e),
         e @ E::Internal(_) => VerificationError::Internal(e.int_err()),
     }

@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use multiformats::stack_string::AsStackString;
+use ssi_caips::caip2::ChainId;
 use ssi_caips::caip10;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -61,6 +62,10 @@ impl DidPkh {
 
     pub fn wallet_address(&self) -> &str {
         &self.caip10_account_id.account_address
+    }
+
+    pub fn chain_id(&self) -> &ChainId {
+        &self.caip10_account_id.chain_id
     }
 }
 

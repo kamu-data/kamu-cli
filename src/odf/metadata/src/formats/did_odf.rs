@@ -19,7 +19,7 @@ pub const DID_ODF_PREFIX: &str = "did:odf:";
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Represents DID in a custom `did:odf` method
-#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct DidOdf {
     did: DidKey,
 }
@@ -119,6 +119,56 @@ impl std::fmt::Debug for DidOdf {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Serde
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl serde::Serialize for DidOdf {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.collect_str(&self.as_did_str())
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for DidOdf {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct Visitor;
+
+        impl serde::de::Visitor<'_> for Visitor {
+            type Value = DidOdf;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                write!(formatter, "a canonical `did:odf:<multibase>` string")
+            }
+
+            fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Self::Value, E> {
+                DidOdf::from_did_str(v).map_err(serde::de::Error::custom)
+            }
+        }
+
+        deserializer.deserialize_string(Visitor)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(feature = "utoipa")]
+impl utoipa::ToSchema for DidOdf {}
+
+#[cfg(feature = "utoipa")]
+impl utoipa::PartialSchema for DidOdf {
+    fn schema() -> utoipa::openapi::RefOr<utoipa::openapi::schema::Schema> {
+        use utoipa::openapi::schema::*;
+
+        Schema::Object(
+            ObjectBuilder::new()
+                .schema_type(SchemaType::Type(Type::String))
+                .examples([serde_json::json!(DidOdf::new_seeded_ed25519(b"sample"))])
+                .build(),
+        )
+        .into()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Formats [`DidOdf`] as a canonical `did:odf:<multibase>` string
 pub struct DidOdfFmt<'a> {
@@ -163,3 +213,5 @@ impl std::fmt::Display for DidOdfFmt<'_> {
         write!(f, "{DID_ODF_PREFIX}{}", self.inner)
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
