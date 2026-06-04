@@ -27,7 +27,6 @@ init-on-startup = { workspace = true }
 kamu-accounts = { workspace = true, features = ["testing"] }
 kamu-accounts-inmem = { workspace = true }
 kamu-accounts-services = { workspace = true }
-kamu-adapter-auth-oso-rebac = { workspace = true }
 kamu-adapter-graphql = { workspace = true }
 kamu-auth-rebac = { workspace = true }
 kamu-auth-rebac-inmem = { workspace = true }
