@@ -49,11 +49,7 @@ serde_json = { version = "1", default-features = false }
 serde_yaml = { package = "serde_yaml_ng", version = "0.10", default-features = false }
 
 # Optional
-datafusion = { optional = true, version = "53", default-features = false, features = [
-    "parquet",
-    "serde",
-    "sql",
-] }
+datafusion = { optional = true, version = "54", default-features = false, features = ["parquet", "serde", "sql"] }
 pretty_assertions = { optional = true, version = "1" }
 
 

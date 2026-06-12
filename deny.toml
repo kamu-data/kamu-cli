@@ -126,4 +126,7 @@ ignore = [
     "RUSTSEC-2026-0049",
     "RUSTSEC-2026-0098",
     "RUSTSEC-2026-0099",
+    # proc-macro-error2: Unmaintained
+    # https://rustsec.org/advisories/RUSTSEC-2026-0173
+    "RUSTSEC-2026-0173",
 ]

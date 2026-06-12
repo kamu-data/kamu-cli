@@ -28,7 +28,7 @@ kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
 odf = { workspace = true, features = ["arrow"] }
 
-datafusion = { version = "53", default-features = false }
+datafusion = { version = "54", default-features = false }
 geo-types = { version = "0.7", default-features = false, features = [] }
 geojson = { version = "1.0", default-features = false, features = [
     "geo-types",
