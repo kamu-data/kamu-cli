@@ -162,7 +162,6 @@ impl FetchService {
         tracing::info!(sql, plan = plan_str, "Original plan");
 
         let Some(filter) = plan
-            .as_any()
             .downcast_ref::<datafusion_ethers::provider::EthGetLogs>()
             .map(|i| i.filter().clone())
         else {

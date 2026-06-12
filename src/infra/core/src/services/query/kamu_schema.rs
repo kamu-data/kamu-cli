@@ -107,10 +107,6 @@ impl KamuSchema {
 
 #[async_trait::async_trait]
 impl SchemaProvider for KamuSchema {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-
     fn table_names(&self) -> Vec<String> {
         let guard = self.tables.lock().unwrap();
         guard.keys().cloned().collect()

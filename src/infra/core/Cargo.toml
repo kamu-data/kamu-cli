@@ -107,7 +107,7 @@ zip = { version = "8", default-features = false, features = [
 
 
 # Data
-datafusion = { version = "53", default-features = false }
+datafusion = { version = "54", default-features = false }
 object_store = { version = "0.13", features = ["aws"] }
 sha3 = "0.10"
 
@@ -170,10 +170,8 @@ curl = { optional = true, version = "0.4", features = [
     "static-ssl",
 ] }
 curl-sys = { optional = true, version = "0.4" }
-datafusion-ethers = { optional = true, version = "53", features = [
-    "eip712",
-] }
-datafusion-functions-json = { optional = true, version = "0.53" }
+datafusion-ethers = { optional = true, version = "54", features = ["eip712"] }
+datafusion-functions-json = { optional = true, version = "0.54" }
 rumqttc = { optional = true, version = "0.25", default-features = false, features = [
 ] }
 mockall = { optional = true, version = "0.14", default-features = false }
@@ -202,9 +200,7 @@ test-utils = { workspace = true, default-features = false }
 
 bon = { version = "3", default-features = false }
 criterion = { version = "0.8", features = ["async_tokio"] }
-datafusion = { version = "53", default-features = false, features = [
-    "parquet",
-] }
+datafusion = { version = "54", default-features = false, features = ["parquet"] }
 filetime = "0.2"
 indoc = "2"
 mockall = { version = "0.14", default-features = false }

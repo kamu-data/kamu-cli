@@ -17,6 +17,7 @@ Recommendation: for ease of reading, use the following format:
 ### Changed
 - Major reorganization of `odf::metadata` sub-crate for IaC changes (see [RFC-018](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/018-iac-resource-framework.md))
 - Added codegen types and formats for many prototype IaC resources
+- Upgraded to `datafusion v54.1`
 
 ## [0.264.0] - 2026-06-29
 ### Added

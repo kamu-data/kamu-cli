@@ -53,7 +53,7 @@ cheap-clone = { version = "0.3", default-features = false, features = [
     "alloc",
 ] }
 chrono = { version = "0.4", default-features = false }
-datafusion = { version = "53", default-features = false, features = ["nested_expressions"] }
+datafusion = { version = "54", default-features = false, features = ["nested_expressions"] }
 dill = { version = "0.15", default-features = false }
 futures = { version = "0.3", default-features = false }
 itertools = { version = "0.14", default-features = false }
