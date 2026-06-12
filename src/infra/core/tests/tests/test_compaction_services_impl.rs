@@ -965,8 +965,7 @@ async fn test_compact_offsets_are_sequential_impl() {
                 r#"
                 Optimized physical plan:
                 DataSinkExec: sink=ParquetSink(file_groups=[])
-                  SortExec: expr=[offset@0 ASC NULLS LAST], preserve_partitioning=[false]
-                    DataSourceExec: file_groups={1 group: [[...]]}, projection=[offset, op, system_time, date, city, population], file_type=parquet
+                  DataSourceExec: file_groups={1 group: [[...]]}, projection=[offset, op, system_time, date, city, population], output_ordering=[offset@0 ASC NULLS LAST], file_type=parquet
                 "#
             )
             .trim(),
