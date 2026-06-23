@@ -204,6 +204,12 @@ impl DatasetEntryNotFoundError {
     }
 }
 
+impl From<DatasetEntryNotFoundError> for odf::DatasetNotFoundError {
+    fn from(e: DatasetEntryNotFoundError) -> Self {
+        Self::new(e.dataset_id.into())
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]

@@ -131,7 +131,7 @@ impl DatasetsMut {
             .classify_dataset_refs_by_access(&dataset_refs_refs, DatasetAction::Write)
             .await?;
 
-        if let Some(error_msg) = resolution.try_get_error_message(skip_missing) {
+        if let Some(error_msg) = resolution.try_get_user_error_report(skip_missing) {
             return Err(GqlError::gql(error_msg));
         }
 

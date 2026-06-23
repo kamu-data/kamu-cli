@@ -174,9 +174,6 @@ impl Command for InspectQueryCommand {
         if self.output_config.is_tty && self.output_config.verbosity_level == 0 {
             let mut pager = minus::Pager::new();
             pager
-                .set_exit_strategy(minus::ExitStrategy::PagerQuit)
-                .unwrap();
-            pager
                 .set_prompt(resolved_dataset.get_alias().to_string())
                 .unwrap();
 

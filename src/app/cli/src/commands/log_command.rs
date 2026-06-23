@@ -561,9 +561,6 @@ impl MetadataRenderer for PagedAsciiRenderer {
         blocks: odf::dataset::DynMetadataStream<'a>,
     ) -> Result<(), CLIError> {
         let mut pager = minus::Pager::new();
-        pager
-            .set_exit_strategy(minus::ExitStrategy::PagerQuit)
-            .unwrap();
         pager.set_prompt(dataset_handle.alias.to_string()).unwrap();
 
         let renderer = AsciiRenderer::new(self.id_to_name_lookup.clone(), self.limit);
@@ -670,9 +667,6 @@ impl MetadataRenderer for PagedYamlRenderer {
         blocks: odf::dataset::DynMetadataStream<'a>,
     ) -> Result<(), CLIError> {
         let mut pager = minus::Pager::new();
-        pager
-            .set_exit_strategy(minus::ExitStrategy::PagerQuit)
-            .unwrap();
         pager.set_prompt(dataset_handle.alias.to_string()).unwrap();
 
         {

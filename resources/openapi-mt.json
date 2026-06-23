@@ -367,6 +367,83 @@
         ],
         "type": "string"
       },
+      "Eip712DomainSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "chainId": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "verifyingContract": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "version",
+          "chainId"
+        ],
+        "type": "object"
+      },
+      "Eip712TypeDetailsSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "type"
+        ],
+        "type": "object"
+      },
+      "Eip712TypedData": {
+        "additionalProperties": false,
+        "properties": {
+          "domain": {
+            "$ref": "#/components/schemas/Eip712DomainSchema"
+          },
+          "message": {
+            "type": "object"
+          },
+          "primaryType": {
+            "type": "string"
+          },
+          "types": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/components/schemas/Eip712TypeDetailsSchema"
+              },
+              "type": "array"
+            },
+            "propertyNames": {
+              "type": "string"
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "domain",
+          "primaryType",
+          "types",
+          "message"
+        ],
+        "type": "object"
+      },
       "Include": {
         "enum": [
           "Input",
@@ -622,7 +699,8 @@
       },
       "ProofType": {
         "enum": [
-          "Ed25519Signature2020"
+          "Ed25519Signature2020",
+          "EcdsaSecp256k1Signature2019"
         ],
         "type": "string"
       },
@@ -740,6 +818,59 @@
           "ParquetJson"
         ],
         "type": "string"
+      },
+      "Secp256k1Signature": {
+        "examples": [
+          "0x48b55bfa915ac795c431978d8a6a992b628d557da5ff759b307d495a36649353efffd310ac743f371de3b9f7f9cb56c0b28ad43601b4ab949f53faa07bd2c8041b"
+        ],
+        "type": "string"
+      },
+      "Secp256k1VerifyingKey": {
+        "examples": [
+          "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31"
+        ],
+        "type": "string"
+      },
+      "SignEip712Proof": {
+        "properties": {
+          "signature": {
+            "$ref": "#/components/schemas/Secp256k1Signature"
+          },
+          "type": {
+            "$ref": "#/components/schemas/ProofType"
+          },
+          "verificationMethod": {
+            "$ref": "#/components/schemas/Secp256k1VerifyingKey"
+          }
+        },
+        "required": [
+          "type",
+          "verificationMethod",
+          "signature"
+        ],
+        "type": "object"
+      },
+      "SignEip712Response": {
+        "properties": {
+          "proof": {
+            "$ref": "#/components/schemas/SignEip712Proof"
+          },
+          "signature": {
+            "$ref": "#/components/schemas/Signature"
+          },
+          "type": {
+            "$ref": "#/components/schemas/ProofType"
+          },
+          "verificationMethod": {
+            "$ref": "#/components/schemas/DidKey"
+          }
+        },
+        "required": [
+          "type",
+          "verificationMethod",
+          "signature"
+        ],
+        "type": "object"
       },
       "Signature": {
         "examples": [
@@ -973,7 +1104,7 @@
     },
     "termsOfService": "https://docs.kamu.dev/terms-of-service/",
     "title": "Kamu REST API",
-    "version": "0.263.3"
+    "version": "0.263.4"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -1662,6 +1793,77 @@
         "summary": "Execute a batch query",
         "tags": [
           "odf-query"
+        ]
+      }
+    },
+    "/sign/eip712": {
+      "post": {
+        "description": "This endpoint authorizes that the caller has signing permissions for a\nspecified managed key and signs the message with it.\n\nThe optional `includeNodeProof` flag is used to additionally sign the\nresulting signature with the node's own secp256k1 key, allowing for on-chain\nverification.",
+        "operationId": "sign_eip712_handler",
+        "parameters": [
+          {
+            "description": "DID of the managed key to sign with",
+            "in": "query",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "examples": [
+                "did:odf:fed01a561ed291d9c38b6a561ed291d9c38b63017d606c75606006bfe2508acbc4c25"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Include a node proof over the resulting signature",
+            "in": "query",
+            "name": "includeNodeProof",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Eip712TypedData"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignEip712Response"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {},
+          {
+            "api_key": []
+          }
+        ],
+        "summary": "Sign EIP-712 typed data",
+        "tags": [
+          "odf-sign"
         ]
       }
     },

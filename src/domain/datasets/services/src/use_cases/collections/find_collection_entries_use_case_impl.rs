@@ -9,6 +9,7 @@
 
 use std::sync::Arc;
 
+use chrono::{DateTime, Utc};
 use internal_error::ResultIntoInternal;
 use kamu_core::{GetDataOptions, QueryService};
 use kamu_datasets::{
@@ -98,7 +99,7 @@ impl FindCollectionEntriesUseCase for FindCollectionEntriesUseCaseImpl {
         r#ref: &odf::DatasetID,
     ) -> Result<Option<CollectionEntry>, FindCollectionEntriesError> {
         let mut results = self
-            .execute_find_multi_by_refs(collection_dataset, as_of, &[r#ref])
+            .execute_find_multi_by_refs(collection_dataset, as_of, &[r#ref], None)
             .await?;
         Ok(results.pop())
     }
@@ -106,14 +107,16 @@ impl FindCollectionEntriesUseCase for FindCollectionEntriesUseCaseImpl {
     #[tracing::instrument(
         name = FindCollectionEntriesUseCaseImpl_execute_find_multi_by_refs,
         skip_all,
-        fields(as_of = ?as_of, refs = ?refs)
+        fields(as_of = ?as_of, refs = ?refs, as_of_event_time = ?as_of_event_time,)
     )]
     async fn execute_find_multi_by_refs(
         &self,
         collection_dataset: ReadCheckedDataset<'_>,
         as_of: Option<odf::Multihash>,
         refs: &[&odf::DatasetID],
+        as_of_event_time: Option<DateTime<Utc>>,
     ) -> Result<Vec<CollectionEntry>, FindCollectionEntriesError> {
+        use datafusion::common::ScalarValue;
         use datafusion::logical_expr::{col, lit};
 
         let Some(df) = self
@@ -134,9 +137,23 @@ impl FindCollectionEntriesUseCase for FindCollectionEntriesUseCaseImpl {
         // Apply filters
         // Note: we are still working with a changelog here in hope to narrow down the
         // record set before projecting
-        let df = df
-            .filter(col("ref").in_list(refs.iter().map(|r| lit(r.to_string())).collect(), false))
-            .int_err()?;
+        let predicate = {
+            let as_of_event_time_predicate = as_of_event_time.map_or_else(
+                || lit(true),
+                |t| {
+                    col("event_time").lt_eq(lit(ScalarValue::TimestampMillisecond(
+                        Some(t.timestamp_millis()),
+                        Some("UTC".into()),
+                    )))
+                },
+            );
+            let refs_predicate =
+                col("ref").in_list(refs.iter().map(|r| lit(r.to_string())).collect(), false);
+
+            as_of_event_time_predicate.and(refs_predicate)
+        };
+
+        let df = df.filter(predicate).int_err()?;
 
         // Project changelog into a state
         let df = odf::utils::data::changelog::project(

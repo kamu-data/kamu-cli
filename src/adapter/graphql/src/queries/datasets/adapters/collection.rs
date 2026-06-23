@@ -209,6 +209,7 @@ impl CollectionProjection<'_> {
                 ReadCheckedDataset::from_ref(readable_dataset),
                 self.as_of.clone(),
                 &odf_refs,
+                None,
             )
             .await
             .map_err(|e| match e {

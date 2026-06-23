@@ -18,11 +18,11 @@ use kamu_accounts::{
     AccountLifecycleMessage,
     CreateAccountUseCase,
     CreateAccountUseCaseOptions,
+    DidPkhAccountIdentity,
     MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
     PredefinedAccountsConfig,
 };
 use messaging_outbox::{MockOutbox, Outbox};
-use odf::AccountName;
 use odf::metadata::DidPkh;
 use pretty_assertions::assert_matches;
 
@@ -36,20 +36,22 @@ const WASYA: &str = "wasya";
 
 #[test_log::test(tokio::test)]
 async fn test_create_account() {
-    let new_account_name_with_email = AccountName::new_unchecked("foo");
+    let new_account_name_with_email = odf::AccountName::new_unchecked("foo");
     let new_account_email = Email::parse("foo@defined.com").unwrap();
 
-    let new_account_name_without_email = AccountName::new_unchecked("bar");
+    let new_account_name_without_email = odf::AccountName::new_unchecked("bar");
     let new_account_name_without_generated_email = Email::parse("wasya+bar@example.com").unwrap();
 
     let mut mock_outbox = MockOutbox::new();
     expect_outbox_account_created_once(
         &mut mock_outbox,
+        new_account_name_with_email.clone(),
         AccountDisplayName::from(new_account_name_with_email.as_str()),
         new_account_email.clone(),
     );
     expect_outbox_account_created_once(
         &mut mock_outbox,
+        new_account_name_without_email.clone(),
         AccountDisplayName::from(new_account_name_without_email.as_str()),
         new_account_name_without_generated_email.clone(),
     );
@@ -57,7 +59,7 @@ async fn test_create_account() {
     let harness = CreateAccountUseCaseImplHarness::new(mock_outbox).await;
     let creator_account_id = harness
         .account_service()
-        .find_account_id_by_name(&AccountName::new_unchecked(WASYA))
+        .find_account_id_by_name(&odf::AccountName::new_unchecked(WASYA))
         .await
         .unwrap()
         .unwrap();
@@ -111,12 +113,12 @@ async fn test_create_wallet_accounts() {
     let mut mock_outbox = MockOutbox::new();
 
     for did_pkh in &did_pkhs {
-        // E.g. 0xbf9a00755BB7d2E904b5F569095220c54E742E07
-        let wallet_address = did_pkh.wallet_address();
+        let identity = DidPkhAccountIdentity::from_did_pkh(did_pkh).unwrap();
         expect_outbox_account_created_once(
             &mut mock_outbox,
-            AccountDisplayName::from(wallet_address),
-            format!("{wallet_address}@example.com").parse().unwrap(),
+            identity.account_name,
+            identity.display_name,
+            identity.email,
         );
     }
 
@@ -159,7 +161,7 @@ impl CreateAccountUseCaseImplHarness {
             predefined_account_config
                 .predefined
                 .push(AccountConfig::test_config_from_name(
-                    AccountName::new_unchecked(account_name),
+                    odf::AccountName::new_unchecked(account_name),
                 ));
         }
 
@@ -189,6 +191,7 @@ impl CreateAccountUseCaseImplHarness {
 
 fn expect_outbox_account_created_once(
     mock_outbox: &mut MockOutbox,
+    expected_account_name: odf::AccountName,
     expected_display_name: AccountDisplayName,
     expected_email: Email,
 ) {
@@ -202,7 +205,8 @@ fn expect_outbox_account_created_once(
                 matches!(
                     serde_json::from_value::<AccountLifecycleMessage>(message_as_json.clone()),
                     Ok(AccountLifecycleMessage::Created(m))
-                        if m.display_name == expected_display_name
+                        if m.account_name == expected_account_name
+                            && m.display_name == expected_display_name
                             && m.email == expected_email
                 )
             }),
