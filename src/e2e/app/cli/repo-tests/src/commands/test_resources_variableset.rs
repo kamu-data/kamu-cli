@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::resources::{ResourceCtx, assert_resource_absent, fixtures};
+use crate::resources::{ResourceCtx, fixtures};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Scenario: VariableSet basic lifecycle (QA scenario 2)
@@ -23,7 +23,7 @@ pub async fn test_resources_variableset_lifecycle(ctx: ResourceCtx) {
     let updated_value = "hello-updated";
 
     // ── 1. Precondition: resource is absent ──────────────────────────────────
-    assert_resource_absent(&ctx, "vs", resource_name).await;
+    ctx.assert_resource_absent("vs", resource_name).await;
 
     // ── 2. Apply a VariableSet via stdin ─────────────────────────────────────
     let manifest = fixtures::variable_set_manifest_yaml(resource_name, initial_value);
@@ -148,7 +148,7 @@ pub async fn test_resources_variableset_lifecycle(ctx: ResourceCtx) {
 pub async fn test_resources_variableset_apply_warning(ctx: ResourceCtx) {
     let resource_name = "warn-vars";
 
-    assert_resource_absent(&ctx, "vs", resource_name).await;
+    ctx.assert_resource_absent("vs", resource_name).await;
 
     // A manifest missing `metadata.description` is applied: it succeeds (the
     // resource is created) but surfaces a non-fatal lint warning.

@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::resources::{ResourceCtx, assert_resource_absent, fixtures};
+use crate::resources::{ResourceCtx, fixtures};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Scenario: dry-run safety (QA scenario 5)
@@ -23,7 +23,7 @@ pub async fn test_resources_dry_run_safety(ctx: ResourceCtx) {
     let updated_value = "updated-value";
 
     // ── 1. Create dry-run previews creation but leaves the resource absent ───
-    assert_resource_absent(&ctx, "vs", resource_name).await;
+    ctx.assert_resource_absent("vs", resource_name).await;
 
     let initial_manifest = fixtures::variable_set_manifest_yaml(resource_name, initial_value);
     ctx.assert_success_with_stdin(
@@ -36,7 +36,7 @@ pub async fn test_resources_dry_run_safety(ctx: ResourceCtx) {
     )
     .await;
 
-    assert_resource_absent(&ctx, "vs", resource_name).await;
+    ctx.assert_resource_absent("vs", resource_name).await;
 
     // ── 2. Real create persists the initial value ────────────────────────────
     ctx.assert_success_with_stdin(
@@ -106,7 +106,7 @@ pub async fn test_resources_dry_run_safety(ctx: ResourceCtx) {
     )
     .await;
 
-    assert_resource_absent(&ctx, "vs", resource_name).await;
+    ctx.assert_resource_absent("vs", resource_name).await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

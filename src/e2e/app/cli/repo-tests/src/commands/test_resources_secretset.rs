@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::resources::{ResourceCtx, assert_resource_absent, fixtures};
+use crate::resources::{ResourceCtx, fixtures};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Scenario: SecretSet lifecycle + reveal safety (QA scenario 3)
@@ -30,7 +30,7 @@ pub async fn test_resources_secretset_lifecycle(ctx: ResourceCtx) {
     let db_password = "hunter2pass";
 
     // ── 1. Precondition: resource is absent ──────────────────────────────────
-    assert_resource_absent(&ctx, "ss", resource_name).await;
+    ctx.assert_resource_absent("ss", resource_name).await;
 
     // ── 2. Apply a SecretSet (two secret entries) via stdin ──────────────────
     let manifest = fixtures::secret_set_manifest_yaml(resource_name, api_token, db_password);
@@ -149,7 +149,7 @@ pub async fn test_resources_secretset_lifecycle(ctx: ResourceCtx) {
 pub async fn test_resources_secretset_apply_pre_encrypted(ctx: ResourceCtx) {
     let resource_name = "gitops-secrets";
 
-    assert_resource_absent(&ctx, "ss", resource_name).await;
+    ctx.assert_resource_absent("ss", resource_name).await;
 
     // Apply a manifest whose secret is supplied in already-encrypted form.
     let manifest = fixtures::secret_set_manifest_pre_encrypted_yaml(resource_name);

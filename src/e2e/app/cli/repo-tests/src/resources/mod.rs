@@ -20,64 +20,19 @@ pub mod fixtures;
 pub use context::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Assert helpers
+// Assert helpers for raw command output
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Assert a resource is not present: `get <kind> <name> --ignore-not-found`
-/// succeeds (does not error) and its name does not appear in `list <kind>`.
-pub async fn assert_resource_absent(ctx: &ResourceCtx, kind: &str, name: &str) {
-    // `get … --ignore-not-found` must succeed and must not echo the name.
-    let get_stdout = ctx
-        .stdout([
-            "get".to_string(),
-            kind.to_string(),
-            name.to_string(),
-            "--ignore-not-found".to_string(),
-        ])
-        .await;
-    assert!(
-        !get_stdout.contains(name),
-        "expected resource '{name}' to be absent, but `get` output mentioned it:\n{get_stdout}"
-    );
-
-    let list_stdout = ctx.stdout(["list".to_string(), kind.to_string()]).await;
-    assert!(
-        !list_stdout.contains(name),
-        "expected resource '{name}' absent from `list {kind}`, but it appeared:\n{list_stdout}"
-    );
-}
-
-/// Fetch a resource as JSON (`get <kind> <name> -o json`) and extract its
-/// stable UID. Looks for a `uid` field anywhere in the parsed document.
-pub async fn get_resource_uid(ctx: &ResourceCtx, kind: &str, name: &str) -> String {
-    let stdout = ctx
-        .stdout([
-            "get".to_string(),
-            kind.to_string(),
-            name.to_string(),
-            "-o".to_string(),
-            "json".to_string(),
-        ])
-        .await;
-
-    let doc: serde_json::Value = serde_json::from_str(&stdout).unwrap_or_else(|e| {
-        panic!("`get {kind} {name} -o json` did not return JSON: {e}\n{stdout}")
-    });
-
-    find_uid(&doc).unwrap_or_else(|| panic!("no `uid` field found in resource JSON:\n{stdout}"))
-}
-
-/// Recursively search a JSON value for a `uid` string field.
-fn find_uid(value: &serde_json::Value) -> Option<String> {
-    match value {
-        serde_json::Value::Object(map) => {
-            if let Some(serde_json::Value::String(uid)) = map.get("uid") {
-                return Some(uid.clone());
-            }
-            map.values().find_map(find_uid)
-        }
-        serde_json::Value::Array(items) => items.iter().find_map(find_uid),
-        _ => None,
+/// Assert every expected substring appears in a command output.
+///
+/// Use this for batch/resource-set commands where the CLI may emit stable
+/// status lines in backend-dependent order.
+pub fn assert_output_contains_all(output: &str, expected_lines: &[&str], command_name: &str) {
+    for expected_line in expected_lines {
+        assert!(
+            output.contains(expected_line),
+            "`{command_name}` should contain '{expected_line}', got:\n{output}"
+        );
     }
 }
 

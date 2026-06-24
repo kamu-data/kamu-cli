@@ -11,6 +11,8 @@ use kamu_cli_e2e_common::{KamuApiServerClient, KamuApiServerClientExt};
 use kamu_cli_puppet::KamuCliPuppet;
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 
+use super::fixtures;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Abstraction over *where* resource CLI commands run, so a single scenario
@@ -211,6 +213,119 @@ impl ResourceCtx {
         std::str::from_utf8(&result.get_output().stdout)
             .unwrap()
             .to_string()
+    }
+
+    /// Run a command (against the active context), assert success, and return
+    /// raw stderr. Useful for commands whose status lines are stable but not
+    /// emitted in a guaranteed order.
+    pub async fn stderr<I, S>(&self, args: I) -> String
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        let full = self.args(args);
+        let result = self.kamu().execute(full).await.success();
+
+        std::str::from_utf8(&result.get_output().stderr)
+            .unwrap()
+            .to_string()
+    }
+
+    /// Apply a canonical `VariableSet` fixture via stdin, asserting success.
+    pub async fn apply_variable_set(&self, name: &str, value: &str) {
+        let manifest = fixtures::variable_set_manifest_yaml(name, value);
+        self.assert_success_with_stdin(["apply", "--stdin"], &manifest, None)
+            .await;
+    }
+
+    /// Apply a canonical `SecretSet` fixture via stdin, asserting success.
+    ///
+    /// The caller must wire the e2e fixture with
+    /// `fixtures::SECRETS_ENCRYPTION_KAMU_CONFIG`; `SecretSet` encryption
+    /// happens inside the CLI/API process that receives the command.
+    pub async fn apply_secret_set(&self, name: &str, token: &str, password: &str) {
+        let manifest = fixtures::secret_set_manifest_yaml(name, token, password);
+        self.assert_success_with_stdin(["apply", "--stdin"], &manifest, None)
+            .await;
+    }
+
+    /// Assert a resource is present in both `get <kind> <name>` and
+    /// `list <kind>` outputs.
+    pub async fn assert_resource_present(&self, kind: &str, name: &str) {
+        let get_stdout = self
+            .stdout(["get".to_string(), kind.to_string(), name.to_string()])
+            .await;
+        assert!(
+            get_stdout.contains(name),
+            "expected resource '{name}' to be present, but `get` output did not mention \
+             it:\n{get_stdout}"
+        );
+
+        let list_stdout = self.stdout(["list".to_string(), kind.to_string()]).await;
+        assert!(
+            list_stdout.contains(name),
+            "expected resource '{name}' present in `list {kind}`, but it did not \
+             appear:\n{list_stdout}"
+        );
+    }
+
+    /// Assert a resource is not present: `get <kind> <name> --ignore-not-found`
+    /// succeeds and its name does not appear in `list <kind>`.
+    pub async fn assert_resource_absent(&self, kind: &str, name: &str) {
+        let get_stdout = self
+            .stdout([
+                "get".to_string(),
+                kind.to_string(),
+                name.to_string(),
+                "--ignore-not-found".to_string(),
+            ])
+            .await;
+        assert!(
+            !get_stdout.contains(name),
+            "expected resource '{name}' to be absent, but `get` output mentioned it:\n{get_stdout}"
+        );
+
+        let list_stdout = self.stdout(["list".to_string(), kind.to_string()]).await;
+        assert!(
+            !list_stdout.contains(name),
+            "expected resource '{name}' absent from `list {kind}`, but it appeared:\n{list_stdout}"
+        );
+    }
+
+    /// Fetch a resource as JSON (`get <kind> <name> -o json`) and extract its
+    /// stable UID. Looks for a `uid` field anywhere in the parsed document.
+    pub async fn resource_uid(&self, kind: &str, name: &str) -> String {
+        let stdout = self
+            .stdout([
+                "get".to_string(),
+                kind.to_string(),
+                name.to_string(),
+                "-o".to_string(),
+                "json".to_string(),
+            ])
+            .await;
+
+        let doc: serde_json::Value = serde_json::from_str(&stdout).unwrap_or_else(|e| {
+            panic!("`get {kind} {name} -o json` did not return JSON: {e}\n{stdout}")
+        });
+
+        find_uid(&doc).unwrap_or_else(|| panic!("no `uid` field found in resource JSON:\n{stdout}"))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Recursively search a JSON value for a `uid` string field.
+fn find_uid(value: &serde_json::Value) -> Option<String> {
+    match value {
+        serde_json::Value::Object(map) => {
+            if let Some(serde_json::Value::String(uid)) = map.get("uid") {
+                return Some(uid.clone());
+            }
+            map.values().find_map(find_uid)
+        }
+        serde_json::Value::Array(items) => items.iter().find_map(find_uid),
+        _ => None,
     }
 }
 
