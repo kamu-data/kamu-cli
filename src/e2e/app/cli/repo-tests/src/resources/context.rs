@@ -138,6 +138,22 @@ impl ResourceCtx {
         args.into_iter().map(Into::into).collect()
     }
 
+    /// Collect command arguments and append `--context <context_name>`.
+    ///
+    /// This is for scenarios that intentionally exercise per-command context
+    /// overrides, including commands targeting a remote context while the
+    /// active context remains `local`.
+    pub fn args_with_context<I, S>(&self, args: I, context_name: &str) -> Vec<String>
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        let mut full = self.args(args);
+        full.push("--context".to_string());
+        full.push(context_name.to_string());
+        full
+    }
+
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Thin command pass-throughs
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -289,6 +305,36 @@ impl ResourceCtx {
         assert!(
             !list_stdout.contains(name),
             "expected resource '{name}' absent from `list {kind}`, but it appeared:\n{list_stdout}"
+        );
+    }
+
+    /// Assert that the active resource context is exactly `local`.
+    ///
+    /// Uses `context list -o json`, which *explicitly* requests JSON (bare
+    /// `context` only emits JSON as a non-TTY fallback — under a real terminal
+    /// it renders a table, so parsing it would be format-fragile). Each entry
+    /// carries a `Current` marker (`"*"` for the active context); we assert the
+    /// active one is named exactly `local`. A substring match would be too
+    /// loose, and matching all listed names would not isolate the active one.
+    pub async fn assert_active_context_is_local(&self) {
+        let stdout = self.stdout(["context", "list", "-o", "json"]).await;
+
+        let contexts: serde_json::Value = serde_json::from_str(&stdout).unwrap_or_else(|e| {
+            panic!("`context list -o json` did not return JSON: {e}\n{stdout}")
+        });
+
+        let active_names: Vec<&str> = contexts
+            .as_array()
+            .unwrap_or_else(|| panic!("`context list -o json` should be a JSON array:\n{stdout}"))
+            .iter()
+            .filter(|entry| entry.get("Current").and_then(|c| c.as_str()) == Some("*"))
+            .filter_map(|entry| entry.get("Name").and_then(|n| n.as_str()))
+            .collect();
+
+        assert_eq!(
+            active_names,
+            ["local"],
+            "exactly one context should be active and it should be `local`, got:\n{stdout}"
         );
     }
 

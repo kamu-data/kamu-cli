@@ -23,6 +23,7 @@ mod test_rename_command;
 mod test_repo_command;
 mod test_reset_command;
 mod test_resources_baseline;
+mod test_resources_context_override;
 mod test_resources_delete;
 mod test_resources_dry_run;
 mod test_resources_secretset;
