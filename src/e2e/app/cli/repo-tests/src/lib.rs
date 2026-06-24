@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 pub mod commands;
+pub mod resources;
 pub mod rest_api;
 pub mod scenarios;
 mod test_flow;
