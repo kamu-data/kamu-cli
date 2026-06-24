@@ -19,7 +19,7 @@ env:
   RUST_LOG: "debug"
   RUST_LOG_SPAN_EVENTS: "new,close"
   RUST_BACKTRACE: "1"
-  KAMU_WEB_UI_DIR: ".github"
+  KAMU_WEB_UI_DIR: "../../../.github"
 jobs:
   lint_fmt:
     name: Lint / Code
