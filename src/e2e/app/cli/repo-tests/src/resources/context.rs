@@ -196,6 +196,22 @@ impl ResourceCtx {
             .success();
     }
 
+    /// Write `content` to `<workspace>/<rel_path>`, creating parent directories
+    /// as needed, and return the absolute path to the written file.
+    ///
+    /// For path- and directory-based `apply` tests (the stdin helpers cover the
+    /// stdin mode). Commands run with `current_dir` set to the workspace, so a
+    /// scenario may pass either the returned absolute path or `rel_path` itself
+    /// to `apply`.
+    pub fn write_manifest(&self, rel_path: &str, content: &str) -> std::path::PathBuf {
+        let path = self.kamu().workspace_path().join(rel_path);
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).unwrap();
+        }
+        std::fs::write(&path, content).unwrap();
+        path
+    }
+
     /// Run a command with stdin, asserting success and optional stderr regexes.
     pub async fn assert_success_with_stdin<I, S>(
         &self,
