@@ -227,12 +227,24 @@ test_smart_transfer_protocol_permutations!(test_smart_push_smart_pull_sequence);
 ```
 
 Each generated name (`…_st_st`, `…_st_mt`, …) is then wired separately in the
-per-DB files. A common variant of this pattern is a body that takes an
-abstraction over "where commands run" (e.g. a small enum wrapping either a plain
-`KamuCliPuppet` for local execution or a puppet pre-authenticated against a
-server) so one body covers both local and remote execution; the two wrappers
-differ only in how they construct that abstraction (`execute_command` fixture vs
-`run_api_server` fixture).
+per-DB files.
+
+### Generating local/remote permutation pairs from one scenario fn
+
+A common need is one scenario body that must run both as a local subprocess and
+against a remote server. The boilerplate-free approach is a **dedicated proc
+macro** that, from a single `fixture = <scenario fn>` + one wiring line per
+storage, emits two separately-runnable test fns — a `_local` one wired to the
+`execute_command` harness and a `_remote` one wired to the `run_api_server`
+harness — each constructing whatever "where do commands run" abstraction the
+scenario takes. This collapses both the hand-written wrapper fns and the
+duplicated per-DB macro invocations.
+
+When a feature area needs this, add a thin proc macro next to the existing ones
+in `common-macros/src/lib.rs` (reuse the shared `InputArgs` parser; derive the
+`_local`/`_remote` fn names with `format_ident!`) and re-export it from the
+prelude. The generated bodies should reference the scenario's helper type by its
+fully-qualified path so wiring files need no extra `use`.
 
 ---
 
