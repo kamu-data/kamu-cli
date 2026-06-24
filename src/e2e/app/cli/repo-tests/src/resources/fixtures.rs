@@ -29,11 +29,19 @@ pub const RESOURCE_API_VERSION: &str = "kamu.dev/v1alpha1";
 pub const VARIABLE_SET_KIND: &str = "VariableSet";
 pub const SECRET_SET_KIND: &str = "SecretSet";
 
+/// Default `metadata.description` baked into the well-formed builders. A
+/// manifest without a description applies successfully but emits a
+/// `missing_description` lint warning; the canonical fixtures include one so
+/// the common lifecycle scenarios stay warning-free. The warning path itself is
+/// covered explicitly by [`variable_set_manifest_no_description`].
+const DEFAULT_DESCRIPTION: &str = "e2e test fixture resource";
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Builders
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// A `VariableSet` manifest in YAML with a single `MESSAGE` variable.
+/// A well-formed `VariableSet` manifest in YAML with a single `MESSAGE`
+/// variable and a `description` (so it applies without lint warnings).
 pub fn variable_set_manifest_yaml(name: &str, value: &str) -> String {
     indoc::formatdoc!(
         r#"
@@ -41,6 +49,7 @@ pub fn variable_set_manifest_yaml(name: &str, value: &str) -> String {
         kind: {VARIABLE_SET_KIND}
         metadata:
           name: {name}
+          description: {DEFAULT_DESCRIPTION}
         spec:
           variables:
             MESSAGE: {value}
@@ -54,13 +63,31 @@ pub fn variable_set_manifest_json(name: &str, value: &str) -> String {
     serde_json::json!({
         "apiVersion": RESOURCE_API_VERSION,
         "kind": VARIABLE_SET_KIND,
-        "metadata": { "name": name },
+        "metadata": { "name": name, "description": DEFAULT_DESCRIPTION },
         "spec": { "variables": { "MESSAGE": value } },
     })
     .to_string()
 }
 
-/// A `SecretSet` manifest in YAML with two secret entries.
+/// A `VariableSet` manifest **without** `metadata.description`. Applies
+/// successfully but emits the `missing_description` lint warning — used to
+/// cover the warning surface explicitly.
+pub fn variable_set_manifest_no_description(name: &str, value: &str) -> String {
+    indoc::formatdoc!(
+        r#"
+        apiVersion: {RESOURCE_API_VERSION}
+        kind: {VARIABLE_SET_KIND}
+        metadata:
+          name: {name}
+        spec:
+          variables:
+            MESSAGE: {value}
+        "#
+    )
+}
+
+/// A well-formed `SecretSet` manifest in YAML with two secret entries and a
+/// `description` (so it applies without lint warnings).
 pub fn secret_set_manifest_yaml(name: &str, token: &str, password: &str) -> String {
     indoc::formatdoc!(
         r#"
@@ -68,6 +95,7 @@ pub fn secret_set_manifest_yaml(name: &str, token: &str, password: &str) -> Stri
         kind: {SECRET_SET_KIND}
         metadata:
           name: {name}
+          description: {DEFAULT_DESCRIPTION}
         spec:
           secrets:
             API_TOKEN:
@@ -83,7 +111,7 @@ pub fn secret_set_manifest_json(name: &str, token: &str, password: &str) -> Stri
     serde_json::json!({
         "apiVersion": RESOURCE_API_VERSION,
         "kind": SECRET_SET_KIND,
-        "metadata": { "name": name },
+        "metadata": { "name": name, "description": DEFAULT_DESCRIPTION },
         "spec": { "secrets": {
             "API_TOKEN": { "value": token },
             "DB_PASSWORD": { "value": password },
