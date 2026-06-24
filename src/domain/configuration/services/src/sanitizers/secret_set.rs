@@ -15,7 +15,6 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu_configuration::{EncryptedSecretSpec, SecretSetResource, SecretSetSpec, SecretSpec};
 use kamu_datasets::SecretsEncryptionConfig;
 use kamu_resources::ResourceSpecSanitizer;
-use secrecy::{ExposeSecret, SecretString};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -36,14 +35,7 @@ impl ResourceSpecSanitizer<SecretSetResource> for SecretSetSpecSanitizer {
     ) -> Result<SecretSetSpec, InternalError> {
         use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 
-        let encryption_key = SecretString::from(
-            self.secrets_encryption_config
-                .encryption_key
-                .as_ref()
-                .unwrap()
-                .clone(),
-        );
-        let encryptor = AesGcmEncryptor::try_new(encryption_key.expose_secret()).int_err()?;
+        let encryptor = self.secrets_encryption_config.new_encryptor()?;
 
         for (name, new_secret) in &mut new_spec.secrets {
             if new_secret.is_encrypted() {

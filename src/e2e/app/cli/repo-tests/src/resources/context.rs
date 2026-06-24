@@ -54,6 +54,15 @@ impl ResourceCtx {
     ///
     /// Mirrors the combined CLI↔server pattern in
     /// `crate::test_smart_transfer_protocol`.
+    ///
+    /// Note on server-side config: the local CLI workspace created here is
+    /// deliberately *unconfigured*. When a command targets a remote context,
+    /// the CLI is a thin client and the work (e.g. `SecretSet` encryption)
+    /// happens on the API server. So any config the scenario needs in the
+    /// remote case (such as the secrets encryption key) must be supplied to
+    /// the *server* — which the `kamu_cli_resource_e2e_test!` macro does by
+    /// passing the same `options` (incl. `with_kamu_config`) to the
+    /// `run_api_server` harness.
     pub async fn remote_from_server(client: &mut KamuApiServerClient, context_name: &str) -> Self {
         let token = client.auth().login_as_e2e_user().await;
         let server_url = client.get_base_url().clone();

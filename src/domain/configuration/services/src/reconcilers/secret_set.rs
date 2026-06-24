@@ -25,7 +25,6 @@ use kamu_configuration::{
 use kamu_datasets::SecretsEncryptionConfig;
 use kamu_resources::{DeclarativeResource, ReconcilableResource, Reconciler, ResourceUID};
 use odf::AccountID;
-use secrecy::{ExposeSecret, SecretString};
 use time_source::SystemTimeSource;
 use uuid::Uuid;
 
@@ -127,15 +126,8 @@ impl SecretSetReconcilerImpl {
     }
 
     fn create_encryptor(&self) -> Result<AesGcmEncryptor, SecretSetReconcileError> {
-        let encryption_key = SecretString::from(
-            self.secrets_encryption_config
-                .encryption_key
-                .as_ref()
-                .unwrap()
-                .clone(),
-        );
-        AesGcmEncryptor::try_new(encryption_key.expose_secret())
-            .int_err()
+        self.secrets_encryption_config
+            .new_encryptor()
             .map_err(SecretSetReconcileError::Internal)
     }
 

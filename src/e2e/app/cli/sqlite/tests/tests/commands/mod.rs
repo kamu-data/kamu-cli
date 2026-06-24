@@ -25,6 +25,7 @@ mod test_rename_command;
 mod test_repo_command;
 mod test_reset_command;
 mod test_resources_baseline;
+mod test_resources_secretset;
 mod test_resources_variableset;
 mod test_search_command;
 mod test_sql_command;

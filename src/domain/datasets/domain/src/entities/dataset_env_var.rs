@@ -9,7 +9,7 @@
 
 use chrono::{DateTime, Utc};
 use crypto_utils::{AesGcmEncryptor, EncryptionError, Encryptor};
-use internal_error::ErrorIntoInternal;
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use secrecy::{ExposeSecret, SecretString};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -156,6 +156,23 @@ impl SecretsEncryptionConfig {
             return true;
         }
         false
+    }
+
+    /// Build an [`AesGcmEncryptor`] from the configured encryption key.
+    ///
+    /// Returns a graceful error (rather than panicking) when no key is
+    /// configured — the same situation `app.rs` treats as "feature disabled".
+    /// Callers that need to encrypt/decrypt secrets (e.g. `SecretSet`
+    /// processing) use this so a missing key surfaces as an `InternalError`
+    /// instead of an `Option::unwrap()` panic.
+    pub fn new_encryptor(&self) -> Result<AesGcmEncryptor, InternalError> {
+        let Some(encryption_key) = self.encryption_key.as_ref() else {
+            return InternalError::bail(
+                "Secrets encryption key is not configured; set `secretsEncryption.encryptionKey`",
+            );
+        };
+
+        AesGcmEncryptor::try_new(encryption_key).int_err()
     }
 }
 
