@@ -9,7 +9,6 @@
 
 use std::sync::Arc;
 
-use crypto_utils::AesGcmEncryptor;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_configuration::{SecretSetResource, SecretSetSpec, SecretSpec};
 use kamu_datasets::SecretsEncryptionConfig;
@@ -19,7 +18,6 @@ use kamu_resources::{
     ResourceDispatcherMeta,
     ResourceSpecViewDispatcher,
 };
-use secrecy::{ExposeSecret, SecretString};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -45,14 +43,7 @@ impl ResourceSpecViewDispatcher for SecretSetSpecViewDispatcher {
     ) -> Result<serde_json::Value, InternalError> {
         let mut spec: SecretSetSpec = serde_json::from_value(spec_json).int_err()?;
 
-        let encryption_key = SecretString::from(
-            self.secrets_encryption_config
-                .encryption_key
-                .as_ref()
-                .unwrap()
-                .clone(),
-        );
-        let encryptor = AesGcmEncryptor::try_new(encryption_key.expose_secret()).int_err()?;
+        let encryptor = self.secrets_encryption_config.new_encryptor()?;
 
         for secret in spec.secrets.values_mut() {
             if let SecretSpec::Encrypted(enc) = secret {

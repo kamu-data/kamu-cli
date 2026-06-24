@@ -7,19 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-pub mod commands;
-pub mod resources;
-pub mod rest_api;
-pub mod scenarios;
-mod test_flow;
-mod test_private_datasets;
-mod test_selftest;
-mod test_smart_transfer_protocol;
-pub mod utils;
-
-pub mod private_datasets {
-    pub use crate::test_private_datasets::*;
-}
-pub use test_flow::*;
-pub use test_selftest::*;
-pub use test_smart_transfer_protocol::*;
+mod test_resources_baseline;
+mod test_resources_context_override;
+mod test_resources_delete;
+mod test_resources_dry_run;
+mod test_resources_secretset;
+mod test_resources_variableset;
