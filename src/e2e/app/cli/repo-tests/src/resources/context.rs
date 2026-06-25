@@ -247,6 +247,38 @@ impl ResourceCtx {
             .to_string()
     }
 
+    /// Run a command and parse stdout as JSON.
+    pub async fn stdout_json<I, S>(&self, args: I) -> serde_json::Value
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        let full = self.args(args);
+        let label = full.join(" ");
+        let raw = self.stdout(full).await;
+
+        serde_json::from_str(&raw)
+            .unwrap_or_else(|e| panic!("`{label}` did not return JSON: {e}\n{raw}"))
+    }
+
+    /// Run a command, parse stdout as YAML, and convert it to a JSON value for
+    /// ergonomic field assertions via `pointer`.
+    pub async fn stdout_yaml_as_json<I, S>(&self, args: I) -> serde_json::Value
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        let full = self.args(args);
+        let label = full.join(" ");
+        let raw = self.stdout(full).await;
+        let yaml: serde_yaml::Value = serde_yaml::from_str(&raw)
+            .unwrap_or_else(|e| panic!("`{label}` did not return YAML: {e}\n{raw}"));
+
+        serde_json::to_value(yaml).unwrap_or_else(|e| {
+            panic!("`{label}` YAML could not be converted to JSON value: {e}\n{raw}")
+        })
+    }
+
     /// Run a command (against the active context), assert success, and return
     /// raw stderr. Useful for commands whose status lines are stable but not
     /// emitted in a guaranteed order.

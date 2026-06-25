@@ -38,4 +38,22 @@ pub fn assert_output_contains_all(output: &str, expected_lines: &[&str], command
     }
 }
 
+/// Assert that a JSON records array (e.g. `list -o json`,
+/// `context api-resources -o json`) contains at least one row whose `"Name"`
+/// and `"Kind"` columns both match. Column names follow the Arrow/RecordsWriter
+/// convention used by the CLI: title-cased strings, not camelCase.
+pub fn assert_record_row(doc: &serde_json::Value, label: &str, name: &str, kind: &str) {
+    let rows = doc
+        .as_array()
+        .unwrap_or_else(|| panic!("`{label}` should be a JSON array of records:\n{doc}"));
+
+    assert!(
+        rows.iter().any(|row| {
+            row.get("Name").and_then(serde_json::Value::as_str) == Some(name)
+                && row.get("Kind").and_then(serde_json::Value::as_str) == Some(kind)
+        }),
+        "`{label}` should contain a row with Name={name} Kind={kind}, got:\n{doc}"
+    );
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
