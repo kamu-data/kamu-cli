@@ -83,14 +83,12 @@ pub async fn test_resources_apply_batch(ctx: ResourceCtx) {
         )
         .await;
 
-        let get_out = ctx.stdout(["get", "vs", name]).await;
-        assert!(
-            get_out.contains("new-value"),
-            "later-wins: `get vs {name}` should show 'new-value', got:\n{get_out}"
-        );
-        assert!(
-            !get_out.contains("old-value"),
-            "later-wins: `get vs {name}` should not show 'old-value', got:\n{get_out}"
+        // Later-wins: the second manifest's value is the one that persists.
+        let view = ctx.get_one(["get", "vs", name]).await;
+        assert_eq!(
+            view.variable("MESSAGE"),
+            Some("new-value"),
+            "later-wins: the second manifest's value must persist"
         );
     }
 

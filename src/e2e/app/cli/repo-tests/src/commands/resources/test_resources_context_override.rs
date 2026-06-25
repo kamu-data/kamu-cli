@@ -41,27 +41,16 @@ pub async fn test_resources_context_override_isolation(mut client: KamuApiServer
     )
     .await;
 
-    let local_get = ctx.stdout(["get", "vs", resource_name]).await;
-    assert!(
-        local_get.contains("local-value"),
-        "plain get should read the local resource, got:\n{local_get}"
-    );
-    assert!(
-        !local_get.contains("remote-value"),
-        "plain get leaked the remote value:\n{local_get}"
-    );
+    // Plain get reads the local context; `--context prod` reads the remote.
+    // Asserting the exact MESSAGE value (not a substring) proves context
+    // isolation: each get sees its own context's value and not the other's.
+    let local_view = ctx.get_one(["get", "vs", resource_name]).await;
+    assert_eq!(local_view.variable("MESSAGE"), Some("local-value"));
 
-    let remote_get = ctx
-        .stdout(ctx.args_with_context(["get", "vs", resource_name], prod_context))
+    let remote_view = ctx
+        .get_one(ctx.args_with_context(["get", "vs", resource_name], prod_context))
         .await;
-    assert!(
-        remote_get.contains("remote-value"),
-        "`--context prod` get should read the remote resource, got:\n{remote_get}"
-    );
-    assert!(
-        !remote_get.contains("local-value"),
-        "`--context prod` get leaked the local value:\n{remote_get}"
-    );
+    assert_eq!(remote_view.variable("MESSAGE"), Some("remote-value"));
 
     ctx.assert_active_context_is_local().await;
 
@@ -109,15 +98,10 @@ pub async fn test_resources_context_override_isolation(mut client: KamuApiServer
         "remote resource should be gone after delete, got:\n{remote_after_delete}"
     );
 
-    let local_after_delete = ctx.stdout(["get", "vs", resource_name]).await;
-    assert!(
-        local_after_delete.contains("local-value"),
-        "local resource should remain after remote delete, got:\n{local_after_delete}"
-    );
-    assert!(
-        !local_after_delete.contains("remote-value"),
-        "local resource should not contain the deleted remote value:\n{local_after_delete}"
-    );
+    // The local copy is untouched by the remote delete: still present, still
+    // carrying the local value.
+    let local_after_delete = ctx.get_one(["get", "vs", resource_name]).await;
+    assert_eq!(local_after_delete.variable("MESSAGE"), Some("local-value"));
 
     ctx.assert_active_context_is_local().await;
 }

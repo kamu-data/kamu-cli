@@ -50,7 +50,7 @@ pub const SECRETS_ENCRYPTION_KAMU_CONFIG: &str = indoc::indoc!(
 /// `missing_description` lint warning; the canonical fixtures include one so
 /// the common lifecycle scenarios stay warning-free. The warning path itself is
 /// covered explicitly by [`variable_set_manifest_no_description`].
-const DEFAULT_DESCRIPTION: &str = "e2e test fixture resource";
+pub const DEFAULT_DESCRIPTION: &str = "e2e test fixture resource";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Builders

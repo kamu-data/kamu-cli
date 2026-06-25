@@ -49,11 +49,8 @@ pub async fn test_resources_dry_run_safety(ctx: ResourceCtx) {
     )
     .await;
 
-    let get_initial = ctx.stdout(["get", "vs", resource_name]).await;
-    assert!(
-        get_initial.contains(initial_value),
-        "`get` after create should show '{initial_value}', got:\n{get_initial}"
-    );
+    let view = ctx.get_one(["get", "vs", resource_name]).await;
+    assert_eq!(view.variable("MESSAGE"), Some(initial_value));
 
     // ── 3. Update dry-run previews update but preserves old state ────────────
     let updated_manifest = fixtures::variable_set_manifest_yaml(resource_name, updated_value);
@@ -67,16 +64,12 @@ pub async fn test_resources_dry_run_safety(ctx: ResourceCtx) {
     )
     .await;
 
-    let get_after_update_dry_run = ctx.stdout(["get", "vs", resource_name]).await;
-    assert!(
-        get_after_update_dry_run.contains(initial_value),
-        "`get` after update dry-run should still show '{initial_value}', \
-         got:\n{get_after_update_dry_run}"
-    );
-    assert!(
-        !get_after_update_dry_run.contains(updated_value),
-        "`get` after update dry-run should not show '{updated_value}', \
-         got:\n{get_after_update_dry_run}"
+    // Update dry-run must not have touched the stored value.
+    let view = ctx.get_one(["get", "vs", resource_name]).await;
+    assert_eq!(
+        view.variable("MESSAGE"),
+        Some(initial_value),
+        "update dry-run must preserve the original MESSAGE"
     );
 
     // ── 4. Delete dry-run previews deletion but leaves resource present ──────
@@ -89,12 +82,9 @@ pub async fn test_resources_dry_run_safety(ctx: ResourceCtx) {
     )
     .await;
 
-    let get_after_delete_dry_run = ctx.stdout(["get", "vs", resource_name]).await;
-    assert!(
-        get_after_delete_dry_run.contains(initial_value),
-        "`get` after delete dry-run should still show '{initial_value}', \
-         got:\n{get_after_delete_dry_run}"
-    );
+    // Delete dry-run must leave the resource (and its value) in place.
+    let view = ctx.get_one(["get", "vs", resource_name]).await;
+    assert_eq!(view.variable("MESSAGE"), Some(initial_value));
 
     // ── 5. Real delete removes the resource ──────────────────────────────────
     ctx.assert_success(
