@@ -79,6 +79,13 @@ impl ResourceView {
             .and_then(Value::as_str)
     }
 
+    /// Stable resource UID. The exact nesting is intentionally not part of the
+    /// test contract, so this searches the rendered document recursively.
+    pub fn uid(&self) -> String {
+        find_uid(&self.0)
+            .unwrap_or_else(|| panic!("resource view has no string `uid`:\n{}", self.0))
+    }
+
     /// The value of a `VariableSet` variable (`spec.variables.<key>`), if
     /// present. Variables render as scalar strings.
     pub fn variable(&self, key: &str) -> Option<&str> {
@@ -112,6 +119,21 @@ impl ResourceView {
             .pointer(pointer)
             .and_then(Value::as_str)
             .unwrap_or_else(|| panic!("resource view has no string `{label}`:\n{}", self.0))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn find_uid(value: &Value) -> Option<String> {
+    match value {
+        Value::Object(map) => {
+            if let Some(Value::String(uid)) = map.get("uid") {
+                return Some(uid.clone());
+            }
+            map.values().find_map(find_uid)
+        }
+        Value::Array(items) => items.iter().find_map(find_uid),
+        _ => None,
     }
 }
 

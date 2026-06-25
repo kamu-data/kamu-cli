@@ -87,19 +87,23 @@ pub async fn test_resources_output_formats(ctx: ResourceCtx) {
     // `summary -o json` / `summary -o yaml`: parseable and count the created
     // VariableSet.
     let summary_json = ctx.stdout_json(["summary", "-o", "json"]).await;
-    assert_summary_count(
-        &summary_json,
-        "summary -o json",
-        fixtures::VARIABLE_SET_KIND,
-        1,
+    assert_eq!(
+        resources::summary_count(
+            &summary_json,
+            "summary -o json",
+            fixtures::VARIABLE_SET_KIND
+        ),
+        1
     );
 
     let summary_yaml = ctx.stdout_yaml_as_json(["summary", "-o", "yaml"]).await;
-    assert_summary_count(
-        &summary_yaml,
-        "summary -o yaml",
-        fixtures::VARIABLE_SET_KIND,
-        1,
+    assert_eq!(
+        resources::summary_count(
+            &summary_yaml,
+            "summary -o yaml",
+            fixtures::VARIABLE_SET_KIND
+        ),
+        1
     );
 
     // `context api-resources -o json`: parseable records array listing the
@@ -139,33 +143,6 @@ fn assert_csv_contains_resource(raw: &str, label: &str, name: &str, kind: &str) 
         lines.any(|line| line.contains(name) && line.contains(kind)),
         "`{label}` should contain a row for {kind}/{name}, got:\n{raw}"
     );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-fn assert_summary_count(doc: &serde_json::Value, label: &str, kind: &str, expected_total: u64) {
-    let count = summary_row(doc, label, kind)
-        .get("totalCount")
-        .and_then(serde_json::Value::as_u64)
-        .unwrap_or_else(|| panic!("`{label}` row for {kind} has no numeric totalCount:\n{doc}"));
-
-    assert_eq!(
-        count, expected_total,
-        "`{label}` should count {expected_total} {kind} resources, got:\n{doc}"
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-fn summary_row<'a>(doc: &'a serde_json::Value, label: &str, kind: &str) -> &'a serde_json::Value {
-    let rows = doc
-        .get("resourceCounts")
-        .and_then(serde_json::Value::as_array)
-        .unwrap_or_else(|| panic!("`{label}` should contain resourceCounts array:\n{doc}"));
-
-    rows.iter()
-        .find(|row| row.get("kind").and_then(serde_json::Value::as_str) == Some(kind))
-        .unwrap_or_else(|| panic!("`{label}` should contain a summary row for {kind}:\n{doc}"))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

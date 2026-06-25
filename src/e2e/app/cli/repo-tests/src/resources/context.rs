@@ -11,7 +11,7 @@ use kamu_cli_e2e_common::{KamuApiServerClient, KamuApiServerClientExt};
 use kamu_cli_puppet::KamuCliPuppet;
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 
-use super::fixtures;
+use super::{fixtures, summary_count};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -102,6 +102,24 @@ impl ResourceCtx {
         match self {
             Self::Local(kamu) | Self::Remote { kamu, .. } => kamu,
         }
+    }
+
+    /// Mutable access to the underlying CLI puppet for harness-level state
+    /// changes such as switching the active account.
+    pub fn kamu_mut(&mut self) -> &mut KamuCliPuppet {
+        match self {
+            Self::Local(kamu) | Self::Remote { kamu, .. } => kamu,
+        }
+    }
+
+    /// Create an account in the current CLI workspace.
+    pub async fn create_account(&self, account_name: &odf::AccountName) {
+        self.kamu().create_account(account_name).await;
+    }
+
+    /// Switch the active account used by subsequent CLI invocations.
+    pub fn set_account(&mut self, account_name: Option<odf::AccountName>) {
+        self.kamu_mut().set_account(account_name);
     }
 
     /// The registered remote context name, if this is a remote context.
@@ -389,37 +407,33 @@ impl ResourceCtx {
     /// Fetch a resource as JSON (`get <kind> <name> -o json`) and extract its
     /// stable UID. Looks for a `uid` field anywhere in the parsed document.
     pub async fn resource_uid(&self, kind: &str, name: &str) -> String {
-        let stdout = self
-            .stdout([
-                "get".to_string(),
-                kind.to_string(),
-                name.to_string(),
-                "-o".to_string(),
-                "json".to_string(),
-            ])
-            .await;
-
-        let doc: serde_json::Value = serde_json::from_str(&stdout).unwrap_or_else(|e| {
-            panic!("`get {kind} {name} -o json` did not return JSON: {e}\n{stdout}")
-        });
-
-        find_uid(&doc).unwrap_or_else(|| panic!("no `uid` field found in resource JSON:\n{stdout}"))
+        self.get_one(["get", kind, name]).await.uid()
     }
-}
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// Run `list <kind> -o json` and return the sorted resource names.
+    pub async fn list_names(&self, kind: &str) -> Vec<String> {
+        let label = format!("list {kind} -o json");
+        let doc = self.stdout_json(["list", kind, "-o", "json"]).await;
 
-/// Recursively search a JSON value for a `uid` string field.
-fn find_uid(value: &serde_json::Value) -> Option<String> {
-    match value {
-        serde_json::Value::Object(map) => {
-            if let Some(serde_json::Value::String(uid)) = map.get("uid") {
-                return Some(uid.clone());
-            }
-            map.values().find_map(find_uid)
-        }
-        serde_json::Value::Array(items) => items.iter().find_map(find_uid),
-        _ => None,
+        let mut names: Vec<String> = doc
+            .as_array()
+            .unwrap_or_else(|| panic!("`{label}` should be a JSON array:\n{doc}"))
+            .iter()
+            .map(|row| {
+                row.get("Name")
+                    .and_then(serde_json::Value::as_str)
+                    .unwrap_or_else(|| panic!("`{label}` row has no Name:\n{row}"))
+                    .to_string()
+            })
+            .collect();
+        names.sort();
+        names
+    }
+
+    /// Return the `summary -o json` total count for a resource kind.
+    pub async fn summary_count(&self, kind: &str) -> u64 {
+        let doc = self.stdout_json(["summary", "-o", "json"]).await;
+        summary_count(&doc, "summary -o json", kind)
     }
 }
 
