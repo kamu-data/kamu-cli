@@ -10,6 +10,7 @@
 mod test_resources_apply_batch;
 mod test_resources_apply_input_modes;
 mod test_resources_baseline;
+mod test_resources_context_management;
 mod test_resources_context_override;
 mod test_resources_delete;
 mod test_resources_dry_run;
