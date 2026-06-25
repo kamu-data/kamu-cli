@@ -11,7 +11,7 @@ use kamu_cli_e2e_common::{KamuApiServerClient, KamuApiServerClientExt};
 use kamu_cli_puppet::KamuCliPuppet;
 use kamu_cli_puppet::extensions::KamuCliPuppetExt;
 
-use super::fixtures;
+use super::{fixtures, summary_count};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -102,6 +102,24 @@ impl ResourceCtx {
         match self {
             Self::Local(kamu) | Self::Remote { kamu, .. } => kamu,
         }
+    }
+
+    /// Mutable access to the underlying CLI puppet for harness-level state
+    /// changes such as switching the active account.
+    pub fn kamu_mut(&mut self) -> &mut KamuCliPuppet {
+        match self {
+            Self::Local(kamu) | Self::Remote { kamu, .. } => kamu,
+        }
+    }
+
+    /// Create an account in the current CLI workspace.
+    pub async fn create_account(&self, account_name: &odf::AccountName) {
+        self.kamu().create_account(account_name).await;
+    }
+
+    /// Switch the active account used by subsequent CLI invocations.
+    pub fn set_account(&mut self, account_name: Option<odf::AccountName>) {
+        self.kamu_mut().set_account(account_name);
     }
 
     /// The registered remote context name, if this is a remote context.
@@ -196,6 +214,22 @@ impl ResourceCtx {
             .success();
     }
 
+    /// Write `content` to `<workspace>/<rel_path>`, creating parent directories
+    /// as needed, and return the absolute path to the written file.
+    ///
+    /// For path- and directory-based `apply` tests (the stdin helpers cover the
+    /// stdin mode). Commands run with `current_dir` set to the workspace, so a
+    /// scenario may pass either the returned absolute path or `rel_path` itself
+    /// to `apply`.
+    pub fn write_manifest(&self, rel_path: &str, content: &str) -> std::path::PathBuf {
+        let path = self.kamu().workspace_path().join(rel_path);
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).unwrap();
+        }
+        std::fs::write(&path, content).unwrap();
+        path
+    }
+
     /// Run a command with stdin, asserting success and optional stderr regexes.
     pub async fn assert_success_with_stdin<I, S>(
         &self,
@@ -217,6 +251,27 @@ impl ResourceCtx {
             .await;
     }
 
+    /// Run a command with stdin, asserting failure and optional stderr regexes.
+    pub async fn assert_failure_with_stdin<I, S>(
+        &self,
+        args: I,
+        stdin: &str,
+        expected: Option<&[&str]>,
+    ) where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        let full = self.args(args);
+        self.kamu()
+            .assert_failure_command_execution_with_input(
+                full,
+                stdin.to_string(),
+                None,
+                expected.map(<[&str]>::to_vec),
+            )
+            .await;
+    }
+
     /// Run a command (against the active context) and return raw stdout.
     pub async fn stdout<I, S>(&self, args: I) -> String
     where
@@ -229,6 +284,38 @@ impl ResourceCtx {
         std::str::from_utf8(&result.get_output().stdout)
             .unwrap()
             .to_string()
+    }
+
+    /// Run a command and parse stdout as JSON.
+    pub async fn stdout_json<I, S>(&self, args: I) -> serde_json::Value
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        let full = self.args(args);
+        let label = full.join(" ");
+        let raw = self.stdout(full).await;
+
+        serde_json::from_str(&raw)
+            .unwrap_or_else(|e| panic!("`{label}` did not return JSON: {e}\n{raw}"))
+    }
+
+    /// Run a command, parse stdout as YAML, and convert it to a JSON value for
+    /// ergonomic field assertions via `pointer`.
+    pub async fn stdout_yaml_as_json<I, S>(&self, args: I) -> serde_json::Value
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        let full = self.args(args);
+        let label = full.join(" ");
+        let raw = self.stdout(full).await;
+        let yaml: serde_yaml::Value = serde_yaml::from_str(&raw)
+            .unwrap_or_else(|e| panic!("`{label}` did not return YAML: {e}\n{raw}"));
+
+        serde_json::to_value(yaml).unwrap_or_else(|e| {
+            panic!("`{label}` YAML could not be converted to JSON value: {e}\n{raw}")
+        })
     }
 
     /// Run a command (against the active context), assert success, and return
@@ -341,37 +428,33 @@ impl ResourceCtx {
     /// Fetch a resource as JSON (`get <kind> <name> -o json`) and extract its
     /// stable UID. Looks for a `uid` field anywhere in the parsed document.
     pub async fn resource_uid(&self, kind: &str, name: &str) -> String {
-        let stdout = self
-            .stdout([
-                "get".to_string(),
-                kind.to_string(),
-                name.to_string(),
-                "-o".to_string(),
-                "json".to_string(),
-            ])
-            .await;
-
-        let doc: serde_json::Value = serde_json::from_str(&stdout).unwrap_or_else(|e| {
-            panic!("`get {kind} {name} -o json` did not return JSON: {e}\n{stdout}")
-        });
-
-        find_uid(&doc).unwrap_or_else(|| panic!("no `uid` field found in resource JSON:\n{stdout}"))
+        self.get_one(["get", kind, name]).await.uid()
     }
-}
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// Run `list <kind> -o json` and return the sorted resource names.
+    pub async fn list_names(&self, kind: &str) -> Vec<String> {
+        let label = format!("list {kind} -o json");
+        let doc = self.stdout_json(["list", kind, "-o", "json"]).await;
 
-/// Recursively search a JSON value for a `uid` string field.
-fn find_uid(value: &serde_json::Value) -> Option<String> {
-    match value {
-        serde_json::Value::Object(map) => {
-            if let Some(serde_json::Value::String(uid)) = map.get("uid") {
-                return Some(uid.clone());
-            }
-            map.values().find_map(find_uid)
-        }
-        serde_json::Value::Array(items) => items.iter().find_map(find_uid),
-        _ => None,
+        let mut names: Vec<String> = doc
+            .as_array()
+            .unwrap_or_else(|| panic!("`{label}` should be a JSON array:\n{doc}"))
+            .iter()
+            .map(|row| {
+                row.get("Name")
+                    .and_then(serde_json::Value::as_str)
+                    .unwrap_or_else(|| panic!("`{label}` row has no Name:\n{row}"))
+                    .to_string()
+            })
+            .collect();
+        names.sort();
+        names
+    }
+
+    /// Return the `summary -o json` total count for a resource kind.
+    pub async fn summary_count(&self, kind: &str) -> u64 {
+        let doc = self.stdout_json(["summary", "-o", "json"]).await;
+        summary_count(&doc, "summary -o json", kind)
     }
 }
 

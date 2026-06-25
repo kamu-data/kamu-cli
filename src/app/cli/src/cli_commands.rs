@@ -578,7 +578,10 @@ pub fn command_needs_transaction(args: &cli::Cli) -> bool {
         cli::Command::Context(c) => {
             matches!(&c.subcommand, Some(cli::ContextSubCommand::ApiResources(_)))
         }
-        cli::Command::Ui(_) | cli::Command::Login(_) | cli::Command::Push(_) => false,
+        cli::Command::Apply(_)
+        | cli::Command::Ui(_)
+        | cli::Command::Login(_)
+        | cli::Command::Push(_) => false,
         _ => true,
     }
 }

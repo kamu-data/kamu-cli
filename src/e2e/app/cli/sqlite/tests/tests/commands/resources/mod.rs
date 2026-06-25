@@ -7,9 +7,19 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod test_resources_apply_batch;
+mod test_resources_apply_input_modes;
 mod test_resources_baseline;
+mod test_resources_context_management;
 mod test_resources_context_override;
+mod test_resources_dataset_compat;
 mod test_resources_delete;
 mod test_resources_dry_run;
+mod test_resources_get_selectors;
+mod test_resources_golden_view;
+mod test_resources_manifest_account;
+mod test_resources_multitenant_isolation;
+mod test_resources_output_formats;
 mod test_resources_secretset;
+mod test_resources_uuid_lookup;
 mod test_resources_variableset;

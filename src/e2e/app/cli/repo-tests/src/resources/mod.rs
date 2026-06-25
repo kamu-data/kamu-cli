@@ -16,8 +16,10 @@
 
 mod context;
 pub mod fixtures;
+mod get_view;
 
 pub use context::*;
+pub use get_view::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Assert helpers for raw command output
@@ -34,6 +36,54 @@ pub fn assert_output_contains_all(output: &str, expected_lines: &[&str], command
             "`{command_name}` should contain '{expected_line}', got:\n{output}"
         );
     }
+}
+
+/// Assert that a JSON records array (e.g. `list -o json`,
+/// `context api-resources -o json`) contains at least one row whose `"Name"`
+/// and `"Kind"` columns both match. Column names follow the Arrow/RecordsWriter
+/// convention used by the CLI: title-cased strings, not camelCase.
+pub fn assert_record_row(doc: &serde_json::Value, label: &str, name: &str, kind: &str) {
+    let rows = doc
+        .as_array()
+        .unwrap_or_else(|| panic!("`{label}` should be a JSON array of records:\n{doc}"));
+
+    assert!(
+        rows.iter().any(|row| {
+            row.get("Name").and_then(serde_json::Value::as_str) == Some(name)
+                && row.get("Kind").and_then(serde_json::Value::as_str) == Some(kind)
+        }),
+        "`{label}` should contain a row with Name={name} Kind={kind}, got:\n{doc}"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Return the `totalCount` for a resource kind from `summary -o json/yaml`
+/// output converted to JSON.
+pub fn summary_count(doc: &serde_json::Value, label: &str, kind: &str) -> u64 {
+    let Some(row) = summary_row(doc, label, kind) else {
+        return 0;
+    };
+
+    row.get("totalCount")
+        .and_then(serde_json::Value::as_u64)
+        .unwrap_or_else(|| panic!("`{label}` row for {kind} has no numeric totalCount:\n{doc}"))
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn summary_row<'a>(
+    doc: &'a serde_json::Value,
+    label: &str,
+    kind: &str,
+) -> Option<&'a serde_json::Value> {
+    let rows = doc
+        .get("resourceCounts")
+        .and_then(serde_json::Value::as_array)
+        .unwrap_or_else(|| panic!("`{label}` should contain resourceCounts array:\n{doc}"));
+
+    rows.iter()
+        .find(|row| row.get("kind").and_then(serde_json::Value::as_str) == Some(kind))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

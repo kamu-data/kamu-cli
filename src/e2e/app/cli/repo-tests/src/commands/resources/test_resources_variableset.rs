@@ -51,16 +51,10 @@ pub async fn test_resources_variableset_lifecycle(ctx: ResourceCtx) {
         "`list vs` should contain '{resource_name}', got:\n{list_alias_out}"
     );
 
-    // ── 5. get variablesets <name> — full YAML view ───────────────────────────
-    let get_out = ctx.stdout(["get", "variablesets", resource_name]).await;
-    assert!(
-        get_out.contains(resource_name),
-        "`get variablesets` should contain the resource name, got:\n{get_out}"
-    );
-    assert!(
-        get_out.contains(initial_value),
-        "`get variablesets` should contain the variable value '{initial_value}', got:\n{get_out}"
-    );
+    // ── 5. get variablesets <name> — resolves to this VS with our value ───────
+    let view = ctx.get_one(["get", "variablesets", resource_name]).await;
+    assert_eq!(view.ident(), (fixtures::VARIABLE_SET_KIND, resource_name));
+    assert_eq!(view.variable("MESSAGE"), Some(initial_value));
 
     // ── 6. get vs <name> --spec — apply-compatible manifest ──────────────────
     let spec_out = ctx.stdout(["get", "vs", resource_name, "--spec"]).await;
@@ -105,11 +99,8 @@ pub async fn test_resources_variableset_lifecycle(ctx: ResourceCtx) {
     .await;
 
     // Verify the new value is visible via get
-    let get_after_update = ctx.stdout(["get", "variablesets", resource_name]).await;
-    assert!(
-        get_after_update.contains(updated_value),
-        "`get` after update should show '{updated_value}', got:\n{get_after_update}"
-    );
+    let updated_view = ctx.get_one(["get", "variablesets", resource_name]).await;
+    assert_eq!(updated_view.variable("MESSAGE"), Some(updated_value));
 
     // ── 9. summary reflects the count ─────────────────────────────────────────
     ctx.assert_success(["summary"], None).await;

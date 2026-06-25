@@ -60,11 +60,19 @@ pub async fn test_resources_secretset_lifecycle(ctx: ResourceCtx) {
     }
 
     // ── 4. get ss <name> (default) — encrypted blobs, NO plaintext ───────────
-    let get_out = ctx.stdout(["get", "ss", resource_name]).await;
+    //
+    // Identity + secret-key presence are asserted structurally via the parsed
+    // view; the no-plaintext crux is asserted on the raw YAML so it also covers
+    // any leakage outside `spec.secrets`.
+    let view = ctx.get_one(["get", "ss", resource_name]).await;
+    assert_eq!(view.ident(), (fixtures::SECRET_SET_KIND, resource_name));
     assert!(
-        get_out.contains(resource_name),
-        "`get ss` should contain the resource name, got:\n{get_out}"
+        view.has_secret("API_TOKEN") && view.has_secret("DB_PASSWORD"),
+        "`get ss` should expose both secret keys:\n{}",
+        view.as_json()
     );
+
+    let get_out = ctx.stdout(["get", "ss", resource_name]).await;
     assert!(
         get_out.contains("encrypted"),
         "`get ss` (default) should show the encrypted form, got:\n{get_out}"
