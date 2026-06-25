@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod test_resources_apply_batch;
 mod test_resources_apply_input_modes;
 mod test_resources_baseline;
 mod test_resources_context_override;

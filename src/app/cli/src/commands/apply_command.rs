@@ -13,7 +13,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use internal_error::{BoxedError, ResultIntoInternal};
+use database_common_macros::transactional_method2;
+use internal_error::{BoxedError, ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_resources::{
     ApplyManifestChange,
     ApplyManifestRejection,
@@ -21,10 +22,7 @@ use kamu_resources::{
     ResourceView,
     ResourceWarning,
 };
-use kamu_resources_facade::{
-    ResourceFacade,
-    ResourceManifestFormat as FacadeResourceManifestFormat,
-};
+use kamu_resources_facade::ResourceManifestFormat as FacadeResourceManifestFormat;
 use thiserror::Error;
 
 use super::{BatchError, CLIError, Command, common};
@@ -35,6 +33,7 @@ use crate::resources::{
     DiscoverResourceManifestsResult,
     DiscoveredResourceManifest,
     DiscoveredResourceManifestSource,
+    ExecuteResourceManifestError,
     ExecuteResourceManifestOutcome,
     ExecutedResourceManifestResult,
     ResourceFacadeFactory,
@@ -47,9 +46,11 @@ use crate::resources::{
 #[dill::component]
 #[dill::interface(dyn Command)]
 pub struct ApplyCommand {
-    resource_facade_factory: Arc<dyn ResourceFacadeFactory>,
+    // The facade factory and execution service are resolved per-manifest from a
+    // transactional catalog instead (this command runs without an outer
+    // transaction), so they are not injected as fields here.
+    catalog: dill::Catalog,
     resource_manifest_discovery_service: Arc<dyn ResourceManifestDiscoveryService>,
-    resource_manifest_execution_service: Arc<dyn ResourceManifestExecutionService>,
     resource_context_resolver: Arc<ResourceContextResolver>,
     resource_context_reporter: Arc<ResourceContextReporter>,
     output_config: Arc<OutputConfig>,
@@ -137,10 +138,38 @@ impl ApplyCommand {
         Ok(manifests)
     }
 
+    /// Applies a single manifest in its own transaction, so previously-applied
+    /// items survive a later rejection or failure. Committed on `Accepted`;
+    /// rolled back on rejection/error, carrying the outcome out for reporting.
+    #[transactional_method2(
+        resource_facade_factory: Arc<dyn ResourceFacadeFactory>,
+        execution_service: Arc<dyn ResourceManifestExecutionService>
+    )]
+    async fn apply_single_manifest(
+        &self,
+        manifest: &DiscoveredResourceManifest,
+    ) -> Result<ExecuteResourceManifestOutcome, ExecuteSingleManifestError> {
+        let resource_facade = resource_facade_factory
+            .get_resource_facade(self.explicit_context_name.as_deref())
+            .map_err(|e| ExecuteSingleManifestError::Internal(e.int_err()))?;
+
+        let outcome = execution_service
+            .execute(resource_facade.as_ref(), manifest, self.dry_run)
+            .await
+            .map_err(ExecuteSingleManifestError::Execute)?;
+
+        // Roll back rejections (nothing to commit), carrying the outcome out.
+        match outcome {
+            outcome @ ExecuteResourceManifestOutcome::Accepted(_) => Ok(outcome),
+            rejected @ ExecuteResourceManifestOutcome::Rejected(_) => {
+                Err(ExecuteSingleManifestError::Rejected(rejected))
+            }
+        }
+    }
+
     async fn apply_manifests_phase(
         &self,
         printer: &ApplyPrinter<'_>,
-        resource_facade: &dyn ResourceFacade,
         manifests: Vec<DiscoveredResourceManifest>,
         maybe_progress: Option<&ApplyMultiProgress>,
         summary: &mut ApplySummary,
@@ -150,11 +179,16 @@ impl ApplyCommand {
             let source = manifest.source.to_string();
             let item_progress = printer.start_item(maybe_progress, &source);
 
-            match self
-                .resource_manifest_execution_service
-                .execute(resource_facade, &manifest, self.dry_run)
-                .await
-            {
+            // Flatten the rollback control-flow back into the outcome/error
+            // shape the reporting below expects.
+            let outcome: Result<ExecuteResourceManifestOutcome, BoxedError> =
+                match self.apply_single_manifest(&manifest).await {
+                    Ok(outcome) | Err(ExecuteSingleManifestError::Rejected(outcome)) => Ok(outcome),
+                    Err(ExecuteSingleManifestError::Execute(err)) => Err(Box::new(err)),
+                    Err(ExecuteSingleManifestError::Internal(err)) => Err(Box::new(err)),
+                };
+
+            match outcome {
                 Ok(ExecuteResourceManifestOutcome::Accepted(result)) => {
                     summary.record_accepted(&result);
                     printer.print_accepted(item_progress, &source, &result, self.dry_run)?;
@@ -179,7 +213,7 @@ impl ApplyCommand {
                     printer.print_failed(item_progress, &source, err.to_string());
 
                     errors.push((
-                        Box::<dyn std::error::Error + Send + Sync>::from(err),
+                        err,
                         format!(
                             "Failed to {} manifest {}",
                             if self.dry_run { "plan" } else { "apply" },
@@ -232,10 +266,6 @@ impl Command for ApplyCommand {
             );
         }
 
-        let resource_facade = self
-            .resource_facade_factory
-            .get_resource_facade(self.explicit_context_name.as_deref())?;
-
         let printer = ApplyPrinter::new(&self.output_config, self.dry_run);
 
         let mut summary = ApplySummary::default();
@@ -260,7 +290,6 @@ impl Command for ApplyCommand {
 
         self.apply_manifests_phase(
             &printer,
-            resource_facade.as_ref(),
             manifests,
             maybe_progress.as_ref(),
             &mut summary,
@@ -334,6 +363,23 @@ impl From<ApplyManifestRejection> for ApplyRejectedError {
             category: value.category.label(),
             message: value.message,
         }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// `Rejected` carries the outcome out of a rolled-back transaction for
+/// reporting; `Execute`/`Internal` are genuine failures.
+enum ExecuteSingleManifestError {
+    Rejected(ExecuteResourceManifestOutcome),
+    Execute(ExecuteResourceManifestError),
+    Internal(InternalError),
+}
+
+// Required by `transactional_method2`.
+impl From<InternalError> for ExecuteSingleManifestError {
+    fn from(value: InternalError) -> Self {
+        Self::Internal(value)
     }
 }
 
