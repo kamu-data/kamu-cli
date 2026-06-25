@@ -16,6 +16,7 @@ mod test_resources_dry_run;
 mod test_resources_get_selectors;
 mod test_resources_golden_view;
 mod test_resources_secretset;
+mod test_resources_uuid_lookup;
 mod test_resources_variableset;
 
 pub use test_resources_apply_batch::*;
@@ -27,4 +28,5 @@ pub use test_resources_dry_run::*;
 pub use test_resources_get_selectors::*;
 pub use test_resources_golden_view::*;
 pub use test_resources_secretset::*;
+pub use test_resources_uuid_lookup::*;
 pub use test_resources_variableset::*;

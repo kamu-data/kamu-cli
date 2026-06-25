@@ -7,11 +7,15 @@ Small project-specific guidance for coding agents working in this repository.
 - Run `cargo fmt` after edits.
 - Run `make clippy` before considering the task finished.
 - Treat Clippy warnings as errors to fix, not to ignore.
+- Prefer full workspace incremental commands over narrowing by package with `-p`;
+  this workspace is usually precompiled and package narrowing is often slower for
+  builds, tests, and validation commands.
 
 ## Tests
 
 - Prefer `cargo nextest run` over `cargo test` for targeted test execution.
-- Prefer workspace-level incremental builds with test filters instead of narrowing by package when possible.
+- Prefer workspace-level incremental runs with test filters instead of narrowing by
+  package.
 - Typical pattern:
 
 ```bash
@@ -46,6 +50,10 @@ Repo-local skills live in `.agents/skills/`. Load them only when the task matche
 - `.agents/skills/kamu-release-dependency-workflows`: changelog, release, and general Cargo dependency update workflows.
 - `.agents/skills/kamu-datafusion-upgrade-workflows`: DataFusion, Arrow, Object Store, Parquet, and related query-engine dependency upgrades.
 - `.agents/skills/kamu-jupyter-demo-release-workflows`: Jupyter demo, rustfs, and multi-platform demo image release workflows.
+
+Reusable sub-agent role descriptions for Rust build/test delegation live in
+`.claude/agents/rust-builder.md` and `.claude/agents/rust-tester.md`; treat
+those files as the canonical role prompts instead of duplicating them elsewhere.
 
 ## Scope
 
