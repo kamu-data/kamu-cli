@@ -17,6 +17,7 @@ mod test_resources_delete;
 mod test_resources_dry_run;
 mod test_resources_get_selectors;
 mod test_resources_golden_view;
+mod test_resources_manifest_account;
 mod test_resources_multitenant_isolation;
 mod test_resources_output_formats;
 mod test_resources_secretset;

@@ -61,15 +61,22 @@ pub fn assert_record_row(doc: &serde_json::Value, label: &str, name: &str, kind:
 /// Return the `totalCount` for a resource kind from `summary -o json/yaml`
 /// output converted to JSON.
 pub fn summary_count(doc: &serde_json::Value, label: &str, kind: &str) -> u64 {
-    summary_row(doc, label, kind)
-        .get("totalCount")
+    let Some(row) = summary_row(doc, label, kind) else {
+        return 0;
+    };
+
+    row.get("totalCount")
         .and_then(serde_json::Value::as_u64)
         .unwrap_or_else(|| panic!("`{label}` row for {kind} has no numeric totalCount:\n{doc}"))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn summary_row<'a>(doc: &'a serde_json::Value, label: &str, kind: &str) -> &'a serde_json::Value {
+fn summary_row<'a>(
+    doc: &'a serde_json::Value,
+    label: &str,
+    kind: &str,
+) -> Option<&'a serde_json::Value> {
     let rows = doc
         .get("resourceCounts")
         .and_then(serde_json::Value::as_array)
@@ -77,7 +84,6 @@ fn summary_row<'a>(doc: &'a serde_json::Value, label: &str, kind: &str) -> &'a s
 
     rows.iter()
         .find(|row| row.get("kind").and_then(serde_json::Value::as_str) == Some(kind))
-        .unwrap_or_else(|| panic!("`{label}` should contain a summary row for {kind}:\n{doc}"))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

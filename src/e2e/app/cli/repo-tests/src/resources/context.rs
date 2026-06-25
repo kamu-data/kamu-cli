@@ -251,6 +251,27 @@ impl ResourceCtx {
             .await;
     }
 
+    /// Run a command with stdin, asserting failure and optional stderr regexes.
+    pub async fn assert_failure_with_stdin<I, S>(
+        &self,
+        args: I,
+        stdin: &str,
+        expected: Option<&[&str]>,
+    ) where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        let full = self.args(args);
+        self.kamu()
+            .assert_failure_command_execution_with_input(
+                full,
+                stdin.to_string(),
+                None,
+                expected.map(<[&str]>::to_vec),
+            )
+            .await;
+    }
+
     /// Run a command (against the active context) and return raw stdout.
     pub async fn stdout<I, S>(&self, args: I) -> String
     where
