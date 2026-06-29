@@ -13,7 +13,7 @@ Recommendation: for ease of reading, use the following format:
 ### Fixed
 -->
 
-## [Unreleased]
+## [0.264.0] - 2026-06-29
 ### Added
 - Uniqueness constraint for wallet accounts
 - HTTP endpoint for signing EIP-712 typed data
