@@ -227,7 +227,7 @@ pub async fn test_get_missing_uid_returns_not_found(h: &impl FacadeContractHarne
                 ResourceLookupProblem::IDNotFound(_)
             ))
         ),
-        "expected UIDNotFound, got: {get_result:?}"
+        "expected IDNotFound, got: {get_result:?}"
     );
 
     let identity_result = facade.get_identity(by_id_selector(&absent_uid)).await;
@@ -238,7 +238,7 @@ pub async fn test_get_missing_uid_returns_not_found(h: &impl FacadeContractHarne
                 ResourceLookupProblem::IDNotFound(_)
             ))
         ),
-        "expected UIDNotFound from get_identity, got: {identity_result:?}"
+        "expected IDNotFound from get_identity, got: {identity_result:?}"
     );
 }
 

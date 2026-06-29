@@ -139,7 +139,7 @@ pub async fn test_get_many_mixed_successes_problems(h: &impl FacadeContractHarne
     );
     assert!(
         matches!(problem_by_index[&3], ResourceLookupProblem::IDNotFound(_)),
-        "idx 3 must be UIDNotFound"
+        "idx 3 must be IDNotFound"
     );
 }
 
@@ -658,7 +658,7 @@ pub async fn test_delete_many_mixed_successes_problems(h: &impl FacadeContractHa
     );
     assert!(
         matches!(problem_by_index[&2], ResourceLookupProblem::IDNotFound(_)),
-        "idx 2 must be UIDNotFound"
+        "idx 2 must be IDNotFound"
     );
 }
 

@@ -218,7 +218,7 @@ fn map_apply_resource_error(
         E::BadAccount(e) => map_bad_account_problem(e).map(ResourceApplyOutcome::BadAccount),
         E::InvalidHeaders(e) => Ok(ResourceApplyOutcome::InvalidHeader(e.into())),
         E::InvalidSpec(e) => Ok(ResourceApplyOutcome::InvalidSpec(e.into())),
-        E::UIDNotFound(error) => Err(GqlError::gql(error.to_string())),
+        E::IDNotFound(error) => Err(GqlError::gql(error.to_string())),
         E::TypeMismatch(error) => Err(GqlError::gql(error.to_string())),
         E::ConcurrentModification(error) => {
             tracing::error!(error = ?error, "Resource apply_manifest concurrent modification");

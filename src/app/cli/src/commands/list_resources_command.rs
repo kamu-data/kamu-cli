@@ -87,7 +87,7 @@ impl ListResourcesCommand {
         }
 
         if self.detail_level > 0 {
-            columns.push(ResourceGenericColumn::Uid);
+            columns.push(ResourceGenericColumn::Id);
         }
 
         columns.extend([
@@ -136,7 +136,7 @@ impl ListResourcesCommand {
             fields.push(match column {
                 ResourceGenericColumn::Name => Field::new("Name", DataType::Utf8, false),
                 ResourceGenericColumn::Kind => Field::new("Kind", DataType::Utf8, false),
-                ResourceGenericColumn::Uid => Field::new("UID", DataType::Utf8, false),
+                ResourceGenericColumn::Id => Field::new("ID", DataType::Utf8, false),
                 ResourceGenericColumn::Phase => Field::new("Phase", DataType::Utf8, true),
                 ResourceGenericColumn::Readiness => {
                     Field::new("Readiness", DataType::Boolean, true)
@@ -185,7 +185,7 @@ impl ListResourcesCommand {
             column_formats.push(match column {
                 ResourceGenericColumn::Name
                 | ResourceGenericColumn::Kind
-                | ResourceGenericColumn::Uid
+                | ResourceGenericColumn::Id
                 | ResourceGenericColumn::Description => ColumnFormat::new().with_style_spec("l"),
                 ResourceGenericColumn::Phase | ResourceGenericColumn::Readiness => {
                     ColumnFormat::new().with_style_spec("c")
@@ -370,7 +370,7 @@ impl ListResourcesCommand {
                         .map(|resource| resource.schema.clone())
                         .collect::<Vec<_>>(),
                 )),
-                ResourceGenericColumn::Uid => Arc::new(StringArray::from(
+                ResourceGenericColumn::Id => Arc::new(StringArray::from(
                     resources
                         .iter()
                         .map(|resource| resource.id.to_string())
@@ -532,7 +532,7 @@ pub enum ListResourcesScope {
 enum ResourceGenericColumn {
     Name,
     Kind,
-    Uid,
+    Id,
     Phase,
     Readiness,
     Updated,

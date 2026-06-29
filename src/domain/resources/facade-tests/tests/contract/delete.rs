@@ -175,7 +175,7 @@ pub async fn test_delete_missing_uid_returns_not_found(h: &impl FacadeContractHa
                 ResourceLookupProblem::IDNotFound(_)
             ))
         ),
-        "expected UIDNotFound, got: {result:?}"
+        "expected IDNotFound, got: {result:?}"
     );
 }
 
@@ -302,7 +302,7 @@ pub async fn test_repeated_delete_is_deterministic(h: &impl FacadeContractHarnes
                 ResourceLookupProblem::IDNotFound(_)
             ))
         ),
-        "second delete must return UIDNotFound, got: {result:?}"
+        "second delete must return IDNotFound, got: {result:?}"
     );
 }
 

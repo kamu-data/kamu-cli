@@ -158,7 +158,7 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
         "delete: expected NameNotFound"
     );
 
-    // --- UIDNotFound ---
+    // --- IDNotFound ---
     let get = facade
         .get(by_id(&absent_uid), SpecViewMode::Encrypted)
         .await;
@@ -167,7 +167,7 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
         Err(GetResourceError::LookupProblem(
             ResourceLookupProblem::IDNotFound(_)
         )),
-        "get: expected UIDNotFound"
+        "get: expected IDNotFound"
     );
 
     let get_id = facade.get_identity(by_id(&absent_uid)).await;
@@ -176,7 +176,7 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
         Err(GetResourceError::LookupProblem(
             ResourceLookupProblem::IDNotFound(_)
         )),
-        "get_identity: expected UIDNotFound"
+        "get_identity: expected IDNotFound"
     );
 
     let render = facade
@@ -191,7 +191,7 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
         Err(RenderResourceManifestError::LookupProblem(
             ResourceLookupProblem::IDNotFound(_)
         )),
-        "render_manifest: expected UIDNotFound"
+        "render_manifest: expected IDNotFound"
     );
 
     let del = facade.delete(by_id(&absent_uid)).await;
@@ -200,7 +200,7 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
         Err(DeleteResourceError::LookupProblem(
             ResourceLookupProblem::IDNotFound(_)
         )),
-        "delete: expected UIDNotFound"
+        "delete: expected IDNotFound"
     );
 
     // --- SchemaMismatch ---
@@ -279,7 +279,7 @@ pub async fn test_batch_lookup_taxonomy(h: &impl FacadeContractHarness) {
         "get_many: expected NameNotFound problem"
     );
 
-    // --- UIDNotFound in get_many ---
+    // --- IDNotFound in get_many ---
     let resp = facade
         .get_many(batch_by_id(absent_uid), SpecViewMode::Encrypted)
         .await
@@ -288,7 +288,7 @@ pub async fn test_batch_lookup_taxonomy(h: &impl FacadeContractHarness) {
     assert_matches!(
         &resp.problems[0].error,
         ResourceLookupProblem::IDNotFound(_),
-        "get_many: expected UIDNotFound problem"
+        "get_many: expected IDNotFound problem"
     );
 
     // --- NameNotFound in get_identities ---

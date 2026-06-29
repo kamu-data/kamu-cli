@@ -229,7 +229,7 @@ pub async fn test_render_missing_resource_returns_not_found(h: &impl FacadeContr
                 ResourceLookupProblem::IDNotFound(_)
             ))
         ),
-        "expected UIDNotFound, got: {by_uid_result:?}"
+        "expected IDNotFound, got: {by_uid_result:?}"
     );
 }
 

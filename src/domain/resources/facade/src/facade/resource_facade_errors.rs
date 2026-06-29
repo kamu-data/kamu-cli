@@ -318,7 +318,7 @@ pub enum ApplyManifestError {
     InvalidSpec(#[from] ResourceInvalidSpecError),
 
     #[error(transparent)]
-    UIDNotFound(#[from] ResourceIDNotFoundError),
+    IDNotFound(#[from] ResourceIDNotFoundError),
 
     #[error(transparent)]
     TypeMismatch(#[from] kamu_resources::ResourceTypeMismatchError),
@@ -344,7 +344,7 @@ impl From<ApplyResourceCrudDispatcherError> for ApplyManifestError {
         use ApplyResourceCrudDispatcherError as E;
         match err {
             E::Internal(err) => Self::Internal(err),
-            E::NotFound(err) => Self::UIDNotFound(err),
+            E::NotFound(err) => Self::IDNotFound(err),
             E::TypeMismatch(err) => Self::TypeMismatch(err),
             E::ConcurrentModification(err) => Self::ConcurrentModification(err),
             E::InvalidSpec { schema, message } => {

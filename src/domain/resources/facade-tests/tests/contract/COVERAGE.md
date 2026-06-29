@@ -26,7 +26,7 @@ Each RF scenario from the original plan is listed with its status.
 | RF-032  | get_identity.rs     | Active   | Get identity by name returns lightweight identity                     |                                                                        |
 | RF-033  | get_identity.rs     | Active   | Get identity by UID returns same identity                             |                                                                        |
 | RF-034  | get_identity.rs     | Active   | Get missing name returns NameNotFound                                 |                                                                        |
-| RF-035  | get_identity.rs     | Active   | Get missing UID returns UIDNotFound                                   |                                                                        |
+| RF-035  | get_identity.rs     | Active   | Get missing UID returns IDNotFound                                   |                                                                        |
 | RF-036  | get_identity.rs     | Active   | Get with wrong schema returns SchemaMismatch                 |                                                                        |
 | RF-037  | get_identity.rs     | Active   | Get by UID with wrong schema returns SchemaMismatch                       |                                                                        |
 | RF-040  | spec_view_mode.rs   | Active   | Encrypted/default spec view hides secret material                     |                                                                        |

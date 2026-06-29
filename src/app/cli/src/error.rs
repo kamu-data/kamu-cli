@@ -369,7 +369,7 @@ impl From<ApplyManifestError> for CLIError {
             | E::BadAccount(_)
             | E::InvalidHeaders(_)
             | E::InvalidSpec(_)
-            | E::UIDNotFound(_)
+            | E::IDNotFound(_)
             | E::TypeMismatch(_)
             | E::ConcurrentModification(_)) => Self::failure(e),
             E::RemoteRequest(err) => Self::from(err),
