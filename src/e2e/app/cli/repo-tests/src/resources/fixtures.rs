@@ -85,7 +85,7 @@ pub fn variable_set_manifest_json(name: &str, value: &str) -> String {
 
 /// A well-formed `VariableSet` manifest in YAML that targets a specific account
 /// by name via the `headers.account.name` field — the GitOps-style path where
-/// a manifest names the account it belongs to (mirrors `ResourceManifestAccount
+/// a manifest names the account it belongs to (mirrors `ResourceAccountRef
 /// { name, id }`, here using the by-name form). Used by the multi-tenant
 /// scenarios to prove the CLI honors the manifest's account selector, including
 /// the mismatch/unknown rejection paths.

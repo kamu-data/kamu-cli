@@ -726,7 +726,7 @@ impl ApplyPrinter<'_> {
             "{}: {} -> {}/{}",
             style,
             source,
-            kamu_resources::ResourceSchema::display_name(&result.resource.schema),
+            kamu_resources::ResourceSchemaId::display_name(&result.resource.schema),
             result.resource.headers.name
         )
     }

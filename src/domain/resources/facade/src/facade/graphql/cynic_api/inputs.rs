@@ -43,10 +43,10 @@ pub(crate) struct ResourceAccountSelectorInput {
     pub by_name: Option<AccountName>,
 }
 
-impl TryFrom<&domain::ResourceManifestAccount> for ResourceAccountSelectorInput {
+impl TryFrom<&domain::ResourceAccountRef> for ResourceAccountSelectorInput {
     type Error = internal_error::InternalError;
 
-    fn try_from(value: &domain::ResourceManifestAccount) -> Result<Self, Self::Error> {
+    fn try_from(value: &domain::ResourceAccountRef) -> Result<Self, Self::Error> {
         Ok(Self {
             by_id: value.id.clone(),
             by_name: value.name.clone().map(AccountName),

@@ -56,8 +56,8 @@ pub struct ResourceAccountSelectorInput {
 }
 
 impl ResourceAccountSelectorInput {
-    pub fn into_manifest_account(self) -> kamu_resources::ResourceManifestAccount {
-        kamu_resources::ResourceManifestAccount {
+    pub fn into_manifest_account(self) -> kamu_resources::ResourceAccountRef {
+        kamu_resources::ResourceAccountRef {
             id: self.by_id.map(Into::into),
             name: self.by_name.map(|name| name.to_string()),
         }

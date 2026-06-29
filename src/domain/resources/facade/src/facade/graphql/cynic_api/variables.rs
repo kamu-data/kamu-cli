@@ -26,7 +26,7 @@ pub(crate) struct ListByKindVariables {
 impl ListByKindVariables {
     pub(crate) fn new(
         kind: &str,
-        account: Option<&kamu_resources::ResourceManifestAccount>,
+        account: Option<&kamu_resources::ResourceAccountRef>,
         pagination: PaginationOpts,
     ) -> Result<Self, InternalError> {
         let (page, per_page) = pagination.as_page_params(Self::DEFAULT_PAGE_SIZE)?;
@@ -52,7 +52,7 @@ pub(crate) struct ListAllVariables {
 
 impl ListAllVariables {
     pub(crate) fn new(
-        account: Option<&kamu_resources::ResourceManifestAccount>,
+        account: Option<&kamu_resources::ResourceAccountRef>,
         pagination: PaginationOpts,
     ) -> Result<Self, InternalError> {
         let (page, per_page) = pagination.as_page_params(Self::DEFAULT_PAGE_SIZE)?;

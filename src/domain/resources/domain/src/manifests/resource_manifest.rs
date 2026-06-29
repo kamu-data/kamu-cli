@@ -13,7 +13,7 @@ use serde::de::{MapAccess, SeqAccess, Visitor};
 use serde::ser::SerializeMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::{ResourceID, ResourceName};
+use crate::{ResourceID, ResourceName, ResourceSchemaId};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -21,7 +21,7 @@ use crate::{ResourceID, ResourceName};
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ResourceManifest {
     #[serde(rename = "$schema")]
-    pub schema: String,
+    pub schema: ResourceSchemaId,
     pub headers: ResourceManifestHeaders,
     pub spec: serde_json::Value,
 }
@@ -32,7 +32,7 @@ pub struct ResourceManifest {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ResourceManifestHeaders {
     pub id: Option<ResourceID>,
-    pub account: Option<ResourceManifestAccount>,
+    pub account: Option<ResourceAccountRef>,
     pub name: ResourceName,
     pub description: Option<String>,
     #[serde(
@@ -53,7 +53,7 @@ pub struct ResourceManifestHeaders {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct ResourceManifestAccount {
+pub struct ResourceAccountRef {
     pub name: Option<String>,
     pub id: Option<odf::AccountID>,
 }

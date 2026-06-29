@@ -461,14 +461,16 @@ impl From<ResourceLookupProblem> for ResourceLookupCliError {
         match problem {
             ResourceLookupProblem::IDNotFound(err) => Self::IDNotFound(err.0),
             ResourceLookupProblem::NameNotFound(err) => Self::NameNotFound {
-                kind: kamu_resources::ResourceSchema::display_name(&err.kind).to_string(),
+                kind: kamu_resources::ResourceSchemaId::display_name(&err.kind).to_string(),
                 name: err.name,
             },
             ResourceLookupProblem::SchemaMismatch(err) => Self::SchemaMismatch {
                 id: err.id,
-                expected_schema: kamu_resources::ResourceSchema::display_name(&err.expected_schema)
-                    .to_string(),
-                actual_schema: kamu_resources::ResourceSchema::display_name(&err.actual_schema)
+                expected_schema: kamu_resources::ResourceSchemaId::display_name(
+                    &err.expected_schema,
+                )
+                .to_string(),
+                actual_schema: kamu_resources::ResourceSchemaId::display_name(&err.actual_schema)
                     .to_string(),
             },
         }

@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use kamu_resources::ResourceManifestAccount;
+use kamu_resources::ResourceAccountRef;
 use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -25,7 +25,7 @@ pub struct ResolvedAccount {
 pub trait ResourceAccountResolver: Send + Sync {
     async fn resolve_target_account(
         &self,
-        selector: Option<&ResourceManifestAccount>,
+        selector: Option<&ResourceAccountRef>,
     ) -> Result<ResolvedAccount, ResolveManifestAccountError>;
 }
 

@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use database_common::PaginationOpts;
-use kamu_resources::{ResourceID, ResourceManifestAccount};
+use kamu_resources::{ResourceAccountRef, ResourceID};
 use kamu_resources_facade::{
     ApplyManifestError,
     ApplyManifestRequest,
@@ -59,7 +59,7 @@ async fn create_with_account_selector(
     h: &impl FacadeContractHarness,
     facade_account: TestAccount,
     name: &str,
-    selector: ResourceManifestAccount,
+    selector: ResourceAccountRef,
 ) -> ResourceID {
     apply_manifest_and_get_id(
         h,
@@ -69,10 +69,7 @@ async fn create_with_account_selector(
     .await
 }
 
-fn variable_set_manifest_json_with_account(
-    name: &str,
-    account: &ResourceManifestAccount,
-) -> String {
+fn variable_set_manifest_json_with_account(name: &str, account: &ResourceAccountRef) -> String {
     let mut account_fields = Vec::new();
     if let Some(n) = &account.name {
         account_fields.push(format!(r#""name": "{n}""#));
@@ -98,42 +95,42 @@ fn variable_set_manifest_json_with_account(
     )
 }
 
-fn account_by_name(name: &odf::AccountName) -> ResourceManifestAccount {
-    ResourceManifestAccount {
+fn account_by_name(name: &odf::AccountName) -> ResourceAccountRef {
+    ResourceAccountRef {
         name: Some(name.to_string()),
         id: None,
     }
 }
 
-fn account_by_id(id: odf::AccountID) -> ResourceManifestAccount {
-    ResourceManifestAccount {
+fn account_by_id(id: odf::AccountID) -> ResourceAccountRef {
+    ResourceAccountRef {
         name: None,
         id: Some(id),
     }
 }
 
-fn account_by_name_and_id(name: &odf::AccountName, id: odf::AccountID) -> ResourceManifestAccount {
-    ResourceManifestAccount {
+fn account_by_name_and_id(name: &odf::AccountName, id: odf::AccountID) -> ResourceAccountRef {
+    ResourceAccountRef {
         name: Some(name.to_string()),
         id: Some(id),
     }
 }
 
-fn unknown_account_by_name() -> ResourceManifestAccount {
-    ResourceManifestAccount {
+fn unknown_account_by_name() -> ResourceAccountRef {
+    ResourceAccountRef {
         name: Some("unknown-resource-contract-account".to_string()),
         id: None,
     }
 }
 
-fn unknown_account_by_id() -> ResourceManifestAccount {
-    ResourceManifestAccount {
+fn unknown_account_by_id() -> ResourceAccountRef {
+    ResourceAccountRef {
         name: None,
         id: Some(odf::AccountID::new_generated_ed25519().1),
     }
 }
 
-fn selector_by_name(name: &str, account: Option<ResourceManifestAccount>) -> ResourceSelector {
+fn selector_by_name(name: &str, account: Option<ResourceAccountRef>) -> ResourceSelector {
     ResourceSelector {
         account,
         kind: VARIABLE_SET_KIND.to_string(),
@@ -143,7 +140,7 @@ fn selector_by_name(name: &str, account: Option<ResourceManifestAccount>) -> Res
 
 fn batch_selector_by_name(
     name: &str,
-    account: Option<ResourceManifestAccount>,
+    account: Option<ResourceAccountRef>,
 ) -> ResourceBatchSelector {
     ResourceBatchSelector {
         account,

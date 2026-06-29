@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources::{ApplyResourceOutcome, ResourceManifestAccount};
+use kamu_resources::{ApplyResourceOutcome, ResourceAccountRef};
 use kamu_resources_facade::{
     ApplyManifestRequest,
     BatchResourceError,
@@ -241,7 +241,7 @@ pub async fn test_get_many_empty_refs_validates_bad_account(h: &impl FacadeContr
     let result = facade
         .get_many(
             ResourceBatchSelector {
-                account: Some(ResourceManifestAccount {
+                account: Some(ResourceAccountRef {
                     name: Some("unknown-resource-contract-account".to_string()),
                     id: None,
                 }),
@@ -270,7 +270,7 @@ contract_test!(
 pub async fn test_batch_empty_refs_validation_is_consistent(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
     let bad_kind = "NoSuchResourceKindXYZ";
-    let bad_account = Some(ResourceManifestAccount {
+    let bad_account = Some(ResourceAccountRef {
         name: Some("unknown-resource-contract-account".to_string()),
         id: None,
     });

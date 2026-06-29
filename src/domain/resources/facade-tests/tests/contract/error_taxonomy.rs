@@ -16,7 +16,7 @@
 //! account-accepting API (not demoted to internal errors).
 
 use database_common::PaginationOpts;
-use kamu_resources::{ApplyResourceOutcome, ResourceManifestAccount};
+use kamu_resources::{ApplyResourceOutcome, ResourceAccountRef};
 use kamu_resources_facade::{
     ApplyManifestError,
     ApplyManifestRequest,
@@ -343,7 +343,7 @@ contract_test!(bad_account_taxonomy, super::test_bad_account_taxonomy);
 pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
-    let unknown_account = ResourceManifestAccount {
+    let unknown_account = ResourceAccountRef {
         name: Some("unknown-resource-contract-account".to_string()),
         id: None,
     };

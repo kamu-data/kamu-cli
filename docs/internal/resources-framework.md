@@ -333,7 +333,7 @@ Generic, `R`-parameterized contracts in `use_cases/`: `ApplyResourceUseCase<R>` 
 ```rust
 pub struct ResourceManifest {
     #[serde(rename = "$schema")]
-    pub schema: String,                      // required — canonical schema URL
+    pub schema: ResourceSchemaId,            // required — canonical schema URL
     pub headers: ResourceManifestHeaders,
     pub spec: serde_json::Value,             // desired state; kind-specific shape
 }

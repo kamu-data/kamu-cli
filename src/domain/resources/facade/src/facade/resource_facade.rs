@@ -11,10 +11,10 @@ use database_common::PaginationOpts;
 use domain::{
     ApplyManifestApplicationDecision,
     ApplyManifestPlanningDecision,
+    ResourceAccountRef,
     ResourceID,
     ResourceIdentityView,
     ResourceKindDescriptor,
-    ResourceManifestAccount,
     ResourceName,
     ResourceSummaryView,
     ResourceView,
@@ -138,7 +138,7 @@ pub trait ResourceFacade: Send + Sync {
 
 #[derive(Debug, Clone)]
 pub struct ResourceSelector {
-    pub account: Option<ResourceManifestAccount>,
+    pub account: Option<ResourceAccountRef>,
     pub kind: String,
     pub resource_ref: ResourceRef,
 }
@@ -147,7 +147,7 @@ pub struct ResourceSelector {
 
 #[derive(Debug, Clone)]
 pub struct ResourceBatchSelector {
-    pub account: Option<ResourceManifestAccount>,
+    pub account: Option<ResourceAccountRef>,
     pub kind: String,
     pub resource_refs: Vec<ResourceRef>,
 }
@@ -211,7 +211,7 @@ pub enum ResourceRef {
 #[derive(Debug, Clone)]
 pub struct ListResourcesRequest {
     pub kind: String,
-    pub account: Option<ResourceManifestAccount>,
+    pub account: Option<ResourceAccountRef>,
     pub pagination: PaginationOpts,
 }
 
@@ -220,7 +220,7 @@ pub struct ListResourcesRequest {
 #[derive(Debug, Clone)]
 pub struct ListResourceIdentitiesRequest {
     pub kind: String,
-    pub account: Option<ResourceManifestAccount>,
+    pub account: Option<ResourceAccountRef>,
     pub pagination: PaginationOpts,
 }
 
@@ -231,7 +231,7 @@ pub struct SearchResourceIdentitiesRequest {
     pub kinds: Vec<String>,
     pub exact_names: Option<Vec<ResourceName>>,
     pub name_pattern: Option<String>,
-    pub account: Option<ResourceManifestAccount>,
+    pub account: Option<ResourceAccountRef>,
     pub pagination: PaginationOpts,
 }
 
@@ -247,7 +247,7 @@ pub struct SearchResourceIdentitiesResponse {
 
 #[derive(Debug, Clone)]
 pub struct ListAllResourcesRequest {
-    pub account: Option<ResourceManifestAccount>,
+    pub account: Option<ResourceAccountRef>,
     pub pagination: PaginationOpts,
 }
 
@@ -255,7 +255,7 @@ pub struct ListAllResourcesRequest {
 
 #[derive(Debug, Clone)]
 pub struct ListAllResourceIdentitiesRequest {
-    pub account: Option<ResourceManifestAccount>,
+    pub account: Option<ResourceAccountRef>,
     pub pagination: PaginationOpts,
 }
 
@@ -263,7 +263,7 @@ pub struct ListAllResourceIdentitiesRequest {
 
 #[derive(Debug, Clone, Default)]
 pub struct ResourcesSummaryRequest {
-    pub account: Option<ResourceManifestAccount>,
+    pub account: Option<ResourceAccountRef>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

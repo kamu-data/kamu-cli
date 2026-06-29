@@ -82,7 +82,9 @@ pub(crate) fn collect_manifest_header_warnings(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn resource_view_to_manifest(view: ResourceView) -> ResourceManifest {
+pub(crate) fn resource_view_to_manifest(
+    view: ResourceView,
+) -> Result<ResourceManifest, InternalError> {
     let ResourceView {
         schema,
         account,
@@ -91,11 +93,16 @@ pub(crate) fn resource_view_to_manifest(view: ResourceView) -> ResourceManifest 
         ..
     } = view;
 
-    ResourceManifest {
+    // `schema` originates from a stored, already-canonical resource, so parsing it
+    // back into a `ResourceSchema` is infallible in practice; treat a failure as a
+    // store-integrity bug.
+    let schema = kamu_resources::ResourceSchemaId::parse(&schema).int_err()?;
+
+    Ok(ResourceManifest {
         schema,
         headers: kamu_resources::ResourceManifestHeaders {
             id: None,
-            account: Some(kamu_resources::ResourceManifestAccount {
+            account: Some(kamu_resources::ResourceAccountRef {
                 id: Some(account.id),
                 name: account.name.map(|name| name.to_string()),
             }),
@@ -105,7 +112,7 @@ pub(crate) fn resource_view_to_manifest(view: ResourceView) -> ResourceManifest 
             annotations: headers.annotations.into_iter().collect(),
         },
         spec,
-    }
+    })
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

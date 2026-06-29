@@ -12,7 +12,7 @@ use std::sync::Arc;
 use internal_error::ResultIntoInternal;
 use kamu_accounts::{AccountService, CurrentAccountSubject};
 use kamu_auth_rebac::{RebacService, RebacServiceExt};
-use kamu_resources::ResourceManifestAccount;
+use kamu_resources::ResourceAccountRef;
 
 use crate::{ResolveManifestAccountError, ResolvedAccount, ResourceAccountResolver};
 
@@ -32,7 +32,7 @@ pub(crate) struct ResourceAccountResolverImpl {
 impl ResourceAccountResolver for ResourceAccountResolverImpl {
     async fn resolve_target_account(
         &self,
-        selector: Option<&ResourceManifestAccount>,
+        selector: Option<&ResourceAccountRef>,
     ) -> Result<ResolvedAccount, ResolveManifestAccountError> {
         let target_account = self.resolve_account(selector).await?;
         self.ensure_can_use_account_resources(&target_account)
@@ -46,7 +46,7 @@ impl ResourceAccountResolver for ResourceAccountResolverImpl {
 impl ResourceAccountResolverImpl {
     async fn resolve_account(
         &self,
-        selector: Option<&ResourceManifestAccount>,
+        selector: Option<&ResourceAccountRef>,
     ) -> Result<ResolvedAccount, ResolveManifestAccountError> {
         let Some(selector) = selector else {
             return self.resolve_current_subject_account();

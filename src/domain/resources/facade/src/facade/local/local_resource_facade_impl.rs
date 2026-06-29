@@ -205,7 +205,8 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 
         self.apply_spec_view_mode::<RenderResourceManifestError>(&mut view, spec_view_mode)?;
 
-        let manifest = resource_view_to_manifest(view);
+        let manifest =
+            resource_view_to_manifest(view).map_err(RenderResourceManifestError::Internal)?;
         let manifest =
             serialize_manifest(&manifest, format).map_err(RenderResourceManifestError::Internal)?;
 
@@ -232,7 +233,8 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         let successes = indexed_resources
             .into_iter()
             .map(|resource| {
-                let manifest = resource_view_to_manifest(resource.item);
+                let manifest = resource_view_to_manifest(resource.item)
+                    .map_err(BatchResourceError::Internal)?;
                 let manifest =
                     serialize_manifest(&manifest, format).map_err(BatchResourceError::Internal)?;
                 Ok(BatchResourceSuccess {
@@ -907,23 +909,22 @@ impl LocalResourceFacadeImpl {
         request: ApplyManifestRequest,
     ) -> Result<PreparedApplyManifest, ApplyManifestError> {
         let manifest = parse_manifest(request.format, &request.manifest)?;
-        ResourceSchema::parse(&manifest.schema).map_err(|err| ParseResourceManifestError {
-            message: err.to_string(),
-        })?;
 
         let target_account = self
             .resource_account_resolver
             .resolve_target_account(manifest.headers.account.as_ref())
             .await?;
 
-        let dispatcher =
-            get_resource_crud_dispatcher::<ApplyManifestError>(&self.catalog, &manifest.schema)?;
+        let dispatcher = get_resource_crud_dispatcher::<ApplyManifestError>(
+            &self.catalog,
+            manifest.schema.as_str(),
+        )?;
 
         let headers = make_headers_input(&manifest, &target_account)?;
         let header_warnings = collect_manifest_header_warnings(&manifest);
 
         self.ensure_manifest_id_is_accessible(
-            &manifest.schema,
+            manifest.schema.as_str(),
             &target_account.id,
             manifest.headers.id,
         )

@@ -15,7 +15,7 @@ use url::Url;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct ResourceSchema {
+pub struct ResourceSchemaId {
     schema: String,
     base: String,
     context: String,
@@ -23,7 +23,7 @@ pub struct ResourceSchema {
     name: String,
 }
 
-impl ResourceSchema {
+impl ResourceSchemaId {
     pub fn parse(schema: &str) -> Result<Self, ParseResourceSchemaError> {
         if schema.trim() != schema || schema.is_empty() {
             return Err(ParseResourceSchemaError::new(schema));
@@ -104,13 +104,13 @@ impl ResourceSchema {
     }
 }
 
-impl std::fmt::Display for ResourceSchema {
+impl std::fmt::Display for ResourceSchemaId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&self.schema)
     }
 }
 
-impl FromStr for ResourceSchema {
+impl FromStr for ResourceSchemaId {
     type Err = ParseResourceSchemaError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -118,7 +118,7 @@ impl FromStr for ResourceSchema {
     }
 }
 
-impl Serialize for ResourceSchema {
+impl Serialize for ResourceSchemaId {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -127,7 +127,7 @@ impl Serialize for ResourceSchema {
     }
 }
 
-impl<'de> Deserialize<'de> for ResourceSchema {
+impl<'de> Deserialize<'de> for ResourceSchemaId {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -147,9 +147,10 @@ mod tests {
 
     #[test]
     fn parses_schema_with_path_base() {
-        let schema =
-            ResourceSchema::parse("https://opendatafabric.org/schemas/config/v1alpha1/VariableSet")
-                .unwrap();
+        let schema = ResourceSchemaId::parse(
+            "https://opendatafabric.org/schemas/config/v1alpha1/VariableSet",
+        )
+        .unwrap();
 
         assert_eq!(
             schema.as_str(),
@@ -166,7 +167,7 @@ mod tests {
     #[test]
     fn parses_schema_with_host_only_base() {
         let schema =
-            ResourceSchema::parse("https://schemas.partner.org/billing/v1/Invoice").unwrap();
+            ResourceSchemaId::parse("https://schemas.partner.org/billing/v1/Invoice").unwrap();
 
         assert_eq!(
             schema.as_str(),
@@ -195,7 +196,7 @@ mod tests {
             "https://schemas.partner.org/billing//v1/Invoice",
         ] {
             assert!(
-                ResourceSchema::parse(invalid_schema).is_err(),
+                ResourceSchemaId::parse(invalid_schema).is_err(),
                 "schema should be rejected: {invalid_schema}"
             );
         }
