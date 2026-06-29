@@ -61,7 +61,7 @@ async fn create_secret_resource(
         .await
         .unwrap();
     assert_applied_outcome(&decision, ApplyResourceOutcome::Created)
-        .metadata
+        .headers
         .uid
 }
 
@@ -122,7 +122,7 @@ pub async fn test_revealed_spec_view_exposes_plaintext(h: &impl FacadeContractHa
     );
 
     // Non-secret identity fields are unchanged
-    assert_eq!(view.metadata.name, "sv-revealed");
+    assert_eq!(view.headers.name, "sv-revealed");
     assert_eq!(view.kind, SECRET_SET_KIND);
     assert_eq!(view.api_version, SECRET_SET_API_VERSION);
 }
@@ -225,7 +225,7 @@ pub async fn test_spec_view_mode_applies_to_render(h: &impl FacadeContractHarnes
         serde_json::from_str(&rev_result.manifest).expect("must be valid JSON");
     assert_eq!(parsed["kind"], SECRET_SET_KIND);
     assert!(
-        parsed["metadata"]["uid"].is_null(),
+        parsed["headers"]["uid"].is_null(),
         "rendered manifest must not include uid"
     );
 }

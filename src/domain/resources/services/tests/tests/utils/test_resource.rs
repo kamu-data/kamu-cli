@@ -148,7 +148,7 @@ pub trait TestResourceEventStore: EventStore<TestResourceState> + 'static {}
 #[derive(Debug, thiserror::Error)]
 pub enum TestResourceLifecycleError {
     #[error(transparent)]
-    MetadataValidation(#[from] ResourceMetadataValidationError),
+    HeadersValidation(#[from] ResourceHeadersValidationError),
 
     #[error(transparent)]
     SpecValidation(#[from] TestResourceSpecValidationError),
@@ -165,7 +165,7 @@ kamu_resources::impl_invariant_violation_lifecycle_error!(
 impl IntoApplyResourceRejection for TestResourceLifecycleError {
     fn into_apply_resource_rejection(self) -> ApplyResourceLifecycleErrorHandling {
         match self {
-            Self::MetadataValidation(err) => {
+            Self::HeadersValidation(err) => {
                 ApplyResourceLifecycleErrorHandling::Rejected(ApplyResourceRejection {
                     category: ApplyResourceRejectionCategory::BusinessValidationFailed,
                     message: err.to_string(),

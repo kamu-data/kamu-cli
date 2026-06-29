@@ -76,18 +76,18 @@ impl ResourceRepository for InMemoryResourceRepository {
         let mut guard = self.state.lock().unwrap();
 
         let lookup_key = ResourceLookupKey {
-            account_id: resource_snapshot.metadata.account.clone(),
+            account_id: resource_snapshot.headers.account.clone(),
             kind: resource_snapshot.kind.clone(),
-            name: resource_snapshot.metadata.name.clone(),
+            name: resource_snapshot.headers.name.clone(),
         };
 
         if guard.snapshots_by_id.contains_key(&resource_snapshot.uid)
             || guard.ids_by_lookup_key.contains_key(&lookup_key)
         {
             return Err(CreateResourceError::Duplicate(ResourceDuplicateError {
-                account_id: resource_snapshot.metadata.account.clone(),
+                account_id: resource_snapshot.headers.account.clone(),
                 kind: resource_snapshot.kind.clone(),
-                name: resource_snapshot.metadata.name.clone(),
+                name: resource_snapshot.headers.name.clone(),
             }));
         }
 
@@ -135,23 +135,23 @@ impl ResourceRepository for InMemoryResourceRepository {
             }
 
             let previous_lookup_key = ResourceLookupKey {
-                account_id: previous_snapshot.metadata.account,
+                account_id: previous_snapshot.headers.account,
                 kind: previous_snapshot.kind,
-                name: previous_snapshot.metadata.name,
+                name: previous_snapshot.headers.name,
             };
             let next_lookup_key = ResourceLookupKey {
-                account_id: resource_snapshot.metadata.account.clone(),
+                account_id: resource_snapshot.headers.account.clone(),
                 kind: resource_snapshot.kind.clone(),
-                name: resource_snapshot.metadata.name.clone(),
+                name: resource_snapshot.headers.name.clone(),
             };
 
             if let Some(existing_resource_id) = guard.ids_by_lookup_key.get(&next_lookup_key)
                 && *existing_resource_id != resource_snapshot.uid
             {
                 return Err(UpdateResourceError::Duplicate(ResourceDuplicateError {
-                    account_id: resource_snapshot.metadata.account.clone(),
+                    account_id: resource_snapshot.headers.account.clone(),
                     kind: resource_snapshot.kind.clone(),
-                    name: resource_snapshot.metadata.name.clone(),
+                    name: resource_snapshot.headers.name.clone(),
                 }));
             }
 
@@ -191,7 +191,7 @@ impl ResourceRepository for InMemoryResourceRepository {
                 name: name.to_ascii_lowercase(),
             })
             .and_then(|uid| guard.snapshots_by_id.get(uid))
-            .filter(|snapshot| snapshot.metadata.deleted_at.is_none())
+            .filter(|snapshot| snapshot.headers.deleted_at.is_none())
             .map(|snapshot| snapshot.uid))
     }
 
@@ -206,13 +206,13 @@ impl ResourceRepository for InMemoryResourceRepository {
             .iter()
             .filter_map(|uid| guard.snapshots_by_id.get(uid))
             .filter(|snapshot| {
-                snapshot.metadata.account == *account_id && snapshot.metadata.deleted_at.is_none()
+                snapshot.headers.account == *account_id && snapshot.headers.deleted_at.is_none()
             })
             .map(|snapshot| ResourceIdentityRow {
                 uid: *snapshot.uid.as_ref(),
                 kind: snapshot.kind.clone(),
                 api_version: snapshot.api_version.clone(),
-                name: snapshot.metadata.name.clone(),
+                name: snapshot.headers.name.clone(),
             })
             .collect())
     }
@@ -238,12 +238,12 @@ impl ResourceRepository for InMemoryResourceRepository {
                     })
                     .and_then(|uid| guard.snapshots_by_id.get(uid))
             })
-            .filter(|snapshot| snapshot.metadata.deleted_at.is_none())
+            .filter(|snapshot| snapshot.headers.deleted_at.is_none())
             .map(|snapshot| ResourceIdentityRow {
                 uid: *snapshot.uid.as_ref(),
                 kind: snapshot.kind.clone(),
                 api_version: snapshot.api_version.clone(),
-                name: snapshot.metadata.name.clone(),
+                name: snapshot.headers.name.clone(),
             })
             .collect())
     }
@@ -266,9 +266,9 @@ impl ResourceRepository for InMemoryResourceRepository {
             filter_search_snapshots(&guard, account_id, kinds, exact_names, name_pattern);
 
         snapshots.sort_by(|lhs, rhs| {
-            rhs.metadata
+            rhs.headers
                 .updated_at
-                .cmp(&lhs.metadata.updated_at)
+                .cmp(&lhs.headers.updated_at)
                 .then_with(|| rhs.uid.cmp(&lhs.uid))
         });
 
@@ -280,7 +280,7 @@ impl ResourceRepository for InMemoryResourceRepository {
                 uid: *snapshot.uid.as_ref(),
                 kind: snapshot.kind.clone(),
                 api_version: snapshot.api_version.clone(),
-                name: snapshot.metadata.name.clone(),
+                name: snapshot.headers.name.clone(),
             })
             .collect())
     }
@@ -310,7 +310,7 @@ impl ResourceRepository for InMemoryResourceRepository {
             .snapshots_by_id
             .get(&query.uid)
             .filter(|snapshot| snapshot.kind == query.kind)
-            .filter(|snapshot| snapshot.metadata.deleted_at.is_none())
+            .filter(|snapshot| snapshot.headers.deleted_at.is_none())
             .cloned())
     }
 
@@ -325,7 +325,7 @@ impl ResourceRepository for InMemoryResourceRepository {
             .iter()
             .filter_map(|uid| guard.snapshots_by_id.get(uid))
             .filter(|snapshot| snapshot.kind == kind)
-            .filter(|snapshot| snapshot.metadata.deleted_at.is_none())
+            .filter(|snapshot| snapshot.headers.deleted_at.is_none())
             .cloned()
             .collect())
     }
@@ -339,7 +339,7 @@ impl ResourceRepository for InMemoryResourceRepository {
         Ok(guard
             .snapshots_by_id
             .get(uid)
-            .filter(|snapshot| snapshot.metadata.deleted_at.is_none())
+            .filter(|snapshot| snapshot.headers.deleted_at.is_none())
             .cloned())
     }
 
@@ -354,7 +354,7 @@ impl ResourceRepository for InMemoryResourceRepository {
             .iter()
             .filter_map(|uid| guard.snapshots_by_id.get(uid))
             .filter(|snapshot| {
-                snapshot.metadata.account == *account_id && snapshot.metadata.deleted_at.is_none()
+                snapshot.headers.account == *account_id && snapshot.headers.deleted_at.is_none()
             })
             .cloned()
             .collect())
@@ -372,18 +372,18 @@ impl ResourceRepository for InMemoryResourceRepository {
                 .snapshots_by_id
                 .values()
                 .filter(|snapshot| {
-                    snapshot.metadata.account == account_id
+                    snapshot.headers.account == account_id
                         && snapshot.kind == kind
-                        && snapshot.metadata.deleted_at.is_none()
+                        && snapshot.headers.deleted_at.is_none()
                 })
                 .cloned()
                 .collect()
         };
 
         resource_ids_page.sort_by(|lhs, rhs| {
-            rhs.metadata
+            rhs.headers
                 .updated_at
-                .cmp(&lhs.metadata.updated_at)
+                .cmp(&lhs.headers.updated_at)
                 .then_with(|| rhs.uid.cmp(&lhs.uid))
         });
 
@@ -409,18 +409,18 @@ impl ResourceRepository for InMemoryResourceRepository {
                 .snapshots_by_id
                 .values()
                 .filter(|snapshot| {
-                    snapshot.metadata.account == account_id
+                    snapshot.headers.account == account_id
                         && snapshot.kind == kind
-                        && snapshot.metadata.deleted_at.is_none()
+                        && snapshot.headers.deleted_at.is_none()
                 })
                 .cloned()
                 .collect()
         };
 
         snapshots_page.sort_by(|lhs, rhs| {
-            rhs.metadata
+            rhs.headers
                 .updated_at
-                .cmp(&lhs.metadata.updated_at)
+                .cmp(&lhs.headers.updated_at)
                 .then_with(|| rhs.uid.cmp(&lhs.uid))
         });
 
@@ -445,17 +445,16 @@ impl ResourceRepository for InMemoryResourceRepository {
                 .snapshots_by_id
                 .values()
                 .filter(|snapshot| {
-                    snapshot.metadata.account == account_id
-                        && snapshot.metadata.deleted_at.is_none()
+                    snapshot.headers.account == account_id && snapshot.headers.deleted_at.is_none()
                 })
                 .cloned()
                 .collect()
         };
 
         snapshots_page.sort_by(|lhs, rhs| {
-            rhs.metadata
+            rhs.headers
                 .updated_at
-                .cmp(&lhs.metadata.updated_at)
+                .cmp(&lhs.headers.updated_at)
                 .then_with(|| rhs.uid.cmp(&lhs.uid))
         });
 
@@ -480,9 +479,9 @@ impl ResourceRepository for InMemoryResourceRepository {
             .snapshots_by_id
             .values()
             .filter(|snapshot| {
-                snapshot.metadata.account == account_id
+                snapshot.headers.account == account_id
                     && snapshot.kind == kind
-                    && snapshot.metadata.deleted_at.is_none()
+                    && snapshot.headers.deleted_at.is_none()
             })
             .count())
     }
@@ -496,7 +495,7 @@ impl ResourceRepository for InMemoryResourceRepository {
         let mut rows_by_key = HashMap::<(String, String), ResourceSummaryRow>::new();
 
         for snapshot in guard.snapshots_by_id.values().filter(|snapshot| {
-            snapshot.metadata.account == account_id && snapshot.metadata.deleted_at.is_none()
+            snapshot.headers.account == account_id && snapshot.headers.deleted_at.is_none()
         }) {
             let row = rows_by_key
                 .entry((snapshot.kind.clone(), snapshot.api_version.clone()))
@@ -597,17 +596,17 @@ fn filter_search_snapshots<'a>(
     guard
         .snapshots_by_id
         .values()
-        .filter(|snapshot| snapshot.metadata.account == *account_id)
+        .filter(|snapshot| snapshot.headers.account == *account_id)
         .filter(|snapshot| kinds.contains(&snapshot.kind))
-        .filter(|snapshot| snapshot.metadata.deleted_at.is_none())
+        .filter(|snapshot| snapshot.headers.deleted_at.is_none())
         .filter(|snapshot| {
             exact_names
                 .as_ref()
-                .is_none_or(|names| names.contains(&snapshot.metadata.name))
+                .is_none_or(|names| names.contains(&snapshot.headers.name))
         })
         .filter(|snapshot| {
             name_pattern.is_none_or(|pattern| {
-                resource_name_matches_pattern(&snapshot.metadata.name, pattern)
+                resource_name_matches_pattern(&snapshot.headers.name, pattern)
             })
         })
         .collect()

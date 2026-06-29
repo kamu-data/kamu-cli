@@ -49,7 +49,7 @@ async fn create_resource(
         .await
         .unwrap();
     let result = assert_applied_outcome(&decision, ApplyResourceOutcome::Created);
-    result.metadata.uid
+    result.headers.uid
 }
 
 fn by_name(name: &str) -> ResourceSelector {
@@ -258,7 +258,7 @@ pub async fn test_delete_is_account_scoped(h: &impl FacadeContractHarness) {
             .await
             .unwrap();
         assert_applied_outcome(&decision, ApplyResourceOutcome::Created)
-            .metadata
+            .headers
             .uid
     };
 
@@ -282,7 +282,7 @@ pub async fn test_delete_is_account_scoped(h: &impl FacadeContractHarness) {
         .get(by_name("scoped-del"), SpecViewMode::Encrypted)
         .await
         .expect("Bob's resource must survive Alice's delete");
-    assert_eq!(bob_view.metadata.uid, bob_uid);
+    assert_eq!(bob_view.headers.uid, bob_uid);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -285,7 +285,7 @@ impl ApplyResourcePlanExecutorHarness {
     ) -> PlannedApplyResource<TestResource> {
         let params = ApplyResourceParams {
             uid: None,
-            metadata: BaseResourceServiceHarness::make_metadata_input(account_id, name),
+            headers: BaseResourceServiceHarness::make_headers_input(account_id, name),
             spec,
         };
 

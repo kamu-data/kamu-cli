@@ -88,7 +88,7 @@ fn variable_set_manifest_json_with_account(
         {{
             "apiVersion": "{api}",
             "kind": "{kind}",
-            "metadata": {{
+            "headers": {{
                 "name": "{name}",
                 "account": {{ {account_fields} }}
             }},
@@ -365,8 +365,8 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
         )
         .await
         .unwrap();
-    assert_eq!(alice_view.metadata.uid, alice_uid);
-    assert_eq!(bob_view.metadata.uid, bob_uid);
+    assert_eq!(alice_view.headers.uid, alice_uid);
+    assert_eq!(bob_view.headers.uid, bob_uid);
 
     let alice_identity = alice
         .get_identity(selector_by_name("acct-isolated", None))
@@ -391,7 +391,7 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
         .await
         .unwrap();
     assert_eq!(alice_batch.successes[0].item.uid, alice_uid);
-    assert_eq!(bob_batch.successes[0].item.metadata.uid, bob_uid);
+    assert_eq!(bob_batch.successes[0].item.headers.uid, bob_uid);
 
     let alice_list = alice
         .list_identities(ListResourceIdentitiesRequest {

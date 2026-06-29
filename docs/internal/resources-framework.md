@@ -11,8 +11,8 @@
 
 **One-paragraph mental model.** The resources framework is a generic, event-sourced,
 Kubernetes-inspired subsystem for *declarative* management of arbitrary "resource kinds". A user
-authors a **manifest** (`apiVersion` + `kind` + `metadata` + `spec`); the framework stores it as an
-event-sourced aggregate, fills in server-owned metadata (uid, timestamps, `generation`) and an
+authors a **manifest** (`apiVersion` + `kind` + `headers` + `spec`); the framework stores it as an
+event-sourced aggregate, fills in server-owned headers (uid, timestamps, `generation`) and an
 **initial** server-owned `status`, then **asynchronously reconciles** it toward the desired state
 (the status progresses `Pending → Reconciling → Ready`/`Failed`). Every kind (today:
 `VariableSet`, `SecretSet`) implements a small set of traits and registers a **dispatcher** keyed by
@@ -50,25 +50,41 @@ make clippy
 
 ## Table of contents
 
-1. [Purpose & scope](#1-purpose--scope)
-2. [Concept glossary](#2-concept-glossary)
-3. [Invariants](#3-invariants)
-4. [Layered architecture](#4-layered-architecture)
-5. [Domain model (`kamu-resources`)](#5-domain-model-kamu-resources)
-   - [5a. Resource anatomy — input vs auto-generated](#5a-resource-anatomy--input-vs-auto-generated)
-6. [Persistence model](#6-persistence-model)
-7. [Account resolution & authorization](#7-account-resolution--authorization)
-8. [Rename & conflict rules](#8-rename--conflict-rules)
-9. [Services (`kamu-resources-services`)](#9-services-kamu-resources-services)
-10. [Facade (`kamu-resources-facade`)](#10-facade-kamu-resources-facade)
-11. [GraphQL API](#11-graphql-api)
-12. [CLI](#12-cli)
+- [Resources Framework — Architecture](#resources-framework--architecture)
+  - [Agent / newcomer quick-start](#agent--newcomer-quick-start)
+  - [Table of contents](#table-of-contents)
+  - [1. Purpose \& scope](#1-purpose--scope)
+  - [2. Concept glossary](#2-concept-glossary)
+  - [3. Invariants](#3-invariants)
+  - [4. Layered architecture](#4-layered-architecture)
+  - [5. Domain model (`kamu-resources`)](#5-domain-model-kamu-resources)
+    - [Core traits](#core-traits)
+    - [Events](#events)
+    - [Repository](#repository)
+    - [Dispatchers](#dispatchers)
+    - [Use-case traits](#use-case-traits)
+    - [5a. Resource anatomy — input vs auto-generated](#5a-resource-anatomy--input-vs-auto-generated)
+  - [6. Persistence model](#6-persistence-model)
+  - [7. Account resolution \& authorization](#7-account-resolution--authorization)
+  - [8. Rename \& conflict rules](#8-rename--conflict-rules)
+  - [9. Services (`kamu-resources-services`)](#9-services-kamu-resources-services)
+  - [10. Facade (`kamu-resources-facade`)](#10-facade-kamu-resources-facade)
+  - [11. GraphQL API](#11-graphql-api)
+  - [12. CLI](#12-cli)
     - [CLI semantics matrix](#cli-semantics-matrix)
-13. [Data flow walkthroughs](#13-data-flow-walkthroughs)
-14. [Concrete resource kinds (`kamu-configuration`)](#14-concrete-resource-kinds-kamu-configuration)
-15. [Tests](#15-tests)
-16. [File/crate reference map](#16-filecrate-reference-map)
-17. [Extension points & gotchas](#17-extension-points--gotchas)
+  - [13. Data flow walkthroughs](#13-data-flow-walkthroughs)
+    - [(a) `kamu apply -f manifest.yaml`](#a-kamu-apply--f-manifestyaml)
+    - [(b) Reconciliation](#b-reconciliation)
+    - [Outbox connections](#outbox-connections)
+    - [How reconciliation is scheduled](#how-reconciliation-is-scheduled)
+    - [Lifecycle state machine](#lifecycle-state-machine)
+  - [14. Concrete resource kinds (`kamu-configuration`)](#14-concrete-resource-kinds-kamu-configuration)
+    - [Secret handling invariant](#secret-handling-invariant)
+    - [Recipe: how to add a new resource kind](#recipe-how-to-add-a-new-resource-kind)
+  - [15. Tests](#15-tests)
+    - [Testing policy — what belongs where](#testing-policy--what-belongs-where)
+  - [16. File/crate reference map](#16-filecrate-reference-map)
+  - [17. Extension points \& gotchas](#17-extension-points--gotchas)
 
 ---
 
@@ -80,9 +96,9 @@ The framework provides a uniform way to **declaratively manage** typed resources
   name patterns), plus a `reconcile` step (outbox-driven, asynchronous — see
   [How reconciliation is scheduled](#how-reconciliation-is-scheduled)) that drives a resource toward
   its desired state.
-- **Kubernetes-style model** — every resource carries user-authored `metadata` + `spec`. The server
-  maintains the remaining metadata — including `generation` (the desired-state revision, bumped on
-  each spec/metadata change) — and a `status` with `phase`, `observedGeneration` (reconciliation
+- **Kubernetes-style model** — every resource carries user-authored `headers` + `spec`. The server
+  maintains the remaining headers — including `generation` (the desired-state revision, bumped on
+  each spec/headers change) — and a `status` with `phase`, `observedGeneration` (reconciliation
   progress), and `conditions`. Reconciliation is needed whenever `observedGeneration < generation`.
 - **Pluggable kinds** — the generic machinery is type-parameterized over a resource type `R`;
   concrete kinds plug in via traits + a registered dispatcher keyed by `(kind, apiVersion)`.
@@ -107,13 +123,13 @@ long-term goal. This page documents what exists now.
 | **Kind** | The resource type discriminator string, e.g. `VariableSet`, `SecretSet`. |
 | **ApiVersion** | Versioning string for the kind's schema, e.g. `kamu.dev/v1alpha1`. |
 | **Descriptor** | The `(kind, apiVersion)` pair (`ResourceDescriptor`) used to route to the right dispatcher. |
-| **Manifest** | The user-authored wire document (`apiVersion`/`kind`/`metadata`/`spec`) in YAML or JSON. |
+| **Manifest** | The user-authored wire document (`apiVersion`/`kind`/`headers`/`spec`) in YAML or JSON. |
 | **Spec** | The desired-state portion authored by the user; stored as `serde_json::Value`. |
-| **Status** | Server-owned observed state (`phase`, `observedGeneration`, `conditions`). Note `generation` lives in **metadata**, not status. |
+| **Status** | Server-owned observed state (`phase`, `observedGeneration`, `conditions`). Note `generation` lives in **headers**, not status. |
 | **Snapshot** | The persisted materialized form of a resource (`ResourceSnapshot`). |
 | **Phase** | Lifecycle stage: `Pending`, `Reconciling`, `Ready`, `Failed`. (`Degraded` exists in the enum but is reserved/unused today — see [§13 state machine](#lifecycle-state-machine).) |
 | **Condition** | A K8s-style condition entry contributing to the overall phase. |
-| **generation / observedGeneration** | `generation` bumps on each spec/metadata change; `observedGeneration` records the last generation reconciliation observed. Drift ⇒ reconcile. |
+| **generation / observedGeneration** | `generation` bumps on each spec/headers change; `observedGeneration` records the last generation reconciliation observed. Drift ⇒ reconcile. |
 | **Reconciliation** | The act of driving actual state toward the spec (e.g. `SecretSet` materializes its encrypted read-side projection). |
 | **Selector** | Identifies one (`ResourceSelector`) or many (`ResourceBatchSelector`) resources, by name or UID, optionally scoped to an account. |
 | **SpecViewMode** | How sensitive spec fields are rendered. Two modes only: `Encrypted` (default — the stored ciphertext envelope is returned as-is) and `Revealed` (decrypted plaintext). There is no separate "redacted/placeholder" mode today. |
@@ -138,10 +154,10 @@ not break; most are enforced in code and exercised by tests — pointers given w
   `VariableSet/kamu.dev/v1beta1/foo` **cannot coexist** — they are the same resource. A version
   change is schema evolution of one named resource, not a second parallel resource (see the
   migration note in [§6](#6-persistence-model)).
-- **`metadata.generation` changes only when desired state changes.** It starts at 1 on create and is
-  bumped by the aggregate only when an apply produces a real metadata/spec change (`Update`); an
+- **`headers.generation` changes only when desired state changes.** It starts at 1 on create and is
+  bumped by the aggregate only when an apply produces a real headers/spec change (`Update`); an
   unchanged apply is `Untouched` and does not bump it.
-- **`status.observedGeneration <= metadata.generation`** always. Reconciliation sets
+- **`status.observedGeneration <= headers.generation`** always. Reconciliation sets
   `observedGeneration` to the generation it just processed; `needs_reconciliation()` is exactly
   `observedGeneration < generation`.
 - **`status` is never accepted from manifests.** It is server-owned end to end; manifests use
@@ -234,7 +250,7 @@ pub trait DeclarativeResource:
         + From<Self>;
 
     fn uid(&self) -> &ResourceUID;
-    fn metadata(&self) -> &ResourceMetadata;
+    fn headers(&self) -> &ResourceHeaders;
     fn spec(&self) -> &Self::Spec;
     fn status(&self) -> &Self::Status;
 }
@@ -253,8 +269,8 @@ pub trait ReconcilableResource: DeclarativeResource {
 
     fn needs_reconciliation(&self) -> bool { /* observed_generation vs generation */ }
 
-    fn try_create(now, uid, metadata: ResourceMetadataInput, spec) -> Result<Self, LifecycleError>;
-    fn try_update_metadata(&mut self, now, new_metadata: ResourceMetadataInput) -> ...;
+    fn try_create(now, uid, headers: ResourceHeadersInput, spec) -> Result<Self, LifecycleError>;
+    fn try_update_headers(&mut self, now, new_headers: ResourceHeadersInput) -> ...;
     fn try_update_spec(&mut self, now, new_spec: Self::Spec) -> ...;
     fn try_delete(&mut self, now, tombstone_name: String) -> ...;
     fn try_mark_reconciliation_started(&mut self, now) -> ...;
@@ -278,7 +294,7 @@ and an aggregate. This is the bound that all generic use cases require.
 ### Events
 
 `ReconcilableResourceEvent<TSpec, TSuccess, TFailureDetails>` is the event-sourcing alphabet:
-`Created`, `MetadataUpdated`, `SpecUpdated`, `Deleted`, `ReconciliationStarted`,
+`Created`, `HeadersUpdated`, `SpecUpdated`, `Deleted`, `ReconciliationStarted`,
 `ReconciliationSucceeded`, `ReconciliationFailed`. The `ResourceState` projection folds these into
 current state.
 
@@ -316,12 +332,12 @@ Generic, `R`-parameterized contracts in `use_cases/`: `ApplyResourceUseCase<R>` 
 pub struct ResourceManifest {
     pub api_version: String,                 // required — e.g. "kamu.dev/v1alpha1"
     pub kind: String,                        // required — e.g. "VariableSet"
-    pub metadata: ResourceManifestMetadata,
+    pub headers: ResourceManifestHeaders,
     pub spec: serde_json::Value,             // desired state; kind-specific shape
 }
 
 #[serde(deny_unknown_fields)]                // ← unknown fields (e.g. `status`) are rejected
-pub struct ResourceManifestMetadata {
+pub struct ResourceManifestHeaders {
     pub uid: Option<ResourceUID>,            // optional — NOT assignable; an exact pointer to an
                                              // existing resource for updates (e.g. when renaming)
     pub account: Option<ResourceManifestAccount>, // optional — by name OR id; defaults to caller
@@ -332,7 +348,7 @@ pub struct ResourceManifestMetadata {
 }
 ```
 
-A user may write **only**: `apiVersion`, `kind`, `metadata.{uid?, account?, name, description?,
+A user may write **only**: `apiVersion`, `kind`, `headers.{uid?, account?, name, description?,
 labels, annotations}`, and `spec`. `deny_unknown_fields` means a manifest **cannot** carry `status`,
 timestamps, or `generation` — those are server-owned.
 
@@ -341,18 +357,18 @@ server. It may only be *supplied* on a manifest to point at an already-existing 
 update; this is what lets a resource be renamed (the `uid` keeps the identity stable while `name`
 changes). Omit it for normal create/update-by-name.
 
-**(2) Framework-generated — the rest of metadata + all of status.**
-`ResourceMetadata` ([`values/resource_metadata.rs`](/src/domain/resources/domain/src/values/resource_metadata.rs))
+**(2) Framework-generated — the rest of headers + all of status.**
+`ResourceHeaders` ([`values/resource_headers.rs`](/src/domain/resources/domain/src/values/resource_headers.rs))
 and `ResourceStatus` ([`state/resource_status.rs`](/src/domain/resources/domain/src/state/resource_status.rs)):
 
 ```rust
-pub struct ResourceMetadata {
+pub struct ResourceHeaders {
     pub account: odf::AccountID,             // resolved from manifest account / caller
     pub name: ResourceName,                  // (authored)
     pub description: Option<String>,         // (authored)
     pub labels: BTreeMap<String, String>,    // (authored)
     pub annotations: BTreeMap<String, String>, // (authored)
-    pub generation: u64,                     // generated — bumps on spec/metadata change
+    pub generation: u64,                     // generated — bumps on spec/headers change
     pub created_at: DateTime<Utc>,           // generated
     pub updated_at: DateTime<Utc>,           // generated
     pub deleted_at: Option<DateTime<Utc>>,   // generated (soft-delete tombstone)
@@ -376,7 +392,7 @@ pub struct ResourceSnapshot {
     pub uid: ResourceUID,
     pub kind: String,
     pub api_version: String,
-    pub metadata: ResourceMetadata,          // authored fields + generated fields
+    pub headers: ResourceHeaders,          // authored fields + generated fields
     pub spec: serde_json::Value,             // authored (may be transformed — see SecretSet)
     pub status: Option<serde_json::Value>,   // generated
     pub last_reconciled_at: Option<DateTime<Utc>>, // generated
@@ -386,7 +402,7 @@ pub struct ResourceSnapshot {
 
 ```mermaid
 flowchart LR
-    M["Manifest (authored)<br/>apiVersion, kind<br/>metadata: name, account?, uid?,<br/>description?, labels, annotations<br/>spec"]
+    M["Manifest (authored)<br/>apiVersion, kind<br/>headers: name, account?, uid?,<br/>description?, labels, annotations<br/>spec"]
     A["apply use case<br/>(resolve account, allocate uid,<br/>bump generation, set timestamps)"]
     S["Snapshot / State<br/>= authored fields<br/>+ <b>generated</b>: account(ID), uid,<br/>generation, created/updated/deleted_at,<br/>status{phase, observedGeneration, conditions}"]
     M --> A --> S
@@ -458,7 +474,7 @@ Every resource belongs to exactly one account, and that scoping is also the auth
 Resolution + permission checks live in `ResourceAccountResolverImpl`
 ([`facade/local/resource_account_resolver_impl.rs`](/src/domain/resources/facade/src/facade/local/resource_account_resolver_impl.rs)).
 
-- **Who may specify `metadata.account`.** The manifest `account` field is optional and **defaults to
+- **Who may specify `headers.account`.** The manifest `account` field is optional and **defaults to
   the calling subject's own account**. To target *another* account, the resolver requires the caller
   to be an **admin** (`rebac_service.is_account_admin`); otherwise it returns
   `AccessError::Unauthorized`. An **anonymous** subject cannot resolve any account (rejected).
@@ -488,17 +504,17 @@ decides create vs update by resolving the target resource first:
 - **No `uid` in manifest** → resolve by `(account, kind, name)`. Found → update; not found → create
   (new UID allocated).
 - **`uid` in manifest** → load that exact resource (the "exact pointer"). This is what enables a
-  **rename**: supply the `uid` and a new `metadata.name`; identity stays stable while the name
+  **rename**: supply the `uid` and a new `headers.name`; identity stays stable while the name
   changes.
 
 Concrete conflict cases:
 
 | Case | Outcome |
 | --- | --- |
-| `uid` + changed `metadata.name` | **Rename** — name updated on the same resource (`Update`). |
+| `uid` + changed `headers.name` | **Rename** — name updated on the same resource (`Update`). |
 | `uid` whose resource is a different `kind` (or apiVersion type) | **Reject** — `ResourceTypeMismatchError`. |
 | `uid` resolving to a resource in a different account | **Not found** — `ResourceUIDNotFoundError` (account-scoped lookup; existence not leaked). |
-| `metadata.account` targeting another account without admin | **Reject** — `AccessError::Unauthorized` ([§7](#7-account-resolution--authorization)). |
+| `headers.account` targeting another account without admin | **Reject** — `AccessError::Unauthorized` ([§7](#7-account-resolution--authorization)). |
 | Rename target name already taken (same account+kind) | **Reject** — unique-constraint `Duplicate` at persistence. |
 | Update by name where another account has the same name | **No conflict** — the account disambiguates; each `(account, kind, name)` is independent. |
 | Apply re-using a tombstoned (deleted) name | **Allowed** — the deleted resource was renamed to a tombstone, freeing the name for a fresh create. |
@@ -653,10 +669,10 @@ typed `Problem` variants *and* transport-level GraphQL errors. The apply outcome
 (`resource_apply_outcome_model.rs`) is the richest example of the union:
 
 - `Success` → operation (`Created`/`Updated`/`Untouched`) + `changes` (each: kind
-  `Generation`/`Metadata`/`Spec`, JSON path, `before`/`after`) + `warnings`.
+  `Generation`/`Headers`/`Spec`, JSON path, `before`/`after`) + `warnings`.
 - `Rejection` → category (`ImmutableFieldChanged`, `BusinessValidationFailed`,
   `ReferencedObjectMissing`, `LifecycleRuleConflict`) + message.
-- `ParseManifest`, `UnsupportedDescriptor`, `BadAccount`, `InvalidMetadata`, `InvalidSpec` →
+- `ParseManifest`, `UnsupportedDescriptor`, `BadAccount`, `InvalidHeaders`, `InvalidSpec` →
   structured validation/parse problems.
 
 These map directly from the domain views in
@@ -886,7 +902,7 @@ stateDiagram-v2
     Pending --> Reconciling: reconcile starts<br/>(observedGeneration < generation)
     Reconciling --> Ready: reconciliation succeeded
     Reconciling --> Failed: reconciliation failed
-    Ready --> Pending: spec/metadata changed<br/>(generation bumps, conditions cleared)
+    Ready --> Pending: spec/headers changed<br/>(generation bumps, conditions cleared)
     Failed --> Pending: re-apply (generation bumps)
     Ready --> [*]: delete
     Failed --> [*]: delete

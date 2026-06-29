@@ -42,7 +42,7 @@ pub trait ApplyResourceUseCase<R: ReconcilableEventSourcedResource>: Send + Sync
 
 pub struct ApplyResourceParams<R: DeclarativeResource> {
     pub uid: Option<ResourceUID>,
-    pub metadata: crate::ResourceMetadataInput,
+    pub headers: crate::ResourceHeadersInput,
     pub spec: R::Spec,
 }
 

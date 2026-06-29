@@ -11,12 +11,12 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{ResourceName, ResourceValidateMetadata};
+use crate::{ResourceName, ResourceValidateHeaders};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ResourceMetadataInput {
+pub struct ResourceHeadersInput {
     pub account: odf::AccountID,
     pub name: ResourceName,
     pub description: Option<String>,
@@ -26,7 +26,7 @@ pub struct ResourceMetadataInput {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl ResourceMetadataInput {
+impl ResourceHeadersInput {
     pub const MAX_NAME_LEN: usize = 128;
     pub const MAX_DESCRIPTION_LEN: usize = 4096;
     pub const MAX_LABELS: usize = 64;
@@ -43,7 +43,7 @@ impl ResourceMetadataInput {
             .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.')
     }
 
-    fn is_valid_metadata_key(key: &str) -> bool {
+    fn is_valid_header_key(key: &str) -> bool {
         if key.is_empty() {
             return false;
         }
@@ -58,34 +58,34 @@ impl ResourceMetadataInput {
         description: Option<String>,
         labels: Vec<(String, String)>,
         annotations: Vec<(String, String)>,
-    ) -> Result<Self, ResourceMetadataValidationError> {
-        let metadata = Self {
+    ) -> Result<Self, ResourceHeadersValidationError> {
+        let headers = Self {
             account,
             name: name.to_ascii_lowercase(),
             description,
-            labels: Self::entries_to_map(labels, ResourceMetadataField::Labels)?,
-            annotations: Self::entries_to_map(annotations, ResourceMetadataField::Annotations)?,
+            labels: Self::entries_to_map(labels, ResourceHeaderField::Labels)?,
+            annotations: Self::entries_to_map(annotations, ResourceHeaderField::Annotations)?,
         };
 
-        metadata.validate()?;
+        headers.validate()?;
 
-        Ok(metadata)
+        Ok(headers)
     }
 
     fn entries_to_map(
         entries: Vec<(String, String)>,
-        field: ResourceMetadataField,
-    ) -> Result<BTreeMap<String, String>, ResourceMetadataValidationError> {
+        field: ResourceHeaderField,
+    ) -> Result<BTreeMap<String, String>, ResourceHeadersValidationError> {
         let mut map = BTreeMap::new();
 
         for (key, value) in entries {
             if map.insert(key.clone(), value).is_some() {
                 return Err(match field {
-                    ResourceMetadataField::Labels => {
-                        ResourceMetadataValidationError::DuplicateLabelKey { key }
+                    ResourceHeaderField::Labels => {
+                        ResourceHeadersValidationError::DuplicateLabelKey { key }
                     }
-                    ResourceMetadataField::Annotations => {
-                        ResourceMetadataValidationError::DuplicateAnnotationKey { key }
+                    ResourceHeaderField::Annotations => {
+                        ResourceHeadersValidationError::DuplicateAnnotationKey { key }
                     }
                 });
             }
@@ -98,30 +98,30 @@ impl ResourceMetadataInput {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Copy)]
-enum ResourceMetadataField {
+enum ResourceHeaderField {
     Labels,
     Annotations,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl ResourceValidateMetadata for ResourceMetadataInput {
-    type ValidationError = ResourceMetadataValidationError;
+impl ResourceValidateHeaders for ResourceHeadersInput {
+    type ValidationError = ResourceHeadersValidationError;
 
     fn validate(&self) -> Result<(), Self::ValidationError> {
         if self.name.is_empty() {
-            return Err(ResourceMetadataValidationError::EmptyName);
+            return Err(ResourceHeadersValidationError::EmptyName);
         }
 
         if self.name.len() > Self::MAX_NAME_LEN {
-            return Err(ResourceMetadataValidationError::NameTooLong {
+            return Err(ResourceHeadersValidationError::NameTooLong {
                 actual: self.name.len(),
                 max: Self::MAX_NAME_LEN,
             });
         }
 
         if !Self::is_valid_name(&self.name) {
-            return Err(ResourceMetadataValidationError::InvalidName {
+            return Err(ResourceHeadersValidationError::InvalidName {
                 name: self.name.clone(),
             });
         }
@@ -129,26 +129,26 @@ impl ResourceValidateMetadata for ResourceMetadataInput {
         if let Some(description) = &self.description
             && description.len() > Self::MAX_DESCRIPTION_LEN
         {
-            return Err(ResourceMetadataValidationError::DescriptionTooLong {
+            return Err(ResourceHeadersValidationError::DescriptionTooLong {
                 actual: description.len(),
                 max: Self::MAX_DESCRIPTION_LEN,
             });
         }
 
         if self.labels.len() > Self::MAX_LABELS {
-            return Err(ResourceMetadataValidationError::TooManyLabels {
+            return Err(ResourceHeadersValidationError::TooManyLabels {
                 actual: self.labels.len(),
                 max: Self::MAX_LABELS,
             });
         }
 
         for (key, value) in &self.labels {
-            if !Self::is_valid_metadata_key(key) {
-                return Err(ResourceMetadataValidationError::InvalidLabelKey { key: key.clone() });
+            if !Self::is_valid_header_key(key) {
+                return Err(ResourceHeadersValidationError::InvalidLabelKey { key: key.clone() });
             }
 
             if value.len() > Self::MAX_LABEL_VALUE_LEN {
-                return Err(ResourceMetadataValidationError::LabelValueTooLong {
+                return Err(ResourceHeadersValidationError::LabelValueTooLong {
                     key: key.clone(),
                     actual: value.len(),
                     max: Self::MAX_LABEL_VALUE_LEN,
@@ -157,21 +157,21 @@ impl ResourceValidateMetadata for ResourceMetadataInput {
         }
 
         if self.annotations.len() > Self::MAX_ANNOTATIONS {
-            return Err(ResourceMetadataValidationError::TooManyAnnotations {
+            return Err(ResourceHeadersValidationError::TooManyAnnotations {
                 actual: self.annotations.len(),
                 max: Self::MAX_ANNOTATIONS,
             });
         }
 
         for (key, value) in &self.annotations {
-            if !Self::is_valid_metadata_key(key) {
-                return Err(ResourceMetadataValidationError::InvalidAnnotationKey {
+            if !Self::is_valid_header_key(key) {
+                return Err(ResourceHeadersValidationError::InvalidAnnotationKey {
                     key: key.clone(),
                 });
             }
 
             if value.len() > Self::MAX_ANNOTATION_VALUE_LEN {
-                return Err(ResourceMetadataValidationError::AnnotationValueTooLong {
+                return Err(ResourceHeadersValidationError::AnnotationValueTooLong {
                     key: key.clone(),
                     actual: value.len(),
                     max: Self::MAX_ANNOTATION_VALUE_LEN,
@@ -186,7 +186,7 @@ impl ResourceValidateMetadata for ResourceMetadataInput {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, thiserror::Error)]
-pub enum ResourceMetadataValidationError {
+pub enum ResourceHeadersValidationError {
     #[error("resource name must not be empty")]
     EmptyName,
 

@@ -12,14 +12,14 @@ use enum_variants::*;
 use event_sourcing::ProjectionEvent;
 use serde::{Deserialize, Serialize};
 
-use crate::{ResourceMetadataInput, ResourceUID};
+use crate::{ResourceHeadersInput, ResourceUID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ReconcilableResourceEvent<TSpec, TSuccess, TFailureDetails> {
     Created(ResourceEventCreated<TSpec>),
-    MetadataUpdated(ResourceEventMetadataUpdated),
+    HeadersUpdated(ResourceEventHeadersUpdated),
     SpecUpdated(ResourceEventSpecUpdated<TSpec>),
     Deleted(ResourceEventDeleted),
     ReconciliationStarted(ResourceEventReconciliationStarted),
@@ -33,15 +33,15 @@ pub enum ReconcilableResourceEvent<TSpec, TSuccess, TFailureDetails> {
 pub struct ResourceEventCreated<TSpec> {
     pub event_time: DateTime<Utc>,
     pub uid: ResourceUID,
-    pub metadata: ResourceMetadataInput,
+    pub headers: ResourceHeadersInput,
     pub spec: TSpec,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ResourceEventMetadataUpdated {
+pub struct ResourceEventHeadersUpdated {
     pub event_time: DateTime<Utc>,
     pub uid: ResourceUID,
-    pub new_metadata: ResourceMetadataInput,
+    pub new_headers: ResourceHeadersInput,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -90,7 +90,7 @@ impl<TSpec, TSuccess, TFailureDetails> ReconcilableResourceEvent<TSpec, TSuccess
     pub fn typename(&self) -> &'static str {
         match self {
             ReconcilableResourceEvent::Created(_) => "Created",
-            ReconcilableResourceEvent::MetadataUpdated(_) => "MetadataUpdated",
+            ReconcilableResourceEvent::HeadersUpdated(_) => "HeadersUpdated",
             ReconcilableResourceEvent::SpecUpdated(_) => "SpecUpdated",
             ReconcilableResourceEvent::Deleted(_) => "Deleted",
             ReconcilableResourceEvent::ReconciliationStarted(_) => "ReconciliationStarted",
@@ -102,7 +102,7 @@ impl<TSpec, TSuccess, TFailureDetails> ReconcilableResourceEvent<TSpec, TSuccess
     pub fn uid(&self) -> &ResourceUID {
         match self {
             ReconcilableResourceEvent::Created(e) => &e.uid,
-            ReconcilableResourceEvent::MetadataUpdated(e) => &e.uid,
+            ReconcilableResourceEvent::HeadersUpdated(e) => &e.uid,
             ReconcilableResourceEvent::SpecUpdated(e) => &e.uid,
             ReconcilableResourceEvent::Deleted(e) => &e.uid,
             ReconcilableResourceEvent::ReconciliationStarted(e) => &e.uid,
@@ -114,7 +114,7 @@ impl<TSpec, TSuccess, TFailureDetails> ReconcilableResourceEvent<TSpec, TSuccess
     pub fn event_time(&self) -> DateTime<Utc> {
         match self {
             ReconcilableResourceEvent::Created(e) => e.event_time,
-            ReconcilableResourceEvent::MetadataUpdated(e) => e.event_time,
+            ReconcilableResourceEvent::HeadersUpdated(e) => e.event_time,
             ReconcilableResourceEvent::SpecUpdated(e) => e.event_time,
             ReconcilableResourceEvent::Deleted(e) => e.event_time,
             ReconcilableResourceEvent::ReconciliationStarted(e) => e.event_time,
@@ -149,7 +149,7 @@ impl_enum_variant!(
 impl_enum_variant!(
     ReconcilableResourceEvent < TSpec,
     TSuccess,
-    TFailureDetails > ::MetadataUpdated(ResourceEventMetadataUpdated)
+    TFailureDetails > ::HeadersUpdated(ResourceEventHeadersUpdated)
 );
 impl_enum_variant!(
     ReconcilableResourceEvent<TSpec, TSuccess, TFailureDetails>::SpecUpdated(

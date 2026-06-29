@@ -14,7 +14,7 @@ use kamu_resources::{
     ApplyResourceRejection,
     ApplyResourceRejectionCategory,
     IntoApplyResourceRejection,
-    ResourceMetadataValidationError,
+    ResourceHeadersValidationError,
 };
 
 use crate::{StorageState, StorageValidationError};
@@ -24,7 +24,7 @@ use crate::{StorageState, StorageValidationError};
 #[derive(Debug, thiserror::Error)]
 pub enum StorageLifecycleError {
     #[error(transparent)]
-    MetadataValidation(#[from] ResourceMetadataValidationError),
+    HeadersValidation(#[from] ResourceHeadersValidationError),
 
     #[error(transparent)]
     SpecValidation(#[from] StorageValidationError),
@@ -42,7 +42,7 @@ kamu_resources::impl_invariant_violation_lifecycle_error!(StorageLifecycleError,
 impl IntoApplyResourceRejection for StorageLifecycleError {
     fn into_apply_resource_rejection(self) -> ApplyResourceLifecycleErrorHandling {
         match self {
-            Self::MetadataValidation(err) => {
+            Self::HeadersValidation(err) => {
                 ApplyResourceLifecycleErrorHandling::Rejected(ApplyResourceRejection {
                     category: ApplyResourceRejectionCategory::BusinessValidationFailed,
                     message: err.to_string(),

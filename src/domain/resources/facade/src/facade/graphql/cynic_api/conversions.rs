@@ -45,32 +45,32 @@ impl TryFrom<fragments::Resource> for domain::ResourceView {
 
     fn try_from(value: fragments::Resource) -> Result<Self, Self::Error> {
         let labels: std::collections::BTreeMap<String, String> =
-            serde_json::from_value(value.metadata.labels).int_err()?;
+            serde_json::from_value(value.headers.labels).int_err()?;
         let annotations: std::collections::BTreeMap<String, String> =
-            serde_json::from_value(value.metadata.annotations).int_err()?;
+            serde_json::from_value(value.headers.annotations).int_err()?;
 
         Ok(Self {
             kind: value.kind.value,
             api_version: value.api_version,
             account: domain::ResourceViewAccount {
-                id: value.metadata.account_id,
+                id: value.headers.account_id,
                 name: value
-                    .metadata
+                    .headers
                     .account_name
                     .map(|name| odf::AccountName::new_unchecked(&name.0)),
             },
-            metadata: domain::ResourceViewMetadata {
-                uid: value.metadata.id,
-                name: value.metadata.name,
-                description: value.metadata.description,
+            headers: domain::ResourceViewHeaders {
+                uid: value.headers.id,
+                name: value.headers.name,
+                description: value.headers.description,
                 labels,
                 annotations,
-                generation: value.metadata.generation.into(),
-                created_at: value.metadata.created_at,
-                updated_at: value.metadata.updated_at,
-                deleted_at: value.metadata.deleted_at,
+                generation: value.headers.generation.into(),
+                created_at: value.headers.created_at,
+                updated_at: value.headers.updated_at,
+                deleted_at: value.headers.deleted_at,
             },
-            last_reconciled_at: value.metadata.last_reconciled_at,
+            last_reconciled_at: value.headers.last_reconciled_at,
             spec: value.spec,
             status: value.status,
         })

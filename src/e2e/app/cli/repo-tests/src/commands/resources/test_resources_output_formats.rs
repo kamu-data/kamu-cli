@@ -46,7 +46,7 @@ pub async fn test_resources_output_formats(ctx: ResourceCtx) {
     );
     assert_eq!(
         get_yaml
-            .pointer("/metadata/name")
+            .pointer("/headers/name")
             .and_then(serde_json::Value::as_str),
         Some(resource_name)
     );

@@ -67,7 +67,7 @@ async fn create_test_resource(
         .await
         .unwrap();
     let result = assert_applied_outcome(&decision, ApplyResourceOutcome::Created);
-    result.metadata.uid
+    result.headers.uid
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -90,8 +90,8 @@ pub async fn test_get_by_name(h: &impl FacadeContractHarness) {
         VARIABLE_SET_API_VERSION,
         "get-name-test",
     );
-    assert_eq!(view.metadata.uid, uid, "uid must match");
-    assert!(view.metadata.deleted_at.is_none());
+    assert_eq!(view.headers.uid, uid, "uid must match");
+    assert!(view.headers.deleted_at.is_none());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -114,7 +114,7 @@ pub async fn test_get_by_uid(h: &impl FacadeContractHarness) {
         VARIABLE_SET_API_VERSION,
         "get-uid-test",
     );
-    assert_eq!(view_by_uid.metadata.uid, uid);
+    assert_eq!(view_by_uid.headers.uid, uid);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

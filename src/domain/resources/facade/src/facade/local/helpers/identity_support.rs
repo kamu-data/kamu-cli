@@ -43,7 +43,7 @@ where
         api_version: snapshot.api_version,
         canonical_kind_name,
         uid: snapshot.uid,
-        name: snapshot.metadata.name,
+        name: snapshot.headers.name,
     })
 }
 

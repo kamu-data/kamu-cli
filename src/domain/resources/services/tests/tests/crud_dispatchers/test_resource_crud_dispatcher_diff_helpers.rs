@@ -12,7 +12,7 @@ use kamu_resources::{
     ApplyManifestChangeKind,
     ResourceView,
     ResourceViewAccount,
-    ResourceViewMetadata,
+    ResourceViewHeaders,
 };
 use kamu_resources_services::make_apply_manifest_changes;
 
@@ -31,7 +31,7 @@ fn make_view(name: &str, value: &str) -> ResourceView {
             id: make_account_id(),
             name: None,
         },
-        metadata: ResourceViewMetadata::simple(Utc::now(), uid, name.to_string()),
+        headers: ResourceViewHeaders::simple(Utc::now(), uid, name.to_string()),
         last_reconciled_at: None,
         spec: serde_json::json!({ "value": value }),
         status: None,
@@ -62,17 +62,17 @@ fn test_make_changes_detects_name_change() {
     let mut after = make_view("b", "same");
 
     // Force shared uid/timestamps so they don't generate noise
-    after.metadata.uid = before.metadata.uid;
-    after.metadata.created_at = before.metadata.created_at;
-    after.metadata.updated_at = before.metadata.updated_at;
-    before.metadata.generation = 1;
-    after.metadata.generation = 1;
+    after.headers.uid = before.headers.uid;
+    after.headers.created_at = before.headers.created_at;
+    after.headers.updated_at = before.headers.updated_at;
+    before.headers.generation = 1;
+    after.headers.generation = 1;
 
     let changes = make_apply_manifest_changes(Some(&before), &after).unwrap();
 
     let name_changes: Vec<_> = changes
         .iter()
-        .filter(|c| c.path == "metadata.name")
+        .filter(|c| c.path == "headers.name")
         .collect();
 
     assert_eq!(name_changes.len(), 1, "expected exactly one name change");
@@ -87,19 +87,19 @@ fn test_make_changes_detects_description_added() {
     let mut before = make_view("res", "val");
     let mut after = make_view("res", "val");
 
-    after.metadata.uid = before.metadata.uid;
-    after.metadata.created_at = before.metadata.created_at;
-    after.metadata.updated_at = before.metadata.updated_at;
-    before.metadata.generation = 1;
-    after.metadata.generation = 1;
-    before.metadata.description = None;
-    after.metadata.description = Some("new desc".to_string());
+    after.headers.uid = before.headers.uid;
+    after.headers.created_at = before.headers.created_at;
+    after.headers.updated_at = before.headers.updated_at;
+    before.headers.generation = 1;
+    after.headers.generation = 1;
+    before.headers.description = None;
+    after.headers.description = Some("new desc".to_string());
 
     let changes = make_apply_manifest_changes(Some(&before), &after).unwrap();
 
     let desc_changes: Vec<_> = changes
         .iter()
-        .filter(|c| c.path == "metadata.description")
+        .filter(|c| c.path == "headers.description")
         .collect();
 
     assert_eq!(desc_changes.len(), 1);
@@ -114,13 +114,13 @@ fn test_make_changes_detects_label_added() {
     let mut before = make_view("res", "val");
     let mut after = make_view("res", "val");
 
-    after.metadata.uid = before.metadata.uid;
-    after.metadata.created_at = before.metadata.created_at;
-    after.metadata.updated_at = before.metadata.updated_at;
-    before.metadata.generation = 1;
-    after.metadata.generation = 1;
+    after.headers.uid = before.headers.uid;
+    after.headers.created_at = before.headers.created_at;
+    after.headers.updated_at = before.headers.updated_at;
+    before.headers.generation = 1;
+    after.headers.generation = 1;
     after
-        .metadata
+        .headers
         .labels
         .insert("env".to_string(), "prod".to_string());
 
@@ -128,7 +128,7 @@ fn test_make_changes_detects_label_added() {
 
     let label_changes: Vec<_> = changes
         .iter()
-        .filter(|c| c.path == "metadata.labels")
+        .filter(|c| c.path == "headers.labels")
         .collect();
     assert_eq!(label_changes.len(), 1, "expected a labels change entry");
 }
@@ -142,11 +142,11 @@ fn test_make_changes_detects_spec_field_change() {
 
     // Normalise shared fields
     let mut after = after;
-    after.metadata.uid = before.metadata.uid;
-    after.metadata.created_at = before.metadata.created_at;
-    after.metadata.updated_at = before.metadata.updated_at;
-    before.metadata.generation = 1;
-    after.metadata.generation = 1;
+    after.headers.uid = before.headers.uid;
+    after.headers.created_at = before.headers.created_at;
+    after.headers.updated_at = before.headers.updated_at;
+    before.headers.generation = 1;
+    after.headers.generation = 1;
 
     let changes = make_apply_manifest_changes(Some(&before), &after).unwrap();
 
@@ -175,7 +175,7 @@ fn test_make_changes_identical_before_after_returns_no_field_changes() {
             id: make_account_id(),
             name: None,
         },
-        metadata: ResourceViewMetadata {
+        headers: ResourceViewHeaders {
             uid,
             name: "res".to_string(),
             description: None,
@@ -202,7 +202,7 @@ fn test_make_changes_identical_before_after_returns_no_field_changes() {
         .collect();
     assert!(
         non_gen.is_empty(),
-        "identical views should produce no metadata/spec changes; got: {non_gen:?}"
+        "identical views should produce no headers/spec changes; got: {non_gen:?}"
     );
 }
 
@@ -224,7 +224,7 @@ fn test_timestamp_precision_normalized_avoids_spurious_diffs() {
             id: account_id.clone(),
             name: None,
         },
-        metadata: ResourceViewMetadata {
+        headers: ResourceViewHeaders {
             uid,
             name: "res".to_string(),
             description: None,
@@ -247,7 +247,7 @@ fn test_timestamp_precision_normalized_avoids_spurious_diffs() {
 
     let ts_changes: Vec<_> = changes
         .iter()
-        .filter(|c| c.path == "metadata.updatedAt")
+        .filter(|c| c.path == "headers.updatedAt")
         .collect();
     assert!(
         ts_changes.is_empty(),

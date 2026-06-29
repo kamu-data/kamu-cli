@@ -18,8 +18,8 @@ use kamu_configuration_inmem::{
 use kamu_core::TenancyConfig;
 use kamu_resources::{
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
+    ResourceHeaders,
     ResourceLifecycleMessage,
-    ResourceMetadata,
     ResourceRepository,
     ResourceSnapshot,
     ResourceUID,
@@ -93,7 +93,7 @@ impl BaseGQLResourceHarness {
                 uid,
                 kind: kind.to_string(),
                 api_version: api_version.to_string(),
-                metadata: ResourceMetadata::simple(Utc::now(), account_id.clone(), name),
+                headers: ResourceHeaders::simple(Utc::now(), account_id.clone(), name),
                 spec,
                 status: None,
                 last_reconciled_at: None,

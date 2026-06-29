@@ -38,7 +38,7 @@ async fn test_reconcile_variable_set_populates_projection_entries() {
         .apply_variable_use_case()
         .apply(ApplyResourceParams {
             uid: None,
-            metadata: BaseResourceServiceHarness::make_metadata_input(account_id, "test-vars"),
+            headers: BaseResourceServiceHarness::make_headers_input(account_id, "test-vars"),
             spec,
         })
         .await
@@ -95,7 +95,7 @@ async fn test_reconcile_variable_set_preserves_entry_id_across_reconciliations()
         .apply_variable_use_case()
         .apply(ApplyResourceParams {
             uid: None,
-            metadata: BaseResourceServiceHarness::make_metadata_input(
+            headers: BaseResourceServiceHarness::make_headers_input(
                 account_id.clone(),
                 "test-vars",
             ),
@@ -138,7 +138,7 @@ async fn test_reconcile_variable_set_preserves_entry_id_across_reconciliations()
         .apply_variable_use_case()
         .apply(ApplyResourceParams {
             uid: Some(uid),
-            metadata: BaseResourceServiceHarness::make_metadata_input(
+            headers: BaseResourceServiceHarness::make_headers_input(
                 account_id.clone(),
                 "test-vars",
             ),

@@ -37,7 +37,7 @@ pub struct ApplyManifestChange {
 #[strum(serialize_all = "snake_case")]
 pub enum ApplyManifestChangeKind {
     Generation,
-    Metadata,
+    Headers,
     Spec,
 }
 

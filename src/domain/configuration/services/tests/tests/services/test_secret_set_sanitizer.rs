@@ -40,7 +40,7 @@ async fn test_apply_secret_set_encrypts_literal_values() {
         .apply_secret_use_case()
         .apply(ApplyResourceParams {
             uid: None,
-            metadata: BaseResourceServiceHarness::make_metadata_input(account_id, "test-secrets"),
+            headers: BaseResourceServiceHarness::make_headers_input(account_id, "test-secrets"),
             spec,
         })
         .await
@@ -105,7 +105,7 @@ async fn test_apply_secret_set_already_encrypted_passes_through_idempotently() {
         .apply_secret_use_case()
         .apply(ApplyResourceParams {
             uid: None,
-            metadata: BaseResourceServiceHarness::make_metadata_input(
+            headers: BaseResourceServiceHarness::make_headers_input(
                 account_id.clone(),
                 "test-secrets",
             ),
@@ -144,7 +144,7 @@ async fn test_apply_secret_set_already_encrypted_passes_through_idempotently() {
         .apply_secret_use_case()
         .apply(ApplyResourceParams {
             uid: Some(uid),
-            metadata: BaseResourceServiceHarness::make_metadata_input(account_id, "test-secrets"),
+            headers: BaseResourceServiceHarness::make_headers_input(account_id, "test-secrets"),
             spec: encrypted_spec.clone(),
         })
         .await
@@ -205,7 +205,7 @@ async fn test_apply_secret_set_same_plaintext_is_untouched() {
         .apply_secret_use_case()
         .apply(ApplyResourceParams {
             uid: None,
-            metadata: BaseResourceServiceHarness::make_metadata_input(
+            headers: BaseResourceServiceHarness::make_headers_input(
                 account_id.clone(),
                 "test-secrets",
             ),
@@ -235,7 +235,7 @@ async fn test_apply_secret_set_same_plaintext_is_untouched() {
         .apply_secret_use_case()
         .apply(ApplyResourceParams {
             uid: Some(uid),
-            metadata: BaseResourceServiceHarness::make_metadata_input(account_id, "test-secrets"),
+            headers: BaseResourceServiceHarness::make_headers_input(account_id, "test-secrets"),
             spec,
         })
         .await

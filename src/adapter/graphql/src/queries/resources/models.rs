@@ -478,19 +478,19 @@ pub struct ResourceRenderManifestResult {
 pub struct Resource {
     pub api_version: String,
     pub kind: ResourceKind,
-    pub metadata: ResourceMetadata,
+    pub headers: ResourceHeaders,
     pub spec: serde_json::Value,
     pub status: Option<serde_json::Value>,
 }
 
 impl From<kamu_resources::ResourceView> for Resource {
     fn from(value: kamu_resources::ResourceView) -> Self {
-        let metadata = ResourceMetadata::from(value.clone());
+        let headers = ResourceHeaders::from(value.clone());
 
         Self {
             api_version: value.api_version,
             kind: ResourceKind::new(value.kind),
-            metadata,
+            headers,
             spec: value.spec,
             status: value.status,
         }
@@ -660,7 +660,7 @@ impl From<BatchGetResourceProblem> for BatchResourceProblem {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject, Debug, Clone)]
-pub struct ResourceMetadata {
+pub struct ResourceHeaders {
     pub id: ResourceID,
     pub account_id: AccountID<'static>,
     pub account_name: Option<AccountName<'static>>,
@@ -675,23 +675,23 @@ pub struct ResourceMetadata {
     pub last_reconciled_at: Option<DateTime<Utc>>,
 }
 
-impl From<kamu_resources::ResourceView> for ResourceMetadata {
+impl From<kamu_resources::ResourceView> for ResourceHeaders {
     fn from(value: kamu_resources::ResourceView) -> Self {
-        let labels = serde_json::to_value(value.metadata.labels).unwrap();
-        let annotations = serde_json::to_value(value.metadata.annotations).unwrap();
+        let labels = serde_json::to_value(value.headers.labels).unwrap();
+        let annotations = serde_json::to_value(value.headers.annotations).unwrap();
 
         Self {
-            id: value.metadata.uid.into(),
+            id: value.headers.uid.into(),
             account_id: value.account.id.into(),
             account_name: value.account.name.map(Into::into),
-            name: value.metadata.name.clone(),
-            description: value.metadata.description,
+            name: value.headers.name.clone(),
+            description: value.headers.description,
             labels,
             annotations,
-            generation: value.metadata.generation.into(),
-            created_at: value.metadata.created_at,
-            updated_at: value.metadata.updated_at,
-            deleted_at: value.metadata.deleted_at,
+            generation: value.headers.generation.into(),
+            created_at: value.headers.created_at,
+            updated_at: value.headers.updated_at,
+            deleted_at: value.headers.deleted_at,
             last_reconciled_at: value.last_reconciled_at,
         }
     }

@@ -18,7 +18,7 @@ use kamu_configuration::{
     VariableSpec,
     VariableValueSpec,
 };
-use kamu_resources::{ResourceMetadata, ResourceRepository, ResourceSnapshot, ResourceUID};
+use kamu_resources::{ResourceHeaders, ResourceRepository, ResourceSnapshot, ResourceUID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -45,7 +45,7 @@ async fn make_variable_set_resource(catalog: &Catalog) -> ResourceUID {
         uid: variable_set_id,
         kind: VariableSetResource::RESOURCE_TYPE.to_string(),
         api_version: VariableSetResource::API_VERSION.to_string(),
-        metadata: ResourceMetadata::simple(
+        headers: ResourceHeaders::simple(
             Utc::now(),
             odf::AccountID::new_seeded_ed25519(b"test-account"),
             variable_set_id.to_string(),

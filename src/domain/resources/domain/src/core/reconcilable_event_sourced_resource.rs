@@ -20,12 +20,12 @@ use crate::{
     ResourceDescriptorProvider,
     ResourceEventCreated,
     ResourceEventDeleted,
-    ResourceEventMetadataUpdated,
+    ResourceEventHeadersUpdated,
     ResourceEventReconciliationFailed,
     ResourceEventReconciliationStarted,
     ResourceEventReconciliationSucceeded,
     ResourceEventSpecUpdated,
-    ResourceMetadataInput,
+    ResourceHeadersInput,
     ResourceReconcileError,
     ResourceSnapshot,
     ResourceStatusLike,
@@ -71,28 +71,28 @@ pub trait ReconcilableEventSourcedResource:
     fn make_created_event(
         now: DateTime<Utc>,
         uid: ResourceUID,
-        metadata: ResourceMetadataInput,
+        headers: ResourceHeadersInput,
         spec: Self::Spec,
     ) -> ReconcilableResourceEvent<Self::Spec, Self::ReconcileSuccess, Self::ReconcileFailureDetails>
     {
         ReconcilableResourceEvent::Created(ResourceEventCreated {
             event_time: now,
             uid,
-            metadata,
+            headers,
             spec,
         })
     }
 
-    fn make_metadata_updated_event(
+    fn make_headers_updated_event(
         &self,
         now: DateTime<Utc>,
-        new_metadata: ResourceMetadataInput,
+        new_headers: ResourceHeadersInput,
     ) -> ReconcilableResourceEvent<Self::Spec, Self::ReconcileSuccess, Self::ReconcileFailureDetails>
     {
-        ReconcilableResourceEvent::MetadataUpdated(ResourceEventMetadataUpdated {
+        ReconcilableResourceEvent::HeadersUpdated(ResourceEventHeadersUpdated {
             event_time: now,
             uid: *self.uid(),
-            new_metadata,
+            new_headers,
         })
     }
 
@@ -134,7 +134,7 @@ pub trait ReconcilableEventSourcedResource:
             *self.uid(),
             Self::DESCRIPTOR.resource_type,
             Self::DESCRIPTOR.api_version,
-            self.metadata().clone(),
+            self.headers().clone(),
             self.spec(),
             self.status(),
             self.aggregate().last_stored_event_id(),
@@ -149,7 +149,7 @@ pub trait ReconcilableEventSourcedResource:
         ReconcilableResourceEvent::ReconciliationStarted(ResourceEventReconciliationStarted {
             event_time: now,
             uid: *self.uid(),
-            generation: self.metadata().generation,
+            generation: self.headers().generation,
         })
     }
 
@@ -188,37 +188,37 @@ pub trait ReconcilableEventSourcedResource:
     fn try_create(
         now: DateTime<Utc>,
         uid: ResourceUID,
-        metadata: ResourceMetadataInput,
+        headers: ResourceHeadersInput,
         spec: Self::Spec,
     ) -> Result<Self, Self::LifecycleError>
     where
         Self: Sized,
         Self::Spec: crate::ResourceValidateSpec,
         Self::LifecycleError: InvariantViolationOf<Self::ResourceState>
-            + From<crate::ResourceMetadataValidationError>
+            + From<crate::ResourceHeadersValidationError>
             + From<<Self::Spec as crate::ResourceValidateSpec>::ValidationError>,
     {
         crate::try_create_reconcilable_resource::<Self, _, _>(
             now,
             uid,
-            metadata,
+            headers,
             spec,
             Aggregate::new,
         )
         .map(Self::from_aggregate)
     }
 
-    fn try_update_metadata(
+    fn try_update_headers(
         &mut self,
         now: DateTime<Utc>,
-        new_metadata: ResourceMetadataInput,
+        new_headers: ResourceHeadersInput,
     ) -> Result<(), Self::LifecycleError>
     where
         Self: Sized,
-        Self::LifecycleError: From<crate::ResourceMetadataValidationError>
-            + InvariantViolationOf<Self::ResourceState>,
+        Self::LifecycleError:
+            From<crate::ResourceHeadersValidationError> + InvariantViolationOf<Self::ResourceState>,
     {
-        crate::try_update_resource_metadata(self, now, new_metadata)
+        crate::try_update_resource_headers(self, now, new_headers)
     }
 
     fn try_update_spec(
@@ -261,26 +261,26 @@ macro_rules! impl_reconcilable_event_sourced_resource {
             fn try_create(
                 now: ::chrono::DateTime<::chrono::Utc>,
                 uid: $crate::ResourceUID,
-                metadata: $crate::ResourceMetadataInput,
+                headers: $crate::ResourceHeadersInput,
                 spec: Self::Spec,
             ) -> Result<Self, Self::LifecycleError> {
                 <$resource as $crate::ReconcilableEventSourcedResource>::try_create(
                     now,
                     uid,
-                    metadata,
+                    headers,
                     spec,
                 )
             }
 
-            fn try_update_metadata(
+            fn try_update_headers(
                 &mut self,
                 now: ::chrono::DateTime<::chrono::Utc>,
-                new_metadata: $crate::ResourceMetadataInput,
+                new_headers: $crate::ResourceHeadersInput,
             ) -> Result<(), Self::LifecycleError> {
-                <$resource as $crate::ReconcilableEventSourcedResource>::try_update_metadata(
+                <$resource as $crate::ReconcilableEventSourcedResource>::try_update_headers(
                     self,
                     now,
-                    new_metadata,
+                    new_headers,
                 )
             }
 

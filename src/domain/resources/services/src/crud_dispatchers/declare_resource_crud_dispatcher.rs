@@ -63,7 +63,7 @@ macro_rules! declare_resource_crud_dispatcher {
                     .apply_resource_use_case
                     .plan(kamu_resources::ApplyResourceParams {
                         uid: request.uid,
-                        metadata: request.metadata,
+                        headers: request.headers,
                         spec,
                     })
                     .await
@@ -95,7 +95,7 @@ macro_rules! declare_resource_crud_dispatcher {
                     .apply_resource_use_case
                     .apply(kamu_resources::ApplyResourceParams {
                         uid: request.uid,
-                        metadata: request.metadata,
+                        headers: request.headers,
                         spec,
                     })
                     .await

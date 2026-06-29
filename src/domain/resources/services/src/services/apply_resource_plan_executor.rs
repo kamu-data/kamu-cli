@@ -27,12 +27,12 @@ use crate::domain::{
     ReconcilableEventSourcedResource,
     ResourceAggregateLoader,
     ResourceDescriptorProvider,
+    ResourceHeadersInput,
+    ResourceHeadersValidationError,
     ResourceLifecycleMessage,
     ResourceLifecycleMessageOutcome,
     ResourceLinterSpec,
     ResourceLoadError,
-    ResourceMetadataInput,
-    ResourceMetadataValidationError,
     ResourcePersistenceError,
     ResourcePersistenceService,
     ResourceStatusLike,
@@ -61,7 +61,7 @@ where
     R::Spec: Serialize + PartialEq + Clone + ResourceValidateSpec + ResourceLinterSpec,
     R::Status: Serialize + ResourceStatusLike,
     R::LifecycleError: InvariantViolationOf<<R as DeclarativeResource>::ResourceState>
-        + From<ResourceMetadataValidationError>
+        + From<ResourceHeadersValidationError>
         + From<<R::Spec as ResourceValidateSpec>::ValidationError>
         + IntoApplyResourceRejection,
 {
@@ -149,14 +149,14 @@ where
         &self,
         plan: PlannedApplyResource<R>,
     ) -> Result<ApplyResourceApplicationDecision<R>, ApplyResourceUseCaseError<R>> {
-        let metadata = plan.resource.metadata();
+        let headers = plan.resource.headers();
 
-        let metadata_input = ResourceMetadataInput {
-            account: metadata.account.clone(),
-            name: metadata.name.clone(),
-            description: metadata.description.clone(),
-            labels: metadata.labels.clone(),
-            annotations: metadata.annotations.clone(),
+        let headers_input = ResourceHeadersInput {
+            account: headers.account.clone(),
+            name: headers.name.clone(),
+            description: headers.description.clone(),
+            labels: headers.labels.clone(),
+            annotations: headers.annotations.clone(),
         };
 
         let planner = ApplyResourcePlanner::<R>::new(
@@ -167,7 +167,7 @@ where
         );
 
         let Some(uid) = planner
-            .resolve_existing_resource_uid(None, &metadata_input)
+            .resolve_existing_resource_uid(None, &headers_input)
             .await?
         else {
             return Err(ApplyResourceUseCaseError::Internal(
@@ -175,9 +175,9 @@ where
                     .int_err()
                     .with_context(format!(
                         "account_id={}, kind='{}', name='{}'",
-                        metadata_input.account,
+                        headers_input.account,
                         R::DESCRIPTOR.resource_type,
-                        metadata_input.name
+                        headers_input.name
                     )),
             ));
         };
@@ -195,7 +195,7 @@ where
             existing_resource,
             ApplyResourceParams {
                 uid: Some(uid),
-                metadata: metadata_input,
+                headers: headers_input,
                 spec: plan.resource.spec().clone(),
             },
             plan.planned_at,
@@ -208,9 +208,9 @@ where
                         .int_err()
                         .with_context(format!(
                             "account_id={}, kind='{}', name='{}'",
-                            plan.resource.metadata().account,
+                            plan.resource.headers().account,
                             R::DESCRIPTOR.resource_type,
-                            plan.resource.metadata().name
+                            plan.resource.headers().name
                         )),
                 )),
                 ApplyResourceAction::Update => self.execute_update(replanned).await,

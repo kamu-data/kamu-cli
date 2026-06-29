@@ -66,7 +66,7 @@ async fn create_resource(
         .await
         .unwrap();
     let result = assert_applied_outcome(&decision, ApplyResourceOutcome::Created);
-    result.metadata.uid
+    result.headers.uid
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -96,13 +96,13 @@ pub async fn test_render_json_by_name(h: &impl FacadeContractHarness) {
         "apiVersion mismatch"
     );
     assert_eq!(
-        parsed["metadata"]["name"], "render-json-name",
+        parsed["headers"]["name"], "render-json-name",
         "name mismatch"
     );
     // UID must NOT appear in rendered manifests (render → apply round-trip
     // contract)
     assert!(
-        parsed["metadata"]["uid"].is_null(),
+        parsed["headers"]["uid"].is_null(),
         "rendered manifest must not include uid"
     );
 }
@@ -131,9 +131,9 @@ pub async fn test_render_yaml_by_uid(h: &impl FacadeContractHarness) {
     let parsed = serde_json::to_value(yaml).unwrap();
     assert_eq!(parsed["kind"], VARIABLE_SET_KIND);
     assert_eq!(parsed["apiVersion"], VARIABLE_SET_API_VERSION);
-    assert_eq!(parsed["metadata"]["name"], "render-yaml-uid");
+    assert_eq!(parsed["headers"]["name"], "render-yaml-uid");
     assert!(
-        parsed["metadata"]["uid"].is_null(),
+        parsed["headers"]["uid"].is_null(),
         "rendered manifest must not include uid"
     );
 }

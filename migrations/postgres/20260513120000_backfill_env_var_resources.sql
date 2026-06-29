@@ -256,7 +256,7 @@ ins_created AS (
         jsonb_build_object('Created', jsonb_build_object(
             'event_time', r.created_at,
             'uid',         r.resource_uid::text,
-            'metadata',    jsonb_build_object(
+            'headers',    jsonb_build_object(
                                'account',     r.account_id,
                                'name',        r.resource_name,
                                'description', NULL,
@@ -326,7 +326,7 @@ ins_created AS (
         jsonb_build_object('Created', jsonb_build_object(
             'event_time', r.created_at,
             'uid',         r.resource_uid::text,
-            'metadata',    jsonb_build_object(
+            'headers',    jsonb_build_object(
                                'account',     r.account_id,
                                'name',        r.resource_name,
                                'description', NULL,

@@ -34,7 +34,7 @@ pub fn make_resource_params(
 ) -> ApplyResourceParams<TestResource> {
     ApplyResourceParams {
         uid: None,
-        metadata: BaseResourceServiceHarness::make_metadata_input(account_id, name),
+        headers: BaseResourceServiceHarness::make_headers_input(account_id, name),
         spec: TestResourceSpec {
             value: name.to_string(),
         },
@@ -55,12 +55,12 @@ pub fn make_fresh_aggregate(
 ) -> (ResourceUID, crate::tests::utils::TestResource) {
     use crate::tests::utils::TestResourceSpec;
     let uid = make_uid();
-    let metadata = BaseResourceServiceHarness::make_metadata_input(account_id, name);
+    let headers = BaseResourceServiceHarness::make_headers_input(account_id, name);
     let spec = TestResourceSpec {
         value: name.to_string(),
     };
     let agg =
-        crate::tests::utils::TestResource::try_create(Utc::now(), uid, metadata, spec).unwrap();
+        crate::tests::utils::TestResource::try_create(Utc::now(), uid, headers, spec).unwrap();
     (uid, agg)
 }
 
@@ -73,7 +73,7 @@ pub fn make_created_event(uid: ResourceUID, name: &str, value: &str) -> TestEven
     TestEvent::Created(ResourceEventCreated {
         event_time: Utc::now(),
         uid,
-        metadata: BaseResourceServiceHarness::make_metadata_input(account_id, name),
+        headers: BaseResourceServiceHarness::make_headers_input(account_id, name),
         spec: TestResourceSpec {
             value: value.to_string(),
         },

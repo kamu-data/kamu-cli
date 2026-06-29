@@ -19,7 +19,7 @@ use kamu_resources::{
     ApplyResourceUseCase,
     ApplyResourceUseCaseError,
     ResourceAggregateLoader,
-    ResourceMetadata,
+    ResourceHeaders,
     ResourceSnapshot,
     ResourceUID,
     TypedResourceQueryService,
@@ -166,7 +166,7 @@ async fn test_plan_type_mismatch_rejects() {
             uid,
             kind: "OtherKind".to_string(),
             api_version: "other.dev/v1".to_string(),
-            metadata: ResourceMetadata::simple(Utc::now(), account_id.clone(), "res_a".to_string()),
+            headers: ResourceHeaders::simple(Utc::now(), account_id.clone(), "res_a".to_string()),
             spec: serde_json::json!({}),
             status: None,
             last_reconciled_at: None,
@@ -254,7 +254,7 @@ impl ApplyResourcePlannerHarness {
     ) -> ApplyResourceParams<TestResource> {
         ApplyResourceParams {
             uid,
-            metadata: BaseResourceServiceHarness::make_metadata_input(account_id, name),
+            headers: BaseResourceServiceHarness::make_headers_input(account_id, name),
             spec: TestResourceSpec {
                 value: value.into(),
             },

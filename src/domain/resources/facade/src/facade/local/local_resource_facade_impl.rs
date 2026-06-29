@@ -388,14 +388,14 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .dispatcher
             .plan_apply(ResourceCrudDispatcherApplyRequest {
                 uid: prepared.uid,
-                metadata: prepared.metadata,
+                headers: prepared.header,
                 spec: prepared.spec,
             })
             .await?;
 
         Ok(match plan {
             ApplyManifestPlanningDecision::Planned(mut plan) => {
-                plan.warnings.splice(0..0, prepared.metadata_warnings);
+                plan.warnings.splice(0..0, prepared.header_warnings);
                 plan.resource.account = ResourceViewAccount {
                     id: prepared.target_account.id,
                     name: Some(prepared.target_account.name),
@@ -419,14 +419,14 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .dispatcher
             .apply(ResourceCrudDispatcherApplyRequest {
                 uid: prepared.uid,
-                metadata: prepared.metadata,
+                headers: prepared.header,
                 spec: prepared.spec,
             })
             .await?;
 
         Ok(match result {
             ApplyManifestApplicationDecision::Applied(mut result) => {
-                result.warnings.splice(0..0, prepared.metadata_warnings);
+                result.warnings.splice(0..0, prepared.header_warnings);
                 result.resource.account = ResourceViewAccount {
                     id: prepared.target_account.id,
                     name: Some(prepared.target_account.name),
@@ -747,7 +747,7 @@ impl LocalResourceFacadeImpl {
                             id: target_account.id.clone(),
                             name: Some(target_account.name.clone()),
                         },
-                        metadata: ResourceViewMetadata::from_owned(uid, snapshot.metadata),
+                        headers: ResourceViewHeaders::from_owned(uid, snapshot.headers),
                         last_reconciled_at: snapshot.last_reconciled_at,
                         spec: snapshot.spec,
                         status: snapshot.status,
@@ -868,7 +868,7 @@ impl LocalResourceFacadeImpl {
             return Ok(None);
         };
 
-        if snapshot.metadata.account != *account_id {
+        if snapshot.headers.account != *account_id {
             return Ok(None);
         }
 
@@ -954,7 +954,7 @@ impl LocalResourceFacadeImpl {
 
         let target_account = self
             .resource_account_resolver
-            .resolve_target_account(manifest.metadata.account.as_ref())
+            .resolve_target_account(manifest.headers.account.as_ref())
             .await?;
 
         let dispatcher = get_resource_crud_dispatcher::<ApplyManifestError>(
@@ -963,22 +963,22 @@ impl LocalResourceFacadeImpl {
             &manifest.api_version,
         )?;
 
-        let metadata = make_metadata_input(&manifest, &target_account)?;
-        let metadata_warnings = collect_manifest_metadata_warnings(&manifest);
+        let headers = make_headers_input(&manifest, &target_account)?;
+        let header_warnings = collect_manifest_header_warnings(&manifest);
 
         self.ensure_manifest_uid_is_accessible(
             &manifest.kind,
             &manifest.api_version,
             &target_account.id,
-            manifest.metadata.uid,
+            manifest.headers.uid,
         )
         .await?;
 
         Ok(PreparedApplyManifest {
             dispatcher,
-            uid: manifest.metadata.uid,
-            metadata,
-            metadata_warnings,
+            uid: manifest.headers.uid,
+            header: headers,
+            header_warnings,
             target_account,
             spec: manifest.spec,
         })
@@ -1003,8 +1003,8 @@ impl LocalResourceFacadeImpl {
 struct PreparedApplyManifest {
     dispatcher: Arc<dyn ResourceCrudDispatcher>,
     uid: Option<ResourceUID>,
-    metadata: ResourceMetadataInput,
-    metadata_warnings: Vec<ResourceWarning>,
+    header: ResourceHeadersInput,
+    header_warnings: Vec<ResourceWarning>,
     target_account: ResolvedAccount,
     spec: serde_json::Value,
 }

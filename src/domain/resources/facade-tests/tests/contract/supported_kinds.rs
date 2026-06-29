@@ -271,7 +271,7 @@ pub async fn test_unsupported_kind_rejected_consistently(h: &impl FacadeContract
 
     // apply_manifest — UnsupportedDescriptor
     let bad_manifest = format!(
-        r#"{{"apiVersion":"v1","kind":"{bad_kind}","metadata":{{"name":"x"}},"spec":{{}}}}"#
+        r#"{{"apiVersion":"v1","kind":"{bad_kind}","headers":{{"name":"x"}},"spec":{{}}}}"#
     );
     let apply_result = facade
         .apply_manifest(kamu_resources_facade::ApplyManifestRequest {

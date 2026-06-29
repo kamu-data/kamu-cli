@@ -48,11 +48,11 @@ async fn test_create_resource_persists_snapshot_and_events() {
     let loaded = harness.aggregate_loader().load(&uid).await.unwrap();
     assert_eq!(*loaded.uid(), uid);
     assert_eq!(loaded.spec().value, "res-a");
-    assert_eq!(loaded.metadata().name.as_str(), "res-a");
+    assert_eq!(loaded.headers().name.as_str(), "res-a");
 
     let snapshot = harness.find_snapshot(&uid).await;
     assert_eq!(snapshot.uid, uid);
-    assert_eq!(snapshot.metadata.name.as_str(), "res-a");
+    assert_eq!(snapshot.headers.name.as_str(), "res-a");
     pretty_assertions::assert_eq!(snapshot.spec, serde_json::json!({ "value": "res-a" }));
     assert!(
         snapshot.last_event_id.is_some(),
@@ -128,7 +128,7 @@ async fn test_delete_resource_marks_deleted() {
 
     let reloaded = harness.aggregate_loader().load(&uid).await.unwrap();
     assert!(
-        reloaded.metadata().deleted_at.is_some(),
+        reloaded.headers().deleted_at.is_some(),
         "expected deleted_at to be set after deletion"
     );
 
@@ -168,7 +168,7 @@ async fn test_delete_many_resources_batch() {
     for uid in [&uid_a, &uid_b, &uid_c] {
         let reloaded = harness.aggregate_loader().load(uid).await.unwrap();
         assert!(
-            reloaded.metadata().deleted_at.is_some(),
+            reloaded.headers().deleted_at.is_some(),
             "expected deleted_at set in aggregate for {uid:?}"
         );
 

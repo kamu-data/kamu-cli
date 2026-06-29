@@ -264,7 +264,7 @@ pub async fn test_plan_rejects_schema_invalid_manifest(h: &impl FacadeContractHa
     let bad_manifest = serde_json::json!({
         "apiVersion": VARIABLE_SET_API_VERSION,
         "kind": VARIABLE_SET_KIND,
-        "metadata": {"name": "schema-invalid-vars"}
+        "headers": {"name": "schema-invalid-vars"}
         // no "spec"
     })
     .to_string();
@@ -281,9 +281,9 @@ pub async fn test_plan_rejects_schema_invalid_manifest(h: &impl FacadeContractHa
             result,
             Err(ApplyManifestError::ParseManifest(_)
                 | ApplyManifestError::InvalidSpec(_)
-                | ApplyManifestError::InvalidMetadata(_))
+                | ApplyManifestError::InvalidHeaders(_))
         ),
-        "schema-invalid manifest must fail with parse/spec/metadata error, got: {result:?}"
+        "schema-invalid manifest must fail with parse/spec/headers error, got: {result:?}"
     );
 
     // No resource should have been persisted
@@ -326,7 +326,7 @@ pub async fn test_apply_rejects_business_invalid_spec(h: &impl FacadeContractHar
     let empty_vars = serde_json::json!({
         "apiVersion": VARIABLE_SET_API_VERSION,
         "kind": VARIABLE_SET_KIND,
-        "metadata": {"name": "biz-invalid-vars"},
+        "headers": {"name": "biz-invalid-vars"},
         "spec": {"variables": {}}
     })
     .to_string();
@@ -407,9 +407,9 @@ pub async fn test_apply_create_json(h: &impl FacadeContractHarness) {
 
     let view = assert_applied_outcome(&decision, ApplyResourceOutcome::Created);
     assert_resource_view_fields(view, VARIABLE_SET_KIND, VARIABLE_SET_API_VERSION, "alpha");
-    assert_eq!(view.metadata.generation, 1, "initial generation must be 1");
+    assert_eq!(view.headers.generation, 1, "initial generation must be 1");
 
-    let uid = view.metadata.uid;
+    let uid = view.headers.uid;
 
     // Verify resource is readable via get
     let fetched = facade
@@ -419,7 +419,7 @@ pub async fn test_apply_create_json(h: &impl FacadeContractHarness) {
         )
         .await
         .unwrap();
-    assert_eq!(fetched.metadata.uid, uid, "uid must match after apply");
+    assert_eq!(fetched.headers.uid, uid, "uid must match after apply");
     assert_resource_view_fields(
         &fetched,
         VARIABLE_SET_KIND,
@@ -452,7 +452,7 @@ pub async fn test_apply_create_yaml(h: &impl FacadeContractHarness) {
         VARIABLE_SET_API_VERSION,
         "yaml-vars",
     );
-    assert_eq!(view.metadata.generation, 1, "initial generation must be 1");
+    assert_eq!(view.headers.generation, 1, "initial generation must be 1");
 
     // Semantic equivalence: same resource via get, just like after JSON apply
     let fetched = facade
@@ -462,7 +462,7 @@ pub async fn test_apply_create_yaml(h: &impl FacadeContractHarness) {
         )
         .await
         .unwrap();
-    assert_eq!(fetched.metadata.uid, view.metadata.uid);
+    assert_eq!(fetched.headers.uid, view.headers.uid);
     assert_resource_view_fields(
         &fetched,
         VARIABLE_SET_KIND,
@@ -489,7 +489,7 @@ pub async fn test_apply_update(h: &impl FacadeContractHarness) {
         .await
         .unwrap();
     let created = assert_applied_outcome(&create_decision, ApplyResourceOutcome::Created);
-    let original_uid = created.metadata.uid;
+    let original_uid = created.headers.uid;
 
     // Update spec
     let update_manifest = variable_set_manifest_json("upd-vars", None, &[("A", "1"), ("B", "2")]);
@@ -504,15 +504,15 @@ pub async fn test_apply_update(h: &impl FacadeContractHarness) {
 
     // uid preserved
     assert_eq!(
-        updated.metadata.uid, original_uid,
+        updated.headers.uid, original_uid,
         "uid must be preserved on update"
     );
     assert_eq!(
-        updated.metadata.name, "upd-vars",
+        updated.headers.name, "upd-vars",
         "name must be preserved on update"
     );
     assert!(
-        updated.metadata.updated_at >= created.metadata.updated_at,
+        updated.headers.updated_at >= created.headers.updated_at,
         "updated_at must not be earlier after update"
     );
 
@@ -524,7 +524,7 @@ pub async fn test_apply_update(h: &impl FacadeContractHarness) {
         )
         .await
         .unwrap();
-    assert_eq!(fetched.metadata.uid, original_uid);
+    assert_eq!(fetched.headers.uid, original_uid);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -545,8 +545,8 @@ pub async fn test_apply_idempotent(h: &impl FacadeContractHarness) {
         .await
         .unwrap();
     let first = assert_applied_outcome(&first_decision, ApplyResourceOutcome::Created);
-    let uid = first.metadata.uid;
-    let generation = first.metadata.generation;
+    let uid = first.headers.uid;
+    let generation = first.headers.generation;
 
     // Second apply with identical manifest
     let second_decision = facade
@@ -559,11 +559,11 @@ pub async fn test_apply_idempotent(h: &impl FacadeContractHarness) {
     let second = assert_applied_outcome(&second_decision, ApplyResourceOutcome::Untouched);
 
     assert_eq!(
-        second.metadata.uid, uid,
+        second.headers.uid, uid,
         "uid must be preserved on no-op apply"
     );
     assert_eq!(
-        second.metadata.generation, generation,
+        second.headers.generation, generation,
         "generation must not change on no-op apply"
     );
 }
@@ -571,7 +571,7 @@ pub async fn test_apply_idempotent(h: &impl FacadeContractHarness) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // RF-024 (deferred): apply rejects immutable field change.
-// Requires a resource kind with at least one immutable spec or metadata field
+// Requires a resource kind with at least one immutable spec or headers field
 // that the facade contract forbids changing after creation. No current resource
 // kind (VariableSet, SecretSet) has such a field. Add once a suitable kind
 // exists.
@@ -580,11 +580,11 @@ pub async fn test_apply_idempotent(h: &impl FacadeContractHarness) {
 
 // RF-026
 contract_test!(
-    apply_rejects_duplicate_metadata_key,
-    super::test_apply_rejects_duplicate_metadata_key
+    apply_rejects_duplicate_header_key,
+    super::test_apply_rejects_duplicate_header_key
 );
 
-pub async fn test_apply_rejects_duplicate_metadata_key(h: &impl FacadeContractHarness) {
+pub async fn test_apply_rejects_duplicate_header_key(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
     // YAML: serde_yaml visits both duplicate key occurrences so the custom
@@ -594,7 +594,7 @@ pub async fn test_apply_rejects_duplicate_metadata_key(h: &impl FacadeContractHa
         r#"
         apiVersion: "kamu.dev/v1alpha1"
         kind: VariableSet
-        metadata:
+        headers:
           name: dup-label-yaml
           labels:
             env: prod
@@ -627,7 +627,7 @@ pub async fn test_apply_rejects_duplicate_metadata_key(h: &impl FacadeContractHa
         r#"{
             "apiVersion": "kamu.dev/v1alpha1",
             "kind": "VariableSet",
-            "metadata": {
+            "headers": {
                 "name": "dup-label-json",
                 "labels": {"env": "prod", "env": "staging"}
             },
@@ -652,22 +652,22 @@ pub async fn test_apply_rejects_duplicate_metadata_key(h: &impl FacadeContractHa
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// RF-143 / apply error taxonomy — InvalidMetadata
-// Empty resource name fails metadata validation before the use case runs.
-// Both local and remote facades must return Err(InvalidMetadata(_)) with the
+// RF-143 / apply error taxonomy — InvalidHeaders
+// Empty resource name fails headers validation before the use case runs.
+// Both local and remote facades must return Err(InvalidHeaders(_)) with the
 // same variant identity (not demoted to Internal on the remote path).
 contract_test!(
-    apply_rejects_invalid_metadata,
-    super::test_apply_rejects_invalid_metadata
+    apply_rejects_invalid_headers,
+    super::test_apply_rejects_invalid_headers
 );
 
-pub async fn test_apply_rejects_invalid_metadata(h: &impl FacadeContractHarness) {
+pub async fn test_apply_rejects_invalid_headers(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
     let empty_name_manifest = serde_json::json!({
         "apiVersion": VARIABLE_SET_API_VERSION,
         "kind": VARIABLE_SET_KIND,
-        "metadata": {"name": ""},
+        "headers": {"name": ""},
         "spec": {"variables": {"K": {"value": "v"}}}
     })
     .to_string();
@@ -679,8 +679,8 @@ pub async fn test_apply_rejects_invalid_metadata(h: &impl FacadeContractHarness)
         })
         .await;
     assert!(
-        matches!(plan_result, Err(ApplyManifestError::InvalidMetadata(_))),
-        "plan with empty name must return Err(InvalidMetadata), got: {plan_result:?}"
+        matches!(plan_result, Err(ApplyManifestError::InvalidHeaders(_))),
+        "plan with empty name must return Err(InvalidHeaders), got: {plan_result:?}"
     );
 
     let apply_result = facade
@@ -690,8 +690,8 @@ pub async fn test_apply_rejects_invalid_metadata(h: &impl FacadeContractHarness)
         })
         .await;
     assert!(
-        matches!(apply_result, Err(ApplyManifestError::InvalidMetadata(_))),
-        "apply with empty name must return Err(InvalidMetadata), got: {apply_result:?}"
+        matches!(apply_result, Err(ApplyManifestError::InvalidHeaders(_))),
+        "apply with empty name must return Err(InvalidHeaders), got: {apply_result:?}"
     );
 }
 
@@ -717,7 +717,7 @@ pub async fn test_apply_invalid_spec_carries_kind_and_api_version(h: &impl Facad
     let malformed_spec = serde_json::json!({
         "apiVersion": VARIABLE_SET_API_VERSION,
         "kind": VARIABLE_SET_KIND,
-        "metadata": {"name": "spec-kind-check"},
+        "headers": {"name": "spec-kind-check"},
         "spec": {"variables": "not-an-object"}
     })
     .to_string();

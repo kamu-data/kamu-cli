@@ -23,7 +23,7 @@ use kamu_configuration::{
     VariableValueSpec,
 };
 use kamu_datasets::{DatasetEntry, DatasetEntryRepository};
-use kamu_resources::{ResourceMetadata, ResourceRepository, ResourceSnapshot, ResourceUID};
+use kamu_resources::{ResourceHeaders, ResourceRepository, ResourceSnapshot, ResourceUID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -207,7 +207,7 @@ async fn create_resource(
             uid: resource_uid,
             kind: VariableSetResource::RESOURCE_TYPE.to_string(),
             api_version: VariableSetResource::API_VERSION.to_string(),
-            metadata: ResourceMetadata::simple(
+            headers: ResourceHeaders::simple(
                 Utc::now(),
                 account.id.clone(),
                 resource_uid.to_string(),

@@ -188,7 +188,7 @@ impl ResourceUseCaseBaseHarness {
     pub async fn apply_and_get_uid(&self, account_id: odf::AccountID, name: &str) -> ResourceUID {
         let params = ApplyResourceParams {
             uid: None,
-            metadata: BaseResourceServiceHarness::make_metadata_input(account_id, name),
+            headers: BaseResourceServiceHarness::make_headers_input(account_id, name),
             spec: TestResourceSpec {
                 value: name.to_string(),
             },

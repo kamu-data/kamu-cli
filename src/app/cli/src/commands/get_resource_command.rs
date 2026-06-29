@@ -113,7 +113,7 @@ impl GetResourceCommand {
     ) -> Result<String, CLIError> {
         #[derive(serde::Serialize)]
         #[serde(rename_all = "camelCase")]
-        struct RenderedResourceViewMetadata<'a> {
+        struct RenderedResourceViewHeaders<'a> {
             uid: &'a kamu_resources::ResourceUID,
             account: &'a kamu_resources::ResourceViewAccount,
             name: &'a str,
@@ -126,19 +126,19 @@ impl GetResourceCommand {
             deleted_at: &'a Option<DateTime<Utc>>,
         }
 
-        impl<'a> RenderedResourceViewMetadata<'a> {
+        impl<'a> RenderedResourceViewHeaders<'a> {
             fn new(resource: &'a kamu_resources::ResourceView) -> Self {
                 Self {
-                    uid: &resource.metadata.uid,
+                    uid: &resource.headers.uid,
                     account: &resource.account,
-                    name: &resource.metadata.name,
-                    description: &resource.metadata.description,
-                    labels: &resource.metadata.labels,
-                    annotations: &resource.metadata.annotations,
-                    generation: resource.metadata.generation,
-                    created_at: &resource.metadata.created_at,
-                    updated_at: &resource.metadata.updated_at,
-                    deleted_at: &resource.metadata.deleted_at,
+                    name: &resource.headers.name,
+                    description: &resource.headers.description,
+                    labels: &resource.headers.labels,
+                    annotations: &resource.headers.annotations,
+                    generation: resource.headers.generation,
+                    created_at: &resource.headers.created_at,
+                    updated_at: &resource.headers.updated_at,
+                    deleted_at: &resource.headers.deleted_at,
                 }
             }
         }
@@ -148,7 +148,7 @@ impl GetResourceCommand {
             #[serde(rename = "apiVersion")]
             api_version: &'a str,
             kind: &'a str,
-            metadata: RenderedResourceViewMetadata<'a>,
+            headers: RenderedResourceViewHeaders<'a>,
             #[serde(rename = "lastReconciledAt")]
             last_reconciled_at: &'a Option<DateTime<Utc>>,
             spec: &'a serde_json::Value,
@@ -160,7 +160,7 @@ impl GetResourceCommand {
             #[serde(rename = "apiVersion")]
             api_version: &'a str,
             kind: &'a str,
-            metadata: RenderedResourceViewMetadata<'a>,
+            headers: RenderedResourceViewHeaders<'a>,
             #[serde(rename = "lastReconciledAt")]
             last_reconciled_at: &'a Option<DateTime<Utc>>,
             spec: serde_yaml::Value,
@@ -172,7 +172,7 @@ impl GetResourceCommand {
                 serde_json::to_string_pretty(&RenderedResourceViewJson {
                     api_version: &resource.api_version,
                     kind: &resource.kind,
-                    metadata: RenderedResourceViewMetadata::new(resource),
+                    headers: RenderedResourceViewHeaders::new(resource),
                     last_reconciled_at: &resource.last_reconciled_at,
                     spec: &resource.spec,
                     status: resource.status.as_ref(),
@@ -184,7 +184,7 @@ impl GetResourceCommand {
                 serde_yaml::to_string(&RenderedResourceViewYaml {
                     api_version: &resource.api_version,
                     kind: &resource.kind,
-                    metadata: RenderedResourceViewMetadata::new(resource),
+                    headers: RenderedResourceViewHeaders::new(resource),
                     last_reconciled_at: &resource.last_reconciled_at,
                     spec: common::json_to_yaml_value(&resource.spec),
                     status: resource.status.as_ref().map(common::json_to_yaml_value),

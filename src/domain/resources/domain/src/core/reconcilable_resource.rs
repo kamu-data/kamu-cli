@@ -24,7 +24,7 @@ pub trait ReconcilableResource: DeclarativeResource {
 
         self.status()
             .resource_status()
-            .needs_reconciliation(self.metadata().generation)
+            .needs_reconciliation(self.headers().generation)
     }
 
     fn reconcile_failure_details(error: &Self::ReconcileError) -> Self::ReconcileFailureDetails;
@@ -32,16 +32,16 @@ pub trait ReconcilableResource: DeclarativeResource {
     fn try_create(
         now: DateTime<Utc>,
         uid: crate::ResourceUID,
-        metadata: crate::ResourceMetadataInput,
+        headers: crate::ResourceHeadersInput,
         spec: Self::Spec,
     ) -> Result<Self, Self::LifecycleError>
     where
         Self: Sized;
 
-    fn try_update_metadata(
+    fn try_update_headers(
         &mut self,
         now: DateTime<Utc>,
-        new_metadata: crate::ResourceMetadataInput,
+        new_headers: crate::ResourceHeadersInput,
     ) -> Result<(), Self::LifecycleError>;
 
     fn try_update_spec(

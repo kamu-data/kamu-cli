@@ -9,7 +9,7 @@
 
 use internal_error::InternalError;
 
-use crate::{ResourceMetadata, ResourceSnapshot, ResourceStatusLike, ResourceUID};
+use crate::{ResourceHeaders, ResourceSnapshot, ResourceStatusLike, ResourceUID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -26,8 +26,8 @@ pub trait DeclarativeResource:
         self.as_ref().uid()
     }
 
-    fn metadata(&self) -> &ResourceMetadata {
-        self.as_ref().metadata()
+    fn headers(&self) -> &ResourceHeaders {
+        self.as_ref().headers()
     }
 
     fn spec(&self) -> &Self::Spec {
@@ -47,8 +47,8 @@ pub trait DeclarativeResourceState: Send + Sync + std::fmt::Debug {
 
     fn uid(&self) -> &ResourceUID;
 
-    fn metadata(&self) -> &ResourceMetadata;
-    fn metadata_mut(&mut self) -> &mut ResourceMetadata;
+    fn headers(&self) -> &ResourceHeaders;
+    fn headers_mut(&mut self) -> &mut ResourceHeaders;
 
     fn spec(&self) -> &Self::Spec;
     fn spec_mut(&mut self) -> &mut Self::Spec;
@@ -56,7 +56,7 @@ pub trait DeclarativeResourceState: Send + Sync + std::fmt::Debug {
     fn status(&self) -> &Self::Status;
     fn status_mut(&mut self) -> &mut Self::Status;
 
-    fn into_parts(self) -> (ResourceUID, ResourceMetadata, Self::Spec, Self::Status)
+    fn into_parts(self) -> (ResourceUID, ResourceHeaders, Self::Spec, Self::Status)
     where
         Self: Sized;
 }

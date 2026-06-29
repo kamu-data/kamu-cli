@@ -105,7 +105,7 @@ async fn test_reconcile_success_transitions_resource_to_ready() {
     let status = snapshot.basic_status().unwrap();
 
     assert_eq!(status.phase, ResourcePhase::Ready);
-    assert_eq!(snapshot.metadata.generation, 1);
+    assert_eq!(snapshot.headers.generation, 1);
     assert_eq!(status.observed_generation, 1);
     assert!(
         snapshot.last_reconciled_at.is_some(),
@@ -153,7 +153,7 @@ async fn test_reconcile_failure_transitions_resource_to_failed() {
     let status = snapshot.basic_status().unwrap();
 
     assert_eq!(status.phase, ResourcePhase::Failed);
-    assert_eq!(snapshot.metadata.generation, 1);
+    assert_eq!(snapshot.headers.generation, 1);
     assert_eq!(status.observed_generation, 1);
 
     BaseResourceServiceHarness::assert_condition(
@@ -197,7 +197,7 @@ async fn test_reconcile_invokes_reconciler_exactly_once() {
 #[test_log::test(tokio::test)]
 async fn test_already_reconciled_is_no_op_and_reconciler_is_not_called() {
     // Generation does not change on a no-op: needs_reconciliation() is false
-    // because observed_generation == metadata.generation. execute() returns
+    // because observed_generation == headers.generation. execute() returns
     // Ok(()) immediately without invoking the reconciler.
     let counter = Arc::new(AtomicU32::new(0));
     let harness = ReconcileTestHarness::dispatching(TestResourceReconcilerProvider::Counting(
@@ -231,7 +231,7 @@ async fn test_already_reconciled_is_no_op_and_reconciler_is_not_called() {
     let snapshot = harness.get_snapshot_by_uid(&uid).await.unwrap();
     let status = snapshot.basic_status().unwrap();
     assert_eq!(status.phase, ResourcePhase::Ready);
-    assert_eq!(snapshot.metadata.generation, 1);
+    assert_eq!(snapshot.headers.generation, 1);
     assert_eq!(status.observed_generation, 1);
 }
 
@@ -303,7 +303,7 @@ async fn test_finish_phase_after_concurrent_spec_update_returns_error() {
     // Concurrent apply: adds a SpecUpdated event and bumps generation to 2
     let update_params = ApplyResourceParams {
         uid: Some(uid),
-        metadata: BaseResourceServiceHarness::make_metadata_input(account_id, "res-a"),
+        headers: BaseResourceServiceHarness::make_headers_input(account_id, "res-a"),
         spec: crate::tests::utils::TestResourceSpec {
             value: "updated-concurrently".to_string(),
         },
@@ -331,7 +331,7 @@ async fn test_finish_phase_after_concurrent_spec_update_returns_error() {
     // The concurrent apply wins: generation=2, phase=Pending
     let snapshot = harness.get_snapshot_by_uid(&uid).await.unwrap();
     let status = snapshot.basic_status().unwrap();
-    assert_eq!(snapshot.metadata.generation, 2);
+    assert_eq!(snapshot.headers.generation, 2);
     assert_eq!(status.phase, ResourcePhase::Pending);
 }
 

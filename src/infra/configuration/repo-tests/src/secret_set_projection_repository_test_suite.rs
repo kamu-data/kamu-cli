@@ -18,7 +18,7 @@ use kamu_configuration::{
     SecretSpec,
     SecretValueSpec,
 };
-use kamu_resources::{ResourceMetadata, ResourceRepository, ResourceSnapshot, ResourceUID};
+use kamu_resources::{ResourceHeaders, ResourceRepository, ResourceSnapshot, ResourceUID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -44,7 +44,7 @@ async fn make_secret_set_resource(catalog: &Catalog) -> ResourceUID {
         uid: secret_set_id,
         kind: SecretSetResource::RESOURCE_TYPE.to_string(),
         api_version: SecretSetResource::API_VERSION.to_string(),
-        metadata: ResourceMetadata::simple(
+        headers: ResourceHeaders::simple(
             Utc::now(),
             odf::AccountID::new_seeded_ed25519(b"test-account"),
             secret_set_id.to_string(),

@@ -223,7 +223,7 @@ fn map_apply_resource_error(
         )),
         E::UnsupportedDescriptor(e) => Ok(ResourceApplyOutcome::UnsupportedDescriptor(e.into())),
         E::BadAccount(e) => map_bad_account_problem(e).map(ResourceApplyOutcome::BadAccount),
-        E::InvalidMetadata(e) => Ok(ResourceApplyOutcome::InvalidMetadata(e.into())),
+        E::InvalidHeaders(e) => Ok(ResourceApplyOutcome::InvalidHeader(e.into())),
         E::InvalidSpec(e) => Ok(ResourceApplyOutcome::InvalidSpec(e.into())),
         E::UIDNotFound(error) => Err(GqlError::gql(error.to_string())),
         E::TypeMismatch(error) => Err(GqlError::gql(error.to_string())),

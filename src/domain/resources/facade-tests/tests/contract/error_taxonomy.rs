@@ -99,7 +99,7 @@ async fn create_resource(
         .await
         .unwrap();
     assert_applied_outcome(&decision, ApplyResourceOutcome::Created)
-        .metadata
+        .headers
         .uid
 }
 
@@ -486,7 +486,7 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
             manifest: serde_json::json!({
                 "apiVersion": VARIABLE_SET_API_VERSION,
                 "kind": VARIABLE_SET_KIND,
-                "metadata": {
+                "headers": {
                     "name": "bad-acct-apply",
                     "account": { "name": "unknown-resource-contract-account" }
                 },
@@ -534,7 +534,7 @@ pub async fn test_apply_rejection_taxonomy(h: &impl FacadeContractHarness) {
         r#"{
             "apiVersion": "kamu.dev/v1alpha1",
             "kind": "VariableSet",
-            "metadata": {"name": "tax-biz-invalid"},
+            "headers": {"name": "tax-biz-invalid"},
             "spec": {"variables": {}}
         }"#
     )

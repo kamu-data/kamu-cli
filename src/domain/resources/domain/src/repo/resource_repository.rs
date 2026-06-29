@@ -235,7 +235,7 @@ impl ResourceSnapshotRow {
             uid: ResourceUID::new(self.uid),
             kind: self.resource_kind,
             api_version: self.api_version,
-            metadata: crate::ResourceMetadata {
+            headers: crate::ResourceHeaders {
                 account: self.account_id,
                 name: self.resource_name,
                 description: self.description,

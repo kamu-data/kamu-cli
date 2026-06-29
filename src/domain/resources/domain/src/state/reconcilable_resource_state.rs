@@ -108,12 +108,12 @@ where
         &self.inner.uid
     }
 
-    fn metadata(&self) -> &crate::ResourceMetadata {
-        &self.inner.metadata
+    fn headers(&self) -> &crate::ResourceHeaders {
+        &self.inner.headers
     }
 
-    fn metadata_mut(&mut self) -> &mut crate::ResourceMetadata {
-        &mut self.inner.metadata
+    fn headers_mut(&mut self) -> &mut crate::ResourceHeaders {
+        &mut self.inner.headers
     }
 
     fn spec(&self) -> &Self::Spec {
@@ -136,7 +136,7 @@ where
         self,
     ) -> (
         ResourceUID,
-        crate::ResourceMetadata,
+        crate::ResourceHeaders,
         Self::Spec,
         Self::Status,
     ) {

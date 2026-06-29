@@ -9,7 +9,7 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub trait ResourceValidateMetadata {
+pub trait ResourceValidateHeaders {
     type ValidationError;
 
     fn validate(&self) -> Result<(), Self::ValidationError>;

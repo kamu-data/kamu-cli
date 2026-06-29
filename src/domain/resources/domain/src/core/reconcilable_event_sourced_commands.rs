@@ -13,10 +13,10 @@ use event_sourcing::{Projection, ProjectionError};
 use crate::{
     ReconcilableEventSourcedResource,
     ReconcilableResourceEvent,
-    ResourceMetadataInput,
-    ResourceMetadataValidationError,
+    ResourceHeadersInput,
+    ResourceHeadersValidationError,
     ResourcePhase,
-    ResourceValidateMetadata,
+    ResourceValidateHeaders,
     ResourceValidateSpec,
 };
 
@@ -44,7 +44,7 @@ macro_rules! impl_invariant_violation_lifecycle_error {
 pub fn try_create_reconcilable_resource<R, TCreated, TCreate>(
     now: DateTime<Utc>,
     uid: crate::ResourceUID,
-    metadata: ResourceMetadataInput,
+    headers: ResourceHeadersInput,
     spec: R::Spec,
     create: TCreate,
 ) -> Result<TCreated, R::LifecycleError>
@@ -52,40 +52,40 @@ where
     R: ReconcilableEventSourcedResource,
     R::Spec: ResourceValidateSpec,
     R::LifecycleError: InvariantViolationOf<R::ResourceState>
-        + From<ResourceMetadataValidationError>
+        + From<ResourceHeadersValidationError>
         + From<<R::Spec as ResourceValidateSpec>::ValidationError>,
     TCreate: FnOnce(
         crate::ResourceUID,
         ReconcilableResourceEvent<R::Spec, R::ReconcileSuccess, R::ReconcileFailureDetails>,
     ) -> Result<TCreated, ProjectionError<R::ResourceState>>,
 {
-    metadata.validate()?;
+    headers.validate()?;
     spec.validate()?;
 
-    let event = R::make_created_event(now, uid, metadata, spec);
+    let event = R::make_created_event(now, uid, headers, spec);
 
     create(uid, event).map_err(R::LifecycleError::invariant_violation)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn try_update_resource_metadata<R>(
+pub fn try_update_resource_headers<R>(
     resource: &mut R,
     now: DateTime<Utc>,
-    new_metadata: ResourceMetadataInput,
+    new_headers: ResourceHeadersInput,
 ) -> Result<(), R::LifecycleError>
 where
     R: ReconcilableEventSourcedResource,
     R::LifecycleError:
-        From<ResourceMetadataValidationError> + InvariantViolationOf<R::ResourceState>,
+        From<ResourceHeadersValidationError> + InvariantViolationOf<R::ResourceState>,
 {
-    new_metadata.validate()?;
+    new_headers.validate()?;
 
-    if resource.metadata().is_equivalent_to(&new_metadata) {
+    if resource.headers().is_equivalent_to(&new_headers) {
         return Ok(());
     }
 
-    let event = resource.make_metadata_updated_event(now, new_metadata);
+    let event = resource.make_headers_updated_event(now, new_headers);
     resource.apply_event(event)
 }
 
@@ -108,7 +108,7 @@ where
         return Ok(());
     }
 
-    let event = resource.make_spec_updated_event(now, new_spec, resource.metadata().generation + 1);
+    let event = resource.make_spec_updated_event(now, new_spec, resource.headers().generation + 1);
     resource.apply_event(event)
 }
 
@@ -123,7 +123,7 @@ where
     R: ReconcilableEventSourcedResource,
     R::LifecycleError: InvariantViolationOf<R::ResourceState>,
 {
-    if resource.metadata().deleted_at.is_some() {
+    if resource.headers().deleted_at.is_some() {
         return Ok(());
     }
 
@@ -166,10 +166,10 @@ where
     R: ReconcilableEventSourcedResource,
     R::LifecycleError: InvariantViolationOf<R::ResourceState>,
 {
-    if resource.metadata().generation != expected_generation {
+    if resource.headers().generation != expected_generation {
         tracing::warn!(
             expected_generation,
-            current_generation = resource.metadata().generation,
+            current_generation = resource.headers().generation,
             "Skipping stale reconciliation success"
         );
         return Ok(());
@@ -191,10 +191,10 @@ where
     R: ReconcilableEventSourcedResource,
     R::LifecycleError: InvariantViolationOf<R::ResourceState>,
 {
-    if resource.metadata().generation != expected_generation {
+    if resource.headers().generation != expected_generation {
         tracing::warn!(
             expected_generation,
-            current_generation = resource.metadata().generation,
+            current_generation = resource.headers().generation,
             "Skipping stale reconciliation failure"
         );
         return Ok(());

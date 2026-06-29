@@ -14,7 +14,7 @@ use event_sourcing::EventID;
 use futures::TryStreamExt;
 use kamu_resources::{
     CreateResourceError,
-    ResourceMetadata,
+    ResourceHeaders,
     ResourcePhaseCounts,
     ResourceRawEventQuery,
     ResourceRepository,
@@ -32,7 +32,7 @@ fn make_test_snapshot(account_id: odf::AccountID, kind: &str, name: &str) -> Res
         uid: ResourceUID::new(uuid::Uuid::new_v4()),
         kind: kind.to_string(),
         api_version: "v1".to_string(),
-        metadata: ResourceMetadata::simple(Utc::now(), account_id, name.to_ascii_lowercase()),
+        headers: ResourceHeaders::simple(Utc::now(), account_id, name.to_ascii_lowercase()),
         spec: serde_json::json!({"key": "value"}),
         status: None,
         last_reconciled_at: None,
@@ -89,7 +89,7 @@ pub async fn test_create_and_find_resource(catalog: &Catalog) {
     let found = found.unwrap();
     assert_eq!(found.uid, uid);
     assert_eq!(found.kind, "TestKind");
-    assert_eq!(found.metadata.name, "my-resource");
+    assert_eq!(found.headers.name, "my-resource");
     assert_eq!(found.last_event_id, None);
 
     // find by name
@@ -501,11 +501,11 @@ pub async fn test_update_resource(catalog: &Catalog) {
 
     let event_id = EventID::new(1);
     let updated = ResourceSnapshot {
-        metadata: ResourceMetadata {
+        headers: ResourceHeaders {
             description: Some("Updated description".to_string()),
             generation: 1,
             updated_at: Utc::now(),
-            ..snapshot.metadata.clone()
+            ..snapshot.headers.clone()
         },
         last_event_id: Some(event_id),
         ..snapshot.clone()
@@ -519,10 +519,10 @@ pub async fn test_update_resource(catalog: &Catalog) {
         .unwrap()
         .unwrap();
     assert_eq!(
-        found.metadata.description,
+        found.headers.description,
         Some("Updated description".to_string())
     );
-    assert_eq!(found.metadata.generation, 1);
+    assert_eq!(found.headers.generation, 1);
     assert_eq!(found.last_event_id, Some(event_id));
 }
 
@@ -559,9 +559,9 @@ pub async fn test_update_resource_optimistic_locking(catalog: &Catalog) {
     // First update: sets last_event_id to Some(1)
     let event_id_v1 = EventID::new(1);
     let v1 = ResourceSnapshot {
-        metadata: ResourceMetadata {
+        headers: ResourceHeaders {
             generation: 1,
-            ..snapshot.metadata.clone()
+            ..snapshot.headers.clone()
         },
         last_event_id: Some(event_id_v1),
         ..snapshot.clone()
@@ -571,9 +571,9 @@ pub async fn test_update_resource_optimistic_locking(catalog: &Catalog) {
     // Second update using correct expected_last_event_id
     let event_id_v2 = EventID::new(2);
     let v2 = ResourceSnapshot {
-        metadata: ResourceMetadata {
+        headers: ResourceHeaders {
             generation: 2,
-            ..v1.metadata.clone()
+            ..v1.headers.clone()
         },
         last_event_id: Some(event_id_v2),
         ..v1.clone()
@@ -606,21 +606,21 @@ pub async fn test_update_resources(catalog: &Catalog) {
     let second_event_id = EventID::new(2);
 
     let updated_first = ResourceSnapshot {
-        metadata: ResourceMetadata {
+        headers: ResourceHeaders {
             description: Some("Updated first".to_string()),
             generation: 1,
             updated_at: Utc::now(),
-            ..first.metadata.clone()
+            ..first.headers.clone()
         },
         last_event_id: Some(first_event_id),
         ..first.clone()
     };
     let updated_second = ResourceSnapshot {
-        metadata: ResourceMetadata {
+        headers: ResourceHeaders {
             description: Some("Updated second".to_string()),
             generation: 1,
             updated_at: Utc::now(),
-            ..second.metadata.clone()
+            ..second.headers.clone()
         },
         last_event_id: Some(second_event_id),
         ..second.clone()
@@ -651,17 +651,17 @@ pub async fn test_update_resources(catalog: &Catalog) {
         .unwrap();
 
     assert_eq!(
-        found_first.metadata.description,
-        updated_first.metadata.description
+        found_first.headers.description,
+        updated_first.headers.description
     );
-    assert_eq!(found_first.metadata.generation, 1);
+    assert_eq!(found_first.headers.generation, 1);
     assert_eq!(found_first.last_event_id, Some(first_event_id));
 
     assert_eq!(
-        found_second.metadata.description,
-        updated_second.metadata.description
+        found_second.headers.description,
+        updated_second.headers.description
     );
-    assert_eq!(found_second.metadata.generation, 1);
+    assert_eq!(found_second.headers.generation, 1);
     assert_eq!(found_second.last_event_id, Some(second_event_id));
 }
 
@@ -680,17 +680,17 @@ pub async fn test_update_resources_wrong_event_id_fails(catalog: &Catalog) {
     repo.create_resource(&second).await.unwrap();
 
     let updated_first = ResourceSnapshot {
-        metadata: ResourceMetadata {
+        headers: ResourceHeaders {
             generation: 1,
-            ..first.metadata.clone()
+            ..first.headers.clone()
         },
         last_event_id: Some(EventID::new(1)),
         ..first.clone()
     };
     let updated_second = ResourceSnapshot {
-        metadata: ResourceMetadata {
+        headers: ResourceHeaders {
             generation: 1,
-            ..second.metadata.clone()
+            ..second.headers.clone()
         },
         last_event_id: Some(EventID::new(2)),
         ..second.clone()
@@ -726,9 +726,9 @@ pub async fn test_update_resources_wrong_event_id_fails(catalog: &Catalog) {
         .unwrap();
 
     assert_eq!(found_first.last_event_id, None);
-    assert_eq!(found_first.metadata.generation, 0);
+    assert_eq!(found_first.headers.generation, 0);
     assert_eq!(found_second.last_event_id, None);
-    assert_eq!(found_second.metadata.generation, 0);
+    assert_eq!(found_second.headers.generation, 0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -920,9 +920,9 @@ pub async fn test_summarize_resources(catalog: &Catalog) {
     deleted.status = Some(serde_json::json!({ "phase": "Reconciling" }));
     repo.create_resource(&deleted).await.unwrap();
     let deleted = ResourceSnapshot {
-        metadata: ResourceMetadata {
+        headers: ResourceHeaders {
             deleted_at: Some(Utc::now()),
-            ..deleted.metadata
+            ..deleted.headers
         },
         ..deleted
     };
@@ -991,9 +991,9 @@ pub async fn test_find_deleted_resource_not_returned(catalog: &Catalog) {
 
     // Mark as deleted
     let deleted = ResourceSnapshot {
-        metadata: ResourceMetadata {
+        headers: ResourceHeaders {
             deleted_at: Some(Utc::now()),
-            ..snapshot.metadata.clone()
+            ..snapshot.headers.clone()
         },
         ..snapshot
     };

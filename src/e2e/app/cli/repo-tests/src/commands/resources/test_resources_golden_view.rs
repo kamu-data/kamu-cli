@@ -13,7 +13,7 @@ use crate::resources::{ResourceCtx, fixtures};
 // Scenario: golden full-document `get -o json` shape (drift guard)
 //
 // This is the *one* place that pins the entire `get -o json` document shape:
-// the `RenderedResourceViewJson` envelope, the metadata block, and the
+// the `RenderedResourceViewJson` envelope, the headers block, and the
 // reconciler `status` block. Its job is to fail loudly when the render struct
 // in `get_resource_command.rs` changes shape, so a human decides whether the
 // change was intended.
@@ -25,7 +25,7 @@ use crate::resources::{ResourceCtx, fixtures};
 // its brittleness at every call site.
 //
 // Volatile fields are stripped from the actual document before comparison:
-//   - metadata.uid / account / generation / createdAt / updatedAt — per-run /
+//   - headers.uid / account / generation / createdAt / updatedAt — per-run /
 //     per-context
 //   - lastReconciledAt — reconciler timestamp
 //   - status.conditions[*].lastTransitionTime — reconciler timestamps
@@ -71,7 +71,7 @@ fn expected_variable_set(name: &str, message_value: &str) -> serde_json::Value {
     serde_json::json!({
         "apiVersion": fixtures::RESOURCE_API_VERSION,
         "kind": fixtures::VARIABLE_SET_KIND,
-        "metadata": {
+        "headers": {
             "name": name,
             "description": fixtures::DEFAULT_DESCRIPTION,
             "labels": {},
@@ -96,7 +96,7 @@ fn expected_secret_set_without_secrets(name: &str) -> serde_json::Value {
     serde_json::json!({
         "apiVersion": fixtures::RESOURCE_API_VERSION,
         "kind": fixtures::SECRET_SET_KIND,
-        "metadata": {
+        "headers": {
             "name": name,
             "description": fixtures::DEFAULT_DESCRIPTION,
             "labels": {},
@@ -126,9 +126,9 @@ fn expected_secret_set_without_secrets(name: &str) -> serde_json::Value {
 /// Remove fields that vary per run or per context so the remaining document is
 /// deterministic and can be asserted verbatim.
 fn strip_volatile(mut doc: serde_json::Value) -> serde_json::Value {
-    if let Some(meta) = doc.get_mut("metadata").and_then(|m| m.as_object_mut()) {
+    if let Some(headers) = doc.get_mut("headers").and_then(|m| m.as_object_mut()) {
         for k in ["uid", "account", "generation", "createdAt", "updatedAt"] {
-            meta.remove(k);
+            headers.remove(k);
         }
     }
     if let Some(obj) = doc.as_object_mut() {

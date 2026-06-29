@@ -18,9 +18,9 @@ use kamu_resources::{
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
     ResourceConditionStatus,
     ResourceConditionType,
+    ResourceHeadersInput,
     ResourceLifecycleMessage,
     ResourceLifecycleMessageOutcome,
-    ResourceMetadataInput,
     ResourceRepository,
     ResourceSnapshot,
     ResourceStatus,
@@ -128,8 +128,8 @@ impl BaseResourceServiceHarness {
         self.generic_query_svc.allocate_uid().await.unwrap()
     }
 
-    pub fn make_metadata_input(account_id: odf::AccountID, name: &str) -> ResourceMetadataInput {
-        ResourceMetadataInput {
+    pub fn make_headers_input(account_id: odf::AccountID, name: &str) -> ResourceHeadersInput {
+        ResourceHeadersInput {
             account: account_id,
             name: name.to_string(),
             description: None,

@@ -19,7 +19,7 @@ use crate::{
     ApplyResourceUseCaseError,
     DeleteResourcesError,
     GetResourceByUidError,
-    ResourceMetadataInput,
+    ResourceHeadersInput,
     ResourceSummaryView,
     ResourceTypeMismatchError,
     ResourceUID,
@@ -62,7 +62,7 @@ pub trait ResourceCrudDispatcher: Send + Sync {
 #[derive(Debug, Clone)]
 pub struct ResourceCrudDispatcherApplyRequest {
     pub uid: Option<ResourceUID>,
-    pub metadata: ResourceMetadataInput,
+    pub headers: ResourceHeadersInput,
     pub spec: serde_json::Value,
 }
 

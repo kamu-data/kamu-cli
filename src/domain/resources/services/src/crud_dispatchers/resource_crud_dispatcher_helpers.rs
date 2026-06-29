@@ -30,7 +30,7 @@ use kamu_resources::{
     ResourceSummaryView,
     ResourceView,
     ResourceViewAccount,
-    ResourceViewMetadata,
+    ResourceViewHeaders,
 };
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -139,16 +139,16 @@ where
     R::Spec: Serialize,
     R::Status: Serialize + ResourceStatusLike,
 {
-    let (uid, metadata, spec, status) = state.into_parts();
+    let (uid, headers, spec, status) = state.into_parts();
 
     Ok(ResourceView {
         kind: R::DESCRIPTOR.resource_type.to_string(),
         api_version: R::DESCRIPTOR.api_version.to_string(),
         account: ResourceViewAccount {
-            id: metadata.account.clone(),
+            id: headers.account.clone(),
             name: None,
         },
-        metadata: ResourceViewMetadata::from_owned(uid, metadata),
+        headers: ResourceViewHeaders::from_owned(uid, headers),
         last_reconciled_at: status.resource_status().last_reconciled_at(),
         spec: serde_json::to_value(spec).int_err()?,
         status: Some(serde_json::to_value(status).int_err()?),
@@ -166,11 +166,11 @@ where
         kind: R::DESCRIPTOR.resource_type.to_string(),
         api_version: R::DESCRIPTOR.api_version.to_string(),
         uid: *state.uid(),
-        name: state.metadata().name.clone(),
-        description: state.metadata().description.clone(),
-        generation: state.metadata().generation,
-        created_at: state.metadata().created_at,
-        updated_at: state.metadata().updated_at,
+        name: state.headers().name.clone(),
+        description: state.headers().description.clone(),
+        generation: state.headers().generation,
+        created_at: state.headers().created_at,
+        updated_at: state.headers().updated_at,
         status: Some(resource_status_summary_view(state.status())),
         list_values: R::list_column_values(state),
     }
@@ -183,7 +183,7 @@ pub(crate) fn resource_snapshot_to_view(snapshot: ResourceSnapshot) -> ResourceV
         uid,
         kind,
         api_version,
-        metadata,
+        headers,
         spec,
         status,
         last_reconciled_at,
@@ -194,10 +194,10 @@ pub(crate) fn resource_snapshot_to_view(snapshot: ResourceSnapshot) -> ResourceV
         kind,
         api_version,
         account: ResourceViewAccount {
-            id: metadata.account.clone(),
+            id: headers.account.clone(),
             name: None,
         },
-        metadata: ResourceViewMetadata::from_owned(uid, metadata),
+        headers: ResourceViewHeaders::from_owned(uid, headers),
         last_reconciled_at,
         spec,
         status,

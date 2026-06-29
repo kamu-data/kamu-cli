@@ -25,8 +25,8 @@ use kamu_configuration_inmem::{
 use kamu_configuration_services::ConfigurationResourceLifecycleMessageConsumer;
 use kamu_resources::{
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
+    ResourceHeaders,
     ResourceLifecycleMessage,
-    ResourceMetadata,
     ResourceSnapshot,
     ResourceUID,
 };
@@ -515,13 +515,13 @@ fn make_snapshot(
 ) -> ResourceSnapshot {
     let (_, account_id) = odf::AccountID::new_generated_ed25519();
     let now = Utc::now();
-    let mut meta = ResourceMetadata::simple(now, account_id, "test-res");
-    meta.generation = generation;
+    let mut headers = ResourceHeaders::simple(now, account_id, "test-res");
+    headers.generation = generation;
     ResourceSnapshot {
         uid,
         kind: kind.to_string(),
         api_version: api_version.to_string(),
-        metadata: meta,
+        headers,
         spec: serde_json::json!({}),
         status: None,
         last_reconciled_at: None,

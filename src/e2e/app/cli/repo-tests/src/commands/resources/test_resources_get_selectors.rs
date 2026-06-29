@@ -22,7 +22,7 @@ use crate::resources::{ResourceCtx, fixtures};
 // resolves to (the sorted `(kind, name)` identity set) and — where it adds
 // signal — the one spec field the form is about. It deliberately does NOT
 // compare whole `get -o json` documents: the reconciler status block, volatile
-// metadata (uid/account/timestamps), and encrypted secret blobs are not what
+// headers (uid/account/timestamps), and encrypted secret blobs are not what
 // the selector grammar is about, and re-asserting them here would break these
 // tests on unrelated changes. The full document shape is pinned once, per kind,
 // by `test_resources_golden_view`.

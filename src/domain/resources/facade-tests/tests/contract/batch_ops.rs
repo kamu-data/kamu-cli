@@ -48,7 +48,7 @@ async fn create_resource(
         .await
         .unwrap();
     let result = assert_applied_outcome(&decision, ApplyResourceOutcome::Created);
-    result.metadata.uid
+    result.headers.uid
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -94,7 +94,7 @@ pub async fn test_get_many_all_successes(h: &impl FacadeContractHarness) {
         VARIABLE_SET_API_VERSION,
         "batch-a",
     );
-    assert_eq!(view_a.metadata.uid, uid_a);
+    assert_eq!(view_a.headers.uid, uid_a);
 
     assert_resource_view_fields(
         view_b,
@@ -102,7 +102,7 @@ pub async fn test_get_many_all_successes(h: &impl FacadeContractHarness) {
         VARIABLE_SET_API_VERSION,
         "batch-b",
     );
-    assert_eq!(view_b.metadata.uid, uid_b);
+    assert_eq!(view_b.headers.uid, uid_b);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -185,7 +185,7 @@ pub async fn test_get_many_duplicate_refs(h: &impl FacadeContractHarness) {
     // Both occurrences succeed and both refer to the same resource.
     assert_batch_indexes(&response, &[0, 1], &[]);
     for s in &response.successes {
-        assert_eq!(s.item.metadata.uid, uid, "all dup refs resolve to same uid");
+        assert_eq!(s.item.headers.uid, uid, "all dup refs resolve to same uid");
     }
 }
 

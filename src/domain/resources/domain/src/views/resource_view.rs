@@ -12,7 +12,7 @@ use std::collections::BTreeMap;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::{ResourceMetadata, ResourceName, ResourceUID};
+use crate::{ResourceHeaders, ResourceName, ResourceUID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -32,7 +32,7 @@ pub struct ResourceView {
     pub kind: String,
     pub api_version: String,
     pub account: ResourceViewAccount,
-    pub metadata: ResourceViewMetadata,
+    pub headers: ResourceViewHeaders,
     pub last_reconciled_at: Option<DateTime<Utc>>,
     pub spec: serde_json::Value,
     pub status: Option<serde_json::Value>,
@@ -49,7 +49,7 @@ pub struct ResourceViewAccount {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ResourceViewMetadata {
+pub struct ResourceViewHeaders {
     pub uid: ResourceUID,
     pub name: ResourceName,
     pub description: Option<String>,
@@ -63,7 +63,7 @@ pub struct ResourceViewMetadata {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl ResourceViewMetadata {
+impl ResourceViewHeaders {
     pub fn simple(now: DateTime<Utc>, uid: ResourceUID, name: impl Into<ResourceName>) -> Self {
         Self {
             uid,
@@ -78,17 +78,17 @@ impl ResourceViewMetadata {
         }
     }
 
-    pub fn from_owned(uid: ResourceUID, metadata: ResourceMetadata) -> Self {
+    pub fn from_owned(uid: ResourceUID, headers: ResourceHeaders) -> Self {
         Self {
             uid,
-            name: metadata.name,
-            description: metadata.description,
-            labels: metadata.labels,
-            annotations: metadata.annotations,
-            generation: metadata.generation,
-            created_at: metadata.created_at,
-            updated_at: metadata.updated_at,
-            deleted_at: metadata.deleted_at,
+            name: headers.name,
+            description: headers.description,
+            labels: headers.labels,
+            annotations: headers.annotations,
+            generation: headers.generation,
+            created_at: headers.created_at,
+            updated_at: headers.updated_at,
+            deleted_at: headers.deleted_at,
         }
     }
 }

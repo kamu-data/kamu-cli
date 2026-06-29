@@ -35,9 +35,9 @@ pub fn assert_resource_view_fields(
         view.api_version, expected_api_version,
         "api_version mismatch"
     );
-    assert_eq!(view.metadata.name, expected_name, "name mismatch");
+    assert_eq!(view.headers.name, expected_name, "name mismatch");
     assert!(
-        view.metadata.deleted_at.is_none(),
+        view.headers.deleted_at.is_none(),
         "resource should not be deleted"
     );
 }

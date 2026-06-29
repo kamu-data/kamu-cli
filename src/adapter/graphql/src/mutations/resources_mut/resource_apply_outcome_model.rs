@@ -19,7 +19,7 @@ pub enum ResourceApplyOutcome {
     ParseManifest(ResourceApplyParseManifestProblem),
     UnsupportedDescriptor(ResourceUnsupportedDescriptorProblem),
     BadAccount(ResourceBadAccountProblem),
-    InvalidMetadata(ResourceInvalidMetadataProblem),
+    InvalidHeader(ResourceInvalidHeaderProblem),
     InvalidSpec(ResourceInvalidSpecProblem),
 }
 
@@ -33,15 +33,15 @@ pub struct ResourceApplyParseManifestProblem {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// A metadata field value (e.g. name, label key) failed validation.
+/// A header field value (e.g. name, label key) failed validation.
 #[derive(SimpleObject, Debug, Clone)]
-pub struct ResourceInvalidMetadataProblem {
-    pub code: ResourceMetadataValidationProblemCode,
+pub struct ResourceInvalidHeaderProblem {
+    pub code: ResourceHeaderValidationProblemCode,
     pub message: String,
 }
 
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ResourceMetadataValidationProblemCode {
+pub enum ResourceHeaderValidationProblemCode {
     EmptyName,
     NameTooLong,
     InvalidName,
@@ -56,31 +56,31 @@ pub enum ResourceMetadataValidationProblemCode {
     AnnotationValueTooLong,
 }
 
-impl From<kamu_resources::ResourceMetadataValidationError> for ResourceInvalidMetadataProblem {
-    fn from(value: kamu_resources::ResourceMetadataValidationError) -> Self {
-        kamu_resources_facade::ResourceInvalidMetadataError::from(value).into()
+impl From<kamu_resources::ResourceHeadersValidationError> for ResourceInvalidHeaderProblem {
+    fn from(value: kamu_resources::ResourceHeadersValidationError) -> Self {
+        kamu_resources_facade::ResourceInvalidHeadersError::from(value).into()
     }
 }
 
-impl From<kamu_resources_facade::ResourceInvalidMetadataError> for ResourceInvalidMetadataProblem {
-    fn from(value: kamu_resources_facade::ResourceInvalidMetadataError) -> Self {
-        use kamu_resources_facade::ResourceMetadataValidationProblemCode as C;
+impl From<kamu_resources_facade::ResourceInvalidHeadersError> for ResourceInvalidHeaderProblem {
+    fn from(value: kamu_resources_facade::ResourceInvalidHeadersError) -> Self {
+        use kamu_resources_facade::ResourceHeadersValidationProblemCode as C;
         let code = match value.code {
-            C::EmptyName => ResourceMetadataValidationProblemCode::EmptyName,
-            C::NameTooLong => ResourceMetadataValidationProblemCode::NameTooLong,
-            C::InvalidName => ResourceMetadataValidationProblemCode::InvalidName,
-            C::DescriptionTooLong => ResourceMetadataValidationProblemCode::DescriptionTooLong,
-            C::TooManyLabels => ResourceMetadataValidationProblemCode::TooManyLabels,
-            C::InvalidLabelKey => ResourceMetadataValidationProblemCode::InvalidLabelKey,
-            C::DuplicateLabelKey => ResourceMetadataValidationProblemCode::DuplicateLabelKey,
-            C::LabelValueTooLong => ResourceMetadataValidationProblemCode::LabelValueTooLong,
-            C::TooManyAnnotations => ResourceMetadataValidationProblemCode::TooManyAnnotations,
-            C::InvalidAnnotationKey => ResourceMetadataValidationProblemCode::InvalidAnnotationKey,
+            C::EmptyName => ResourceHeaderValidationProblemCode::EmptyName,
+            C::NameTooLong => ResourceHeaderValidationProblemCode::NameTooLong,
+            C::InvalidName => ResourceHeaderValidationProblemCode::InvalidName,
+            C::DescriptionTooLong => ResourceHeaderValidationProblemCode::DescriptionTooLong,
+            C::TooManyLabels => ResourceHeaderValidationProblemCode::TooManyLabels,
+            C::InvalidLabelKey => ResourceHeaderValidationProblemCode::InvalidLabelKey,
+            C::DuplicateLabelKey => ResourceHeaderValidationProblemCode::DuplicateLabelKey,
+            C::LabelValueTooLong => ResourceHeaderValidationProblemCode::LabelValueTooLong,
+            C::TooManyAnnotations => ResourceHeaderValidationProblemCode::TooManyAnnotations,
+            C::InvalidAnnotationKey => ResourceHeaderValidationProblemCode::InvalidAnnotationKey,
             C::DuplicateAnnotationKey => {
-                ResourceMetadataValidationProblemCode::DuplicateAnnotationKey
+                ResourceHeaderValidationProblemCode::DuplicateAnnotationKey
             }
             C::AnnotationValueTooLong => {
-                ResourceMetadataValidationProblemCode::AnnotationValueTooLong
+                ResourceHeaderValidationProblemCode::AnnotationValueTooLong
             }
         };
         Self {
@@ -193,7 +193,7 @@ impl From<kamu_resources::ApplyManifestChange> for ResourceApplyChange {
 #[graphql(remote = "kamu_resources::ApplyManifestChangeKind")]
 pub enum ResourceApplyChangeKind {
     Generation,
-    Metadata,
+    Headers,
     Spec,
 }
 

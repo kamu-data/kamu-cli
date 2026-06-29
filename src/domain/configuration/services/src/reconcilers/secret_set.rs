@@ -54,8 +54,8 @@ impl Reconciler<SecretSetResource> for SecretSetReconcilerImpl {
         let total = resource.spec().secrets.len();
         let now = self.time_source.now();
         let resource_uid = *resource.uid();
-        let resource_generation = resource.metadata().generation;
-        let account_id = &resource.metadata().account;
+        let resource_generation = resource.headers().generation;
+        let account_id = &resource.headers().account;
 
         let previous_entries_by_key = self
             .load_previous_entries_by_key(&resource_uid, resource_generation)

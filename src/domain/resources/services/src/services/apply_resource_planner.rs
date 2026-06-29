@@ -28,10 +28,10 @@ use crate::domain::{
     ReconcilableResource,
     ResourceAggregateLoader,
     ResourceDescriptorProvider,
+    ResourceHeadersInput,
+    ResourceHeadersValidationError,
     ResourceLinterSpec,
     ResourceLoadError,
-    ResourceMetadataInput,
-    ResourceMetadataValidationError,
     ResourceStatusLike,
     ResourceUID,
     ResourceValidateSpec,
@@ -56,7 +56,7 @@ where
     R::Spec: Serialize + PartialEq + Clone + ResourceValidateSpec + ResourceLinterSpec,
     R::Status: Serialize + ResourceStatusLike,
     R::LifecycleError: InvariantViolationOf<<R as DeclarativeResource>::ResourceState>
-        + From<ResourceMetadataValidationError>
+        + From<ResourceHeadersValidationError>
         + From<<R::Spec as ResourceValidateSpec>::ValidationError>
         + IntoApplyResourceRejection,
 {
@@ -96,7 +96,7 @@ where
         let now = self.time_source.now();
 
         let maybe_existing_uid = self
-            .resolve_existing_resource_uid(params.uid, &params.metadata)
+            .resolve_existing_resource_uid(params.uid, &params.headers)
             .await?;
 
         let Some(uid) = maybe_existing_uid else {
@@ -118,16 +118,16 @@ where
     pub(crate) async fn resolve_existing_resource_uid(
         &self,
         uid: Option<ResourceUID>,
-        metadata: &ResourceMetadataInput,
+        headers: &ResourceHeadersInput,
     ) -> Result<Option<ResourceUID>, ApplyResourceUseCaseError<R>> {
         match uid {
             Some(uid) => Ok(Some(uid)),
             None => self
                 .generic_resource_query_service
                 .find_resource_uid_by_name(
-                    &metadata.account,
+                    &headers.account,
                     R::DESCRIPTOR.resource_type,
-                    &metadata.name,
+                    &headers.name,
                 )
                 .await
                 .map_err(ApplyResourceUseCaseError::Internal),
@@ -156,7 +156,7 @@ where
             .map_err(ApplyResourceUseCaseError::Internal)?;
 
         let resource =
-            match <R as ReconcilableResource>::try_create(now, uid, params.metadata, params.spec) {
+            match <R as ReconcilableResource>::try_create(now, uid, params.headers, params.spec) {
                 Ok(resource) => resource,
                 Err(err) => {
                     return Ok(PlannedApplyResourceDecision::Rejected(
@@ -186,7 +186,7 @@ where
         now: DateTime<Utc>,
     ) -> Result<PlannedApplyResourceDecision<R>, ApplyResourceUseCaseError<R>> {
         if let Err(err) =
-            <R as ReconcilableResource>::try_update_metadata(&mut resource, now, params.metadata)
+            <R as ReconcilableResource>::try_update_headers(&mut resource, now, params.headers)
         {
             return Ok(PlannedApplyResourceDecision::Rejected(
                 Self::map_lifecycle_error(err)?,

@@ -251,7 +251,7 @@ async fn test_apply_create_initial_status_is_pending() {
     let status = snapshot.basic_status().unwrap();
 
     assert_eq!(status.phase, ResourcePhase::Pending);
-    assert_eq!(snapshot.metadata.generation, 1);
+    assert_eq!(snapshot.headers.generation, 1);
     assert_eq!(status.observed_generation, 0);
     assert!(
         snapshot.last_reconciled_at.is_none(),
@@ -293,7 +293,7 @@ async fn test_apply_update_resets_status_to_pending() {
     // Spec update → gen bumped to 2, phase reset to Pending
     let update_params = ApplyResourceParams {
         uid: Some(uid),
-        metadata: BaseResourceServiceHarness::make_metadata_input(account_id, "res-a"),
+        headers: BaseResourceServiceHarness::make_headers_input(account_id, "res-a"),
         spec: TestResourceSpec {
             value: "updated".to_string(),
         },
@@ -309,7 +309,7 @@ async fn test_apply_update_resets_status_to_pending() {
     let status = snapshot.basic_status().unwrap();
 
     assert_eq!(status.phase, ResourcePhase::Pending);
-    assert_eq!(snapshot.metadata.generation, 2);
+    assert_eq!(snapshot.headers.generation, 2);
     // reset_pending_from_spec creates a fresh ResourceStatus, so
     // observed_generation resets to 0 on every spec update —
     // needs_reconciliation() is still true (0 < 2).
@@ -330,7 +330,7 @@ fn make_params(
 ) -> ApplyResourceParams<crate::tests::utils::TestResource> {
     ApplyResourceParams {
         uid: None,
-        metadata: BaseResourceServiceHarness::make_metadata_input(account_id, name),
+        headers: BaseResourceServiceHarness::make_headers_input(account_id, name),
         spec: TestResourceSpec {
             value: value.to_string(),
         },

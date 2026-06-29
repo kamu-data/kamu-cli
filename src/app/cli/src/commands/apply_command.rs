@@ -658,7 +658,7 @@ impl ApplyPrinter<'_> {
     fn render_verbose_resource(resource: &ResourceView) -> Result<String, CLIError> {
         #[derive(serde::Serialize)]
         #[serde(rename_all = "camelCase")]
-        struct RenderedResourceViewMetadata<'a> {
+        struct RenderedResourceViewHeaders<'a> {
             uid: &'a kamu_resources::ResourceUID,
             account: &'a kamu_resources::ResourceViewAccount,
             name: &'a str,
@@ -671,19 +671,19 @@ impl ApplyPrinter<'_> {
             deleted_at: &'a Option<DateTime<Utc>>,
         }
 
-        impl<'a> RenderedResourceViewMetadata<'a> {
+        impl<'a> RenderedResourceViewHeaders<'a> {
             fn new(resource: &'a ResourceView) -> Self {
                 Self {
-                    uid: &resource.metadata.uid,
+                    uid: &resource.headers.uid,
                     account: &resource.account,
-                    name: &resource.metadata.name,
-                    description: &resource.metadata.description,
-                    labels: &resource.metadata.labels,
-                    annotations: &resource.metadata.annotations,
-                    generation: resource.metadata.generation,
-                    created_at: &resource.metadata.created_at,
-                    updated_at: &resource.metadata.updated_at,
-                    deleted_at: &resource.metadata.deleted_at,
+                    name: &resource.headers.name,
+                    description: &resource.headers.description,
+                    labels: &resource.headers.labels,
+                    annotations: &resource.headers.annotations,
+                    generation: resource.headers.generation,
+                    created_at: &resource.headers.created_at,
+                    updated_at: &resource.headers.updated_at,
+                    deleted_at: &resource.headers.deleted_at,
                 }
             }
         }
@@ -693,7 +693,7 @@ impl ApplyPrinter<'_> {
             #[serde(rename = "apiVersion")]
             api_version: &'a str,
             kind: &'a str,
-            metadata: RenderedResourceViewMetadata<'a>,
+            headers: RenderedResourceViewHeaders<'a>,
             #[serde(rename = "lastReconciledAt")]
             last_reconciled_at: &'a Option<DateTime<Utc>>,
             spec: serde_yaml::Value,
@@ -703,7 +703,7 @@ impl ApplyPrinter<'_> {
         serde_yaml::to_string(&RenderedResourceView {
             api_version: &resource.api_version,
             kind: &resource.kind,
-            metadata: RenderedResourceViewMetadata::new(resource),
+            headers: RenderedResourceViewHeaders::new(resource),
             last_reconciled_at: &resource.last_reconciled_at,
             spec: common::json_to_yaml_value(&resource.spec),
             status: resource.status.as_ref().map(common::json_to_yaml_value),
@@ -726,7 +726,7 @@ impl ApplyPrinter<'_> {
 
         format!(
             "{}: {} -> {}/{}",
-            style, source, result.resource.kind, result.resource.metadata.name
+            style, source, result.resource.kind, result.resource.headers.name
         )
     }
 

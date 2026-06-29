@@ -98,7 +98,7 @@ where
             return Err(ResourceUIDNotFoundError(*uid).into());
         };
 
-        if resource_snapshot.metadata.account != account_id {
+        if resource_snapshot.headers.account != account_id {
             return Err(ResourceUIDNotFoundError(*uid).into());
         }
 

@@ -369,7 +369,7 @@ impl From<ApplyManifestError> for CLIError {
             e @ (E::ParseManifest(_)
             | E::UnsupportedDescriptor(_)
             | E::BadAccount(_)
-            | E::InvalidMetadata(_)
+            | E::InvalidHeaders(_)
             | E::InvalidSpec(_)
             | E::UIDNotFound(_)
             | E::TypeMismatch(_)

@@ -13,7 +13,7 @@ use crate::{
     DeclarativeResourceState,
     ReconcilableResourceEvent,
     ReconcilableStateModel,
-    ResourceMetadata,
+    ResourceHeaders,
     ResourceState,
     ResourceStatusLike,
 };
@@ -60,21 +60,21 @@ where
             let pending_status = TModel::StatusProjector::new_pending(&e.spec);
             Ok(ResourceState::new(
                 e.uid,
-                ResourceMetadata::from_input(e.event_time, e.metadata),
+                ResourceHeaders::from_input(e.event_time, e.headers),
                 e.spec,
                 pending_status,
             )
             .into())
         }
 
-        (Some(s), event) if s.metadata().deleted_at.is_some() => {
+        (Some(s), event) if s.headers().deleted_at.is_some() => {
             Err(ProjectionError::new(Some(s), event))
         }
 
-        (Some(mut s), E::MetadataUpdated(e)) => {
+        (Some(mut s), E::HeadersUpdated(e)) => {
             assert_eq!(s.uid(), &e.uid);
 
-            s.metadata_mut().apply_update(e.event_time, e.new_metadata);
+            s.headers_mut().apply_update(e.event_time, e.new_headers);
 
             Ok(s)
         }
@@ -83,8 +83,8 @@ where
             assert_eq!(s.uid(), &e.uid);
 
             *s.spec_mut() = e.new_spec;
-            s.metadata_mut().generation = e.new_generation;
-            s.metadata_mut().updated_at = e.event_time;
+            s.headers_mut().generation = e.new_generation;
+            s.headers_mut().updated_at = e.event_time;
 
             s.status_mut()
                 .resource_status_mut()
@@ -99,9 +99,9 @@ where
         (Some(mut s), E::Deleted(e)) => {
             assert_eq!(s.uid(), &e.uid);
 
-            s.metadata_mut().deleted_at = Some(e.event_time);
-            s.metadata_mut().updated_at = e.event_time;
-            s.metadata_mut().name = e.tombstone_name;
+            s.headers_mut().deleted_at = Some(e.event_time);
+            s.headers_mut().updated_at = e.event_time;
+            s.headers_mut().name = e.tombstone_name;
 
             Ok(s)
         }

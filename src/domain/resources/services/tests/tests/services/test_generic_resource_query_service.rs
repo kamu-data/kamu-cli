@@ -11,7 +11,7 @@ use chrono::Utc;
 use kamu_resources::{
     FindOwnedResourceError,
     FindOwnedSnapshotsOutcome,
-    ResourceMetadata,
+    ResourceHeaders,
     ResourceSnapshot,
     ResourceUID,
 };
@@ -47,7 +47,7 @@ async fn test_find_owned_snapshot_success() {
     assert_eq!(snapshot.uid, uid);
     assert_eq!(snapshot.kind, "TestResource");
     assert_eq!(snapshot.api_version, "test.kamu.dev/v1");
-    assert_eq!(snapshot.metadata.account, account_a);
+    assert_eq!(snapshot.headers.account, account_a);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -412,7 +412,7 @@ impl GenericResourceQueryServiceHarness {
             uid,
             kind: kind.to_string(),
             api_version: api_version.to_string(),
-            metadata: ResourceMetadata::simple(Utc::now(), owner_account_id, name),
+            headers: ResourceHeaders::simple(Utc::now(), owner_account_id, name),
             spec: serde_json::json!({"value": name}),
             status: None,
             last_reconciled_at: None,

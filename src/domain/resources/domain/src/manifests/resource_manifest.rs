@@ -22,7 +22,7 @@ use crate::{ResourceName, ResourceUID};
 pub struct ResourceManifest {
     pub api_version: String,
     pub kind: String,
-    pub metadata: ResourceManifestMetadata,
+    pub headers: ResourceManifestHeaders,
     pub spec: serde_json::Value,
 }
 
@@ -30,7 +30,7 @@ pub struct ResourceManifest {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct ResourceManifestMetadata {
+pub struct ResourceManifestHeaders {
     pub uid: Option<ResourceUID>,
     pub account: Option<ResourceManifestAccount>,
     pub name: ResourceName,
@@ -119,7 +119,7 @@ where
             while let Some((key, value)) = map.next_entry::<String, String>()? {
                 if !seen.insert(key.clone()) {
                     return Err(serde::de::Error::custom(format!(
-                        "duplicate metadata key '{key}'"
+                        "duplicate header key '{key}'"
                     )));
                 }
                 entries.push((key, value));
@@ -138,7 +138,7 @@ where
             while let Some((key, value)) = seq.next_element::<(String, String)>()? {
                 if !seen.insert(key.clone()) {
                     return Err(serde::de::Error::custom(format!(
-                        "duplicate metadata key '{key}'"
+                        "duplicate header key '{key}'"
                     )));
                 }
                 entries.push((key, value));

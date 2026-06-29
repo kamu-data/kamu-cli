@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     PendingStatusFromSpec,
-    ResourceMetadata,
+    ResourceHeaders,
     ResourceStatus,
     ResourceStatusLike,
     ResourceUID,
@@ -28,7 +28,7 @@ pub struct ResourceSnapshot {
     pub uid: ResourceUID,
     pub kind: String,
     pub api_version: String,
-    pub metadata: ResourceMetadata,
+    pub headers: ResourceHeaders,
 
     pub spec: serde_json::Value,
     pub status: Option<serde_json::Value>,
@@ -68,7 +68,7 @@ pub type ResourceSnapshotStream<'a> = std::pin::Pin<
 
 pub fn decode_typed_resource_snapshot<TSpec, TStatus>(
     snapshot: ResourceSnapshot,
-) -> Result<(ResourceUID, ResourceMetadata, TSpec, TStatus), InternalError>
+) -> Result<(ResourceUID, ResourceHeaders, TSpec, TStatus), InternalError>
 where
     TSpec: DeserializeOwned,
     TStatus: DeserializeOwned + PendingStatusFromSpec<TSpec>,
@@ -79,7 +79,7 @@ where
         None => TStatus::pending_from_spec(&spec),
     };
 
-    Ok((snapshot.uid, snapshot.metadata, spec, status))
+    Ok((snapshot.uid, snapshot.headers, spec, status))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -88,7 +88,7 @@ pub fn make_typed_resource_snapshot<TSpec, TStatus>(
     uid: ResourceUID,
     kind: &'static str,
     api_version: &'static str,
-    metadata: ResourceMetadata,
+    headers: ResourceHeaders,
     spec: &TSpec,
     status: &TStatus,
     last_event_id: Option<EventID>,
@@ -105,7 +105,7 @@ where
         uid,
         kind: kind.to_string(),
         api_version: api_version.to_string(),
-        metadata,
+        headers,
         spec,
         status: Some(status_json),
         last_reconciled_at,

@@ -15,7 +15,7 @@ use dill::CatalogBuilder;
 use kamu_resources::{
     ApplyResourceUseCase,
     DeclarativeResourceState,
-    ResourceMetadata,
+    ResourceHeaders,
     ResourceSnapshot,
     ResourceUID,
     TypedResourceQueryError,
@@ -247,7 +247,7 @@ impl TypedResourceQueryServiceHarness {
             uid,
             kind: kind.to_string(),
             api_version: api_version.to_string(),
-            metadata: ResourceMetadata::simple(Utc::now(), owner_account_id, name),
+            headers: ResourceHeaders::simple(Utc::now(), owner_account_id, name),
             spec: serde_json::json!({"value": name}),
             status: None,
             last_reconciled_at: None,

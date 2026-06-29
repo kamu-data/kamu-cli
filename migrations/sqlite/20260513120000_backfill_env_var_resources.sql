@@ -249,7 +249,7 @@ SELECT
     r.created_at,
     'Created',
     '{"Created":{"event_time":"' || r.created_at || '","uid":"' || r.resource_uid
-        || '","metadata":{"account":"' || r.account_id
+        || '","headers":{"account":"' || r.account_id
         || '","name":"' || r.resource_name
         || '","description":null,"labels":{},"annotations":{}},"spec":' || r.spec || '}}'
 FROM resources r
@@ -311,7 +311,7 @@ SELECT
     r.created_at,
     'Created',
     '{"Created":{"event_time":"' || r.created_at || '","uid":"' || r.resource_uid
-        || '","metadata":{"account":"' || r.account_id
+        || '","headers":{"account":"' || r.account_id
         || '","name":"' || r.resource_name
         || '","description":null,"labels":{},"annotations":{}},"spec":' || r.spec || '}}'
 FROM resources r

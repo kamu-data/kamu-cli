@@ -3861,7 +3861,7 @@ type RequestHeader {
 type Resource {
 	apiVersion: String!
 	kind: ResourceKind!
-	metadata: ResourceMetadata!
+	headers: ResourceHeaders!
 	spec: JSON!
 	status: JSON
 }
@@ -3886,7 +3886,7 @@ type ResourceApplyChange {
 
 enum ResourceApplyChangeKind {
 	GENERATION
-	METADATA
+	HEADERS
 	SPEC
 }
 
@@ -3896,7 +3896,7 @@ enum ResourceApplyOperation {
 	UNTOUCHED
 }
 
-union ResourceApplyOutcome = ResourceApplySuccess | ResourceApplyRejection | ResourceApplyParseManifestProblem | ResourceUnsupportedDescriptorProblem | ResourceBadAccountProblem | ResourceInvalidMetadataProblem | ResourceInvalidSpecProblem
+union ResourceApplyOutcome = ResourceApplySuccess | ResourceApplyRejection | ResourceApplyParseManifestProblem | ResourceUnsupportedDescriptorProblem | ResourceBadAccountProblem | ResourceInvalidHeaderProblem | ResourceInvalidSpecProblem
 
 """
 The manifest text could not be parsed (malformed JSON/YAML).
@@ -4000,6 +4000,36 @@ union ResourceGetIdentityOutcome = ResourceIdentity | ResourceSelectorProblemRes
 
 union ResourceGetOutcome = Resource | ResourceSelectorProblemResult
 
+enum ResourceHeaderValidationProblemCode {
+	EMPTY_NAME
+	NAME_TOO_LONG
+	INVALID_NAME
+	DESCRIPTION_TOO_LONG
+	TOO_MANY_LABELS
+	INVALID_LABEL_KEY
+	DUPLICATE_LABEL_KEY
+	LABEL_VALUE_TOO_LONG
+	TOO_MANY_ANNOTATIONS
+	INVALID_ANNOTATION_KEY
+	DUPLICATE_ANNOTATION_KEY
+	ANNOTATION_VALUE_TOO_LONG
+}
+
+type ResourceHeaders {
+	id: ResourceID!
+	accountId: AccountID!
+	accountName: AccountName
+	name: String!
+	description: String
+	labels: JSON!
+	annotations: JSON!
+	generation: Uint64!
+	createdAt: DateTime!
+	updatedAt: DateTime!
+	deletedAt: DateTime
+	lastReconciledAt: DateTime
+}
+
 scalar ResourceID
 
 type ResourceIdentity {
@@ -4035,10 +4065,10 @@ union ResourceIdentityListAllOutcome = ResourceIdentityConnection | ResourceBadA
 union ResourceIdentityListOutcome = ResourceIdentityConnection | ResourceUnsupportedDescriptorProblem | ResourceBadAccountProblem | ResourceInvalidSearchQueryProblem
 
 """
-A metadata field value (e.g. name, label key) failed validation.
+A header field value (e.g. name, label key) failed validation.
 """
-type ResourceInvalidMetadataProblem {
-	code: ResourceMetadataValidationProblemCode!
+type ResourceInvalidHeaderProblem {
+	code: ResourceHeaderValidationProblemCode!
 	message: String!
 }
 
@@ -4112,36 +4142,6 @@ union ResourceLookupProblem = ResourceUIDNotFoundProblem | ResourceNameNotFoundP
 enum ResourceManifestFormat {
 	JSON
 	YAML
-}
-
-type ResourceMetadata {
-	id: ResourceID!
-	accountId: AccountID!
-	accountName: AccountName
-	name: String!
-	description: String
-	labels: JSON!
-	annotations: JSON!
-	generation: Uint64!
-	createdAt: DateTime!
-	updatedAt: DateTime!
-	deletedAt: DateTime
-	lastReconciledAt: DateTime
-}
-
-enum ResourceMetadataValidationProblemCode {
-	EMPTY_NAME
-	NAME_TOO_LONG
-	INVALID_NAME
-	DESCRIPTION_TOO_LONG
-	TOO_MANY_LABELS
-	INVALID_LABEL_KEY
-	DUPLICATE_LABEL_KEY
-	LABEL_VALUE_TOO_LONG
-	TOO_MANY_ANNOTATIONS
-	INVALID_ANNOTATION_KEY
-	DUPLICATE_ANNOTATION_KEY
-	ANNOTATION_VALUE_TOO_LONG
 }
 
 type ResourceNameNotFoundProblem {

@@ -43,7 +43,7 @@ use kamu_resources::{
     ResourceCrudDispatcher,
     ResourceCrudDispatcherApplyRequest,
     ResourceCrudDispatcherDeleteRequest,
-    ResourceMetadataInput,
+    ResourceHeadersInput,
     ResourceUID,
     UnsupportedResourceDescriptorError,
 };
@@ -175,7 +175,7 @@ impl DatasetEnvVarMutationAdapterImpl {
         let apply_decision = dispatcher.apply(request).await.int_err().map_err(E::from)?;
 
         match apply_decision {
-            ApplyManifestApplicationDecision::Applied(result) => Ok(result.resource.metadata.uid),
+            ApplyManifestApplicationDecision::Applied(result) => Ok(result.resource.headers.uid),
             ApplyManifestApplicationDecision::Rejected(rejection) => Err(E::from(
                 format!("{resource_type_name} apply rejected: {}", rejection.message).int_err(),
             )),
@@ -212,7 +212,7 @@ impl DatasetEnvVarMutationAdapterImpl {
         );
 
         let new_spec = serde_json::to_value(VariableSetSpec { variables }).int_err()?;
-        let metadata = self.make_metadata(account_id.clone(), resource_name);
+        let headers = self.make_headers(account_id.clone(), resource_name);
 
         let dispatcher =
             self.get_dispatcher::<InternalError>(VariableSetResource::RESOURCE_TYPE)?;
@@ -222,7 +222,7 @@ impl DatasetEnvVarMutationAdapterImpl {
                 &dispatcher,
                 ResourceCrudDispatcherApplyRequest {
                     uid: existing_uid,
-                    metadata,
+                    headers,
                     spec: new_spec,
                 },
                 "VariableSet",
@@ -278,7 +278,7 @@ impl DatasetEnvVarMutationAdapterImpl {
         secrets.insert(key.to_string(), SecretSpec::Literal(plaintext.to_string()));
 
         let new_spec = serde_json::to_value(SecretSetSpec { secrets }).int_err()?;
-        let metadata = self.make_metadata(account_id.clone(), resource_name);
+        let headers = self.make_headers(account_id.clone(), resource_name);
 
         let dispatcher = self.get_dispatcher::<InternalError>(SecretSetResource::RESOURCE_TYPE)?;
 
@@ -287,7 +287,7 @@ impl DatasetEnvVarMutationAdapterImpl {
                 &dispatcher,
                 ResourceCrudDispatcherApplyRequest {
                     uid: existing_uid,
-                    metadata,
+                    headers,
                     spec: new_spec,
                 },
                 "SecretSet",
@@ -353,7 +353,7 @@ impl DatasetEnvVarMutationAdapterImpl {
         if spec.variables.is_empty() {
             dispatcher
                 .delete(ResourceCrudDispatcherDeleteRequest {
-                    account_id: snapshot.metadata.account.clone(),
+                    account_id: snapshot.headers.account.clone(),
                     uids: vec![resource_uid],
                 })
                 .await
@@ -364,18 +364,18 @@ impl DatasetEnvVarMutationAdapterImpl {
                 .await
                 .int_err()?;
         } else {
-            let metadata = ResourceMetadataInput {
-                account: snapshot.metadata.account,
-                name: snapshot.metadata.name,
-                description: snapshot.metadata.description,
-                labels: snapshot.metadata.labels,
-                annotations: snapshot.metadata.annotations,
+            let headers = ResourceHeadersInput {
+                account: snapshot.headers.account,
+                name: snapshot.headers.name,
+                description: snapshot.headers.description,
+                labels: snapshot.headers.labels,
+                annotations: snapshot.headers.annotations,
             };
             self.apply_and_handle_rejection(
                 &dispatcher,
                 ResourceCrudDispatcherApplyRequest {
                     uid: Some(resource_uid),
-                    metadata,
+                    headers,
                     spec: serde_json::to_value(spec).int_err()?,
                 },
                 "VariableSet",
@@ -415,7 +415,7 @@ impl DatasetEnvVarMutationAdapterImpl {
         if decrypted.is_empty() {
             dispatcher
                 .delete(ResourceCrudDispatcherDeleteRequest {
-                    account_id: snapshot.metadata.account.clone(),
+                    account_id: snapshot.headers.account.clone(),
                     uids: vec![resource_uid],
                 })
                 .await
@@ -432,18 +432,18 @@ impl DatasetEnvVarMutationAdapterImpl {
                     .map(|(k, v)| (k, SecretSpec::Literal(v)))
                     .collect(),
             };
-            let metadata = ResourceMetadataInput {
-                account: snapshot.metadata.account,
-                name: snapshot.metadata.name,
-                description: snapshot.metadata.description,
-                labels: snapshot.metadata.labels,
-                annotations: snapshot.metadata.annotations,
+            let headers = ResourceHeadersInput {
+                account: snapshot.headers.account,
+                name: snapshot.headers.name,
+                description: snapshot.headers.description,
+                labels: snapshot.headers.labels,
+                annotations: snapshot.headers.annotations,
             };
             self.apply_and_handle_rejection(
                 &dispatcher,
                 ResourceCrudDispatcherApplyRequest {
                     uid: Some(resource_uid),
-                    metadata,
+                    headers,
                     spec: serde_json::to_value(new_spec).int_err()?,
                 },
                 "SecretSet",
@@ -652,12 +652,12 @@ impl DatasetEnvVarMutationAdapterImpl {
         Ok(decrypted)
     }
 
-    fn make_metadata(
+    fn make_headers(
         &self,
         account_id: odf::AccountID,
         resource_name: String,
-    ) -> ResourceMetadataInput {
-        ResourceMetadataInput {
+    ) -> ResourceHeadersInput {
+        ResourceHeadersInput {
             account: account_id,
             name: resource_name,
             description: None,

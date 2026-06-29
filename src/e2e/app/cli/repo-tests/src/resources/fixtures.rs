@@ -9,7 +9,7 @@
 
 // Manifest fixtures for resource CLI e2e tests.
 //
-// The manifest envelope (`apiVersion`/`kind`/`metadata.name`/`spec`) mirrors
+// The manifest envelope (`apiVersion`/`kind`/`headers.name`/`spec`) mirrors
 // `kamu_resources::ResourceManifest`. The specs mirror
 // `kamu_configuration::{VariableSetSpec, SecretSetSpec}`:
 //   - VariableSet spec: `{ variables: { NAME: "value" } }` (scalar) or `{
@@ -45,7 +45,7 @@ pub const SECRETS_ENCRYPTION_KAMU_CONFIG: &str = indoc::indoc!(
     "#
 );
 
-/// Default `metadata.description` baked into the well-formed builders. A
+/// Default `headers.description` baked into the well-formed builders. A
 /// manifest without a description applies successfully but emits a
 /// `missing_description` lint warning; the canonical fixtures include one so
 /// the common lifecycle scenarios stay warning-free. The warning path itself is
@@ -63,7 +63,7 @@ pub fn variable_set_manifest_yaml(name: &str, value: &str) -> String {
         r#"
         apiVersion: {RESOURCE_API_VERSION}
         kind: {VARIABLE_SET_KIND}
-        metadata:
+        headers:
           name: {name}
           description: {DEFAULT_DESCRIPTION}
         spec:
@@ -79,14 +79,14 @@ pub fn variable_set_manifest_json(name: &str, value: &str) -> String {
     serde_json::json!({
         "apiVersion": RESOURCE_API_VERSION,
         "kind": VARIABLE_SET_KIND,
-        "metadata": { "name": name, "description": DEFAULT_DESCRIPTION },
+        "headers": { "name": name, "description": DEFAULT_DESCRIPTION },
         "spec": { "variables": { "MESSAGE": value } },
     })
     .to_string()
 }
 
 /// A well-formed `VariableSet` manifest in YAML that targets a specific account
-/// by name via the `metadata.account.name` field — the GitOps-style path where
+/// by name via the `headers.account.name` field — the GitOps-style path where
 /// a manifest names the account it belongs to (mirrors `ResourceManifestAccount
 /// { name, id }`, here using the by-name form). Used by the multi-tenant
 /// scenarios to prove the CLI honors the manifest's account selector, including
@@ -100,7 +100,7 @@ pub fn variable_set_manifest_yaml_for_account(
         r#"
         apiVersion: {RESOURCE_API_VERSION}
         kind: {VARIABLE_SET_KIND}
-        metadata:
+        headers:
           name: {name}
           description: {DEFAULT_DESCRIPTION}
           account:
@@ -112,7 +112,7 @@ pub fn variable_set_manifest_yaml_for_account(
     )
 }
 
-/// A `VariableSet` manifest **without** `metadata.description`. Applies
+/// A `VariableSet` manifest **without** `headers.description`. Applies
 /// successfully but emits the `missing_description` lint warning — used to
 /// cover the warning surface explicitly.
 pub fn variable_set_manifest_no_description(name: &str, value: &str) -> String {
@@ -120,7 +120,7 @@ pub fn variable_set_manifest_no_description(name: &str, value: &str) -> String {
         r#"
         apiVersion: {RESOURCE_API_VERSION}
         kind: {VARIABLE_SET_KIND}
-        metadata:
+        headers:
           name: {name}
         spec:
           variables:
@@ -136,7 +136,7 @@ pub fn secret_set_manifest_yaml(name: &str, token: &str, password: &str) -> Stri
         r#"
         apiVersion: {RESOURCE_API_VERSION}
         kind: {SECRET_SET_KIND}
-        metadata:
+        headers:
           name: {name}
           description: {DEFAULT_DESCRIPTION}
         spec:
@@ -188,7 +188,7 @@ pub fn secret_set_manifest_pre_encrypted_yaml(name: &str) -> String {
         r#"
         apiVersion: {RESOURCE_API_VERSION}
         kind: {SECRET_SET_KIND}
-        metadata:
+        headers:
           name: {name}
           description: {DEFAULT_DESCRIPTION}
         spec:
@@ -205,7 +205,7 @@ pub fn secret_set_manifest_json(name: &str, token: &str, password: &str) -> Stri
     serde_json::json!({
         "apiVersion": RESOURCE_API_VERSION,
         "kind": SECRET_SET_KIND,
-        "metadata": { "name": name, "description": DEFAULT_DESCRIPTION },
+        "headers": { "name": name, "description": DEFAULT_DESCRIPTION },
         "spec": { "secrets": {
             "API_TOKEN": { "value": token },
             "DB_PASSWORD": { "value": password },
@@ -221,7 +221,7 @@ pub fn variable_set_manifest_business_invalid(name: &str) -> String {
         r#"
         apiVersion: {RESOURCE_API_VERSION}
         kind: {VARIABLE_SET_KIND}
-        metadata:
+        headers:
           name: {name}
         spec:
           variables: {{}}

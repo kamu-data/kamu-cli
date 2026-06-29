@@ -114,7 +114,7 @@ where
         match self.reconciler.reconcile(&*resource).await {
             Ok(success) => {
                 resource
-                    .try_mark_reconciliation_succeeded(now, resource.metadata().generation, success)
+                    .try_mark_reconciliation_succeeded(now, resource.headers().generation, success)
                     .map_err(ReconcileResourceUseCaseError::Lifecycle)?;
 
                 Ok(ResourceLifecycleMessage::reconciliation_succeeded(
@@ -126,7 +126,7 @@ where
             }
             Err(err) => {
                 resource
-                    .try_mark_reconciliation_failed(now, resource.metadata().generation, &err)
+                    .try_mark_reconciliation_failed(now, resource.headers().generation, &err)
                     .map_err(ReconcileResourceUseCaseError::Lifecycle)?;
 
                 Ok(ResourceLifecycleMessage::reconciliation_failed(

@@ -59,7 +59,7 @@ pub fn variable_set_manifest_json(
         {{
             "apiVersion": "{api}",
             "kind": "{kind}",
-            "metadata": {{"name": "{name}"}},
+            "headers": {{"name": "{name}"}},
             {account_field}"spec": {{
                 "variables": {{
                     {variables}
@@ -102,7 +102,7 @@ pub fn variable_set_manifest_yaml(
         "
         apiVersion: {api}
         kind: {kind}
-        metadata:
+        headers:
           name: {name}
         {account_section}spec:
           variables:
@@ -142,7 +142,7 @@ pub async fn apply_manifest_and_get_uid(
         .await
         .unwrap();
     let view = assert_applied_outcome(&decision, ApplyResourceOutcome::Created);
-    view.metadata.uid
+    view.headers.uid
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -182,7 +182,7 @@ pub fn secret_set_manifest_json(
         {{
             "apiVersion": "{api}",
             "kind": "{kind}",
-            "metadata": {{"name": "{name}"}},
+            "headers": {{"name": "{name}"}},
             {account_field}"spec": {{
                 "secrets": {{
                     {entries}

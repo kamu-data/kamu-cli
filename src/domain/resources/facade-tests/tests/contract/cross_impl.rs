@@ -105,7 +105,7 @@ pub async fn test_local_created_readable_remotely(h: &impl FacadeContractHarness
             .await
             .unwrap();
         assert_applied_outcome(&d, ApplyResourceOutcome::Created)
-            .metadata
+            .headers
             .uid
     };
 
@@ -120,7 +120,7 @@ pub async fn test_local_created_readable_remotely(h: &impl FacadeContractHarness
         VARIABLE_SET_API_VERSION,
         "cross-local-to-remote",
     );
-    assert_eq!(view.metadata.uid, uid);
+    assert_eq!(view.headers.uid, uid);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -147,7 +147,7 @@ pub async fn test_remote_created_readable_locally(h: &impl FacadeContractHarness
             .await
             .unwrap();
         assert_applied_outcome(&d, ApplyResourceOutcome::Created)
-            .metadata
+            .headers
             .uid
     };
 
@@ -162,7 +162,7 @@ pub async fn test_remote_created_readable_locally(h: &impl FacadeContractHarness
         VARIABLE_SET_API_VERSION,
         "cross-remote-to-local",
     );
-    assert_eq!(view.metadata.uid, uid);
+    assert_eq!(view.headers.uid, uid);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -265,7 +265,7 @@ pub async fn test_batch_equivalence(h: &impl FacadeContractHarness) {
             .await
             .unwrap();
         assert_applied_outcome(&d, ApplyResourceOutcome::Created)
-            .metadata
+            .headers
             .uid
     };
     let absent_uid = kamu_resources::ResourceUID::new(uuid::Uuid::new_v4());
@@ -292,8 +292,8 @@ pub async fn test_batch_equivalence(h: &impl FacadeContractHarness) {
         .unwrap();
     assert_batch_indexes(&local_get, &[0], &[1, 2]);
     assert_batch_indexes(&remote_get, &[0], &[1, 2]);
-    assert_eq!(local_get.successes[0].item.metadata.uid, uid_a);
-    assert_eq!(remote_get.successes[0].item.metadata.uid, uid_a);
+    assert_eq!(local_get.successes[0].item.headers.uid, uid_a);
+    assert_eq!(remote_get.successes[0].item.headers.uid, uid_a);
     assert_matches!(
         &local_get
             .problems
@@ -478,7 +478,7 @@ pub async fn test_apply_equivalence(h: &impl FacadeContractHarness) {
         r#"{
             "apiVersion": "kamu.dev/v1alpha1",
             "kind": "VariableSet",
-            "metadata": {"name": "cross-apply-eq-rejected"},
+            "headers": {"name": "cross-apply-eq-rejected"},
             "spec": {"variables": {}}
         }"#
     )

@@ -13,7 +13,7 @@ use serde::de::DeserializeOwned;
 use crate::{
     DeclarativeResourceState,
     PendingStatusFromSpec,
-    ResourceMetadata,
+    ResourceHeaders,
     ResourceSnapshot,
     ResourceStatusLike,
     ResourceUID,
@@ -28,7 +28,7 @@ pub struct ResourceState<
     TStatus: ResourceStatusLike + std::fmt::Debug + Clone,
 > {
     pub uid: ResourceUID,
-    pub metadata: ResourceMetadata,
+    pub headers: ResourceHeaders,
     pub spec: TSpec,
     pub status: TStatus,
 }
@@ -40,10 +40,10 @@ where
     TSpec: std::fmt::Debug + Clone + Send + Sync,
     TStatus: ResourceStatusLike + std::fmt::Debug + Clone,
 {
-    pub fn new(uid: ResourceUID, metadata: ResourceMetadata, spec: TSpec, status: TStatus) -> Self {
+    pub fn new(uid: ResourceUID, headers: ResourceHeaders, spec: TSpec, status: TStatus) -> Self {
         Self {
             uid,
-            metadata,
+            headers,
             spec,
             status,
         }
@@ -64,12 +64,12 @@ where
         &self.uid
     }
 
-    fn metadata(&self) -> &ResourceMetadata {
-        &self.metadata
+    fn headers(&self) -> &ResourceHeaders {
+        &self.headers
     }
 
-    fn metadata_mut(&mut self) -> &mut ResourceMetadata {
-        &mut self.metadata
+    fn headers_mut(&mut self) -> &mut ResourceHeaders {
+        &mut self.headers
     }
 
     fn spec(&self) -> &Self::Spec {
@@ -88,8 +88,8 @@ where
         &mut self.status
     }
 
-    fn into_parts(self) -> (ResourceUID, ResourceMetadata, Self::Spec, Self::Status) {
-        (self.uid, self.metadata, self.spec, self.status)
+    fn into_parts(self) -> (ResourceUID, ResourceHeaders, Self::Spec, Self::Status) {
+        (self.uid, self.headers, self.spec, self.status)
     }
 }
 
@@ -107,12 +107,12 @@ where
     type Error = InternalError;
 
     fn try_from(snapshot: ResourceSnapshot) -> Result<Self, Self::Error> {
-        let (uid, metadata, spec, status) =
+        let (uid, headers, spec, status) =
             decode_typed_resource_snapshot::<TSpec, TStatus>(snapshot)?;
 
         Ok(Self {
             uid,
-            metadata,
+            headers,
             spec,
             status,
         })

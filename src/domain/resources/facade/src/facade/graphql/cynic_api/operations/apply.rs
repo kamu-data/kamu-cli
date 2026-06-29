@@ -45,7 +45,7 @@ pub(crate) enum ResourceApplyOutcome {
     ResourceApplyParseManifestProblem(ResourceApplyParseManifestProblem),
     ResourceUnsupportedDescriptorProblem(ResourceUnsupportedDescriptorProblem),
     ResourceBadAccountProblem(ResourceBadAccountProblem),
-    ResourceInvalidMetadataProblem(ResourceInvalidMetadataProblem),
+    ResourceInvalidHeaderProblem(ResourceInvalidHeaderProblem),
     ResourceInvalidSpecProblem(ResourceInvalidSpecProblem),
     #[cynic(fallback)]
     Unknown,
@@ -102,7 +102,7 @@ impl From<ResourceApplyChange> for domain::ApplyManifestChange {
 #[derive(cynic::Enum, Debug, Clone, Copy)]
 pub(crate) enum ResourceApplyChangeKind {
     Generation,
-    Metadata,
+    Headers,
     Spec,
 }
 
@@ -110,7 +110,7 @@ impl From<ResourceApplyChangeKind> for domain::ApplyManifestChangeKind {
     fn from(value: ResourceApplyChangeKind) -> Self {
         match value {
             ResourceApplyChangeKind::Generation => Self::Generation,
-            ResourceApplyChangeKind::Metadata => Self::Metadata,
+            ResourceApplyChangeKind::Headers => Self::Headers,
             ResourceApplyChangeKind::Spec => Self::Spec,
         }
     }
@@ -185,13 +185,13 @@ pub(crate) struct ResourceApplyParseManifestProblem {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
-pub(crate) struct ResourceInvalidMetadataProblem {
-    pub code: ResourceMetadataValidationProblemCode,
+pub(crate) struct ResourceInvalidHeaderProblem {
+    pub code: ResourceHeaderValidationProblemCode,
     pub message: String,
 }
 
 #[derive(cynic::Enum, Debug, Clone, Copy)]
-pub(crate) enum ResourceMetadataValidationProblemCode {
+pub(crate) enum ResourceHeaderValidationProblemCode {
     EmptyName,
     NameTooLong,
     InvalidName,
@@ -206,9 +206,9 @@ pub(crate) enum ResourceMetadataValidationProblemCode {
     AnnotationValueTooLong,
 }
 
-impl From<ResourceMetadataValidationProblemCode> for crate::ResourceMetadataValidationProblemCode {
-    fn from(value: ResourceMetadataValidationProblemCode) -> Self {
-        use ResourceMetadataValidationProblemCode as C;
+impl From<ResourceHeaderValidationProblemCode> for crate::ResourceHeadersValidationProblemCode {
+    fn from(value: ResourceHeaderValidationProblemCode) -> Self {
+        use ResourceHeaderValidationProblemCode as C;
         match value {
             C::EmptyName => Self::EmptyName,
             C::NameTooLong => Self::NameTooLong,
@@ -226,9 +226,9 @@ impl From<ResourceMetadataValidationProblemCode> for crate::ResourceMetadataVali
     }
 }
 
-impl From<ResourceInvalidMetadataProblem> for crate::ApplyManifestError {
-    fn from(value: ResourceInvalidMetadataProblem) -> Self {
-        Self::InvalidMetadata(crate::ResourceInvalidMetadataError {
+impl From<ResourceInvalidHeaderProblem> for crate::ApplyManifestError {
+    fn from(value: ResourceInvalidHeaderProblem) -> Self {
+        Self::InvalidHeaders(crate::ResourceInvalidHeadersError {
             code: value.code.into(),
             message: value.message,
         })
@@ -333,7 +333,7 @@ fn map_apply_problem(
         ResourceApplyOutcome::ResourceBadAccountProblem(p) => Ok(
             crate::ApplyManifestError::BadAccount(outcome_mapper::bad_account_problem_error(p)?),
         ),
-        ResourceApplyOutcome::ResourceInvalidMetadataProblem(p) => Ok(p.into()),
+        ResourceApplyOutcome::ResourceInvalidHeaderProblem(p) => Ok(p.into()),
         ResourceApplyOutcome::ResourceInvalidSpecProblem(p) => Ok(p.into()),
         ResourceApplyOutcome::Unknown => Err(InternalError::new(
             "Remote apply returned an unrecognized ResourceApplyOutcome variant",

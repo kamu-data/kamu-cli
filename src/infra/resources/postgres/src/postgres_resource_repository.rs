@@ -17,8 +17,8 @@ use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_resources::{
     CreateResourceError,
     ResourceDuplicateError,
+    ResourceHeaders,
     ResourceIdentityRow,
-    ResourceMetadata,
     ResourceName,
     ResourcePhaseCounts,
     ResourceRawEventQuery,
@@ -57,11 +57,11 @@ impl ResourceRepository for PostgresResourceRepository {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
-        let account_id_stack = resource_snapshot.metadata.account.as_stack_string();
+        let account_id_stack = resource_snapshot.headers.account.as_stack_string();
         let account_id_str = account_id_stack.as_str();
-        let labels = serde_json::to_value(&resource_snapshot.metadata.labels).unwrap();
-        let annotations = serde_json::to_value(&resource_snapshot.metadata.annotations).unwrap();
-        let generation = i64::try_from(resource_snapshot.metadata.generation).unwrap();
+        let labels = serde_json::to_value(&resource_snapshot.headers.labels).unwrap();
+        let annotations = serde_json::to_value(&resource_snapshot.headers.annotations).unwrap();
+        let generation = i64::try_from(resource_snapshot.headers.generation).unwrap();
         let last_event_id = resource_snapshot.last_event_id.map(EventID::into_inner);
         let resource_uid: &uuid::Uuid = resource_snapshot.uid.as_ref();
 
@@ -91,16 +91,16 @@ impl ResourceRepository for PostgresResourceRepository {
             account_id_str,
             resource_snapshot.kind,
             resource_snapshot.api_version,
-            resource_snapshot.metadata.name,
-            resource_snapshot.metadata.description,
+            resource_snapshot.headers.name,
+            resource_snapshot.headers.description,
             labels,
             annotations,
             resource_snapshot.spec,
             resource_snapshot.status,
             generation,
-            resource_snapshot.metadata.created_at,
-            resource_snapshot.metadata.updated_at,
-            resource_snapshot.metadata.deleted_at,
+            resource_snapshot.headers.created_at,
+            resource_snapshot.headers.updated_at,
+            resource_snapshot.headers.deleted_at,
             resource_snapshot.last_reconciled_at,
             last_event_id,
         )
@@ -109,9 +109,9 @@ impl ResourceRepository for PostgresResourceRepository {
         .map_err(|e: sqlx::Error| match e {
             sqlx::Error::Database(e) if e.is_unique_violation() => {
                 CreateResourceError::Duplicate(ResourceDuplicateError {
-                    account_id: resource_snapshot.metadata.account.clone(),
+                    account_id: resource_snapshot.headers.account.clone(),
                     kind: resource_snapshot.kind.clone(),
-                    name: resource_snapshot.metadata.name.clone(),
+                    name: resource_snapshot.headers.name.clone(),
                 })
             }
             _ => CreateResourceError::Internal(e.int_err()),
@@ -173,21 +173,21 @@ impl ResourceRepository for PostgresResourceRepository {
             b.push_bind(*resource_snapshot.uid.as_ref())
                 .push_bind(
                     resource_snapshot
-                        .metadata
+                        .headers
                         .account
                         .as_stack_string()
                         .to_string(),
                 )
                 .push_bind(resource_snapshot.api_version.clone())
-                .push_bind(resource_snapshot.metadata.name.clone())
-                .push_bind(resource_snapshot.metadata.description.clone())
-                .push_bind(serde_json::to_value(&resource_snapshot.metadata.labels).unwrap())
-                .push_bind(serde_json::to_value(&resource_snapshot.metadata.annotations).unwrap())
+                .push_bind(resource_snapshot.headers.name.clone())
+                .push_bind(resource_snapshot.headers.description.clone())
+                .push_bind(serde_json::to_value(&resource_snapshot.headers.labels).unwrap())
+                .push_bind(serde_json::to_value(&resource_snapshot.headers.annotations).unwrap())
                 .push_bind(resource_snapshot.spec.clone())
                 .push_bind(resource_snapshot.status.clone())
-                .push_bind(i64::try_from(resource_snapshot.metadata.generation).unwrap())
-                .push_bind(resource_snapshot.metadata.updated_at)
-                .push_bind(resource_snapshot.metadata.deleted_at)
+                .push_bind(i64::try_from(resource_snapshot.headers.generation).unwrap())
+                .push_bind(resource_snapshot.headers.updated_at)
+                .push_bind(resource_snapshot.headers.deleted_at)
                 .push_bind(resource_snapshot.last_reconciled_at)
                 .push_bind(resource_snapshot.last_event_id.map(EventID::into_inner))
                 .push_bind(
@@ -240,9 +240,9 @@ impl ResourceRepository for PostgresResourceRepository {
                 sqlx::Error::Database(e) if e.is_unique_violation() => {
                     let resource_snapshot = &resource_updates[0].snapshot;
                     UpdateResourceError::Duplicate(ResourceDuplicateError {
-                        account_id: resource_snapshot.metadata.account.clone(),
+                        account_id: resource_snapshot.headers.account.clone(),
                         kind: resource_snapshot.kind.clone(),
-                        name: resource_snapshot.metadata.name.clone(),
+                        name: resource_snapshot.headers.name.clone(),
                     })
                 }
                 _ => UpdateResourceError::Internal(e.int_err()),
@@ -510,7 +510,7 @@ impl ResourceRepository for PostgresResourceRepository {
             uid: ResourceUID::new(row.uid),
             kind: row.resource_kind,
             api_version: row.api_version,
-            metadata: ResourceMetadata {
+            headers: ResourceHeaders {
                 account: row.account_id,
                 name: row.resource_name,
                 description: row.description,
@@ -625,7 +625,7 @@ impl ResourceRepository for PostgresResourceRepository {
             uid: ResourceUID::new(row.uid),
             kind: row.resource_kind,
             api_version: row.api_version,
-            metadata: ResourceMetadata {
+            headers: ResourceHeaders {
                 account: row.account_id,
                 name: row.resource_name,
                 description: row.description,
@@ -694,7 +694,7 @@ impl ResourceRepository for PostgresResourceRepository {
                 uid: ResourceUID::new(row.uid),
                 kind: row.resource_kind,
                 api_version: row.api_version,
-                metadata: ResourceMetadata {
+                headers: ResourceHeaders {
                     account: row.account_id,
                     name: row.resource_name,
                     description: row.description,
@@ -808,7 +808,7 @@ impl ResourceRepository for PostgresResourceRepository {
                     uid: ResourceUID::new(row.uid),
                     kind: row.resource_kind,
                     api_version: row.api_version,
-                    metadata: ResourceMetadata {
+                    headers: ResourceHeaders {
                         account: row.account_id,
                         name: row.resource_name,
                         description: row.description,
@@ -878,7 +878,7 @@ impl ResourceRepository for PostgresResourceRepository {
                     uid: ResourceUID::new(row.uid),
                     kind: row.resource_kind,
                     api_version: row.api_version,
-                    metadata: ResourceMetadata {
+                    headers: ResourceHeaders {
                         account: row.account_id,
                         name: row.resource_name,
                         description: row.description,

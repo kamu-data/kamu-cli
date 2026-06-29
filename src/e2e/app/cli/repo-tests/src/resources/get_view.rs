@@ -61,9 +61,9 @@ impl ResourceView {
         self.str_at("/kind", "kind")
     }
 
-    /// The resource name (`/metadata/name`).
+    /// The resource name (`/headers/name`).
     pub fn name(&self) -> &str {
-        self.str_at("/metadata/name", "metadata.name")
+        self.str_at("/headers/name", "headers.name")
     }
 
     /// `(kind, name)` — the resource's identity. The primary assertion target
@@ -72,10 +72,10 @@ impl ResourceView {
         (self.kind(), self.name())
     }
 
-    /// `metadata.description`, if present.
+    /// `headers.description`, if present.
     pub fn description(&self) -> Option<&str> {
         self.0
-            .pointer("/metadata/description")
+            .pointer("/headers/description")
             .and_then(Value::as_str)
     }
 

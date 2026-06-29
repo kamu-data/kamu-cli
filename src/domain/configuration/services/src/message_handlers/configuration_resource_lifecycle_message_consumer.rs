@@ -78,7 +78,7 @@ impl MessageConsumerT<ResourceLifecycleMessage> for ConfigurationResourceLifecyc
 
                         repo.cleanup_entries_before_generation(
                             &succeeded_message.resource.uid,
-                            succeeded_message.resource.metadata.generation,
+                            succeeded_message.resource.headers.generation,
                         )
                         .await
                     }
@@ -89,7 +89,7 @@ impl MessageConsumerT<ResourceLifecycleMessage> for ConfigurationResourceLifecyc
 
                         repo.cleanup_entries_before_generation(
                             &succeeded_message.resource.uid,
-                            succeeded_message.resource.metadata.generation,
+                            succeeded_message.resource.headers.generation,
                         )
                         .await
                     }

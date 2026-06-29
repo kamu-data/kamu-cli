@@ -12,7 +12,7 @@ use dill::Catalog;
 use event_sourcing::{EventID, GetEventsOpts, SaveEventsError, SaveEventsItem};
 use futures::TryStreamExt;
 use kamu_resources::{
-    ResourceMetadata,
+    ResourceHeaders,
     ResourceRawEvent,
     ResourceRawEventQuery,
     ResourceRawEventStore,
@@ -31,7 +31,7 @@ async fn make_resource(catalog: &Catalog, kind: &str) -> ResourceRawEventQuery {
         uid: id,
         kind: kind.to_string(),
         api_version: "v1".to_string(),
-        metadata: ResourceMetadata::simple(
+        headers: ResourceHeaders::simple(
             Utc::now(),
             odf::AccountID::new_seeded_ed25519(b"test-account"),
             id.to_string(),

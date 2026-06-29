@@ -14,7 +14,7 @@ use kamu_resources::{
     ApplyResourceRejection,
     ApplyResourceRejectionCategory,
     IntoApplyResourceRejection,
-    ResourceMetadataValidationError,
+    ResourceHeadersValidationError,
 };
 use thiserror::Error;
 
@@ -25,7 +25,7 @@ use crate::{VariableSetSpecValidationError, VariableSetState};
 #[derive(Debug, Error)]
 pub enum VariableSetLifecycleError {
     #[error(transparent)]
-    MetadataValidation(#[from] ResourceMetadataValidationError),
+    HeadersValidation(#[from] ResourceHeadersValidationError),
 
     #[error(transparent)]
     SpecValidation(#[from] VariableSetSpecValidationError),
@@ -46,7 +46,7 @@ kamu_resources::impl_invariant_violation_lifecycle_error!(
 impl IntoApplyResourceRejection for VariableSetLifecycleError {
     fn into_apply_resource_rejection(self) -> ApplyResourceLifecycleErrorHandling {
         match self {
-            Self::MetadataValidation(err) => {
+            Self::HeadersValidation(err) => {
                 ApplyResourceLifecycleErrorHandling::Rejected(ApplyResourceRejection {
                     category: ApplyResourceRejectionCategory::BusinessValidationFailed,
                     message: err.to_string(),

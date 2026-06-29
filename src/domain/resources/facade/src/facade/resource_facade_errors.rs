@@ -15,8 +15,8 @@ use kamu_resources::{
     DeleteResourcesCrudDispatcherError,
     GetResourceCrudDispatcherError,
     ResourceAPIVersionMismatchError,
+    ResourceHeadersValidationError,
     ResourceInvalidSpecError,
-    ResourceMetadataValidationError,
     ResourceNameNotFoundError,
     ResourceUID,
     ResourceUIDNotFoundError,
@@ -27,7 +27,7 @@ use thiserror::Error;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ResourceMetadataValidationProblemCode {
+pub enum ResourceHeadersValidationProblemCode {
     EmptyName,
     NameTooLong,
     InvalidName,
@@ -44,15 +44,15 @@ pub enum ResourceMetadataValidationProblemCode {
 
 #[derive(Debug, Error)]
 #[error("{message}")]
-pub struct ResourceInvalidMetadataError {
-    pub code: ResourceMetadataValidationProblemCode,
+pub struct ResourceInvalidHeadersError {
+    pub code: ResourceHeadersValidationProblemCode,
     pub message: String,
 }
 
-impl From<ResourceMetadataValidationError> for ResourceInvalidMetadataError {
-    fn from(err: ResourceMetadataValidationError) -> Self {
-        use ResourceMetadataValidationError as E;
-        use ResourceMetadataValidationProblemCode as C;
+impl From<ResourceHeadersValidationError> for ResourceInvalidHeadersError {
+    fn from(err: ResourceHeadersValidationError) -> Self {
+        use ResourceHeadersValidationError as E;
+        use ResourceHeadersValidationProblemCode as C;
         let code = match &err {
             E::EmptyName => C::EmptyName,
             E::NameTooLong { .. } => C::NameTooLong,
@@ -338,7 +338,7 @@ pub enum ApplyManifestError {
     BadAccount(#[from] ResolveManifestAccountError),
 
     #[error(transparent)]
-    InvalidMetadata(#[from] ResourceInvalidMetadataError),
+    InvalidHeaders(#[from] ResourceInvalidHeadersError),
 
     #[error(transparent)]
     InvalidSpec(#[from] ResourceInvalidSpecError),
@@ -359,9 +359,9 @@ pub enum ApplyManifestError {
     Internal(#[from] InternalError),
 }
 
-impl From<ResourceMetadataValidationError> for ApplyManifestError {
-    fn from(err: ResourceMetadataValidationError) -> Self {
-        Self::InvalidMetadata(err.into())
+impl From<ResourceHeadersValidationError> for ApplyManifestError {
+    fn from(err: ResourceHeadersValidationError) -> Self {
+        Self::InvalidHeaders(err.into())
     }
 }
 

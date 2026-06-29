@@ -218,7 +218,7 @@ pub(crate) struct ResourcePhaseCounts {
 pub(crate) struct Resource {
     pub api_version: String,
     pub kind: ResourceKind,
-    pub metadata: ResourceMetadata,
+    pub headers: ResourceHeaders,
     pub spec: serde_json::Value,
     pub status: Option<serde_json::Value>,
 }
@@ -233,7 +233,7 @@ pub(crate) struct ResourceKind {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
-pub(crate) struct ResourceMetadata {
+pub(crate) struct ResourceHeaders {
     pub id: kamu_resources::ResourceUID,
     pub account_id: odf::AccountID,
     pub account_name: Option<AccountName>,

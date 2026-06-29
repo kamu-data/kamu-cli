@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_resources::{ResourceManifest, ResourceMetadataInput, ResourceView, ResourceWarning};
+use kamu_resources::{ResourceHeadersInput, ResourceManifest, ResourceView, ResourceWarning};
 
 use crate::{
     ApplyManifestError,
@@ -43,36 +43,36 @@ pub(crate) fn parse_manifest(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn make_metadata_input(
+pub(crate) fn make_headers_input(
     manifest: &ResourceManifest,
     target_account: &ResolvedAccount,
-) -> Result<ResourceMetadataInput, ApplyManifestError> {
-    ResourceMetadataInput::try_new(
+) -> Result<ResourceHeadersInput, ApplyManifestError> {
+    ResourceHeadersInput::try_new(
         target_account.id.clone(),
-        &manifest.metadata.name,
-        manifest.metadata.description.clone(),
-        manifest.metadata.labels.clone(),
-        manifest.metadata.annotations.clone(),
+        &manifest.headers.name,
+        manifest.headers.description.clone(),
+        manifest.headers.labels.clone(),
+        manifest.headers.annotations.clone(),
     )
     .map_err(Into::into)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn collect_manifest_metadata_warnings(
+pub(crate) fn collect_manifest_header_warnings(
     manifest: &ResourceManifest,
 ) -> Vec<ResourceWarning> {
     let mut warnings = Vec::new();
 
     if manifest
-        .metadata
+        .headers
         .description
         .as_ref()
         .is_none_or(|description| description.trim().is_empty())
     {
         warnings.push(ResourceWarning {
             code: WARNING_CODE_MISSING_DESCRIPTION.to_string(),
-            path: Some("metadata.description".to_string()),
+            path: Some("headers.description".to_string()),
             message: "Resource has no description".to_string(),
         });
     }
@@ -87,7 +87,7 @@ pub(crate) fn resource_view_to_manifest(view: ResourceView) -> ResourceManifest 
         kind,
         api_version,
         account,
-        metadata,
+        headers,
         spec,
         ..
     } = view;
@@ -95,16 +95,16 @@ pub(crate) fn resource_view_to_manifest(view: ResourceView) -> ResourceManifest 
     ResourceManifest {
         api_version,
         kind,
-        metadata: kamu_resources::ResourceManifestMetadata {
+        headers: kamu_resources::ResourceManifestHeaders {
             uid: None,
             account: Some(kamu_resources::ResourceManifestAccount {
                 id: Some(account.id),
                 name: account.name.map(|name| name.to_string()),
             }),
-            name: metadata.name,
-            description: metadata.description,
-            labels: metadata.labels.into_iter().collect(),
-            annotations: metadata.annotations.into_iter().collect(),
+            name: headers.name,
+            description: headers.description,
+            labels: headers.labels.into_iter().collect(),
+            annotations: headers.annotations.into_iter().collect(),
         },
         spec,
     }

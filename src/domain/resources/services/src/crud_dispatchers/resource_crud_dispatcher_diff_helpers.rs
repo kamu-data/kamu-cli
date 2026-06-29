@@ -56,14 +56,14 @@ pub fn make_apply_manifest_changes(
 ) -> Result<Vec<ApplyManifestChange>, InternalError> {
     let mut changes = Vec::new();
 
-    push_metadata_change(
+    push_headers_change(
         &mut changes,
         ApplyManifestChangeKind::Generation,
-        "metadata.generation",
-        before.map(|view| view.metadata.generation),
-        Some(after.metadata.generation),
+        "headers.generation",
+        before.map(|view| view.headers.generation),
+        Some(after.headers.generation),
     )?;
-    append_metadata_changes(&mut changes, before, after)?;
+    append_headers_changes(&mut changes, before, after)?;
 
     changes.extend(make_spec_changes(
         before.map(|view| &view.spec),
@@ -75,66 +75,66 @@ pub fn make_apply_manifest_changes(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn append_metadata_changes(
+fn append_headers_changes(
     changes: &mut Vec<ApplyManifestChange>,
     before: Option<&ResourceView>,
     after: &ResourceView,
 ) -> Result<(), InternalError> {
-    push_metadata_change(
+    push_headers_change(
         changes,
-        ApplyManifestChangeKind::Metadata,
-        "metadata.uid",
-        before.map(|view| view.metadata.uid),
-        Some(after.metadata.uid),
+        ApplyManifestChangeKind::Headers,
+        "headers.uid",
+        before.map(|view| view.headers.uid),
+        Some(after.headers.uid),
     )?;
-    push_metadata_change(
+    push_headers_change(
         changes,
-        ApplyManifestChangeKind::Metadata,
-        "metadata.name",
-        before.map(|view| &view.metadata.name),
-        Some(&after.metadata.name),
+        ApplyManifestChangeKind::Headers,
+        "headers.name",
+        before.map(|view| &view.headers.name),
+        Some(&after.headers.name),
     )?;
-    push_metadata_change(
+    push_headers_change(
         changes,
-        ApplyManifestChangeKind::Metadata,
-        "metadata.description",
-        before.and_then(|view| view.metadata.description.as_ref()),
-        after.metadata.description.as_ref(),
+        ApplyManifestChangeKind::Headers,
+        "headers.description",
+        before.and_then(|view| view.headers.description.as_ref()),
+        after.headers.description.as_ref(),
     )?;
-    push_metadata_change(
+    push_headers_change(
         changes,
-        ApplyManifestChangeKind::Metadata,
-        "metadata.labels",
-        before.map(|view| &view.metadata.labels),
-        Some(&after.metadata.labels),
+        ApplyManifestChangeKind::Headers,
+        "headers.labels",
+        before.map(|view| &view.headers.labels),
+        Some(&after.headers.labels),
     )?;
-    push_metadata_change(
+    push_headers_change(
         changes,
-        ApplyManifestChangeKind::Metadata,
-        "metadata.annotations",
-        before.map(|view| &view.metadata.annotations),
-        Some(&after.metadata.annotations),
+        ApplyManifestChangeKind::Headers,
+        "headers.annotations",
+        before.map(|view| &view.headers.annotations),
+        Some(&after.headers.annotations),
     )?;
-    push_metadata_change(
+    push_headers_change(
         changes,
-        ApplyManifestChangeKind::Metadata,
-        "metadata.createdAt",
-        before.map(|view| normalize_timestamp_precision(view.metadata.created_at)),
-        Some(normalize_timestamp_precision(after.metadata.created_at)),
+        ApplyManifestChangeKind::Headers,
+        "headers.createdAt",
+        before.map(|view| normalize_timestamp_precision(view.headers.created_at)),
+        Some(normalize_timestamp_precision(after.headers.created_at)),
     )?;
-    push_metadata_change(
+    push_headers_change(
         changes,
-        ApplyManifestChangeKind::Metadata,
-        "metadata.updatedAt",
-        before.map(|view| normalize_timestamp_precision(view.metadata.updated_at)),
-        Some(normalize_timestamp_precision(after.metadata.updated_at)),
+        ApplyManifestChangeKind::Headers,
+        "headers.updatedAt",
+        before.map(|view| normalize_timestamp_precision(view.headers.updated_at)),
+        Some(normalize_timestamp_precision(after.headers.updated_at)),
     )?;
-    push_metadata_change(
+    push_headers_change(
         changes,
-        ApplyManifestChangeKind::Metadata,
-        "metadata.deletedAt",
-        before.and_then(|view| view.metadata.deleted_at),
-        after.metadata.deleted_at,
+        ApplyManifestChangeKind::Headers,
+        "headers.deletedAt",
+        before.and_then(|view| view.headers.deleted_at),
+        after.headers.deleted_at,
     )?;
 
     Ok(())
@@ -142,7 +142,7 @@ fn append_metadata_changes(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn push_metadata_change<T>(
+fn push_headers_change<T>(
     changes: &mut Vec<ApplyManifestChange>,
     kind: ApplyManifestChangeKind,
     path: &'static str,

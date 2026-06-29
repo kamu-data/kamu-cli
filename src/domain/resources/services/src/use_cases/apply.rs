@@ -51,10 +51,10 @@ macro_rules! declare_apply_resource_use_case {
                     None => self
                         .generic_resource_query_service
                         .find_resource_uid_by_name(
-                            &params.metadata.account,
+                            &params.headers.account,
                             <$resource as kamu_resources::ResourceDescriptorProvider>::DESCRIPTOR
                                 .resource_type,
-                            &params.metadata.name,
+                            &params.headers.name,
                         )
                         .await
                         .map_err(kamu_resources::ApplyResourceUseCaseError::Internal)?,
@@ -106,7 +106,7 @@ macro_rules! declare_apply_resource_use_case {
                     + kamu_resources::InvariantViolationOf<
                         <$resource as kamu_resources::DeclarativeResource>::ResourceState,
                     >
-                    + From<kamu_resources::ResourceMetadataValidationError>
+                    + From<kamu_resources::ResourceHeadersValidationError>
                     + From<
                         <<$resource as kamu_resources::DeclarativeResource>::Spec as kamu_resources::ResourceValidateSpec>::ValidationError,
                     >,

@@ -12,7 +12,7 @@ use std::collections::BTreeMap;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::ResourceMetadataInput;
+use crate::ResourceHeadersInput;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -21,7 +21,7 @@ pub type ResourceName = String;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ResourceMetadata {
+pub struct ResourceHeaders {
     pub account: odf::AccountID,
     pub name: ResourceName,
     pub description: Option<String>,
@@ -33,7 +33,7 @@ pub struct ResourceMetadata {
     pub deleted_at: Option<DateTime<Utc>>,
 }
 
-impl ResourceMetadata {
+impl ResourceHeaders {
     pub fn simple(
         now: DateTime<Utc>,
         account: odf::AccountID,
@@ -52,7 +52,7 @@ impl ResourceMetadata {
         }
     }
 
-    pub fn from_input(now: DateTime<Utc>, input: ResourceMetadataInput) -> Self {
+    pub fn from_input(now: DateTime<Utc>, input: ResourceHeadersInput) -> Self {
         Self {
             account: input.account,
             name: input.name.to_ascii_lowercase(),
@@ -66,7 +66,7 @@ impl ResourceMetadata {
         }
     }
 
-    pub fn is_equivalent_to(&self, input: &ResourceMetadataInput) -> bool {
+    pub fn is_equivalent_to(&self, input: &ResourceHeadersInput) -> bool {
         self.account == input.account
             && self.name == input.name
             && self.description == input.description
@@ -74,7 +74,7 @@ impl ResourceMetadata {
             && self.annotations == input.annotations
     }
 
-    pub fn apply_update(&mut self, now: DateTime<Utc>, input: ResourceMetadataInput) {
+    pub fn apply_update(&mut self, now: DateTime<Utc>, input: ResourceHeadersInput) {
         self.account = input.account;
         self.name = input.name.to_ascii_lowercase();
         self.description = input.description;

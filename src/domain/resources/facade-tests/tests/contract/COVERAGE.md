@@ -16,11 +16,11 @@ Each RF scenario from the original plan is listed with its status.
 | RF-016  | apply_manifest.rs   | Active   | Plan rejects business-invalid manifest                                | Combined with RF-025 in one test                                       |
 | RF-020  | apply_manifest.rs   | Active   | Apply create from JSON manifest                                       |                                                                        |
 | RF-021  | apply_manifest.rs   | Active   | Apply create from YAML manifest                                       |                                                                        |
-| RF-022  | apply_manifest.rs   | Active   | Apply update changes metadata/spec                                    |                                                                        |
+| RF-022  | apply_manifest.rs   | Active   | Apply update changes headers/spec                                    |                                                                        |
 | RF-023  | apply_manifest.rs   | Active   | Apply unchanged manifest is idempotent                                |                                                                        |
 | RF-024  | apply_manifest.rs   | Deferred | Apply rejects immutable field change                                  | Requires a resource kind with an immutable field                       |
 | RF-025  | apply_manifest.rs   | Active   | Apply rejects invalid spec                                            | Combined with RF-016 in one test                                       |
-| RF-026  | apply_manifest.rs   | Active   | Apply preserves duplicate metadata-key validation                     |                                                                        |
+| RF-026  | apply_manifest.rs   | Active   | Apply preserves duplicate header-key validation                     |                                                                        |
 | RF-030  | get_identity.rs     | Active   | Get by name returns full resource view                                |                                                                        |
 | RF-031  | get_identity.rs     | Active   | Get by UID returns same full resource view                            |                                                                        |
 | RF-032  | get_identity.rs     | Active   | Get identity by name returns lightweight identity                     |                                                                        |
@@ -91,7 +91,7 @@ Each RF scenario from the original plan is listed with its status.
 | RF-140  | error_taxonomy.rs   | Active   | Single-resource lookup error taxonomy is consistent across get/render/delete |                                                                 |
 | RF-141  | error_taxonomy.rs   | Active   | Batch lookup problem taxonomy mirrors single-resource taxonomy        |                                                                        |
 | RF-142  | error_taxonomy.rs   | Active   | Batch-level error taxonomy (unsupported kind, bad account)            |                                                                        |
-| RF-143  | error_taxonomy.rs   | Active   | Apply rejection taxonomy (InvalidMetadata, InvalidSpec, Rejected)     | Also split into apply_manifest.rs for apply-specific rejection cases   |
+| RF-143  | error_taxonomy.rs   | Active   | Apply rejection taxonomy (InvalidHeaders, InvalidSpec, Rejected)     | Also split into apply_manifest.rs for apply-specific rejection cases   |
 | RF-150  | cross_impl.rs       | Active   | Local and remote expose same supported kind descriptors               | Verified via `contract_test!` macro, not side-by-side comparison       |
 | RF-151  | cross_impl.rs       | Active   | Local-created resource is readable remotely                           | True cross-facade test                                                 |
 | RF-152  | cross_impl.rs       | Active   | Remote-created resource is readable locally                           | True cross-facade test                                                 |
