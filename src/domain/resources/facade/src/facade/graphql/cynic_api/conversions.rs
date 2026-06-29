@@ -50,15 +50,16 @@ impl TryFrom<fragments::Resource> for domain::ResourceView {
 
         Ok(Self {
             schema: value.schema,
-            account: domain::ResourceViewAccount {
-                id: value.headers.account_id,
-                name: value
-                    .headers
-                    .account_name
-                    .map(|name| odf::AccountName::new_unchecked(&name.0)),
-            },
             headers: domain::ResourceViewHeaders {
                 id: value.headers.id,
+                account: domain::ResourceViewAccount {
+                    id: value.headers.account.id,
+                    name: value
+                        .headers
+                        .account
+                        .name
+                        .map(|name| odf::AccountName::new_unchecked(&name.0)),
+                },
                 name: value.headers.name,
                 description: value.headers.description,
                 labels,

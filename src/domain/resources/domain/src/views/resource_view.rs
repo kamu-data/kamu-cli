@@ -29,7 +29,6 @@ pub struct ResourceIdentityView {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceView {
     pub schema: String,
-    pub account: ResourceViewAccount,
     pub headers: ResourceViewHeaders,
     pub last_reconciled_at: Option<DateTime<Utc>>,
     pub spec: serde_json::Value,
@@ -49,6 +48,7 @@ pub struct ResourceViewAccount {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceViewHeaders {
     pub id: ResourceID,
+    pub account: ResourceViewAccount,
     pub name: ResourceName,
     pub description: Option<String>,
     pub labels: BTreeMap<String, String>,
@@ -62,9 +62,15 @@ pub struct ResourceViewHeaders {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl ResourceViewHeaders {
-    pub fn simple(now: DateTime<Utc>, id: ResourceID, name: impl Into<ResourceName>) -> Self {
+    pub fn simple(
+        now: DateTime<Utc>,
+        id: ResourceID,
+        account: ResourceViewAccount,
+        name: impl Into<ResourceName>,
+    ) -> Self {
         Self {
             id,
+            account,
             name: name.into(),
             description: None,
             labels: BTreeMap::new(),
@@ -77,8 +83,14 @@ impl ResourceViewHeaders {
     }
 
     pub fn from_owned(id: ResourceID, headers: ResourceHeaders) -> Self {
+        let account = ResourceViewAccount {
+            id: headers.account.clone(),
+            name: None,
+        };
+
         Self {
             id,
+            account,
             name: headers.name,
             description: headers.description,
             labels: headers.labels,
@@ -88,6 +100,11 @@ impl ResourceViewHeaders {
             updated_at: headers.updated_at,
             deleted_at: headers.deleted_at,
         }
+    }
+
+    pub fn with_account(mut self, account: ResourceViewAccount) -> Self {
+        self.account = account;
+        self
     }
 }
 

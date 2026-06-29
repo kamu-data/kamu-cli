@@ -617,8 +617,7 @@ impl From<BatchGetResourceProblem> for BatchResourceProblem {
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceHeaders {
     pub id: ResourceID,
-    pub account_id: AccountID<'static>,
-    pub account_name: Option<AccountName<'static>>,
+    pub account: ResourceAccount,
     pub name: String,
     pub description: Option<String>,
     pub labels: serde_json::Value,
@@ -630,6 +629,12 @@ pub struct ResourceHeaders {
     pub last_reconciled_at: Option<DateTime<Utc>>,
 }
 
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ResourceAccount {
+    pub id: AccountID<'static>,
+    pub name: Option<AccountName<'static>>,
+}
+
 impl From<kamu_resources::ResourceView> for ResourceHeaders {
     fn from(value: kamu_resources::ResourceView) -> Self {
         let labels = serde_json::to_value(value.headers.labels).unwrap();
@@ -637,8 +642,10 @@ impl From<kamu_resources::ResourceView> for ResourceHeaders {
 
         Self {
             id: value.headers.id.into(),
-            account_id: value.account.id.into(),
-            account_name: value.account.name.map(Into::into),
+            account: ResourceAccount {
+                id: value.headers.account.id.into(),
+                name: value.headers.account.name.map(Into::into),
+            },
             name: value.headers.name.clone(),
             description: value.headers.description,
             labels,

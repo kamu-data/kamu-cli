@@ -130,7 +130,7 @@ impl GetResourceCommand {
             fn new(resource: &'a kamu_resources::ResourceView) -> Self {
                 Self {
                     id: &resource.headers.id,
-                    account: &resource.account,
+                    account: &resource.headers.account,
                     name: &resource.headers.name,
                     description: &resource.headers.description,
                     labels: &resource.headers.labels,

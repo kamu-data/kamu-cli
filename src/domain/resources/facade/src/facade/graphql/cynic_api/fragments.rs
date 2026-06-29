@@ -216,8 +216,7 @@ pub(crate) struct Resource {
 #[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct ResourceHeaders {
     pub id: kamu_resources::ResourceID,
-    pub account_id: odf::AccountID,
-    pub account_name: Option<AccountName>,
+    pub account: ResourceAccount,
     pub name: String,
     pub description: Option<String>,
     pub labels: serde_json::Value,
@@ -227,6 +226,14 @@ pub(crate) struct ResourceHeaders {
     pub updated_at: DateTime<Utc>,
     pub deleted_at: Option<DateTime<Utc>>,
     pub last_reconciled_at: Option<DateTime<Utc>>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
+pub(crate) struct ResourceAccount {
+    pub id: odf::AccountID,
+    pub name: Option<AccountName>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

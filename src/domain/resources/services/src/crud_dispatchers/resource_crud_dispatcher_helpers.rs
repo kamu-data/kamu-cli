@@ -29,7 +29,6 @@ use kamu_resources::{
     ResourceStatusSummaryView,
     ResourceSummaryView,
     ResourceView,
-    ResourceViewAccount,
     ResourceViewHeaders,
 };
 use serde::Serialize;
@@ -141,10 +140,6 @@ where
 
     Ok(ResourceView {
         schema: R::DESCRIPTOR.schema.to_string(),
-        account: ResourceViewAccount {
-            id: headers.account.clone(),
-            name: None,
-        },
         headers: ResourceViewHeaders::from_owned(id, headers),
         last_reconciled_at: status.resource_status().last_reconciled_at(),
         spec: serde_json::to_value(spec).int_err()?,
@@ -187,10 +182,6 @@ pub(crate) fn resource_snapshot_to_view(snapshot: ResourceSnapshot) -> ResourceV
 
     ResourceView {
         schema,
-        account: ResourceViewAccount {
-            id: headers.account.clone(),
-            name: None,
-        },
         headers: ResourceViewHeaders::from_owned(id, headers),
         last_reconciled_at,
         spec,

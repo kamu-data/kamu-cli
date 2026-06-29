@@ -198,7 +198,7 @@ async fn test_apply_update_returns_applied_updated() {
     let id = applied1.resource.headers.id;
 
     // Second apply with same account but different spec value — Update
-    let account_id = applied1.resource.account.id.clone();
+    let account_id = applied1.resource.headers.account.id.clone();
     let req2 = ResourceCrudDispatcherApplyRequest {
         id: Some(id),
         headers: BaseResourceServiceHarness::make_headers_input(account_id, "res-a"),
@@ -224,7 +224,7 @@ async fn test_apply_untouched_returns_applied_untouched() {
     let decision1 = harness.dispatcher().apply(req1).await.unwrap();
     let applied1 = decision1.expect_applied();
     let id = applied1.resource.headers.id;
-    let account_id = applied1.resource.account.id.clone();
+    let account_id = applied1.resource.headers.account.id.clone();
 
     // Second apply — identical spec and headers
     let req2 = ResourceCrudDispatcherApplyRequest {

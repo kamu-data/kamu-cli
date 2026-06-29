@@ -3857,6 +3857,11 @@ type Resource {
 	status: JSON
 }
 
+type ResourceAccount {
+	id: AccountID!
+	name: AccountName
+}
+
 input ResourceAccountSelectorInput {
 	byId: AccountID
 	byName: AccountName
@@ -4000,8 +4005,7 @@ enum ResourceHeaderValidationProblemCode {
 
 type ResourceHeaders {
 	id: ResourceID!
-	accountId: AccountID!
-	accountName: AccountName
+	account: ResourceAccount!
 	name: String!
 	description: String
 	labels: JSON!

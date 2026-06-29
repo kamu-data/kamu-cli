@@ -171,8 +171,11 @@ pub async fn test_default_account_selector_resolves_current_account(
         .await
         .unwrap();
 
-    assert_eq!(view.account.id, h.account_id(TestAccount::Alice));
-    assert_eq!(view.account.name, Some(h.account_name(TestAccount::Alice)));
+    assert_eq!(view.headers.account.id, h.account_id(TestAccount::Alice));
+    assert_eq!(
+        view.headers.account.name,
+        Some(h.account_name(TestAccount::Alice))
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -205,7 +208,7 @@ pub async fn test_account_by_name_resolves_correctly(h: &impl FacadeContractHarn
         .await
         .unwrap();
 
-    assert_eq!(view.account.id, h.account_id(TestAccount::Alice));
+    assert_eq!(view.headers.account.id, h.account_id(TestAccount::Alice));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -237,7 +240,7 @@ pub async fn test_account_by_id_resolves_correctly(h: &impl FacadeContractHarnes
         .await
         .unwrap();
 
-    assert_eq!(view.account.id, h.account_id(TestAccount::Alice));
+    assert_eq!(view.headers.account.id, h.account_id(TestAccount::Alice));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

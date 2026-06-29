@@ -394,7 +394,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         Ok(match plan {
             ApplyManifestPlanningDecision::Planned(mut plan) => {
                 plan.warnings.splice(0..0, prepared.header_warnings);
-                plan.resource.account = ResourceViewAccount {
+                plan.resource.headers.account = ResourceViewAccount {
                     id: prepared.target_account.id,
                     name: Some(prepared.target_account.name),
                 };
@@ -425,7 +425,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         Ok(match result {
             ApplyManifestApplicationDecision::Applied(mut result) => {
                 result.warnings.splice(0..0, prepared.header_warnings);
-                result.resource.account = ResourceViewAccount {
+                result.resource.headers.account = ResourceViewAccount {
                     id: prepared.target_account.id,
                     name: Some(prepared.target_account.name),
                 };
@@ -641,10 +641,10 @@ impl LocalResourceFacadeImpl {
             .await?;
 
         Ok(ResourceView {
-            account: ResourceViewAccount {
+            headers: view.headers.with_account(ResourceViewAccount {
                 id: target_account.id,
                 name: Some(target_account.name),
-            },
+            }),
             ..view
         })
     }
@@ -720,11 +720,11 @@ impl LocalResourceFacadeImpl {
 
                     let resource = ResourceView {
                         schema: snapshot.schema,
-                        account: ResourceViewAccount {
-                            id: target_account.id.clone(),
-                            name: Some(target_account.name.clone()),
-                        },
-                        headers: ResourceViewHeaders::from_owned(id, snapshot.headers),
+                        headers: ResourceViewHeaders::from_owned(id, snapshot.headers)
+                            .with_account(ResourceViewAccount {
+                                id: target_account.id.clone(),
+                                name: Some(target_account.name.clone()),
+                            }),
                         last_reconciled_at: snapshot.last_reconciled_at,
                         spec: snapshot.spec,
                         status: snapshot.status,

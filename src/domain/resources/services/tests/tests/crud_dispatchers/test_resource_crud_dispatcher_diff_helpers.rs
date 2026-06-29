@@ -26,11 +26,15 @@ fn make_view(name: &str, value: &str) -> ResourceView {
     let id = make_id();
     ResourceView {
         schema: "TestResource".to_string(),
-        account: ResourceViewAccount {
-            id: make_account_id(),
-            name: None,
-        },
-        headers: ResourceViewHeaders::simple(Utc::now(), id, name.to_string()),
+        headers: ResourceViewHeaders::simple(
+            Utc::now(),
+            id,
+            ResourceViewAccount {
+                id: make_account_id(),
+                name: None,
+            },
+            name.to_string(),
+        ),
         last_reconciled_at: None,
         spec: serde_json::json!({ "value": value }),
         status: None,
@@ -166,15 +170,16 @@ fn test_make_changes_detects_spec_field_change() {
 fn test_make_changes_identical_before_after_returns_no_field_changes() {
     let ts = chrono::Utc::now().trunc_subsecs(6);
     let id = make_id();
+    let account_id = make_account_id();
 
     let make = || ResourceView {
         schema: "TestResource".to_string(),
-        account: ResourceViewAccount {
-            id: make_account_id(),
-            name: None,
-        },
         headers: ResourceViewHeaders {
             id,
+            account: ResourceViewAccount {
+                id: account_id.clone(),
+                name: None,
+            },
             name: "res".to_string(),
             description: None,
             labels: Default::default(),
@@ -217,12 +222,12 @@ fn test_timestamp_precision_normalized_avoids_spurious_diffs() {
 
     let make_view_ts = |updated_at| ResourceView {
         schema: "TestResource".to_string(),
-        account: ResourceViewAccount {
-            id: account_id.clone(),
-            name: None,
-        },
         headers: ResourceViewHeaders {
             id,
+            account: ResourceViewAccount {
+                id: account_id.clone(),
+                name: None,
+            },
             name: "res".to_string(),
             description: None,
             labels: Default::default(),
