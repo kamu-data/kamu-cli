@@ -16,6 +16,7 @@ use kamu_resources::{
     ResourceDescriptor,
     ResourceDescriptorProvider,
     ResourceDispatcherMeta,
+    ResourcePresentation,
     ResourceSpecViewDispatcher,
 };
 
@@ -24,7 +25,9 @@ use kamu_resources::{
 #[dill::component]
 #[dill::interface(dyn ResourceSpecViewDispatcher)]
 #[dill::meta(ResourceDispatcherMeta {
-    descriptor: <SecretSetResource as ResourceDescriptorProvider>::DESCRIPTOR,
+    schema: <SecretSetResource as ResourceDescriptorProvider>::DESCRIPTOR.schema,
+    name: <SecretSetResource as ResourcePresentation>::PRESENTATION.resource_name,
+    short_names: <SecretSetResource as ResourcePresentation>::PRESENTATION.resource_short_names,
 })]
 pub struct SecretSetSpecViewDispatcher {
     secrets_encryption_config: Arc<SecretsEncryptionConfig>,

@@ -19,7 +19,7 @@ use kamu_resources::{
 use kamu_resources_services::testing::BaseResourceServiceHarness;
 
 use crate::tests::use_cases::ResourceUseCaseBaseHarness;
-use crate::tests::utils::make_account_id;
+use crate::tests::utils::{TestResource, make_account_id};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Tests — spec decoding / validation
@@ -40,10 +40,9 @@ async fn test_apply_rejects_invalid_json_shape() {
     assert_matches!(
         err,
         ApplyResourceCrudDispatcherError::InvalidSpec {
-            ref kind,
-            ref api_version,
+            ref schema,
             ..
-        } if kind == "TestResource" && api_version == "test.kamu.dev/v1",
+        } if schema == TestResource::SCHEMA,
         "expected InvalidSpec error, got: {err:?}"
     );
 }
@@ -156,8 +155,7 @@ async fn test_apply_creates_resource_and_returns_view() {
     let applied = decision.expect_applied();
 
     assert_eq!(applied.outcome, ApplyResourceOutcome::Created);
-    assert_eq!(applied.resource.kind, "TestResource");
-    assert_eq!(applied.resource.api_version, "test.kamu.dev/v1");
+    assert_eq!(applied.resource.schema, TestResource::SCHEMA);
     assert_eq!(
         applied.resource.spec,
         serde_json::json!({ "value": "hello" })

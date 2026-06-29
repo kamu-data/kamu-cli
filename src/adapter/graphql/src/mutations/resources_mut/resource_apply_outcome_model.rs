@@ -95,16 +95,14 @@ impl From<kamu_resources_facade::ResourceInvalidHeadersError> for ResourceInvali
 /// The `spec` field failed domain validation.
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceInvalidSpecProblem {
-    pub kind: String,
-    pub api_version: String,
+    pub schema: String,
     pub message: String,
 }
 
 impl From<kamu_resources::ResourceInvalidSpecError> for ResourceInvalidSpecProblem {
     fn from(value: kamu_resources::ResourceInvalidSpecError) -> Self {
         Self {
-            kind: value.kind,
-            api_version: value.api_version,
+            schema: value.schema,
             message: value.message,
         }
     }

@@ -11,10 +11,10 @@ use kamu_resources::ApplyResourceOutcome;
 use kamu_resources_facade::{
     ApplyManifestRequest,
     GetResourceError,
-    ResourceKindMismatchError,
     ResourceLookupProblem,
     ResourceManifestFormat,
     ResourceRef,
+    ResourceSchemaMismatchError,
     ResourceSelector,
     SpecViewMode,
 };
@@ -23,8 +23,9 @@ use pretty_assertions::assert_eq;
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
 use crate::helpers::{
-    VARIABLE_SET_API_VERSION,
+    SECRET_SET_KIND,
     VARIABLE_SET_KIND,
+    VARIABLE_SET_SCHEMA,
     assert_applied_outcome,
     assert_identity_fields,
     assert_resource_view_fields,
@@ -37,7 +38,6 @@ fn by_name_selector(name: &str) -> ResourceSelector {
     ResourceSelector {
         account: None,
         kind: VARIABLE_SET_KIND.to_string(),
-        api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
         resource_ref: ResourceRef::ByName(name.to_string()),
     }
 }
@@ -46,7 +46,6 @@ fn by_id_selector(id: &kamu_resources::ResourceID) -> ResourceSelector {
     ResourceSelector {
         account: None,
         kind: VARIABLE_SET_KIND.to_string(),
-        api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
         resource_ref: ResourceRef::ById(*id),
     }
 }
@@ -86,8 +85,8 @@ pub async fn test_get_by_name(h: &impl FacadeContractHarness) {
 
     assert_resource_view_fields(
         &view,
-        VARIABLE_SET_KIND,
-        VARIABLE_SET_API_VERSION,
+        VARIABLE_SET_SCHEMA,
+        VARIABLE_SET_SCHEMA,
         "get-name-test",
     );
     assert_eq!(view.headers.id, id, "id must match");
@@ -110,8 +109,8 @@ pub async fn test_get_by_uid(h: &impl FacadeContractHarness) {
 
     assert_resource_view_fields(
         &view_by_uid,
-        VARIABLE_SET_KIND,
-        VARIABLE_SET_API_VERSION,
+        VARIABLE_SET_SCHEMA,
+        VARIABLE_SET_SCHEMA,
         "get-id-test",
     );
     assert_eq!(view_by_uid.headers.id, id);
@@ -133,8 +132,8 @@ pub async fn test_get_identity_by_name(h: &impl FacadeContractHarness) {
 
     assert_identity_fields(
         &identity,
-        VARIABLE_SET_KIND,
-        VARIABLE_SET_API_VERSION,
+        VARIABLE_SET_SCHEMA,
+        VARIABLE_SET_SCHEMA,
         "ident-name-test",
         &id,
     );
@@ -161,8 +160,8 @@ pub async fn test_get_identity_by_uid(h: &impl FacadeContractHarness) {
         "id must match when fetched by name vs id"
     );
     assert_eq!(identity_by_name.name, identity_by_uid.name);
-    assert_eq!(identity_by_name.kind, identity_by_uid.kind);
-    assert_eq!(identity_by_name.api_version, identity_by_uid.api_version);
+    assert_eq!(identity_by_name.schema, identity_by_uid.schema);
+    assert_eq!(identity_by_name.schema, identity_by_uid.schema);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -247,43 +246,42 @@ pub async fn test_get_missing_uid_returns_not_found(h: &impl FacadeContractHarne
 
 // RF-036
 contract_test!(
-    get_wrong_api_version_returns_mismatch,
-    super::test_get_wrong_api_version_returns_mismatch
+    get_wrong_schema_returns_mismatch,
+    super::test_get_wrong_schema_returns_mismatch
 );
 
-pub async fn test_get_wrong_api_version_returns_mismatch(h: &impl FacadeContractHarness) {
+pub async fn test_get_wrong_schema_returns_mismatch(h: &impl FacadeContractHarness) {
     let id = create_test_resource(h, "api-ver-mismatch-test").await;
     let facade = h.facade_for(TestAccount::Alice);
 
-    let wrong_version_selector = ResourceSelector {
+    let wrong_schema_selector = ResourceSelector {
         account: None,
-        kind: VARIABLE_SET_KIND.to_string(),
-        api_version: Some("v0.never.existed".to_string()),
+        kind: SECRET_SET_KIND.to_string(),
         resource_ref: ResourceRef::ById(id),
     };
 
     let result = facade
-        .get(wrong_version_selector.clone(), SpecViewMode::Encrypted)
+        .get(wrong_schema_selector.clone(), SpecViewMode::Encrypted)
         .await;
     assert!(
         matches!(
             result,
             Err(GetResourceError::LookupProblem(
-                ResourceLookupProblem::ApiVersionMismatch(_)
+                ResourceLookupProblem::SchemaMismatch(_)
             ))
         ),
-        "expected ApiVersionMismatch, got: {result:?}"
+        "expected SchemaMismatch, got: {result:?}"
     );
 
-    let identity_result = facade.get_identity(wrong_version_selector).await;
+    let identity_result = facade.get_identity(wrong_schema_selector).await;
     assert!(
         matches!(
             identity_result,
             Err(GetResourceError::LookupProblem(
-                ResourceLookupProblem::ApiVersionMismatch(_)
+                ResourceLookupProblem::SchemaMismatch(_)
             ))
         ),
-        "expected ApiVersionMismatch from get_identity, got: {identity_result:?}"
+        "expected SchemaMismatch from get_identity, got: {identity_result:?}"
     );
 }
 
@@ -296,7 +294,7 @@ contract_test!(
 );
 
 pub async fn test_get_wrong_kind_returns_kind_mismatch(h: &impl FacadeContractHarness) {
-    use crate::helpers::{SECRET_SET_API_VERSION, SECRET_SET_KIND};
+    use crate::helpers::SECRET_SET_SCHEMA;
 
     let id = create_test_resource(h, "kind-mismatch-test").await;
     let facade = h.facade_for(TestAccount::Alice);
@@ -304,7 +302,6 @@ pub async fn test_get_wrong_kind_returns_kind_mismatch(h: &impl FacadeContractHa
     let wrong_kind_selector = ResourceSelector {
         account: None,
         kind: SECRET_SET_KIND.to_string(),
-        api_version: Some(SECRET_SET_API_VERSION.to_string()),
         resource_ref: ResourceRef::ById(id),
     };
 
@@ -312,23 +309,23 @@ pub async fn test_get_wrong_kind_returns_kind_mismatch(h: &impl FacadeContractHa
         .get(wrong_kind_selector.clone(), SpecViewMode::Encrypted)
         .await;
     match &result {
-        Err(GetResourceError::LookupProblem(ResourceLookupProblem::KindMismatch(
-            ResourceKindMismatchError {
-                expected_kind,
-                actual_kind,
+        Err(GetResourceError::LookupProblem(ResourceLookupProblem::SchemaMismatch(
+            ResourceSchemaMismatchError {
+                expected_schema,
+                actual_schema,
                 ..
             },
         ))) => {
             assert_eq!(
-                expected_kind, SECRET_SET_KIND,
-                "expected_kind must be the requested kind"
+                expected_schema, SECRET_SET_SCHEMA,
+                "expected_schema must be the requested kind"
             );
             assert_eq!(
-                actual_kind, VARIABLE_SET_KIND,
-                "actual_kind must be the stored kind"
+                actual_schema, VARIABLE_SET_SCHEMA,
+                "actual_schema must be the stored kind"
             );
         }
-        other => panic!("expected KindMismatch, got: {other:?}"),
+        other => panic!("expected SchemaMismatch, got: {other:?}"),
     }
 
     let identity_result = facade.get_identity(wrong_kind_selector).await;
@@ -336,10 +333,10 @@ pub async fn test_get_wrong_kind_returns_kind_mismatch(h: &impl FacadeContractHa
         matches!(
             identity_result,
             Err(GetResourceError::LookupProblem(
-                ResourceLookupProblem::KindMismatch(_)
+                ResourceLookupProblem::SchemaMismatch(_)
             ))
         ),
-        "expected KindMismatch from get_identity, got: {identity_result:?}"
+        "expected SchemaMismatch from get_identity, got: {identity_result:?}"
     );
 }
 

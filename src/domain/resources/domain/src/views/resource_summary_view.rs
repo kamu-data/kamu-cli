@@ -25,8 +25,7 @@ use crate::{
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceSummaryView {
-    pub kind: String,
-    pub api_version: String,
+    pub schema: String,
     pub id: ResourceID,
     pub name: ResourceName,
     pub description: Option<String>,
@@ -53,8 +52,7 @@ impl From<ResourceSnapshot> for ResourceSummaryView {
         let status = value.basic_status().map(Into::into);
 
         Self {
-            kind: value.kind,
-            api_version: value.api_version,
+            schema: value.schema,
             id: value.id,
             name: value.headers.name,
             description: value.headers.description,

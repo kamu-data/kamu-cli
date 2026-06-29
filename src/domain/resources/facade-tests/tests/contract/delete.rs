@@ -25,9 +25,7 @@ use pretty_assertions::assert_eq;
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
 use crate::helpers::{
-    SECRET_SET_API_VERSION,
     SECRET_SET_KIND,
-    VARIABLE_SET_API_VERSION,
     VARIABLE_SET_KIND,
     assert_applied_outcome,
     variable_set_manifest_json,
@@ -53,7 +51,6 @@ fn by_name(name: &str) -> ResourceSelector {
     ResourceSelector {
         account: None,
         kind: VARIABLE_SET_KIND.to_string(),
-        api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
         resource_ref: ResourceRef::ByName(name.to_string()),
     }
 }
@@ -62,7 +59,6 @@ fn by_id(id: &kamu_resources::ResourceID) -> ResourceSelector {
     ResourceSelector {
         account: None,
         kind: VARIABLE_SET_KIND.to_string(),
-        api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
         resource_ref: ResourceRef::ById(*id),
     }
 }
@@ -187,35 +183,33 @@ pub async fn test_delete_missing_uid_returns_not_found(h: &impl FacadeContractHa
 
 // RF-134
 contract_test!(
-    delete_wrong_api_version_returns_mismatch,
-    super::test_delete_wrong_api_version_returns_mismatch
+    delete_wrong_schema_returns_mismatch,
+    super::test_delete_wrong_schema_returns_mismatch
 );
 
-pub async fn test_delete_wrong_api_version_returns_mismatch(h: &impl FacadeContractHarness) {
+pub async fn test_delete_wrong_schema_returns_mismatch(h: &impl FacadeContractHarness) {
     let id = create_resource(h, "del-api-ver").await;
     let facade = h.facade_for(TestAccount::Alice);
 
-    let wrong_version = ResourceSelector {
+    let wrong_schema_selector = ResourceSelector {
         account: None,
-        kind: VARIABLE_SET_KIND.to_string(),
-        api_version: Some("v0.never.existed".to_string()),
+        kind: SECRET_SET_KIND.to_string(),
         resource_ref: ResourceRef::ById(id),
     };
-    let result = facade.delete(wrong_version).await;
+    let result = facade.delete(wrong_schema_selector).await;
     assert!(
         matches!(
             result,
             Err(DeleteResourceError::LookupProblem(
-                ResourceLookupProblem::ApiVersionMismatch(_)
+                ResourceLookupProblem::SchemaMismatch(_)
             ))
         ),
-        "expected ApiVersionMismatch, got: {result:?}"
+        "expected SchemaMismatch, got: {result:?}"
     );
 
     let wrong_kind = ResourceSelector {
         account: None,
         kind: SECRET_SET_KIND.to_string(),
-        api_version: Some(SECRET_SET_API_VERSION.to_string()),
         resource_ref: ResourceRef::ById(id),
     };
     let result = facade.delete(wrong_kind).await;
@@ -223,10 +217,10 @@ pub async fn test_delete_wrong_api_version_returns_mismatch(h: &impl FacadeContr
         matches!(
             result,
             Err(DeleteResourceError::LookupProblem(
-                ResourceLookupProblem::KindMismatch(_)
+                ResourceLookupProblem::SchemaMismatch(_)
             ))
         ),
-        "expected KindMismatch, got: {result:?}"
+        "expected SchemaMismatch, got: {result:?}"
     );
 }
 

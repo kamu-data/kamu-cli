@@ -690,9 +690,8 @@ impl ApplyPrinter<'_> {
 
         #[derive(serde::Serialize)]
         struct RenderedResourceView<'a> {
-            #[serde(rename = "apiVersion")]
-            api_version: &'a str,
-            kind: &'a str,
+            #[serde(rename = "$schema")]
+            schema: &'a str,
             headers: RenderedResourceViewHeaders<'a>,
             #[serde(rename = "lastReconciledAt")]
             last_reconciled_at: &'a Option<DateTime<Utc>>,
@@ -701,8 +700,7 @@ impl ApplyPrinter<'_> {
         }
 
         serde_yaml::to_string(&RenderedResourceView {
-            api_version: &resource.api_version,
-            kind: &resource.kind,
+            schema: &resource.schema,
             headers: RenderedResourceViewHeaders::new(resource),
             last_reconciled_at: &resource.last_reconciled_at,
             spec: common::json_to_yaml_value(&resource.spec),
@@ -726,7 +724,10 @@ impl ApplyPrinter<'_> {
 
         format!(
             "{}: {} -> {}/{}",
-            style, source, result.resource.kind, result.resource.headers.name
+            style,
+            source,
+            kamu_resources::ResourceSchema::display_name(&result.resource.schema),
+            result.resource.headers.name
         )
     }
 

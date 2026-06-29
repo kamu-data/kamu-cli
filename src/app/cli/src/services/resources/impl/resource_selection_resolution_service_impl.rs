@@ -214,15 +214,11 @@ impl ResourceSelectionResolutionService for ResourceSelectionResolutionServiceIm
 
 impl ResourceSelectionResolutionServiceImpl {
     fn target_key_from_identity(identity: &ResourceIdentityView) -> ResourceTargetKey {
-        (
-            identity.kind.clone(),
-            identity.api_version.clone(),
-            identity.id,
-        )
+        (identity.schema.clone(), identity.id)
     }
 
     fn target_key(target: &ResourceTarget) -> ResourceTargetKey {
-        (target.kind.clone(), target.api_version.clone(), target.id)
+        (target.schema.clone(), target.id)
     }
 
     fn append_new_targets(
@@ -273,8 +269,7 @@ impl ResourceSelectionResolutionServiceImpl {
             .filter_map(|(index, item)| match item {
                 ResourceSelectionItem::Exact(selector) => Some((
                     index,
-                    selector.kind_descriptor.kind.clone(),
-                    selector.kind_descriptor.api_version.clone(),
+                    selector.kind_descriptor.name.clone(),
                     selector.resource_ref.clone(),
                 )),
                 ResourceSelectionItem::All
@@ -292,21 +287,18 @@ impl ResourceSelectionResolutionServiceImpl {
             .collect::<Vec<Option<Result<ResourceIdentityView, GetResourceError>>>>();
         let mut groups = BTreeMap::new();
 
-        for (exact_index, (_, kind, api_version, resource_ref)) in
-            exact_selectors.into_iter().enumerate()
-        {
+        for (exact_index, (_, kind, resource_ref)) in exact_selectors.into_iter().enumerate() {
             groups
-                .entry((kind, api_version))
+                .entry(kind)
                 .or_insert_with(Vec::new)
                 .push((exact_index, resource_ref));
         }
 
-        for ((kind, api_version), entries) in groups {
+        for (kind, entries) in groups {
             let exact_batch_result = resource_facade
                 .get_identities(ResourceBatchSelector {
                     account: None,
                     kind,
-                    api_version: Some(api_version),
                     resource_refs: entries
                         .iter()
                         .map(|(_, resource_ref)| resource_ref.clone())
@@ -377,7 +369,7 @@ impl ResourceSelectionResolutionServiceImpl {
             |pagination| async move {
                 resource_facade
                     .list_identities(ListResourceIdentitiesRequest {
-                        kind: kind_descriptor.kind.clone(),
+                        kind: kind_descriptor.name.clone(),
                         account: None,
                         pagination,
                     })
@@ -414,7 +406,7 @@ impl ResourceSelectionResolutionServiceImpl {
 
         let matched_kind_names = matched_kinds
             .iter()
-            .map(|descriptor| descriptor.kind.clone())
+            .map(|descriptor| descriptor.name.clone())
             .collect::<Vec<_>>();
 
         let collected = Self::collect_unique_bounded_identities(
@@ -466,7 +458,7 @@ impl ResourceSelectionResolutionServiceImpl {
                 async move {
                     resource_facade
                         .search_identities(SearchResourceIdentitiesRequest {
-                            kinds: vec![kind_descriptor.kind.clone()],
+                            kinds: vec![kind_descriptor.name.clone()],
                             exact_names: None,
                             name_pattern: Some(request_name_pattern),
                             account: None,
@@ -531,8 +523,7 @@ impl ResourceSelectionResolutionServiceImpl {
             match resource_facade
                 .get_identity(ResourceSelector {
                     account: None,
-                    kind: kind_descriptor.kind.clone(),
-                    api_version: Some(kind_descriptor.api_version.clone()),
+                    kind: kind_descriptor.name.clone(),
                     resource_ref: resource_ref.clone(),
                 })
                 .await
@@ -607,7 +598,7 @@ impl ResourceSelectionResolutionServiceImpl {
 
         let matched_kind_names = matched_kinds
             .iter()
-            .map(|descriptor| descriptor.kind.clone())
+            .map(|descriptor| descriptor.name.clone())
             .collect::<Vec<_>>();
 
         let collected = Self::collect_unique_bounded_identities(
@@ -836,8 +827,8 @@ impl ResourceSelectionResolutionServiceImpl {
         selector_input: String,
     ) -> ResourceTarget {
         ResourceTarget {
-            kind: identity.kind,
-            api_version: identity.api_version,
+            kind: identity.canonical_kind_name.clone(),
+            schema: identity.schema,
             canonical_kind_name: identity.canonical_kind_name,
             id: identity.id,
             name: identity.name,
@@ -848,7 +839,7 @@ impl ResourceSelectionResolutionServiceImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-type ResourceTargetKey = (String, String, kamu_resources::ResourceID);
+type ResourceTargetKey = (String, kamu_resources::ResourceID);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

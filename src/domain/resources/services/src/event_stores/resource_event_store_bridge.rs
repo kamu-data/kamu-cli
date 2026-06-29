@@ -52,18 +52,18 @@ where
 {
     fn make_raw_query(id: &ResourceID) -> ResourceRawEventQuery {
         ResourceRawEventQuery {
-            kind: TResource::DESCRIPTOR.resource_type.to_string(),
+            schema: TResource::DESCRIPTOR.schema.to_string(),
             id: *id,
         }
     }
 
     fn decode_raw_event(raw: ResourceRawEvent) -> Result<(EventID, TEvent), InternalError> {
-        if raw.query.kind != TResource::DESCRIPTOR.resource_type {
+        if raw.query.schema != TResource::DESCRIPTOR.schema {
             return InternalError::bail(format!(
-                "Unexpected resource kind in resource event store bridge: expected='{}', \
+                "Unexpected resource schema in resource event store bridge: expected='{}', \
                  actual='{}'",
-                TResource::DESCRIPTOR.resource_type,
-                raw.query.kind
+                TResource::DESCRIPTOR.schema,
+                raw.query.schema
             ));
         }
 
@@ -109,7 +109,7 @@ where
         raw_event_store: &dyn ResourceRawEventStore,
     ) -> Result<usize, InternalError> {
         raw_event_store
-            .total_events_stored_by_kind(TResource::DESCRIPTOR.resource_type)
+            .total_events_stored_by_schema(TResource::DESCRIPTOR.schema)
             .await
     }
 
@@ -119,7 +119,7 @@ where
     ) -> EventStream<'_, TEvent> {
         Box::pin(
             raw_event_store
-                .get_all_events_by_kind(TResource::DESCRIPTOR.resource_type, opts)
+                .get_all_events_by_schema(TResource::DESCRIPTOR.schema, opts)
                 .map(|result| {
                     result.and_then(|(_, raw_event)| {
                         Self::decode_raw_event(raw_event).map_err(GetEventsError::Internal)

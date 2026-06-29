@@ -18,8 +18,7 @@ use crate::{ResourceHeaders, ResourceID, ResourceName};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceIdentityView {
-    pub kind: String,
-    pub api_version: String,
+    pub schema: String,
     pub canonical_kind_name: String,
     pub id: ResourceID,
     pub name: ResourceName,
@@ -29,8 +28,7 @@ pub struct ResourceIdentityView {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceView {
-    pub kind: String,
-    pub api_version: String,
+    pub schema: String,
     pub account: ResourceViewAccount,
     pub headers: ResourceViewHeaders,
     pub last_reconciled_at: Option<DateTime<Utc>>,

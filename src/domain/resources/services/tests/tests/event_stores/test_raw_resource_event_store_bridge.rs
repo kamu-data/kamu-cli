@@ -64,7 +64,7 @@ async fn test_kind_filtering_excludes_unrelated_raw_events() {
     harness.save_events(id, vec![created]).await;
 
     let wrong_query = ResourceRawEventQuery {
-        kind: "OtherResource".to_string(),
+        schema: "OtherResource".to_string(),
         id,
     };
     let wrong_raw = ResourceRawEvent {

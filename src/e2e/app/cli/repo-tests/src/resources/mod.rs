@@ -58,7 +58,7 @@ pub fn assert_record_row(doc: &serde_json::Value, label: &str, name: &str, kind:
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Return the `totalCount` for a resource kind from `summary -o json/yaml`
+/// Return the `totalCount` for a resource schema from `summary -o json/yaml`
 /// output converted to JSON.
 pub fn summary_count(doc: &serde_json::Value, label: &str, kind: &str) -> u64 {
     let Some(row) = summary_row(doc, label, kind) else {
@@ -83,7 +83,7 @@ fn summary_row<'a>(
         .unwrap_or_else(|| panic!("`{label}` should contain resourceCounts array:\n{doc}"));
 
     rows.iter()
-        .find(|row| row.get("kind").and_then(serde_json::Value::as_str) == Some(kind))
+        .find(|row| row.get("schema").and_then(serde_json::Value::as_str) == Some(kind))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

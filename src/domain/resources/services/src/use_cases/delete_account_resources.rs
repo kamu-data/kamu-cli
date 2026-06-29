@@ -68,10 +68,7 @@ impl DeleteAccountResourcesUsecaseImpl {
 
         for resource_snapshot in resource_snapshots {
             let id = resource_snapshot.id;
-            let descriptor_key = (
-                resource_snapshot.kind.clone(),
-                resource_snapshot.api_version.clone(),
-            );
+            let descriptor_key = resource_snapshot.schema.clone();
 
             grouped
                 .entry(descriptor_key)
@@ -95,8 +92,7 @@ impl DeleteAccountResourcesUseCase for DeleteAccountResourcesUsecaseImpl {
         for (resource_snapshot, ids) in self.group_resource_ids_by_descriptor(resource_snapshots) {
             let dispatcher = get_resource_crud_dispatcher::<DeleteAccountResourceDispatchError>(
                 &self.catalog,
-                &resource_snapshot.kind,
-                &resource_snapshot.api_version,
+                &resource_snapshot.schema,
             )
             .map_err(ErrorIntoInternal::int_err)?;
 

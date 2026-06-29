@@ -37,15 +37,9 @@ pub trait ResourceLifecycleEventDispatcher: Send + Sync {
 
 pub fn get_resource_lifecycle_dispatcher_from_catalog(
     target_catalog: &Catalog,
-    kind: &str,
-    api_version: &str,
+    schema: &str,
 ) -> Result<Arc<dyn ResourceLifecycleEventDispatcher>, InternalError> {
-    get_resource_dispatcher_from_catalog(
-        target_catalog,
-        kind,
-        api_version,
-        "resource lifecycle dispatcher",
-    )
+    get_resource_dispatcher_from_catalog(target_catalog, schema, "resource lifecycle dispatcher")
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

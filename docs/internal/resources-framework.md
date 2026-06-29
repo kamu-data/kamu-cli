@@ -11,14 +11,14 @@
 
 **One-paragraph mental model.** The resources framework is a generic, event-sourced,
 Kubernetes-inspired subsystem for *declarative* management of arbitrary "resource kinds". A user
-authors a **manifest** (`apiVersion` + `kind` + `headers` + `spec`); the framework stores it as an
-event-sourced aggregate, fills in server-owned headers (id, timestamps, `generation`) and an
-**initial** server-owned `status`, then **asynchronously reconciles** it toward the desired state
-(the status progresses `Pending → Reconciling → Ready`/`Failed`). Every kind (today:
-`VariableSet`, `SecretSet`) implements a small set of traits and registers a **dispatcher** keyed by
-`(kind, apiVersion)`. All callers — the CLI and the GraphQL API — go through a single seam, the
-**`ResourceFacade`** trait, which has an in-process (`Local`) implementation and a
-`RemoteGraphql` implementation that talks to a remote server.
+authors a **manifest** (`$schema` + `headers` + `spec`); the framework stores it as an event-sourced
+aggregate, fills in server-owned headers (id, timestamps, `generation`) and an **initial**
+server-owned `status`, then **asynchronously reconciles** it toward the desired state (the status
+progresses `Pending → Reconciling → Ready`/`Failed`). Every kind (today: `VariableSet`, `SecretSet`)
+implements a small set of traits and registers a **dispatcher** keyed by its canonical schema URL.
+All callers — the CLI and the GraphQL API — go through a single seam, the **`ResourceFacade`** trait,
+which has an in-process (`Local`) implementation and a `RemoteGraphql` implementation that talks to
+a remote server.
 
 **Where to start reading, by intent:**
 
@@ -101,7 +101,7 @@ The framework provides a uniform way to **declaratively manage** typed resources
   each spec/headers change) — and a `status` with `phase`, `observedGeneration` (reconciliation
   progress), and `conditions`. Reconciliation is needed whenever `observedGeneration < generation`.
 - **Pluggable kinds** — the generic machinery is type-parameterized over a resource type `R`;
-  concrete kinds plug in via traits + a registered dispatcher keyed by `(kind, apiVersion)`.
+  concrete kinds plug in via traits + registered dispatchers keyed by canonical schema URL.
 - **Local & remote symmetry** — the same operations run in-process or against a remote server behind
   one trait (`ResourceFacade`).
 - **Event-sourced & transactional** — mutations are recorded as immutable events; lifecycle changes
@@ -120,10 +120,11 @@ long-term goal. This page documents what exists now.
 | Term | Meaning |
 | --- | --- |
 | **Resource** | A single managed object instance of a given kind, identified by a `ResourceID`. |
-| **Kind** | The resource type discriminator string, e.g. `VariableSet`, `SecretSet`. |
-| **ApiVersion** | Versioning string for the kind's schema, e.g. `kamu.dev/v1alpha1`. |
-| **Descriptor** | The `(kind, apiVersion)` pair (`ResourceDescriptor`) used to route to the right dispatcher. |
-| **Manifest** | The user-authored wire document (`apiVersion`/`kind`/`headers`/`spec`) in YAML or JSON. |
+| **Schema** | The canonical resource type identity URL, e.g. `https://opendatafabric.org/schemas/config/v1alpha1/VariableSet`. |
+| **Kind name** | User-facing selector / presentation name, e.g. `variablesets`, `secretsets`. Not persisted as the resource type identity. |
+| **Short name** | Selector alias, e.g. `vs`, `ss`. |
+| **Descriptor** | The schema-only `ResourceDescriptor` used to route to the right dispatcher. |
+| **Manifest** | The user-authored wire document (`$schema`/`headers`/`spec`) in YAML or JSON. |
 | **Spec** | The desired-state portion authored by the user; stored as `serde_json::Value`. |
 | **Status** | Server-owned observed state (`phase`, `observedGeneration`, `conditions`). Note `generation` lives in **headers**, not status. |
 | **Snapshot** | The persisted materialized form of a resource (`ResourceSnapshot`). |
@@ -133,7 +134,7 @@ long-term goal. This page documents what exists now.
 | **Reconciliation** | The act of driving actual state toward the spec (e.g. `SecretSet` materializes its encrypted read-side projection). |
 | **Selector** | Identifies one (`ResourceSelector`) or many (`ResourceBatchSelector`) resources, by name or UID, optionally scoped to an account. |
 | **SpecViewMode** | How sensitive spec fields are rendered. Two modes only: `Encrypted` (default — the stored ciphertext envelope is returned as-is) and `Revealed` (decrypted plaintext). There is no separate "redacted/placeholder" mode today. |
-| **Dispatcher** | Per-kind adapter (`ResourceCrudDispatcher`, …) registered in `dill` and looked up by descriptor. |
+| **Dispatcher** | Per-kind adapter (`ResourceCrudDispatcher`, …) registered in `dill` and looked up by schema or selector metadata. |
 | **Facade** | The single API seam (`ResourceFacade`) used by all callers; local or remote-GraphQL impl. |
 
 ---
@@ -146,14 +147,14 @@ not break; most are enforced in code and exercised by tests — pointers given w
 - **`ResourceID` is immutable and server-allocated.** A new resource's UID comes from
   `GenericResourceQueryService::allocate_uid()`; callers cannot choose it. Once assigned it never
   changes (it is the primary key — see [§6](#6-persistence-model)).
-- **`(account_id, kind, name)` is unique.** Enforced by a DB unique constraint
-  `UNIQUE (account_id, resource_kind, resource_name)`. Names are stored lowercased.
-- **`apiVersion` selects schema/dispatcher behavior — it is *not* part of resource identity.**
-  Identity is `(account, kind, name)` (and the UID); `apiVersion` only routes to a dispatcher
-  ([§9](#9-services-kamu-resources-services)). Consequently `VariableSet/kamu.dev/v1alpha1/foo` and
-  `VariableSet/kamu.dev/v1beta1/foo` **cannot coexist** — they are the same resource. A version
-  change is schema evolution of one named resource, not a second parallel resource (see the
-  migration note in [§6](#6-persistence-model)).
+- **`(account_id, schema, name)` is unique.** Enforced by a DB unique constraint
+  `UNIQUE (account_id, resource_schema, resource_name)`. Names are stored lowercased.
+- **`$schema` is the resource type identity.** Manifests no longer carry top-level `apiVersion` or
+  `kind`; both are rejected as unknown fields. A schema URL is parsed into base/context/version/name
+  for validation and display, but dispatch and persistence compare the full canonical schema string.
+- **Selectors are presentation names, not manifest identity.** CLI and GraphQL selectors still use
+  friendly kind names and short names (`variablesets`, `vs`, `secretsets`, `ss`), which are resolved
+  to a `ResourceKindDescriptor.schema` before repository or dispatcher access.
 - **`headers.generation` changes only when desired state changes.** It starts at 1 on create and is
   bumped by the aggregate only when an apply produces a real headers/spec change (`Update`); an
   unchanged apply is `Untouched` and does not bump it.
@@ -194,7 +195,7 @@ flowchart TD
     REMOTE["RemoteGraphqlResourceFacadeImpl<br/>(cynic GraphQL client)"]
 
     subgraph domain["Domain + services"]
-      REG["Dispatcher registry<br/>lookup by (kind, apiVersion)"]
+      REG["Dispatcher registry<br/>lookup by schema<br/>or selector metadata"]
       DISP["ResourceCrudDispatcher&lt;R&gt;<br/>per-kind"]
       UC["Use cases&lt;R&gt;<br/>apply / reconcile / get / list / delete"]
     end
@@ -285,11 +286,12 @@ and an aggregate. This is the bound that all generic use cases require.
 
 **Presentation & descriptor traits:**
 
-- **`ResourceType` / `ResourceApiVersion`** — const strings `RESOURCE_TYPE` and `API_VERSION`.
-- **`ResourceDescriptorProvider`** — blanket-implemented for any `ResourceType + ResourceApiVersion`;
-  exposes `const DESCRIPTOR: ResourceDescriptor` = `(kind, apiVersion)`
+- **`ResourceSchemaProvider`** — const string `SCHEMA`, the canonical schema URL for the resource.
+- **`ResourceDescriptorProvider`** — blanket-implemented for any `ResourceSchemaProvider`;
+  exposes `const DESCRIPTOR: ResourceDescriptor` = `schema`
   ([`core/resource_descriptor.rs`](/src/domain/resources/domain/src/core/resource_descriptor.rs)).
-- **`ResourcePresentation`** — short names + per-kind list columns for table/`list` rendering.
+- **`ResourcePresentation`** — selector name, short names, and per-kind list columns for
+  table/`list` rendering.
 
 ### Events
 
@@ -302,7 +304,7 @@ current state.
 
 `ResourceRepository` (`repo/`) is the persistence seam: allocate UID, create/update snapshot
 (with optimistic `expected_last_event_id`), find by name/id, search identities, and stream UIDs /
-snapshots by kind.
+snapshots by schema.
 
 ### Dispatchers
 
@@ -310,7 +312,7 @@ The generic code can't name a concrete `R` at the API boundary, so dynamic dispa
 descriptor. `ResourceCrudDispatcher` is the main one (also `ResourcePresentationDispatcher`,
 `ResourceLifecycleEventDispatcher`, and a spec-view dispatcher that reveals/decrypts sensitive
 spec fields on request). Each carries
-`ResourceDispatcherMeta { descriptor }` as `dill` metadata for registry lookup
+schema plus presentation metadata as `dill` metadata for registry lookup
 (see [§9](#9-services-kamu-resources-services)).
 
 ### Use-case traits
@@ -330,8 +332,8 @@ Generic, `R`-parameterized contracts in `use_cases/`: `ApplyResourceUseCase<R>` 
 
 ```rust
 pub struct ResourceManifest {
-    pub api_version: String,                 // required — e.g. "kamu.dev/v1alpha1"
-    pub kind: String,                        // required — e.g. "VariableSet"
+    #[serde(rename = "$schema")]
+    pub schema: String,                      // required — canonical schema URL
     pub headers: ResourceManifestHeaders,
     pub spec: serde_json::Value,             // desired state; kind-specific shape
 }
@@ -348,9 +350,10 @@ pub struct ResourceManifestHeaders {
 }
 ```
 
-A user may write **only**: `apiVersion`, `kind`, `headers.{id?, account?, name, description?,
-labels, annotations}`, and `spec`. `deny_unknown_fields` means a manifest **cannot** carry `status`,
-timestamps, or `generation` — those are server-owned.
+A user may write **only**: `$schema`, `headers.{id?, account?, name, description?, labels,
+annotations}`, and `spec`. `deny_unknown_fields` means a manifest **cannot** carry `status`,
+timestamps, `generation`, or the legacy top-level `apiVersion`/`kind` fields — those are
+server-owned or no longer part of the manifest envelope.
 
 The `id` is **not** something the user assigns — a new resource's UID is always allocated by the
 server. It may only be *supplied* on a manifest to point at an already-existing resource for an
@@ -390,8 +393,7 @@ combines authored + generated + event-sourcing bookkeeping:
 ```rust
 pub struct ResourceSnapshot {
     pub id: ResourceID,
-    pub kind: String,
-    pub api_version: String,
+    pub schema: String,
     pub headers: ResourceHeaders,            // authored fields + generated fields
     pub spec: serde_json::Value,             // authored (may be transformed — see SecretSet)
     pub status: Option<serde_json::Value>,   // generated
@@ -402,7 +404,7 @@ pub struct ResourceSnapshot {
 
 ```mermaid
 flowchart LR
-    M["Manifest (authored)<br/>apiVersion, kind<br/>headers: name, account?, id?,<br/>description?, labels, annotations<br/>spec"]
+    M["Manifest (authored)<br/>$schema<br/>headers: name, account?, id?,<br/>description?, labels, annotations<br/>spec"]
     A["apply use case<br/>(resolve account, allocate id,<br/>bump generation, set timestamps)"]
     S["Snapshot / State<br/>= authored fields<br/>+ <b>generated</b>: account(ID), id,<br/>generation, created/updated/deleted_at,<br/>status{phase, observedGeneration, conditions}"]
     M --> A --> S
@@ -429,14 +431,14 @@ Resources are **event-sourced with a materialized snapshot per resource**. Stora
 **Two tables:**
 
 - **`resources`** — one row per resource (the snapshot): `resource_id` (UUID, **PK**),
-  `account_id`, `resource_kind`, `api_version`, `resource_name`, `description`, `labels`/`annotations`
+  `account_id`, `resource_schema`, `resource_name`, `description`, `labels`/`annotations`
   (JSONB), `spec` (JSONB), `status` (JSONB, nullable), `generation`, `created_at`/`updated_at`,
   `deleted_at` (nullable), `last_reconciled_at`, `last_event_id`. **Uniqueness:**
-  `UNIQUE (account_id, resource_kind, resource_name)` — note **api_version is not part of the key**.
-  A partial index on `(account_id, kind, api_version, status->>'phase') WHERE deleted_at IS NULL`
+  `UNIQUE (account_id, resource_schema, resource_name)`.
+  A partial index on `(account_id, resource_schema, status->>'phase') WHERE deleted_at IS NULL`
   backs the summary projection.
 - **`resource_events`** — append-only log: `event_id` (BIGINT from a sequence, PK), `resource_id`
-  (FK → `resources`), `resource_kind`, `event_time`, `event_type`, `event_payload` (JSONB).
+  (FK → `resources`), `resource_schema`, `event_time`, `event_type`, `event_payload` (JSONB).
 
 **Source of truth.** The event log is authoritative — aggregates are rebuilt by projecting events
 (`ResourceAggregateLoader`). The `resources` row is a **derived snapshot** maintained in the same
@@ -451,7 +453,7 @@ returns `UpdateResourceError::concurrent_modification()`. A unique-constraint vi
 **Soft-delete / tombstone.** Delete is a soft-delete: the row stays with `deleted_at` set and a
 `Deleted` event is appended. Because the unique constraint still covers deleted rows, delete also
 **renames the resource to a tombstone name** (`try_delete(now, tombstone_name)` → `Deleted` event
-carries `tombstone_name`) so the original `(account, kind, name)` is freed for reuse. All query/list
+carries `tombstone_name`) so the original `(account, schema, name)` is freed for reuse. All query/list
 methods filter `WHERE deleted_at IS NULL`, so tombstones are invisible to normal reads.
 
 **Migration / backfill.** Schema changes are ordinary SQLx migrations under `migrations/{postgres,sqlite}`.
@@ -460,11 +462,11 @@ There is a precedent for data backfill into resources —
 resources; new kinds that supersede existing data should follow that pattern (additive migration +
 backfill, never rewriting the event log in place).
 
-**Version upgrades.** Because `apiVersion` is not part of identity (see [§3](#3-invariants)), a new
-schema version of a kind must be modeled as **schema evolution / conversion of the same named
-resource**, not as a parallel resource with the same name under a different API version. Upgrades
-should convert spec/status in place (migration or a conversion step) so the `(account, kind, name)`
-row remains singular across versions.
+**Schema/version upgrades.** The schema URL is part of resource identity, including its version
+segment. Supporting a new schema version therefore requires an explicit compatibility/migration
+story for that resource kind: update manifests, projections, dispatcher registration, and any
+existing rows/events that should move to the new schema. Do not assume the pre-`$schema` version
+conversion rules still apply.
 
 ---
 
@@ -488,7 +490,8 @@ Resolution + permission checks live in `ResourceAccountResolverImpl`
 - **UID belonging to a different account.** Lookups are account-scoped (`find_account_snapshot`
   filters by `account_id`). A UID that exists but belongs to another account is reported as
   **not-found** (`ResourceIDNotFoundError`), not "forbidden" — so existence is not leaked across
-  accounts. A UID of the wrong *kind* yields `ResourceTypeMismatchError`.
+  accounts. A UID of the wrong schema yields `ResourceTypeMismatchError` in the domain and
+  `ResourceLookupProblem::SchemaMismatch` at the facade boundary.
 - **Account-deletion cascade.** When an account is deleted, `DeleteAccountResourcesUseCase` deletes
   that account's resources (see [§13](#13-data-flow-walkthroughs)). It operates on live resources;
   already-tombstoned resources are simply skipped (they are already `deleted_at`-marked), so the
@@ -501,7 +504,7 @@ Resolution + permission checks live in `ResourceAccountResolverImpl`
 The apply planner ([`services/apply_resource_planner.rs`](/src/domain/resources/services/src/services/apply_resource_planner.rs))
 decides create vs update by resolving the target resource first:
 
-- **No `id` in manifest** → resolve by `(account, kind, name)`. Found → update; not found → create
+- **No `id` in manifest** → resolve by `(account, schema, name)`. Found → update; not found → create
   (new UID allocated).
 - **`id` in manifest** → load that exact resource (the "exact pointer"). This is what enables a
   **rename**: supply the `id` and a new `headers.name`; identity stays stable while the name
@@ -512,11 +515,11 @@ Concrete conflict cases:
 | Case | Outcome |
 | --- | --- |
 | `id` + changed `headers.name` | **Rename** — name updated on the same resource (`Update`). |
-| `id` whose resource is a different `kind` (or apiVersion type) | **Reject** — `ResourceTypeMismatchError`. |
+| `id` whose resource has a different schema | **Reject** — `ResourceTypeMismatchError` in domain code, mapped to `SchemaMismatch` in the facade. |
 | `id` resolving to a resource in a different account | **Not found** — `ResourceIDNotFoundError` (account-scoped lookup; existence not leaked). |
 | `headers.account` targeting another account without admin | **Reject** — `AccessError::Unauthorized` ([§7](#7-account-resolution--authorization)). |
-| Rename target name already taken (same account+kind) | **Reject** — unique-constraint `Duplicate` at persistence. |
-| Update by name where another account has the same name | **No conflict** — the account disambiguates; each `(account, kind, name)` is independent. |
+| Rename target name already taken (same account+schema) | **Reject** — unique-constraint `Duplicate` at persistence. |
+| Update by name where another account has the same name | **No conflict** — the account disambiguates; each `(account, schema, name)` is independent. |
 | Apply re-using a tombstoned (deleted) name | **Allowed** — the deleted resource was renamed to a tombstone, freeing the name for a fresh create. |
 | Apply with no real change | **`Untouched`** — no generation bump, no events, no reconcile. |
 
@@ -561,18 +564,16 @@ The `--dry-run` path uses `plan`; a live apply uses `apply`. Use-case implementa
 by **`declare_*_use_case!`** macros so each kind gets a fully-wired instance without boilerplate.
 
 **Dispatchers + registry.** Each kind registers a `ResourceCrudDispatcher` via
-`declare_resource_crud_dispatcher!` (and a presentation dispatcher). Lookup is by descriptor through
-`dill` metadata
+`declare_resource_crud_dispatcher!` (and a presentation dispatcher). Lookup is by schema or selector
+metadata through `dill`
 ([`crud_dispatchers/resource_crud_dispatcher_registry.rs`](/src/domain/resources/services/src/crud_dispatchers/resource_crud_dispatcher_registry.rs)):
 
 ```rust
-pub fn get_resource_crud_dispatcher<E>(target_catalog, kind, api_version)
+pub fn get_resource_crud_dispatcher<E>(target_catalog, schema)
     -> Result<Arc<dyn ResourceCrudDispatcher>, E>
 {
     let mut handlers = target_catalog.builders_for_with_meta::<dyn ResourceCrudDispatcher, _>(
-        |meta: &ResourceDispatcherMeta| {
-            meta.descriptor.resource_type == kind && meta.descriptor.api_version == api_version
-        });
+        |meta: &ResourceDispatcherMeta| meta.schema == schema);
     // exactly-one expected → NotFound / Duplicate otherwise
 }
 ```
@@ -621,7 +622,7 @@ pub trait ResourceFacade: Send + Sync {
 
 ```rust
 pub struct ResourceSelector { pub account: Option<ResourceManifestAccount>, pub kind: String,
-                              pub api_version: Option<String>, pub resource_ref: ResourceRef }
+                              pub resource_ref: ResourceRef }
 pub enum   ResourceRef { ById(ResourceID), ByName(ResourceName) }
 pub enum   ResourceManifestFormat { Json, Yaml }
 pub enum   SpecViewMode { Encrypted /* default */, Revealed }
@@ -632,8 +633,9 @@ Batch operations return `BatchResourceResponse<T, E>` with positional `successes
 
 **Implementations:**
 
-- **`LocalResourceFacadeImpl`** — resolves account → resolves selector to UID/snapshot → looks up the
-  per-kind dispatcher via `get_resource_crud_dispatcher` → calls it. Holds the `dill::Catalog`,
+- **`LocalResourceFacadeImpl`** — resolves account → resolves selector kind name/short name to a
+  schema and UID/snapshot → looks up the per-kind dispatcher via `get_resource_crud_dispatcher` →
+  calls it. Holds the `dill::Catalog`,
   a `ResourceAccountResolver`, and `GenericResourceQueryService`.
 - **`RemoteGraphqlResourceFacadeImpl`** — a `cynic`-based GraphQL client that issues the queries /
   mutations of a remote server (whose resolvers use a *local* facade there). Operations live under
@@ -774,8 +776,8 @@ sequenceDiagram
 
     U->>D: apply -f manifest.yaml [--dry-run]
     D->>F: apply_manifest(ApplyManifestRequest) (or plan_apply_manifest)
-    F->>F: resolve account, parse manifest (kind, apiVersion, spec)
-    F->>R: get_resource_crud_dispatcher(kind, apiVersion)
+    F->>F: resolve account, parse manifest ($schema, spec)
+    F->>R: get_resource_crud_dispatcher(schema)
     R-->>F: ResourceCrudDispatcher<R>
     F->>UC: plan(params)  %% validate + diff (create/update/untouched)
     alt dry-run
@@ -855,7 +857,7 @@ Reconciliation is **not** synchronous within `apply` — it is driven by the out
 flowchart LR
     A["apply use case<br/>(persist + produce Applied)"] --> OB[("Outbox")]
     OB --> C["ResourceLifecycleMessageConsumer<br/>(event bridge)"]
-    C -->|lookup by kind/apiVersion| D["per-kind ResourceLifecycleEventDispatcher<br/>handle_applied()"]
+    C -->|lookup by schema| D["per-kind ResourceLifecycleEventDispatcher<br/>handle_applied()"]
     D --> R["ReconcileResourceUseCase::execute(id)"]
     R --> Rec["Reconciler&lt;R&gt;"]
 ```
@@ -926,14 +928,14 @@ stateDiagram-v2
 
 ## 14. Concrete resource kinds (`kamu-configuration`)
 
-Two kinds are functional today, both at `apiVersion = kamu.dev/v1alpha1`. (A third, `Storage`
+Two kinds are functional today, both under the config `v1alpha1` schema namespace. (A third, `Storage`
 (`st`/`storage`), lives under `src/domain/storage/` and is wired through the same machinery but is
 **work in progress / not yet complete** — treat it as an in-flight example, not a supported kind.)
 
-| Kind | Short name | Spec | Reconciliation |
-| --- | --- | --- | --- |
-| **`VariableSet`** | `vs` | `spec.variables` (name → value, scalar or `{ value }`) | Projects status; lint warnings (e.g. reserved `KAMU_` prefix). |
-| **`SecretSet`** | `ss` | `spec.secrets` (name → plaintext / `{ value }` / encrypted) | Materializes an **encrypted** read-side projection (`SecretSetEntry`) for consumers (see [Secret handling](#secret-handling-invariant) for where encryption actually happens). |
+| Schema | Selector name | Short name | Spec | Reconciliation |
+| --- | --- | --- | --- | --- |
+| `https://opendatafabric.org/schemas/config/v1alpha1/VariableSet` | `variablesets` | `vs` | `spec.variables` (name → value, scalar or `{ value }`) | Projects status; lint warnings (e.g. reserved `KAMU_` prefix). |
+| `https://opendatafabric.org/schemas/config/v1alpha1/SecretSet` | `secretsets` | `ss` | `spec.secrets` (name → plaintext / `{ value }` / encrypted) | Materializes an **encrypted** read-side projection (`SecretSetEntry`) for consumers (see [Secret handling](#secret-handling-invariant) for where encryption actually happens). |
 
 ### Secret handling invariant
 
@@ -973,12 +975,12 @@ resource declares its identity and implements the core traits, e.g.:
 ```rust
 // variable_set/resource.rs
 impl VariableSetResource {
-    pub const RESOURCE_TYPE: &'static str = "VariableSet";
+    pub const SCHEMA: &'static str =
+        "https://opendatafabric.org/schemas/config/v1alpha1/VariableSet";
+    pub const RESOURCE_NAME: &'static str = "variablesets";
     pub const RESOURCE_SHORT_NAMES: &'static [&'static str] = &["vs"];
-    pub const API_VERSION: &'static str = "kamu.dev/v1alpha1";
 }
-impl ResourceType for VariableSetResource { const RESOURCE_TYPE: &'static str = Self::RESOURCE_TYPE; }
-impl ResourceApiVersion for VariableSetResource { const API_VERSION: &'static str = Self::API_VERSION; }
+impl ResourceSchemaProvider for VariableSetResource { const SCHEMA: &'static str = Self::SCHEMA; }
 impl DeclarativeResource for VariableSetResource { /* … */ }
 impl ResourcePresentation for VariableSetResource { /* short names + list columns */ }
 ```
@@ -1002,9 +1004,9 @@ pub fn register_variable_set_resource_crud_dispatcher(catalog_builder: &mut dill
 
 1. **Define the domain types** under `configuration/domain/src/resources/<kind>/`: `spec.rs`
    (`#[serde(deny_unknown_fields)]`, with validation + lint), `status.rs`, `state.rs`, `event.rs`,
-   and `resource.rs` implementing `ResourceType`, `ResourceApiVersion`, `DeclarativeResource`,
+   and `resource.rs` implementing `ResourceSchemaProvider`, `DeclarativeResource`,
    `ReconcilableResource`/`ReconcilableEventSourcedResource`, and `ResourcePresentation`
-   (set `RESOURCE_TYPE`, `RESOURCE_SHORT_NAMES`, `API_VERSION`).
+   (set `SCHEMA`, `RESOURCE_NAME`, `RESOURCE_SHORT_NAMES`).
 2. **Implement a `Reconciler<R>`** in `configuration/services/src/reconcilers/` (no-op projection is
    fine if there's nothing to do; transform the spec here if needed — see `SecretSet`).
 3. **Declare dispatchers** with `declare_resource_crud_dispatcher!` /
@@ -1018,7 +1020,7 @@ pub fn register_variable_set_resource_crud_dispatcher(catalog_builder: &mut dill
 5. **Test all three tiers** (see [§15](#15-tests)): a reconciler/service unit test, a facade contract
    case, and an E2E lifecycle test (apply → list → get → update → delete) plus a golden-view test.
 
-The dispatcher registry then resolves your kind by `(kind, apiVersion)`, so the generic CRUD
+The dispatcher registry then resolves your resource by schema or selector metadata, so the generic CRUD
 operations work everywhere without changing the CLI command or GraphQL resolver code. **But "no
 changes" is only true for the generic path** — in practice a complete kind still needs:
 
@@ -1103,12 +1105,19 @@ Otherwise the behavior is already guaranteed for both implementations by the con
   cache instead of a live database — needed for agent/CI-style runs without a reachable Postgres.
   Developers with the local Docker Postgres/Elasticsearch services up may omit it. (Never needed for
   `fmt`/`doc`.)
-- **Dispatch is by `(kind, apiVersion)` — both must match.** A missing pair yields
+- **Dispatch is by schema.** A missing schema yields
   `UnsupportedResourceDescriptorError::NotFound`; two matching registrations yield `Duplicate`.
+  Selector-based lookup (`variablesets`, `vs`, etc.) is a separate metadata path and yields
+  selector-specific not-found/duplicate errors.
 - **Manifests are strict** — `#[serde(deny_unknown_fields)]` means a manifest cannot carry
-  `status`, timestamps, or `generation`. Those are server-owned ([§5a](#5a-resource-anatomy--input-vs-auto-generated)).
+  `status`, timestamps, `generation`, or legacy top-level `apiVersion`/`kind`. Those are
+  server-owned or no longer accepted in the manifest envelope
+  ([§5a](#5a-resource-anatomy--input-vs-auto-generated)).
 - **`spec` is stored as `serde_json::Value`** — the framework is schema-agnostic; per-kind structure
   and validation live in the kind's `spec.rs`.
+- **Schema strings are validated, not normalized** — `ResourceSchema` rejects malformed URLs,
+  whitespace, query strings, fragments, trailing slashes, and too-few path segments, but it preserves
+  the accepted string and allows non-`opendatafabric.org` hosts for future custom schema namespaces.
 - **Secrets are encrypted before the first durable write** (by the spec sanitizer, not the
   reconciler) and only decrypted on read with `SpecViewMode::Revealed` (CLI `--revealed`, GraphQL
   `revealed: true`); the default `Encrypted` returns the stored ciphertext envelope. See

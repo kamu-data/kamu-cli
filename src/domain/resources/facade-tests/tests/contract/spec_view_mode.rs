@@ -29,8 +29,8 @@ use pretty_assertions::assert_eq;
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
 use crate::helpers::{
-    SECRET_SET_API_VERSION,
     SECRET_SET_KIND,
+    SECRET_SET_SCHEMA,
     assert_applied_outcome,
     assert_batch_indexes,
     secret_set_manifest_json,
@@ -42,7 +42,6 @@ fn secret_selector(name: &str) -> ResourceSelector {
     ResourceSelector {
         account: None,
         kind: SECRET_SET_KIND.to_string(),
-        api_version: Some(SECRET_SET_API_VERSION.to_string()),
         resource_ref: ResourceRef::ByName(name.to_string()),
     }
 }
@@ -123,8 +122,8 @@ pub async fn test_revealed_spec_view_exposes_plaintext(h: &impl FacadeContractHa
 
     // Non-secret identity fields are unchanged
     assert_eq!(view.headers.name, "sv-revealed");
-    assert_eq!(view.kind, SECRET_SET_KIND);
-    assert_eq!(view.api_version, SECRET_SET_API_VERSION);
+    assert_eq!(view.schema, SECRET_SET_SCHEMA);
+    assert_eq!(view.schema, SECRET_SET_SCHEMA);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -143,7 +142,6 @@ pub async fn test_spec_view_mode_applies_to_batch_get(h: &impl FacadeContractHar
     let batch_selector = ResourceBatchSelector {
         account: None,
         kind: SECRET_SET_KIND.to_string(),
-        api_version: Some(SECRET_SET_API_VERSION.to_string()),
         resource_refs: vec![ResourceRef::ById(id_a), ResourceRef::ById(id_b)],
     };
 
@@ -223,7 +221,7 @@ pub async fn test_spec_view_mode_applies_to_render(h: &impl FacadeContractHarnes
     // Parsed revealed manifest has the secret in the spec
     let parsed: serde_json::Value =
         serde_json::from_str(&rev_result.manifest).expect("must be valid JSON");
-    assert_eq!(parsed["kind"], SECRET_SET_KIND);
+    assert_eq!(parsed["$schema"], SECRET_SET_SCHEMA, "schema mismatch");
     assert!(
         parsed["headers"]["id"].is_null(),
         "rendered manifest must not include id"

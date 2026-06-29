@@ -11,7 +11,6 @@ use event_sourcing::*;
 use kamu_resources::{
     DeclarativeResource,
     DeclarativeResourceState,
-    ResourceApiVersion,
     ResourceListColumnDataType,
     ResourceListColumnDefinition,
     ResourceListColumnValue,
@@ -19,7 +18,7 @@ use kamu_resources::{
     ResourceListColumnVisibility,
     ResourcePresentation,
     ResourcePresentationDefinition,
-    ResourceType,
+    ResourceSchemaProvider,
 };
 
 use crate::{SecretSetEventStore, SecretSetSpec, SecretSetState, SecretSetStatus};
@@ -32,20 +31,15 @@ pub struct SecretSetResource(pub(crate) Aggregate<SecretSetState, dyn SecretSetE
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl SecretSetResource {
-    pub const RESOURCE_TYPE: &'static str = "SecretSet";
+    pub const SCHEMA: &'static str = "https://opendatafabric.org/schemas/config/v1alpha1/SecretSet";
     pub const RESOURCE_NAME: &'static str = "secretsets";
     pub const RESOURCE_SHORT_NAMES: &'static [&'static str] = &["ss"];
-    pub const API_VERSION: &'static str = "kamu.dev/v1alpha1";
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl ResourceType for SecretSetResource {
-    const RESOURCE_TYPE: &'static str = Self::RESOURCE_TYPE;
-}
-
-impl ResourceApiVersion for SecretSetResource {
-    const API_VERSION: &'static str = Self::API_VERSION;
+impl ResourceSchemaProvider for SecretSetResource {
+    const SCHEMA: &'static str = Self::SCHEMA;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

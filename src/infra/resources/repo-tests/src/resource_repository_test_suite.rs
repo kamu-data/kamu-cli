@@ -30,8 +30,7 @@ use kamu_resources::{
 fn make_test_snapshot(account_id: odf::AccountID, kind: &str, name: &str) -> ResourceSnapshot {
     ResourceSnapshot {
         id: ResourceID::new(uuid::Uuid::new_v4()),
-        kind: kind.to_string(),
-        api_version: "v1".to_string(),
+        schema: kind.to_string(),
         headers: ResourceHeaders::simple(Utc::now(), account_id, name.to_ascii_lowercase()),
         spec: serde_json::json!({"key": "value"}),
         status: None,
@@ -88,7 +87,7 @@ pub async fn test_create_and_find_resource(catalog: &Catalog) {
     assert!(found.is_some());
     let found = found.unwrap();
     assert_eq!(found.id, id);
-    assert_eq!(found.kind, "TestKind");
+    assert_eq!(found.schema, "TestKind");
     assert_eq!(found.headers.name, "my-resource");
     assert_eq!(found.last_event_id, None);
 
@@ -102,7 +101,7 @@ pub async fn test_create_and_find_resource(catalog: &Catalog) {
     // find via raw event query
     let found = repo
         .find_resource_snapshot(&ResourceRawEventQuery {
-            kind: "TestKind".to_string(),
+            schema: "TestKind".to_string(),
             id,
         })
         .await
@@ -113,7 +112,7 @@ pub async fn test_create_and_find_resource(catalog: &Catalog) {
     // wrong kind returns nothing
     let not_found = repo
         .find_resource_snapshot(&ResourceRawEventQuery {
-            kind: "OtherKind".to_string(),
+            schema: "OtherKind".to_string(),
             id,
         })
         .await
@@ -157,7 +156,7 @@ pub async fn test_find_resource_snapshots_by_ids(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_find_resource_snapshots_by_kind_and_ids(catalog: &Catalog) {
+pub async fn test_find_resource_snapshots_by_schema_and_ids(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
     let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
     let other_account_id = odf::AccountID::new_seeded_ed25519(b"other-account");
@@ -175,7 +174,7 @@ pub async fn test_find_resource_snapshots_by_kind_and_ids(catalog: &Catalog) {
     repo.create_resource(&third).await.unwrap();
 
     let found = repo
-        .find_resource_snapshots_by_kind_and_ids(
+        .find_resource_snapshots_by_schema_and_ids(
             "TestKind",
             &[second.id, missing_id, third.id, first.id],
         )
@@ -777,7 +776,7 @@ pub async fn test_list_resource_ids_with_pagination(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_list_resource_snapshots_by_kind(catalog: &Catalog) {
+pub async fn test_list_resource_snapshots_by_schema(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
     let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
 
@@ -795,7 +794,7 @@ pub async fn test_list_resource_snapshots_by_kind(catalog: &Catalog) {
     }
 
     let kind_a: Vec<_> = repo
-        .list_resource_snapshots_by_kind(
+        .list_resource_snapshots_by_schema(
             account_id.clone(),
             "KindA",
             PaginationOpts::from_max_results(100),
@@ -804,10 +803,10 @@ pub async fn test_list_resource_snapshots_by_kind(catalog: &Catalog) {
         .await
         .unwrap();
     assert_eq!(kind_a.len(), 3);
-    assert!(kind_a.iter().all(|s| s.kind == "KindA"));
+    assert!(kind_a.iter().all(|s| s.schema == "KindA"));
 
     let kind_b: Vec<_> = repo
-        .list_resource_snapshots_by_kind(
+        .list_resource_snapshots_by_schema(
             account_id.clone(),
             "KindB",
             PaginationOpts::from_max_results(100),
@@ -816,10 +815,14 @@ pub async fn test_list_resource_snapshots_by_kind(catalog: &Catalog) {
         .await
         .unwrap();
     assert_eq!(kind_b.len(), 2);
-    assert!(kind_b.iter().all(|s| s.kind == "KindB"));
+    assert!(kind_b.iter().all(|s| s.schema == "KindB"));
 
     let kind_c: Vec<_> = repo
-        .list_resource_snapshots_by_kind(account_id, "KindC", PaginationOpts::from_max_results(100))
+        .list_resource_snapshots_by_schema(
+            account_id,
+            "KindC",
+            PaginationOpts::from_max_results(100),
+        )
         .try_collect()
         .await
         .unwrap();
@@ -901,7 +904,7 @@ pub async fn test_summarize_resources(catalog: &Catalog) {
 
     let mut degraded_v2 = make_test_snapshot(account_id.clone(), "KindA", "degraded-v2");
     degraded_v2.id = repo.new_resource_id().await.unwrap();
-    degraded_v2.api_version = "v2".to_string();
+    degraded_v2.schema = "KindA-v2".to_string();
     degraded_v2.status = Some(serde_json::json!({ "phase": "Degraded" }));
     repo.create_resource(&degraded_v2).await.unwrap();
 
@@ -939,8 +942,7 @@ pub async fn test_summarize_resources(catalog: &Catalog) {
         summary,
         vec![
             ResourceSummaryRow {
-                kind: "KindA".to_string(),
-                api_version: "v1".to_string(),
+                schema: "KindA".to_string(),
                 total_count: 2,
                 phase_counts: ResourcePhaseCounts {
                     pending: 1,
@@ -951,8 +953,7 @@ pub async fn test_summarize_resources(catalog: &Catalog) {
                 },
             },
             ResourceSummaryRow {
-                kind: "KindA".to_string(),
-                api_version: "v2".to_string(),
+                schema: "KindA-v2".to_string(),
                 total_count: 1,
                 phase_counts: ResourcePhaseCounts {
                     pending: 0,
@@ -963,8 +964,7 @@ pub async fn test_summarize_resources(catalog: &Catalog) {
                 },
             },
             ResourceSummaryRow {
-                kind: "KindB".to_string(),
-                api_version: "v1".to_string(),
+                schema: "KindB".to_string(),
                 total_count: 2,
                 phase_counts: ResourcePhaseCounts {
                     pending: 1,
@@ -1004,7 +1004,7 @@ pub async fn test_find_deleted_resource_not_returned(catalog: &Catalog) {
 
     let by_query = repo
         .find_resource_snapshot(&ResourceRawEventQuery {
-            kind: "TestKind".to_string(),
+            schema: "TestKind".to_string(),
             id,
         })
         .await

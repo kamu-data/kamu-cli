@@ -26,8 +26,8 @@ use pretty_assertions::assert_eq;
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
 use crate::helpers::{
-    VARIABLE_SET_API_VERSION,
     VARIABLE_SET_KIND,
+    VARIABLE_SET_SCHEMA,
     assert_applied_outcome,
     variable_set_manifest_json,
 };
@@ -38,7 +38,6 @@ fn by_name(name: &str) -> ResourceSelector {
     ResourceSelector {
         account: None,
         kind: VARIABLE_SET_KIND.to_string(),
-        api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
         resource_ref: ResourceRef::ByName(name.to_string()),
     }
 }
@@ -47,7 +46,6 @@ fn by_id(id: &kamu_resources::ResourceID) -> ResourceSelector {
     ResourceSelector {
         account: None,
         kind: VARIABLE_SET_KIND.to_string(),
-        api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
         resource_ref: ResourceRef::ById(*id),
     }
 }
@@ -87,11 +85,8 @@ pub async fn test_render_json_by_name(h: &impl FacadeContractHarness) {
     assert_eq!(result.format, ResourceManifestFormat::Json);
     let parsed: serde_json::Value =
         serde_json::from_str(&result.manifest).expect("must be valid JSON");
-    assert_eq!(parsed["kind"], VARIABLE_SET_KIND, "kind mismatch");
-    assert_eq!(
-        parsed["apiVersion"], VARIABLE_SET_API_VERSION,
-        "apiVersion mismatch"
-    );
+    assert_eq!(parsed["$schema"], VARIABLE_SET_SCHEMA, "schema mismatch");
+    assert_eq!(parsed["$schema"], VARIABLE_SET_SCHEMA, "schema mismatch");
     assert_eq!(
         parsed["headers"]["name"], "render-json-name",
         "name mismatch"
@@ -126,8 +121,8 @@ pub async fn test_render_yaml_by_uid(h: &impl FacadeContractHarness) {
     let yaml: serde_yaml::Value =
         serde_yaml::from_str(&result.manifest).expect("must be valid YAML");
     let parsed = serde_json::to_value(yaml).unwrap();
-    assert_eq!(parsed["kind"], VARIABLE_SET_KIND);
-    assert_eq!(parsed["apiVersion"], VARIABLE_SET_API_VERSION);
+    assert_eq!(parsed["$schema"], VARIABLE_SET_SCHEMA, "schema mismatch");
+    assert_eq!(parsed["$schema"], VARIABLE_SET_SCHEMA);
     assert_eq!(parsed["headers"]["name"], "render-yaml-id");
     assert!(
         parsed["headers"]["id"].is_null(),
@@ -242,27 +237,24 @@ pub async fn test_render_missing_resource_returns_not_found(h: &impl FacadeContr
 
 // RF-074
 contract_test!(
-    render_wrong_api_version_or_kind_returns_mismatch,
-    super::test_render_wrong_api_version_or_kind_returns_mismatch
+    render_wrong_schema_returns_mismatch,
+    super::test_render_wrong_schema_returns_mismatch
 );
 
-pub async fn test_render_wrong_api_version_or_kind_returns_mismatch(
-    h: &impl FacadeContractHarness,
-) {
-    use crate::helpers::{SECRET_SET_API_VERSION, SECRET_SET_KIND};
+pub async fn test_render_wrong_schema_returns_mismatch(h: &impl FacadeContractHarness) {
+    use crate::helpers::SECRET_SET_KIND;
 
     let id = create_resource(h, "render-mismatch").await;
     let facade = h.facade_for(TestAccount::Alice);
 
-    let wrong_version = ResourceSelector {
+    let wrong_schema_selector = ResourceSelector {
         account: None,
-        kind: VARIABLE_SET_KIND.to_string(),
-        api_version: Some("v0.never.existed".to_string()),
+        kind: SECRET_SET_KIND.to_string(),
         resource_ref: ResourceRef::ById(id),
     };
     let result = facade
         .render_manifest(
-            wrong_version,
+            wrong_schema_selector,
             ResourceManifestFormat::Json,
             SpecViewMode::Encrypted,
         )
@@ -271,16 +263,15 @@ pub async fn test_render_wrong_api_version_or_kind_returns_mismatch(
         matches!(
             result,
             Err(RenderResourceManifestError::LookupProblem(
-                ResourceLookupProblem::ApiVersionMismatch(_)
+                ResourceLookupProblem::SchemaMismatch(_)
             ))
         ),
-        "expected ApiVersionMismatch, got: {result:?}"
+        "expected SchemaMismatch, got: {result:?}"
     );
 
     let wrong_kind = ResourceSelector {
         account: None,
         kind: SECRET_SET_KIND.to_string(),
-        api_version: Some(SECRET_SET_API_VERSION.to_string()),
         resource_ref: ResourceRef::ById(id),
     };
     let result = facade
@@ -294,10 +285,10 @@ pub async fn test_render_wrong_api_version_or_kind_returns_mismatch(
         matches!(
             result,
             Err(RenderResourceManifestError::LookupProblem(
-                ResourceLookupProblem::KindMismatch(_)
+                ResourceLookupProblem::SchemaMismatch(_)
             ))
         ),
-        "expected KindMismatch, got: {result:?}"
+        "expected SchemaMismatch, got: {result:?}"
     );
 }
 

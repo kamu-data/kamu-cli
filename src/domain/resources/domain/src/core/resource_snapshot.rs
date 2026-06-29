@@ -26,8 +26,7 @@ use crate::{
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceSnapshot {
     pub id: ResourceID,
-    pub kind: String,
-    pub api_version: String,
+    pub schema: String,
     pub headers: ResourceHeaders,
 
     pub spec: serde_json::Value,
@@ -49,12 +48,11 @@ impl ResourceSnapshot {
             return true;
         }
 
-        let first_kind = &snapshots[0].kind;
-        let first_api_version = &snapshots[0].api_version;
+        let first_schema = &snapshots[0].schema;
 
-        snapshots.iter().all(|snapshot| {
-            snapshot.kind == *first_kind && snapshot.api_version == *first_api_version
-        })
+        snapshots
+            .iter()
+            .all(|snapshot| snapshot.schema == *first_schema)
     }
 }
 
@@ -86,8 +84,7 @@ where
 
 pub fn make_typed_resource_snapshot<TSpec, TStatus>(
     id: ResourceID,
-    kind: &'static str,
-    api_version: &'static str,
+    schema: &'static str,
     headers: ResourceHeaders,
     spec: &TSpec,
     status: &TStatus,
@@ -103,8 +100,7 @@ where
 
     Ok(ResourceSnapshot {
         id,
-        kind: kind.to_string(),
-        api_version: api_version.to_string(),
+        schema: schema.to_string(),
         headers,
         spec,
         status: Some(status_json),

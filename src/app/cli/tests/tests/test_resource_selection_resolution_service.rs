@@ -35,14 +35,13 @@ use kamu_resources_facade::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-const API_VERSION_V1: &str = "v1";
-const VARIABLESET_KIND: &str = "kamu.dev/variableset";
+const VARIABLESET_KIND: &str = "https://opendatafabric.org/schemas/config/v1alpha1/VariableSet";
 const VARIABLESETS_NAME: &str = "variablesets";
 const VARIABLESETS_SHORT_NAME: &str = "vs";
-const SECRETSET_KIND: &str = "kamu.dev/secretset";
+const SECRETSET_KIND: &str = "https://opendatafabric.org/schemas/config/v1alpha1/SecretSet";
 const SECRETSETS_NAME: &str = "secretsets";
 const SECRETSETS_SHORT_NAME: &str = "ss";
-const STORAGE_KIND: &str = "kamu.dev/storage";
+const STORAGE_KIND: &str = "https://opendatafabric.org/schemas/config/v1alpha1/Storage";
 const STORAGES_NAME: &str = "storages";
 const STORAGES_SHORT_NAME: &str = "st";
 
@@ -60,8 +59,7 @@ async fn resolves_exact_kind_name_patterns_via_search() {
     harness.expect_search_identities(
         1,
         vec![ResourceIdentityView {
-            kind: VARIABLESET_KIND.to_string(),
-            api_version: API_VERSION_V1.to_string(),
+            schema: VARIABLESET_KIND.to_string(),
             canonical_kind_name: VARIABLESETS_NAME.to_string(),
             id: ResourceID::new(uuid::Uuid::new_v4()),
             name: "app-alpha".to_string(),
@@ -94,7 +92,7 @@ async fn resolves_exact_kind_name_patterns_via_search() {
 
     let requests = search_requests.lock().unwrap();
     assert_eq!(requests.len(), 1);
-    assert_eq!(requests[0].kinds, vec![VARIABLESET_KIND]);
+    assert_eq!(requests[0].kinds, vec![VARIABLESETS_NAME]);
     assert_eq!(requests[0].name_pattern.as_deref(), Some(NAME_APP_PATTERN));
 }
 
@@ -181,20 +179,18 @@ async fn resolves_kind_patterns_with_exact_names_in_supported_kind_order() {
         2,
         HashMap::from([
             (
-                SECRETSET_KIND.to_string(),
+                SECRETSETS_NAME.to_string(),
                 Some(ResourceIdentityView {
-                    kind: SECRETSET_KIND.to_string(),
-                    api_version: API_VERSION_V1.to_string(),
+                    schema: SECRETSET_KIND.to_string(),
                     canonical_kind_name: SECRETSETS_NAME.to_string(),
                     id: ResourceID::new(uuid::Uuid::new_v4()),
                     name: RESOURCE_DB_CREDS.to_string(),
                 }),
             ),
             (
-                STORAGE_KIND.to_string(),
+                STORAGES_NAME.to_string(),
                 Some(ResourceIdentityView {
-                    kind: STORAGE_KIND.to_string(),
-                    api_version: API_VERSION_V1.to_string(),
+                    schema: STORAGE_KIND.to_string(),
                     canonical_kind_name: STORAGES_NAME.to_string(),
                     id: ResourceID::new(uuid::Uuid::new_v4()),
                     name: RESOURCE_DB_CREDS.to_string(),
@@ -238,8 +234,8 @@ async fn resolves_kind_patterns_with_exact_names_in_supported_kind_order() {
 
     let requests = get_identity_requests.lock().unwrap();
     assert_eq!(requests.len(), 2);
-    assert_eq!(requests[0].kind, SECRETSET_KIND);
-    assert_eq!(requests[1].kind, STORAGE_KIND);
+    assert_eq!(requests[0].kind, SECRETSETS_NAME);
+    assert_eq!(requests[1].kind, STORAGES_NAME);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -257,15 +253,13 @@ async fn resolves_kind_pattern_all_via_search_across_matched_kinds() {
         1,
         vec![
             ResourceIdentityView {
-                kind: SECRETSET_KIND.to_string(),
-                api_version: API_VERSION_V1.to_string(),
+                schema: SECRETSET_KIND.to_string(),
                 canonical_kind_name: SECRETSETS_NAME.to_string(),
                 id: ResourceID::new(uuid::Uuid::new_v4()),
                 name: "db-creds".to_string(),
             },
             ResourceIdentityView {
-                kind: STORAGE_KIND.to_string(),
-                api_version: API_VERSION_V1.to_string(),
+                schema: STORAGE_KIND.to_string(),
                 canonical_kind_name: STORAGES_NAME.to_string(),
                 id: ResourceID::new(uuid::Uuid::new_v4()),
                 name: "warehouse".to_string(),
@@ -301,7 +295,7 @@ async fn resolves_kind_pattern_all_via_search_across_matched_kinds() {
     assert_eq!(requests.len(), 1);
     assert_eq!(
         requests[0].kinds,
-        vec![SECRETSET_KIND.to_string(), STORAGE_KIND.to_string()]
+        vec![SECRETSETS_NAME.to_string(), STORAGES_NAME.to_string()]
     );
     assert_eq!(requests[0].exact_names, None);
     assert_eq!(requests[0].name_pattern, None);
@@ -322,15 +316,13 @@ async fn resolves_kind_pattern_name_patterns_via_single_search_across_matched_ki
         1,
         vec![
             ResourceIdentityView {
-                kind: SECRETSET_KIND.to_string(),
-                api_version: API_VERSION_V1.to_string(),
+                schema: SECRETSET_KIND.to_string(),
                 canonical_kind_name: SECRETSETS_NAME.to_string(),
                 id: ResourceID::new(uuid::Uuid::new_v4()),
                 name: "db-creds".to_string(),
             },
             ResourceIdentityView {
-                kind: STORAGE_KIND.to_string(),
-                api_version: API_VERSION_V1.to_string(),
+                schema: STORAGE_KIND.to_string(),
                 canonical_kind_name: STORAGES_NAME.to_string(),
                 id: ResourceID::new(uuid::Uuid::new_v4()),
                 name: "db-warehouse".to_string(),
@@ -373,7 +365,7 @@ async fn resolves_kind_pattern_name_patterns_via_single_search_across_matched_ki
     assert_eq!(requests.len(), 1);
     assert_eq!(
         requests[0].kinds,
-        vec![SECRETSET_KIND.to_string(), STORAGE_KIND.to_string()]
+        vec![SECRETSETS_NAME.to_string(), STORAGES_NAME.to_string()]
     );
     assert_eq!(requests[0].exact_names, None);
     assert_eq!(requests[0].name_pattern.as_deref(), Some("db-%"));
@@ -394,10 +386,9 @@ async fn kind_pattern_exact_id_tries_every_matched_kind() {
     harness.expect_get_identity(
         2,
         HashMap::from([(
-            STORAGE_KIND.to_string(),
+            STORAGES_NAME.to_string(),
             Some(ResourceIdentityView {
-                kind: STORAGE_KIND.to_string(),
-                api_version: API_VERSION_V1.to_string(),
+                schema: STORAGE_KIND.to_string(),
                 canonical_kind_name: STORAGES_NAME.to_string(),
                 id,
                 name: RESOURCE_DB_CREDS.to_string(),
@@ -431,8 +422,8 @@ async fn kind_pattern_exact_id_tries_every_matched_kind() {
 
     let requests = get_identity_requests.lock().unwrap();
     assert_eq!(requests.len(), 2);
-    assert_eq!(requests[0].kind, SECRETSET_KIND);
-    assert_eq!(requests[1].kind, STORAGE_KIND);
+    assert_eq!(requests[0].kind, SECRETSETS_NAME);
+    assert_eq!(requests[1].kind, STORAGES_NAME);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -588,8 +579,7 @@ async fn deduplicates_overlapping_name_patterns_before_counting_max_results() {
     harness.expect_search_identities(
         2,
         vec![ResourceIdentityView {
-            kind: VARIABLESET_KIND.to_string(),
-            api_version: API_VERSION_V1.to_string(),
+            schema: VARIABLESET_KIND.to_string(),
             canonical_kind_name: VARIABLESETS_NAME.to_string(),
             id: shared_id,
             name: "app-alpha".to_string(),
@@ -644,10 +634,9 @@ async fn deduplicates_repeated_kind_pattern_exact_name_matches() {
     harness.expect_get_identity(
         2,
         HashMap::from([(
-            SECRETSET_KIND.to_string(),
+            SECRETSETS_NAME.to_string(),
             Some(ResourceIdentityView {
-                kind: SECRETSET_KIND.to_string(),
-                api_version: API_VERSION_V1.to_string(),
+                schema: SECRETSET_KIND.to_string(),
                 canonical_kind_name: SECRETSETS_NAME.to_string(),
                 id: shared_id,
                 name: RESOURCE_DB_CREDS.to_string(),
@@ -706,8 +695,7 @@ async fn deduplicates_kind_pattern_all_before_counting_max_results() {
     harness.expect_search_identities(
         1,
         vec![ResourceIdentityView {
-            kind: SECRETSET_KIND.to_string(),
-            api_version: API_VERSION_V1.to_string(),
+            schema: SECRETSET_KIND.to_string(),
             canonical_kind_name: SECRETSETS_NAME.to_string(),
             id: shared_id,
             name: RESOURCE_DB_CREDS.to_string(),
@@ -719,10 +707,9 @@ async fn deduplicates_kind_pattern_all_before_counting_max_results() {
     harness.expect_get_identity(
         1,
         HashMap::from([(
-            SECRETSET_KIND.to_string(),
+            SECRETSETS_NAME.to_string(),
             Some(ResourceIdentityView {
-                kind: SECRETSET_KIND.to_string(),
-                api_version: API_VERSION_V1.to_string(),
+                schema: SECRETSET_KIND.to_string(),
                 canonical_kind_name: SECRETSETS_NAME.to_string(),
                 id: shared_id,
                 name: RESOURCE_DB_CREDS.to_string(),
@@ -781,8 +768,7 @@ async fn deduplicates_kind_pattern_name_patterns_before_counting_max_results() {
     harness.expect_search_identities(
         2,
         vec![ResourceIdentityView {
-            kind: SECRETSET_KIND.to_string(),
-            api_version: API_VERSION_V1.to_string(),
+            schema: SECRETSET_KIND.to_string(),
             canonical_kind_name: SECRETSETS_NAME.to_string(),
             id: shared_id,
             name: RESOURCE_DB_CREDS.to_string(),
@@ -840,15 +826,13 @@ async fn errors_when_unique_targets_exceed_max_results_after_deduplication() {
         1,
         vec![
             ResourceIdentityView {
-                kind: VARIABLESET_KIND.to_string(),
-                api_version: API_VERSION_V1.to_string(),
+                schema: VARIABLESET_KIND.to_string(),
                 canonical_kind_name: VARIABLESETS_NAME.to_string(),
                 id: shared_id,
                 name: "app-alpha".to_string(),
             },
             ResourceIdentityView {
-                kind: VARIABLESET_KIND.to_string(),
-                api_version: API_VERSION_V1.to_string(),
+                schema: VARIABLESET_KIND.to_string(),
                 canonical_kind_name: VARIABLESETS_NAME.to_string(),
                 id: second_id,
                 name: "app-beta".to_string(),
@@ -985,8 +969,7 @@ impl ResourceSelectionResolutionHarness {
         ResourceKindDescriptor {
             name: VARIABLESETS_NAME.to_string(),
             short_names: vec![VARIABLESETS_SHORT_NAME.to_string()],
-            kind: VARIABLESET_KIND.to_string(),
-            api_version: API_VERSION_V1.to_string(),
+            schema: VARIABLESET_KIND.to_string(),
             list_columns: Vec::new(),
         }
     }
@@ -995,8 +978,7 @@ impl ResourceSelectionResolutionHarness {
         ResourceKindDescriptor {
             name: SECRETSETS_NAME.to_string(),
             short_names: vec![SECRETSETS_SHORT_NAME.to_string()],
-            kind: SECRETSET_KIND.to_string(),
-            api_version: API_VERSION_V1.to_string(),
+            schema: SECRETSET_KIND.to_string(),
             list_columns: Vec::new(),
         }
     }
@@ -1005,8 +987,7 @@ impl ResourceSelectionResolutionHarness {
         ResourceKindDescriptor {
             name: STORAGES_NAME.to_string(),
             short_names: vec![STORAGES_SHORT_NAME.to_string()],
-            kind: STORAGE_KIND.to_string(),
-            api_version: API_VERSION_V1.to_string(),
+            schema: STORAGE_KIND.to_string(),
             list_columns: Vec::new(),
         }
     }

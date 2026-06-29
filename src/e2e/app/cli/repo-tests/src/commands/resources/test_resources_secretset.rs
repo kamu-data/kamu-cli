@@ -94,8 +94,8 @@ pub async fn test_resources_secretset_lifecycle(ctx: ResourceCtx) {
     //       still no plaintext) ────────────────────────────────────────────────
     let spec_out = ctx.stdout(["get", "ss", resource_name, "--spec"]).await;
     assert!(
-        spec_out.contains("apiVersion") && spec_out.contains("SecretSet"),
-        "`get ss --spec` should emit a SecretSet manifest, got:\n{spec_out}"
+        spec_out.contains("$schema") && spec_out.contains(fixtures::SECRET_SET_KIND),
+        "`get ss --spec` should emit a SecretSet schema manifest, got:\n{spec_out}"
     );
     assert!(
         spec_out.contains(resource_name),

@@ -62,7 +62,7 @@ impl ResourceLifecycleMessage {
 
         debug_assert!(
             ResourceSnapshot::check_homogeneous(&resources),
-            "all resources in a deleted message must share the same kind and api_version"
+            "all resources in a deleted message must share the same schema"
         );
 
         Self::Deleted(ResourceLifecycleMessageDeleted {
@@ -118,7 +118,7 @@ pub struct ResourceLifecycleMessageReconciliationFailed {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceLifecycleMessageDeleted {
     pub event_time: DateTime<Utc>,
-    // all resources share the same `kind` and `api_version`
+    // all resources share the same `schema`
     pub resources: Vec<ResourceSnapshot>,
 }
 

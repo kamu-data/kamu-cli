@@ -36,7 +36,7 @@ use kamu_resources::{
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct ResourceLookupKey {
     account_id: odf::AccountID,
-    kind: String,
+    schema: String,
     name: ResourceName,
 }
 
@@ -77,7 +77,7 @@ impl ResourceRepository for InMemoryResourceRepository {
 
         let lookup_key = ResourceLookupKey {
             account_id: resource_snapshot.headers.account.clone(),
-            kind: resource_snapshot.kind.clone(),
+            schema: resource_snapshot.schema.clone(),
             name: resource_snapshot.headers.name.clone(),
         };
 
@@ -86,7 +86,7 @@ impl ResourceRepository for InMemoryResourceRepository {
         {
             return Err(CreateResourceError::Duplicate(ResourceDuplicateError {
                 account_id: resource_snapshot.headers.account.clone(),
-                kind: resource_snapshot.kind.clone(),
+                schema: resource_snapshot.schema.clone(),
                 name: resource_snapshot.headers.name.clone(),
             }));
         }
@@ -136,12 +136,12 @@ impl ResourceRepository for InMemoryResourceRepository {
 
             let previous_lookup_key = ResourceLookupKey {
                 account_id: previous_snapshot.headers.account,
-                kind: previous_snapshot.kind,
+                schema: previous_snapshot.schema,
                 name: previous_snapshot.headers.name,
             };
             let next_lookup_key = ResourceLookupKey {
                 account_id: resource_snapshot.headers.account.clone(),
-                kind: resource_snapshot.kind.clone(),
+                schema: resource_snapshot.schema.clone(),
                 name: resource_snapshot.headers.name.clone(),
             };
 
@@ -150,7 +150,7 @@ impl ResourceRepository for InMemoryResourceRepository {
             {
                 return Err(UpdateResourceError::Duplicate(ResourceDuplicateError {
                     account_id: resource_snapshot.headers.account.clone(),
-                    kind: resource_snapshot.kind.clone(),
+                    schema: resource_snapshot.schema.clone(),
                     name: resource_snapshot.headers.name.clone(),
                 }));
             }
@@ -178,7 +178,7 @@ impl ResourceRepository for InMemoryResourceRepository {
     async fn find_resource_id_by_name(
         &self,
         account_id: &odf::AccountID,
-        kind: &str,
+        schema: &str,
         name: &ResourceName,
     ) -> Result<Option<ResourceID>, InternalError> {
         let guard = self.state.lock().unwrap();
@@ -187,7 +187,7 @@ impl ResourceRepository for InMemoryResourceRepository {
             .ids_by_lookup_key
             .get(&ResourceLookupKey {
                 account_id: account_id.clone(),
-                kind: kind.to_owned(),
+                schema: schema.to_owned(),
                 name: name.to_ascii_lowercase(),
             })
             .and_then(|id| guard.snapshots_by_id.get(id))
@@ -210,8 +210,7 @@ impl ResourceRepository for InMemoryResourceRepository {
             })
             .map(|snapshot| ResourceIdentityRow {
                 id: *snapshot.id.as_ref(),
-                kind: snapshot.kind.clone(),
-                api_version: snapshot.api_version.clone(),
+                schema: snapshot.schema.clone(),
                 name: snapshot.headers.name.clone(),
             })
             .collect())
@@ -220,7 +219,7 @@ impl ResourceRepository for InMemoryResourceRepository {
     async fn find_resource_identities_by_names(
         &self,
         account_id: &odf::AccountID,
-        kind: &str,
+        schema: &str,
         names: &[ResourceName],
     ) -> Result<Vec<ResourceIdentityRow>, InternalError> {
         let guard = self.state.lock().unwrap();
@@ -233,7 +232,7 @@ impl ResourceRepository for InMemoryResourceRepository {
                     .ids_by_lookup_key
                     .get(&ResourceLookupKey {
                         account_id: account_id.clone(),
-                        kind: kind.to_owned(),
+                        schema: schema.to_owned(),
                         name: name.clone(),
                     })
                     .and_then(|id| guard.snapshots_by_id.get(id))
@@ -241,8 +240,7 @@ impl ResourceRepository for InMemoryResourceRepository {
             .filter(|snapshot| snapshot.headers.deleted_at.is_none())
             .map(|snapshot| ResourceIdentityRow {
                 id: *snapshot.id.as_ref(),
-                kind: snapshot.kind.clone(),
-                api_version: snapshot.api_version.clone(),
+                schema: snapshot.schema.clone(),
                 name: snapshot.headers.name.clone(),
             })
             .collect())
@@ -251,19 +249,19 @@ impl ResourceRepository for InMemoryResourceRepository {
     async fn search_resource_identities(
         &self,
         account_id: &odf::AccountID,
-        kinds: &[String],
+        schemas: &[String],
         exact_names: Option<&[ResourceName]>,
         name_pattern: Option<&str>,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceIdentityRow>, InternalError> {
         let guard = self.state.lock().unwrap();
 
-        if kinds.is_empty() || exact_names.is_some_and(<[ResourceName]>::is_empty) {
+        if schemas.is_empty() || exact_names.is_some_and(<[ResourceName]>::is_empty) {
             return Ok(Vec::new());
         }
 
         let mut snapshots =
-            filter_search_snapshots(&guard, account_id, kinds, exact_names, name_pattern);
+            filter_search_snapshots(&guard, account_id, schemas, exact_names, name_pattern);
 
         snapshots.sort_by(|lhs, rhs| {
             rhs.headers
@@ -278,8 +276,7 @@ impl ResourceRepository for InMemoryResourceRepository {
             .take(pagination.limit)
             .map(|snapshot| ResourceIdentityRow {
                 id: *snapshot.id.as_ref(),
-                kind: snapshot.kind.clone(),
-                api_version: snapshot.api_version.clone(),
+                schema: snapshot.schema.clone(),
                 name: snapshot.headers.name.clone(),
             })
             .collect())
@@ -288,17 +285,17 @@ impl ResourceRepository for InMemoryResourceRepository {
     async fn count_search_resource_identities(
         &self,
         account_id: &odf::AccountID,
-        kinds: &[String],
+        schemas: &[String],
         exact_names: Option<&[ResourceName]>,
         name_pattern: Option<&str>,
     ) -> Result<usize, InternalError> {
         let guard = self.state.lock().unwrap();
 
-        if kinds.is_empty() || exact_names.is_some_and(<[ResourceName]>::is_empty) {
+        if schemas.is_empty() || exact_names.is_some_and(<[ResourceName]>::is_empty) {
             return Ok(0);
         }
 
-        Ok(filter_search_snapshots(&guard, account_id, kinds, exact_names, name_pattern).len())
+        Ok(filter_search_snapshots(&guard, account_id, schemas, exact_names, name_pattern).len())
     }
 
     async fn find_resource_snapshot(
@@ -309,14 +306,14 @@ impl ResourceRepository for InMemoryResourceRepository {
         Ok(guard
             .snapshots_by_id
             .get(&query.id)
-            .filter(|snapshot| snapshot.kind == query.kind)
+            .filter(|snapshot| snapshot.schema == query.schema)
             .filter(|snapshot| snapshot.headers.deleted_at.is_none())
             .cloned())
     }
 
-    async fn find_resource_snapshots_by_kind_and_ids(
+    async fn find_resource_snapshots_by_schema_and_ids(
         &self,
-        kind: &str,
+        schema: &str,
         ids: &[ResourceID],
     ) -> Result<Vec<ResourceSnapshot>, InternalError> {
         let guard = self.state.lock().unwrap();
@@ -324,7 +321,7 @@ impl ResourceRepository for InMemoryResourceRepository {
         Ok(ids
             .iter()
             .filter_map(|id| guard.snapshots_by_id.get(id))
-            .filter(|snapshot| snapshot.kind == kind)
+            .filter(|snapshot| snapshot.schema == schema)
             .filter(|snapshot| snapshot.headers.deleted_at.is_none())
             .cloned()
             .collect())
@@ -363,7 +360,7 @@ impl ResourceRepository for InMemoryResourceRepository {
     fn list_resource_ids(
         &self,
         account_id: odf::AccountID,
-        kind: &str,
+        schema: &str,
         pagination: PaginationOpts,
     ) -> ResourceIDStream<'_> {
         let mut resource_ids_page: Vec<_> = {
@@ -373,7 +370,7 @@ impl ResourceRepository for InMemoryResourceRepository {
                 .values()
                 .filter(|snapshot| {
                     snapshot.headers.account == account_id
-                        && snapshot.kind == kind
+                        && snapshot.schema == schema
                         && snapshot.headers.deleted_at.is_none()
                 })
                 .cloned()
@@ -397,10 +394,10 @@ impl ResourceRepository for InMemoryResourceRepository {
         Box::pin(futures::stream::iter(resource_ids_page))
     }
 
-    fn list_resource_snapshots_by_kind(
+    fn list_resource_snapshots_by_schema(
         &self,
         account_id: odf::AccountID,
-        kind: &str,
+        schema: &str,
         pagination: PaginationOpts,
     ) -> ResourceSnapshotStream<'_> {
         let mut snapshots_page: Vec<_> = {
@@ -410,7 +407,7 @@ impl ResourceRepository for InMemoryResourceRepository {
                 .values()
                 .filter(|snapshot| {
                     snapshot.headers.account == account_id
-                        && snapshot.kind == kind
+                        && snapshot.schema == schema
                         && snapshot.headers.deleted_at.is_none()
                 })
                 .cloned()
@@ -471,7 +468,7 @@ impl ResourceRepository for InMemoryResourceRepository {
     async fn count_resources(
         &self,
         account_id: odf::AccountID,
-        kind: &str,
+        schema: &str,
     ) -> Result<usize, InternalError> {
         let guard = self.state.lock().unwrap();
 
@@ -480,7 +477,7 @@ impl ResourceRepository for InMemoryResourceRepository {
             .values()
             .filter(|snapshot| {
                 snapshot.headers.account == account_id
-                    && snapshot.kind == kind
+                    && snapshot.schema == schema
                     && snapshot.headers.deleted_at.is_none()
             })
             .count())
@@ -492,16 +489,15 @@ impl ResourceRepository for InMemoryResourceRepository {
     ) -> Result<Vec<ResourceSummaryRow>, InternalError> {
         let guard = self.state.lock().unwrap();
 
-        let mut rows_by_key = HashMap::<(String, String), ResourceSummaryRow>::new();
+        let mut rows_by_key = HashMap::<String, ResourceSummaryRow>::new();
 
         for snapshot in guard.snapshots_by_id.values().filter(|snapshot| {
             snapshot.headers.account == account_id && snapshot.headers.deleted_at.is_none()
         }) {
             let row = rows_by_key
-                .entry((snapshot.kind.clone(), snapshot.api_version.clone()))
+                .entry(snapshot.schema.clone())
                 .or_insert_with(|| ResourceSummaryRow {
-                    kind: snapshot.kind.clone(),
-                    api_version: snapshot.api_version.clone(),
+                    schema: snapshot.schema.clone(),
                     total_count: 0,
                     phase_counts: ResourcePhaseCounts::default(),
                 });
@@ -523,11 +519,7 @@ impl ResourceRepository for InMemoryResourceRepository {
         }
 
         let mut rows = rows_by_key.into_values().collect::<Vec<_>>();
-        rows.sort_by(|lhs, rhs| {
-            lhs.kind
-                .cmp(&rhs.kind)
-                .then_with(|| lhs.api_version.cmp(&rhs.api_version))
-        });
+        rows.sort_by(|lhs, rhs| lhs.schema.cmp(&rhs.schema));
 
         Ok(rows)
     }
@@ -582,7 +574,7 @@ fn resource_name_matches_pattern(name: &str, pattern: &str) -> bool {
 fn filter_search_snapshots<'a>(
     guard: &'a State,
     account_id: &odf::AccountID,
-    kinds: &[String],
+    schemas: &[String],
     exact_names: Option<&[ResourceName]>,
     name_pattern: Option<&str>,
 ) -> Vec<&'a ResourceSnapshot> {
@@ -597,7 +589,7 @@ fn filter_search_snapshots<'a>(
         .snapshots_by_id
         .values()
         .filter(|snapshot| snapshot.headers.account == *account_id)
-        .filter(|snapshot| kinds.contains(&snapshot.kind))
+        .filter(|snapshot| schemas.contains(&snapshot.schema))
         .filter(|snapshot| snapshot.headers.deleted_at.is_none())
         .filter(|snapshot| {
             exact_names

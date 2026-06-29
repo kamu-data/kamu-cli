@@ -47,7 +47,7 @@ use kamu_resources::{
     ResourceID,
     UnsupportedResourceDescriptorError,
 };
-use kamu_resources_services::get_resource_crud_dispatcher_by_kind;
+use kamu_resources_services::get_resource_crud_dispatcher;
 use secrecy::ExposeSecret;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -154,11 +154,11 @@ impl DatasetEnvVarMutationAdapterImpl {
         format!("legacy-secrets-{}", dataset_id.as_multibase())
     }
 
-    fn get_dispatcher<E>(&self, resource_type: &str) -> Result<Arc<dyn ResourceCrudDispatcher>, E>
+    fn get_dispatcher<E>(&self, schema: &str) -> Result<Arc<dyn ResourceCrudDispatcher>, E>
     where
         E: From<InternalError>,
     {
-        get_resource_crud_dispatcher_by_kind::<GetDispatcherError>(&self.catalog, resource_type)
+        get_resource_crud_dispatcher::<GetDispatcherError>(&self.catalog, schema)
             .map_err(InternalError::from)
             .map_err(E::from)
     }
@@ -214,8 +214,7 @@ impl DatasetEnvVarMutationAdapterImpl {
         let new_spec = serde_json::to_value(VariableSetSpec { variables }).int_err()?;
         let headers = self.make_headers(account_id.clone(), resource_name);
 
-        let dispatcher =
-            self.get_dispatcher::<InternalError>(VariableSetResource::RESOURCE_TYPE)?;
+        let dispatcher = self.get_dispatcher::<InternalError>(VariableSetResource::SCHEMA)?;
 
         let resource_id = self
             .apply_and_handle_rejection::<InternalError>(
@@ -280,7 +279,7 @@ impl DatasetEnvVarMutationAdapterImpl {
         let new_spec = serde_json::to_value(SecretSetSpec { secrets }).int_err()?;
         let headers = self.make_headers(account_id.clone(), resource_name);
 
-        let dispatcher = self.get_dispatcher::<InternalError>(SecretSetResource::RESOURCE_TYPE)?;
+        let dispatcher = self.get_dispatcher::<InternalError>(SecretSetResource::SCHEMA)?;
 
         let resource_id = self
             .apply_and_handle_rejection::<InternalError>(
@@ -347,7 +346,7 @@ impl DatasetEnvVarMutationAdapterImpl {
         spec.variables.remove(key);
 
         let dispatcher = self
-            .get_dispatcher(VariableSetResource::RESOURCE_TYPE)
+            .get_dispatcher(VariableSetResource::SCHEMA)
             .map_err(DeleteDatasetEnvVarError::Internal)?;
 
         if spec.variables.is_empty() {
@@ -409,7 +408,7 @@ impl DatasetEnvVarMutationAdapterImpl {
         decrypted.remove(key);
 
         let dispatcher = self
-            .get_dispatcher(SecretSetResource::RESOURCE_TYPE)
+            .get_dispatcher(SecretSetResource::SCHEMA)
             .map_err(DeleteDatasetEnvVarError::Internal)?;
 
         if decrypted.is_empty() {
@@ -577,7 +576,7 @@ impl DatasetEnvVarMutationAdapterImpl {
             .generic_resource_query_service
             .find_resource_id_by_name(
                 account_id,
-                VariableSetResource::RESOURCE_TYPE,
+                VariableSetResource::SCHEMA,
                 &resource_name.to_string(),
             )
             .await?;
@@ -606,7 +605,7 @@ impl DatasetEnvVarMutationAdapterImpl {
             .generic_resource_query_service
             .find_resource_id_by_name(
                 account_id,
-                SecretSetResource::RESOURCE_TYPE,
+                SecretSetResource::SCHEMA,
                 &resource_name.to_string(),
             )
             .await?;

@@ -29,8 +29,7 @@ async fn make_resource(catalog: &Catalog, kind: &str) -> ResourceRawEventQuery {
 
     let snapshot = ResourceSnapshot {
         id,
-        kind: kind.to_string(),
-        api_version: "v1".to_string(),
+        schema: kind.to_string(),
         headers: ResourceHeaders::simple(
             Utc::now(),
             odf::AccountID::new_seeded_ed25519(b"test-account"),
@@ -45,7 +44,7 @@ async fn make_resource(catalog: &Catalog, kind: &str) -> ResourceRawEventQuery {
     repo.create_resource(&snapshot).await.unwrap();
 
     ResourceRawEventQuery {
-        kind: kind.to_string(),
+        schema: kind.to_string(),
         id,
     }
 }
@@ -83,13 +82,13 @@ pub async fn test_event_store_empty(catalog: &Catalog) {
     assert!(events.is_empty());
 
     let total_by_kind = event_store
-        .total_events_stored_by_kind("TestKind")
+        .total_events_stored_by_schema("TestKind")
         .await
         .unwrap();
     assert_eq!(0, total_by_kind);
 
     let events_by_kind: Vec<_> = event_store
-        .get_all_events_by_kind("TestKind", GetEventsOpts::default())
+        .get_all_events_by_schema("TestKind", GetEventsOpts::default())
         .try_collect()
         .await
         .unwrap();
@@ -267,25 +266,25 @@ pub async fn test_events_filtered_by_kind(catalog: &Catalog) {
         .unwrap();
 
     let total_kind_a = event_store
-        .total_events_stored_by_kind("KindA")
+        .total_events_stored_by_schema("KindA")
         .await
         .unwrap();
     assert_eq!(2, total_kind_a);
 
     let total_kind_b = event_store
-        .total_events_stored_by_kind("KindB")
+        .total_events_stored_by_schema("KindB")
         .await
         .unwrap();
     assert_eq!(1, total_kind_b);
 
     let total_kind_c = event_store
-        .total_events_stored_by_kind("KindC")
+        .total_events_stored_by_schema("KindC")
         .await
         .unwrap();
     assert_eq!(0, total_kind_c);
 
     let events_kind_a: Vec<_> = event_store
-        .get_all_events_by_kind("KindA", GetEventsOpts::default())
+        .get_all_events_by_schema("KindA", GetEventsOpts::default())
         .map_ok(|(_, e)| e)
         .try_collect()
         .await
@@ -294,17 +293,17 @@ pub async fn test_events_filtered_by_kind(catalog: &Catalog) {
     assert!(
         events_kind_a
             .iter()
-            .all(|e| e.query.kind == "KindA" && e.payload["kind"] == serde_json::json!("a"))
+            .all(|e| e.query.schema == "KindA" && e.payload["kind"] == serde_json::json!("a"))
     );
 
     let events_kind_b: Vec<_> = event_store
-        .get_all_events_by_kind("KindB", GetEventsOpts::default())
+        .get_all_events_by_schema("KindB", GetEventsOpts::default())
         .map_ok(|(_, e)| e)
         .try_collect()
         .await
         .unwrap();
     assert_eq!(1, events_kind_b.len());
-    assert_eq!(events_kind_b[0].query.kind, "KindB");
+    assert_eq!(events_kind_b[0].query.schema, "KindB");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

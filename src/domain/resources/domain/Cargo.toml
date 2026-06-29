@@ -47,6 +47,7 @@ thiserror = { version = "2", default-features = false, features = ["std"] }
 mockall = { version = "0.14", default-features = false, optional = true }
 tokio-stream = { version = "0.1", default-features = false }
 tracing = { version = "0.1", default-features = false }
+url = { version = "2", default-features = false }
 uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
 
 # Optional

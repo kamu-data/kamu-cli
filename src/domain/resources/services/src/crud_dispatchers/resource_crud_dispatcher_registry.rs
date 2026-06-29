@@ -12,36 +12,32 @@ use kamu_resources::{
     ResourceCrudDispatcher,
     ResourceDispatcherMeta,
     UnsupportedResourceDescriptorError,
+    resource_kind_matches_selector,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn get_resource_crud_dispatcher<E>(
     target_catalog: &dill::Catalog,
-    kind: &str,
-    api_version: &str,
+    schema: &str,
 ) -> Result<std::sync::Arc<dyn ResourceCrudDispatcher>, E>
 where
     E: From<UnsupportedResourceDescriptorError> + From<InternalError>,
 {
     let mut handlers = target_catalog.builders_for_with_meta::<dyn ResourceCrudDispatcher, _>(
-        |meta: &ResourceDispatcherMeta| {
-            meta.descriptor.resource_type == kind && meta.descriptor.api_version == api_version
-        },
+        |meta: &ResourceDispatcherMeta| meta.schema == schema,
     );
 
     let Some(builder) = handlers.next() else {
         return Err(UnsupportedResourceDescriptorError::NotFound {
-            kind: kind.to_string(),
-            api_version: api_version.to_string(),
+            schema: schema.to_string(),
         }
         .into());
     };
 
     if handlers.next().is_some() {
         return Err(UnsupportedResourceDescriptorError::Duplicate {
-            kind: kind.to_string(),
-            api_version: api_version.to_string(),
+            schema: schema.to_string(),
         }
         .into());
     }
@@ -51,29 +47,29 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn get_resource_crud_dispatcher_by_kind<E>(
+pub fn get_resource_crud_dispatcher_by_selector<E>(
     target_catalog: &dill::Catalog,
-    kind: &str,
+    selector: &str,
 ) -> Result<std::sync::Arc<dyn ResourceCrudDispatcher>, E>
 where
     E: From<UnsupportedResourceDescriptorError> + From<InternalError>,
 {
     let mut handlers = target_catalog.builders_for_with_meta::<dyn ResourceCrudDispatcher, _>(
-        |meta: &ResourceDispatcherMeta| meta.descriptor.resource_type == kind,
+        |meta: &ResourceDispatcherMeta| {
+            resource_kind_matches_selector(meta.name, meta.short_names, selector)
+        },
     );
 
     let Some(builder) = handlers.next() else {
-        return Err(UnsupportedResourceDescriptorError::NotFound {
-            kind: kind.to_string(),
-            api_version: "*".to_string(),
+        return Err(UnsupportedResourceDescriptorError::SelectorNotFound {
+            selector: selector.to_string(),
         }
         .into());
     };
 
     if handlers.next().is_some() {
-        return Err(UnsupportedResourceDescriptorError::Duplicate {
-            kind: kind.to_string(),
-            api_version: "*".to_string(),
+        return Err(UnsupportedResourceDescriptorError::SelectorDuplicate {
+            selector: selector.to_string(),
         }
         .into());
     }

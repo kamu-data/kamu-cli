@@ -216,14 +216,16 @@ impl DeleteResourcesCommand {
         }
 
         // The facade batches by descriptor, so cross-kind selections are split into one
-        // `delete_many(...)` call per `(kind, api_version)` group.
-        for ((kind, api_version), entries) in Self::group_targets_by_descriptor(targets) {
+        // `delete_many(...)` call per resolved schema.
+        for (schema, entries) in Self::group_targets_by_descriptor(targets) {
             match self
                 .resource_facade
                 .delete_many(ResourceBatchSelector {
                     account: None,
-                    kind: kind.clone(),
-                    api_version: Some(api_version.clone()),
+                    kind: entries
+                        .first()
+                        .map(|(_, target)| target.kind.clone())
+                        .unwrap_or(schema),
                     resource_refs: entries
                         .iter()
                         .map(|(_, target)| ResourceRef::ById(target.id))
@@ -259,12 +261,12 @@ impl DeleteResourcesCommand {
 
     fn group_targets_by_descriptor(
         targets: Vec<DeleteResourceTarget>,
-    ) -> BTreeMap<(String, String), Vec<(usize, DeleteResourceTarget)>> {
+    ) -> BTreeMap<String, Vec<(usize, DeleteResourceTarget)>> {
         let mut groups = BTreeMap::new();
 
         for (index, target) in targets.into_iter().enumerate() {
             groups
-                .entry((target.kind.clone(), target.api_version.clone()))
+                .entry(target.schema.clone())
                 .or_insert_with(Vec::new)
                 .push((index, target));
         }
@@ -367,7 +369,7 @@ pub(super) struct PreparedDeleteTargets {
 #[derive(Debug, Clone)]
 struct DeleteResourceTarget {
     kind: String,
-    api_version: String,
+    schema: String,
     canonical_kind_name: String,
     id: ResourceID,
     name: String,
@@ -377,7 +379,7 @@ impl DeleteResourceTarget {
     fn from_resource_target(target: ResourceTarget) -> Self {
         Self {
             kind: target.kind,
-            api_version: target.api_version,
+            schema: target.schema,
             canonical_kind_name: target.canonical_kind_name,
             id: target.id,
             name: target.name,

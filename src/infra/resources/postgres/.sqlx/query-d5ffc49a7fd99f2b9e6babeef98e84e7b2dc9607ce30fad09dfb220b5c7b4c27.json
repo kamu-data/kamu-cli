@@ -1,0 +1,58 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                resource_schema,\n                COUNT(*) as \"total_count!\",\n                COUNT(*) FILTER (WHERE phase = 'Reconciling') as \"reconciling_count!\",\n                COUNT(*) FILTER (WHERE phase = 'Ready') as \"ready_count!\",\n                COUNT(*) FILTER (WHERE phase = 'Degraded') as \"degraded_count!\",\n                COUNT(*) FILTER (WHERE phase = 'Failed') as \"failed_count!\",\n                COUNT(*) FILTER (WHERE phase = 'Pending') as \"pending_count!\"\n            FROM (\n                SELECT\n                    resource_schema,\n                    CASE COALESCE(status ->> 'phase', 'Pending')\n                        WHEN 'Reconciling' THEN 'Reconciling'\n                        WHEN 'Ready' THEN 'Ready'\n                        WHEN 'Degraded' THEN 'Degraded'\n                        WHEN 'Failed' THEN 'Failed'\n                        ELSE 'Pending'\n                    END as phase\n                FROM resources\n                WHERE account_id = $1\n                  AND deleted_at IS NULL\n            ) as normalized_resources\n            GROUP BY resource_schema\n            ORDER BY resource_schema ASC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "resource_schema",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "total_count!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "reconciling_count!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "ready_count!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "degraded_count!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "failed_count!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 6,
+        "name": "pending_count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "d5ffc49a7fd99f2b9e6babeef98e84e7b2dc9607ce30fad09dfb220b5c7b4c27"
+}

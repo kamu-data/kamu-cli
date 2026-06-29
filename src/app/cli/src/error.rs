@@ -30,6 +30,7 @@ use kamu_resources_facade::{
     ListResourcesError,
     ListSupportedResourceKindsError,
     RenderResourceManifestError,
+    ResourceLookupProblem,
     ResourcesSummaryError,
 };
 use odf::utils::data::format::WriterError;
@@ -325,9 +326,8 @@ impl From<DeleteResourceError> for CLIError {
         use DeleteResourceError as E;
 
         match e {
-            e @ (E::UnsupportedDescriptor(_) | E::BadAccount(_) | E::LookupProblem(_)) => {
-                Self::failure(e)
-            }
+            E::LookupProblem(problem) => Self::failure(ResourceLookupCliError::from(problem)),
+            e @ (E::UnsupportedDescriptor(_) | E::BadAccount(_)) => Self::failure(e),
             E::RemoteRequest(err) => Self::from(err),
             E::Internal(err) => Self::critical(err),
         }
@@ -339,9 +339,8 @@ impl From<GetResourceError> for CLIError {
         use GetResourceError as E;
 
         match e {
-            e @ (E::UnsupportedDescriptor(_) | E::BadAccount(_) | E::LookupProblem(_)) => {
-                Self::failure(e)
-            }
+            E::LookupProblem(problem) => Self::failure(ResourceLookupCliError::from(problem)),
+            e @ (E::UnsupportedDescriptor(_) | E::BadAccount(_)) => Self::failure(e),
             E::RemoteRequest(err) => Self::from(err),
             E::Internal(err) => Self::critical(err),
         }
@@ -353,9 +352,8 @@ impl From<RenderResourceManifestError> for CLIError {
         use RenderResourceManifestError as E;
 
         match e {
-            e @ (E::UnsupportedDescriptor(_) | E::BadAccount(_) | E::LookupProblem(_)) => {
-                Self::failure(e)
-            }
+            E::LookupProblem(problem) => Self::failure(ResourceLookupCliError::from(problem)),
+            e @ (E::UnsupportedDescriptor(_) | E::BadAccount(_)) => Self::failure(e),
             E::RemoteRequest(err) => Self::from(err),
             E::Internal(err) => Self::critical(err),
         }
@@ -441,6 +439,41 @@ pub struct MultiTenantRefUnexpectedError {
 #[derive(Debug, Error)]
 #[error("Command interpretation failed")]
 pub struct CommandInterpretationFailed;
+
+#[derive(Debug, Error)]
+enum ResourceLookupCliError {
+    #[error("Resource with id {0} was not found")]
+    IDNotFound(kamu_resources::ResourceID),
+
+    #[error("Resource '{name}' of kind '{kind}' was not found")]
+    NameNotFound { kind: String, name: String },
+
+    #[error("Resource id {id} refers to schema '{actual_schema}', expected '{expected_schema}'")]
+    SchemaMismatch {
+        id: kamu_resources::ResourceID,
+        expected_schema: String,
+        actual_schema: String,
+    },
+}
+
+impl From<ResourceLookupProblem> for ResourceLookupCliError {
+    fn from(problem: ResourceLookupProblem) -> Self {
+        match problem {
+            ResourceLookupProblem::IDNotFound(err) => Self::IDNotFound(err.0),
+            ResourceLookupProblem::NameNotFound(err) => Self::NameNotFound {
+                kind: kamu_resources::ResourceSchema::display_name(&err.kind).to_string(),
+                name: err.name,
+            },
+            ResourceLookupProblem::SchemaMismatch(err) => Self::SchemaMismatch {
+                id: err.id,
+                expected_schema: kamu_resources::ResourceSchema::display_name(&err.expected_schema)
+                    .to_string(),
+                actual_schema: kamu_resources::ResourceSchema::display_name(&err.actual_schema)
+                    .to_string(),
+            },
+        }
+    }
+}
 
 #[derive(Debug, Error)]
 #[error(

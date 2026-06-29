@@ -35,22 +35,9 @@ pub struct ResourceNameNotFoundError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
-#[error(
-    "Resource api version mismatch: expected '{expected_api_version}', actual \
-     '{actual_api_version}'"
-)]
-pub struct ResourceAPIVersionMismatchError {
-    pub expected_api_version: String,
-    pub actual_api_version: String,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
-#[error("Invalid spec for resource {kind}::{api_version}: {message}")]
+#[error("Invalid spec for resource {schema}: {message}")]
 pub struct ResourceInvalidSpecError {
-    pub kind: String,
-    pub api_version: String,
+    pub schema: String,
     pub message: String,
 }
 
@@ -66,32 +53,19 @@ pub struct ResourceNotOwnedByAccountError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
-#[error(
-    "Resource id {id} refers to {actual_kind}/{actual_api_version}, expected \
-     {expected_kind}/{expected_api_version}"
-)]
+#[error("Resource id {id} refers to {actual_schema}, expected {expected_schema}")]
 pub struct ResourceTypeMismatchError {
     pub id: ResourceID,
-    pub expected_kind: String,
-    pub expected_api_version: String,
-    pub actual_kind: String,
-    pub actual_api_version: String,
+    pub expected_schema: String,
+    pub actual_schema: String,
 }
 
 impl ResourceTypeMismatchError {
-    pub fn new(
-        id: ResourceID,
-        expected_kind: String,
-        expected_api_version: String,
-        actual_kind: String,
-        actual_api_version: String,
-    ) -> Self {
+    pub fn new(id: ResourceID, expected_schema: String, actual_schema: String) -> Self {
         Self {
             id,
-            expected_kind,
-            expected_api_version,
-            actual_kind,
-            actual_api_version,
+            expected_schema,
+            actual_schema,
         }
     }
 
@@ -100,13 +74,7 @@ impl ResourceTypeMismatchError {
         expected: &ResourceDescriptor,
         actual: &ResourceSnapshot,
     ) -> Self {
-        Self::new(
-            id,
-            expected.resource_type.to_string(),
-            expected.api_version.to_string(),
-            actual.kind.clone(),
-            actual.api_version.clone(),
-        )
+        Self::new(id, expected.schema.to_string(), actual.schema.clone())
     }
 }
 

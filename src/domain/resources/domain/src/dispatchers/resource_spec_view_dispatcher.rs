@@ -29,16 +29,9 @@ pub trait ResourceSpecViewDispatcher: Send + Sync {
 /// no sensitive fields.
 pub fn get_resource_spec_view_dispatcher_from_catalog(
     catalog: &Catalog,
-    kind: &str,
-    api_version: &str,
+    schema: &str,
 ) -> Option<Arc<dyn ResourceSpecViewDispatcher>> {
-    get_resource_dispatcher_from_catalog(
-        catalog,
-        kind,
-        api_version,
-        "resource spec view dispatcher",
-    )
-    .ok()
+    get_resource_dispatcher_from_catalog(catalog, schema, "resource spec view dispatcher").ok()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

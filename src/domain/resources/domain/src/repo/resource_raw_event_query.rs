@@ -13,7 +13,7 @@ use crate::ResourceID;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ResourceRawEventQuery {
-    pub kind: String,
+    pub schema: String,
     pub id: ResourceID,
 }
 

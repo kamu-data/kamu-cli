@@ -11,7 +11,7 @@ use internal_error::InternalError;
 use kamu_resources as domain;
 
 use crate::facade::graphql::cynic_api;
-use crate::{BatchResourceError, ResourceKindMismatchError, ResourceLookupProblem};
+use crate::{BatchResourceError, ResourceLookupProblem, ResourceSchemaMismatchError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -22,8 +22,7 @@ pub(crate) fn map_batch_lookup_problem(
     match problem {
         P::ResourceIDNotFoundProblem(p) => Ok(map_id_not_found(p)),
         P::ResourceNameNotFoundProblem(p) => Ok(map_name_not_found(p)),
-        P::ResourceApiVersionMismatchProblem(p) => Ok(map_api_version_mismatch(p)),
-        P::ResourceKindMismatchProblem(p) => Ok(map_kind_mismatch(p)),
+        P::ResourceSchemaMismatchProblem(p) => Ok(map_schema_mismatch(p)),
         P::Unknown => Err(BatchResourceError::Internal(InternalError::new(
             "Remote batch problem contains unrecognized ResourceLookupProblem variant",
         ))),
@@ -39,12 +38,10 @@ pub(crate) fn unsupported_descriptor_problem_error(
 
     match problem.code {
         C::NotFound => domain::UnsupportedResourceDescriptorError::NotFound {
-            kind: problem.kind,
-            api_version: problem.api_version,
+            schema: problem.schema,
         },
         C::Duplicate => domain::UnsupportedResourceDescriptorError::Duplicate {
-            kind: problem.kind,
-            api_version: problem.api_version,
+            schema: problem.schema,
         },
     }
 }
@@ -116,24 +113,13 @@ pub(crate) fn map_name_not_found(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn map_api_version_mismatch(
-    p: cynic_api::fragments::ResourceApiVersionMismatchProblem,
+pub(crate) fn map_schema_mismatch(
+    p: cynic_api::fragments::ResourceSchemaMismatchProblem,
 ) -> ResourceLookupProblem {
-    ResourceLookupProblem::ApiVersionMismatch(domain::ResourceAPIVersionMismatchError {
-        expected_api_version: p.expected_api_version,
-        actual_api_version: p.actual_api_version,
-    })
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) fn map_kind_mismatch(
-    p: cynic_api::fragments::ResourceKindMismatchProblem,
-) -> ResourceLookupProblem {
-    ResourceLookupProblem::KindMismatch(ResourceKindMismatchError {
+    ResourceLookupProblem::SchemaMismatch(ResourceSchemaMismatchError {
         id: p.id,
-        expected_kind: p.expected_kind,
-        actual_kind: p.actual_kind,
+        expected_schema: p.expected_schema,
+        actual_schema: p.actual_schema,
     })
 }
 
@@ -154,8 +140,7 @@ where
     match result.problem {
         P::ResourceIDNotFoundProblem(p) => Ok(map_lookup(map_id_not_found(p))),
         P::ResourceNameNotFoundProblem(p) => Ok(map_lookup(map_name_not_found(p))),
-        P::ResourceApiVersionMismatchProblem(p) => Ok(map_lookup(map_api_version_mismatch(p))),
-        P::ResourceKindMismatchProblem(p) => Ok(map_lookup(map_kind_mismatch(p))),
+        P::ResourceSchemaMismatchProblem(p) => Ok(map_lookup(map_schema_mismatch(p))),
         P::ResourceUnsupportedDescriptorProblem(p) => {
             Ok(map_unsupported(unsupported_descriptor_problem_error(p)))
         }

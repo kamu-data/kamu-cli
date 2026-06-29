@@ -40,8 +40,7 @@ use crate::{load_previous_resource_view, make_apply_manifest_changes};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn decode_resource_spec<R>(
-    kind: &str,
-    api_version: &str,
+    schema: &str,
     spec: serde_json::Value,
 ) -> Result<R::Spec, ApplyResourceCrudDispatcherError>
 where
@@ -49,8 +48,7 @@ where
     R::Spec: DeserializeOwned,
 {
     serde_json::from_value(spec).map_err(|e| ApplyResourceCrudDispatcherError::InvalidSpec {
-        kind: kind.to_string(),
-        api_version: api_version.to_string(),
+        schema: schema.to_string(),
         message: e.to_string(),
     })
 }
@@ -142,8 +140,7 @@ where
     let (id, headers, spec, status) = state.into_parts();
 
     Ok(ResourceView {
-        kind: R::DESCRIPTOR.resource_type.to_string(),
-        api_version: R::DESCRIPTOR.api_version.to_string(),
+        schema: R::DESCRIPTOR.schema.to_string(),
         account: ResourceViewAccount {
             id: headers.account.clone(),
             name: None,
@@ -163,8 +160,7 @@ where
     R::Status: ResourceStatusLike,
 {
     ResourceSummaryView {
-        kind: R::DESCRIPTOR.resource_type.to_string(),
-        api_version: R::DESCRIPTOR.api_version.to_string(),
+        schema: R::DESCRIPTOR.schema.to_string(),
         id: *state.id(),
         name: state.headers().name.clone(),
         description: state.headers().description.clone(),
@@ -181,8 +177,7 @@ where
 pub(crate) fn resource_snapshot_to_view(snapshot: ResourceSnapshot) -> ResourceView {
     let ResourceSnapshot {
         id,
-        kind,
-        api_version,
+        schema,
         headers,
         spec,
         status,
@@ -191,8 +186,7 @@ pub(crate) fn resource_snapshot_to_view(snapshot: ResourceSnapshot) -> ResourceV
     } = snapshot;
 
     ResourceView {
-        kind,
-        api_version,
+        schema,
         account: ResourceViewAccount {
             id: headers.account.clone(),
             name: None,

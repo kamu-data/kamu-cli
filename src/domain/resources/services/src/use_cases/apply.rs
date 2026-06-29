@@ -53,7 +53,7 @@ macro_rules! declare_apply_resource_use_case {
                         .find_resource_id_by_name(
                             &params.headers.account,
                             <$resource as kamu_resources::ResourceDescriptorProvider>::DESCRIPTOR
-                                .resource_type,
+                                .schema,
                             &params.headers.name,
                         )
                         .await

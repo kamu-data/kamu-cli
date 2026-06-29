@@ -119,7 +119,7 @@ impl EventStore<ResourceRawEventProjection> for InMemoryRawResourceEventStore {
 
 #[async_trait::async_trait]
 impl ResourceRawEventStore for InMemoryRawResourceEventStore {
-    async fn total_events_stored_by_kind(&self, kind: &str) -> Result<usize, InternalError> {
+    async fn total_events_stored_by_schema(&self, schema: &str) -> Result<usize, InternalError> {
         let mut events = self.get_all_events(GetEventsOpts::default());
         let mut count = 0;
 
@@ -131,7 +131,7 @@ impl ResourceRawEventStore for InMemoryRawResourceEventStore {
                 },
             };
 
-            if event.query.kind == kind {
+            if event.query.schema == schema {
                 count += 1;
             }
         }
@@ -139,18 +139,20 @@ impl ResourceRawEventStore for InMemoryRawResourceEventStore {
         Ok(count)
     }
 
-    fn get_all_events_by_kind(
+    fn get_all_events_by_schema(
         &self,
-        kind: &str,
+        schema: &str,
         opts: GetEventsOpts,
     ) -> EventStream<'_, ResourceRawEvent> {
-        let kind = kind.to_string();
+        let schema = schema.to_string();
 
         Box::pin(self.get_all_events(opts).filter_map(move |event| {
-            let kind = kind.clone();
+            let schema = schema.clone();
 
             future::ready(match event {
-                Ok((event_id, event)) if event.query.kind == kind => Some(Ok((event_id, event))),
+                Ok((event_id, event)) if event.query.schema == schema => {
+                    Some(Ok((event_id, event)))
+                }
                 Ok(_) => None,
                 Err(err) => Some(Err(err)),
             })

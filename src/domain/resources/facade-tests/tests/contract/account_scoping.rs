@@ -32,8 +32,8 @@ use pretty_assertions::assert_eq;
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
 use crate::helpers::{
-    VARIABLE_SET_API_VERSION,
     VARIABLE_SET_KIND,
+    VARIABLE_SET_SCHEMA,
     apply_manifest_and_get_id,
     sorted_identity_names,
     total_kind_count,
@@ -81,13 +81,10 @@ fn variable_set_manifest_json_with_account(
         account_fields.push(format!(r#""id": "{id}""#));
     }
     let account_fields = account_fields.join(", ");
-    let api = VARIABLE_SET_API_VERSION;
-    let kind = VARIABLE_SET_KIND;
     indoc::formatdoc!(
         r#"
         {{
-            "apiVersion": "{api}",
-            "kind": "{kind}",
+            "$schema": "{VARIABLE_SET_SCHEMA}",
             "headers": {{
                 "name": "{name}",
                 "account": {{ {account_fields} }}
@@ -140,7 +137,6 @@ fn selector_by_name(name: &str, account: Option<ResourceManifestAccount>) -> Res
     ResourceSelector {
         account,
         kind: VARIABLE_SET_KIND.to_string(),
-        api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
         resource_ref: ResourceRef::ByName(name.to_string()),
     }
 }
@@ -152,7 +148,6 @@ fn batch_selector_by_name(
     ResourceBatchSelector {
         account,
         kind: VARIABLE_SET_KIND.to_string(),
-        api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
         resource_refs: vec![ResourceRef::ByName(name.to_string())],
     }
 }
@@ -475,7 +470,7 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
                 .summary(ResourcesSummaryRequest { account: None })
                 .await
                 .unwrap(),
-            VARIABLE_SET_KIND,
+            VARIABLE_SET_SCHEMA,
         ),
         2
     );
@@ -484,7 +479,7 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
             bob.summary(ResourcesSummaryRequest { account: None })
                 .await
                 .unwrap(),
-            VARIABLE_SET_KIND,
+            VARIABLE_SET_SCHEMA,
         ),
         2
     );

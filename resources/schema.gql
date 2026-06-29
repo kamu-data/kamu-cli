@@ -1236,8 +1236,7 @@ type DatasetBindingView {
 	resourceId: ResourceID!
 	bindingOrder: Int!
 	resourceName: String!
-	resourceKind: ResourceKind!
-	apiVersion: String!
+	resourceSchema: String!
 }
 
 type DatasetCollaboration {
@@ -3815,22 +3814,15 @@ type ReplaceBindingsResourceAccountMismatch implements ReplaceDatasetBindingsRes
 	message: String!
 }
 
-type ReplaceBindingsResourceApiVersionMismatch implements ReplaceDatasetBindingsResult {
-	resourceId: ResourceID!
-	expectedApiVersion: String!
-	actualApiVersion: String!
-	message: String!
-}
-
-type ReplaceBindingsResourceKindMismatch implements ReplaceDatasetBindingsResult {
-	resourceId: ResourceID!
-	expectedKind: String!
-	actualKind: String!
-	message: String!
-}
-
 type ReplaceBindingsResourceNotFound implements ReplaceDatasetBindingsResult {
 	resourceId: ResourceID!
+	message: String!
+}
+
+type ReplaceBindingsResourceSchemaMismatch implements ReplaceDatasetBindingsResult {
+	resourceId: ResourceID!
+	expectedSchema: String!
+	actualSchema: String!
 	message: String!
 }
 
@@ -3859,8 +3851,7 @@ type RequestHeader {
 }
 
 type Resource {
-	apiVersion: String!
-	kind: ResourceKind!
+	schema: String!
 	headers: ResourceHeaders!
 	spec: JSON!
 	status: JSON
@@ -3869,12 +3860,6 @@ type Resource {
 input ResourceAccountSelectorInput {
 	byId: AccountID
 	byName: AccountName
-}
-
-type ResourceApiVersionMismatchProblem {
-	expectedApiVersion: String!
-	actualApiVersion: String!
-	message: String!
 }
 
 type ResourceApplyChange {
@@ -3948,7 +3933,6 @@ enum ResourceBadAccountProblemCode {
 
 input ResourceBatchSelectorInput {
 	kind: ResourceKindInput!
-	apiVersion: String
 	refs: [ResourceRefInput!]!
 	account: ResourceAccountSelectorInput
 }
@@ -3989,7 +3973,6 @@ union ResourceDeleteOutcome = ResourceDeleteSuccess | ResourceSelectorProblemRes
 
 type ResourceDeleteSuccess {
 	resourceId: ResourceID!
-	kind: ResourceKind
 }
 
 type ResourceEdge {
@@ -4039,8 +4022,7 @@ type ResourceIDNotFoundProblem {
 
 type ResourceIdentity {
 	id: ResourceID!
-	apiVersion: String!
-	kind: ResourceKind!
+	schema: String!
 	canonicalKindName: String!
 	name: String!
 }
@@ -4085,32 +4067,19 @@ type ResourceInvalidSearchQueryProblem {
 The `spec` field failed domain validation.
 """
 type ResourceInvalidSpecProblem {
-	kind: String!
-	apiVersion: String!
+	schema: String!
 	message: String!
-}
-
-type ResourceKind {
-	value: String!
 }
 
 type ResourceKindDescriptor {
 	name: String!
 	shortNames: [String!]!
-	kind: ResourceKind!
-	apiVersion: String!
+	schema: String!
 	listColumns: [ResourceListColumnDescriptor!]!
 }
 
 input ResourceKindInput {
 	kind: String!
-}
-
-type ResourceKindMismatchProblem {
-	id: ResourceID!
-	expectedKind: String!
-	actualKind: String!
-	message: String!
 }
 
 union ResourceListAllOutcome = ResourceConnection | ResourceBadAccountProblem
@@ -4142,7 +4111,7 @@ enum ResourceListColumnVisibility {
 
 union ResourceListOutcome = ResourceConnection | ResourceUnsupportedDescriptorProblem | ResourceBadAccountProblem
 
-union ResourceLookupProblem = ResourceIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceApiVersionMismatchProblem | ResourceKindMismatchProblem
+union ResourceLookupProblem = ResourceIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceSchemaMismatchProblem
 
 enum ResourceManifestFormat {
 	JSON
@@ -4183,14 +4152,20 @@ type ResourceRenderManifestResult {
 	format: ResourceManifestFormat!
 }
 
+type ResourceSchemaMismatchProblem {
+	id: ResourceID!
+	expectedSchema: String!
+	actualSchema: String!
+	message: String!
+}
+
 input ResourceSelectorInput {
 	kind: ResourceKindInput!
-	apiVersion: String
 	ref: ResourceRefInput!
 	account: ResourceAccountSelectorInput
 }
 
-union ResourceSelectorProblem = ResourceIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceApiVersionMismatchProblem | ResourceKindMismatchProblem | ResourceUnsupportedDescriptorProblem | ResourceBadAccountProblem
+union ResourceSelectorProblem = ResourceIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceSchemaMismatchProblem | ResourceUnsupportedDescriptorProblem | ResourceBadAccountProblem
 
 type ResourceSelectorProblemResult {
 	problem: ResourceSelectorProblem!
@@ -4204,8 +4179,7 @@ type ResourceStatusSummary {
 
 type ResourceSummary {
 	id: ResourceID!
-	apiVersion: String!
-	kind: ResourceKind!
+	schema: String!
 	name: String!
 	description: String
 	generation: Uint64!
@@ -4216,17 +4190,15 @@ type ResourceSummary {
 }
 
 type ResourceTypeCountSummary {
-	kind: String!
+	schema: String!
 	name: String!
-	apiVersion: String!
 	totalCount: Uint64!
 	phaseCounts: ResourcePhaseCounts!
 }
 
 type ResourceUnsupportedDescriptorProblem {
 	code: ResourceUnsupportedDescriptorProblemCode!
-	kind: String!
-	apiVersion: String!
+	schema: String!
 	message: String!
 }
 

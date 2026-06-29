@@ -9,40 +9,29 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub trait ResourceType {
-    const RESOURCE_TYPE: &'static str;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub trait ResourceApiVersion {
-    const API_VERSION: &'static str;
+pub trait ResourceSchemaProvider {
+    const SCHEMA: &'static str;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ResourceDescriptor {
-    pub resource_type: &'static str,
-    pub api_version: &'static str,
+    pub schema: &'static str,
 }
 
 impl ResourceDescriptor {
-    pub const fn new(resource_type: &'static str, api_version: &'static str) -> Self {
-        Self {
-            resource_type,
-            api_version,
-        }
+    pub const fn new(schema: &'static str) -> Self {
+        Self { schema }
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub trait ResourceDescriptorProvider: ResourceType + ResourceApiVersion {
-    const DESCRIPTOR: ResourceDescriptor =
-        ResourceDescriptor::new(Self::RESOURCE_TYPE, Self::API_VERSION);
+pub trait ResourceDescriptorProvider: ResourceSchemaProvider {
+    const DESCRIPTOR: ResourceDescriptor = ResourceDescriptor::new(Self::SCHEMA);
 }
 
-impl<T> ResourceDescriptorProvider for T where T: ResourceType + ResourceApiVersion {}
+impl<T> ResourceDescriptorProvider for T where T: ResourceSchemaProvider {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

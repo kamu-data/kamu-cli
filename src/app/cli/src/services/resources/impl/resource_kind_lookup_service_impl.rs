@@ -103,13 +103,13 @@ impl ResourceKindLookupServiceImpl {
             selector_to_kinds
                 .entry(descriptor.name.to_ascii_lowercase())
                 .or_default()
-                .push(descriptor.kind.as_str());
+                .push(descriptor.name.as_str());
 
             for short_name in &descriptor.short_names {
                 selector_to_kinds
                     .entry(short_name.to_ascii_lowercase())
                     .or_default()
-                    .push(descriptor.kind.as_str());
+                    .push(descriptor.name.as_str());
             }
         }
 

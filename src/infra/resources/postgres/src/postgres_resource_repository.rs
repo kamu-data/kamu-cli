@@ -70,8 +70,7 @@ impl ResourceRepository for PostgresResourceRepository {
             INSERT INTO resources (
                 resource_id,
                 account_id,
-                resource_kind,
-                api_version,
+                resource_schema,
                 resource_name,
                 description,
                 labels,
@@ -85,12 +84,11 @@ impl ResourceRepository for PostgresResourceRepository {
                 last_reconciled_at,
                 last_event_id
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
             "#,
             resource_id,
             account_id_str,
-            resource_snapshot.kind,
-            resource_snapshot.api_version,
+            resource_snapshot.schema,
             resource_snapshot.headers.name,
             resource_snapshot.headers.description,
             labels,
@@ -110,7 +108,7 @@ impl ResourceRepository for PostgresResourceRepository {
             sqlx::Error::Database(e) if e.is_unique_violation() => {
                 CreateResourceError::Duplicate(ResourceDuplicateError {
                     account_id: resource_snapshot.headers.account.clone(),
-                    kind: resource_snapshot.kind.clone(),
+                    schema: resource_snapshot.schema.clone(),
                     name: resource_snapshot.headers.name.clone(),
                 })
             }
@@ -150,7 +148,7 @@ impl ResourceRepository for PostgresResourceRepository {
             WITH resource_updates(
                 resource_id,
                 account_id,
-                api_version,
+                resource_schema,
                 resource_name,
                 description,
                 labels,
@@ -178,7 +176,7 @@ impl ResourceRepository for PostgresResourceRepository {
                         .as_stack_string()
                         .to_string(),
                 )
-                .push_bind(resource_snapshot.api_version.clone())
+                .push_bind(resource_snapshot.schema.clone())
                 .push_bind(resource_snapshot.headers.name.clone())
                 .push_bind(resource_snapshot.headers.description.clone())
                 .push_bind(serde_json::to_value(&resource_snapshot.headers.labels).unwrap())
@@ -213,7 +211,7 @@ impl ResourceRepository for PostgresResourceRepository {
             UPDATE resources AS r
             SET
                 account_id = u.account_id,
-                api_version = u.api_version,
+                resource_schema = u.resource_schema,
                 resource_name = u.resource_name,
                 description = u.description,
                 labels = u.labels,
@@ -241,7 +239,7 @@ impl ResourceRepository for PostgresResourceRepository {
                     let resource_snapshot = &resource_updates[0].snapshot;
                     UpdateResourceError::Duplicate(ResourceDuplicateError {
                         account_id: resource_snapshot.headers.account.clone(),
-                        kind: resource_snapshot.kind.clone(),
+                        schema: resource_snapshot.schema.clone(),
                         name: resource_snapshot.headers.name.clone(),
                     })
                 }
@@ -258,7 +256,7 @@ impl ResourceRepository for PostgresResourceRepository {
     async fn find_resource_id_by_name(
         &self,
         account_id: &odf::AccountID,
-        kind: &str,
+        schema: &str,
         name: &ResourceName,
     ) -> Result<Option<ResourceID>, InternalError> {
         let mut tr = self.transaction.lock().await;
@@ -271,12 +269,12 @@ impl ResourceRepository for PostgresResourceRepository {
             SELECT resource_id as "id: uuid::Uuid"
             FROM resources
             WHERE account_id = $1
-              AND resource_kind = $2
+              AND resource_schema = $2
               AND resource_name = $3
               AND deleted_at IS NULL
             "#,
             account_id_stack.as_str(),
-            kind,
+            schema,
             name.to_ascii_lowercase(),
         )
         .fetch_optional(connection_mut)
@@ -306,8 +304,7 @@ impl ResourceRepository for PostgresResourceRepository {
             r#"
             SELECT
                 resource_id as "id: uuid::Uuid",
-                resource_kind as kind,
-                api_version,
+                resource_schema as schema,
                 resource_name as name
             FROM resources
             WHERE account_id = $1
@@ -327,7 +324,7 @@ impl ResourceRepository for PostgresResourceRepository {
     async fn find_resource_identities_by_names(
         &self,
         account_id: &odf::AccountID,
-        kind: &str,
+        schema: &str,
         names: &[ResourceName],
     ) -> Result<Vec<ResourceIdentityRow>, InternalError> {
         if names.is_empty() {
@@ -344,17 +341,16 @@ impl ResourceRepository for PostgresResourceRepository {
             r#"
             SELECT
                 resource_id as "id: uuid::Uuid",
-                resource_kind as kind,
-                api_version,
+                resource_schema as schema,
                 resource_name as name
             FROM resources
             WHERE account_id = $1
-              AND resource_kind = $2
+              AND resource_schema = $2
               AND resource_name = ANY($3)
               AND deleted_at IS NULL
             "#,
             account_id_stack.as_str(),
-            kind,
+            schema,
             names
                 .iter()
                 .map(|n| n.to_ascii_lowercase())
@@ -370,12 +366,12 @@ impl ResourceRepository for PostgresResourceRepository {
     async fn search_resource_identities(
         &self,
         account_id: &odf::AccountID,
-        kinds: &[String],
+        schemas: &[String],
         exact_names: Option<&[ResourceName]>,
         name_pattern: Option<&str>,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceIdentityRow>, InternalError> {
-        if kinds.is_empty() || exact_names.is_some_and(<[ResourceName]>::is_empty) {
+        if schemas.is_empty() || exact_names.is_some_and(<[ResourceName]>::is_empty) {
             return Ok(Vec::new());
         }
 
@@ -397,12 +393,11 @@ impl ResourceRepository for PostgresResourceRepository {
             r#"
             SELECT
                 resource_id as "id: uuid::Uuid",
-                resource_kind as kind,
-                api_version,
+                resource_schema as schema,
                 resource_name as name
             FROM resources
             WHERE account_id = $1
-              AND resource_kind = ANY($2)
+              AND resource_schema = ANY($2)
               AND ($3::text[] IS NULL OR resource_name = ANY($3))
               AND ($4::text IS NULL OR resource_name ILIKE $4 ESCAPE '\')
               AND deleted_at IS NULL
@@ -410,7 +405,7 @@ impl ResourceRepository for PostgresResourceRepository {
             LIMIT $5 OFFSET $6
             "#,
             account_id_stack.as_str(),
-            kinds as _,
+            schemas as _,
             exact_names.as_deref() as _,
             name_pattern.as_deref(),
             limit,
@@ -426,11 +421,11 @@ impl ResourceRepository for PostgresResourceRepository {
     async fn count_search_resource_identities(
         &self,
         account_id: &odf::AccountID,
-        kinds: &[String],
+        schemas: &[String],
         exact_names: Option<&[ResourceName]>,
         name_pattern: Option<&str>,
     ) -> Result<usize, InternalError> {
-        if kinds.is_empty() || exact_names.is_some_and(<[ResourceName]>::is_empty) {
+        if schemas.is_empty() || exact_names.is_some_and(<[ResourceName]>::is_empty) {
             return Ok(0);
         }
 
@@ -450,13 +445,13 @@ impl ResourceRepository for PostgresResourceRepository {
             SELECT COUNT(*) AS count
             FROM resources
             WHERE account_id = $1
-              AND resource_kind = ANY($2)
+              AND resource_schema = ANY($2)
               AND ($3::text[] IS NULL OR resource_name = ANY($3))
               AND ($4::text IS NULL OR resource_name ILIKE $4 ESCAPE '\')
               AND deleted_at IS NULL
             "#,
             account_id_stack.as_str(),
-            kinds as _,
+            schemas as _,
             exact_names.as_deref() as _,
             name_pattern.as_deref(),
         )
@@ -480,8 +475,7 @@ impl ResourceRepository for PostgresResourceRepository {
             SELECT
                 resource_id as "id: uuid::Uuid",
                 account_id as "account_id: odf::AccountID",
-                resource_kind,
-                api_version,
+                resource_schema,
                 resource_name,
                 description,
                 labels,
@@ -496,11 +490,11 @@ impl ResourceRepository for PostgresResourceRepository {
                 last_event_id
             FROM resources
             WHERE resource_id = $1
-              AND resource_kind = $2
+              AND resource_schema = $2
               AND deleted_at IS NULL
             "#,
             query_id,
-            query.kind,
+            query.schema,
         )
         .fetch_optional(connection_mut)
         .await
@@ -508,8 +502,7 @@ impl ResourceRepository for PostgresResourceRepository {
 
         Ok(maybe_row.map(|row| ResourceSnapshot {
             id: ResourceID::new(row.id),
-            kind: row.resource_kind,
-            api_version: row.api_version,
+            schema: row.resource_schema,
             headers: ResourceHeaders {
                 account: row.account_id,
                 name: row.resource_name,
@@ -528,9 +521,9 @@ impl ResourceRepository for PostgresResourceRepository {
         }))
     }
 
-    async fn find_resource_snapshots_by_kind_and_ids(
+    async fn find_resource_snapshots_by_schema_and_ids(
         &self,
-        kind: &str,
+        schema: &str,
         ids: &[ResourceID],
     ) -> Result<Vec<ResourceSnapshot>, InternalError> {
         if ids.is_empty() {
@@ -546,8 +539,7 @@ impl ResourceRepository for PostgresResourceRepository {
             SELECT
             resource_id as id,
             account_id,
-                resource_kind,
-                api_version,
+                resource_schema,
                 resource_name,
                 description,
                 labels,
@@ -561,12 +553,12 @@ impl ResourceRepository for PostgresResourceRepository {
                 last_reconciled_at,
                 last_event_id
             FROM resources
-            WHERE resource_kind = $1
+            WHERE resource_schema = $1
               AND resource_id = ANY($2)
               AND deleted_at IS NULL
             "#,
         )
-        .bind(kind)
+        .bind(schema)
         .bind(&ids)
         .fetch_all(connection_mut)
         .await
@@ -597,8 +589,7 @@ impl ResourceRepository for PostgresResourceRepository {
             SELECT
                 resource_id as "id: uuid::Uuid",
                 account_id as "account_id: odf::AccountID",
-                resource_kind,
-                api_version,
+                resource_schema,
                 resource_name,
                 description,
                 labels,
@@ -623,8 +614,7 @@ impl ResourceRepository for PostgresResourceRepository {
 
         Ok(maybe_row.map(|row| ResourceSnapshot {
             id: ResourceID::new(row.id),
-            kind: row.resource_kind,
-            api_version: row.api_version,
+            schema: row.resource_schema,
             headers: ResourceHeaders {
                 account: row.account_id,
                 name: row.resource_name,
@@ -662,8 +652,7 @@ impl ResourceRepository for PostgresResourceRepository {
             SELECT
                 resource_id as "id: uuid::Uuid",
                 account_id as "account_id: odf::AccountID",
-                resource_kind,
-                api_version,
+                resource_schema,
                 resource_name,
                 description,
                 labels,
@@ -692,8 +681,7 @@ impl ResourceRepository for PostgresResourceRepository {
             .into_iter()
             .map(|row| ResourceSnapshot {
                 id: ResourceID::new(row.id),
-                kind: row.resource_kind,
-                api_version: row.api_version,
+                schema: row.resource_schema,
                 headers: ResourceHeaders {
                     account: row.account_id,
                     name: row.resource_name,
@@ -716,10 +704,10 @@ impl ResourceRepository for PostgresResourceRepository {
     fn list_resource_ids(
         &self,
         account_id: odf::AccountID,
-        kind: &str,
+        schema: &str,
         pagination: PaginationOpts,
     ) -> ResourceIDStream<'_> {
-        let resource_kind = kind.to_owned();
+        let resource_schema = schema.to_owned();
 
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
@@ -734,13 +722,13 @@ impl ResourceRepository for PostgresResourceRepository {
                 SELECT resource_id as "id: uuid::Uuid"
                 FROM resources
                 WHERE account_id = $1
-                  AND resource_kind = $2
+                  AND resource_schema = $2
                   AND deleted_at IS NULL
                 ORDER BY updated_at DESC, resource_id DESC
                 LIMIT $3 OFFSET $4
                 "#,
                 account_id_stack.as_str(),
-                resource_kind,
+                resource_schema,
                 limit,
                 offset,
             )
@@ -753,13 +741,13 @@ impl ResourceRepository for PostgresResourceRepository {
         })
     }
 
-    fn list_resource_snapshots_by_kind(
+    fn list_resource_snapshots_by_schema(
         &self,
         account_id: odf::AccountID,
-        kind: &str,
+        schema: &str,
         pagination: PaginationOpts,
     ) -> ResourceSnapshotStream<'_> {
-        let resource_kind = kind.to_owned();
+        let resource_schema = schema.to_owned();
 
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
@@ -774,8 +762,7 @@ impl ResourceRepository for PostgresResourceRepository {
                 SELECT
                     resource_id as "id: uuid::Uuid",
                     account_id as "account_id: odf::AccountID",
-                    resource_kind,
-                    api_version,
+                    resource_schema,
                     resource_name,
                     description,
                     labels,
@@ -790,13 +777,13 @@ impl ResourceRepository for PostgresResourceRepository {
                     last_event_id
                 FROM resources
                 WHERE account_id = $1
-                  AND resource_kind = $2
+                  AND resource_schema = $2
                   AND deleted_at IS NULL
                 ORDER BY updated_at DESC, resource_id DESC
                 LIMIT $3 OFFSET $4
                 "#,
                 account_id_stack.as_str(),
-                resource_kind,
+                resource_schema,
                 limit,
                 offset,
             )
@@ -806,8 +793,7 @@ impl ResourceRepository for PostgresResourceRepository {
             while let Some(row) = query_stream.try_next().await? {
                 yield Ok(ResourceSnapshot {
                     id: ResourceID::new(row.id),
-                    kind: row.resource_kind,
-                    api_version: row.api_version,
+                    schema: row.resource_schema,
                     headers: ResourceHeaders {
                         account: row.account_id,
                         name: row.resource_name,
@@ -846,8 +832,7 @@ impl ResourceRepository for PostgresResourceRepository {
                 SELECT
                     resource_id as "id: uuid::Uuid",
                     account_id as "account_id: odf::AccountID",
-                    resource_kind,
-                    api_version,
+                    resource_schema,
                     resource_name,
                     description,
                     labels,
@@ -876,8 +861,7 @@ impl ResourceRepository for PostgresResourceRepository {
             while let Some(row) = query_stream.try_next().await? {
                 yield Ok(ResourceSnapshot {
                     id: ResourceID::new(row.id),
-                    kind: row.resource_kind,
-                    api_version: row.api_version,
+                    schema: row.resource_schema,
                     headers: ResourceHeaders {
                         account: row.account_id,
                         name: row.resource_name,
@@ -901,7 +885,7 @@ impl ResourceRepository for PostgresResourceRepository {
     async fn count_resources(
         &self,
         account_id: odf::AccountID,
-        kind: &str,
+        schema: &str,
     ) -> Result<usize, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
@@ -913,11 +897,11 @@ impl ResourceRepository for PostgresResourceRepository {
             SELECT COUNT(*) as "count!"
             FROM resources
             WHERE account_id = $1
-              AND resource_kind = $2
+              AND resource_schema = $2
               AND deleted_at IS NULL
             "#,
             account_id_stack.as_str(),
-            kind,
+            schema,
         )
         .fetch_one(connection_mut)
         .await
@@ -938,8 +922,7 @@ impl ResourceRepository for PostgresResourceRepository {
         let rows = sqlx::query!(
             r#"
             SELECT
-                resource_kind,
-                api_version,
+                resource_schema,
                 COUNT(*) as "total_count!",
                 COUNT(*) FILTER (WHERE phase = 'Reconciling') as "reconciling_count!",
                 COUNT(*) FILTER (WHERE phase = 'Ready') as "ready_count!",
@@ -948,8 +931,7 @@ impl ResourceRepository for PostgresResourceRepository {
                 COUNT(*) FILTER (WHERE phase = 'Pending') as "pending_count!"
             FROM (
                 SELECT
-                    resource_kind,
-                    api_version,
+                    resource_schema,
                     CASE COALESCE(status ->> 'phase', 'Pending')
                         WHEN 'Reconciling' THEN 'Reconciling'
                         WHEN 'Ready' THEN 'Ready'
@@ -961,8 +943,8 @@ impl ResourceRepository for PostgresResourceRepository {
                 WHERE account_id = $1
                   AND deleted_at IS NULL
             ) as normalized_resources
-            GROUP BY resource_kind, api_version
-            ORDER BY resource_kind ASC, api_version ASC
+            GROUP BY resource_schema
+            ORDER BY resource_schema ASC
             "#,
             account_id_stack.as_str(),
         )
@@ -973,8 +955,7 @@ impl ResourceRepository for PostgresResourceRepository {
         Ok(rows
             .into_iter()
             .map(|row| ResourceSummaryRow {
-                kind: row.resource_kind,
-                api_version: row.api_version,
+                schema: row.resource_schema,
                 total_count: u64::try_from(row.total_count).unwrap(),
                 phase_counts: ResourcePhaseCounts {
                     pending: u64::try_from(row.pending_count).unwrap(),

@@ -14,7 +14,6 @@ use kamu_resources::{
     ApplyResourceCrudDispatcherError,
     DeleteResourcesCrudDispatcherError,
     GetResourceCrudDispatcherError,
-    ResourceAPIVersionMismatchError,
     ResourceHeadersValidationError,
     ResourceID,
     ResourceIDNotFoundError,
@@ -112,24 +111,13 @@ impl From<GetResourceCrudDispatcherError> for GetResourceError {
         use GetResourceCrudDispatcherError as E;
         match err {
             E::NotFound(err) => Self::LookupProblem(ResourceLookupProblem::IDNotFound(err)),
-            E::TypeMismatch(err) => {
-                if err.expected_kind != err.actual_kind {
-                    Self::LookupProblem(ResourceLookupProblem::KindMismatch(
-                        ResourceKindMismatchError {
-                            id: err.id,
-                            expected_kind: err.expected_kind,
-                            actual_kind: err.actual_kind,
-                        },
-                    ))
-                } else {
-                    Self::LookupProblem(ResourceLookupProblem::ApiVersionMismatch(
-                        ResourceAPIVersionMismatchError {
-                            expected_api_version: err.expected_api_version,
-                            actual_api_version: err.actual_api_version,
-                        },
-                    ))
-                }
-            }
+            E::TypeMismatch(err) => Self::LookupProblem(ResourceLookupProblem::SchemaMismatch(
+                ResourceSchemaMismatchError {
+                    id: err.id,
+                    expected_schema: err.expected_schema,
+                    actual_schema: err.actual_schema,
+                },
+            )),
             E::Internal(err) => Self::Internal(err),
         }
     }
@@ -146,10 +134,7 @@ pub enum ResourceLookupProblem {
     NameNotFound(#[from] ResourceNameNotFoundError),
 
     #[error(transparent)]
-    ApiVersionMismatch(#[from] ResourceAPIVersionMismatchError),
-
-    #[error(transparent)]
-    KindMismatch(#[from] ResourceKindMismatchError),
+    SchemaMismatch(#[from] ResourceSchemaMismatchError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -194,24 +179,13 @@ impl From<GetResourceCrudDispatcherError> for RenderResourceManifestError {
         use GetResourceCrudDispatcherError as E;
         match err {
             E::NotFound(err) => Self::LookupProblem(ResourceLookupProblem::IDNotFound(err)),
-            E::TypeMismatch(err) => {
-                if err.expected_kind != err.actual_kind {
-                    Self::LookupProblem(ResourceLookupProblem::KindMismatch(
-                        ResourceKindMismatchError {
-                            id: err.id,
-                            expected_kind: err.expected_kind,
-                            actual_kind: err.actual_kind,
-                        },
-                    ))
-                } else {
-                    Self::LookupProblem(ResourceLookupProblem::ApiVersionMismatch(
-                        ResourceAPIVersionMismatchError {
-                            expected_api_version: err.expected_api_version,
-                            actual_api_version: err.actual_api_version,
-                        },
-                    ))
-                }
-            }
+            E::TypeMismatch(err) => Self::LookupProblem(ResourceLookupProblem::SchemaMismatch(
+                ResourceSchemaMismatchError {
+                    id: err.id,
+                    expected_schema: err.expected_schema,
+                    actual_schema: err.actual_schema,
+                },
+            )),
             E::Internal(err) => Self::Internal(err),
         }
     }
@@ -373,15 +347,9 @@ impl From<ApplyResourceCrudDispatcherError> for ApplyManifestError {
             E::NotFound(err) => Self::UIDNotFound(err),
             E::TypeMismatch(err) => Self::TypeMismatch(err),
             E::ConcurrentModification(err) => Self::ConcurrentModification(err),
-            E::InvalidSpec {
-                kind,
-                api_version,
-                message,
-            } => Self::InvalidSpec(ResourceInvalidSpecError {
-                kind,
-                api_version,
-                message,
-            }),
+            E::InvalidSpec { schema, message } => {
+                Self::InvalidSpec(ResourceInvalidSpecError { schema, message })
+            }
         }
     }
 }
@@ -395,11 +363,11 @@ pub struct ParseResourceManifestError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
-#[error("Resource id {id} refers to kind '{actual_kind}', expected '{expected_kind}'")]
-pub struct ResourceKindMismatchError {
+#[error("Resource id {id} refers to schema '{actual_schema}', expected '{expected_schema}'")]
+pub struct ResourceSchemaMismatchError {
     pub id: ResourceID,
-    pub expected_kind: String,
-    pub actual_kind: String,
+    pub expected_schema: String,
+    pub actual_schema: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

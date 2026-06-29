@@ -20,8 +20,9 @@ use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
 use crate::helpers::{
     SECRET_SET_KIND,
-    VARIABLE_SET_API_VERSION,
+    SECRET_SET_SCHEMA,
     VARIABLE_SET_KIND,
+    VARIABLE_SET_SCHEMA,
     apply_manifest_and_get_id,
     normalize_identity_views,
     normalize_summary_views,
@@ -78,11 +79,8 @@ pub async fn test_list_summaries_for_account(h: &impl FacadeContractHarness) {
     );
 
     for s in &summaries {
-        assert_eq!(s.kind, VARIABLE_SET_KIND, "kind must match");
-        assert_eq!(
-            s.api_version, VARIABLE_SET_API_VERSION,
-            "api_version must match"
-        );
+        assert_eq!(s.schema, VARIABLE_SET_SCHEMA, "schema must match");
+        assert_eq!(s.schema, VARIABLE_SET_SCHEMA, "schema must match");
         assert!(!s.id.to_string().is_empty(), "id must be set");
     }
 }
@@ -119,8 +117,8 @@ pub async fn test_list_identities_for_account(h: &impl FacadeContractHarness) {
     assert!(!names.contains(&"idlist-bob-1"));
 
     for i in &identities {
-        assert_eq!(i.kind, VARIABLE_SET_KIND);
-        assert_eq!(i.api_version, VARIABLE_SET_API_VERSION);
+        assert_eq!(i.schema, VARIABLE_SET_SCHEMA);
+        assert_eq!(i.schema, VARIABLE_SET_SCHEMA);
         assert!(!i.canonical_kind_name.is_empty());
     }
 }
@@ -152,7 +150,7 @@ pub async fn test_list_supports_pagination_limit(h: &impl FacadeContractHarness)
     assert!(
         summaries
             .iter()
-            .all(|summary| summary.kind == VARIABLE_SET_KIND)
+            .all(|summary| summary.schema == VARIABLE_SET_SCHEMA)
     );
 }
 
@@ -463,14 +461,14 @@ pub async fn test_search_multi_kind(h: &impl FacadeContractHarness) {
 
     // Both kinds must be represented in the result
     let kinds: std::collections::HashSet<_> =
-        response.items.iter().map(|i| i.kind.as_str()).collect();
+        response.items.iter().map(|i| i.schema.as_str()).collect();
     assert!(
-        kinds.contains(VARIABLE_SET_KIND),
-        "result must include VariableSet kind"
+        kinds.contains(VARIABLE_SET_SCHEMA),
+        "result must include VariableSet schema"
     );
     assert!(
-        kinds.contains(SECRET_SET_KIND),
-        "result must include SecretSet kind"
+        kinds.contains(SECRET_SET_SCHEMA),
+        "result must include SecretSet schema"
     );
 }
 

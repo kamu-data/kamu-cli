@@ -85,12 +85,7 @@ async fn test_reconciliation_succeeded_for_variable_set_cleans_up_old_entries() 
     harness
         .consume_message(&ResourceLifecycleMessage::reconciliation_succeeded(
             Utc::now(),
-            make_snapshot(
-                id,
-                VariableSetResource::RESOURCE_TYPE,
-                VariableSetResource::API_VERSION,
-                2,
-            ),
+            make_snapshot(id, VariableSetResource::SCHEMA, 2),
         ))
         .await
         .unwrap();
@@ -153,12 +148,7 @@ async fn test_reconciliation_succeeded_for_secret_set_cleans_up_old_entries() {
     harness
         .consume_message(&ResourceLifecycleMessage::reconciliation_succeeded(
             Utc::now(),
-            make_snapshot(
-                id,
-                SecretSetResource::RESOURCE_TYPE,
-                SecretSetResource::API_VERSION,
-                2,
-            ),
+            make_snapshot(id, SecretSetResource::SCHEMA, 2),
         ))
         .await
         .unwrap();
@@ -181,7 +171,7 @@ async fn test_reconciliation_succeeded_for_unknown_kind_is_no_op() {
     harness
         .consume_message(&ResourceLifecycleMessage::reconciliation_succeeded(
             Utc::now(),
-            make_snapshot(id, "UnknownKind", "unknown.dev/v1", 1),
+            make_snapshot(id, "UnknownKind", 1),
         ))
         .await
         .unwrap();
@@ -217,12 +207,7 @@ async fn test_deleted_for_variable_set_removes_all_projection_entries() {
     harness
         .consume_message(&ResourceLifecycleMessage::deleted(
             Utc::now(),
-            vec![make_snapshot(
-                id,
-                VariableSetResource::RESOURCE_TYPE,
-                VariableSetResource::API_VERSION,
-                1,
-            )],
+            vec![make_snapshot(id, VariableSetResource::SCHEMA, 1)],
         ))
         .await
         .unwrap();
@@ -266,12 +251,7 @@ async fn test_deleted_for_secret_set_removes_all_projection_entries() {
     harness
         .consume_message(&ResourceLifecycleMessage::deleted(
             Utc::now(),
-            vec![make_snapshot(
-                id,
-                SecretSetResource::RESOURCE_TYPE,
-                SecretSetResource::API_VERSION,
-                1,
-            )],
+            vec![make_snapshot(id, SecretSetResource::SCHEMA, 1)],
         ))
         .await
         .unwrap();
@@ -315,18 +295,8 @@ async fn test_deleted_for_variable_set_with_multiple_ids_removes_all() {
         .consume_message(&ResourceLifecycleMessage::deleted(
             Utc::now(),
             vec![
-                make_snapshot(
-                    id_a,
-                    VariableSetResource::RESOURCE_TYPE,
-                    VariableSetResource::API_VERSION,
-                    1,
-                ),
-                make_snapshot(
-                    id_b,
-                    VariableSetResource::RESOURCE_TYPE,
-                    VariableSetResource::API_VERSION,
-                    1,
-                ),
+                make_snapshot(id_a, VariableSetResource::SCHEMA, 1),
+                make_snapshot(id_b, VariableSetResource::SCHEMA, 1),
             ],
         ))
         .await
@@ -381,12 +351,7 @@ async fn test_deleted_for_variable_set_removes_only_targeted_id() {
     harness
         .consume_message(&ResourceLifecycleMessage::deleted(
             Utc::now(),
-            vec![make_snapshot(
-                id_deleted,
-                VariableSetResource::RESOURCE_TYPE,
-                VariableSetResource::API_VERSION,
-                1,
-            )],
+            vec![make_snapshot(id_deleted, VariableSetResource::SCHEMA, 1)],
         ))
         .await
         .unwrap();
@@ -447,18 +412,8 @@ async fn test_deleted_for_secret_set_with_multiple_ids_removes_all() {
         .consume_message(&ResourceLifecycleMessage::deleted(
             Utc::now(),
             vec![
-                make_snapshot(
-                    id_a,
-                    SecretSetResource::RESOURCE_TYPE,
-                    SecretSetResource::API_VERSION,
-                    1,
-                ),
-                make_snapshot(
-                    id_b,
-                    SecretSetResource::RESOURCE_TYPE,
-                    SecretSetResource::API_VERSION,
-                    1,
-                ),
+                make_snapshot(id_a, SecretSetResource::SCHEMA, 1),
+                make_snapshot(id_b, SecretSetResource::SCHEMA, 1),
             ],
         ))
         .await
@@ -488,12 +443,7 @@ async fn test_applied_message_is_no_op() {
         .consume_message(&ResourceLifecycleMessage::applied(
             Utc::now(),
             kamu_resources::ResourceLifecycleMessageOutcome::Created,
-            make_snapshot(
-                id,
-                VariableSetResource::RESOURCE_TYPE,
-                VariableSetResource::API_VERSION,
-                1,
-            ),
+            make_snapshot(id, VariableSetResource::SCHEMA, 1),
         ))
         .await
         .unwrap();
@@ -503,20 +453,14 @@ async fn test_applied_message_is_no_op() {
 // Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn make_snapshot(
-    id: ResourceID,
-    kind: &str,
-    api_version: &str,
-    generation: u64,
-) -> ResourceSnapshot {
+fn make_snapshot(id: ResourceID, kind: &str, generation: u64) -> ResourceSnapshot {
     let (_, account_id) = odf::AccountID::new_generated_ed25519();
     let now = Utc::now();
     let mut headers = ResourceHeaders::simple(now, account_id, "test-res");
     headers.generation = generation;
     ResourceSnapshot {
         id,
-        kind: kind.to_string(),
-        api_version: api_version.to_string(),
+        schema: kind.to_string(),
         headers,
         spec: serde_json::json!({}),
         status: None,

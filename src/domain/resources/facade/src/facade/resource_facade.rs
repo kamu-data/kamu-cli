@@ -140,7 +140,6 @@ pub trait ResourceFacade: Send + Sync {
 pub struct ResourceSelector {
     pub account: Option<ResourceManifestAccount>,
     pub kind: String,
-    pub api_version: Option<String>,
     pub resource_ref: ResourceRef,
 }
 
@@ -150,7 +149,6 @@ pub struct ResourceSelector {
 pub struct ResourceBatchSelector {
     pub account: Option<ResourceManifestAccount>,
     pub kind: String,
-    pub api_version: Option<String>,
     pub resource_refs: Vec<ResourceRef>,
 }
 

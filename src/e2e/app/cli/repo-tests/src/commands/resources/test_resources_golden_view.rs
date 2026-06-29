@@ -69,8 +69,7 @@ pub async fn test_resources_golden_view(ctx: ResourceCtx) {
 
 fn expected_variable_set(name: &str, message_value: &str) -> serde_json::Value {
     serde_json::json!({
-        "apiVersion": fixtures::RESOURCE_API_VERSION,
-        "kind": fixtures::VARIABLE_SET_KIND,
+        "$schema": fixtures::VARIABLE_SET_KIND,
         "headers": {
             "name": name,
             "description": fixtures::DEFAULT_DESCRIPTION,
@@ -94,8 +93,7 @@ fn expected_variable_set(name: &str, message_value: &str) -> serde_json::Value {
 
 fn expected_secret_set_without_secrets(name: &str) -> serde_json::Value {
     serde_json::json!({
-        "apiVersion": fixtures::RESOURCE_API_VERSION,
-        "kind": fixtures::SECRET_SET_KIND,
+        "$schema": fixtures::SECRET_SET_KIND,
         "headers": {
             "name": name,
             "description": fixtures::DEFAULT_DESCRIPTION,

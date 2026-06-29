@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT event_id\n            FROM resource_events\n            WHERE\n                resource_id = $1 AND resource_schema = $2\n            ORDER BY event_id DESC\n            LIMIT 1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "event_id",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "31b79fa07e0cb42397ac26b9862039624982b2603d47873d63fd9cd360957904"
+}

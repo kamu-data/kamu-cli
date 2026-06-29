@@ -18,18 +18,13 @@ use crate::ResourceListColumnDescriptor;
 pub struct ResourceKindDescriptor {
     pub name: String,
     pub short_names: Vec<String>,
-    pub kind: String,
-    pub api_version: String,
+    pub schema: String,
     pub list_columns: Vec<ResourceListColumnDescriptor>,
 }
 
 impl ResourceKindDescriptor {
     pub fn matches_selector(&self, selector: &str) -> bool {
-        self.name.eq_ignore_ascii_case(selector)
-            || self
-                .short_names
-                .iter()
-                .any(|short_name| short_name.eq_ignore_ascii_case(selector))
+        resource_kind_matches_selector(&self.name, &self.short_names, selector)
     }
 
     pub fn matches_selector_pattern(&self, pattern: &str) -> bool {
@@ -39,6 +34,17 @@ impl ResourceKindDescriptor {
                 .iter()
                 .any(|short_name| matches_wildcard_pattern(pattern, short_name))
     }
+}
+
+pub fn resource_kind_matches_selector(
+    name: &str,
+    short_names: &[impl AsRef<str>],
+    selector: &str,
+) -> bool {
+    name.eq_ignore_ascii_case(selector)
+        || short_names
+            .iter()
+            .any(|short_name| short_name.as_ref().eq_ignore_ascii_case(selector))
 }
 
 fn matches_wildcard_pattern(pattern: &str, value: &str) -> bool {
@@ -56,8 +62,7 @@ mod tests {
         let descriptor = ResourceKindDescriptor {
             name: "variablesets".to_owned(),
             short_names: vec!["vs".to_owned()],
-            kind: "dev.kamu/variableset".to_owned(),
-            api_version: "v1".to_owned(),
+            schema: "https://opendatafabric.org/schemas/config/v1alpha1/VariableSet".to_owned(),
             list_columns: Vec::new(),
         };
 
@@ -70,8 +75,7 @@ mod tests {
         let descriptor = ResourceKindDescriptor {
             name: "secretsets".to_owned(),
             short_names: vec!["ss".to_owned()],
-            kind: "dev.kamu/secretset".to_owned(),
-            api_version: "v1".to_owned(),
+            schema: "https://opendatafabric.org/schemas/config/v1alpha1/SecretSet".to_owned(),
             list_columns: Vec::new(),
         };
 

@@ -25,8 +25,7 @@ use crate::tests::utils::{make_account_id, make_id};
 fn make_view(name: &str, value: &str) -> ResourceView {
     let id = make_id();
     ResourceView {
-        kind: "TestResource".to_string(),
-        api_version: "test.kamu.dev/v1".to_string(),
+        schema: "TestResource".to_string(),
         account: ResourceViewAccount {
             id: make_account_id(),
             name: None,
@@ -169,8 +168,7 @@ fn test_make_changes_identical_before_after_returns_no_field_changes() {
     let id = make_id();
 
     let make = || ResourceView {
-        kind: "TestResource".to_string(),
-        api_version: "test.kamu.dev/v1".to_string(),
+        schema: "TestResource".to_string(),
         account: ResourceViewAccount {
             id: make_account_id(),
             name: None,
@@ -218,8 +216,7 @@ fn test_timestamp_precision_normalized_avoids_spurious_diffs() {
     let account_id = make_account_id();
 
     let make_view_ts = |updated_at| ResourceView {
-        kind: "TestResource".to_string(),
-        api_version: "test.kamu.dev/v1".to_string(),
+        schema: "TestResource".to_string(),
         account: ResourceViewAccount {
             id: account_id.clone(),
             name: None,

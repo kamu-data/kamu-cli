@@ -7,26 +7,26 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources::{ResourceAPIVersionMismatchError, ResourceID};
+use kamu_resources::ResourceID;
 
-use crate::{ResourceKindMismatchError, ResourceLookupProblem};
+use crate::{ResourceLookupProblem, ResourceSchemaMismatchError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn ensure_kind_matches<E>(
+pub(crate) fn ensure_schema_matches<E>(
     id: ResourceID,
-    expected_kind: &str,
-    actual_kind: &str,
+    expected_schema: &str,
+    actual_schema: &str,
 ) -> Result<(), E>
 where
     E: From<ResourceLookupProblem>,
 {
-    if actual_kind != expected_kind {
+    if actual_schema != expected_schema {
         return Err(
-            ResourceLookupProblem::KindMismatch(ResourceKindMismatchError {
+            ResourceLookupProblem::SchemaMismatch(ResourceSchemaMismatchError {
                 id,
-                expected_kind: expected_kind.to_string(),
-                actual_kind: actual_kind.to_string(),
+                expected_schema: expected_schema.to_string(),
+                actual_schema: actual_schema.to_string(),
             })
             .into(),
         );
@@ -34,29 +34,3 @@ where
 
     Ok(())
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) fn ensure_requested_api_version<E>(
-    expected_api_version: Option<&String>,
-    actual_api_version: &str,
-) -> Result<(), E>
-where
-    E: From<ResourceLookupProblem>,
-{
-    if let Some(expected_api_version) = expected_api_version
-        && actual_api_version != expected_api_version
-    {
-        return Err(
-            ResourceLookupProblem::ApiVersionMismatch(ResourceAPIVersionMismatchError {
-                expected_api_version: expected_api_version.clone(),
-                actual_api_version: actual_api_version.to_string(),
-            })
-            .into(),
-        );
-    }
-
-    Ok(())
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

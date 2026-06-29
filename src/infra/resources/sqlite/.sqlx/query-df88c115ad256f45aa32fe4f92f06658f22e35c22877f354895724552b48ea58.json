@@ -1,0 +1,56 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT\n                resource_schema,\n                COUNT(*) as \"total_count!: i64\",\n                SUM(CASE WHEN phase = 'Reconciling' THEN 1 ELSE 0 END) as \"reconciling_count!: i64\",\n                SUM(CASE WHEN phase = 'Ready' THEN 1 ELSE 0 END) as \"ready_count!: i64\",\n                SUM(CASE WHEN phase = 'Degraded' THEN 1 ELSE 0 END) as \"degraded_count!: i64\",\n                SUM(CASE WHEN phase = 'Failed' THEN 1 ELSE 0 END) as \"failed_count!: i64\",\n                SUM(CASE WHEN phase = 'Pending' THEN 1 ELSE 0 END) as \"pending_count!: i64\"\n            FROM (\n                SELECT\n                    resource_schema,\n                    CASE COALESCE(json_extract(status, '$.phase'), 'Pending')\n                        WHEN 'Reconciling' THEN 'Reconciling'\n                        WHEN 'Ready' THEN 'Ready'\n                        WHEN 'Degraded' THEN 'Degraded'\n                        WHEN 'Failed' THEN 'Failed'\n                        ELSE 'Pending'\n                    END as phase\n                FROM resources\n                WHERE account_id = $1\n                  AND deleted_at IS NULL\n            ) as normalized_resources\n            GROUP BY resource_schema\n            ORDER BY resource_schema ASC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "resource_schema",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "total_count!: i64",
+        "ordinal": 1,
+        "type_info": "Null"
+      },
+      {
+        "name": "reconciling_count!: i64",
+        "ordinal": 2,
+        "type_info": "Null"
+      },
+      {
+        "name": "ready_count!: i64",
+        "ordinal": 3,
+        "type_info": "Null"
+      },
+      {
+        "name": "degraded_count!: i64",
+        "ordinal": 4,
+        "type_info": "Null"
+      },
+      {
+        "name": "failed_count!: i64",
+        "ordinal": 5,
+        "type_info": "Null"
+      },
+      {
+        "name": "pending_count!: i64",
+        "ordinal": 6,
+        "type_info": "Null"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "df88c115ad256f45aa32fe4f92f06658f22e35c22877f354895724552b48ea58"
+}

@@ -11,7 +11,6 @@ use event_sourcing::*;
 use kamu_resources::{
     DeclarativeResource,
     DeclarativeResourceState,
-    ResourceApiVersion,
     ResourceListColumnDataType,
     ResourceListColumnDefinition,
     ResourceListColumnValue,
@@ -19,7 +18,7 @@ use kamu_resources::{
     ResourceListColumnVisibility,
     ResourcePresentation,
     ResourcePresentationDefinition,
-    ResourceType,
+    ResourceSchemaProvider,
 };
 
 use crate::{VariableSetEventStore, VariableSetSpec, VariableSetState, VariableSetStatus};
@@ -32,20 +31,16 @@ pub struct VariableSetResource(pub(crate) Aggregate<VariableSetState, dyn Variab
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl VariableSetResource {
-    pub const RESOURCE_TYPE: &'static str = "VariableSet";
+    pub const SCHEMA: &'static str =
+        "https://opendatafabric.org/schemas/config/v1alpha1/VariableSet";
     pub const RESOURCE_NAME: &'static str = "variablesets";
     pub const RESOURCE_SHORT_NAMES: &'static [&'static str] = &["vs"];
-    pub const API_VERSION: &'static str = "kamu.dev/v1alpha1";
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl ResourceType for VariableSetResource {
-    const RESOURCE_TYPE: &'static str = Self::RESOURCE_TYPE;
-}
-
-impl ResourceApiVersion for VariableSetResource {
-    const API_VERSION: &'static str = Self::API_VERSION;
+impl ResourceSchemaProvider for VariableSetResource {
+    const SCHEMA: &'static str = Self::SCHEMA;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

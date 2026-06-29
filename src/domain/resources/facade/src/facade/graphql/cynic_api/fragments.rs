@@ -17,8 +17,7 @@ use crate::facade::graphql::cynic_api::schema;
 #[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct ResourceSummary {
     pub id: kamu_resources::ResourceID,
-    pub api_version: String,
-    pub kind: ResourceKind,
+    pub schema: String,
     pub name: String,
     pub description: Option<String>,
     pub generation: Uint64,
@@ -97,8 +96,7 @@ pub(crate) struct ResourcesSummary {
 #[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct ResourceUnsupportedDescriptorProblem {
     pub code: ResourceUnsupportedDescriptorProblemCode,
-    pub kind: String,
-    pub api_version: String,
+    pub schema: String,
 }
 
 #[derive(cynic::Enum, Debug, Clone, Copy)]
@@ -140,16 +138,10 @@ pub(crate) struct ResourceNameNotFoundProblem {
 }
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
-pub(crate) struct ResourceApiVersionMismatchProblem {
-    pub expected_api_version: String,
-    pub actual_api_version: String,
-}
-
-#[derive(cynic::QueryFragment, Debug, Clone)]
-pub(crate) struct ResourceKindMismatchProblem {
+pub(crate) struct ResourceSchemaMismatchProblem {
     pub id: kamu_resources::ResourceID,
-    pub expected_kind: String,
-    pub actual_kind: String,
+    pub expected_schema: String,
+    pub actual_schema: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -158,8 +150,7 @@ pub(crate) struct ResourceKindMismatchProblem {
 pub(crate) enum ResourceLookupProblem {
     ResourceIDNotFoundProblem(ResourceIDNotFoundProblem),
     ResourceNameNotFoundProblem(ResourceNameNotFoundProblem),
-    ResourceApiVersionMismatchProblem(ResourceApiVersionMismatchProblem),
-    ResourceKindMismatchProblem(ResourceKindMismatchProblem),
+    ResourceSchemaMismatchProblem(ResourceSchemaMismatchProblem),
     #[cynic(fallback)]
     Unknown,
 }
@@ -170,8 +161,7 @@ pub(crate) enum ResourceLookupProblem {
 pub(crate) enum ResourceSelectorProblem {
     ResourceIDNotFoundProblem(ResourceIDNotFoundProblem),
     ResourceNameNotFoundProblem(ResourceNameNotFoundProblem),
-    ResourceApiVersionMismatchProblem(ResourceApiVersionMismatchProblem),
-    ResourceKindMismatchProblem(ResourceKindMismatchProblem),
+    ResourceSchemaMismatchProblem(ResourceSchemaMismatchProblem),
     ResourceUnsupportedDescriptorProblem(ResourceUnsupportedDescriptorProblem),
     ResourceBadAccountProblem(ResourceBadAccountProblem),
     #[cynic(fallback)]
@@ -194,9 +184,8 @@ pub(crate) struct ResourceInvalidSearchQueryProblem {
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct ResourceTypeCountSummary {
-    pub kind: String,
+    pub schema: String,
     pub name: String,
-    pub api_version: String,
     pub total_count: Uint64,
     pub phase_counts: ResourcePhaseCounts,
 }
@@ -216,18 +205,10 @@ pub(crate) struct ResourcePhaseCounts {
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct Resource {
-    pub api_version: String,
-    pub kind: ResourceKind,
+    pub schema: String,
     pub headers: ResourceHeaders,
     pub spec: serde_json::Value,
     pub status: Option<serde_json::Value>,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(cynic::QueryFragment, Debug, Clone)]
-pub(crate) struct ResourceKind {
-    pub value: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -253,8 +234,7 @@ pub(crate) struct ResourceHeaders {
 #[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct ResourceIdentity {
     pub id: kamu_resources::ResourceID,
-    pub api_version: String,
-    pub kind: ResourceKind,
+    pub schema: String,
     pub canonical_kind_name: String,
     pub name: String,
 }

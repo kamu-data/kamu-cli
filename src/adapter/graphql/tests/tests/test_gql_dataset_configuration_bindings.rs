@@ -19,6 +19,9 @@ use pretty_assertions::assert_eq;
 
 use crate::utils::{BaseGQLResourceHarness, PredefinedAccountOpts, authentication_catalogs_ext};
 
+const VARIABLE_SET_SCHEMA: &str = "https://opendatafabric.org/schemas/config/v1alpha1/VariableSet";
+const SECRET_SET_SCHEMA: &str = "https://opendatafabric.org/schemas/config/v1alpha1/SecretSet";
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
@@ -65,8 +68,7 @@ async fn test_replace_variable_set_bindings_success() {
                                 "resourceId": resource_id_str,
                                 "bindingOrder": 0,
                                 "resourceName": "my-varset",
-                                "resourceKind": { "value": "VariableSet" },
-                                "apiVersion": "kamu.dev/v1alpha1"
+                                "resourceSchema": VARIABLE_SET_SCHEMA
                             }
                         ]
                     }
@@ -122,8 +124,7 @@ async fn test_replace_secret_set_bindings_success() {
                                 "resourceId": resource_id_str,
                                 "bindingOrder": 0,
                                 "resourceName": "my-secretset",
-                                "resourceKind": { "value": "SecretSet" },
-                                "apiVersion": "kamu.dev/v1alpha1"
+                                "resourceSchema": SECRET_SET_SCHEMA
                             }
                         ]
                     }
@@ -248,7 +249,7 @@ async fn test_replace_variable_set_bindings_wrong_kind() {
                     "configuration": {
                         "replaceVariableSetBindings": {
                             "message": format!(
-                                "Resource '{resource_id_str}' has kind 'SecretSet' but expected 'VariableSet'"
+                                "Resource '{resource_id_str}' has schema '{SECRET_SET_SCHEMA}' but expected '{VARIABLE_SET_SCHEMA}'"
                             )
                         }
                     }
@@ -365,15 +366,13 @@ async fn test_query_bindings_ordered() {
                                 "resourceId": id_a,
                                 "bindingOrder": 0,
                                 "resourceName": "varset-alpha",
-                                "resourceKind": { "value": "VariableSet" },
-                                "apiVersion": "kamu.dev/v1alpha1"
+                                "resourceSchema": VARIABLE_SET_SCHEMA
                             },
                             {
                                 "resourceId": id_b,
                                 "bindingOrder": 1,
                                 "resourceName": "varset-beta",
-                                "resourceKind": { "value": "VariableSet" },
-                                "apiVersion": "kamu.dev/v1alpha1"
+                                "resourceSchema": VARIABLE_SET_SCHEMA
                             }
                         ]
                     }
@@ -657,8 +656,7 @@ impl DatasetConfigurationHarness {
                                 resourceId
                                 bindingOrder
                                 resourceName
-                                resourceKind { value }
-                                apiVersion
+                                resourceSchema
                             }
                         }
                     }
@@ -682,8 +680,7 @@ impl DatasetConfigurationHarness {
                                 resourceId
                                 bindingOrder
                                 resourceName
-                                resourceKind { value }
-                                apiVersion
+                                resourceSchema
                             }
                         }
                     }

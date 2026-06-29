@@ -8912,6 +8912,7 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio-stream",
  "tracing",
+ "url",
  "uuid",
 ]
 

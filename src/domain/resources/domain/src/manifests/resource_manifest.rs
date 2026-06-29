@@ -20,8 +20,8 @@ use crate::{ResourceID, ResourceName};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ResourceManifest {
-    pub api_version: String,
-    pub kind: String,
+    #[serde(rename = "$schema")]
+    pub schema: String,
     pub headers: ResourceManifestHeaders,
     pub spec: serde_json::Value,
 }

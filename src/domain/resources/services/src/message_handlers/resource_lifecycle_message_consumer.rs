@@ -63,8 +63,7 @@ impl MessageConsumerT<ResourceLifecycleMessage> for ResourceLifecycleMessageCons
                 let resource = &applied_message.resource;
                 let dispatcher = get_resource_lifecycle_dispatcher_from_catalog(
                     target_catalog,
-                    &resource.kind,
-                    &resource.api_version,
+                    &resource.schema,
                 )?;
 
                 dispatcher.handle_applied(resource).await
@@ -73,8 +72,7 @@ impl MessageConsumerT<ResourceLifecycleMessage> for ResourceLifecycleMessageCons
                 let resource = &succeeded_message.resource;
                 let dispatcher = get_resource_lifecycle_dispatcher_from_catalog(
                     target_catalog,
-                    &resource.kind,
-                    &resource.api_version,
+                    &resource.schema,
                 )?;
 
                 dispatcher.handle_reconciliation_succeeded(resource).await
@@ -83,8 +81,7 @@ impl MessageConsumerT<ResourceLifecycleMessage> for ResourceLifecycleMessageCons
                 let resource = &failed_message.resource;
                 let dispatcher = get_resource_lifecycle_dispatcher_from_catalog(
                     target_catalog,
-                    &resource.kind,
-                    &resource.api_version,
+                    &resource.schema,
                 )?;
 
                 dispatcher.handle_reconciliation_failed(resource).await
@@ -96,11 +93,8 @@ impl MessageConsumerT<ResourceLifecycleMessage> for ResourceLifecycleMessageCons
                 );
 
                 let first = &deleted_message.resources[0];
-                let dispatcher = get_resource_lifecycle_dispatcher_from_catalog(
-                    target_catalog,
-                    &first.kind,
-                    &first.api_version,
-                )?;
+                let dispatcher =
+                    get_resource_lifecycle_dispatcher_from_catalog(target_catalog, &first.schema)?;
 
                 for resource in &deleted_message.resources {
                     dispatcher.handle_deleted(resource).await?;

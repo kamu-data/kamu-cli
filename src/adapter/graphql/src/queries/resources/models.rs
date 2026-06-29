@@ -69,7 +69,6 @@ impl ResourceAccountSelectorInput {
 #[derive(InputObject, Debug, Clone)]
 pub struct ResourceSelectorInput {
     pub kind: ResourceKindInput,
-    pub api_version: Option<String>,
     #[graphql(name = "ref")]
     pub resource_ref: ResourceRefInput,
     pub account: Option<ResourceAccountSelectorInput>,
@@ -80,7 +79,6 @@ pub struct ResourceSelectorInput {
 #[derive(InputObject, Debug, Clone)]
 pub struct ResourceBatchSelectorInput {
     pub kind: ResourceKindInput,
-    pub api_version: Option<String>,
     #[graphql(name = "refs")]
     pub resource_refs: Vec<ResourceRefInput>,
     pub account: Option<ResourceAccountSelectorInput>,
@@ -93,7 +91,6 @@ impl From<ResourceSelectorInput> for kamu_resources_facade::ResourceSelector {
                 .account
                 .map(ResourceAccountSelectorInput::into_manifest_account),
             kind: value.kind.into_resource_type(),
-            api_version: value.api_version,
             resource_ref: value.resource_ref.into(),
         }
     }
@@ -108,7 +105,6 @@ impl From<ResourceBatchSelectorInput> for kamu_resources_facade::ResourceBatchSe
                 .account
                 .map(ResourceAccountSelectorInput::into_manifest_account),
             kind: value.kind.into_resource_type(),
-            api_version: value.api_version,
             resource_refs: value.resource_refs.into_iter().map(Into::into).collect(),
         }
     }
@@ -172,26 +168,10 @@ pub struct ResourceByNameSelectorInput {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
-pub struct ResourceKind {
-    pub value: String,
-}
-
-impl ResourceKind {
-    pub fn new(value: impl Into<String>) -> Self {
-        Self {
-            value: value.into(),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
 pub struct ResourceKindDescriptor {
     pub name: String,
     pub short_names: Vec<String>,
-    pub kind: ResourceKind,
-    pub api_version: String,
+    pub schema: String,
     pub list_columns: Vec<ResourceListColumnDescriptor>,
 }
 
@@ -200,8 +180,7 @@ impl From<kamu_resources::ResourceKindDescriptor> for ResourceKindDescriptor {
         Self {
             name: value.name,
             short_names: value.short_names,
-            kind: ResourceKind::new(value.kind),
-            api_version: value.api_version,
+            schema: value.schema,
             list_columns: value.list_columns.into_iter().map(Into::into).collect(),
         }
     }
@@ -212,8 +191,7 @@ impl From<kamu_resources::ResourceKindDescriptor> for ResourceKindDescriptor {
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceUnsupportedDescriptorProblem {
     pub code: ResourceUnsupportedDescriptorProblemCode,
-    pub kind: String,
-    pub api_version: String,
+    pub schema: String,
     pub message: String,
 }
 
@@ -225,16 +203,14 @@ impl From<kamu_resources::UnsupportedResourceDescriptorError>
 
         let message = value.to_string();
         match value {
-            E::NotFound { kind, api_version } => Self {
+            E::NotFound { schema } | E::SelectorNotFound { selector: schema } => Self {
                 code: ResourceUnsupportedDescriptorProblemCode::NotFound,
-                kind,
-                api_version,
+                schema,
                 message,
             },
-            E::Duplicate { kind, api_version } => Self {
+            E::Duplicate { schema } | E::SelectorDuplicate { selector: schema } => Self {
                 code: ResourceUnsupportedDescriptorProblemCode::Duplicate,
-                kind,
-                api_version,
+                schema,
                 message,
             },
         }
@@ -334,17 +310,10 @@ pub struct ResourceNameNotFoundProblem {
 }
 
 #[derive(SimpleObject, Debug, Clone)]
-pub struct ResourceApiVersionMismatchProblem {
-    pub expected_api_version: String,
-    pub actual_api_version: String,
-    pub message: String,
-}
-
-#[derive(SimpleObject, Debug, Clone)]
-pub struct ResourceKindMismatchProblem {
+pub struct ResourceSchemaMismatchProblem {
     pub id: ResourceID,
-    pub expected_kind: String,
-    pub actual_kind: String,
+    pub expected_schema: String,
+    pub actual_schema: String,
     pub message: String,
 }
 
@@ -354,8 +323,7 @@ pub struct ResourceKindMismatchProblem {
 pub enum ResourceLookupProblem {
     UidNotFound(ResourceIDNotFoundProblem),
     NameNotFound(ResourceNameNotFoundProblem),
-    ApiVersionMismatch(ResourceApiVersionMismatchProblem),
-    KindMismatch(ResourceKindMismatchProblem),
+    SchemaMismatch(ResourceSchemaMismatchProblem),
 }
 
 impl From<kamu_resources_facade::ResourceLookupProblem> for ResourceLookupProblem {
@@ -371,17 +339,10 @@ impl From<kamu_resources_facade::ResourceLookupProblem> for ResourceLookupProble
                 name: e.name.clone(),
                 message: e.to_string(),
             }),
-            P::ApiVersionMismatch(e) => {
-                Self::ApiVersionMismatch(ResourceApiVersionMismatchProblem {
-                    expected_api_version: e.expected_api_version.clone(),
-                    actual_api_version: e.actual_api_version.clone(),
-                    message: e.to_string(),
-                })
-            }
-            P::KindMismatch(e) => Self::KindMismatch(ResourceKindMismatchProblem {
+            P::SchemaMismatch(e) => Self::SchemaMismatch(ResourceSchemaMismatchProblem {
                 id: e.id.into(),
-                expected_kind: e.expected_kind.clone(),
-                actual_kind: e.actual_kind.clone(),
+                expected_schema: e.expected_schema.clone(),
+                actual_schema: e.actual_schema.clone(),
                 message: e.to_string(),
             }),
         }
@@ -394,8 +355,7 @@ impl From<kamu_resources_facade::ResourceLookupProblem> for ResourceLookupProble
 pub enum ResourceSelectorProblem {
     UidNotFound(ResourceIDNotFoundProblem),
     NameNotFound(ResourceNameNotFoundProblem),
-    ApiVersionMismatch(ResourceApiVersionMismatchProblem),
-    KindMismatch(ResourceKindMismatchProblem),
+    SchemaMismatch(ResourceSchemaMismatchProblem),
     UnsupportedDescriptor(ResourceUnsupportedDescriptorProblem),
     BadAccount(ResourceBadAccountProblem),
 }
@@ -405,8 +365,7 @@ impl From<kamu_resources_facade::ResourceLookupProblem> for ResourceSelectorProb
         match ResourceLookupProblem::from(value) {
             ResourceLookupProblem::UidNotFound(p) => Self::UidNotFound(p),
             ResourceLookupProblem::NameNotFound(p) => Self::NameNotFound(p),
-            ResourceLookupProblem::ApiVersionMismatch(p) => Self::ApiVersionMismatch(p),
-            ResourceLookupProblem::KindMismatch(p) => Self::KindMismatch(p),
+            ResourceLookupProblem::SchemaMismatch(p) => Self::SchemaMismatch(p),
         }
     }
 }
@@ -476,8 +435,7 @@ pub struct ResourceRenderManifestResult {
 
 #[derive(SimpleObject, Debug, Clone)]
 pub struct Resource {
-    pub api_version: String,
-    pub kind: ResourceKind,
+    pub schema: String,
     pub headers: ResourceHeaders,
     pub spec: serde_json::Value,
     pub status: Option<serde_json::Value>,
@@ -488,8 +446,7 @@ impl From<kamu_resources::ResourceView> for Resource {
         let headers = ResourceHeaders::from(value.clone());
 
         Self {
-            api_version: value.api_version,
-            kind: ResourceKind::new(value.kind),
+            schema: value.schema,
             headers,
             spec: value.spec,
             status: value.status,
@@ -583,8 +540,7 @@ pub struct BatchResourceManifestSuccess {
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceIdentity {
     pub id: ResourceID,
-    pub api_version: String,
-    pub kind: ResourceKind,
+    pub schema: String,
     pub canonical_kind_name: String,
     pub name: String,
 }
@@ -593,8 +549,7 @@ impl From<kamu_resources::ResourceIdentityView> for ResourceIdentity {
     fn from(value: kamu_resources::ResourceIdentityView) -> Self {
         Self {
             id: value.id.into(),
-            api_version: value.api_version,
-            kind: ResourceKind::new(value.kind),
+            schema: value.schema,
             canonical_kind_name: value.canonical_kind_name,
             name: value.name,
         }
@@ -702,8 +657,7 @@ impl From<kamu_resources::ResourceView> for ResourceHeaders {
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceSummary {
     pub id: ResourceID,
-    pub api_version: String,
-    pub kind: ResourceKind,
+    pub schema: String,
     pub name: String,
     pub description: Option<String>,
     pub generation: UInt64,
@@ -717,8 +671,7 @@ impl From<kamu_resources::ResourceSummaryView> for ResourceSummary {
     fn from(value: kamu_resources::ResourceSummaryView) -> Self {
         Self {
             id: value.id.into(),
-            api_version: value.api_version,
-            kind: ResourceKind::new(value.kind),
+            schema: value.schema,
             name: value.name.clone(),
             description: value.description,
             generation: value.generation.into(),
@@ -847,9 +800,8 @@ impl From<kamu_resources::ResourcesSummary> for ResourcesSummary {
 
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceTypeCountSummary {
-    pub kind: String,
+    pub schema: String,
     pub name: String,
-    pub api_version: String,
     pub total_count: UInt64,
     pub phase_counts: ResourcePhaseCounts,
 }
@@ -857,9 +809,8 @@ pub struct ResourceTypeCountSummary {
 impl From<kamu_resources::ResourceTypeCountSummary> for ResourceTypeCountSummary {
     fn from(value: kamu_resources::ResourceTypeCountSummary) -> Self {
         Self {
-            kind: value.kind,
+            schema: value.schema,
             name: value.name,
-            api_version: value.api_version,
             total_count: value.total_count.into(),
             phase_counts: value.phase_counts.into(),
         }

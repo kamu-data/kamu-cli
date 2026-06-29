@@ -124,11 +124,7 @@ where
             Some(id) => Ok(Some(id)),
             None => self
                 .generic_resource_query_service
-                .find_resource_id_by_name(
-                    &headers.account,
-                    R::DESCRIPTOR.resource_type,
-                    &headers.name,
-                )
+                .find_resource_id_by_name(&headers.account, R::DESCRIPTOR.schema, &headers.name)
                 .await
                 .map_err(ApplyResourceUseCaseError::Internal),
         }

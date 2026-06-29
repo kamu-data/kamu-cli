@@ -82,7 +82,7 @@ impl BaseGQLResourceHarness {
         account_id: &odf::AccountID,
         name: &str,
         kind: &str,
-        api_version: &str,
+        _api_version: &str,
         spec: serde_json::Value,
     ) -> ResourceID {
         let resource_repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
@@ -91,8 +91,7 @@ impl BaseGQLResourceHarness {
         resource_repo
             .create_resource(&ResourceSnapshot {
                 id,
-                kind: kind.to_string(),
-                api_version: api_version.to_string(),
+                schema: kind.to_string(),
                 headers: ResourceHeaders::simple(Utc::now(), account_id.clone(), name),
                 spec,
                 status: None,
@@ -141,8 +140,8 @@ impl BaseGQLResourceHarness {
             catalog,
             account_id,
             name,
-            VariableSetResource::RESOURCE_TYPE,
-            VariableSetResource::API_VERSION,
+            VariableSetResource::SCHEMA,
+            "",
             spec,
         )
         .await
@@ -158,8 +157,8 @@ impl BaseGQLResourceHarness {
             catalog,
             account_id,
             name,
-            SecretSetResource::RESOURCE_TYPE,
-            SecretSetResource::API_VERSION,
+            SecretSetResource::SCHEMA,
+            "",
             spec,
         )
         .await

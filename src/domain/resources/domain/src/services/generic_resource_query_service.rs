@@ -28,7 +28,7 @@ pub trait GenericResourceQueryService: Send + Sync {
     async fn find_resource_id_by_name(
         &self,
         account_id: &odf::AccountID,
-        kind: &str,
+        schema: &str,
         name: &ResourceName,
     ) -> Result<Option<ResourceID>, InternalError>;
 
@@ -41,14 +41,14 @@ pub trait GenericResourceQueryService: Send + Sync {
     async fn find_resource_identities_by_names(
         &self,
         account_id: &odf::AccountID,
-        kind: &str,
+        schema: &str,
         names: &[ResourceName],
     ) -> Result<Vec<ResourceIdentityRow>, InternalError>;
 
     async fn search_resource_identities(
         &self,
         account_id: &odf::AccountID,
-        kinds: &[String],
+        schemas: &[String],
         exact_names: Option<&[ResourceName]>,
         name_pattern: Option<&str>,
         pagination: PaginationOpts,
@@ -57,7 +57,7 @@ pub trait GenericResourceQueryService: Send + Sync {
     async fn count_search_resource_identities(
         &self,
         account_id: &odf::AccountID,
-        kinds: &[String],
+        schemas: &[String],
         exact_names: Option<&[ResourceName]>,
         name_pattern: Option<&str>,
     ) -> Result<usize, InternalError>;
@@ -65,16 +65,14 @@ pub trait GenericResourceQueryService: Send + Sync {
     async fn find_owned_snapshot(
         &self,
         account_id: &odf::AccountID,
-        kind: &'static str,
-        api_version: &'static str,
+        schema: &'static str,
         id: ResourceID,
     ) -> Result<Option<ResourceSnapshot>, FindOwnedResourceError>;
 
     async fn find_owned_snapshots(
         &self,
         account_id: &odf::AccountID,
-        kind: &'static str,
-        api_version: &'static str,
+        schema: &'static str,
         ids: &[ResourceID],
     ) -> Result<FindOwnedSnapshotsOutcome, InternalError>;
 
@@ -89,10 +87,10 @@ pub trait GenericResourceQueryService: Send + Sync {
         ids: &[ResourceID],
     ) -> Result<Vec<ResourceSnapshot>, InternalError>;
 
-    async fn list_snapshots_by_kind(
+    async fn list_snapshots_by_schema(
         &self,
         account_id: odf::AccountID,
-        kind: &str,
+        schema: &str,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceSnapshot>, InternalError>;
 
@@ -113,12 +111,9 @@ pub trait GenericResourceQueryService: Send + Sync {
 pub struct FindOwnedSnapshotsOutcome {
     pub found: Vec<ResourceSnapshot>,
     pub not_found: Vec<ResourceID>,
-    /// IDs owned by the account but with a different kind:
-    /// (id, `actual_kind`)
-    pub kind_mismatch: Vec<(ResourceID, String)>,
-    /// IDs owned by the account, correct kind,
-    /// but wrong `api_version`: (id, `actual_api_version`)
-    pub api_version_mismatch: Vec<(ResourceID, String)>,
+    /// IDs owned by the account but with a different schema:
+    /// (id, `actual_schema`)
+    pub schema_mismatch: Vec<(ResourceID, String)>,
     pub access_denied: Vec<ResourceID>,
 }
 

@@ -669,15 +669,13 @@ mod tests {
             ResourceKindDescriptor {
                 name: "variablesets".to_owned(),
                 short_names: vec!["vs".to_owned()],
-                kind: "dev.kamu/variableset".to_owned(),
-                api_version: "v1".to_owned(),
+                schema: "dev.kamu/variableset/v1".to_owned(),
                 list_columns: Vec::new(),
             },
             ResourceKindDescriptor {
                 name: "secretsets".to_owned(),
                 short_names: vec!["ss".to_owned()],
-                kind: "dev.kamu/secretset".to_owned(),
-                api_version: "v1".to_owned(),
+                schema: "dev.kamu/secretset/v1".to_owned(),
                 list_columns: Vec::new(),
             },
         ];

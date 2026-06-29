@@ -14,7 +14,6 @@ use crate::queries::{
     ResourceAccountSelectorInput,
     ResourceBadAccountProblem,
     ResourceBatchSelectorInput,
-    ResourceKind,
     ResourceManifestFormat,
     ResourceSelectorInput,
     ResourceSelectorProblem,
@@ -76,7 +75,6 @@ impl ResourcesMut {
 
         let ResourceSelectorInput {
             kind,
-            api_version,
             resource_ref,
             account,
         } = selector;
@@ -84,16 +82,14 @@ impl ResourcesMut {
 
         match resource_facade
             .delete(kamu_resources_facade::ResourceSelector {
-                kind: kind.clone(),
+                kind,
                 account: account.map(ResourceAccountSelectorInput::into_manifest_account),
-                api_version,
                 resource_ref: resource_ref.into(),
             })
             .await
         {
             Ok(resource_id) => Ok(ResourceDeleteOutcome::Success(ResourceDeleteSuccess {
                 resource_id: resource_id.into(),
-                kind: ResourceKind::new(kind).into(),
             })),
             Err(kamu_resources_facade::DeleteResourceError::LookupProblem(problem)) => {
                 Ok(ResourceDeleteOutcome::Problem(problem.into()))
@@ -121,7 +117,6 @@ impl ResourcesMut {
 
         let ResourceBatchSelectorInput {
             kind,
-            api_version,
             resource_refs,
             account,
         } = selector;
@@ -131,7 +126,6 @@ impl ResourcesMut {
             .delete_many(kamu_resources_facade::ResourceBatchSelector {
                 account: account.map(ResourceAccountSelectorInput::into_manifest_account),
                 kind,
-                api_version,
                 resource_refs: resource_refs.into_iter().map(Into::into).collect(),
             })
             .await
@@ -161,7 +155,6 @@ pub enum ResourceDeleteOutcome {
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceDeleteSuccess {
     pub resource_id: ResourceID,
-    pub kind: Option<ResourceKind>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

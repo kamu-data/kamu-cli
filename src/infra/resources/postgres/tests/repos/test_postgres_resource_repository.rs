@@ -42,7 +42,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = postgres,
-    fixture = resource_repo_suite::test_find_resource_snapshots_by_kind_and_ids,
+    fixture = resource_repo_suite::test_find_resource_snapshots_by_schema_and_ids,
     harness = PostgresResourceRepositoryHarness
 );
 
@@ -130,7 +130,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = postgres,
-    fixture = resource_repo_suite::test_list_resource_snapshots_by_kind,
+    fixture = resource_repo_suite::test_list_resource_snapshots_by_schema,
     harness = PostgresResourceRepositoryHarness
 );
 

@@ -88,7 +88,6 @@ impl From<&ResourceRef> for ResourceRefInput {
 #[cynic(graphql_type = "ResourceSelectorInput")]
 pub(crate) struct ResourceSelectorInput {
     pub kind: ResourceKindInput,
-    pub api_version: Option<String>,
 
     #[cynic(rename = "ref")]
     pub ref_: ResourceRefInput,
@@ -102,7 +101,6 @@ impl TryFrom<&ResourceSelector> for ResourceSelectorInput {
     fn try_from(value: &ResourceSelector) -> Result<Self, Self::Error> {
         Ok(Self {
             kind: ResourceKindInput::from_kind(&value.kind),
-            api_version: value.api_version.clone(),
             ref_: (&value.resource_ref).into(),
             account: value.account.as_ref().map(TryInto::try_into).transpose()?,
         })
@@ -115,7 +113,6 @@ impl TryFrom<&ResourceSelector> for ResourceSelectorInput {
 #[cynic(graphql_type = "ResourceBatchSelectorInput")]
 pub(crate) struct ResourceBatchSelectorInput {
     pub kind: ResourceKindInput,
-    pub api_version: Option<String>,
     pub refs: Vec<ResourceRefInput>,
     pub account: Option<ResourceAccountSelectorInput>,
 }
@@ -126,7 +123,6 @@ impl TryFrom<&ResourceBatchSelector> for ResourceBatchSelectorInput {
     fn try_from(value: &ResourceBatchSelector) -> Result<Self, Self::Error> {
         Ok(Self {
             kind: ResourceKindInput::from_kind(&value.kind),
-            api_version: value.api_version.clone(),
             refs: value.resource_refs.iter().map(Into::into).collect(),
             account: value.account.as_ref().map(TryInto::try_into).transpose()?,
         })

@@ -132,8 +132,7 @@ pub trait ReconcilableEventSourcedResource:
     {
         make_typed_resource_snapshot(
             *self.id(),
-            Self::DESCRIPTOR.resource_type,
-            Self::DESCRIPTOR.api_version,
+            Self::DESCRIPTOR.schema,
             self.headers().clone(),
             self.spec(),
             self.status(),

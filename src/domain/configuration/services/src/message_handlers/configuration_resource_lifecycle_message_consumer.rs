@@ -70,8 +70,8 @@ impl MessageConsumerT<ResourceLifecycleMessage> for ConfigurationResourceLifecyc
 
         match message {
             ResourceLifecycleMessage::ReconciliationSucceeded(succeeded_message) => {
-                match succeeded_message.resource.kind.as_str() {
-                    VariableSetResource::RESOURCE_TYPE => {
+                match succeeded_message.resource.schema.as_str() {
+                    VariableSetResource::SCHEMA => {
                         let repo = target_catalog
                             .get_one::<dyn VariableSetProjectionRepository>()
                             .map_err(ErrorIntoInternal::int_err)?;
@@ -82,7 +82,7 @@ impl MessageConsumerT<ResourceLifecycleMessage> for ConfigurationResourceLifecyc
                         )
                         .await
                     }
-                    SecretSetResource::RESOURCE_TYPE => {
+                    SecretSetResource::SCHEMA => {
                         let repo = target_catalog
                             .get_one::<dyn SecretSetProjectionRepository>()
                             .map_err(ErrorIntoInternal::int_err)?;
@@ -102,8 +102,8 @@ impl MessageConsumerT<ResourceLifecycleMessage> for ConfigurationResourceLifecyc
                     "deleted message must contain at least one resource"
                 );
 
-                match deleted_message.resources[0].kind.as_str() {
-                    VariableSetResource::RESOURCE_TYPE => {
+                match deleted_message.resources[0].schema.as_str() {
+                    VariableSetResource::SCHEMA => {
                         let repo = target_catalog
                             .get_one::<dyn VariableSetProjectionRepository>()
                             .map_err(ErrorIntoInternal::int_err)?;
@@ -112,7 +112,7 @@ impl MessageConsumerT<ResourceLifecycleMessage> for ConfigurationResourceLifecyc
                             deleted_message.resources.iter().map(|r| r.id).collect();
                         repo.delete_all_entries(&ids).await
                     }
-                    SecretSetResource::RESOURCE_TYPE => {
+                    SecretSetResource::SCHEMA => {
                         let repo = target_catalog
                             .get_one::<dyn SecretSetProjectionRepository>()
                             .map_err(ErrorIntoInternal::int_err)?;

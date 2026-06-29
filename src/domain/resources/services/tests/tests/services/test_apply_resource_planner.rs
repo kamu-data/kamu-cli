@@ -164,8 +164,7 @@ async fn test_plan_type_mismatch_rejects() {
         .resource_repo()
         .create_resource(&ResourceSnapshot {
             id,
-            kind: "OtherKind".to_string(),
-            api_version: "other.dev/v1".to_string(),
+            schema: "OtherKind".to_string(),
             headers: ResourceHeaders::simple(Utc::now(), account_id.clone(), "res_a".to_string()),
             spec: serde_json::json!({}),
             status: None,

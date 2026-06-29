@@ -9,7 +9,6 @@
 
 use cynic::QueryBuilder;
 
-use crate::facade::graphql::cynic_api::fragments::ResourceKind;
 use crate::facade::graphql::cynic_api::schema;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -30,8 +29,7 @@ pub(crate) struct SupportedKindsResources {
 pub(crate) struct ResourceKindDescriptor {
     pub name: String,
     pub short_names: Vec<String>,
-    pub kind: ResourceKind,
-    pub api_version: String,
+    pub schema: String,
     pub list_columns: Vec<ResourceListColumnDescriptor>,
 }
 

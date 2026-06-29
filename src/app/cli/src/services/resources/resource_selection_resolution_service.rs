@@ -46,7 +46,7 @@ pub struct ResourceSelectionResolution {
 #[derive(Debug, Clone)]
 pub struct ResourceTarget {
     pub kind: String,
-    pub api_version: String,
+    pub schema: String,
     pub canonical_kind_name: String,
     pub id: ResourceID,
     pub name: ResourceName,

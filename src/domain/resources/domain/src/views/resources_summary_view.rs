@@ -20,9 +20,8 @@ pub struct ResourcesSummary {
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ResourceTypeCountSummary {
-    pub kind: String,
+    pub schema: String,
     pub name: String,
-    pub api_version: String,
     pub total_count: u64,
     pub phase_counts: ResourcePhaseCounts,
 }
@@ -32,8 +31,7 @@ pub struct ResourceTypeCountSummary {
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ResourceSummaryRow {
-    pub kind: String,
-    pub api_version: String,
+    pub schema: String,
     pub total_count: u64,
     pub phase_counts: ResourcePhaseCounts,
 }

@@ -24,23 +24,21 @@ use crate::ResourceLookupProblem;
 
 pub(crate) fn resource_identity_from_snapshot<E>(
     snapshot: ResourceSnapshot,
-    descriptors_by_key: &HashMap<(String, String), String>,
+    descriptors_by_schema: &HashMap<String, String>,
 ) -> Result<ResourceIdentityView, E>
 where
     E: From<UnsupportedResourceDescriptorError>,
 {
-    let key = (snapshot.kind.clone(), snapshot.api_version.clone());
-    let found = descriptors_by_key.get(&key);
+    let schema = snapshot.schema.clone();
+    let found = descriptors_by_schema.get(&schema);
     let canonical_kind_name = found
-        .ok_or_else(|| {
-            let (kind, api_version) = key;
-            UnsupportedResourceDescriptorError::NotFound { kind, api_version }
+        .ok_or_else(|| UnsupportedResourceDescriptorError::NotFound {
+            schema: schema.clone(),
         })?
         .clone();
 
     Ok(ResourceIdentityView {
-        kind: snapshot.kind,
-        api_version: snapshot.api_version,
+        schema: snapshot.schema,
         canonical_kind_name,
         id: snapshot.id,
         name: snapshot.headers.name,
@@ -51,23 +49,21 @@ where
 
 pub(crate) fn resource_identity_from_row<E>(
     row: ResourceIdentityRow,
-    descriptors_by_key: &HashMap<(String, String), String>,
+    descriptors_by_schema: &HashMap<String, String>,
 ) -> Result<ResourceIdentityView, E>
 where
     E: From<UnsupportedResourceDescriptorError>,
 {
-    let key = (row.kind.clone(), row.api_version.clone());
-    let found = descriptors_by_key.get(&key);
+    let schema = row.schema.clone();
+    let found = descriptors_by_schema.get(&schema);
     let canonical_kind_name = found
-        .ok_or_else(|| {
-            let (kind, api_version) = key;
-            UnsupportedResourceDescriptorError::NotFound { kind, api_version }
+        .ok_or_else(|| UnsupportedResourceDescriptorError::NotFound {
+            schema: schema.clone(),
         })?
         .clone();
 
     Ok(ResourceIdentityView {
-        kind: row.kind,
-        api_version: row.api_version,
+        schema: row.schema,
         canonical_kind_name,
         id: ResourceID::new(row.id),
         name: row.name,
@@ -76,19 +72,15 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn validate_identity_row<F1, F2>(
+pub(crate) fn validate_identity_row<F>(
     row: ResourceIdentityRow,
-    expected_kind: &str,
-    expected_api_version: Option<&String>,
-    ensure_kind_matches: F1,
-    ensure_requested_api_version: F2,
+    expected_schema: &str,
+    ensure_schema_matches: F,
 ) -> Result<ResourceIdentityRow, ResourceLookupProblem>
 where
-    F1: FnOnce(ResourceID, &str, &str) -> Result<(), ResourceLookupProblem>,
-    F2: FnOnce(Option<&String>, &str) -> Result<(), ResourceLookupProblem>,
+    F: FnOnce(ResourceID, &str, &str) -> Result<(), ResourceLookupProblem>,
 {
-    ensure_kind_matches(ResourceID::new(row.id), expected_kind, &row.kind)?;
-    ensure_requested_api_version(expected_api_version, &row.api_version)?;
+    ensure_schema_matches(ResourceID::new(row.id), expected_schema, &row.schema)?;
 
     Ok(row)
 }
@@ -97,14 +89,14 @@ where
 
 pub(crate) fn map_snapshots_to_identities(
     snapshots: Vec<ResourceSnapshot>,
-    descriptors_by_key: &HashMap<(String, String), String>,
+    descriptors_by_schema: &HashMap<String, String>,
 ) -> Result<Vec<ResourceIdentityView>, InternalError> {
     snapshots
         .into_iter()
         .map(|snapshot| {
             resource_identity_from_snapshot::<UnsupportedResourceDescriptorError>(
                 snapshot,
-                descriptors_by_key,
+                descriptors_by_schema,
             )
             .map_err(|error| InternalError::new(format!("{error}")))
         })

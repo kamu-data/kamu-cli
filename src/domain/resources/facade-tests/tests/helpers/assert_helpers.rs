@@ -26,15 +26,11 @@ use pretty_assertions::assert_eq;
 #[track_caller]
 pub fn assert_resource_view_fields(
     view: &ResourceView,
-    expected_kind: &str,
-    expected_api_version: &str,
+    _expected_kind: &str,
+    expected_schema: &str,
     expected_name: &str,
 ) {
-    assert_eq!(view.kind, expected_kind, "kind mismatch");
-    assert_eq!(
-        view.api_version, expected_api_version,
-        "api_version mismatch"
-    );
+    assert_eq!(view.schema, expected_schema, "schema mismatch");
     assert_eq!(view.headers.name, expected_name, "name mismatch");
     assert!(
         view.headers.deleted_at.is_none(),
@@ -48,16 +44,12 @@ pub fn assert_resource_view_fields(
 #[track_caller]
 pub fn assert_identity_fields(
     identity: &ResourceIdentityView,
-    expected_kind: &str,
-    expected_api_version: &str,
+    _expected_kind: &str,
+    expected_schema: &str,
     expected_name: &str,
     expected_uid: &ResourceID,
 ) {
-    assert_eq!(identity.kind, expected_kind, "identity kind mismatch");
-    assert_eq!(
-        identity.api_version, expected_api_version,
-        "identity api_version mismatch"
-    );
+    assert_eq!(identity.schema, expected_schema, "identity schema mismatch");
     assert_eq!(identity.name, expected_name, "identity name mismatch");
     assert_eq!(identity.id, *expected_uid, "identity id mismatch");
 }
@@ -147,12 +139,12 @@ pub fn assert_batch_indexes<T, E>(
 
 /// Normalizes a slice of `ResourceSummaryView` by sorting by `(kind, name)`.
 pub fn normalize_summary_views(views: &mut [ResourceSummaryView]) {
-    views.sort_by(|a, b| (&a.kind, &a.name).cmp(&(&b.kind, &b.name)));
+    views.sort_by(|a, b| (&a.schema, &a.name).cmp(&(&b.schema, &b.name)));
 }
 
 /// Normalizes a slice of `ResourceIdentityView` by sorting by `(kind, name)`.
 pub fn normalize_identity_views(views: &mut [ResourceIdentityView]) {
-    views.sort_by(|a, b| (&a.kind, &a.name).cmp(&(&b.kind, &b.name)));
+    views.sort_by(|a, b| (&a.schema, &a.name).cmp(&(&b.schema, &b.name)));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

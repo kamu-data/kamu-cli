@@ -42,8 +42,7 @@ async fn make_secret_set_resource(catalog: &Catalog) -> ResourceID {
 
     repo.create_resource(&ResourceSnapshot {
         id: secret_set_id,
-        kind: SecretSetResource::RESOURCE_TYPE.to_string(),
-        api_version: SecretSetResource::API_VERSION.to_string(),
+        schema: SecretSetResource::SCHEMA.to_string(),
         headers: ResourceHeaders::simple(
             Utc::now(),
             odf::AccountID::new_seeded_ed25519(b"test-account"),

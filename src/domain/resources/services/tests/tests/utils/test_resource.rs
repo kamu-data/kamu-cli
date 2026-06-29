@@ -227,12 +227,12 @@ impl ResourceReconcileError for TestResourceReconcileError {
 #[derive(Aggregate, Debug)]
 pub struct TestResource(pub(crate) Aggregate<TestResourceState, dyn TestResourceEventStore>);
 
-impl ResourceType for TestResource {
-    const RESOURCE_TYPE: &'static str = "TestResource";
+impl TestResource {
+    pub const SCHEMA: &'static str = "https://test.kamu.dev/schemas/test/v1/TestResource";
 }
 
-impl ResourceApiVersion for TestResource {
-    const API_VERSION: &'static str = "test.kamu.dev/v1";
+impl ResourceSchemaProvider for TestResource {
+    const SCHEMA: &'static str = Self::SCHEMA;
 }
 
 impl DeclarativeResource for TestResource {

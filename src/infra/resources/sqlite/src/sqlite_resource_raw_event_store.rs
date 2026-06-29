@@ -46,7 +46,7 @@ pub struct SqliteResourceRawEventStore {
 struct EventRow {
     event_id: i64,
     id: uuid::Uuid,
-    kind: String,
+    schema: String,
     event_time: DateTime<Utc>,
     event_type: String,
     payload: serde_json::Value,
@@ -124,7 +124,7 @@ impl SqliteResourceRawEventStore {
             r#"
             INSERT INTO resource_events (
                 resource_id,
-                resource_kind,
+                resource_schema,
                 event_time,
                 event_type,
                 event_payload
@@ -135,7 +135,7 @@ impl SqliteResourceRawEventStore {
         query_builder.push_values(rows, |mut b, row| {
             let (_, query, event) = *row;
             b.push_bind(*query.id.as_ref());
-            b.push_bind(&query.kind);
+            b.push_bind(&query.schema);
             b.push_bind(event.event_time);
             b.push_bind(&event.event_type);
             b.push_bind(&event.payload);
@@ -176,12 +176,12 @@ impl SqliteResourceRawEventStore {
             SELECT event_id
             FROM resource_events
             WHERE resource_id = $1
-              AND resource_kind = $2
+              AND resource_schema = $2
             ORDER BY event_id DESC
             LIMIT 1
             "#,
             query_id,
-            query.kind,
+            query.schema,
         )
         .fetch_optional(connection_mut)
         .await
@@ -202,7 +202,7 @@ impl SqliteResourceRawEventStore {
         #[derive(Debug, sqlx::FromRow)]
         struct LastEventRow {
             id: uuid::Uuid,
-            kind: String,
+            schema: String,
             event_id: i64,
         }
 
@@ -210,7 +210,7 @@ impl SqliteResourceRawEventStore {
             r#"
             SELECT
                 resource_id as id,
-                resource_kind as kind,
+                resource_schema as schema,
                 MAX(event_id) as event_id
             FROM resource_events
             WHERE
@@ -226,12 +226,12 @@ impl SqliteResourceRawEventStore {
                 .push("(")
                 .push("resource_id = ")
                 .push_bind(*query.id.as_ref())
-                .push(" AND resource_kind = ")
-                .push_bind(&query.kind)
+                .push(" AND resource_schema = ")
+                .push_bind(&query.schema)
                 .push(")");
         }
 
-        query_builder.push(" GROUP BY resource_id, resource_kind");
+        query_builder.push(" GROUP BY resource_id, resource_schema");
 
         let rows = query_builder
             .build_query_as::<LastEventRow>()
@@ -244,7 +244,7 @@ impl SqliteResourceRawEventStore {
             .map(|row| {
                 (
                     ResourceRawEventQuery {
-                        kind: row.kind,
+                        schema: row.schema,
                         id: ResourceID::new(row.id),
                     },
                     EventID::new(row.event_id),
@@ -288,7 +288,7 @@ impl EventStore<ResourceRawEventProjection> for SqliteResourceRawEventStore {
                 SELECT
                     event_id,
                     resource_id as "id: _",
-                    resource_kind as "kind!",
+                    resource_schema as "schema!",
                     event_time as "event_time: DateTime<Utc>",
                     event_type,
                     event_payload as "payload: serde_json::Value"
@@ -308,7 +308,7 @@ impl EventStore<ResourceRawEventProjection> for SqliteResourceRawEventStore {
                 yield Ok((event_id, ResourceRawEvent {
                     event_id,
                     query: ResourceRawEventQuery {
-                        kind: row.kind,
+                        schema: row.schema,
                         id: ResourceID::new(row.id),
                     },
                     event_time: row.event_time,
@@ -339,19 +339,19 @@ impl EventStore<ResourceRawEventProjection> for SqliteResourceRawEventStore {
                 SELECT
                     event_id,
                     resource_id as "id: _",
-                    resource_kind as "kind!",
+                    resource_schema as "schema!",
                     event_time as "event_time: DateTime<Utc>",
                     event_type,
                     event_payload as "payload: serde_json::Value"
                 FROM resource_events
                 WHERE resource_id = $1
-                  AND resource_kind = $2
+                  AND resource_schema = $2
                   AND ($3 IS NULL OR event_id > $3)
                   AND ($4 IS NULL OR event_id <= $4)
                 ORDER BY event_id
                 "#,
                 query_id,
-                query.kind,
+                query.schema,
                 maybe_from_id,
                 maybe_to_id,
             )
@@ -363,7 +363,7 @@ impl EventStore<ResourceRawEventProjection> for SqliteResourceRawEventStore {
                 yield Ok((event_id, ResourceRawEvent {
                     event_id,
                     query: ResourceRawEventQuery {
-                        kind: row.kind,
+                        schema: row.schema,
                         id: ResourceID::new(row.id),
                     },
                     event_time: row.event_time,
@@ -393,7 +393,7 @@ impl EventStore<ResourceRawEventProjection> for SqliteResourceRawEventStore {
                 SELECT
                     event_id,
                     resource_id as id,
-                    resource_kind as kind,
+                    resource_schema as schema,
                     event_time,
                     event_type,
                     event_payload as payload
@@ -411,8 +411,8 @@ impl EventStore<ResourceRawEventProjection> for SqliteResourceRawEventStore {
                     .push("(")
                     .push("resource_id = ")
                     .push_bind(*query.id.as_ref())
-                    .push(" AND resource_kind = ")
-                    .push_bind(&query.kind)
+                    .push(" AND resource_schema = ")
+                    .push_bind(&query.schema)
                     .push(")");
             }
 
@@ -426,7 +426,7 @@ impl EventStore<ResourceRawEventProjection> for SqliteResourceRawEventStore {
             while let Some(row) = rows.try_next().await? {
                 let event_id = EventID::new(row.event_id);
                 let query = ResourceRawEventQuery {
-                    kind: row.kind,
+                    schema: row.schema,
                     id: ResourceID::new(row.id),
                 };
                 yield Ok((query.clone(), event_id, ResourceRawEvent {
@@ -506,7 +506,7 @@ impl EventStore<ResourceRawEventProjection> for SqliteResourceRawEventStore {
 
 #[async_trait::async_trait]
 impl ResourceRawEventStore for SqliteResourceRawEventStore {
-    async fn total_events_stored_by_kind(&self, kind: &str) -> Result<usize, InternalError> {
+    async fn total_events_stored_by_schema(&self, schema: &str) -> Result<usize, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
@@ -515,9 +515,9 @@ impl ResourceRawEventStore for SqliteResourceRawEventStore {
             SELECT
                 COUNT(*) as "count!: i64"
             FROM resource_events
-            WHERE resource_kind = $1
+            WHERE resource_schema = $1
             "#,
-            kind,
+            schema,
         )
         .fetch_one(connection_mut)
         .await
@@ -526,12 +526,12 @@ impl ResourceRawEventStore for SqliteResourceRawEventStore {
         Ok(usize::try_from(events_count).unwrap())
     }
 
-    fn get_all_events_by_kind(
+    fn get_all_events_by_schema(
         &self,
-        kind: &str,
+        schema: &str,
         opts: GetEventsOpts,
     ) -> EventStream<'_, ResourceRawEvent> {
-        let kind = kind.to_string();
+        let schema = schema.to_string();
         let maybe_from_id = opts.from.map(EventID::into_inner);
         let maybe_to_id = opts.to.map(EventID::into_inner);
 
@@ -545,17 +545,17 @@ impl ResourceRawEventStore for SqliteResourceRawEventStore {
                 SELECT
                     event_id,
                     resource_id as "id: _",
-                    resource_kind as "kind!",
+                    resource_schema as "schema!",
                     event_time as "event_time: DateTime<Utc>",
                     event_type,
                     event_payload as "payload: serde_json::Value"
                 FROM resource_events
-                WHERE resource_kind = $1
+                WHERE resource_schema = $1
                   AND ($2 IS NULL OR event_id > $2)
                   AND ($3 IS NULL OR event_id <= $3)
                 ORDER BY event_id
                 "#,
-                kind,
+                schema,
                 maybe_from_id,
                 maybe_to_id,
             )
@@ -567,7 +567,7 @@ impl ResourceRawEventStore for SqliteResourceRawEventStore {
                 yield Ok((event_id, ResourceRawEvent {
                     event_id,
                     query: ResourceRawEventQuery {
-                        kind: row.kind,
+                        schema: row.schema,
                         id: ResourceID::new(row.id),
                     },
                     event_time: row.event_time,

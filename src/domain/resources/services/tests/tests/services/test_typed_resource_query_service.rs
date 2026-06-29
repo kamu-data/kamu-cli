@@ -239,14 +239,13 @@ impl TypedResourceQueryServiceHarness {
         &self,
         id: ResourceID,
         owner_account_id: odf::AccountID,
-        kind: &str,
-        api_version: &str,
+        schema: &str,
+        _api_version: &str,
         name: &str,
     ) {
         let snapshot = ResourceSnapshot {
             id,
-            kind: kind.to_string(),
-            api_version: api_version.to_string(),
+            schema: schema.to_string(),
             headers: ResourceHeaders::simple(Utc::now(), owner_account_id, name),
             spec: serde_json::json!({"value": name}),
             status: None,

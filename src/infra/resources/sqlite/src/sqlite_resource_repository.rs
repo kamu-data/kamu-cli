@@ -76,8 +76,7 @@ impl ResourceRepository for SqliteResourceRepository {
             INSERT INTO resources (
                 resource_id,
                 account_id,
-                resource_kind,
-                api_version,
+                resource_schema,
                 resource_name,
                 description,
                 labels,
@@ -91,12 +90,11 @@ impl ResourceRepository for SqliteResourceRepository {
                 last_reconciled_at,
                 last_event_id
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
             "#,
             resource_id,
             account_id_str,
-            resource_snapshot.kind,
-            resource_snapshot.api_version,
+            resource_snapshot.schema,
             resource_snapshot.headers.name,
             resource_snapshot.headers.description,
             labels,
@@ -116,7 +114,7 @@ impl ResourceRepository for SqliteResourceRepository {
             sqlx::Error::Database(e) if e.is_unique_violation() => {
                 CreateResourceError::Duplicate(ResourceDuplicateError {
                     account_id: resource_snapshot.headers.account.clone(),
-                    kind: resource_snapshot.kind.clone(),
+                    schema: resource_snapshot.schema.clone(),
                     name: resource_snapshot.headers.name.clone(),
                 })
             }
@@ -148,7 +146,7 @@ impl ResourceRepository for SqliteResourceRepository {
             UPDATE resources
             SET
                 account_id = $2,
-                api_version = $3,
+                resource_schema = $3,
                 resource_name = $4,
                 description = $5,
                 labels = $6,
@@ -168,7 +166,7 @@ impl ResourceRepository for SqliteResourceRepository {
             "#,
             resource_id,
             account_id_str,
-            resource_snapshot.api_version,
+            resource_snapshot.schema,
             resource_snapshot.headers.name,
             resource_snapshot.headers.description,
             labels,
@@ -188,7 +186,7 @@ impl ResourceRepository for SqliteResourceRepository {
             sqlx::Error::Database(e) if e.is_unique_violation() => {
                 UpdateResourceError::Duplicate(ResourceDuplicateError {
                     account_id: resource_snapshot.headers.account.clone(),
-                    kind: resource_snapshot.kind.clone(),
+                    schema: resource_snapshot.schema.clone(),
                     name: resource_snapshot.headers.name.clone(),
                 })
             }
@@ -205,7 +203,7 @@ impl ResourceRepository for SqliteResourceRepository {
     async fn find_resource_id_by_name(
         &self,
         account_id: &odf::AccountID,
-        kind: &str,
+        schema: &str,
         name: &ResourceName,
     ) -> Result<Option<ResourceID>, InternalError> {
         let mut tr = self.transaction.lock().await;
@@ -220,12 +218,12 @@ impl ResourceRepository for SqliteResourceRepository {
             SELECT resource_id as "id: uuid::Uuid"
             FROM resources
             WHERE account_id = $1
-              AND resource_kind = $2
+              AND resource_schema = $2
               AND resource_name = $3
               AND deleted_at IS NULL
             "#,
             account_id_str,
-            kind,
+            schema,
             name_lower,
         )
         .fetch_optional(connection_mut)
@@ -257,8 +255,7 @@ impl ResourceRepository for SqliteResourceRepository {
             r#"
             SELECT
                 resource_id as id,
-                resource_kind as kind,
-                api_version,
+                resource_schema as schema,
                 resource_name as name
             FROM resources
             WHERE account_id = $1
@@ -280,7 +277,7 @@ impl ResourceRepository for SqliteResourceRepository {
     async fn find_resource_identities_by_names(
         &self,
         account_id: &odf::AccountID,
-        kind: &str,
+        schema: &str,
         names: &[ResourceName],
     ) -> Result<Vec<ResourceIdentityRow>, InternalError> {
         if names.is_empty() {
@@ -300,12 +297,11 @@ impl ResourceRepository for SqliteResourceRepository {
             r#"
             SELECT
                 resource_id as id,
-                resource_kind as kind,
-                api_version,
+                resource_schema as schema,
                 resource_name as name
             FROM resources
             WHERE account_id = $1
-              AND resource_kind = $2
+              AND resource_schema = $2
               AND resource_name IN ({names_placeholders})
               AND deleted_at IS NULL
             "#,
@@ -313,7 +309,7 @@ impl ResourceRepository for SqliteResourceRepository {
 
         let mut query = sqlx::query_as::<_, ResourceIdentityRow>(&query_str)
             .bind(account_id_str)
-            .bind(kind);
+            .bind(schema);
         for name in names {
             query = query.bind(name.to_ascii_lowercase());
         }
@@ -326,12 +322,12 @@ impl ResourceRepository for SqliteResourceRepository {
     async fn search_resource_identities(
         &self,
         account_id: &odf::AccountID,
-        kinds: &[String],
+        schemas: &[String],
         exact_names: Option<&[ResourceName]>,
         name_pattern: Option<&str>,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceIdentityRow>, InternalError> {
-        if kinds.is_empty() || exact_names.is_some_and(<[ResourceName]>::is_empty) {
+        if schemas.is_empty() || exact_names.is_some_and(<[ResourceName]>::is_empty) {
             return Ok(Vec::new());
         }
 
@@ -347,19 +343,18 @@ impl ResourceRepository for SqliteResourceRepository {
             r#"
             SELECT
                 resource_id as id,
-                resource_kind as kind,
-                api_version,
+                resource_schema as schema,
                 resource_name as name
             FROM resources
             WHERE account_id = "#,
         );
         query_builder
             .push_bind(account_id_str)
-            .push(" AND deleted_at IS NULL AND resource_kind IN (");
+            .push(" AND deleted_at IS NULL AND resource_schema IN (");
         {
             let mut separated = query_builder.separated(", ");
-            for kind in kinds {
-                separated.push_bind(kind);
+            for schema in schemas {
+                separated.push_bind(schema);
             }
         }
         query_builder.push(")");
@@ -395,11 +390,11 @@ impl ResourceRepository for SqliteResourceRepository {
     async fn count_search_resource_identities(
         &self,
         account_id: &odf::AccountID,
-        kinds: &[String],
+        schemas: &[String],
         exact_names: Option<&[ResourceName]>,
         name_pattern: Option<&str>,
     ) -> Result<usize, InternalError> {
-        if kinds.is_empty() || exact_names.is_some_and(<[ResourceName]>::is_empty) {
+        if schemas.is_empty() || exact_names.is_some_and(<[ResourceName]>::is_empty) {
             return Ok(0);
         }
 
@@ -417,11 +412,11 @@ impl ResourceRepository for SqliteResourceRepository {
         );
         query_builder
             .push_bind(account_id_str)
-            .push(" AND deleted_at IS NULL AND resource_kind IN (");
+            .push(" AND deleted_at IS NULL AND resource_schema IN (");
         {
             let mut separated = query_builder.separated(", ");
-            for kind in kinds {
-                separated.push_bind(kind);
+            for schema in schemas {
+                separated.push_bind(schema);
             }
         }
         query_builder.push(")");
@@ -463,8 +458,7 @@ impl ResourceRepository for SqliteResourceRepository {
             SELECT
                 resource_id as "id: uuid::Uuid",
                 account_id as "account_id: odf::AccountID",
-                resource_kind,
-                api_version,
+                resource_schema,
                 resource_name,
                 description,
                 labels as "labels: serde_json::Value",
@@ -479,11 +473,11 @@ impl ResourceRepository for SqliteResourceRepository {
                 last_event_id
             FROM resources
             WHERE resource_id = $1
-              AND resource_kind = $2
+              AND resource_schema = $2
               AND deleted_at IS NULL
             "#,
             query_id,
-            query.kind,
+            query.schema,
         )
         .fetch_optional(connection_mut)
         .await
@@ -491,8 +485,7 @@ impl ResourceRepository for SqliteResourceRepository {
 
         Ok(maybe_row.map(|row| ResourceSnapshot {
             id: ResourceID::new(row.id),
-            kind: row.resource_kind,
-            api_version: row.api_version,
+            schema: row.resource_schema,
             headers: ResourceHeaders {
                 account: row.account_id,
                 name: row.resource_name,
@@ -511,9 +504,9 @@ impl ResourceRepository for SqliteResourceRepository {
         }))
     }
 
-    async fn find_resource_snapshots_by_kind_and_ids(
+    async fn find_resource_snapshots_by_schema_and_ids(
         &self,
-        kind: &str,
+        schema: &str,
         ids: &[ResourceID],
     ) -> Result<Vec<ResourceSnapshot>, InternalError> {
         if ids.is_empty() {
@@ -531,8 +524,7 @@ impl ResourceRepository for SqliteResourceRepository {
             SELECT
                 resource_id as id,
                 account_id,
-                resource_kind,
-                api_version,
+                resource_schema,
                 resource_name,
                 description,
                 labels,
@@ -546,13 +538,13 @@ impl ResourceRepository for SqliteResourceRepository {
                 last_reconciled_at,
                 last_event_id
             FROM resources
-            WHERE resource_kind = $1
+            WHERE resource_schema = $1
               AND resource_id IN ({uids_placeholders})
               AND deleted_at IS NULL
             "#,
         );
 
-        let mut query = sqlx::query_as::<_, ResourceSnapshotRow>(&query_str).bind(kind);
+        let mut query = sqlx::query_as::<_, ResourceSnapshotRow>(&query_str).bind(schema);
         for id in ids {
             query = query.bind(*id.as_ref());
         }
@@ -584,8 +576,7 @@ impl ResourceRepository for SqliteResourceRepository {
             SELECT
                 resource_id as "id: uuid::Uuid",
                 account_id as "account_id: odf::AccountID",
-                resource_kind,
-                api_version,
+                resource_schema,
                 resource_name,
                 description,
                 labels as "labels: serde_json::Value",
@@ -610,8 +601,7 @@ impl ResourceRepository for SqliteResourceRepository {
 
         Ok(maybe_row.map(|row| ResourceSnapshot {
             id: ResourceID::new(row.id),
-            kind: row.resource_kind,
-            api_version: row.api_version,
+            schema: row.resource_schema,
             headers: ResourceHeaders {
                 account: row.account_id,
                 name: row.resource_name,
@@ -652,8 +642,7 @@ impl ResourceRepository for SqliteResourceRepository {
             SELECT
                 resource_id as id,
                 account_id,
-                resource_kind,
-                api_version,
+                resource_schema,
                 resource_name,
                 description,
                 labels,
@@ -684,8 +673,7 @@ impl ResourceRepository for SqliteResourceRepository {
             .into_iter()
             .map(|row| ResourceSnapshot {
                 id: ResourceID::new(row.id),
-                kind: row.resource_kind,
-                api_version: row.api_version,
+                schema: row.resource_schema,
                 headers: ResourceHeaders {
                     account: row.account_id,
                     name: row.resource_name,
@@ -708,10 +696,10 @@ impl ResourceRepository for SqliteResourceRepository {
     fn list_resource_ids(
         &self,
         account_id: odf::AccountID,
-        kind: &str,
+        schema: &str,
         pagination: PaginationOpts,
     ) -> ResourceIDStream<'_> {
-        let resource_kind = kind.to_owned();
+        let resource_schema = schema.to_owned();
 
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
@@ -727,13 +715,13 @@ impl ResourceRepository for SqliteResourceRepository {
                 SELECT resource_id as "id: uuid::Uuid"
                 FROM resources
                 WHERE account_id = $1
-                  AND resource_kind = $2
+                  AND resource_schema = $2
                   AND deleted_at IS NULL
                 ORDER BY updated_at DESC, resource_id DESC
                 LIMIT $3 OFFSET $4
                 "#,
                 account_id_str,
-                resource_kind,
+                resource_schema,
                 limit,
                 offset,
             )
@@ -746,13 +734,13 @@ impl ResourceRepository for SqliteResourceRepository {
         })
     }
 
-    fn list_resource_snapshots_by_kind(
+    fn list_resource_snapshots_by_schema(
         &self,
         account_id: odf::AccountID,
-        kind: &str,
+        schema: &str,
         pagination: PaginationOpts,
     ) -> ResourceSnapshotStream<'_> {
-        let resource_kind = kind.to_owned();
+        let resource_schema = schema.to_owned();
 
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
@@ -768,8 +756,7 @@ impl ResourceRepository for SqliteResourceRepository {
                 SELECT
                     resource_id as "id: uuid::Uuid",
                     account_id as "account_id: odf::AccountID",
-                    resource_kind,
-                    api_version,
+                    resource_schema,
                     resource_name,
                     description,
                     labels as "labels: serde_json::Value",
@@ -784,13 +771,13 @@ impl ResourceRepository for SqliteResourceRepository {
                     last_event_id
                 FROM resources
                 WHERE account_id = $1
-                  AND resource_kind = $2
+                  AND resource_schema = $2
                   AND deleted_at IS NULL
                 ORDER BY updated_at DESC, resource_id DESC
                 LIMIT $3 OFFSET $4
                 "#,
                 account_id_str,
-                resource_kind,
+                resource_schema,
                 limit,
                 offset,
             )
@@ -800,8 +787,7 @@ impl ResourceRepository for SqliteResourceRepository {
             while let Some(row) = query_stream.try_next().await? {
                 yield Ok(ResourceSnapshot {
                     id: ResourceID::new(row.id),
-                    kind: row.resource_kind,
-                    api_version: row.api_version,
+                    schema: row.resource_schema,
                     headers: ResourceHeaders {
                         account: row.account_id,
                         name: row.resource_name,
@@ -841,8 +827,7 @@ impl ResourceRepository for SqliteResourceRepository {
                 SELECT
                     resource_id as "id: uuid::Uuid",
                     account_id as "account_id: odf::AccountID",
-                    resource_kind,
-                    api_version,
+                    resource_schema,
                     resource_name,
                     description,
                     labels as "labels: serde_json::Value",
@@ -871,8 +856,7 @@ impl ResourceRepository for SqliteResourceRepository {
             while let Some(row) = query_stream.try_next().await? {
                 yield Ok(ResourceSnapshot {
                     id: ResourceID::new(row.id),
-                    kind: row.resource_kind,
-                    api_version: row.api_version,
+                    schema: row.resource_schema,
                     headers: ResourceHeaders {
                         account: row.account_id,
                         name: row.resource_name,
@@ -896,7 +880,7 @@ impl ResourceRepository for SqliteResourceRepository {
     async fn count_resources(
         &self,
         account_id: odf::AccountID,
-        kind: &str,
+        schema: &str,
     ) -> Result<usize, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
@@ -909,11 +893,11 @@ impl ResourceRepository for SqliteResourceRepository {
             SELECT COUNT(*) as "count!: i64"
             FROM resources
             WHERE account_id = $1
-              AND resource_kind = $2
+              AND resource_schema = $2
               AND deleted_at IS NULL
             "#,
             account_id_str,
-            kind,
+            schema,
         )
         .fetch_one(connection_mut)
         .await
@@ -935,8 +919,7 @@ impl ResourceRepository for SqliteResourceRepository {
         let rows = sqlx::query!(
             r#"
             SELECT
-                resource_kind,
-                api_version,
+                resource_schema,
                 COUNT(*) as "total_count!: i64",
                 SUM(CASE WHEN phase = 'Reconciling' THEN 1 ELSE 0 END) as "reconciling_count!: i64",
                 SUM(CASE WHEN phase = 'Ready' THEN 1 ELSE 0 END) as "ready_count!: i64",
@@ -945,8 +928,7 @@ impl ResourceRepository for SqliteResourceRepository {
                 SUM(CASE WHEN phase = 'Pending' THEN 1 ELSE 0 END) as "pending_count!: i64"
             FROM (
                 SELECT
-                    resource_kind,
-                    api_version,
+                    resource_schema,
                     CASE COALESCE(json_extract(status, '$.phase'), 'Pending')
                         WHEN 'Reconciling' THEN 'Reconciling'
                         WHEN 'Ready' THEN 'Ready'
@@ -958,8 +940,8 @@ impl ResourceRepository for SqliteResourceRepository {
                 WHERE account_id = $1
                   AND deleted_at IS NULL
             ) as normalized_resources
-            GROUP BY resource_kind, api_version
-            ORDER BY resource_kind ASC, api_version ASC
+            GROUP BY resource_schema
+            ORDER BY resource_schema ASC
             "#,
             account_id_str,
         )
@@ -970,8 +952,7 @@ impl ResourceRepository for SqliteResourceRepository {
         Ok(rows
             .into_iter()
             .map(|row| ResourceSummaryRow {
-                kind: row.resource_kind,
-                api_version: row.api_version,
+                schema: row.resource_schema,
                 total_count: u64::try_from(row.total_count).unwrap(),
                 phase_counts: ResourcePhaseCounts {
                     pending: u64::try_from(row.pending_count).unwrap(),

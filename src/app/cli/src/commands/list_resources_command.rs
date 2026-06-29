@@ -323,7 +323,7 @@ impl ListResourcesCommand {
     async fn load_resources(&self) -> Result<Vec<ResourceSummaryView>, CLIError> {
         match &self.scope {
             ListResourcesScope::ByKind(kind_descriptor) => {
-                let mut resources = self.list_resources_by_kind(&kind_descriptor.kind).await?;
+                let mut resources = self.list_resources_by_kind(&kind_descriptor.name).await?;
                 resources.sort_by(|lhs, rhs| lhs.name.cmp(&rhs.name));
                 Ok(resources)
             }
@@ -332,7 +332,7 @@ impl ListResourcesCommand {
                 resources.sort_by(|lhs, rhs| {
                     lhs.name
                         .cmp(&rhs.name)
-                        .then_with(|| lhs.kind.cmp(&rhs.kind))
+                        .then_with(|| lhs.schema.cmp(&rhs.schema))
                         .then_with(|| lhs.id.to_string().cmp(&rhs.id.to_string()))
                 });
                 Ok(resources)
@@ -367,7 +367,7 @@ impl ListResourcesCommand {
                 ResourceGenericColumn::Kind => Arc::new(StringArray::from(
                     resources
                         .iter()
-                        .map(|resource| resource.kind.clone())
+                        .map(|resource| resource.schema.clone())
                         .collect::<Vec<_>>(),
                 )),
                 ResourceGenericColumn::Uid => Arc::new(StringArray::from(

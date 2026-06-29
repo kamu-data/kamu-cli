@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO resources (\n                resource_id,\n                account_id,\n                resource_schema,\n                resource_name,\n                description,\n                labels,\n                annotations,\n                spec,\n                status,\n                generation,\n                created_at,\n                updated_at,\n                deleted_at,\n                last_reconciled_at,\n                last_event_id\n            )\n            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Text",
+        "Varchar",
+        "Text",
+        "Jsonb",
+        "Jsonb",
+        "Jsonb",
+        "Jsonb",
+        "Int8",
+        "Timestamptz",
+        "Timestamptz",
+        "Timestamptz",
+        "Timestamptz",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "20a12c6e0b3a4ab83b9f6260d3e5e5d71736636c610cf5c6c54c33f77b92904d"
+}

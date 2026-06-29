@@ -43,8 +43,7 @@ async fn make_variable_set_resource(catalog: &Catalog) -> ResourceID {
 
     repo.create_resource(&ResourceSnapshot {
         id: variable_set_id,
-        kind: VariableSetResource::RESOURCE_TYPE.to_string(),
-        api_version: VariableSetResource::API_VERSION.to_string(),
+        schema: VariableSetResource::SCHEMA.to_string(),
         headers: ResourceHeaders::simple(
             Utc::now(),
             odf::AccountID::new_seeded_ed25519(b"test-account"),

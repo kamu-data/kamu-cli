@@ -46,11 +46,7 @@ async fn test_lazy_creation_of_variable_resource_on_first_upsert() {
         DatasetEnvVarMutationAdapterImpl::legacy_variable_set_resource_name(&dataset_id);
 
     let found = harness
-        .resource_id_by_name(
-            &account_id,
-            VariableSetResource::RESOURCE_TYPE,
-            &resource_name,
-        )
+        .resource_id_by_name(&account_id, VariableSetResource::SCHEMA, &resource_name)
         .await;
     assert_eq!(found, Some(resource_id));
 
@@ -121,11 +117,7 @@ async fn test_lazy_creation_of_secret_resource_on_first_upsert() {
         DatasetEnvVarMutationAdapterImpl::legacy_secret_set_resource_name(&dataset_id);
 
     let found = harness
-        .resource_id_by_name(
-            &account_id,
-            SecretSetResource::RESOURCE_TYPE,
-            &resource_name,
-        )
+        .resource_id_by_name(&account_id, SecretSetResource::SCHEMA, &resource_name)
         .await;
     assert_eq!(found, Some(sec_bindings[0].resource_id));
 
@@ -205,11 +197,7 @@ async fn test_delete_last_variable_removes_resource_and_binding() {
         DatasetEnvVarMutationAdapterImpl::legacy_variable_set_resource_name(&dataset_id);
 
     let found = harness
-        .resource_id_by_name(
-            &account_id,
-            VariableSetResource::RESOURCE_TYPE,
-            &resource_name,
-        )
+        .resource_id_by_name(&account_id, VariableSetResource::SCHEMA, &resource_name)
         .await;
     assert_eq!(found, None, "managed resource must be deleted");
 
@@ -292,11 +280,7 @@ async fn test_delete_last_secret_removes_resource_and_binding() {
     let resource_name =
         DatasetEnvVarMutationAdapterImpl::legacy_secret_set_resource_name(&dataset_id);
     let found = harness
-        .resource_id_by_name(
-            &account_id,
-            SecretSetResource::RESOURCE_TYPE,
-            &resource_name,
-        )
+        .resource_id_by_name(&account_id, SecretSetResource::SCHEMA, &resource_name)
         .await;
     assert_eq!(found, None, "managed secret resource must be deleted");
 

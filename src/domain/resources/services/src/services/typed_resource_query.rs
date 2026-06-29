@@ -54,15 +54,11 @@ where
             .await?
             .ok_or(ResourceIDNotFoundError(*id))?;
 
-        if snapshot.kind != R::DESCRIPTOR.resource_type
-            || snapshot.api_version != R::DESCRIPTOR.api_version
-        {
+        if snapshot.schema != R::DESCRIPTOR.schema {
             return Err(ResourceTypeMismatchError::new(
                 *id,
-                R::DESCRIPTOR.resource_type.to_string(),
-                R::DESCRIPTOR.api_version.to_string(),
-                snapshot.kind,
-                snapshot.api_version,
+                R::DESCRIPTOR.schema.to_string(),
+                snapshot.schema,
             )
             .into());
         }
@@ -75,7 +71,7 @@ where
         id: &ResourceID,
     ) -> Result<Option<ResourceSnapshot>, InternalError> {
         let query = ResourceRawEventQuery {
-            kind: R::DESCRIPTOR.resource_type.to_string(),
+            schema: R::DESCRIPTOR.schema.to_string(),
             id: *id,
         };
 
@@ -102,9 +98,7 @@ where
             return Err(ResourceIDNotFoundError(*id).into());
         }
 
-        if resource_snapshot.kind != R::DESCRIPTOR.resource_type
-            || resource_snapshot.api_version != R::DESCRIPTOR.api_version
-        {
+        if resource_snapshot.schema != R::DESCRIPTOR.schema {
             return Err(Self::type_mismatch(&resource_snapshot));
         }
 
@@ -118,15 +112,13 @@ where
     ) -> Result<Vec<R::ResourceState>, InternalError> {
         let mut resource_snapshots_stream = self
             .resource_repository
-            .list_resource_snapshots_by_kind(account_id, R::DESCRIPTOR.resource_type, pagination);
+            .list_resource_snapshots_by_schema(account_id, R::DESCRIPTOR.schema, pagination);
 
         let mut resource_states = Vec::new();
         while let Some(resource_snapshot) = resource_snapshots_stream.next().await {
             let resource_snapshot = resource_snapshot?;
 
-            if resource_snapshot.kind != R::DESCRIPTOR.resource_type
-                || resource_snapshot.api_version != R::DESCRIPTOR.api_version
-            {
+            if resource_snapshot.schema != R::DESCRIPTOR.schema {
                 return Err(Self::type_mismatch(&resource_snapshot).int_err());
             }
 
@@ -139,10 +131,8 @@ where
     fn type_mismatch(resource_snapshot: &ResourceSnapshot) -> TypedResourceQueryError {
         ResourceTypeMismatchError::new(
             resource_snapshot.id,
-            R::DESCRIPTOR.resource_type.to_string(),
-            R::DESCRIPTOR.api_version.to_string(),
-            resource_snapshot.kind.clone(),
-            resource_snapshot.api_version.clone(),
+            R::DESCRIPTOR.schema.to_string(),
+            resource_snapshot.schema.clone(),
         )
         .into()
     }

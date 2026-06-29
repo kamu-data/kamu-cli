@@ -3,8 +3,7 @@
 CREATE TABLE resources (
     resource_id            UUID PRIMARY KEY,
     account_id             VARCHAR(100) NOT NULL,
-    resource_kind          VARCHAR(100) NOT NULL,
-    api_version            VARCHAR(100) NOT NULL,
+    resource_schema        TEXT NOT NULL,
     resource_name          VARCHAR(200) NOT NULL,
     description            TEXT NULL,
     labels                 JSONB NOT NULL,
@@ -21,20 +20,19 @@ CREATE TABLE resources (
     last_reconciled_at     TIMESTAMPTZ NULL,
     last_event_id          BIGINT NULL,
 
-    UNIQUE (account_id, resource_kind, resource_name)
+    UNIQUE (account_id, resource_schema, resource_name)
 );
 
-CREATE INDEX idx_resources_account_kind_name
-    ON resources (account_id, resource_kind, resource_name);
+CREATE INDEX idx_resources_account_schema_name
+    ON resources (account_id, resource_schema, resource_name);
 
-CREATE INDEX idx_resources_account_kind_updated_at
-    ON resources (account_id, resource_kind, updated_at DESC);
+CREATE INDEX idx_resources_account_schema_updated_at
+    ON resources (account_id, resource_schema, updated_at DESC);
 
 CREATE INDEX idx_resources_summary_projection
     ON resources (
         account_id,
-        resource_kind,
-        api_version,
+        resource_schema,
         ((status ->> 'phase'))
     )
     WHERE deleted_at IS NULL;
@@ -46,7 +44,7 @@ CREATE SEQUENCE resource_event_id_seq AS BIGINT;
 CREATE TABLE resource_events (
     event_id               BIGINT PRIMARY KEY DEFAULT nextval('resource_event_id_seq'),
     resource_id            UUID NOT NULL,
-    resource_kind          VARCHAR(100) NOT NULL,
+    resource_schema        TEXT NOT NULL,
 
     event_time             TIMESTAMPTZ NOT NULL,
     event_type             VARCHAR(100) NOT NULL,
@@ -59,7 +57,7 @@ CREATE TABLE resource_events (
 CREATE INDEX idx_resource_events_resource_id_event_id
     ON resource_events (resource_id, event_id);
 
-CREATE INDEX idx_resource_events_kind_event_id
-    ON resource_events (resource_kind, event_id);
+CREATE INDEX idx_resource_events_schema_event_id
+    ON resource_events (resource_schema, event_id);
 
 /* ------------------------------ */

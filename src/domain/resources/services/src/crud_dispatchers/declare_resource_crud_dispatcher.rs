@@ -18,7 +18,10 @@ macro_rules! declare_resource_crud_dispatcher {
         #[dill::component]
         #[dill::interface(dyn $crate::ResourceCrudDispatcher)]
         #[dill::meta(kamu_resources::ResourceDispatcherMeta {
-            descriptor: <$resource as kamu_resources::ResourceDescriptorProvider>::DESCRIPTOR,
+            schema: <$resource as kamu_resources::ResourceDescriptorProvider>::DESCRIPTOR.schema,
+            name: <$resource as kamu_resources::ResourcePresentation>::PRESENTATION.resource_name,
+            short_names:
+                <$resource as kamu_resources::ResourcePresentation>::PRESENTATION.resource_short_names,
         })]
         pub struct $dispatcher {
             apply_resource_use_case:
@@ -37,7 +40,8 @@ macro_rules! declare_resource_crud_dispatcher {
         impl $crate::ResourceCrudDispatcher for $dispatcher
         where
             $resource: kamu_resources::ReconcilableEventSourcedResource
-                + kamu_resources::ResourceDescriptorProvider,
+                + kamu_resources::ResourceDescriptorProvider
+                + kamu_resources::ResourcePresentation,
             <$resource as kamu_resources::DeclarativeResource>::Spec:
                 serde::de::DeserializeOwned + serde::Serialize,
             <$resource as kamu_resources::DeclarativeResource>::Status:
@@ -52,12 +56,9 @@ macro_rules! declare_resource_crud_dispatcher {
                 kamu_resources::ApplyManifestPlanningDecision,
                 $crate::ApplyResourceCrudDispatcherError,
             > {
-                let kind =
-                    <$resource as kamu_resources::ResourceDescriptorProvider>::DESCRIPTOR.resource_type;
-                let api_version =
-                    <$resource as kamu_resources::ResourceDescriptorProvider>::DESCRIPTOR.api_version;
-                let spec =
-                    $crate::decode_resource_spec::<$resource>(kind, api_version, request.spec)?;
+                let schema =
+                    <$resource as kamu_resources::ResourceDescriptorProvider>::DESCRIPTOR.schema;
+                let spec = $crate::decode_resource_spec::<$resource>(schema, request.spec)?;
 
                 let plan = self
                     .apply_resource_use_case
@@ -84,12 +85,9 @@ macro_rules! declare_resource_crud_dispatcher {
                 kamu_resources::ApplyManifestApplicationDecision,
                 $crate::ApplyResourceCrudDispatcherError,
             > {
-                let kind =
-                    <$resource as kamu_resources::ResourceDescriptorProvider>::DESCRIPTOR.resource_type;
-                let api_version =
-                    <$resource as kamu_resources::ResourceDescriptorProvider>::DESCRIPTOR.api_version;
-                let spec =
-                    $crate::decode_resource_spec::<$resource>(kind, api_version, request.spec)?;
+                let schema =
+                    <$resource as kamu_resources::ResourceDescriptorProvider>::DESCRIPTOR.schema;
+                let spec = $crate::decode_resource_spec::<$resource>(schema, request.spec)?;
 
                 let result = self
                     .apply_resource_use_case

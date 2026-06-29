@@ -24,8 +24,9 @@ use pretty_assertions::{assert_eq, assert_matches};
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
 use crate::helpers::{
-    VARIABLE_SET_API_VERSION,
+    SECRET_SET_KIND,
     VARIABLE_SET_KIND,
+    VARIABLE_SET_SCHEMA,
     assert_applied_outcome,
     assert_batch_indexes,
     assert_resource_view_fields,
@@ -61,7 +62,6 @@ pub async fn test_get_many_all_successes(h: &impl FacadeContractHarness) {
     let selector = ResourceBatchSelector {
         account: None,
         kind: VARIABLE_SET_KIND.to_string(),
-        api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
         resource_refs: vec![
             ResourceRef::ByName("batch-a".to_string()),
             ResourceRef::ById(id_b),
@@ -85,20 +85,10 @@ pub async fn test_get_many_all_successes(h: &impl FacadeContractHarness) {
     let view_a = by_index[&0];
     let view_b = by_index[&1];
 
-    assert_resource_view_fields(
-        view_a,
-        VARIABLE_SET_KIND,
-        VARIABLE_SET_API_VERSION,
-        "batch-a",
-    );
+    assert_resource_view_fields(view_a, VARIABLE_SET_KIND, VARIABLE_SET_SCHEMA, "batch-a");
     assert_eq!(view_a.headers.id, id_a);
 
-    assert_resource_view_fields(
-        view_b,
-        VARIABLE_SET_KIND,
-        VARIABLE_SET_API_VERSION,
-        "batch-b",
-    );
+    assert_resource_view_fields(view_b, VARIABLE_SET_KIND, VARIABLE_SET_SCHEMA, "batch-b");
     assert_eq!(view_b.headers.id, id_b);
 }
 
@@ -120,7 +110,6 @@ pub async fn test_get_many_mixed_successes_problems(h: &impl FacadeContractHarne
             ResourceBatchSelector {
                 account: None,
                 kind: VARIABLE_SET_KIND.to_string(),
-                api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
                 resource_refs: vec![
                     ResourceRef::ByName("mixed-a".to_string()), // idx 0 — exists
                     ResourceRef::ByName("no-such-name".to_string()), // idx 1 — missing name
@@ -168,7 +157,6 @@ pub async fn test_get_many_duplicate_refs(h: &impl FacadeContractHarness) {
             ResourceBatchSelector {
                 account: None,
                 kind: VARIABLE_SET_KIND.to_string(),
-                api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
                 resource_refs: vec![
                     ResourceRef::ByName("dup-ref".to_string()), // idx 0
                     ResourceRef::ByName("dup-ref".to_string()), // idx 1 — same ref
@@ -199,7 +187,6 @@ pub async fn test_get_many_empty_refs(h: &impl FacadeContractHarness) {
             ResourceBatchSelector {
                 account: None,
                 kind: VARIABLE_SET_KIND.to_string(),
-                api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
                 resource_refs: vec![],
             },
             SpecViewMode::Encrypted,
@@ -227,7 +214,6 @@ pub async fn test_get_many_empty_refs_validates_unsupported_kind(h: &impl Facade
             ResourceBatchSelector {
                 account: None,
                 kind: "NoSuchResourceKindXYZ".to_string(),
-                api_version: None,
                 resource_refs: vec![],
             },
             SpecViewMode::Encrypted,
@@ -260,7 +246,6 @@ pub async fn test_get_many_empty_refs_validates_bad_account(h: &impl FacadeContr
                     id: None,
                 }),
                 kind: VARIABLE_SET_KIND.to_string(),
-                api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
                 resource_refs: vec![],
             },
             SpecViewMode::Encrypted,
@@ -295,7 +280,6 @@ pub async fn test_batch_empty_refs_validation_is_consistent(h: &impl FacadeContr
         .get_identities(ResourceBatchSelector {
             account: None,
             kind: bad_kind.to_string(),
-            api_version: None,
             resource_refs: vec![],
         })
         .await;
@@ -310,7 +294,6 @@ pub async fn test_batch_empty_refs_validation_is_consistent(h: &impl FacadeContr
         .get_identities(ResourceBatchSelector {
             account: bad_account.clone(),
             kind: VARIABLE_SET_KIND.to_string(),
-            api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
             resource_refs: vec![],
         })
         .await;
@@ -326,7 +309,6 @@ pub async fn test_batch_empty_refs_validation_is_consistent(h: &impl FacadeContr
             ResourceBatchSelector {
                 account: None,
                 kind: bad_kind.to_string(),
-                api_version: None,
                 resource_refs: vec![],
             },
             ResourceManifestFormat::Json,
@@ -345,7 +327,6 @@ pub async fn test_batch_empty_refs_validation_is_consistent(h: &impl FacadeContr
             ResourceBatchSelector {
                 account: bad_account.clone(),
                 kind: VARIABLE_SET_KIND.to_string(),
-                api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
                 resource_refs: vec![],
             },
             ResourceManifestFormat::Json,
@@ -363,7 +344,6 @@ pub async fn test_batch_empty_refs_validation_is_consistent(h: &impl FacadeContr
         .delete_many(ResourceBatchSelector {
             account: None,
             kind: bad_kind.to_string(),
-            api_version: None,
             resource_refs: vec![],
         })
         .await;
@@ -378,7 +358,6 @@ pub async fn test_batch_empty_refs_validation_is_consistent(h: &impl FacadeContr
         .delete_many(ResourceBatchSelector {
             account: bad_account.clone(),
             kind: VARIABLE_SET_KIND.to_string(),
-            api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
             resource_refs: vec![],
         })
         .await;
@@ -392,12 +371,9 @@ pub async fn test_batch_empty_refs_validation_is_consistent(h: &impl FacadeContr
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // RF-054
-contract_test!(
-    get_many_wrong_api_version,
-    super::test_get_many_wrong_api_version
-);
+contract_test!(get_many_wrong_schema, super::test_get_many_wrong_schema);
 
-pub async fn test_get_many_wrong_api_version(h: &impl FacadeContractHarness) {
+pub async fn test_get_many_wrong_schema(h: &impl FacadeContractHarness) {
     let id = create_resource(h, "api-ver-batch").await;
     let facade = h.facade_for(TestAccount::Alice);
 
@@ -405,10 +381,9 @@ pub async fn test_get_many_wrong_api_version(h: &impl FacadeContractHarness) {
         .get_many(
             ResourceBatchSelector {
                 account: None,
-                kind: VARIABLE_SET_KIND.to_string(),
-                api_version: Some("v0.never.existed".to_string()),
+                kind: SECRET_SET_KIND.to_string(),
                 resource_refs: vec![
-                    ResourceRef::ById(id), // idx 0 — exists but wrong api_version
+                    ResourceRef::ById(id), // idx 0 — exists but wrong schema
                 ],
             },
             SpecViewMode::Encrypted,
@@ -420,9 +395,9 @@ pub async fn test_get_many_wrong_api_version(h: &impl FacadeContractHarness) {
     assert!(
         matches!(
             &response.problems[0].error,
-            ResourceLookupProblem::ApiVersionMismatch(_)
+            ResourceLookupProblem::SchemaMismatch(_)
         ),
-        "expected ApiVersionMismatch problem, got: {:?}",
+        "expected SchemaMismatch problem, got: {:?}",
         response.problems[0].error
     );
 }
@@ -444,7 +419,6 @@ pub async fn test_get_identities_mirrors_get_many(h: &impl FacadeContractHarness
         .get_identities(ResourceBatchSelector {
             account: None,
             kind: VARIABLE_SET_KIND.to_string(),
-            api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
             resource_refs: vec![
                 ResourceRef::ByName("idents-a".to_string()), // idx 0 — exists
                 ResourceRef::ByName("no-such-ident".to_string()), // idx 1 — missing
@@ -492,7 +466,6 @@ pub async fn test_render_manifests_all_successes(h: &impl FacadeContractHarness)
                 ResourceBatchSelector {
                     account: None,
                     kind: VARIABLE_SET_KIND.to_string(),
-                    api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
                     resource_refs: vec![
                         ResourceRef::ById(id_a), // idx 0
                         ResourceRef::ById(id_b), // idx 1
@@ -513,7 +486,7 @@ pub async fn test_render_manifests_all_successes(h: &impl FacadeContractHarness)
                 "rendered manifest must not be empty"
             );
 
-            // Parse and check kind/apiVersion are present
+            // Parse and check schema are present
             let parsed: serde_json::Value = match format {
                 kamu_resources_facade::ResourceManifestFormat::Json => {
                     serde_json::from_str(&s.item.manifest).expect("must be valid JSON")
@@ -524,8 +497,8 @@ pub async fn test_render_manifests_all_successes(h: &impl FacadeContractHarness)
                     serde_json::to_value(y).unwrap()
                 }
             };
-            assert_eq!(parsed["kind"], VARIABLE_SET_KIND);
-            assert_eq!(parsed["apiVersion"], VARIABLE_SET_API_VERSION);
+            assert_eq!(parsed["$schema"], VARIABLE_SET_SCHEMA, "schema mismatch");
+            assert_eq!(parsed["$schema"], VARIABLE_SET_SCHEMA);
         }
     }
 }
@@ -548,7 +521,6 @@ pub async fn test_render_manifests_mixed_successes_problems(h: &impl FacadeContr
             ResourceBatchSelector {
                 account: None,
                 kind: VARIABLE_SET_KIND.to_string(),
-                api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
                 resource_refs: vec![
                     ResourceRef::ById(uid_existing),                   // idx 0 — exists
                     ResourceRef::ByName("render-missing".to_string()), // idx 1 — missing
@@ -595,7 +567,6 @@ pub async fn test_delete_many_all_successes(h: &impl FacadeContractHarness) {
         .delete_many(ResourceBatchSelector {
             account: None,
             kind: VARIABLE_SET_KIND.to_string(),
-            api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
             resource_refs: vec![
                 ResourceRef::ByName("del-many-a".to_string()), // idx 0
                 ResourceRef::ById(id_b),                       // idx 1
@@ -628,7 +599,6 @@ pub async fn test_delete_many_all_successes(h: &impl FacadeContractHarness) {
                 ResourceSelector {
                     account: None,
                     kind: VARIABLE_SET_KIND.to_string(),
-                    api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
                     resource_ref: ResourceRef::ByName(name.to_string()),
                 },
                 SpecViewMode::Encrypted,
@@ -658,7 +628,6 @@ pub async fn test_delete_many_mixed_successes_problems(h: &impl FacadeContractHa
         .delete_many(ResourceBatchSelector {
             account: None,
             kind: VARIABLE_SET_KIND.to_string(),
-            api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
             resource_refs: vec![
                 ResourceRef::ByName("del-mix-exists".to_string()), // idx 0 — exists
                 ResourceRef::ByName("del-mix-missing".to_string()), // idx 1 — missing name
@@ -714,7 +683,6 @@ pub async fn test_delete_many_duplicate_refs_is_deterministic(h: &impl FacadeCon
         .delete_many(ResourceBatchSelector {
             account: None,
             kind: VARIABLE_SET_KIND.to_string(),
-            api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
             resource_refs: vec![
                 ResourceRef::ByName("del-dup-ref".to_string()), // idx 0
                 ResourceRef::ByName("del-dup-ref".to_string()), // idx 1 — duplicate
@@ -774,7 +742,6 @@ pub async fn test_batch_apis_reject_unsupported_kind(h: &impl FacadeContractHarn
     let selector = ResourceBatchSelector {
         account: None,
         kind: bad_kind.to_string(),
-        api_version: None,
         resource_refs: vec![ResourceRef::ById(id)],
     };
 

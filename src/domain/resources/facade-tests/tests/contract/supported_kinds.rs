@@ -20,9 +20,9 @@ use kamu_resources_facade::{
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
 use crate::helpers::{
-    SECRET_SET_KIND,
-    VARIABLE_SET_API_VERSION,
+    SECRET_SET_SCHEMA,
     VARIABLE_SET_KIND,
+    VARIABLE_SET_SCHEMA,
     apply_manifest_and_get_id,
     variable_set_manifest_json,
 };
@@ -40,11 +40,8 @@ pub async fn test_lists_supported_kinds(h: &impl FacadeContractHarness) {
 
     for d in &descriptors {
         assert!(!d.name.is_empty(), "descriptor name must not be empty");
-        assert!(!d.kind.is_empty(), "descriptor kind must not be empty");
-        assert!(
-            !d.api_version.is_empty(),
-            "descriptor api_version must not be empty"
-        );
+        assert!(!d.schema.is_empty(), "descriptor kind must not be empty");
+        assert!(!d.schema.is_empty(), "descriptor schema must not be empty");
     }
 
     // Descriptor names are unique
@@ -57,22 +54,19 @@ pub async fn test_lists_supported_kinds(h: &impl FacadeContractHarness) {
         "descriptor names must be unique"
     );
 
-    // (kind, api_version) pairs are unique
-    let pairs: Vec<_> = descriptors
-        .iter()
-        .map(|d| (d.kind.as_str(), d.api_version.as_str()))
-        .collect();
-    let pair_count = pairs.len();
-    let unique_pairs: std::collections::HashSet<_> = pairs.into_iter().collect();
+    // Schemas are unique
+    let schemas: Vec<_> = descriptors.iter().map(|d| d.schema.as_str()).collect();
+    let schema_count = schemas.len();
+    let unique_schemas: std::collections::HashSet<_> = schemas.into_iter().collect();
     assert_eq!(
-        unique_pairs.len(),
-        pair_count,
-        "(kind, api_version) pairs must be unique"
+        unique_schemas.len(),
+        schema_count,
+        "descriptor schemas must be unique"
     );
 
     // VariableSet and SecretSet must be present
-    let has_variable_set = descriptors.iter().any(|d| d.kind == VARIABLE_SET_KIND);
-    let has_secret_set = descriptors.iter().any(|d| d.kind == SECRET_SET_KIND);
+    let has_variable_set = descriptors.iter().any(|d| d.schema == VARIABLE_SET_SCHEMA);
+    let has_secret_set = descriptors.iter().any(|d| d.schema == SECRET_SET_SCHEMA);
     assert!(has_variable_set, "VariableSet kind must be present");
     assert!(has_secret_set, "SecretSet kind must be present");
 }
@@ -112,7 +106,10 @@ pub async fn test_kind_aliases_resolve_consistently(h: &impl FacadeContractHarne
         .await
         .expect("list with canonical kind must succeed");
     for s in &summaries {
-        assert_eq!(s.kind, VARIABLE_SET_KIND, "list kind must be canonical");
+        assert_eq!(
+            s.schema, VARIABLE_SET_SCHEMA,
+            "list schema must be canonical"
+        );
     }
 
     let identities = facade
@@ -125,8 +122,8 @@ pub async fn test_kind_aliases_resolve_consistently(h: &impl FacadeContractHarne
         .expect("list_identities with canonical kind must succeed");
     for i in &identities {
         assert_eq!(
-            i.kind, VARIABLE_SET_KIND,
-            "list_identities kind must be canonical"
+            i.schema, VARIABLE_SET_SCHEMA,
+            "list_identities schema must be canonical"
         );
     }
 
@@ -135,7 +132,6 @@ pub async fn test_kind_aliases_resolve_consistently(h: &impl FacadeContractHarne
             ResourceSelector {
                 account: None,
                 kind: VARIABLE_SET_KIND.to_string(),
-                api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
                 resource_ref: kamu_resources_facade::ResourceRef::ByName("alias-check".to_string()),
             },
             SpecViewMode::Encrypted,
@@ -143,22 +139,21 @@ pub async fn test_kind_aliases_resolve_consistently(h: &impl FacadeContractHarne
         .await
         .expect("get with canonical kind must succeed");
 
-    // Short name "vs" is NOT a supported selector — it returns
-    // UnsupportedDescriptor
-    let short_name_list = facade
+    // Short name "vs" resolves to the canonical VariableSet schema.
+    let short_name_summaries = facade
         .list(ListResourcesRequest {
             kind: "vs".to_string(),
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
-        .await;
-    assert!(
-        matches!(
-            short_name_list,
-            Err(ListResourcesError::UnsupportedDescriptor(_))
-        ),
-        "short name 'vs' is not a supported kind selector for list; got: {short_name_list:?}"
-    );
+        .await
+        .expect("short name 'vs' must resolve for list");
+    for s in &short_name_summaries {
+        assert_eq!(
+            s.schema, VARIABLE_SET_SCHEMA,
+            "short name list schema must be canonical"
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -194,14 +189,14 @@ pub async fn test_unsupported_kind_rejected_consistently(h: &impl FacadeContract
 
     let facade = h.facade_for(TestAccount::Alice);
     let bad_kind = "NoSuchResourceKindXYZ";
+    let bad_schema = "https://example.com/schemas/resources/v1/NoSuchResourceKindXYZ";
 
-    // get by ByName — NameNotFound (kind not validated before DB name lookup)
+    // get by ByName — unsupported selector is rejected before lookup
     let get_by_name = facade
         .get(
             ResourceSelector {
                 account: None,
                 kind: bad_kind.to_string(),
-                api_version: None,
                 resource_ref: kamu_resources_facade::ResourceRef::ByName(
                     "unsupported-kind-base".to_string(),
                 ),
@@ -210,34 +205,24 @@ pub async fn test_unsupported_kind_rejected_consistently(h: &impl FacadeContract
         )
         .await;
     assert!(
-        matches!(
-            get_by_name,
-            Err(GetResourceError::LookupProblem(
-                kamu_resources_facade::ResourceLookupProblem::NameNotFound(_)
-            ))
-        ),
-        "get by ByName with unknown kind returns NameNotFound, got: {get_by_name:?}"
+        matches!(get_by_name, Err(GetResourceError::UnsupportedDescriptor(_))),
+        "get by ByName with unknown kind returns UnsupportedDescriptor, got: {get_by_name:?}"
     );
 
-    // get_identity by ByName — same NameNotFound behavior
+    // get_identity by ByName — same UnsupportedDescriptor behavior
     let gi_by_name = facade
         .get_identity(ResourceSelector {
             account: None,
             kind: bad_kind.to_string(),
-            api_version: None,
             resource_ref: kamu_resources_facade::ResourceRef::ByName(
                 "unsupported-kind-base".to_string(),
             ),
         })
         .await;
     assert!(
-        matches!(
-            gi_by_name,
-            Err(GetResourceError::LookupProblem(
-                kamu_resources_facade::ResourceLookupProblem::NameNotFound(_)
-            ))
-        ),
-        "get_identity by ByName with unknown kind returns NameNotFound, got: {gi_by_name:?}"
+        matches!(gi_by_name, Err(GetResourceError::UnsupportedDescriptor(_))),
+        "get_identity by ByName with unknown kind returns UnsupportedDescriptor, got: \
+         {gi_by_name:?}"
     );
 
     // list — UnsupportedDescriptor (kind validated before DB query)
@@ -270,9 +255,8 @@ pub async fn test_unsupported_kind_rejected_consistently(h: &impl FacadeContract
     );
 
     // apply_manifest — UnsupportedDescriptor
-    let bad_manifest = format!(
-        r#"{{"apiVersion":"v1","kind":"{bad_kind}","headers":{{"name":"x"}},"spec":{{}}}}"#
-    );
+    let bad_manifest =
+        format!(r#"{{"$schema":"{bad_schema}","headers":{{"name":"x"}},"spec":{{}}}}"#);
     let apply_result = facade
         .apply_manifest(kamu_resources_facade::ApplyManifestRequest {
             format: kamu_resources_facade::ResourceManifestFormat::Json,
@@ -292,7 +276,6 @@ pub async fn test_unsupported_kind_rejected_consistently(h: &impl FacadeContract
         .delete(ResourceSelector {
             account: None,
             kind: bad_kind.to_string(),
-            api_version: None,
             resource_ref: kamu_resources_facade::ResourceRef::ById(id),
         })
         .await;

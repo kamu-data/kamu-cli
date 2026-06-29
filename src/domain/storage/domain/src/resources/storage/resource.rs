@@ -11,7 +11,6 @@ use event_sourcing::*;
 use kamu_resources::{
     DeclarativeResource,
     DeclarativeResourceState,
-    ResourceApiVersion,
     ResourceListColumnDataType,
     ResourceListColumnDefinition,
     ResourceListColumnValue,
@@ -19,7 +18,7 @@ use kamu_resources::{
     ResourceListColumnVisibility,
     ResourcePresentation,
     ResourcePresentationDefinition,
-    ResourceType,
+    ResourceSchemaProvider,
 };
 
 use crate::{StorageEventStore, StorageProviderSpec, StorageSpec, StorageState, StorageStatus};
@@ -32,10 +31,9 @@ pub struct StorageResource(pub(crate) Aggregate<StorageState, dyn StorageEventSt
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl StorageResource {
-    pub const RESOURCE_TYPE: &'static str = "Storage";
+    pub const SCHEMA: &'static str = "https://opendatafabric.org/schemas/storage/v1alpha1/Storage";
     pub const RESOURCE_NAME: &'static str = "storages";
     pub const RESOURCE_SHORT_NAMES: &'static [&'static str] = &["st", "storage"];
-    pub const API_VERSION: &'static str = "kamu.dev/v1alpha1";
 
     fn provider_detail(spec: &StorageSpec) -> String {
         match &spec.provider {
@@ -52,12 +50,8 @@ impl StorageResource {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl ResourceType for StorageResource {
-    const RESOURCE_TYPE: &'static str = Self::RESOURCE_TYPE;
-}
-
-impl ResourceApiVersion for StorageResource {
-    const API_VERSION: &'static str = Self::API_VERSION;
+impl ResourceSchemaProvider for StorageResource {
+    const SCHEMA: &'static str = Self::SCHEMA;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

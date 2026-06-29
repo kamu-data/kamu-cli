@@ -239,16 +239,14 @@ impl From<ResourceInvalidHeaderProblem> for crate::ApplyManifestError {
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct ResourceInvalidSpecProblem {
-    pub kind: String,
-    pub api_version: String,
+    pub schema: String,
     pub message: String,
 }
 
 impl From<ResourceInvalidSpecProblem> for crate::ApplyManifestError {
     fn from(value: ResourceInvalidSpecProblem) -> Self {
         Self::InvalidSpec(kamu_resources::ResourceInvalidSpecError {
-            kind: value.kind,
-            api_version: value.api_version,
+            schema: value.schema,
             message: value.message,
         })
     }

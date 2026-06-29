@@ -17,7 +17,11 @@ use kamu_resources::{
 };
 use kamu_resources_services::testing::BaseResourceServiceHarness;
 
-use crate::tests::utils::make_account_id;
+use crate::tests::utils::{TestResource, make_account_id};
+
+const OTHER_SCHEMA: &str = "https://test.kamu.dev/schemas/test/v1/OtherResource";
+const LEGACY_SCHEMA: &str = "https://test.kamu.dev/schemas/test/v0/TestResource";
+const NEWER_SCHEMA: &str = "https://test.kamu.dev/schemas/test/v2/TestResource";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // find_owned_snapshot tests
@@ -30,23 +34,16 @@ async fn test_find_owned_snapshot_success() {
     let id = harness.allocate_id().await;
 
     harness
-        .insert_snapshot(
-            id,
-            account_a.clone(),
-            "TestResource",
-            "test.kamu.dev/v1",
-            "res-a",
-        )
+        .insert_snapshot(id, account_a.clone(), TestResource::SCHEMA, "res-a")
         .await;
 
     let result = harness
-        .find_owned_snapshot(&account_a, "TestResource", "test.kamu.dev/v1", id)
+        .find_owned_snapshot(&account_a, TestResource::SCHEMA, id)
         .await;
 
     let snapshot = result.unwrap().unwrap();
     assert_eq!(snapshot.id, id);
-    assert_eq!(snapshot.kind, "TestResource");
-    assert_eq!(snapshot.api_version, "test.kamu.dev/v1");
+    assert_eq!(snapshot.schema, TestResource::SCHEMA);
     assert_eq!(snapshot.headers.account, account_a);
 }
 
@@ -59,7 +56,7 @@ async fn test_find_owned_snapshot_not_found() {
     let id = harness.allocate_id().await;
 
     let result = harness
-        .find_owned_snapshot(&account_a, "TestResource", "test.kamu.dev/v1", id)
+        .find_owned_snapshot(&account_a, TestResource::SCHEMA, id)
         .await;
 
     assert!(result.unwrap().is_none());
@@ -75,17 +72,11 @@ async fn test_find_owned_snapshot_access_denied() {
     let id = harness.allocate_id().await;
 
     harness
-        .insert_snapshot(
-            id,
-            account_a.clone(),
-            "TestResource",
-            "test.kamu.dev/v1",
-            "res-a",
-        )
+        .insert_snapshot(id, account_a.clone(), TestResource::SCHEMA, "res-a")
         .await;
 
     let result = harness
-        .find_owned_snapshot(&account_b, "TestResource", "test.kamu.dev/v1", id)
+        .find_owned_snapshot(&account_b, TestResource::SCHEMA, id)
         .await;
 
     assert!(
@@ -100,23 +91,17 @@ async fn test_find_owned_snapshot_access_denied() {
 // find_resource_snapshot filters by kind in the query and returns None — no
 // snapshot is found.
 #[test_log::test(tokio::test)]
-async fn test_find_owned_snapshot_kind_mismatch() {
+async fn test_find_owned_snapshot_schema_mismatch_by_query() {
     let harness = GenericResourceQueryServiceHarness::new();
     let account_a = make_account_id();
     let id = harness.allocate_id().await;
 
     harness
-        .insert_snapshot(
-            id,
-            account_a.clone(),
-            "TestResource",
-            "test.kamu.dev/v1",
-            "res-a",
-        )
+        .insert_snapshot(id, account_a.clone(), TestResource::SCHEMA, "res-a")
         .await;
 
     let result = harness
-        .find_owned_snapshot(&account_a, "OtherKind", "test.kamu.dev/v1", id)
+        .find_owned_snapshot(&account_a, OTHER_SCHEMA, id)
         .await;
 
     // The repository filters by kind in find_resource_snapshot, so a wrong kind
@@ -126,33 +111,24 @@ async fn test_find_owned_snapshot_kind_mismatch() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Paired with test_find_owned_snapshots_api_version_mismatch (bulk) to guard
-// against discrepancy: scalar checks api_version after confirming ownership;
-// bulk categorizes via kind + api_version buckets independently.
+// Paired with test_find_owned_snapshots_schema_mismatch (bulk) to guard
+// against discrepancy: scalar queries by schema up front, while bulk
+// categorizes schema mismatches after loading owned resources by ID.
 #[test_log::test(tokio::test)]
-async fn test_find_owned_snapshot_api_version_mismatch() {
+async fn test_find_owned_snapshot_schema_mismatch_by_type() {
     let harness = GenericResourceQueryServiceHarness::new();
     let account_a = make_account_id();
     let id = harness.allocate_id().await;
 
     harness
-        .insert_snapshot(
-            id,
-            account_a.clone(),
-            "TestResource",
-            "test.kamu.dev/v1",
-            "res-a",
-        )
+        .insert_snapshot(id, account_a.clone(), TestResource::SCHEMA, "res-a")
         .await;
 
     let result = harness
-        .find_owned_snapshot(&account_a, "TestResource", "wrong.dev/v99", id)
+        .find_owned_snapshot(&account_a, NEWER_SCHEMA, id)
         .await;
 
-    assert!(
-        matches!(result, Err(FindOwnedResourceError::TypeMismatch(_))),
-        "expected TypeMismatch error, got {result:?}"
-    );
+    assert!(result.unwrap().is_none());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -170,30 +146,19 @@ async fn test_find_owned_snapshots_all_found() {
 
     for (id, name) in [(uid_1, "res-1"), (uid_2, "res-2"), (uid_3, "res-3")] {
         harness
-            .insert_snapshot(
-                id,
-                account_a.clone(),
-                "TestResource",
-                "test.kamu.dev/v1",
-                name,
-            )
+            .insert_snapshot(id, account_a.clone(), TestResource::SCHEMA, name)
             .await;
     }
 
     let outcome = harness
-        .find_owned_snapshots(
-            &account_a,
-            "TestResource",
-            "test.kamu.dev/v1",
-            &[uid_1, uid_2, uid_3],
-        )
+        .find_owned_snapshots(&account_a, TestResource::SCHEMA, &[uid_1, uid_2, uid_3])
         .await;
 
     assert_eq!(outcome.found.len(), 3);
     assert!(outcome.not_found.is_empty());
     assert!(outcome.access_denied.is_empty());
-    assert!(outcome.kind_mismatch.is_empty());
-    assert!(outcome.api_version_mismatch.is_empty());
+    assert!(outcome.schema_mismatch.is_empty());
+    assert!(outcome.schema_mismatch.is_empty());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -207,12 +172,7 @@ async fn test_find_owned_snapshots_not_found() {
     let uid_2 = harness.allocate_id().await;
 
     let outcome = harness
-        .find_owned_snapshots(
-            &account_a,
-            "TestResource",
-            "test.kamu.dev/v1",
-            &[uid_1, uid_2],
-        )
+        .find_owned_snapshots(&account_a, TestResource::SCHEMA, &[uid_1, uid_2])
         .await;
 
     assert!(outcome.found.is_empty());
@@ -230,17 +190,11 @@ async fn test_find_owned_snapshots_access_denied() {
     let id = harness.allocate_id().await;
 
     harness
-        .insert_snapshot(
-            id,
-            account_a.clone(),
-            "TestResource",
-            "test.kamu.dev/v1",
-            "res-a",
-        )
+        .insert_snapshot(id, account_a.clone(), TestResource::SCHEMA, "res-a")
         .await;
 
     let outcome = harness
-        .find_owned_snapshots(&account_b, "TestResource", "test.kamu.dev/v1", &[id])
+        .find_owned_snapshots(&account_b, TestResource::SCHEMA, &[id])
         .await;
 
     assert!(outcome.found.is_empty());
@@ -250,51 +204,45 @@ async fn test_find_owned_snapshots_access_denied() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_find_owned_snapshots_kind_mismatch() {
+async fn test_find_owned_snapshots_schema_mismatch_by_type() {
     let harness = GenericResourceQueryServiceHarness::new();
     let account_a = make_account_id();
     let id = harness.allocate_id().await;
 
     harness
-        .insert_snapshot(id, account_a.clone(), "Foo", "test.kamu.dev/v1", "res-a")
+        .insert_snapshot(id, account_a.clone(), OTHER_SCHEMA, "res-a")
         .await;
 
     let outcome = harness
-        .find_owned_snapshots(&account_a, "Bar", "test.kamu.dev/v1", &[id])
+        .find_owned_snapshots(&account_a, TestResource::SCHEMA, &[id])
         .await;
 
     assert!(outcome.found.is_empty());
-    assert_eq!(outcome.kind_mismatch.len(), 1);
-    assert_eq!(outcome.kind_mismatch[0].0, id);
-    assert_eq!(outcome.kind_mismatch[0].1, "Foo");
+    assert_eq!(outcome.schema_mismatch.len(), 1);
+    assert_eq!(outcome.schema_mismatch[0].0, id);
+    assert_eq!(outcome.schema_mismatch[0].1, OTHER_SCHEMA);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_find_owned_snapshots_api_version_mismatch() {
+async fn test_find_owned_snapshots_schema_mismatch_by_version() {
     let harness = GenericResourceQueryServiceHarness::new();
     let account_a = make_account_id();
     let id = harness.allocate_id().await;
 
     harness
-        .insert_snapshot(
-            id,
-            account_a.clone(),
-            "TestResource",
-            "test.kamu.dev/v1",
-            "res-a",
-        )
+        .insert_snapshot(id, account_a.clone(), LEGACY_SCHEMA, "res-a")
         .await;
 
     let outcome = harness
-        .find_owned_snapshots(&account_a, "TestResource", "test.kamu.dev/v2", &[id])
+        .find_owned_snapshots(&account_a, TestResource::SCHEMA, &[id])
         .await;
 
     assert!(outcome.found.is_empty());
-    assert_eq!(outcome.api_version_mismatch.len(), 1);
-    assert_eq!(outcome.api_version_mismatch[0].0, id);
-    assert_eq!(outcome.api_version_mismatch[0].1, "test.kamu.dev/v1");
+    assert_eq!(outcome.schema_mismatch.len(), 1);
+    assert_eq!(outcome.schema_mismatch[0].0, id);
+    assert_eq!(outcome.schema_mismatch[0].1, LEGACY_SCHEMA);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -305,39 +253,25 @@ async fn test_find_owned_snapshots_mixed_outcomes() {
     let account_a = make_account_id();
     let account_b = make_account_id();
 
-    // uid_found: correct owner, kind, api_version
+    // uid_found: correct owner and schema
     let uid_found = harness.allocate_id().await;
     harness
         .insert_snapshot(
             uid_found,
             account_a.clone(),
-            "TestResource",
-            "test.kamu.dev/v1",
+            TestResource::SCHEMA,
             "res-found",
         )
         .await;
 
-    // uid_kind_mismatch: owned by account_a but with a different kind
-    let uid_kind_mismatch = harness.allocate_id().await;
+    // uid_schema_mismatch: owned by account_a but with a different schema
+    let uid_schema_mismatch = harness.allocate_id().await;
     harness
         .insert_snapshot(
-            uid_kind_mismatch,
+            uid_schema_mismatch,
             account_a.clone(),
-            "OtherKind",
-            "test.kamu.dev/v1",
+            OTHER_SCHEMA,
             "res-other-kind",
-        )
-        .await;
-
-    // uid_api_version_mismatch: owned by account_a, correct kind, wrong api_version
-    let uid_api_mismatch = harness.allocate_id().await;
-    harness
-        .insert_snapshot(
-            uid_api_mismatch,
-            account_a.clone(),
-            "TestResource",
-            "test.kamu.dev/v99",
-            "res-api-mismatch",
         )
         .await;
 
@@ -347,8 +281,7 @@ async fn test_find_owned_snapshots_mixed_outcomes() {
         .insert_snapshot(
             uid_access_denied,
             account_b.clone(),
-            "TestResource",
-            "test.kamu.dev/v1",
+            TestResource::SCHEMA,
             "res-denied",
         )
         .await;
@@ -359,12 +292,10 @@ async fn test_find_owned_snapshots_mixed_outcomes() {
     let outcome = harness
         .find_owned_snapshots(
             &account_a,
-            "TestResource",
-            "test.kamu.dev/v1",
+            TestResource::SCHEMA,
             &[
                 uid_found,
-                uid_kind_mismatch,
-                uid_api_mismatch,
+                uid_schema_mismatch,
                 uid_access_denied,
                 uid_not_found,
             ],
@@ -374,11 +305,8 @@ async fn test_find_owned_snapshots_mixed_outcomes() {
     assert_eq!(outcome.found.len(), 1);
     assert_eq!(outcome.found[0].id, uid_found);
 
-    assert_eq!(outcome.kind_mismatch.len(), 1);
-    assert_eq!(outcome.kind_mismatch[0].0, uid_kind_mismatch);
-
-    assert_eq!(outcome.api_version_mismatch.len(), 1);
-    assert_eq!(outcome.api_version_mismatch[0].0, uid_api_mismatch);
+    assert_eq!(outcome.schema_mismatch.len(), 1);
+    assert_eq!(outcome.schema_mismatch[0].0, uid_schema_mismatch);
 
     assert_eq!(outcome.access_denied, vec![uid_access_denied]);
 
@@ -404,14 +332,12 @@ impl GenericResourceQueryServiceHarness {
         &self,
         id: ResourceID,
         owner_account_id: odf::AccountID,
-        kind: &str,
-        api_version: &str,
+        schema: &str,
         name: &str,
     ) {
         let snapshot = ResourceSnapshot {
             id,
-            kind: kind.to_string(),
-            api_version: api_version.to_string(),
+            schema: schema.to_string(),
             headers: ResourceHeaders::simple(Utc::now(), owner_account_id, name),
             spec: serde_json::json!({"value": name}),
             status: None,
@@ -428,24 +354,22 @@ impl GenericResourceQueryServiceHarness {
     async fn find_owned_snapshot(
         &self,
         account_id: &odf::AccountID,
-        kind: &'static str,
-        api_version: &'static str,
+        schema: &'static str,
         id: ResourceID,
     ) -> Result<Option<ResourceSnapshot>, FindOwnedResourceError> {
         self.generic_query_svc()
-            .find_owned_snapshot(account_id, kind, api_version, id)
+            .find_owned_snapshot(account_id, schema, id)
             .await
     }
 
     async fn find_owned_snapshots(
         &self,
         account_id: &odf::AccountID,
-        kind: &'static str,
-        api_version: &'static str,
+        schema: &'static str,
         ids: &[ResourceID],
     ) -> FindOwnedSnapshotsOutcome {
         self.generic_query_svc()
-            .find_owned_snapshots(account_id, kind, api_version, ids)
+            .find_owned_snapshots(account_id, schema, ids)
             .await
             .unwrap()
     }

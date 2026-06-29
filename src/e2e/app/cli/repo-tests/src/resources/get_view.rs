@@ -14,9 +14,9 @@
 //! Resource e2e tests almost always want to answer one of two questions:
 //!
 //! 1. **Identity** — "which resources did this selector return?" i.e. the set
-//!    of `(kind, name)` pairs. This is the whole point of the selector-grammar
-//!    tests (QA 7): did `s%/db-creds` resolve to the `SecretSet` named
-//!    `db-creds`, and *only* that?
+//!    of `(schema, name)` pairs. This is the whole point of the
+//!    selector-grammar tests (QA 7): did `s%/db-creds` resolve to the
+//!    `SecretSet` named `db-creds`, and *only* that?
 //! 2. **A specific field** — "does the resolved `VariableSet` carry
 //!    `MESSAGE=hello`?" i.e. the one spec field the case is actually about.
 //!
@@ -56,9 +56,9 @@ use super::ResourceCtx;
 pub struct ResourceView(Value);
 
 impl ResourceView {
-    /// The resource kind, e.g. `VariableSet` / `SecretSet` (`/kind`).
+    /// The resource schema URL (`/$schema`).
     pub fn kind(&self) -> &str {
-        self.str_at("/kind", "kind")
+        self.str_at("/$schema", "$schema")
     }
 
     /// The resource name (`/headers/name`).
@@ -66,7 +66,7 @@ impl ResourceView {
         self.str_at("/headers/name", "headers.name")
     }
 
-    /// `(kind, name)` — the resource's identity. The primary assertion target
+    /// `(schema, name)` — the resource's identity. The primary assertion target
     /// for selector tests: collect these across a result and compare the set.
     pub fn ident(&self) -> (&str, &str) {
         (self.kind(), self.name())
@@ -200,7 +200,7 @@ impl ResourceCtx {
         views.pop().unwrap()
     }
 
-    /// Run a `get` command and return the **sorted set of `(kind, name)`
+    /// Run a `get` command and return the **sorted set of `(schema, name)`
     /// identities** it resolved to. The canonical assertion for selector
     /// grammar: compare against an expected sorted list to prove the selector
     /// matched the right resources and only those.

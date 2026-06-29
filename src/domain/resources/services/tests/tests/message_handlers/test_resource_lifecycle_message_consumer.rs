@@ -14,13 +14,11 @@ use kamu_resources::{
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
     ReconcileResourceUseCase,
     ReconcileResourceUseCaseError,
-    ResourceApiVersion,
     ResourceHeaders,
     ResourceID,
     ResourceLifecycleMessage,
     ResourceLifecycleMessageOutcome,
     ResourceSnapshot,
-    ResourceType,
 };
 use messaging_outbox::{MessageConsumerT, OutboxProvider, register_message_dispatcher};
 use mockall::mock;
@@ -183,14 +181,17 @@ impl ResourceLifecycleConsumerHarness {
     }
 
     fn make_snapshot(id: ResourceID) -> ResourceSnapshot {
-        Self::make_snapshot_with_kind(id, TestResource::RESOURCE_TYPE, TestResource::API_VERSION)
+        Self::make_snapshot_with_kind(id, TestResource::SCHEMA, "")
     }
 
-    fn make_snapshot_with_kind(id: ResourceID, kind: &str, api_version: &str) -> ResourceSnapshot {
+    fn make_snapshot_with_kind(
+        id: ResourceID,
+        schema: &str,
+        _api_version: &str,
+    ) -> ResourceSnapshot {
         ResourceSnapshot {
             id,
-            kind: kind.to_string(),
-            api_version: api_version.to_string(),
+            schema: schema.to_string(),
             headers: ResourceHeaders::simple(Utc::now(), make_account_id(), "res"),
             spec: serde_json::json!({ "value": "x" }),
             status: None,

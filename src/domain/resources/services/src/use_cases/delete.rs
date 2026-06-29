@@ -83,12 +83,7 @@ where
 
         let outcome = self
             .generic_resource_query_service
-            .find_owned_snapshots(
-                &account_id,
-                R::DESCRIPTOR.resource_type,
-                R::DESCRIPTOR.api_version,
-                &unique_ids,
-            )
+            .find_owned_snapshots(&account_id, R::DESCRIPTOR.schema, &unique_ids)
             .await
             .map_err(DeleteResourcesError::Internal)?;
 
@@ -97,7 +92,7 @@ where
                 odf::AccessError::Unauthorized(
                     ResourceNotOwnedByAccountError {
                         id,
-                        resource_type: R::DESCRIPTOR.resource_type,
+                        resource_type: R::DESCRIPTOR.schema,
                     }
                     .into(),
                 ),

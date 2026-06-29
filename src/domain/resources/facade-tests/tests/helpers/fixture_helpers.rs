@@ -16,11 +16,11 @@ use crate::helpers::assert_applied_outcome;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub const VARIABLE_SET_KIND: &str = VariableSetResource::RESOURCE_TYPE;
-pub const VARIABLE_SET_API_VERSION: &str = VariableSetResource::API_VERSION;
+pub const VARIABLE_SET_KIND: &str = VariableSetResource::RESOURCE_NAME;
+pub const VARIABLE_SET_SCHEMA: &str = VariableSetResource::SCHEMA;
 
-pub const SECRET_SET_KIND: &str = SecretSetResource::RESOURCE_TYPE;
-pub const SECRET_SET_API_VERSION: &str = SecretSetResource::API_VERSION;
+pub const SECRET_SET_KIND: &str = SecretSetResource::RESOURCE_NAME;
+pub const SECRET_SET_SCHEMA: &str = SecretSetResource::SCHEMA;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -52,13 +52,10 @@ pub fn variable_set_manifest_json(
         })
         .collect::<Vec<_>>()
         .join(",\n");
-    let api = VARIABLE_SET_API_VERSION;
-    let kind = VARIABLE_SET_KIND;
     indoc::formatdoc!(
         r#"
         {{
-            "apiVersion": "{api}",
-            "kind": "{kind}",
+            "$schema": "{VARIABLE_SET_SCHEMA}",
             "headers": {{"name": "{name}"}},
             {account_field}"spec": {{
                 "variables": {{
@@ -96,12 +93,9 @@ pub fn variable_set_manifest_yaml(
         .map(|(k, v)| format!("    {k}:\n      value: {v}"))
         .collect::<Vec<_>>()
         .join("\n");
-    let api = VARIABLE_SET_API_VERSION;
-    let kind = VARIABLE_SET_KIND;
     indoc::formatdoc!(
         "
-        apiVersion: {api}
-        kind: {kind}
+        $schema: {VARIABLE_SET_SCHEMA}
         headers:
           name: {name}
         {account_section}spec:
@@ -122,7 +116,7 @@ pub fn total_kind_count(summary: kamu_resources::ResourcesSummary, kind: &str) -
     summary
         .resource_counts
         .into_iter()
-        .find(|count| count.kind == kind)
+        .find(|count| count.schema == kind)
         .map_or(0, |count| count.total_count)
 }
 
@@ -175,13 +169,10 @@ pub fn secret_set_manifest_json(
         })
         .collect::<Vec<_>>()
         .join(",\n");
-    let api = SECRET_SET_API_VERSION;
-    let kind = SECRET_SET_KIND;
     indoc::formatdoc!(
         r#"
         {{
-            "apiVersion": "{api}",
-            "kind": "{kind}",
+            "$schema": "{SECRET_SET_SCHEMA}",
             "headers": {{"name": "{name}"}},
             {account_field}"spec": {{
                 "secrets": {{

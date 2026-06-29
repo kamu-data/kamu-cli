@@ -84,8 +84,7 @@ pub(crate) fn collect_manifest_header_warnings(
 
 pub(crate) fn resource_view_to_manifest(view: ResourceView) -> ResourceManifest {
     let ResourceView {
-        kind,
-        api_version,
+        schema,
         account,
         headers,
         spec,
@@ -93,8 +92,7 @@ pub(crate) fn resource_view_to_manifest(view: ResourceView) -> ResourceManifest 
     } = view;
 
     ResourceManifest {
-        api_version,
-        kind,
+        schema,
         headers: kamu_resources::ResourceManifestHeaders {
             id: None,
             account: Some(kamu_resources::ResourceManifestAccount {

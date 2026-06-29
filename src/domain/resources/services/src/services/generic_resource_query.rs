@@ -47,11 +47,11 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
     async fn find_resource_id_by_name(
         &self,
         account_id: &odf::AccountID,
-        kind: &str,
+        schema: &str,
         name: &ResourceName,
     ) -> Result<Option<ResourceID>, InternalError> {
         self.resource_repository
-            .find_resource_id_by_name(account_id, kind, name)
+            .find_resource_id_by_name(account_id, schema, name)
             .await
     }
 
@@ -68,48 +68,47 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
     async fn find_resource_identities_by_names(
         &self,
         account_id: &odf::AccountID,
-        kind: &str,
+        schema: &str,
         names: &[ResourceName],
     ) -> Result<Vec<ResourceIdentityRow>, InternalError> {
         self.resource_repository
-            .find_resource_identities_by_names(account_id, kind, names)
+            .find_resource_identities_by_names(account_id, schema, names)
             .await
     }
 
     async fn search_resource_identities(
         &self,
         account_id: &odf::AccountID,
-        kinds: &[String],
+        schemas: &[String],
         exact_names: Option<&[ResourceName]>,
         name_pattern: Option<&str>,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceIdentityRow>, InternalError> {
         self.resource_repository
-            .search_resource_identities(account_id, kinds, exact_names, name_pattern, pagination)
+            .search_resource_identities(account_id, schemas, exact_names, name_pattern, pagination)
             .await
     }
 
     async fn count_search_resource_identities(
         &self,
         account_id: &odf::AccountID,
-        kinds: &[String],
+        schemas: &[String],
         exact_names: Option<&[ResourceName]>,
         name_pattern: Option<&str>,
     ) -> Result<usize, InternalError> {
         self.resource_repository
-            .count_search_resource_identities(account_id, kinds, exact_names, name_pattern)
+            .count_search_resource_identities(account_id, schemas, exact_names, name_pattern)
             .await
     }
 
     async fn find_owned_snapshot(
         &self,
         account_id: &odf::AccountID,
-        kind: &'static str,
-        api_version: &'static str,
+        schema: &'static str,
         id: ResourceID,
     ) -> Result<Option<ResourceSnapshot>, FindOwnedResourceError> {
         let query = ResourceRawEventQuery {
-            kind: kind.to_string(),
+            schema: schema.to_string(),
             id,
         };
 
@@ -125,20 +124,18 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
             return Err(odf::AccessError::Unauthorized(
                 ResourceNotOwnedByAccountError {
                     id: resource_snapshot.id,
-                    resource_type: kind,
+                    resource_type: schema,
                 }
                 .into(),
             )
             .into());
         }
 
-        if resource_snapshot.api_version != api_version {
+        if resource_snapshot.schema != schema {
             return Err(ResourceTypeMismatchError {
                 id: resource_snapshot.id,
-                expected_kind: kind.to_string(),
-                expected_api_version: api_version.to_string(),
-                actual_kind: resource_snapshot.kind,
-                actual_api_version: resource_snapshot.api_version,
+                expected_schema: schema.to_string(),
+                actual_schema: resource_snapshot.schema,
             }
             .into());
         }
@@ -149,8 +146,7 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
     async fn find_owned_snapshots(
         &self,
         account_id: &odf::AccountID,
-        kind: &'static str,
-        api_version: &'static str,
+        schema: &'static str,
         ids: &[ResourceID],
     ) -> Result<FindOwnedSnapshotsOutcome, InternalError> {
         let owned_any_kind: HashMap<ResourceID, ResourceSnapshot> = self
@@ -161,16 +157,10 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
             .map(|snapshot| (snapshot.id, snapshot))
             .collect();
 
-        let kind_mismatch: Vec<(ResourceID, String)> = owned_any_kind
+        let schema_mismatch: Vec<(ResourceID, String)> = owned_any_kind
             .values()
-            .filter(|snapshot| snapshot.kind != kind)
-            .map(|snapshot| (snapshot.id, snapshot.kind.clone()))
-            .collect();
-
-        let api_version_mismatch: Vec<(ResourceID, String)> = owned_any_kind
-            .values()
-            .filter(|snapshot| snapshot.kind == kind && snapshot.api_version != api_version)
-            .map(|snapshot| (snapshot.id, snapshot.api_version.clone()))
+            .filter(|snapshot| snapshot.schema != schema)
+            .map(|snapshot| (snapshot.id, snapshot.schema.clone()))
             .collect();
 
         let missing_ids: Vec<ResourceID> = ids
@@ -181,7 +171,7 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
 
         let access_denied_snapshots = self
             .resource_repository
-            .find_resource_snapshots_by_kind_and_ids(kind, &missing_ids)
+            .find_resource_snapshots_by_schema_and_ids(schema, &missing_ids)
             .await?;
         let access_denied_ids: std::collections::HashSet<ResourceID> =
             access_denied_snapshots.iter().map(|s| s.id).collect();
@@ -195,14 +185,13 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
 
         let found: Vec<ResourceSnapshot> = owned_any_kind
             .into_values()
-            .filter(|snapshot| snapshot.kind == kind && snapshot.api_version == api_version)
+            .filter(|snapshot| snapshot.schema == schema)
             .collect();
 
         Ok(FindOwnedSnapshotsOutcome {
             found,
             not_found,
-            kind_mismatch,
-            api_version_mismatch,
+            schema_mismatch,
             access_denied,
         })
     }
@@ -226,15 +215,15 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
             .await
     }
 
-    async fn list_snapshots_by_kind(
+    async fn list_snapshots_by_schema(
         &self,
         account_id: odf::AccountID,
-        kind: &str,
+        schema: &str,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceSnapshot>, InternalError> {
         let mut resource_snapshots_stream = self
             .resource_repository
-            .list_resource_snapshots_by_kind(account_id, kind, pagination);
+            .list_resource_snapshots_by_schema(account_id, schema, pagination);
 
         use tokio_stream::StreamExt;
 

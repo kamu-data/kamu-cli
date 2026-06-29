@@ -78,8 +78,7 @@ async fn test_spec_view_dispatcher_reveals_encrypted_secrets_as_plaintext() {
     // Resolve the view dispatcher from catalog and call reveal_spec
     let dispatcher = get_resource_spec_view_dispatcher_from_catalog(
         harness.catalog(),
-        SecretSetResource::DESCRIPTOR.resource_type,
-        SecretSetResource::DESCRIPTOR.api_version,
+        SecretSetResource::DESCRIPTOR.schema,
     )
     .expect("SecretSetSpecViewDispatcher must be registered");
 

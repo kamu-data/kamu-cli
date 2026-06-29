@@ -59,12 +59,12 @@ pub async fn test_resources_variableset_lifecycle(ctx: ResourceCtx) {
     // ── 6. get vs <name> --spec — apply-compatible manifest ──────────────────
     let spec_out = ctx.stdout(["get", "vs", resource_name, "--spec"]).await;
     assert!(
-        spec_out.contains("apiVersion"),
-        "`get vs --spec` should emit a manifest with 'apiVersion', got:\n{spec_out}"
+        spec_out.contains("$schema"),
+        "`get vs --spec` should emit a manifest with '$schema', got:\n{spec_out}"
     );
     assert!(
-        spec_out.contains("VariableSet"),
-        "`get vs --spec` should emit kind 'VariableSet', got:\n{spec_out}"
+        spec_out.contains(fixtures::VARIABLE_SET_KIND),
+        "`get vs --spec` should emit VariableSet schema, got:\n{spec_out}"
     );
     assert!(
         spec_out.contains(resource_name),

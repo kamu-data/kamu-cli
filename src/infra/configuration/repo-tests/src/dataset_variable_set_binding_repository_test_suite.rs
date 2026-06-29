@@ -205,8 +205,7 @@ async fn create_resource(
     resource_repo
         .create_resource(&ResourceSnapshot {
             id: resource_id,
-            kind: VariableSetResource::RESOURCE_TYPE.to_string(),
-            api_version: VariableSetResource::API_VERSION.to_string(),
+            schema: VariableSetResource::SCHEMA.to_string(),
             headers: ResourceHeaders::simple(
                 Utc::now(),
                 account.id.clone(),

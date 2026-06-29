@@ -40,7 +40,7 @@ pub async fn test_resources_output_formats(ctx: ResourceCtx) {
         .await;
     assert_eq!(
         get_yaml
-            .pointer("/kind")
+            .pointer("/$schema")
             .and_then(serde_json::Value::as_str),
         Some(fixtures::VARIABLE_SET_KIND)
     );
@@ -154,7 +154,7 @@ fn assert_api_resources_has_kind(doc: &serde_json::Value, label: &str, kind: &st
 
     assert!(
         rows.iter()
-            .any(|row| row.get("Kind").and_then(serde_json::Value::as_str) == Some(kind)),
+            .any(|row| row.get("Schema").and_then(serde_json::Value::as_str) == Some(kind)),
         "`{label}` should list supported kind {kind}, got:\n{doc}"
     );
 }

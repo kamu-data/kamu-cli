@@ -37,8 +37,8 @@ use pretty_assertions::{assert_eq, assert_matches};
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
 use crate::helpers::{
-    VARIABLE_SET_API_VERSION,
     VARIABLE_SET_KIND,
+    VARIABLE_SET_SCHEMA,
     assert_applied_outcome,
     assert_batch_indexes,
     assert_resource_view_fields,
@@ -51,7 +51,6 @@ fn by_name(name: &str) -> ResourceSelector {
     ResourceSelector {
         account: None,
         kind: VARIABLE_SET_KIND.to_string(),
-        api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
         resource_ref: ResourceRef::ByName(name.to_string()),
     }
 }
@@ -68,8 +67,8 @@ pub async fn test_same_supported_kinds(h: &impl FacadeContractHarness) {
     let mut local_kinds = local.list_supported_kinds().await.unwrap();
     let mut remote_kinds = remote.list_supported_kinds().await.unwrap();
 
-    local_kinds.sort_by(|a, b| a.kind.cmp(&b.kind));
-    remote_kinds.sort_by(|a, b| a.kind.cmp(&b.kind));
+    local_kinds.sort_by(|a, b| a.schema.cmp(&b.schema));
+    remote_kinds.sort_by(|a, b| a.schema.cmp(&b.schema));
 
     assert!(!local_kinds.is_empty(), "descriptors must not be empty");
     assert_eq!(
@@ -117,7 +116,7 @@ pub async fn test_local_created_readable_remotely(h: &impl FacadeContractHarness
     assert_resource_view_fields(
         &view,
         VARIABLE_SET_KIND,
-        VARIABLE_SET_API_VERSION,
+        VARIABLE_SET_SCHEMA,
         "cross-local-to-remote",
     );
     assert_eq!(view.headers.id, id);
@@ -159,7 +158,7 @@ pub async fn test_remote_created_readable_locally(h: &impl FacadeContractHarness
     assert_resource_view_fields(
         &view,
         VARIABLE_SET_KIND,
-        VARIABLE_SET_API_VERSION,
+        VARIABLE_SET_SCHEMA,
         "cross-remote-to-local",
     );
     assert_eq!(view.headers.id, id);
@@ -273,7 +272,6 @@ pub async fn test_batch_equivalence(h: &impl FacadeContractHarness) {
     let batch_selector = ResourceBatchSelector {
         account: None,
         kind: VARIABLE_SET_KIND.to_string(),
-        api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
         resource_refs: vec![
             ResourceRef::ByName("cross-batch-a".to_string()), // idx 0 — exists
             ResourceRef::ByName("cross-batch-missing".to_string()), // idx 1 — missing name
@@ -474,14 +472,11 @@ pub async fn test_apply_equivalence(h: &impl FacadeContractHarness) {
     // Empty variables deserializes correctly but fails VariableSetSpec::validate()
     // inside the lifecycle, so both apply and plan return
     // Ok(Rejected(BusinessValidationFailed)).
-    let reject_manifest = indoc::indoc!(
-        r#"{
-            "apiVersion": "kamu.dev/v1alpha1",
-            "kind": "VariableSet",
-            "headers": {"name": "cross-apply-eq-rejected"},
-            "spec": {"variables": {}}
-        }"#
-    )
+    let reject_manifest = serde_json::json!({
+        "$schema": VARIABLE_SET_SCHEMA,
+        "headers": {"name": "cross-apply-eq-rejected"},
+        "spec": {"variables": {}}
+    })
     .to_string();
     let local_reject = local
         .apply_manifest(ApplyManifestRequest {

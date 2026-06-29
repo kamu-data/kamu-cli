@@ -14,8 +14,8 @@ use pretty_assertions::assert_eq;
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
 use crate::helpers::{
-    SECRET_SET_KIND,
-    VARIABLE_SET_KIND,
+    SECRET_SET_SCHEMA,
+    VARIABLE_SET_SCHEMA,
     apply_manifest_and_get_id,
     normalize_identity_views,
     normalize_summary_views,
@@ -29,7 +29,7 @@ fn summary_keys(mut items: Vec<kamu_resources::ResourceSummaryView>) -> Vec<(Str
     normalize_summary_views(&mut items);
     items
         .into_iter()
-        .map(|item| (item.kind, item.name))
+        .map(|item| (item.schema, item.name))
         .collect()
 }
 
@@ -37,7 +37,7 @@ fn identity_keys(mut items: Vec<kamu_resources::ResourceIdentityView>) -> Vec<(S
     normalize_identity_views(&mut items);
     items
         .into_iter()
-        .map(|item| (item.kind, item.name))
+        .map(|item| (item.schema, item.name))
         .collect()
 }
 
@@ -81,8 +81,11 @@ pub async fn test_list_all_summaries_across_supported_kinds(h: &impl FacadeContr
     assert_eq!(
         summary_keys(summaries),
         vec![
-            (SECRET_SET_KIND.to_string(), "all-secret-alice".to_string()),
-            (VARIABLE_SET_KIND.to_string(), "all-var-alice".to_string()),
+            (
+                SECRET_SET_SCHEMA.to_string(),
+                "all-secret-alice".to_string()
+            ),
+            (VARIABLE_SET_SCHEMA.to_string(), "all-var-alice".to_string(),),
         ]
     );
 }
@@ -127,8 +130,8 @@ pub async fn test_list_all_identities_across_supported_kinds(h: &impl FacadeCont
     assert_eq!(
         identity_keys(identities),
         vec![
-            (SECRET_SET_KIND.to_string(), "all-id-secret".to_string()),
-            (VARIABLE_SET_KIND.to_string(), "all-id-var".to_string()),
+            (SECRET_SET_SCHEMA.to_string(), "all-id-secret".to_string()),
+            (VARIABLE_SET_SCHEMA.to_string(), "all-id-var".to_string()),
         ]
     );
 }

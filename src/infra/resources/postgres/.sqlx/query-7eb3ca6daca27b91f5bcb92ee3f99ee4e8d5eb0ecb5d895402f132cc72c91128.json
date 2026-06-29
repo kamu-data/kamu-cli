@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT resource_id as \"id: uuid::Uuid\"\n            FROM resources\n            WHERE account_id = $1\n              AND resource_schema = $2\n              AND resource_name = $3\n              AND deleted_at IS NULL\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: uuid::Uuid",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "7eb3ca6daca27b91f5bcb92ee3f99ee4e8d5eb0ecb5d895402f132cc72c91128"
+}

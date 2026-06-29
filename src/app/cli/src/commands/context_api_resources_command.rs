@@ -49,20 +49,15 @@ impl ContextApiResourcesCommand {
             .iter()
             .map(|item| item.short_names.join(","))
             .collect();
-        let col_kind: Vec<_> = supported_kinds
+        let col_schema: Vec<_> = supported_kinds
             .iter()
-            .map(|item| item.kind.clone())
-            .collect();
-        let col_api_version: Vec<_> = supported_kinds
-            .iter()
-            .map(|item| item.api_version.clone())
+            .map(|item| item.schema.clone())
             .collect();
 
         self.records(vec![
             Arc::new(StringArray::from(col_name)),
             Arc::new(StringArray::from(col_short_names)),
-            Arc::new(StringArray::from(col_kind)),
-            Arc::new(StringArray::from(col_api_version)),
+            Arc::new(StringArray::from(col_schema)),
         ])
         .map_err(CLIError::critical)
     }
@@ -104,7 +99,6 @@ impl OutputWriter for ContextApiResourcesCommand {
                 ColumnFormat::new().with_style_spec("l"),
                 ColumnFormat::new().with_style_spec("l"),
                 ColumnFormat::new().with_style_spec("l"),
-                ColumnFormat::new().with_style_spec("l"),
             ])
     }
 
@@ -112,8 +106,7 @@ impl OutputWriter for ContextApiResourcesCommand {
         Arc::new(Schema::new(vec![
             Field::new("Name", DataType::Utf8, false),
             Field::new("Short Names", DataType::Utf8, false),
-            Field::new("Kind", DataType::Utf8, false),
-            Field::new("API Version", DataType::Utf8, false),
+            Field::new("Schema", DataType::Utf8, false),
         ]))
     }
 }

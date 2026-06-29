@@ -19,8 +19,7 @@
 INSERT INTO resources (
     resource_id,
     account_id,
-    resource_kind,
-    api_version,
+    resource_schema,
     resource_name,
     description,
     labels,
@@ -37,8 +36,7 @@ INSERT INTO resources (
 SELECT
     gen_random_uuid()                                                           AS resource_id,
     de.owner_id                                                                 AS account_id,
-    'VariableSet'                                                               AS resource_kind,
-    'kamu.dev/v1alpha1'                                                         AS api_version,
+    'https://opendatafabric.org/schemas/config/v1alpha1/VariableSet'                 AS resource_schema,
     'legacy-vars-' || substring(dev.dataset_id, 9)                              AS resource_name,
     NULL                                                                        AS description,
     '{}'::jsonb                                                                 AS labels,
@@ -70,7 +68,7 @@ FROM dataset_env_vars dev
 JOIN dataset_entries de ON de.dataset_id = dev.dataset_id
 WHERE dev.secret_nonce IS NULL
 GROUP BY dev.dataset_id, de.owner_id
-ON CONFLICT (account_id, resource_kind, resource_name) DO NOTHING;
+ON CONFLICT (account_id, resource_schema, resource_name) DO NOTHING;
 
 /* ------------------------------ */
 
@@ -97,7 +95,7 @@ FROM dataset_env_vars dev
 JOIN dataset_entries de ON de.dataset_id = dev.dataset_id
 JOIN resources r
     ON r.account_id = de.owner_id
-   AND r.resource_kind = 'VariableSet'
+   AND r.resource_schema = 'https://opendatafabric.org/schemas/config/v1alpha1/VariableSet'
    AND r.resource_name = 'legacy-vars-' || substring(dev.dataset_id, 9)
 WHERE dev.secret_nonce IS NULL
 ON CONFLICT (resource_id, resource_generation, variable_key) DO NOTHING;
@@ -117,7 +115,7 @@ FROM dataset_env_vars dev
 JOIN dataset_entries de ON de.dataset_id = dev.dataset_id
 JOIN resources r
     ON r.account_id = de.owner_id
-   AND r.resource_kind = 'VariableSet'
+   AND r.resource_schema = 'https://opendatafabric.org/schemas/config/v1alpha1/VariableSet'
    AND r.resource_name = 'legacy-vars-' || substring(dev.dataset_id, 9)
 WHERE dev.secret_nonce IS NULL
 ON CONFLICT DO NOTHING;
@@ -129,8 +127,7 @@ ON CONFLICT DO NOTHING;
 INSERT INTO resources (
     resource_id,
     account_id,
-    resource_kind,
-    api_version,
+    resource_schema,
     resource_name,
     description,
     labels,
@@ -147,8 +144,7 @@ INSERT INTO resources (
 SELECT
     gen_random_uuid()                                                           AS resource_id,
     de.owner_id                                                                 AS account_id,
-    'SecretSet'                                                                 AS resource_kind,
-    'kamu.dev/v1alpha1'                                                         AS api_version,
+    'https://opendatafabric.org/schemas/config/v1alpha1/SecretSet'                   AS resource_schema,
     'legacy-secrets-' || substring(dev.dataset_id, 9)                           AS resource_name,
     NULL                                                                        AS description,
     '{}'::jsonb                                                                 AS labels,
@@ -180,7 +176,7 @@ FROM dataset_env_vars dev
 JOIN dataset_entries de ON de.dataset_id = dev.dataset_id
 WHERE dev.secret_nonce IS NOT NULL
 GROUP BY dev.dataset_id, de.owner_id
-ON CONFLICT (account_id, resource_kind, resource_name) DO NOTHING;
+ON CONFLICT (account_id, resource_schema, resource_name) DO NOTHING;
 
 /* ------------------------------ */
 
@@ -209,7 +205,7 @@ FROM dataset_env_vars dev
 JOIN dataset_entries de ON de.dataset_id = dev.dataset_id
 JOIN resources r
     ON r.account_id = de.owner_id
-   AND r.resource_kind = 'SecretSet'
+   AND r.resource_schema = 'https://opendatafabric.org/schemas/config/v1alpha1/SecretSet'
    AND r.resource_name = 'legacy-secrets-' || substring(dev.dataset_id, 9)
 WHERE dev.secret_nonce IS NOT NULL
 ON CONFLICT (resource_id, resource_generation, secret_key) DO NOTHING;
@@ -229,7 +225,7 @@ FROM dataset_env_vars dev
 JOIN dataset_entries de ON de.dataset_id = dev.dataset_id
 JOIN resources r
     ON r.account_id = de.owner_id
-   AND r.resource_kind = 'SecretSet'
+   AND r.resource_schema = 'https://opendatafabric.org/schemas/config/v1alpha1/SecretSet'
    AND r.resource_name = 'legacy-secrets-' || substring(dev.dataset_id, 9)
 WHERE dev.secret_nonce IS NOT NULL
 ON CONFLICT DO NOTHING;
@@ -240,17 +236,17 @@ ON CONFLICT DO NOTHING;
 
 WITH
 var_resources AS (
-    SELECT resource_id, account_id, resource_name, created_at, spec, status
+    SELECT resource_id, resource_schema, account_id, resource_name, created_at, spec, status
     FROM resources
-    WHERE resource_kind = 'VariableSet'
+    WHERE resource_schema = 'https://opendatafabric.org/schemas/config/v1alpha1/VariableSet'
       AND resource_name LIKE 'legacy-vars-%'
       AND last_event_id IS NULL
 ),
 ins_created AS (
-    INSERT INTO resource_events (resource_id, resource_kind, event_time, event_type, event_payload)
+    INSERT INTO resource_events (resource_id, resource_schema, event_time, event_type, event_payload)
     SELECT
         r.resource_id,
-        'VariableSet',
+        r.resource_schema,
         r.created_at,
         'Created',
         jsonb_build_object('Created', jsonb_build_object(
@@ -269,10 +265,10 @@ ins_created AS (
     RETURNING resource_id, event_id
 ),
 ins_started AS (
-    INSERT INTO resource_events (resource_id, resource_kind, event_time, event_type, event_payload)
+    INSERT INTO resource_events (resource_id, resource_schema, event_time, event_type, event_payload)
     SELECT
         r.resource_id,
-        'VariableSet',
+        r.resource_schema,
         r.created_at,
         'ReconciliationStarted',
         jsonb_build_object('ReconciliationStarted', jsonb_build_object(
@@ -284,10 +280,10 @@ ins_started AS (
     RETURNING resource_id, event_id
 ),
 ins_succeeded AS (
-    INSERT INTO resource_events (resource_id, resource_kind, event_time, event_type, event_payload)
+    INSERT INTO resource_events (resource_id, resource_schema, event_time, event_type, event_payload)
     SELECT
         r.resource_id,
-        'VariableSet',
+        r.resource_schema,
         r.created_at,
         'ReconciliationSucceeded',
         jsonb_build_object('ReconciliationSucceeded', jsonb_build_object(
@@ -310,17 +306,17 @@ WHERE resources.resource_id = ins_succeeded.resource_id;
 
 WITH
 secret_resources AS (
-    SELECT resource_id, account_id, resource_name, created_at, spec, status
+    SELECT resource_id, resource_schema, account_id, resource_name, created_at, spec, status
     FROM resources
-    WHERE resource_kind = 'SecretSet'
+    WHERE resource_schema = 'https://opendatafabric.org/schemas/config/v1alpha1/SecretSet'
       AND resource_name LIKE 'legacy-secrets-%'
       AND last_event_id IS NULL
 ),
 ins_created AS (
-    INSERT INTO resource_events (resource_id, resource_kind, event_time, event_type, event_payload)
+    INSERT INTO resource_events (resource_id, resource_schema, event_time, event_type, event_payload)
     SELECT
         r.resource_id,
-        'SecretSet',
+        r.resource_schema,
         r.created_at,
         'Created',
         jsonb_build_object('Created', jsonb_build_object(
@@ -339,10 +335,10 @@ ins_created AS (
     RETURNING resource_id, event_id
 ),
 ins_started AS (
-    INSERT INTO resource_events (resource_id, resource_kind, event_time, event_type, event_payload)
+    INSERT INTO resource_events (resource_id, resource_schema, event_time, event_type, event_payload)
     SELECT
         r.resource_id,
-        'SecretSet',
+        r.resource_schema,
         r.created_at,
         'ReconciliationStarted',
         jsonb_build_object('ReconciliationStarted', jsonb_build_object(
@@ -354,10 +350,10 @@ ins_started AS (
     RETURNING resource_id, event_id
 ),
 ins_succeeded AS (
-    INSERT INTO resource_events (resource_id, resource_kind, event_time, event_type, event_payload)
+    INSERT INTO resource_events (resource_id, resource_schema, event_time, event_type, event_payload)
     SELECT
         r.resource_id,
-        'SecretSet',
+        r.resource_schema,
         r.created_at,
         'ReconciliationSucceeded',
         jsonb_build_object('ReconciliationSucceeded', jsonb_build_object(

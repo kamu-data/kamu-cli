@@ -17,7 +17,7 @@ use pretty_assertions::assert_eq;
 
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
-use crate::helpers::{VARIABLE_SET_KIND, assert_applied_outcome, variable_set_manifest_json};
+use crate::helpers::{VARIABLE_SET_SCHEMA, assert_applied_outcome, variable_set_manifest_json};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -50,7 +50,7 @@ pub async fn test_summary_empty_account(h: &impl FacadeContractHarness) {
     let bob_vs_count = summary
         .resource_counts
         .iter()
-        .find(|r| r.kind == VARIABLE_SET_KIND)
+        .find(|r| r.schema == VARIABLE_SET_SCHEMA)
         .map(|r| r.total_count)
         .unwrap_or(0);
 
@@ -82,7 +82,7 @@ pub async fn test_summary_counts_resources(h: &impl FacadeContractHarness) {
     let alice_vs_count = alice_summary
         .resource_counts
         .iter()
-        .find(|r| r.kind == VARIABLE_SET_KIND)
+        .find(|r| r.schema == VARIABLE_SET_SCHEMA)
         .map(|r| r.total_count)
         .expect("VariableSet kind must appear in summary");
 
@@ -98,7 +98,7 @@ pub async fn test_summary_counts_resources(h: &impl FacadeContractHarness) {
     let bob_vs_count = bob_summary
         .resource_counts
         .iter()
-        .find(|r| r.kind == VARIABLE_SET_KIND)
+        .find(|r| r.schema == VARIABLE_SET_SCHEMA)
         .map(|r| r.total_count)
         .unwrap_or(0);
 
@@ -169,7 +169,7 @@ fn vs_phase_counts(summary: &ResourcesSummary) -> ResourcePhaseCounts {
     summary
         .resource_counts
         .iter()
-        .find(|r| r.kind == VARIABLE_SET_KIND)
+        .find(|r| r.schema == VARIABLE_SET_SCHEMA)
         .map(|r| r.phase_counts.clone())
         .unwrap_or_default()
 }
@@ -198,14 +198,14 @@ pub async fn test_summary_account_scoping(h: &impl FacadeContractHarness) {
     let alice_vs = alice_summary
         .resource_counts
         .iter()
-        .find(|r| r.kind == VARIABLE_SET_KIND)
+        .find(|r| r.schema == VARIABLE_SET_SCHEMA)
         .map(|r| r.total_count)
         .unwrap_or(0);
 
     let bob_vs = bob_summary
         .resource_counts
         .iter()
-        .find(|r| r.kind == VARIABLE_SET_KIND)
+        .find(|r| r.schema == VARIABLE_SET_SCHEMA)
         .map(|r| r.total_count)
         .unwrap_or(0);
 

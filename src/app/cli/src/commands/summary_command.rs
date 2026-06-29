@@ -52,8 +52,7 @@ impl SummaryCommand {
 
         let schema = Arc::new(Schema::new(vec![
             Field::new("Name", DataType::Utf8, false),
-            Field::new("Kind", DataType::Utf8, false),
-            Field::new("API Version", DataType::Utf8, false),
+            Field::new("Schema", DataType::Utf8, false),
             Field::new("Total", DataType::UInt64, false),
             Field::new("Pending", DataType::UInt64, false),
             Field::new("Reconciling", DataType::UInt64, false),
@@ -76,14 +75,7 @@ impl SummaryCommand {
                     summary
                         .resource_counts
                         .iter()
-                        .map(|item| item.kind.clone())
-                        .collect::<Vec<_>>(),
-                )),
-                Arc::new(StringArray::from(
-                    summary
-                        .resource_counts
-                        .iter()
-                        .map(|item| item.api_version.clone())
+                        .map(|item| item.schema.clone())
                         .collect::<Vec<_>>(),
                 )),
                 Arc::new(UInt64Array::from(

@@ -145,9 +145,8 @@ impl GetResourceCommand {
 
         #[derive(serde::Serialize)]
         struct RenderedResourceViewJson<'a> {
-            #[serde(rename = "apiVersion")]
-            api_version: &'a str,
-            kind: &'a str,
+            #[serde(rename = "$schema")]
+            schema: &'a str,
             headers: RenderedResourceViewHeaders<'a>,
             #[serde(rename = "lastReconciledAt")]
             last_reconciled_at: &'a Option<DateTime<Utc>>,
@@ -157,9 +156,8 @@ impl GetResourceCommand {
 
         #[derive(serde::Serialize)]
         struct RenderedResourceViewYaml<'a> {
-            #[serde(rename = "apiVersion")]
-            api_version: &'a str,
-            kind: &'a str,
+            #[serde(rename = "$schema")]
+            schema: &'a str,
             headers: RenderedResourceViewHeaders<'a>,
             #[serde(rename = "lastReconciledAt")]
             last_reconciled_at: &'a Option<DateTime<Utc>>,
@@ -170,8 +168,7 @@ impl GetResourceCommand {
         match format {
             FacadeResourceManifestFormat::Json => {
                 serde_json::to_string_pretty(&RenderedResourceViewJson {
-                    api_version: &resource.api_version,
-                    kind: &resource.kind,
+                    schema: &resource.schema,
                     headers: RenderedResourceViewHeaders::new(resource),
                     last_reconciled_at: &resource.last_reconciled_at,
                     spec: &resource.spec,
@@ -182,8 +179,7 @@ impl GetResourceCommand {
 
             FacadeResourceManifestFormat::Yaml => {
                 serde_yaml::to_string(&RenderedResourceViewYaml {
-                    api_version: &resource.api_version,
-                    kind: &resource.kind,
+                    schema: &resource.schema,
                     headers: RenderedResourceViewHeaders::new(resource),
                     last_reconciled_at: &resource.last_reconciled_at,
                     spec: common::json_to_yaml_value(&resource.spec),
@@ -220,14 +216,16 @@ impl GetResourceCommand {
     ) -> Result<Vec<String>, CLIError> {
         let mut rendered_items = vec![None; targets.len()];
 
-        for ((kind, api_version), entries) in Self::group_targets_by_descriptor(targets) {
+        for (_schema, entries) in Self::group_targets_by_descriptor(targets) {
             for chunk in entries.chunks(Self::MATERIALIZATION_BATCH_SIZE) {
                 let result = resource_facade
                     .render_manifests(
                         ResourceBatchSelector {
                             account: None,
-                            kind: kind.clone(),
-                            api_version: Some(api_version.clone()),
+                            kind: chunk
+                                .first()
+                                .map(|(_, target)| target.kind.clone())
+                                .unwrap_or_default(),
                             resource_refs: chunk
                                 .iter()
                                 .map(|(_, target)| ResourceRef::ById(target.id))
@@ -258,14 +256,16 @@ impl GetResourceCommand {
     ) -> Result<Vec<String>, CLIError> {
         let mut rendered_items = vec![None; targets.len()];
 
-        for ((kind, api_version), entries) in Self::group_targets_by_descriptor(targets) {
+        for (_schema, entries) in Self::group_targets_by_descriptor(targets) {
             for chunk in entries.chunks(Self::MATERIALIZATION_BATCH_SIZE) {
                 let result = resource_facade
                     .get_many(
                         ResourceBatchSelector {
                             account: None,
-                            kind: kind.clone(),
-                            api_version: Some(api_version.clone()),
+                            kind: chunk
+                                .first()
+                                .map(|(_, target)| target.kind.clone())
+                                .unwrap_or_default(),
                             resource_refs: chunk
                                 .iter()
                                 .map(|(_, target)| ResourceRef::ById(target.id))
@@ -290,11 +290,11 @@ impl GetResourceCommand {
 
     fn group_targets_by_descriptor(
         targets: &[ResourceTarget],
-    ) -> BTreeMap<(String, String), Vec<(usize, &ResourceTarget)>> {
+    ) -> BTreeMap<String, Vec<(usize, &ResourceTarget)>> {
         let mut groups = BTreeMap::new();
         for (index, target) in targets.iter().enumerate() {
             groups
-                .entry((target.kind.clone(), target.api_version.clone()))
+                .entry(target.schema.clone())
                 .or_insert_with(Vec::new)
                 .push((index, target));
         }

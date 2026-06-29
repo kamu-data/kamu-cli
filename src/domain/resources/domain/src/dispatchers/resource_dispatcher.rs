@@ -12,26 +12,25 @@ use std::sync::Arc;
 use dill::Catalog;
 use internal_error::{InternalError, ResultIntoInternal};
 
-use crate::ResourceDescriptor;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
 pub struct ResourceDispatcherMeta {
-    pub descriptor: ResourceDescriptor,
+    pub schema: &'static str,
+    pub name: &'static str,
+    pub short_names: &'static [&'static str],
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn get_resource_dispatcher_from_catalog<TDispatcher: ?Sized + 'static>(
     target_catalog: &Catalog,
-    kind: &str,
-    api_version: &str,
+    schema: &str,
     dispatcher_name: &str,
 ) -> Result<Arc<TDispatcher>, InternalError> {
     let mut dispatchers =
         target_catalog.builders_for_with_meta::<TDispatcher, _>(|meta: &ResourceDispatcherMeta| {
-            meta.descriptor.resource_type == kind && meta.descriptor.api_version == api_version
+            meta.schema == schema
         });
 
     dispatchers
@@ -39,8 +38,7 @@ pub fn get_resource_dispatcher_from_catalog<TDispatcher: ?Sized + 'static>(
         .map(|builder| {
             if dispatchers.next().is_some() {
                 return Err(InternalError::new(format!(
-                    "Duplicate {dispatcher_name} registered for resource_type='{kind}', \
-                     api_version='{api_version}'",
+                    "Duplicate {dispatcher_name} registered for schema='{schema}'",
                 )));
             }
 
@@ -49,8 +47,7 @@ pub fn get_resource_dispatcher_from_catalog<TDispatcher: ?Sized + 'static>(
         .transpose()?
         .ok_or_else(|| {
             InternalError::new(format!(
-                "No {dispatcher_name} registered for resource_type='{kind}', \
-                 api_version='{api_version}'",
+                "No {dispatcher_name} registered for schema='{schema}'",
             ))
         })
 }

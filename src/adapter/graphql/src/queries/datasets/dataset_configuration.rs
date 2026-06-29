@@ -12,7 +12,7 @@ use kamu_configuration::{DatasetSecretSetBindingRepository, DatasetVariableSetBi
 use kamu_resources::GenericResourceQueryService;
 
 use crate::prelude::*;
-use crate::queries::{DatasetRequestState, ResourceKind};
+use crate::queries::DatasetRequestState;
 use crate::scalars::ResourceID;
 use crate::utils;
 
@@ -79,8 +79,7 @@ impl<'a> DatasetConfiguration<'a> {
                         resource_id: kamu_resources::ResourceID::new(identity.id).into(),
                         binding_order: b.binding_order,
                         resource_name: identity.name.clone(),
-                        resource_kind: ResourceKind::new(identity.kind.clone()),
-                        api_version: identity.api_version.clone(),
+                        resource_schema: identity.schema.clone(),
                     })
             })
             .collect())
@@ -129,8 +128,7 @@ impl<'a> DatasetConfiguration<'a> {
                         resource_id: kamu_resources::ResourceID::new(identity.id).into(),
                         binding_order: b.binding_order,
                         resource_name: identity.name.clone(),
-                        resource_kind: ResourceKind::new(identity.kind.clone()),
-                        api_version: identity.api_version.clone(),
+                        resource_schema: identity.schema.clone(),
                     })
             })
             .collect())
@@ -144,8 +142,7 @@ pub struct DatasetBindingView {
     pub resource_id: ResourceID,
     pub binding_order: u64,
     pub resource_name: String,
-    pub resource_kind: ResourceKind,
-    pub api_version: String,
+    pub resource_schema: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

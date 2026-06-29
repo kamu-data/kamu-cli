@@ -18,7 +18,10 @@ macro_rules! declare_resource_lifecycle_reconcile_dispatcher {
         #[dill::component]
         #[dill::interface(dyn kamu_resources::ResourceLifecycleEventDispatcher)]
         #[dill::meta(kamu_resources::ResourceDispatcherMeta {
-            descriptor: <$resource as kamu_resources::ResourceDescriptorProvider>::DESCRIPTOR,
+            schema: <$resource as kamu_resources::ResourceDescriptorProvider>::DESCRIPTOR.schema,
+            name: <$resource as kamu_resources::ResourcePresentation>::PRESENTATION.resource_name,
+            short_names:
+                <$resource as kamu_resources::ResourcePresentation>::PRESENTATION.resource_short_names,
         })]
         pub struct $dispatcher {
             reconcile_resource_use_case:
@@ -26,7 +29,10 @@ macro_rules! declare_resource_lifecycle_reconcile_dispatcher {
         }
 
         #[async_trait::async_trait]
-        impl kamu_resources::ResourceLifecycleEventDispatcher for $dispatcher {
+        impl kamu_resources::ResourceLifecycleEventDispatcher for $dispatcher
+        where
+            $resource: kamu_resources::ResourcePresentation,
+        {
             async fn handle_applied(
                 &self,
                 resource: &kamu_resources::ResourceSnapshot,

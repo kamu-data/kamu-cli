@@ -27,8 +27,8 @@ Each RF scenario from the original plan is listed with its status.
 | RF-033  | get_identity.rs     | Active   | Get identity by UID returns same identity                             |                                                                        |
 | RF-034  | get_identity.rs     | Active   | Get missing name returns NameNotFound                                 |                                                                        |
 | RF-035  | get_identity.rs     | Active   | Get missing UID returns UIDNotFound                                   |                                                                        |
-| RF-036  | get_identity.rs     | Active   | Get with wrong api_version returns ApiVersionMismatch                 |                                                                        |
-| RF-037  | get_identity.rs     | Active   | Get by UID with wrong kind returns KindMismatch                       |                                                                        |
+| RF-036  | get_identity.rs     | Active   | Get with wrong schema returns SchemaMismatch                 |                                                                        |
+| RF-037  | get_identity.rs     | Active   | Get by UID with wrong schema returns SchemaMismatch                       |                                                                        |
 | RF-040  | spec_view_mode.rs   | Active   | Encrypted/default spec view hides secret material                     |                                                                        |
 | RF-041  | spec_view_mode.rs   | Active   | Revealed spec view exposes revealable material                        |                                                                        |
 | RF-042  | spec_view_mode.rs   | Active   | Spec view mode applies consistently to batch get                      |                                                                        |
@@ -40,7 +40,7 @@ Each RF scenario from the original plan is listed with its status.
 | RF-053A | batch_ops.rs        | Active   | Empty batch still validates unsupported kind                          | Extension beyond original plan                                         |
 | RF-053B | batch_ops.rs        | Active   | Empty batch still validates bad account                               | Extension beyond original plan                                         |
 | RF-053C | batch_ops.rs        | Active   | Empty-batch validation mirrors RF-053A/B across all batch ops         | Extension beyond original plan                                         |
-| RF-054  | batch_ops.rs        | Active   | get_many wrong api_version produces per-item mismatch problems        |                                                                        |
+| RF-054  | batch_ops.rs        | Active   | get_many wrong schema produces per-item mismatch problems        |                                                                        |
 | RF-055  | batch_ops.rs        | Active   | get_identities mirrors get_many lookup behavior                       |                                                                        |
 | RF-056  | batch_ops.rs        | Active   | render_manifests all successes                                        |                                                                        |
 | RF-057  | batch_ops.rs        | Active   | render_manifests mixed successes and problems                         |                                                                        |
@@ -52,7 +52,7 @@ Each RF scenario from the original plan is listed with its status.
 | RF-071  | render_manifest.rs  | Active   | Render YAML manifest by UID                                           |                                                                        |
 | RF-072  | render_manifest.rs  | Active   | Rendered manifest can be reapplied unchanged                          |                                                                        |
 | RF-073  | render_manifest.rs  | Active   | Render missing resource returns lookup problem                        |                                                                        |
-| RF-074  | render_manifest.rs  | Active   | Render wrong api_version/kind returns mismatch problem                |                                                                        |
+| RF-074  | render_manifest.rs  | Active   | Render wrong schema returns mismatch problem                |                                                                        |
 | RF-080  | list_search.rs      | Active   | List by kind returns summaries for account                            |                                                                        |
 | RF-081  | list_search.rs      | Active   | list_identities by kind returns identities for account                |                                                                        |
 | RF-082  | list_search.rs      | Active   | List supports pagination limit                                        |                                                                        |
@@ -85,7 +85,7 @@ Each RF scenario from the original plan is listed with its status.
 | RF-131  | delete.rs           | Active   | Delete by UID removes resource                                        |                                                                        |
 | RF-132  | delete.rs           | Active   | Delete missing name returns lookup problem                            |                                                                        |
 | RF-133  | delete.rs           | Active   | Delete missing UID returns lookup problem                             |                                                                        |
-| RF-134  | delete.rs           | Active   | Delete wrong api_version/kind returns mismatch problem                |                                                                        |
+| RF-134  | delete.rs           | Active   | Delete wrong schema returns mismatch problem                |                                                                        |
 | RF-135  | delete.rs           | Active   | Delete is account-scoped                                              |                                                                        |
 | RF-136  | delete.rs           | Active   | Repeated delete returns not found                                     |                                                                        |
 | RF-140  | error_taxonomy.rs   | Active   | Single-resource lookup error taxonomy is consistent across get/render/delete |                                                                 |

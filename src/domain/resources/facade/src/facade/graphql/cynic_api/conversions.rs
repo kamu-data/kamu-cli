@@ -20,8 +20,7 @@ impl From<supported_kinds::ResourceKindDescriptor> for domain::ResourceKindDescr
         Self {
             name: value.name,
             short_names: value.short_names,
-            kind: value.kind.value,
-            api_version: value.api_version,
+            schema: value.schema,
             list_columns: value.list_columns.into_iter().map(Into::into).collect(),
         }
     }
@@ -50,8 +49,7 @@ impl TryFrom<fragments::Resource> for domain::ResourceView {
             serde_json::from_value(value.headers.annotations).int_err()?;
 
         Ok(Self {
-            kind: value.kind.value,
-            api_version: value.api_version,
+            schema: value.schema,
             account: domain::ResourceViewAccount {
                 id: value.headers.account_id,
                 name: value
@@ -82,8 +80,7 @@ impl TryFrom<fragments::Resource> for domain::ResourceView {
 impl From<fragments::ResourceIdentity> for domain::ResourceIdentityView {
     fn from(value: fragments::ResourceIdentity) -> Self {
         Self {
-            kind: value.kind.value,
-            api_version: value.api_version,
+            schema: value.schema,
             canonical_kind_name: value.canonical_kind_name,
             id: value.id,
             name: value.name,
@@ -142,8 +139,7 @@ impl TryFrom<fragments::ResourceSummary> for domain::ResourceSummaryView {
             .collect::<Result<Vec<_>, _>>()?;
 
         Ok(domain::ResourceSummaryView {
-            kind: value.kind.value,
-            api_version: value.api_version,
+            schema: value.schema,
             id: value.id,
             name: value.name,
             description: value.description,
@@ -177,9 +173,8 @@ impl TryFrom<fragments::ResourceTypeCountSummary> for domain::ResourceTypeCountS
 
     fn try_from(value: fragments::ResourceTypeCountSummary) -> Result<Self, Self::Error> {
         Ok(Self {
-            kind: value.kind,
+            schema: value.schema,
             name: value.name,
-            api_version: value.api_version,
             total_count: value.total_count.into(),
             phase_counts: domain::ResourcePhaseCounts {
                 pending: value.phase_counts.pending.into(),

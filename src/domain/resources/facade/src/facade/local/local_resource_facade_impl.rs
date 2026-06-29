@@ -12,7 +12,10 @@ use std::sync::Arc;
 
 use internal_error::InternalError;
 use kamu_resources::*;
-use kamu_resources_services::{get_resource_crud_dispatcher, get_resource_crud_dispatcher_by_kind};
+use kamu_resources_services::{
+    get_resource_crud_dispatcher,
+    get_resource_crud_dispatcher_by_selector,
+};
 
 use super::helpers::*;
 use crate::*;
@@ -46,7 +49,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .resolve_target_account(request.account.as_ref())
             .await?;
 
-        let descriptors_by_key = self.resource_kind_names_by_key();
+        let names_by_schema = self.resource_kind_names_by_schema();
 
         let resource_counts = self
             .generic_resource_query_service
@@ -54,20 +57,19 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .await?
             .into_iter()
             .map(|row| {
-                let name = descriptors_by_key
-                    .get(&(row.kind.clone(), row.api_version.clone()))
+                let name = names_by_schema
+                    .get(&row.schema)
                     .ok_or_else(|| {
                         ResourcesSummaryError::Internal(InternalError::new(format!(
-                            "No resource descriptor registered for {}/{}",
-                            row.kind, row.api_version
+                            "No resource descriptor registered for {}",
+                            row.schema
                         )))
                     })?
                     .clone();
 
                 Ok(ResourceTypeCountSummary {
-                    kind: row.kind,
+                    schema: row.schema,
                     name,
-                    api_version: row.api_version,
                     total_count: row.total_count,
                     phase_counts: row.phase_counts,
                 })
@@ -127,26 +129,22 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .resource_account_resolver
             .resolve_target_account(selector.account.as_ref())
             .await?;
+        let schema = self.resolve_schema_for_selector::<GetResourceError>(&selector.kind)?;
 
         let id = resolve_resource_id::<GetResourceError>(
             self.generic_resource_query_service.as_ref(),
-            &selector.kind,
+            &schema,
             &target_account.id,
             &selector.resource_ref,
         )
         .await?;
 
         let snapshot = self
-            .resolve_snapshot_for_kind::<GetResourceError>(&selector.kind, &target_account.id, id)
+            .resolve_snapshot_for_schema::<GetResourceError>(&schema, &target_account.id, id)
             .await?;
 
-        ensure_requested_api_version::<GetResourceError>(
-            selector.api_version.as_ref(),
-            &snapshot.api_version,
-        )?;
-
-        let descriptors_by_key = self.resource_kind_names_by_key();
-        resource_identity_from_snapshot::<GetResourceError>(snapshot, &descriptors_by_key)
+        let names_by_schema = self.resource_kind_names_by_schema();
+        resource_identity_from_snapshot::<GetResourceError>(snapshot, &names_by_schema)
     }
 
     async fn get_identities(
@@ -161,17 +159,14 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .resolve_target_account(selector.account.as_ref())
             .await?;
 
-        let descriptors_by_key = self.resource_kind_names_by_key();
-
-        let kind = selector.kind.clone();
-        let api_version = selector.api_version.clone();
-        get_resource_crud_dispatcher_by_kind::<BatchResourceError>(&self.catalog, &kind)?;
+        let names_by_schema = self.resource_kind_names_by_schema();
+        let schema = self.resolve_schema_for_selector::<BatchResourceError>(&selector.kind)?;
 
         let groups = group_batch_resource_refs(selector);
         let resolution_response = resolve_batch_ids(
             self.generic_resource_query_service.as_ref(),
             &target_account.id,
-            &kind,
+            &schema,
             groups,
         )
         .await?;
@@ -179,11 +174,10 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         let (identities, problems) = self
             .resolve_id_identity_groups(
                 &target_account.id,
-                &kind,
-                api_version.as_ref(),
+                &schema,
                 resolution_response.id_entries,
                 resolution_response.problems,
-                &descriptors_by_key,
+                &names_by_schema,
             )
             .await?;
 
@@ -263,7 +257,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .resolve_target_account(request.account.as_ref())
             .await?;
 
-        let dispatcher = get_resource_crud_dispatcher_by_kind::<ListResourcesError>(
+        let dispatcher = get_resource_crud_dispatcher_by_selector::<ListResourcesError>(
             &self.catalog,
             &request.kind,
         )?;
@@ -286,15 +280,15 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .resolve_target_account(request.account.as_ref())
             .await?;
 
-        get_resource_crud_dispatcher_by_kind::<ListResourcesError>(&self.catalog, &request.kind)?;
+        let schema = self.resolve_schema_for_selector::<ListResourcesError>(&request.kind)?;
 
         let snapshots = self
             .generic_resource_query_service
-            .list_snapshots_by_kind(target_account.id, &request.kind, request.pagination)
+            .list_snapshots_by_schema(target_account.id, &schema, request.pagination)
             .await?;
 
-        let descriptors_by_key = self.resource_kind_names_by_key();
-        map_snapshots_to_identities(snapshots, &descriptors_by_key).map_err(Into::into)
+        let names_by_schema = self.resource_kind_names_by_schema();
+        map_snapshots_to_identities(snapshots, &names_by_schema).map_err(Into::into)
     }
 
     async fn search_identities(
@@ -310,15 +304,17 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .resolve_target_account(request.account.as_ref())
             .await?;
 
-        for kind in &request.kinds {
-            get_resource_crud_dispatcher_by_kind::<ListResourcesError>(&self.catalog, kind)?;
-        }
+        let schemas = request
+            .kinds
+            .iter()
+            .map(|kind| self.resolve_schema_for_selector::<ListResourcesError>(kind))
+            .collect::<Result<Vec<_>, _>>()?;
 
         let rows = self
             .generic_resource_query_service
             .search_resource_identities(
                 &target_account.id,
-                &request.kinds,
+                &schemas,
                 request.exact_names.as_deref(),
                 request.name_pattern.as_deref(),
                 request.pagination,
@@ -328,16 +324,16 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .generic_resource_query_service
             .count_search_resource_identities(
                 &target_account.id,
-                &request.kinds,
+                &schemas,
                 request.exact_names.as_deref(),
                 request.name_pattern.as_deref(),
             )
             .await?;
 
-        let descriptors_by_key = self.resource_kind_names_by_key();
+        let names_by_schema = self.resource_kind_names_by_schema();
         let items = rows
             .into_iter()
-            .map(|row| resource_identity_from_row::<ListResourcesError>(row, &descriptors_by_key))
+            .map(|row| resource_identity_from_row::<ListResourcesError>(row, &names_by_schema))
             .collect::<Result<Vec<_>, _>>()?;
 
         Ok(SearchResourceIdentitiesResponse { items, total_count })
@@ -374,8 +370,8 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .list_all_snapshots(target_account.id, request.pagination)
             .await?;
 
-        let descriptors_by_key = self.resource_kind_names_by_key();
-        map_snapshots_to_identities(snapshots, &descriptors_by_key).map_err(Into::into)
+        let names_by_schema = self.resource_kind_names_by_schema();
+        map_snapshots_to_identities(snapshots, &names_by_schema).map_err(Into::into)
     }
 
     async fn plan_apply_manifest(
@@ -449,15 +445,13 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .resolve_target_account(selector.account.as_ref())
             .await?;
 
-        let kind = selector.kind.clone();
-        let api_version = selector.api_version.clone();
-        get_resource_crud_dispatcher_by_kind::<BatchResourceError>(&self.catalog, &kind)?;
+        let schema = self.resolve_schema_for_selector::<BatchResourceError>(&selector.kind)?;
 
         let groups = group_batch_resource_refs(selector);
         let resolution_response = resolve_batch_ids(
             self.generic_resource_query_service.as_ref(),
             &target_account.id,
-            &kind,
+            &schema,
             groups,
         )
         .await?;
@@ -465,7 +459,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         let mut problems = resolution_response.problems;
         let mut successes = Vec::new();
         let mut seen_valid_ids = HashSet::new();
-        let mut ids_by_api_version = HashMap::<String, Vec<ResourceID>>::new();
+        let mut ids_to_delete = Vec::<ResourceID>::new();
 
         let ids = resolution_response
             .id_entries
@@ -488,25 +482,16 @@ impl ResourceFacade for LocalResourceFacadeImpl {
                 .ok_or_else(|| id_not_found(id));
 
             match row_result.and_then(|row| {
-                validate_identity_row(
-                    row,
-                    &kind,
-                    api_version.as_ref(),
-                    ensure_kind_matches::<ResourceLookupProblem>,
-                    ensure_requested_api_version::<ResourceLookupProblem>,
-                )
+                validate_identity_row(row, &schema, ensure_schema_matches::<ResourceLookupProblem>)
             }) {
-                Ok(row) => {
+                Ok(_) => {
                     successes.push(BatchResourceSuccess {
                         request_index,
                         item: id,
                     });
 
                     if seen_valid_ids.insert(id) {
-                        ids_by_api_version
-                            .entry(row.api_version)
-                            .or_default()
-                            .push(id);
+                        ids_to_delete.push(id);
                     }
                 }
                 Err(error) => problems.push(BatchResourceProblem {
@@ -516,16 +501,13 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             }
         }
 
-        for (api_version, ids) in ids_by_api_version {
-            let dispatcher = get_resource_crud_dispatcher::<BatchResourceError>(
-                &self.catalog,
-                &kind,
-                &api_version,
-            )?;
+        if !ids_to_delete.is_empty() {
+            let dispatcher =
+                get_resource_crud_dispatcher::<BatchResourceError>(&self.catalog, &schema)?;
             dispatcher
                 .delete(ResourceCrudDispatcherDeleteRequest {
                     account_id: target_account.id.clone(),
-                    ids,
+                    ids: ids_to_delete,
                 })
                 .await?;
         }
@@ -544,7 +526,6 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .delete_many(ResourceBatchSelector {
                 account: selector.account,
                 kind: selector.kind,
-                api_version: selector.api_version,
                 resource_refs: vec![selector.resource_ref],
             })
             .await?;
@@ -577,7 +558,7 @@ impl LocalResourceFacadeImpl {
             let descriptor = dispatcher.descriptor();
             let presentation = dispatcher.presentation();
 
-            if seen.insert((descriptor.resource_type, descriptor.api_version)) {
+            if seen.insert(descriptor.schema) {
                 descriptors.push(ResourceKindDescriptor {
                     name: presentation.resource_name.to_string(),
                     short_names: presentation
@@ -585,8 +566,7 @@ impl LocalResourceFacadeImpl {
                         .iter()
                         .map(ToString::to_string)
                         .collect(),
-                    kind: descriptor.resource_type.to_string(),
-                    api_version: descriptor.api_version.to_string(),
+                    schema: descriptor.schema.to_string(),
                     list_columns: presentation
                         .list_columns
                         .iter()
@@ -597,20 +577,30 @@ impl LocalResourceFacadeImpl {
             }
         }
 
-        descriptors.sort_by(|a, b| {
-            a.kind
-                .cmp(&b.kind)
-                .then_with(|| a.api_version.cmp(&b.api_version))
-        });
+        descriptors.sort_by(|a, b| a.schema.cmp(&b.schema));
 
         descriptors
     }
 
-    fn resource_kind_names_by_key(&self) -> HashMap<(String, String), String> {
+    fn resource_kind_names_by_schema(&self) -> HashMap<String, String> {
         self.list_resource_kind_descriptors()
             .into_iter()
-            .map(|descriptor| ((descriptor.kind, descriptor.api_version), descriptor.name))
+            .map(|descriptor| (descriptor.schema, descriptor.name))
             .collect()
+    }
+
+    fn resolve_schema_for_selector<E>(&self, selector: &str) -> Result<String, E>
+    where
+        E: From<UnsupportedResourceDescriptorError>,
+    {
+        self.list_resource_kind_descriptors()
+            .into_iter()
+            .find(|descriptor| descriptor.matches_selector(selector))
+            .map(|descriptor| descriptor.schema)
+            .ok_or_else(|| UnsupportedResourceDescriptorError::SelectorNotFound {
+                selector: selector.to_string(),
+            })
+            .map_err(Into::into)
     }
 
     async fn resolve_resource_view<E>(&self, selector: ResourceSelector) -> Result<ResourceView, E>
@@ -625,26 +615,21 @@ impl LocalResourceFacadeImpl {
             .resource_account_resolver
             .resolve_target_account(selector.account.as_ref())
             .await?;
+        let schema = self.resolve_schema_for_selector::<E>(&selector.kind)?;
 
         let id = resolve_resource_id::<E>(
             self.generic_resource_query_service.as_ref(),
-            &selector.kind,
+            &schema,
             &target_account.id,
             &selector.resource_ref,
         )
         .await?;
 
         let snapshot = self
-            .resolve_snapshot_for_kind::<E>(&selector.kind, &target_account.id, id)
+            .resolve_snapshot_for_schema::<E>(&schema, &target_account.id, id)
             .await?;
 
-        ensure_requested_api_version::<E>(selector.api_version.as_ref(), &snapshot.api_version)?;
-
-        let dispatcher = get_resource_crud_dispatcher::<E>(
-            &self.catalog,
-            &snapshot.kind,
-            &snapshot.api_version,
-        )?;
+        let dispatcher = get_resource_crud_dispatcher::<E>(&self.catalog, &snapshot.schema)?;
 
         let view = dispatcher
             .get(ResourceCrudDispatcherGetRequest {
@@ -677,18 +662,16 @@ impl LocalResourceFacadeImpl {
             .resolve_target_account(selector.account.as_ref())
             .await?;
 
-        let descriptors_by_key = self.resource_kind_names_by_key();
+        let names_by_schema = self.resource_kind_names_by_schema();
 
-        let kind = selector.kind.clone();
-        let api_version = selector.api_version.clone();
-        get_resource_crud_dispatcher_by_kind::<BatchResourceError>(&self.catalog, &kind)?;
+        let schema = self.resolve_schema_for_selector::<BatchResourceError>(&selector.kind)?;
 
         let groups = group_batch_resource_refs(selector);
 
         let resolution_response = resolve_batch_ids(
             self.generic_resource_query_service.as_ref(),
             &target_account.id,
-            &kind,
+            &schema,
             groups,
         )
         .await?;
@@ -718,31 +701,23 @@ impl LocalResourceFacadeImpl {
                     id,
                 )))
                 .and_then(|snapshot| {
-                    ensure_kind_matches::<ResourceLookupProblem>(
+                    ensure_schema_matches::<ResourceLookupProblem>(
                         snapshot.id,
-                        &kind,
-                        &snapshot.kind,
-                    )?;
-                    ensure_requested_api_version::<ResourceLookupProblem>(
-                        api_version.as_ref(),
-                        &snapshot.api_version,
+                        &schema,
+                        &snapshot.schema,
                     )?;
                     Ok(snapshot)
                 }) {
                 Ok(snapshot) => {
-                    if !descriptors_by_key
-                        .contains_key(&(snapshot.kind.clone(), snapshot.api_version.clone()))
-                    {
+                    if !names_by_schema.contains_key(&snapshot.schema) {
                         return Err(UnsupportedResourceDescriptorError::NotFound {
-                            kind: snapshot.kind.clone(),
-                            api_version: snapshot.api_version.clone(),
+                            schema: snapshot.schema.clone(),
                         }
                         .into());
                     }
 
                     let resource = ResourceView {
-                        kind: snapshot.kind,
-                        api_version: snapshot.api_version,
+                        schema: snapshot.schema,
                         account: ResourceViewAccount {
                             id: target_account.id.clone(),
                             name: Some(target_account.name.clone()),
@@ -776,11 +751,10 @@ impl LocalResourceFacadeImpl {
     async fn resolve_id_identity_groups(
         &self,
         account_id: &odf::AccountID,
-        kind: &str,
-        api_version: Option<&String>,
+        schema: &str,
         id_entries: BatchIdEntries,
         mut problems: Vec<BatchResourceProblem<ResourceLookupProblem>>,
-        descriptors_by_key: &HashMap<(String, String), String>,
+        names_by_schema: &HashMap<String, String>,
     ) -> Result<
         (
             Vec<IndexedResource<ResourceIdentityView>>,
@@ -805,17 +779,11 @@ impl LocalResourceFacadeImpl {
                 .cloned()
                 .ok_or_else(|| id_not_found(id));
             match row_result.and_then(|row| {
-                validate_identity_row(
-                    row,
-                    kind,
-                    api_version,
-                    ensure_kind_matches::<ResourceLookupProblem>,
-                    ensure_requested_api_version::<ResourceLookupProblem>,
-                )
+                validate_identity_row(row, schema, ensure_schema_matches::<ResourceLookupProblem>)
             }) {
                 Ok(row) => {
                     let identity =
-                        resource_identity_from_row::<BatchResourceError>(row, descriptors_by_key)?;
+                        resource_identity_from_row::<BatchResourceError>(row, names_by_schema)?;
                     identities.push(IndexedResource {
                         request_index,
                         item: identity,
@@ -834,9 +802,9 @@ impl LocalResourceFacadeImpl {
         Ok((identities, problems))
     }
 
-    async fn resolve_snapshot_for_kind<E>(
+    async fn resolve_snapshot_for_schema<E>(
         &self,
-        kind: &str,
+        schema: &str,
         account_id: &odf::AccountID,
         id: ResourceID,
     ) -> Result<ResourceSnapshot, E>
@@ -847,7 +815,7 @@ impl LocalResourceFacadeImpl {
             return Err(ResourceLookupProblem::IDNotFound(ResourceIDNotFoundError(id)).into());
         };
 
-        ensure_kind_matches::<E>(id, kind, &snapshot.kind)?;
+        ensure_schema_matches::<E>(id, schema, &snapshot.schema)?;
 
         Ok(snapshot)
     }
@@ -874,8 +842,7 @@ impl LocalResourceFacadeImpl {
 
     async fn ensure_manifest_id_is_accessible(
         &self,
-        kind: &str,
-        api_version: &str,
+        schema: &str,
         account_id: &odf::AccountID,
         maybe_id: Option<ResourceID>,
     ) -> Result<(), ApplyManifestError> {
@@ -887,15 +854,10 @@ impl LocalResourceFacadeImpl {
             return Err(ResourceIDNotFoundError(id).into());
         };
 
-        if snapshot.kind != kind || snapshot.api_version != api_version {
-            return Err(ResourceTypeMismatchError::new(
-                id,
-                kind.to_string(),
-                api_version.to_string(),
-                snapshot.kind,
-                snapshot.api_version,
-            )
-            .into());
+        if snapshot.schema != schema {
+            return Err(
+                ResourceTypeMismatchError::new(id, schema.to_string(), snapshot.schema).into(),
+            );
         }
 
         Ok(())
@@ -909,9 +871,7 @@ impl LocalResourceFacadeImpl {
     where
         E: From<InternalError>,
     {
-        if let Some(d) =
-            self.try_resolve_spec_view_dispatcher(&view.kind, &view.api_version, spec_view_mode)
-        {
+        if let Some(d) = self.try_resolve_spec_view_dispatcher(&view.schema, spec_view_mode) {
             let spec = std::mem::replace(&mut view.spec, serde_json::Value::Null);
             view.spec = d.reveal_spec(spec).map_err(E::from)?;
         }
@@ -927,11 +887,10 @@ impl LocalResourceFacadeImpl {
         E: From<InternalError>,
     {
         // Dispatcher is resolved once from the first item; all items in a batch share
-        // the same kind/api_version, so this avoids redundant catalog lookups.
-        // If multi-version batches become supported, resolve per item instead.
-        let maybe_dispatcher = resources.first().and_then(|r| {
-            self.try_resolve_spec_view_dispatcher(&r.item.kind, &r.item.api_version, spec_view_mode)
-        });
+        // the same schema, so this avoids redundant catalog lookups.
+        let maybe_dispatcher = resources
+            .first()
+            .and_then(|r| self.try_resolve_spec_view_dispatcher(&r.item.schema, spec_view_mode));
 
         if let Some(d) = maybe_dispatcher {
             for resource in resources.iter_mut() {
@@ -948,24 +907,23 @@ impl LocalResourceFacadeImpl {
         request: ApplyManifestRequest,
     ) -> Result<PreparedApplyManifest, ApplyManifestError> {
         let manifest = parse_manifest(request.format, &request.manifest)?;
+        ResourceSchema::parse(&manifest.schema).map_err(|err| ParseResourceManifestError {
+            message: err.to_string(),
+        })?;
 
         let target_account = self
             .resource_account_resolver
             .resolve_target_account(manifest.headers.account.as_ref())
             .await?;
 
-        let dispatcher = get_resource_crud_dispatcher::<ApplyManifestError>(
-            &self.catalog,
-            &manifest.kind,
-            &manifest.api_version,
-        )?;
+        let dispatcher =
+            get_resource_crud_dispatcher::<ApplyManifestError>(&self.catalog, &manifest.schema)?;
 
         let headers = make_headers_input(&manifest, &target_account)?;
         let header_warnings = collect_manifest_header_warnings(&manifest);
 
         self.ensure_manifest_id_is_accessible(
-            &manifest.kind,
-            &manifest.api_version,
+            &manifest.schema,
             &target_account.id,
             manifest.headers.id,
         )
@@ -983,12 +941,11 @@ impl LocalResourceFacadeImpl {
 
     fn try_resolve_spec_view_dispatcher(
         &self,
-        kind: &str,
-        api_version: &str,
+        schema: &str,
         spec_view_mode: SpecViewMode,
     ) -> Option<Arc<dyn ResourceSpecViewDispatcher>> {
         if spec_view_mode == SpecViewMode::Revealed {
-            get_resource_spec_view_dispatcher_from_catalog(&self.catalog, kind, api_version)
+            get_resource_spec_view_dispatcher_from_catalog(&self.catalog, schema)
         } else {
             None
         }

@@ -26,8 +26,8 @@ use pretty_assertions::{assert_eq, assert_matches};
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
 use crate::helpers::{
-    VARIABLE_SET_API_VERSION,
     VARIABLE_SET_KIND,
+    VARIABLE_SET_SCHEMA,
     assert_applied_outcome,
     assert_planning_outcome,
     assert_resource_view_fields,
@@ -37,11 +37,10 @@ use crate::helpers::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn make_selector(kind: &str, api_version: &str, name: &str) -> ResourceSelector {
+fn make_selector(kind: &str, _schema: &str, name: &str) -> ResourceSelector {
     ResourceSelector {
         account: None,
         kind: kind.to_string(),
-        api_version: Some(api_version.to_string()),
         resource_ref: ResourceRef::ByName(name.to_string()),
     }
 }
@@ -72,14 +71,14 @@ pub async fn test_plan_create_json(h: &impl FacadeContractHarness) {
     assert_resource_view_fields(
         &plan.resource,
         VARIABLE_SET_KIND,
-        VARIABLE_SET_API_VERSION,
+        VARIABLE_SET_SCHEMA,
         "my-vars",
     );
 
     // Verify no side effect - resource must not exist yet
     let get_result = facade
         .get(
-            make_selector(VARIABLE_SET_KIND, VARIABLE_SET_API_VERSION, "my-vars"),
+            make_selector(VARIABLE_SET_KIND, VARIABLE_SET_SCHEMA, "my-vars"),
             SpecViewMode::Encrypted,
         )
         .await;
@@ -115,14 +114,14 @@ pub async fn test_plan_create_yaml(h: &impl FacadeContractHarness) {
     assert_resource_view_fields(
         &plan.resource,
         VARIABLE_SET_KIND,
-        VARIABLE_SET_API_VERSION,
+        VARIABLE_SET_SCHEMA,
         "my-yaml-vars",
     );
 
     // Verify no side effect - resource must not exist yet
     let get_result = facade
         .get(
-            make_selector(VARIABLE_SET_KIND, VARIABLE_SET_API_VERSION, "my-yaml-vars"),
+            make_selector(VARIABLE_SET_KIND, VARIABLE_SET_SCHEMA, "my-yaml-vars"),
             SpecViewMode::Encrypted,
         )
         .await;
@@ -173,7 +172,7 @@ pub async fn test_plan_update(h: &impl FacadeContractHarness) {
     // Resource in store must remain unchanged (no side effect)
     let stored = facade
         .get(
-            make_selector(VARIABLE_SET_KIND, VARIABLE_SET_API_VERSION, "plan-upd-vars"),
+            make_selector(VARIABLE_SET_KIND, VARIABLE_SET_SCHEMA, "plan-upd-vars"),
             SpecViewMode::Encrypted,
         )
         .await
@@ -231,8 +230,9 @@ pub async fn test_plan_rejects_malformed_manifest(h: &impl FacadeContractHarness
         })
         .await;
 
-    assert!(
-        matches!(result, Err(ApplyManifestError::ParseManifest(_))),
+    assert_matches!(
+        result,
+        Err(ApplyManifestError::ParseManifest(_)),
         "malformed JSON must produce ParseManifest error, got: {result:?}"
     );
 
@@ -243,13 +243,12 @@ pub async fn test_plan_rejects_malformed_manifest(h: &impl FacadeContractHarness
         })
         .await;
 
-    assert!(
-        matches!(result_yaml, Err(ApplyManifestError::ParseManifest(_))),
+    assert_matches!(
+        result_yaml,
+        Err(ApplyManifestError::ParseManifest(_)),
         "malformed YAML must produce ParseManifest error, got: {result_yaml:?}"
     );
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // RF-015
 contract_test!(
@@ -262,8 +261,7 @@ pub async fn test_plan_rejects_schema_invalid_manifest(h: &impl FacadeContractHa
 
     // Missing `spec` field entirely — fails spec deserialization
     let bad_manifest = serde_json::json!({
-        "apiVersion": VARIABLE_SET_API_VERSION,
-        "kind": VARIABLE_SET_KIND,
+        "$schema": VARIABLE_SET_SCHEMA,
         "headers": {"name": "schema-invalid-vars"}
         // no "spec"
     })
@@ -291,7 +289,7 @@ pub async fn test_plan_rejects_schema_invalid_manifest(h: &impl FacadeContractHa
         .get(
             make_selector(
                 VARIABLE_SET_KIND,
-                VARIABLE_SET_API_VERSION,
+                VARIABLE_SET_SCHEMA,
                 "schema-invalid-vars",
             ),
             SpecViewMode::Encrypted,
@@ -324,8 +322,7 @@ pub async fn test_apply_rejects_business_invalid_spec(h: &impl FacadeContractHar
     // VariableSetSpec::validate() inside the lifecycle; the facade surfaces
     // this as Ok(Rejected(BusinessValidationFailed)).
     let empty_vars = serde_json::json!({
-        "apiVersion": VARIABLE_SET_API_VERSION,
-        "kind": VARIABLE_SET_KIND,
+        "$schema": VARIABLE_SET_SCHEMA,
         "headers": {"name": "biz-invalid-vars"},
         "spec": {"variables": {}}
     })
@@ -374,11 +371,7 @@ pub async fn test_apply_rejects_business_invalid_spec(h: &impl FacadeContractHar
     // Resource must not have been created
     let get = facade
         .get(
-            make_selector(
-                VARIABLE_SET_KIND,
-                VARIABLE_SET_API_VERSION,
-                "biz-invalid-vars",
-            ),
+            make_selector(VARIABLE_SET_KIND, VARIABLE_SET_SCHEMA, "biz-invalid-vars"),
             SpecViewMode::Encrypted,
         )
         .await;
@@ -406,7 +399,7 @@ pub async fn test_apply_create_json(h: &impl FacadeContractHarness) {
         .unwrap();
 
     let view = assert_applied_outcome(&decision, ApplyResourceOutcome::Created);
-    assert_resource_view_fields(view, VARIABLE_SET_KIND, VARIABLE_SET_API_VERSION, "alpha");
+    assert_resource_view_fields(view, VARIABLE_SET_KIND, VARIABLE_SET_SCHEMA, "alpha");
     assert_eq!(view.headers.generation, 1, "initial generation must be 1");
 
     let id = view.headers.id;
@@ -414,18 +407,13 @@ pub async fn test_apply_create_json(h: &impl FacadeContractHarness) {
     // Verify resource is readable via get
     let fetched = facade
         .get(
-            make_selector(VARIABLE_SET_KIND, VARIABLE_SET_API_VERSION, "alpha"),
+            make_selector(VARIABLE_SET_KIND, VARIABLE_SET_SCHEMA, "alpha"),
             SpecViewMode::Encrypted,
         )
         .await
         .unwrap();
     assert_eq!(fetched.headers.id, id, "id must match after apply");
-    assert_resource_view_fields(
-        &fetched,
-        VARIABLE_SET_KIND,
-        VARIABLE_SET_API_VERSION,
-        "alpha",
-    );
+    assert_resource_view_fields(&fetched, VARIABLE_SET_KIND, VARIABLE_SET_SCHEMA, "alpha");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -446,18 +434,13 @@ pub async fn test_apply_create_yaml(h: &impl FacadeContractHarness) {
         .unwrap();
 
     let view = assert_applied_outcome(&decision, ApplyResourceOutcome::Created);
-    assert_resource_view_fields(
-        view,
-        VARIABLE_SET_KIND,
-        VARIABLE_SET_API_VERSION,
-        "yaml-vars",
-    );
+    assert_resource_view_fields(view, VARIABLE_SET_KIND, VARIABLE_SET_SCHEMA, "yaml-vars");
     assert_eq!(view.headers.generation, 1, "initial generation must be 1");
 
     // Semantic equivalence: same resource via get, just like after JSON apply
     let fetched = facade
         .get(
-            make_selector(VARIABLE_SET_KIND, VARIABLE_SET_API_VERSION, "yaml-vars"),
+            make_selector(VARIABLE_SET_KIND, VARIABLE_SET_SCHEMA, "yaml-vars"),
             SpecViewMode::Encrypted,
         )
         .await
@@ -466,7 +449,7 @@ pub async fn test_apply_create_yaml(h: &impl FacadeContractHarness) {
     assert_resource_view_fields(
         &fetched,
         VARIABLE_SET_KIND,
-        VARIABLE_SET_API_VERSION,
+        VARIABLE_SET_SCHEMA,
         "yaml-vars",
     );
 }
@@ -519,7 +502,7 @@ pub async fn test_apply_update(h: &impl FacadeContractHarness) {
     // Verify via get
     let fetched = facade
         .get(
-            make_selector(VARIABLE_SET_KIND, VARIABLE_SET_API_VERSION, "upd-vars"),
+            make_selector(VARIABLE_SET_KIND, VARIABLE_SET_SCHEMA, "upd-vars"),
             SpecViewMode::Encrypted,
         )
         .await
@@ -589,8 +572,7 @@ pub async fn test_apply_rejects_duplicate_header_key(h: &impl FacadeContractHarn
     // parse error. Expected: Err(ParseManifest).
     let yaml_with_dup_label = indoc::indoc!(
         r#"
-        apiVersion: "kamu.dev/v1alpha1"
-        kind: VariableSet
+        $schema: https://opendatafabric.org/schemas/config/v1alpha1/VariableSet
         headers:
           name: dup-label-yaml
           labels:
@@ -622,8 +604,7 @@ pub async fn test_apply_rejects_duplicate_header_key(h: &impl FacadeContractHarn
     // matching YAML behavior. Both formats are consistently rejected.
     let json_with_dup_label = indoc::indoc!(
         r#"{
-            "apiVersion": "kamu.dev/v1alpha1",
-            "kind": "VariableSet",
+            "$schema": VARIABLE_SET_SCHEMA,
             "headers": {
                 "name": "dup-label-json",
                 "labels": {"env": "prod", "env": "staging"}
@@ -662,8 +643,7 @@ pub async fn test_apply_rejects_invalid_headers(h: &impl FacadeContractHarness) 
     let facade = h.facade_for(TestAccount::Alice);
 
     let empty_name_manifest = serde_json::json!({
-        "apiVersion": VARIABLE_SET_API_VERSION,
-        "kind": VARIABLE_SET_KIND,
+        "$schema": VARIABLE_SET_SCHEMA,
         "headers": {"name": ""},
         "spec": {"variables": {"K": {"value": "v"}}}
     })
@@ -694,27 +674,26 @@ pub async fn test_apply_rejects_invalid_headers(h: &impl FacadeContractHarness) 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// RF-143 / apply error taxonomy — InvalidSpec carries kind and api_version
+// RF-143 / apply error taxonomy — InvalidSpec carries schema
 // Verifies that the remote facade reconstructs InvalidSpec with the correct
-// kind and api_version fields (previously both were empty strings on the
+// schema fields (previously both were empty strings on the
 // remote path due to the lossy ResourceApplyError shape).
 // Uses a spec where `variables` is a string instead of an object — this fails
 // JSON deserialization and therefore hits InvalidSpec, not
 // BusinessValidationFailed.
 contract_test!(
-    apply_invalid_spec_carries_kind_and_api_version,
-    super::test_apply_invalid_spec_carries_kind_and_api_version
+    apply_invalid_spec_carries_schema,
+    super::test_apply_invalid_spec_carries_schema
 );
 
-pub async fn test_apply_invalid_spec_carries_kind_and_api_version(h: &impl FacadeContractHarness) {
+pub async fn test_apply_invalid_spec_carries_schema(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
     // `variables` is a string, not an object — fails serde deserialization →
     // InvalidSpec
     let malformed_spec = serde_json::json!({
-        "apiVersion": VARIABLE_SET_API_VERSION,
-        "kind": VARIABLE_SET_KIND,
-        "headers": {"name": "spec-kind-check"},
+        "$schema": VARIABLE_SET_SCHEMA,
+        "headers": {"name": "spec-schema-check"},
         "spec": {"variables": "not-an-object"}
     })
     .to_string();
@@ -729,12 +708,8 @@ pub async fn test_apply_invalid_spec_carries_kind_and_api_version(h: &impl Facad
     match result {
         Err(ApplyManifestError::InvalidSpec(e)) => {
             assert_eq!(
-                e.kind, VARIABLE_SET_KIND,
-                "InvalidSpec must carry the correct kind"
-            );
-            assert_eq!(
-                e.api_version, VARIABLE_SET_API_VERSION,
-                "InvalidSpec must carry the correct api_version"
+                e.schema, VARIABLE_SET_SCHEMA,
+                "InvalidSpec must carry the correct schema"
             );
         }
         other => panic!("expected Err(InvalidSpec), got: {other:?}"),

@@ -176,7 +176,7 @@ where
                     .with_context(format!(
                         "account_id={}, kind='{}', name='{}'",
                         headers_input.account,
-                        R::DESCRIPTOR.resource_type,
+                        R::DESCRIPTOR.schema,
                         headers_input.name
                     )),
             ));
@@ -209,7 +209,7 @@ where
                         .with_context(format!(
                             "account_id={}, kind='{}', name='{}'",
                             plan.resource.headers().account,
-                            R::DESCRIPTOR.resource_type,
+                            R::DESCRIPTOR.schema,
                             plan.resource.headers().name
                         )),
                 )),

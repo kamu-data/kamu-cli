@@ -42,8 +42,9 @@ use pretty_assertions::assert_matches;
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
 use crate::helpers::{
-    VARIABLE_SET_API_VERSION,
+    SECRET_SET_KIND,
     VARIABLE_SET_KIND,
+    VARIABLE_SET_SCHEMA,
     assert_applied_outcome,
     variable_set_manifest_json,
 };
@@ -54,7 +55,6 @@ fn by_name(name: &str) -> ResourceSelector {
     ResourceSelector {
         account: None,
         kind: VARIABLE_SET_KIND.to_string(),
-        api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
         resource_ref: ResourceRef::ByName(name.to_string()),
     }
 }
@@ -63,7 +63,6 @@ fn by_id(id: &kamu_resources::ResourceID) -> ResourceSelector {
     ResourceSelector {
         account: None,
         kind: VARIABLE_SET_KIND.to_string(),
-        api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
         resource_ref: ResourceRef::ById(*id),
     }
 }
@@ -72,7 +71,6 @@ fn batch_by_name(name: &str) -> ResourceBatchSelector {
     ResourceBatchSelector {
         account: None,
         kind: VARIABLE_SET_KIND.to_string(),
-        api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
         resource_refs: vec![ResourceRef::ByName(name.to_string())],
     }
 }
@@ -81,7 +79,6 @@ fn batch_by_id(id: kamu_resources::ResourceID) -> ResourceBatchSelector {
     ResourceBatchSelector {
         account: None,
         kind: VARIABLE_SET_KIND.to_string(),
-        api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
         resource_refs: vec![ResourceRef::ById(id)],
     }
 }
@@ -206,37 +203,36 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
         "delete: expected UIDNotFound"
     );
 
-    // --- ApiVersionMismatch ---
-    let wrong_version = ResourceSelector {
+    // --- SchemaMismatch ---
+    let wrong_schema_selector = ResourceSelector {
         account: None,
-        kind: VARIABLE_SET_KIND.to_string(),
-        api_version: Some("v0.never.existed".to_string()),
+        kind: SECRET_SET_KIND.to_string(),
         resource_ref: ResourceRef::ById(id),
     };
 
     let get = facade
-        .get(wrong_version.clone(), SpecViewMode::Encrypted)
+        .get(wrong_schema_selector.clone(), SpecViewMode::Encrypted)
         .await;
     assert_matches!(
         get,
         Err(GetResourceError::LookupProblem(
-            ResourceLookupProblem::ApiVersionMismatch(_)
+            ResourceLookupProblem::SchemaMismatch(_)
         )),
-        "get: expected ApiVersionMismatch"
+        "get: expected SchemaMismatch"
     );
 
-    let get_id = facade.get_identity(wrong_version.clone()).await;
+    let get_id = facade.get_identity(wrong_schema_selector.clone()).await;
     assert_matches!(
         get_id,
         Err(GetResourceError::LookupProblem(
-            ResourceLookupProblem::ApiVersionMismatch(_)
+            ResourceLookupProblem::SchemaMismatch(_)
         )),
-        "get_identity: expected ApiVersionMismatch"
+        "get_identity: expected SchemaMismatch"
     );
 
     let render = facade
         .render_manifest(
-            wrong_version.clone(),
+            wrong_schema_selector.clone(),
             ResourceManifestFormat::Json,
             SpecViewMode::Encrypted,
         )
@@ -244,18 +240,18 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
     assert_matches!(
         render,
         Err(RenderResourceManifestError::LookupProblem(
-            ResourceLookupProblem::ApiVersionMismatch(_)
+            ResourceLookupProblem::SchemaMismatch(_)
         )),
-        "render_manifest: expected ApiVersionMismatch"
+        "render_manifest: expected SchemaMismatch"
     );
 
-    let del = facade.delete(wrong_version).await;
+    let del = facade.delete(wrong_schema_selector).await;
     assert_matches!(
         del,
         Err(DeleteResourceError::LookupProblem(
-            ResourceLookupProblem::ApiVersionMismatch(_)
+            ResourceLookupProblem::SchemaMismatch(_)
         )),
-        "delete: expected ApiVersionMismatch"
+        "delete: expected SchemaMismatch"
     );
 }
 
@@ -358,7 +354,6 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
             ResourceSelector {
                 account: Some(unknown_account.clone()),
                 kind: VARIABLE_SET_KIND.to_string(),
-                api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
                 resource_ref: ResourceRef::ByName("bad-acct-get".to_string()),
             },
             SpecViewMode::Encrypted,
@@ -376,7 +371,6 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
             ResourceBatchSelector {
                 account: Some(unknown_account.clone()),
                 kind: VARIABLE_SET_KIND.to_string(),
-                api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
                 resource_refs: vec![ResourceRef::ByName("bad-acct-get-many".to_string())],
             },
             SpecViewMode::Encrypted,
@@ -394,7 +388,6 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
             ResourceSelector {
                 account: Some(unknown_account.clone()),
                 kind: VARIABLE_SET_KIND.to_string(),
-                api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
                 resource_ref: ResourceRef::ByName("bad-acct-render".to_string()),
             },
             ResourceManifestFormat::Json,
@@ -412,7 +405,6 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
         .delete(ResourceSelector {
             account: Some(unknown_account.clone()),
             kind: VARIABLE_SET_KIND.to_string(),
-            api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
             resource_ref: ResourceRef::ByName("bad-acct-delete".to_string()),
         })
         .await;
@@ -427,7 +419,6 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
         .delete_many(ResourceBatchSelector {
             account: Some(unknown_account.clone()),
             kind: VARIABLE_SET_KIND.to_string(),
-            api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
             resource_refs: vec![ResourceRef::ByName("bad-acct-delete-many".to_string())],
         })
         .await;
@@ -481,8 +472,7 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
         .apply_manifest(ApplyManifestRequest {
             format: ResourceManifestFormat::Json,
             manifest: serde_json::json!({
-                "apiVersion": VARIABLE_SET_API_VERSION,
-                "kind": VARIABLE_SET_KIND,
+                "$schema": VARIABLE_SET_SCHEMA,
                 "headers": {
                     "name": "bad-acct-apply",
                     "account": { "name": "unknown-resource-contract-account" }
@@ -527,14 +517,11 @@ pub async fn test_apply_rejection_taxonomy(h: &impl FacadeContractHarness) {
     // Empty variables map deserializes correctly but fails
     // VariableSetSpec::validate() inside the lifecycle; both plan and apply
     // return Ok(Rejected(BusinessValidationFailed)).
-    let empty_vars_manifest = indoc::indoc!(
-        r#"{
-            "apiVersion": "kamu.dev/v1alpha1",
-            "kind": "VariableSet",
-            "headers": {"name": "tax-biz-invalid"},
-            "spec": {"variables": {}}
-        }"#
-    )
+    let empty_vars_manifest = serde_json::json!({
+        "$schema": VARIABLE_SET_SCHEMA,
+        "headers": {"name": "tax-biz-invalid"},
+        "spec": {"variables": {}}
+    })
     .to_string();
 
     let plan_result = facade
