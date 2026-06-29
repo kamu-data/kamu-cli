@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use kamu_resources::ResourceUID;
+use kamu_resources::ResourceID;
 use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -25,10 +25,10 @@ pub enum ReplaceDatasetBindingsError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Error, Debug)]
-#[error("Duplicate dataset binding for dataset '{dataset_id}' and resource '{resource_uid}'")]
+#[error("Duplicate dataset binding for dataset '{dataset_id}' and resource '{resource_id}'")]
 pub struct DatasetResourceBindingDuplicateError {
     pub dataset_id: odf::DatasetID,
-    pub resource_uid: ResourceUID,
+    pub resource_id: ResourceID,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

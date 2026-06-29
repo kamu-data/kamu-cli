@@ -59,7 +59,7 @@ where
         (None, E::Created(e)) => {
             let pending_status = TModel::StatusProjector::new_pending(&e.spec);
             Ok(ResourceState::new(
-                e.uid,
+                e.id,
                 ResourceHeaders::from_input(e.event_time, e.headers),
                 e.spec,
                 pending_status,
@@ -72,7 +72,7 @@ where
         }
 
         (Some(mut s), E::HeadersUpdated(e)) => {
-            assert_eq!(s.uid(), &e.uid);
+            assert_eq!(s.id(), &e.id);
 
             s.headers_mut().apply_update(e.event_time, e.new_headers);
 
@@ -80,7 +80,7 @@ where
         }
 
         (Some(mut s), E::SpecUpdated(e)) => {
-            assert_eq!(s.uid(), &e.uid);
+            assert_eq!(s.id(), &e.id);
 
             *s.spec_mut() = e.new_spec;
             s.headers_mut().generation = e.new_generation;
@@ -97,7 +97,7 @@ where
         }
 
         (Some(mut s), E::Deleted(e)) => {
-            assert_eq!(s.uid(), &e.uid);
+            assert_eq!(s.id(), &e.id);
 
             s.headers_mut().deleted_at = Some(e.event_time);
             s.headers_mut().updated_at = e.event_time;
@@ -107,7 +107,7 @@ where
         }
 
         (Some(mut s), E::ReconciliationStarted(e)) => {
-            assert_eq!(s.uid(), &e.uid);
+            assert_eq!(s.id(), &e.id);
 
             s.status_mut()
                 .resource_status_mut()
@@ -117,7 +117,7 @@ where
         }
 
         (Some(mut s), E::ReconciliationSucceeded(e)) => {
-            assert_eq!(s.uid(), &e.uid);
+            assert_eq!(s.id(), &e.id);
 
             s.status_mut()
                 .resource_status_mut()
@@ -128,7 +128,7 @@ where
         }
 
         (Some(mut s), E::ReconciliationFailed(e)) => {
-            assert_eq!(s.uid(), &e.uid);
+            assert_eq!(s.id(), &e.id);
 
             s.status_mut().resource_status_mut().mark_failed(
                 e.event_time,

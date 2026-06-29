@@ -38,11 +38,11 @@ harness struct. This keeps test code discoverable, namespaced, and self-containe
 async fn test_second_write_is_visible_across_accounts() {
     let harness = MyHarness::new();
 
-    harness.save_events("alice", uid, vec![created.clone()]).await;
-    let prev_id = harness.get_last_event_id("alice", uid).await;
-    harness.save_events_after("bob", uid, prev_id, vec![updated.clone()]).await;
+    harness.save_events("alice", id, vec![created.clone()]).await;
+    let prev_id = harness.get_last_event_id("alice", id).await;
+    harness.save_events_after("bob", id, prev_id, vec![updated.clone()]).await;
 
-    let events = harness.get_events_for("alice", uid).await;
+    let events = harness.get_events_for("alice", id).await;
     assert_eq!(events.len(), 2);
 }
 ```
@@ -54,7 +54,7 @@ describes the scenario, not the plumbing.
 
 ```rust
 // Bad: free helper function — put it on the harness instead
-async fn save_and_get(svc: &FooService, uid: ResourceUID) -> Vec<Event> { ... }
+async fn save_and_get(svc: &FooService, id: ResourceID) -> Vec<Event> { ... }
 
 // Bad: catalog / service resolution inside a test body
 let catalog = CatalogBuilder::new_chained(&harness.base_catalog).build();
@@ -62,7 +62,7 @@ let svc = catalog.get_one::<FooService>().unwrap();
 
 // Bad: stream boilerplate inside a test body
 let events = harness.bridge()
-    .get_events(&uid, GetEventsOpts::default())
+    .get_events(&id, GetEventsOpts::default())
     .map(|r| r.unwrap().1)
     .collect::<Vec<_>>()
     .await;
@@ -145,17 +145,17 @@ Each method unwraps internally; tests never see `Result` or stream chains.
 
 ```rust
 impl MyHarness {
-    async fn get_events_for(&self, account: &str, uid: ResourceUID) -> Vec<TestEvent> {
+    async fn get_events_for(&self, account: &str, id: ResourceID) -> Vec<TestEvent> {
         self.state_svc(account)
-            .get_events(&uid, GetEventsOpts::default())
+            .get_events(&id, GetEventsOpts::default())
             .map(|r| r.unwrap().1)
             .collect()
             .await
     }
 
-    async fn get_last_event_id(&self, account: &str, uid: ResourceUID) -> EventID {
+    async fn get_last_event_id(&self, account: &str, id: ResourceID) -> EventID {
         self.state_svc(account)
-            .get_events(&uid, GetEventsOpts::default())
+            .get_events(&id, GetEventsOpts::default())
             .collect::<Vec<_>>()
             .await
             .into_iter()
@@ -168,11 +168,11 @@ impl MyHarness {
     async fn save_events(
         &self,
         account: &str,
-        uid: ResourceUID,
+        id: ResourceID,
         events: Vec<TestEvent>,
     ) -> EventID {
         self.state_svc(account)
-            .save_events(&uid, None, events)
+            .save_events(&id, None, events)
             .await
             .unwrap()
     }
@@ -180,12 +180,12 @@ impl MyHarness {
     async fn save_events_after(
         &self,
         account: &str,
-        uid: ResourceUID,
+        id: ResourceID,
         prev_id: EventID,
         events: Vec<TestEvent>,
     ) -> EventID {
         self.state_svc(account)
-            .save_events(&uid, Some(prev_id), events)
+            .save_events(&id, Some(prev_id), events)
             .await
             .unwrap()
     }

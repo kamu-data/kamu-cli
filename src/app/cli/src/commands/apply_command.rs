@@ -659,7 +659,7 @@ impl ApplyPrinter<'_> {
         #[derive(serde::Serialize)]
         #[serde(rename_all = "camelCase")]
         struct RenderedResourceViewHeaders<'a> {
-            uid: &'a kamu_resources::ResourceUID,
+            id: &'a kamu_resources::ResourceID,
             account: &'a kamu_resources::ResourceViewAccount,
             name: &'a str,
             description: &'a Option<String>,
@@ -674,7 +674,7 @@ impl ApplyPrinter<'_> {
         impl<'a> RenderedResourceViewHeaders<'a> {
             fn new(resource: &'a ResourceView) -> Self {
                 Self {
-                    uid: &resource.headers.uid,
+                    id: &resource.headers.id,
                     account: &resource.account,
                     name: &resource.headers.name,
                     description: &resource.headers.description,

@@ -11,9 +11,9 @@ use kamu_resources::{
     ApplyManifestApplicationDecision,
     ApplyManifestPlanningDecision,
     ApplyResourceOutcome,
+    ResourceID,
     ResourceIdentityView,
     ResourceSummaryView,
-    ResourceUID,
     ResourceView,
 };
 use kamu_resources_facade::BatchResourceResponse;
@@ -51,7 +51,7 @@ pub fn assert_identity_fields(
     expected_kind: &str,
     expected_api_version: &str,
     expected_name: &str,
-    expected_uid: &ResourceUID,
+    expected_uid: &ResourceID,
 ) {
     assert_eq!(identity.kind, expected_kind, "identity kind mismatch");
     assert_eq!(
@@ -59,7 +59,7 @@ pub fn assert_identity_fields(
         "identity api_version mismatch"
     );
     assert_eq!(identity.name, expected_name, "identity name mismatch");
-    assert_eq!(identity.uid, *expected_uid, "identity uid mismatch");
+    assert_eq!(identity.id, *expected_uid, "identity id mismatch");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

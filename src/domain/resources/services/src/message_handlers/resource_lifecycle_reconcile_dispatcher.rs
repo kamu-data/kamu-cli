@@ -32,7 +32,7 @@ macro_rules! declare_resource_lifecycle_reconcile_dispatcher {
                 resource: &kamu_resources::ResourceSnapshot,
             ) -> Result<(), internal_error::InternalError> {
                 self.reconcile_resource_use_case
-                    .execute(&resource.uid)
+                    .execute(&resource.id)
                     .await
                     .map_err(internal_error::ErrorIntoInternal::int_err)
             }

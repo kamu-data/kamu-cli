@@ -12,7 +12,7 @@ use enum_variants::*;
 use event_sourcing::ProjectionEvent;
 use serde::{Deserialize, Serialize};
 
-use crate::{ResourceHeadersInput, ResourceUID};
+use crate::{ResourceHeadersInput, ResourceID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -32,7 +32,7 @@ pub enum ReconcilableResourceEvent<TSpec, TSuccess, TFailureDetails> {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceEventCreated<TSpec> {
     pub event_time: DateTime<Utc>,
-    pub uid: ResourceUID,
+    pub id: ResourceID,
     pub headers: ResourceHeadersInput,
     pub spec: TSpec,
 }
@@ -40,14 +40,14 @@ pub struct ResourceEventCreated<TSpec> {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceEventHeadersUpdated {
     pub event_time: DateTime<Utc>,
-    pub uid: ResourceUID,
+    pub id: ResourceID,
     pub new_headers: ResourceHeadersInput,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceEventSpecUpdated<TSpec> {
     pub event_time: DateTime<Utc>,
-    pub uid: ResourceUID,
+    pub id: ResourceID,
     pub new_spec: TSpec,
     pub new_generation: u64,
 }
@@ -55,21 +55,21 @@ pub struct ResourceEventSpecUpdated<TSpec> {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceEventDeleted {
     pub event_time: DateTime<Utc>,
-    pub uid: ResourceUID,
+    pub id: ResourceID,
     pub tombstone_name: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceEventReconciliationStarted {
     pub event_time: DateTime<Utc>,
-    pub uid: ResourceUID,
+    pub id: ResourceID,
     pub generation: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceEventReconciliationSucceeded<TSuccess> {
     pub event_time: DateTime<Utc>,
-    pub uid: ResourceUID,
+    pub id: ResourceID,
     pub generation: u64,
     pub success: TSuccess,
 }
@@ -77,7 +77,7 @@ pub struct ResourceEventReconciliationSucceeded<TSuccess> {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceEventReconciliationFailed<TFailureDetails> {
     pub event_time: DateTime<Utc>,
-    pub uid: ResourceUID,
+    pub id: ResourceID,
     pub generation: u64,
     pub reason: String,
     pub message: String,
@@ -99,15 +99,15 @@ impl<TSpec, TSuccess, TFailureDetails> ReconcilableResourceEvent<TSpec, TSuccess
         }
     }
 
-    pub fn uid(&self) -> &ResourceUID {
+    pub fn id(&self) -> &ResourceID {
         match self {
-            ReconcilableResourceEvent::Created(e) => &e.uid,
-            ReconcilableResourceEvent::HeadersUpdated(e) => &e.uid,
-            ReconcilableResourceEvent::SpecUpdated(e) => &e.uid,
-            ReconcilableResourceEvent::Deleted(e) => &e.uid,
-            ReconcilableResourceEvent::ReconciliationStarted(e) => &e.uid,
-            ReconcilableResourceEvent::ReconciliationSucceeded(e) => &e.uid,
-            ReconcilableResourceEvent::ReconciliationFailed(e) => &e.uid,
+            ReconcilableResourceEvent::Created(e) => &e.id,
+            ReconcilableResourceEvent::HeadersUpdated(e) => &e.id,
+            ReconcilableResourceEvent::SpecUpdated(e) => &e.id,
+            ReconcilableResourceEvent::Deleted(e) => &e.id,
+            ReconcilableResourceEvent::ReconciliationStarted(e) => &e.id,
+            ReconcilableResourceEvent::ReconciliationSucceeded(e) => &e.id,
+            ReconcilableResourceEvent::ReconciliationFailed(e) => &e.id,
         }
     }
 
@@ -126,15 +126,15 @@ impl<TSpec, TSuccess, TFailureDetails> ReconcilableResourceEvent<TSpec, TSuccess
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<TSpec, TSuccess, TFailureDetails> ProjectionEvent<ResourceUID>
+impl<TSpec, TSuccess, TFailureDetails> ProjectionEvent<ResourceID>
     for ReconcilableResourceEvent<TSpec, TSuccess, TFailureDetails>
 where
     TSpec: std::fmt::Debug + Clone + Send + Sync + 'static,
     TSuccess: std::fmt::Debug + Clone + Send + Sync + 'static,
     TFailureDetails: std::fmt::Debug + Clone + Send + Sync + 'static,
 {
-    fn matches_query(&self, query: &ResourceUID) -> bool {
-        self.uid() == query
+    fn matches_query(&self, query: &ResourceID) -> bool {
+        self.id() == query
     }
 }
 

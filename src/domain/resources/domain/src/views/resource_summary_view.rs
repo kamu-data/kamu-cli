@@ -13,12 +13,12 @@ use serde::{Deserialize, Serialize};
 use crate::{
     ResourceConditionStatus,
     ResourceConditionType,
+    ResourceID,
     ResourceListColumnValueView,
     ResourceName,
     ResourcePhase,
     ResourceSnapshot,
     ResourceStatus,
-    ResourceUID,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -27,7 +27,7 @@ use crate::{
 pub struct ResourceSummaryView {
     pub kind: String,
     pub api_version: String,
-    pub uid: ResourceUID,
+    pub id: ResourceID,
     pub name: ResourceName,
     pub description: Option<String>,
     pub generation: u64,
@@ -55,7 +55,7 @@ impl From<ResourceSnapshot> for ResourceSummaryView {
         Self {
             kind: value.kind,
             api_version: value.api_version,
-            uid: value.uid,
+            id: value.id,
             name: value.headers.name,
             description: value.headers.description,
             generation: value.headers.generation,

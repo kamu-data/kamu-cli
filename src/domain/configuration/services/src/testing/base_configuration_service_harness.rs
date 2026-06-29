@@ -26,7 +26,7 @@ use kamu_configuration_inmem::{
     InMemoryVariableSetProjectionRepository,
 };
 use kamu_datasets::SecretsEncryptionConfig;
-use kamu_resources::{ApplyResourceUseCase, ResourceUID};
+use kamu_resources::{ApplyResourceUseCase, ResourceID};
 use kamu_resources_services::testing::BaseResourceServiceHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -88,8 +88,8 @@ impl BaseConfigurationServiceHarness {
         self.catalog.get_one().unwrap()
     }
 
-    pub async fn allocate_resource_uid(&self) -> ResourceUID {
-        self.base.allocate_resource_uid().await
+    pub async fn allocate_resource_id(&self) -> ResourceID {
+        self.base.allocate_resource_id().await
     }
 
     pub async fn variable_bindings(

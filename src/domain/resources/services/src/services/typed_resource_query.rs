@@ -14,12 +14,12 @@ use tokio_stream::StreamExt;
 use crate::domain::{
     DeclarativeResource,
     ResourceDescriptorProvider,
+    ResourceID,
+    ResourceIDNotFoundError,
     ResourceRawEventQuery,
     ResourceRepository,
     ResourceSnapshot,
     ResourceTypeMismatchError,
-    ResourceUID,
-    ResourceUIDNotFoundError,
     TypedResourceQueryError,
 };
 
@@ -44,21 +44,21 @@ where
         }
     }
 
-    pub async fn load_snapshot_by_uid(
+    pub async fn load_snapshot_by_id(
         &self,
-        uid: &ResourceUID,
+        id: &ResourceID,
     ) -> Result<ResourceSnapshot, TypedResourceQueryError> {
         let snapshot = self
             .resource_repository
-            .find_resource_snapshot_by_uid(uid)
+            .find_resource_snapshot_by_id(id)
             .await?
-            .ok_or(ResourceUIDNotFoundError(*uid))?;
+            .ok_or(ResourceIDNotFoundError(*id))?;
 
         if snapshot.kind != R::DESCRIPTOR.resource_type
             || snapshot.api_version != R::DESCRIPTOR.api_version
         {
             return Err(ResourceTypeMismatchError::new(
-                *uid,
+                *id,
                 R::DESCRIPTOR.resource_type.to_string(),
                 R::DESCRIPTOR.api_version.to_string(),
                 snapshot.kind,
@@ -72,11 +72,11 @@ where
 
     async fn get_snapshot_by_query(
         &self,
-        uid: &ResourceUID,
+        id: &ResourceID,
     ) -> Result<Option<ResourceSnapshot>, InternalError> {
         let query = ResourceRawEventQuery {
             kind: R::DESCRIPTOR.resource_type.to_string(),
-            uid: *uid,
+            id: *id,
         };
 
         self.resource_repository
@@ -89,17 +89,17 @@ impl<R> TypedResourceQueryServiceHelper<'_, R>
 where
     R: DeclarativeResource + ResourceDescriptorProvider,
 {
-    pub async fn get_state_by_uid(
+    pub async fn get_state_by_id(
         &self,
         account_id: odf::AccountID,
-        uid: &ResourceUID,
+        id: &ResourceID,
     ) -> Result<R::ResourceState, TypedResourceQueryError> {
-        let Some(resource_snapshot) = self.get_snapshot_by_query(uid).await? else {
-            return Err(ResourceUIDNotFoundError(*uid).into());
+        let Some(resource_snapshot) = self.get_snapshot_by_query(id).await? else {
+            return Err(ResourceIDNotFoundError(*id).into());
         };
 
         if resource_snapshot.headers.account != account_id {
-            return Err(ResourceUIDNotFoundError(*uid).into());
+            return Err(ResourceIDNotFoundError(*id).into());
         }
 
         if resource_snapshot.kind != R::DESCRIPTOR.resource_type
@@ -138,7 +138,7 @@ where
 
     fn type_mismatch(resource_snapshot: &ResourceSnapshot) -> TypedResourceQueryError {
         ResourceTypeMismatchError::new(
-            resource_snapshot.uid,
+            resource_snapshot.id,
             R::DESCRIPTOR.resource_type.to_string(),
             R::DESCRIPTOR.api_version.to_string(),
             resource_snapshot.kind.clone(),
@@ -164,21 +164,21 @@ macro_rules! declare_typed_resource_query_service {
 
         #[async_trait::async_trait]
         impl kamu_resources::TypedResourceQueryService<$resource> for $service {
-            async fn ensure_resource_uid_matches_type(
+            async fn ensure_resource_id_matches_type(
                 &self,
-                uid: &kamu_resources::ResourceUID,
+                id: &kamu_resources::ResourceID,
             ) -> Result<(), kamu_resources::TypedResourceQueryError> {
                 let helper = $crate::TypedResourceQueryServiceHelper::<$resource>::new(
                     self.resource_repository.as_ref(),
                 );
 
-                helper.load_snapshot_by_uid(uid).await.map(|_| ())
+                helper.load_snapshot_by_id(id).await.map(|_| ())
             }
 
-            async fn get_state_by_uid(
+            async fn get_state_by_id(
                 &self,
                 account_id: odf::AccountID,
-                uid: &kamu_resources::ResourceUID,
+                id: &kamu_resources::ResourceID,
             ) -> Result<
                 <$resource as kamu_resources::DeclarativeResource>::ResourceState,
                 kamu_resources::TypedResourceQueryError,
@@ -187,7 +187,7 @@ macro_rules! declare_typed_resource_query_service {
                     self.resource_repository.as_ref(),
                 );
 
-                helper.get_state_by_uid(account_id, uid).await
+                helper.get_state_by_id(account_id, id).await
             }
 
             async fn list_states_by_kind(

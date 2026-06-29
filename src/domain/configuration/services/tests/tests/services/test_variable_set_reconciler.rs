@@ -37,19 +37,19 @@ async fn test_reconcile_variable_set_populates_projection_entries() {
     let decision = harness
         .apply_variable_use_case()
         .apply(ApplyResourceParams {
-            uid: None,
+            id: None,
             headers: BaseResourceServiceHarness::make_headers_input(account_id, "test-vars"),
             spec,
         })
         .await
         .unwrap();
 
-    let applied_uid = decision.expect_applied().uid;
+    let applied_id = decision.expect_applied().id;
 
     // Reconciliation fires synchronously via OutboxImmediateImpl
     let entries = harness
         .variable_set_projection_repo()
-        .get_latest_entries(&applied_uid)
+        .get_latest_entries(&applied_id)
         .await
         .unwrap();
 
@@ -94,7 +94,7 @@ async fn test_reconcile_variable_set_preserves_entry_id_across_reconciliations()
     let decision = harness
         .apply_variable_use_case()
         .apply(ApplyResourceParams {
-            uid: None,
+            id: None,
             headers: BaseResourceServiceHarness::make_headers_input(
                 account_id.clone(),
                 "test-vars",
@@ -104,11 +104,11 @@ async fn test_reconcile_variable_set_preserves_entry_id_across_reconciliations()
         .await
         .unwrap();
 
-    let uid = decision.expect_applied().uid;
+    let id = decision.expect_applied().id;
 
     let entries_gen1 = harness
         .variable_set_projection_repo()
-        .get_latest_entries(&uid)
+        .get_latest_entries(&id)
         .await
         .unwrap();
     assert_eq!(entries_gen1.len(), 2);
@@ -137,7 +137,7 @@ async fn test_reconcile_variable_set_preserves_entry_id_across_reconciliations()
     let decision2 = harness
         .apply_variable_use_case()
         .apply(ApplyResourceParams {
-            uid: Some(uid),
+            id: Some(id),
             headers: BaseResourceServiceHarness::make_headers_input(
                 account_id.clone(),
                 "test-vars",
@@ -151,7 +151,7 @@ async fn test_reconcile_variable_set_preserves_entry_id_across_reconciliations()
 
     let entries_gen2 = harness
         .variable_set_projection_repo()
-        .get_latest_entries(&uid)
+        .get_latest_entries(&id)
         .await
         .unwrap();
     assert_eq!(entries_gen2.len(), 2);

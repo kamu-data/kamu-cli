@@ -34,10 +34,7 @@ use crate::helpers::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn create_resource(
-    h: &impl FacadeContractHarness,
-    name: &str,
-) -> kamu_resources::ResourceUID {
+async fn create_resource(h: &impl FacadeContractHarness, name: &str) -> kamu_resources::ResourceID {
     let facade = h.facade_for(TestAccount::Alice);
     let manifest = variable_set_manifest_json(name, None, &[("K", "v")]);
     let decision = facade
@@ -48,7 +45,7 @@ async fn create_resource(
         .await
         .unwrap();
     let result = assert_applied_outcome(&decision, ApplyResourceOutcome::Created);
-    result.headers.uid
+    result.headers.id
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -57,8 +54,8 @@ async fn create_resource(
 contract_test!(get_many_all_successes, super::test_get_many_all_successes);
 
 pub async fn test_get_many_all_successes(h: &impl FacadeContractHarness) {
-    let uid_a = create_resource(h, "batch-a").await;
-    let uid_b = create_resource(h, "batch-b").await;
+    let id_a = create_resource(h, "batch-a").await;
+    let id_b = create_resource(h, "batch-b").await;
     let facade = h.facade_for(TestAccount::Alice);
 
     let selector = ResourceBatchSelector {
@@ -67,7 +64,7 @@ pub async fn test_get_many_all_successes(h: &impl FacadeContractHarness) {
         api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
         resource_refs: vec![
             ResourceRef::ByName("batch-a".to_string()),
-            ResourceRef::ById(uid_b),
+            ResourceRef::ById(id_b),
         ],
     };
 
@@ -94,7 +91,7 @@ pub async fn test_get_many_all_successes(h: &impl FacadeContractHarness) {
         VARIABLE_SET_API_VERSION,
         "batch-a",
     );
-    assert_eq!(view_a.headers.uid, uid_a);
+    assert_eq!(view_a.headers.id, id_a);
 
     assert_resource_view_fields(
         view_b,
@@ -102,7 +99,7 @@ pub async fn test_get_many_all_successes(h: &impl FacadeContractHarness) {
         VARIABLE_SET_API_VERSION,
         "batch-b",
     );
-    assert_eq!(view_b.headers.uid, uid_b);
+    assert_eq!(view_b.headers.id, id_b);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -114,8 +111,8 @@ contract_test!(
 );
 
 pub async fn test_get_many_mixed_successes_problems(h: &impl FacadeContractHarness) {
-    let uid_existing = create_resource(h, "mixed-a").await;
-    let absent_uid = kamu_resources::ResourceUID::new(uuid::Uuid::new_v4());
+    let id_existing = create_resource(h, "mixed-a").await;
+    let absent_id = kamu_resources::ResourceID::new(uuid::Uuid::new_v4());
     let facade = h.facade_for(TestAccount::Alice);
 
     let response = facade
@@ -127,8 +124,8 @@ pub async fn test_get_many_mixed_successes_problems(h: &impl FacadeContractHarne
                 resource_refs: vec![
                     ResourceRef::ByName("mixed-a".to_string()), // idx 0 — exists
                     ResourceRef::ByName("no-such-name".to_string()), // idx 1 — missing name
-                    ResourceRef::ById(uid_existing),            // idx 2 — exists by uid
-                    ResourceRef::ById(absent_uid),              // idx 3 — missing uid
+                    ResourceRef::ById(id_existing),             // idx 2 — exists by id
+                    ResourceRef::ById(absent_id),               // idx 3 — missing id
                 ],
             },
             SpecViewMode::Encrypted,
@@ -152,7 +149,7 @@ pub async fn test_get_many_mixed_successes_problems(h: &impl FacadeContractHarne
         "idx 1 must be NameNotFound"
     );
     assert!(
-        matches!(problem_by_index[&3], ResourceLookupProblem::UIDNotFound(_)),
+        matches!(problem_by_index[&3], ResourceLookupProblem::IDNotFound(_)),
         "idx 3 must be UIDNotFound"
     );
 }
@@ -163,7 +160,7 @@ pub async fn test_get_many_mixed_successes_problems(h: &impl FacadeContractHarne
 contract_test!(get_many_duplicate_refs, super::test_get_many_duplicate_refs);
 
 pub async fn test_get_many_duplicate_refs(h: &impl FacadeContractHarness) {
-    let uid = create_resource(h, "dup-ref").await;
+    let id = create_resource(h, "dup-ref").await;
     let facade = h.facade_for(TestAccount::Alice);
 
     let response = facade
@@ -185,7 +182,7 @@ pub async fn test_get_many_duplicate_refs(h: &impl FacadeContractHarness) {
     // Both occurrences succeed and both refer to the same resource.
     assert_batch_indexes(&response, &[0, 1], &[]);
     for s in &response.successes {
-        assert_eq!(s.item.headers.uid, uid, "all dup refs resolve to same uid");
+        assert_eq!(s.item.headers.id, id, "all dup refs resolve to same id");
     }
 }
 
@@ -401,7 +398,7 @@ contract_test!(
 );
 
 pub async fn test_get_many_wrong_api_version(h: &impl FacadeContractHarness) {
-    let uid = create_resource(h, "api-ver-batch").await;
+    let id = create_resource(h, "api-ver-batch").await;
     let facade = h.facade_for(TestAccount::Alice);
 
     let response = facade
@@ -411,7 +408,7 @@ pub async fn test_get_many_wrong_api_version(h: &impl FacadeContractHarness) {
                 kind: VARIABLE_SET_KIND.to_string(),
                 api_version: Some("v0.never.existed".to_string()),
                 resource_refs: vec![
-                    ResourceRef::ById(uid), // idx 0 — exists but wrong api_version
+                    ResourceRef::ById(id), // idx 0 — exists but wrong api_version
                 ],
             },
             SpecViewMode::Encrypted,
@@ -440,7 +437,7 @@ contract_test!(
 
 pub async fn test_get_identities_mirrors_get_many(h: &impl FacadeContractHarness) {
     let uid_a = create_resource(h, "idents-a").await;
-    let absent_uid = kamu_resources::ResourceUID::new(uuid::Uuid::new_v4());
+    let absent_uid = kamu_resources::ResourceID::new(uuid::Uuid::new_v4());
     let facade = h.facade_for(TestAccount::Alice);
 
     let response = facade
@@ -451,14 +448,14 @@ pub async fn test_get_identities_mirrors_get_many(h: &impl FacadeContractHarness
             resource_refs: vec![
                 ResourceRef::ByName("idents-a".to_string()), // idx 0 — exists
                 ResourceRef::ByName("no-such-ident".to_string()), // idx 1 — missing
-                ResourceRef::ById(absent_uid),               // idx 2 — missing uid
+                ResourceRef::ById(absent_uid),               // idx 2 — missing id
             ],
         })
         .await
         .unwrap();
 
     assert_batch_indexes(&response, &[0], &[1, 2]);
-    assert_eq!(response.successes[0].item.uid, uid_a);
+    assert_eq!(response.successes[0].item.id, uid_a);
 
     let problem_by_index: std::collections::HashMap<
         usize,
@@ -470,7 +467,7 @@ pub async fn test_get_identities_mirrors_get_many(h: &impl FacadeContractHarness
         .collect();
 
     assert_matches!(problem_by_index[&1], ResourceLookupProblem::NameNotFound(_));
-    assert_matches!(problem_by_index[&2], ResourceLookupProblem::UIDNotFound(_));
+    assert_matches!(problem_by_index[&2], ResourceLookupProblem::IDNotFound(_));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -482,8 +479,8 @@ contract_test!(
 );
 
 pub async fn test_render_manifests_all_successes(h: &impl FacadeContractHarness) {
-    let uid_a = create_resource(h, "render-a").await;
-    let uid_b = create_resource(h, "render-b").await;
+    let id_a = create_resource(h, "render-a").await;
+    let id_b = create_resource(h, "render-b").await;
     let facade = h.facade_for(TestAccount::Alice);
 
     for format in [
@@ -497,8 +494,8 @@ pub async fn test_render_manifests_all_successes(h: &impl FacadeContractHarness)
                     kind: VARIABLE_SET_KIND.to_string(),
                     api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
                     resource_refs: vec![
-                        ResourceRef::ById(uid_a), // idx 0
-                        ResourceRef::ById(uid_b), // idx 1
+                        ResourceRef::ById(id_a), // idx 0
+                        ResourceRef::ById(id_b), // idx 1
                     ],
                 },
                 format,
@@ -543,7 +540,7 @@ contract_test!(
 
 pub async fn test_render_manifests_mixed_successes_problems(h: &impl FacadeContractHarness) {
     let uid_existing = create_resource(h, "render-mix").await;
-    let absent_uid = kamu_resources::ResourceUID::new(uuid::Uuid::new_v4());
+    let absent_uid = kamu_resources::ResourceID::new(uuid::Uuid::new_v4());
     let facade = h.facade_for(TestAccount::Alice);
 
     let response = facade
@@ -555,7 +552,7 @@ pub async fn test_render_manifests_mixed_successes_problems(h: &impl FacadeContr
                 resource_refs: vec![
                     ResourceRef::ById(uid_existing),                   // idx 0 — exists
                     ResourceRef::ByName("render-missing".to_string()), // idx 1 — missing
-                    ResourceRef::ById(absent_uid),                     // idx 2 — missing uid
+                    ResourceRef::ById(absent_uid),                     // idx 2 — missing id
                 ],
             },
             kamu_resources_facade::ResourceManifestFormat::Json,
@@ -577,7 +574,7 @@ pub async fn test_render_manifests_mixed_successes_problems(h: &impl FacadeContr
         .collect();
 
     assert_matches!(problem_by_index[&1], ResourceLookupProblem::NameNotFound(_));
-    assert_matches!(problem_by_index[&2], ResourceLookupProblem::UIDNotFound(_));
+    assert_matches!(problem_by_index[&2], ResourceLookupProblem::IDNotFound(_));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -589,9 +586,9 @@ contract_test!(
 );
 
 pub async fn test_delete_many_all_successes(h: &impl FacadeContractHarness) {
-    let uid_a = create_resource(h, "del-many-a").await;
-    let uid_b = create_resource(h, "del-many-b").await;
-    let uid_c = create_resource(h, "del-many-c").await;
+    let id_a = create_resource(h, "del-many-a").await;
+    let id_b = create_resource(h, "del-many-b").await;
+    let id_c = create_resource(h, "del-many-c").await;
     let facade = h.facade_for(TestAccount::Alice);
 
     let response = facade
@@ -601,7 +598,7 @@ pub async fn test_delete_many_all_successes(h: &impl FacadeContractHarness) {
             api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
             resource_refs: vec![
                 ResourceRef::ByName("del-many-a".to_string()), // idx 0
-                ResourceRef::ById(uid_b),                      // idx 1
+                ResourceRef::ById(id_b),                       // idx 1
                 ResourceRef::ByName("del-many-c".to_string()), // idx 2
             ],
         })
@@ -610,21 +607,21 @@ pub async fn test_delete_many_all_successes(h: &impl FacadeContractHarness) {
 
     assert_batch_indexes(&response, &[0, 1, 2], &[]);
 
-    let deleted_by_index: std::collections::HashMap<usize, kamu_resources::ResourceUID> = response
+    let deleted_by_index: std::collections::HashMap<usize, kamu_resources::ResourceID> = response
         .successes
         .into_iter()
         .map(|s| (s.request_index, s.item))
         .collect();
 
-    assert_eq!(deleted_by_index[&0], uid_a, "idx 0 must return uid_a");
-    assert_eq!(deleted_by_index[&1], uid_b, "idx 1 must return uid_b");
-    assert_eq!(deleted_by_index[&2], uid_c, "idx 2 must return uid_c");
+    assert_eq!(deleted_by_index[&0], id_a, "idx 0 must return id_a");
+    assert_eq!(deleted_by_index[&1], id_b, "idx 1 must return id_b");
+    assert_eq!(deleted_by_index[&2], id_c, "idx 2 must return id_c");
 
     // All three resources must be gone
-    for (name, uid) in [
-        ("del-many-a", uid_a),
-        ("del-many-b", uid_b),
-        ("del-many-c", uid_c),
+    for (name, id) in [
+        ("del-many-a", id_a),
+        ("del-many-b", id_b),
+        ("del-many-c", id_c),
     ] {
         let get = facade
             .get(
@@ -639,7 +636,7 @@ pub async fn test_delete_many_all_successes(h: &impl FacadeContractHarness) {
             .await;
         assert!(
             matches!(get, Err(GetResourceError::LookupProblem(_))),
-            "deleted resource '{name}' (uid={uid}) must not be found after delete_many"
+            "deleted resource '{name}' (id={id}) must not be found after delete_many"
         );
     }
 }
@@ -654,7 +651,7 @@ contract_test!(
 
 pub async fn test_delete_many_mixed_successes_problems(h: &impl FacadeContractHarness) {
     let uid_existing = create_resource(h, "del-mix-exists").await;
-    let absent_uid = kamu_resources::ResourceUID::new(uuid::Uuid::new_v4());
+    let absent_uid = kamu_resources::ResourceID::new(uuid::Uuid::new_v4());
     let facade = h.facade_for(TestAccount::Alice);
 
     let response = facade
@@ -665,7 +662,7 @@ pub async fn test_delete_many_mixed_successes_problems(h: &impl FacadeContractHa
             resource_refs: vec![
                 ResourceRef::ByName("del-mix-exists".to_string()), // idx 0 — exists
                 ResourceRef::ByName("del-mix-missing".to_string()), // idx 1 — missing name
-                ResourceRef::ById(absent_uid),                     // idx 2 — missing uid
+                ResourceRef::ById(absent_uid),                     // idx 2 — missing id
             ],
         })
         .await
@@ -674,7 +671,7 @@ pub async fn test_delete_many_mixed_successes_problems(h: &impl FacadeContractHa
     assert_batch_indexes(&response, &[0], &[1, 2]);
     assert_eq!(
         response.successes[0].item, uid_existing,
-        "success must return the deleted uid"
+        "success must return the deleted id"
     );
 
     let problem_by_index: std::collections::HashMap<
@@ -691,7 +688,7 @@ pub async fn test_delete_many_mixed_successes_problems(h: &impl FacadeContractHa
         "idx 1 must be NameNotFound"
     );
     assert!(
-        matches!(problem_by_index[&2], ResourceLookupProblem::UIDNotFound(_)),
+        matches!(problem_by_index[&2], ResourceLookupProblem::IDNotFound(_)),
         "idx 2 must be UIDNotFound"
     );
 }
@@ -710,7 +707,7 @@ contract_test!(
 );
 
 pub async fn test_delete_many_duplicate_refs_is_deterministic(h: &impl FacadeContractHarness) {
-    let uid = create_resource(h, "del-dup-ref").await;
+    let id = create_resource(h, "del-dup-ref").await;
     let facade = h.facade_for(TestAccount::Alice);
 
     let response = facade
@@ -737,15 +734,15 @@ pub async fn test_delete_many_duplicate_refs_is_deterministic(h: &impl FacadeCon
         // Contract A: both succeed, same UID
         for s in &response.successes {
             assert_eq!(
-                s.item, uid,
-                "duplicate delete_many success must refer to same uid"
+                s.item, id,
+                "duplicate delete_many success must refer to same id"
             );
         }
     } else {
         // Contract B: first succeeds, second fails
         assert_eq!(response.successes.len(), 1);
         assert_eq!(response.problems.len(), 1);
-        assert_eq!(response.successes[0].item, uid);
+        assert_eq!(response.successes[0].item, id);
         assert!(
             matches!(
                 &response.problems[0].error,
@@ -770,7 +767,7 @@ contract_test!(
 );
 
 pub async fn test_batch_apis_reject_unsupported_kind(h: &impl FacadeContractHarness) {
-    let uid = create_resource(h, "batch-bad-kind-base").await;
+    let id = create_resource(h, "batch-bad-kind-base").await;
     let facade = h.facade_for(TestAccount::Alice);
     let bad_kind = "NoSuchResourceKindXYZ";
 
@@ -778,7 +775,7 @@ pub async fn test_batch_apis_reject_unsupported_kind(h: &impl FacadeContractHarn
         account: None,
         kind: bad_kind.to_string(),
         api_version: None,
-        resource_refs: vec![ResourceRef::ById(uid)],
+        resource_refs: vec![ResourceRef::ById(id)],
     };
 
     let gm = facade

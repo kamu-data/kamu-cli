@@ -14,7 +14,7 @@ use kamu_resources::{
     ReconcilableResourceEvent,
     ResourceEventCreated,
     ResourceEventSpecUpdated,
-    ResourceUID,
+    ResourceID,
 };
 use kamu_resources_services::testing::BaseResourceServiceHarness;
 
@@ -33,7 +33,7 @@ pub fn make_resource_params(
     name: &str,
 ) -> ApplyResourceParams<TestResource> {
     ApplyResourceParams {
-        uid: None,
+        id: None,
         headers: BaseResourceServiceHarness::make_headers_input(account_id, name),
         spec: TestResourceSpec {
             value: name.to_string(),
@@ -43,8 +43,8 @@ pub fn make_resource_params(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn make_uid() -> ResourceUID {
-    ResourceUID::new(uuid::Uuid::new_v4())
+pub fn make_id() -> ResourceID {
+    ResourceID::new(uuid::Uuid::new_v4())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -52,27 +52,26 @@ pub fn make_uid() -> ResourceUID {
 pub fn make_fresh_aggregate(
     account_id: odf::AccountID,
     name: &str,
-) -> (ResourceUID, crate::tests::utils::TestResource) {
+) -> (ResourceID, crate::tests::utils::TestResource) {
     use crate::tests::utils::TestResourceSpec;
-    let uid = make_uid();
+    let id = make_id();
     let headers = BaseResourceServiceHarness::make_headers_input(account_id, name);
     let spec = TestResourceSpec {
         value: name.to_string(),
     };
-    let agg =
-        crate::tests::utils::TestResource::try_create(Utc::now(), uid, headers, spec).unwrap();
-    (uid, agg)
+    let agg = crate::tests::utils::TestResource::try_create(Utc::now(), id, headers, spec).unwrap();
+    (id, agg)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub type TestEvent = ReconcilableResourceEvent<TestResourceSpec, (), String>;
 
-pub fn make_created_event(uid: ResourceUID, name: &str, value: &str) -> TestEvent {
+pub fn make_created_event(id: ResourceID, name: &str, value: &str) -> TestEvent {
     let account_id = make_account_id();
     TestEvent::Created(ResourceEventCreated {
         event_time: Utc::now(),
-        uid,
+        id,
         headers: BaseResourceServiceHarness::make_headers_input(account_id, name),
         spec: TestResourceSpec {
             value: value.to_string(),
@@ -80,10 +79,10 @@ pub fn make_created_event(uid: ResourceUID, name: &str, value: &str) -> TestEven
     })
 }
 
-pub fn make_spec_updated_event(uid: ResourceUID, value: &str, new_generation: u64) -> TestEvent {
+pub fn make_spec_updated_event(id: ResourceID, value: &str, new_generation: u64) -> TestEvent {
     TestEvent::SpecUpdated(ResourceEventSpecUpdated {
         event_time: Utc::now(),
-        uid,
+        id,
         new_spec: TestResourceSpec {
             value: value.to_string(),
         },

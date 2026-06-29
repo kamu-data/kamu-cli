@@ -20,7 +20,7 @@ pub(crate) fn map_batch_lookup_problem(
 ) -> Result<ResourceLookupProblem, BatchResourceError> {
     use cynic_api::fragments::ResourceLookupProblem as P;
     match problem {
-        P::ResourceUIDNotFoundProblem(p) => Ok(map_uid_not_found(p)),
+        P::ResourceIDNotFoundProblem(p) => Ok(map_id_not_found(p)),
         P::ResourceNameNotFoundProblem(p) => Ok(map_name_not_found(p)),
         P::ResourceApiVersionMismatchProblem(p) => Ok(map_api_version_mismatch(p)),
         P::ResourceKindMismatchProblem(p) => Ok(map_kind_mismatch(p)),
@@ -97,10 +97,10 @@ fn account_name_from_problem(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn map_uid_not_found(
-    p: cynic_api::fragments::ResourceUIDNotFoundProblem,
+pub(crate) fn map_id_not_found(
+    p: cynic_api::fragments::ResourceIDNotFoundProblem,
 ) -> ResourceLookupProblem {
-    ResourceLookupProblem::UIDNotFound(domain::ResourceUIDNotFoundError(p.uid))
+    ResourceLookupProblem::IDNotFound(domain::ResourceIDNotFoundError(p.id))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -131,7 +131,7 @@ pub(crate) fn map_kind_mismatch(
     p: cynic_api::fragments::ResourceKindMismatchProblem,
 ) -> ResourceLookupProblem {
     ResourceLookupProblem::KindMismatch(ResourceKindMismatchError {
-        uid: p.uid,
+        id: p.id,
         expected_kind: p.expected_kind,
         actual_kind: p.actual_kind,
     })
@@ -152,7 +152,7 @@ where
 {
     use cynic_api::fragments::ResourceSelectorProblem as P;
     match result.problem {
-        P::ResourceUIDNotFoundProblem(p) => Ok(map_lookup(map_uid_not_found(p))),
+        P::ResourceIDNotFoundProblem(p) => Ok(map_lookup(map_id_not_found(p))),
         P::ResourceNameNotFoundProblem(p) => Ok(map_lookup(map_name_not_found(p))),
         P::ResourceApiVersionMismatchProblem(p) => Ok(map_lookup(map_api_version_mismatch(p))),
         P::ResourceKindMismatchProblem(p) => Ok(map_lookup(map_kind_mismatch(p))),

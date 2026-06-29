@@ -7,14 +7,14 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources::{ResourceAPIVersionMismatchError, ResourceUID};
+use kamu_resources::{ResourceAPIVersionMismatchError, ResourceID};
 
 use crate::{ResourceKindMismatchError, ResourceLookupProblem};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn ensure_kind_matches<E>(
-    uid: ResourceUID,
+    id: ResourceID,
     expected_kind: &str,
     actual_kind: &str,
 ) -> Result<(), E>
@@ -24,7 +24,7 @@ where
     if actual_kind != expected_kind {
         return Err(
             ResourceLookupProblem::KindMismatch(ResourceKindMismatchError {
-                uid,
+                id,
                 expected_kind: expected_kind.to_string(),
                 actual_kind: actual_kind.to_string(),
             })

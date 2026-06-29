@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use kamu_resources::ResourceUID;
+use kamu_resources::ResourceID;
 
 use crate::{DatasetConfigurationSetBinding, ReplaceDatasetBindingsError};
 
@@ -24,7 +24,7 @@ pub trait DatasetSecretSetBindingRepository: Send + Sync {
     async fn replace_bindings(
         &self,
         dataset_id: &odf::DatasetID,
-        resource_uids: &[ResourceUID],
+        resource_ids: &[ResourceID],
     ) -> Result<(), ReplaceDatasetBindingsError>;
 
     async fn delete_bindings_for_dataset(

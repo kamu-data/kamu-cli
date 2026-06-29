@@ -11,12 +11,12 @@ use database_common::PaginationOpts;
 use domain::{
     ApplyManifestApplicationDecision,
     ApplyManifestPlanningDecision,
+    ResourceID,
     ResourceIdentityView,
     ResourceKindDescriptor,
     ResourceManifestAccount,
     ResourceName,
     ResourceSummaryView,
-    ResourceUID,
     ResourceView,
     ResourcesSummary,
 };
@@ -126,12 +126,12 @@ pub trait ResourceFacade: Send + Sync {
         request: ApplyManifestRequest,
     ) -> Result<ApplyManifestApplicationDecision, ApplyManifestError>;
 
-    async fn delete(&self, selector: ResourceSelector) -> Result<ResourceUID, DeleteResourceError>;
+    async fn delete(&self, selector: ResourceSelector) -> Result<ResourceID, DeleteResourceError>;
 
     async fn delete_many(
         &self,
         selector: ResourceBatchSelector,
-    ) -> Result<BatchResourceResponse<ResourceUID, ResourceLookupProblem>, BatchResourceError>;
+    ) -> Result<BatchResourceResponse<ResourceID, ResourceLookupProblem>, BatchResourceError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -204,7 +204,7 @@ pub enum ResourceManifestFormat {
 
 #[derive(Debug, Clone)]
 pub enum ResourceRef {
-    ById(ResourceUID),
+    ById(ResourceID),
     ByName(ResourceName),
 }
 

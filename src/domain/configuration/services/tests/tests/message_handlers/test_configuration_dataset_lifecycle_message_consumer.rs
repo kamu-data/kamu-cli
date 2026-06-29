@@ -19,7 +19,7 @@ use kamu_configuration_inmem::{
 };
 use kamu_configuration_services::ConfigurationDatasetLifecycleMessageConsumer;
 use kamu_datasets::{DatasetLifecycleMessage, MESSAGE_PRODUCER_KAMU_DATASET_SERVICE};
-use kamu_resources::ResourceUID;
+use kamu_resources::ResourceID;
 use messaging_outbox::{MessageConsumerT, OutboxProvider, register_message_dispatcher};
 use uuid::Uuid;
 
@@ -32,8 +32,8 @@ async fn test_dataset_deleted_clears_variable_and_secret_bindings() {
     let harness = ConfigurationDatasetLifecycleConsumerHarness::new();
 
     let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
-    let uid_var = ResourceUID::new(Uuid::new_v4());
-    let uid_sec = ResourceUID::new(Uuid::new_v4());
+    let uid_var = ResourceID::new(Uuid::new_v4());
+    let uid_sec = ResourceID::new(Uuid::new_v4());
 
     // Seed a variable-set binding and a secret-set binding for the dataset
     harness
@@ -105,7 +105,7 @@ async fn test_non_deleted_message_is_no_op() {
 
     let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
     let (_, account_id) = odf::AccountID::new_generated_ed25519();
-    let uid_var = ResourceUID::new(Uuid::new_v4());
+    let uid_var = ResourceID::new(Uuid::new_v4());
 
     harness
         .variable_binding_repo()
@@ -146,24 +146,24 @@ async fn test_deleting_one_dataset_does_not_affect_other_datasets_bindings() {
 
     let (_, dataset_a) = odf::DatasetID::new_generated_ed25519();
     let (_, dataset_b) = odf::DatasetID::new_generated_ed25519();
-    let uid_a_var = ResourceUID::new(Uuid::new_v4());
-    let uid_a_sec = ResourceUID::new(Uuid::new_v4());
-    let uid_b_var = ResourceUID::new(Uuid::new_v4());
+    let id_a_var = ResourceID::new(Uuid::new_v4());
+    let id_a_sec = ResourceID::new(Uuid::new_v4());
+    let id_b_var = ResourceID::new(Uuid::new_v4());
 
     // Bind both datasets
     harness
         .variable_binding_repo()
-        .replace_bindings(&dataset_a, &[uid_a_var])
+        .replace_bindings(&dataset_a, &[id_a_var])
         .await
         .unwrap();
     harness
         .secret_binding_repo()
-        .replace_bindings(&dataset_a, &[uid_a_sec])
+        .replace_bindings(&dataset_a, &[id_a_sec])
         .await
         .unwrap();
     harness
         .variable_binding_repo()
-        .replace_bindings(&dataset_b, &[uid_b_var])
+        .replace_bindings(&dataset_b, &[id_b_var])
         .await
         .unwrap();
 

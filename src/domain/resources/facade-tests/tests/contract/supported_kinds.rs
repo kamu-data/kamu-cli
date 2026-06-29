@@ -23,7 +23,7 @@ use crate::helpers::{
     SECRET_SET_KIND,
     VARIABLE_SET_API_VERSION,
     VARIABLE_SET_KIND,
-    apply_manifest_and_get_uid,
+    apply_manifest_and_get_id,
     variable_set_manifest_json,
 };
 
@@ -93,7 +93,7 @@ contract_test!(
 );
 
 pub async fn test_kind_aliases_resolve_consistently(h: &impl FacadeContractHarness) {
-    apply_manifest_and_get_uid(
+    apply_manifest_and_get_id(
         h,
         TestAccount::Alice,
         variable_set_manifest_json("alias-check", None, &[("K", "v")]),
@@ -185,7 +185,7 @@ contract_test!(
 );
 
 pub async fn test_unsupported_kind_rejected_consistently(h: &impl FacadeContractHarness) {
-    let uid = apply_manifest_and_get_uid(
+    let id = apply_manifest_and_get_id(
         h,
         TestAccount::Alice,
         variable_set_manifest_json("unsupported-kind-base", None, &[("K", "v")]),
@@ -293,7 +293,7 @@ pub async fn test_unsupported_kind_rejected_consistently(h: &impl FacadeContract
             account: None,
             kind: bad_kind.to_string(),
             api_version: None,
-            resource_ref: kamu_resources_facade::ResourceRef::ById(uid),
+            resource_ref: kamu_resources_facade::ResourceRef::ById(id),
         })
         .await;
     assert!(

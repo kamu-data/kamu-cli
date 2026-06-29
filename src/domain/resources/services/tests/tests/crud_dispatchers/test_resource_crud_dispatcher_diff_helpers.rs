@@ -16,14 +16,14 @@ use kamu_resources::{
 };
 use kamu_resources_services::make_apply_manifest_changes;
 
-use crate::tests::utils::{make_account_id, make_uid};
+use crate::tests::utils::{make_account_id, make_id};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn make_view(name: &str, value: &str) -> ResourceView {
-    let uid = make_uid();
+    let id = make_id();
     ResourceView {
         kind: "TestResource".to_string(),
         api_version: "test.kamu.dev/v1".to_string(),
@@ -31,7 +31,7 @@ fn make_view(name: &str, value: &str) -> ResourceView {
             id: make_account_id(),
             name: None,
         },
-        headers: ResourceViewHeaders::simple(Utc::now(), uid, name.to_string()),
+        headers: ResourceViewHeaders::simple(Utc::now(), id, name.to_string()),
         last_reconciled_at: None,
         spec: serde_json::json!({ "value": value }),
         status: None,
@@ -61,8 +61,8 @@ fn test_make_changes_detects_name_change() {
     let mut before = make_view("a", "same");
     let mut after = make_view("b", "same");
 
-    // Force shared uid/timestamps so they don't generate noise
-    after.headers.uid = before.headers.uid;
+    // Force shared id/timestamps so they don't generate noise
+    after.headers.id = before.headers.id;
     after.headers.created_at = before.headers.created_at;
     after.headers.updated_at = before.headers.updated_at;
     before.headers.generation = 1;
@@ -87,7 +87,7 @@ fn test_make_changes_detects_description_added() {
     let mut before = make_view("res", "val");
     let mut after = make_view("res", "val");
 
-    after.headers.uid = before.headers.uid;
+    after.headers.id = before.headers.id;
     after.headers.created_at = before.headers.created_at;
     after.headers.updated_at = before.headers.updated_at;
     before.headers.generation = 1;
@@ -114,7 +114,7 @@ fn test_make_changes_detects_label_added() {
     let mut before = make_view("res", "val");
     let mut after = make_view("res", "val");
 
-    after.headers.uid = before.headers.uid;
+    after.headers.id = before.headers.id;
     after.headers.created_at = before.headers.created_at;
     after.headers.updated_at = before.headers.updated_at;
     before.headers.generation = 1;
@@ -142,7 +142,7 @@ fn test_make_changes_detects_spec_field_change() {
 
     // Normalise shared fields
     let mut after = after;
-    after.headers.uid = before.headers.uid;
+    after.headers.id = before.headers.id;
     after.headers.created_at = before.headers.created_at;
     after.headers.updated_at = before.headers.updated_at;
     before.headers.generation = 1;
@@ -166,7 +166,7 @@ fn test_make_changes_detects_spec_field_change() {
 #[test]
 fn test_make_changes_identical_before_after_returns_no_field_changes() {
     let ts = chrono::Utc::now().trunc_subsecs(6);
-    let uid = make_uid();
+    let id = make_id();
 
     let make = || ResourceView {
         kind: "TestResource".to_string(),
@@ -176,7 +176,7 @@ fn test_make_changes_identical_before_after_returns_no_field_changes() {
             name: None,
         },
         headers: ResourceViewHeaders {
-            uid,
+            id,
             name: "res".to_string(),
             description: None,
             labels: Default::default(),
@@ -214,7 +214,7 @@ fn test_timestamp_precision_normalized_avoids_spurious_diffs() {
     // Add sub-microsecond noise (1 nanosecond) — should be normalized away
     let ts_noisy = ts_base + chrono::Duration::nanoseconds(1);
 
-    let uid = make_uid();
+    let id = make_id();
     let account_id = make_account_id();
 
     let make_view_ts = |updated_at| ResourceView {
@@ -225,7 +225,7 @@ fn test_timestamp_precision_normalized_avoids_spurious_diffs() {
             name: None,
         },
         headers: ResourceViewHeaders {
-            uid,
+            id,
             name: "res".to_string(),
             description: None,
             labels: Default::default(),

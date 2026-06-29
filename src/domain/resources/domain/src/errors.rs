@@ -9,7 +9,7 @@
 
 use event_sourcing::{LoadError, Projection};
 
-use crate::{ResourceDescriptor, ResourceName, ResourceSnapshot, ResourceUID};
+use crate::{ResourceDescriptor, ResourceID, ResourceName, ResourceSnapshot};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -20,8 +20,8 @@ pub struct ResourceLoadError<S: Projection>(pub LoadError<S>);
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug, Clone, Copy, PartialEq, Eq)]
-#[error("Resource with uid {0} was not found")]
-pub struct ResourceUIDNotFoundError(pub ResourceUID);
+#[error("Resource with id {0} was not found")]
+pub struct ResourceIDNotFoundError(pub ResourceID);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -57,9 +57,9 @@ pub struct ResourceInvalidSpecError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
-#[error("Resource '{uid}' of type '{resource_type}' is not owned by the specified account")]
+#[error("Resource '{id}' of type '{resource_type}' is not owned by the specified account")]
 pub struct ResourceNotOwnedByAccountError {
-    pub uid: ResourceUID,
+    pub id: ResourceID,
     pub resource_type: &'static str,
 }
 
@@ -67,11 +67,11 @@ pub struct ResourceNotOwnedByAccountError {
 
 #[derive(thiserror::Error, Debug)]
 #[error(
-    "Resource uid {uid} refers to {actual_kind}/{actual_api_version}, expected \
+    "Resource id {id} refers to {actual_kind}/{actual_api_version}, expected \
      {expected_kind}/{expected_api_version}"
 )]
 pub struct ResourceTypeMismatchError {
-    pub uid: ResourceUID,
+    pub id: ResourceID,
     pub expected_kind: String,
     pub expected_api_version: String,
     pub actual_kind: String,
@@ -80,14 +80,14 @@ pub struct ResourceTypeMismatchError {
 
 impl ResourceTypeMismatchError {
     pub fn new(
-        uid: ResourceUID,
+        id: ResourceID,
         expected_kind: String,
         expected_api_version: String,
         actual_kind: String,
         actual_api_version: String,
     ) -> Self {
         Self {
-            uid,
+            id,
             expected_kind,
             expected_api_version,
             actual_kind,
@@ -96,12 +96,12 @@ impl ResourceTypeMismatchError {
     }
 
     pub fn from_expected_and_actual(
-        uid: ResourceUID,
+        id: ResourceID,
         expected: &ResourceDescriptor,
         actual: &ResourceSnapshot,
     ) -> Self {
         Self::new(
-            uid,
+            id,
             expected.resource_type.to_string(),
             expected.api_version.to_string(),
             actual.kind.clone(),

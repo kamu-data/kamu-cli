@@ -137,13 +137,13 @@ where
     }
 
     fn mark_deleted(resource: &mut R, now: DateTime<Utc>) -> Result<(), ResourcePersistenceError> {
-        let tombstone_name = format!("deleted-{}", resource.uid());
+        let tombstone_name = format!("deleted-{}", resource.id());
 
         resource.try_delete(now, tombstone_name).map_err(|err| {
             ResourcePersistenceError::Internal(
                 format!("{err}")
                     .int_err()
-                    .with_context(format!("Failed to delete resource {}", resource.uid())),
+                    .with_context(format!("Failed to delete resource {}", resource.id())),
             )
         })
     }

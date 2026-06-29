@@ -60,7 +60,7 @@ impl TryFrom<fragments::Resource> for domain::ResourceView {
                     .map(|name| odf::AccountName::new_unchecked(&name.0)),
             },
             headers: domain::ResourceViewHeaders {
-                uid: value.headers.id,
+                id: value.headers.id,
                 name: value.headers.name,
                 description: value.headers.description,
                 labels,
@@ -85,7 +85,7 @@ impl From<fragments::ResourceIdentity> for domain::ResourceIdentityView {
             kind: value.kind.value,
             api_version: value.api_version,
             canonical_kind_name: value.canonical_kind_name,
-            uid: value.id,
+            id: value.id,
             name: value.name,
         }
     }
@@ -144,7 +144,7 @@ impl TryFrom<fragments::ResourceSummary> for domain::ResourceSummaryView {
         Ok(domain::ResourceSummaryView {
             kind: value.kind.value,
             api_version: value.api_version,
-            uid: value.id,
+            id: value.id,
             name: value.name,
             description: value.description,
             generation: value.generation.into(),

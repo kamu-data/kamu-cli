@@ -57,7 +57,7 @@ async fn test_apply_end_to_end_create_and_retrieve() {
     let result = decision.expect_applied();
     assert_eq!(result.outcome, ApplyResourceOutcome::Created);
 
-    let snapshot = harness.get_snapshot_by_uid(&result.uid).await.unwrap();
+    let snapshot = harness.get_snapshot_by_id(&result.id).await.unwrap();
     pretty_assertions::assert_eq!(snapshot.spec, serde_json::json!({ "value": "res-a" }));
 
     // Default harness uses Immediate outbox — auto-reconcile runs synchronously
@@ -112,7 +112,7 @@ async fn test_sanitizer_modifies_spec_on_create() {
     assert_eq!(result.outcome, ApplyResourceOutcome::Created);
 
     // The sanitizer appends "-sanitized"; the persisted spec must reflect that.
-    let snapshot = harness.get_snapshot_by_uid(&result.uid).await.unwrap();
+    let snapshot = harness.get_snapshot_by_id(&result.id).await.unwrap();
     pretty_assertions::assert_eq!(
         snapshot.spec,
         serde_json::json!({ "value": "original-sanitized" })
@@ -129,7 +129,7 @@ async fn test_sanitizer_receives_current_spec_on_update() {
     });
     let account_id = make_account_id();
 
-    let (uid, initial_snapshot) = harness
+    let (id, initial_snapshot) = harness
         .apply_and_assert_snapshot(account_id.clone(), "res-a")
         .await;
     // Sanitizer appends "-sanitized" even during initial apply
@@ -139,7 +139,7 @@ async fn test_sanitizer_receives_current_spec_on_update() {
     );
 
     let params = ApplyResourceParams {
-        uid: Some(uid),
+        id: Some(id),
         ..make_params(account_id, "res-a", "updated")
     };
 
@@ -150,7 +150,7 @@ async fn test_sanitizer_receives_current_spec_on_update() {
         ApplyResourceOutcome::Updated
     );
 
-    let snapshot = harness.get_snapshot_by_uid(&uid).await.unwrap();
+    let snapshot = harness.get_snapshot_by_id(&id).await.unwrap();
     pretty_assertions::assert_eq!(
         snapshot.spec,
         serde_json::json!({ "value": "updated-sanitized" })
@@ -198,7 +198,7 @@ async fn test_no_sanitizer_passes_spec_unchanged() {
 
     let result = decision.expect_applied();
 
-    let snapshot = harness.get_snapshot_by_uid(&result.uid).await.unwrap();
+    let snapshot = harness.get_snapshot_by_id(&result.id).await.unwrap();
     pretty_assertions::assert_eq!(snapshot.spec, serde_json::json!({ "value": "original" }));
 }
 
@@ -247,7 +247,7 @@ async fn test_apply_create_initial_status_is_pending() {
         .unwrap()
         .expect_applied();
 
-    let snapshot = harness.get_snapshot_by_uid(&result.uid).await.unwrap();
+    let snapshot = harness.get_snapshot_by_id(&result.id).await.unwrap();
     let status = snapshot.basic_status().unwrap();
 
     assert_eq!(status.phase, ResourcePhase::Pending);
@@ -275,11 +275,11 @@ async fn test_apply_update_resets_status_to_pending() {
     let account_id = make_account_id();
 
     // Create + reconcile → gen=1, observed_gen=1, phase=Ready
-    let uid = harness.apply_and_get_uid(account_id.clone(), "res-a").await;
-    harness.reconcile_test_uc().execute(&uid).await.unwrap();
+    let id = harness.apply_and_get_id(account_id.clone(), "res-a").await;
+    harness.reconcile_test_uc().execute(&id).await.unwrap();
     harness.flush_outbox().await;
 
-    let snapshot = harness.get_snapshot_by_uid(&uid).await.unwrap();
+    let snapshot = harness.get_snapshot_by_id(&id).await.unwrap();
     let status = snapshot.basic_status().unwrap();
     assert_eq!(status.phase, ResourcePhase::Ready);
     BaseResourceServiceHarness::assert_condition(
@@ -292,7 +292,7 @@ async fn test_apply_update_resets_status_to_pending() {
 
     // Spec update → gen bumped to 2, phase reset to Pending
     let update_params = ApplyResourceParams {
-        uid: Some(uid),
+        id: Some(id),
         headers: BaseResourceServiceHarness::make_headers_input(account_id, "res-a"),
         spec: TestResourceSpec {
             value: "updated".to_string(),
@@ -305,7 +305,7 @@ async fn test_apply_update_resets_status_to_pending() {
         .unwrap()
         .expect_applied();
 
-    let snapshot = harness.get_snapshot_by_uid(&uid).await.unwrap();
+    let snapshot = harness.get_snapshot_by_id(&id).await.unwrap();
     let status = snapshot.basic_status().unwrap();
 
     assert_eq!(status.phase, ResourcePhase::Pending);
@@ -329,7 +329,7 @@ fn make_params(
     value: &str,
 ) -> ApplyResourceParams<crate::tests::utils::TestResource> {
     ApplyResourceParams {
-        uid: None,
+        id: None,
         headers: BaseResourceServiceHarness::make_headers_input(account_id, name),
         spec: TestResourceSpec {
             value: value.to_string(),

@@ -23,25 +23,25 @@ use kamu_configuration::{
     VariableValueSpec,
 };
 use kamu_datasets::{DatasetEntry, DatasetEntryRepository};
-use kamu_resources::{ResourceHeaders, ResourceRepository, ResourceSnapshot, ResourceUID};
+use kamu_resources::{ResourceHeaders, ResourceID, ResourceRepository, ResourceSnapshot};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_replace_and_list_bindings(catalog: &Catalog) {
-    let (dataset_id, resource_uids) = prepare_dataset(catalog).await;
+    let (dataset_id, resource_ids) = prepare_dataset(catalog).await;
     let repo = catalog
         .get_one::<dyn DatasetVariableSetBindingRepository>()
         .unwrap();
 
-    repo.replace_bindings(&dataset_id, &resource_uids)
+    repo.replace_bindings(&dataset_id, &resource_ids)
         .await
         .unwrap();
 
     let bindings = repo.list_bindings(&dataset_id).await.unwrap();
     assert_eq!(bindings.len(), 3);
-    assert_eq!(bindings[0].resource_uid, resource_uids[0]);
-    assert_eq!(bindings[1].resource_uid, resource_uids[1]);
-    assert_eq!(bindings[2].resource_uid, resource_uids[2]);
+    assert_eq!(bindings[0].resource_id, resource_ids[0]);
+    assert_eq!(bindings[1].resource_id, resource_ids[1]);
+    assert_eq!(bindings[2].resource_id, resource_ids[2]);
     assert_eq!(bindings[0].binding_order, 0);
     assert_eq!(bindings[1].binding_order, 1);
     assert_eq!(bindings[2].binding_order, 2);
@@ -50,28 +50,28 @@ pub async fn test_replace_and_list_bindings(catalog: &Catalog) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_replace_overwrites_previous_bindings(catalog: &Catalog) {
-    let (dataset_id, resource_uids) = prepare_dataset(catalog).await;
+    let (dataset_id, resource_ids) = prepare_dataset(catalog).await;
     let repo = catalog
         .get_one::<dyn DatasetVariableSetBindingRepository>()
         .unwrap();
 
-    repo.replace_bindings(&dataset_id, &resource_uids[..2])
+    repo.replace_bindings(&dataset_id, &resource_ids[..2])
         .await
         .unwrap();
-    repo.replace_bindings(&dataset_id, &resource_uids[1..])
+    repo.replace_bindings(&dataset_id, &resource_ids[1..])
         .await
         .unwrap();
 
     let bindings = repo.list_bindings(&dataset_id).await.unwrap();
     assert_eq!(bindings.len(), 2);
-    assert_eq!(bindings[0].resource_uid, resource_uids[1]);
-    assert_eq!(bindings[1].resource_uid, resource_uids[2]);
+    assert_eq!(bindings[0].resource_id, resource_ids[1]);
+    assert_eq!(bindings[1].resource_id, resource_ids[2]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_replace_rejects_duplicates(catalog: &Catalog) {
-    let (dataset_id, resource_uids) = prepare_dataset(catalog).await;
+    let (dataset_id, resource_ids) = prepare_dataset(catalog).await;
     let repo = catalog
         .get_one::<dyn DatasetVariableSetBindingRepository>()
         .unwrap();
@@ -79,7 +79,7 @@ pub async fn test_replace_rejects_duplicates(catalog: &Catalog) {
     let result = repo
         .replace_bindings(
             &dataset_id,
-            &[resource_uids[0], resource_uids[1], resource_uids[0]],
+            &[resource_ids[0], resource_ids[1], resource_ids[0]],
         )
         .await;
 
@@ -90,12 +90,12 @@ pub async fn test_replace_rejects_duplicates(catalog: &Catalog) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_delete_bindings_for_dataset(catalog: &Catalog) {
-    let (dataset_id, resource_uids) = prepare_dataset(catalog).await;
+    let (dataset_id, resource_ids) = prepare_dataset(catalog).await;
     let repo = catalog
         .get_one::<dyn DatasetVariableSetBindingRepository>()
         .unwrap();
 
-    repo.replace_bindings(&dataset_id, &resource_uids)
+    repo.replace_bindings(&dataset_id, &resource_ids)
         .await
         .unwrap();
 
@@ -107,7 +107,7 @@ pub async fn test_delete_bindings_for_dataset(catalog: &Catalog) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_list_bindings_empty_initially(catalog: &Catalog) {
-    let (dataset_id, _resource_uids) = prepare_dataset(catalog).await;
+    let (dataset_id, _resource_ids) = prepare_dataset(catalog).await;
     let repo = catalog
         .get_one::<dyn DatasetVariableSetBindingRepository>()
         .unwrap();
@@ -119,7 +119,7 @@ pub async fn test_list_bindings_empty_initially(catalog: &Catalog) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_delete_bindings_for_dataset_no_op(catalog: &Catalog) {
-    let (dataset_id, _resource_uids) = prepare_dataset(catalog).await;
+    let (dataset_id, _resource_ids) = prepare_dataset(catalog).await;
     let repo = catalog
         .get_one::<dyn DatasetVariableSetBindingRepository>()
         .unwrap();
@@ -132,7 +132,7 @@ pub async fn test_delete_bindings_for_dataset_no_op(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) async fn prepare_dataset(catalog: &Catalog) -> (odf::DatasetID, Vec<ResourceUID>) {
+pub(crate) async fn prepare_dataset(catalog: &Catalog) -> (odf::DatasetID, Vec<ResourceID>) {
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
     let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
     let resource_repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
@@ -144,17 +144,17 @@ pub(crate) async fn prepare_dataset(catalog: &Catalog) -> (odf::DatasetID, Vec<R
         .await
         .unwrap();
 
-    let resource_uids = vec![
-        ResourceUID::new(uuid::Uuid::new_v4()),
-        ResourceUID::new(uuid::Uuid::new_v4()),
-        ResourceUID::new(uuid::Uuid::new_v4()),
+    let resource_ids = vec![
+        ResourceID::new(uuid::Uuid::new_v4()),
+        ResourceID::new(uuid::Uuid::new_v4()),
+        ResourceID::new(uuid::Uuid::new_v4()),
     ];
 
-    for resource_uid in &resource_uids {
-        create_resource(&resource_repo, &account, *resource_uid).await;
+    for resource_id in &resource_ids {
+        create_resource(&resource_repo, &account, *resource_id).await;
     }
 
-    (dataset_entry.id, resource_uids)
+    (dataset_entry.id, resource_ids)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -200,17 +200,17 @@ fn new_dataset_entry(owner: &Account) -> DatasetEntry {
 async fn create_resource(
     resource_repo: &Arc<dyn ResourceRepository>,
     account: &Account,
-    resource_uid: ResourceUID,
+    resource_id: ResourceID,
 ) {
     resource_repo
         .create_resource(&ResourceSnapshot {
-            uid: resource_uid,
+            id: resource_id,
             kind: VariableSetResource::RESOURCE_TYPE.to_string(),
             api_version: VariableSetResource::API_VERSION.to_string(),
             headers: ResourceHeaders::simple(
                 Utc::now(),
                 account.id.clone(),
-                resource_uid.to_string(),
+                resource_id.to_string(),
             ),
             spec: serde_json::to_value(VariableSetSpec {
                 variables: [(

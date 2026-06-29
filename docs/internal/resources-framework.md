@@ -12,7 +12,7 @@
 **One-paragraph mental model.** The resources framework is a generic, event-sourced,
 Kubernetes-inspired subsystem for *declarative* management of arbitrary "resource kinds". A user
 authors a **manifest** (`apiVersion` + `kind` + `headers` + `spec`); the framework stores it as an
-event-sourced aggregate, fills in server-owned headers (uid, timestamps, `generation`) and an
+event-sourced aggregate, fills in server-owned headers (id, timestamps, `generation`) and an
 **initial** server-owned `status`, then **asynchronously reconciles** it toward the desired state
 (the status progresses `Pending → Reconciling → Ready`/`Failed`). Every kind (today:
 `VariableSet`, `SecretSet`) implements a small set of traits and registers a **dispatcher** keyed by
@@ -119,7 +119,7 @@ long-term goal. This page documents what exists now.
 
 | Term | Meaning |
 | --- | --- |
-| **Resource** | A single managed object instance of a given kind, identified by a `ResourceUID`. |
+| **Resource** | A single managed object instance of a given kind, identified by a `ResourceID`. |
 | **Kind** | The resource type discriminator string, e.g. `VariableSet`, `SecretSet`. |
 | **ApiVersion** | Versioning string for the kind's schema, e.g. `kamu.dev/v1alpha1`. |
 | **Descriptor** | The `(kind, apiVersion)` pair (`ResourceDescriptor`) used to route to the right dispatcher. |
@@ -143,7 +143,7 @@ long-term goal. This page documents what exists now.
 The rules below hold across the framework. They are the contract a maintainer (or coding agent) must
 not break; most are enforced in code and exercised by tests — pointers given where useful.
 
-- **`ResourceUID` is immutable and server-allocated.** A new resource's UID comes from
+- **`ResourceID` is immutable and server-allocated.** A new resource's UID comes from
   `GenericResourceQueryService::allocate_uid()`; callers cannot choose it. Once assigned it never
   changes (it is the primary key — see [§6](#6-persistence-model)).
 - **`(account_id, kind, name)` is unique.** Enforced by a DB unique constraint
@@ -249,7 +249,7 @@ pub trait DeclarativeResource:
         + TryFrom<ResourceSnapshot, Error = InternalError>
         + From<Self>;
 
-    fn uid(&self) -> &ResourceUID;
+    fn id(&self) -> &ResourceID;
     fn headers(&self) -> &ResourceHeaders;
     fn spec(&self) -> &Self::Spec;
     fn status(&self) -> &Self::Status;
@@ -269,7 +269,7 @@ pub trait ReconcilableResource: DeclarativeResource {
 
     fn needs_reconciliation(&self) -> bool { /* observed_generation vs generation */ }
 
-    fn try_create(now, uid, headers: ResourceHeadersInput, spec) -> Result<Self, LifecycleError>;
+    fn try_create(now, id, headers: ResourceHeadersInput, spec) -> Result<Self, LifecycleError>;
     fn try_update_headers(&mut self, now, new_headers: ResourceHeadersInput) -> ...;
     fn try_update_spec(&mut self, now, new_spec: Self::Spec) -> ...;
     fn try_delete(&mut self, now, tombstone_name: String) -> ...;
@@ -301,7 +301,7 @@ current state.
 ### Repository
 
 `ResourceRepository` (`repo/`) is the persistence seam: allocate UID, create/update snapshot
-(with optimistic `expected_last_event_id`), find by name/uid, search identities, and stream UIDs /
+(with optimistic `expected_last_event_id`), find by name/id, search identities, and stream UIDs /
 snapshots by kind.
 
 ### Dispatchers
@@ -338,7 +338,7 @@ pub struct ResourceManifest {
 
 #[serde(deny_unknown_fields)]                // ← unknown fields (e.g. `status`) are rejected
 pub struct ResourceManifestHeaders {
-    pub uid: Option<ResourceUID>,            // optional — NOT assignable; an exact pointer to an
+    pub id: Option<ResourceID>,              // optional — NOT assignable; an exact pointer to an
                                              // existing resource for updates (e.g. when renaming)
     pub account: Option<ResourceManifestAccount>, // optional — by name OR id; defaults to caller
     pub name: ResourceName,                  // required
@@ -348,13 +348,13 @@ pub struct ResourceManifestHeaders {
 }
 ```
 
-A user may write **only**: `apiVersion`, `kind`, `headers.{uid?, account?, name, description?,
+A user may write **only**: `apiVersion`, `kind`, `headers.{id?, account?, name, description?,
 labels, annotations}`, and `spec`. `deny_unknown_fields` means a manifest **cannot** carry `status`,
 timestamps, or `generation` — those are server-owned.
 
-The `uid` is **not** something the user assigns — a new resource's UID is always allocated by the
+The `id` is **not** something the user assigns — a new resource's UID is always allocated by the
 server. It may only be *supplied* on a manifest to point at an already-existing resource for an
-update; this is what lets a resource be renamed (the `uid` keeps the identity stable while `name`
+update; this is what lets a resource be renamed (the `id` keeps the identity stable while `name`
 changes). Omit it for normal create/update-by-name.
 
 **(2) Framework-generated — the rest of headers + all of status.**
@@ -381,7 +381,7 @@ pub struct ResourceStatus {                  // entirely server-owned
 }
 ```
 
-Also generated: `uid` (allocated if the manifest omitted it) and `last_reconciled_at`.
+Also generated: `id` (allocated if the manifest omitted it) and `last_reconciled_at`.
 
 **(3) Persisted form — the snapshot.** `ResourceSnapshot`
 ([`core/resource_snapshot.rs`](/src/domain/resources/domain/src/core/resource_snapshot.rs))
@@ -389,10 +389,10 @@ combines authored + generated + event-sourcing bookkeeping:
 
 ```rust
 pub struct ResourceSnapshot {
-    pub uid: ResourceUID,
+    pub id: ResourceID,
     pub kind: String,
     pub api_version: String,
-    pub headers: ResourceHeaders,          // authored fields + generated fields
+    pub headers: ResourceHeaders,            // authored fields + generated fields
     pub spec: serde_json::Value,             // authored (may be transformed — see SecretSet)
     pub status: Option<serde_json::Value>,   // generated
     pub last_reconciled_at: Option<DateTime<Utc>>, // generated
@@ -402,9 +402,9 @@ pub struct ResourceSnapshot {
 
 ```mermaid
 flowchart LR
-    M["Manifest (authored)<br/>apiVersion, kind<br/>headers: name, account?, uid?,<br/>description?, labels, annotations<br/>spec"]
-    A["apply use case<br/>(resolve account, allocate uid,<br/>bump generation, set timestamps)"]
-    S["Snapshot / State<br/>= authored fields<br/>+ <b>generated</b>: account(ID), uid,<br/>generation, created/updated/deleted_at,<br/>status{phase, observedGeneration, conditions}"]
+    M["Manifest (authored)<br/>apiVersion, kind<br/>headers: name, account?, id?,<br/>description?, labels, annotations<br/>spec"]
+    A["apply use case<br/>(resolve account, allocate id,<br/>bump generation, set timestamps)"]
+    S["Snapshot / State<br/>= authored fields<br/>+ <b>generated</b>: account(ID), id,<br/>generation, created/updated/deleted_at,<br/>status{phase, observedGeneration, conditions}"]
     M --> A --> S
 ```
 
@@ -428,14 +428,14 @@ Resources are **event-sourced with a materialized snapshot per resource**. Stora
 
 **Two tables:**
 
-- **`resources`** — one row per resource (the snapshot): `resource_uid` (UUID, **PK**),
+- **`resources`** — one row per resource (the snapshot): `resource_id` (UUID, **PK**),
   `account_id`, `resource_kind`, `api_version`, `resource_name`, `description`, `labels`/`annotations`
   (JSONB), `spec` (JSONB), `status` (JSONB, nullable), `generation`, `created_at`/`updated_at`,
   `deleted_at` (nullable), `last_reconciled_at`, `last_event_id`. **Uniqueness:**
   `UNIQUE (account_id, resource_kind, resource_name)` — note **api_version is not part of the key**.
   A partial index on `(account_id, kind, api_version, status->>'phase') WHERE deleted_at IS NULL`
   backs the summary projection.
-- **`resource_events`** — append-only log: `event_id` (BIGINT from a sequence, PK), `resource_uid`
+- **`resource_events`** — append-only log: `event_id` (BIGINT from a sequence, PK), `resource_id`
   (FK → `resources`), `resource_kind`, `event_time`, `event_type`, `event_payload` (JSONB).
 
 **Source of truth.** The event log is authoritative — aggregates are rebuilt by projecting events
@@ -487,7 +487,7 @@ Resolution + permission checks live in `ResourceAccountResolverImpl`
   (`CurrentAccountSubject`) as the caller; the same admin rule applies for cross-account targeting.
 - **UID belonging to a different account.** Lookups are account-scoped (`find_account_snapshot`
   filters by `account_id`). A UID that exists but belongs to another account is reported as
-  **not-found** (`ResourceUIDNotFoundError`), not "forbidden" — so existence is not leaked across
+  **not-found** (`ResourceIDNotFoundError`), not "forbidden" — so existence is not leaked across
   accounts. A UID of the wrong *kind* yields `ResourceTypeMismatchError`.
 - **Account-deletion cascade.** When an account is deleted, `DeleteAccountResourcesUseCase` deletes
   that account's resources (see [§13](#13-data-flow-walkthroughs)). It operates on live resources;
@@ -501,19 +501,19 @@ Resolution + permission checks live in `ResourceAccountResolverImpl`
 The apply planner ([`services/apply_resource_planner.rs`](/src/domain/resources/services/src/services/apply_resource_planner.rs))
 decides create vs update by resolving the target resource first:
 
-- **No `uid` in manifest** → resolve by `(account, kind, name)`. Found → update; not found → create
+- **No `id` in manifest** → resolve by `(account, kind, name)`. Found → update; not found → create
   (new UID allocated).
-- **`uid` in manifest** → load that exact resource (the "exact pointer"). This is what enables a
-  **rename**: supply the `uid` and a new `headers.name`; identity stays stable while the name
+- **`id` in manifest** → load that exact resource (the "exact pointer"). This is what enables a
+  **rename**: supply the `id` and a new `headers.name`; identity stays stable while the name
   changes.
 
 Concrete conflict cases:
 
 | Case | Outcome |
 | --- | --- |
-| `uid` + changed `headers.name` | **Rename** — name updated on the same resource (`Update`). |
-| `uid` whose resource is a different `kind` (or apiVersion type) | **Reject** — `ResourceTypeMismatchError`. |
-| `uid` resolving to a resource in a different account | **Not found** — `ResourceUIDNotFoundError` (account-scoped lookup; existence not leaked). |
+| `id` + changed `headers.name` | **Rename** — name updated on the same resource (`Update`). |
+| `id` whose resource is a different `kind` (or apiVersion type) | **Reject** — `ResourceTypeMismatchError`. |
+| `id` resolving to a resource in a different account | **Not found** — `ResourceIDNotFoundError` (account-scoped lookup; existence not leaked). |
 | `headers.account` targeting another account without admin | **Reject** — `AccessError::Unauthorized` ([§7](#7-account-resolution--authorization)). |
 | Rename target name already taken (same account+kind) | **Reject** — unique-constraint `Duplicate` at persistence. |
 | Update by name where another account has the same name | **No conflict** — the account disambiguates; each `(account, kind, name)` is independent. |
@@ -612,7 +612,7 @@ pub trait ResourceFacade: Send + Sync {
 
     async fn plan_apply_manifest(&self, request: ApplyManifestRequest) -> Result<ApplyManifestPlanningDecision, ...>;
     async fn apply_manifest(&self, request: ApplyManifestRequest) -> Result<ApplyManifestApplicationDecision, ...>;
-    async fn delete(&self, selector: ResourceSelector) -> Result<ResourceUID, ...>;
+    async fn delete(&self, selector: ResourceSelector) -> Result<ResourceID, ...>;
     async fn delete_many(&self, selector: ResourceBatchSelector) -> ...;
 }
 ```
@@ -622,7 +622,7 @@ pub trait ResourceFacade: Send + Sync {
 ```rust
 pub struct ResourceSelector { pub account: Option<ResourceManifestAccount>, pub kind: String,
                               pub api_version: Option<String>, pub resource_ref: ResourceRef }
-pub enum   ResourceRef { ById(ResourceUID), ByName(ResourceName) }
+pub enum   ResourceRef { ById(ResourceID), ByName(ResourceName) }
 pub enum   ResourceManifestFormat { Json, Yaml }
 pub enum   SpecViewMode { Encrypted /* default */, Revealed }
 ```
@@ -798,7 +798,7 @@ sequenceDiagram
     participant ST as Event store + repo
     participant OB as Outbox
 
-    UC->>L: load(uid)  %% needs_reconciliation()? observed_generation < generation
+    UC->>L: load(id)  %% needs_reconciliation()? observed_generation < generation
     UC->>ST: try_mark_reconciliation_started → append event
     UC->>Rec: reconcile(resource)  %% e.g. SecretSet builds encrypted projection
     alt success
@@ -856,7 +856,7 @@ flowchart LR
     A["apply use case<br/>(persist + produce Applied)"] --> OB[("Outbox")]
     OB --> C["ResourceLifecycleMessageConsumer<br/>(event bridge)"]
     C -->|lookup by kind/apiVersion| D["per-kind ResourceLifecycleEventDispatcher<br/>handle_applied()"]
-    D --> R["ReconcileResourceUseCase::execute(uid)"]
+    D --> R["ReconcileResourceUseCase::execute(id)"]
     R --> Rec["Reconciler&lt;R&gt;"]
 ```
 
@@ -865,7 +865,7 @@ flowchart LR
    `MESSAGE_CONSUMER_KAMU_RESOURCE_LIFECYCLE_EVENT_BRIDGE`,
    [`message_handlers/resource_lifecycle_message_consumer.rs`](/src/domain/resources/services/src/message_handlers/resource_lifecycle_message_consumer.rs))
    consumes it and looks up the per-kind `ResourceLifecycleEventDispatcher` by descriptor.
-3. That dispatcher's `handle_applied` calls **`ReconcileResourceUseCase::execute(uid)`**, which loads
+3. That dispatcher's `handle_applied` calls **`ReconcileResourceUseCase::execute(id)`**, which loads
    the aggregate, marks reconciliation started, invokes the kind's `Reconciler<R>`, and records the
    outcome (producing `ReconciliationSucceeded` / `ReconciliationFailed`).
 
@@ -1053,11 +1053,11 @@ list/search, supported kinds, get-identity, error taxonomy, delete, render-manif
 summary, and spec view modes.
 
 **E2E (CLI)** —
-[`src/e2e/app/cli/repo-tests/src/commands/resources`](/src/e2e/app/cli/repo-tests/src/commands/resources).
+[`src/e2e/app/cli/repo-tests/src/commands/resources`](/src/e2e/app/cli/repo-tests/src/commands/resources/).
 Drive the real CLI binary via `KamuCliPuppet`. A `ResourceCtx` abstraction
 (`repo-tests/src/resources/context.rs`) runs every scenario against **both** an implicit local
 context and a registered remote context. The `get_view.rs` helper parses `get -o json` into a
-queryable `ResourceView` (`ident()`, `variable()`, `has_secret()`, `uid()`, …) so assertions are
+queryable `ResourceView` (`ident()`, `variable()`, `has_secret()`, `id()`, …) so assertions are
 targeted rather than brittle; a golden-view test pins the whole-document shape once per kind.
 
 ### Testing policy — what belongs where

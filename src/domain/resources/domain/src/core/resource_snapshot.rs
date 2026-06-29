@@ -16,16 +16,16 @@ use serde::{Deserialize, Serialize};
 use crate::{
     PendingStatusFromSpec,
     ResourceHeaders,
+    ResourceID,
     ResourceStatus,
     ResourceStatusLike,
-    ResourceUID,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceSnapshot {
-    pub uid: ResourceUID,
+    pub id: ResourceID,
     pub kind: String,
     pub api_version: String,
     pub headers: ResourceHeaders,
@@ -68,7 +68,7 @@ pub type ResourceSnapshotStream<'a> = std::pin::Pin<
 
 pub fn decode_typed_resource_snapshot<TSpec, TStatus>(
     snapshot: ResourceSnapshot,
-) -> Result<(ResourceUID, ResourceHeaders, TSpec, TStatus), InternalError>
+) -> Result<(ResourceID, ResourceHeaders, TSpec, TStatus), InternalError>
 where
     TSpec: DeserializeOwned,
     TStatus: DeserializeOwned + PendingStatusFromSpec<TSpec>,
@@ -79,13 +79,13 @@ where
         None => TStatus::pending_from_spec(&spec),
     };
 
-    Ok((snapshot.uid, snapshot.headers, spec, status))
+    Ok((snapshot.id, snapshot.headers, spec, status))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn make_typed_resource_snapshot<TSpec, TStatus>(
-    uid: ResourceUID,
+    id: ResourceID,
     kind: &'static str,
     api_version: &'static str,
     headers: ResourceHeaders,
@@ -102,7 +102,7 @@ where
     let last_reconciled_at = status.resource_status().last_reconciled_at();
 
     Ok(ResourceSnapshot {
-        uid,
+        id,
         kind: kind.to_string(),
         api_version: api_version.to_string(),
         headers,

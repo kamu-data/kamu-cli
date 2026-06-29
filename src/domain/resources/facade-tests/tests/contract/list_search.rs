@@ -22,7 +22,7 @@ use crate::helpers::{
     SECRET_SET_KIND,
     VARIABLE_SET_API_VERSION,
     VARIABLE_SET_KIND,
-    apply_manifest_and_get_uid,
+    apply_manifest_and_get_id,
     normalize_identity_views,
     normalize_summary_views,
     secret_set_manifest_json,
@@ -33,7 +33,7 @@ use crate::helpers::{
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn create_resource(h: &impl FacadeContractHarness, account: TestAccount, name: &str) {
-    apply_manifest_and_get_uid(
+    apply_manifest_and_get_id(
         h,
         account,
         variable_set_manifest_json(name, None, &[("K", "v")]),
@@ -83,7 +83,7 @@ pub async fn test_list_summaries_for_account(h: &impl FacadeContractHarness) {
             s.api_version, VARIABLE_SET_API_VERSION,
             "api_version must match"
         );
-        assert!(!s.uid.to_string().is_empty(), "uid must be set");
+        assert!(!s.id.to_string().is_empty(), "id must be set");
     }
 }
 
@@ -414,20 +414,20 @@ contract_test!(search_multi_kind, super::test_search_multi_kind);
 
 pub async fn test_search_multi_kind(h: &impl FacadeContractHarness) {
     // Create one VariableSet and one SecretSet with a shared name prefix
-    apply_manifest_and_get_uid(
+    apply_manifest_and_get_id(
         h,
         TestAccount::Alice,
         variable_set_manifest_json("multi-kind-vs", None, &[("K", "v")]),
     )
     .await;
-    apply_manifest_and_get_uid(
+    apply_manifest_and_get_id(
         h,
         TestAccount::Alice,
         secret_set_manifest_json("multi-kind-ss", None, &[("K", "v")]),
     )
     .await;
     // A third resource that must not appear in results
-    apply_manifest_and_get_uid(
+    apply_manifest_and_get_id(
         h,
         TestAccount::Alice,
         variable_set_manifest_json("other-resource", None, &[("K", "v")]),

@@ -19,10 +19,10 @@ use kamu_cli::services::resources::{
     ResourceSelectionSyntax,
 };
 use kamu_resources::{
+    ResourceID,
     ResourceIdentityView,
     ResourceKindDescriptor,
     ResourceNameNotFoundError,
-    ResourceUID,
 };
 use kamu_resources_facade::{
     MockResourceFacade,
@@ -63,7 +63,7 @@ async fn resolves_exact_kind_name_patterns_via_search() {
             kind: VARIABLESET_KIND.to_string(),
             api_version: API_VERSION_V1.to_string(),
             canonical_kind_name: VARIABLESETS_NAME.to_string(),
-            uid: ResourceUID::new(uuid::Uuid::new_v4()),
+            id: ResourceID::new(uuid::Uuid::new_v4()),
             name: "app-alpha".to_string(),
         }],
         Arc::clone(&search_requests),
@@ -186,7 +186,7 @@ async fn resolves_kind_patterns_with_exact_names_in_supported_kind_order() {
                     kind: SECRETSET_KIND.to_string(),
                     api_version: API_VERSION_V1.to_string(),
                     canonical_kind_name: SECRETSETS_NAME.to_string(),
-                    uid: ResourceUID::new(uuid::Uuid::new_v4()),
+                    id: ResourceID::new(uuid::Uuid::new_v4()),
                     name: RESOURCE_DB_CREDS.to_string(),
                 }),
             ),
@@ -196,7 +196,7 @@ async fn resolves_kind_patterns_with_exact_names_in_supported_kind_order() {
                     kind: STORAGE_KIND.to_string(),
                     api_version: API_VERSION_V1.to_string(),
                     canonical_kind_name: STORAGES_NAME.to_string(),
-                    uid: ResourceUID::new(uuid::Uuid::new_v4()),
+                    id: ResourceID::new(uuid::Uuid::new_v4()),
                     name: RESOURCE_DB_CREDS.to_string(),
                 }),
             ),
@@ -260,14 +260,14 @@ async fn resolves_kind_pattern_all_via_search_across_matched_kinds() {
                 kind: SECRETSET_KIND.to_string(),
                 api_version: API_VERSION_V1.to_string(),
                 canonical_kind_name: SECRETSETS_NAME.to_string(),
-                uid: ResourceUID::new(uuid::Uuid::new_v4()),
+                id: ResourceID::new(uuid::Uuid::new_v4()),
                 name: "db-creds".to_string(),
             },
             ResourceIdentityView {
                 kind: STORAGE_KIND.to_string(),
                 api_version: API_VERSION_V1.to_string(),
                 canonical_kind_name: STORAGES_NAME.to_string(),
-                uid: ResourceUID::new(uuid::Uuid::new_v4()),
+                id: ResourceID::new(uuid::Uuid::new_v4()),
                 name: "warehouse".to_string(),
             },
         ],
@@ -325,14 +325,14 @@ async fn resolves_kind_pattern_name_patterns_via_single_search_across_matched_ki
                 kind: SECRETSET_KIND.to_string(),
                 api_version: API_VERSION_V1.to_string(),
                 canonical_kind_name: SECRETSETS_NAME.to_string(),
-                uid: ResourceUID::new(uuid::Uuid::new_v4()),
+                id: ResourceID::new(uuid::Uuid::new_v4()),
                 name: "db-creds".to_string(),
             },
             ResourceIdentityView {
                 kind: STORAGE_KIND.to_string(),
                 api_version: API_VERSION_V1.to_string(),
                 canonical_kind_name: STORAGES_NAME.to_string(),
-                uid: ResourceUID::new(uuid::Uuid::new_v4()),
+                id: ResourceID::new(uuid::Uuid::new_v4()),
                 name: "db-warehouse".to_string(),
             },
         ],
@@ -382,9 +382,9 @@ async fn resolves_kind_pattern_name_patterns_via_single_search_across_matched_ki
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn kind_pattern_exact_uuid_tries_every_matched_kind() {
+async fn kind_pattern_exact_id_tries_every_matched_kind() {
     let mut harness = ResourceSelectionResolutionHarness::new();
-    let uid = ResourceUID::new(uuid::Uuid::new_v4());
+    let id = ResourceID::new(uuid::Uuid::new_v4());
     harness.expect_list_supported_kinds(vec![
         harness.secretset_kind_descriptor(),
         harness.storage_kind_descriptor(),
@@ -399,7 +399,7 @@ async fn kind_pattern_exact_uuid_tries_every_matched_kind() {
                 kind: STORAGE_KIND.to_string(),
                 api_version: API_VERSION_V1.to_string(),
                 canonical_kind_name: STORAGES_NAME.to_string(),
-                uid,
+                id,
                 name: RESOURCE_DB_CREDS.to_string(),
             }),
         )]),
@@ -412,8 +412,8 @@ async fn kind_pattern_exact_uuid_tries_every_matched_kind() {
             ResourceSelectionSyntax {
                 items: vec![ResourceSelectionItem::KindPatternExactName {
                     kind_pattern: KIND_PATTERN_S.to_string(),
-                    selector_input: format!("{KIND_PATTERN_S}/{uid}"),
-                    resource_ref: kamu_resources_facade::ResourceRef::ById(uid),
+                    selector_input: format!("{KIND_PATTERN_S}/{id}"),
+                    resource_ref: kamu_resources_facade::ResourceRef::ById(id),
                 }],
                 shadowed_selectors: Vec::new(),
             },
@@ -583,7 +583,7 @@ async fn errors_on_unmatched_kind_pattern_name_patterns_by_default() {
 #[test_log::test(tokio::test)]
 async fn deduplicates_overlapping_name_patterns_before_counting_max_results() {
     let mut harness = ResourceSelectionResolutionHarness::new();
-    let shared_uid = ResourceUID::new(uuid::Uuid::new_v4());
+    let shared_id = ResourceID::new(uuid::Uuid::new_v4());
     let search_requests = Arc::new(Mutex::new(Vec::new()));
     harness.expect_search_identities(
         2,
@@ -591,7 +591,7 @@ async fn deduplicates_overlapping_name_patterns_before_counting_max_results() {
             kind: VARIABLESET_KIND.to_string(),
             api_version: API_VERSION_V1.to_string(),
             canonical_kind_name: VARIABLESETS_NAME.to_string(),
-            uid: shared_uid,
+            id: shared_id,
             name: "app-alpha".to_string(),
         }],
         Arc::clone(&search_requests),
@@ -625,7 +625,7 @@ async fn deduplicates_overlapping_name_patterns_before_counting_max_results() {
         .unwrap();
 
     assert_eq!(result.targets.len(), 1);
-    assert_eq!(result.targets[0].uid, shared_uid);
+    assert_eq!(result.targets[0].id, shared_id);
     assert_eq!(result.targets[0].selector_input, NAME_APP_PATTERN);
 
     let requests = search_requests.lock().unwrap();
@@ -637,7 +637,7 @@ async fn deduplicates_overlapping_name_patterns_before_counting_max_results() {
 #[test_log::test(tokio::test)]
 async fn deduplicates_repeated_kind_pattern_exact_name_matches() {
     let mut harness = ResourceSelectionResolutionHarness::new();
-    let shared_uid = ResourceUID::new(uuid::Uuid::new_v4());
+    let shared_id = ResourceID::new(uuid::Uuid::new_v4());
     harness.expect_list_supported_kinds(vec![harness.secretset_kind_descriptor()]);
 
     let get_identity_requests = Arc::new(Mutex::new(Vec::new()));
@@ -649,7 +649,7 @@ async fn deduplicates_repeated_kind_pattern_exact_name_matches() {
                 kind: SECRETSET_KIND.to_string(),
                 api_version: API_VERSION_V1.to_string(),
                 canonical_kind_name: SECRETSETS_NAME.to_string(),
-                uid: shared_uid,
+                id: shared_id,
                 name: RESOURCE_DB_CREDS.to_string(),
             }),
         )]),
@@ -688,7 +688,7 @@ async fn deduplicates_repeated_kind_pattern_exact_name_matches() {
         .unwrap();
 
     assert_eq!(result.targets.len(), 1);
-    assert_eq!(result.targets[0].uid, shared_uid);
+    assert_eq!(result.targets[0].id, shared_id);
 
     let requests = get_identity_requests.lock().unwrap();
     assert_eq!(requests.len(), 2);
@@ -699,7 +699,7 @@ async fn deduplicates_repeated_kind_pattern_exact_name_matches() {
 #[test_log::test(tokio::test)]
 async fn deduplicates_kind_pattern_all_before_counting_max_results() {
     let mut harness = ResourceSelectionResolutionHarness::new();
-    let shared_uid = ResourceUID::new(uuid::Uuid::new_v4());
+    let shared_id = ResourceID::new(uuid::Uuid::new_v4());
     harness.expect_list_supported_kinds(vec![harness.secretset_kind_descriptor()]);
 
     let search_requests = Arc::new(Mutex::new(Vec::new()));
@@ -709,7 +709,7 @@ async fn deduplicates_kind_pattern_all_before_counting_max_results() {
             kind: SECRETSET_KIND.to_string(),
             api_version: API_VERSION_V1.to_string(),
             canonical_kind_name: SECRETSETS_NAME.to_string(),
-            uid: shared_uid,
+            id: shared_id,
             name: RESOURCE_DB_CREDS.to_string(),
         }],
         Arc::clone(&search_requests),
@@ -724,7 +724,7 @@ async fn deduplicates_kind_pattern_all_before_counting_max_results() {
                 kind: SECRETSET_KIND.to_string(),
                 api_version: API_VERSION_V1.to_string(),
                 canonical_kind_name: SECRETSETS_NAME.to_string(),
-                uid: shared_uid,
+                id: shared_id,
                 name: RESOURCE_DB_CREDS.to_string(),
             }),
         )]),
@@ -760,7 +760,7 @@ async fn deduplicates_kind_pattern_all_before_counting_max_results() {
         .unwrap();
 
     assert_eq!(result.targets.len(), 1);
-    assert_eq!(result.targets[0].uid, shared_uid);
+    assert_eq!(result.targets[0].id, shared_id);
 
     let search_requests = search_requests.lock().unwrap();
     assert_eq!(search_requests.len(), 1);
@@ -774,7 +774,7 @@ async fn deduplicates_kind_pattern_all_before_counting_max_results() {
 #[test_log::test(tokio::test)]
 async fn deduplicates_kind_pattern_name_patterns_before_counting_max_results() {
     let mut harness = ResourceSelectionResolutionHarness::new();
-    let shared_uid = ResourceUID::new(uuid::Uuid::new_v4());
+    let shared_id = ResourceID::new(uuid::Uuid::new_v4());
     harness.expect_list_supported_kinds(vec![harness.secretset_kind_descriptor()]);
 
     let search_requests = Arc::new(Mutex::new(Vec::new()));
@@ -784,7 +784,7 @@ async fn deduplicates_kind_pattern_name_patterns_before_counting_max_results() {
             kind: SECRETSET_KIND.to_string(),
             api_version: API_VERSION_V1.to_string(),
             canonical_kind_name: SECRETSETS_NAME.to_string(),
-            uid: shared_uid,
+            id: shared_id,
             name: RESOURCE_DB_CREDS.to_string(),
         }],
         Arc::clone(&search_requests),
@@ -818,7 +818,7 @@ async fn deduplicates_kind_pattern_name_patterns_before_counting_max_results() {
         .unwrap();
 
     assert_eq!(result.targets.len(), 1);
-    assert_eq!(result.targets[0].uid, shared_uid);
+    assert_eq!(result.targets[0].id, shared_id);
     assert_eq!(
         result.targets[0].selector_input,
         format!("{KIND_PATTERN_S}/db-%")
@@ -833,8 +833,8 @@ async fn deduplicates_kind_pattern_name_patterns_before_counting_max_results() {
 #[test_log::test(tokio::test)]
 async fn errors_when_unique_targets_exceed_max_results_after_deduplication() {
     let mut harness = ResourceSelectionResolutionHarness::new();
-    let shared_uid = ResourceUID::new(uuid::Uuid::new_v4());
-    let second_uid = ResourceUID::new(uuid::Uuid::new_v4());
+    let shared_id = ResourceID::new(uuid::Uuid::new_v4());
+    let second_id = ResourceID::new(uuid::Uuid::new_v4());
     let search_requests = Arc::new(Mutex::new(Vec::new()));
     harness.expect_search_identities(
         1,
@@ -843,14 +843,14 @@ async fn errors_when_unique_targets_exceed_max_results_after_deduplication() {
                 kind: VARIABLESET_KIND.to_string(),
                 api_version: API_VERSION_V1.to_string(),
                 canonical_kind_name: VARIABLESETS_NAME.to_string(),
-                uid: shared_uid,
+                id: shared_id,
                 name: "app-alpha".to_string(),
             },
             ResourceIdentityView {
                 kind: VARIABLESET_KIND.to_string(),
                 api_version: API_VERSION_V1.to_string(),
                 canonical_kind_name: VARIABLESETS_NAME.to_string(),
-                uid: second_uid,
+                id: second_id,
                 name: "app-beta".to_string(),
             },
         ],
@@ -948,8 +948,8 @@ impl ResourceSelectionResolutionHarness {
                 }
 
                 match selector.resource_ref {
-                    ResourceRef::ById(uid) => Err(ResourceLookupProblem::UIDNotFound(
-                        kamu_resources::ResourceUIDNotFoundError(uid),
+                    ResourceRef::ById(id) => Err(ResourceLookupProblem::IDNotFound(
+                        kamu_resources::ResourceIDNotFoundError(id),
                     )
                     .into()),
                     ResourceRef::ByName(name) => Err(ResourceLookupProblem::NameNotFound(

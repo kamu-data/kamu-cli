@@ -128,7 +128,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .resolve_target_account(selector.account.as_ref())
             .await?;
 
-        let uid = resolve_resource_uid::<GetResourceError>(
+        let id = resolve_resource_id::<GetResourceError>(
             self.generic_resource_query_service.as_ref(),
             &selector.kind,
             &target_account.id,
@@ -137,7 +137,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         .await?;
 
         let snapshot = self
-            .resolve_snapshot_for_kind::<GetResourceError>(&selector.kind, &target_account.id, uid)
+            .resolve_snapshot_for_kind::<GetResourceError>(&selector.kind, &target_account.id, id)
             .await?;
 
         ensure_requested_api_version::<GetResourceError>(
@@ -168,7 +168,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         get_resource_crud_dispatcher_by_kind::<BatchResourceError>(&self.catalog, &kind)?;
 
         let groups = group_batch_resource_refs(selector);
-        let resolution_response = resolve_batch_uids(
+        let resolution_response = resolve_batch_ids(
             self.generic_resource_query_service.as_ref(),
             &target_account.id,
             &kind,
@@ -177,11 +177,11 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         .await?;
 
         let (identities, problems) = self
-            .resolve_uid_identity_groups(
+            .resolve_id_identity_groups(
                 &target_account.id,
                 &kind,
                 api_version.as_ref(),
-                resolution_response.uid_entries,
+                resolution_response.id_entries,
                 resolution_response.problems,
                 &descriptors_by_key,
             )
@@ -387,7 +387,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         let plan = prepared
             .dispatcher
             .plan_apply(ResourceCrudDispatcherApplyRequest {
-                uid: prepared.uid,
+                id: prepared.id,
                 headers: prepared.header,
                 spec: prepared.spec,
             })
@@ -418,7 +418,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         let result = prepared
             .dispatcher
             .apply(ResourceCrudDispatcherApplyRequest {
-                uid: prepared.uid,
+                id: prepared.id,
                 headers: prepared.header,
                 spec: prepared.spec,
             })
@@ -443,7 +443,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
     async fn delete_many(
         &self,
         selector: ResourceBatchSelector,
-    ) -> Result<BatchResourceResponse<ResourceUID, ResourceLookupProblem>, BatchResourceError> {
+    ) -> Result<BatchResourceResponse<ResourceID, ResourceLookupProblem>, BatchResourceError> {
         let target_account = self
             .resource_account_resolver
             .resolve_target_account(selector.account.as_ref())
@@ -454,7 +454,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         get_resource_crud_dispatcher_by_kind::<BatchResourceError>(&self.catalog, &kind)?;
 
         let groups = group_batch_resource_refs(selector);
-        let resolution_response = resolve_batch_uids(
+        let resolution_response = resolve_batch_ids(
             self.generic_resource_query_service.as_ref(),
             &target_account.id,
             &kind,
@@ -464,28 +464,28 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 
         let mut problems = resolution_response.problems;
         let mut successes = Vec::new();
-        let mut seen_valid_uids = HashSet::new();
-        let mut uids_by_api_version = HashMap::<String, Vec<ResourceUID>>::new();
+        let mut seen_valid_ids = HashSet::new();
+        let mut ids_by_api_version = HashMap::<String, Vec<ResourceID>>::new();
 
-        let uids = resolution_response
-            .uid_entries
+        let ids = resolution_response
+            .id_entries
             .iter()
-            .map(|(_, _, uid)| *uid)
+            .map(|(_, _, id)| *id)
             .collect::<Vec<_>>();
 
-        let rows_by_uid = self
+        let rows_by_id = self
             .generic_resource_query_service
-            .find_resource_identities_by_uids(&target_account.id, &uids)
+            .find_resource_identities_by_ids(&target_account.id, &ids)
             .await?
             .into_iter()
-            .map(|row| (row.uid, row))
+            .map(|row| (row.id, row))
             .collect::<HashMap<_, _>>();
 
-        for (request_index, _, uid) in resolution_response.uid_entries {
-            let row_result = rows_by_uid
-                .get(uid.as_ref())
+        for (request_index, _, id) in resolution_response.id_entries {
+            let row_result = rows_by_id
+                .get(id.as_ref())
                 .cloned()
-                .ok_or_else(|| uid_not_found(uid));
+                .ok_or_else(|| id_not_found(id));
 
             match row_result.and_then(|row| {
                 validate_identity_row(
@@ -499,14 +499,14 @@ impl ResourceFacade for LocalResourceFacadeImpl {
                 Ok(row) => {
                     successes.push(BatchResourceSuccess {
                         request_index,
-                        item: uid,
+                        item: id,
                     });
 
-                    if seen_valid_uids.insert(uid) {
-                        uids_by_api_version
+                    if seen_valid_ids.insert(id) {
+                        ids_by_api_version
                             .entry(row.api_version)
                             .or_default()
-                            .push(uid);
+                            .push(id);
                     }
                 }
                 Err(error) => problems.push(BatchResourceProblem {
@@ -516,7 +516,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             }
         }
 
-        for (api_version, uids) in uids_by_api_version {
+        for (api_version, ids) in ids_by_api_version {
             let dispatcher = get_resource_crud_dispatcher::<BatchResourceError>(
                 &self.catalog,
                 &kind,
@@ -525,7 +525,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             dispatcher
                 .delete(ResourceCrudDispatcherDeleteRequest {
                     account_id: target_account.id.clone(),
-                    uids,
+                    ids,
                 })
                 .await?;
         }
@@ -539,7 +539,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         })
     }
 
-    async fn delete(&self, selector: ResourceSelector) -> Result<ResourceUID, DeleteResourceError> {
+    async fn delete(&self, selector: ResourceSelector) -> Result<ResourceID, DeleteResourceError> {
         let response = self
             .delete_many(ResourceBatchSelector {
                 account: selector.account,
@@ -626,7 +626,7 @@ impl LocalResourceFacadeImpl {
             .resolve_target_account(selector.account.as_ref())
             .await?;
 
-        let uid = resolve_resource_uid::<E>(
+        let id = resolve_resource_id::<E>(
             self.generic_resource_query_service.as_ref(),
             &selector.kind,
             &target_account.id,
@@ -635,7 +635,7 @@ impl LocalResourceFacadeImpl {
         .await?;
 
         let snapshot = self
-            .resolve_snapshot_for_kind::<E>(&selector.kind, &target_account.id, uid)
+            .resolve_snapshot_for_kind::<E>(&selector.kind, &target_account.id, id)
             .await?;
 
         ensure_requested_api_version::<E>(selector.api_version.as_ref(), &snapshot.api_version)?;
@@ -649,7 +649,7 @@ impl LocalResourceFacadeImpl {
         let view = dispatcher
             .get(ResourceCrudDispatcherGetRequest {
                 account_id: target_account.id.clone(),
-                uid,
+                id,
             })
             .await?;
 
@@ -685,7 +685,7 @@ impl LocalResourceFacadeImpl {
 
         let groups = group_batch_resource_refs(selector);
 
-        let resolution_response = resolve_batch_uids(
+        let resolution_response = resolve_batch_ids(
             self.generic_resource_query_service.as_ref(),
             &target_account.id,
             &kind,
@@ -696,30 +696,30 @@ impl LocalResourceFacadeImpl {
         let mut indexed_resources = Vec::new();
         let mut problems = resolution_response.problems;
 
-        let uids = resolution_response
-            .uid_entries
+        let ids = resolution_response
+            .id_entries
             .iter()
-            .map(|(_, _, uid)| *uid)
+            .map(|(_, _, id)| *id)
             .collect::<Vec<_>>();
 
-        let snapshots_by_uid = self
+        let snapshots_by_id = self
             .generic_resource_query_service
-            .find_snapshots_by_uids(&target_account.id, &uids)
+            .find_snapshots_by_ids(&target_account.id, &ids)
             .await?
             .into_iter()
-            .map(|snapshot| (snapshot.uid, snapshot))
+            .map(|snapshot| (snapshot.id, snapshot))
             .collect::<HashMap<_, _>>();
 
-        for (request_index, _, uid) in resolution_response.uid_entries {
-            match snapshots_by_uid
-                .get(&uid)
+        for (request_index, _, id) in resolution_response.id_entries {
+            match snapshots_by_id
+                .get(&id)
                 .cloned()
-                .ok_or(ResourceLookupProblem::UIDNotFound(
-                    ResourceUIDNotFoundError(uid),
-                ))
+                .ok_or(ResourceLookupProblem::IDNotFound(ResourceIDNotFoundError(
+                    id,
+                )))
                 .and_then(|snapshot| {
                     ensure_kind_matches::<ResourceLookupProblem>(
-                        snapshot.uid,
+                        snapshot.id,
                         &kind,
                         &snapshot.kind,
                     )?;
@@ -747,7 +747,7 @@ impl LocalResourceFacadeImpl {
                             id: target_account.id.clone(),
                             name: Some(target_account.name.clone()),
                         },
-                        headers: ResourceViewHeaders::from_owned(uid, snapshot.headers),
+                        headers: ResourceViewHeaders::from_owned(id, snapshot.headers),
                         last_reconciled_at: snapshot.last_reconciled_at,
                         spec: snapshot.spec,
                         status: snapshot.status,
@@ -773,12 +773,12 @@ impl LocalResourceFacadeImpl {
         Ok((indexed_resources, problems))
     }
 
-    async fn resolve_uid_identity_groups(
+    async fn resolve_id_identity_groups(
         &self,
         account_id: &odf::AccountID,
         kind: &str,
         api_version: Option<&String>,
-        uid_entries: BatchUidEntries,
+        id_entries: BatchIdEntries,
         mut problems: Vec<BatchResourceProblem<ResourceLookupProblem>>,
         descriptors_by_key: &HashMap<(String, String), String>,
     ) -> Result<
@@ -788,25 +788,22 @@ impl LocalResourceFacadeImpl {
         ),
         BatchResourceError,
     > {
-        let uids = uid_entries
-            .iter()
-            .map(|(_, _, uid)| *uid)
-            .collect::<Vec<_>>();
+        let ids = id_entries.iter().map(|(_, _, id)| *id).collect::<Vec<_>>();
 
-        let rows_by_uid = self
+        let rows_by_id = self
             .generic_resource_query_service
-            .find_resource_identities_by_uids(account_id, &uids)
+            .find_resource_identities_by_ids(account_id, &ids)
             .await?
             .into_iter()
-            .map(|row| (row.uid, row))
+            .map(|row| (row.id, row))
             .collect::<HashMap<_, _>>();
 
         let mut identities = Vec::new();
-        for (request_index, _, uid) in uid_entries {
-            let row_result = rows_by_uid
-                .get(uid.as_ref())
+        for (request_index, _, id) in id_entries {
+            let row_result = rows_by_id
+                .get(id.as_ref())
                 .cloned()
-                .ok_or_else(|| uid_not_found(uid));
+                .ok_or_else(|| id_not_found(id));
             match row_result.and_then(|row| {
                 validate_identity_row(
                     row,
@@ -841,16 +838,16 @@ impl LocalResourceFacadeImpl {
         &self,
         kind: &str,
         account_id: &odf::AccountID,
-        uid: ResourceUID,
+        id: ResourceID,
     ) -> Result<ResourceSnapshot, E>
     where
         E: From<InternalError> + From<ResourceLookupProblem>,
     {
-        let Some(snapshot) = self.find_account_snapshot(account_id, uid).await? else {
-            return Err(ResourceLookupProblem::UIDNotFound(ResourceUIDNotFoundError(uid)).into());
+        let Some(snapshot) = self.find_account_snapshot(account_id, id).await? else {
+            return Err(ResourceLookupProblem::IDNotFound(ResourceIDNotFoundError(id)).into());
         };
 
-        ensure_kind_matches::<E>(uid, kind, &snapshot.kind)?;
+        ensure_kind_matches::<E>(id, kind, &snapshot.kind)?;
 
         Ok(snapshot)
     }
@@ -858,11 +855,11 @@ impl LocalResourceFacadeImpl {
     async fn find_account_snapshot(
         &self,
         account_id: &odf::AccountID,
-        uid: ResourceUID,
+        id: ResourceID,
     ) -> Result<Option<ResourceSnapshot>, InternalError> {
         let Some(snapshot) = self
             .generic_resource_query_service
-            .get_snapshot_by_uid(&uid)
+            .get_snapshot_by_id(&id)
             .await?
         else {
             return Ok(None);
@@ -875,24 +872,24 @@ impl LocalResourceFacadeImpl {
         Ok(Some(snapshot))
     }
 
-    async fn ensure_manifest_uid_is_accessible(
+    async fn ensure_manifest_id_is_accessible(
         &self,
         kind: &str,
         api_version: &str,
         account_id: &odf::AccountID,
-        maybe_uid: Option<ResourceUID>,
+        maybe_id: Option<ResourceID>,
     ) -> Result<(), ApplyManifestError> {
-        let Some(uid) = maybe_uid else {
+        let Some(id) = maybe_id else {
             return Ok(());
         };
 
-        let Some(snapshot) = self.find_account_snapshot(account_id, uid).await? else {
-            return Err(ResourceUIDNotFoundError(uid).into());
+        let Some(snapshot) = self.find_account_snapshot(account_id, id).await? else {
+            return Err(ResourceIDNotFoundError(id).into());
         };
 
         if snapshot.kind != kind || snapshot.api_version != api_version {
             return Err(ResourceTypeMismatchError::new(
-                uid,
+                id,
                 kind.to_string(),
                 api_version.to_string(),
                 snapshot.kind,
@@ -966,17 +963,17 @@ impl LocalResourceFacadeImpl {
         let headers = make_headers_input(&manifest, &target_account)?;
         let header_warnings = collect_manifest_header_warnings(&manifest);
 
-        self.ensure_manifest_uid_is_accessible(
+        self.ensure_manifest_id_is_accessible(
             &manifest.kind,
             &manifest.api_version,
             &target_account.id,
-            manifest.headers.uid,
+            manifest.headers.id,
         )
         .await?;
 
         Ok(PreparedApplyManifest {
             dispatcher,
-            uid: manifest.headers.uid,
+            id: manifest.headers.id,
             header: headers,
             header_warnings,
             target_account,
@@ -1002,7 +999,7 @@ impl LocalResourceFacadeImpl {
 
 struct PreparedApplyManifest {
     dispatcher: Arc<dyn ResourceCrudDispatcher>,
-    uid: Option<ResourceUID>,
+    id: Option<ResourceID>,
     header: ResourceHeadersInput,
     header_warnings: Vec<ResourceWarning>,
     target_account: ResolvedAccount,

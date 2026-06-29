@@ -42,8 +42,8 @@ use crate::tests::utils::{TestResource, TestResourceReconcilerProvider, make_acc
 async fn test_reconcile_returns_error_for_non_applied_resource() {
     let harness = ReconcileTestHarness::dispatching(TestResourceReconcilerProvider::Stub);
 
-    let uid = harness.allocate_resource_uid().await;
-    let result = harness.reconcile_test_uc().execute(&uid).await;
+    let id = harness.allocate_resource_id().await;
+    let result = harness.reconcile_test_uc().execute(&id).await;
 
     assert!(
         matches!(result, Err(ReconcileResourceUseCaseError::LoadFailed(_))),
@@ -62,17 +62,17 @@ async fn test_start_phase_transitions_resource_to_reconciling() {
     let harness = ReconcileTestHarness::dispatching(TestResourceReconcilerProvider::Stub);
 
     let account_id = make_account_id();
-    let uid = harness.apply_and_get_uid(account_id, "res-a").await;
+    let id = harness.apply_and_get_id(account_id, "res-a").await;
 
     let helper = harness.make_reconcile_helper();
 
     let resource = helper
-        .start_reconciliation_phase(uid)
+        .start_reconciliation_phase(id)
         .await
         .unwrap()
         .expect("resource should need reconciliation after apply");
 
-    let snapshot = harness.get_snapshot_by_uid(&uid).await.unwrap();
+    let snapshot = harness.get_snapshot_by_id(&id).await.unwrap();
     let status = snapshot.basic_status().unwrap();
 
     assert_eq!(status.phase, ResourcePhase::Reconciling);
@@ -96,12 +96,12 @@ async fn test_reconcile_success_transitions_resource_to_ready() {
     let harness = ReconcileTestHarness::dispatching(TestResourceReconcilerProvider::Stub);
 
     let account_id = make_account_id();
-    let uid = harness.apply_and_get_uid(account_id, "res-a").await;
+    let id = harness.apply_and_get_id(account_id, "res-a").await;
 
-    harness.reconcile_test_uc().execute(&uid).await.unwrap();
+    harness.reconcile_test_uc().execute(&id).await.unwrap();
     harness.flush_outbox().await;
 
-    let snapshot = harness.get_snapshot_by_uid(&uid).await.unwrap();
+    let snapshot = harness.get_snapshot_by_id(&id).await.unwrap();
     let status = snapshot.basic_status().unwrap();
 
     assert_eq!(status.phase, ResourcePhase::Ready);
@@ -142,14 +142,14 @@ async fn test_reconcile_failure_transitions_resource_to_failed() {
     let harness = ReconcileTestHarness::dispatching(TestResourceReconcilerProvider::Failing);
 
     let account_id = make_account_id();
-    let uid = harness.apply_and_get_uid(account_id, "res-a").await;
+    let id = harness.apply_and_get_id(account_id, "res-a").await;
 
     // Reconciler errors are outcomes, not use-case failures — execute returns
     // Ok(())
-    harness.reconcile_test_uc().execute(&uid).await.unwrap();
+    harness.reconcile_test_uc().execute(&id).await.unwrap();
     harness.flush_outbox().await;
 
-    let snapshot = harness.get_snapshot_by_uid(&uid).await.unwrap();
+    let snapshot = harness.get_snapshot_by_id(&id).await.unwrap();
     let status = snapshot.basic_status().unwrap();
 
     assert_eq!(status.phase, ResourcePhase::Failed);
@@ -184,9 +184,9 @@ async fn test_reconcile_invokes_reconciler_exactly_once() {
     ));
 
     let account_id = make_account_id();
-    let uid = harness.apply_and_get_uid(account_id, "res-a").await;
+    let id = harness.apply_and_get_id(account_id, "res-a").await;
 
-    harness.reconcile_test_uc().execute(&uid).await.unwrap();
+    harness.reconcile_test_uc().execute(&id).await.unwrap();
     harness.flush_outbox().await;
 
     assert_eq!(counter.load(Ordering::SeqCst), 1);
@@ -205,10 +205,10 @@ async fn test_already_reconciled_is_no_op_and_reconciler_is_not_called() {
     ));
 
     let account_id = make_account_id();
-    let uid = harness.apply_and_get_uid(account_id, "res-a").await;
+    let id = harness.apply_and_get_id(account_id, "res-a").await;
 
     // First execute: Pending → reconciler called once → Ready
-    harness.reconcile_test_uc().execute(&uid).await.unwrap();
+    harness.reconcile_test_uc().execute(&id).await.unwrap();
     harness.flush_outbox().await;
 
     assert_eq!(
@@ -218,7 +218,7 @@ async fn test_already_reconciled_is_no_op_and_reconciler_is_not_called() {
     );
 
     // Second execute: already Ready — no-op, no outbox message posted
-    harness.reconcile_test_uc().execute(&uid).await.unwrap();
+    harness.reconcile_test_uc().execute(&id).await.unwrap();
     harness.flush_outbox().await;
 
     assert_eq!(
@@ -228,7 +228,7 @@ async fn test_already_reconciled_is_no_op_and_reconciler_is_not_called() {
     );
 
     // State must be unchanged after the no-op
-    let snapshot = harness.get_snapshot_by_uid(&uid).await.unwrap();
+    let snapshot = harness.get_snapshot_by_id(&id).await.unwrap();
     let status = snapshot.basic_status().unwrap();
     assert_eq!(status.phase, ResourcePhase::Ready);
     assert_eq!(snapshot.headers.generation, 1);
@@ -251,9 +251,9 @@ async fn test_reconcile_success_posts_reconciliation_succeeded_message() {
     );
 
     let account_id = make_account_id();
-    let uid = harness.apply_and_get_uid(account_id, "res-a").await;
+    let id = harness.apply_and_get_id(account_id, "res-a").await;
 
-    harness.reconcile_test_uc().execute(&uid).await.unwrap();
+    harness.reconcile_test_uc().execute(&id).await.unwrap();
     // MockOutbox verifies expected call counts on drop
 }
 
@@ -271,9 +271,9 @@ async fn test_reconcile_failure_posts_reconciliation_failed_message() {
     );
 
     let account_id = make_account_id();
-    let uid = harness.apply_and_get_uid(account_id, "res-a").await;
+    let id = harness.apply_and_get_id(account_id, "res-a").await;
 
-    harness.reconcile_test_uc().execute(&uid).await.unwrap();
+    harness.reconcile_test_uc().execute(&id).await.unwrap();
     // MockOutbox verifies expected call counts on drop
 }
 
@@ -289,20 +289,20 @@ async fn test_finish_phase_after_concurrent_spec_update_returns_error() {
     let harness = ReconcileTestHarness::dispatching(TestResourceReconcilerProvider::Stub);
 
     let account_id = make_account_id();
-    let uid = harness.apply_and_get_uid(account_id.clone(), "res-a").await;
+    let id = harness.apply_and_get_id(account_id.clone(), "res-a").await;
 
     let helper = harness.make_reconcile_helper();
 
     // Phase 1: commit ReconciliationStarted; capture the aggregate at that version
     let resource_before_concurrent_update = helper
-        .start_reconciliation_phase(uid)
+        .start_reconciliation_phase(id)
         .await
         .unwrap()
         .expect("resource should need reconciliation");
 
     // Concurrent apply: adds a SpecUpdated event and bumps generation to 2
     let update_params = ApplyResourceParams {
-        uid: Some(uid),
+        id: Some(id),
         headers: BaseResourceServiceHarness::make_headers_input(account_id, "res-a"),
         spec: crate::tests::utils::TestResourceSpec {
             value: "updated-concurrently".to_string(),
@@ -329,7 +329,7 @@ async fn test_finish_phase_after_concurrent_spec_update_returns_error() {
     );
 
     // The concurrent apply wins: generation=2, phase=Pending
-    let snapshot = harness.get_snapshot_by_uid(&uid).await.unwrap();
+    let snapshot = harness.get_snapshot_by_id(&id).await.unwrap();
     let status = snapshot.basic_status().unwrap();
     assert_eq!(snapshot.headers.generation, 2);
     assert_eq!(status.phase, ResourcePhase::Pending);
@@ -348,16 +348,16 @@ async fn test_reconcile_after_delete_returns_ok_but_snapshot_is_gone() {
     let harness = ReconcileTestHarness::dispatching(TestResourceReconcilerProvider::Stub);
 
     let account_id = make_account_id();
-    let uid = harness.apply_and_get_uid(account_id.clone(), "res-a").await;
+    let id = harness.apply_and_get_id(account_id.clone(), "res-a").await;
 
-    harness.delete_resources(account_id, vec![uid]).await;
+    harness.delete_resources(account_id, vec![id]).await;
 
     assert!(
-        harness.get_snapshot_by_uid(&uid).await.is_none(),
+        harness.get_snapshot_by_id(&id).await.is_none(),
         "snapshot must be absent immediately after delete"
     );
 
-    let result = harness.reconcile_test_uc().execute(&uid).await;
+    let result = harness.reconcile_test_uc().execute(&id).await;
     assert!(
         matches!(result, Err(ReconcileResourceUseCaseError::Lifecycle(_))),
         "expected Lifecycle(InvariantViolation) for a deleted resource, got: {result:?}"

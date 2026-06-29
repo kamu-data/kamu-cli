@@ -22,7 +22,7 @@
 //!
 //! Neither question is served by comparing the *whole* `get -o json` document.
 //! A full-document comparison forces every test to (re-)assert volatile fields
-//! (`uid`, `account`, timestamps) and incidental server state (the reconciler
+//! (`id`, `account`, timestamps) and incidental server state (the reconciler
 //! status block, `stats`, condition timestamps) that the test does not care
 //! about — so an unrelated status change breaks selector tests with a diff that
 //! points at the wrong feature.
@@ -79,11 +79,10 @@ impl ResourceView {
             .and_then(Value::as_str)
     }
 
-    /// Stable resource UID. The exact nesting is intentionally not part of the
+    /// Stable resource ID. The exact nesting is intentionally not part of the
     /// test contract, so this searches the rendered document recursively.
-    pub fn uid(&self) -> String {
-        find_uid(&self.0)
-            .unwrap_or_else(|| panic!("resource view has no string `uid`:\n{}", self.0))
+    pub fn id(&self) -> String {
+        find_id(&self.0).unwrap_or_else(|| panic!("resource view has no string `id`:\n{}", self.0))
     }
 
     /// The value of a `VariableSet` variable (`spec.variables.<key>`), if
@@ -124,15 +123,15 @@ impl ResourceView {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn find_uid(value: &Value) -> Option<String> {
+fn find_id(value: &Value) -> Option<String> {
     match value {
         Value::Object(map) => {
-            if let Some(Value::String(uid)) = map.get("uid") {
-                return Some(uid.clone());
+            if let Some(Value::String(id)) = map.get("id") {
+                return Some(id.clone());
             }
-            map.values().find_map(find_uid)
+            map.values().find_map(find_id)
         }
-        Value::Array(items) => items.iter().find_map(find_uid),
+        Value::Array(items) => items.iter().find_map(find_id),
         _ => None,
     }
 }

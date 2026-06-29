@@ -17,20 +17,20 @@ use crate::dataset_variable_set_binding_repository_test_suite::prepare_dataset;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_replace_and_list_bindings(catalog: &Catalog) {
-    let (dataset_id, resource_uids) = prepare_dataset(catalog).await;
+    let (dataset_id, resource_ids) = prepare_dataset(catalog).await;
     let repo = catalog
         .get_one::<dyn DatasetSecretSetBindingRepository>()
         .unwrap();
 
-    repo.replace_bindings(&dataset_id, &resource_uids)
+    repo.replace_bindings(&dataset_id, &resource_ids)
         .await
         .unwrap();
 
     let bindings = repo.list_bindings(&dataset_id).await.unwrap();
     assert_eq!(bindings.len(), 3);
-    assert_eq!(bindings[0].resource_uid, resource_uids[0]);
-    assert_eq!(bindings[1].resource_uid, resource_uids[1]);
-    assert_eq!(bindings[2].resource_uid, resource_uids[2]);
+    assert_eq!(bindings[0].resource_id, resource_ids[0]);
+    assert_eq!(bindings[1].resource_id, resource_ids[1]);
+    assert_eq!(bindings[2].resource_id, resource_ids[2]);
     assert_eq!(bindings[0].binding_order, 0);
     assert_eq!(bindings[1].binding_order, 1);
     assert_eq!(bindings[2].binding_order, 2);
@@ -39,28 +39,28 @@ pub async fn test_replace_and_list_bindings(catalog: &Catalog) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_replace_overwrites_previous_bindings(catalog: &Catalog) {
-    let (dataset_id, resource_uids) = prepare_dataset(catalog).await;
+    let (dataset_id, resource_ids) = prepare_dataset(catalog).await;
     let repo = catalog
         .get_one::<dyn DatasetSecretSetBindingRepository>()
         .unwrap();
 
-    repo.replace_bindings(&dataset_id, &resource_uids[..2])
+    repo.replace_bindings(&dataset_id, &resource_ids[..2])
         .await
         .unwrap();
-    repo.replace_bindings(&dataset_id, &resource_uids[1..])
+    repo.replace_bindings(&dataset_id, &resource_ids[1..])
         .await
         .unwrap();
 
     let bindings = repo.list_bindings(&dataset_id).await.unwrap();
     assert_eq!(bindings.len(), 2);
-    assert_eq!(bindings[0].resource_uid, resource_uids[1]);
-    assert_eq!(bindings[1].resource_uid, resource_uids[2]);
+    assert_eq!(bindings[0].resource_id, resource_ids[1]);
+    assert_eq!(bindings[1].resource_id, resource_ids[2]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_replace_rejects_duplicates(catalog: &Catalog) {
-    let (dataset_id, resource_uids) = prepare_dataset(catalog).await;
+    let (dataset_id, resource_ids) = prepare_dataset(catalog).await;
     let repo = catalog
         .get_one::<dyn DatasetSecretSetBindingRepository>()
         .unwrap();
@@ -68,7 +68,7 @@ pub async fn test_replace_rejects_duplicates(catalog: &Catalog) {
     let result = repo
         .replace_bindings(
             &dataset_id,
-            &[resource_uids[0], resource_uids[1], resource_uids[0]],
+            &[resource_ids[0], resource_ids[1], resource_ids[0]],
         )
         .await;
 
@@ -79,12 +79,12 @@ pub async fn test_replace_rejects_duplicates(catalog: &Catalog) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_delete_bindings_for_dataset(catalog: &Catalog) {
-    let (dataset_id, resource_uids) = prepare_dataset(catalog).await;
+    let (dataset_id, resource_ids) = prepare_dataset(catalog).await;
     let repo = catalog
         .get_one::<dyn DatasetSecretSetBindingRepository>()
         .unwrap();
 
-    repo.replace_bindings(&dataset_id, &resource_uids)
+    repo.replace_bindings(&dataset_id, &resource_ids)
         .await
         .unwrap();
 
@@ -96,7 +96,7 @@ pub async fn test_delete_bindings_for_dataset(catalog: &Catalog) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_list_bindings_empty_initially(catalog: &Catalog) {
-    let (dataset_id, _resource_uids) = prepare_dataset(catalog).await;
+    let (dataset_id, _resource_ids) = prepare_dataset(catalog).await;
     let repo = catalog
         .get_one::<dyn DatasetSecretSetBindingRepository>()
         .unwrap();
@@ -108,7 +108,7 @@ pub async fn test_list_bindings_empty_initially(catalog: &Catalog) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_delete_bindings_for_dataset_no_op(catalog: &Catalog) {
-    let (dataset_id, _resource_uids) = prepare_dataset(catalog).await;
+    let (dataset_id, _resource_ids) = prepare_dataset(catalog).await;
     let repo = catalog
         .get_one::<dyn DatasetSecretSetBindingRepository>()
         .unwrap();

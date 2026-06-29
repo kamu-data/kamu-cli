@@ -67,14 +67,14 @@ pub(crate) struct ResourceByNameSelectorInput {
 #[derive(cynic::InputObject, Debug, Clone)]
 #[cynic(graphql_type = "ResourceRefInput")]
 pub(crate) enum ResourceRefInput {
-    ById(domain::ResourceUID),
+    ById(domain::ResourceID),
     ByName(ResourceByNameSelectorInput),
 }
 
 impl From<&ResourceRef> for ResourceRefInput {
     fn from(value: &ResourceRef) -> Self {
         match value {
-            ResourceRef::ById(uid) => Self::ById(*uid),
+            ResourceRef::ById(id) => Self::ById(*id),
             ResourceRef::ByName(name) => {
                 Self::ByName(ResourceByNameSelectorInput { name: name.clone() })
             }

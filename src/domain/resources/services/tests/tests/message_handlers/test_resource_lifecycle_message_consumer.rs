@@ -16,11 +16,11 @@ use kamu_resources::{
     ReconcileResourceUseCaseError,
     ResourceApiVersion,
     ResourceHeaders,
+    ResourceID,
     ResourceLifecycleMessage,
     ResourceLifecycleMessageOutcome,
     ResourceSnapshot,
     ResourceType,
-    ResourceUID,
 };
 use messaging_outbox::{MessageConsumerT, OutboxProvider, register_message_dispatcher};
 use mockall::mock;
@@ -29,7 +29,7 @@ use crate::tests::utils::{
     TestResource,
     TestResourceResourceLifecycleDispatcher,
     make_account_id,
-    make_uid,
+    make_id,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -44,7 +44,7 @@ mock! {
     impl ReconcileResourceUseCase<TestResource> for TestResourceReconcileUseCase {
         async fn execute(
             &self,
-            id: &ResourceUID,
+            id: &ResourceID,
         ) -> Result<(), ReconcileResourceUseCaseError<TestResource>>;
     }
 }
@@ -57,17 +57,17 @@ mock! {
 async fn test_applied_message_triggers_reconciliation() {
     // Applied message → ResourceLifecycleMessageConsumer → handle_applied →
     // ReconcileResourceUseCase::execute.  Verified via mock expectations.
-    let uid = make_uid();
+    let id = make_id();
 
     let harness = ResourceLifecycleConsumerHarness::new(
-        ResourceLifecycleConsumerHarness::expect_execute_once(uid),
+        ResourceLifecycleConsumerHarness::expect_execute_once(id),
     );
 
     harness
         .consume_message(&ResourceLifecycleMessage::applied(
             Utc::now(),
             ResourceLifecycleMessageOutcome::Created,
-            ResourceLifecycleConsumerHarness::make_snapshot(uid),
+            ResourceLifecycleConsumerHarness::make_snapshot(id),
         ))
         .await
         .unwrap();
@@ -79,7 +79,7 @@ async fn test_applied_message_triggers_reconciliation() {
 async fn test_deleted_message_is_no_op_for_reconciler() {
     // Deleted message → handle_deleted, which is a no-op in the generated
     // reconcile dispatcher.  Verified: reconcile use case is never called.
-    let uid = make_uid();
+    let id = make_id();
 
     let harness = ResourceLifecycleConsumerHarness::new(
         ResourceLifecycleConsumerHarness::expect_no_execute(),
@@ -88,7 +88,7 @@ async fn test_deleted_message_is_no_op_for_reconciler() {
     harness
         .consume_message(&ResourceLifecycleMessage::deleted(
             Utc::now(),
-            vec![ResourceLifecycleConsumerHarness::make_snapshot(uid)],
+            vec![ResourceLifecycleConsumerHarness::make_snapshot(id)],
         ))
         .await
         .unwrap();
@@ -100,7 +100,7 @@ async fn test_deleted_message_is_no_op_for_reconciler() {
 async fn test_applied_message_with_unregistered_kind_returns_error() {
     // Applied message for an unknown kind: dispatcher lookup fails because no
     // lifecycle dispatcher is registered for "UnknownKind".
-    let uid = make_uid();
+    let id = make_id();
 
     let harness = ResourceLifecycleConsumerHarness::new(
         ResourceLifecycleConsumerHarness::expect_no_execute(),
@@ -111,7 +111,7 @@ async fn test_applied_message_with_unregistered_kind_returns_error() {
             Utc::now(),
             ResourceLifecycleMessageOutcome::Created,
             ResourceLifecycleConsumerHarness::make_snapshot_with_kind(
-                uid,
+                id,
                 "UnknownKind",
                 "unknown.dev/v1",
             ),
@@ -133,11 +133,11 @@ struct ResourceLifecycleConsumerHarness {
 }
 
 impl ResourceLifecycleConsumerHarness {
-    fn expect_execute_once(uid: ResourceUID) -> MockTestResourceReconcileUseCase {
+    fn expect_execute_once(id: ResourceID) -> MockTestResourceReconcileUseCase {
         let mut mock = MockTestResourceReconcileUseCase::new();
         mock.expect_execute()
             .once()
-            .withf(move |id| *id == uid)
+            .withf(move |id_| *id_ == id)
             .returning(|_| Ok(()));
         mock
     }
@@ -182,17 +182,13 @@ impl ResourceLifecycleConsumerHarness {
             .await
     }
 
-    fn make_snapshot(uid: ResourceUID) -> ResourceSnapshot {
-        Self::make_snapshot_with_kind(uid, TestResource::RESOURCE_TYPE, TestResource::API_VERSION)
+    fn make_snapshot(id: ResourceID) -> ResourceSnapshot {
+        Self::make_snapshot_with_kind(id, TestResource::RESOURCE_TYPE, TestResource::API_VERSION)
     }
 
-    fn make_snapshot_with_kind(
-        uid: ResourceUID,
-        kind: &str,
-        api_version: &str,
-    ) -> ResourceSnapshot {
+    fn make_snapshot_with_kind(id: ResourceID, kind: &str, api_version: &str) -> ResourceSnapshot {
         ResourceSnapshot {
-            uid,
+            id,
             kind: kind.to_string(),
             api_version: api_version.to_string(),
             headers: ResourceHeaders::simple(Utc::now(), make_account_id(), "res"),

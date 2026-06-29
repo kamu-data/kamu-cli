@@ -51,7 +51,7 @@ async fn create_secret_resource(
     h: &impl FacadeContractHarness,
     name: &str,
     secrets: &[(&str, &str)],
-) -> kamu_resources::ResourceUID {
+) -> kamu_resources::ResourceID {
     let facade = h.facade_for(TestAccount::Alice);
     let decision = facade
         .apply_manifest(ApplyManifestRequest {
@@ -62,7 +62,7 @@ async fn create_secret_resource(
         .unwrap();
     assert_applied_outcome(&decision, ApplyResourceOutcome::Created)
         .headers
-        .uid
+        .id
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -136,15 +136,15 @@ contract_test!(
 );
 
 pub async fn test_spec_view_mode_applies_to_batch_get(h: &impl FacadeContractHarness) {
-    let uid_a = create_secret_resource(h, "sv-batch-a", &[("TOKEN_A", "secret-a-value")]).await;
-    let uid_b = create_secret_resource(h, "sv-batch-b", &[("TOKEN_B", "secret-b-value")]).await;
+    let id_a = create_secret_resource(h, "sv-batch-a", &[("TOKEN_A", "secret-a-value")]).await;
+    let id_b = create_secret_resource(h, "sv-batch-b", &[("TOKEN_B", "secret-b-value")]).await;
     let facade = h.facade_for(TestAccount::Alice);
 
     let batch_selector = ResourceBatchSelector {
         account: None,
         kind: SECRET_SET_KIND.to_string(),
         api_version: Some(SECRET_SET_API_VERSION.to_string()),
-        resource_refs: vec![ResourceRef::ById(uid_a), ResourceRef::ById(uid_b)],
+        resource_refs: vec![ResourceRef::ById(id_a), ResourceRef::ById(id_b)],
     };
 
     // Encrypted view — no plaintext
@@ -225,8 +225,8 @@ pub async fn test_spec_view_mode_applies_to_render(h: &impl FacadeContractHarnes
         serde_json::from_str(&rev_result.manifest).expect("must be valid JSON");
     assert_eq!(parsed["kind"], SECRET_SET_KIND);
     assert!(
-        parsed["headers"]["uid"].is_null(),
-        "rendered manifest must not include uid"
+        parsed["headers"]["id"].is_null(),
+        "rendered manifest must not include id"
     );
 }
 

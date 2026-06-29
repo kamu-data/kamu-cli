@@ -44,7 +44,7 @@ use kamu_resources::{
     ResourceCrudDispatcherApplyRequest,
     ResourceCrudDispatcherDeleteRequest,
     ResourceHeadersInput,
-    ResourceUID,
+    ResourceID,
     UnsupportedResourceDescriptorError,
 };
 use kamu_resources_services::get_resource_crud_dispatcher_by_kind;
@@ -168,14 +168,14 @@ impl DatasetEnvVarMutationAdapterImpl {
         dispatcher: &Arc<dyn ResourceCrudDispatcher>,
         request: ResourceCrudDispatcherApplyRequest,
         resource_type_name: &str,
-    ) -> Result<ResourceUID, E>
+    ) -> Result<ResourceID, E>
     where
         E: From<InternalError>,
     {
         let apply_decision = dispatcher.apply(request).await.int_err().map_err(E::from)?;
 
         match apply_decision {
-            ApplyManifestApplicationDecision::Applied(result) => Ok(result.resource.headers.uid),
+            ApplyManifestApplicationDecision::Applied(result) => Ok(result.resource.headers.id),
             ApplyManifestApplicationDecision::Rejected(rejection) => Err(E::from(
                 format!("{resource_type_name} apply rejected: {}", rejection.message).int_err(),
             )),
@@ -190,7 +190,7 @@ impl DatasetEnvVarMutationAdapterImpl {
         account_id: &odf::AccountID,
     ) -> Result<DatasetEnvVarUpsertResult, InternalError> {
         let resource_name = Self::legacy_variable_set_resource_name(dataset_id);
-        let (existing_uid, mut variables) = self
+        let (existing_id, mut variables) = self
             .load_existing_variable_spec(account_id, &resource_name)
             .await?;
 
@@ -217,11 +217,11 @@ impl DatasetEnvVarMutationAdapterImpl {
         let dispatcher =
             self.get_dispatcher::<InternalError>(VariableSetResource::RESOURCE_TYPE)?;
 
-        let resource_uid = self
+        let resource_id = self
             .apply_and_handle_rejection::<InternalError>(
                 &dispatcher,
                 ResourceCrudDispatcherApplyRequest {
-                    uid: existing_uid,
+                    id: existing_id,
                     headers,
                     spec: new_spec,
                 },
@@ -230,7 +230,7 @@ impl DatasetEnvVarMutationAdapterImpl {
             .await?;
 
         self.variable_set_binding_repo
-            .replace_bindings(dataset_id, &[resource_uid])
+            .replace_bindings(dataset_id, &[resource_id])
             .await
             .int_err()?;
 
@@ -261,7 +261,7 @@ impl DatasetEnvVarMutationAdapterImpl {
     ) -> Result<DatasetEnvVarUpsertResult, InternalError> {
         let resource_name = Self::legacy_secret_set_resource_name(dataset_id);
 
-        let (existing_uid, mut secrets) = self
+        let (existing_id, mut secrets) = self
             .load_existing_secret_spec_decrypted(account_id, &resource_name)
             .await?;
 
@@ -282,11 +282,11 @@ impl DatasetEnvVarMutationAdapterImpl {
 
         let dispatcher = self.get_dispatcher::<InternalError>(SecretSetResource::RESOURCE_TYPE)?;
 
-        let resource_uid = self
+        let resource_id = self
             .apply_and_handle_rejection::<InternalError>(
                 &dispatcher,
                 ResourceCrudDispatcherApplyRequest {
-                    uid: existing_uid,
+                    id: existing_id,
                     headers,
                     spec: new_spec,
                 },
@@ -295,7 +295,7 @@ impl DatasetEnvVarMutationAdapterImpl {
             .await?;
 
         self.secret_set_binding_repo
-            .replace_bindings(dataset_id, &[resource_uid])
+            .replace_bindings(dataset_id, &[resource_id])
             .await
             .int_err()?;
 
@@ -328,17 +328,17 @@ impl DatasetEnvVarMutationAdapterImpl {
     async fn delete_variable(
         &self,
         dataset_id: &odf::DatasetID,
-        resource_uid: ResourceUID,
+        resource_id: ResourceID,
         key: &str,
     ) -> Result<(), DeleteDatasetEnvVarError> {
         let snapshot = self
             .generic_resource_query_service
-            .get_snapshot_by_uid(&resource_uid)
+            .get_snapshot_by_id(&resource_id)
             .await
             .int_err()?
             .ok_or_else(|| {
                 DeleteDatasetEnvVarError::Internal(
-                    format!("VariableSet resource {resource_uid} not found in snapshot store")
+                    format!("VariableSet resource {resource_id} not found in snapshot store")
                         .int_err(),
                 )
             })?;
@@ -354,7 +354,7 @@ impl DatasetEnvVarMutationAdapterImpl {
             dispatcher
                 .delete(ResourceCrudDispatcherDeleteRequest {
                     account_id: snapshot.headers.account.clone(),
-                    uids: vec![resource_uid],
+                    ids: vec![resource_id],
                 })
                 .await
                 .int_err()?;
@@ -374,7 +374,7 @@ impl DatasetEnvVarMutationAdapterImpl {
             self.apply_and_handle_rejection(
                 &dispatcher,
                 ResourceCrudDispatcherApplyRequest {
-                    uid: Some(resource_uid),
+                    id: Some(resource_id),
                     headers,
                     spec: serde_json::to_value(spec).int_err()?,
                 },
@@ -390,22 +390,22 @@ impl DatasetEnvVarMutationAdapterImpl {
     async fn delete_secret(
         &self,
         dataset_id: &odf::DatasetID,
-        resource_uid: ResourceUID,
+        resource_id: ResourceID,
         key: &str,
     ) -> Result<(), DeleteDatasetEnvVarError> {
         let snapshot = self
             .generic_resource_query_service
-            .get_snapshot_by_uid(&resource_uid)
+            .get_snapshot_by_id(&resource_id)
             .await
             .int_err()?
             .ok_or_else(|| {
                 DeleteDatasetEnvVarError::Internal(
-                    format!("SecretSet resource {resource_uid} not found in snapshot store")
+                    format!("SecretSet resource {resource_id} not found in snapshot store")
                         .int_err(),
                 )
             })?;
 
-        let mut decrypted = self.decrypt_secret_entries(&resource_uid).await.int_err()?;
+        let mut decrypted = self.decrypt_secret_entries(&resource_id).await.int_err()?;
         decrypted.remove(key);
 
         let dispatcher = self
@@ -416,7 +416,7 @@ impl DatasetEnvVarMutationAdapterImpl {
             dispatcher
                 .delete(ResourceCrudDispatcherDeleteRequest {
                     account_id: snapshot.headers.account.clone(),
-                    uids: vec![resource_uid],
+                    ids: vec![resource_id],
                 })
                 .await
                 .int_err()?;
@@ -442,7 +442,7 @@ impl DatasetEnvVarMutationAdapterImpl {
             self.apply_and_handle_rejection(
                 &dispatcher,
                 ResourceCrudDispatcherApplyRequest {
-                    uid: Some(resource_uid),
+                    id: Some(resource_id),
                     headers,
                     spec: serde_json::to_value(new_spec).int_err()?,
                 },
@@ -463,8 +463,8 @@ impl DatasetEnvVarMutationAdapterImpl {
         key: &str,
     ) -> Result<bool, InternalError> {
         match self.find_secret(dataset_id, key).await? {
-            Some((resource_uid, key)) => self
-                .delete_secret(dataset_id, resource_uid, &key)
+            Some((resource_id, key)) => self
+                .delete_secret(dataset_id, resource_id, &key)
                 .await
                 .map_err(|e| match e {
                     DeleteDatasetEnvVarError::NotFound(e) => e.int_err(),
@@ -483,8 +483,8 @@ impl DatasetEnvVarMutationAdapterImpl {
         key: &str,
     ) -> Result<bool, InternalError> {
         match self.find_variable(dataset_id, key).await? {
-            Some((resource_uid, key)) => self
-                .delete_variable(dataset_id, resource_uid, &key)
+            Some((resource_id, key)) => self
+                .delete_variable(dataset_id, resource_id, &key)
                 .await
                 .map_err(|e| match e {
                     DeleteDatasetEnvVarError::NotFound(e) => e.int_err(),
@@ -499,7 +499,7 @@ impl DatasetEnvVarMutationAdapterImpl {
         &self,
         dataset_id: &odf::DatasetID,
         key: &str,
-    ) -> Result<Option<(ResourceUID, String)>, InternalError> {
+    ) -> Result<Option<(ResourceID, String)>, InternalError> {
         let bindings = self
             .secret_set_binding_repo
             .list_bindings(dataset_id)
@@ -521,11 +521,11 @@ impl DatasetEnvVarMutationAdapterImpl {
 
         let entries = self
             .secret_set_projection_repo
-            .get_latest_entries(&the_binding.resource_uid)
+            .get_latest_entries(&the_binding.resource_id)
             .await?;
 
         if entries.iter().any(|e| e.key == key) {
-            return Ok(Some((the_binding.resource_uid, key.to_string())));
+            return Ok(Some((the_binding.resource_id, key.to_string())));
         }
 
         Ok(None)
@@ -535,7 +535,7 @@ impl DatasetEnvVarMutationAdapterImpl {
         &self,
         dataset_id: &odf::DatasetID,
         key: &str,
-    ) -> Result<Option<(ResourceUID, String)>, InternalError> {
+    ) -> Result<Option<(ResourceID, String)>, InternalError> {
         let bindings = self
             .variable_set_binding_repo
             .list_bindings(dataset_id)
@@ -557,77 +557,77 @@ impl DatasetEnvVarMutationAdapterImpl {
 
         let entries = self
             .variable_set_projection_repo
-            .get_latest_entries(&the_binding.resource_uid)
+            .get_latest_entries(&the_binding.resource_id)
             .await?;
 
         if entries.iter().any(|e| e.key == key) {
-            return Ok(Some((the_binding.resource_uid, key.to_string())));
+            return Ok(Some((the_binding.resource_id, key.to_string())));
         }
 
         Ok(None)
     }
 
-    // Returns (existing_uid, variables_map, existing_entry_id_for_key)
+    // Returns (existing_id, variables_map, existing_entry_id_for_key)
     async fn load_existing_variable_spec(
         &self,
         account_id: &odf::AccountID,
         resource_name: &str,
-    ) -> Result<(Option<ResourceUID>, BTreeMap<String, VariableSpec>), InternalError> {
-        let uid = self
+    ) -> Result<(Option<ResourceID>, BTreeMap<String, VariableSpec>), InternalError> {
+        let id = self
             .generic_resource_query_service
-            .find_resource_uid_by_name(
+            .find_resource_id_by_name(
                 account_id,
                 VariableSetResource::RESOURCE_TYPE,
                 &resource_name.to_string(),
             )
             .await?;
 
-        let Some(uid) = uid else {
+        let Some(id) = id else {
             return Ok((None, BTreeMap::new()));
         };
 
         let snapshot = self
             .generic_resource_query_service
-            .get_snapshot_by_uid(&uid)
+            .get_snapshot_by_id(&id)
             .await?
-            .ok_or_else(|| format!("VariableSet {uid} missing snapshot").int_err())?;
+            .ok_or_else(|| format!("VariableSet {id} missing snapshot").int_err())?;
 
         let spec: VariableSetSpec = serde_json::from_value(snapshot.spec).int_err()?;
-        Ok((Some(uid), spec.variables))
+        Ok((Some(id), spec.variables))
     }
 
-    // Returns (existing_uid, decrypted_secrets_map)
+    // Returns (existing_id, decrypted_secrets_map)
     async fn load_existing_secret_spec_decrypted(
         &self,
         account_id: &odf::AccountID,
         resource_name: &str,
-    ) -> Result<(Option<ResourceUID>, BTreeMap<String, SecretSpec>), InternalError> {
-        let uid = self
+    ) -> Result<(Option<ResourceID>, BTreeMap<String, SecretSpec>), InternalError> {
+        let id = self
             .generic_resource_query_service
-            .find_resource_uid_by_name(
+            .find_resource_id_by_name(
                 account_id,
                 SecretSetResource::RESOURCE_TYPE,
                 &resource_name.to_string(),
             )
             .await?;
 
-        let Some(uid) = uid else {
+        let Some(id) = id else {
             return Ok((None, BTreeMap::new()));
         };
 
-        let decrypted = self.decrypt_secret_entries(&uid).await?;
+        let decrypted = self.decrypt_secret_entries(&id).await?;
 
         let secrets = decrypted
             .into_iter()
             .map(|(k, v)| (k, SecretSpec::Literal(v)))
             .collect();
 
-        Ok((Some(uid), secrets))
+        Ok((Some(id), secrets))
     }
 
     async fn decrypt_secret_entries(
         &self,
-        resource_uid: &ResourceUID,
+        resource_id: &ResourceID,
     ) -> Result<BTreeMap<String, String>, InternalError> {
         let encryption_key = self
             .secrets_encryption_config
@@ -638,7 +638,7 @@ impl DatasetEnvVarMutationAdapterImpl {
 
         let entries = self
             .secret_set_projection_repo
-            .get_latest_entries(resource_uid)
+            .get_latest_entries(resource_id)
             .await?;
 
         let mut decrypted = BTreeMap::new();

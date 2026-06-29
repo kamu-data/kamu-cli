@@ -15,12 +15,12 @@ use kamu_resources::{
     DeclarativeResourceState,
     ReconcilableResource,
     ResourceAggregateLoader,
+    ResourceID,
     ResourcePersistenceError,
     ResourcePersistenceService,
     ResourceRawEventQuery,
     ResourceSnapshot,
     ResourceType,
-    ResourceUID,
 };
 use kamu_resources_services::testing::BaseResourceServiceHarness;
 
@@ -41,17 +41,17 @@ use crate::tests::utils::{
 async fn test_create_resource_persists_snapshot_and_events() {
     let harness = ResourcePersistenceServiceHarness::new();
     let account_id = make_account_id();
-    let (uid, mut agg) = make_fresh_aggregate(account_id, "res-a");
+    let (id, mut agg) = make_fresh_aggregate(account_id, "res-a");
 
     harness.persistence_svc().create(&mut agg).await.unwrap();
 
-    let loaded = harness.aggregate_loader().load(&uid).await.unwrap();
-    assert_eq!(*loaded.uid(), uid);
+    let loaded = harness.aggregate_loader().load(&id).await.unwrap();
+    assert_eq!(*loaded.id(), id);
     assert_eq!(loaded.spec().value, "res-a");
     assert_eq!(loaded.headers().name.as_str(), "res-a");
 
-    let snapshot = harness.find_snapshot(&uid).await;
-    assert_eq!(snapshot.uid, uid);
+    let snapshot = harness.find_snapshot(&id).await;
+    assert_eq!(snapshot.id, id);
     assert_eq!(snapshot.headers.name.as_str(), "res-a");
     pretty_assertions::assert_eq!(snapshot.spec, serde_json::json!({ "value": "res-a" }));
     assert!(
@@ -64,7 +64,7 @@ async fn test_create_resource_persists_snapshot_and_events() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_create_duplicate_uid_returns_error() {
+async fn test_create_duplicate_id_returns_error() {
     let harness = ResourcePersistenceServiceHarness::new();
     let account_id = make_account_id();
 
@@ -87,10 +87,10 @@ async fn test_create_duplicate_uid_returns_error() {
 async fn test_save_resource_updates_snapshot() {
     let harness = ResourcePersistenceServiceHarness::new();
     let account_id = make_account_id();
-    let (uid, mut agg) = make_fresh_aggregate(account_id, "res-a");
+    let (id, mut agg) = make_fresh_aggregate(account_id, "res-a");
     harness.persistence_svc().create(&mut agg).await.unwrap();
 
-    let mut loaded = harness.aggregate_loader().load(&uid).await.unwrap();
+    let mut loaded = harness.aggregate_loader().load(&id).await.unwrap();
     loaded
         .try_update_spec(
             Utc::now(),
@@ -101,10 +101,10 @@ async fn test_save_resource_updates_snapshot() {
         .unwrap();
     harness.persistence_svc().save(&mut loaded).await.unwrap();
 
-    let reloaded = harness.aggregate_loader().load(&uid).await.unwrap();
+    let reloaded = harness.aggregate_loader().load(&id).await.unwrap();
     assert_eq!(reloaded.spec().value, "updated");
 
-    let snapshot = harness.find_snapshot(&uid).await;
+    let snapshot = harness.find_snapshot(&id).await;
     pretty_assertions::assert_eq!(snapshot.spec, serde_json::json!({ "value": "updated" }));
     assert_eq!(snapshot.last_event_id, reloaded.last_stored_event_id());
 }
@@ -115,10 +115,10 @@ async fn test_save_resource_updates_snapshot() {
 async fn test_delete_resource_marks_deleted() {
     let harness = ResourcePersistenceServiceHarness::new();
     let account_id = make_account_id();
-    let (uid, mut agg) = make_fresh_aggregate(account_id, "res-a");
+    let (id, mut agg) = make_fresh_aggregate(account_id, "res-a");
     harness.persistence_svc().create(&mut agg).await.unwrap();
 
-    let mut loaded = harness.aggregate_loader().load(&uid).await.unwrap();
+    let mut loaded = harness.aggregate_loader().load(&id).await.unwrap();
     let now = Utc::now();
     harness
         .persistence_svc()
@@ -126,7 +126,7 @@ async fn test_delete_resource_marks_deleted() {
         .await
         .unwrap();
 
-    let reloaded = harness.aggregate_loader().load(&uid).await.unwrap();
+    let reloaded = harness.aggregate_loader().load(&id).await.unwrap();
     assert!(
         reloaded.headers().deleted_at.is_some(),
         "expected deleted_at to be set after deletion"
@@ -134,7 +134,7 @@ async fn test_delete_resource_marks_deleted() {
 
     // Deleted snapshots are hidden from live lookups — finding None is correct
     assert!(
-        harness.snapshot_not_found(&uid).await,
+        harness.snapshot_not_found(&id).await,
         "deleted resource must not appear in live snapshot lookup"
     );
 }
@@ -146,17 +146,17 @@ async fn test_delete_many_resources_batch() {
     let harness = ResourcePersistenceServiceHarness::new();
     let account_id = make_account_id();
 
-    let (uid_a, mut agg_a) = make_fresh_aggregate(account_id.clone(), "res-a");
-    let (uid_b, mut agg_b) = make_fresh_aggregate(account_id.clone(), "res-b");
-    let (uid_c, mut agg_c) = make_fresh_aggregate(account_id, "res-c");
+    let (id_a, mut agg_a) = make_fresh_aggregate(account_id.clone(), "res-a");
+    let (id_b, mut agg_b) = make_fresh_aggregate(account_id.clone(), "res-b");
+    let (id_c, mut agg_c) = make_fresh_aggregate(account_id, "res-c");
 
     harness.persistence_svc().create(&mut agg_a).await.unwrap();
     harness.persistence_svc().create(&mut agg_b).await.unwrap();
     harness.persistence_svc().create(&mut agg_c).await.unwrap();
 
-    let loaded_a = harness.aggregate_loader().load(&uid_a).await.unwrap();
-    let loaded_b = harness.aggregate_loader().load(&uid_b).await.unwrap();
-    let loaded_c = harness.aggregate_loader().load(&uid_c).await.unwrap();
+    let loaded_a = harness.aggregate_loader().load(&id_a).await.unwrap();
+    let loaded_b = harness.aggregate_loader().load(&id_b).await.unwrap();
+    let loaded_c = harness.aggregate_loader().load(&id_c).await.unwrap();
 
     let now = Utc::now();
     harness
@@ -165,17 +165,17 @@ async fn test_delete_many_resources_batch() {
         .await
         .unwrap();
 
-    for uid in [&uid_a, &uid_b, &uid_c] {
-        let reloaded = harness.aggregate_loader().load(uid).await.unwrap();
+    for id in [&id_a, &id_b, &id_c] {
+        let reloaded = harness.aggregate_loader().load(id).await.unwrap();
         assert!(
             reloaded.headers().deleted_at.is_some(),
-            "expected deleted_at set in aggregate for {uid:?}"
+            "expected deleted_at set in aggregate for {id:?}"
         );
 
         // Deleted snapshots are hidden from live lookups — finding None is correct
         assert!(
-            harness.snapshot_not_found(uid).await,
-            "deleted resource must not appear in live snapshot lookup for {uid:?}"
+            harness.snapshot_not_found(id).await,
+            "deleted resource must not appear in live snapshot lookup for {id:?}"
         );
     }
 }
@@ -186,12 +186,12 @@ async fn test_delete_many_resources_batch() {
 async fn test_concurrent_modification_detected() {
     let harness = ResourcePersistenceServiceHarness::new();
     let account_id = make_account_id();
-    let (uid, mut agg) = make_fresh_aggregate(account_id, "res-a");
+    let (id, mut agg) = make_fresh_aggregate(account_id, "res-a");
     harness.persistence_svc().create(&mut agg).await.unwrap();
 
     // Load the same aggregate into two independent instances
-    let mut agg_1 = harness.aggregate_loader().load(&uid).await.unwrap();
-    let mut agg_2 = harness.aggregate_loader().load(&uid).await.unwrap();
+    let mut agg_1 = harness.aggregate_loader().load(&id).await.unwrap();
+    let mut agg_2 = harness.aggregate_loader().load(&id).await.unwrap();
 
     let now = Utc::now();
 
@@ -258,22 +258,22 @@ impl ResourcePersistenceServiceHarness {
         self.catalog.get_one().unwrap()
     }
 
-    async fn find_snapshot(&self, uid: &ResourceUID) -> ResourceSnapshot {
+    async fn find_snapshot(&self, id: &ResourceID) -> ResourceSnapshot {
         self.resource_repo()
             .find_resource_snapshot(&ResourceRawEventQuery {
                 kind: TestResource::RESOURCE_TYPE.to_string(),
-                uid: *uid,
+                id: *id,
             })
             .await
             .unwrap()
             .expect("snapshot must exist")
     }
 
-    async fn snapshot_not_found(&self, uid: &ResourceUID) -> bool {
+    async fn snapshot_not_found(&self, id: &ResourceID) -> bool {
         self.resource_repo()
             .find_resource_snapshot(&ResourceRawEventQuery {
                 kind: TestResource::RESOURCE_TYPE.to_string(),
-                uid: *uid,
+                id: *id,
             })
             .await
             .unwrap()

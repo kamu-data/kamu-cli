@@ -17,8 +17,8 @@ use kamu_resources::{
     DeleteAccountResourcesUseCase,
     DeleteResourcesUseCase,
     ReconcileResourceUseCase,
+    ResourceID,
     ResourceSpecSanitizer,
-    ResourceUID,
 };
 use kamu_resources_services::testing::{
     BaseResourceServiceHarness,
@@ -161,9 +161,9 @@ impl ResourceUseCaseBaseHarness {
             .unwrap();
     }
 
-    pub async fn delete_resources(&self, account_id: odf::AccountID, uids: Vec<ResourceUID>) {
+    pub async fn delete_resources(&self, account_id: odf::AccountID, ids: Vec<ResourceID>) {
         self.delete_test_uc()
-            .execute(account_id, uids)
+            .execute(account_id, ids)
             .await
             .unwrap();
     }
@@ -179,15 +179,15 @@ impl ResourceUseCaseBaseHarness {
         &self,
         account_id: odf::AccountID,
         name: &str,
-    ) -> (ResourceUID, kamu_resources::ResourceSnapshot) {
-        let uid = self.apply_and_get_uid(account_id, name).await;
-        let snapshot = self.get_snapshot_by_uid(&uid).await.unwrap();
-        (uid, snapshot)
+    ) -> (ResourceID, kamu_resources::ResourceSnapshot) {
+        let id = self.apply_and_get_id(account_id, name).await;
+        let snapshot = self.get_snapshot_by_id(&id).await.unwrap();
+        (id, snapshot)
     }
 
-    pub async fn apply_and_get_uid(&self, account_id: odf::AccountID, name: &str) -> ResourceUID {
+    pub async fn apply_and_get_id(&self, account_id: odf::AccountID, name: &str) -> ResourceID {
         let params = ApplyResourceParams {
-            uid: None,
+            id: None,
             headers: BaseResourceServiceHarness::make_headers_input(account_id, name),
             spec: TestResourceSpec {
                 value: name.to_string(),
@@ -197,7 +197,7 @@ impl ResourceUseCaseBaseHarness {
         let decision = self.apply_test_uc().apply(params).await.unwrap();
 
         match decision {
-            ApplyResourceApplicationDecision::Applied(result) => result.uid,
+            ApplyResourceApplicationDecision::Applied(result) => result.id,
             ApplyResourceApplicationDecision::Rejected(r) => {
                 panic!("apply rejected: {:?}", r.message)
             }

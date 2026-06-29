@@ -10,26 +10,21 @@
 use database_common::PaginationOpts;
 use internal_error::InternalError;
 
-use crate::{
-    DeclarativeResource,
-    ResourceTypeMismatchError,
-    ResourceUID,
-    ResourceUIDNotFoundError,
-};
+use crate::{DeclarativeResource, ResourceID, ResourceIDNotFoundError, ResourceTypeMismatchError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait TypedResourceQueryService<R: DeclarativeResource>: Send + Sync {
-    async fn ensure_resource_uid_matches_type(
+    async fn ensure_resource_id_matches_type(
         &self,
-        uid: &ResourceUID,
+        id: &ResourceID,
     ) -> Result<(), TypedResourceQueryError>;
 
-    async fn get_state_by_uid(
+    async fn get_state_by_id(
         &self,
         account_id: odf::AccountID,
-        uid: &ResourceUID,
+        id: &ResourceID,
     ) -> Result<R::ResourceState, TypedResourceQueryError>;
 
     async fn list_states_by_kind(
@@ -42,7 +37,7 @@ pub trait TypedResourceQueryService<R: DeclarativeResource>: Send + Sync {
 #[derive(Debug, thiserror::Error)]
 pub enum TypedResourceQueryError {
     #[error(transparent)]
-    NotFound(#[from] ResourceUIDNotFoundError),
+    NotFound(#[from] ResourceIDNotFoundError),
 
     #[error(transparent)]
     TypeMismatch(#[from] ResourceTypeMismatchError),

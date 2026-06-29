@@ -16,7 +16,7 @@ use crate::harness::{FacadeContractHarness, TestAccount};
 use crate::helpers::{
     SECRET_SET_KIND,
     VARIABLE_SET_KIND,
-    apply_manifest_and_get_uid,
+    apply_manifest_and_get_id,
     normalize_identity_views,
     normalize_summary_views,
     secret_set_manifest_json,
@@ -50,19 +50,19 @@ contract_test!(
 );
 
 pub async fn test_list_all_summaries_across_supported_kinds(h: &impl FacadeContractHarness) {
-    apply_manifest_and_get_uid(
+    apply_manifest_and_get_id(
         h,
         TestAccount::Alice,
         variable_set_manifest_json("all-var-alice", None, &[("K", "v")]),
     )
     .await;
-    apply_manifest_and_get_uid(
+    apply_manifest_and_get_id(
         h,
         TestAccount::Alice,
         secret_set_manifest_json("all-secret-alice", None, &[("K", "v")]),
     )
     .await;
-    apply_manifest_and_get_uid(
+    apply_manifest_and_get_id(
         h,
         TestAccount::Bob,
         variable_set_manifest_json("all-var-bob", None, &[("K", "v")]),
@@ -96,19 +96,19 @@ contract_test!(
 );
 
 pub async fn test_list_all_identities_across_supported_kinds(h: &impl FacadeContractHarness) {
-    apply_manifest_and_get_uid(
+    apply_manifest_and_get_id(
         h,
         TestAccount::Alice,
         variable_set_manifest_json("all-id-var", None, &[("K", "v")]),
     )
     .await;
-    apply_manifest_and_get_uid(
+    apply_manifest_and_get_id(
         h,
         TestAccount::Alice,
         secret_set_manifest_json("all-id-secret", None, &[("K", "v")]),
     )
     .await;
-    apply_manifest_and_get_uid(
+    apply_manifest_and_get_id(
         h,
         TestAccount::Bob,
         secret_set_manifest_json("all-id-bob", None, &[("K", "v")]),
@@ -142,19 +142,19 @@ contract_test!(
 );
 
 pub async fn test_list_all_supports_pagination(h: &impl FacadeContractHarness) {
-    apply_manifest_and_get_uid(
+    apply_manifest_and_get_id(
         h,
         TestAccount::Alice,
         variable_set_manifest_json("all-page-var-1", None, &[("K", "v")]),
     )
     .await;
-    apply_manifest_and_get_uid(
+    apply_manifest_and_get_id(
         h,
         TestAccount::Alice,
         secret_set_manifest_json("all-page-secret", None, &[("K", "v")]),
     )
     .await;
-    apply_manifest_and_get_uid(
+    apply_manifest_and_get_id(
         h,
         TestAccount::Alice,
         variable_set_manifest_json("all-page-var-2", None, &[("K", "v")]),
@@ -207,7 +207,7 @@ contract_test!(
 );
 
 pub async fn test_list_all_empty_account_returns_empty(h: &impl FacadeContractHarness) {
-    apply_manifest_and_get_uid(
+    apply_manifest_and_get_id(
         h,
         TestAccount::Alice,
         variable_set_manifest_json("all-empty-alice", None, &[("K", "v")]),

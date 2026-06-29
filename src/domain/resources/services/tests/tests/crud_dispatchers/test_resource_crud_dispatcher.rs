@@ -197,12 +197,12 @@ async fn test_apply_update_returns_applied_updated() {
     let decision1 = harness.dispatcher().apply(req1).await.unwrap();
     let applied1 = decision1.expect_applied();
     assert_eq!(applied1.outcome, ApplyResourceOutcome::Created);
-    let uid = applied1.resource.headers.uid;
+    let id = applied1.resource.headers.id;
 
     // Second apply with same account but different spec value — Update
     let account_id = applied1.resource.account.id.clone();
     let req2 = ResourceCrudDispatcherApplyRequest {
-        uid: Some(uid),
+        id: Some(id),
         headers: BaseResourceServiceHarness::make_headers_input(account_id, "res-a"),
         spec: serde_json::json!({ "value": "value-v2" }),
     };
@@ -225,12 +225,12 @@ async fn test_apply_untouched_returns_applied_untouched() {
     let req1 = ResourceCrudDispatcherHarness::make_apply_request("res-a", "same-value");
     let decision1 = harness.dispatcher().apply(req1).await.unwrap();
     let applied1 = decision1.expect_applied();
-    let uid = applied1.resource.headers.uid;
+    let id = applied1.resource.headers.id;
     let account_id = applied1.resource.account.id.clone();
 
     // Second apply — identical spec and headers
     let req2 = ResourceCrudDispatcherApplyRequest {
-        uid: Some(uid),
+        id: Some(id),
         headers: BaseResourceServiceHarness::make_headers_input(account_id, "res-a"),
         spec: serde_json::json!({ "value": "same-value" }),
     };
@@ -262,7 +262,7 @@ impl ResourceCrudDispatcherHarness {
     fn make_apply_request(name: &str, value: &str) -> ResourceCrudDispatcherApplyRequest {
         let account_id = make_account_id();
         ResourceCrudDispatcherApplyRequest {
-            uid: None,
+            id: None,
             headers: BaseResourceServiceHarness::make_headers_input(account_id, name),
             spec: serde_json::json!({ "value": value }),
         }
@@ -274,7 +274,7 @@ impl ResourceCrudDispatcherHarness {
     ) -> ResourceCrudDispatcherApplyRequest {
         let account_id = make_account_id();
         ResourceCrudDispatcherApplyRequest {
-            uid: None,
+            id: None,
             headers: BaseResourceServiceHarness::make_headers_input(account_id, name),
             spec,
         }

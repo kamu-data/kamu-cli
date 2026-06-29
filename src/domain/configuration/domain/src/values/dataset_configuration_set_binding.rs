@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources::ResourceUID;
+use kamu_resources::ResourceID;
 use uuid::Uuid;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -15,7 +15,7 @@ use uuid::Uuid;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DatasetConfigurationSetBinding {
     pub dataset_id: odf::DatasetID,
-    pub resource_uid: ResourceUID,
+    pub resource_id: ResourceID,
     pub binding_order: u64,
 }
 
@@ -24,7 +24,7 @@ pub struct DatasetConfigurationSetBinding {
 #[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
 pub struct DatasetConfigurationSetBindingRowModel {
     pub dataset_id: odf::DatasetID,
-    pub resource_uid: Uuid,
+    pub resource_id: Uuid,
     pub binding_order: i64,
 }
 
@@ -32,7 +32,7 @@ impl From<DatasetConfigurationSetBindingRowModel> for DatasetConfigurationSetBin
     fn from(value: DatasetConfigurationSetBindingRowModel) -> Self {
         Self {
             dataset_id: value.dataset_id,
-            resource_uid: ResourceUID::new(value.resource_uid),
+            resource_id: ResourceID::new(value.resource_id),
             binding_order: u64::try_from(value.binding_order).unwrap(),
         }
     }

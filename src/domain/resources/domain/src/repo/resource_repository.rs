@@ -14,20 +14,20 @@ use internal_error::InternalError;
 use thiserror::Error;
 
 use crate::{
+    ResourceID,
+    ResourceIDStream,
     ResourceName,
     ResourceRawEventQuery,
     ResourceSnapshot,
     ResourceSnapshotStream,
     ResourceSummaryRow,
-    ResourceUID,
-    ResourceUIDStream,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait ResourceRepository: Send + Sync {
-    async fn new_resource_uid(&self) -> Result<ResourceUID, InternalError>;
+    async fn new_resource_id(&self) -> Result<ResourceID, InternalError>;
 
     async fn create_resource(
         &self,
@@ -55,17 +55,17 @@ pub trait ResourceRepository: Send + Sync {
         Ok(())
     }
 
-    async fn find_resource_uid_by_name(
+    async fn find_resource_id_by_name(
         &self,
         account_id: &odf::AccountID,
         kind: &str,
         name: &ResourceName,
-    ) -> Result<Option<ResourceUID>, InternalError>;
+    ) -> Result<Option<ResourceID>, InternalError>;
 
-    async fn find_resource_identities_by_uids(
+    async fn find_resource_identities_by_ids(
         &self,
         account_id: &odf::AccountID,
-        uids: &[ResourceUID],
+        ids: &[ResourceID],
     ) -> Result<Vec<ResourceIdentityRow>, InternalError>;
 
     async fn find_resource_identities_by_names(
@@ -97,29 +97,29 @@ pub trait ResourceRepository: Send + Sync {
         query: &ResourceRawEventQuery,
     ) -> Result<Option<ResourceSnapshot>, InternalError>;
 
-    async fn find_resource_snapshots_by_kind_and_uids(
+    async fn find_resource_snapshots_by_kind_and_ids(
         &self,
         kind: &str,
-        uids: &[ResourceUID],
+        ids: &[ResourceID],
     ) -> Result<Vec<ResourceSnapshot>, InternalError>;
 
-    async fn find_resource_snapshot_by_uid(
+    async fn find_resource_snapshot_by_id(
         &self,
-        uid: &ResourceUID,
+        id: &ResourceID,
     ) -> Result<Option<ResourceSnapshot>, InternalError>;
 
-    async fn find_resource_snapshots_by_uids(
+    async fn find_resource_snapshots_by_ids(
         &self,
         account_id: &odf::AccountID,
-        uids: &[ResourceUID],
+        ids: &[ResourceID],
     ) -> Result<Vec<ResourceSnapshot>, InternalError>;
 
-    fn list_resource_uids(
+    fn list_resource_ids(
         &self,
         account_id: odf::AccountID,
         kind: &str,
         pagination: PaginationOpts,
-    ) -> ResourceUIDStream<'_>;
+    ) -> ResourceIDStream<'_>;
 
     fn list_resource_snapshots_by_kind(
         &self,
@@ -200,7 +200,7 @@ pub struct ResourceDuplicateError {
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
 pub struct ResourceIdentityRow {
-    pub uid: uuid::Uuid,
+    pub id: uuid::Uuid,
     pub kind: String,
     pub api_version: String,
     pub name: ResourceName,
@@ -211,7 +211,7 @@ pub struct ResourceIdentityRow {
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "sqlx", derive(sqlx::FromRow))]
 pub struct ResourceSnapshotRow {
-    pub uid: uuid::Uuid,
+    pub id: uuid::Uuid,
     pub account_id: odf::AccountID,
     pub resource_kind: String,
     pub api_version: String,
@@ -232,7 +232,7 @@ pub struct ResourceSnapshotRow {
 impl ResourceSnapshotRow {
     pub fn into_snapshot(self) -> ResourceSnapshot {
         ResourceSnapshot {
-            uid: ResourceUID::new(self.uid),
+            id: ResourceID::new(self.id),
             kind: self.resource_kind,
             api_version: self.api_version,
             headers: crate::ResourceHeaders {

@@ -17,6 +17,8 @@ use internal_error::InternalError;
 use kamu_resources::{
     CreateResourceError,
     ResourceDuplicateError,
+    ResourceID,
+    ResourceIDStream,
     ResourceIdentityRow,
     ResourceName,
     ResourcePhaseCounts,
@@ -26,8 +28,6 @@ use kamu_resources::{
     ResourceSnapshotStream,
     ResourceSnapshotUpdate,
     ResourceSummaryRow,
-    ResourceUID,
-    ResourceUIDStream,
     UpdateResourceError,
 };
 
@@ -42,8 +42,8 @@ struct ResourceLookupKey {
 
 #[derive(Default)]
 struct State {
-    snapshots_by_id: HashMap<ResourceUID, ResourceSnapshot>,
-    ids_by_lookup_key: HashMap<ResourceLookupKey, ResourceUID>,
+    snapshots_by_id: HashMap<ResourceID, ResourceSnapshot>,
+    ids_by_lookup_key: HashMap<ResourceLookupKey, ResourceID>,
 }
 
 pub struct InMemoryResourceRepository {
@@ -65,8 +65,8 @@ impl InMemoryResourceRepository {
 
 #[async_trait::async_trait]
 impl ResourceRepository for InMemoryResourceRepository {
-    async fn new_resource_uid(&self) -> Result<ResourceUID, InternalError> {
-        Ok(ResourceUID::new(uuid::Uuid::new_v4()))
+    async fn new_resource_id(&self) -> Result<ResourceID, InternalError> {
+        Ok(ResourceID::new(uuid::Uuid::new_v4()))
     }
 
     async fn create_resource(
@@ -81,7 +81,7 @@ impl ResourceRepository for InMemoryResourceRepository {
             name: resource_snapshot.headers.name.clone(),
         };
 
-        if guard.snapshots_by_id.contains_key(&resource_snapshot.uid)
+        if guard.snapshots_by_id.contains_key(&resource_snapshot.id)
             || guard.ids_by_lookup_key.contains_key(&lookup_key)
         {
             return Err(CreateResourceError::Duplicate(ResourceDuplicateError {
@@ -93,10 +93,10 @@ impl ResourceRepository for InMemoryResourceRepository {
 
         guard
             .ids_by_lookup_key
-            .insert(lookup_key, resource_snapshot.uid);
+            .insert(lookup_key, resource_snapshot.id);
         guard
             .snapshots_by_id
-            .insert(resource_snapshot.uid, resource_snapshot.clone());
+            .insert(resource_snapshot.id, resource_snapshot.clone());
 
         Ok(())
     }
@@ -126,7 +126,7 @@ impl ResourceRepository for InMemoryResourceRepository {
             let resource_snapshot = &resource_update.snapshot;
             let previous_snapshot = guard
                 .snapshots_by_id
-                .get(&resource_snapshot.uid)
+                .get(&resource_snapshot.id)
                 .cloned()
                 .ok_or_else(UpdateResourceError::concurrent_modification)?;
 
@@ -146,7 +146,7 @@ impl ResourceRepository for InMemoryResourceRepository {
             };
 
             if let Some(existing_resource_id) = guard.ids_by_lookup_key.get(&next_lookup_key)
-                && *existing_resource_id != resource_snapshot.uid
+                && *existing_resource_id != resource_snapshot.id
             {
                 return Err(UpdateResourceError::Duplicate(ResourceDuplicateError {
                     account_id: resource_snapshot.headers.account.clone(),
@@ -166,21 +166,21 @@ impl ResourceRepository for InMemoryResourceRepository {
             guard.ids_by_lookup_key.remove(&previous_lookup_key);
             guard
                 .ids_by_lookup_key
-                .insert(next_lookup_key, resource_snapshot.uid);
+                .insert(next_lookup_key, resource_snapshot.id);
             guard
                 .snapshots_by_id
-                .insert(resource_snapshot.uid, resource_snapshot);
+                .insert(resource_snapshot.id, resource_snapshot);
         }
 
         Ok(())
     }
 
-    async fn find_resource_uid_by_name(
+    async fn find_resource_id_by_name(
         &self,
         account_id: &odf::AccountID,
         kind: &str,
         name: &ResourceName,
-    ) -> Result<Option<ResourceUID>, InternalError> {
+    ) -> Result<Option<ResourceID>, InternalError> {
         let guard = self.state.lock().unwrap();
 
         Ok(guard
@@ -190,26 +190,26 @@ impl ResourceRepository for InMemoryResourceRepository {
                 kind: kind.to_owned(),
                 name: name.to_ascii_lowercase(),
             })
-            .and_then(|uid| guard.snapshots_by_id.get(uid))
+            .and_then(|id| guard.snapshots_by_id.get(id))
             .filter(|snapshot| snapshot.headers.deleted_at.is_none())
-            .map(|snapshot| snapshot.uid))
+            .map(|snapshot| snapshot.id))
     }
 
-    async fn find_resource_identities_by_uids(
+    async fn find_resource_identities_by_ids(
         &self,
         account_id: &odf::AccountID,
-        uids: &[ResourceUID],
+        ids: &[ResourceID],
     ) -> Result<Vec<ResourceIdentityRow>, InternalError> {
         let guard = self.state.lock().unwrap();
 
-        Ok(uids
+        Ok(ids
             .iter()
-            .filter_map(|uid| guard.snapshots_by_id.get(uid))
+            .filter_map(|id| guard.snapshots_by_id.get(id))
             .filter(|snapshot| {
                 snapshot.headers.account == *account_id && snapshot.headers.deleted_at.is_none()
             })
             .map(|snapshot| ResourceIdentityRow {
-                uid: *snapshot.uid.as_ref(),
+                id: *snapshot.id.as_ref(),
                 kind: snapshot.kind.clone(),
                 api_version: snapshot.api_version.clone(),
                 name: snapshot.headers.name.clone(),
@@ -236,11 +236,11 @@ impl ResourceRepository for InMemoryResourceRepository {
                         kind: kind.to_owned(),
                         name: name.clone(),
                     })
-                    .and_then(|uid| guard.snapshots_by_id.get(uid))
+                    .and_then(|id| guard.snapshots_by_id.get(id))
             })
             .filter(|snapshot| snapshot.headers.deleted_at.is_none())
             .map(|snapshot| ResourceIdentityRow {
-                uid: *snapshot.uid.as_ref(),
+                id: *snapshot.id.as_ref(),
                 kind: snapshot.kind.clone(),
                 api_version: snapshot.api_version.clone(),
                 name: snapshot.headers.name.clone(),
@@ -269,7 +269,7 @@ impl ResourceRepository for InMemoryResourceRepository {
             rhs.headers
                 .updated_at
                 .cmp(&lhs.headers.updated_at)
-                .then_with(|| rhs.uid.cmp(&lhs.uid))
+                .then_with(|| rhs.id.cmp(&lhs.id))
         });
 
         Ok(snapshots
@@ -277,7 +277,7 @@ impl ResourceRepository for InMemoryResourceRepository {
             .skip(pagination.offset)
             .take(pagination.limit)
             .map(|snapshot| ResourceIdentityRow {
-                uid: *snapshot.uid.as_ref(),
+                id: *snapshot.id.as_ref(),
                 kind: snapshot.kind.clone(),
                 api_version: snapshot.api_version.clone(),
                 name: snapshot.headers.name.clone(),
@@ -308,51 +308,51 @@ impl ResourceRepository for InMemoryResourceRepository {
         let guard = self.state.lock().unwrap();
         Ok(guard
             .snapshots_by_id
-            .get(&query.uid)
+            .get(&query.id)
             .filter(|snapshot| snapshot.kind == query.kind)
             .filter(|snapshot| snapshot.headers.deleted_at.is_none())
             .cloned())
     }
 
-    async fn find_resource_snapshots_by_kind_and_uids(
+    async fn find_resource_snapshots_by_kind_and_ids(
         &self,
         kind: &str,
-        uids: &[ResourceUID],
+        ids: &[ResourceID],
     ) -> Result<Vec<ResourceSnapshot>, InternalError> {
         let guard = self.state.lock().unwrap();
 
-        Ok(uids
+        Ok(ids
             .iter()
-            .filter_map(|uid| guard.snapshots_by_id.get(uid))
+            .filter_map(|id| guard.snapshots_by_id.get(id))
             .filter(|snapshot| snapshot.kind == kind)
             .filter(|snapshot| snapshot.headers.deleted_at.is_none())
             .cloned()
             .collect())
     }
 
-    async fn find_resource_snapshot_by_uid(
+    async fn find_resource_snapshot_by_id(
         &self,
-        uid: &ResourceUID,
+        id: &ResourceID,
     ) -> Result<Option<ResourceSnapshot>, InternalError> {
         let guard = self.state.lock().unwrap();
 
         Ok(guard
             .snapshots_by_id
-            .get(uid)
+            .get(id)
             .filter(|snapshot| snapshot.headers.deleted_at.is_none())
             .cloned())
     }
 
-    async fn find_resource_snapshots_by_uids(
+    async fn find_resource_snapshots_by_ids(
         &self,
         account_id: &odf::AccountID,
-        uids: &[ResourceUID],
+        ids: &[ResourceID],
     ) -> Result<Vec<ResourceSnapshot>, InternalError> {
         let guard = self.state.lock().unwrap();
 
-        Ok(uids
+        Ok(ids
             .iter()
-            .filter_map(|uid| guard.snapshots_by_id.get(uid))
+            .filter_map(|id| guard.snapshots_by_id.get(id))
             .filter(|snapshot| {
                 snapshot.headers.account == *account_id && snapshot.headers.deleted_at.is_none()
             })
@@ -360,12 +360,12 @@ impl ResourceRepository for InMemoryResourceRepository {
             .collect())
     }
 
-    fn list_resource_uids(
+    fn list_resource_ids(
         &self,
         account_id: odf::AccountID,
         kind: &str,
         pagination: PaginationOpts,
-    ) -> ResourceUIDStream<'_> {
+    ) -> ResourceIDStream<'_> {
         let mut resource_ids_page: Vec<_> = {
             let guard = self.state.lock().unwrap();
             guard
@@ -384,14 +384,14 @@ impl ResourceRepository for InMemoryResourceRepository {
             rhs.headers
                 .updated_at
                 .cmp(&lhs.headers.updated_at)
-                .then_with(|| rhs.uid.cmp(&lhs.uid))
+                .then_with(|| rhs.id.cmp(&lhs.id))
         });
 
         let resource_ids_page: Vec<_> = resource_ids_page
             .into_iter()
             .skip(pagination.offset)
             .take(pagination.limit)
-            .map(|snapshot| Ok(snapshot.uid))
+            .map(|snapshot| Ok(snapshot.id))
             .collect();
 
         Box::pin(futures::stream::iter(resource_ids_page))
@@ -421,7 +421,7 @@ impl ResourceRepository for InMemoryResourceRepository {
             rhs.headers
                 .updated_at
                 .cmp(&lhs.headers.updated_at)
-                .then_with(|| rhs.uid.cmp(&lhs.uid))
+                .then_with(|| rhs.id.cmp(&lhs.id))
         });
 
         let snapshots_page: Vec<_> = snapshots_page
@@ -455,7 +455,7 @@ impl ResourceRepository for InMemoryResourceRepository {
             rhs.headers
                 .updated_at
                 .cmp(&lhs.headers.updated_at)
-                .then_with(|| rhs.uid.cmp(&lhs.uid))
+                .then_with(|| rhs.id.cmp(&lhs.id))
         });
 
         let snapshots_page: Vec<_> = snapshots_page

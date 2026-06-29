@@ -22,8 +22,8 @@ async fn test_variable_binding_order_first_wins() {
     let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
     let (_, account_id) = odf::AccountID::new_generated_ed25519();
 
-    let uid_a = harness.allocate_resource_uid().await;
-    let uid_b = harness.allocate_resource_uid().await;
+    let id_a = harness.allocate_resource_id().await;
+    let id_b = harness.allocate_resource_id().await;
 
     let now = Utc::now();
 
@@ -31,7 +31,7 @@ async fn test_variable_binding_order_first_wins() {
 
     var_repo
         .replace_entries(
-            &uid_a,
+            &id_a,
             1,
             &[
                 VariableSetEntry {
@@ -57,7 +57,7 @@ async fn test_variable_binding_order_first_wins() {
 
     var_repo
         .replace_entries(
-            &uid_b,
+            &id_b,
             1,
             &[
                 VariableSetEntry {
@@ -81,10 +81,10 @@ async fn test_variable_binding_order_first_wins() {
         .await
         .unwrap();
 
-    // Bind uid_a first, uid_b second
+    // Bind id_a first, id_b second
     harness
         .variable_set_binding_repo()
-        .replace_bindings(&dataset_id, &[uid_a, uid_b])
+        .replace_bindings(&dataset_id, &[id_a, id_b])
         .await
         .unwrap();
 
@@ -114,8 +114,8 @@ async fn test_secret_overrides_variable_on_same_key() {
     let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
     let (_, account_id) = odf::AccountID::new_generated_ed25519();
 
-    let uid_var = harness.allocate_resource_uid().await;
-    let uid_sec = harness.allocate_resource_uid().await;
+    let uid_var = harness.allocate_resource_id().await;
+    let uid_sec = harness.allocate_resource_id().await;
     let now = Utc::now();
 
     harness

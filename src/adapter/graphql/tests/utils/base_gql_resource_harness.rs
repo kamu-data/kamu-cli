@@ -19,10 +19,10 @@ use kamu_core::TenancyConfig;
 use kamu_resources::{
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
     ResourceHeaders,
+    ResourceID,
     ResourceLifecycleMessage,
     ResourceRepository,
     ResourceSnapshot,
-    ResourceUID,
 };
 use kamu_resources_inmem::{InMemoryRawResourceEventStore, InMemoryResourceRepository};
 use messaging_outbox::{OutboxProvider, register_message_dispatcher};
@@ -84,13 +84,13 @@ impl BaseGQLResourceHarness {
         kind: &str,
         api_version: &str,
         spec: serde_json::Value,
-    ) -> ResourceUID {
+    ) -> ResourceID {
         let resource_repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
-        let uid = ResourceUID::new(uuid::Uuid::new_v4());
+        let id = ResourceID::new(uuid::Uuid::new_v4());
 
         resource_repo
             .create_resource(&ResourceSnapshot {
-                uid,
+                id,
                 kind: kind.to_string(),
                 api_version: api_version.to_string(),
                 headers: ResourceHeaders::simple(Utc::now(), account_id.clone(), name),
@@ -102,7 +102,7 @@ impl BaseGQLResourceHarness {
             .await
             .unwrap();
 
-        uid
+        id
     }
 
     pub fn dummy_variable_set_spec() -> serde_json::Value {
@@ -136,7 +136,7 @@ impl BaseGQLResourceHarness {
         account_id: &odf::AccountID,
         name: &str,
         spec: serde_json::Value,
-    ) -> ResourceUID {
+    ) -> ResourceID {
         Self::create_resource(
             catalog,
             account_id,
@@ -153,7 +153,7 @@ impl BaseGQLResourceHarness {
         account_id: &odf::AccountID,
         name: &str,
         spec: serde_json::Value,
-    ) -> ResourceUID {
+    ) -> ResourceID {
         Self::create_resource(
             catalog,
             account_id,

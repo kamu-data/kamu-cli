@@ -11,31 +11,31 @@ use database_common::PaginationOpts;
 use internal_error::InternalError;
 
 use crate::{
+    ResourceID,
     ResourceIdentityRow,
     ResourceName,
     ResourceSnapshot,
     ResourceSummaryRow,
     ResourceTypeMismatchError,
-    ResourceUID,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait GenericResourceQueryService: Send + Sync {
-    async fn allocate_uid(&self) -> Result<ResourceUID, InternalError>;
+    async fn allocate_id(&self) -> Result<ResourceID, InternalError>;
 
-    async fn find_resource_uid_by_name(
+    async fn find_resource_id_by_name(
         &self,
         account_id: &odf::AccountID,
         kind: &str,
         name: &ResourceName,
-    ) -> Result<Option<ResourceUID>, InternalError>;
+    ) -> Result<Option<ResourceID>, InternalError>;
 
-    async fn find_resource_identities_by_uids(
+    async fn find_resource_identities_by_ids(
         &self,
         account_id: &odf::AccountID,
-        uids: &[ResourceUID],
+        ids: &[ResourceID],
     ) -> Result<Vec<ResourceIdentityRow>, InternalError>;
 
     async fn find_resource_identities_by_names(
@@ -67,7 +67,7 @@ pub trait GenericResourceQueryService: Send + Sync {
         account_id: &odf::AccountID,
         kind: &'static str,
         api_version: &'static str,
-        uid: ResourceUID,
+        id: ResourceID,
     ) -> Result<Option<ResourceSnapshot>, FindOwnedResourceError>;
 
     async fn find_owned_snapshots(
@@ -75,18 +75,18 @@ pub trait GenericResourceQueryService: Send + Sync {
         account_id: &odf::AccountID,
         kind: &'static str,
         api_version: &'static str,
-        uids: &[ResourceUID],
+        ids: &[ResourceID],
     ) -> Result<FindOwnedSnapshotsOutcome, InternalError>;
 
-    async fn get_snapshot_by_uid(
+    async fn get_snapshot_by_id(
         &self,
-        uid: &crate::ResourceUID,
+        id: &crate::ResourceID,
     ) -> Result<Option<ResourceSnapshot>, InternalError>;
 
-    async fn find_snapshots_by_uids(
+    async fn find_snapshots_by_ids(
         &self,
         account_id: &odf::AccountID,
-        uids: &[ResourceUID],
+        ids: &[ResourceID],
     ) -> Result<Vec<ResourceSnapshot>, InternalError>;
 
     async fn list_snapshots_by_kind(
@@ -112,14 +112,14 @@ pub trait GenericResourceQueryService: Send + Sync {
 
 pub struct FindOwnedSnapshotsOutcome {
     pub found: Vec<ResourceSnapshot>,
-    pub not_found: Vec<ResourceUID>,
-    /// UIDs owned by the account but with a different kind:
-    /// (uid, `actual_kind`)
-    pub kind_mismatch: Vec<(ResourceUID, String)>,
-    /// UIDs owned by the account, correct kind,
-    /// but wrong `api_version`: (uid, `actual_api_version`)
-    pub api_version_mismatch: Vec<(ResourceUID, String)>,
-    pub access_denied: Vec<ResourceUID>,
+    pub not_found: Vec<ResourceID>,
+    /// IDs owned by the account but with a different kind:
+    /// (id, `actual_kind`)
+    pub kind_mismatch: Vec<(ResourceID, String)>,
+    /// IDs owned by the account, correct kind,
+    /// but wrong `api_version`: (id, `actual_api_version`)
+    pub api_version_mismatch: Vec<(ResourceID, String)>,
+    pub access_denied: Vec<ResourceID>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

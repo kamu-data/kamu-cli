@@ -9,17 +9,17 @@
 
 use event_sourcing::{GetEventsError, LoadError};
 
-use crate::{ReconcilableEventSourcedResource, ResourceUID};
+use crate::{ReconcilableEventSourcedResource, ResourceID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait ResourceAggregateLoader<R: ReconcilableEventSourcedResource>: Send + Sync {
-    async fn load(&self, uid: &ResourceUID) -> Result<R, LoadError<R::ResourceState>>;
+    async fn load(&self, id: &ResourceID) -> Result<R, LoadError<R::ResourceState>>;
 
     async fn load_many(
         &self,
-        uids: &[ResourceUID],
+        ids: &[ResourceID],
     ) -> Result<Vec<Result<R, LoadError<R::ResourceState>>>, GetEventsError>;
 }
 

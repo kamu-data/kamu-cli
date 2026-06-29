@@ -26,10 +26,10 @@ use crate::{
     ResourceEventReconciliationSucceeded,
     ResourceEventSpecUpdated,
     ResourceHeadersInput,
+    ResourceID,
     ResourceReconcileError,
     ResourceSnapshot,
     ResourceStatusLike,
-    ResourceUID,
     make_typed_resource_snapshot,
 };
 
@@ -39,7 +39,7 @@ pub trait ReconcilableEventSourcedResource:
     ReconcilableResource
     + DeclarativeResource<
         ResourceState: Projection<
-            Query = ResourceUID,
+            Query = ResourceID,
             Event = ReconcilableResourceEvent<
                 Self::Spec,
                 Self::ReconcileSuccess,
@@ -70,14 +70,14 @@ pub trait ReconcilableEventSourcedResource:
 
     fn make_created_event(
         now: DateTime<Utc>,
-        uid: ResourceUID,
+        id: ResourceID,
         headers: ResourceHeadersInput,
         spec: Self::Spec,
     ) -> ReconcilableResourceEvent<Self::Spec, Self::ReconcileSuccess, Self::ReconcileFailureDetails>
     {
         ReconcilableResourceEvent::Created(ResourceEventCreated {
             event_time: now,
-            uid,
+            id,
             headers,
             spec,
         })
@@ -91,7 +91,7 @@ pub trait ReconcilableEventSourcedResource:
     {
         ReconcilableResourceEvent::HeadersUpdated(ResourceEventHeadersUpdated {
             event_time: now,
-            uid: *self.uid(),
+            id: *self.id(),
             new_headers,
         })
     }
@@ -105,7 +105,7 @@ pub trait ReconcilableEventSourcedResource:
     {
         ReconcilableResourceEvent::SpecUpdated(ResourceEventSpecUpdated {
             event_time: now,
-            uid: *self.uid(),
+            id: *self.id(),
             new_spec,
             new_generation,
         })
@@ -119,7 +119,7 @@ pub trait ReconcilableEventSourcedResource:
     {
         ReconcilableResourceEvent::Deleted(ResourceEventDeleted {
             event_time: now,
-            uid: *self.uid(),
+            id: *self.id(),
             tombstone_name,
         })
     }
@@ -131,7 +131,7 @@ pub trait ReconcilableEventSourcedResource:
         Self::Status: Serialize + ResourceStatusLike,
     {
         make_typed_resource_snapshot(
-            *self.uid(),
+            *self.id(),
             Self::DESCRIPTOR.resource_type,
             Self::DESCRIPTOR.api_version,
             self.headers().clone(),
@@ -148,7 +148,7 @@ pub trait ReconcilableEventSourcedResource:
     {
         ReconcilableResourceEvent::ReconciliationStarted(ResourceEventReconciliationStarted {
             event_time: now,
-            uid: *self.uid(),
+            id: *self.id(),
             generation: self.headers().generation,
         })
     }
@@ -162,7 +162,7 @@ pub trait ReconcilableEventSourcedResource:
     {
         ReconcilableResourceEvent::ReconciliationSucceeded(ResourceEventReconciliationSucceeded {
             event_time: now,
-            uid: *self.uid(),
+            id: *self.id(),
             generation: expected_generation,
             success,
         })
@@ -177,7 +177,7 @@ pub trait ReconcilableEventSourcedResource:
     {
         ReconcilableResourceEvent::ReconciliationFailed(ResourceEventReconciliationFailed {
             event_time: now,
-            uid: *self.uid(),
+            id: *self.id(),
             generation: expected_generation,
             reason: error.reason_code().to_string(),
             message: error.user_message(),
@@ -187,7 +187,7 @@ pub trait ReconcilableEventSourcedResource:
 
     fn try_create(
         now: DateTime<Utc>,
-        uid: ResourceUID,
+        id: ResourceID,
         headers: ResourceHeadersInput,
         spec: Self::Spec,
     ) -> Result<Self, Self::LifecycleError>
@@ -200,7 +200,7 @@ pub trait ReconcilableEventSourcedResource:
     {
         crate::try_create_reconcilable_resource::<Self, _, _>(
             now,
-            uid,
+            id,
             headers,
             spec,
             Aggregate::new,
@@ -260,13 +260,13 @@ macro_rules! impl_reconcilable_event_sourced_resource {
 
             fn try_create(
                 now: ::chrono::DateTime<::chrono::Utc>,
-                uid: $crate::ResourceUID,
+                id: $crate::ResourceID,
                 headers: $crate::ResourceHeadersInput,
                 spec: Self::Spec,
             ) -> Result<Self, Self::LifecycleError> {
                 <$resource as $crate::ReconcilableEventSourcedResource>::try_create(
                     now,
-                    uid,
+                    id,
                     headers,
                     spec,
                 )

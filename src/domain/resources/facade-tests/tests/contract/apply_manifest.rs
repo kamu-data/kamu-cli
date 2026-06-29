@@ -409,7 +409,7 @@ pub async fn test_apply_create_json(h: &impl FacadeContractHarness) {
     assert_resource_view_fields(view, VARIABLE_SET_KIND, VARIABLE_SET_API_VERSION, "alpha");
     assert_eq!(view.headers.generation, 1, "initial generation must be 1");
 
-    let uid = view.headers.uid;
+    let id = view.headers.id;
 
     // Verify resource is readable via get
     let fetched = facade
@@ -419,7 +419,7 @@ pub async fn test_apply_create_json(h: &impl FacadeContractHarness) {
         )
         .await
         .unwrap();
-    assert_eq!(fetched.headers.uid, uid, "uid must match after apply");
+    assert_eq!(fetched.headers.id, id, "id must match after apply");
     assert_resource_view_fields(
         &fetched,
         VARIABLE_SET_KIND,
@@ -462,7 +462,7 @@ pub async fn test_apply_create_yaml(h: &impl FacadeContractHarness) {
         )
         .await
         .unwrap();
-    assert_eq!(fetched.headers.uid, view.headers.uid);
+    assert_eq!(fetched.headers.id, view.headers.id);
     assert_resource_view_fields(
         &fetched,
         VARIABLE_SET_KIND,
@@ -489,7 +489,7 @@ pub async fn test_apply_update(h: &impl FacadeContractHarness) {
         .await
         .unwrap();
     let created = assert_applied_outcome(&create_decision, ApplyResourceOutcome::Created);
-    let original_uid = created.headers.uid;
+    let original_id = created.headers.id;
 
     // Update spec
     let update_manifest = variable_set_manifest_json("upd-vars", None, &[("A", "1"), ("B", "2")]);
@@ -502,10 +502,10 @@ pub async fn test_apply_update(h: &impl FacadeContractHarness) {
         .unwrap();
     let updated = assert_applied_outcome(&update_decision, ApplyResourceOutcome::Updated);
 
-    // uid preserved
+    // id preserved
     assert_eq!(
-        updated.headers.uid, original_uid,
-        "uid must be preserved on update"
+        updated.headers.id, original_id,
+        "id must be preserved on update"
     );
     assert_eq!(
         updated.headers.name, "upd-vars",
@@ -524,7 +524,7 @@ pub async fn test_apply_update(h: &impl FacadeContractHarness) {
         )
         .await
         .unwrap();
-    assert_eq!(fetched.headers.uid, original_uid);
+    assert_eq!(fetched.headers.id, original_id);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -545,7 +545,7 @@ pub async fn test_apply_idempotent(h: &impl FacadeContractHarness) {
         .await
         .unwrap();
     let first = assert_applied_outcome(&first_decision, ApplyResourceOutcome::Created);
-    let uid = first.headers.uid;
+    let id: kamu_resources::ResourceID = first.headers.id;
     let generation = first.headers.generation;
 
     // Second apply with identical manifest
@@ -558,10 +558,7 @@ pub async fn test_apply_idempotent(h: &impl FacadeContractHarness) {
         .unwrap();
     let second = assert_applied_outcome(&second_decision, ApplyResourceOutcome::Untouched);
 
-    assert_eq!(
-        second.headers.uid, uid,
-        "uid must be preserved on no-op apply"
-    );
+    assert_eq!(second.headers.id, id, "id must be preserved on no-op apply");
     assert_eq!(
         second.headers.generation, generation,
         "generation must not change on no-op apply"

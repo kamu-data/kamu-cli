@@ -17,7 +17,7 @@
 /* ------------------------------ */
 
 INSERT INTO resources (
-    resource_uid,
+    resource_id,
     account_id,
     resource_kind,
     api_version,
@@ -35,7 +35,7 @@ INSERT INTO resources (
     last_event_id
 )
 SELECT
-    gen_random_uuid()                                                           AS resource_uid,
+    gen_random_uuid()                                                           AS resource_id,
     de.owner_id                                                                 AS account_id,
     'VariableSet'                                                               AS resource_kind,
     'kamu.dev/v1alpha1'                                                         AS api_version,
@@ -76,7 +76,7 @@ ON CONFLICT (account_id, resource_kind, resource_name) DO NOTHING;
 
 INSERT INTO config_variable_set_entries (
     entry_id,
-    resource_uid,
+    resource_id,
     resource_generation,
     account_id,
     variable_key,
@@ -86,7 +86,7 @@ INSERT INTO config_variable_set_entries (
 )
 SELECT
     gen_random_uuid()                                                           AS entry_id,
-    r.resource_uid,
+    r.resource_id,
     1                                                                           AS resource_generation,
     de.owner_id                                                                 AS account_id,
     dev.key                                                                     AS variable_key,
@@ -100,18 +100,18 @@ JOIN resources r
    AND r.resource_kind = 'VariableSet'
    AND r.resource_name = 'legacy-vars-' || substring(dev.dataset_id, 9)
 WHERE dev.secret_nonce IS NULL
-ON CONFLICT (resource_uid, resource_generation, variable_key) DO NOTHING;
+ON CONFLICT (resource_id, resource_generation, variable_key) DO NOTHING;
 
 /* ------------------------------ */
 
 INSERT INTO config_dataset_variable_set_bindings (
     dataset_id,
-    resource_uid,
+    resource_id,
     binding_order
 )
 SELECT DISTINCT
     dev.dataset_id,
-    r.resource_uid,
+    r.resource_id,
     0                                                                           AS binding_order
 FROM dataset_env_vars dev
 JOIN dataset_entries de ON de.dataset_id = dev.dataset_id
@@ -127,7 +127,7 @@ ON CONFLICT DO NOTHING;
 /* ------------------------------ */
 
 INSERT INTO resources (
-    resource_uid,
+    resource_id,
     account_id,
     resource_kind,
     api_version,
@@ -145,7 +145,7 @@ INSERT INTO resources (
     last_event_id
 )
 SELECT
-    gen_random_uuid()                                                           AS resource_uid,
+    gen_random_uuid()                                                           AS resource_id,
     de.owner_id                                                                 AS account_id,
     'SecretSet'                                                                 AS resource_kind,
     'kamu.dev/v1alpha1'                                                         AS api_version,
@@ -186,7 +186,7 @@ ON CONFLICT (account_id, resource_kind, resource_name) DO NOTHING;
 
 INSERT INTO config_secret_set_entries (
     entry_id,
-    resource_uid,
+    resource_id,
     resource_generation,
     account_id,
     secret_key,
@@ -197,7 +197,7 @@ INSERT INTO config_secret_set_entries (
 )
 SELECT
     gen_random_uuid()                                                           AS entry_id,
-    r.resource_uid,
+    r.resource_id,
     1                                                                           AS resource_generation,
     de.owner_id                                                                 AS account_id,
     dev.key                                                                     AS secret_key,
@@ -212,18 +212,18 @@ JOIN resources r
    AND r.resource_kind = 'SecretSet'
    AND r.resource_name = 'legacy-secrets-' || substring(dev.dataset_id, 9)
 WHERE dev.secret_nonce IS NOT NULL
-ON CONFLICT (resource_uid, resource_generation, secret_key) DO NOTHING;
+ON CONFLICT (resource_id, resource_generation, secret_key) DO NOTHING;
 
 /* ------------------------------ */
 
 INSERT INTO config_dataset_secret_set_bindings (
     dataset_id,
-    resource_uid,
+    resource_id,
     binding_order
 )
 SELECT DISTINCT
     dev.dataset_id,
-    r.resource_uid,
+    r.resource_id,
     0                                                                           AS binding_order
 FROM dataset_env_vars dev
 JOIN dataset_entries de ON de.dataset_id = dev.dataset_id
@@ -240,22 +240,22 @@ ON CONFLICT DO NOTHING;
 
 WITH
 var_resources AS (
-    SELECT resource_uid, account_id, resource_name, created_at, spec, status
+    SELECT resource_id, account_id, resource_name, created_at, spec, status
     FROM resources
     WHERE resource_kind = 'VariableSet'
       AND resource_name LIKE 'legacy-vars-%'
       AND last_event_id IS NULL
 ),
 ins_created AS (
-    INSERT INTO resource_events (resource_uid, resource_kind, event_time, event_type, event_payload)
+    INSERT INTO resource_events (resource_id, resource_kind, event_time, event_type, event_payload)
     SELECT
-        r.resource_uid,
+        r.resource_id,
         'VariableSet',
         r.created_at,
         'Created',
         jsonb_build_object('Created', jsonb_build_object(
             'event_time', r.created_at,
-            'uid',         r.resource_uid::text,
+            'id',         r.resource_id::text,
             'headers',    jsonb_build_object(
                                'account',     r.account_id,
                                'name',        r.resource_name,
@@ -266,43 +266,43 @@ ins_created AS (
             'spec',        r.spec
         ))
     FROM var_resources r
-    RETURNING resource_uid, event_id
+    RETURNING resource_id, event_id
 ),
 ins_started AS (
-    INSERT INTO resource_events (resource_uid, resource_kind, event_time, event_type, event_payload)
+    INSERT INTO resource_events (resource_id, resource_kind, event_time, event_type, event_payload)
     SELECT
-        r.resource_uid,
+        r.resource_id,
         'VariableSet',
         r.created_at,
         'ReconciliationStarted',
         jsonb_build_object('ReconciliationStarted', jsonb_build_object(
             'event_time', r.created_at,
-            'uid',        r.resource_uid::text,
+            'id',        r.resource_id::text,
             'generation', 1
         ))
     FROM var_resources r
-    RETURNING resource_uid, event_id
+    RETURNING resource_id, event_id
 ),
 ins_succeeded AS (
-    INSERT INTO resource_events (resource_uid, resource_kind, event_time, event_type, event_payload)
+    INSERT INTO resource_events (resource_id, resource_kind, event_time, event_type, event_payload)
     SELECT
-        r.resource_uid,
+        r.resource_id,
         'VariableSet',
         r.created_at,
         'ReconciliationSucceeded',
         jsonb_build_object('ReconciliationSucceeded', jsonb_build_object(
             'event_time', r.created_at,
-            'uid',        r.resource_uid::text,
+            'id',        r.resource_id::text,
             'generation', 1,
             'success',    jsonb_build_object('stats', r.status -> 'stats')
         ))
     FROM var_resources r
-    RETURNING resource_uid, event_id
+    RETURNING resource_id, event_id
 )
 UPDATE resources
 SET last_event_id = ins_succeeded.event_id
 FROM ins_succeeded
-WHERE resources.resource_uid = ins_succeeded.resource_uid;
+WHERE resources.resource_id = ins_succeeded.resource_id;
 
 /* ------------------------------ */
 /* Resource events: SecretSet     */
@@ -310,22 +310,22 @@ WHERE resources.resource_uid = ins_succeeded.resource_uid;
 
 WITH
 secret_resources AS (
-    SELECT resource_uid, account_id, resource_name, created_at, spec, status
+    SELECT resource_id, account_id, resource_name, created_at, spec, status
     FROM resources
     WHERE resource_kind = 'SecretSet'
       AND resource_name LIKE 'legacy-secrets-%'
       AND last_event_id IS NULL
 ),
 ins_created AS (
-    INSERT INTO resource_events (resource_uid, resource_kind, event_time, event_type, event_payload)
+    INSERT INTO resource_events (resource_id, resource_kind, event_time, event_type, event_payload)
     SELECT
-        r.resource_uid,
+        r.resource_id,
         'SecretSet',
         r.created_at,
         'Created',
         jsonb_build_object('Created', jsonb_build_object(
             'event_time', r.created_at,
-            'uid',         r.resource_uid::text,
+            'id',         r.resource_id::text,
             'headers',    jsonb_build_object(
                                'account',     r.account_id,
                                'name',        r.resource_name,
@@ -336,43 +336,43 @@ ins_created AS (
             'spec',        r.spec
         ))
     FROM secret_resources r
-    RETURNING resource_uid, event_id
+    RETURNING resource_id, event_id
 ),
 ins_started AS (
-    INSERT INTO resource_events (resource_uid, resource_kind, event_time, event_type, event_payload)
+    INSERT INTO resource_events (resource_id, resource_kind, event_time, event_type, event_payload)
     SELECT
-        r.resource_uid,
+        r.resource_id,
         'SecretSet',
         r.created_at,
         'ReconciliationStarted',
         jsonb_build_object('ReconciliationStarted', jsonb_build_object(
             'event_time', r.created_at,
-            'uid',        r.resource_uid::text,
+            'id',        r.resource_id::text,
             'generation', 1
         ))
     FROM secret_resources r
-    RETURNING resource_uid, event_id
+    RETURNING resource_id, event_id
 ),
 ins_succeeded AS (
-    INSERT INTO resource_events (resource_uid, resource_kind, event_time, event_type, event_payload)
+    INSERT INTO resource_events (resource_id, resource_kind, event_time, event_type, event_payload)
     SELECT
-        r.resource_uid,
+        r.resource_id,
         'SecretSet',
         r.created_at,
         'ReconciliationSucceeded',
         jsonb_build_object('ReconciliationSucceeded', jsonb_build_object(
             'event_time', r.created_at,
-            'uid',        r.resource_uid::text,
+            'id',        r.resource_id::text,
             'generation', 1,
             'success',    jsonb_build_object('stats', r.status -> 'stats')
         ))
     FROM secret_resources r
-    RETURNING resource_uid, event_id
+    RETURNING resource_id, event_id
 )
 UPDATE resources
 SET last_event_id = ins_succeeded.event_id
 FROM ins_succeeded
-WHERE resources.resource_uid = ins_succeeded.resource_uid;
+WHERE resources.resource_id = ins_succeeded.resource_id;
 
 /* ------------------------------ */
 

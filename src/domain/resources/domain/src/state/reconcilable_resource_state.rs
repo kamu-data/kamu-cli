@@ -14,9 +14,9 @@ use crate::{
     DeclarativeResourceState,
     ReconcilableResourceEvent,
     ReconcilableStateModel,
+    ResourceID,
     ResourceSnapshot,
     ResourceState,
-    ResourceUID,
     project_reconcilable_resource_state,
 };
 
@@ -104,8 +104,8 @@ where
     type Spec = TModel::Spec;
     type Status = TModel::Status;
 
-    fn uid(&self) -> &ResourceUID {
-        &self.inner.uid
+    fn id(&self) -> &ResourceID {
+        &self.inner.id
     }
 
     fn headers(&self) -> &crate::ResourceHeaders {
@@ -132,14 +132,7 @@ where
         &mut self.inner.status
     }
 
-    fn into_parts(
-        self,
-    ) -> (
-        ResourceUID,
-        crate::ResourceHeaders,
-        Self::Spec,
-        Self::Status,
-    ) {
+    fn into_parts(self) -> (ResourceID, crate::ResourceHeaders, Self::Spec, Self::Status) {
         self.inner.into_parts()
     }
 }
@@ -150,7 +143,7 @@ impl<TModel> Projection for ReconcilableResourceState<TModel>
 where
     TModel: ReconcilableStateModel<State = Self> + 'static,
 {
-    type Query = ResourceUID;
+    type Query = ResourceID;
     type Event = ReconcilableResourceEvent<TModel::Spec, TModel::Success, TModel::FailureDetails>;
 
     fn apply(state: Option<Self>, event: Self::Event) -> Result<Self, ProjectionError<Self>> {

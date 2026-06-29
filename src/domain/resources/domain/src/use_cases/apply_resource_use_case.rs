@@ -13,12 +13,12 @@ use internal_error::{ErrorIntoInternal, InternalError};
 use crate::{
     DeclarativeResource,
     ReconcilableEventSourcedResource,
+    ResourceID,
+    ResourceIDNotFoundError,
     ResourceLoadError,
     ResourcePersistenceError,
     ResourceSnapshot,
     ResourceTypeMismatchError,
-    ResourceUID,
-    ResourceUIDNotFoundError,
     ResourceWarning,
     TypedResourceQueryError,
 };
@@ -41,7 +41,7 @@ pub trait ApplyResourceUseCase<R: ReconcilableEventSourcedResource>: Send + Sync
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct ApplyResourceParams<R: DeclarativeResource> {
-    pub uid: Option<ResourceUID>,
+    pub id: Option<ResourceID>,
     pub headers: crate::ResourceHeadersInput,
     pub spec: R::Spec,
 }
@@ -77,7 +77,7 @@ impl<R: DeclarativeResource> ApplyResourceApplicationDecision<R> {
 
 #[derive(Debug)]
 pub struct ApplyResourcePlan<R: DeclarativeResource> {
-    pub uid: ResourceUID,
+    pub id: ResourceID,
     pub state: R::ResourceState,
     pub action: ApplyResourceAction,
     pub reconciliation_required: bool,
@@ -98,7 +98,7 @@ pub enum ApplyResourceAction {
 
 #[derive(Debug)]
 pub struct ApplyResourceResult<R: DeclarativeResource> {
-    pub uid: ResourceUID,
+    pub id: ResourceID,
     pub state: R::ResourceState,
     pub outcome: ApplyResourceOutcome,
     pub warnings: Vec<ResourceWarning>,
@@ -188,7 +188,7 @@ pub enum ApplyResourceUseCaseError<R: ReconcilableEventSourcedResource> {
     LoadFailed(#[from] ResourceLoadError<R::ResourceState>),
 
     #[error(transparent)]
-    ResourceUIDNotFound(#[from] ResourceUIDNotFoundError),
+    ResourceIDNotFound(#[from] ResourceIDNotFoundError),
 
     #[error(transparent)]
     ResourceTypeMismatch(#[from] ResourceTypeMismatchError),
@@ -207,12 +207,12 @@ where
     R: ReconcilableEventSourcedResource,
 {
     pub fn type_mismatch(
-        uid: ResourceUID,
+        id: ResourceID,
         expected: &crate::ResourceDescriptor,
         actual: &ResourceSnapshot,
     ) -> Self {
         Self::ResourceTypeMismatch(ResourceTypeMismatchError::from_expected_and_actual(
-            uid, expected, actual,
+            id, expected, actual,
         ))
     }
 }
@@ -242,7 +242,7 @@ where
 {
     fn from(err: TypedResourceQueryError) -> Self {
         match err {
-            TypedResourceQueryError::NotFound(err) => Self::ResourceUIDNotFound(err),
+            TypedResourceQueryError::NotFound(err) => Self::ResourceIDNotFound(err),
             TypedResourceQueryError::TypeMismatch(err) => Self::ResourceTypeMismatch(err),
             TypedResourceQueryError::Internal(err) => Self::Internal(err),
         }

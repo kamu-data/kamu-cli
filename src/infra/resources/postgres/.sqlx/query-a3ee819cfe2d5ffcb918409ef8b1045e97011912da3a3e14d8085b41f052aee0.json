@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            WITH inserted AS (\n                INSERT INTO resource_events (\n                    resource_id,\n                    resource_kind,\n                    event_time,\n                    event_type,\n                    event_payload\n                )\n                SELECT\n                    $1,\n                    $2,\n                    e.event_time,\n                    e.event_type,\n                    e.event_payload\n                FROM UNNEST(\n                    $3::timestamptz[],\n                    $4::text[],\n                    $5::jsonb[]\n                ) AS e(event_time, event_type, event_payload)\n                RETURNING event_id\n            )\n            SELECT MAX(event_id) AS \"event_id!\" FROM inserted\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "event_id!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "TimestamptzArray",
+        "TextArray",
+        "JsonbArray"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "a3ee819cfe2d5ffcb918409ef8b1045e97011912da3a3e14d8085b41f052aee0"
+}

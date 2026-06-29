@@ -44,15 +44,15 @@ async fn test_spec_view_dispatcher_reveals_encrypted_secrets_as_plaintext() {
     let decision = harness
         .apply_secret_use_case()
         .apply(ApplyResourceParams {
-            uid: None,
+            id: None,
             headers: BaseResourceServiceHarness::make_headers_input(account_id, "test-secrets"),
             spec,
         })
         .await
         .unwrap();
 
-    let applied_uid = match decision {
-        ApplyResourceApplicationDecision::Applied(result) => result.uid,
+    let applied_id = match decision {
+        ApplyResourceApplicationDecision::Applied(result) => result.id,
         ApplyResourceApplicationDecision::Rejected(r) => {
             panic!("apply was rejected: {}", r.message)
         }
@@ -60,7 +60,7 @@ async fn test_spec_view_dispatcher_reveals_encrypted_secrets_as_plaintext() {
 
     let snapshot = harness
         .generic_query_svc()
-        .get_snapshot_by_uid(&applied_uid)
+        .get_snapshot_by_id(&applied_id)
         .await
         .unwrap()
         .expect("snapshot must exist after apply");

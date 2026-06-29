@@ -4032,6 +4032,11 @@ type ResourceHeaders {
 
 scalar ResourceID
 
+type ResourceIDNotFoundProblem {
+	id: ResourceID!
+	message: String!
+}
+
 type ResourceIdentity {
 	id: ResourceID!
 	apiVersion: String!
@@ -4102,7 +4107,7 @@ input ResourceKindInput {
 }
 
 type ResourceKindMismatchProblem {
-	uid: ResourceID!
+	id: ResourceID!
 	expectedKind: String!
 	actualKind: String!
 	message: String!
@@ -4137,7 +4142,7 @@ enum ResourceListColumnVisibility {
 
 union ResourceListOutcome = ResourceConnection | ResourceUnsupportedDescriptorProblem | ResourceBadAccountProblem
 
-union ResourceLookupProblem = ResourceUIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceApiVersionMismatchProblem | ResourceKindMismatchProblem
+union ResourceLookupProblem = ResourceIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceApiVersionMismatchProblem | ResourceKindMismatchProblem
 
 enum ResourceManifestFormat {
 	JSON
@@ -4185,7 +4190,7 @@ input ResourceSelectorInput {
 	account: ResourceAccountSelectorInput
 }
 
-union ResourceSelectorProblem = ResourceUIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceApiVersionMismatchProblem | ResourceKindMismatchProblem | ResourceUnsupportedDescriptorProblem | ResourceBadAccountProblem
+union ResourceSelectorProblem = ResourceIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceApiVersionMismatchProblem | ResourceKindMismatchProblem | ResourceUnsupportedDescriptorProblem | ResourceBadAccountProblem
 
 type ResourceSelectorProblemResult {
 	problem: ResourceSelectorProblem!
@@ -4216,11 +4221,6 @@ type ResourceTypeCountSummary {
 	apiVersion: String!
 	totalCount: Uint64!
 	phaseCounts: ResourcePhaseCounts!
-}
-
-type ResourceUIDNotFoundProblem {
-	uid: ResourceID!
-	message: String!
 }
 
 type ResourceUnsupportedDescriptorProblem {

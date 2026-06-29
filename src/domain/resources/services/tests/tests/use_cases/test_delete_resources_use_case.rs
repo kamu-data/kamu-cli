@@ -16,7 +16,7 @@ use kamu_resources_services::testing::BaseResourceServiceHarness;
 use messaging_outbox::MockOutbox;
 
 use crate::tests::use_cases::resource_use_case_base_harness::ResourceUseCaseBaseHarness;
-use crate::tests::utils::{make_account_id, make_uid};
+use crate::tests::utils::{make_account_id, make_id};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Tests
@@ -27,14 +27,14 @@ async fn test_delete_single_resource_success() {
     let harness = ResourceUseCaseBaseHarness::new();
     let account_id = make_account_id();
 
-    let (uid, snapshot) = harness
+    let (id, snapshot) = harness
         .apply_and_assert_snapshot(account_id.clone(), "res-a")
         .await;
     pretty_assertions::assert_eq!(snapshot.spec, serde_json::json!({ "value": "res-a" }));
 
-    harness.delete_resources(account_id, vec![uid]).await;
+    harness.delete_resources(account_id, vec![id]).await;
 
-    assert!(harness.get_snapshot_by_uid(&uid).await.is_none());
+    assert!(harness.get_snapshot_by_id(&id).await.is_none());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -44,13 +44,13 @@ async fn test_delete_multiple_resources_in_one_call() {
     let harness = ResourceUseCaseBaseHarness::new();
     let account_id = make_account_id();
 
-    let (uid_a, snapshot_a) = harness
+    let (id_a, snapshot_a) = harness
         .apply_and_assert_snapshot(account_id.clone(), "res-a")
         .await;
-    let (uid_b, snapshot_b) = harness
+    let (id_b, snapshot_b) = harness
         .apply_and_assert_snapshot(account_id.clone(), "res-b")
         .await;
-    let (uid_c, snapshot_c) = harness
+    let (id_c, snapshot_c) = harness
         .apply_and_assert_snapshot(account_id.clone(), "res-c")
         .await;
 
@@ -59,13 +59,13 @@ async fn test_delete_multiple_resources_in_one_call() {
     pretty_assertions::assert_eq!(snapshot_c.spec, serde_json::json!({ "value": "res-c" }));
 
     harness
-        .delete_resources(account_id, vec![uid_a, uid_b, uid_c])
+        .delete_resources(account_id, vec![id_a, id_b, id_c])
         .await;
 
-    for uid in [&uid_a, &uid_b, &uid_c] {
+    for id in [&id_a, &id_b, &id_c] {
         assert!(
-            harness.get_snapshot_by_uid(uid).await.is_none(),
-            "expected snapshot for {uid} to be gone"
+            harness.get_snapshot_by_id(id).await.is_none(),
+            "expected snapshot for {id} to be gone"
         );
     }
 }
@@ -73,14 +73,14 @@ async fn test_delete_multiple_resources_in_one_call() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_delete_nonexistent_uid_is_idempotent() {
+async fn test_delete_nonexistent_id_is_idempotent() {
     let harness = ResourceUseCaseBaseHarness::new();
     let account_id = make_account_id();
 
-    let random_uid = make_uid();
+    let random_id = make_id();
 
-    // Non-existent UIDs land in `outcome.not_found` and are silently skipped
-    harness.delete_resources(account_id, vec![random_uid]).await;
+    // Non-existent IDs land in `outcome.not_found` and are silently skipped
+    harness.delete_resources(account_id, vec![random_id]).await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -91,12 +91,12 @@ async fn test_delete_resource_owned_by_other_account_fails() {
     let account_a = make_account_id();
     let account_b = make_account_id();
 
-    let (uid, snapshot) = harness
+    let (id, snapshot) = harness
         .apply_and_assert_snapshot(account_a.clone(), "res-a")
         .await;
     pretty_assertions::assert_eq!(snapshot.spec, serde_json::json!({ "value": "res-a" }));
 
-    let result = harness.delete_test_uc().execute(account_b, vec![uid]).await;
+    let result = harness.delete_test_uc().execute(account_b, vec![id]).await;
 
     assert!(
         matches!(result, Err(DeleteResourcesError::Access(_))),
@@ -105,7 +105,7 @@ async fn test_delete_resource_owned_by_other_account_fails() {
 
     // Resource must still exist after an unauthorized delete attempt
     assert!(
-        harness.get_snapshot_by_uid(&uid).await.is_some(),
+        harness.get_snapshot_by_id(&id).await.is_some(),
         "resource must still exist after failed delete"
     );
 }
@@ -115,16 +115,16 @@ async fn test_delete_resource_owned_by_other_account_fails() {
 #[test_log::test(tokio::test)]
 async fn test_delete_emits_deleted_lifecycle_message() {
     let mut mock_outbox = MockOutbox::new();
-    // apply_and_get_uid posts one Applied message; expect it before the Deleted one
+    // apply_and_get_id posts one Applied message; expect it before the Deleted one
     BaseResourceServiceHarness::expect_applied_messages(&mut mock_outbox, 1, None);
     BaseResourceServiceHarness::expect_deleted_message(&mut mock_outbox, 1);
 
     let harness = ResourceUseCaseBaseHarness::new_with_mock_outbox(mock_outbox);
     let account_id = make_account_id();
 
-    let uid = harness.apply_and_get_uid(account_id.clone(), "res-a").await;
+    let id = harness.apply_and_get_id(account_id.clone(), "res-a").await;
 
-    harness.delete_resources(account_id, vec![uid]).await;
+    harness.delete_resources(account_id, vec![id]).await;
     // MockOutbox verifies .times() expectations on drop
 }
 
@@ -141,12 +141,12 @@ async fn test_delete_multiple_emits_single_message_with_all_resources() {
     let harness = ResourceUseCaseBaseHarness::new_with_mock_outbox(mock_outbox);
     let account_id = make_account_id();
 
-    let uid_a = harness.apply_and_get_uid(account_id.clone(), "res-a").await;
-    let uid_b = harness.apply_and_get_uid(account_id.clone(), "res-b").await;
-    let uid_c = harness.apply_and_get_uid(account_id.clone(), "res-c").await;
+    let id_a = harness.apply_and_get_id(account_id.clone(), "res-a").await;
+    let id_b = harness.apply_and_get_id(account_id.clone(), "res-b").await;
+    let id_c = harness.apply_and_get_id(account_id.clone(), "res-c").await;
 
     harness
-        .delete_resources(account_id, vec![uid_a, uid_b, uid_c])
+        .delete_resources(account_id, vec![id_a, id_b, id_c])
         .await;
     // MockOutbox verifies exactly one Deleted message with 3 resources on drop
 }
@@ -163,7 +163,7 @@ async fn test_delete_no_op_emits_no_message() {
     let harness = ResourceUseCaseBaseHarness::new_with_mock_outbox(mock_outbox);
     let account_id = make_account_id();
 
-    harness.delete_resources(account_id, vec![make_uid()]).await;
+    harness.delete_resources(account_id, vec![make_id()]).await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -173,20 +173,20 @@ async fn test_deleted_message_carries_correct_snapshot_data() {
     // Verify the Deleted message payload contains the correct UID and spec.
     let mut mock_outbox = MockOutbox::new();
 
-    // apply_and_get_uid posts one Applied message; accept it first
+    // apply_and_get_id posts one Applied message; accept it first
     BaseResourceServiceHarness::expect_applied_messages(&mut mock_outbox, 1, None);
 
     // Use a shared cell to capture the UID inside the withf closure, since we
     // don't know it until after apply.
-    let uid_cell = std::sync::Arc::new(std::sync::Mutex::new(None::<kamu_resources::ResourceUID>));
+    let uid_cell = std::sync::Arc::new(std::sync::Mutex::new(None::<kamu_resources::ResourceID>));
     let uid_cell_clone = uid_cell.clone();
 
     mock_outbox
         .expect_post_message_as_json()
         .times(1)
         .withf(move |producer, message, _version| {
-            let expected_uid = uid_cell_clone.lock().unwrap();
-            let Some(expected_uid) = *expected_uid else {
+            let expected_id = uid_cell_clone.lock().unwrap();
+            let Some(expected_id) = *expected_id else {
                 return false;
             };
             producer == MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE
@@ -195,7 +195,7 @@ async fn test_deleted_message_carries_correct_snapshot_data() {
                 {
                     ResourceLifecycleMessage::Deleted(m) => {
                         m.resources.len() == 1
-                            && m.resources[0].uid == expected_uid
+                            && m.resources[0].id == expected_id
                             && m.resources[0].spec == serde_json::json!({ "value": "res-a" })
                     }
                     _ => false,
@@ -206,10 +206,10 @@ async fn test_deleted_message_carries_correct_snapshot_data() {
     let harness = ResourceUseCaseBaseHarness::new_with_mock_outbox(mock_outbox);
     let account_id = make_account_id();
 
-    let uid = harness.apply_and_get_uid(account_id.clone(), "res-a").await;
-    *uid_cell.lock().unwrap() = Some(uid);
+    let id = harness.apply_and_get_id(account_id.clone(), "res-a").await;
+    *uid_cell.lock().unwrap() = Some(id);
 
-    harness.delete_resources(account_id, vec![uid]).await;
+    harness.delete_resources(account_id, vec![id]).await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

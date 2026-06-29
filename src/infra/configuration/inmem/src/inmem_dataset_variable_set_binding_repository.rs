@@ -19,7 +19,7 @@ use kamu_configuration::{
     ReplaceDatasetBindingsError,
 };
 use kamu_datasets::DatasetEntryRemovalListener;
-use kamu_resources::ResourceUID;
+use kamu_resources::ResourceID;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -43,7 +43,7 @@ impl InMemoryDatasetVariableSetBindingRepository {
 
 #[derive(Default)]
 struct State {
-    resource_uids_by_dataset_id: HashMap<odf::DatasetID, Vec<ResourceUID>>,
+    resource_ids_by_dataset_id: HashMap<odf::DatasetID, Vec<ResourceID>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -57,15 +57,15 @@ impl DatasetVariableSetBindingRepository for InMemoryDatasetVariableSetBindingRe
         let guard = self.state.lock().unwrap();
 
         Ok(guard
-            .resource_uids_by_dataset_id
+            .resource_ids_by_dataset_id
             .get(dataset_id)
             .into_iter()
             .flatten()
             .enumerate()
             .map(
-                |(binding_order, resource_uid)| DatasetConfigurationSetBinding {
+                |(binding_order, resource_id)| DatasetConfigurationSetBinding {
                     dataset_id: dataset_id.clone(),
-                    resource_uid: *resource_uid,
+                    resource_id: *resource_id,
                     binding_order: u64::try_from(binding_order).unwrap(),
                 },
             )
@@ -75,14 +75,14 @@ impl DatasetVariableSetBindingRepository for InMemoryDatasetVariableSetBindingRe
     async fn replace_bindings(
         &self,
         dataset_id: &odf::DatasetID,
-        resource_uids: &[ResourceUID],
+        resource_ids: &[ResourceID],
     ) -> Result<(), ReplaceDatasetBindingsError> {
-        validate_unique_bindings(dataset_id, resource_uids)?;
+        validate_unique_bindings(dataset_id, resource_ids)?;
 
         let mut guard = self.state.lock().unwrap();
         guard
-            .resource_uids_by_dataset_id
-            .insert(dataset_id.clone(), resource_uids.to_vec());
+            .resource_ids_by_dataset_id
+            .insert(dataset_id.clone(), resource_ids.to_vec());
 
         Ok(())
     }
@@ -92,7 +92,7 @@ impl DatasetVariableSetBindingRepository for InMemoryDatasetVariableSetBindingRe
         dataset_id: &odf::DatasetID,
     ) -> Result<(), InternalError> {
         let mut guard = self.state.lock().unwrap();
-        guard.resource_uids_by_dataset_id.remove(dataset_id);
+        guard.resource_ids_by_dataset_id.remove(dataset_id);
         Ok(())
     }
 }
@@ -113,15 +113,15 @@ impl DatasetEntryRemovalListener for InMemoryDatasetVariableSetBindingRepository
 
 fn validate_unique_bindings(
     dataset_id: &odf::DatasetID,
-    resource_uids: &[ResourceUID],
+    resource_ids: &[ResourceID],
 ) -> Result<(), ReplaceDatasetBindingsError> {
     let mut seen = HashSet::new();
 
-    for resource_uid in resource_uids {
-        if !seen.insert(*resource_uid) {
+    for resource_id in resource_ids {
+        if !seen.insert(*resource_id) {
             return Err(DatasetResourceBindingDuplicateError {
                 dataset_id: dataset_id.clone(),
-                resource_uid: *resource_uid,
+                resource_id: *resource_id,
             }
             .into());
         }

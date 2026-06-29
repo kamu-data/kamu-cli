@@ -363,7 +363,7 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
     async fn delete(
         &self,
         selector: ResourceSelector,
-    ) -> Result<domain::ResourceUID, DeleteResourceError> {
+    ) -> Result<domain::ResourceID, DeleteResourceError> {
         use cynic_api::operations::delete as Operation;
 
         let variables = Operation::DeleteVariables {
@@ -383,7 +383,7 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
     async fn delete_many(
         &self,
         selector: ResourceBatchSelector,
-    ) -> Result<BatchResourceResponse<domain::ResourceUID, ResourceLookupProblem>, BatchResourceError>
+    ) -> Result<BatchResourceResponse<domain::ResourceID, ResourceLookupProblem>, BatchResourceError>
     {
         use cynic_api::operations::delete as Operation;
 

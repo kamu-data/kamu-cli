@@ -42,16 +42,16 @@ pub async fn test_resources_multitenant_isolation(kamu: KamuCliPuppet) {
         (fixtures::VARIABLE_SET_KIND, "shared")
     );
     assert_eq!(alice_shared.variable("MESSAGE"), Some("alice-value"));
-    let alice_shared_uid = alice_shared.uid();
+    let alice_shared_id = alice_shared.id();
 
     ctx.set_account(Some(bob.clone()));
     let bob_shared = ctx.get_one(["get", "vs", "shared"]).await;
     assert_eq!(bob_shared.ident(), (fixtures::VARIABLE_SET_KIND, "shared"));
     assert_eq!(bob_shared.variable("MESSAGE"), Some("bob-value"));
-    let bob_shared_uid = bob_shared.uid();
+    let bob_shared_id = bob_shared.id();
 
     assert_ne!(
-        alice_shared_uid, bob_shared_uid,
+        alice_shared_id, bob_shared_id,
         "same resource name in different accounts must resolve to distinct UIDs"
     );
 
@@ -94,8 +94,8 @@ pub async fn test_resources_multitenant_isolation(kamu: KamuCliPuppet) {
         Some("bob-value")
     );
     assert_eq!(
-        bob_shared_after_alice_delete.uid(),
-        bob_shared_uid,
+        bob_shared_after_alice_delete.id(),
+        bob_shared_id,
         "deleting alice's `shared` resource must not replace or remove bob's copy"
     );
 }

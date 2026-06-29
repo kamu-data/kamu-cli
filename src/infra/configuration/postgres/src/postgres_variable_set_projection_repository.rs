@@ -15,7 +15,7 @@ use kamu_configuration::{
     VariableSetEntry,
     VariableSetProjectionRepository,
 };
-use kamu_resources::ResourceUID;
+use kamu_resources::ResourceID;
 use odf::metadata::AsStackString;
 use odf::metadata::stack_string::StackString;
 
@@ -31,7 +31,7 @@ pub struct PostgresVariableSetProjectionRepository {
 impl VariableSetProjectionRepository for PostgresVariableSetProjectionRepository {
     async fn find_entry(
         &self,
-        resource_uid: &ResourceUID,
+        resource_id: &ResourceID,
         resource_generation: u64,
         key: &str,
     ) -> Result<Option<VariableSetEntry>, InternalError> {
@@ -39,7 +39,7 @@ impl VariableSetProjectionRepository for PostgresVariableSetProjectionRepository
         let connection_mut = tr.connection_mut().await?;
 
         let resource_generation = i64::try_from(resource_generation).unwrap();
-        let resource_uid: &uuid::Uuid = resource_uid.as_ref();
+        let resource_id: &uuid::Uuid = resource_id.as_ref();
 
         let row = sqlx::query_as!(
             VariableSetEntry,
@@ -52,11 +52,11 @@ impl VariableSetProjectionRepository for PostgresVariableSetProjectionRepository
                 created_at,
                 updated_at
             FROM config_variable_set_entries
-            WHERE resource_uid = $1
+            WHERE resource_id = $1
               AND resource_generation = $2
               AND variable_key = $3
             "#,
-            resource_uid,
+            resource_id,
             resource_generation,
             key,
         )
@@ -69,14 +69,14 @@ impl VariableSetProjectionRepository for PostgresVariableSetProjectionRepository
 
     async fn get_entries(
         &self,
-        resource_uid: &ResourceUID,
+        resource_id: &ResourceID,
         resource_generation: u64,
     ) -> Result<Vec<VariableSetEntry>, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
         let resource_generation = i64::try_from(resource_generation).unwrap();
-        let resource_uid: &uuid::Uuid = resource_uid.as_ref();
+        let resource_id: &uuid::Uuid = resource_id.as_ref();
 
         let rows = sqlx::query_as!(
             VariableSetEntry,
@@ -89,11 +89,11 @@ impl VariableSetProjectionRepository for PostgresVariableSetProjectionRepository
                 created_at,
                 updated_at
             FROM config_variable_set_entries
-            WHERE resource_uid = $1
+            WHERE resource_id = $1
               AND resource_generation = $2
             ORDER BY variable_key
             "#,
-            resource_uid,
+            resource_id,
             resource_generation,
         )
         .fetch_all(&mut *connection_mut)
@@ -105,12 +105,12 @@ impl VariableSetProjectionRepository for PostgresVariableSetProjectionRepository
 
     async fn get_latest_entries(
         &self,
-        resource_uid: &ResourceUID,
+        resource_id: &ResourceID,
     ) -> Result<Vec<VariableSetEntry>, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
-        let resource_uid: &uuid::Uuid = resource_uid.as_ref();
+        let resource_id: &uuid::Uuid = resource_id.as_ref();
 
         let rows = sqlx::query_as!(
             VariableSetEntry,
@@ -123,13 +123,13 @@ impl VariableSetProjectionRepository for PostgresVariableSetProjectionRepository
                 e.created_at,
                 e.updated_at
             FROM config_variable_set_entries e
-            JOIN resources r ON r.resource_uid = e.resource_uid
+            JOIN resources r ON r.resource_id = e.resource_id
                 AND r.generation = e.resource_generation
                 AND r.deleted_at IS NULL
-            WHERE e.resource_uid = $1
+            WHERE e.resource_id = $1
             ORDER BY e.variable_key
             "#,
-            resource_uid,
+            resource_id,
         )
         .fetch_all(&mut *connection_mut)
         .await
@@ -140,14 +140,14 @@ impl VariableSetProjectionRepository for PostgresVariableSetProjectionRepository
 
     async fn get_latest_entries_before_generation(
         &self,
-        resource_uid: &ResourceUID,
+        resource_id: &ResourceID,
         resource_generation: u64,
     ) -> Result<Vec<VariableSetEntry>, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
         let resource_generation = i64::try_from(resource_generation).unwrap();
-        let resource_uid: &uuid::Uuid = resource_uid.as_ref();
+        let resource_id: &uuid::Uuid = resource_id.as_ref();
 
         let rows = sqlx::query_as!(
             VariableSetEntry,
@@ -160,16 +160,16 @@ impl VariableSetProjectionRepository for PostgresVariableSetProjectionRepository
                 created_at,
                 updated_at
             FROM config_variable_set_entries
-            WHERE resource_uid = $1
+            WHERE resource_id = $1
               AND resource_generation = (
                   SELECT MAX(resource_generation)
                   FROM config_variable_set_entries
-                  WHERE resource_uid = $1
+                  WHERE resource_id = $1
                     AND resource_generation < $2
               )
             ORDER BY variable_key
             "#,
-            resource_uid,
+            resource_id,
             resource_generation,
         )
         .fetch_all(&mut *connection_mut)
@@ -180,7 +180,7 @@ impl VariableSetProjectionRepository for PostgresVariableSetProjectionRepository
     }
     async fn replace_entries(
         &self,
-        resource_uid: &ResourceUID,
+        resource_id: &ResourceID,
         resource_generation: u64,
         entries: &[VariableSetEntry],
     ) -> Result<(), ReplaceProjectionEntriesError> {
@@ -192,7 +192,7 @@ impl VariableSetProjectionRepository for PostgresVariableSetProjectionRepository
         let connection_mut = tr.connection_mut().await?;
 
         let resource_generation = i64::try_from(resource_generation).unwrap();
-        let resource_uid: &uuid::Uuid = resource_uid.as_ref();
+        let resource_id: &uuid::Uuid = resource_id.as_ref();
 
         let entry_ids: Vec<_> = entries.iter().map(|e| e.entry_id).collect();
         let account_ids: Vec<_> = entries
@@ -212,7 +212,7 @@ impl VariableSetProjectionRepository for PostgresVariableSetProjectionRepository
             r#"
             INSERT INTO config_variable_set_entries (
                 entry_id,
-                resource_uid,
+                resource_id,
                 resource_generation,
                 account_id,
                 variable_key,
@@ -224,7 +224,7 @@ impl VariableSetProjectionRepository for PostgresVariableSetProjectionRepository
             FROM UNNEST($3::uuid[], $4::text[], $5::text[], $6::text[], $7::timestamptz[], $8::timestamptz[])
                 AS e(entry_id, account_id, variable_key, value, created_at, updated_at)
             "#,
-            resource_uid,
+            resource_id,
             resource_generation,
             &entry_ids,
             &account_ids_strs as &[&str],
@@ -249,22 +249,22 @@ impl VariableSetProjectionRepository for PostgresVariableSetProjectionRepository
 
     async fn cleanup_entries_before_generation(
         &self,
-        resource_uid: &ResourceUID,
+        resource_id: &ResourceID,
         resource_generation: u64,
     ) -> Result<(), InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
         let resource_generation = i64::try_from(resource_generation).unwrap();
-        let resource_uid: &uuid::Uuid = resource_uid.as_ref();
+        let resource_id: &uuid::Uuid = resource_id.as_ref();
 
         sqlx::query!(
             r#"
             DELETE FROM config_variable_set_entries
-            WHERE resource_uid = $1
+            WHERE resource_id = $1
               AND resource_generation < $2
             "#,
-            resource_uid,
+            resource_id,
             resource_generation,
         )
         .execute(&mut *connection_mut)
@@ -274,22 +274,22 @@ impl VariableSetProjectionRepository for PostgresVariableSetProjectionRepository
         Ok(())
     }
 
-    async fn delete_all_entries(&self, resource_uids: &[ResourceUID]) -> Result<(), InternalError> {
-        if resource_uids.is_empty() {
+    async fn delete_all_entries(&self, resource_ids: &[ResourceID]) -> Result<(), InternalError> {
+        if resource_ids.is_empty() {
             return Ok(());
         }
 
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
-        let uids: Vec<uuid::Uuid> = resource_uids.iter().map(|uid| *uid.as_ref()).collect();
+        let ids: Vec<uuid::Uuid> = resource_ids.iter().map(|id| *id.as_ref()).collect();
 
         sqlx::query!(
             r#"
             DELETE FROM config_variable_set_entries
-                WHERE resource_uid = ANY($1::uuid[])
+                WHERE resource_id = ANY($1::uuid[])
             "#,
-            &uids,
+            &ids,
         )
         .execute(&mut *connection_mut)
         .await

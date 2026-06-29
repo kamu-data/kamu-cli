@@ -53,8 +53,8 @@ macro_rules! declare_resource_service_layer {
                 resource = $resource
             );
 
-            $crate::declare_get_resource_by_uid_use_case!(
-                use_case = [<$name GetResourceByUidUseCaseImpl>],
+            $crate::declare_get_resource_by_id_use_case!(
+                use_case = [<$name GetResourceByIdUseCaseImpl>],
                 resource = $resource
             );
 
@@ -83,7 +83,7 @@ macro_rules! declare_resource_service_layer {
                 catalog_builder.add::<[<$name ResourceLifecycleDispatcher>]>();
                 catalog_builder.add::<[<$name ResourcePersistenceServiceImpl>]>();
                 catalog_builder.add::<[<$name TypedResourceQueryServiceImpl>]>();
-                catalog_builder.add::<[<$name GetResourceByUidUseCaseImpl>]>();
+                catalog_builder.add::<[<$name GetResourceByIdUseCaseImpl>]>();
                 catalog_builder.add::<[<$name ListResourcesByKindUseCaseImpl>]>();
                 catalog_builder.add::<[<$name ReconcileResourceUseCaseImpl>]>();
             }

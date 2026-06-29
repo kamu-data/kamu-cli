@@ -47,7 +47,7 @@ impl DatasetVariableSetBindingRepository for SqliteDatasetVariableSetBindingRepo
             r#"
             SELECT
                 dataset_id as "dataset_id: odf::DatasetID",
-                resource_uid as "resource_uid: Uuid",
+                resource_id as "resource_id: Uuid",
                 binding_order as "binding_order: i64"
             FROM config_dataset_variable_set_bindings
             WHERE dataset_id = $1
@@ -65,9 +65,9 @@ impl DatasetVariableSetBindingRepository for SqliteDatasetVariableSetBindingRepo
     async fn replace_bindings(
         &self,
         dataset_id: &odf::DatasetID,
-        resource_uids: &[kamu_resources::ResourceUID],
+        resource_ids: &[kamu_resources::ResourceID],
     ) -> Result<(), ReplaceDatasetBindingsError> {
-        validate_unique_bindings(dataset_id, resource_uids)?;
+        validate_unique_bindings(dataset_id, resource_ids)?;
 
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
@@ -85,21 +85,21 @@ impl DatasetVariableSetBindingRepository for SqliteDatasetVariableSetBindingRepo
         .await
         .int_err()?;
 
-        if resource_uids.is_empty() {
+        if resource_ids.is_empty() {
             return Ok(());
         }
 
         let mut query_builder = QueryBuilder::<Sqlite>::new(
             r#"
-            INSERT INTO config_dataset_variable_set_bindings(dataset_id, resource_uid, binding_order)
+            INSERT INTO config_dataset_variable_set_bindings(dataset_id, resource_id, binding_order)
             "#,
         );
 
         query_builder.push_values(
-            resource_uids.iter().enumerate(),
-            |mut b, (binding_order, resource_uid)| {
+            resource_ids.iter().enumerate(),
+            |mut b, (binding_order, resource_id)| {
                 b.push_bind(stack_dataset_id.as_str());
-                b.push_bind(resource_uid.as_ref());
+                b.push_bind(resource_id.as_ref());
                 b.push_bind(i64::try_from(binding_order).unwrap());
             },
         );
@@ -112,7 +112,7 @@ impl DatasetVariableSetBindingRepository for SqliteDatasetVariableSetBindingRepo
                 sqlx::Error::Database(e) if e.is_unique_violation() => {
                     ReplaceDatasetBindingsError::Duplicate(DatasetResourceBindingDuplicateError {
                         dataset_id: dataset_id.clone(),
-                        resource_uid: resource_uids[0],
+                        resource_id: resource_ids[0],
                     })
                 }
                 _ => ReplaceDatasetBindingsError::Internal(e.int_err()),
@@ -150,15 +150,15 @@ impl DatasetVariableSetBindingRepository for SqliteDatasetVariableSetBindingRepo
 
 fn validate_unique_bindings(
     dataset_id: &odf::DatasetID,
-    resource_uids: &[kamu_resources::ResourceUID],
+    resource_ids: &[kamu_resources::ResourceID],
 ) -> Result<(), ReplaceDatasetBindingsError> {
     let mut seen = HashSet::new();
 
-    for resource_uid in resource_uids {
-        if !seen.insert(*resource_uid) {
+    for resource_id in resource_ids {
+        if !seen.insert(*resource_id) {
             return Err(DatasetResourceBindingDuplicateError {
                 dataset_id: dataset_id.clone(),
-                resource_uid: *resource_uid,
+                resource_id: *resource_id,
             }
             .into());
         }

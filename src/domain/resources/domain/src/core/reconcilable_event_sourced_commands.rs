@@ -43,7 +43,7 @@ macro_rules! impl_invariant_violation_lifecycle_error {
 
 pub fn try_create_reconcilable_resource<R, TCreated, TCreate>(
     now: DateTime<Utc>,
-    uid: crate::ResourceUID,
+    id: crate::ResourceID,
     headers: ResourceHeadersInput,
     spec: R::Spec,
     create: TCreate,
@@ -55,16 +55,16 @@ where
         + From<ResourceHeadersValidationError>
         + From<<R::Spec as ResourceValidateSpec>::ValidationError>,
     TCreate: FnOnce(
-        crate::ResourceUID,
+        crate::ResourceID,
         ReconcilableResourceEvent<R::Spec, R::ReconcileSuccess, R::ReconcileFailureDetails>,
     ) -> Result<TCreated, ProjectionError<R::ResourceState>>,
 {
     headers.validate()?;
     spec.validate()?;
 
-    let event = R::make_created_event(now, uid, headers, spec);
+    let event = R::make_created_event(now, id, headers, spec);
 
-    create(uid, event).map_err(R::LifecycleError::invariant_violation)
+    create(id, event).map_err(R::LifecycleError::invariant_violation)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

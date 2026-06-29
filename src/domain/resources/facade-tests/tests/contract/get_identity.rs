@@ -42,12 +42,12 @@ fn by_name_selector(name: &str) -> ResourceSelector {
     }
 }
 
-fn by_id_selector(uid: &kamu_resources::ResourceUID) -> ResourceSelector {
+fn by_id_selector(id: &kamu_resources::ResourceID) -> ResourceSelector {
     ResourceSelector {
         account: None,
         kind: VARIABLE_SET_KIND.to_string(),
         api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
-        resource_ref: ResourceRef::ById(*uid),
+        resource_ref: ResourceRef::ById(*id),
     }
 }
 
@@ -56,7 +56,7 @@ fn by_id_selector(uid: &kamu_resources::ResourceUID) -> ResourceSelector {
 async fn create_test_resource(
     h: &impl FacadeContractHarness,
     name: &str,
-) -> kamu_resources::ResourceUID {
+) -> kamu_resources::ResourceID {
     let facade = h.facade_for(TestAccount::Alice);
     let manifest = variable_set_manifest_json(name, None, &[("K", "v")]);
     let decision = facade
@@ -67,7 +67,7 @@ async fn create_test_resource(
         .await
         .unwrap();
     let result = assert_applied_outcome(&decision, ApplyResourceOutcome::Created);
-    result.headers.uid
+    result.headers.id
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -76,7 +76,7 @@ async fn create_test_resource(
 contract_test!(get_by_name, super::test_get_by_name);
 
 pub async fn test_get_by_name(h: &impl FacadeContractHarness) {
-    let uid = create_test_resource(h, "get-name-test").await;
+    let id = create_test_resource(h, "get-name-test").await;
     let facade = h.facade_for(TestAccount::Alice);
 
     let view = facade
@@ -90,7 +90,7 @@ pub async fn test_get_by_name(h: &impl FacadeContractHarness) {
         VARIABLE_SET_API_VERSION,
         "get-name-test",
     );
-    assert_eq!(view.headers.uid, uid, "uid must match");
+    assert_eq!(view.headers.id, id, "id must match");
     assert!(view.headers.deleted_at.is_none());
 }
 
@@ -100,11 +100,11 @@ pub async fn test_get_by_name(h: &impl FacadeContractHarness) {
 contract_test!(get_by_uid, super::test_get_by_uid);
 
 pub async fn test_get_by_uid(h: &impl FacadeContractHarness) {
-    let uid = create_test_resource(h, "get-uid-test").await;
+    let id = create_test_resource(h, "get-id-test").await;
     let facade = h.facade_for(TestAccount::Alice);
 
     let view_by_uid = facade
-        .get(by_id_selector(&uid), SpecViewMode::Encrypted)
+        .get(by_id_selector(&id), SpecViewMode::Encrypted)
         .await
         .unwrap();
 
@@ -112,9 +112,9 @@ pub async fn test_get_by_uid(h: &impl FacadeContractHarness) {
         &view_by_uid,
         VARIABLE_SET_KIND,
         VARIABLE_SET_API_VERSION,
-        "get-uid-test",
+        "get-id-test",
     );
-    assert_eq!(view_by_uid.headers.uid, uid);
+    assert_eq!(view_by_uid.headers.id, id);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -123,7 +123,7 @@ pub async fn test_get_by_uid(h: &impl FacadeContractHarness) {
 contract_test!(get_identity_by_name, super::test_get_identity_by_name);
 
 pub async fn test_get_identity_by_name(h: &impl FacadeContractHarness) {
-    let uid = create_test_resource(h, "ident-name-test").await;
+    let id = create_test_resource(h, "ident-name-test").await;
     let facade = h.facade_for(TestAccount::Alice);
 
     let identity = facade
@@ -136,7 +136,7 @@ pub async fn test_get_identity_by_name(h: &impl FacadeContractHarness) {
         VARIABLE_SET_KIND,
         VARIABLE_SET_API_VERSION,
         "ident-name-test",
-        &uid,
+        &id,
     );
     assert!(!identity.canonical_kind_name.is_empty());
 }
@@ -147,18 +147,18 @@ pub async fn test_get_identity_by_name(h: &impl FacadeContractHarness) {
 contract_test!(get_identity_by_uid, super::test_get_identity_by_uid);
 
 pub async fn test_get_identity_by_uid(h: &impl FacadeContractHarness) {
-    let uid = create_test_resource(h, "ident-uid-test").await;
+    let id = create_test_resource(h, "ident-id-test").await;
     let facade = h.facade_for(TestAccount::Alice);
 
     let identity_by_name = facade
-        .get_identity(by_name_selector("ident-uid-test"))
+        .get_identity(by_name_selector("ident-id-test"))
         .await
         .unwrap();
-    let identity_by_uid = facade.get_identity(by_id_selector(&uid)).await.unwrap();
+    let identity_by_uid = facade.get_identity(by_id_selector(&id)).await.unwrap();
 
     assert_eq!(
-        identity_by_name.uid, identity_by_uid.uid,
-        "uid must match when fetched by name vs uid"
+        identity_by_name.id, identity_by_uid.id,
+        "id must match when fetched by name vs id"
     );
     assert_eq!(identity_by_name.name, identity_by_uid.name);
     assert_eq!(identity_by_name.kind, identity_by_uid.kind);
@@ -216,7 +216,7 @@ contract_test!(
 
 pub async fn test_get_missing_uid_returns_not_found(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
-    let absent_uid = kamu_resources::ResourceUID::new(uuid::Uuid::new_v4());
+    let absent_uid = kamu_resources::ResourceID::new(uuid::Uuid::new_v4());
 
     let get_result = facade
         .get(by_id_selector(&absent_uid), SpecViewMode::Encrypted)
@@ -225,7 +225,7 @@ pub async fn test_get_missing_uid_returns_not_found(h: &impl FacadeContractHarne
         matches!(
             get_result,
             Err(GetResourceError::LookupProblem(
-                ResourceLookupProblem::UIDNotFound(_)
+                ResourceLookupProblem::IDNotFound(_)
             ))
         ),
         "expected UIDNotFound, got: {get_result:?}"
@@ -236,7 +236,7 @@ pub async fn test_get_missing_uid_returns_not_found(h: &impl FacadeContractHarne
         matches!(
             identity_result,
             Err(GetResourceError::LookupProblem(
-                ResourceLookupProblem::UIDNotFound(_)
+                ResourceLookupProblem::IDNotFound(_)
             ))
         ),
         "expected UIDNotFound from get_identity, got: {identity_result:?}"
@@ -252,14 +252,14 @@ contract_test!(
 );
 
 pub async fn test_get_wrong_api_version_returns_mismatch(h: &impl FacadeContractHarness) {
-    let uid = create_test_resource(h, "api-ver-mismatch-test").await;
+    let id = create_test_resource(h, "api-ver-mismatch-test").await;
     let facade = h.facade_for(TestAccount::Alice);
 
     let wrong_version_selector = ResourceSelector {
         account: None,
         kind: VARIABLE_SET_KIND.to_string(),
         api_version: Some("v0.never.existed".to_string()),
-        resource_ref: ResourceRef::ById(uid),
+        resource_ref: ResourceRef::ById(id),
     };
 
     let result = facade
@@ -298,14 +298,14 @@ contract_test!(
 pub async fn test_get_wrong_kind_returns_kind_mismatch(h: &impl FacadeContractHarness) {
     use crate::helpers::{SECRET_SET_API_VERSION, SECRET_SET_KIND};
 
-    let uid = create_test_resource(h, "kind-mismatch-test").await;
+    let id = create_test_resource(h, "kind-mismatch-test").await;
     let facade = h.facade_for(TestAccount::Alice);
 
     let wrong_kind_selector = ResourceSelector {
         account: None,
         kind: SECRET_SET_KIND.to_string(),
         api_version: Some(SECRET_SET_API_VERSION.to_string()),
-        resource_ref: ResourceRef::ById(uid),
+        resource_ref: ResourceRef::ById(id),
     };
 
     let result = facade

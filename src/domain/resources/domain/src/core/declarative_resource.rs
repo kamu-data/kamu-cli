@@ -9,7 +9,7 @@
 
 use internal_error::InternalError;
 
-use crate::{ResourceHeaders, ResourceSnapshot, ResourceStatusLike, ResourceUID};
+use crate::{ResourceHeaders, ResourceID, ResourceSnapshot, ResourceStatusLike};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -22,8 +22,8 @@ pub trait DeclarativeResource:
         + TryFrom<ResourceSnapshot, Error = InternalError>
         + From<Self>;
 
-    fn uid(&self) -> &ResourceUID {
-        self.as_ref().uid()
+    fn id(&self) -> &ResourceID {
+        self.as_ref().id()
     }
 
     fn headers(&self) -> &ResourceHeaders {
@@ -45,7 +45,7 @@ pub trait DeclarativeResourceState: Send + Sync + std::fmt::Debug {
     type Spec: std::fmt::Debug + Send + Sync;
     type Status: ResourceStatusLike + std::fmt::Debug;
 
-    fn uid(&self) -> &ResourceUID;
+    fn id(&self) -> &ResourceID;
 
     fn headers(&self) -> &ResourceHeaders;
     fn headers_mut(&mut self) -> &mut ResourceHeaders;
@@ -56,7 +56,7 @@ pub trait DeclarativeResourceState: Send + Sync + std::fmt::Debug {
     fn status(&self) -> &Self::Status;
     fn status_mut(&mut self) -> &mut Self::Status;
 
-    fn into_parts(self) -> (ResourceUID, ResourceHeaders, Self::Spec, Self::Status)
+    fn into_parts(self) -> (ResourceID, ResourceHeaders, Self::Spec, Self::Status)
     where
         Self: Sized;
 }

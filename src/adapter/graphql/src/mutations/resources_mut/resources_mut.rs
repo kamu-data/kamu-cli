@@ -180,7 +180,7 @@ pub struct ResourceDeleteManyResult {
 }
 
 type BatchDeleteResourcesResponse = kamu_resources_facade::BatchResourceResponse<
-    kamu_resources::ResourceUID,
+    kamu_resources::ResourceID,
     kamu_resources_facade::ResourceLookupProblem,
 >;
 

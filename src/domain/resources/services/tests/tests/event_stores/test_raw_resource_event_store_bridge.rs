@@ -13,7 +13,7 @@ use chrono::Utc;
 use database_common::NoOpDatabasePlugin;
 use dill::CatalogBuilder;
 use event_sourcing::{GetEventsOpts, SaveEventsItem};
-use kamu_resources::{ResourceRawEvent, ResourceRawEventQuery, ResourceRawEventStore, ResourceUID};
+use kamu_resources::{ResourceID, ResourceRawEvent, ResourceRawEventQuery, ResourceRawEventStore};
 use kamu_resources_inmem::InMemoryRawResourceEventStore;
 use tokio_stream::StreamExt;
 
@@ -21,8 +21,8 @@ use crate::tests::utils::{
     TestEvent,
     TestResourceEventStore,
     make_created_event,
+    make_id,
     make_spec_updated_event,
-    make_uid,
     register_test_resource_resource_service_layer,
 };
 
@@ -33,19 +33,19 @@ use crate::tests::utils::{
 #[test_log::test(tokio::test)]
 async fn test_save_and_get_events_round_trip() {
     let harness = RawResourceEventStoreBridgeHarness::new();
-    let uid = make_uid();
+    let id = make_id();
 
-    let created = make_created_event(uid, "res-a", "hello");
-    let updated = make_spec_updated_event(uid, "world", 2);
+    let created = make_created_event(id, "res-a", "hello");
+    let updated = make_spec_updated_event(id, "world", 2);
 
-    harness.save_events(uid, vec![created.clone()]).await;
+    harness.save_events(id, vec![created.clone()]).await;
 
-    let prev_id = harness.get_last_event_id(uid).await;
+    let prev_id = harness.get_last_event_id(id).await;
     harness
-        .save_events_after(uid, prev_id, vec![updated.clone()])
+        .save_events_after(id, prev_id, vec![updated.clone()])
         .await;
 
-    let events = harness.get_events_for(uid).await;
+    let events = harness.get_events_for(id).await;
 
     assert_eq!(events.len(), 2);
     assert_eq!(events[0], created);
@@ -58,14 +58,14 @@ async fn test_save_and_get_events_round_trip() {
 async fn test_kind_filtering_excludes_unrelated_raw_events() {
     let harness = RawResourceEventStoreBridgeHarness::new();
     let raw_store = harness.raw_store();
-    let uid = make_uid();
+    let id = make_id();
 
-    let created = make_created_event(uid, "res-b", "value");
-    harness.save_events(uid, vec![created]).await;
+    let created = make_created_event(id, "res-b", "value");
+    harness.save_events(id, vec![created]).await;
 
     let wrong_query = ResourceRawEventQuery {
         kind: "OtherResource".to_string(),
-        uid,
+        id,
     };
     let wrong_raw = ResourceRawEvent {
         event_id: event_sourcing::EventID::new(0),
@@ -79,28 +79,28 @@ async fn test_kind_filtering_excludes_unrelated_raw_events() {
         .await
         .unwrap();
 
-    let events = harness.get_events_for(uid).await;
+    let events = harness.get_events_for(id).await;
     assert_eq!(events.len(), 1);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_get_all_events_streams_all_uids() {
+async fn test_get_all_events_streams_all_ids() {
     let harness = RawResourceEventStoreBridgeHarness::new();
 
-    let uid_a = make_uid();
-    let uid_b = make_uid();
-    let uid_c = make_uid();
+    let id_a = make_id();
+    let id_b = make_id();
+    let id_c = make_id();
 
     harness
-        .save_events(uid_a, vec![make_created_event(uid_a, "res-a", "a")])
+        .save_events(id_a, vec![make_created_event(id_a, "res-a", "a")])
         .await;
     harness
-        .save_events(uid_b, vec![make_created_event(uid_b, "res-b", "b")])
+        .save_events(id_b, vec![make_created_event(id_b, "res-b", "b")])
         .await;
     harness
-        .save_events(uid_c, vec![make_created_event(uid_c, "res-c", "c")])
+        .save_events(id_c, vec![make_created_event(id_c, "res-c", "c")])
         .await;
 
     let all_events: Vec<TestEvent> = harness
@@ -112,11 +112,10 @@ async fn test_get_all_events_streams_all_uids() {
 
     assert_eq!(all_events.len(), 3);
 
-    let uids: std::collections::HashSet<ResourceUID> =
-        all_events.iter().map(|e| *e.uid()).collect();
-    assert!(uids.contains(&uid_a));
-    assert!(uids.contains(&uid_b));
-    assert!(uids.contains(&uid_c));
+    let ids: std::collections::HashSet<ResourceID> = all_events.iter().map(|e| *e.id()).collect();
+    assert!(ids.contains(&id_a));
+    assert!(ids.contains(&id_b));
+    assert!(ids.contains(&id_c));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -125,34 +124,34 @@ async fn test_get_all_events_streams_all_uids() {
 async fn test_save_events_multi_batch() {
     let harness = RawResourceEventStoreBridgeHarness::new();
 
-    let uid_a = make_uid();
-    let uid_b = make_uid();
+    let id_a = make_id();
+    let id_b = make_id();
 
     harness
         .bridge()
         .save_events_multi(vec![
             SaveEventsItem {
-                query: uid_a,
+                query: id_a,
                 maybe_prev_stored_event_id: None,
-                events: vec![make_created_event(uid_a, "res-a", "va")],
+                events: vec![make_created_event(id_a, "res-a", "va")],
             },
             SaveEventsItem {
-                query: uid_b,
+                query: id_b,
                 maybe_prev_stored_event_id: None,
-                events: vec![make_created_event(uid_b, "res-b", "vb")],
+                events: vec![make_created_event(id_b, "res-b", "vb")],
             },
         ])
         .await
         .unwrap();
 
-    let events_a = harness.get_events_for(uid_a).await;
-    let events_b = harness.get_events_for(uid_b).await;
+    let events_a = harness.get_events_for(id_a).await;
+    let events_b = harness.get_events_for(id_b).await;
 
     assert_eq!(events_a.len(), 1);
-    assert_eq!(*events_a[0].uid(), uid_a);
+    assert_eq!(*events_a[0].id(), id_a);
 
     assert_eq!(events_b.len(), 1);
-    assert_eq!(*events_b[0].uid(), uid_b);
+    assert_eq!(*events_b[0].id(), id_b);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -161,14 +160,14 @@ async fn test_save_events_multi_batch() {
 async fn test_total_events_stored_counts_correctly() {
     let harness = RawResourceEventStoreBridgeHarness::new();
 
-    let uid = make_uid();
-    let created = make_created_event(uid, "res-count", "v1");
-    let updated = make_spec_updated_event(uid, "v2", 2);
+    let id = make_id();
+    let created = make_created_event(id, "res-count", "v1");
+    let updated = make_spec_updated_event(id, "v2", 2);
 
-    harness.save_events(uid, vec![created]).await;
+    harness.save_events(id, vec![created]).await;
 
-    let prev_id = harness.get_last_event_id(uid).await;
-    harness.save_events_after(uid, prev_id, vec![updated]).await;
+    let prev_id = harness.get_last_event_id(id).await;
+    harness.save_events_after(id, prev_id, vec![updated]).await;
 
     let total = harness.bridge().total_events_stored().await.unwrap();
     assert_eq!(total, 2);
@@ -177,47 +176,43 @@ async fn test_total_events_stored_counts_correctly() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_get_events_multi_streams_per_uid() {
+async fn test_get_events_multi_streams_per_id() {
     let harness = RawResourceEventStoreBridgeHarness::new();
 
-    let uid_a = make_uid();
-    let uid_b = make_uid();
+    let id_a = make_id();
+    let id_b = make_id();
 
     harness
-        .save_events(uid_a, vec![make_created_event(uid_a, "res-a", "a1")])
+        .save_events(id_a, vec![make_created_event(id_a, "res-a", "a1")])
         .await;
-    let prev_a = harness.get_last_event_id(uid_a).await;
+    let prev_a = harness.get_last_event_id(id_a).await;
     harness
-        .save_events_after(uid_a, prev_a, vec![make_spec_updated_event(uid_a, "a2", 2)])
+        .save_events_after(id_a, prev_a, vec![make_spec_updated_event(id_a, "a2", 2)])
         .await;
 
     harness
-        .save_events(uid_b, vec![make_created_event(uid_b, "res-b", "b1")])
+        .save_events(id_b, vec![make_created_event(id_b, "res-b", "b1")])
         .await;
-    let prev_b = harness.get_last_event_id(uid_b).await;
+    let prev_b = harness.get_last_event_id(id_b).await;
     harness
-        .save_events_after(uid_b, prev_b, vec![make_spec_updated_event(uid_b, "b2", 2)])
+        .save_events_after(id_b, prev_b, vec![make_spec_updated_event(id_b, "b2", 2)])
         .await;
-    let prev_b2 = harness.get_last_event_id(uid_b).await;
+    let prev_b2 = harness.get_last_event_id(id_b).await;
     harness
-        .save_events_after(
-            uid_b,
-            prev_b2,
-            vec![make_spec_updated_event(uid_b, "b3", 3)],
-        )
+        .save_events_after(id_b, prev_b2, vec![make_spec_updated_event(id_b, "b3", 3)])
         .await;
 
-    let mut by_uid: std::collections::HashMap<ResourceUID, Vec<TestEvent>> =
+    let mut by_id: std::collections::HashMap<ResourceID, Vec<TestEvent>> =
         std::collections::HashMap::new();
     let bridge = harness.bridge();
-    let mut multi = bridge.get_events_multi(&[uid_a, uid_b]);
+    let mut multi = bridge.get_events_multi(&[id_a, id_b]);
     while let Some(result) = multi.next().await {
-        let (uid, _event_id, event) = result.unwrap();
-        by_uid.entry(uid).or_default().push(event);
+        let (id, _event_id, event) = result.unwrap();
+        by_id.entry(id).or_default().push(event);
     }
 
-    assert_eq!(by_uid[&uid_a].len(), 2);
-    assert_eq!(by_uid[&uid_b].len(), 3);
+    assert_eq!(by_id[&id_a].len(), 2);
+    assert_eq!(by_id[&id_b].len(), 3);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -245,17 +240,17 @@ impl RawResourceEventStoreBridgeHarness {
         self.catalog.get_one().unwrap()
     }
 
-    async fn get_events_for(&self, uid: ResourceUID) -> Vec<TestEvent> {
+    async fn get_events_for(&self, id: ResourceID) -> Vec<TestEvent> {
         self.bridge()
-            .get_events(&uid, GetEventsOpts::default())
+            .get_events(&id, GetEventsOpts::default())
             .map(|r| r.unwrap().1)
             .collect()
             .await
     }
 
-    async fn get_last_event_id(&self, uid: ResourceUID) -> event_sourcing::EventID {
+    async fn get_last_event_id(&self, id: ResourceID) -> event_sourcing::EventID {
         self.bridge()
-            .get_events(&uid, GetEventsOpts::default())
+            .get_events(&id, GetEventsOpts::default())
             .collect::<Vec<_>>()
             .await
             .into_iter()
@@ -265,22 +260,18 @@ impl RawResourceEventStoreBridgeHarness {
             .0
     }
 
-    async fn save_events(
-        &self,
-        uid: ResourceUID,
-        events: Vec<TestEvent>,
-    ) -> event_sourcing::EventID {
-        self.bridge().save_events(&uid, None, events).await.unwrap()
+    async fn save_events(&self, id: ResourceID, events: Vec<TestEvent>) -> event_sourcing::EventID {
+        self.bridge().save_events(&id, None, events).await.unwrap()
     }
 
     async fn save_events_after(
         &self,
-        uid: ResourceUID,
+        id: ResourceID,
         prev_id: event_sourcing::EventID,
         events: Vec<TestEvent>,
     ) -> event_sourcing::EventID {
         self.bridge()
-            .save_events(&uid, Some(prev_id), events)
+            .save_events(&id, Some(prev_id), events)
             .await
             .unwrap()
     }

@@ -30,10 +30,10 @@ use crate::domain::{
     ResourceDescriptorProvider,
     ResourceHeadersInput,
     ResourceHeadersValidationError,
+    ResourceID,
     ResourceLinterSpec,
     ResourceLoadError,
     ResourceStatusLike,
-    ResourceUID,
     ResourceValidateSpec,
     TypedResourceQueryService,
 };
@@ -95,19 +95,19 @@ where
     ) -> Result<PlannedApplyResourceDecision<R>, ApplyResourceUseCaseError<R>> {
         let now = self.time_source.now();
 
-        let maybe_existing_uid = self
-            .resolve_existing_resource_uid(params.uid, &params.headers)
+        let maybe_existing_id = self
+            .resolve_existing_resource_id(params.id, &params.headers)
             .await?;
 
-        let Some(uid) = maybe_existing_uid else {
+        let Some(id) = maybe_existing_id else {
             return self.plan_create_resource(params, now).await;
         };
 
-        self.ensure_resource_uid_matches_type(&uid).await?;
+        self.ensure_resource_id_matches_type(&id).await?;
 
         let resource = self
             .resource_aggregate_loader
-            .load(&uid)
+            .load(&id)
             .await
             .map_err(ResourceLoadError)
             .map_err(ApplyResourceUseCaseError::LoadFailed)?;
@@ -115,16 +115,16 @@ where
         self.plan_update_resource(resource, params, now)
     }
 
-    pub(crate) async fn resolve_existing_resource_uid(
+    pub(crate) async fn resolve_existing_resource_id(
         &self,
-        uid: Option<ResourceUID>,
+        id: Option<ResourceID>,
         headers: &ResourceHeadersInput,
-    ) -> Result<Option<ResourceUID>, ApplyResourceUseCaseError<R>> {
-        match uid {
-            Some(uid) => Ok(Some(uid)),
+    ) -> Result<Option<ResourceID>, ApplyResourceUseCaseError<R>> {
+        match id {
+            Some(id) => Ok(Some(id)),
             None => self
                 .generic_resource_query_service
-                .find_resource_uid_by_name(
+                .find_resource_id_by_name(
                     &headers.account,
                     R::DESCRIPTOR.resource_type,
                     &headers.name,
@@ -134,12 +134,12 @@ where
         }
     }
 
-    pub(crate) async fn ensure_resource_uid_matches_type(
+    pub(crate) async fn ensure_resource_id_matches_type(
         &self,
-        uid: &ResourceUID,
+        id: &ResourceID,
     ) -> Result<(), ApplyResourceUseCaseError<R>> {
         self.typed_resource_query_service
-            .ensure_resource_uid_matches_type(uid)
+            .ensure_resource_id_matches_type(id)
             .await
             .map_err(ApplyResourceUseCaseError::from)
     }
@@ -149,14 +149,14 @@ where
         params: ApplyResourceParams<R>,
         now: DateTime<Utc>,
     ) -> Result<PlannedApplyResourceDecision<R>, ApplyResourceUseCaseError<R>> {
-        let uid = self
+        let id = self
             .generic_resource_query_service
-            .allocate_uid()
+            .allocate_id()
             .await
             .map_err(ApplyResourceUseCaseError::Internal)?;
 
         let resource =
-            match <R as ReconcilableResource>::try_create(now, uid, params.headers, params.spec) {
+            match <R as ReconcilableResource>::try_create(now, id, params.headers, params.spec) {
                 Ok(resource) => resource,
                 Err(err) => {
                     return Ok(PlannedApplyResourceDecision::Rejected(
@@ -256,12 +256,12 @@ where
     R: ReconcilableEventSourcedResource,
 {
     fn into_public_plan(mut self) -> ApplyResourcePlan<R> {
-        let uid = *self.resource.uid();
+        let id = *self.resource.id();
         let state = self.resource.as_ref().clone();
         self.resource.revert();
 
         ApplyResourcePlan {
-            uid,
+            id,
             state,
             action: self.action,
             reconciliation_required: self.reconciliation_required,

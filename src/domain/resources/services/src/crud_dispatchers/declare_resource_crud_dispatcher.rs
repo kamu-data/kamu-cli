@@ -25,8 +25,8 @@ macro_rules! declare_resource_crud_dispatcher {
                 std::sync::Arc<dyn kamu_resources::ApplyResourceUseCase<$resource>>,
             generic_resource_query_service:
                 std::sync::Arc<dyn kamu_resources::GenericResourceQueryService>,
-            get_resource_by_uid_use_case:
-                std::sync::Arc<dyn kamu_resources::GetResourceByUidUseCase<$resource>>,
+            get_resource_by_id_use_case:
+                std::sync::Arc<dyn kamu_resources::GetResourceByIdUseCase<$resource>>,
             list_resources_by_kind_use_case:
                 std::sync::Arc<dyn kamu_resources::ListResourcesByKindUseCase<$resource>>,
             delete_resources_use_case:
@@ -62,7 +62,7 @@ macro_rules! declare_resource_crud_dispatcher {
                 let plan = self
                     .apply_resource_use_case
                     .plan(kamu_resources::ApplyResourceParams {
-                        uid: request.uid,
+                        id: request.id,
                         headers: request.headers,
                         spec,
                     })
@@ -94,7 +94,7 @@ macro_rules! declare_resource_crud_dispatcher {
                 let result = self
                     .apply_resource_use_case
                     .apply(kamu_resources::ApplyResourceParams {
-                        uid: request.uid,
+                        id: request.id,
                         headers: request.headers,
                         spec,
                     })
@@ -110,8 +110,8 @@ macro_rules! declare_resource_crud_dispatcher {
                 request: $crate::ResourceCrudDispatcherGetRequest,
             ) -> Result<kamu_resources::ResourceView, $crate::GetResourceCrudDispatcherError> {
                 let state = self
-                    .get_resource_by_uid_use_case
-                    .execute(request.account_id, &request.uid)
+                    .get_resource_by_id_use_case
+                    .execute(request.account_id, &request.id)
                     .await
                     .map_err(kamu_resources::GetResourceCrudDispatcherError::from)?;
 
@@ -138,7 +138,7 @@ macro_rules! declare_resource_crud_dispatcher {
                 request: $crate::ResourceCrudDispatcherDeleteRequest,
             ) -> Result<(), $crate::DeleteResourcesCrudDispatcherError> {
                 self.delete_resources_use_case
-                    .execute(request.account_id, request.uids)
+                    .execute(request.account_id, request.ids)
                     .await
                     .map_err(kamu_resources::DeleteResourcesCrudDispatcherError::from)
             }

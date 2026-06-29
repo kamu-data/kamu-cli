@@ -31,7 +31,7 @@ pub trait ReconcilableResource: DeclarativeResource {
 
     fn try_create(
         now: DateTime<Utc>,
-        uid: crate::ResourceUID,
+        id: crate::ResourceID,
         headers: crate::ResourceHeadersInput,
         spec: Self::Spec,
     ) -> Result<Self, Self::LifecycleError>

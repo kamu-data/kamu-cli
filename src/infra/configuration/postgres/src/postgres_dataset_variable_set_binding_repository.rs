@@ -47,7 +47,7 @@ impl DatasetVariableSetBindingRepository for PostgresDatasetVariableSetBindingRe
             r#"
             SELECT
                 dataset_id as "dataset_id: odf::DatasetID",
-                resource_uid as "resource_uid: Uuid",
+                resource_id as "resource_id: Uuid",
                 binding_order
             FROM config_dataset_variable_set_bindings
             WHERE dataset_id = $1
@@ -65,13 +65,13 @@ impl DatasetVariableSetBindingRepository for PostgresDatasetVariableSetBindingRe
     async fn replace_bindings(
         &self,
         dataset_id: &odf::DatasetID,
-        resource_uids: &[kamu_resources::ResourceUID],
+        resource_ids: &[kamu_resources::ResourceID],
     ) -> Result<(), ReplaceDatasetBindingsError> {
-        validate_unique_bindings(dataset_id, resource_uids)?;
+        validate_unique_bindings(dataset_id, resource_ids)?;
 
         self.delete_bindings_for_dataset(dataset_id).await?;
 
-        if resource_uids.is_empty() {
+        if resource_ids.is_empty() {
             return Ok(());
         }
 
@@ -80,19 +80,19 @@ impl DatasetVariableSetBindingRepository for PostgresDatasetVariableSetBindingRe
 
         let stack_dataset_id = dataset_id.as_did_str().to_stack_string();
 
-        let dataset_ids = vec![stack_dataset_id.as_str(); resource_uids.len()];
-        let uids: Vec<Uuid> = resource_uids.iter().map(|uid| *uid.as_ref()).collect();
-        let orders: Vec<i64> = (0..resource_uids.len())
+        let dataset_ids = vec![stack_dataset_id.as_str(); resource_ids.len()];
+        let ids: Vec<Uuid> = resource_ids.iter().map(|id| *id.as_ref()).collect();
+        let orders: Vec<i64> = (0..resource_ids.len())
             .map(|i| i64::try_from(i).unwrap())
             .collect();
 
         sqlx::query!(
             r#"
-            INSERT INTO config_dataset_variable_set_bindings(dataset_id, resource_uid, binding_order)
+            INSERT INTO config_dataset_variable_set_bindings(dataset_id, resource_id, binding_order)
             SELECT * FROM UNNEST($1::text[], $2::uuid[], $3::int8[])
             "#,
             &dataset_ids as &[&str],
-            &uids as &[Uuid],
+            &ids as &[Uuid],
             &orders as &[i64],
         )
         .execute(&mut *connection_mut)
@@ -101,7 +101,7 @@ impl DatasetVariableSetBindingRepository for PostgresDatasetVariableSetBindingRe
             sqlx::Error::Database(e) if e.is_unique_violation() => {
                 ReplaceDatasetBindingsError::Duplicate(DatasetResourceBindingDuplicateError {
                     dataset_id: dataset_id.clone(),
-                    resource_uid: resource_uids[0],
+                    resource_id: resource_ids[0],
                 })
             }
             _ => ReplaceDatasetBindingsError::Internal(e.int_err()),
@@ -138,15 +138,15 @@ impl DatasetVariableSetBindingRepository for PostgresDatasetVariableSetBindingRe
 
 fn validate_unique_bindings(
     dataset_id: &odf::DatasetID,
-    resource_uids: &[kamu_resources::ResourceUID],
+    resource_ids: &[kamu_resources::ResourceID],
 ) -> Result<(), ReplaceDatasetBindingsError> {
     let mut seen = HashSet::new();
 
-    for resource_uid in resource_uids {
-        if !seen.insert(*resource_uid) {
+    for resource_id in resource_ids {
+        if !seen.insert(*resource_id) {
             return Err(DatasetResourceBindingDuplicateError {
                 dataset_id: dataset_id.clone(),
-                resource_uid: *resource_uid,
+                resource_id: *resource_id,
             }
             .into());
         }

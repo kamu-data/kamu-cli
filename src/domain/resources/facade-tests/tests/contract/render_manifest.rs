@@ -43,19 +43,16 @@ fn by_name(name: &str) -> ResourceSelector {
     }
 }
 
-fn by_id(uid: &kamu_resources::ResourceUID) -> ResourceSelector {
+fn by_id(id: &kamu_resources::ResourceID) -> ResourceSelector {
     ResourceSelector {
         account: None,
         kind: VARIABLE_SET_KIND.to_string(),
         api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
-        resource_ref: ResourceRef::ById(*uid),
+        resource_ref: ResourceRef::ById(*id),
     }
 }
 
-async fn create_resource(
-    h: &impl FacadeContractHarness,
-    name: &str,
-) -> kamu_resources::ResourceUID {
+async fn create_resource(h: &impl FacadeContractHarness, name: &str) -> kamu_resources::ResourceID {
     let facade = h.facade_for(TestAccount::Alice);
     let manifest = variable_set_manifest_json(name, None, &[("K", "v")]);
     let decision = facade
@@ -66,7 +63,7 @@ async fn create_resource(
         .await
         .unwrap();
     let result = assert_applied_outcome(&decision, ApplyResourceOutcome::Created);
-    result.headers.uid
+    result.headers.id
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -102,8 +99,8 @@ pub async fn test_render_json_by_name(h: &impl FacadeContractHarness) {
     // UID must NOT appear in rendered manifests (render → apply round-trip
     // contract)
     assert!(
-        parsed["headers"]["uid"].is_null(),
-        "rendered manifest must not include uid"
+        parsed["headers"]["id"].is_null(),
+        "rendered manifest must not include id"
     );
 }
 
@@ -113,12 +110,12 @@ pub async fn test_render_json_by_name(h: &impl FacadeContractHarness) {
 contract_test!(render_yaml_by_uid, super::test_render_yaml_by_uid);
 
 pub async fn test_render_yaml_by_uid(h: &impl FacadeContractHarness) {
-    let uid = create_resource(h, "render-yaml-uid").await;
+    let id = create_resource(h, "render-yaml-id").await;
     let facade = h.facade_for(TestAccount::Alice);
 
     let result = facade
         .render_manifest(
-            by_id(&uid),
+            by_id(&id),
             ResourceManifestFormat::Yaml,
             SpecViewMode::Encrypted,
         )
@@ -131,10 +128,10 @@ pub async fn test_render_yaml_by_uid(h: &impl FacadeContractHarness) {
     let parsed = serde_json::to_value(yaml).unwrap();
     assert_eq!(parsed["kind"], VARIABLE_SET_KIND);
     assert_eq!(parsed["apiVersion"], VARIABLE_SET_API_VERSION);
-    assert_eq!(parsed["headers"]["name"], "render-yaml-uid");
+    assert_eq!(parsed["headers"]["name"], "render-yaml-id");
     assert!(
-        parsed["headers"]["uid"].is_null(),
-        "rendered manifest must not include uid"
+        parsed["headers"]["id"].is_null(),
+        "rendered manifest must not include id"
     );
 }
 
@@ -147,12 +144,12 @@ contract_test!(
 );
 
 pub async fn test_rendered_manifest_can_be_reapplied(h: &impl FacadeContractHarness) {
-    let uid = create_resource(h, "render-reapply").await;
+    let id = create_resource(h, "render-reapply").await;
     let facade = h.facade_for(TestAccount::Alice);
 
     let rendered = facade
         .render_manifest(
-            by_id(&uid),
+            by_id(&id),
             ResourceManifestFormat::Json,
             SpecViewMode::Encrypted,
         )
@@ -204,7 +201,7 @@ contract_test!(
 
 pub async fn test_render_missing_resource_returns_not_found(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
-    let absent_uid = kamu_resources::ResourceUID::new(uuid::Uuid::new_v4());
+    let absent_uid = kamu_resources::ResourceID::new(uuid::Uuid::new_v4());
 
     let by_name_result = facade
         .render_manifest(
@@ -234,7 +231,7 @@ pub async fn test_render_missing_resource_returns_not_found(h: &impl FacadeContr
         matches!(
             by_uid_result,
             Err(RenderResourceManifestError::LookupProblem(
-                ResourceLookupProblem::UIDNotFound(_)
+                ResourceLookupProblem::IDNotFound(_)
             ))
         ),
         "expected UIDNotFound, got: {by_uid_result:?}"
@@ -254,14 +251,14 @@ pub async fn test_render_wrong_api_version_or_kind_returns_mismatch(
 ) {
     use crate::helpers::{SECRET_SET_API_VERSION, SECRET_SET_KIND};
 
-    let uid = create_resource(h, "render-mismatch").await;
+    let id = create_resource(h, "render-mismatch").await;
     let facade = h.facade_for(TestAccount::Alice);
 
     let wrong_version = ResourceSelector {
         account: None,
         kind: VARIABLE_SET_KIND.to_string(),
         api_version: Some("v0.never.existed".to_string()),
-        resource_ref: ResourceRef::ById(uid),
+        resource_ref: ResourceRef::ById(id),
     };
     let result = facade
         .render_manifest(
@@ -284,7 +281,7 @@ pub async fn test_render_wrong_api_version_or_kind_returns_mismatch(
         account: None,
         kind: SECRET_SET_KIND.to_string(),
         api_version: Some(SECRET_SET_API_VERSION.to_string()),
-        resource_ref: ResourceRef::ById(uid),
+        resource_ref: ResourceRef::ById(id),
     };
     let result = facade
         .render_manifest(

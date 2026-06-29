@@ -35,10 +35,7 @@ use crate::helpers::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn create_resource(
-    h: &impl FacadeContractHarness,
-    name: &str,
-) -> kamu_resources::ResourceUID {
+async fn create_resource(h: &impl FacadeContractHarness, name: &str) -> kamu_resources::ResourceID {
     let facade = h.facade_for(TestAccount::Alice);
     let manifest = variable_set_manifest_json(name, None, &[("K", "v")]);
     let decision = facade
@@ -49,7 +46,7 @@ async fn create_resource(
         .await
         .unwrap();
     let result = assert_applied_outcome(&decision, ApplyResourceOutcome::Created);
-    result.headers.uid
+    result.headers.id
 }
 
 fn by_name(name: &str) -> ResourceSelector {
@@ -61,12 +58,12 @@ fn by_name(name: &str) -> ResourceSelector {
     }
 }
 
-fn by_id(uid: &kamu_resources::ResourceUID) -> ResourceSelector {
+fn by_id(id: &kamu_resources::ResourceID) -> ResourceSelector {
     ResourceSelector {
         account: None,
         kind: VARIABLE_SET_KIND.to_string(),
         api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
-        resource_ref: ResourceRef::ById(*uid),
+        resource_ref: ResourceRef::ById(*id),
     }
 }
 
@@ -76,12 +73,12 @@ fn by_id(uid: &kamu_resources::ResourceUID) -> ResourceSelector {
 contract_test!(delete_by_name, super::test_delete_by_name);
 
 pub async fn test_delete_by_name(h: &impl FacadeContractHarness) {
-    let uid = create_resource(h, "del-name-test").await;
+    let id = create_resource(h, "del-name-test").await;
     let facade = h.facade_for(TestAccount::Alice);
 
     let deleted_uid = facade.delete(by_name("del-name-test")).await.unwrap();
 
-    assert_eq!(deleted_uid, uid, "deleted uid must match created uid");
+    assert_eq!(deleted_uid, id, "deleted id must match created id");
 
     // Resource must not be found by name
     let get_by_name = facade
@@ -92,11 +89,11 @@ pub async fn test_delete_by_name(h: &impl FacadeContractHarness) {
         "deleted resource must not be found by name"
     );
 
-    // Resource must not be found by uid
-    let get_by_uid = facade.get(by_id(&uid), SpecViewMode::Encrypted).await;
+    // Resource must not be found by id
+    let get_by_uid = facade.get(by_id(&id), SpecViewMode::Encrypted).await;
     assert!(
         matches!(get_by_uid, Err(GetResourceError::LookupProblem(_))),
-        "deleted resource must not be found by uid"
+        "deleted resource must not be found by id"
     );
 
     // Resource must not appear in list
@@ -112,7 +109,7 @@ pub async fn test_delete_by_name(h: &impl FacadeContractHarness) {
         .await
         .unwrap();
     assert!(
-        !list.iter().any(|s| s.uid == uid),
+        !list.iter().any(|s| s.id == id),
         "deleted resource must not appear in list"
     );
 }
@@ -123,19 +120,19 @@ pub async fn test_delete_by_name(h: &impl FacadeContractHarness) {
 contract_test!(delete_by_uid, super::test_delete_by_uid);
 
 pub async fn test_delete_by_uid(h: &impl FacadeContractHarness) {
-    let uid = create_resource(h, "del-uid-test").await;
+    let id = create_resource(h, "del-id-test").await;
     let facade = h.facade_for(TestAccount::Alice);
 
-    let deleted_uid = facade.delete(by_id(&uid)).await.unwrap();
+    let deleted_uid = facade.delete(by_id(&id)).await.unwrap();
 
-    assert_eq!(deleted_uid, uid, "deleted uid must match created uid");
+    assert_eq!(deleted_uid, id, "deleted id must match created id");
 
     let get_by_name = facade
-        .get(by_name("del-uid-test"), SpecViewMode::Encrypted)
+        .get(by_name("del-id-test"), SpecViewMode::Encrypted)
         .await;
     assert!(
         matches!(get_by_name, Err(GetResourceError::LookupProblem(_))),
-        "resource must not be found by name after delete by uid"
+        "resource must not be found by name after delete by id"
     );
 }
 
@@ -172,14 +169,14 @@ contract_test!(
 
 pub async fn test_delete_missing_uid_returns_not_found(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
-    let absent_uid = kamu_resources::ResourceUID::new(uuid::Uuid::new_v4());
+    let absent_uid = kamu_resources::ResourceID::new(uuid::Uuid::new_v4());
 
     let result = facade.delete(by_id(&absent_uid)).await;
     assert!(
         matches!(
             result,
             Err(DeleteResourceError::LookupProblem(
-                ResourceLookupProblem::UIDNotFound(_)
+                ResourceLookupProblem::IDNotFound(_)
             ))
         ),
         "expected UIDNotFound, got: {result:?}"
@@ -195,14 +192,14 @@ contract_test!(
 );
 
 pub async fn test_delete_wrong_api_version_returns_mismatch(h: &impl FacadeContractHarness) {
-    let uid = create_resource(h, "del-api-ver").await;
+    let id = create_resource(h, "del-api-ver").await;
     let facade = h.facade_for(TestAccount::Alice);
 
     let wrong_version = ResourceSelector {
         account: None,
         kind: VARIABLE_SET_KIND.to_string(),
         api_version: Some("v0.never.existed".to_string()),
-        resource_ref: ResourceRef::ById(uid),
+        resource_ref: ResourceRef::ById(id),
     };
     let result = facade.delete(wrong_version).await;
     assert!(
@@ -219,7 +216,7 @@ pub async fn test_delete_wrong_api_version_returns_mismatch(h: &impl FacadeContr
         account: None,
         kind: SECRET_SET_KIND.to_string(),
         api_version: Some(SECRET_SET_API_VERSION.to_string()),
-        resource_ref: ResourceRef::ById(uid),
+        resource_ref: ResourceRef::ById(id),
     };
     let result = facade.delete(wrong_kind).await;
     assert!(
@@ -259,7 +256,7 @@ pub async fn test_delete_is_account_scoped(h: &impl FacadeContractHarness) {
             .unwrap();
         assert_applied_outcome(&decision, ApplyResourceOutcome::Created)
             .headers
-            .uid
+            .id
     };
 
     // Delete Alice's resource.
@@ -282,7 +279,7 @@ pub async fn test_delete_is_account_scoped(h: &impl FacadeContractHarness) {
         .get(by_name("scoped-del"), SpecViewMode::Encrypted)
         .await
         .expect("Bob's resource must survive Alice's delete");
-    assert_eq!(bob_view.headers.uid, bob_uid);
+    assert_eq!(bob_view.headers.id, bob_uid);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -295,20 +292,20 @@ contract_test!(
 );
 
 pub async fn test_repeated_delete_is_deterministic(h: &impl FacadeContractHarness) {
-    let uid = create_resource(h, "repeat-del").await;
+    let id = create_resource(h, "repeat-del").await;
     let facade = h.facade_for(TestAccount::Alice);
 
     // First delete succeeds.
-    let deleted = facade.delete(by_id(&uid)).await.unwrap();
-    assert_eq!(deleted, uid);
+    let deleted = facade.delete(by_id(&id)).await.unwrap();
+    assert_eq!(deleted, id);
 
     // Second delete must return not-found.
-    let result = facade.delete(by_id(&uid)).await;
+    let result = facade.delete(by_id(&id)).await;
     assert!(
         matches!(
             result,
             Err(DeleteResourceError::LookupProblem(
-                ResourceLookupProblem::UIDNotFound(_)
+                ResourceLookupProblem::IDNotFound(_)
             ))
         ),
         "second delete must return UIDNotFound, got: {result:?}"

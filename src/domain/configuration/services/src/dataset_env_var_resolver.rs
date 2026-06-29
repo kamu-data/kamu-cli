@@ -54,7 +54,7 @@ impl DatasetEnvVarResolver for DatasetEnvVarResolverImpl {
         for binding in &var_bindings {
             let entries = self
                 .variable_set_projection_repo
-                .get_latest_entries(&binding.resource_uid)
+                .get_latest_entries(&binding.resource_id)
                 .await?;
 
             for entry in entries {
@@ -80,7 +80,7 @@ impl DatasetEnvVarResolver for DatasetEnvVarResolverImpl {
         for binding in &secret_bindings {
             let entries = self
                 .secret_set_projection_repo
-                .get_latest_entries(&binding.resource_uid)
+                .get_latest_entries(&binding.resource_id)
                 .await?;
 
             for entry in entries {
@@ -123,7 +123,7 @@ impl DatasetEnvVarResolver for DatasetEnvVarResolverImpl {
         for binding in &var_bindings {
             let entries = self
                 .variable_set_projection_repo
-                .get_latest_entries(&binding.resource_uid)
+                .get_latest_entries(&binding.resource_id)
                 .await
                 .int_err()?;
 
@@ -148,7 +148,7 @@ impl DatasetEnvVarResolver for DatasetEnvVarResolverImpl {
         for binding in &secret_bindings {
             let entries = self
                 .secret_set_projection_repo
-                .get_latest_entries(&binding.resource_uid)
+                .get_latest_entries(&binding.resource_id)
                 .await
                 .int_err()?;
 

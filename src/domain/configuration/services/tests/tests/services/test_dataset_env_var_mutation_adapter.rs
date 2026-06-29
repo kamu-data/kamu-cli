@@ -41,18 +41,18 @@ async fn test_lazy_creation_of_variable_resource_on_first_upsert() {
     let bindings = harness.variable_bindings(&dataset_id).await;
     assert_eq!(bindings.len(), 1, "exactly one variable binding must exist");
 
-    let resource_uid = bindings[0].resource_uid;
+    let resource_id = bindings[0].resource_id;
     let resource_name =
         DatasetEnvVarMutationAdapterImpl::legacy_variable_set_resource_name(&dataset_id);
 
     let found = harness
-        .resource_uid_by_name(
+        .resource_id_by_name(
             &account_id,
             VariableSetResource::RESOURCE_TYPE,
             &resource_name,
         )
         .await;
-    assert_eq!(found, Some(resource_uid));
+    assert_eq!(found, Some(resource_id));
 
     let env_map = harness
         .resolver()
@@ -121,13 +121,13 @@ async fn test_lazy_creation_of_secret_resource_on_first_upsert() {
         DatasetEnvVarMutationAdapterImpl::legacy_secret_set_resource_name(&dataset_id);
 
     let found = harness
-        .resource_uid_by_name(
+        .resource_id_by_name(
             &account_id,
             SecretSetResource::RESOURCE_TYPE,
             &resource_name,
         )
         .await;
-    assert_eq!(found, Some(sec_bindings[0].resource_uid));
+    assert_eq!(found, Some(sec_bindings[0].resource_id));
 
     let env_map = harness
         .resolver()
@@ -205,7 +205,7 @@ async fn test_delete_last_variable_removes_resource_and_binding() {
         DatasetEnvVarMutationAdapterImpl::legacy_variable_set_resource_name(&dataset_id);
 
     let found = harness
-        .resource_uid_by_name(
+        .resource_id_by_name(
             &account_id,
             VariableSetResource::RESOURCE_TYPE,
             &resource_name,
@@ -292,7 +292,7 @@ async fn test_delete_last_secret_removes_resource_and_binding() {
     let resource_name =
         DatasetEnvVarMutationAdapterImpl::legacy_secret_set_resource_name(&dataset_id);
     let found = harness
-        .resource_uid_by_name(
+        .resource_id_by_name(
             &account_id,
             SecretSetResource::RESOURCE_TYPE,
             &resource_name,

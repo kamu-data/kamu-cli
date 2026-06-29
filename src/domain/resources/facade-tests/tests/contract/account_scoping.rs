@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use database_common::PaginationOpts;
-use kamu_resources::{ResourceManifestAccount, ResourceUID};
+use kamu_resources::{ResourceID, ResourceManifestAccount};
 use kamu_resources_facade::{
     ApplyManifestError,
     ApplyManifestRequest,
@@ -34,7 +34,7 @@ use crate::harness::{FacadeContractHarness, TestAccount};
 use crate::helpers::{
     VARIABLE_SET_API_VERSION,
     VARIABLE_SET_KIND,
-    apply_manifest_and_get_uid,
+    apply_manifest_and_get_id,
     sorted_identity_names,
     total_kind_count,
     variable_set_manifest_json,
@@ -46,8 +46,8 @@ async fn create_default_account_resource(
     h: &impl FacadeContractHarness,
     account: TestAccount,
     name: &str,
-) -> ResourceUID {
-    apply_manifest_and_get_uid(
+) -> ResourceID {
+    apply_manifest_and_get_id(
         h,
         account,
         variable_set_manifest_json(name, None, &[("K", "v")]),
@@ -60,8 +60,8 @@ async fn create_with_account_selector(
     facade_account: TestAccount,
     name: &str,
     selector: ResourceManifestAccount,
-) -> ResourceUID {
-    apply_manifest_and_get_uid(
+) -> ResourceID {
+    apply_manifest_and_get_id(
         h,
         facade_account,
         variable_set_manifest_json_with_account(name, &selector),
@@ -343,8 +343,8 @@ contract_test!(
 );
 
 pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarness) {
-    let alice_uid = create_default_account_resource(h, TestAccount::Alice, "acct-isolated").await;
-    let bob_uid = create_default_account_resource(h, TestAccount::Bob, "acct-isolated").await;
+    let alice_id = create_default_account_resource(h, TestAccount::Alice, "acct-isolated").await;
+    let bob_id = create_default_account_resource(h, TestAccount::Bob, "acct-isolated").await;
     create_default_account_resource(h, TestAccount::Alice, "acct-alice-only").await;
     create_default_account_resource(h, TestAccount::Bob, "acct-bob-only").await;
 
@@ -365,8 +365,8 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
         )
         .await
         .unwrap();
-    assert_eq!(alice_view.headers.uid, alice_uid);
-    assert_eq!(bob_view.headers.uid, bob_uid);
+    assert_eq!(alice_view.headers.id, alice_id);
+    assert_eq!(bob_view.headers.id, bob_id);
 
     let alice_identity = alice
         .get_identity(selector_by_name("acct-isolated", None))
@@ -376,8 +376,8 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
         .get_identity(selector_by_name("acct-isolated", None))
         .await
         .unwrap();
-    assert_eq!(alice_identity.uid, alice_uid);
-    assert_eq!(bob_identity.uid, bob_uid);
+    assert_eq!(alice_identity.id, alice_id);
+    assert_eq!(bob_identity.id, bob_id);
 
     let alice_batch = alice
         .get_identities(batch_selector_by_name("acct-isolated", None))
@@ -390,8 +390,8 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
         )
         .await
         .unwrap();
-    assert_eq!(alice_batch.successes[0].item.uid, alice_uid);
-    assert_eq!(bob_batch.successes[0].item.headers.uid, bob_uid);
+    assert_eq!(alice_batch.successes[0].item.id, alice_id);
+    assert_eq!(bob_batch.successes[0].item.headers.id, bob_id);
 
     let alice_list = alice
         .list_identities(ListResourceIdentitiesRequest {

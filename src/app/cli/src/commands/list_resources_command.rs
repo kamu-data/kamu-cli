@@ -333,7 +333,7 @@ impl ListResourcesCommand {
                     lhs.name
                         .cmp(&rhs.name)
                         .then_with(|| lhs.kind.cmp(&rhs.kind))
-                        .then_with(|| lhs.uid.to_string().cmp(&rhs.uid.to_string()))
+                        .then_with(|| lhs.id.to_string().cmp(&rhs.id.to_string()))
                 });
                 Ok(resources)
             }
@@ -373,7 +373,7 @@ impl ListResourcesCommand {
                 ResourceGenericColumn::Uid => Arc::new(StringArray::from(
                     resources
                         .iter()
-                        .map(|resource| resource.uid.to_string())
+                        .map(|resource| resource.id.to_string())
                         .collect::<Vec<_>>(),
                 )),
                 ResourceGenericColumn::Phase => Arc::new(StringArray::from(

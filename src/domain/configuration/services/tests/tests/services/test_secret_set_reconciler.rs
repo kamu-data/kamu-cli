@@ -40,15 +40,15 @@ async fn test_reconcile_secret_set_decrypts_and_reprojects_values() {
     let decision = harness
         .apply_secret_use_case()
         .apply(ApplyResourceParams {
-            uid: None,
+            id: None,
             headers: BaseResourceServiceHarness::make_headers_input(account_id, "test-secrets"),
             spec,
         })
         .await
         .unwrap();
 
-    let applied_uid = match decision {
-        ApplyResourceApplicationDecision::Applied(result) => result.uid,
+    let applied_id = match decision {
+        ApplyResourceApplicationDecision::Applied(result) => result.id,
         ApplyResourceApplicationDecision::Rejected(r) => {
             panic!("apply was rejected: {}", r.message)
         }
@@ -58,7 +58,7 @@ async fn test_reconcile_secret_set_decrypts_and_reprojects_values() {
     // entries should already be populated
     let entries = harness
         .secret_set_projection_repo()
-        .get_latest_entries(&applied_uid)
+        .get_latest_entries(&applied_id)
         .await
         .unwrap();
 

@@ -24,19 +24,19 @@ use serde::Serialize;
 
 pub(crate) async fn load_previous_resource_view(
     action: ApplyResourceAction,
-    uid: kamu_resources::ResourceUID,
+    id: kamu_resources::ResourceID,
     generic_resource_query_service: &dyn GenericResourceQueryService,
 ) -> Result<Option<ResourceView>, InternalError> {
     match action {
         ApplyResourceAction::Create => Ok(None),
         ApplyResourceAction::Update | ApplyResourceAction::Untouched => {
             let snapshot = generic_resource_query_service
-                .get_snapshot_by_uid(&uid)
+                .get_snapshot_by_id(&id)
                 .await?;
             let snapshot = match snapshot {
                 Some(snapshot) => snapshot,
                 None => InternalError::bail(format!(
-                    "Failed to build apply dry-run diff for resource {uid}: current snapshot is \
+                    "Failed to build apply dry-run diff for resource {id}: current snapshot is \
                      missing"
                 ))?,
             };
@@ -83,9 +83,9 @@ fn append_headers_changes(
     push_headers_change(
         changes,
         ApplyManifestChangeKind::Headers,
-        "headers.uid",
-        before.map(|view| view.headers.uid),
-        Some(after.headers.uid),
+        "headers.id",
+        before.map(|view| view.headers.id),
+        Some(after.headers.id),
     )?;
     push_headers_change(
         changes,

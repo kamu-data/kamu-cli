@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use kamu_configuration::{SecretSetResource, VariableSetResource};
-use kamu_resources::{ApplyResourceOutcome, ResourceUID};
+use kamu_resources::{ApplyResourceOutcome, ResourceID};
 use kamu_resources_facade::{ApplyManifestRequest, ResourceManifestFormat};
 
 use crate::harness::{FacadeContractHarness, TestAccount};
@@ -128,11 +128,11 @@ pub fn total_kind_count(summary: kamu_resources::ResourcesSummary, kind: &str) -
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn apply_manifest_and_get_uid(
+pub async fn apply_manifest_and_get_id(
     h: &impl FacadeContractHarness,
     account: TestAccount,
     manifest: String,
-) -> ResourceUID {
+) -> ResourceID {
     let decision = h
         .facade_for(account)
         .apply_manifest(ApplyManifestRequest {
@@ -142,7 +142,7 @@ pub async fn apply_manifest_and_get_uid(
         .await
         .unwrap();
     let view = assert_applied_outcome(&decision, ApplyResourceOutcome::Created);
-    view.headers.uid
+    view.headers.id
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

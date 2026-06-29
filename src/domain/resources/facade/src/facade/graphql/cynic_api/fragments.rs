@@ -16,7 +16,7 @@ use crate::facade::graphql::cynic_api::schema;
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct ResourceSummary {
-    pub id: kamu_resources::ResourceUID,
+    pub id: kamu_resources::ResourceID,
     pub api_version: String,
     pub kind: ResourceKind,
     pub name: String,
@@ -129,8 +129,8 @@ pub(crate) enum ResourceBadAccountProblemCode {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::QueryFragment, Debug, Copy, Clone)]
-pub(crate) struct ResourceUIDNotFoundProblem {
-    pub uid: kamu_resources::ResourceUID,
+pub(crate) struct ResourceIDNotFoundProblem {
+    pub id: kamu_resources::ResourceID,
 }
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
@@ -147,7 +147,7 @@ pub(crate) struct ResourceApiVersionMismatchProblem {
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct ResourceKindMismatchProblem {
-    pub uid: kamu_resources::ResourceUID,
+    pub id: kamu_resources::ResourceID,
     pub expected_kind: String,
     pub actual_kind: String,
 }
@@ -156,7 +156,7 @@ pub(crate) struct ResourceKindMismatchProblem {
 
 #[derive(cynic::InlineFragments, Debug, Clone)]
 pub(crate) enum ResourceLookupProblem {
-    ResourceUIDNotFoundProblem(ResourceUIDNotFoundProblem),
+    ResourceIDNotFoundProblem(ResourceIDNotFoundProblem),
     ResourceNameNotFoundProblem(ResourceNameNotFoundProblem),
     ResourceApiVersionMismatchProblem(ResourceApiVersionMismatchProblem),
     ResourceKindMismatchProblem(ResourceKindMismatchProblem),
@@ -168,7 +168,7 @@ pub(crate) enum ResourceLookupProblem {
 
 #[derive(cynic::InlineFragments, Debug, Clone)]
 pub(crate) enum ResourceSelectorProblem {
-    ResourceUIDNotFoundProblem(ResourceUIDNotFoundProblem),
+    ResourceIDNotFoundProblem(ResourceIDNotFoundProblem),
     ResourceNameNotFoundProblem(ResourceNameNotFoundProblem),
     ResourceApiVersionMismatchProblem(ResourceApiVersionMismatchProblem),
     ResourceKindMismatchProblem(ResourceKindMismatchProblem),
@@ -234,7 +234,7 @@ pub(crate) struct ResourceKind {
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct ResourceHeaders {
-    pub id: kamu_resources::ResourceUID,
+    pub id: kamu_resources::ResourceID,
     pub account_id: odf::AccountID,
     pub account_name: Option<AccountName>,
     pub name: String,
@@ -252,7 +252,7 @@ pub(crate) struct ResourceHeaders {
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct ResourceIdentity {
-    pub id: kamu_resources::ResourceUID,
+    pub id: kamu_resources::ResourceID,
     pub api_version: String,
     pub kind: ResourceKind,
     pub canonical_kind_name: String,

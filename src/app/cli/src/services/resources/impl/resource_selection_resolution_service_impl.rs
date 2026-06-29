@@ -217,12 +217,12 @@ impl ResourceSelectionResolutionServiceImpl {
         (
             identity.kind.clone(),
             identity.api_version.clone(),
-            identity.uid,
+            identity.id,
         )
     }
 
     fn target_key(target: &ResourceTarget) -> ResourceTargetKey {
-        (target.kind.clone(), target.api_version.clone(), target.uid)
+        (target.kind.clone(), target.api_version.clone(), target.id)
     }
 
     fn append_new_targets(
@@ -558,7 +558,7 @@ impl ResourceSelectionResolutionServiceImpl {
                     }
                 }
                 Err(GetResourceError::LookupProblem(
-                    ResourceLookupProblem::NameNotFound(_) | ResourceLookupProblem::UIDNotFound(_),
+                    ResourceLookupProblem::NameNotFound(_) | ResourceLookupProblem::IDNotFound(_),
                 )) => {}
                 Err(error) => return Err(error.into()),
             }
@@ -679,7 +679,7 @@ impl ResourceSelectionResolutionServiceImpl {
                 }
             }
             Err(GetResourceError::LookupProblem(
-                ResourceLookupProblem::NameNotFound(_) | ResourceLookupProblem::UIDNotFound(_),
+                ResourceLookupProblem::NameNotFound(_) | ResourceLookupProblem::IDNotFound(_),
             )) if options.ignore_not_found => {
                 ignored_selectors.push(ResourceIgnoredSelector {
                     kind_descriptor: selector.kind_descriptor,
@@ -800,7 +800,7 @@ impl ResourceSelectionResolutionServiceImpl {
         resource_ref: &kamu_resources_facade::ResourceRef,
     ) -> CLIError {
         let selector = match resource_ref {
-            kamu_resources_facade::ResourceRef::ById(uid) => uid.to_string(),
+            kamu_resources_facade::ResourceRef::ById(id) => id.to_string(),
             kamu_resources_facade::ResourceRef::ByName(name) => name.clone(),
         };
 
@@ -839,7 +839,7 @@ impl ResourceSelectionResolutionServiceImpl {
             kind: identity.kind,
             api_version: identity.api_version,
             canonical_kind_name: identity.canonical_kind_name,
-            uid: identity.uid,
+            id: identity.id,
             name: identity.name,
             selector_input,
         }
@@ -848,7 +848,7 @@ impl ResourceSelectionResolutionServiceImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-type ResourceTargetKey = (String, String, kamu_resources::ResourceUID);
+type ResourceTargetKey = (String, String, kamu_resources::ResourceID);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

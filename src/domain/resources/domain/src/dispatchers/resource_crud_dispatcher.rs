@@ -18,12 +18,12 @@ use crate::{
     ApplyManifestRejection,
     ApplyResourceUseCaseError,
     DeleteResourcesError,
-    GetResourceByUidError,
+    GetResourceByIdError,
     ResourceHeadersInput,
+    ResourceID,
+    ResourceIDNotFoundError,
     ResourceSummaryView,
     ResourceTypeMismatchError,
-    ResourceUID,
-    ResourceUIDNotFoundError,
     ResourceView,
 };
 
@@ -61,7 +61,7 @@ pub trait ResourceCrudDispatcher: Send + Sync {
 
 #[derive(Debug, Clone)]
 pub struct ResourceCrudDispatcherApplyRequest {
-    pub uid: Option<ResourceUID>,
+    pub id: Option<ResourceID>,
     pub headers: ResourceHeadersInput,
     pub spec: serde_json::Value,
 }
@@ -71,7 +71,7 @@ pub struct ResourceCrudDispatcherApplyRequest {
 #[derive(Debug, Clone)]
 pub struct ResourceCrudDispatcherGetRequest {
     pub account_id: odf::AccountID,
-    pub uid: ResourceUID,
+    pub id: ResourceID,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -87,7 +87,7 @@ pub struct ResourceCrudDispatcherListRequest {
 #[derive(Debug, Clone)]
 pub struct ResourceCrudDispatcherDeleteRequest {
     pub account_id: odf::AccountID,
-    pub uids: Vec<ResourceUID>,
+    pub ids: Vec<ResourceID>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -102,7 +102,7 @@ pub enum ApplyResourceCrudDispatcherError {
     },
 
     #[error(transparent)]
-    NotFound(#[from] ResourceUIDNotFoundError),
+    NotFound(#[from] ResourceIDNotFoundError),
 
     #[error(transparent)]
     TypeMismatch(#[from] ResourceTypeMismatchError),
@@ -119,7 +119,7 @@ pub enum ApplyResourceCrudDispatcherError {
 #[derive(Debug, Error)]
 pub enum GetResourceCrudDispatcherError {
     #[error(transparent)]
-    NotFound(#[from] ResourceUIDNotFoundError),
+    NotFound(#[from] ResourceIDNotFoundError),
 
     #[error(transparent)]
     TypeMismatch(#[from] ResourceTypeMismatchError),
@@ -164,7 +164,7 @@ where
             ApplyResourceUseCaseError::LoadFailed(err) => {
                 Self::Internal(format!("{err}").int_err())
             }
-            ApplyResourceUseCaseError::ResourceUIDNotFound(err) => Self::NotFound(err),
+            ApplyResourceUseCaseError::ResourceIDNotFound(err) => Self::NotFound(err),
             ApplyResourceUseCaseError::ResourceTypeMismatch(err) => Self::TypeMismatch(err),
             ApplyResourceUseCaseError::ConcurrentModification(err) => {
                 Self::ConcurrentModification(err)
@@ -187,12 +187,12 @@ impl From<crate::ApplyResourceRejection> for ApplyManifestRejection {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<GetResourceByUidError> for GetResourceCrudDispatcherError {
-    fn from(err: GetResourceByUidError) -> Self {
+impl From<GetResourceByIdError> for GetResourceCrudDispatcherError {
+    fn from(err: GetResourceByIdError) -> Self {
         match err {
-            GetResourceByUidError::NotFound(err) => Self::NotFound(err),
-            GetResourceByUidError::TypeMismatch(err) => Self::TypeMismatch(err),
-            GetResourceByUidError::Internal(err) => Self::Internal(err),
+            GetResourceByIdError::NotFound(err) => Self::NotFound(err),
+            GetResourceByIdError::TypeMismatch(err) => Self::TypeMismatch(err),
+            GetResourceByIdError::Internal(err) => Self::Internal(err),
         }
     }
 }

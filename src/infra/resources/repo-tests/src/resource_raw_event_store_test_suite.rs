@@ -13,22 +13,22 @@ use event_sourcing::{EventID, GetEventsOpts, SaveEventsError, SaveEventsItem};
 use futures::TryStreamExt;
 use kamu_resources::{
     ResourceHeaders,
+    ResourceID,
     ResourceRawEvent,
     ResourceRawEventQuery,
     ResourceRawEventStore,
     ResourceRepository,
     ResourceSnapshot,
-    ResourceUID,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn make_resource(catalog: &Catalog, kind: &str) -> ResourceRawEventQuery {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
-    let id = ResourceUID::new(uuid::Uuid::new_v4());
+    let id = ResourceID::new(uuid::Uuid::new_v4());
 
     let snapshot = ResourceSnapshot {
-        uid: id,
+        id,
         kind: kind.to_string(),
         api_version: "v1".to_string(),
         headers: ResourceHeaders::simple(
@@ -46,7 +46,7 @@ async fn make_resource(catalog: &Catalog, kind: &str) -> ResourceRawEventQuery {
 
     ResourceRawEventQuery {
         kind: kind.to_string(),
-        uid: id,
+        id,
     }
 }
 

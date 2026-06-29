@@ -96,7 +96,7 @@ pub(crate) fn resource_view_to_manifest(view: ResourceView) -> ResourceManifest 
         api_version,
         kind,
         headers: kamu_resources::ResourceManifestHeaders {
-            uid: None,
+            id: None,
             account: Some(kamu_resources::ResourceManifestAccount {
                 id: Some(account.id),
                 name: account.name.map(|name| name.to_string()),

@@ -96,7 +96,7 @@ pub async fn test_local_created_readable_remotely(h: &impl FacadeContractHarness
     let local = h.local_facade_for(TestAccount::Alice);
     let remote = h.facade_for(TestAccount::Alice);
 
-    let uid = {
+    let id = {
         let d = local
             .apply_manifest(ApplyManifestRequest {
                 format: ResourceManifestFormat::Json,
@@ -106,7 +106,7 @@ pub async fn test_local_created_readable_remotely(h: &impl FacadeContractHarness
             .unwrap();
         assert_applied_outcome(&d, ApplyResourceOutcome::Created)
             .headers
-            .uid
+            .id
     };
 
     let view = remote
@@ -120,7 +120,7 @@ pub async fn test_local_created_readable_remotely(h: &impl FacadeContractHarness
         VARIABLE_SET_API_VERSION,
         "cross-local-to-remote",
     );
-    assert_eq!(view.headers.uid, uid);
+    assert_eq!(view.headers.id, id);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -138,7 +138,7 @@ pub async fn test_remote_created_readable_locally(h: &impl FacadeContractHarness
     let local = h.local_facade_for(TestAccount::Alice);
     let remote = h.facade_for(TestAccount::Alice);
 
-    let uid = {
+    let id = {
         let d = remote
             .apply_manifest(ApplyManifestRequest {
                 format: ResourceManifestFormat::Json,
@@ -148,7 +148,7 @@ pub async fn test_remote_created_readable_locally(h: &impl FacadeContractHarness
             .unwrap();
         assert_applied_outcome(&d, ApplyResourceOutcome::Created)
             .headers
-            .uid
+            .id
     };
 
     let view = local
@@ -162,7 +162,7 @@ pub async fn test_remote_created_readable_locally(h: &impl FacadeContractHarness
         VARIABLE_SET_API_VERSION,
         "cross-remote-to-local",
     );
-    assert_eq!(view.headers.uid, uid);
+    assert_eq!(view.headers.id, id);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -266,9 +266,9 @@ pub async fn test_batch_equivalence(h: &impl FacadeContractHarness) {
             .unwrap();
         assert_applied_outcome(&d, ApplyResourceOutcome::Created)
             .headers
-            .uid
+            .id
     };
-    let absent_uid = kamu_resources::ResourceUID::new(uuid::Uuid::new_v4());
+    let absent_uid = kamu_resources::ResourceID::new(uuid::Uuid::new_v4());
 
     let batch_selector = ResourceBatchSelector {
         account: None,
@@ -277,7 +277,7 @@ pub async fn test_batch_equivalence(h: &impl FacadeContractHarness) {
         resource_refs: vec![
             ResourceRef::ByName("cross-batch-a".to_string()), // idx 0 — exists
             ResourceRef::ByName("cross-batch-missing".to_string()), // idx 1 — missing name
-            ResourceRef::ById(absent_uid),                    // idx 2 — missing uid
+            ResourceRef::ById(absent_uid),                    // idx 2 — missing id
         ],
     };
 
@@ -292,8 +292,8 @@ pub async fn test_batch_equivalence(h: &impl FacadeContractHarness) {
         .unwrap();
     assert_batch_indexes(&local_get, &[0], &[1, 2]);
     assert_batch_indexes(&remote_get, &[0], &[1, 2]);
-    assert_eq!(local_get.successes[0].item.headers.uid, uid_a);
-    assert_eq!(remote_get.successes[0].item.headers.uid, uid_a);
+    assert_eq!(local_get.successes[0].item.headers.id, uid_a);
+    assert_eq!(remote_get.successes[0].item.headers.id, uid_a);
     assert_matches!(
         &local_get
             .problems
@@ -319,7 +319,7 @@ pub async fn test_batch_equivalence(h: &impl FacadeContractHarness) {
             .find(|p| p.request_index == 2)
             .unwrap()
             .error,
-        ResourceLookupProblem::UIDNotFound(_)
+        ResourceLookupProblem::IDNotFound(_)
     );
     assert_matches!(
         &remote_get
@@ -328,16 +328,16 @@ pub async fn test_batch_equivalence(h: &impl FacadeContractHarness) {
             .find(|p| p.request_index == 2)
             .unwrap()
             .error,
-        ResourceLookupProblem::UIDNotFound(_)
+        ResourceLookupProblem::IDNotFound(_)
     );
 
-    // get_identities: both facades must agree on success uid and problem indexes
+    // get_identities: both facades must agree on success id and problem indexes
     let local_id = local.get_identities(batch_selector.clone()).await.unwrap();
     let remote_id = remote.get_identities(batch_selector.clone()).await.unwrap();
     assert_batch_indexes(&local_id, &[0], &[1, 2]);
     assert_batch_indexes(&remote_id, &[0], &[1, 2]);
-    assert_eq!(local_id.successes[0].item.uid, uid_a);
-    assert_eq!(remote_id.successes[0].item.uid, uid_a);
+    assert_eq!(local_id.successes[0].item.id, uid_a);
+    assert_eq!(remote_id.successes[0].item.id, uid_a);
 
     // render_manifests: both facades must return a non-empty manifest for the found
     // resource

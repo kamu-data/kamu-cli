@@ -39,8 +39,8 @@ impl InMemoryVariableSetProjectionRepository {
 
 #[derive(Default)]
 struct State {
-    entries_by_resource_uid_generation:
-        HashMap<(kamu_resources::ResourceUID, u64), Vec<VariableSetEntry>>,
+    entries_by_resource_id_generation:
+        HashMap<(kamu_resources::ResourceID, u64), Vec<VariableSetEntry>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -49,47 +49,47 @@ struct State {
 impl VariableSetProjectionRepository for InMemoryVariableSetProjectionRepository {
     async fn find_entry(
         &self,
-        resource_uid: &kamu_resources::ResourceUID,
+        resource_id: &kamu_resources::ResourceID,
         resource_generation: u64,
         key: &str,
     ) -> Result<Option<VariableSetEntry>, InternalError> {
         let guard = self.state.lock().unwrap();
         Ok(guard
-            .entries_by_resource_uid_generation
-            .get(&(*resource_uid, resource_generation))
+            .entries_by_resource_id_generation
+            .get(&(*resource_id, resource_generation))
             .and_then(|entries| entries.iter().find(|entry| entry.key == key))
             .cloned())
     }
 
     async fn get_entries(
         &self,
-        resource_uid: &kamu_resources::ResourceUID,
+        resource_id: &kamu_resources::ResourceID,
         resource_generation: u64,
     ) -> Result<Vec<VariableSetEntry>, InternalError> {
         let guard = self.state.lock().unwrap();
         Ok(guard
-            .entries_by_resource_uid_generation
-            .get(&(*resource_uid, resource_generation))
+            .entries_by_resource_id_generation
+            .get(&(*resource_id, resource_generation))
             .cloned()
             .unwrap_or_default())
     }
 
     async fn get_latest_entries(
         &self,
-        resource_uid: &kamu_resources::ResourceUID,
+        resource_id: &kamu_resources::ResourceID,
     ) -> Result<Vec<VariableSetEntry>, InternalError> {
         let guard = self.state.lock().unwrap();
         let max_gen = guard
-            .entries_by_resource_uid_generation
+            .entries_by_resource_id_generation
             .keys()
-            .filter(|(uid, _)| uid == resource_uid)
+            .filter(|(id, _)| id == resource_id)
             .map(|(_, generation)| *generation)
             .max();
         Ok(max_gen
             .and_then(|generation| {
                 guard
-                    .entries_by_resource_uid_generation
-                    .get(&(*resource_uid, generation))
+                    .entries_by_resource_id_generation
+                    .get(&(*resource_id, generation))
             })
             .cloned()
             .unwrap_or_default())
@@ -97,15 +97,15 @@ impl VariableSetProjectionRepository for InMemoryVariableSetProjectionRepository
 
     async fn get_latest_entries_before_generation(
         &self,
-        resource_uid: &kamu_resources::ResourceUID,
+        resource_id: &kamu_resources::ResourceID,
         resource_generation: u64,
     ) -> Result<Vec<VariableSetEntry>, InternalError> {
         let guard = self.state.lock().unwrap();
         Ok(guard
-            .entries_by_resource_uid_generation
+            .entries_by_resource_id_generation
             .iter()
-            .filter(|((stored_resource_uid, stored_generation), _)| {
-                stored_resource_uid == resource_uid && *stored_generation < resource_generation
+            .filter(|((stored_resource_id, stored_generation), _)| {
+                stored_resource_id == resource_id && *stored_generation < resource_generation
             })
             .max_by_key(|((_, stored_generation), _)| *stored_generation)
             .map(|(_, entries)| entries.clone())
@@ -114,30 +114,30 @@ impl VariableSetProjectionRepository for InMemoryVariableSetProjectionRepository
 
     async fn replace_entries(
         &self,
-        resource_uid: &kamu_resources::ResourceUID,
+        resource_id: &kamu_resources::ResourceID,
         resource_generation: u64,
         entries: &[VariableSetEntry],
     ) -> Result<(), ReplaceProjectionEntriesError> {
         let mut guard = self.state.lock().unwrap();
-        let key = (*resource_uid, resource_generation);
-        if guard.entries_by_resource_uid_generation.contains_key(&key) {
+        let key = (*resource_id, resource_generation);
+        if guard.entries_by_resource_id_generation.contains_key(&key) {
             return Err(ReplaceProjectionEntriesError::concurrent_modification());
         }
         guard
-            .entries_by_resource_uid_generation
+            .entries_by_resource_id_generation
             .insert(key, entries.to_vec());
         Ok(())
     }
 
     async fn cleanup_entries_before_generation(
         &self,
-        resource_uid: &kamu_resources::ResourceUID,
+        resource_id: &kamu_resources::ResourceID,
         resource_generation: u64,
     ) -> Result<(), InternalError> {
         let mut guard = self.state.lock().unwrap();
-        guard.entries_by_resource_uid_generation.retain(
-            |(stored_resource_uid, stored_generation), _| {
-                stored_resource_uid != resource_uid || *stored_generation >= resource_generation
+        guard.entries_by_resource_id_generation.retain(
+            |(stored_resource_id, stored_generation), _| {
+                stored_resource_id != resource_id || *stored_generation >= resource_generation
             },
         );
         Ok(())
@@ -145,12 +145,12 @@ impl VariableSetProjectionRepository for InMemoryVariableSetProjectionRepository
 
     async fn delete_all_entries(
         &self,
-        resource_uids: &[kamu_resources::ResourceUID],
+        resource_ids: &[kamu_resources::ResourceID],
     ) -> Result<(), InternalError> {
         let mut guard = self.state.lock().unwrap();
         guard
-            .entries_by_resource_uid_generation
-            .retain(|(stored_resource_uid, _), _| !resource_uids.contains(stored_resource_uid));
+            .entries_by_resource_id_generation
+            .retain(|(stored_resource_id, _), _| !resource_ids.contains(stored_resource_id));
         Ok(())
     }
 }

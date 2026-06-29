@@ -20,8 +20,8 @@ use kamu_resources::{
     ApplyResourceUseCaseError,
     ResourceAggregateLoader,
     ResourceHeaders,
+    ResourceID,
     ResourceSnapshot,
-    ResourceUID,
     TypedResourceQueryService,
 };
 use kamu_resources_services::ApplyResourcePlanner;
@@ -32,8 +32,8 @@ use crate::tests::utils::{
     TestResourceReconciler,
     TestResourceSpec,
     make_account_id,
+    make_id,
     make_resource_params,
-    make_uid,
     register_test_resource_resource_service_layer,
 };
 
@@ -58,18 +58,18 @@ async fn test_plan_create_new_resource() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_plan_with_unknown_uid_returns_not_found() {
+async fn test_plan_with_unknown_id_returns_not_found() {
     let harness = ApplyResourcePlannerHarness::new();
     let account_id = make_account_id();
-    let uid = make_uid();
+    let id = make_id();
 
-    let params = harness.make_apply_params(Some(uid), account_id, "res-a", "res-a");
+    let params = harness.make_apply_params(Some(id), account_id, "res-a", "res-a");
 
     let result = harness.plan_result(params).await;
 
     pretty_assertions::assert_matches!(
         result,
-        Err(ApplyResourceUseCaseError::ResourceUIDNotFound(err)) if err.0 == uid
+        Err(ApplyResourceUseCaseError::ResourceIDNotFound(err)) if err.0 == id
     );
 }
 
@@ -80,9 +80,9 @@ async fn test_plan_update_with_spec_change() {
     let harness = ApplyResourcePlannerHarness::new();
     let account_id = make_account_id();
 
-    let uid = harness.apply_and_get_uid(account_id.clone(), "res-a").await;
+    let id = harness.apply_and_get_id(account_id.clone(), "res-a").await;
 
-    let params = harness.make_apply_params(Some(uid), account_id.clone(), "res-a", "changed-value");
+    let params = harness.make_apply_params(Some(id), account_id.clone(), "res-a", "changed-value");
 
     let decision = harness.plan(params).await;
 
@@ -99,9 +99,9 @@ async fn test_plan_untouched_no_changes() {
     let harness = ApplyResourcePlannerHarness::new();
     let account_id = make_account_id();
 
-    let uid = harness.apply_and_get_uid(account_id.clone(), "res-a").await;
+    let id = harness.apply_and_get_id(account_id.clone(), "res-a").await;
 
-    let params = harness.make_apply_params(Some(uid), account_id.clone(), "res-a", "res-a");
+    let params = harness.make_apply_params(Some(id), account_id.clone(), "res-a", "res-a");
 
     let decision = harness.plan(params).await;
 
@@ -118,7 +118,7 @@ async fn test_plan_update_via_name_lookup() {
     let harness = ApplyResourcePlannerHarness::new();
     let account_id = make_account_id();
 
-    harness.apply_and_get_uid(account_id.clone(), "res-a").await;
+    harness.apply_and_get_id(account_id.clone(), "res-a").await;
 
     // Plan with same name but no UID — planner resolves via name lookup
     let params = harness.make_apply_params(None, account_id, "res-a", "new-value");
@@ -134,20 +134,20 @@ async fn test_plan_update_via_name_lookup() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_plan_with_unknown_uid_returns_not_found_even_if_name_exists() {
+async fn test_plan_with_unknown_id_returns_not_found_even_if_name_exists() {
     let harness = ApplyResourcePlannerHarness::new();
     let account_id = make_account_id();
 
-    harness.apply_and_get_uid(account_id.clone(), "res-a").await;
+    harness.apply_and_get_id(account_id.clone(), "res-a").await;
 
-    let stale_uid = make_uid();
-    let params = harness.make_apply_params(Some(stale_uid), account_id, "res-a", "new-value");
+    let stale_id = make_id();
+    let params = harness.make_apply_params(Some(stale_id), account_id, "res-a", "new-value");
 
     let result = harness.plan_result(params).await;
 
     pretty_assertions::assert_matches!(
         result,
-        Err(ApplyResourceUseCaseError::ResourceUIDNotFound(err)) if err.0 == stale_uid
+        Err(ApplyResourceUseCaseError::ResourceIDNotFound(err)) if err.0 == stale_id
     );
 }
 
@@ -157,13 +157,13 @@ async fn test_plan_with_unknown_uid_returns_not_found_even_if_name_exists() {
 async fn test_plan_type_mismatch_rejects() {
     let harness = ApplyResourcePlannerHarness::new();
     let account_id = make_account_id();
-    let uid = harness.base.allocate_resource_uid().await;
+    let id = harness.base.allocate_resource_id().await;
 
     // Insert a snapshot with the wrong kind directly into the repository
     harness
         .resource_repo()
         .create_resource(&ResourceSnapshot {
-            uid,
+            id,
             kind: "OtherKind".to_string(),
             api_version: "other.dev/v1".to_string(),
             headers: ResourceHeaders::simple(Utc::now(), account_id.clone(), "res_a".to_string()),
@@ -175,7 +175,7 @@ async fn test_plan_type_mismatch_rejects() {
         .await
         .unwrap();
 
-    let params = harness.make_apply_params(Some(uid), account_id, "res-a", "val");
+    let params = harness.make_apply_params(Some(id), account_id, "res-a", "val");
 
     let result = harness.plan_result(params).await;
 
@@ -247,13 +247,13 @@ impl ApplyResourcePlannerHarness {
 
     fn make_apply_params(
         &self,
-        uid: Option<ResourceUID>,
+        id: Option<ResourceID>,
         account_id: odf::AccountID,
         name: &str,
         value: impl Into<String>,
     ) -> ApplyResourceParams<TestResource> {
         ApplyResourceParams {
-            uid,
+            id,
             headers: BaseResourceServiceHarness::make_headers_input(account_id, name),
             spec: TestResourceSpec {
                 value: value.into(),
@@ -261,10 +261,10 @@ impl ApplyResourcePlannerHarness {
         }
     }
 
-    async fn apply_and_get_uid(&self, account_id: odf::AccountID, name: &str) -> ResourceUID {
+    async fn apply_and_get_id(&self, account_id: odf::AccountID, name: &str) -> ResourceID {
         let params = make_resource_params(account_id, name);
         match self.apply_svc.apply(params).await.unwrap() {
-            ApplyResourceApplicationDecision::Applied(result) => result.uid,
+            ApplyResourceApplicationDecision::Applied(result) => result.id,
             ApplyResourceApplicationDecision::Rejected(r) => {
                 panic!("apply rejected: {:?}", r.message)
             }

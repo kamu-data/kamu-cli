@@ -10,13 +10,13 @@
 mod resource_condition;
 mod resource_headers;
 mod resource_headers_input;
+mod resource_id;
 mod resource_phase;
-mod resource_uid;
 mod resource_warning;
 
 pub use resource_condition::*;
 pub use resource_headers::*;
 pub use resource_headers_input::*;
+pub use resource_id::*;
 pub use resource_phase::*;
-pub use resource_uid::*;
 pub use resource_warning::*;

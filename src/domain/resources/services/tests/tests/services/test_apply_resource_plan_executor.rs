@@ -197,7 +197,7 @@ async fn test_execute_create_duplicate_retries_as_update() {
         .await
         .unwrap();
 
-    // Plan a Create with uid=None and a fresh name (no prior UID hint).
+    // Plan a Create with id=None and a fresh name (no prior UID hint).
     // plan_create_resource allocates a new UID without doing a name lookup,
     // so the plan carries action=Create. When the executor calls
     // persistence_svc.create(), the store rejects it with Duplicate (same
@@ -284,7 +284,7 @@ impl ApplyResourcePlanExecutorHarness {
         spec: TestResourceSpec,
     ) -> PlannedApplyResource<TestResource> {
         let params = ApplyResourceParams {
-            uid: None,
+            id: None,
             headers: BaseResourceServiceHarness::make_headers_input(account_id, name),
             spec,
         };

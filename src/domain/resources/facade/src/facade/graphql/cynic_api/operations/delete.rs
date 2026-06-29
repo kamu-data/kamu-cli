@@ -72,7 +72,7 @@ pub(crate) enum ResourceDeleteOutcome {
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct ResourceDeleteSuccess {
-    pub resource_id: kamu_resources::ResourceUID,
+    pub resource_id: kamu_resources::ResourceID,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -86,7 +86,7 @@ pub(crate) struct ResourceDeleteManyResult {
 #[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct ResourceDeleteManySuccess {
     pub request_index: i32,
-    pub resource_id: kamu_resources::ResourceUID,
+    pub resource_id: kamu_resources::ResourceID,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

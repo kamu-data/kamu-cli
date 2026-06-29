@@ -11,10 +11,10 @@ use std::collections::HashMap;
 
 use internal_error::InternalError;
 use kamu_resources::{
+    ResourceID,
     ResourceIdentityRow,
     ResourceIdentityView,
     ResourceSnapshot,
-    ResourceUID,
     UnsupportedResourceDescriptorError,
 };
 
@@ -42,7 +42,7 @@ where
         kind: snapshot.kind,
         api_version: snapshot.api_version,
         canonical_kind_name,
-        uid: snapshot.uid,
+        id: snapshot.id,
         name: snapshot.headers.name,
     })
 }
@@ -69,7 +69,7 @@ where
         kind: row.kind,
         api_version: row.api_version,
         canonical_kind_name,
-        uid: ResourceUID::new(row.uid),
+        id: ResourceID::new(row.id),
         name: row.name,
     })
 }
@@ -84,10 +84,10 @@ pub(crate) fn validate_identity_row<F1, F2>(
     ensure_requested_api_version: F2,
 ) -> Result<ResourceIdentityRow, ResourceLookupProblem>
 where
-    F1: FnOnce(ResourceUID, &str, &str) -> Result<(), ResourceLookupProblem>,
+    F1: FnOnce(ResourceID, &str, &str) -> Result<(), ResourceLookupProblem>,
     F2: FnOnce(Option<&String>, &str) -> Result<(), ResourceLookupProblem>,
 {
-    ensure_kind_matches(ResourceUID::new(row.uid), expected_kind, &row.kind)?;
+    ensure_kind_matches(ResourceID::new(row.id), expected_kind, &row.kind)?;
     ensure_requested_api_version(expected_api_version, &row.api_version)?;
 
     Ok(row)

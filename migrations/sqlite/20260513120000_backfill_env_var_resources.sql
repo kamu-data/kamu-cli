@@ -11,7 +11,7 @@
 /* ------------------------------ */
 
 INSERT OR IGNORE INTO resources (
-    resource_uid,
+    resource_id,
     account_id,
     resource_kind,
     api_version,
@@ -33,7 +33,7 @@ SELECT
         substr(lower(hex(randomblob(2))),2) || '-' ||
         substr('89ab', abs(random()) % 4 + 1, 1) ||
         substr(lower(hex(randomblob(2))),2) || '-' ||
-        lower(hex(randomblob(6)))                                               AS resource_uid,
+        lower(hex(randomblob(6)))                                               AS resource_id,
     de.owner_id                                                                 AS account_id,
     'VariableSet'                                                               AS resource_kind,
     'kamu.dev/v1alpha1'                                                         AS api_version,
@@ -73,7 +73,7 @@ GROUP BY dev.dataset_id, de.owner_id;
 
 INSERT OR IGNORE INTO config_variable_set_entries (
     entry_id,
-    resource_uid,
+    resource_id,
     resource_generation,
     account_id,
     variable_key,
@@ -87,7 +87,7 @@ SELECT
         substr('89ab', abs(random()) % 4 + 1, 1) ||
         substr(lower(hex(randomblob(2))),2) || '-' ||
         lower(hex(randomblob(6)))                                               AS entry_id,
-    r.resource_uid,
+    r.resource_id,
     1                                                                           AS resource_generation,
     de.owner_id                                                                 AS account_id,
     dev.key                                                                     AS variable_key,
@@ -106,12 +106,12 @@ WHERE dev.secret_nonce IS NULL;
 
 INSERT OR IGNORE INTO config_dataset_variable_set_bindings (
     dataset_id,
-    resource_uid,
+    resource_id,
     binding_order
 )
 SELECT DISTINCT
     dev.dataset_id,
-    r.resource_uid,
+    r.resource_id,
     0                                                                           AS binding_order
 FROM dataset_env_vars dev
 JOIN dataset_entries de ON de.dataset_id = dev.dataset_id
@@ -126,7 +126,7 @@ WHERE dev.secret_nonce IS NULL;
 /* ------------------------------ */
 
 INSERT OR IGNORE INTO resources (
-    resource_uid,
+    resource_id,
     account_id,
     resource_kind,
     api_version,
@@ -148,7 +148,7 @@ SELECT
         substr(lower(hex(randomblob(2))),2) || '-' ||
         substr('89ab', abs(random()) % 4 + 1, 1) ||
         substr(lower(hex(randomblob(2))),2) || '-' ||
-        lower(hex(randomblob(6)))                                               AS resource_uid,
+        lower(hex(randomblob(6)))                                               AS resource_id,
     de.owner_id                                                                 AS account_id,
     'SecretSet'                                                                 AS resource_kind,
     'kamu.dev/v1alpha1'                                                         AS api_version,
@@ -188,7 +188,7 @@ GROUP BY dev.dataset_id, de.owner_id;
 
 INSERT OR IGNORE INTO config_secret_set_entries (
     entry_id,
-    resource_uid,
+    resource_id,
     resource_generation,
     account_id,
     secret_key,
@@ -203,7 +203,7 @@ SELECT
         substr('89ab', abs(random()) % 4 + 1, 1) ||
         substr(lower(hex(randomblob(2))),2) || '-' ||
         lower(hex(randomblob(6)))                                               AS entry_id,
-    r.resource_uid,
+    r.resource_id,
     1                                                                           AS resource_generation,
     de.owner_id                                                                 AS account_id,
     dev.key                                                                     AS secret_key,
@@ -223,12 +223,12 @@ WHERE dev.secret_nonce IS NOT NULL;
 
 INSERT OR IGNORE INTO config_dataset_secret_set_bindings (
     dataset_id,
-    resource_uid,
+    resource_id,
     binding_order
 )
 SELECT DISTINCT
     dev.dataset_id,
-    r.resource_uid,
+    r.resource_id,
     0                                                                           AS binding_order
 FROM dataset_env_vars dev
 JOIN dataset_entries de ON de.dataset_id = dev.dataset_id
@@ -242,13 +242,13 @@ WHERE dev.secret_nonce IS NOT NULL;
 /* Resource events: VariableSet   */
 /* ------------------------------ */
 
-INSERT INTO resource_events (resource_uid, resource_kind, event_time, event_type, event_payload)
+INSERT INTO resource_events (resource_id, resource_kind, event_time, event_type, event_payload)
 SELECT
-    r.resource_uid,
+    r.resource_id,
     'VariableSet',
     r.created_at,
     'Created',
-    '{"Created":{"event_time":"' || r.created_at || '","uid":"' || r.resource_uid
+    '{"Created":{"event_time":"' || r.created_at || '","id":"' || r.resource_id
         || '","headers":{"account":"' || r.account_id
         || '","name":"' || r.resource_name
         || '","description":null,"labels":{},"annotations":{}},"spec":' || r.spec || '}}'
@@ -257,16 +257,16 @@ WHERE r.resource_kind = 'VariableSet'
   AND r.resource_name LIKE 'legacy-vars-%'
   AND r.last_event_id IS NULL;
 
-INSERT INTO resource_events (resource_uid, resource_kind, event_time, event_type, event_payload)
+INSERT INTO resource_events (resource_id, resource_kind, event_time, event_type, event_payload)
 SELECT
-    r.resource_uid,
+    r.resource_id,
     'VariableSet',
     r.created_at,
     'ReconciliationStarted',
     json_object(
         'ReconciliationStarted', json_object(
             'event_time', r.created_at,
-            'uid',        r.resource_uid,
+            'id',        r.resource_id,
             'generation', 1
         )
     )
@@ -275,13 +275,13 @@ WHERE r.resource_kind = 'VariableSet'
   AND r.resource_name LIKE 'legacy-vars-%'
   AND r.last_event_id IS NULL;
 
-INSERT INTO resource_events (resource_uid, resource_kind, event_time, event_type, event_payload)
+INSERT INTO resource_events (resource_id, resource_kind, event_time, event_type, event_payload)
 SELECT
-    r.resource_uid,
+    r.resource_id,
     'VariableSet',
     r.created_at,
     'ReconciliationSucceeded',
-    '{"ReconciliationSucceeded":{"event_time":"' || r.created_at || '","uid":"' || r.resource_uid
+    '{"ReconciliationSucceeded":{"event_time":"' || r.created_at || '","id":"' || r.resource_id
         || '","generation":1,"success":{"stats":' || json_extract(r.status, '$.stats') || '}}}'
 FROM resources r
 WHERE r.resource_kind = 'VariableSet'
@@ -292,7 +292,7 @@ UPDATE resources
 SET last_event_id = (
     SELECT MAX(e.event_id)
     FROM resource_events e
-    WHERE e.resource_uid   = resources.resource_uid
+    WHERE e.resource_id   = resources.resource_id
       AND e.resource_kind  = 'VariableSet'
       AND e.event_type     = 'ReconciliationSucceeded'
 )
@@ -304,13 +304,13 @@ WHERE resource_kind  = 'VariableSet'
 /* Resource events: SecretSet     */
 /* ------------------------------ */
 
-INSERT INTO resource_events (resource_uid, resource_kind, event_time, event_type, event_payload)
+INSERT INTO resource_events (resource_id, resource_kind, event_time, event_type, event_payload)
 SELECT
-    r.resource_uid,
+    r.resource_id,
     'SecretSet',
     r.created_at,
     'Created',
-    '{"Created":{"event_time":"' || r.created_at || '","uid":"' || r.resource_uid
+    '{"Created":{"event_time":"' || r.created_at || '","id":"' || r.resource_id
         || '","headers":{"account":"' || r.account_id
         || '","name":"' || r.resource_name
         || '","description":null,"labels":{},"annotations":{}},"spec":' || r.spec || '}}'
@@ -319,16 +319,16 @@ WHERE r.resource_kind = 'SecretSet'
   AND r.resource_name LIKE 'legacy-secrets-%'
   AND r.last_event_id IS NULL;
 
-INSERT INTO resource_events (resource_uid, resource_kind, event_time, event_type, event_payload)
+INSERT INTO resource_events (resource_id, resource_kind, event_time, event_type, event_payload)
 SELECT
-    r.resource_uid,
+    r.resource_id,
     'SecretSet',
     r.created_at,
     'ReconciliationStarted',
     json_object(
         'ReconciliationStarted', json_object(
             'event_time', r.created_at,
-            'uid',        r.resource_uid,
+            'id',        r.resource_id,
             'generation', 1
         )
     )
@@ -337,13 +337,13 @@ WHERE r.resource_kind = 'SecretSet'
   AND r.resource_name LIKE 'legacy-secrets-%'
   AND r.last_event_id IS NULL;
 
-INSERT INTO resource_events (resource_uid, resource_kind, event_time, event_type, event_payload)
+INSERT INTO resource_events (resource_id, resource_kind, event_time, event_type, event_payload)
 SELECT
-    r.resource_uid,
+    r.resource_id,
     'SecretSet',
     r.created_at,
     'ReconciliationSucceeded',
-    '{"ReconciliationSucceeded":{"event_time":"' || r.created_at || '","uid":"' || r.resource_uid
+    '{"ReconciliationSucceeded":{"event_time":"' || r.created_at || '","id":"' || r.resource_id
         || '","generation":1,"success":{"stats":' || json_extract(r.status, '$.stats') || '}}}'
 FROM resources r
 WHERE r.resource_kind = 'SecretSet'
@@ -354,7 +354,7 @@ UPDATE resources
 SET last_event_id = (
     SELECT MAX(e.event_id)
     FROM resource_events e
-    WHERE e.resource_uid   = resources.resource_uid
+    WHERE e.resource_id   = resources.resource_id
       AND e.resource_kind  = 'SecretSet'
       AND e.event_type     = 'ReconciliationSucceeded'
 )

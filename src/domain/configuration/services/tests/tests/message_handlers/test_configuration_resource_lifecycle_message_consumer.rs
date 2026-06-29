@@ -26,9 +26,9 @@ use kamu_configuration_services::ConfigurationResourceLifecycleMessageConsumer;
 use kamu_resources::{
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
     ResourceHeaders,
+    ResourceID,
     ResourceLifecycleMessage,
     ResourceSnapshot,
-    ResourceUID,
 };
 use messaging_outbox::{MessageConsumerT, OutboxProvider, register_message_dispatcher};
 use uuid::Uuid;
@@ -40,7 +40,7 @@ use uuid::Uuid;
 #[test_log::test(tokio::test)]
 async fn test_reconciliation_succeeded_for_variable_set_cleans_up_old_entries() {
     let harness = ConfigurationResourceLifecycleConsumerHarness::new();
-    let uid = harness.alloc_uid();
+    let id = harness.alloc_id();
     let (_, account_id) = odf::AccountID::new_generated_ed25519();
 
     let now = Utc::now();
@@ -49,7 +49,7 @@ async fn test_reconciliation_succeeded_for_variable_set_cleans_up_old_entries() 
     harness
         .variable_repo()
         .replace_entries(
-            &uid,
+            &id,
             1,
             &[kamu_configuration::VariableSetEntry {
                 entry_id: Uuid::new_v4(),
@@ -67,7 +67,7 @@ async fn test_reconciliation_succeeded_for_variable_set_cleans_up_old_entries() 
     harness
         .variable_repo()
         .replace_entries(
-            &uid,
+            &id,
             2,
             &[kamu_configuration::VariableSetEntry {
                 entry_id: Uuid::new_v4(),
@@ -86,7 +86,7 @@ async fn test_reconciliation_succeeded_for_variable_set_cleans_up_old_entries() 
         .consume_message(&ResourceLifecycleMessage::reconciliation_succeeded(
             Utc::now(),
             make_snapshot(
-                uid,
+                id,
                 VariableSetResource::RESOURCE_TYPE,
                 VariableSetResource::API_VERSION,
                 2,
@@ -96,11 +96,11 @@ async fn test_reconciliation_succeeded_for_variable_set_cleans_up_old_entries() 
         .unwrap();
 
     // Generation 1 entries must be gone
-    let gen1 = harness.variable_repo().get_entries(&uid, 1).await.unwrap();
+    let gen1 = harness.variable_repo().get_entries(&id, 1).await.unwrap();
     assert!(gen1.is_empty(), "gen-1 entries must be cleaned up");
 
     // Generation 2 entries must still be present
-    let gen2 = harness.variable_repo().get_entries(&uid, 2).await.unwrap();
+    let gen2 = harness.variable_repo().get_entries(&id, 2).await.unwrap();
     assert_eq!(gen2.len(), 1, "gen-2 entries must survive cleanup");
 }
 
@@ -109,7 +109,7 @@ async fn test_reconciliation_succeeded_for_variable_set_cleans_up_old_entries() 
 #[test_log::test(tokio::test)]
 async fn test_reconciliation_succeeded_for_secret_set_cleans_up_old_entries() {
     let harness = ConfigurationResourceLifecycleConsumerHarness::new();
-    let uid = harness.alloc_uid();
+    let id = harness.alloc_id();
     let (_, account_id) = odf::AccountID::new_generated_ed25519();
 
     let now = Utc::now();
@@ -117,7 +117,7 @@ async fn test_reconciliation_succeeded_for_secret_set_cleans_up_old_entries() {
     harness
         .secret_repo()
         .replace_entries(
-            &uid,
+            &id,
             1,
             &[kamu_configuration::SecretSetEntry {
                 entry_id: Uuid::new_v4(),
@@ -135,7 +135,7 @@ async fn test_reconciliation_succeeded_for_secret_set_cleans_up_old_entries() {
     harness
         .secret_repo()
         .replace_entries(
-            &uid,
+            &id,
             2,
             &[kamu_configuration::SecretSetEntry {
                 entry_id: Uuid::new_v4(),
@@ -154,7 +154,7 @@ async fn test_reconciliation_succeeded_for_secret_set_cleans_up_old_entries() {
         .consume_message(&ResourceLifecycleMessage::reconciliation_succeeded(
             Utc::now(),
             make_snapshot(
-                uid,
+                id,
                 SecretSetResource::RESOURCE_TYPE,
                 SecretSetResource::API_VERSION,
                 2,
@@ -163,10 +163,10 @@ async fn test_reconciliation_succeeded_for_secret_set_cleans_up_old_entries() {
         .await
         .unwrap();
 
-    let gen1 = harness.secret_repo().get_entries(&uid, 1).await.unwrap();
+    let gen1 = harness.secret_repo().get_entries(&id, 1).await.unwrap();
     assert!(gen1.is_empty(), "gen-1 entries must be cleaned up");
 
-    let gen2 = harness.secret_repo().get_entries(&uid, 2).await.unwrap();
+    let gen2 = harness.secret_repo().get_entries(&id, 2).await.unwrap();
     assert_eq!(gen2.len(), 1, "gen-2 entries must survive cleanup");
 }
 
@@ -175,13 +175,13 @@ async fn test_reconciliation_succeeded_for_secret_set_cleans_up_old_entries() {
 #[test_log::test(tokio::test)]
 async fn test_reconciliation_succeeded_for_unknown_kind_is_no_op() {
     let harness = ConfigurationResourceLifecycleConsumerHarness::new();
-    let uid = harness.alloc_uid();
+    let id = harness.alloc_id();
 
     // Must succeed without error
     harness
         .consume_message(&ResourceLifecycleMessage::reconciliation_succeeded(
             Utc::now(),
-            make_snapshot(uid, "UnknownKind", "unknown.dev/v1", 1),
+            make_snapshot(id, "UnknownKind", "unknown.dev/v1", 1),
         ))
         .await
         .unwrap();
@@ -192,7 +192,7 @@ async fn test_reconciliation_succeeded_for_unknown_kind_is_no_op() {
 #[test_log::test(tokio::test)]
 async fn test_deleted_for_variable_set_removes_all_projection_entries() {
     let harness = ConfigurationResourceLifecycleConsumerHarness::new();
-    let uid = harness.alloc_uid();
+    let id = harness.alloc_id();
     let (_, account_id) = odf::AccountID::new_generated_ed25519();
 
     let now = Utc::now();
@@ -200,7 +200,7 @@ async fn test_deleted_for_variable_set_removes_all_projection_entries() {
     harness
         .variable_repo()
         .replace_entries(
-            &uid,
+            &id,
             1,
             &[kamu_configuration::VariableSetEntry {
                 entry_id: Uuid::new_v4(),
@@ -218,7 +218,7 @@ async fn test_deleted_for_variable_set_removes_all_projection_entries() {
         .consume_message(&ResourceLifecycleMessage::deleted(
             Utc::now(),
             vec![make_snapshot(
-                uid,
+                id,
                 VariableSetResource::RESOURCE_TYPE,
                 VariableSetResource::API_VERSION,
                 1,
@@ -229,7 +229,7 @@ async fn test_deleted_for_variable_set_removes_all_projection_entries() {
 
     let remaining = harness
         .variable_repo()
-        .get_latest_entries(&uid)
+        .get_latest_entries(&id)
         .await
         .unwrap();
     assert!(remaining.is_empty(), "all variable entries must be deleted");
@@ -240,7 +240,7 @@ async fn test_deleted_for_variable_set_removes_all_projection_entries() {
 #[test_log::test(tokio::test)]
 async fn test_deleted_for_secret_set_removes_all_projection_entries() {
     let harness = ConfigurationResourceLifecycleConsumerHarness::new();
-    let uid = harness.alloc_uid();
+    let id = harness.alloc_id();
     let (_, account_id) = odf::AccountID::new_generated_ed25519();
 
     let now = Utc::now();
@@ -248,7 +248,7 @@ async fn test_deleted_for_secret_set_removes_all_projection_entries() {
     harness
         .secret_repo()
         .replace_entries(
-            &uid,
+            &id,
             1,
             &[kamu_configuration::SecretSetEntry {
                 entry_id: Uuid::new_v4(),
@@ -267,7 +267,7 @@ async fn test_deleted_for_secret_set_removes_all_projection_entries() {
         .consume_message(&ResourceLifecycleMessage::deleted(
             Utc::now(),
             vec![make_snapshot(
-                uid,
+                id,
                 SecretSetResource::RESOURCE_TYPE,
                 SecretSetResource::API_VERSION,
                 1,
@@ -276,31 +276,27 @@ async fn test_deleted_for_secret_set_removes_all_projection_entries() {
         .await
         .unwrap();
 
-    let remaining = harness
-        .secret_repo()
-        .get_latest_entries(&uid)
-        .await
-        .unwrap();
+    let remaining = harness.secret_repo().get_latest_entries(&id).await.unwrap();
     assert!(remaining.is_empty(), "all secret entries must be deleted");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_deleted_for_variable_set_with_multiple_uids_removes_all() {
+async fn test_deleted_for_variable_set_with_multiple_ids_removes_all() {
     // All UIDs passed in the same Deleted message are deleted together
     let harness = ConfigurationResourceLifecycleConsumerHarness::new();
-    let uid_a = harness.alloc_uid();
-    let uid_b = harness.alloc_uid();
+    let id_a = harness.alloc_id();
+    let id_b = harness.alloc_id();
     let (_, account_id) = odf::AccountID::new_generated_ed25519();
 
     let now = Utc::now();
 
-    for uid in [uid_a, uid_b] {
+    for id in [id_a, id_b] {
         harness
             .variable_repo()
             .replace_entries(
-                &uid,
+                &id,
                 1,
                 &[kamu_configuration::VariableSetEntry {
                     entry_id: Uuid::new_v4(),
@@ -320,13 +316,13 @@ async fn test_deleted_for_variable_set_with_multiple_uids_removes_all() {
             Utc::now(),
             vec![
                 make_snapshot(
-                    uid_a,
+                    id_a,
                     VariableSetResource::RESOURCE_TYPE,
                     VariableSetResource::API_VERSION,
                     1,
                 ),
                 make_snapshot(
-                    uid_b,
+                    id_b,
                     VariableSetResource::RESOURCE_TYPE,
                     VariableSetResource::API_VERSION,
                     1,
@@ -336,15 +332,15 @@ async fn test_deleted_for_variable_set_with_multiple_uids_removes_all() {
         .await
         .unwrap();
 
-    for uid in [uid_a, uid_b] {
+    for id in [id_a, id_b] {
         assert!(
             harness
                 .variable_repo()
-                .get_latest_entries(&uid)
+                .get_latest_entries(&id)
                 .await
                 .unwrap()
                 .is_empty(),
-            "entries for uid {uid} must be deleted"
+            "entries for id {id} must be deleted"
         );
     }
 }
@@ -352,21 +348,21 @@ async fn test_deleted_for_variable_set_with_multiple_uids_removes_all() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_deleted_for_variable_set_removes_only_targeted_uid() {
+async fn test_deleted_for_variable_set_removes_only_targeted_id() {
     // Only the UID(s) named in the Deleted message lose their entries;
     // unrelated UIDs (e.g. from a different dataset's binding) are untouched.
     let harness = ConfigurationResourceLifecycleConsumerHarness::new();
-    let uid_deleted = harness.alloc_uid();
-    let uid_other = harness.alloc_uid();
+    let id_deleted = harness.alloc_id();
+    let id_other = harness.alloc_id();
     let (_, account_id) = odf::AccountID::new_generated_ed25519();
 
     let now = Utc::now();
 
-    for uid in [uid_deleted, uid_other] {
+    for id in [id_deleted, id_other] {
         harness
             .variable_repo()
             .replace_entries(
-                &uid,
+                &id,
                 1,
                 &[kamu_configuration::VariableSetEntry {
                     entry_id: Uuid::new_v4(),
@@ -386,7 +382,7 @@ async fn test_deleted_for_variable_set_removes_only_targeted_uid() {
         .consume_message(&ResourceLifecycleMessage::deleted(
             Utc::now(),
             vec![make_snapshot(
-                uid_deleted,
+                id_deleted,
                 VariableSetResource::RESOURCE_TYPE,
                 VariableSetResource::API_VERSION,
                 1,
@@ -398,40 +394,40 @@ async fn test_deleted_for_variable_set_removes_only_targeted_uid() {
     assert!(
         harness
             .variable_repo()
-            .get_latest_entries(&uid_deleted)
+            .get_latest_entries(&id_deleted)
             .await
             .unwrap()
             .is_empty(),
-        "targeted uid entries must be deleted"
+        "targeted id entries must be deleted"
     );
     assert_eq!(
         harness
             .variable_repo()
-            .get_latest_entries(&uid_other)
+            .get_latest_entries(&id_other)
             .await
             .unwrap()
             .len(),
         1,
-        "unrelated uid entries must be untouched"
+        "unrelated id entries must be untouched"
     );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_deleted_for_secret_set_with_multiple_uids_removes_all() {
+async fn test_deleted_for_secret_set_with_multiple_ids_removes_all() {
     let harness = ConfigurationResourceLifecycleConsumerHarness::new();
-    let uid_a = harness.alloc_uid();
-    let uid_b = harness.alloc_uid();
+    let id_a = harness.alloc_id();
+    let id_b = harness.alloc_id();
     let (_, account_id) = odf::AccountID::new_generated_ed25519();
 
     let now = Utc::now();
 
-    for uid in [uid_a, uid_b] {
+    for id in [id_a, id_b] {
         harness
             .secret_repo()
             .replace_entries(
-                &uid,
+                &id,
                 1,
                 &[kamu_configuration::SecretSetEntry {
                     entry_id: Uuid::new_v4(),
@@ -452,13 +448,13 @@ async fn test_deleted_for_secret_set_with_multiple_uids_removes_all() {
             Utc::now(),
             vec![
                 make_snapshot(
-                    uid_a,
+                    id_a,
                     SecretSetResource::RESOURCE_TYPE,
                     SecretSetResource::API_VERSION,
                     1,
                 ),
                 make_snapshot(
-                    uid_b,
+                    id_b,
                     SecretSetResource::RESOURCE_TYPE,
                     SecretSetResource::API_VERSION,
                     1,
@@ -468,15 +464,15 @@ async fn test_deleted_for_secret_set_with_multiple_uids_removes_all() {
         .await
         .unwrap();
 
-    for uid in [uid_a, uid_b] {
+    for id in [id_a, id_b] {
         assert!(
             harness
                 .secret_repo()
-                .get_latest_entries(&uid)
+                .get_latest_entries(&id)
                 .await
                 .unwrap()
                 .is_empty(),
-            "entries for uid {uid} must be deleted"
+            "entries for id {id} must be deleted"
         );
     }
 }
@@ -486,14 +482,14 @@ async fn test_deleted_for_secret_set_with_multiple_uids_removes_all() {
 #[test_log::test(tokio::test)]
 async fn test_applied_message_is_no_op() {
     let harness = ConfigurationResourceLifecycleConsumerHarness::new();
-    let uid = harness.alloc_uid();
+    let id = harness.alloc_id();
 
     harness
         .consume_message(&ResourceLifecycleMessage::applied(
             Utc::now(),
             kamu_resources::ResourceLifecycleMessageOutcome::Created,
             make_snapshot(
-                uid,
+                id,
                 VariableSetResource::RESOURCE_TYPE,
                 VariableSetResource::API_VERSION,
                 1,
@@ -508,7 +504,7 @@ async fn test_applied_message_is_no_op() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn make_snapshot(
-    uid: ResourceUID,
+    id: ResourceID,
     kind: &str,
     api_version: &str,
     generation: u64,
@@ -518,7 +514,7 @@ fn make_snapshot(
     let mut headers = ResourceHeaders::simple(now, account_id, "test-res");
     headers.generation = generation;
     ResourceSnapshot {
-        uid,
+        id,
         kind: kind.to_string(),
         api_version: api_version.to_string(),
         headers,
@@ -558,8 +554,8 @@ impl ConfigurationResourceLifecycleConsumerHarness {
         Self { catalog: b.build() }
     }
 
-    fn alloc_uid(&self) -> ResourceUID {
-        ResourceUID::new(Uuid::new_v4())
+    fn alloc_id(&self) -> ResourceID {
+        ResourceID::new(Uuid::new_v4())
     }
 
     fn variable_repo(&self) -> Arc<dyn VariableSetProjectionRepository> {

@@ -17,8 +17,8 @@ use kamu_configuration::{
 };
 use kamu_resources::{
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
+    ResourceID,
     ResourceLifecycleMessage,
-    ResourceUID,
 };
 use messaging_outbox::{
     InitialConsumerBoundary,
@@ -77,7 +77,7 @@ impl MessageConsumerT<ResourceLifecycleMessage> for ConfigurationResourceLifecyc
                             .map_err(ErrorIntoInternal::int_err)?;
 
                         repo.cleanup_entries_before_generation(
-                            &succeeded_message.resource.uid,
+                            &succeeded_message.resource.id,
                             succeeded_message.resource.headers.generation,
                         )
                         .await
@@ -88,7 +88,7 @@ impl MessageConsumerT<ResourceLifecycleMessage> for ConfigurationResourceLifecyc
                             .map_err(ErrorIntoInternal::int_err)?;
 
                         repo.cleanup_entries_before_generation(
-                            &succeeded_message.resource.uid,
+                            &succeeded_message.resource.id,
                             succeeded_message.resource.headers.generation,
                         )
                         .await
@@ -108,18 +108,18 @@ impl MessageConsumerT<ResourceLifecycleMessage> for ConfigurationResourceLifecyc
                             .get_one::<dyn VariableSetProjectionRepository>()
                             .map_err(ErrorIntoInternal::int_err)?;
 
-                        let uids: Vec<ResourceUID> =
-                            deleted_message.resources.iter().map(|r| r.uid).collect();
-                        repo.delete_all_entries(&uids).await
+                        let ids: Vec<ResourceID> =
+                            deleted_message.resources.iter().map(|r| r.id).collect();
+                        repo.delete_all_entries(&ids).await
                     }
                     SecretSetResource::RESOURCE_TYPE => {
                         let repo = target_catalog
                             .get_one::<dyn SecretSetProjectionRepository>()
                             .map_err(ErrorIntoInternal::int_err)?;
 
-                        let uids: Vec<ResourceUID> =
-                            deleted_message.resources.iter().map(|r| r.uid).collect();
-                        repo.delete_all_entries(&uids).await
+                        let ids: Vec<ResourceID> =
+                            deleted_message.resources.iter().map(|r| r.id).collect();
+                        repo.delete_all_entries(&ids).await
                     }
                     _ => Ok(()),
                 }

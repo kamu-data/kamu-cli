@@ -14,9 +14,9 @@ use crate::{
     DeclarativeResourceState,
     PendingStatusFromSpec,
     ResourceHeaders,
+    ResourceID,
     ResourceSnapshot,
     ResourceStatusLike,
-    ResourceUID,
     decode_typed_resource_snapshot,
 };
 
@@ -27,7 +27,7 @@ pub struct ResourceState<
     TSpec: std::fmt::Debug + Clone + Send + Sync,
     TStatus: ResourceStatusLike + std::fmt::Debug + Clone,
 > {
-    pub uid: ResourceUID,
+    pub id: ResourceID,
     pub headers: ResourceHeaders,
     pub spec: TSpec,
     pub status: TStatus,
@@ -40,9 +40,9 @@ where
     TSpec: std::fmt::Debug + Clone + Send + Sync,
     TStatus: ResourceStatusLike + std::fmt::Debug + Clone,
 {
-    pub fn new(uid: ResourceUID, headers: ResourceHeaders, spec: TSpec, status: TStatus) -> Self {
+    pub fn new(id: ResourceID, headers: ResourceHeaders, spec: TSpec, status: TStatus) -> Self {
         Self {
-            uid,
+            id,
             headers,
             spec,
             status,
@@ -60,8 +60,8 @@ where
     type Spec = TSpec;
     type Status = TStatus;
 
-    fn uid(&self) -> &ResourceUID {
-        &self.uid
+    fn id(&self) -> &ResourceID {
+        &self.id
     }
 
     fn headers(&self) -> &ResourceHeaders {
@@ -88,8 +88,8 @@ where
         &mut self.status
     }
 
-    fn into_parts(self) -> (ResourceUID, ResourceHeaders, Self::Spec, Self::Status) {
-        (self.uid, self.headers, self.spec, self.status)
+    fn into_parts(self) -> (ResourceID, ResourceHeaders, Self::Spec, Self::Status) {
+        (self.id, self.headers, self.spec, self.status)
     }
 }
 
@@ -107,11 +107,11 @@ where
     type Error = InternalError;
 
     fn try_from(snapshot: ResourceSnapshot) -> Result<Self, Self::Error> {
-        let (uid, headers, spec, status) =
+        let (id, headers, spec, status) =
             decode_typed_resource_snapshot::<TSpec, TStatus>(snapshot)?;
 
         Ok(Self {
-            uid,
+            id,
             headers,
             spec,
             status,

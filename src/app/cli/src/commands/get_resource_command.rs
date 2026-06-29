@@ -114,7 +114,7 @@ impl GetResourceCommand {
         #[derive(serde::Serialize)]
         #[serde(rename_all = "camelCase")]
         struct RenderedResourceViewHeaders<'a> {
-            uid: &'a kamu_resources::ResourceUID,
+            id: &'a kamu_resources::ResourceID,
             account: &'a kamu_resources::ResourceViewAccount,
             name: &'a str,
             description: &'a Option<String>,
@@ -129,7 +129,7 @@ impl GetResourceCommand {
         impl<'a> RenderedResourceViewHeaders<'a> {
             fn new(resource: &'a kamu_resources::ResourceView) -> Self {
                 Self {
-                    uid: &resource.headers.uid,
+                    id: &resource.headers.id,
                     account: &resource.account,
                     name: &resource.headers.name,
                     description: &resource.headers.description,
@@ -230,7 +230,7 @@ impl GetResourceCommand {
                             api_version: Some(api_version.clone()),
                             resource_refs: chunk
                                 .iter()
-                                .map(|(_, target)| ResourceRef::ById(target.uid))
+                                .map(|(_, target)| ResourceRef::ById(target.id))
                                 .collect(),
                         },
                         format,
@@ -268,7 +268,7 @@ impl GetResourceCommand {
                             api_version: Some(api_version.clone()),
                             resource_refs: chunk
                                 .iter()
-                                .map(|(_, target)| ResourceRef::ById(target.uid))
+                                .map(|(_, target)| ResourceRef::ById(target.id))
                                 .collect(),
                         },
                         self.spec_view_mode(),
@@ -307,7 +307,7 @@ impl GetResourceCommand {
     ) -> Result<(), CLIError> {
         for problem in problems {
             match problem.error {
-                ResourceLookupProblem::NameNotFound(_) | ResourceLookupProblem::UIDNotFound(_)
+                ResourceLookupProblem::NameNotFound(_) | ResourceLookupProblem::IDNotFound(_)
                     if self.ignore_not_found => {}
                 error => {
                     return Err(
@@ -326,7 +326,7 @@ impl GetResourceCommand {
     ) -> Result<(), CLIError> {
         for problem in problems {
             match problem.error {
-                ResourceLookupProblem::NameNotFound(_) | ResourceLookupProblem::UIDNotFound(_)
+                ResourceLookupProblem::NameNotFound(_) | ResourceLookupProblem::IDNotFound(_)
                     if self.ignore_not_found => {}
                 error => return Err(RenderResourceManifestError::LookupProblem(error).into()),
             }

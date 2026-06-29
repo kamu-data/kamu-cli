@@ -15,7 +15,7 @@ use kamu_configuration::{
     SecretSetEntry,
     SecretSetProjectionRepository,
 };
-use kamu_resources::ResourceUID;
+use kamu_resources::ResourceID;
 use odf::metadata::AsStackString;
 use odf::metadata::stack_string::StackString;
 
@@ -31,7 +31,7 @@ pub struct PostgresSecretSetProjectionRepository {
 impl SecretSetProjectionRepository for PostgresSecretSetProjectionRepository {
     async fn find_entry(
         &self,
-        resource_uid: &ResourceUID,
+        resource_id: &ResourceID,
         resource_generation: u64,
         key: &str,
     ) -> Result<Option<SecretSetEntry>, InternalError> {
@@ -39,7 +39,7 @@ impl SecretSetProjectionRepository for PostgresSecretSetProjectionRepository {
         let connection_mut = tr.connection_mut().await?;
 
         let resource_generation = i64::try_from(resource_generation).unwrap();
-        let resource_uid: &uuid::Uuid = resource_uid.as_ref();
+        let resource_id: &uuid::Uuid = resource_id.as_ref();
 
         let row = sqlx::query_as!(
             SecretSetEntry,
@@ -53,11 +53,11 @@ impl SecretSetProjectionRepository for PostgresSecretSetProjectionRepository {
                 created_at,
                 updated_at
             FROM config_secret_set_entries
-            WHERE resource_uid = $1
+            WHERE resource_id = $1
               AND resource_generation = $2
               AND secret_key = $3
             "#,
-            resource_uid,
+            resource_id,
             resource_generation,
             key,
         )
@@ -70,14 +70,14 @@ impl SecretSetProjectionRepository for PostgresSecretSetProjectionRepository {
 
     async fn get_entries(
         &self,
-        resource_uid: &ResourceUID,
+        resource_id: &ResourceID,
         resource_generation: u64,
     ) -> Result<Vec<SecretSetEntry>, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
         let resource_generation = i64::try_from(resource_generation).unwrap();
-        let resource_uid: &uuid::Uuid = resource_uid.as_ref();
+        let resource_id: &uuid::Uuid = resource_id.as_ref();
 
         let rows = sqlx::query_as!(
             SecretSetEntry,
@@ -91,11 +91,11 @@ impl SecretSetProjectionRepository for PostgresSecretSetProjectionRepository {
                 created_at,
                 updated_at
             FROM config_secret_set_entries
-            WHERE resource_uid = $1
+            WHERE resource_id = $1
               AND resource_generation = $2
             ORDER BY secret_key
             "#,
-            resource_uid,
+            resource_id,
             resource_generation,
         )
         .fetch_all(&mut *connection_mut)
@@ -107,12 +107,12 @@ impl SecretSetProjectionRepository for PostgresSecretSetProjectionRepository {
 
     async fn get_latest_entries(
         &self,
-        resource_uid: &ResourceUID,
+        resource_id: &ResourceID,
     ) -> Result<Vec<SecretSetEntry>, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
-        let resource_uid: &uuid::Uuid = resource_uid.as_ref();
+        let resource_id: &uuid::Uuid = resource_id.as_ref();
 
         let rows = sqlx::query_as!(
             SecretSetEntry,
@@ -126,13 +126,13 @@ impl SecretSetProjectionRepository for PostgresSecretSetProjectionRepository {
                 e.created_at,
                 e.updated_at
             FROM config_secret_set_entries e
-            JOIN resources r ON r.resource_uid = e.resource_uid
+            JOIN resources r ON r.resource_id = e.resource_id
                 AND r.generation = e.resource_generation
                 AND r.deleted_at IS NULL
-            WHERE e.resource_uid = $1
+            WHERE e.resource_id = $1
             ORDER BY e.secret_key
             "#,
-            resource_uid,
+            resource_id,
         )
         .fetch_all(&mut *connection_mut)
         .await
@@ -143,14 +143,14 @@ impl SecretSetProjectionRepository for PostgresSecretSetProjectionRepository {
 
     async fn get_latest_entries_before_generation(
         &self,
-        resource_uid: &ResourceUID,
+        resource_id: &ResourceID,
         resource_generation: u64,
     ) -> Result<Vec<SecretSetEntry>, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
         let resource_generation = i64::try_from(resource_generation).unwrap();
-        let resource_uid: &uuid::Uuid = resource_uid.as_ref();
+        let resource_id: &uuid::Uuid = resource_id.as_ref();
 
         let rows = sqlx::query_as!(
             SecretSetEntry,
@@ -164,16 +164,16 @@ impl SecretSetProjectionRepository for PostgresSecretSetProjectionRepository {
                 created_at,
                 updated_at
             FROM config_secret_set_entries
-            WHERE resource_uid = $1
+            WHERE resource_id = $1
               AND resource_generation = (
                   SELECT MAX(resource_generation)
                   FROM config_secret_set_entries
-                  WHERE resource_uid = $1
+                  WHERE resource_id = $1
                     AND resource_generation < $2
               )
             ORDER BY secret_key
             "#,
-            resource_uid,
+            resource_id,
             resource_generation,
         )
         .fetch_all(&mut *connection_mut)
@@ -185,7 +185,7 @@ impl SecretSetProjectionRepository for PostgresSecretSetProjectionRepository {
 
     async fn replace_entries(
         &self,
-        resource_uid: &ResourceUID,
+        resource_id: &ResourceID,
         resource_generation: u64,
         entries: &[SecretSetEntry],
     ) -> Result<(), ReplaceProjectionEntriesError> {
@@ -197,7 +197,7 @@ impl SecretSetProjectionRepository for PostgresSecretSetProjectionRepository {
         let connection_mut = tr.connection_mut().await?;
 
         let resource_generation = i64::try_from(resource_generation).unwrap();
-        let resource_uid: &uuid::Uuid = resource_uid.as_ref();
+        let resource_id: &uuid::Uuid = resource_id.as_ref();
 
         let entry_ids: Vec<_> = entries.iter().map(|e| e.entry_id).collect();
         let account_ids: Vec<_> = entries
@@ -218,7 +218,7 @@ impl SecretSetProjectionRepository for PostgresSecretSetProjectionRepository {
             r#"
             INSERT INTO config_secret_set_entries (
                 entry_id,
-                resource_uid,
+                resource_id,
                 resource_generation,
                 account_id,
                 secret_key,
@@ -231,7 +231,7 @@ impl SecretSetProjectionRepository for PostgresSecretSetProjectionRepository {
             FROM UNNEST($3::uuid[], $4::text[], $5::text[], $6::bytea[], $7::bytea[], $8::timestamptz[], $9::timestamptz[])
                 AS e(entry_id, account_id, secret_key, value, secret_nonce, created_at, updated_at)
             "#,
-            resource_uid,
+            resource_id,
             resource_generation,
             &entry_ids,
             &account_ids_strs as &[&str],
@@ -257,22 +257,22 @@ impl SecretSetProjectionRepository for PostgresSecretSetProjectionRepository {
 
     async fn cleanup_entries_before_generation(
         &self,
-        resource_uid: &ResourceUID,
+        resource_id: &ResourceID,
         resource_generation: u64,
     ) -> Result<(), InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
         let resource_generation = i64::try_from(resource_generation).unwrap();
-        let resource_uid: &uuid::Uuid = resource_uid.as_ref();
+        let resource_id: &uuid::Uuid = resource_id.as_ref();
 
         sqlx::query!(
             r#"
             DELETE FROM config_secret_set_entries
-            WHERE resource_uid = $1
+            WHERE resource_id = $1
               AND resource_generation < $2
             "#,
-            resource_uid,
+            resource_id,
             resource_generation,
         )
         .execute(&mut *connection_mut)
@@ -282,22 +282,22 @@ impl SecretSetProjectionRepository for PostgresSecretSetProjectionRepository {
         Ok(())
     }
 
-    async fn delete_all_entries(&self, resource_uids: &[ResourceUID]) -> Result<(), InternalError> {
-        if resource_uids.is_empty() {
+    async fn delete_all_entries(&self, resource_ids: &[ResourceID]) -> Result<(), InternalError> {
+        if resource_ids.is_empty() {
             return Ok(());
         }
 
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
-        let uids: Vec<uuid::Uuid> = resource_uids.iter().map(|uid| *uid.as_ref()).collect();
+        let ids: Vec<uuid::Uuid> = resource_ids.iter().map(|id| *id.as_ref()).collect();
 
         sqlx::query!(
             r#"
             DELETE FROM config_secret_set_entries
-                WHERE resource_uid = ANY($1::uuid[])
+                WHERE resource_id = ANY($1::uuid[])
             "#,
-            &uids,
+            &ids,
         )
         .execute(&mut *connection_mut)
         .await

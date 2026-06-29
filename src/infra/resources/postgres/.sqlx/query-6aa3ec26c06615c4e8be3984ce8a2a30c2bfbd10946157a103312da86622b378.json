@@ -1,0 +1,53 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                SELECT\n                    event_id,\n                    resource_id as \"id: uuid::Uuid\",\n                    resource_kind as \"kind!\",\n                    event_time,\n                    event_type,\n                    event_payload as \"payload!\"\n                FROM resource_events\n                WHERE ($1::bigint IS NULL OR event_id > $1)\n                  AND ($2::bigint IS NULL OR event_id <= $2)\n                ORDER BY event_id\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "event_id",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "id: uuid::Uuid",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "kind!",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "event_time",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 4,
+        "name": "event_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "payload!",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "6aa3ec26c06615c4e8be3984ce8a2a30c2bfbd10946157a103312da86622b378"
+}

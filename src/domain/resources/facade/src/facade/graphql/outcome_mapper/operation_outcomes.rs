@@ -234,7 +234,7 @@ pub(crate) fn map_get_identity_outcome(
 
 pub(crate) fn map_delete_outcome(
     outcome: cynic_api::operations::delete::ResourceDeleteOutcome,
-) -> Result<domain::ResourceUID, DeleteResourceError> {
+) -> Result<domain::ResourceID, DeleteResourceError> {
     use cynic_api::operations::delete::ResourceDeleteOutcome as O;
     match outcome {
         O::ResourceDeleteSuccess(s) => Ok(s.resource_id),
@@ -391,7 +391,7 @@ pub(crate) fn map_batch_render_manifests_outcome(
 pub(crate) fn map_batch_delete_many_outcome(
     outcome: cynic_api::operations::delete::ResourceDeleteManyOutcome,
     selector: &ResourceBatchSelector,
-) -> Result<BatchResourceResponse<domain::ResourceUID, ResourceLookupProblem>, BatchResourceError> {
+) -> Result<BatchResourceResponse<domain::ResourceID, ResourceLookupProblem>, BatchResourceError> {
     use cynic_api::operations::delete::ResourceDeleteManyOutcome as O;
     match outcome {
         O::ResourceDeleteManyResult(batch) => {

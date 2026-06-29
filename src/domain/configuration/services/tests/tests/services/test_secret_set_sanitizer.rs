@@ -39,15 +39,15 @@ async fn test_apply_secret_set_encrypts_literal_values() {
     let decision = harness
         .apply_secret_use_case()
         .apply(ApplyResourceParams {
-            uid: None,
+            id: None,
             headers: BaseResourceServiceHarness::make_headers_input(account_id, "test-secrets"),
             spec,
         })
         .await
         .unwrap();
 
-    let applied_uid = match decision {
-        ApplyResourceApplicationDecision::Applied(result) => result.uid,
+    let applied_id = match decision {
+        ApplyResourceApplicationDecision::Applied(result) => result.id,
         ApplyResourceApplicationDecision::Rejected(r) => {
             panic!("apply was rejected: {}", r.message)
         }
@@ -56,7 +56,7 @@ async fn test_apply_secret_set_encrypts_literal_values() {
     // Load the stored snapshot and deserialize the spec
     let snapshot = harness
         .generic_query_svc()
-        .get_snapshot_by_uid(&applied_uid)
+        .get_snapshot_by_id(&applied_id)
         .await
         .unwrap()
         .expect("snapshot must exist after apply");
@@ -104,7 +104,7 @@ async fn test_apply_secret_set_already_encrypted_passes_through_idempotently() {
     let decision = harness
         .apply_secret_use_case()
         .apply(ApplyResourceParams {
-            uid: None,
+            id: None,
             headers: BaseResourceServiceHarness::make_headers_input(
                 account_id.clone(),
                 "test-secrets",
@@ -114,8 +114,8 @@ async fn test_apply_secret_set_already_encrypted_passes_through_idempotently() {
         .await
         .unwrap();
 
-    let uid = match decision {
-        ApplyResourceApplicationDecision::Applied(result) => result.uid,
+    let id = match decision {
+        ApplyResourceApplicationDecision::Applied(result) => result.id,
         ApplyResourceApplicationDecision::Rejected(r) => {
             panic!("first apply was rejected: {}", r.message)
         }
@@ -124,7 +124,7 @@ async fn test_apply_secret_set_already_encrypted_passes_through_idempotently() {
     // Load the stored spec (already encrypted) and re-apply it as-is
     let snapshot = harness
         .generic_query_svc()
-        .get_snapshot_by_uid(&uid)
+        .get_snapshot_by_id(&id)
         .await
         .unwrap()
         .unwrap();
@@ -143,7 +143,7 @@ async fn test_apply_secret_set_already_encrypted_passes_through_idempotently() {
     let decision2 = harness
         .apply_secret_use_case()
         .apply(ApplyResourceParams {
-            uid: Some(uid),
+            id: Some(id),
             headers: BaseResourceServiceHarness::make_headers_input(account_id, "test-secrets"),
             spec: encrypted_spec.clone(),
         })
@@ -161,7 +161,7 @@ async fn test_apply_secret_set_already_encrypted_passes_through_idempotently() {
 
     let snapshot2 = harness
         .generic_query_svc()
-        .get_snapshot_by_uid(&uid)
+        .get_snapshot_by_id(&id)
         .await
         .unwrap()
         .unwrap();
@@ -204,7 +204,7 @@ async fn test_apply_secret_set_same_plaintext_is_untouched() {
     let decision = harness
         .apply_secret_use_case()
         .apply(ApplyResourceParams {
-            uid: None,
+            id: None,
             headers: BaseResourceServiceHarness::make_headers_input(
                 account_id.clone(),
                 "test-secrets",
@@ -214,8 +214,8 @@ async fn test_apply_secret_set_same_plaintext_is_untouched() {
         .await
         .unwrap();
 
-    let uid = match decision {
-        ApplyResourceApplicationDecision::Applied(result) => result.uid,
+    let id = match decision {
+        ApplyResourceApplicationDecision::Applied(result) => result.id,
         ApplyResourceApplicationDecision::Rejected(r) => {
             panic!("first apply was rejected: {}", r.message)
         }
@@ -223,7 +223,7 @@ async fn test_apply_secret_set_same_plaintext_is_untouched() {
 
     let snapshot = harness
         .generic_query_svc()
-        .get_snapshot_by_uid(&uid)
+        .get_snapshot_by_id(&id)
         .await
         .unwrap()
         .unwrap();
@@ -234,7 +234,7 @@ async fn test_apply_secret_set_same_plaintext_is_untouched() {
     let decision2 = harness
         .apply_secret_use_case()
         .apply(ApplyResourceParams {
-            uid: Some(uid),
+            id: Some(id),
             headers: BaseResourceServiceHarness::make_headers_input(account_id, "test-secrets"),
             spec,
         })
@@ -252,7 +252,7 @@ async fn test_apply_secret_set_same_plaintext_is_untouched() {
 
     let snapshot2 = harness
         .generic_query_svc()
-        .get_snapshot_by_uid(&uid)
+        .get_snapshot_by_id(&id)
         .await
         .unwrap()
         .unwrap();

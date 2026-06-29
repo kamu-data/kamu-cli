@@ -16,8 +16,8 @@ use kamu_resources::{
     ApplyResourceUseCase,
     DeclarativeResourceState,
     ResourceHeaders,
+    ResourceID,
     ResourceSnapshot,
-    ResourceUID,
     TypedResourceQueryError,
     TypedResourceQueryService,
 };
@@ -36,14 +36,14 @@ use crate::tests::utils::{
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_get_state_by_uid_success() {
+async fn test_get_state_by_id_success() {
     let harness = TypedResourceQueryServiceHarness::new();
     let account_a = make_account_id();
-    let uid = harness.apply_and_get_uid(account_a.clone(), "res-a").await;
+    let id = harness.apply_and_get_id(account_a.clone(), "res-a").await;
 
     let state = harness
         .typed_query_svc()
-        .get_state_by_uid(account_a, &uid)
+        .get_state_by_id(account_a, &id)
         .await
         .unwrap();
 
@@ -53,14 +53,14 @@ async fn test_get_state_by_uid_success() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_get_state_by_uid_not_found() {
+async fn test_get_state_by_id_not_found() {
     let harness = TypedResourceQueryServiceHarness::new();
     let account_a = make_account_id();
-    let uid = harness.allocate_uid().await;
+    let id = harness.allocate_id().await;
 
     let result = harness
         .typed_query_svc()
-        .get_state_by_uid(account_a, &uid)
+        .get_state_by_id(account_a, &id)
         .await;
 
     assert!(
@@ -72,15 +72,15 @@ async fn test_get_state_by_uid_not_found() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_get_state_by_uid_wrong_account() {
+async fn test_get_state_by_id_wrong_account() {
     let harness = TypedResourceQueryServiceHarness::new();
     let account_a = make_account_id();
     let account_b = make_account_id();
-    let uid = harness.apply_and_get_uid(account_a, "res-a").await;
+    let id = harness.apply_and_get_id(account_a, "res-a").await;
 
     let result = harness
         .typed_query_svc()
-        .get_state_by_uid(account_b, &uid)
+        .get_state_by_id(account_b, &id)
         .await;
 
     // Wrong account: implementation returns NotFound to avoid information leakage
@@ -93,24 +93,24 @@ async fn test_get_state_by_uid_wrong_account() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_get_state_by_uid_type_mismatch() {
+async fn test_get_state_by_id_type_mismatch() {
     let harness = TypedResourceQueryServiceHarness::new();
     let account_a = make_account_id();
-    let uid = harness.allocate_uid().await;
+    let id = harness.allocate_id().await;
 
     harness
-        .insert_snapshot_with_kind(uid, account_a.clone(), "OtherKind", "other.dev/v1", "res-a")
+        .insert_snapshot_with_kind(id, account_a.clone(), "OtherKind", "other.dev/v1", "res-a")
         .await;
 
     let result = harness
         .typed_query_svc()
-        .get_state_by_uid(account_a, &uid)
+        .get_state_by_id(account_a, &id)
         .await;
 
-    // get_state_by_uid uses get_snapshot_by_query which filters by kind, so a
+    // get_state_by_id uses get_snapshot_by_query which filters by kind, so a
     // snapshot with a different kind is invisible to this query → NotFound, not
-    // TypeMismatch. TypeMismatch is covered by ensure_resource_uid_matches_type
-    // which uses load_snapshot_by_uid (kind-agnostic lookup).
+    // TypeMismatch. TypeMismatch is covered by ensure_resource_id_matches_type
+    // which uses load_snapshot_by_id (kind-agnostic lookup).
     assert!(
         matches!(result, Err(TypedResourceQueryError::NotFound(_))),
         "expected NotFound for wrong-kind snapshot (kind filter hides it), got {result:?}"
@@ -126,11 +126,11 @@ async fn test_list_states_by_kind_filters_by_account() {
     let account_b = make_account_id();
 
     for name in ["res-a1", "res-a2", "res-a3"] {
-        harness.apply_and_get_uid(account_a.clone(), name).await;
+        harness.apply_and_get_id(account_a.clone(), name).await;
     }
 
     for name in ["res-b1", "res-b2"] {
-        harness.apply_and_get_uid(account_b.clone(), name).await;
+        harness.apply_and_get_id(account_b.clone(), name).await;
     }
 
     let states_a = harness
@@ -153,14 +153,14 @@ async fn test_list_states_by_kind_filters_by_account() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_ensure_uid_matches_type_success() {
+async fn test_ensure_id_matches_type_success() {
     let harness = TypedResourceQueryServiceHarness::new();
     let account_a = make_account_id();
-    let uid = harness.apply_and_get_uid(account_a, "res-a").await;
+    let id = harness.apply_and_get_id(account_a, "res-a").await;
 
     let result = harness
         .typed_query_svc()
-        .ensure_resource_uid_matches_type(&uid)
+        .ensure_resource_id_matches_type(&id)
         .await;
 
     assert!(result.is_ok(), "expected Ok(()), got {result:?}");
@@ -169,18 +169,18 @@ async fn test_ensure_uid_matches_type_success() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_ensure_uid_matches_type_mismatch() {
+async fn test_ensure_id_matches_type_mismatch() {
     let harness = TypedResourceQueryServiceHarness::new();
     let account_a = make_account_id();
-    let uid = harness.allocate_uid().await;
+    let id = harness.allocate_id().await;
 
     harness
-        .insert_snapshot_with_kind(uid, account_a, "OtherKind", "other.dev/v1", "res-a")
+        .insert_snapshot_with_kind(id, account_a, "OtherKind", "other.dev/v1", "res-a")
         .await;
 
     let result = harness
         .typed_query_svc()
-        .ensure_resource_uid_matches_type(&uid)
+        .ensure_resource_id_matches_type(&id)
         .await;
 
     assert!(
@@ -221,14 +221,14 @@ impl TypedResourceQueryServiceHarness {
         self.catalog.get_one().unwrap()
     }
 
-    async fn apply_and_get_uid(&self, account_id: odf::AccountID, name: &str) -> ResourceUID {
+    async fn apply_and_get_id(&self, account_id: odf::AccountID, name: &str) -> ResourceID {
         use kamu_resources::ApplyResourceApplicationDecision;
 
         let params = make_resource_params(account_id, name);
         let decision = self.apply_svc().apply(params).await.unwrap();
 
         match decision {
-            ApplyResourceApplicationDecision::Applied(result) => result.uid,
+            ApplyResourceApplicationDecision::Applied(result) => result.id,
             ApplyResourceApplicationDecision::Rejected(rejection) => {
                 panic!("apply rejected: {:?}", rejection.message)
             }
@@ -237,14 +237,14 @@ impl TypedResourceQueryServiceHarness {
 
     async fn insert_snapshot_with_kind(
         &self,
-        uid: ResourceUID,
+        id: ResourceID,
         owner_account_id: odf::AccountID,
         kind: &str,
         api_version: &str,
         name: &str,
     ) {
         let snapshot = ResourceSnapshot {
-            uid,
+            id,
             kind: kind.to_string(),
             api_version: api_version.to_string(),
             headers: ResourceHeaders::simple(Utc::now(), owner_account_id, name),
@@ -260,12 +260,12 @@ impl TypedResourceQueryServiceHarness {
             .unwrap();
     }
 
-    async fn allocate_uid(&self) -> ResourceUID {
+    async fn allocate_id(&self) -> ResourceID {
         use kamu_resources::GenericResourceQueryService;
         self.catalog
             .get_one::<dyn GenericResourceQueryService>()
             .unwrap()
-            .allocate_uid()
+            .allocate_id()
             .await
             .unwrap()
     }

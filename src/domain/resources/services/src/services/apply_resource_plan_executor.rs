@@ -166,8 +166,8 @@ where
             self.time_source,
         );
 
-        let Some(uid) = planner
-            .resolve_existing_resource_uid(None, &headers_input)
+        let Some(id) = planner
+            .resolve_existing_resource_id(None, &headers_input)
             .await?
         else {
             return Err(ApplyResourceUseCaseError::Internal(
@@ -182,11 +182,11 @@ where
             ));
         };
 
-        planner.ensure_resource_uid_matches_type(&uid).await?;
+        planner.ensure_resource_id_matches_type(&id).await?;
 
         let existing_resource = self
             .resource_aggregate_loader
-            .load(&uid)
+            .load(&id)
             .await
             .map_err(ResourceLoadError)
             .map_err(ApplyResourceUseCaseError::LoadFailed)?;
@@ -194,7 +194,7 @@ where
         let replanned = planner.plan_update_resource(
             existing_resource,
             ApplyResourceParams {
-                uid: Some(uid),
+                id: Some(id),
                 headers: headers_input,
                 spec: plan.resource.spec().clone(),
             },
@@ -226,7 +226,7 @@ where
 
     fn make_apply_result(&self, plan: PlannedApplyResource<R>) -> ApplyResourceResult<R> {
         ApplyResourceResult {
-            uid: *plan.resource.uid(),
+            id: *plan.resource.id(),
             state: plan.resource.into(),
             outcome: plan.action.into(),
             warnings: plan.warnings,

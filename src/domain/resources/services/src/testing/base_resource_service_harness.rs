@@ -19,12 +19,12 @@ use kamu_resources::{
     ResourceConditionStatus,
     ResourceConditionType,
     ResourceHeadersInput,
+    ResourceID,
     ResourceLifecycleMessage,
     ResourceLifecycleMessageOutcome,
     ResourceRepository,
     ResourceSnapshot,
     ResourceStatus,
-    ResourceUID,
 };
 use kamu_resources_inmem::{InMemoryRawResourceEventStore, InMemoryResourceRepository};
 use messaging_outbox::{MockOutbox, Outbox, OutboxProvider, register_message_dispatcher};
@@ -124,8 +124,8 @@ impl BaseResourceServiceHarness {
         self.resource_repo.as_ref()
     }
 
-    pub async fn allocate_resource_uid(&self) -> ResourceUID {
-        self.generic_query_svc.allocate_uid().await.unwrap()
+    pub async fn allocate_resource_id(&self) -> ResourceID {
+        self.generic_query_svc.allocate_id().await.unwrap()
     }
 
     pub fn make_headers_input(account_id: odf::AccountID, name: &str) -> ResourceHeadersInput {
@@ -138,21 +138,18 @@ impl BaseResourceServiceHarness {
         }
     }
 
-    pub async fn get_snapshot_by_uid(&self, uid: &ResourceUID) -> Option<ResourceSnapshot> {
-        self.generic_query_svc
-            .get_snapshot_by_uid(uid)
-            .await
-            .unwrap()
+    pub async fn get_snapshot_by_id(&self, id: &ResourceID) -> Option<ResourceSnapshot> {
+        self.generic_query_svc.get_snapshot_by_id(id).await.unwrap()
     }
 
-    pub async fn resource_uid_by_name(
+    pub async fn resource_id_by_name(
         &self,
         account_id: &odf::AccountID,
         kind: &str,
         name: &str,
-    ) -> Option<ResourceUID> {
+    ) -> Option<ResourceID> {
         self.generic_query_svc
-            .find_resource_uid_by_name(account_id, kind, &name.to_string())
+            .find_resource_id_by_name(account_id, kind, &name.to_string())
             .await
             .unwrap()
     }

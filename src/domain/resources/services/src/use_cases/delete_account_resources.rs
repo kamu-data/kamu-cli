@@ -16,8 +16,8 @@ use kamu_resources::{
     DeleteAccountResourcesUseCase,
     GenericResourceQueryService,
     ResourceCrudDispatcherDeleteRequest,
+    ResourceID,
     ResourceSnapshot,
-    ResourceUID,
     UnsupportedResourceDescriptorError,
 };
 
@@ -60,14 +60,14 @@ impl DeleteAccountResourcesUsecaseImpl {
         .await
     }
 
-    fn group_resource_uids_by_descriptor(
+    fn group_resource_ids_by_descriptor(
         &self,
         resource_snapshots: Vec<ResourceSnapshot>,
-    ) -> Vec<(ResourceSnapshot, Vec<ResourceUID>)> {
+    ) -> Vec<(ResourceSnapshot, Vec<ResourceID>)> {
         let mut grouped = HashMap::new();
 
         for resource_snapshot in resource_snapshots {
-            let uid = resource_snapshot.uid;
+            let id = resource_snapshot.id;
             let descriptor_key = (
                 resource_snapshot.kind.clone(),
                 resource_snapshot.api_version.clone(),
@@ -75,10 +75,10 @@ impl DeleteAccountResourcesUsecaseImpl {
 
             grouped
                 .entry(descriptor_key)
-                .and_modify(|(_, uids): &mut (ResourceSnapshot, Vec<ResourceUID>)| {
-                    uids.push(uid);
+                .and_modify(|(_, ids): &mut (ResourceSnapshot, Vec<ResourceID>)| {
+                    ids.push(id);
                 })
-                .or_insert_with(|| (resource_snapshot, vec![uid]));
+                .or_insert_with(|| (resource_snapshot, vec![id]));
         }
 
         grouped.into_values().collect()
@@ -92,8 +92,7 @@ impl DeleteAccountResourcesUseCase for DeleteAccountResourcesUsecaseImpl {
     async fn execute(&self, account_id: odf::AccountID) -> Result<(), InternalError> {
         let resource_snapshots = self.list_owned_resource_snapshots(&account_id).await?;
 
-        for (resource_snapshot, uids) in self.group_resource_uids_by_descriptor(resource_snapshots)
-        {
+        for (resource_snapshot, ids) in self.group_resource_ids_by_descriptor(resource_snapshots) {
             let dispatcher = get_resource_crud_dispatcher::<DeleteAccountResourceDispatchError>(
                 &self.catalog,
                 &resource_snapshot.kind,
@@ -104,7 +103,7 @@ impl DeleteAccountResourcesUseCase for DeleteAccountResourcesUsecaseImpl {
             dispatcher
                 .delete(ResourceCrudDispatcherDeleteRequest {
                     account_id: account_id.clone(),
-                    uids,
+                    ids,
                 })
                 .await
                 .map_err(ErrorIntoInternal::int_err)?;

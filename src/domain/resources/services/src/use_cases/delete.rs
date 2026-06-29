@@ -24,11 +24,11 @@ use crate::domain::{
     ReconcilableEventSourcedResource,
     ResourceAggregateLoader,
     ResourceDescriptorProvider,
+    ResourceID,
     ResourceNotOwnedByAccountError,
     ResourcePersistenceError,
     ResourcePersistenceService,
     ResourceStatusLike,
-    ResourceUID,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -71,11 +71,11 @@ where
     pub async fn execute(
         &self,
         account_id: odf::AccountID,
-        uids: Vec<ResourceUID>,
+        ids: Vec<ResourceID>,
     ) -> Result<(), DeleteResourcesError> {
         let now = self.time_source.now();
 
-        let unique_uids = uids
+        let unique_ids = ids
             .into_iter()
             .collect::<HashSet<_>>()
             .into_iter()
@@ -87,16 +87,16 @@ where
                 &account_id,
                 R::DESCRIPTOR.resource_type,
                 R::DESCRIPTOR.api_version,
-                &unique_uids,
+                &unique_ids,
             )
             .await
             .map_err(DeleteResourcesError::Internal)?;
 
-        if let Some(&uid) = outcome.access_denied.first() {
+        if let Some(&id) = outcome.access_denied.first() {
             return Err(DeleteResourcesError::Access(
                 odf::AccessError::Unauthorized(
                     ResourceNotOwnedByAccountError {
-                        uid,
+                        id,
                         resource_type: R::DESCRIPTOR.resource_type,
                     }
                     .into(),
@@ -104,13 +104,13 @@ where
             ));
         }
 
-        let owned_resource_uids = outcome
+        let owned_resource_ids = outcome
             .found
             .into_iter()
-            .map(|snapshot| snapshot.uid)
+            .map(|snapshot| snapshot.id)
             .collect::<Vec<_>>();
 
-        let mut resources = self.load_resources(&owned_resource_uids).await?;
+        let mut resources = self.load_resources(&owned_resource_ids).await?;
 
         match self
             .resource_persistence_service
@@ -136,9 +136,9 @@ where
         Ok(())
     }
 
-    async fn load_resources(&self, uids: &[ResourceUID]) -> Result<Vec<R>, DeleteResourcesError> {
+    async fn load_resources(&self, ids: &[ResourceID]) -> Result<Vec<R>, DeleteResourcesError> {
         self.resource_aggregate_loader
-            .load_many(uids)
+            .load_many(ids)
             .await
             .map_err(|err| {
                 DeleteResourcesError::Internal(
@@ -148,13 +148,13 @@ where
                 )
             })?
             .into_iter()
-            .zip(uids)
-            .map(|(resource_result, uid)| {
+            .zip(ids)
+            .map(|(resource_result, id)| {
                 resource_result.map_err(|err| {
                     DeleteResourcesError::Internal(
                         format!("{err}")
                             .int_err()
-                            .with_context(format!("Failed to load resource {uid}")),
+                            .with_context(format!("Failed to load resource {id}")),
                     )
                 })
             })
@@ -213,7 +213,7 @@ macro_rules! declare_delete_resources_use_case {
             async fn execute(
                 &self,
                 account_id: odf::AccountID,
-                uids: Vec<kamu_resources::ResourceUID>,
+                ids: Vec<kamu_resources::ResourceID>,
             ) -> Result<(), kamu_resources::DeleteResourcesError> {
                 let helper = $crate::DeleteResourcesUseCaseHelper::<$resource>::new(
                     self.generic_resource_query_service.as_ref(),
@@ -223,7 +223,7 @@ macro_rules! declare_delete_resources_use_case {
                     self.time_source.as_ref(),
                 );
 
-                helper.execute(account_id, uids).await
+                helper.execute(account_id, ids).await
             }
         }
     };

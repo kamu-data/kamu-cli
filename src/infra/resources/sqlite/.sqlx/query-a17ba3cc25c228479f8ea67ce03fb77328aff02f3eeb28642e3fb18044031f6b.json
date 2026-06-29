@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO resources (\n                resource_id,\n                account_id,\n                resource_kind,\n                api_version,\n                resource_name,\n                description,\n                labels,\n                annotations,\n                spec,\n                status,\n                generation,\n                created_at,\n                updated_at,\n                deleted_at,\n                last_reconciled_at,\n                last_event_id\n            )\n            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 16
+    },
+    "nullable": []
+  },
+  "hash": "a17ba3cc25c228479f8ea67ce03fb77328aff02f3eeb28642e3fb18044031f6b"
+}

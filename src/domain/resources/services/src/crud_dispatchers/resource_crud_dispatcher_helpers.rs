@@ -69,7 +69,7 @@ where
     Ok(match decision {
         ApplyResourcePlanningDecision::Planned(plan) => {
             let kamu_resources::ApplyResourcePlan {
-                uid,
+                id,
                 state,
                 action,
                 reconciliation_required,
@@ -79,7 +79,7 @@ where
 
             let resource = typed_resource_state_to_view::<R>(state)?;
             let previous_resource =
-                load_previous_resource_view(action, uid, generic_resource_query_service).await?;
+                load_previous_resource_view(action, id, generic_resource_query_service).await?;
             let changes = make_apply_manifest_changes(previous_resource.as_ref(), &resource)?;
 
             ApplyManifestPlanningDecision::Planned(ApplyManifestPlan {
@@ -139,7 +139,7 @@ where
     R::Spec: Serialize,
     R::Status: Serialize + ResourceStatusLike,
 {
-    let (uid, headers, spec, status) = state.into_parts();
+    let (id, headers, spec, status) = state.into_parts();
 
     Ok(ResourceView {
         kind: R::DESCRIPTOR.resource_type.to_string(),
@@ -148,7 +148,7 @@ where
             id: headers.account.clone(),
             name: None,
         },
-        headers: ResourceViewHeaders::from_owned(uid, headers),
+        headers: ResourceViewHeaders::from_owned(id, headers),
         last_reconciled_at: status.resource_status().last_reconciled_at(),
         spec: serde_json::to_value(spec).int_err()?,
         status: Some(serde_json::to_value(status).int_err()?),
@@ -165,7 +165,7 @@ where
     ResourceSummaryView {
         kind: R::DESCRIPTOR.resource_type.to_string(),
         api_version: R::DESCRIPTOR.api_version.to_string(),
-        uid: *state.uid(),
+        id: *state.id(),
         name: state.headers().name.clone(),
         description: state.headers().description.clone(),
         generation: state.headers().generation,
@@ -180,7 +180,7 @@ where
 
 pub(crate) fn resource_snapshot_to_view(snapshot: ResourceSnapshot) -> ResourceView {
     let ResourceSnapshot {
-        uid,
+        id,
         kind,
         api_version,
         headers,
@@ -197,7 +197,7 @@ pub(crate) fn resource_snapshot_to_view(snapshot: ResourceSnapshot) -> ResourceV
             id: headers.account.clone(),
             name: None,
         },
-        headers: ResourceViewHeaders::from_owned(uid, headers),
+        headers: ResourceViewHeaders::from_owned(id, headers),
         last_reconciled_at,
         spec,
         status,

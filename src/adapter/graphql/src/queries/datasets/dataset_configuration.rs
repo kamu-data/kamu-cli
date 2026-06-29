@@ -61,22 +61,22 @@ impl<'a> DatasetConfiguration<'a> {
 
         let current_account_id = current_account_subject.account_id();
 
-        let uids: Vec<_> = bindings.iter().map(|b| b.resource_uid).collect();
+        let ids: Vec<_> = bindings.iter().map(|b| b.resource_id).collect();
         let identities = generic_resource_query_svc
-            .find_resource_identities_by_uids(current_account_id, &uids)
+            .find_resource_identities_by_ids(current_account_id, &ids)
             .await
             .int_err()?;
 
         let identity_map: std::collections::HashMap<_, _> =
-            identities.into_iter().map(|i| (i.uid, i)).collect();
+            identities.into_iter().map(|i| (i.id, i)).collect();
 
         Ok(bindings
             .into_iter()
             .filter_map(|b| {
                 identity_map
-                    .get(b.resource_uid.as_ref())
+                    .get(b.resource_id.as_ref())
                     .map(|identity| DatasetBindingView {
-                        resource_id: kamu_resources::ResourceUID::new(identity.uid).into(),
+                        resource_id: kamu_resources::ResourceID::new(identity.id).into(),
                         binding_order: b.binding_order,
                         resource_name: identity.name.clone(),
                         resource_kind: ResourceKind::new(identity.kind.clone()),
@@ -111,22 +111,22 @@ impl<'a> DatasetConfiguration<'a> {
 
         let current_account_id = current_account_subject.account_id();
 
-        let uids: Vec<_> = bindings.iter().map(|b| b.resource_uid).collect();
+        let ids: Vec<_> = bindings.iter().map(|b| b.resource_id).collect();
         let identities = generic_resource_query_svc
-            .find_resource_identities_by_uids(current_account_id, &uids)
+            .find_resource_identities_by_ids(current_account_id, &ids)
             .await
             .int_err()?;
 
         let identity_map: std::collections::HashMap<_, _> =
-            identities.into_iter().map(|i| (i.uid, i)).collect();
+            identities.into_iter().map(|i| (i.id, i)).collect();
 
         Ok(bindings
             .into_iter()
             .filter_map(|b| {
                 identity_map
-                    .get(b.resource_uid.as_ref())
+                    .get(b.resource_id.as_ref())
                     .map(|identity| DatasetBindingView {
-                        resource_id: kamu_resources::ResourceUID::new(identity.uid).into(),
+                        resource_id: kamu_resources::ResourceID::new(identity.id).into(),
                         binding_order: b.binding_order,
                         resource_name: identity.name.clone(),
                         resource_kind: ResourceKind::new(identity.kind.clone()),

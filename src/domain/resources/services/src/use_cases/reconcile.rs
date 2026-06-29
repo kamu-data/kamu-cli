@@ -21,11 +21,11 @@ use crate::domain::{
     Reconciler,
     ResourceAggregateLoader,
     ResourceDescriptorProvider,
+    ResourceID,
     ResourceLifecycleMessage,
     ResourceLoadError,
     ResourcePersistenceService,
     ResourceStatusLike,
-    ResourceUID,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -66,7 +66,7 @@ where
 
     pub async fn start_reconciliation_phase(
         &self,
-        id: ResourceUID,
+        id: ResourceID,
     ) -> Result<Option<R>, ReconcileResourceUseCaseError<R>> {
         let resource = self
             .resource_aggregate_loader
@@ -207,7 +207,7 @@ macro_rules! declare_reconcile_resource_use_case {
                     )]
             async fn start_reconciliation_phase(
                 &self,
-                id: kamu_resources::ResourceUID,
+                id: kamu_resources::ResourceID,
             ) -> Result<Option<$resource>, kamu_resources::ReconcileResourceUseCaseError<$resource>>
             {
                 let helper = $crate::ReconcileResourceUseCaseHelper::<$resource>::new(
@@ -253,7 +253,7 @@ macro_rules! declare_reconcile_resource_use_case {
         impl kamu_resources::ReconcileResourceUseCase<$resource> for $use_case {
             async fn execute(
                 &self,
-                id: &kamu_resources::ResourceUID,
+                id: &kamu_resources::ResourceID,
             ) -> Result<(), kamu_resources::ReconcileResourceUseCaseError<$resource>> {
                 // The public use case only orchestrates the two committed
                 // phases; transaction-scoped dependencies stay inside helpers.

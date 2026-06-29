@@ -426,9 +426,9 @@ impl ResourceCtx {
     }
 
     /// Fetch a resource as JSON (`get <kind> <name> -o json`) and extract its
-    /// stable UID. Looks for a `uid` field anywhere in the parsed document.
-    pub async fn resource_uid(&self, kind: &str, name: &str) -> String {
-        self.get_one(["get", kind, name]).await.uid()
+    /// stable ID. Looks for a `id` field anywhere in the parsed document.
+    pub async fn resource_id(&self, kind: &str, name: &str) -> String {
+        self.get_one(["get", kind, name]).await.id()
     }
 
     /// Run `list <kind> -o json` and return the sorted resource names.

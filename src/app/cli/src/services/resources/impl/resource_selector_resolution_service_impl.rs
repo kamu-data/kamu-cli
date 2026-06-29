@@ -27,8 +27,8 @@ impl ResourceSelectorResolutionService for ResourceSelectorResolutionServiceImpl
         selector: &str,
     ) -> Result<ResolvedResourceSelector, CLIError> {
         let resource_ref = match uuid::Uuid::parse_str(selector) {
-            Ok(uid) if uid.get_version() == Some(uuid::Version::Random) => {
-                ResourceRef::ById(kamu_resources::ResourceUID::new(uid))
+            Ok(id) if id.get_version() == Some(uuid::Version::Random) => {
+                ResourceRef::ById(kamu_resources::ResourceID::new(id))
             }
             _ => ResourceRef::ByName(selector.to_owned()),
         };

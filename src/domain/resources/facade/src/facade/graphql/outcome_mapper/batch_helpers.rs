@@ -134,29 +134,29 @@ pub(crate) fn validate_batch_response_indexes<T, E>(
 
 #[cfg(test)]
 mod tests {
-    use kamu_resources::ResourceUID;
+    use kamu_resources::ResourceID;
 
     use super::*;
     use crate::facade::graphql::cynic_api::fragments::{
         BatchResourceProblem,
+        ResourceIDNotFoundProblem,
         ResourceLookupProblem as CynicResourceLookupProblem,
-        ResourceUIDNotFoundProblem,
     };
 
-    fn uid_not_found_problem(index: i32) -> BatchResourceProblem {
-        let uid: ResourceUID =
+    fn id_not_found_problem(index: i32) -> BatchResourceProblem {
+        let id: ResourceID =
             serde_json::from_str("\"00000000-0000-0000-0000-000000000000\"").unwrap();
         BatchResourceProblem {
             request_index: index,
-            problem: CynicResourceLookupProblem::ResourceUIDNotFoundProblem(
-                ResourceUIDNotFoundProblem { uid },
+            problem: CynicResourceLookupProblem::ResourceIDNotFoundProblem(
+                ResourceIDNotFoundProblem { id },
             ),
         }
     }
 
     #[test]
     fn collect_batch_problems_negative_index_is_error() {
-        let err = collect_batch_problems(vec![uid_not_found_problem(-1)], 1, "test").unwrap_err();
+        let err = collect_batch_problems(vec![id_not_found_problem(-1)], 1, "test").unwrap_err();
         assert!(
             matches!(err, BatchResourceError::Internal(_)),
             "expected Internal error for negative problem index"
@@ -165,7 +165,7 @@ mod tests {
 
     #[test]
     fn collect_batch_problems_out_of_bounds_index_is_error() {
-        let err = collect_batch_problems(vec![uid_not_found_problem(5)], 1, "test").unwrap_err();
+        let err = collect_batch_problems(vec![id_not_found_problem(5)], 1, "test").unwrap_err();
         assert!(
             matches!(err, BatchResourceError::Internal(_)),
             "expected Internal error for out-of-bounds problem index"

@@ -59,12 +59,12 @@ fn by_name(name: &str) -> ResourceSelector {
     }
 }
 
-fn by_id(uid: &kamu_resources::ResourceUID) -> ResourceSelector {
+fn by_id(id: &kamu_resources::ResourceID) -> ResourceSelector {
     ResourceSelector {
         account: None,
         kind: VARIABLE_SET_KIND.to_string(),
         api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
-        resource_ref: ResourceRef::ById(*uid),
+        resource_ref: ResourceRef::ById(*id),
     }
 }
 
@@ -77,19 +77,16 @@ fn batch_by_name(name: &str) -> ResourceBatchSelector {
     }
 }
 
-fn batch_by_id(uid: kamu_resources::ResourceUID) -> ResourceBatchSelector {
+fn batch_by_id(id: kamu_resources::ResourceID) -> ResourceBatchSelector {
     ResourceBatchSelector {
         account: None,
         kind: VARIABLE_SET_KIND.to_string(),
         api_version: Some(VARIABLE_SET_API_VERSION.to_string()),
-        resource_refs: vec![ResourceRef::ById(uid)],
+        resource_refs: vec![ResourceRef::ById(id)],
     }
 }
 
-async fn create_resource(
-    h: &impl FacadeContractHarness,
-    name: &str,
-) -> kamu_resources::ResourceUID {
+async fn create_resource(h: &impl FacadeContractHarness, name: &str) -> kamu_resources::ResourceID {
     let facade = h.facade_for(TestAccount::Alice);
     let decision = facade
         .apply_manifest(ApplyManifestRequest {
@@ -100,7 +97,7 @@ async fn create_resource(
         .unwrap();
     assert_applied_outcome(&decision, ApplyResourceOutcome::Created)
         .headers
-        .uid
+        .id
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -113,8 +110,8 @@ contract_test!(
 );
 
 pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness) {
-    let uid = create_resource(h, "taxonomy-single").await;
-    let absent_uid = kamu_resources::ResourceUID::new(uuid::Uuid::new_v4());
+    let id = create_resource(h, "taxonomy-single").await;
+    let absent_uid = kamu_resources::ResourceID::new(uuid::Uuid::new_v4());
     let facade = h.facade_for(TestAccount::Alice);
 
     // --- NameNotFound ---
@@ -171,7 +168,7 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
     assert_matches!(
         get,
         Err(GetResourceError::LookupProblem(
-            ResourceLookupProblem::UIDNotFound(_)
+            ResourceLookupProblem::IDNotFound(_)
         )),
         "get: expected UIDNotFound"
     );
@@ -180,7 +177,7 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
     assert_matches!(
         get_id,
         Err(GetResourceError::LookupProblem(
-            ResourceLookupProblem::UIDNotFound(_)
+            ResourceLookupProblem::IDNotFound(_)
         )),
         "get_identity: expected UIDNotFound"
     );
@@ -195,7 +192,7 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
     assert_matches!(
         render,
         Err(RenderResourceManifestError::LookupProblem(
-            ResourceLookupProblem::UIDNotFound(_)
+            ResourceLookupProblem::IDNotFound(_)
         )),
         "render_manifest: expected UIDNotFound"
     );
@@ -204,7 +201,7 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
     assert_matches!(
         del,
         Err(DeleteResourceError::LookupProblem(
-            ResourceLookupProblem::UIDNotFound(_)
+            ResourceLookupProblem::IDNotFound(_)
         )),
         "delete: expected UIDNotFound"
     );
@@ -214,7 +211,7 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
         account: None,
         kind: VARIABLE_SET_KIND.to_string(),
         api_version: Some("v0.never.existed".to_string()),
-        resource_ref: ResourceRef::ById(uid),
+        resource_ref: ResourceRef::ById(id),
     };
 
     let get = facade
@@ -268,7 +265,7 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
 contract_test!(batch_lookup_taxonomy, super::test_batch_lookup_taxonomy);
 
 pub async fn test_batch_lookup_taxonomy(h: &impl FacadeContractHarness) {
-    let absent_uid = kamu_resources::ResourceUID::new(uuid::Uuid::new_v4());
+    let absent_uid = kamu_resources::ResourceID::new(uuid::Uuid::new_v4());
     let facade = h.facade_for(TestAccount::Alice);
 
     // --- NameNotFound in get_many ---
@@ -294,7 +291,7 @@ pub async fn test_batch_lookup_taxonomy(h: &impl FacadeContractHarness) {
     assert_eq!(resp.problems.len(), 1);
     assert_matches!(
         &resp.problems[0].error,
-        ResourceLookupProblem::UIDNotFound(_),
+        ResourceLookupProblem::IDNotFound(_),
         "get_many: expected UIDNotFound problem"
     );
 

@@ -16,10 +16,10 @@ use kamu_resources::{
     GetResourceCrudDispatcherError,
     ResourceAPIVersionMismatchError,
     ResourceHeadersValidationError,
+    ResourceID,
+    ResourceIDNotFoundError,
     ResourceInvalidSpecError,
     ResourceNameNotFoundError,
-    ResourceUID,
-    ResourceUIDNotFoundError,
     UnsupportedResourceDescriptorError,
 };
 use thiserror::Error;
@@ -111,12 +111,12 @@ impl From<GetResourceCrudDispatcherError> for GetResourceError {
     fn from(err: GetResourceCrudDispatcherError) -> Self {
         use GetResourceCrudDispatcherError as E;
         match err {
-            E::NotFound(err) => Self::LookupProblem(ResourceLookupProblem::UIDNotFound(err)),
+            E::NotFound(err) => Self::LookupProblem(ResourceLookupProblem::IDNotFound(err)),
             E::TypeMismatch(err) => {
                 if err.expected_kind != err.actual_kind {
                     Self::LookupProblem(ResourceLookupProblem::KindMismatch(
                         ResourceKindMismatchError {
-                            uid: err.uid,
+                            id: err.id,
                             expected_kind: err.expected_kind,
                             actual_kind: err.actual_kind,
                         },
@@ -140,7 +140,7 @@ impl From<GetResourceCrudDispatcherError> for GetResourceError {
 #[derive(Debug, Error)]
 pub enum ResourceLookupProblem {
     #[error(transparent)]
-    UIDNotFound(#[from] ResourceUIDNotFoundError),
+    IDNotFound(#[from] ResourceIDNotFoundError),
 
     #[error(transparent)]
     NameNotFound(#[from] ResourceNameNotFoundError),
@@ -193,12 +193,12 @@ impl From<GetResourceCrudDispatcherError> for RenderResourceManifestError {
     fn from(err: GetResourceCrudDispatcherError) -> Self {
         use GetResourceCrudDispatcherError as E;
         match err {
-            E::NotFound(err) => Self::LookupProblem(ResourceLookupProblem::UIDNotFound(err)),
+            E::NotFound(err) => Self::LookupProblem(ResourceLookupProblem::IDNotFound(err)),
             E::TypeMismatch(err) => {
                 if err.expected_kind != err.actual_kind {
                     Self::LookupProblem(ResourceLookupProblem::KindMismatch(
                         ResourceKindMismatchError {
-                            uid: err.uid,
+                            id: err.id,
                             expected_kind: err.expected_kind,
                             actual_kind: err.actual_kind,
                         },
@@ -344,7 +344,7 @@ pub enum ApplyManifestError {
     InvalidSpec(#[from] ResourceInvalidSpecError),
 
     #[error(transparent)]
-    UIDNotFound(#[from] ResourceUIDNotFoundError),
+    UIDNotFound(#[from] ResourceIDNotFoundError),
 
     #[error(transparent)]
     TypeMismatch(#[from] kamu_resources::ResourceTypeMismatchError),
@@ -395,9 +395,9 @@ pub struct ParseResourceManifestError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
-#[error("Resource uid {uid} refers to kind '{actual_kind}', expected '{expected_kind}'")]
+#[error("Resource id {id} refers to kind '{actual_kind}', expected '{expected_kind}'")]
 pub struct ResourceKindMismatchError {
-    pub uid: ResourceUID,
+    pub id: ResourceID,
     pub expected_kind: String,
     pub actual_kind: String,
 }

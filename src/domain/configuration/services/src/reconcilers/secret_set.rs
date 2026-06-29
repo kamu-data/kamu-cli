@@ -23,7 +23,7 @@ use kamu_configuration::{
     SecretSetStats,
 };
 use kamu_datasets::SecretsEncryptionConfig;
-use kamu_resources::{DeclarativeResource, ReconcilableResource, Reconciler, ResourceUID};
+use kamu_resources::{DeclarativeResource, ReconcilableResource, Reconciler, ResourceID};
 use odf::AccountID;
 use time_source::SystemTimeSource;
 use uuid::Uuid;
@@ -53,12 +53,12 @@ impl Reconciler<SecretSetResource> for SecretSetReconcilerImpl {
     > {
         let total = resource.spec().secrets.len();
         let now = self.time_source.now();
-        let resource_uid = *resource.uid();
+        let resource_id = *resource.id();
         let resource_generation = resource.headers().generation;
         let account_id = &resource.headers().account;
 
         let previous_entries_by_key = self
-            .load_previous_entries_by_key(&resource_uid, resource_generation)
+            .load_previous_entries_by_key(&resource_id, resource_generation)
             .await?;
 
         let encryptor = self.create_encryptor()?;
@@ -72,7 +72,7 @@ impl Reconciler<SecretSetResource> for SecretSetReconcilerImpl {
         )?;
 
         self.secret_set_projection_repository
-            .replace_entries(&resource_uid, resource_generation, &entries)
+            .replace_entries(&resource_id, resource_generation, &entries)
             .await
             .map_err(|e| match e {
                 ReplaceProjectionEntriesError::ConcurrentModification(err) => {
@@ -98,7 +98,7 @@ impl Reconciler<SecretSetResource> for SecretSetReconcilerImpl {
 impl SecretSetReconcilerImpl {
     async fn load_previous_entries_by_key(
         &self,
-        resource_uid: &ResourceUID,
+        resource_id: &ResourceID,
         resource_generation: u64,
     ) -> Result<HashMap<String, PreviousConfigurationEntry>, SecretSetReconcileError> {
         if resource_generation == 0 {
@@ -107,7 +107,7 @@ impl SecretSetReconcilerImpl {
 
         let entries = self
             .secret_set_projection_repository
-            .get_latest_entries_before_generation(resource_uid, resource_generation)
+            .get_latest_entries_before_generation(resource_id, resource_generation)
             .await
             .map_err(SecretSetReconcileError::Internal)?;
 

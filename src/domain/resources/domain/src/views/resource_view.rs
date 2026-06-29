@@ -12,7 +12,7 @@ use std::collections::BTreeMap;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::{ResourceHeaders, ResourceName, ResourceUID};
+use crate::{ResourceHeaders, ResourceID, ResourceName};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -21,7 +21,7 @@ pub struct ResourceIdentityView {
     pub kind: String,
     pub api_version: String,
     pub canonical_kind_name: String,
-    pub uid: ResourceUID,
+    pub id: ResourceID,
     pub name: ResourceName,
 }
 
@@ -50,7 +50,7 @@ pub struct ResourceViewAccount {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceViewHeaders {
-    pub uid: ResourceUID,
+    pub id: ResourceID,
     pub name: ResourceName,
     pub description: Option<String>,
     pub labels: BTreeMap<String, String>,
@@ -64,9 +64,9 @@ pub struct ResourceViewHeaders {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl ResourceViewHeaders {
-    pub fn simple(now: DateTime<Utc>, uid: ResourceUID, name: impl Into<ResourceName>) -> Self {
+    pub fn simple(now: DateTime<Utc>, id: ResourceID, name: impl Into<ResourceName>) -> Self {
         Self {
-            uid,
+            id,
             name: name.into(),
             description: None,
             labels: BTreeMap::new(),
@@ -78,9 +78,9 @@ impl ResourceViewHeaders {
         }
     }
 
-    pub fn from_owned(uid: ResourceUID, headers: ResourceHeaders) -> Self {
+    pub fn from_owned(id: ResourceID, headers: ResourceHeaders) -> Self {
         Self {
-            uid,
+            id,
             name: headers.name,
             description: headers.description,
             labels: headers.labels,

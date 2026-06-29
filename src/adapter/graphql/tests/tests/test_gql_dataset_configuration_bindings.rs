@@ -12,7 +12,7 @@ use indoc::indoc;
 use kamu_core::TenancyConfig;
 use kamu_datasets::*;
 use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
-use kamu_resources::ResourceUID;
+use kamu_resources::ResourceID;
 use messaging_outbox::OutboxProvider;
 use odf::metadata::testing::MetadataFactory;
 use pretty_assertions::assert_eq;
@@ -26,12 +26,12 @@ async fn test_replace_variable_set_bindings_success() {
     let harness = DatasetConfigurationHarness::new().await;
     let dataset = harness.create_dataset().await;
 
-    let resource_uid = harness.create_variable_set_resource("my-varset").await;
-    let resource_id = resource_uid.to_string();
+    let resource_id = harness.create_variable_set_resource("my-varset").await;
+    let resource_id_str = resource_id.to_string();
 
     let res = harness
         .execute_authorized_query(
-            harness.replace_variable_set_bindings(&dataset.dataset_handle.id, &[&resource_id]),
+            harness.replace_variable_set_bindings(&dataset.dataset_handle.id, &[&resource_id_str]),
         )
         .await;
 
@@ -62,7 +62,7 @@ async fn test_replace_variable_set_bindings_success() {
                     "configuration": {
                         "variableSetBindings": [
                             {
-                                "resourceId": resource_id,
+                                "resourceId": resource_id_str,
                                 "bindingOrder": 0,
                                 "resourceName": "my-varset",
                                 "resourceKind": { "value": "VariableSet" },
@@ -83,12 +83,12 @@ async fn test_replace_secret_set_bindings_success() {
     let harness = DatasetConfigurationHarness::new().await;
     let dataset = harness.create_dataset().await;
 
-    let resource_uid = harness.create_secret_set_resource("my-secretset").await;
-    let resource_id = resource_uid.to_string();
+    let resource_id = harness.create_secret_set_resource("my-secretset").await;
+    let resource_id_str = resource_id.to_string();
 
     let res = harness
         .execute_authorized_query(
-            harness.replace_secret_set_bindings(&dataset.dataset_handle.id, &[&resource_id]),
+            harness.replace_secret_set_bindings(&dataset.dataset_handle.id, &[&resource_id_str]),
         )
         .await;
 
@@ -119,7 +119,7 @@ async fn test_replace_secret_set_bindings_success() {
                     "configuration": {
                         "secretSetBindings": [
                             {
-                                "resourceId": resource_id,
+                                "resourceId": resource_id_str,
                                 "bindingOrder": 0,
                                 "resourceName": "my-secretset",
                                 "resourceKind": { "value": "SecretSet" },
@@ -140,13 +140,13 @@ async fn test_replace_bindings_empty_list() {
     let harness = DatasetConfigurationHarness::new().await;
     let dataset = harness.create_dataset().await;
 
-    let resource_uid = harness.create_variable_set_resource("some-varset").await;
-    let resource_id = resource_uid.to_string();
+    let resource_id = harness.create_variable_set_resource("some-varset").await;
+    let resource_id_str = resource_id.to_string();
 
     // Set a binding first
     harness
         .execute_authorized_query(
-            harness.replace_variable_set_bindings(&dataset.dataset_handle.id, &[&resource_id]),
+            harness.replace_variable_set_bindings(&dataset.dataset_handle.id, &[&resource_id_str]),
         )
         .await;
 
@@ -197,7 +197,7 @@ async fn test_replace_bindings_resource_not_found() {
     let harness = DatasetConfigurationHarness::new().await;
     let dataset = harness.create_dataset().await;
 
-    let nonexistent_id = ResourceUID::new(uuid::Uuid::new_v4()).to_string();
+    let nonexistent_id = ResourceID::new(uuid::Uuid::new_v4()).to_string();
 
     let res = harness
         .execute_authorized_query(
@@ -229,14 +229,14 @@ async fn test_replace_variable_set_bindings_wrong_kind() {
     let dataset = harness.create_dataset().await;
 
     // Create a SecretSet resource but try to bind it as a VariableSet
-    let resource_uid = harness
+    let resource_id = harness
         .create_secret_set_resource("wrong-kind-secret")
         .await;
-    let resource_id = resource_uid.to_string();
+    let resource_id_str = resource_id.to_string();
 
     let res = harness
         .execute_authorized_query(
-            harness.replace_variable_set_bindings(&dataset.dataset_handle.id, &[&resource_id]),
+            harness.replace_variable_set_bindings(&dataset.dataset_handle.id, &[&resource_id_str]),
         )
         .await;
 
@@ -248,7 +248,7 @@ async fn test_replace_variable_set_bindings_wrong_kind() {
                     "configuration": {
                         "replaceVariableSetBindings": {
                             "message": format!(
-                                "Resource '{resource_id}' has kind 'SecretSet' but expected 'VariableSet'"
+                                "Resource '{resource_id_str}' has kind 'SecretSet' but expected 'VariableSet'"
                             )
                         }
                     }
@@ -269,14 +269,14 @@ async fn test_replace_bindings_wrong_account() {
     let dataset = harness.create_dataset().await;
 
     // Resource was created under the *default* test account, not "other-account"
-    let resource_uid = harness
+    let resource_id = harness
         .create_variable_set_resource_for_default_account("foreign-varset")
         .await;
-    let resource_id = resource_uid.to_string();
+    let resource_id_str = resource_id.to_string();
 
     let res = harness
         .execute_authorized_query(
-            harness.replace_variable_set_bindings(&dataset.dataset_handle.id, &[&resource_id]),
+            harness.replace_variable_set_bindings(&dataset.dataset_handle.id, &[&resource_id_str]),
         )
         .await;
 
@@ -288,7 +288,7 @@ async fn test_replace_bindings_wrong_account() {
                     "configuration": {
                         "replaceVariableSetBindings": {
                             "message": format!(
-                                "Resource '{resource_id}' does not belong to the current account"
+                                "Resource '{resource_id_str}' does not belong to the current account"
                             )
                         }
                     }
@@ -305,13 +305,13 @@ async fn test_replace_bindings_duplicate_refs() {
     let harness = DatasetConfigurationHarness::new().await;
     let dataset = harness.create_dataset().await;
 
-    let resource_uid = harness.create_variable_set_resource("dup-varset").await;
-    let resource_id = resource_uid.to_string();
+    let resource_id = harness.create_variable_set_resource("dup-varset").await;
+    let resource_id_str = resource_id.to_string();
 
     let res = harness
         .execute_authorized_query(harness.replace_variable_set_bindings(
             &dataset.dataset_handle.id,
-            &[&resource_id, &resource_id],
+            &[&resource_id_str, &resource_id_str],
         ))
         .await;
 
@@ -322,7 +322,7 @@ async fn test_replace_bindings_duplicate_refs() {
                 "byId": {
                     "configuration": {
                         "replaceVariableSetBindings": {
-                            "message": format!("Duplicate resource '{resource_id}' in the binding list")
+                            "message": format!("Duplicate resource '{resource_id_str}' in the binding list")
                         }
                     }
                 }
@@ -338,14 +338,15 @@ async fn test_query_bindings_ordered() {
     let harness = DatasetConfigurationHarness::new().await;
     let dataset = harness.create_dataset().await;
 
-    let uid_a = harness.create_variable_set_resource("varset-alpha").await;
-    let uid_b = harness.create_variable_set_resource("varset-beta").await;
-    let id_a = uid_a.to_string();
-    let id_b = uid_b.to_string();
+    let id_a = harness.create_variable_set_resource("varset-alpha").await;
+    let id_b = harness.create_variable_set_resource("varset-beta").await;
+    let id_a_str = id_a.to_string();
+    let id_b_str = id_b.to_string();
 
     harness
         .execute_authorized_query(
-            harness.replace_variable_set_bindings(&dataset.dataset_handle.id, &[&id_a, &id_b]),
+            harness
+                .replace_variable_set_bindings(&dataset.dataset_handle.id, &[&id_a_str, &id_b_str]),
         )
         .await;
 
@@ -558,7 +559,7 @@ impl DatasetConfigurationHarness {
             .unwrap()
     }
 
-    async fn create_variable_set_resource(&self, name: &str) -> ResourceUID {
+    async fn create_variable_set_resource(&self, name: &str) -> ResourceID {
         BaseGQLResourceHarness::create_variable_set_resource(
             &self.catalog_authorized,
             &self.main_account_id,
@@ -568,7 +569,7 @@ impl DatasetConfigurationHarness {
         .await
     }
 
-    async fn create_secret_set_resource(&self, name: &str) -> ResourceUID {
+    async fn create_secret_set_resource(&self, name: &str) -> ResourceID {
         BaseGQLResourceHarness::create_secret_set_resource(
             &self.catalog_authorized,
             &self.main_account_id,
@@ -580,7 +581,7 @@ impl DatasetConfigurationHarness {
 
     // Creates a VariableSet resource owned by the default test account (not the
     // current "authorized" account), to simulate a foreign resource.
-    async fn create_variable_set_resource_for_default_account(&self, name: &str) -> ResourceUID {
+    async fn create_variable_set_resource_for_default_account(&self, name: &str) -> ResourceID {
         let account_id = kamu_accounts::CurrentAccountSubject::new_test()
             .account_id()
             .clone();

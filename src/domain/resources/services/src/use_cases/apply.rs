@@ -46,11 +46,11 @@ macro_rules! declare_apply_resource_use_case {
                 };
 
                 // Find the resource UID if not provided
-                let maybe_resource_uid = match params.uid {
-                    Some(uid) => Some(uid),
+                let maybe_resource_id = match params.id {
+                    Some(id) => Some(id),
                     None => self
                         .generic_resource_query_service
-                        .find_resource_uid_by_name(
+                        .find_resource_id_by_name(
                             &params.headers.account,
                             <$resource as kamu_resources::ResourceDescriptorProvider>::DESCRIPTOR
                                 .resource_type,
@@ -61,15 +61,15 @@ macro_rules! declare_apply_resource_use_case {
                 };
 
                 // Load the current spec if the resource exists to provide it to the sanitizer for comparison
-                let current_spec = if let Some(uid) = maybe_resource_uid {
+                let current_spec = if let Some(id) = maybe_resource_id {
                     self.typed_resource_query_service
-                        .ensure_resource_uid_matches_type(&uid)
+                        .ensure_resource_id_matches_type(&id)
                         .await
                         .map_err(kamu_resources::ApplyResourceUseCaseError::from)?;
 
                     let resource = self
                         .resource_aggregate_loader
-                        .load(&uid)
+                        .load(&id)
                         .await
                         .map_err(kamu_resources::ResourceLoadError)
                         .map_err(kamu_resources::ApplyResourceUseCaseError::LoadFailed)?;

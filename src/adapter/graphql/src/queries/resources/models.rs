@@ -156,7 +156,7 @@ pub enum ResourceRefInput {
 impl From<ResourceRefInput> for kamu_resources_facade::ResourceRef {
     fn from(value: ResourceRefInput) -> Self {
         match value {
-            ResourceRefInput::ById(uid) => Self::ById(uid.into()),
+            ResourceRefInput::ById(id) => Self::ById(id.into()),
             ResourceRefInput::ByName(by_name) => Self::ByName(by_name.name.clone()),
         }
     }
@@ -321,8 +321,8 @@ pub enum ResourceBadAccountProblemCode {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject, Debug, Clone)]
-pub struct ResourceUIDNotFoundProblem {
-    pub uid: ResourceID,
+pub struct ResourceIDNotFoundProblem {
+    pub id: ResourceID,
     pub message: String,
 }
 
@@ -342,7 +342,7 @@ pub struct ResourceApiVersionMismatchProblem {
 
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceKindMismatchProblem {
-    pub uid: ResourceID,
+    pub id: ResourceID,
     pub expected_kind: String,
     pub actual_kind: String,
     pub message: String,
@@ -352,7 +352,7 @@ pub struct ResourceKindMismatchProblem {
 
 #[derive(Union, Debug, Clone)]
 pub enum ResourceLookupProblem {
-    UidNotFound(ResourceUIDNotFoundProblem),
+    UidNotFound(ResourceIDNotFoundProblem),
     NameNotFound(ResourceNameNotFoundProblem),
     ApiVersionMismatch(ResourceApiVersionMismatchProblem),
     KindMismatch(ResourceKindMismatchProblem),
@@ -362,8 +362,8 @@ impl From<kamu_resources_facade::ResourceLookupProblem> for ResourceLookupProble
     fn from(value: kamu_resources_facade::ResourceLookupProblem) -> Self {
         use kamu_resources_facade::ResourceLookupProblem as P;
         match value {
-            P::UIDNotFound(e) => Self::UidNotFound(ResourceUIDNotFoundProblem {
-                uid: e.0.into(),
+            P::IDNotFound(e) => Self::UidNotFound(ResourceIDNotFoundProblem {
+                id: e.0.into(),
                 message: e.to_string(),
             }),
             P::NameNotFound(e) => Self::NameNotFound(ResourceNameNotFoundProblem {
@@ -379,7 +379,7 @@ impl From<kamu_resources_facade::ResourceLookupProblem> for ResourceLookupProble
                 })
             }
             P::KindMismatch(e) => Self::KindMismatch(ResourceKindMismatchProblem {
-                uid: e.uid.into(),
+                id: e.id.into(),
                 expected_kind: e.expected_kind.clone(),
                 actual_kind: e.actual_kind.clone(),
                 message: e.to_string(),
@@ -392,7 +392,7 @@ impl From<kamu_resources_facade::ResourceLookupProblem> for ResourceLookupProble
 
 #[derive(Union, Debug, Clone)]
 pub enum ResourceSelectorProblem {
-    UidNotFound(ResourceUIDNotFoundProblem),
+    UidNotFound(ResourceIDNotFoundProblem),
     NameNotFound(ResourceNameNotFoundProblem),
     ApiVersionMismatch(ResourceApiVersionMismatchProblem),
     KindMismatch(ResourceKindMismatchProblem),
@@ -592,7 +592,7 @@ pub struct ResourceIdentity {
 impl From<kamu_resources::ResourceIdentityView> for ResourceIdentity {
     fn from(value: kamu_resources::ResourceIdentityView) -> Self {
         Self {
-            id: value.uid.into(),
+            id: value.id.into(),
             api_version: value.api_version,
             kind: ResourceKind::new(value.kind),
             canonical_kind_name: value.canonical_kind_name,
@@ -681,7 +681,7 @@ impl From<kamu_resources::ResourceView> for ResourceHeaders {
         let annotations = serde_json::to_value(value.headers.annotations).unwrap();
 
         Self {
-            id: value.headers.uid.into(),
+            id: value.headers.id.into(),
             account_id: value.account.id.into(),
             account_name: value.account.name.map(Into::into),
             name: value.headers.name.clone(),
@@ -716,7 +716,7 @@ pub struct ResourceSummary {
 impl From<kamu_resources::ResourceSummaryView> for ResourceSummary {
     fn from(value: kamu_resources::ResourceSummaryView) -> Self {
         Self {
-            id: value.uid.into(),
+            id: value.id.into(),
             api_version: value.api_version,
             kind: ResourceKind::new(value.kind),
             name: value.name.clone(),

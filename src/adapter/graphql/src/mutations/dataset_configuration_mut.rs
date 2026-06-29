@@ -14,7 +14,7 @@ use kamu_configuration::{
     SecretSetResource,
     VariableSetResource,
 };
-use kamu_resources::{GenericResourceQueryService, ResourceUID};
+use kamu_resources::GenericResourceQueryService;
 
 use crate::prelude::*;
 use crate::queries::DatasetRequestState;
@@ -53,12 +53,13 @@ impl<'a> DatasetConfigurationMut<'a> {
     ) -> Result<ReplaceDatasetBindingsResult> {
         let dataset_id = self.dataset_request_state.dataset_id();
 
-        let uids: Vec<ResourceUID> = resource_ids.into_iter().map(Into::into).collect();
+        let ids: Vec<kamu_resources::ResourceID> =
+            resource_ids.into_iter().map(Into::into).collect();
 
-        if let Some(duplicate_uid) = find_first_duplicate(&uids) {
+        if let Some(duplicate_id) = find_first_duplicate(&ids) {
             return Ok(ReplaceDatasetBindingsResult::DuplicateResources(
                 ReplaceBindingsDuplicateResources {
-                    resource_id: duplicate_uid.into(),
+                    resource_id: duplicate_id.into(),
                 },
             ));
         }
@@ -77,41 +78,41 @@ impl<'a> DatasetConfigurationMut<'a> {
                 &current_account_id,
                 VariableSetResource::RESOURCE_TYPE,
                 VariableSetResource::API_VERSION,
-                &uids,
+                &ids,
             )
             .await
             .int_err()?;
 
-        if let Some(&uid) = outcome.access_denied.first() {
+        if let Some(&id) = outcome.access_denied.first() {
             return Ok(ReplaceDatasetBindingsResult::ResourceAccountMismatch(
                 ReplaceBindingsResourceAccountMismatch {
-                    resource_id: uid.into(),
+                    resource_id: id.into(),
                 },
             ));
         }
 
-        if let Some(&uid) = outcome.not_found.first() {
+        if let Some(&id) = outcome.not_found.first() {
             return Ok(ReplaceDatasetBindingsResult::ResourceNotFound(
                 ReplaceBindingsResourceNotFound {
-                    resource_id: uid.into(),
+                    resource_id: id.into(),
                 },
             ));
         }
 
-        if let Some((uid, actual_kind)) = outcome.kind_mismatch.into_iter().next() {
+        if let Some((id, actual_kind)) = outcome.kind_mismatch.into_iter().next() {
             return Ok(ReplaceDatasetBindingsResult::ResourceKindMismatch(
                 ReplaceBindingsResourceKindMismatch {
-                    resource_id: uid.into(),
+                    resource_id: id.into(),
                     expected_kind: VariableSetResource::RESOURCE_TYPE.to_string(),
                     actual_kind,
                 },
             ));
         }
 
-        if let Some((uid, actual_api_version)) = outcome.api_version_mismatch.into_iter().next() {
+        if let Some((id, actual_api_version)) = outcome.api_version_mismatch.into_iter().next() {
             return Ok(ReplaceDatasetBindingsResult::ResourceApiVersionMismatch(
                 ReplaceBindingsResourceApiVersionMismatch {
-                    resource_id: uid.into(),
+                    resource_id: id.into(),
                     expected_api_version: VariableSetResource::API_VERSION.to_string(),
                     actual_api_version,
                 },
@@ -119,7 +120,7 @@ impl<'a> DatasetConfigurationMut<'a> {
         }
 
         variable_set_binding_repo
-            .replace_bindings(dataset_id, &uids)
+            .replace_bindings(dataset_id, &ids)
             .await
             .int_err()?;
 
@@ -140,12 +141,13 @@ impl<'a> DatasetConfigurationMut<'a> {
     ) -> Result<ReplaceDatasetBindingsResult> {
         let dataset_id = self.dataset_request_state.dataset_id();
 
-        let uids: Vec<ResourceUID> = resource_ids.into_iter().map(Into::into).collect();
+        let ids: Vec<kamu_resources::ResourceID> =
+            resource_ids.into_iter().map(Into::into).collect();
 
-        if let Some(duplicate_uid) = find_first_duplicate(&uids) {
+        if let Some(duplicate_id) = find_first_duplicate(&ids) {
             return Ok(ReplaceDatasetBindingsResult::DuplicateResources(
                 ReplaceBindingsDuplicateResources {
-                    resource_id: duplicate_uid.into(),
+                    resource_id: duplicate_id.into(),
                 },
             ));
         }
@@ -164,41 +166,41 @@ impl<'a> DatasetConfigurationMut<'a> {
                 &current_account_id,
                 SecretSetResource::RESOURCE_TYPE,
                 SecretSetResource::API_VERSION,
-                &uids,
+                &ids,
             )
             .await
             .int_err()?;
 
-        if let Some(&uid) = outcome.access_denied.first() {
+        if let Some(&id) = outcome.access_denied.first() {
             return Ok(ReplaceDatasetBindingsResult::ResourceAccountMismatch(
                 ReplaceBindingsResourceAccountMismatch {
-                    resource_id: uid.into(),
+                    resource_id: id.into(),
                 },
             ));
         }
 
-        if let Some(&uid) = outcome.not_found.first() {
+        if let Some(&id) = outcome.not_found.first() {
             return Ok(ReplaceDatasetBindingsResult::ResourceNotFound(
                 ReplaceBindingsResourceNotFound {
-                    resource_id: uid.into(),
+                    resource_id: id.into(),
                 },
             ));
         }
 
-        if let Some((uid, actual_kind)) = outcome.kind_mismatch.into_iter().next() {
+        if let Some((id, actual_kind)) = outcome.kind_mismatch.into_iter().next() {
             return Ok(ReplaceDatasetBindingsResult::ResourceKindMismatch(
                 ReplaceBindingsResourceKindMismatch {
-                    resource_id: uid.into(),
+                    resource_id: id.into(),
                     expected_kind: SecretSetResource::RESOURCE_TYPE.to_string(),
                     actual_kind,
                 },
             ));
         }
 
-        if let Some((uid, actual_api_version)) = outcome.api_version_mismatch.into_iter().next() {
+        if let Some((id, actual_api_version)) = outcome.api_version_mismatch.into_iter().next() {
             return Ok(ReplaceDatasetBindingsResult::ResourceApiVersionMismatch(
                 ReplaceBindingsResourceApiVersionMismatch {
-                    resource_id: uid.into(),
+                    resource_id: id.into(),
                     expected_api_version: SecretSetResource::API_VERSION.to_string(),
                     actual_api_version,
                 },
@@ -206,7 +208,7 @@ impl<'a> DatasetConfigurationMut<'a> {
         }
 
         secret_set_binding_repo
-            .replace_bindings(dataset_id, &uids)
+            .replace_bindings(dataset_id, &ids)
             .await
             .int_err()?;
 
@@ -218,9 +220,9 @@ impl<'a> DatasetConfigurationMut<'a> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn find_first_duplicate(uids: &[ResourceUID]) -> Option<ResourceUID> {
+fn find_first_duplicate(ids: &[kamu_resources::ResourceID]) -> Option<kamu_resources::ResourceID> {
     let mut seen = std::collections::HashSet::new();
-    uids.iter().find(|&&uid| !seen.insert(uid)).copied()
+    ids.iter().find(|&&id| !seen.insert(id)).copied()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

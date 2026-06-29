@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use internal_error::{BoxedError, InternalError};
-use kamu_resources::ResourceUID;
+use kamu_resources::ResourceID;
 use kamu_resources_facade::{
     BatchResourceError,
     ResourceBatchSelector,
@@ -226,7 +226,7 @@ impl DeleteResourcesCommand {
                     api_version: Some(api_version.clone()),
                     resource_refs: entries
                         .iter()
-                        .map(|(_, target)| ResourceRef::ById(target.uid))
+                        .map(|(_, target)| ResourceRef::ById(target.id))
                         .collect(),
                 })
                 .await
@@ -275,7 +275,7 @@ impl DeleteResourcesCommand {
     fn handle_delete_many_result(
         &self,
         entries: &[(usize, DeleteResourceTarget)],
-        response: kamu_resources_facade::BatchResourceResponse<ResourceUID, ResourceLookupProblem>,
+        response: kamu_resources_facade::BatchResourceResponse<ResourceID, ResourceLookupProblem>,
         summary: &mut DeleteResourcesSummary,
         errors: &mut Vec<(BoxedError, String)>,
         output_config: &OutputConfig,
@@ -296,7 +296,7 @@ impl DeleteResourcesCommand {
             if self.ignore_not_found
                 && matches!(
                     &error,
-                    ResourceLookupProblem::NameNotFound(_) | ResourceLookupProblem::UIDNotFound(_)
+                    ResourceLookupProblem::NameNotFound(_) | ResourceLookupProblem::IDNotFound(_)
                 )
             {
                 summary.record_ignored();
@@ -369,7 +369,7 @@ struct DeleteResourceTarget {
     kind: String,
     api_version: String,
     canonical_kind_name: String,
-    uid: ResourceUID,
+    id: ResourceID,
     name: String,
 }
 
@@ -379,7 +379,7 @@ impl DeleteResourceTarget {
             kind: target.kind,
             api_version: target.api_version,
             canonical_kind_name: target.canonical_kind_name,
-            uid: target.uid,
+            id: target.id,
             name: target.name,
         }
     }

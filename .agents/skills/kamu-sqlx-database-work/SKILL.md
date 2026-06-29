@@ -34,22 +34,22 @@ pub struct MyEntityRow {
 
 ### Avoiding dynamic QueryBuilder in Postgres
 
-For Postgres queries that filter on a set of composite keys (e.g. `(uid, kind)` pairs), prefer static `UNNEST`-based queries over dynamically built `OR` chains:
+For Postgres queries that filter on a set of composite keys (e.g. `(id, kind)` pairs), prefer static `UNNEST`-based queries over dynamically built `OR` chains:
 
 ```sql
 -- Prefer this:
-WHERE (resource_uid, resource_kind) IN (
+WHERE (resource_id, resource_kind) IN (
     SELECT * FROM UNNEST($1::uuid[], $2::text[])
 )
 
 -- Over a dynamically built:
--- WHERE (resource_uid = $1 AND resource_kind = $2) OR (resource_uid = $3 AND resource_kind = $4) ...
+-- WHERE (resource_id = $1 AND resource_kind = $2) OR (resource_id = $3 AND resource_kind = $4) ...
 ```
 
 Extract the arrays before entering any `async_stream::stream!` block so they are captured cleanly:
 
 ```rust
-let uids: Vec<uuid::Uuid> = queries.iter().map(|q| *q.uid.as_ref()).collect();
+let ids: Vec<uuid::Uuid> = queries.iter().map(|q| *q.id.as_ref()).collect();
 let kinds: Vec<String> = queries.iter().map(|q| q.kind.clone()).collect();
 ```
 
