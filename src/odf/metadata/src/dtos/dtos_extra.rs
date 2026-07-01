@@ -16,7 +16,7 @@ use crate::*;
 // OffsetInterval
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl OffsetInterval {
+impl dataset::OffsetInterval {
     #[allow(clippy::cast_possible_truncation)]
     pub fn len(&self) -> usize {
         (self.end - self.start + 1) as usize
@@ -27,7 +27,7 @@ impl OffsetInterval {
 // AddData
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl AddData {
+impl dataset::AddData {
     /// Helper for determining the last record offset in the dataset
     pub fn last_offset(&self) -> Option<u64> {
         self.new_data
@@ -48,7 +48,7 @@ impl AddData {
 // ExecuteTransform
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl ExecuteTransform {
+impl dataset::ExecuteTransform {
     /// Helper for determining the last record offset in the dataset
     pub fn last_offset(&self) -> Option<u64> {
         self.new_data
@@ -66,7 +66,7 @@ impl ExecuteTransform {
 // ExecuteTransformInput
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl ExecuteTransformInput {
+impl dataset::ExecuteTransformInput {
     /// Helper for determining the input's last block hash included in the
     /// transaction
     pub fn last_block_hash(&self) -> Option<&Multihash> {
@@ -100,8 +100,8 @@ impl ExecuteTransformInput {
 // SetTransform
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl SetTransform {
-    pub fn as_dataset_ref_alias_map(&self) -> HashMap<&DatasetRef, &String> {
+impl dataset::SetTransform {
+    pub fn as_dataset_ref_alias_map(&self) -> HashMap<&dataset::DatasetRef, &String> {
         self.inputs.iter().fold(HashMap::new(), |mut acc, input| {
             if let Some(alias) = input.alias.as_ref() {
                 acc.insert(&input.dataset_ref, alias);
@@ -115,10 +115,10 @@ impl SetTransform {
 // Transform
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl Transform {
+impl dataset::Transform {
     pub fn engine(&self) -> &str {
         match self {
-            Transform::Sql(v) => v.engine.as_str(),
+            Self::Sql(v) => v.engine.as_str(),
         }
     }
 }
@@ -127,36 +127,13 @@ impl Transform {
 // SetVocab
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<SetVocab> for DatasetVocabulary {
-    fn from(v: SetVocab) -> Self {
+impl From<dataset::SetVocab> for dataset::DatasetVocabulary {
+    fn from(v: dataset::SetVocab) -> Self {
         Self {
-            offset_column: v
-                .offset_column
-                .unwrap_or_else(|| DatasetVocabulary::DEFAULT_OFFSET_COLUMN_NAME.to_string()),
-            operation_type_column: v.operation_type_column.unwrap_or_else(|| {
-                DatasetVocabulary::DEFAULT_OPERATION_TYPE_COLUMN_NAME.to_string()
-            }),
-            system_time_column: v
-                .system_time_column
-                .unwrap_or_else(|| DatasetVocabulary::DEFAULT_SYSTEM_TIME_COLUMN_NAME.to_string()),
-            event_time_column: v
-                .event_time_column
-                .unwrap_or_else(|| DatasetVocabulary::DEFAULT_EVENT_TIME_COLUMN_NAME.to_string()),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// DatasetVocabulary
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl Default for DatasetVocabulary {
-    fn default() -> Self {
-        Self {
-            offset_column: Self::DEFAULT_OFFSET_COLUMN_NAME.to_string(),
-            operation_type_column: Self::DEFAULT_OPERATION_TYPE_COLUMN_NAME.to_string(),
-            system_time_column: Self::DEFAULT_SYSTEM_TIME_COLUMN_NAME.to_string(),
-            event_time_column: Self::DEFAULT_EVENT_TIME_COLUMN_NAME.to_string(),
+            offset_column: v.offset_column,
+            operation_type_column: v.operation_type_column,
+            system_time_column: v.system_time_column,
+            event_time_column: v.event_time_column,
         }
     }
 }
@@ -165,58 +142,58 @@ impl Default for DatasetVocabulary {
 // ReadStep
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl ReadStep {
+impl source::ReadStep {
     pub fn ddl_schema(&self) -> Option<&Vec<String>> {
         match self {
-            ReadStep::Csv(v) => v.ddl_schema.as_ref(),
-            ReadStep::Json(v) => v.ddl_schema.as_ref(),
-            ReadStep::NdJson(v) => v.ddl_schema.as_ref(),
-            ReadStep::GeoJson(v) => v.ddl_schema.as_ref(),
-            ReadStep::NdGeoJson(v) => v.ddl_schema.as_ref(),
-            ReadStep::EsriShapefile(v) => v.ddl_schema.as_ref(),
-            ReadStep::Parquet(v) => v.ddl_schema.as_ref(),
+            Self::Csv(v) => v.ddl_schema.as_ref(),
+            Self::Json(v) => v.ddl_schema.as_ref(),
+            Self::NdJson(v) => v.ddl_schema.as_ref(),
+            Self::GeoJson(v) => v.ddl_schema.as_ref(),
+            Self::NdGeoJson(v) => v.ddl_schema.as_ref(),
+            Self::EsriShapefile(v) => v.ddl_schema.as_ref(),
+            Self::Parquet(v) => v.ddl_schema.as_ref(),
         }
     }
 
-    pub fn schema(&self) -> Option<&DataSchema> {
+    pub fn schema(&self) -> Option<&data::DataSchema> {
         match self {
-            ReadStep::Csv(v) => v.schema.as_ref(),
-            ReadStep::Json(v) => v.schema.as_ref(),
-            ReadStep::NdJson(v) => v.schema.as_ref(),
-            ReadStep::GeoJson(v) => v.schema.as_ref(),
-            ReadStep::NdGeoJson(v) => v.schema.as_ref(),
-            ReadStep::EsriShapefile(v) => v.schema.as_ref(),
-            ReadStep::Parquet(v) => v.schema.as_ref(),
+            Self::Csv(v) => v.schema.as_ref(),
+            Self::Json(v) => v.schema.as_ref(),
+            Self::NdJson(v) => v.schema.as_ref(),
+            Self::GeoJson(v) => v.schema.as_ref(),
+            Self::NdGeoJson(v) => v.schema.as_ref(),
+            Self::EsriShapefile(v) => v.schema.as_ref(),
+            Self::Parquet(v) => v.schema.as_ref(),
         }
     }
 
-    pub fn set_schema(&mut self, schema: DataSchema) {
+    pub fn set_schema(&mut self, schema: data::DataSchema) {
         match self {
-            ReadStep::Csv(v) => {
+            Self::Csv(v) => {
                 v.ddl_schema = None;
                 v.schema = Some(schema);
             }
-            ReadStep::Json(v) => {
+            Self::Json(v) => {
                 v.ddl_schema = None;
                 v.schema = Some(schema);
             }
-            ReadStep::NdJson(v) => {
+            Self::NdJson(v) => {
                 v.ddl_schema = None;
                 v.schema = Some(schema);
             }
-            ReadStep::GeoJson(v) => {
+            Self::GeoJson(v) => {
                 v.ddl_schema = None;
                 v.schema = Some(schema);
             }
-            ReadStep::NdGeoJson(v) => {
+            Self::NdGeoJson(v) => {
                 v.ddl_schema = None;
                 v.schema = Some(schema);
             }
-            ReadStep::EsriShapefile(v) => {
+            Self::EsriShapefile(v) => {
                 v.ddl_schema = None;
                 v.schema = Some(schema);
             }
-            ReadStep::Parquet(v) => {
+            Self::Parquet(v) => {
                 v.ddl_schema = None;
                 v.schema = Some(schema);
             }
@@ -225,17 +202,40 @@ impl ReadStep {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DatasetVocabulary
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl dataset::DatasetVocabulary {
+    pub fn set_defaults(&mut self) -> &mut Self {
+        self.offset_column
+            .get_or_insert_with(|| Self::default_offset_column().into());
+        self.operation_type_column
+            .get_or_insert_with(|| Self::default_operation_type_column().into());
+        self.system_time_column
+            .get_or_insert_with(|| Self::default_system_time_column().into());
+        self.event_time_column
+            .get_or_insert_with(|| Self::default_event_time_column().into());
+        self
+    }
+
+    pub fn with_defaults(mut self) -> Self {
+        self.set_defaults();
+        self
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // MergeStrategy
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl MergeStrategy {
+impl source::MergeStrategy {
     pub fn primary_key(self) -> Option<Vec<String>> {
         match self {
-            MergeStrategy::Append(_a) => None,
-            MergeStrategy::Ledger(l) => Some(l.primary_key),
-            MergeStrategy::Snapshot(s) => Some(s.primary_key),
-            MergeStrategy::ChangelogStream(c) => Some(c.primary_key),
-            MergeStrategy::UpsertStream(u) => Some(u.primary_key),
+            Self::Append(_a) => None,
+            Self::Ledger(l) => Some(l.primary_key),
+            Self::Snapshot(s) => Some(s.primary_key),
+            Self::ChangelogStream(c) => Some(c.primary_key),
+            Self::UpsertStream(u) => Some(u.primary_key),
         }
     }
 }
@@ -244,13 +244,13 @@ impl MergeStrategy {
 // RawQueryResponse
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl Display for RawQueryResponseInvalidQuery {
+impl Display for engine::RawQueryResponseInvalidQuery {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", &self.message)
     }
 }
 
-impl Display for RawQueryResponseInternalError {
+impl Display for engine::RawQueryResponseInternalError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", &self.message)?;
         if let Some(bt) = &self.backtrace {
@@ -264,13 +264,13 @@ impl Display for RawQueryResponseInternalError {
 // TransformResponse
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl Display for TransformResponseInvalidQuery {
+impl Display for engine::TransformResponseInvalidQuery {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", &self.message)
     }
 }
 
-impl Display for TransformResponseInternalError {
+impl Display for engine::TransformResponseInternalError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", &self.message)?;
         if let Some(bt) = &self.backtrace {
@@ -284,7 +284,7 @@ impl Display for TransformResponseInternalError {
 // DataSlice
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl DataSlice {
+impl dataset::DataSlice {
     pub fn num_records(&self) -> u64 {
         self.offset_interval.end - self.offset_interval.start + 1
     }
@@ -299,11 +299,11 @@ impl DataSlice {
 pub struct SetDataSchemaV2 {
     /// Defines the logical schema of the data files that follow this event.
     /// Will become a required field after migration.
-    pub schema: DataSchema,
+    pub schema: data::DataSchema,
 }
 
-impl SetDataSchema {
-    pub fn new(schema: DataSchema) -> Self {
+impl dataset::SetDataSchema {
+    pub fn new(schema: data::DataSchema) -> Self {
         Self {
             raw_arrow_schema: None,
             schema: Some(schema),
@@ -316,12 +316,14 @@ impl SetDataSchema {
         if let Some(schema) = self.schema {
             SetDataSchemaV2 { schema }
         } else {
-            let arrow_schema = self.schema_as_arrow(&ToArrowSettings::default()).unwrap();
+            let arrow_schema = self
+                .schema_as_arrow(&data::ToArrowSettings::default())
+                .unwrap();
 
             // SAFETY: Old version of the event was writing schemas after execution of our
             // engines which produce the subset of types that we know for certain are
             // compatible with ODF schema, so unwrapping is safe.
-            let schema = DataSchema::new_from_arrow(&arrow_schema).unwrap();
+            let schema = data::DataSchema::new_from_arrow(&arrow_schema).unwrap();
 
             // NOTE: Previously Arrow schema was written as it appeared in the output
             // DataFrame. This included View type encodings. ODF schema makes a decision to
@@ -352,7 +354,7 @@ impl SetDataSchema {
     #[cfg(feature = "arrow")]
     pub fn schema_as_arrow(
         &self,
-        settings: &ToArrowSettings,
+        settings: &data::ToArrowSettings,
     ) -> Result<arrow::datatypes::Schema, SchemaAsArrowError> {
         if let Some(raw_arrow_schema) = &self.raw_arrow_schema {
             assert!(self.schema.is_none());
@@ -374,22 +376,24 @@ impl SetDataSchema {
 #[error(transparent)]
 pub enum SchemaAsArrowError {
     Serde(#[from] crate::serde::Error),
-    Unsupported(#[from] crate::schema::UnsupportedSchema),
+    Unsupported(#[from] crate::data::UnsupportedSchema),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // SourceState
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl SourceState {
+impl source::SourceState {
     pub const DEFAULT_SOURCE_NAME: &'static str = "default";
+    pub const KIND_ETAG: &'static str = "odf/etag";
+    pub const KIND_LAST_MODIFIED: &'static str = "odf/last-modified";
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // MetadataEventTypeFlags
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl MetadataEventTypeFlags {
+impl dataset::MetadataEventTypeFlags {
     pub const DATA_BLOCK: Self =
         Self::from_bits_retain(Self::ADD_DATA.bits() | Self::EXECUTE_TRANSFORM.bits());
 

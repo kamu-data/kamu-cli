@@ -110,7 +110,7 @@ where
 {
     let ctx = SessionContext::new();
     let strat = MergeStrategyAppend::new(odf::metadata::DatasetVocabulary {
-        event_time_column: "year".to_string(),
+        event_time_column: Some("year".into()),
         ..Default::default()
     });
     let prev = {

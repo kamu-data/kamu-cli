@@ -12,7 +12,7 @@ use std::convert::TryFrom;
 use digest::Digest;
 use rand::Rng;
 
-use crate::*;
+use crate::dataset::*;
 
 pub struct IDFactory;
 

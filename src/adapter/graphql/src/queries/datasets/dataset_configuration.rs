@@ -13,7 +13,6 @@ use kamu_resources::GenericResourceQueryService;
 
 use crate::prelude::*;
 use crate::queries::DatasetRequestState;
-use crate::scalars::ResourceID;
 use crate::utils;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -139,7 +138,7 @@ impl<'a> DatasetConfiguration<'a> {
 
 #[derive(SimpleObject, Debug)]
 pub struct DatasetBindingView {
-    pub resource_id: ResourceID,
+    pub resource_id: ResourceID2,
     pub binding_order: u64,
     pub resource_name: String,
     pub resource_schema: String,

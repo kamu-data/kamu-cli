@@ -466,10 +466,10 @@ fn extract_schema_field_names(
                 .filter(|f| {
                     // Only include fields that are not default vocabulary fields
                     ![
-                        odf::metadata::DatasetVocabulary::DEFAULT_OFFSET_COLUMN_NAME,
-                        odf::metadata::DatasetVocabulary::DEFAULT_OPERATION_TYPE_COLUMN_NAME,
-                        odf::metadata::DatasetVocabulary::DEFAULT_SYSTEM_TIME_COLUMN_NAME,
-                        odf::metadata::DatasetVocabulary::DEFAULT_EVENT_TIME_COLUMN_NAME,
+                        odf::metadata::DatasetVocabulary::default_offset_column(),
+                        odf::metadata::DatasetVocabulary::default_operation_type_column(),
+                        odf::metadata::DatasetVocabulary::default_system_time_column(),
+                        odf::metadata::DatasetVocabulary::default_event_time_column(),
                     ]
                     .contains(&f.name.as_str())
                 })

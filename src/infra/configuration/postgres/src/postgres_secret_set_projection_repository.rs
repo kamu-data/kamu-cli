@@ -16,8 +16,8 @@ use kamu_configuration::{
     SecretSetProjectionRepository,
 };
 use kamu_resources::ResourceID;
+use multiformats::stack_string::StackString;
 use odf::metadata::AsStackString;
-use odf::metadata::stack_string::StackString;
 
 #[component]
 #[interface(dyn SecretSetProjectionRepository)]

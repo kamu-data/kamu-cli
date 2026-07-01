@@ -15,20 +15,9 @@ use super::grpc_generated::{
     RawQueryRequest as RawQueryRequestGRPC,
     TransformRequest as TransformRequestGRPC,
 };
+use crate::dtos::engine::*;
 use crate::serde::flatbuffers::FlatbuffersEngineProtocol;
 use crate::serde::{EngineProtocolDeserializer, EngineProtocolSerializer};
-use crate::{
-    RawQueryRequest,
-    RawQueryResponse,
-    RawQueryResponseInternalError,
-    RawQueryResponseInvalidQuery,
-    RawQueryResponseSuccess,
-    TransformRequest,
-    TransformResponse,
-    TransformResponseInternalError,
-    TransformResponseInvalidQuery,
-    TransformResponseSuccess,
-};
 
 pub struct EngineGrpcClient {
     client: EngineClientGRPC<tonic::transport::Channel>,
@@ -82,8 +71,15 @@ impl EngineGrpcClient {
 
     pub async fn execute_transform(
         &mut self,
-        request: TransformRequest,
+        mut request: TransformRequest,
     ) -> Result<TransformResponseSuccess, ExecuteTransformError> {
+        // TODO: Previously `DatasetVocab` did not allow empty fields, so we need to
+        // fill them to maintain compatibility with older engines
+        request.vocab.set_defaults();
+        for input in &mut request.query_inputs {
+            input.vocab.set_defaults();
+        }
+
         let fb = FlatbuffersEngineProtocol
             .write_transform_request(&request)
             .int_err()?;

@@ -43,6 +43,14 @@ impl<T: Multiformat> ParseError<T> {
             _phantom: PhantomData,
         }
     }
+
+    pub fn convert<T2: Multiformat>(self) -> ParseError<T2> {
+        ParseError {
+            value: self.value,
+            source: self.source,
+            _phantom: PhantomData,
+        }
+    }
 }
 
 impl<T: Multiformat> std::fmt::Display for ParseError<T> {

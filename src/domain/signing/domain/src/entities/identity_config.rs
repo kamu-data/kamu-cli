@@ -27,7 +27,7 @@ pub struct IdentityConfig {
     // Backward compatibility (alias)
     #[serde(alias = "privateKey")]
     #[config(combine(replace))]
-    pub ed25519_private_key: Option<odf::metadata::PrivateKey>,
+    pub ed25519_private_key: Option<odf::metadata::formats::PrivateKey>,
 
     /// Secp256k1 private key used to sign EIP-712 typed data.
     ///

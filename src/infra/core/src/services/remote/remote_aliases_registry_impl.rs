@@ -13,7 +13,7 @@ use dill::*;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_core::*;
 use kamu_datasets::{DatasetRegistry, ResolvedDataset};
-use odf::metadata::serde::yaml::Manifest;
+use odf::metadata::serde::yaml::legacy::Manifest;
 use thiserror::Error;
 
 use crate::DatasetConfig;

@@ -10,7 +10,7 @@
 use std::path::PathBuf;
 
 use internal_error::{InternalError, ResultIntoInternal};
-use odf::metadata::serde::yaml::Manifest;
+use odf::metadata::serde::yaml::legacy::Manifest;
 
 use crate::{NotInWorkspace, WorkspaceLayout, resource_context};
 

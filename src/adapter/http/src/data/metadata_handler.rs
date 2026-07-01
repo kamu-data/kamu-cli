@@ -83,17 +83,17 @@ pub struct DatasetMetadataResponse {
 #[derive(Debug, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Output {
-    #[serde_as(as = "Option<odf::serde::yaml::SetAttachmentsDef>")]
+    #[serde_as(as = "Option<odf::metadata::serde::yaml::dataset::SetAttachments>")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Object)]
     pub attachments: Option<odf::metadata::SetAttachments>,
 
-    #[serde_as(as = "Option<odf::serde::yaml::SetInfoDef>")]
+    #[serde_as(as = "Option<odf::metadata::serde::yaml::dataset::SetInfo>")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Object)]
     pub info: Option<odf::metadata::SetInfo>,
 
-    #[serde_as(as = "Option<odf::serde::yaml::SetLicenseDef>")]
+    #[serde_as(as = "Option<odf::metadata::serde::yaml::dataset::SetLicense>")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Object)]
     pub license: Option<odf::metadata::SetLicense>,
@@ -110,12 +110,12 @@ pub struct Output {
     #[schema(value_type = query_types::SchemaFormat)]
     pub schema_format: Option<query_types::SchemaFormat>,
 
-    #[serde_as(as = "Option<odf::serde::yaml::SeedDef>")]
+    #[serde_as(as = "Option<odf::metadata::serde::yaml::dataset::Seed>")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Object)]
     pub seed: Option<odf::metadata::Seed>,
 
-    #[serde_as(as = "Option<odf::serde::yaml::DatasetVocabularyDef>")]
+    #[serde_as(as = "Option<odf::metadata::serde::yaml::dataset::DatasetVocabulary>")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Object)]
     pub vocab: Option<odf::metadata::DatasetVocabulary>,
@@ -221,9 +221,10 @@ pub async fn dataset_metadata_handler(
 
     let seed = seed_visitor.and_then(odf::dataset::SearchSingleTypedBlockVisitor::into_event);
 
-    let vocab = vocab_visitor
-        .map(|v| v.into_event().unwrap_or_default())
-        .map(Into::into);
+    let vocab = vocab_visitor.map(|v| {
+        odf::metadata::dataset::DatasetVocabulary::from(v.into_event().unwrap_or_default())
+            .with_defaults()
+    });
 
     let refs = if !params.include.contains(&Include::Refs) {
         None

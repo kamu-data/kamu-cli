@@ -18,7 +18,7 @@ use kamu_resources::GenericResourceQueryService;
 
 use crate::prelude::*;
 use crate::queries::DatasetRequestState;
-use crate::scalars::ResourceID;
+use crate::scalars::ResourceID2;
 use crate::utils;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -49,7 +49,7 @@ impl<'a> DatasetConfigurationMut<'a> {
     async fn replace_variable_set_bindings(
         &self,
         ctx: &Context<'_>,
-        resource_ids: Vec<ResourceID>,
+        resource_ids: Vec<ResourceID2>,
     ) -> Result<ReplaceDatasetBindingsResult> {
         let dataset_id = self.dataset_request_state.dataset_id();
 
@@ -122,7 +122,7 @@ impl<'a> DatasetConfigurationMut<'a> {
     async fn replace_secret_set_bindings(
         &self,
         ctx: &Context<'_>,
-        resource_ids: Vec<ResourceID>,
+        resource_ids: Vec<ResourceID2>,
     ) -> Result<ReplaceDatasetBindingsResult> {
         let dataset_id = self.dataset_request_state.dataset_id();
 
@@ -224,7 +224,7 @@ impl ReplaceDatasetBindingsSuccess {
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct ReplaceBindingsResourceNotFound {
-    pub resource_id: ResourceID,
+    pub resource_id: ResourceID2,
 }
 
 #[ComplexObject]
@@ -239,7 +239,7 @@ impl ReplaceBindingsResourceNotFound {
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct ReplaceBindingsResourceSchemaMismatch {
-    pub resource_id: ResourceID,
+    pub resource_id: ResourceID2,
     pub expected_schema: String,
     pub actual_schema: String,
 }
@@ -259,7 +259,7 @@ impl ReplaceBindingsResourceSchemaMismatch {
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct ReplaceBindingsResourceAccountMismatch {
-    pub resource_id: ResourceID,
+    pub resource_id: ResourceID2,
 }
 
 #[ComplexObject]
@@ -277,7 +277,7 @@ impl ReplaceBindingsResourceAccountMismatch {
 #[derive(SimpleObject, Debug)]
 #[graphql(complex)]
 pub struct ReplaceBindingsDuplicateResources {
-    pub resource_id: ResourceID,
+    pub resource_id: ResourceID2,
 }
 
 #[ComplexObject]

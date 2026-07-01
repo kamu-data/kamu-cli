@@ -9,7 +9,9 @@
 
 use std::str::FromStr;
 
-use opendatafabric_metadata::*;
+use opendatafabric_metadata::auth::*;
+use opendatafabric_metadata::dataset::*;
+use opendatafabric_metadata::storage::*;
 use url::Url;
 
 #[test]

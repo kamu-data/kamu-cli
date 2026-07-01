@@ -145,7 +145,7 @@ impl SearchResourceIdentitiesInput {
 
 #[derive(OneofObject, Debug, Clone)]
 pub enum ResourceRefInput {
-    ById(ResourceID),
+    ById(ResourceID2),
     ByName(ResourceByNameSelectorInput),
 }
 
@@ -298,7 +298,7 @@ pub enum ResourceBadAccountProblemCode {
 
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceIDNotFoundProblem {
-    pub id: ResourceID,
+    pub id: ResourceID2,
     pub message: String,
 }
 
@@ -311,7 +311,7 @@ pub struct ResourceNameNotFoundProblem {
 
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceSchemaMismatchProblem {
-    pub id: ResourceID,
+    pub id: ResourceID2,
     pub expected_schema: String,
     pub actual_schema: String,
     pub message: String,
@@ -539,7 +539,7 @@ pub struct BatchResourceManifestSuccess {
 
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceIdentity {
-    pub id: ResourceID,
+    pub id: ResourceID2,
     pub schema: String,
     pub canonical_kind_name: String,
     pub name: String,
@@ -616,7 +616,7 @@ impl From<BatchGetResourceProblem> for BatchResourceProblem {
 
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceHeaders {
-    pub id: ResourceID,
+    pub id: ResourceID2,
     pub account: ResourceAccount,
     pub name: String,
     pub description: Option<String>,
@@ -663,7 +663,7 @@ impl From<kamu_resources::ResourceView> for ResourceHeaders {
 
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceSummary {
-    pub id: ResourceID,
+    pub id: ResourceID2,
     pub schema: String,
     pub name: String,
     pub description: Option<String>,

@@ -82,7 +82,11 @@ nutype = { version = "0.7", default-features = false }
 secrecy = "0.10"
 serde = { version = "1", default-features = false }
 serde_json = "1"
-setty = { version = "1.0", default-features = false }
+setty = { version = "1", default-features = false, features = [
+    "types-bytesize",
+    "types-duration-string",
+    "derive-async-graphql",
+] }
 sha3 = "0.10"
 strum = { version = "0.28", default-features = false, features = ["derive"] }
 thiserror = "2"

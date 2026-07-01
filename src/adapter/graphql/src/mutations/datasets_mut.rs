@@ -36,7 +36,10 @@ impl DatasetsMut {
                 for event in events {
                     match de.read_manifest(event.as_bytes()) {
                         Ok(event) => res.push(event),
-                        Err(e @ odf::metadata::serde::Error::SerdeError { .. }) => {
+                        Err(
+                            e @ (odf::metadata::serde::Error::SerdeError { .. }
+                            | odf::metadata::serde::Error::Validation(_)),
+                        ) => {
                             return Err(Ok(Box::new(CreateDatasetFromSnapshotResult::Malformed(
                                 MetadataManifestMalformed {
                                     message: e.to_string(),
@@ -209,7 +212,10 @@ impl DatasetsMut {
                 let de = odf::metadata::serde::yaml::YamlDatasetSnapshotDeserializer;
                 match de.read_manifest(snapshot.as_bytes()) {
                     Ok(snapshot) => snapshot,
-                    Err(e @ odf::metadata::serde::Error::SerdeError { .. }) => {
+                    Err(
+                        e @ (odf::metadata::serde::Error::SerdeError { .. }
+                        | odf::metadata::serde::Error::Validation(_)),
+                    ) => {
                         return Ok(CreateDatasetFromSnapshotResult::Malformed(
                             MetadataManifestMalformed {
                                 message: e.to_string(),
