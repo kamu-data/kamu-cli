@@ -382,7 +382,7 @@ impl DeleteResourceTarget {
             schema: target.schema,
             canonical_kind_name: target.canonical_kind_name,
             id: target.id,
-            name: target.name,
+            name: target.name.to_string(),
         }
     }
 

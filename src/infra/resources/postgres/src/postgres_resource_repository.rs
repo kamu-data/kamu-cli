@@ -89,7 +89,7 @@ impl ResourceRepository for PostgresResourceRepository {
             resource_id,
             account_id_str,
             resource_snapshot.schema,
-            resource_snapshot.headers.name,
+            resource_snapshot.headers.name.as_str(),
             resource_snapshot.headers.description,
             labels,
             annotations,
@@ -177,7 +177,7 @@ impl ResourceRepository for PostgresResourceRepository {
                         .to_string(),
                 )
                 .push_bind(resource_snapshot.schema.clone())
-                .push_bind(resource_snapshot.headers.name.clone())
+                .push_bind(resource_snapshot.headers.name.to_string())
                 .push_bind(resource_snapshot.headers.description.clone())
                 .push_bind(serde_json::to_value(&resource_snapshot.headers.labels).unwrap())
                 .push_bind(serde_json::to_value(&resource_snapshot.headers.annotations).unwrap())
@@ -270,12 +270,12 @@ impl ResourceRepository for PostgresResourceRepository {
             FROM resources
             WHERE account_id = $1
               AND resource_schema = $2
-              AND resource_name = $3
+              AND LOWER(resource_name) = LOWER($3)
               AND deleted_at IS NULL
             "#,
             account_id_stack.as_str(),
             schema,
-            name.to_ascii_lowercase(),
+            name.as_str(),
         )
         .fetch_optional(connection_mut)
         .await
@@ -346,7 +346,7 @@ impl ResourceRepository for PostgresResourceRepository {
             FROM resources
             WHERE account_id = $1
               AND resource_schema = $2
-              AND resource_name = ANY($3)
+              AND LOWER(resource_name) = ANY($3)
               AND deleted_at IS NULL
             "#,
             account_id_stack.as_str(),
@@ -398,7 +398,7 @@ impl ResourceRepository for PostgresResourceRepository {
             FROM resources
             WHERE account_id = $1
               AND resource_schema = ANY($2)
-              AND ($3::text[] IS NULL OR resource_name = ANY($3))
+              AND ($3::text[] IS NULL OR LOWER(resource_name) = ANY($3))
               AND ($4::text IS NULL OR resource_name ILIKE $4 ESCAPE '\')
               AND deleted_at IS NULL
             ORDER BY updated_at DESC, resource_id DESC
@@ -446,7 +446,7 @@ impl ResourceRepository for PostgresResourceRepository {
             FROM resources
             WHERE account_id = $1
               AND resource_schema = ANY($2)
-              AND ($3::text[] IS NULL OR resource_name = ANY($3))
+              AND ($3::text[] IS NULL OR LOWER(resource_name) = ANY($3))
               AND ($4::text IS NULL OR resource_name ILIKE $4 ESCAPE '\')
               AND deleted_at IS NULL
             "#,
@@ -505,7 +505,7 @@ impl ResourceRepository for PostgresResourceRepository {
             schema: row.resource_schema,
             headers: ResourceHeaders {
                 account: row.account_id,
-                name: row.resource_name,
+                name: kamu_resources::ResourceName::new_unchecked(&row.resource_name),
                 description: row.description,
                 labels: serde_json::from_value(row.labels).unwrap(),
                 annotations: serde_json::from_value(row.annotations).unwrap(),
@@ -617,7 +617,7 @@ impl ResourceRepository for PostgresResourceRepository {
             schema: row.resource_schema,
             headers: ResourceHeaders {
                 account: row.account_id,
-                name: row.resource_name,
+                name: kamu_resources::ResourceName::new_unchecked(&row.resource_name),
                 description: row.description,
                 labels: serde_json::from_value(row.labels).unwrap(),
                 annotations: serde_json::from_value(row.annotations).unwrap(),
@@ -684,7 +684,7 @@ impl ResourceRepository for PostgresResourceRepository {
                 schema: row.resource_schema,
                 headers: ResourceHeaders {
                     account: row.account_id,
-                    name: row.resource_name,
+                    name: kamu_resources::ResourceName::new_unchecked(&row.resource_name),
                     description: row.description,
                     labels: serde_json::from_value(row.labels).unwrap(),
                     annotations: serde_json::from_value(row.annotations).unwrap(),
@@ -796,7 +796,7 @@ impl ResourceRepository for PostgresResourceRepository {
                     schema: row.resource_schema,
                     headers: ResourceHeaders {
                         account: row.account_id,
-                        name: row.resource_name,
+                        name: kamu_resources::ResourceName::new_unchecked(&row.resource_name),
                         description: row.description,
                         labels: serde_json::from_value(row.labels).unwrap(),
                         annotations: serde_json::from_value(row.annotations).unwrap(),
@@ -864,7 +864,7 @@ impl ResourceRepository for PostgresResourceRepository {
                     schema: row.resource_schema,
                     headers: ResourceHeaders {
                         account: row.account_id,
-                        name: row.resource_name,
+                        name: kamu_resources::ResourceName::new_unchecked(&row.resource_name),
                         description: row.description,
                         labels: serde_json::from_value(row.labels).unwrap(),
                         annotations: serde_json::from_value(row.annotations).unwrap(),

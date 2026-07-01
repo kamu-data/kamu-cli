@@ -533,7 +533,7 @@ mod tests {
     fn resolved_selector(input: &str) -> ResolvedResourceSelector {
         ResolvedResourceSelector {
             input: input.to_owned(),
-            resource_ref: ResourceRef::ByName(input.to_owned()),
+            resource_ref: ResourceRef::ByName(input.parse().unwrap()),
         }
     }
 

@@ -33,7 +33,7 @@ async fn make_resource(catalog: &Catalog, kind: &str) -> ResourceRawEventQuery {
         headers: ResourceHeaders::simple(
             Utc::now(),
             odf::AccountID::new_seeded_ed25519(b"test-account"),
-            id.to_string(),
+            &id.to_string(),
         ),
         spec: serde_json::json!({}),
         status: None,

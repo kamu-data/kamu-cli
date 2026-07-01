@@ -132,7 +132,9 @@ pub async fn test_kind_aliases_resolve_consistently(h: &impl FacadeContractHarne
             ResourceSelector {
                 account: None,
                 kind: VARIABLE_SET_KIND.to_string(),
-                resource_ref: kamu_resources_facade::ResourceRef::ByName("alias-check".to_string()),
+                resource_ref: kamu_resources_facade::ResourceRef::ByName(
+                    "alias-check".parse().unwrap(),
+                ),
             },
             SpecViewMode::Encrypted,
         )
@@ -198,7 +200,7 @@ pub async fn test_unsupported_kind_rejected_consistently(h: &impl FacadeContract
                 account: None,
                 kind: bad_kind.to_string(),
                 resource_ref: kamu_resources_facade::ResourceRef::ByName(
-                    "unsupported-kind-base".to_string(),
+                    "unsupported-kind-base".parse().unwrap(),
                 ),
             },
             SpecViewMode::Encrypted,
@@ -215,7 +217,7 @@ pub async fn test_unsupported_kind_rejected_consistently(h: &impl FacadeContract
             account: None,
             kind: bad_kind.to_string(),
             resource_ref: kamu_resources_facade::ResourceRef::ByName(
-                "unsupported-kind-base".to_string(),
+                "unsupported-kind-base".parse().unwrap(),
             ),
         })
         .await;

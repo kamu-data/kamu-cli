@@ -55,7 +55,7 @@ fn by_name(name: &str) -> ResourceSelector {
     ResourceSelector {
         account: None,
         kind: VARIABLE_SET_KIND.to_string(),
-        resource_ref: ResourceRef::ByName(name.to_string()),
+        resource_ref: ResourceRef::ByName(name.parse().unwrap()),
     }
 }
 
@@ -71,7 +71,7 @@ fn batch_by_name(name: &str) -> ResourceBatchSelector {
     ResourceBatchSelector {
         account: None,
         kind: VARIABLE_SET_KIND.to_string(),
-        resource_refs: vec![ResourceRef::ByName(name.to_string())],
+        resource_refs: vec![ResourceRef::ByName(name.parse().unwrap())],
     }
 }
 
@@ -354,7 +354,7 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
             ResourceSelector {
                 account: Some(unknown_account.clone()),
                 kind: VARIABLE_SET_KIND.to_string(),
-                resource_ref: ResourceRef::ByName("bad-acct-get".to_string()),
+                resource_ref: ResourceRef::ByName("bad-acct-get".parse().unwrap()),
             },
             SpecViewMode::Encrypted,
         )
@@ -371,7 +371,7 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
             ResourceBatchSelector {
                 account: Some(unknown_account.clone()),
                 kind: VARIABLE_SET_KIND.to_string(),
-                resource_refs: vec![ResourceRef::ByName("bad-acct-get-many".to_string())],
+                resource_refs: vec![ResourceRef::ByName("bad-acct-get-many".parse().unwrap())],
             },
             SpecViewMode::Encrypted,
         )
@@ -388,7 +388,7 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
             ResourceSelector {
                 account: Some(unknown_account.clone()),
                 kind: VARIABLE_SET_KIND.to_string(),
-                resource_ref: ResourceRef::ByName("bad-acct-render".to_string()),
+                resource_ref: ResourceRef::ByName("bad-acct-render".parse().unwrap()),
             },
             ResourceManifestFormat::Json,
             SpecViewMode::Encrypted,
@@ -405,7 +405,7 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
         .delete(ResourceSelector {
             account: Some(unknown_account.clone()),
             kind: VARIABLE_SET_KIND.to_string(),
-            resource_ref: ResourceRef::ByName("bad-acct-delete".to_string()),
+            resource_ref: ResourceRef::ByName("bad-acct-delete".parse().unwrap()),
         })
         .await;
     assert_matches!(
@@ -419,7 +419,7 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
         .delete_many(ResourceBatchSelector {
             account: Some(unknown_account.clone()),
             kind: VARIABLE_SET_KIND.to_string(),
-            resource_refs: vec![ResourceRef::ByName("bad-acct-delete-many".to_string())],
+            resource_refs: vec![ResourceRef::ByName("bad-acct-delete-many".parse().unwrap())],
         })
         .await;
     assert_matches!(

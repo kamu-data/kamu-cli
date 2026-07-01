@@ -115,7 +115,7 @@ impl From<ResourceBatchSelectorInput> for kamu_resources_facade::ResourceBatchSe
 #[derive(InputObject, Debug, Clone)]
 pub struct SearchResourceIdentitiesInput {
     pub kinds: Vec<ResourceKindInput>,
-    pub names: Option<Vec<String>>,
+    pub names: Option<Vec<ResourceName<'static>>>,
     pub name_pattern: Option<String>,
     pub account: Option<ResourceAccountSelectorInput>,
 }
@@ -131,7 +131,9 @@ impl SearchResourceIdentitiesInput {
                 .into_iter()
                 .map(ResourceKindInput::into_resource_type)
                 .collect(),
-            exact_names: self.names,
+            exact_names: self
+                .names
+                .map(|names| names.into_iter().map(Into::into).collect()),
             name_pattern: self.name_pattern,
             account: self
                 .account
@@ -153,7 +155,7 @@ impl From<ResourceRefInput> for kamu_resources_facade::ResourceRef {
     fn from(value: ResourceRefInput) -> Self {
         match value {
             ResourceRefInput::ById(id) => Self::ById(id.into()),
-            ResourceRefInput::ByName(by_name) => Self::ByName(by_name.name.clone()),
+            ResourceRefInput::ByName(by_name) => Self::ByName(by_name.name.clone().into()),
         }
     }
 }
@@ -162,7 +164,7 @@ impl From<ResourceRefInput> for kamu_resources_facade::ResourceRef {
 
 #[derive(InputObject, Debug, Clone)]
 pub struct ResourceByNameSelectorInput {
-    pub name: String,
+    pub name: ResourceName<'static>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -305,7 +307,7 @@ pub struct ResourceIDNotFoundProblem {
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceNameNotFoundProblem {
     pub kind: String,
-    pub name: String,
+    pub name: ResourceName<'static>,
     pub message: String,
 }
 
@@ -336,7 +338,7 @@ impl From<kamu_resources_facade::ResourceLookupProblem> for ResourceLookupProble
             }),
             P::NameNotFound(e) => Self::NameNotFound(ResourceNameNotFoundProblem {
                 kind: e.kind.clone(),
-                name: e.name.clone(),
+                name: e.name.clone().into(),
                 message: e.to_string(),
             }),
             P::SchemaMismatch(e) => Self::SchemaMismatch(ResourceSchemaMismatchProblem {
@@ -542,7 +544,7 @@ pub struct ResourceIdentity {
     pub id: ResourceID<'static>,
     pub schema: String,
     pub canonical_kind_name: String,
-    pub name: String,
+    pub name: ResourceName<'static>,
 }
 
 impl From<kamu_resources::ResourceIdentityView> for ResourceIdentity {
@@ -551,7 +553,7 @@ impl From<kamu_resources::ResourceIdentityView> for ResourceIdentity {
             id: value.id.into(),
             schema: value.schema,
             canonical_kind_name: value.canonical_kind_name,
-            name: value.name,
+            name: value.name.into(),
         }
     }
 }
@@ -618,7 +620,7 @@ impl From<BatchGetResourceProblem> for BatchResourceProblem {
 pub struct ResourceHeaders {
     pub id: ResourceID<'static>,
     pub account: ResourceAccount,
-    pub name: String,
+    pub name: ResourceName<'static>,
     pub description: Option<String>,
     pub labels: serde_json::Value,
     pub annotations: serde_json::Value,
@@ -646,7 +648,7 @@ impl From<kamu_resources::ResourceView> for ResourceHeaders {
                 id: value.headers.account.id.into(),
                 name: value.headers.account.name.map(Into::into),
             },
-            name: value.headers.name.clone(),
+            name: value.headers.name.clone().into(),
             description: value.headers.description,
             labels,
             annotations,
@@ -665,7 +667,7 @@ impl From<kamu_resources::ResourceView> for ResourceHeaders {
 pub struct ResourceSummary {
     pub id: ResourceID<'static>,
     pub schema: String,
-    pub name: String,
+    pub name: ResourceName<'static>,
     pub description: Option<String>,
     pub generation: UInt64,
     pub created_at: DateTime<Utc>,
@@ -679,7 +681,7 @@ impl From<kamu_resources::ResourceSummaryView> for ResourceSummary {
         Self {
             id: value.id.into(),
             schema: value.schema,
-            name: value.name.clone(),
+            name: value.name.clone().into(),
             description: value.description,
             generation: value.generation.into(),
             created_at: value.created_at,

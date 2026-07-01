@@ -9,7 +9,7 @@
 
 use chrono::{DateTime, Utc};
 
-use crate::{DeclarativeResource, ResourceReconcileError};
+use crate::{DeclarativeResource, ResourceName, ResourceReconcileError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -53,7 +53,7 @@ pub trait ReconcilableResource: DeclarativeResource {
     fn try_delete(
         &mut self,
         now: DateTime<Utc>,
-        tombstone_name: String,
+        tombstone_name: ResourceName,
     ) -> Result<(), Self::LifecycleError>
     where
         Self: Sized;

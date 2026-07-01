@@ -165,7 +165,7 @@ async fn test_plan_type_mismatch_rejects() {
         .create_resource(&ResourceSnapshot {
             id,
             schema: "OtherKind".to_string(),
-            headers: ResourceHeaders::simple(Utc::now(), account_id.clone(), "res_a".to_string()),
+            headers: ResourceHeaders::simple(Utc::now(), account_id.clone(), "res-a"),
             spec: serde_json::json!({}),
             status: None,
             last_reconciled_at: None,

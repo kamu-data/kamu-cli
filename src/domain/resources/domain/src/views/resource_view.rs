@@ -66,12 +66,12 @@ impl ResourceViewHeaders {
         now: DateTime<Utc>,
         id: ResourceID,
         account: ResourceViewAccount,
-        name: impl Into<ResourceName>,
+        name: &str,
     ) -> Self {
         Self {
             id,
             account,
-            name: name.into(),
+            name: ResourceName::new_unchecked(name),
             description: None,
             labels: BTreeMap::new(),
             annotations: BTreeMap::new(),

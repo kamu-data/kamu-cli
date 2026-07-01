@@ -4,7 +4,7 @@ CREATE TABLE resources (
     resource_id            CHAR(36) PRIMARY KEY NOT NULL,
     account_id             VARCHAR(100) NOT NULL,
     resource_schema        TEXT NOT NULL,
-    resource_name          VARCHAR(200) NOT NULL,
+    resource_name          VARCHAR(200) NOT NULL COLLATE NOCASE,
     description            TEXT NULL,
     labels                 JSONB NOT NULL,
     annotations            JSONB NOT NULL,
@@ -18,12 +18,13 @@ CREATE TABLE resources (
     updated_at             TIMESTAMPTZ NOT NULL,
     deleted_at             TIMESTAMPTZ NULL,
     last_reconciled_at     TIMESTAMPTZ NULL,
-    last_event_id          BIGINT NULL,
-
-    UNIQUE (account_id, resource_schema, resource_name)
+    last_event_id          BIGINT NULL
 );
 
-CREATE INDEX idx_resources_account_schema_name
+-- Resource names are case-insensitive per the ODF `ResourceName` grammar
+-- (ASCII-only hostname-like charset); the column's NOCASE collation makes
+-- this index and all `resource_name` comparisons case-insensitive.
+CREATE UNIQUE INDEX idx_resources_account_schema_name_ci
     ON resources (account_id, resource_schema, resource_name);
 
 CREATE INDEX idx_resources_account_schema_updated_at

@@ -51,7 +51,7 @@ fn by_name(name: &str) -> ResourceSelector {
     ResourceSelector {
         account: None,
         kind: VARIABLE_SET_KIND.to_string(),
-        resource_ref: ResourceRef::ByName(name.to_string()),
+        resource_ref: ResourceRef::ByName(name.parse().unwrap()),
     }
 }
 

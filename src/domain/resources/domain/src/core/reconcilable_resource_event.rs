@@ -12,7 +12,7 @@ use enum_variants::*;
 use event_sourcing::ProjectionEvent;
 use serde::{Deserialize, Serialize};
 
-use crate::{ResourceHeadersInput, ResourceID};
+use crate::{ResourceHeadersInput, ResourceID, ResourceName};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -56,7 +56,7 @@ pub struct ResourceEventSpecUpdated<TSpec> {
 pub struct ResourceEventDeleted {
     pub event_time: DateTime<Utc>,
     pub id: ResourceID,
-    pub tombstone_name: String,
+    pub tombstone_name: ResourceName,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

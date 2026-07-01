@@ -3943,7 +3943,7 @@ input ResourceBatchSelectorInput {
 }
 
 input ResourceByNameSelectorInput {
-	name: String!
+	name: ResourceName!
 }
 
 type ResourceConnection {
@@ -4006,7 +4006,7 @@ enum ResourceHeaderValidationProblemCode {
 type ResourceHeaders {
 	id: ResourceID!
 	account: ResourceAccount!
-	name: String!
+	name: ResourceName!
 	description: String
 	labels: JSON!
 	annotations: JSON!
@@ -4028,7 +4028,7 @@ type ResourceIdentity {
 	id: ResourceID!
 	schema: String!
 	canonicalKindName: String!
-	name: String!
+	name: ResourceName!
 }
 
 type ResourceIdentityConnection {
@@ -4122,9 +4122,11 @@ enum ResourceManifestFormat {
 	YAML
 }
 
+scalar ResourceName
+
 type ResourceNameNotFoundProblem {
 	kind: String!
-	name: String!
+	name: ResourceName!
 	message: String!
 }
 
@@ -4184,7 +4186,7 @@ type ResourceStatusSummary {
 type ResourceSummary {
 	id: ResourceID!
 	schema: String!
-	name: String!
+	name: ResourceName!
 	description: String
 	generation: Uint64!
 	createdAt: DateTime!
@@ -4355,7 +4357,7 @@ enum SearchEntityName {
 
 input SearchResourceIdentitiesInput {
 	kinds: [ResourceKindInput!]!
-	names: [String!]
+	names: [ResourceName!]
 	namePattern: String
 	account: ResourceAccountSelectorInput
 }

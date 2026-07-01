@@ -46,7 +46,7 @@ async fn make_secret_set_resource(catalog: &Catalog) -> ResourceID {
         headers: ResourceHeaders::simple(
             Utc::now(),
             odf::AccountID::new_seeded_ed25519(b"test-account"),
-            secret_set_id.to_string(),
+            &secret_set_id.to_string(),
         ),
         spec: serde_json::to_value(SecretSetSpec {
             secrets: [(

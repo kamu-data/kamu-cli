@@ -98,7 +98,12 @@ pub(crate) async fn resolve_batch_ids(
             .find_resource_identities_by_names(account_id, kind, &names)
             .await?
             .into_iter()
-            .map(|row| (row.name, ResourceID::new(row.id)))
+            .map(|row| {
+                (
+                    ResourceName::new_unchecked(&row.name),
+                    ResourceID::new(row.id),
+                )
+            })
             .collect::<HashMap<_, _>>();
 
         for (request_index, resource_ref, name) in groups.name_entries {

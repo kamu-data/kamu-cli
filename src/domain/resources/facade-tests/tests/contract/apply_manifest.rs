@@ -41,7 +41,7 @@ fn make_selector(kind: &str, _schema: &str, name: &str) -> ResourceSelector {
     ResourceSelector {
         account: None,
         kind: kind.to_string(),
-        resource_ref: ResourceRef::ByName(name.to_string()),
+        resource_ref: ResourceRef::ByName(name.parse().unwrap()),
     }
 }
 
@@ -669,6 +669,52 @@ pub async fn test_apply_rejects_invalid_headers(h: &impl FacadeContractHarness) 
     assert!(
         matches!(apply_result, Err(ApplyManifestError::InvalidHeaders(_))),
         "apply with empty name must return Err(InvalidHeaders), got: {apply_result:?}"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// A non-empty name that violates the ODF `ResourceName` grammar (underscores
+// are not part of the hostname-like charset) must also surface as
+// Err(InvalidHeaders(_)), not as a manifest parse failure or an internal
+// error, on both local and remote facades.
+contract_test!(
+    apply_rejects_grammatically_invalid_name,
+    super::test_apply_rejects_grammatically_invalid_name
+);
+
+pub async fn test_apply_rejects_grammatically_invalid_name(h: &impl FacadeContractHarness) {
+    let facade = h.facade_for(TestAccount::Alice);
+
+    let invalid_name_manifest = serde_json::json!({
+        "$schema": VARIABLE_SET_SCHEMA,
+        "headers": {"name": "invalid_name"},
+        "spec": {"variables": {"K": {"value": "v"}}}
+    })
+    .to_string();
+
+    let plan_result = facade
+        .plan_apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: invalid_name_manifest.clone(),
+        })
+        .await;
+    assert!(
+        matches!(plan_result, Err(ApplyManifestError::InvalidHeaders(_))),
+        "plan with grammatically invalid name must return Err(InvalidHeaders), got: \
+         {plan_result:?}"
+    );
+
+    let apply_result = facade
+        .apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: invalid_name_manifest,
+        })
+        .await;
+    assert!(
+        matches!(apply_result, Err(ApplyManifestError::InvalidHeaders(_))),
+        "apply with grammatically invalid name must return Err(InvalidHeaders), got: \
+         {apply_result:?}"
     );
 }
 

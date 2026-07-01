@@ -18,13 +18,13 @@ CREATE TABLE resources (
     updated_at             TIMESTAMPTZ NOT NULL,
     deleted_at             TIMESTAMPTZ NULL,
     last_reconciled_at     TIMESTAMPTZ NULL,
-    last_event_id          BIGINT NULL,
-
-    UNIQUE (account_id, resource_schema, resource_name)
+    last_event_id          BIGINT NULL
 );
 
-CREATE INDEX idx_resources_account_schema_name
-    ON resources (account_id, resource_schema, resource_name);
+-- Resource names are case-insensitive per the ODF `ResourceName` grammar, so
+-- uniqueness and lookups must be enforced/optimized on the folded form.
+CREATE UNIQUE INDEX idx_resources_account_schema_name_ci
+    ON resources (account_id, resource_schema, LOWER(resource_name));
 
 CREATE INDEX idx_resources_account_schema_updated_at
     ON resources (account_id, resource_schema, updated_at DESC);

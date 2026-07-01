@@ -51,7 +51,7 @@ fn by_name(name: &str) -> ResourceSelector {
     ResourceSelector {
         account: None,
         kind: VARIABLE_SET_KIND.to_string(),
-        resource_ref: ResourceRef::ByName(name.to_string()),
+        resource_ref: ResourceRef::ByName(name.parse().unwrap()),
     }
 }
 
@@ -273,9 +273,9 @@ pub async fn test_batch_equivalence(h: &impl FacadeContractHarness) {
         account: None,
         kind: VARIABLE_SET_KIND.to_string(),
         resource_refs: vec![
-            ResourceRef::ByName("cross-batch-a".to_string()), // idx 0 — exists
-            ResourceRef::ByName("cross-batch-missing".to_string()), // idx 1 — missing name
-            ResourceRef::ById(absent_uid),                    // idx 2 — missing id
+            ResourceRef::ByName("cross-batch-a".parse().unwrap()), // idx 0 — exists
+            ResourceRef::ByName("cross-batch-missing".parse().unwrap()), // idx 1 — missing name
+            ResourceRef::ById(absent_uid),                         // idx 2 — missing id
         ],
     };
 

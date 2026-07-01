@@ -16,7 +16,7 @@ use crate::ResourceHeadersInput;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub type ResourceName = String;
+pub type ResourceName = odf::metadata::resource::ResourceName;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -34,14 +34,10 @@ pub struct ResourceHeaders {
 }
 
 impl ResourceHeaders {
-    pub fn simple(
-        now: DateTime<Utc>,
-        account: odf::AccountID,
-        name: impl Into<ResourceName>,
-    ) -> Self {
+    pub fn simple(now: DateTime<Utc>, account: odf::AccountID, name: &str) -> Self {
         Self {
             account,
-            name: name.into(),
+            name: ResourceName::new_unchecked(name),
             description: None,
             labels: BTreeMap::new(),
             annotations: BTreeMap::new(),
@@ -55,7 +51,7 @@ impl ResourceHeaders {
     pub fn from_input(now: DateTime<Utc>, input: ResourceHeadersInput) -> Self {
         Self {
             account: input.account,
-            name: input.name.to_ascii_lowercase(),
+            name: input.name,
             description: input.description,
             labels: input.labels,
             annotations: input.annotations,
@@ -76,7 +72,7 @@ impl ResourceHeaders {
 
     pub fn apply_update(&mut self, now: DateTime<Utc>, input: ResourceHeadersInput) {
         self.account = input.account;
-        self.name = input.name.to_ascii_lowercase();
+        self.name = input.name;
         self.description = input.description;
         self.labels = input.labels;
         self.annotations = input.annotations;

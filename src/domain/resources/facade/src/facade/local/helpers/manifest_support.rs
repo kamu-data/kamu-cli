@@ -49,7 +49,7 @@ pub(crate) fn make_headers_input(
 ) -> Result<ResourceHeadersInput, ApplyManifestError> {
     ResourceHeadersInput::try_new(
         target_account.id.clone(),
-        &manifest.headers.name,
+        manifest.headers.name.as_str(),
         manifest.headers.description.clone(),
         manifest.headers.labels.clone(),
         manifest.headers.annotations.clone(),
@@ -105,7 +105,7 @@ pub(crate) fn resource_view_to_manifest(
                 id: Some(headers.account.id),
                 name: headers.account.name.map(|name| name.to_string()),
             }),
-            name: headers.name,
+            name: headers.name.to_string(),
             description: headers.description,
             labels: headers.labels.into_iter().collect(),
             annotations: headers.annotations.into_iter().collect(),

@@ -30,7 +30,9 @@ impl ResourceSelectorResolutionService for ResourceSelectorResolutionServiceImpl
             Ok(id) if id.get_version() == Some(uuid::Version::Random) => {
                 ResourceRef::ById(kamu_resources::ResourceID::new(id))
             }
-            _ => ResourceRef::ByName(selector.to_owned()),
+            _ => ResourceRef::ByName(selector.parse().map_err(|_| {
+                CLIError::usage_error(format!("Invalid resource name: {selector}"))
+            })?),
         };
 
         Ok(ResolvedResourceSelector {

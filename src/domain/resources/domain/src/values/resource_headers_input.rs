@@ -34,15 +34,6 @@ impl ResourceHeadersInput {
     pub const MAX_ANNOTATIONS: usize = 128;
     pub const MAX_ANNOTATION_VALUE_LEN: usize = 16 * 1024;
 
-    fn is_valid_name(name: &str) -> bool {
-        if name.is_empty() {
-            return false;
-        }
-
-        name.chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.')
-    }
-
     fn is_valid_header_key(key: &str) -> bool {
         if key.is_empty() {
             return false;
@@ -54,14 +45,24 @@ impl ResourceHeadersInput {
 
     pub fn try_new(
         account: odf::AccountID,
-        name: &ResourceName,
+        name: &str,
         description: Option<String>,
         labels: Vec<(String, String)>,
         annotations: Vec<(String, String)>,
     ) -> Result<Self, ResourceHeadersValidationError> {
+        if name.is_empty() {
+            return Err(ResourceHeadersValidationError::EmptyName);
+        }
+
+        let name = name
+            .parse()
+            .map_err(|_| ResourceHeadersValidationError::InvalidName {
+                name: name.to_string(),
+            })?;
+
         let headers = Self {
             account,
-            name: name.to_ascii_lowercase(),
+            name,
             description,
             labels: Self::entries_to_map(labels, ResourceHeaderField::Labels)?,
             annotations: Self::entries_to_map(annotations, ResourceHeaderField::Annotations)?,
@@ -117,12 +118,6 @@ impl ResourceValidateHeaders for ResourceHeadersInput {
             return Err(ResourceHeadersValidationError::NameTooLong {
                 actual: self.name.len(),
                 max: Self::MAX_NAME_LEN,
-            });
-        }
-
-        if !Self::is_valid_name(&self.name) {
-            return Err(ResourceHeadersValidationError::InvalidName {
-                name: self.name.clone(),
             });
         }
 

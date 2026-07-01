@@ -45,6 +45,7 @@ use kamu_resources::{
     ResourceCrudDispatcherDeleteRequest,
     ResourceHeadersInput,
     ResourceID,
+    ResourceName,
     UnsupportedResourceDescriptorError,
 };
 use kamu_resources_services::get_resource_crud_dispatcher;
@@ -146,12 +147,12 @@ impl DatasetEnvVarMutationAdapter for DatasetEnvVarMutationAdapterImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl DatasetEnvVarMutationAdapterImpl {
-    pub fn legacy_variable_set_resource_name(dataset_id: &odf::DatasetID) -> String {
-        format!("legacy-vars-{}", dataset_id.as_multibase())
+    pub fn legacy_variable_set_resource_name(dataset_id: &odf::DatasetID) -> ResourceName {
+        ResourceName::new_unchecked(&format!("legacy-vars-{}", dataset_id.as_multibase()))
     }
 
-    pub fn legacy_secret_set_resource_name(dataset_id: &odf::DatasetID) -> String {
-        format!("legacy-secrets-{}", dataset_id.as_multibase())
+    pub fn legacy_secret_set_resource_name(dataset_id: &odf::DatasetID) -> ResourceName {
+        ResourceName::new_unchecked(&format!("legacy-secrets-{}", dataset_id.as_multibase()))
     }
 
     fn get_dispatcher<E>(&self, schema: &str) -> Result<Arc<dyn ResourceCrudDispatcher>, E>
@@ -570,15 +571,11 @@ impl DatasetEnvVarMutationAdapterImpl {
     async fn load_existing_variable_spec(
         &self,
         account_id: &odf::AccountID,
-        resource_name: &str,
+        resource_name: &ResourceName,
     ) -> Result<(Option<ResourceID>, BTreeMap<String, VariableSpec>), InternalError> {
         let id = self
             .generic_resource_query_service
-            .find_resource_id_by_name(
-                account_id,
-                VariableSetResource::SCHEMA,
-                &resource_name.to_string(),
-            )
+            .find_resource_id_by_name(account_id, VariableSetResource::SCHEMA, resource_name)
             .await?;
 
         let Some(id) = id else {
@@ -599,15 +596,11 @@ impl DatasetEnvVarMutationAdapterImpl {
     async fn load_existing_secret_spec_decrypted(
         &self,
         account_id: &odf::AccountID,
-        resource_name: &str,
+        resource_name: &ResourceName,
     ) -> Result<(Option<ResourceID>, BTreeMap<String, SecretSpec>), InternalError> {
         let id = self
             .generic_resource_query_service
-            .find_resource_id_by_name(
-                account_id,
-                SecretSetResource::SCHEMA,
-                &resource_name.to_string(),
-            )
+            .find_resource_id_by_name(account_id, SecretSetResource::SCHEMA, resource_name)
             .await?;
 
         let Some(id) = id else {
@@ -654,7 +647,7 @@ impl DatasetEnvVarMutationAdapterImpl {
     fn make_headers(
         &self,
         account_id: odf::AccountID,
-        resource_name: String,
+        resource_name: ResourceName,
     ) -> ResourceHeadersInput {
         ResourceHeadersInput {
             account: account_id,

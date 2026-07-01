@@ -462,7 +462,7 @@ impl From<ResourceLookupProblem> for ResourceLookupCliError {
             ResourceLookupProblem::IDNotFound(err) => Self::IDNotFound(err.0),
             ResourceLookupProblem::NameNotFound(err) => Self::NameNotFound {
                 kind: kamu_resources::ResourceSchemaId::display_name(&err.kind).to_string(),
-                name: err.name,
+                name: err.name.to_string(),
             },
             ResourceLookupProblem::SchemaMismatch(err) => Self::SchemaMismatch {
                 id: err.id,

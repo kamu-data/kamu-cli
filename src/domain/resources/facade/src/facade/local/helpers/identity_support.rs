@@ -14,6 +14,7 @@ use kamu_resources::{
     ResourceID,
     ResourceIdentityRow,
     ResourceIdentityView,
+    ResourceName,
     ResourceSnapshot,
     UnsupportedResourceDescriptorError,
 };
@@ -66,7 +67,7 @@ where
         schema: row.schema,
         canonical_kind_name,
         id: ResourceID::new(row.id),
-        name: row.name,
+        name: ResourceName::new_unchecked(&row.name),
     })
 }
 

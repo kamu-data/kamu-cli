@@ -63,7 +63,7 @@ pub async fn test_get_many_all_successes(h: &impl FacadeContractHarness) {
         account: None,
         kind: VARIABLE_SET_KIND.to_string(),
         resource_refs: vec![
-            ResourceRef::ByName("batch-a".to_string()),
+            ResourceRef::ByName("batch-a".parse().unwrap()),
             ResourceRef::ById(id_b),
         ],
     };
@@ -111,10 +111,10 @@ pub async fn test_get_many_mixed_successes_problems(h: &impl FacadeContractHarne
                 account: None,
                 kind: VARIABLE_SET_KIND.to_string(),
                 resource_refs: vec![
-                    ResourceRef::ByName("mixed-a".to_string()), // idx 0 — exists
-                    ResourceRef::ByName("no-such-name".to_string()), // idx 1 — missing name
-                    ResourceRef::ById(id_existing),             // idx 2 — exists by id
-                    ResourceRef::ById(absent_id),               // idx 3 — missing id
+                    ResourceRef::ByName("mixed-a".parse().unwrap()), // idx 0 — exists
+                    ResourceRef::ByName("no-such-name".parse().unwrap()), // idx 1 — missing name
+                    ResourceRef::ById(id_existing),                  // idx 2 — exists by id
+                    ResourceRef::ById(absent_id),                    // idx 3 — missing id
                 ],
             },
             SpecViewMode::Encrypted,
@@ -158,8 +158,8 @@ pub async fn test_get_many_duplicate_refs(h: &impl FacadeContractHarness) {
                 account: None,
                 kind: VARIABLE_SET_KIND.to_string(),
                 resource_refs: vec![
-                    ResourceRef::ByName("dup-ref".to_string()), // idx 0
-                    ResourceRef::ByName("dup-ref".to_string()), // idx 1 — same ref
+                    ResourceRef::ByName("dup-ref".parse().unwrap()), // idx 0
+                    ResourceRef::ByName("dup-ref".parse().unwrap()), // idx 1 — same ref
                 ],
             },
             SpecViewMode::Encrypted,
@@ -420,9 +420,9 @@ pub async fn test_get_identities_mirrors_get_many(h: &impl FacadeContractHarness
             account: None,
             kind: VARIABLE_SET_KIND.to_string(),
             resource_refs: vec![
-                ResourceRef::ByName("idents-a".to_string()), // idx 0 — exists
-                ResourceRef::ByName("no-such-ident".to_string()), // idx 1 — missing
-                ResourceRef::ById(absent_uid),               // idx 2 — missing id
+                ResourceRef::ByName("idents-a".parse().unwrap()), // idx 0 — exists
+                ResourceRef::ByName("no-such-ident".parse().unwrap()), // idx 1 — missing
+                ResourceRef::ById(absent_uid),                    // idx 2 — missing id
             ],
         })
         .await
@@ -522,9 +522,9 @@ pub async fn test_render_manifests_mixed_successes_problems(h: &impl FacadeContr
                 account: None,
                 kind: VARIABLE_SET_KIND.to_string(),
                 resource_refs: vec![
-                    ResourceRef::ById(uid_existing),                   // idx 0 — exists
-                    ResourceRef::ByName("render-missing".to_string()), // idx 1 — missing
-                    ResourceRef::ById(absent_uid),                     // idx 2 — missing id
+                    ResourceRef::ById(uid_existing), // idx 0 — exists
+                    ResourceRef::ByName("render-missing".parse().unwrap()), // idx 1 — missing
+                    ResourceRef::ById(absent_uid),   // idx 2 — missing id
                 ],
             },
             kamu_resources_facade::ResourceManifestFormat::Json,
@@ -568,9 +568,9 @@ pub async fn test_delete_many_all_successes(h: &impl FacadeContractHarness) {
             account: None,
             kind: VARIABLE_SET_KIND.to_string(),
             resource_refs: vec![
-                ResourceRef::ByName("del-many-a".to_string()), // idx 0
-                ResourceRef::ById(id_b),                       // idx 1
-                ResourceRef::ByName("del-many-c".to_string()), // idx 2
+                ResourceRef::ByName("del-many-a".parse().unwrap()), // idx 0
+                ResourceRef::ById(id_b),                            // idx 1
+                ResourceRef::ByName("del-many-c".parse().unwrap()), // idx 2
             ],
         })
         .await
@@ -599,7 +599,7 @@ pub async fn test_delete_many_all_successes(h: &impl FacadeContractHarness) {
                 ResourceSelector {
                     account: None,
                     kind: VARIABLE_SET_KIND.to_string(),
-                    resource_ref: ResourceRef::ByName(name.to_string()),
+                    resource_ref: ResourceRef::ByName(name.parse().unwrap()),
                 },
                 SpecViewMode::Encrypted,
             )
@@ -629,9 +629,9 @@ pub async fn test_delete_many_mixed_successes_problems(h: &impl FacadeContractHa
             account: None,
             kind: VARIABLE_SET_KIND.to_string(),
             resource_refs: vec![
-                ResourceRef::ByName("del-mix-exists".to_string()), // idx 0 — exists
-                ResourceRef::ByName("del-mix-missing".to_string()), // idx 1 — missing name
-                ResourceRef::ById(absent_uid),                     // idx 2 — missing id
+                ResourceRef::ByName("del-mix-exists".parse().unwrap()), // idx 0 — exists
+                ResourceRef::ByName("del-mix-missing".parse().unwrap()), // idx 1 — missing name
+                ResourceRef::ById(absent_uid),                          // idx 2 — missing id
             ],
         })
         .await
@@ -684,8 +684,8 @@ pub async fn test_delete_many_duplicate_refs_is_deterministic(h: &impl FacadeCon
             account: None,
             kind: VARIABLE_SET_KIND.to_string(),
             resource_refs: vec![
-                ResourceRef::ByName("del-dup-ref".to_string()), // idx 0
-                ResourceRef::ByName("del-dup-ref".to_string()), // idx 1 — duplicate
+                ResourceRef::ByName("del-dup-ref".parse().unwrap()), // idx 0
+                ResourceRef::ByName("del-dup-ref".parse().unwrap()), // idx 1 — duplicate
             ],
         })
         .await

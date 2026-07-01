@@ -29,7 +29,7 @@ fn summary_keys(mut items: Vec<kamu_resources::ResourceSummaryView>) -> Vec<(Str
     normalize_summary_views(&mut items);
     items
         .into_iter()
-        .map(|item| (item.schema, item.name))
+        .map(|item| (item.schema, item.name.to_string()))
         .collect()
 }
 
@@ -37,7 +37,7 @@ fn identity_keys(mut items: Vec<kamu_resources::ResourceIdentityView>) -> Vec<(S
     normalize_identity_views(&mut items);
     items
         .into_iter()
-        .map(|item| (item.schema, item.name))
+        .map(|item| (item.schema, item.name.to_string()))
         .collect()
 }
 

@@ -792,7 +792,7 @@ impl ResourceSelectionResolutionServiceImpl {
     ) -> CLIError {
         let selector = match resource_ref {
             kamu_resources_facade::ResourceRef::ById(id) => id.to_string(),
-            kamu_resources_facade::ResourceRef::ByName(name) => name.clone(),
+            kamu_resources_facade::ResourceRef::ByName(name) => name.to_string(),
         };
 
         CLIError::usage_error(format!(

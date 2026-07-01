@@ -137,7 +137,8 @@ where
     }
 
     fn mark_deleted(resource: &mut R, now: DateTime<Utc>) -> Result<(), ResourcePersistenceError> {
-        let tombstone_name = format!("deleted-{}", resource.id());
+        let tombstone_name =
+            kamu_resources::ResourceName::new_unchecked(&format!("deleted-{}", resource.id()));
 
         resource.try_delete(now, tombstone_name).map_err(|err| {
             ResourcePersistenceError::Internal(

@@ -68,7 +68,7 @@ FROM dataset_env_vars dev
 JOIN dataset_entries de ON de.dataset_id = dev.dataset_id
 WHERE dev.secret_nonce IS NULL
 GROUP BY dev.dataset_id, de.owner_id
-ON CONFLICT (account_id, resource_schema, resource_name) DO NOTHING;
+ON CONFLICT (account_id, resource_schema, LOWER(resource_name)) DO NOTHING;
 
 /* ------------------------------ */
 
@@ -176,7 +176,7 @@ FROM dataset_env_vars dev
 JOIN dataset_entries de ON de.dataset_id = dev.dataset_id
 WHERE dev.secret_nonce IS NOT NULL
 GROUP BY dev.dataset_id, de.owner_id
-ON CONFLICT (account_id, resource_schema, resource_name) DO NOTHING;
+ON CONFLICT (account_id, resource_schema, LOWER(resource_name)) DO NOTHING;
 
 /* ------------------------------ */
 

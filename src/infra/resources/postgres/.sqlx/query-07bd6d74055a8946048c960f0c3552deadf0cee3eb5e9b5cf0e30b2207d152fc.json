@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT COUNT(*) AS count\n            FROM resources\n            WHERE account_id = $1\n              AND resource_schema = ANY($2)\n              AND ($3::text[] IS NULL OR LOWER(resource_name) = ANY($3))\n              AND ($4::text IS NULL OR resource_name ILIKE $4 ESCAPE '\\')\n              AND deleted_at IS NULL\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "TextArray",
+        "TextArray",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "07bd6d74055a8946048c960f0c3552deadf0cee3eb5e9b5cf0e30b2207d152fc"
+}

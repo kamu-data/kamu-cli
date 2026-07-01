@@ -202,7 +202,7 @@ pub struct ResourceDuplicateError {
 pub struct ResourceIdentityRow {
     pub id: uuid::Uuid,
     pub schema: String,
-    pub name: ResourceName,
+    pub name: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -213,7 +213,7 @@ pub struct ResourceSnapshotRow {
     pub id: uuid::Uuid,
     pub account_id: odf::AccountID,
     pub resource_schema: String,
-    pub resource_name: ResourceName,
+    pub resource_name: String,
     pub description: Option<String>,
     pub labels: serde_json::Value,
     pub annotations: serde_json::Value,
@@ -234,7 +234,7 @@ impl ResourceSnapshotRow {
             schema: self.resource_schema,
             headers: crate::ResourceHeaders {
                 account: self.account_id,
-                name: self.resource_name,
+                name: ResourceName::new_unchecked(&self.resource_name),
                 description: self.description,
                 labels: serde_json::from_value(self.labels).unwrap(),
                 annotations: serde_json::from_value(self.annotations).unwrap(),

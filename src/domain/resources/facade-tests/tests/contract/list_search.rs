@@ -326,8 +326,8 @@ pub async fn test_search_by_exact_names(h: &impl FacadeContractHarness) {
         .search_identities(SearchResourceIdentitiesRequest {
             kinds: vec![VARIABLE_SET_KIND.to_string()],
             exact_names: Some(vec![
-                "search-exact-alpha".to_string(),
-                "search-exact-beta".to_string(),
+                "search-exact-alpha".parse().unwrap(),
+                "search-exact-beta".parse().unwrap(),
             ]),
             name_pattern: None,
             account: None,
@@ -359,8 +359,8 @@ pub async fn test_search_exact_names_ignores_missing(h: &impl FacadeContractHarn
         .search_identities(SearchResourceIdentitiesRequest {
             kinds: vec![VARIABLE_SET_KIND.to_string()],
             exact_names: Some(vec![
-                "search-missing-present".to_string(),
-                "search-missing-absent".to_string(),
+                "search-missing-present".parse().unwrap(),
+                "search-missing-absent".parse().unwrap(),
             ]),
             name_pattern: None,
             account: None,

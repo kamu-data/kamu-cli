@@ -361,7 +361,7 @@ impl ListResourcesCommand {
                 ResourceGenericColumn::Name => Arc::new(StringArray::from(
                     resources
                         .iter()
-                        .map(|resource| resource.name.clone())
+                        .map(|resource| resource.name.to_string())
                         .collect::<Vec<_>>(),
                 )),
                 ResourceGenericColumn::Kind => Arc::new(StringArray::from(

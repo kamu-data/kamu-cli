@@ -109,7 +109,10 @@ pub fn variable_set_manifest_yaml(
 
 pub fn sorted_identity_names(mut items: Vec<kamu_resources::ResourceIdentityView>) -> Vec<String> {
     crate::helpers::normalize_identity_views(&mut items);
-    items.into_iter().map(|item| item.name).collect()
+    items
+        .into_iter()
+        .map(|item| item.name.to_string())
+        .collect()
 }
 
 pub fn total_kind_count(summary: kamu_resources::ResourcesSummary, kind: &str) -> u64 {

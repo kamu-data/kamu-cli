@@ -47,7 +47,7 @@ async fn make_variable_set_resource(catalog: &Catalog) -> ResourceID {
         headers: ResourceHeaders::simple(
             Utc::now(),
             odf::AccountID::new_seeded_ed25519(b"test-account"),
-            variable_set_id.to_string(),
+            &variable_set_id.to_string(),
         ),
         spec: serde_json::to_value(VariableSetSpec {
             variables: [(

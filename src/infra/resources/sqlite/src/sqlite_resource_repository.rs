@@ -65,6 +65,7 @@ impl ResourceRepository for SqliteResourceRepository {
 
         let account_id_stack = resource_snapshot.headers.account.as_stack_string();
         let account_id_str = account_id_stack.as_str();
+        let name_str = resource_snapshot.headers.name.as_str();
         let labels = serde_json::to_value(&resource_snapshot.headers.labels).unwrap();
         let annotations = serde_json::to_value(&resource_snapshot.headers.annotations).unwrap();
         let generation = i64::try_from(resource_snapshot.headers.generation).unwrap();
@@ -95,7 +96,7 @@ impl ResourceRepository for SqliteResourceRepository {
             resource_id,
             account_id_str,
             resource_snapshot.schema,
-            resource_snapshot.headers.name,
+            name_str,
             resource_snapshot.headers.description,
             labels,
             annotations,
@@ -134,6 +135,7 @@ impl ResourceRepository for SqliteResourceRepository {
 
         let account_id_stack = resource_snapshot.headers.account.as_stack_string();
         let account_id_str = account_id_stack.as_str();
+        let name_str = resource_snapshot.headers.name.as_str();
         let labels = serde_json::to_value(&resource_snapshot.headers.labels).unwrap();
         let annotations = serde_json::to_value(&resource_snapshot.headers.annotations).unwrap();
         let generation = i64::try_from(resource_snapshot.headers.generation).unwrap();
@@ -167,7 +169,7 @@ impl ResourceRepository for SqliteResourceRepository {
             resource_id,
             account_id_str,
             resource_snapshot.schema,
-            resource_snapshot.headers.name,
+            name_str,
             resource_snapshot.headers.description,
             labels,
             annotations,
@@ -211,7 +213,7 @@ impl ResourceRepository for SqliteResourceRepository {
 
         let account_id_stack = account_id.as_stack_string();
         let account_id_str = account_id_stack.as_str();
-        let name_lower = name.to_ascii_lowercase();
+        let name_str = name.as_str();
 
         let maybe_resource_id = sqlx::query_scalar!(
             r#"
@@ -219,12 +221,12 @@ impl ResourceRepository for SqliteResourceRepository {
             FROM resources
             WHERE account_id = $1
               AND resource_schema = $2
-              AND resource_name = $3
+              AND resource_name COLLATE NOCASE = $3
               AND deleted_at IS NULL
             "#,
             account_id_str,
             schema,
-            name_lower,
+            name_str,
         )
         .fetch_optional(connection_mut)
         .await
@@ -302,7 +304,7 @@ impl ResourceRepository for SqliteResourceRepository {
             FROM resources
             WHERE account_id = $1
               AND resource_schema = $2
-              AND resource_name IN ({names_placeholders})
+              AND resource_name COLLATE NOCASE IN ({names_placeholders})
               AND deleted_at IS NULL
             "#,
         );
@@ -311,7 +313,7 @@ impl ResourceRepository for SqliteResourceRepository {
             .bind(account_id_str)
             .bind(schema);
         for name in names {
-            query = query.bind(name.to_ascii_lowercase());
+            query = query.bind(name.to_string());
         }
 
         let rows = query.fetch_all(connection_mut).await.int_err()?;
@@ -360,10 +362,10 @@ impl ResourceRepository for SqliteResourceRepository {
         query_builder.push(")");
 
         if let Some(exact_names) = exact_names {
-            query_builder.push(" AND resource_name IN (");
+            query_builder.push(" AND resource_name COLLATE NOCASE IN (");
             let mut separated = query_builder.separated(", ");
             for name in exact_names {
-                separated.push_bind(name.to_ascii_lowercase());
+                separated.push_bind(name.to_string());
             }
             query_builder.push(")");
         }
@@ -422,10 +424,10 @@ impl ResourceRepository for SqliteResourceRepository {
         query_builder.push(")");
 
         if let Some(exact_names) = exact_names {
-            query_builder.push(" AND resource_name IN (");
+            query_builder.push(" AND resource_name COLLATE NOCASE IN (");
             let mut separated = query_builder.separated(", ");
             for name in exact_names {
-                separated.push_bind(name.to_ascii_lowercase());
+                separated.push_bind(name.to_string());
             }
             query_builder.push(")");
         }
@@ -488,7 +490,7 @@ impl ResourceRepository for SqliteResourceRepository {
             schema: row.resource_schema,
             headers: ResourceHeaders {
                 account: row.account_id,
-                name: row.resource_name,
+                name: kamu_resources::ResourceName::new_unchecked(&row.resource_name),
                 description: row.description,
                 labels: serde_json::from_value(row.labels).unwrap(),
                 annotations: serde_json::from_value(row.annotations).unwrap(),
@@ -604,7 +606,7 @@ impl ResourceRepository for SqliteResourceRepository {
             schema: row.resource_schema,
             headers: ResourceHeaders {
                 account: row.account_id,
-                name: row.resource_name,
+                name: kamu_resources::ResourceName::new_unchecked(&row.resource_name),
                 description: row.description,
                 labels: serde_json::from_value(row.labels).unwrap(),
                 annotations: serde_json::from_value(row.annotations).unwrap(),
@@ -676,7 +678,7 @@ impl ResourceRepository for SqliteResourceRepository {
                 schema: row.resource_schema,
                 headers: ResourceHeaders {
                     account: row.account_id,
-                    name: row.resource_name,
+                    name: kamu_resources::ResourceName::new_unchecked(&row.resource_name),
                     description: row.description,
                     labels: serde_json::from_value(row.labels).unwrap(),
                     annotations: serde_json::from_value(row.annotations).unwrap(),
@@ -790,7 +792,7 @@ impl ResourceRepository for SqliteResourceRepository {
                     schema: row.resource_schema,
                     headers: ResourceHeaders {
                         account: row.account_id,
-                        name: row.resource_name,
+                        name: kamu_resources::ResourceName::new_unchecked(&row.resource_name),
                         description: row.description,
                         labels: serde_json::from_value(row.labels).unwrap(),
                         annotations: serde_json::from_value(row.annotations).unwrap(),
@@ -859,7 +861,7 @@ impl ResourceRepository for SqliteResourceRepository {
                     schema: row.resource_schema,
                     headers: ResourceHeaders {
                         account: row.account_id,
-                        name: row.resource_name,
+                        name: kamu_resources::ResourceName::new_unchecked(&row.resource_name),
                         description: row.description,
                         labels: serde_json::from_value(row.labels).unwrap(),
                         annotations: serde_json::from_value(row.annotations).unwrap(),

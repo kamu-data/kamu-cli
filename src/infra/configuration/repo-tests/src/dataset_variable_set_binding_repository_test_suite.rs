@@ -209,7 +209,7 @@ async fn create_resource(
             headers: ResourceHeaders::simple(
                 Utc::now(),
                 account.id.clone(),
-                resource_id.to_string(),
+                &resource_id.to_string(),
             ),
             spec: serde_json::to_value(VariableSetSpec {
                 variables: [(

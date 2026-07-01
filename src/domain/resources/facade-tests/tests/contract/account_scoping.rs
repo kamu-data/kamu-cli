@@ -134,7 +134,7 @@ fn selector_by_name(name: &str, account: Option<ResourceAccountRef>) -> Resource
     ResourceSelector {
         account,
         kind: VARIABLE_SET_KIND.to_string(),
-        resource_ref: ResourceRef::ByName(name.to_string()),
+        resource_ref: ResourceRef::ByName(name.parse().unwrap()),
     }
 }
 
@@ -145,7 +145,7 @@ fn batch_selector_by_name(
     ResourceBatchSelector {
         account,
         kind: VARIABLE_SET_KIND.to_string(),
-        resource_refs: vec![ResourceRef::ByName(name.to_string())],
+        resource_refs: vec![ResourceRef::ByName(name.parse().unwrap())],
     }
 }
 
@@ -460,7 +460,10 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
         sorted_identity_names(alice_all),
         vec!["acct-alice-only", "acct-isolated"]
     );
-    let mut bob_all_names: Vec<String> = bob_all.into_iter().map(|item| item.name).collect();
+    let mut bob_all_names: Vec<String> = bob_all
+        .into_iter()
+        .map(|item| item.name.to_string())
+        .collect();
     bob_all_names.sort();
     assert_eq!(bob_all_names, vec!["acct-bob-only", "acct-isolated"]);
 

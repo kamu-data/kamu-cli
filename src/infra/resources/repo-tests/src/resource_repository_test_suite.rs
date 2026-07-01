@@ -31,7 +31,7 @@ fn make_test_snapshot(account_id: odf::AccountID, kind: &str, name: &str) -> Res
     ResourceSnapshot {
         id: ResourceID::new(uuid::Uuid::new_v4()),
         schema: kind.to_string(),
-        headers: ResourceHeaders::simple(Utc::now(), account_id, name.to_ascii_lowercase()),
+        headers: ResourceHeaders::simple(Utc::now(), account_id, name),
         spec: serde_json::json!({"key": "value"}),
         status: None,
         last_reconciled_at: None,
@@ -93,7 +93,7 @@ pub async fn test_create_and_find_resource(catalog: &Catalog) {
 
     // find by name
     let found_id = repo
-        .find_resource_id_by_name(&account_id, "TestKind", &"my-resource".to_string())
+        .find_resource_id_by_name(&account_id, "TestKind", &"my-resource".parse().unwrap())
         .await
         .unwrap();
     assert_eq!(found_id, Some(id));
@@ -229,7 +229,7 @@ pub async fn test_search_resource_identities(catalog: &Catalog) {
         .search_resource_identities(
             &account_id,
             &["TestKind".to_string()],
-            Some(&["app-alpha".to_string(), "db-alpha".to_string()]),
+            Some(&["app-alpha".parse().unwrap(), "db-alpha".parse().unwrap()]),
             None,
             PaginationOpts::from_max_results(10),
         )
@@ -244,7 +244,7 @@ pub async fn test_search_resource_identities(catalog: &Catalog) {
         .search_resource_identities(
             &account_id,
             &["TestKind".to_string()],
-            Some(&["App-Alpha".to_string(), "DB-ALPHA".to_string()]),
+            Some(&["App-Alpha".parse().unwrap(), "DB-ALPHA".parse().unwrap()]),
             None,
             PaginationOpts::from_max_results(10),
         )
@@ -322,7 +322,7 @@ pub async fn test_count_search_resource_identities(catalog: &Catalog) {
         .count_search_resource_identities(
             &account_id,
             &["TestKind".to_string()],
-            Some(&["App-Alpha".to_string(), "DB-ALPHA".to_string()]),
+            Some(&["App-Alpha".parse().unwrap(), "DB-ALPHA".parse().unwrap()]),
             None,
         )
         .await
@@ -376,13 +376,13 @@ pub async fn test_resource_name_case_insensitive(catalog: &Catalog) {
 
     // --- find_resource_id_by_name is case-insensitive ---
     let found = repo
-        .find_resource_id_by_name(&account_id, "TestKind", &"My-Resource".to_string())
+        .find_resource_id_by_name(&account_id, "TestKind", &"My-Resource".parse().unwrap())
         .await
         .unwrap();
     assert_eq!(found, Some(id));
 
     let found = repo
-        .find_resource_id_by_name(&account_id, "TestKind", &"MY-RESOURCE".to_string())
+        .find_resource_id_by_name(&account_id, "TestKind", &"MY-RESOURCE".parse().unwrap())
         .await
         .unwrap();
     assert_eq!(found, Some(id));
@@ -392,7 +392,10 @@ pub async fn test_resource_name_case_insensitive(catalog: &Catalog) {
         .find_resource_identities_by_names(
             &account_id,
             "TestKind",
-            &["My-Resource".to_string(), "OTHER-RESOURCE".to_string()],
+            &[
+                "My-Resource".parse().unwrap(),
+                "OTHER-RESOURCE".parse().unwrap(),
+            ],
         )
         .await
         .unwrap();
@@ -405,7 +408,7 @@ pub async fn test_resource_name_case_insensitive(catalog: &Catalog) {
         .search_resource_identities(
             &account_id,
             &["TestKind".to_string()],
-            Some(&["MY-RESOURCE".to_string()]),
+            Some(&["MY-RESOURCE".parse().unwrap()]),
             None,
             PaginationOpts::from_max_results(10),
         )
@@ -1012,7 +1015,7 @@ pub async fn test_find_deleted_resource_not_returned(catalog: &Catalog) {
     assert!(by_query.is_none());
 
     let by_name = repo
-        .find_resource_id_by_name(&account_id, "TestKind", &"to-delete".to_string())
+        .find_resource_id_by_name(&account_id, "TestKind", &"to-delete".parse().unwrap())
         .await
         .unwrap();
     assert!(by_name.is_none());

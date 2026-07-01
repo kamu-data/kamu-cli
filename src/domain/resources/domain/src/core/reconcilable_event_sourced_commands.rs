@@ -15,6 +15,7 @@ use crate::{
     ReconcilableResourceEvent,
     ResourceHeadersInput,
     ResourceHeadersValidationError,
+    ResourceName,
     ResourcePhase,
     ResourceValidateHeaders,
     ResourceValidateSpec,
@@ -117,7 +118,7 @@ where
 pub fn try_delete_resource<R>(
     resource: &mut R,
     now: DateTime<Utc>,
-    tombstone_name: String,
+    tombstone_name: ResourceName,
 ) -> Result<(), R::LifecycleError>
 where
     R: ReconcilableEventSourcedResource,

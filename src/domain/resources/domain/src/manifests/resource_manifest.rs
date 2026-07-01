@@ -13,7 +13,7 @@ use serde::de::{MapAccess, SeqAccess, Visitor};
 use serde::ser::SerializeMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::{ResourceID, ResourceName, ResourceSchemaId};
+use crate::{ResourceID, ResourceSchemaId};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -33,7 +33,7 @@ pub struct ResourceManifest {
 pub struct ResourceManifestHeaders {
     pub id: Option<ResourceID>,
     pub account: Option<ResourceAccountRef>,
-    pub name: ResourceName,
+    pub name: String,
     pub description: Option<String>,
     #[serde(
         default,

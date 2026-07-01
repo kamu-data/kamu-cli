@@ -131,7 +131,7 @@ impl BaseResourceServiceHarness {
     pub fn make_headers_input(account_id: odf::AccountID, name: &str) -> ResourceHeadersInput {
         ResourceHeadersInput {
             account: account_id,
-            name: name.to_string(),
+            name: kamu_resources::ResourceName::new_unchecked(name),
             description: None,
             labels: BTreeMap::new(),
             annotations: BTreeMap::new(),
@@ -149,7 +149,11 @@ impl BaseResourceServiceHarness {
         name: &str,
     ) -> Option<ResourceID> {
         self.generic_query_svc
-            .find_resource_id_by_name(account_id, kind, &name.to_string())
+            .find_resource_id_by_name(
+                account_id,
+                kind,
+                &kamu_resources::ResourceName::new_unchecked(name),
+            )
             .await
             .unwrap()
     }

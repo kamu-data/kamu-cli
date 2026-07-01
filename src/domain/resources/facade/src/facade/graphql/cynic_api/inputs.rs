@@ -59,7 +59,7 @@ impl TryFrom<&domain::ResourceAccountRef> for ResourceAccountSelectorInput {
 #[derive(cynic::InputObject, Debug, Clone)]
 #[cynic(graphql_type = "ResourceByNameSelectorInput")]
 pub(crate) struct ResourceByNameSelectorInput {
-    pub name: String,
+    pub name: domain::ResourceName,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -135,7 +135,7 @@ impl TryFrom<&ResourceBatchSelector> for ResourceBatchSelectorInput {
 #[cynic(graphql_type = "SearchResourceIdentitiesInput")]
 pub(crate) struct SearchResourceIdentitiesInput {
     pub kinds: Vec<ResourceKindInput>,
-    pub names: Option<Vec<String>>,
+    pub names: Option<Vec<domain::ResourceName>>,
     pub name_pattern: Option<String>,
     pub account: Option<ResourceAccountSelectorInput>,
 }

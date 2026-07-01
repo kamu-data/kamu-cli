@@ -188,7 +188,7 @@ impl ResourceRepository for InMemoryResourceRepository {
             .get(&ResourceLookupKey {
                 account_id: account_id.clone(),
                 schema: schema.to_owned(),
-                name: name.to_ascii_lowercase(),
+                name: name.clone(),
             })
             .and_then(|id| guard.snapshots_by_id.get(id))
             .filter(|snapshot| snapshot.headers.deleted_at.is_none())
@@ -211,7 +211,7 @@ impl ResourceRepository for InMemoryResourceRepository {
             .map(|snapshot| ResourceIdentityRow {
                 id: *snapshot.id.as_ref(),
                 schema: snapshot.schema.clone(),
-                name: snapshot.headers.name.clone(),
+                name: snapshot.headers.name.to_string(),
             })
             .collect())
     }
@@ -226,7 +226,6 @@ impl ResourceRepository for InMemoryResourceRepository {
 
         Ok(names
             .iter()
-            .map(|n| n.to_ascii_lowercase())
             .filter_map(|name| {
                 guard
                     .ids_by_lookup_key
@@ -241,7 +240,7 @@ impl ResourceRepository for InMemoryResourceRepository {
             .map(|snapshot| ResourceIdentityRow {
                 id: *snapshot.id.as_ref(),
                 schema: snapshot.schema.clone(),
-                name: snapshot.headers.name.clone(),
+                name: snapshot.headers.name.to_string(),
             })
             .collect())
     }
@@ -277,7 +276,7 @@ impl ResourceRepository for InMemoryResourceRepository {
             .map(|snapshot| ResourceIdentityRow {
                 id: *snapshot.id.as_ref(),
                 schema: snapshot.schema.clone(),
-                name: snapshot.headers.name.clone(),
+                name: snapshot.headers.name.to_string(),
             })
             .collect())
     }
@@ -528,9 +527,9 @@ impl ResourceRepository for InMemoryResourceRepository {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn resource_name_matches_pattern(name: &str, pattern: &str) -> bool {
-    // Since names are normalized to lowercase at write time, and callers may
-    // supply mixed-case patterns, we fold both sides to lowercase before matching
-    // to mirror Postgres ILIKE / SQLite LIKE ... COLLATE NOCASE behavior.
+    // Resource names are compared case-insensitively, so we fold both sides to
+    // lowercase before matching to mirror Postgres ILIKE / SQLite
+    // LIKE ... COLLATE NOCASE behavior.
     let name_lc = name.to_ascii_lowercase();
     let pattern_lc = pattern.to_ascii_lowercase();
     let name = name_lc.as_str();
@@ -578,24 +577,13 @@ fn filter_search_snapshots<'a>(
     exact_names: Option<&[ResourceName]>,
     name_pattern: Option<&str>,
 ) -> Vec<&'a ResourceSnapshot> {
-    let exact_names = exact_names.map(|names| {
-        names
-            .iter()
-            .map(|name| name.to_ascii_lowercase())
-            .collect::<Vec<_>>()
-    });
-
     guard
         .snapshots_by_id
         .values()
         .filter(|snapshot| snapshot.headers.account == *account_id)
         .filter(|snapshot| schemas.contains(&snapshot.schema))
         .filter(|snapshot| snapshot.headers.deleted_at.is_none())
-        .filter(|snapshot| {
-            exact_names
-                .as_ref()
-                .is_none_or(|names| names.contains(&snapshot.headers.name))
-        })
+        .filter(|snapshot| exact_names.is_none_or(|names| names.contains(&snapshot.headers.name)))
         .filter(|snapshot| {
             name_pattern.is_none_or(|pattern| {
                 resource_name_matches_pattern(&snapshot.headers.name, pattern)

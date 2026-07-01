@@ -27,6 +27,7 @@ use crate::{
     ResourceEventSpecUpdated,
     ResourceHeadersInput,
     ResourceID,
+    ResourceName,
     ResourceReconcileError,
     ResourceSnapshot,
     ResourceStatusLike,
@@ -114,7 +115,7 @@ pub trait ReconcilableEventSourcedResource:
     fn make_deleted_event(
         &self,
         now: DateTime<Utc>,
-        tombstone_name: String,
+        tombstone_name: ResourceName,
     ) -> ReconcilableResourceEvent<Self::Spec, Self::ReconcileSuccess, Self::ReconcileFailureDetails>
     {
         ReconcilableResourceEvent::Deleted(ResourceEventDeleted {
@@ -298,7 +299,7 @@ macro_rules! impl_reconcilable_event_sourced_resource {
             fn try_delete(
                 &mut self,
                 now: ::chrono::DateTime<::chrono::Utc>,
-                tombstone_name: String,
+                tombstone_name: $crate::ResourceName,
             ) -> Result<(), Self::LifecycleError> {
                 $crate::try_delete_resource(self, now, tombstone_name)
             }

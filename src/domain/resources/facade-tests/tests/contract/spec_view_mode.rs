@@ -42,7 +42,7 @@ fn secret_selector(name: &str) -> ResourceSelector {
     ResourceSelector {
         account: None,
         kind: SECRET_SET_KIND.to_string(),
-        resource_ref: ResourceRef::ByName(name.to_string()),
+        resource_ref: ResourceRef::ByName(name.parse().unwrap()),
     }
 }
 

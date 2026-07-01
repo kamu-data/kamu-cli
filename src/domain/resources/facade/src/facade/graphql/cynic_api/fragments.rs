@@ -18,7 +18,7 @@ use crate::facade::graphql::cynic_api::schema;
 pub(crate) struct ResourceSummary {
     pub id: kamu_resources::ResourceID,
     pub schema: String,
-    pub name: String,
+    pub name: kamu_resources::ResourceName,
     pub description: Option<String>,
     pub generation: Uint64,
     pub created_at: DateTime<Utc>,
@@ -134,7 +134,7 @@ pub(crate) struct ResourceIDNotFoundProblem {
 #[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct ResourceNameNotFoundProblem {
     pub kind: String,
-    pub name: String,
+    pub name: kamu_resources::ResourceName,
 }
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
@@ -217,7 +217,7 @@ pub(crate) struct Resource {
 pub(crate) struct ResourceHeaders {
     pub id: kamu_resources::ResourceID,
     pub account: ResourceAccount,
-    pub name: String,
+    pub name: kamu_resources::ResourceName,
     pub description: Option<String>,
     pub labels: serde_json::Value,
     pub annotations: serde_json::Value,
@@ -243,7 +243,7 @@ pub(crate) struct ResourceIdentity {
     pub id: kamu_resources::ResourceID,
     pub schema: String,
     pub canonical_kind_name: String,
-    pub name: String,
+    pub name: kamu_resources::ResourceName,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
