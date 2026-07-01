@@ -1126,7 +1126,7 @@ fn test_serde_resource_generics() {
         r#"
         $schema: https://opendatafabric.org/schemas/config/v1alpha1/SecretSet
         headers:
-          id: aa-12345
+          id: 7149c2f9-41f2-4cbb-be8f-7d7747525f9a
           name: my-secret
           account:
             name: sergiimk
@@ -1176,7 +1176,7 @@ fn test_serde_resource_generics() {
         Resource {
             schema: SecretSet::schema().clone(),
             headers: ResourceHeaders {
-                id: Some("aa-12345".parse().unwrap()),
+                id: Some("7149c2f9-41f2-4cbb-be8f-7d7747525f9a".parse().unwrap()),
                 name: "my-secret".parse().unwrap(),
                 account: Some("sergiimk".parse().unwrap()),
                 labels: Some(ResourceLabels {

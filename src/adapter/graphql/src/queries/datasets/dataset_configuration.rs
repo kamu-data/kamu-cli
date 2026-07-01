@@ -138,7 +138,7 @@ impl<'a> DatasetConfiguration<'a> {
 
 #[derive(SimpleObject, Debug)]
 pub struct DatasetBindingView {
-    pub resource_id: ResourceID2,
+    pub resource_id: ResourceID<'static>,
     pub binding_order: u64,
     pub resource_name: String,
     pub resource_schema: String,

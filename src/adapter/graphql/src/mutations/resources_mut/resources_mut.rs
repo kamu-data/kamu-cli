@@ -154,7 +154,7 @@ pub enum ResourceDeleteOutcome {
 
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceDeleteSuccess {
-    pub resource_id: ResourceID2,
+    pub resource_id: ResourceID<'static>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -198,7 +198,7 @@ impl From<BatchDeleteResourcesResponse> for ResourceDeleteManyResult {
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceDeleteManySuccess {
     pub request_index: usize,
-    pub resource_id: ResourceID2,
+    pub resource_id: ResourceID<'static>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

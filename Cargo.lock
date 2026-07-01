@@ -11028,6 +11028,7 @@ dependencies = [
  "tonic-prost",
  "url",
  "utoipa",
+ "uuid",
 ]
 
 [[package]]

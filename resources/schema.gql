@@ -1233,7 +1233,7 @@ enum DatasetArchetype {
 }
 
 type DatasetBindingView {
-	resourceId: ResourceID2!
+	resourceId: ResourceID!
 	bindingOrder: Int!
 	resourceName: String!
 	resourceSchema: String!
@@ -1268,8 +1268,8 @@ type DatasetConfiguration {
 }
 
 type DatasetConfigurationMut {
-	replaceVariableSetBindings(resourceIds: [ResourceID2!]!): ReplaceDatasetBindingsResult!
-	replaceSecretSetBindings(resourceIds: [ResourceID2!]!): ReplaceDatasetBindingsResult!
+	replaceVariableSetBindings(resourceIds: [ResourceID!]!): ReplaceDatasetBindingsResult!
+	replaceSecretSetBindings(resourceIds: [ResourceID!]!): ReplaceDatasetBindingsResult!
 }
 
 type DatasetConfigurationPermissions {
@@ -3805,22 +3805,22 @@ type RenameResultSuccess implements RenameResult {
 }
 
 type ReplaceBindingsDuplicateResources implements ReplaceDatasetBindingsResult {
-	resourceId: ResourceID2!
+	resourceId: ResourceID!
 	message: String!
 }
 
 type ReplaceBindingsResourceAccountMismatch implements ReplaceDatasetBindingsResult {
-	resourceId: ResourceID2!
+	resourceId: ResourceID!
 	message: String!
 }
 
 type ReplaceBindingsResourceNotFound implements ReplaceDatasetBindingsResult {
-	resourceId: ResourceID2!
+	resourceId: ResourceID!
 	message: String!
 }
 
 type ReplaceBindingsResourceSchemaMismatch implements ReplaceDatasetBindingsResult {
-	resourceId: ResourceID2!
+	resourceId: ResourceID!
 	expectedSchema: String!
 	actualSchema: String!
 	message: String!
@@ -3971,13 +3971,13 @@ type ResourceDeleteManyResult {
 
 type ResourceDeleteManySuccess {
 	requestIndex: Int!
-	resourceId: ResourceID2!
+	resourceId: ResourceID!
 }
 
 union ResourceDeleteOutcome = ResourceDeleteSuccess | ResourceSelectorProblemResult
 
 type ResourceDeleteSuccess {
-	resourceId: ResourceID2!
+	resourceId: ResourceID!
 }
 
 type ResourceEdge {
@@ -4004,7 +4004,7 @@ enum ResourceHeaderValidationProblemCode {
 }
 
 type ResourceHeaders {
-	id: ResourceID2!
+	id: ResourceID!
 	account: ResourceAccount!
 	name: String!
 	description: String
@@ -4017,15 +4017,15 @@ type ResourceHeaders {
 	lastReconciledAt: DateTime
 }
 
-scalar ResourceID2
+scalar ResourceID
 
 type ResourceIDNotFoundProblem {
-	id: ResourceID2!
+	id: ResourceID!
 	message: String!
 }
 
 type ResourceIdentity {
-	id: ResourceID2!
+	id: ResourceID!
 	schema: String!
 	canonicalKindName: String!
 	name: String!
@@ -4145,7 +4145,7 @@ type ResourcePhaseCounts {
 }
 
 input ResourceRefInput @oneOf {
-	byId: ResourceID2
+	byId: ResourceID
 	byName: ResourceByNameSelectorInput
 }
 
@@ -4157,7 +4157,7 @@ type ResourceRenderManifestResult {
 }
 
 type ResourceSchemaMismatchProblem {
-	id: ResourceID2!
+	id: ResourceID!
 	expectedSchema: String!
 	actualSchema: String!
 	message: String!
@@ -4182,7 +4182,7 @@ type ResourceStatusSummary {
 }
 
 type ResourceSummary {
-	id: ResourceID2!
+	id: ResourceID!
 	schema: String!
 	name: String!
 	description: String

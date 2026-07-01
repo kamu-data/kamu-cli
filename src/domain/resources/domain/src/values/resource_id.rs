@@ -8,25 +8,10 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use nutype::nutype;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[nutype(derive(
-    Debug,
-    Display,
-    AsRef,
-    Copy,
-    Clone,
-    Ord,
-    PartialOrd,
-    Eq,
-    PartialEq,
-    Hash,
-    Serialize,
-    Deserialize
-))]
-pub struct ResourceID(uuid::Uuid);
+pub type ResourceID = odf::metadata::resource::ResourceID;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

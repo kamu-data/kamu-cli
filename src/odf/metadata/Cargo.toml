@@ -54,6 +54,7 @@ setty = { version = "1", default-features = false, features = [
 like = { version = "0.3", default-features = false }
 sha3 = "0.10"
 url = "2"
+uuid = { version = "1", default-features = false, features = ["v4"] }
 
 # Crypto
 ed25519-dalek = { version = "2", default-features = false, features = [
