@@ -53,7 +53,7 @@ pub mod auth {
         pub fn schema() -> &'static TypeUri {
             &ACCOUNT_SCHEMA
         }
-        pub fn schema_str() -> &'static str {
+        pub const fn schema_str() -> &'static str {
             ACCOUNT_SCHEMA_STR
         }
     }
@@ -169,7 +169,7 @@ pub mod auth {
         pub fn schema() -> &'static TypeUri {
             &RELATIONS_SCHEMA
         }
-        pub fn schema_str() -> &'static str {
+        pub const fn schema_str() -> &'static str {
             RELATIONS_SCHEMA_STR
         }
     }
@@ -229,7 +229,7 @@ pub mod config {
         pub fn schema() -> &'static TypeUri {
             &SECRET_SET_SCHEMA
         }
-        pub fn schema_str() -> &'static str {
+        pub const fn schema_str() -> &'static str {
             SECRET_SET_SCHEMA_STR
         }
     }
@@ -297,7 +297,7 @@ pub mod config {
         pub fn schema() -> &'static TypeUri {
             &VARIABLE_SET_SCHEMA
         }
-        pub fn schema_str() -> &'static str {
+        pub const fn schema_str() -> &'static str {
             VARIABLE_SET_SCHEMA_STR
         }
     }
@@ -836,7 +836,7 @@ pub mod dataset {
         pub fn schema() -> &'static TypeUri {
             &DATASET_SCHEMA
         }
-        pub fn schema_str() -> &'static str {
+        pub const fn schema_str() -> &'static str {
             DATASET_SCHEMA_STR
         }
     }
@@ -1149,7 +1149,7 @@ pub mod dataset {
         pub fn schema() -> &'static TypeUri {
             &PROJECTION_SCHEMA
         }
-        pub fn schema_str() -> &'static str {
+        pub const fn schema_str() -> &'static str {
             PROJECTION_SCHEMA_STR
         }
     }
@@ -1584,7 +1584,7 @@ pub mod flow {
         pub fn schema() -> &'static TypeUri {
             &FLOW_SCHEMA
         }
-        pub fn schema_str() -> &'static str {
+        pub const fn schema_str() -> &'static str {
             FLOW_SCHEMA_STR
         }
     }
@@ -1697,7 +1697,7 @@ pub mod flow {
         pub fn schema() -> &'static TypeUri {
             &TASK_SCHEMA
         }
-        pub fn schema_str() -> &'static str {
+        pub const fn schema_str() -> &'static str {
             TASK_SCHEMA_STR
         }
     }
@@ -2116,7 +2116,7 @@ pub mod sink {
         pub fn schema() -> &'static TypeUri {
             &WEBHOOK_TARGET_SCHEMA
         }
-        pub fn schema_str() -> &'static str {
+        pub const fn schema_str() -> &'static str {
             WEBHOOK_TARGET_SCHEMA_STR
         }
     }
@@ -3049,7 +3049,7 @@ pub mod source {
         pub fn schema() -> &'static TypeUri {
             &SOURCE_SCHEMA
         }
-        pub fn schema_str() -> &'static str {
+        pub const fn schema_str() -> &'static str {
             SOURCE_SCHEMA_STR
         }
     }
@@ -3158,7 +3158,7 @@ pub mod storage {
         pub fn schema() -> &'static TypeUri {
             &PERSISTENT_VOLUME_SCHEMA
         }
-        pub fn schema_str() -> &'static str {
+        pub const fn schema_str() -> &'static str {
             PERSISTENT_VOLUME_SCHEMA_STR
         }
     }
