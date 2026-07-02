@@ -7,7 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources::ApplyResourceOutcome;
+use kamu_configuration::VariableSetResource;
+use kamu_resources::{ApplyResourceOutcome, ResourceSchemaProvider};
 use kamu_resources_facade::{
     ApplyManifestRequest,
     GetResourceError,
@@ -25,7 +26,7 @@ use crate::harness::{FacadeContractHarness, TestAccount};
 use crate::helpers::{
     SECRET_SET_KIND,
     VARIABLE_SET_KIND,
-    VARIABLE_SET_SCHEMA,
+    VARIABLE_SET_SCHEMA_STR,
     assert_applied_outcome,
     assert_identity_fields,
     assert_resource_view_fields,
@@ -83,12 +84,7 @@ pub async fn test_get_by_name(h: &impl FacadeContractHarness) {
         .await
         .unwrap();
 
-    assert_resource_view_fields(
-        &view,
-        VARIABLE_SET_SCHEMA,
-        VARIABLE_SET_SCHEMA,
-        "get-name-test",
-    );
+    assert_resource_view_fields(&view, VariableSetResource::schema(), "get-name-test");
     assert_eq!(view.headers.id, id, "id must match");
     assert!(view.headers.deleted_at.is_none());
 }
@@ -107,12 +103,7 @@ pub async fn test_get_by_uid(h: &impl FacadeContractHarness) {
         .await
         .unwrap();
 
-    assert_resource_view_fields(
-        &view_by_uid,
-        VARIABLE_SET_SCHEMA,
-        VARIABLE_SET_SCHEMA,
-        "get-id-test",
-    );
+    assert_resource_view_fields(&view_by_uid, VariableSetResource::schema(), "get-id-test");
     assert_eq!(view_by_uid.headers.id, id);
 }
 
@@ -132,8 +123,7 @@ pub async fn test_get_identity_by_name(h: &impl FacadeContractHarness) {
 
     assert_identity_fields(
         &identity,
-        VARIABLE_SET_SCHEMA,
-        VARIABLE_SET_SCHEMA,
+        VariableSetResource::schema(),
         "ident-name-test",
         &id,
     );
@@ -294,7 +284,7 @@ contract_test!(
 );
 
 pub async fn test_get_wrong_kind_returns_kind_mismatch(h: &impl FacadeContractHarness) {
-    use crate::helpers::SECRET_SET_SCHEMA;
+    use crate::helpers::SECRET_SET_SCHEMA_STR;
 
     let id = create_test_resource(h, "kind-mismatch-test").await;
     let facade = h.facade_for(TestAccount::Alice);
@@ -317,11 +307,13 @@ pub async fn test_get_wrong_kind_returns_kind_mismatch(h: &impl FacadeContractHa
             },
         ))) => {
             assert_eq!(
-                expected_schema, SECRET_SET_SCHEMA,
+                expected_schema.as_str(),
+                SECRET_SET_SCHEMA_STR,
                 "expected_schema must be the requested kind"
             );
             assert_eq!(
-                actual_schema, VARIABLE_SET_SCHEMA,
+                actual_schema.as_str(),
+                VARIABLE_SET_SCHEMA_STR,
                 "actual_schema must be the stored kind"
             );
         }

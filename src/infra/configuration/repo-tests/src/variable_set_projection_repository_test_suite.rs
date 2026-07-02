@@ -18,7 +18,13 @@ use kamu_configuration::{
     VariableSpec,
     VariableValueSpec,
 };
-use kamu_resources::{ResourceHeaders, ResourceID, ResourceRepository, ResourceSnapshot};
+use kamu_resources::{
+    ResourceHeaders,
+    ResourceID,
+    ResourceRepository,
+    ResourceSchemaProvider,
+    ResourceSnapshot,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -43,7 +49,7 @@ async fn make_variable_set_resource(catalog: &Catalog) -> ResourceID {
 
     repo.create_resource(&ResourceSnapshot {
         id: variable_set_id,
-        schema: VariableSetResource::SCHEMA.to_string(),
+        schema: VariableSetResource::schema().clone(),
         headers: ResourceHeaders::simple(
             Utc::now(),
             odf::AccountID::new_seeded_ed25519(b"test-account"),

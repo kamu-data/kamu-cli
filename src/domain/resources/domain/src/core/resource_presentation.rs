@@ -10,11 +10,11 @@
 use serde::{Deserialize, Serialize};
 use strum::{Display, EnumString};
 
-use crate::{DeclarativeResource, ResourceDescriptorProvider};
+use crate::{DeclarativeResource, ResourceSchemaProvider};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub trait ResourcePresentation: ResourceDescriptorProvider + DeclarativeResource {
+pub trait ResourcePresentation: ResourceSchemaProvider + DeclarativeResource {
     const PRESENTATION: ResourcePresentationDefinition;
 
     fn list_column_values(state: &Self::ResourceState) -> Vec<crate::ResourceListColumnValueView>;

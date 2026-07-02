@@ -23,7 +23,13 @@ use kamu_configuration::{
     VariableValueSpec,
 };
 use kamu_datasets::{DatasetEntry, DatasetEntryRepository};
-use kamu_resources::{ResourceHeaders, ResourceID, ResourceRepository, ResourceSnapshot};
+use kamu_resources::{
+    ResourceHeaders,
+    ResourceID,
+    ResourceRepository,
+    ResourceSchemaProvider,
+    ResourceSnapshot,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -205,7 +211,7 @@ async fn create_resource(
     resource_repo
         .create_resource(&ResourceSnapshot {
             id: resource_id,
-            schema: VariableSetResource::SCHEMA.to_string(),
+            schema: VariableSetResource::schema().clone(),
             headers: ResourceHeaders::simple(
                 Utc::now(),
                 account.id.clone(),

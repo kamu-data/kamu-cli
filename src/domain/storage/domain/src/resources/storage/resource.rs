@@ -19,6 +19,7 @@ use kamu_resources::{
     ResourcePresentation,
     ResourcePresentationDefinition,
     ResourceSchemaProvider,
+    TypeUri,
 };
 
 use crate::{StorageEventStore, StorageProviderSpec, StorageSpec, StorageState, StorageStatus};
@@ -31,7 +32,14 @@ pub struct StorageResource(pub(crate) Aggregate<StorageState, dyn StorageEventSt
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl StorageResource {
-    pub const SCHEMA: &'static str = "https://opendatafabric.org/schemas/storage/v1alpha1/Storage";
+    /// Canonical schema URL as a `&'static str`.
+    ///
+    /// Used as the const dill-registry key (dill `#[meta]` requires a const);
+    /// the typed identity is [`Self::schema`] returning a `TypeUri` derived
+    /// from this same const. There is no ODF-generated `Storage` type yet, so
+    /// the literal lives here.
+    pub const SCHEMA_STR: &'static str =
+        "https://opendatafabric.org/schemas/storage/v1alpha1/Storage";
     pub const RESOURCE_NAME: &'static str = "storages";
     pub const RESOURCE_SHORT_NAMES: &'static [&'static str] = &["st", "storage"];
 
@@ -51,7 +59,11 @@ impl StorageResource {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl ResourceSchemaProvider for StorageResource {
-    const SCHEMA: &'static str = Self::SCHEMA;
+    fn schema() -> &'static TypeUri {
+        static STORAGE_SCHEMA: std::sync::LazyLock<TypeUri> =
+            std::sync::LazyLock::new(|| TypeUri::new_unchecked(StorageResource::SCHEMA_STR));
+        &STORAGE_SCHEMA
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -228,11 +228,17 @@ impl ResourceReconcileError for TestResourceReconcileError {
 pub struct TestResource(pub(crate) Aggregate<TestResourceState, dyn TestResourceEventStore>);
 
 impl TestResource {
-    pub const SCHEMA: &'static str = "https://test.kamu.dev/schemas/test/v1/TestResource";
+    pub const SCHEMA_STR: &'static str = "https://test.kamu.dev/schemas/test/v1/TestResource";
 }
 
 impl ResourceSchemaProvider for TestResource {
-    const SCHEMA: &'static str = Self::SCHEMA;
+    fn schema() -> &'static kamu_resources::TypeUri {
+        static TEST_RESOURCE_SCHEMA: std::sync::LazyLock<kamu_resources::TypeUri> =
+            std::sync::LazyLock::new(|| {
+                kamu_resources::TypeUri::new_unchecked(TestResource::SCHEMA_STR)
+            });
+        &TEST_RESOURCE_SCHEMA
+    }
 }
 
 impl DeclarativeResource for TestResource {

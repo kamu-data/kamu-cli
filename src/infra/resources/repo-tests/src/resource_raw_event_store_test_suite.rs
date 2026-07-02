@@ -19,6 +19,7 @@ use kamu_resources::{
     ResourceRawEventStore,
     ResourceRepository,
     ResourceSnapshot,
+    TypeUri,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -29,7 +30,7 @@ async fn make_resource(catalog: &Catalog, kind: &str) -> ResourceRawEventQuery {
 
     let snapshot = ResourceSnapshot {
         id,
-        schema: kind.to_string(),
+        schema: TypeUri::new_unchecked(kind),
         headers: ResourceHeaders::simple(
             Utc::now(),
             odf::AccountID::new_seeded_ed25519(b"test-account"),
@@ -44,7 +45,7 @@ async fn make_resource(catalog: &Catalog, kind: &str) -> ResourceRawEventQuery {
     repo.create_resource(&snapshot).await.unwrap();
 
     ResourceRawEventQuery {
-        schema: kind.to_string(),
+        schema: TypeUri::new_unchecked(kind),
         id,
     }
 }
@@ -293,7 +294,8 @@ pub async fn test_events_filtered_by_kind(catalog: &Catalog) {
     assert!(
         events_kind_a
             .iter()
-            .all(|e| e.query.schema == "KindA" && e.payload["kind"] == serde_json::json!("a"))
+            .all(|e| e.query.schema.as_str() == "KindA"
+                && e.payload["kind"] == serde_json::json!("a"))
     );
 
     let events_kind_b: Vec<_> = event_store
@@ -303,7 +305,7 @@ pub async fn test_events_filtered_by_kind(catalog: &Catalog) {
         .await
         .unwrap();
     assert_eq!(1, events_kind_b.len());
-    assert_eq!(events_kind_b[0].query.schema, "KindB");
+    assert_eq!(events_kind_b[0].query.schema.as_str(), "KindB");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

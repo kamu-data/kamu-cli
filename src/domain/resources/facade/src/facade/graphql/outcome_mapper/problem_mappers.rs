@@ -34,15 +34,23 @@ pub(crate) fn map_batch_lookup_problem(
 pub(crate) fn unsupported_descriptor_problem_error(
     problem: cynic_api::fragments::ResourceUnsupportedDescriptorProblem,
 ) -> domain::UnsupportedResourceDescriptorError {
-    use cynic_api::fragments::ResourceUnsupportedDescriptorProblemCode as C;
+    // The wire type only ever conveys a "not found" descriptor: `Duplicate` is a
+    // static wiring bug the server promotes to an internal error, never a union
+    // arm, so it cannot reach the client.
+    domain::UnsupportedResourceDescriptorError::NotFound {
+        schema: problem.schema,
+    }
+}
 
-    match problem.code {
-        C::NotFound => domain::UnsupportedResourceDescriptorError::NotFound {
-            schema: problem.schema,
-        },
-        C::Duplicate => domain::UnsupportedResourceDescriptorError::Duplicate {
-            schema: problem.schema,
-        },
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn unsupported_selector_problem_error(
+    problem: cynic_api::fragments::ResourceUnsupportedSelectorProblem,
+) -> domain::UnsupportedResourceSelectorError {
+    // Likewise, only "not found" selectors cross the wire; `Duplicate` is a
+    // wiring bug promoted to an internal error server-side.
+    domain::UnsupportedResourceSelectorError::NotFound {
+        selector: problem.selector,
     }
 }
 
@@ -133,7 +141,7 @@ pub(crate) fn map_selector_problem_result<E, FLookup, FUnsupported, FBadAccount>
 ) -> Result<E, InternalError>
 where
     FLookup: FnOnce(ResourceLookupProblem) -> E,
-    FUnsupported: FnOnce(domain::UnsupportedResourceDescriptorError) -> E,
+    FUnsupported: FnOnce(domain::UnsupportedResourceSelectorError) -> E,
     FBadAccount: FnOnce(crate::ResolveManifestAccountError) -> E,
 {
     use cynic_api::fragments::ResourceSelectorProblem as P;
@@ -141,8 +149,8 @@ where
         P::ResourceIDNotFoundProblem(p) => Ok(map_lookup(map_id_not_found(p))),
         P::ResourceNameNotFoundProblem(p) => Ok(map_lookup(map_name_not_found(p))),
         P::ResourceSchemaMismatchProblem(p) => Ok(map_lookup(map_schema_mismatch(p))),
-        P::ResourceUnsupportedDescriptorProblem(p) => {
-            Ok(map_unsupported(unsupported_descriptor_problem_error(p)))
+        P::ResourceUnsupportedSelectorProblem(p) => {
+            Ok(map_unsupported(unsupported_selector_problem_error(p)))
         }
         P::ResourceBadAccountProblem(p) => Ok(map_bad_account(bad_account_problem_error(p)?)),
         P::Unknown => Err(InternalError::new(

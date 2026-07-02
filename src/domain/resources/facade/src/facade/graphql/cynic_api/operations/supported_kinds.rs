@@ -29,7 +29,7 @@ pub(crate) struct SupportedKindsResources {
 pub(crate) struct ResourceKindDescriptor {
     pub name: String,
     pub short_names: Vec<String>,
-    pub schema: String,
+    pub schema: kamu_resources::TypeUri,
     pub list_columns: Vec<ResourceListColumnDescriptor>,
 }
 

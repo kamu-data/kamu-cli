@@ -120,10 +120,10 @@ long-term goal. This page documents what exists now.
 | Term | Meaning |
 | --- | --- |
 | **Resource** | A single managed object instance of a given kind, identified by a `ResourceID`. |
-| **Schema** | The canonical resource type identity URL, e.g. `https://opendatafabric.org/schemas/config/v1alpha1/VariableSet`. |
+| **Schema** | The canonical resource type identity URL, e.g. `https://opendatafabric.org/schemas/config/v1alpha1/VariableSet`. Carried in code as a `TypeUri` (opaque identity value); a parsed lens over it is `ResourceSchemaId` (see [§5a](#5a-resource-anatomy--input-vs-auto-generated)). |
 | **Kind name** | User-facing selector / presentation name, e.g. `variablesets`, `secretsets`. Not persisted as the resource type identity. |
 | **Short name** | Selector alias, e.g. `vs`, `ss`. |
-| **Descriptor** | The schema-only `ResourceDescriptor` used to route to the right dispatcher. |
+| **Descriptor** | The schema (`TypeUri`) identifying a resource kind for dispatcher routing; carried in the `dill` registry as `ResourceDispatcherMeta`. |
 | **Manifest** | The user-authored wire document (`$schema`/`headers`/`spec`) in YAML or JSON. |
 | **Spec** | The desired-state portion authored by the user; stored as `serde_json::Value`. |
 | **Status** | Server-owned observed state (`phase`, `observedGeneration`, `conditions`). Note `generation` lives in **headers**, not status. |
@@ -151,7 +151,9 @@ not break; most are enforced in code and exercised by tests — pointers given w
   `UNIQUE (account_id, resource_schema, resource_name)`. Names are stored lowercased.
 - **`$schema` is the resource type identity.** Manifests no longer carry top-level `apiVersion` or
   `kind`; both are rejected as unknown fields. A schema URL is parsed into base/context/version/name
-  for validation and display, but dispatch and persistence compare the full canonical schema string.
+  for validation and display, but dispatch and persistence compare the full canonical schema — carried
+  as a `TypeUri` and string-equal on the wire/in storage (the dill registry key is an equivalent
+  `&'static str`, see [§9](#9-services-kamu-resources-services)).
 - **Selectors are presentation names, not manifest identity.** CLI and GraphQL selectors still use
   friendly kind names and short names (`variablesets`, `vs`, `secretsets`, `ss`), which are resolved
   to a `ResourceKindDescriptor.schema` before repository or dispatcher access.
@@ -286,12 +288,16 @@ and an aggregate. This is the bound that all generic use cases require.
 
 **Presentation & descriptor traits:**
 
-- **`ResourceSchemaProvider`** — const string `SCHEMA`, the canonical schema URL for the resource.
-- **`ResourceDescriptorProvider`** — blanket-implemented for any `ResourceSchemaProvider`;
-  exposes `const DESCRIPTOR: ResourceDescriptor` = `schema`
-  ([`core/resource_descriptor.rs`](/src/domain/resources/domain/src/core/resource_descriptor.rs)).
+- **`ResourceSchemaProvider`** — exposes `fn schema() -> &'static TypeUri`, the canonical schema URL
+  (as a `TypeUri`) for the resource, backed by a `'static` value (a `LazyLock<TypeUri>` from the ODF
+  codegen) ([`core/resource_descriptor.rs`](/src/domain/resources/domain/src/core/resource_descriptor.rs)).
 - **`ResourcePresentation`** — selector name, short names, and per-kind list columns for
   table/`list` rendering.
+
+  > Routing to the right dispatcher no longer goes through a `ResourceDescriptor`/`DESCRIPTOR`
+  > const — the registry keys dispatchers on `dill` metadata (`ResourceDispatcherMeta`, carrying the
+  > schema as a `&'static str` plus selector name/short-names) and compares it against the target
+  > `TypeUri` / selector. See [§9](#9-services-kamu-resources-services).
 
 ### Events
 
@@ -355,6 +361,15 @@ annotations}`, and `spec`. `deny_unknown_fields` means a manifest **cannot** car
 timestamps, `generation`, or the legacy top-level `apiVersion`/`kind` fields — those are
 server-owned or no longer part of the manifest envelope.
 
+> **`TypeUri` vs `ResourceSchemaId`.** Both model the *same* `$schema` attribute at two levels.
+> `TypeUri` is the opaque identity value carried through fields, storage, and the wire
+> (`ResourceSnapshot.schema`, dispatcher lookup, outbox payloads). `ResourceSchemaId` is a parsed
+> *lens* over it — it wraps a `TypeUri` (`typ`) and exposes the decomposed `base`/`context`/`version`/
+> `name` segments used for validation and display. The manifest deserializes `$schema` as
+> `ResourceSchemaId` (so a malformed URL is rejected at parse time and the segments are available);
+> everything downstream carries the plain `TypeUri`. Both serialize byte-identically to the schema
+> URL string, so there is no wire or storage difference between them.
+
 The `id` is **not** something the user assigns — a new resource's UID is always allocated by the
 server. It may only be *supplied* on a manifest to point at an already-existing resource for an
 update; this is what lets a resource be renamed (the `id` keeps the identity stable while `name`
@@ -393,7 +408,7 @@ combines authored + generated + event-sourcing bookkeeping:
 ```rust
 pub struct ResourceSnapshot {
     pub id: ResourceID,
-    pub schema: String,
+    pub schema: TypeUri,                      // canonical schema URL (identity value)
     pub headers: ResourceHeaders,            // authored fields + generated fields
     pub spec: serde_json::Value,             // authored (may be transformed — see SecretSet)
     pub status: Option<serde_json::Value>,   // generated
@@ -565,18 +580,32 @@ by **`declare_*_use_case!`** macros so each kind gets a fully-wired instance wit
 
 **Dispatchers + registry.** Each kind registers a `ResourceCrudDispatcher` via
 `declare_resource_crud_dispatcher!` (and a presentation dispatcher). Lookup is by schema or selector
-metadata through `dill`
+metadata through `dill` — the registry key is `ResourceDispatcherMeta` (schema `&'static str` +
+selector name/short-names). There are **three** lookup entry points, differing only in how a missing
+dispatcher is reported
 ([`crud_dispatchers/resource_crud_dispatcher_registry.rs`](/src/domain/resources/services/src/crud_dispatchers/resource_crud_dispatcher_registry.rs)):
 
 ```rust
-pub fn get_resource_crud_dispatcher<E>(target_catalog, schema)
-    -> Result<Arc<dyn ResourceCrudDispatcher>, E>
-{
-    let mut handlers = target_catalog.builders_for_with_meta::<dyn ResourceCrudDispatcher, _>(
-        |meta: &ResourceDispatcherMeta| meta.schema == schema);
-    // exactly-one expected → NotFound / Duplicate otherwise
-}
+// (1) By schema (from a parsed manifest `$schema`) — a miss is a user error.
+pub fn get_resource_crud_dispatcher<E>(target_catalog, schema: &str) -> Result<Arc<dyn …>, E>
+    where E: From<UnsupportedResourceDescriptorError> + From<InternalError>;
+
+// (2) By selector name/short-name (from a CLI/GraphQL selector) — a miss is a user error.
+pub fn get_resource_crud_dispatcher_by_selector<E>(target_catalog, selector: &str) -> Result<…, E>
+    where E: From<UnsupportedResourceSelectorError> + From<InternalError>;
+
+// (3) By a schema already known valid (stored snapshot, or an already-resolved selector) —
+//     a miss is a data-integrity catastrophe, so it is an InternalError (→ 500), never a user error.
+pub fn get_resource_crud_dispatcher_for_trusted_schema(target_catalog, schema: &str)
+    -> Result<Arc<dyn …>, InternalError>;
 ```
+
+Each finds exactly one dispatcher; zero → `NotFound`, more than one → `Duplicate`. The
+**descriptor** path (1) is reachable only where a fresh unvalidated schema arrives — the apply
+manifest `$schema`. The **selector** path (2) serves every CLI/GraphQL selector. The **trusted**
+path (3) is for schemas the system itself produced (a stored snapshot's `schema`, or a schema
+already resolved from a valid selector), where a lookup miss means storage/registration is corrupt,
+not a bad request.
 
 **Message handlers** (outbox consumers — see [§13](#13-data-flow-walkthroughs)):
 `ResourceLifecycleMessageConsumer` and `AccountLifecycleMessageConsumer`.
@@ -975,12 +1004,17 @@ resource declares its identity and implements the core traits, e.g.:
 ```rust
 // variable_set/resource.rs
 impl VariableSetResource {
-    pub const SCHEMA: &'static str =
-        "https://opendatafabric.org/schemas/config/v1alpha1/VariableSet";
+    // Const `&'static str`, reused straight from the ODF codegen (no re-declared URL literal).
+    // Used only as the const dill-registry key (dill `#[meta]` requires a const).
+    pub const SCHEMA_STR: &'static str = odf::metadata::config::VariableSet::schema_str();
     pub const RESOURCE_NAME: &'static str = "variablesets";
     pub const RESOURCE_SHORT_NAMES: &'static [&'static str] = &["vs"];
 }
-impl ResourceSchemaProvider for VariableSetResource { const SCHEMA: &'static str = Self::SCHEMA; }
+// The typed schema identity is a `TypeUri` accessor (LazyLock-backed in the codegen), not a const;
+// it and SCHEMA_STR derive from the same generated static, so they cannot drift.
+impl ResourceSchemaProvider for VariableSetResource {
+    fn schema() -> &'static TypeUri { odf::metadata::config::VariableSet::schema() }
+}
 impl DeclarativeResource for VariableSetResource { /* … */ }
 impl ResourcePresentation for VariableSetResource { /* short names + list columns */ }
 ```
@@ -1006,7 +1040,8 @@ pub fn register_variable_set_resource_crud_dispatcher(catalog_builder: &mut dill
    (`#[serde(deny_unknown_fields)]`, with validation + lint), `status.rs`, `state.rs`, `event.rs`,
    and `resource.rs` implementing `ResourceSchemaProvider`, `DeclarativeResource`,
    `ReconcilableResource`/`ReconcilableEventSourcedResource`, and `ResourcePresentation`
-   (set `SCHEMA`, `RESOURCE_NAME`, `RESOURCE_SHORT_NAMES`).
+   (implement `schema() -> &'static TypeUri`, and set `SCHEMA_STR`, `RESOURCE_NAME`,
+   `RESOURCE_SHORT_NAMES`).
 2. **Implement a `Reconciler<R>`** in `configuration/services/src/reconcilers/` (no-op projection is
    fine if there's nothing to do; transform the spec here if needed — see `SecretSet`).
 3. **Declare dispatchers** with `declare_resource_crud_dispatcher!` /
@@ -1115,9 +1150,10 @@ Otherwise the behavior is already guaranteed for both implementations by the con
   ([§5a](#5a-resource-anatomy--input-vs-auto-generated)).
 - **`spec` is stored as `serde_json::Value`** — the framework is schema-agnostic; per-kind structure
   and validation live in the kind's `spec.rs`.
-- **Schema strings are validated, not normalized** — `ResourceSchema` rejects malformed URLs,
-  whitespace, query strings, fragments, trailing slashes, and too-few path segments, but it preserves
-  the accepted string and allows non-`opendatafabric.org` hosts for future custom schema namespaces.
+- **Schema strings are validated, not normalized** — `ResourceSchemaId::parse` rejects malformed
+  URLs, whitespace, query strings, fragments, trailing slashes, and too-few path segments, but it
+  preserves the accepted string (stored as the inner `TypeUri`) and allows non-`opendatafabric.org`
+  hosts for future custom schema namespaces.
 - **Secrets are encrypted before the first durable write** (by the spec sanitizer, not the
   reconciler) and only decrypted on read with `SpecViewMode::Revealed` (CLI `--revealed`, GraphQL
   `revealed: true`); the default `Encrypted` returns the stored ciphertext envelope. See

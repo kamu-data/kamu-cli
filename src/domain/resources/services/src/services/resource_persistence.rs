@@ -17,9 +17,9 @@ use crate::domain::{
     DeclarativeResource,
     InvariantViolationOf,
     ReconcilableEventSourcedResource,
-    ResourceDescriptorProvider,
     ResourcePersistenceError,
     ResourceRepository,
+    ResourceSchemaProvider,
     ResourceSnapshotUpdate,
     ResourceStatusLike,
     UpdateResourceError,
@@ -29,7 +29,7 @@ use crate::domain::{
 
 pub struct ResourcePersistenceServiceHelper<'a, R>
 where
-    R: ReconcilableEventSourcedResource + ResourceDescriptorProvider,
+    R: ReconcilableEventSourcedResource + ResourceSchemaProvider,
 {
     resource_repository: &'a dyn ResourceRepository,
     event_store: &'a R::Store,
@@ -37,7 +37,7 @@ where
 
 impl<'a, R> ResourcePersistenceServiceHelper<'a, R>
 where
-    R: ReconcilableEventSourcedResource + ResourceDescriptorProvider,
+    R: ReconcilableEventSourcedResource + ResourceSchemaProvider,
     R::LifecycleError: InvariantViolationOf<<R as DeclarativeResource>::ResourceState>,
     R::Spec: Serialize,
     R::Status: Serialize + ResourceStatusLike,
@@ -94,7 +94,7 @@ where
 
 impl<R> ResourcePersistenceServiceHelper<'_, R>
 where
-    R: ReconcilableEventSourcedResource + ResourceDescriptorProvider,
+    R: ReconcilableEventSourcedResource + ResourceSchemaProvider,
     R::LifecycleError:
         InvariantViolationOf<<R as DeclarativeResource>::ResourceState> + std::fmt::Display,
     R::Spec: Serialize,
@@ -152,7 +152,7 @@ where
 
 impl<R> ResourcePersistenceServiceHelper<'_, R>
 where
-    R: ReconcilableEventSourcedResource + ResourceDescriptorProvider,
+    R: ReconcilableEventSourcedResource + ResourceSchemaProvider,
     R::LifecycleError: InvariantViolationOf<<R as DeclarativeResource>::ResourceState>,
     R::Spec: Serialize,
     R::Status: Serialize + ResourceStatusLike,

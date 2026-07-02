@@ -52,8 +52,7 @@ macro_rules! declare_apply_resource_use_case {
                         .generic_resource_query_service
                         .find_resource_id_by_name(
                             &params.headers.account,
-                            <$resource as kamu_resources::ResourceDescriptorProvider>::DESCRIPTOR
-                                .schema,
+                            <$resource as kamu_resources::ResourceSchemaProvider>::schema(),
                             &params.headers.name,
                         )
                         .await
@@ -96,7 +95,7 @@ macro_rules! declare_apply_resource_use_case {
         impl kamu_resources::ApplyResourceUseCase<$resource> for $use_case
         where
             $resource: kamu_resources::ReconcilableEventSourcedResource
-                + kamu_resources::ResourceDescriptorProvider,
+                + kamu_resources::ResourceSchemaProvider,
             <$resource as kamu_resources::DeclarativeResource>::Spec:
                 serde::Serialize + PartialEq + Clone + kamu_resources::ResourceValidateSpec,
             <$resource as kamu_resources::DeclarativeResource>::Status:

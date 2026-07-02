@@ -26,7 +26,6 @@ use crate::domain::{
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
     ReconcilableEventSourcedResource,
     ResourceAggregateLoader,
-    ResourceDescriptorProvider,
     ResourceHeadersInput,
     ResourceHeadersValidationError,
     ResourceLifecycleMessage,
@@ -35,6 +34,7 @@ use crate::domain::{
     ResourceLoadError,
     ResourcePersistenceError,
     ResourcePersistenceService,
+    ResourceSchemaProvider,
     ResourceStatusLike,
     ResourceValidateSpec,
     TypedResourceQueryService,
@@ -45,7 +45,7 @@ use crate::{ApplyResourcePlanner, PlannedApplyResource, PlannedApplyResourceDeci
 
 pub struct ApplyResourcePlanExecutor<'a, R>
 where
-    R: ReconcilableEventSourcedResource + ResourceDescriptorProvider,
+    R: ReconcilableEventSourcedResource + ResourceSchemaProvider,
 {
     generic_resource_query_service: &'a dyn GenericResourceQueryService,
     typed_resource_query_service: &'a dyn TypedResourceQueryService<R>,
@@ -57,7 +57,7 @@ where
 
 impl<'a, R> ApplyResourcePlanExecutor<'a, R>
 where
-    R: ReconcilableEventSourcedResource + ResourceDescriptorProvider,
+    R: ReconcilableEventSourcedResource + ResourceSchemaProvider,
     R::Spec: Serialize + PartialEq + Clone + ResourceValidateSpec + ResourceLinterSpec,
     R::Status: Serialize + ResourceStatusLike,
     R::LifecycleError: InvariantViolationOf<<R as DeclarativeResource>::ResourceState>
@@ -176,7 +176,7 @@ where
                     .with_context(format!(
                         "account_id={}, kind='{}', name='{}'",
                         headers_input.account,
-                        R::DESCRIPTOR.schema,
+                        R::schema(),
                         headers_input.name
                     )),
             ));
@@ -209,7 +209,7 @@ where
                         .with_context(format!(
                             "account_id={}, kind='{}', name='{}'",
                             plan.resource.headers().account,
-                            R::DESCRIPTOR.schema,
+                            R::schema(),
                             plan.resource.headers().name
                         )),
                 )),

@@ -28,7 +28,9 @@ use kamu_resources::{
     ResourceHeaders,
     ResourceID,
     ResourceLifecycleMessage,
+    ResourceSchemaProvider,
     ResourceSnapshot,
+    TypeUri,
 };
 use messaging_outbox::{MessageConsumerT, OutboxProvider, register_message_dispatcher};
 use uuid::Uuid;
@@ -85,7 +87,7 @@ async fn test_reconciliation_succeeded_for_variable_set_cleans_up_old_entries() 
     harness
         .consume_message(&ResourceLifecycleMessage::reconciliation_succeeded(
             Utc::now(),
-            make_snapshot(id, VariableSetResource::SCHEMA, 2),
+            make_snapshot(id, VariableSetResource::schema(), 2),
         ))
         .await
         .unwrap();
@@ -148,7 +150,7 @@ async fn test_reconciliation_succeeded_for_secret_set_cleans_up_old_entries() {
     harness
         .consume_message(&ResourceLifecycleMessage::reconciliation_succeeded(
             Utc::now(),
-            make_snapshot(id, SecretSetResource::SCHEMA, 2),
+            make_snapshot(id, SecretSetResource::schema(), 2),
         ))
         .await
         .unwrap();
@@ -167,11 +169,14 @@ async fn test_reconciliation_succeeded_for_unknown_kind_is_no_op() {
     let harness = ConfigurationResourceLifecycleConsumerHarness::new();
     let id = harness.alloc_id();
 
+    static UNKNOWN_SCHEMA: std::sync::LazyLock<TypeUri> =
+        std::sync::LazyLock::new(|| TypeUri::new_unchecked("unknown"));
+
     // Must succeed without error
     harness
         .consume_message(&ResourceLifecycleMessage::reconciliation_succeeded(
             Utc::now(),
-            make_snapshot(id, "UnknownKind", 1),
+            make_snapshot(id, &UNKNOWN_SCHEMA, 1),
         ))
         .await
         .unwrap();
@@ -207,7 +212,7 @@ async fn test_deleted_for_variable_set_removes_all_projection_entries() {
     harness
         .consume_message(&ResourceLifecycleMessage::deleted(
             Utc::now(),
-            vec![make_snapshot(id, VariableSetResource::SCHEMA, 1)],
+            vec![make_snapshot(id, VariableSetResource::schema(), 1)],
         ))
         .await
         .unwrap();
@@ -251,7 +256,7 @@ async fn test_deleted_for_secret_set_removes_all_projection_entries() {
     harness
         .consume_message(&ResourceLifecycleMessage::deleted(
             Utc::now(),
-            vec![make_snapshot(id, SecretSetResource::SCHEMA, 1)],
+            vec![make_snapshot(id, SecretSetResource::schema(), 1)],
         ))
         .await
         .unwrap();
@@ -295,8 +300,8 @@ async fn test_deleted_for_variable_set_with_multiple_ids_removes_all() {
         .consume_message(&ResourceLifecycleMessage::deleted(
             Utc::now(),
             vec![
-                make_snapshot(id_a, VariableSetResource::SCHEMA, 1),
-                make_snapshot(id_b, VariableSetResource::SCHEMA, 1),
+                make_snapshot(id_a, VariableSetResource::schema(), 1),
+                make_snapshot(id_b, VariableSetResource::schema(), 1),
             ],
         ))
         .await
@@ -351,7 +356,7 @@ async fn test_deleted_for_variable_set_removes_only_targeted_id() {
     harness
         .consume_message(&ResourceLifecycleMessage::deleted(
             Utc::now(),
-            vec![make_snapshot(id_deleted, VariableSetResource::SCHEMA, 1)],
+            vec![make_snapshot(id_deleted, VariableSetResource::schema(), 1)],
         ))
         .await
         .unwrap();
@@ -412,8 +417,8 @@ async fn test_deleted_for_secret_set_with_multiple_ids_removes_all() {
         .consume_message(&ResourceLifecycleMessage::deleted(
             Utc::now(),
             vec![
-                make_snapshot(id_a, SecretSetResource::SCHEMA, 1),
-                make_snapshot(id_b, SecretSetResource::SCHEMA, 1),
+                make_snapshot(id_a, SecretSetResource::schema(), 1),
+                make_snapshot(id_b, SecretSetResource::schema(), 1),
             ],
         ))
         .await
@@ -443,7 +448,7 @@ async fn test_applied_message_is_no_op() {
         .consume_message(&ResourceLifecycleMessage::applied(
             Utc::now(),
             kamu_resources::ResourceLifecycleMessageOutcome::Created,
-            make_snapshot(id, VariableSetResource::SCHEMA, 1),
+            make_snapshot(id, VariableSetResource::schema(), 1),
         ))
         .await
         .unwrap();
@@ -453,14 +458,14 @@ async fn test_applied_message_is_no_op() {
 // Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn make_snapshot(id: ResourceID, kind: &str, generation: u64) -> ResourceSnapshot {
+fn make_snapshot(id: ResourceID, schema: &'static TypeUri, generation: u64) -> ResourceSnapshot {
     let (_, account_id) = odf::AccountID::new_generated_ed25519();
     let now = Utc::now();
     let mut headers = ResourceHeaders::simple(now, account_id, "test-res");
     headers.generation = generation;
     ResourceSnapshot {
         id,
-        schema: kind.to_string(),
+        schema: schema.clone(),
         headers,
         spec: serde_json::json!({}),
         status: None,

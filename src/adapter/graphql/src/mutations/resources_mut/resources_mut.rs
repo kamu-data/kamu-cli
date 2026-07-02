@@ -18,9 +18,11 @@ use crate::queries::{
     ResourceSelectorInput,
     ResourceSelectorProblem,
     ResourceSelectorProblemResult,
-    ResourceUnsupportedDescriptorProblem,
+    ResourceUnsupportedSelectorProblem,
     map_bad_account_problem,
     map_resolve_manifest_account_error,
+    map_unsupported_descriptor_problem,
+    map_unsupported_selector_problem,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -94,8 +96,8 @@ impl ResourcesMut {
             Err(kamu_resources_facade::DeleteResourceError::LookupProblem(problem)) => {
                 Ok(ResourceDeleteOutcome::Problem(problem.into()))
             }
-            Err(kamu_resources_facade::DeleteResourceError::UnsupportedDescriptor(e)) => {
-                Ok(ResourceDeleteOutcome::Problem(e.into()))
+            Err(kamu_resources_facade::DeleteResourceError::UnsupportedSelector(e)) => {
+                Ok(ResourceDeleteOutcome::Problem(e.try_into()?))
             }
             Err(kamu_resources_facade::DeleteResourceError::BadAccount(e)) => Ok(
                 ResourceDeleteOutcome::Problem(ResourceSelectorProblemResult {
@@ -131,8 +133,10 @@ impl ResourcesMut {
             .await
         {
             Ok(response) => Ok(ResourceDeleteManyOutcome::Success(response.into())),
-            Err(kamu_resources_facade::BatchResourceError::UnsupportedDescriptor(e)) => {
-                Ok(ResourceDeleteManyOutcome::UnsupportedDescriptor(e.into()))
+            Err(kamu_resources_facade::BatchResourceError::UnsupportedSelector(e)) => {
+                Ok(ResourceDeleteManyOutcome::UnsupportedSelector(
+                    map_unsupported_selector_problem(e)?,
+                ))
             }
             Err(kamu_resources_facade::BatchResourceError::BadAccount(e)) => Ok(
                 ResourceDeleteManyOutcome::BadAccount(map_bad_account_problem(e)?),
@@ -162,7 +166,7 @@ pub struct ResourceDeleteSuccess {
 #[derive(Union, Debug, Clone)]
 pub enum ResourceDeleteManyOutcome {
     Success(ResourceDeleteManyResult),
-    UnsupportedDescriptor(ResourceUnsupportedDescriptorProblem),
+    UnsupportedSelector(ResourceUnsupportedSelectorProblem),
     BadAccount(ResourceBadAccountProblem),
 }
 
@@ -214,7 +218,9 @@ fn map_apply_resource_error(
                 message: e.to_string(),
             },
         )),
-        E::UnsupportedDescriptor(e) => Ok(ResourceApplyOutcome::UnsupportedDescriptor(e.into())),
+        E::UnsupportedDescriptor(e) => Ok(ResourceApplyOutcome::UnsupportedDescriptor(
+            map_unsupported_descriptor_problem(e)?,
+        )),
         E::BadAccount(e) => map_bad_account_problem(e).map(ResourceApplyOutcome::BadAccount),
         E::InvalidHeaders(e) => Ok(ResourceApplyOutcome::InvalidHeader(e.into())),
         E::InvalidSpec(e) => Ok(ResourceApplyOutcome::InvalidSpec(e.into())),
@@ -235,7 +241,7 @@ fn map_batch_delete_resource_error(error: kamu_resources_facade::BatchResourceEr
     use kamu_resources_facade::BatchResourceError as E;
 
     match error {
-        E::UnsupportedDescriptor(_) => GqlError::gql("Unsupported resource kind"),
+        E::UnsupportedSelector(_) => GqlError::gql("Unsupported resource kind"),
         E::BadAccount(error) => map_resolve_manifest_account_error(error),
         E::RemoteRequest(error) => error.int_err().into(),
         E::Internal(error) => error.into(),
@@ -248,8 +254,8 @@ fn map_delete_resource_error(error: kamu_resources_facade::DeleteResourceError) 
     use kamu_resources_facade::DeleteResourceError as E;
 
     match error {
-        E::UnsupportedDescriptor(_) => {
-            unreachable!("UnsupportedDescriptor is handled as a union arm")
+        E::UnsupportedSelector(_) => {
+            unreachable!("UnsupportedSelector is handled as a union arm")
         }
         E::BadAccount(_) => unreachable!("BadAccount is handled as a union arm"),
         E::LookupProblem(_) => unreachable!("LookupProblem is handled as a union arm"),

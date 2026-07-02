@@ -18,7 +18,7 @@ use super::batch_helpers::{
 use super::problem_mappers::{
     bad_account_problem_error,
     map_selector_problem_result,
-    unsupported_descriptor_problem_error,
+    unsupported_selector_problem_error,
 };
 use crate::facade::graphql::cynic_api;
 use crate::{
@@ -68,8 +68,8 @@ pub(crate) fn map_list_outcome(
             .map(TryInto::try_into)
             .collect::<Result<Vec<_>, InternalError>>()
             .map_err(ListResourcesError::Internal),
-        O::ResourceUnsupportedDescriptorProblem(problem) => {
-            Err(unsupported_descriptor_problem_error(problem).into())
+        O::ResourceUnsupportedSelectorProblem(problem) => {
+            Err(unsupported_selector_problem_error(problem).into())
         }
         O::ResourceBadAccountProblem(problem) => Err(ListResourcesError::BadAccount(
             bad_account_problem_error(problem).map_err(ListResourcesError::Internal)?,
@@ -114,8 +114,8 @@ pub(crate) fn map_list_identities_outcome(
         O::ResourceIdentityConnection(connection) => {
             Ok(connection.nodes.into_iter().map(Into::into).collect())
         }
-        O::ResourceUnsupportedDescriptorProblem(problem) => {
-            Err(unsupported_descriptor_problem_error(problem).into())
+        O::ResourceUnsupportedSelectorProblem(problem) => {
+            Err(unsupported_selector_problem_error(problem).into())
         }
         O::ResourceBadAccountProblem(problem) => Err(ListResourcesError::BadAccount(
             bad_account_problem_error(problem).map_err(ListResourcesError::Internal)?,
@@ -172,8 +172,8 @@ pub(crate) fn map_search_identities_outcome(
                 total_count,
             })
         }
-        O::ResourceUnsupportedDescriptorProblem(problem) => {
-            Err(unsupported_descriptor_problem_error(problem).into())
+        O::ResourceUnsupportedSelectorProblem(problem) => {
+            Err(unsupported_selector_problem_error(problem).into())
         }
         O::ResourceBadAccountProblem(problem) => Err(ListResourcesError::BadAccount(
             bad_account_problem_error(problem).map_err(ListResourcesError::Internal)?,
@@ -287,8 +287,8 @@ pub(crate) fn map_batch_get_resources_outcome(
                 problems,
             })
         }
-        O::ResourceUnsupportedDescriptorProblem(problem) => {
-            Err(unsupported_descriptor_problem_error(problem).into())
+        O::ResourceUnsupportedSelectorProblem(problem) => {
+            Err(unsupported_selector_problem_error(problem).into())
         }
         O::ResourceBadAccountProblem(problem) => Err(BatchResourceError::BadAccount(
             bad_account_problem_error(problem).map_err(BatchResourceError::Internal)?,
@@ -330,8 +330,8 @@ pub(crate) fn map_batch_get_identities_outcome(
                 problems,
             })
         }
-        O::ResourceUnsupportedDescriptorProblem(problem) => {
-            Err(unsupported_descriptor_problem_error(problem).into())
+        O::ResourceUnsupportedSelectorProblem(problem) => {
+            Err(unsupported_selector_problem_error(problem).into())
         }
         O::ResourceBadAccountProblem(problem) => Err(BatchResourceError::BadAccount(
             bad_account_problem_error(problem).map_err(BatchResourceError::Internal)?,
@@ -373,8 +373,8 @@ pub(crate) fn map_batch_render_manifests_outcome(
                 problems,
             })
         }
-        O::ResourceUnsupportedDescriptorProblem(problem) => {
-            Err(unsupported_descriptor_problem_error(problem).into())
+        O::ResourceUnsupportedSelectorProblem(problem) => {
+            Err(unsupported_selector_problem_error(problem).into())
         }
         O::ResourceBadAccountProblem(problem) => Err(BatchResourceError::BadAccount(
             bad_account_problem_error(problem).map_err(BatchResourceError::Internal)?,
@@ -414,8 +414,8 @@ pub(crate) fn map_batch_delete_many_outcome(
                 problems,
             })
         }
-        O::ResourceUnsupportedDescriptorProblem(problem) => {
-            Err(unsupported_descriptor_problem_error(problem).into())
+        O::ResourceUnsupportedSelectorProblem(problem) => {
+            Err(unsupported_selector_problem_error(problem).into())
         }
         O::ResourceBadAccountProblem(problem) => Err(BatchResourceError::BadAccount(
             bad_account_problem_error(problem).map_err(BatchResourceError::Internal)?,

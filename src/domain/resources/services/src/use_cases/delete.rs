@@ -23,11 +23,11 @@ use crate::domain::{
     InvariantViolationOf,
     ReconcilableEventSourcedResource,
     ResourceAggregateLoader,
-    ResourceDescriptorProvider,
     ResourceID,
     ResourceNotOwnedByAccountError,
     ResourcePersistenceError,
     ResourcePersistenceService,
+    ResourceSchemaProvider,
     ResourceStatusLike,
 };
 
@@ -35,7 +35,7 @@ use crate::domain::{
 
 pub struct DeleteResourcesUseCaseHelper<'a, R>
 where
-    R: ReconcilableEventSourcedResource + ResourceDescriptorProvider,
+    R: ReconcilableEventSourcedResource + ResourceSchemaProvider,
 {
     generic_resource_query_service: &'a dyn GenericResourceQueryService,
     resource_aggregate_loader: &'a dyn ResourceAggregateLoader<R>,
@@ -46,7 +46,7 @@ where
 
 impl<'a, R> DeleteResourcesUseCaseHelper<'a, R>
 where
-    R: ReconcilableEventSourcedResource + ResourceDescriptorProvider,
+    R: ReconcilableEventSourcedResource + ResourceSchemaProvider,
     R::LifecycleError:
         InvariantViolationOf<<R as DeclarativeResource>::ResourceState> + std::fmt::Display,
     R::Spec: Serialize,
@@ -83,7 +83,7 @@ where
 
         let outcome = self
             .generic_resource_query_service
-            .find_owned_snapshots(&account_id, R::DESCRIPTOR.schema, &unique_ids)
+            .find_owned_snapshots(&account_id, R::schema(), &unique_ids)
             .await
             .map_err(DeleteResourcesError::Internal)?;
 
@@ -92,7 +92,7 @@ where
                 odf::AccessError::Unauthorized(
                     ResourceNotOwnedByAccountError {
                         id,
-                        resource_type: R::DESCRIPTOR.schema,
+                        resource_type: R::schema(),
                     }
                     .into(),
                 ),

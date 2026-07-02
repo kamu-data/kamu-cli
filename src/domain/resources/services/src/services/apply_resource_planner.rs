@@ -27,12 +27,12 @@ use crate::domain::{
     ReconcilableEventSourcedResource,
     ReconcilableResource,
     ResourceAggregateLoader,
-    ResourceDescriptorProvider,
     ResourceHeadersInput,
     ResourceHeadersValidationError,
     ResourceID,
     ResourceLinterSpec,
     ResourceLoadError,
+    ResourceSchemaProvider,
     ResourceStatusLike,
     ResourceValidateSpec,
     TypedResourceQueryService,
@@ -42,7 +42,7 @@ use crate::domain::{
 
 pub struct ApplyResourcePlanner<'a, R>
 where
-    R: ReconcilableEventSourcedResource + ResourceDescriptorProvider,
+    R: ReconcilableEventSourcedResource + ResourceSchemaProvider,
 {
     generic_resource_query_service: &'a dyn GenericResourceQueryService,
     typed_resource_query_service: &'a dyn TypedResourceQueryService<R>,
@@ -52,7 +52,7 @@ where
 
 impl<'a, R> ApplyResourcePlanner<'a, R>
 where
-    R: ReconcilableEventSourcedResource + ResourceDescriptorProvider,
+    R: ReconcilableEventSourcedResource + ResourceSchemaProvider,
     R::Spec: Serialize + PartialEq + Clone + ResourceValidateSpec + ResourceLinterSpec,
     R::Status: Serialize + ResourceStatusLike,
     R::LifecycleError: InvariantViolationOf<<R as DeclarativeResource>::ResourceState>
@@ -124,7 +124,7 @@ where
             Some(id) => Ok(Some(id)),
             None => self
                 .generic_resource_query_service
-                .find_resource_id_by_name(&headers.account, R::DESCRIPTOR.schema, &headers.name)
+                .find_resource_id_by_name(&headers.account, R::schema(), &headers.name)
                 .await
                 .map_err(ApplyResourceUseCaseError::Internal),
         }

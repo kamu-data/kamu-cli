@@ -567,7 +567,7 @@ Base64-encoded binary data (url-safe, no padding)
 """
 scalar Base64Usnp
 
-union BatchResourceIdentitiesOutcome = BatchResourceIdentitiesResult | ResourceUnsupportedDescriptorProblem | ResourceBadAccountProblem
+union BatchResourceIdentitiesOutcome = BatchResourceIdentitiesResult | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem
 
 type BatchResourceIdentitiesResult {
 	identities: [BatchResourceIdentitySuccess!]!
@@ -584,7 +584,7 @@ type BatchResourceManifestSuccess {
 	manifest: ResourceRenderManifestResult!
 }
 
-union BatchResourceManifestsOutcome = BatchResourceManifestsResult | ResourceUnsupportedDescriptorProblem | ResourceBadAccountProblem
+union BatchResourceManifestsOutcome = BatchResourceManifestsResult | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem
 
 type BatchResourceManifestsResult {
 	manifests: [BatchResourceManifestSuccess!]!
@@ -601,7 +601,7 @@ type BatchResourceSuccess {
 	resource: Resource!
 }
 
-union BatchResourcesOutcome = BatchResourcesResult | ResourceUnsupportedDescriptorProblem | ResourceBadAccountProblem
+union BatchResourcesOutcome = BatchResourcesResult | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem
 
 type BatchResourcesResult {
 	resources: [BatchResourceSuccess!]!
@@ -1236,7 +1236,7 @@ type DatasetBindingView {
 	resourceId: ResourceID!
 	bindingOrder: Int!
 	resourceName: String!
-	resourceSchema: String!
+	resourceSchema: TypeUri!
 }
 
 type DatasetCollaboration {
@@ -3821,8 +3821,8 @@ type ReplaceBindingsResourceNotFound implements ReplaceDatasetBindingsResult {
 
 type ReplaceBindingsResourceSchemaMismatch implements ReplaceDatasetBindingsResult {
 	resourceId: ResourceID!
-	expectedSchema: String!
-	actualSchema: String!
+	expectedSchema: TypeUri!
+	actualSchema: TypeUri!
 	message: String!
 }
 
@@ -3851,7 +3851,7 @@ type RequestHeader {
 }
 
 type Resource {
-	schema: String!
+	schema: TypeUri!
 	headers: ResourceHeaders!
 	spec: JSON!
 	status: JSON
@@ -3962,7 +3962,7 @@ type ResourceConnection {
 	edges: [ResourceEdge!]!
 }
 
-union ResourceDeleteManyOutcome = ResourceDeleteManyResult | ResourceUnsupportedDescriptorProblem | ResourceBadAccountProblem
+union ResourceDeleteManyOutcome = ResourceDeleteManyResult | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem
 
 type ResourceDeleteManyResult {
 	resources: [ResourceDeleteManySuccess!]!
@@ -4026,7 +4026,7 @@ type ResourceIDNotFoundProblem {
 
 type ResourceIdentity {
 	id: ResourceID!
-	schema: String!
+	schema: TypeUri!
 	canonicalKindName: String!
 	name: ResourceName!
 }
@@ -4053,7 +4053,7 @@ type ResourceIdentityEdge {
 
 union ResourceIdentityListAllOutcome = ResourceIdentityConnection | ResourceBadAccountProblem
 
-union ResourceIdentityListOutcome = ResourceIdentityConnection | ResourceUnsupportedDescriptorProblem | ResourceBadAccountProblem | ResourceInvalidSearchQueryProblem
+union ResourceIdentityListOutcome = ResourceIdentityConnection | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem | ResourceInvalidSearchQueryProblem
 
 """
 A header field value (e.g. name, label key) failed validation.
@@ -4071,14 +4071,14 @@ type ResourceInvalidSearchQueryProblem {
 The `spec` field failed domain validation.
 """
 type ResourceInvalidSpecProblem {
-	schema: String!
+	schema: TypeUri!
 	message: String!
 }
 
 type ResourceKindDescriptor {
 	name: String!
 	shortNames: [String!]!
-	schema: String!
+	schema: TypeUri!
 	listColumns: [ResourceListColumnDescriptor!]!
 }
 
@@ -4113,7 +4113,7 @@ enum ResourceListColumnVisibility {
 	WIDE_ONLY
 }
 
-union ResourceListOutcome = ResourceConnection | ResourceUnsupportedDescriptorProblem | ResourceBadAccountProblem
+union ResourceListOutcome = ResourceConnection | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem
 
 union ResourceLookupProblem = ResourceIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceSchemaMismatchProblem
 
@@ -4160,8 +4160,8 @@ type ResourceRenderManifestResult {
 
 type ResourceSchemaMismatchProblem {
 	id: ResourceID!
-	expectedSchema: String!
-	actualSchema: String!
+	expectedSchema: TypeUri!
+	actualSchema: TypeUri!
 	message: String!
 }
 
@@ -4171,7 +4171,7 @@ input ResourceSelectorInput {
 	account: ResourceAccountSelectorInput
 }
 
-union ResourceSelectorProblem = ResourceIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceSchemaMismatchProblem | ResourceUnsupportedDescriptorProblem | ResourceBadAccountProblem
+union ResourceSelectorProblem = ResourceIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceSchemaMismatchProblem | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem
 
 type ResourceSelectorProblemResult {
 	problem: ResourceSelectorProblem!
@@ -4185,7 +4185,7 @@ type ResourceStatusSummary {
 
 type ResourceSummary {
 	id: ResourceID!
-	schema: String!
+	schema: TypeUri!
 	name: ResourceName!
 	description: String
 	generation: Uint64!
@@ -4196,21 +4196,32 @@ type ResourceSummary {
 }
 
 type ResourceTypeCountSummary {
-	schema: String!
+	schema: TypeUri!
 	name: String!
 	totalCount: Uint64!
 	phaseCounts: ResourcePhaseCounts!
 }
 
+"""
+A resource kind was addressed by its canonical schema URI, but no descriptor
+is registered for it. This is reachable *only* on the apply-manifest path,
+where the `$schema` URI comes straight from the user's manifest; selector
+lookups surface [`ResourceUnsupportedSelectorProblem`] instead, so this
+field never carries a short selector masquerading as a URI.
+"""
 type ResourceUnsupportedDescriptorProblem {
-	code: ResourceUnsupportedDescriptorProblemCode!
-	schema: String!
+	schema: TypeUri!
 	message: String!
 }
 
-enum ResourceUnsupportedDescriptorProblemCode {
-	NOT_FOUND
-	DUPLICATE
+"""
+A resource kind was addressed by a short selector (main name or alias, e.g.
+`vs`), but no descriptor matches it. The `selector` is the raw user-supplied
+string — never a schema URI (the public API only selects kinds by name).
+"""
+type ResourceUnsupportedSelectorProblem {
+	selector: String!
+	message: String!
 }
 
 type Resources {
@@ -4898,6 +4909,8 @@ type TriggerFlowSuccess implements TriggerFlowResult {
 	flow: Flow!
 	message: String!
 }
+
+scalar TypeUri
 
 scalar URL
 

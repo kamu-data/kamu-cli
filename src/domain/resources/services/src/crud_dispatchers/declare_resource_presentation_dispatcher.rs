@@ -18,7 +18,7 @@ macro_rules! declare_resource_presentation_dispatcher {
         #[dill::component]
         #[dill::interface(dyn kamu_resources::ResourcePresentationDispatcher)]
         #[dill::meta(kamu_resources::ResourceDispatcherMeta {
-            schema: <$resource as kamu_resources::ResourceDescriptorProvider>::DESCRIPTOR.schema,
+            schema: <$resource>::SCHEMA_STR,
             name: <$resource as kamu_resources::ResourcePresentation>::PRESENTATION.resource_name,
             short_names:
                 <$resource as kamu_resources::ResourcePresentation>::PRESENTATION.resource_short_names,
@@ -27,10 +27,10 @@ macro_rules! declare_resource_presentation_dispatcher {
 
         impl kamu_resources::ResourcePresentationDispatcher for $dispatcher
         where
-            $resource: kamu_resources::ResourceDescriptorProvider + kamu_resources::ResourcePresentation,
+            $resource: kamu_resources::ResourceSchemaProvider + kamu_resources::ResourcePresentation,
         {
-            fn descriptor(&self) -> kamu_resources::ResourceDescriptor {
-                <$resource as kamu_resources::ResourceDescriptorProvider>::DESCRIPTOR
+            fn schema(&self) -> &'static kamu_resources::TypeUri {
+                <$resource as kamu_resources::ResourceSchemaProvider>::schema()
             }
 
             fn presentation(&self) -> kamu_resources::ResourcePresentationDefinition {

@@ -51,7 +51,7 @@ impl ContextApiResourcesCommand {
             .collect();
         let col_schema: Vec<_> = supported_kinds
             .iter()
-            .map(|item| item.schema.clone())
+            .map(|item| item.schema.to_string())
             .collect();
 
         self.records(vec![

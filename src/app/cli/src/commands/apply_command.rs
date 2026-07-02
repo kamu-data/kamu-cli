@@ -21,6 +21,7 @@ use kamu_resources::{
     ApplyResourceOutcome,
     ResourceView,
     ResourceWarning,
+    resource_kind_display_name,
 };
 use kamu_resources_facade::ResourceManifestFormat as FacadeResourceManifestFormat;
 use thiserror::Error;
@@ -466,7 +467,7 @@ impl<'a> ApplyPrinter<'a> {
     ) -> Result<(), CLIError> {
         let progress = self.finish_item(
             item_progress,
-            self.accepted_status_line(source, result),
+            self.accepted_status_line(source, result)?,
             self.should_print_success_line(),
         );
         self.increment_completed(progress);
@@ -700,7 +701,7 @@ impl ApplyPrinter<'_> {
         }
 
         serde_yaml::to_string(&RenderedResourceView {
-            schema: &resource.schema,
+            schema: resource.schema.as_str(),
             headers: RenderedResourceViewHeaders::new(resource),
             last_reconciled_at: &resource.last_reconciled_at,
             spec: common::json_to_yaml_value(&resource.spec),
@@ -713,7 +714,7 @@ impl ApplyPrinter<'_> {
         &self,
         source: &str,
         result: &ExecutedResourceManifestResult,
-    ) -> String {
+    ) -> Result<String, CLIError> {
         let label = result.outcome.label(self.dry_run);
         let style = match result.outcome {
             ApplyResourceOutcome::Created | ApplyResourceOutcome::Updated => {
@@ -722,13 +723,13 @@ impl ApplyPrinter<'_> {
             ApplyResourceOutcome::Untouched => console::style(label).yellow().bold(),
         };
 
-        format!(
+        let kind_name =
+            resource_kind_display_name(&result.resource.schema).map_err(CLIError::critical)?;
+
+        Ok(format!(
             "{}: {} -> {}/{}",
-            style,
-            source,
-            kamu_resources::ResourceSchemaId::display_name(&result.resource.schema),
-            result.resource.headers.name
-        )
+            style, source, kind_name, result.resource.headers.name
+        ))
     }
 
     fn error_status_line(&self, source: impl std::fmt::Display, label: &str) -> String {

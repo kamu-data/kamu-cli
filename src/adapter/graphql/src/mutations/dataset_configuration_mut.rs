@@ -14,7 +14,7 @@ use kamu_configuration::{
     SecretSetResource,
     VariableSetResource,
 };
-use kamu_resources::GenericResourceQueryService;
+use kamu_resources::{GenericResourceQueryService, ResourceSchemaProvider};
 
 use crate::prelude::*;
 use crate::queries::DatasetRequestState;
@@ -73,7 +73,7 @@ impl<'a> DatasetConfigurationMut<'a> {
         let current_account_id = current_account_subject.account_id().clone();
 
         let outcome = generic_resource_query_svc
-            .find_owned_snapshots(&current_account_id, VariableSetResource::SCHEMA, &ids)
+            .find_owned_snapshots(&current_account_id, VariableSetResource::schema(), &ids)
             .await
             .int_err()?;
 
@@ -97,8 +97,8 @@ impl<'a> DatasetConfigurationMut<'a> {
             return Ok(ReplaceDatasetBindingsResult::ResourceSchemaMismatch(
                 ReplaceBindingsResourceSchemaMismatch {
                     resource_id: id.into(),
-                    expected_schema: VariableSetResource::SCHEMA.to_string(),
-                    actual_schema,
+                    expected_schema: VariableSetResource::schema().clone().into(),
+                    actual_schema: actual_schema.into(),
                 },
             ));
         }
@@ -146,7 +146,7 @@ impl<'a> DatasetConfigurationMut<'a> {
         let current_account_id = current_account_subject.account_id().clone();
 
         let outcome = generic_resource_query_svc
-            .find_owned_snapshots(&current_account_id, SecretSetResource::SCHEMA, &ids)
+            .find_owned_snapshots(&current_account_id, SecretSetResource::schema(), &ids)
             .await
             .int_err()?;
 
@@ -170,8 +170,8 @@ impl<'a> DatasetConfigurationMut<'a> {
             return Ok(ReplaceDatasetBindingsResult::ResourceSchemaMismatch(
                 ReplaceBindingsResourceSchemaMismatch {
                     resource_id: id.into(),
-                    expected_schema: SecretSetResource::SCHEMA.to_string(),
-                    actual_schema,
+                    expected_schema: SecretSetResource::schema().clone().into(),
+                    actual_schema: actual_schema.into(),
                 },
             ));
         }
@@ -239,8 +239,8 @@ impl ReplaceBindingsResourceNotFound {
 #[graphql(complex)]
 pub struct ReplaceBindingsResourceSchemaMismatch {
     pub resource_id: ResourceID<'static>,
-    pub expected_schema: String,
-    pub actual_schema: String,
+    pub expected_schema: TypeUri<'static>,
+    pub actual_schema: TypeUri<'static>,
 }
 
 #[ComplexObject]

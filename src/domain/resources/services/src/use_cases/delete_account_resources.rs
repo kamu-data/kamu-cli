@@ -18,25 +18,13 @@ use kamu_resources::{
     ResourceCrudDispatcherDeleteRequest,
     ResourceID,
     ResourceSnapshot,
-    UnsupportedResourceDescriptorError,
 };
 
-use crate::get_resource_crud_dispatcher;
+use crate::get_resource_crud_dispatcher_for_trusted_schema;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 const PAGE_SIZE: usize = 100;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, thiserror::Error)]
-enum DeleteAccountResourceDispatchError {
-    #[error(transparent)]
-    UnsupportedDescriptor(#[from] UnsupportedResourceDescriptorError),
-
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -90,11 +78,12 @@ impl DeleteAccountResourcesUseCase for DeleteAccountResourcesUsecaseImpl {
         let resource_snapshots = self.list_owned_resource_snapshots(&account_id).await?;
 
         for (resource_snapshot, ids) in self.group_resource_ids_by_descriptor(resource_snapshots) {
-            let dispatcher = get_resource_crud_dispatcher::<DeleteAccountResourceDispatchError>(
+            // The schema comes from a stored snapshot, so a missing dispatcher is
+            // a data-integrity catastrophe, not a user error.
+            let dispatcher = get_resource_crud_dispatcher_for_trusted_schema(
                 &self.catalog,
-                &resource_snapshot.schema,
-            )
-            .map_err(ErrorIntoInternal::int_err)?;
+                resource_snapshot.schema.as_str(),
+            )?;
 
             dispatcher
                 .delete(ResourceCrudDispatcherDeleteRequest {

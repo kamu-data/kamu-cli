@@ -288,7 +288,7 @@ impl From<ListResourcesError> for CLIError {
         use ListResourcesError as E;
 
         match e {
-            e @ (E::UnsupportedDescriptor(_) | E::BadAccount(_) | E::InvalidSearchQuery(_)) => {
+            e @ (E::UnsupportedSelector(_) | E::BadAccount(_) | E::InvalidSearchQuery(_)) => {
                 Self::failure(e)
             }
             E::RemoteRequest(err) => Self::from(err),
@@ -314,7 +314,7 @@ impl From<BatchResourceError> for CLIError {
         use BatchResourceError as E;
 
         match e {
-            e @ (E::UnsupportedDescriptor(_) | E::BadAccount(_)) => Self::failure(e),
+            e @ (E::UnsupportedSelector(_) | E::BadAccount(_)) => Self::failure(e),
             E::RemoteRequest(err) => Self::from(err),
             E::Internal(err) => Self::critical(err),
         }
@@ -327,7 +327,7 @@ impl From<DeleteResourceError> for CLIError {
 
         match e {
             E::LookupProblem(problem) => Self::failure(ResourceLookupCliError::from(problem)),
-            e @ (E::UnsupportedDescriptor(_) | E::BadAccount(_)) => Self::failure(e),
+            e @ (E::UnsupportedSelector(_) | E::BadAccount(_)) => Self::failure(e),
             E::RemoteRequest(err) => Self::from(err),
             E::Internal(err) => Self::critical(err),
         }
@@ -340,7 +340,7 @@ impl From<GetResourceError> for CLIError {
 
         match e {
             E::LookupProblem(problem) => Self::failure(ResourceLookupCliError::from(problem)),
-            e @ (E::UnsupportedDescriptor(_) | E::BadAccount(_)) => Self::failure(e),
+            e @ (E::UnsupportedSelector(_) | E::BadAccount(_)) => Self::failure(e),
             E::RemoteRequest(err) => Self::from(err),
             E::Internal(err) => Self::critical(err),
         }
@@ -353,7 +353,7 @@ impl From<RenderResourceManifestError> for CLIError {
 
         match e {
             E::LookupProblem(problem) => Self::failure(ResourceLookupCliError::from(problem)),
-            e @ (E::UnsupportedDescriptor(_) | E::BadAccount(_)) => Self::failure(e),
+            e @ (E::UnsupportedSelector(_) | E::BadAccount(_)) => Self::failure(e),
             E::RemoteRequest(err) => Self::from(err),
             E::Internal(err) => Self::critical(err),
         }
@@ -461,17 +461,13 @@ impl From<ResourceLookupProblem> for ResourceLookupCliError {
         match problem {
             ResourceLookupProblem::IDNotFound(err) => Self::IDNotFound(err.0),
             ResourceLookupProblem::NameNotFound(err) => Self::NameNotFound {
-                kind: kamu_resources::ResourceSchemaId::display_name(&err.kind).to_string(),
+                kind: err.kind,
                 name: err.name.to_string(),
             },
             ResourceLookupProblem::SchemaMismatch(err) => Self::SchemaMismatch {
                 id: err.id,
-                expected_schema: kamu_resources::ResourceSchemaId::display_name(
-                    &err.expected_schema,
-                )
-                .to_string(),
-                actual_schema: kamu_resources::ResourceSchemaId::display_name(&err.actual_schema)
-                    .to_string(),
+                expected_schema: err.expected_schema.to_string(),
+                actual_schema: err.actual_schema.to_string(),
             },
         }
     }

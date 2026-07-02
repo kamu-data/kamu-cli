@@ -131,7 +131,7 @@ impl ResourceRawEventStore for InMemoryRawResourceEventStore {
                 },
             };
 
-            if event.query.schema == schema {
+            if event.query.schema.as_str() == schema {
                 count += 1;
             }
         }
@@ -150,7 +150,7 @@ impl ResourceRawEventStore for InMemoryRawResourceEventStore {
             let schema = schema.clone();
 
             future::ready(match event {
-                Ok((event_id, event)) if event.query.schema == schema => {
+                Ok((event_id, event)) if event.query.schema.as_str() == schema => {
                     Some(Ok((event_id, event)))
                 }
                 Ok(_) => None,

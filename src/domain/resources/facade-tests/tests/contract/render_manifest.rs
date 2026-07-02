@@ -27,7 +27,7 @@ use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
 use crate::helpers::{
     VARIABLE_SET_KIND,
-    VARIABLE_SET_SCHEMA,
+    VARIABLE_SET_SCHEMA_STR,
     assert_applied_outcome,
     variable_set_manifest_json,
 };
@@ -85,8 +85,14 @@ pub async fn test_render_json_by_name(h: &impl FacadeContractHarness) {
     assert_eq!(result.format, ResourceManifestFormat::Json);
     let parsed: serde_json::Value =
         serde_json::from_str(&result.manifest).expect("must be valid JSON");
-    assert_eq!(parsed["$schema"], VARIABLE_SET_SCHEMA, "schema mismatch");
-    assert_eq!(parsed["$schema"], VARIABLE_SET_SCHEMA, "schema mismatch");
+    assert_eq!(
+        parsed["$schema"], VARIABLE_SET_SCHEMA_STR,
+        "schema mismatch"
+    );
+    assert_eq!(
+        parsed["$schema"], VARIABLE_SET_SCHEMA_STR,
+        "schema mismatch"
+    );
     assert_eq!(
         parsed["headers"]["name"], "render-json-name",
         "name mismatch"
@@ -121,8 +127,11 @@ pub async fn test_render_yaml_by_uid(h: &impl FacadeContractHarness) {
     let yaml: serde_yaml::Value =
         serde_yaml::from_str(&result.manifest).expect("must be valid YAML");
     let parsed = serde_json::to_value(yaml).unwrap();
-    assert_eq!(parsed["$schema"], VARIABLE_SET_SCHEMA, "schema mismatch");
-    assert_eq!(parsed["$schema"], VARIABLE_SET_SCHEMA);
+    assert_eq!(
+        parsed["$schema"], VARIABLE_SET_SCHEMA_STR,
+        "schema mismatch"
+    );
+    assert_eq!(parsed["$schema"], VARIABLE_SET_SCHEMA_STR);
     assert_eq!(parsed["headers"]["name"], "render-yaml-id");
     assert!(
         parsed["headers"]["id"].is_null(),

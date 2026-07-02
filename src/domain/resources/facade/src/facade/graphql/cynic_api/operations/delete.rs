@@ -13,7 +13,7 @@ use crate::facade::graphql::cynic_api::fragments::{
     BatchResourceProblem,
     ResourceBadAccountProblem,
     ResourceSelectorProblemResult,
-    ResourceUnsupportedDescriptorProblem,
+    ResourceUnsupportedSelectorProblem,
 };
 use crate::facade::graphql::cynic_api::inputs::{
     ResourceBatchSelectorInput,
@@ -56,7 +56,7 @@ pub(crate) struct ResourcesMutDeleteMany {
 #[derive(cynic::InlineFragments, Debug, Clone)]
 pub(crate) enum ResourceDeleteManyOutcome {
     ResourceDeleteManyResult(ResourceDeleteManyResult),
-    ResourceUnsupportedDescriptorProblem(ResourceUnsupportedDescriptorProblem),
+    ResourceUnsupportedSelectorProblem(ResourceUnsupportedSelectorProblem),
     ResourceBadAccountProblem(ResourceBadAccountProblem),
     #[cynic(fallback)]
     Unknown,

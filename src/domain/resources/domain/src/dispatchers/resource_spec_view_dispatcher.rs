@@ -12,12 +12,12 @@ use std::sync::Arc;
 use dill::Catalog;
 use internal_error::InternalError;
 
-use crate::{ResourceDescriptor, get_resource_dispatcher_from_catalog};
+use crate::{TypeUri, get_resource_dispatcher_from_catalog};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub trait ResourceSpecViewDispatcher: Send + Sync {
-    fn descriptor(&self) -> ResourceDescriptor;
+    fn schema(&self) -> &'static TypeUri;
 
     fn reveal_spec(&self, spec: serde_json::Value) -> Result<serde_json::Value, InternalError>;
 }
@@ -29,7 +29,7 @@ pub trait ResourceSpecViewDispatcher: Send + Sync {
 /// no sensitive fields.
 pub fn get_resource_spec_view_dispatcher_from_catalog(
     catalog: &Catalog,
-    schema: &str,
+    schema: &TypeUri,
 ) -> Option<Arc<dyn ResourceSpecViewDispatcher>> {
     get_resource_dispatcher_from_catalog(catalog, schema, "resource spec view dispatcher").ok()
 }

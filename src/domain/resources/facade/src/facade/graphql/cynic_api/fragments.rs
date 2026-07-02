@@ -17,7 +17,7 @@ use crate::facade::graphql::cynic_api::schema;
 #[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct ResourceSummary {
     pub id: kamu_resources::ResourceID,
-    pub schema: String,
+    pub schema: kamu_resources::TypeUri,
     pub name: kamu_resources::ResourceName,
     pub description: Option<String>,
     pub generation: Uint64,
@@ -95,14 +95,12 @@ pub(crate) struct ResourcesSummary {
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct ResourceUnsupportedDescriptorProblem {
-    pub code: ResourceUnsupportedDescriptorProblemCode,
-    pub schema: String,
+    pub schema: kamu_resources::TypeUri,
 }
 
-#[derive(cynic::Enum, Debug, Clone, Copy)]
-pub(crate) enum ResourceUnsupportedDescriptorProblemCode {
-    NotFound,
-    Duplicate,
+#[derive(cynic::QueryFragment, Debug, Clone)]
+pub(crate) struct ResourceUnsupportedSelectorProblem {
+    pub selector: String,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -140,8 +138,8 @@ pub(crate) struct ResourceNameNotFoundProblem {
 #[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct ResourceSchemaMismatchProblem {
     pub id: kamu_resources::ResourceID,
-    pub expected_schema: String,
-    pub actual_schema: String,
+    pub expected_schema: kamu_resources::TypeUri,
+    pub actual_schema: kamu_resources::TypeUri,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -162,7 +160,7 @@ pub(crate) enum ResourceSelectorProblem {
     ResourceIDNotFoundProblem(ResourceIDNotFoundProblem),
     ResourceNameNotFoundProblem(ResourceNameNotFoundProblem),
     ResourceSchemaMismatchProblem(ResourceSchemaMismatchProblem),
-    ResourceUnsupportedDescriptorProblem(ResourceUnsupportedDescriptorProblem),
+    ResourceUnsupportedSelectorProblem(ResourceUnsupportedSelectorProblem),
     ResourceBadAccountProblem(ResourceBadAccountProblem),
     #[cynic(fallback)]
     Unknown,
@@ -184,7 +182,7 @@ pub(crate) struct ResourceInvalidSearchQueryProblem {
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct ResourceTypeCountSummary {
-    pub schema: String,
+    pub schema: kamu_resources::TypeUri,
     pub name: String,
     pub total_count: Uint64,
     pub phase_counts: ResourcePhaseCounts,
@@ -205,7 +203,7 @@ pub(crate) struct ResourcePhaseCounts {
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct Resource {
-    pub schema: String,
+    pub schema: kamu_resources::TypeUri,
     pub headers: ResourceHeaders,
     pub spec: serde_json::Value,
     pub status: Option<serde_json::Value>,
@@ -241,7 +239,7 @@ pub(crate) struct ResourceAccount {
 #[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct ResourceIdentity {
     pub id: kamu_resources::ResourceID,
-    pub schema: String,
+    pub schema: kamu_resources::TypeUri,
     pub canonical_kind_name: String,
     pub name: kamu_resources::ResourceName,
 }

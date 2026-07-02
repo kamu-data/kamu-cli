@@ -12,11 +12,21 @@ use std::str::FromStr;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use url::Url;
 
+use crate::TypeUri;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// A parsed lens over a [`TypeUri`]: the same schema identity value, plus its
+/// decomposed `base` / `context` / `version` / `name` segments.
+///
+/// [`TypeUri`] is the opaque identity carried through fields, storage, and the
+/// wire; `ResourceSchemaId` is obtained on demand (by parsing a `TypeUri`) when
+/// the individual URL segments are needed. The inner `typ` is the single source
+/// of truth for the schema string — `as_str`, `Display`, and serde all delegate
+/// to it.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ResourceSchemaId {
-    schema: String,
+    typ: TypeUri,
     base: String,
     context: String,
     version: String,
@@ -71,7 +81,7 @@ impl ResourceSchemaId {
         }
 
         Ok(Self {
-            schema: schema.to_owned(),
+            typ: TypeUri::new_unchecked(schema),
             base,
             context,
             version,
@@ -79,12 +89,13 @@ impl ResourceSchemaId {
         })
     }
 
-    pub fn as_str(&self) -> &str {
-        &self.schema
+    /// The schema identity as a [`TypeUri`] (the single source of truth).
+    pub fn typ(&self) -> &TypeUri {
+        &self.typ
     }
 
-    pub fn display_name(schema: &str) -> &str {
-        schema.rsplit('/').next().unwrap_or(schema)
+    pub fn as_str(&self) -> &str {
+        self.typ.as_str()
     }
 
     pub fn base(&self) -> &str {
@@ -104,9 +115,33 @@ impl ResourceSchemaId {
     }
 }
 
+/// The short display name (RFC-018 CRD-style type name, e.g. `VariableSet`) of
+/// a schema [`TypeUri`], for human-facing output and error messages.
+///
+/// Callers pass a `TypeUri` that is expected to already be a valid canonical
+/// schema (stored snapshots, apply results, schemas resolved from registered
+/// selectors). A parse failure therefore means the identity is corrupt, which
+/// is a data-integrity catastrophe — it is surfaced as an [`InternalError`],
+/// never silently rendered as the raw URL.
+// TODO(typeuri-followup): when RFC-018 `TypeName` is adopted for the schema's
+// last segment, return `&TypeName` from a `ResourceSchemaId::type_name()`
+// method and/or source known kinds from `ResourcePresentation` instead of URL
+// parsing.
+pub fn resource_kind_display_name(
+    schema: &TypeUri,
+) -> Result<String, internal_error::InternalError> {
+    ResourceSchemaId::try_from(schema)
+        .map(|schema_id| schema_id.name().to_string())
+        .map_err(|err| {
+            internal_error::InternalError::new(format!(
+                "Stored resource schema '{schema}' is not a valid canonical schema URL: {err}"
+            ))
+        })
+}
+
 impl std::fmt::Display for ResourceSchemaId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.schema)
+        f.write_str(self.as_str())
     }
 }
 
@@ -115,6 +150,14 @@ impl FromStr for ResourceSchemaId {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Self::parse(s)
+    }
+}
+
+impl TryFrom<&TypeUri> for ResourceSchemaId {
+    type Error = ParseResourceSchemaError;
+
+    fn try_from(typ: &TypeUri) -> Result<Self, Self::Error> {
+        Self::parse(typ.as_str())
     }
 }
 

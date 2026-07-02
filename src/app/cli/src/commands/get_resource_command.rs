@@ -14,6 +14,7 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use internal_error::ResultIntoInternal;
+use kamu_resources::TypeUri;
 use kamu_resources_facade::{
     BatchResourceProblem,
     RenderResourceManifestError,
@@ -168,7 +169,7 @@ impl GetResourceCommand {
         match format {
             FacadeResourceManifestFormat::Json => {
                 serde_json::to_string_pretty(&RenderedResourceViewJson {
-                    schema: &resource.schema,
+                    schema: resource.schema.as_str(),
                     headers: RenderedResourceViewHeaders::new(resource),
                     last_reconciled_at: &resource.last_reconciled_at,
                     spec: &resource.spec,
@@ -179,7 +180,7 @@ impl GetResourceCommand {
 
             FacadeResourceManifestFormat::Yaml => {
                 serde_yaml::to_string(&RenderedResourceViewYaml {
-                    schema: &resource.schema,
+                    schema: resource.schema.as_str(),
                     headers: RenderedResourceViewHeaders::new(resource),
                     last_reconciled_at: &resource.last_reconciled_at,
                     spec: common::json_to_yaml_value(&resource.spec),
@@ -216,7 +217,7 @@ impl GetResourceCommand {
     ) -> Result<Vec<String>, CLIError> {
         let mut rendered_items = vec![None; targets.len()];
 
-        for (_schema, entries) in Self::group_targets_by_descriptor(targets) {
+        for (_schema, entries) in Self::group_targets_by_schema(targets) {
             for chunk in entries.chunks(Self::MATERIALIZATION_BATCH_SIZE) {
                 let result = resource_facade
                     .render_manifests(
@@ -225,7 +226,7 @@ impl GetResourceCommand {
                             kind: chunk
                                 .first()
                                 .map(|(_, target)| target.kind.clone())
-                                .unwrap_or_default(),
+                                .expect("non-empty chunk"),
                             resource_refs: chunk
                                 .iter()
                                 .map(|(_, target)| ResourceRef::ById(target.id))
@@ -256,7 +257,7 @@ impl GetResourceCommand {
     ) -> Result<Vec<String>, CLIError> {
         let mut rendered_items = vec![None; targets.len()];
 
-        for (_schema, entries) in Self::group_targets_by_descriptor(targets) {
+        for (_schema, entries) in Self::group_targets_by_schema(targets) {
             for chunk in entries.chunks(Self::MATERIALIZATION_BATCH_SIZE) {
                 let result = resource_facade
                     .get_many(
@@ -288,9 +289,9 @@ impl GetResourceCommand {
         Ok(rendered_items.into_iter().flatten().collect())
     }
 
-    fn group_targets_by_descriptor(
+    fn group_targets_by_schema(
         targets: &[ResourceTarget],
-    ) -> BTreeMap<String, Vec<(usize, &ResourceTarget)>> {
+    ) -> BTreeMap<TypeUri, Vec<(usize, &ResourceTarget)>> {
         let mut groups = BTreeMap::new();
         for (index, target) in targets.iter().enumerate() {
             groups

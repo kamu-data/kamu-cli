@@ -20,6 +20,7 @@ use crate::{
     ResourceSnapshot,
     ResourceTypeMismatchError,
     ResourceWarning,
+    TypeUri,
     TypedResourceQueryError,
 };
 
@@ -206,11 +207,7 @@ impl<R> ApplyResourceUseCaseError<R>
 where
     R: ReconcilableEventSourcedResource,
 {
-    pub fn type_mismatch(
-        id: ResourceID,
-        expected: &crate::ResourceDescriptor,
-        actual: &ResourceSnapshot,
-    ) -> Self {
+    pub fn type_mismatch(id: ResourceID, expected: &TypeUri, actual: &ResourceSnapshot) -> Self {
         Self::ResourceTypeMismatch(ResourceTypeMismatchError::from_expected_and_actual(
             id, expected, actual,
         ))

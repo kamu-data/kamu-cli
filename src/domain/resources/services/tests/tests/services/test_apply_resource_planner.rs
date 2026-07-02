@@ -26,6 +26,7 @@ use kamu_resources::{
 };
 use kamu_resources_services::ApplyResourcePlanner;
 use kamu_resources_services::testing::BaseResourceServiceHarness;
+use odf::metadata::resource::TypeUri;
 
 use crate::tests::utils::{
     TestResource,
@@ -164,7 +165,7 @@ async fn test_plan_type_mismatch_rejects() {
         .resource_repo()
         .create_resource(&ResourceSnapshot {
             id,
-            schema: "OtherKind".to_string(),
+            schema: TypeUri::new_unchecked("OtherKind"),
             headers: ResourceHeaders::simple(Utc::now(), account_id.clone(), "res-a"),
             spec: serde_json::json!({}),
             status: None,

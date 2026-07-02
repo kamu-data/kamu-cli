@@ -30,6 +30,7 @@ use kamu_resources::{
     ResourceRawEventProjection,
     ResourceRawEventQuery,
     ResourceRawEventStore,
+    TypeUri,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -88,7 +89,7 @@ impl PostgresRawResourceEventStore {
             SELECT MAX(event_id) AS "event_id!" FROM inserted
             "#,
             *query.id.as_ref(),
-            &query.schema,
+            query.schema.as_str(),
             &event_times,
             &event_types,
             &event_payloads,
@@ -122,7 +123,7 @@ impl PostgresRawResourceEventStore {
             let item_index = i64::try_from(item_index).unwrap();
             for (event_index, event) in item.events.into_iter().enumerate() {
                 resource_ids.push(*item.query.id.as_ref());
-                resource_schemas.push(item.query.schema.clone());
+                resource_schemas.push(item.query.schema.to_string());
                 event_times.push(event.event_time);
                 event_types.push(event.event_type);
                 event_payloads.push(event.payload);
@@ -231,6 +232,7 @@ impl PostgresRawResourceEventStore {
         query: &ResourceRawEventQuery,
     ) -> Result<Option<EventID>, InternalError> {
         let query_id: &uuid::Uuid = query.id.as_ref();
+        let query_schema = query.schema.as_str();
         let last_event_id = sqlx::query_scalar!(
             r#"
             SELECT event_id
@@ -241,7 +243,7 @@ impl PostgresRawResourceEventStore {
             LIMIT 1
             "#,
             query_id,
-            query.schema,
+            query_schema,
         )
         .fetch_optional(connection_mut)
         .await
@@ -260,7 +262,7 @@ impl PostgresRawResourceEventStore {
         }
 
         let ids: Vec<uuid::Uuid> = queries.iter().map(|q| *q.id.as_ref()).collect();
-        let schemas: Vec<String> = queries.iter().map(|q| q.schema.clone()).collect();
+        let schemas: Vec<String> = queries.iter().map(|q| q.schema.to_string()).collect();
 
         #[derive(Debug, sqlx::FromRow)]
         struct LastEventRow {
@@ -294,7 +296,7 @@ impl PostgresRawResourceEventStore {
             .map(|row| {
                 (
                     ResourceRawEventQuery {
-                        schema: row.schema,
+                        schema: TypeUri::new_unchecked(row.schema),
                         id: ResourceID::new(row.id),
                     },
                     EventID::new(row.event_id),
@@ -354,7 +356,7 @@ impl EventStore<ResourceRawEventProjection> for PostgresRawResourceEventStore {
                 yield Ok((event_id, ResourceRawEvent {
                     event_id,
                     query: ResourceRawEventQuery {
-                        schema: row.schema,
+                        schema: TypeUri::new_unchecked(row.schema),
                         id: ResourceID::new(row.id),
                     },
                     event_time: row.event_time,
@@ -394,7 +396,7 @@ impl EventStore<ResourceRawEventProjection> for PostgresRawResourceEventStore {
                 ORDER BY event_id
                 "#,
                 query_id,
-                key.schema,
+                key.schema.as_str(),
                 opts.from.map(EventID::into_inner),
                 opts.to.map(EventID::into_inner),
             )
@@ -406,7 +408,7 @@ impl EventStore<ResourceRawEventProjection> for PostgresRawResourceEventStore {
                 yield Ok((event_id, ResourceRawEvent {
                     event_id,
                     query: ResourceRawEventQuery {
-                        schema: row.schema,
+                        schema: TypeUri::new_unchecked(row.schema),
                         id: ResourceID::new(row.id),
                     },
                     event_time: row.event_time,
@@ -426,7 +428,7 @@ impl EventStore<ResourceRawEventProjection> for PostgresRawResourceEventStore {
         }
 
         let ids: Vec<uuid::Uuid> = queries.iter().map(|q| *q.id.as_ref()).collect();
-        let schemas: Vec<String> = queries.iter().map(|q| q.schema.clone()).collect();
+        let schemas: Vec<String> = queries.iter().map(|q| q.schema.to_string()).collect();
 
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
@@ -456,7 +458,7 @@ impl EventStore<ResourceRawEventProjection> for PostgresRawResourceEventStore {
             while let Some(row) = rows.try_next().await? {
                 let event_id = EventID::new(row.event_id);
                 let query = ResourceRawEventQuery {
-                    schema: row.schema,
+                    schema: TypeUri::new_unchecked(row.schema),
                     id: ResourceID::new(row.id),
                 };
                 yield Ok((query.clone(), event_id, ResourceRawEvent {
@@ -597,7 +599,7 @@ impl ResourceRawEventStore for PostgresRawResourceEventStore {
                 yield Ok((event_id, ResourceRawEvent {
                     event_id,
                     query: ResourceRawEventQuery {
-                        schema: row.schema,
+                        schema: TypeUri::new_unchecked(row.schema),
                         id: ResourceID::new(row.id),
                     },
                     event_time: row.event_time,

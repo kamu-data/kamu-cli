@@ -78,7 +78,10 @@ impl<'a> DatasetConfiguration<'a> {
                         resource_id: kamu_resources::ResourceID::new(identity.id).into(),
                         binding_order: b.binding_order,
                         resource_name: identity.name.clone(),
-                        resource_schema: identity.schema.clone(),
+                        resource_schema: kamu_resources::TypeUri::new_unchecked(
+                            identity.schema.clone(),
+                        )
+                        .into(),
                     })
             })
             .collect())
@@ -127,7 +130,10 @@ impl<'a> DatasetConfiguration<'a> {
                         resource_id: kamu_resources::ResourceID::new(identity.id).into(),
                         binding_order: b.binding_order,
                         resource_name: identity.name.clone(),
-                        resource_schema: identity.schema.clone(),
+                        resource_schema: kamu_resources::TypeUri::new_unchecked(
+                            identity.schema.clone(),
+                        )
+                        .into(),
                     })
             })
             .collect())
@@ -141,7 +147,7 @@ pub struct DatasetBindingView {
     pub resource_id: ResourceID<'static>,
     pub binding_order: u64,
     pub resource_name: String,
-    pub resource_schema: String,
+    pub resource_schema: TypeUri<'static>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

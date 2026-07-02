@@ -19,6 +19,7 @@ use kamu_resources::{
     ResourcePresentation,
     ResourcePresentationDefinition,
     ResourceSchemaProvider,
+    TypeUri,
 };
 
 use crate::{SecretSetEventStore, SecretSetSpec, SecretSetState, SecretSetStatus};
@@ -31,7 +32,11 @@ pub struct SecretSetResource(pub(crate) Aggregate<SecretSetState, dyn SecretSetE
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl SecretSetResource {
-    pub const SCHEMA: &'static str = "https://opendatafabric.org/schemas/config/v1alpha1/SecretSet";
+    /// Canonical schema URL as a `&'static str`, sourced from the ODF codegen.
+    ///
+    /// Used as the const dill-registry key (dill `#[meta]` requires a const);
+    /// the typed identity is [`Self::schema`] returning a `TypeUri`.
+    pub const SCHEMA_STR: &'static str = odf::metadata::config::SecretSet::schema_str();
     pub const RESOURCE_NAME: &'static str = "secretsets";
     pub const RESOURCE_SHORT_NAMES: &'static [&'static str] = &["ss"];
 }
@@ -39,7 +44,9 @@ impl SecretSetResource {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl ResourceSchemaProvider for SecretSetResource {
-    const SCHEMA: &'static str = Self::SCHEMA;
+    fn schema() -> &'static TypeUri {
+        odf::metadata::config::SecretSet::schema()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

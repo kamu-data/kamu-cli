@@ -30,6 +30,7 @@ use kamu_resources::{
     ResourceRawEventProjection,
     ResourceRawEventQuery,
     ResourceRawEventStore,
+    TypeUri,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -135,7 +136,7 @@ impl SqliteResourceRawEventStore {
         query_builder.push_values(rows, |mut b, row| {
             let (_, query, event) = *row;
             b.push_bind(*query.id.as_ref());
-            b.push_bind(&query.schema);
+            b.push_bind(query.schema.as_str());
             b.push_bind(event.event_time);
             b.push_bind(&event.event_type);
             b.push_bind(&event.payload);
@@ -171,6 +172,7 @@ impl SqliteResourceRawEventStore {
         query: &ResourceRawEventQuery,
     ) -> Result<Option<EventID>, InternalError> {
         let query_id: &uuid::Uuid = query.id.as_ref();
+        let query_schema = query.schema.as_str();
         let last_event_id = sqlx::query_scalar!(
             r#"
             SELECT event_id
@@ -181,7 +183,7 @@ impl SqliteResourceRawEventStore {
             LIMIT 1
             "#,
             query_id,
-            query.schema,
+            query_schema,
         )
         .fetch_optional(connection_mut)
         .await
@@ -227,7 +229,7 @@ impl SqliteResourceRawEventStore {
                 .push("resource_id = ")
                 .push_bind(*query.id.as_ref())
                 .push(" AND resource_schema = ")
-                .push_bind(&query.schema)
+                .push_bind(query.schema.as_str())
                 .push(")");
         }
 
@@ -244,7 +246,7 @@ impl SqliteResourceRawEventStore {
             .map(|row| {
                 (
                     ResourceRawEventQuery {
-                        schema: row.schema,
+                        schema: TypeUri::new_unchecked(row.schema),
                         id: ResourceID::new(row.id),
                     },
                     EventID::new(row.event_id),
@@ -308,7 +310,7 @@ impl EventStore<ResourceRawEventProjection> for SqliteResourceRawEventStore {
                 yield Ok((event_id, ResourceRawEvent {
                     event_id,
                     query: ResourceRawEventQuery {
-                        schema: row.schema,
+                        schema: TypeUri::new_unchecked(row.schema),
                         id: ResourceID::new(row.id),
                     },
                     event_time: row.event_time,
@@ -332,6 +334,7 @@ impl EventStore<ResourceRawEventProjection> for SqliteResourceRawEventStore {
             let maybe_from_id = opts.from.map(EventID::into_inner);
             let maybe_to_id = opts.to.map(EventID::into_inner);
             let query_id: &uuid::Uuid = query.id.as_ref();
+            let query_schema = query.schema.as_str();
 
             let mut rows = sqlx::query_as!(
                 EventRow,
@@ -351,7 +354,7 @@ impl EventStore<ResourceRawEventProjection> for SqliteResourceRawEventStore {
                 ORDER BY event_id
                 "#,
                 query_id,
-                query.schema,
+                query_schema,
                 maybe_from_id,
                 maybe_to_id,
             )
@@ -363,7 +366,7 @@ impl EventStore<ResourceRawEventProjection> for SqliteResourceRawEventStore {
                 yield Ok((event_id, ResourceRawEvent {
                     event_id,
                     query: ResourceRawEventQuery {
-                        schema: row.schema,
+                        schema: TypeUri::new_unchecked(row.schema),
                         id: ResourceID::new(row.id),
                     },
                     event_time: row.event_time,
@@ -412,7 +415,7 @@ impl EventStore<ResourceRawEventProjection> for SqliteResourceRawEventStore {
                     .push("resource_id = ")
                     .push_bind(*query.id.as_ref())
                     .push(" AND resource_schema = ")
-                    .push_bind(&query.schema)
+                    .push_bind(query.schema.as_str())
                     .push(")");
             }
 
@@ -426,7 +429,7 @@ impl EventStore<ResourceRawEventProjection> for SqliteResourceRawEventStore {
             while let Some(row) = rows.try_next().await? {
                 let event_id = EventID::new(row.event_id);
                 let query = ResourceRawEventQuery {
-                    schema: row.schema,
+                    schema: TypeUri::new_unchecked(row.schema),
                     id: ResourceID::new(row.id),
                 };
                 yield Ok((query.clone(), event_id, ResourceRawEvent {
@@ -567,7 +570,7 @@ impl ResourceRawEventStore for SqliteResourceRawEventStore {
                 yield Ok((event_id, ResourceRawEvent {
                     event_id,
                     query: ResourceRawEventQuery {
-                        schema: row.schema,
+                        schema: TypeUri::new_unchecked(row.schema),
                         id: ResourceID::new(row.id),
                     },
                     event_time: row.event_time,

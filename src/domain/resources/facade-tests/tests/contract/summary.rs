@@ -7,7 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources::{ApplyResourceOutcome, ResourcePhaseCounts, ResourcesSummary};
+use kamu_configuration::VariableSetResource;
+use kamu_resources::{
+    ApplyResourceOutcome,
+    ResourcePhaseCounts,
+    ResourceSchemaProvider,
+    ResourcesSummary,
+};
 use kamu_resources_facade::{
     ApplyManifestRequest,
     ResourceManifestFormat,
@@ -17,7 +23,7 @@ use pretty_assertions::assert_eq;
 
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
-use crate::helpers::{VARIABLE_SET_SCHEMA, assert_applied_outcome, variable_set_manifest_json};
+use crate::helpers::{assert_applied_outcome, variable_set_manifest_json};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -50,7 +56,7 @@ pub async fn test_summary_empty_account(h: &impl FacadeContractHarness) {
     let bob_vs_count = summary
         .resource_counts
         .iter()
-        .find(|r| r.schema == VARIABLE_SET_SCHEMA)
+        .find(|r| r.schema == *VariableSetResource::schema())
         .map(|r| r.total_count)
         .unwrap_or(0);
 
@@ -82,7 +88,7 @@ pub async fn test_summary_counts_resources(h: &impl FacadeContractHarness) {
     let alice_vs_count = alice_summary
         .resource_counts
         .iter()
-        .find(|r| r.schema == VARIABLE_SET_SCHEMA)
+        .find(|r| r.schema == *VariableSetResource::schema())
         .map(|r| r.total_count)
         .expect("VariableSet kind must appear in summary");
 
@@ -98,7 +104,7 @@ pub async fn test_summary_counts_resources(h: &impl FacadeContractHarness) {
     let bob_vs_count = bob_summary
         .resource_counts
         .iter()
-        .find(|r| r.schema == VARIABLE_SET_SCHEMA)
+        .find(|r| r.schema == *VariableSetResource::schema())
         .map(|r| r.total_count)
         .unwrap_or(0);
 
@@ -169,7 +175,7 @@ fn vs_phase_counts(summary: &ResourcesSummary) -> ResourcePhaseCounts {
     summary
         .resource_counts
         .iter()
-        .find(|r| r.schema == VARIABLE_SET_SCHEMA)
+        .find(|r| r.schema == *VariableSetResource::schema())
         .map(|r| r.phase_counts.clone())
         .unwrap_or_default()
 }
@@ -198,14 +204,14 @@ pub async fn test_summary_account_scoping(h: &impl FacadeContractHarness) {
     let alice_vs = alice_summary
         .resource_counts
         .iter()
-        .find(|r| r.schema == VARIABLE_SET_SCHEMA)
+        .find(|r| r.schema == *VariableSetResource::schema())
         .map(|r| r.total_count)
         .unwrap_or(0);
 
     let bob_vs = bob_summary
         .resource_counts
         .iter()
-        .find(|r| r.schema == VARIABLE_SET_SCHEMA)
+        .find(|r| r.schema == *VariableSetResource::schema())
         .map(|r| r.total_count)
         .unwrap_or(0);
 

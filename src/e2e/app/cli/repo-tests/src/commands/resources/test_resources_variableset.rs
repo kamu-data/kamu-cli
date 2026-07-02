@@ -53,7 +53,7 @@ pub async fn test_resources_variableset_lifecycle(ctx: ResourceCtx) {
 
     // ── 5. get variablesets <name> — resolves to this VS with our value ───────
     let view = ctx.get_one(["get", "variablesets", resource_name]).await;
-    assert_eq!(view.ident(), (fixtures::VARIABLE_SET_KIND, resource_name));
+    assert_eq!(view.ident(), (fixtures::VARIABLE_SET_SCHEMA, resource_name));
     assert_eq!(view.variable("MESSAGE"), Some(initial_value));
 
     // ── 6. get vs <name> --spec — apply-compatible manifest ──────────────────
@@ -63,7 +63,7 @@ pub async fn test_resources_variableset_lifecycle(ctx: ResourceCtx) {
         "`get vs --spec` should emit a manifest with '$schema', got:\n{spec_out}"
     );
     assert!(
-        spec_out.contains(fixtures::VARIABLE_SET_KIND),
+        spec_out.contains(fixtures::VARIABLE_SET_SCHEMA),
         "`get vs --spec` should emit VariableSet schema, got:\n{spec_out}"
     );
     assert!(

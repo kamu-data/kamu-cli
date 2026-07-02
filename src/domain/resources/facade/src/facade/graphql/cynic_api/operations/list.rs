@@ -14,7 +14,7 @@ use crate::facade::graphql::cynic_api::fragments::{
     ResourceConnection,
     ResourceIdentityConnection,
     ResourceInvalidSearchQueryProblem,
-    ResourceUnsupportedDescriptorProblem,
+    ResourceUnsupportedSelectorProblem,
 };
 use crate::facade::graphql::cynic_api::schema;
 use crate::facade::graphql::cynic_api::variables::{
@@ -89,7 +89,7 @@ pub(crate) struct ListAllIdentitiesResources {
 #[derive(cynic::InlineFragments, Debug, Clone)]
 pub(crate) enum ResourceListOutcome {
     ResourceConnection(ResourceConnection),
-    ResourceUnsupportedDescriptorProblem(ResourceUnsupportedDescriptorProblem),
+    ResourceUnsupportedSelectorProblem(ResourceUnsupportedSelectorProblem),
     ResourceBadAccountProblem(ResourceBadAccountProblem),
     #[cynic(fallback)]
     Unknown,
@@ -110,7 +110,7 @@ pub(crate) enum ResourceListAllOutcome {
 #[derive(cynic::InlineFragments, Debug, Clone)]
 pub(crate) enum ResourceIdentityListOutcome {
     ResourceIdentityConnection(ResourceIdentityConnection),
-    ResourceUnsupportedDescriptorProblem(ResourceUnsupportedDescriptorProblem),
+    ResourceUnsupportedSelectorProblem(ResourceUnsupportedSelectorProblem),
     ResourceBadAccountProblem(ResourceBadAccountProblem),
     ResourceInvalidSearchQueryProblem(ResourceInvalidSearchQueryProblem),
     #[cynic(fallback)]

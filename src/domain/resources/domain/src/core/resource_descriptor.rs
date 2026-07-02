@@ -7,31 +7,16 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use crate::TypeUri;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub trait ResourceSchemaProvider {
-    const SCHEMA: &'static str;
+    /// The canonical schema URL (resource type identity) as an ODF `TypeUri`.
+    ///
+    /// Backed by a `'static` value (typically a `LazyLock<TypeUri>`), so the
+    /// returned reference lives for the whole program.
+    fn schema() -> &'static TypeUri;
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ResourceDescriptor {
-    pub schema: &'static str,
-}
-
-impl ResourceDescriptor {
-    pub const fn new(schema: &'static str) -> Self {
-        Self { schema }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub trait ResourceDescriptorProvider: ResourceSchemaProvider {
-    const DESCRIPTOR: ResourceDescriptor = ResourceDescriptor::new(Self::SCHEMA);
-}
-
-impl<T> ResourceDescriptorProvider for T where T: ResourceSchemaProvider {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

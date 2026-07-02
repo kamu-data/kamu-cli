@@ -505,6 +505,7 @@ impl KindCoverageMask {
 
 #[cfg(test)]
 mod tests {
+    use kamu_resources::TypeUri;
     use kamu_resources_facade::ResourceRef;
 
     use super::*;
@@ -518,13 +519,13 @@ mod tests {
             ResourceKindDescriptor {
                 name: "variables".to_owned(),
                 short_names: vec!["vs".to_owned()],
-                schema: "dev.kamu/variable/v1".to_owned(),
+                schema: TypeUri::new_unchecked("dev.kamu/variable/v1"),
                 list_columns: Vec::new(),
             },
             ResourceKindDescriptor {
                 name: "secrets".to_owned(),
                 short_names: vec!["ss".to_owned()],
-                schema: "dev.kamu/secret/v1".to_owned(),
+                schema: TypeUri::new_unchecked("dev.kamu/secret/v1"),
                 list_columns: Vec::new(),
             },
         ]

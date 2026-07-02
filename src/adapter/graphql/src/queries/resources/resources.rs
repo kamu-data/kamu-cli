@@ -31,9 +31,10 @@ use crate::queries::{
     ResourceSelectorProblem,
     ResourceSelectorProblemResult,
     ResourceSummary,
-    ResourceUnsupportedDescriptorProblem,
+    ResourceUnsupportedSelectorProblem,
     ResourcesSummary,
     SearchResourceIdentitiesInput,
+    map_unsupported_selector_problem,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -116,8 +117,8 @@ impl Resources {
             Err(kamu_resources_facade::GetResourceError::LookupProblem(problem)) => {
                 Ok(ResourceGetOutcome::Problem(problem.into()))
             }
-            Err(kamu_resources_facade::GetResourceError::UnsupportedDescriptor(error)) => {
-                Ok(ResourceGetOutcome::Problem(error.into()))
+            Err(kamu_resources_facade::GetResourceError::UnsupportedSelector(error)) => {
+                Ok(ResourceGetOutcome::Problem(error.try_into()?))
             }
             Err(kamu_resources_facade::GetResourceError::BadAccount(error)) => {
                 Ok(ResourceGetOutcome::Problem(ResourceSelectorProblemResult {
@@ -146,9 +147,9 @@ impl Resources {
             .await
         {
             Ok(response) => Ok(BatchResourcesOutcome::Success(response.into())),
-            Err(kamu_resources_facade::BatchResourceError::UnsupportedDescriptor(e)) => {
-                Ok(BatchResourcesOutcome::UnsupportedDescriptor(e.into()))
-            }
+            Err(kamu_resources_facade::BatchResourceError::UnsupportedSelector(e)) => Ok(
+                BatchResourcesOutcome::UnsupportedSelector(map_unsupported_selector_problem(e)?),
+            ),
             Err(kamu_resources_facade::BatchResourceError::BadAccount(e)) => Ok(
                 BatchResourcesOutcome::BadAccount(map_bad_account_problem(e)?),
             ),
@@ -171,8 +172,8 @@ impl Resources {
             Err(kamu_resources_facade::GetResourceError::LookupProblem(problem)) => {
                 Ok(ResourceGetIdentityOutcome::Problem(problem.into()))
             }
-            Err(kamu_resources_facade::GetResourceError::UnsupportedDescriptor(error)) => {
-                Ok(ResourceGetIdentityOutcome::Problem(error.into()))
+            Err(kamu_resources_facade::GetResourceError::UnsupportedSelector(error)) => {
+                Ok(ResourceGetIdentityOutcome::Problem(error.try_into()?))
             }
             Err(kamu_resources_facade::GetResourceError::BadAccount(error)) => Ok(
                 ResourceGetIdentityOutcome::Problem(ResourceSelectorProblemResult {
@@ -195,9 +196,11 @@ impl Resources {
 
         match resource_facade.get_identities(selector.into()).await {
             Ok(response) => Ok(BatchResourceIdentitiesOutcome::Success(response.into())),
-            Err(kamu_resources_facade::BatchResourceError::UnsupportedDescriptor(e)) => Ok(
-                BatchResourceIdentitiesOutcome::UnsupportedDescriptor(e.into()),
-            ),
+            Err(kamu_resources_facade::BatchResourceError::UnsupportedSelector(e)) => {
+                Ok(BatchResourceIdentitiesOutcome::UnsupportedSelector(
+                    map_unsupported_selector_problem(e)?,
+                ))
+            }
             Err(kamu_resources_facade::BatchResourceError::BadAccount(e)) => Ok(
                 BatchResourceIdentitiesOutcome::BadAccount(map_bad_account_problem(e)?),
             ),
@@ -238,9 +241,9 @@ impl Resources {
                     total_count,
                 )))
             }
-            Err(kamu_resources_facade::ListResourcesError::UnsupportedDescriptor(error)) => {
-                Ok(ResourceListOutcome::UnsupportedDescriptor(error.into()))
-            }
+            Err(kamu_resources_facade::ListResourcesError::UnsupportedSelector(error)) => Ok(
+                ResourceListOutcome::UnsupportedSelector(map_unsupported_selector_problem(error)?),
+            ),
             Err(kamu_resources_facade::ListResourcesError::BadAccount(error)) => Ok(
                 ResourceListOutcome::BadAccount(map_bad_account_problem(error)?),
             ),
@@ -278,9 +281,11 @@ impl Resources {
                     ResourceIdentityConnection::new(items, page, per_page, total_count),
                 ))
             }
-            Err(kamu_resources_facade::ListResourcesError::UnsupportedDescriptor(error)) => Ok(
-                ResourceIdentityListOutcome::UnsupportedDescriptor(error.into()),
-            ),
+            Err(kamu_resources_facade::ListResourcesError::UnsupportedSelector(error)) => {
+                Ok(ResourceIdentityListOutcome::UnsupportedSelector(
+                    map_unsupported_selector_problem(error)?,
+                ))
+            }
             Err(kamu_resources_facade::ListResourcesError::BadAccount(error)) => Ok(
                 ResourceIdentityListOutcome::BadAccount(map_bad_account_problem(error)?),
             ),
@@ -320,9 +325,11 @@ impl Resources {
                     ResourceIdentityConnection::new(items, page, per_page, total_count),
                 ))
             }
-            Err(kamu_resources_facade::ListResourcesError::UnsupportedDescriptor(error)) => Ok(
-                ResourceIdentityListOutcome::UnsupportedDescriptor(error.into()),
-            ),
+            Err(kamu_resources_facade::ListResourcesError::UnsupportedSelector(error)) => {
+                Ok(ResourceIdentityListOutcome::UnsupportedSelector(
+                    map_unsupported_selector_problem(error)?,
+                ))
+            }
             Err(kamu_resources_facade::ListResourcesError::BadAccount(error)) => Ok(
                 ResourceIdentityListOutcome::BadAccount(map_bad_account_problem(error)?),
             ),
@@ -433,9 +440,9 @@ impl Resources {
             Err(kamu_resources_facade::RenderResourceManifestError::LookupProblem(problem)) => {
                 Ok(ResourceRenderManifestOutcome::Problem(problem.into()))
             }
-            Err(kamu_resources_facade::RenderResourceManifestError::UnsupportedDescriptor(
-                error,
-            )) => Ok(ResourceRenderManifestOutcome::Problem(error.into())),
+            Err(kamu_resources_facade::RenderResourceManifestError::UnsupportedSelector(error)) => {
+                Ok(ResourceRenderManifestOutcome::Problem(error.try_into()?))
+            }
             Err(kamu_resources_facade::RenderResourceManifestError::BadAccount(error)) => Ok(
                 ResourceRenderManifestOutcome::Problem(ResourceSelectorProblemResult {
                     problem: ResourceSelectorProblem::BadAccount(map_bad_account_problem(error)?),
@@ -464,9 +471,11 @@ impl Resources {
             .await
         {
             Ok(response) => Ok(BatchResourceManifestsOutcome::Success(response.into())),
-            Err(kamu_resources_facade::BatchResourceError::UnsupportedDescriptor(e)) => Ok(
-                BatchResourceManifestsOutcome::UnsupportedDescriptor(e.into()),
-            ),
+            Err(kamu_resources_facade::BatchResourceError::UnsupportedSelector(e)) => {
+                Ok(BatchResourceManifestsOutcome::UnsupportedSelector(
+                    map_unsupported_selector_problem(e)?,
+                ))
+            }
             Err(kamu_resources_facade::BatchResourceError::BadAccount(e)) => Ok(
                 BatchResourceManifestsOutcome::BadAccount(map_bad_account_problem(e)?),
             ),
@@ -493,7 +502,7 @@ fn map_get_resource_non_lookup_error(error: kamu_resources_facade::GetResourceEr
     use kamu_resources_facade::GetResourceError as E;
 
     match error {
-        E::LookupProblem(_) | E::UnsupportedDescriptor(_) | E::BadAccount(_) => {
+        E::LookupProblem(_) | E::UnsupportedSelector(_) | E::BadAccount(_) => {
             unreachable!("handled as union arm")
         }
         E::RemoteRequest(error) => error.int_err().into(),
@@ -514,7 +523,7 @@ pub enum ResourcesSummaryOutcome {
 #[derive(Union)]
 pub enum ResourceListOutcome {
     Success(ResourceConnection),
-    UnsupportedDescriptor(ResourceUnsupportedDescriptorProblem),
+    UnsupportedSelector(ResourceUnsupportedSelectorProblem),
     BadAccount(ResourceBadAccountProblem),
 }
 
@@ -523,7 +532,7 @@ pub enum ResourceListOutcome {
 #[derive(Union)]
 pub enum ResourceIdentityListOutcome {
     Success(ResourceIdentityConnection),
-    UnsupportedDescriptor(ResourceUnsupportedDescriptorProblem),
+    UnsupportedSelector(ResourceUnsupportedSelectorProblem),
     BadAccount(ResourceBadAccountProblem),
     InvalidSearchQuery(ResourceInvalidSearchQueryProblem),
 }
@@ -568,7 +577,7 @@ fn map_render_resource_manifest_error(
     use kamu_resources_facade::RenderResourceManifestError as E;
 
     match error {
-        E::UnsupportedDescriptor(_) | E::BadAccount(_) | E::LookupProblem(_) => {
+        E::UnsupportedSelector(_) | E::BadAccount(_) | E::LookupProblem(_) => {
             unreachable!("handled as union arm")
         }
         E::RemoteRequest(error) => error.int_err().into(),
@@ -590,7 +599,7 @@ fn map_batch_resource_error(error: kamu_resources_facade::BatchResourceError) ->
     use kamu_resources_facade::BatchResourceError as E;
 
     match error {
-        E::UnsupportedDescriptor(_) => GqlError::gql("Unsupported resource kind"),
+        E::UnsupportedSelector(_) => GqlError::gql("Unsupported resource kind"),
         E::BadAccount(error) => map_resolve_manifest_account_error(error),
         E::RemoteRequest(error) => error.int_err().into(),
         E::Internal(error) => error.into(),
@@ -603,7 +612,7 @@ fn map_list_resources_error(error: kamu_resources_facade::ListResourcesError) ->
     use kamu_resources_facade::ListResourcesError as E;
 
     match error {
-        E::UnsupportedDescriptor(_) => GqlError::gql("Unsupported resource kind"),
+        E::UnsupportedSelector(_) => GqlError::gql("Unsupported resource kind"),
         E::BadAccount(error) => map_resolve_manifest_account_error(error),
         E::InvalidSearchQuery(error) => GqlError::gql(error.to_string()),
         E::RemoteRequest(error) => error.int_err().into(),

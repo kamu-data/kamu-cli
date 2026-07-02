@@ -19,6 +19,7 @@ use kamu_resources::{
     ResourcePresentation,
     ResourcePresentationDefinition,
     ResourceSchemaProvider,
+    TypeUri,
 };
 
 use crate::{VariableSetEventStore, VariableSetSpec, VariableSetState, VariableSetStatus};
@@ -31,8 +32,12 @@ pub struct VariableSetResource(pub(crate) Aggregate<VariableSetState, dyn Variab
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl VariableSetResource {
-    pub const SCHEMA: &'static str =
-        "https://opendatafabric.org/schemas/config/v1alpha1/VariableSet";
+    /// Canonical schema URL as a `&'static str`, sourced from the ODF codegen.
+    ///
+    /// Used as the const dill-registry key (dill `#[meta]` requires a const);
+    /// the typed identity is [`Self::schema`] returning a `TypeUri`. Both
+    /// derive from the same generated static, so they cannot drift.
+    pub const SCHEMA_STR: &'static str = odf::metadata::config::VariableSet::schema_str();
     pub const RESOURCE_NAME: &'static str = "variablesets";
     pub const RESOURCE_SHORT_NAMES: &'static [&'static str] = &["vs"];
 }
@@ -40,7 +45,9 @@ impl VariableSetResource {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl ResourceSchemaProvider for VariableSetResource {
-    const SCHEMA: &'static str = Self::SCHEMA;
+    fn schema() -> &'static TypeUri {
+        odf::metadata::config::VariableSet::schema()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -10,13 +10,14 @@
 use chrono::{SubsecRound as _, Utc};
 use kamu_resources::{
     ApplyManifestChangeKind,
+    ResourceSchemaProvider,
     ResourceView,
     ResourceViewAccount,
     ResourceViewHeaders,
 };
 use kamu_resources_services::make_apply_manifest_changes;
 
-use crate::tests::utils::{make_account_id, make_id};
+use crate::tests::utils::{TestResource, make_account_id, make_id};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Helpers
@@ -25,7 +26,7 @@ use crate::tests::utils::{make_account_id, make_id};
 fn make_view(name: &str, value: &str) -> ResourceView {
     let id = make_id();
     ResourceView {
-        schema: "TestResource".to_string(),
+        schema: TestResource::schema().clone(),
         headers: ResourceViewHeaders::simple(
             Utc::now(),
             id,
@@ -173,7 +174,7 @@ fn test_make_changes_identical_before_after_returns_no_field_changes() {
     let account_id = make_account_id();
 
     let make = || ResourceView {
-        schema: "TestResource".to_string(),
+        schema: TestResource::schema().clone(),
         headers: ResourceViewHeaders {
             id,
             account: ResourceViewAccount {
@@ -221,7 +222,7 @@ fn test_timestamp_precision_normalized_avoids_spurious_diffs() {
     let account_id = make_account_id();
 
     let make_view_ts = |updated_at| ResourceView {
-        schema: "TestResource".to_string(),
+        schema: TestResource::schema().clone(),
         headers: ResourceViewHeaders {
             id,
             account: ResourceViewAccount {

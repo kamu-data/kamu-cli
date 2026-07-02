@@ -22,7 +22,8 @@
 //! facade and `local_facade_for` returns the underlying
 //! `LocalResourceFacadeImpl` that shares the same in-memory store.
 
-use kamu_resources::{ApplyManifestPlanningDecision, ApplyResourceOutcome};
+use kamu_configuration::VariableSetResource;
+use kamu_resources::{ApplyManifestPlanningDecision, ApplyResourceOutcome, ResourceSchemaProvider};
 use kamu_resources_facade::{
     ApplyManifestRequest,
     ResourceBatchSelector,
@@ -38,7 +39,7 @@ use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
 use crate::helpers::{
     VARIABLE_SET_KIND,
-    VARIABLE_SET_SCHEMA,
+    VARIABLE_SET_SCHEMA_STR,
     assert_applied_outcome,
     assert_batch_indexes,
     assert_resource_view_fields,
@@ -115,8 +116,7 @@ pub async fn test_local_created_readable_remotely(h: &impl FacadeContractHarness
 
     assert_resource_view_fields(
         &view,
-        VARIABLE_SET_KIND,
-        VARIABLE_SET_SCHEMA,
+        VariableSetResource::schema(),
         "cross-local-to-remote",
     );
     assert_eq!(view.headers.id, id);
@@ -157,8 +157,7 @@ pub async fn test_remote_created_readable_locally(h: &impl FacadeContractHarness
 
     assert_resource_view_fields(
         &view,
-        VARIABLE_SET_KIND,
-        VARIABLE_SET_SCHEMA,
+        VariableSetResource::schema(),
         "cross-remote-to-local",
     );
     assert_eq!(view.headers.id, id);
@@ -473,7 +472,7 @@ pub async fn test_apply_equivalence(h: &impl FacadeContractHarness) {
     // inside the lifecycle, so both apply and plan return
     // Ok(Rejected(BusinessValidationFailed)).
     let reject_manifest = serde_json::json!({
-        "$schema": VARIABLE_SET_SCHEMA,
+        "$schema": VARIABLE_SET_SCHEMA_STR,
         "headers": {"name": "cross-apply-eq-rejected"},
         "spec": {"variables": {}}
     })

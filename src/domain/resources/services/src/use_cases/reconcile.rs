@@ -20,11 +20,11 @@ use crate::domain::{
     ReconcileResourceUseCaseError,
     Reconciler,
     ResourceAggregateLoader,
-    ResourceDescriptorProvider,
     ResourceID,
     ResourceLifecycleMessage,
     ResourceLoadError,
     ResourcePersistenceService,
+    ResourceSchemaProvider,
     ResourceStatusLike,
 };
 
@@ -32,7 +32,7 @@ use crate::domain::{
 
 pub struct ReconcileResourceUseCaseHelper<'a, R>
 where
-    R: ReconcilableEventSourcedResource + ResourceDescriptorProvider,
+    R: ReconcilableEventSourcedResource + ResourceSchemaProvider,
 {
     resource_aggregate_loader: &'a dyn ResourceAggregateLoader<R>,
     resource_persistence_service: &'a dyn ResourcePersistenceService<R>,
@@ -43,7 +43,7 @@ where
 
 impl<'a, R> ReconcileResourceUseCaseHelper<'a, R>
 where
-    R: ReconcilableEventSourcedResource + ResourceDescriptorProvider,
+    R: ReconcilableEventSourcedResource + ResourceSchemaProvider,
     R::LifecycleError: InvariantViolationOf<<R as DeclarativeResource>::ResourceState>,
     R::Spec: Serialize,
     R::Status: Serialize + ResourceStatusLike,

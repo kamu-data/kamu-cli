@@ -22,12 +22,17 @@
 // fixture below.
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Canonical schemas (kept in sync with the domain constants)
+// Canonical schemas (sourced from the ODF codegen — the single source of truth)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub const VARIABLE_SET_KIND: &str =
-    "https://opendatafabric.org/schemas/config/v1alpha1/VariableSet";
-pub const SECRET_SET_KIND: &str = "https://opendatafabric.org/schemas/config/v1alpha1/SecretSet";
+pub const VARIABLE_SET_SCHEMA: &str = odf::metadata::config::VariableSet::schema_str();
+pub const SECRET_SET_SCHEMA: &str = odf::metadata::config::SecretSet::schema_str();
+
+/// Short CRD-style type name (the `Kind` column in `list`/`summary` output),
+/// as opposed to [`VARIABLE_SET_SCHEMA`]/[`SECRET_SET_SCHEMA`] which are the
+/// full canonical `$schema` URIs.
+pub const VARIABLE_SET_SHORT_NAME: &str = "VariableSet";
+pub const SECRET_SET_SHORT_NAME: &str = "SecretSet";
 
 /// Kamu config enabling secrets encryption. `SecretSet` apply encrypts values
 /// via the configured key, so any scenario that applies a `SecretSet` must run
@@ -61,7 +66,7 @@ pub const DEFAULT_DESCRIPTION: &str = "e2e test fixture resource";
 pub fn variable_set_manifest_yaml(name: &str, value: &str) -> String {
     indoc::formatdoc!(
         r#"
-        $schema: {VARIABLE_SET_KIND}
+        $schema: {VARIABLE_SET_SCHEMA}
         headers:
           name: {name}
           description: {DEFAULT_DESCRIPTION}
@@ -76,7 +81,7 @@ pub fn variable_set_manifest_yaml(name: &str, value: &str) -> String {
 /// JSON.
 pub fn variable_set_manifest_json(name: &str, value: &str) -> String {
     serde_json::json!({
-        "$schema": VARIABLE_SET_KIND,
+        "$schema": VARIABLE_SET_SCHEMA,
         "headers": { "name": name, "description": DEFAULT_DESCRIPTION },
         "spec": { "variables": { "MESSAGE": value } },
     })
@@ -96,7 +101,7 @@ pub fn variable_set_manifest_yaml_for_account(
 ) -> String {
     indoc::formatdoc!(
         r#"
-        $schema: {VARIABLE_SET_KIND}
+        $schema: {VARIABLE_SET_SCHEMA}
         headers:
           name: {name}
           description: {DEFAULT_DESCRIPTION}
@@ -115,7 +120,7 @@ pub fn variable_set_manifest_yaml_for_account(
 pub fn variable_set_manifest_no_description(name: &str, value: &str) -> String {
     indoc::formatdoc!(
         r#"
-        $schema: {VARIABLE_SET_KIND}
+        $schema: {VARIABLE_SET_SCHEMA}
         headers:
           name: {name}
         spec:
@@ -130,7 +135,7 @@ pub fn variable_set_manifest_no_description(name: &str, value: &str) -> String {
 pub fn secret_set_manifest_yaml(name: &str, token: &str, password: &str) -> String {
     indoc::formatdoc!(
         r#"
-        $schema: {SECRET_SET_KIND}
+        $schema: {SECRET_SET_SCHEMA}
         headers:
           name: {name}
           description: {DEFAULT_DESCRIPTION}
@@ -181,7 +186,7 @@ pub fn secret_set_manifest_pre_encrypted_yaml(name: &str) -> String {
     let (encrypted, nonce) = PRE_ENCRYPTED_API_TOKEN;
     indoc::formatdoc!(
         r#"
-        $schema: {SECRET_SET_KIND}
+        $schema: {SECRET_SET_SCHEMA}
         headers:
           name: {name}
           description: {DEFAULT_DESCRIPTION}
@@ -197,7 +202,7 @@ pub fn secret_set_manifest_pre_encrypted_yaml(name: &str) -> String {
 /// The same `SecretSet` manifest as [`secret_set_manifest_yaml`] but in JSON.
 pub fn secret_set_manifest_json(name: &str, token: &str, password: &str) -> String {
     serde_json::json!({
-        "$schema": SECRET_SET_KIND,
+        "$schema": SECRET_SET_SCHEMA,
         "headers": { "name": name, "description": DEFAULT_DESCRIPTION },
         "spec": { "secrets": {
             "API_TOKEN": { "value": token },
@@ -212,7 +217,7 @@ pub fn secret_set_manifest_json(name: &str, token: &str, password: &str) -> Stri
 pub fn variable_set_manifest_business_invalid(name: &str) -> String {
     indoc::formatdoc!(
         r#"
-        $schema: {VARIABLE_SET_KIND}
+        $schema: {VARIABLE_SET_SCHEMA}
         headers:
           name: {name}
         spec:

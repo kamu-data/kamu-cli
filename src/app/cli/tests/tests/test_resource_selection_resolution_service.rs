@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, LazyLock, Mutex};
 
 use dill::CatalogBuilder;
 use kamu_cli::services::resources::{
@@ -23,6 +23,7 @@ use kamu_resources::{
     ResourceIdentityView,
     ResourceKindDescriptor,
     ResourceNameNotFoundError,
+    TypeUri,
 };
 use kamu_resources_facade::{
     MockResourceFacade,
@@ -35,13 +36,21 @@ use kamu_resources_facade::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-const VARIABLESET_KIND: &str = "https://opendatafabric.org/schemas/config/v1alpha1/VariableSet";
+fn variableset_type_uri() -> &'static TypeUri {
+    odf::metadata::config::VariableSet::schema()
+}
 const VARIABLESETS_NAME: &str = "variablesets";
 const VARIABLESETS_SHORT_NAME: &str = "vs";
-const SECRETSET_KIND: &str = "https://opendatafabric.org/schemas/config/v1alpha1/SecretSet";
+
+fn secretset_type_uri() -> &'static TypeUri {
+    odf::metadata::config::SecretSet::schema()
+}
 const SECRETSETS_NAME: &str = "secretsets";
 const SECRETSETS_SHORT_NAME: &str = "ss";
-const STORAGE_KIND: &str = "https://opendatafabric.org/schemas/config/v1alpha1/Storage";
+
+static STORAGE_TYPE_URI: LazyLock<TypeUri> = LazyLock::new(|| {
+    TypeUri::new_unchecked("https://opendatafabric.org/schemas/config/v1alpha1/Storage")
+});
 const STORAGES_NAME: &str = "storages";
 const STORAGES_SHORT_NAME: &str = "st";
 
@@ -59,7 +68,7 @@ async fn resolves_exact_kind_name_patterns_via_search() {
     harness.expect_search_identities(
         1,
         vec![ResourceIdentityView {
-            schema: VARIABLESET_KIND.to_string(),
+            schema: variableset_type_uri().clone(),
             canonical_kind_name: VARIABLESETS_NAME.to_string(),
             id: ResourceID::new(uuid::Uuid::new_v4()),
             name: "app-alpha".parse().unwrap(),
@@ -181,7 +190,7 @@ async fn resolves_kind_patterns_with_exact_names_in_supported_kind_order() {
             (
                 SECRETSETS_NAME.to_string(),
                 Some(ResourceIdentityView {
-                    schema: SECRETSET_KIND.to_string(),
+                    schema: secretset_type_uri().clone(),
                     canonical_kind_name: SECRETSETS_NAME.to_string(),
                     id: ResourceID::new(uuid::Uuid::new_v4()),
                     name: RESOURCE_DB_CREDS.parse().unwrap(),
@@ -190,7 +199,7 @@ async fn resolves_kind_patterns_with_exact_names_in_supported_kind_order() {
             (
                 STORAGES_NAME.to_string(),
                 Some(ResourceIdentityView {
-                    schema: STORAGE_KIND.to_string(),
+                    schema: STORAGE_TYPE_URI.clone(),
                     canonical_kind_name: STORAGES_NAME.to_string(),
                     id: ResourceID::new(uuid::Uuid::new_v4()),
                     name: RESOURCE_DB_CREDS.parse().unwrap(),
@@ -253,13 +262,13 @@ async fn resolves_kind_pattern_all_via_search_across_matched_kinds() {
         1,
         vec![
             ResourceIdentityView {
-                schema: SECRETSET_KIND.to_string(),
+                schema: secretset_type_uri().clone(),
                 canonical_kind_name: SECRETSETS_NAME.to_string(),
                 id: ResourceID::new(uuid::Uuid::new_v4()),
                 name: "db-creds".parse().unwrap(),
             },
             ResourceIdentityView {
-                schema: STORAGE_KIND.to_string(),
+                schema: STORAGE_TYPE_URI.clone(),
                 canonical_kind_name: STORAGES_NAME.to_string(),
                 id: ResourceID::new(uuid::Uuid::new_v4()),
                 name: "warehouse".parse().unwrap(),
@@ -316,13 +325,13 @@ async fn resolves_kind_pattern_name_patterns_via_single_search_across_matched_ki
         1,
         vec![
             ResourceIdentityView {
-                schema: SECRETSET_KIND.to_string(),
+                schema: secretset_type_uri().clone(),
                 canonical_kind_name: SECRETSETS_NAME.to_string(),
                 id: ResourceID::new(uuid::Uuid::new_v4()),
                 name: "db-creds".parse().unwrap(),
             },
             ResourceIdentityView {
-                schema: STORAGE_KIND.to_string(),
+                schema: STORAGE_TYPE_URI.clone(),
                 canonical_kind_name: STORAGES_NAME.to_string(),
                 id: ResourceID::new(uuid::Uuid::new_v4()),
                 name: "db-warehouse".parse().unwrap(),
@@ -388,7 +397,7 @@ async fn kind_pattern_exact_id_tries_every_matched_kind() {
         HashMap::from([(
             STORAGES_NAME.to_string(),
             Some(ResourceIdentityView {
-                schema: STORAGE_KIND.to_string(),
+                schema: STORAGE_TYPE_URI.clone(),
                 canonical_kind_name: STORAGES_NAME.to_string(),
                 id,
                 name: RESOURCE_DB_CREDS.parse().unwrap(),
@@ -583,7 +592,7 @@ async fn deduplicates_overlapping_name_patterns_before_counting_max_results() {
     harness.expect_search_identities(
         2,
         vec![ResourceIdentityView {
-            schema: VARIABLESET_KIND.to_string(),
+            schema: variableset_type_uri().clone(),
             canonical_kind_name: VARIABLESETS_NAME.to_string(),
             id: shared_id,
             name: "app-alpha".parse().unwrap(),
@@ -640,7 +649,7 @@ async fn deduplicates_repeated_kind_pattern_exact_name_matches() {
         HashMap::from([(
             SECRETSETS_NAME.to_string(),
             Some(ResourceIdentityView {
-                schema: SECRETSET_KIND.to_string(),
+                schema: secretset_type_uri().clone(),
                 canonical_kind_name: SECRETSETS_NAME.to_string(),
                 id: shared_id,
                 name: RESOURCE_DB_CREDS.parse().unwrap(),
@@ -699,7 +708,7 @@ async fn deduplicates_kind_pattern_all_before_counting_max_results() {
     harness.expect_search_identities(
         1,
         vec![ResourceIdentityView {
-            schema: SECRETSET_KIND.to_string(),
+            schema: secretset_type_uri().clone(),
             canonical_kind_name: SECRETSETS_NAME.to_string(),
             id: shared_id,
             name: RESOURCE_DB_CREDS.parse().unwrap(),
@@ -713,7 +722,7 @@ async fn deduplicates_kind_pattern_all_before_counting_max_results() {
         HashMap::from([(
             SECRETSETS_NAME.to_string(),
             Some(ResourceIdentityView {
-                schema: SECRETSET_KIND.to_string(),
+                schema: secretset_type_uri().clone(),
                 canonical_kind_name: SECRETSETS_NAME.to_string(),
                 id: shared_id,
                 name: RESOURCE_DB_CREDS.parse().unwrap(),
@@ -772,7 +781,7 @@ async fn deduplicates_kind_pattern_name_patterns_before_counting_max_results() {
     harness.expect_search_identities(
         2,
         vec![ResourceIdentityView {
-            schema: SECRETSET_KIND.to_string(),
+            schema: secretset_type_uri().clone(),
             canonical_kind_name: SECRETSETS_NAME.to_string(),
             id: shared_id,
             name: RESOURCE_DB_CREDS.parse().unwrap(),
@@ -830,13 +839,13 @@ async fn errors_when_unique_targets_exceed_max_results_after_deduplication() {
         1,
         vec![
             ResourceIdentityView {
-                schema: VARIABLESET_KIND.to_string(),
+                schema: variableset_type_uri().clone(),
                 canonical_kind_name: VARIABLESETS_NAME.to_string(),
                 id: shared_id,
                 name: "app-alpha".parse().unwrap(),
             },
             ResourceIdentityView {
-                schema: VARIABLESET_KIND.to_string(),
+                schema: variableset_type_uri().clone(),
                 canonical_kind_name: VARIABLESETS_NAME.to_string(),
                 id: second_id,
                 name: "app-beta".parse().unwrap(),
@@ -973,7 +982,7 @@ impl ResourceSelectionResolutionHarness {
         ResourceKindDescriptor {
             name: VARIABLESETS_NAME.to_string(),
             short_names: vec![VARIABLESETS_SHORT_NAME.to_string()],
-            schema: VARIABLESET_KIND.to_string(),
+            schema: variableset_type_uri().clone(),
             list_columns: Vec::new(),
         }
     }
@@ -982,7 +991,7 @@ impl ResourceSelectionResolutionHarness {
         ResourceKindDescriptor {
             name: SECRETSETS_NAME.to_string(),
             short_names: vec![SECRETSETS_SHORT_NAME.to_string()],
-            schema: SECRETSET_KIND.to_string(),
+            schema: secretset_type_uri().clone(),
             list_columns: Vec::new(),
         }
     }
@@ -991,7 +1000,7 @@ impl ResourceSelectionResolutionHarness {
         ResourceKindDescriptor {
             name: STORAGES_NAME.to_string(),
             short_names: vec![STORAGES_SHORT_NAME.to_string()],
-            schema: STORAGE_KIND.to_string(),
+            schema: STORAGE_TYPE_URI.clone(),
             list_columns: Vec::new(),
         }
     }

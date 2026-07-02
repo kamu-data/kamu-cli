@@ -15,6 +15,7 @@ use kamu_resources::*;
 use kamu_resources_services::{
     get_resource_crud_dispatcher,
     get_resource_crud_dispatcher_by_selector,
+    get_resource_crud_dispatcher_for_trusted_schema,
 };
 
 use super::helpers::*;
@@ -57,18 +58,18 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .await?
             .into_iter()
             .map(|row| {
+                let schema = TypeUri::new_unchecked(row.schema);
                 let name = names_by_schema
-                    .get(&row.schema)
+                    .get(&schema)
                     .ok_or_else(|| {
                         ResourcesSummaryError::Internal(InternalError::new(format!(
-                            "No resource descriptor registered for {}",
-                            row.schema
+                            "No resource descriptor registered for {schema}"
                         )))
                     })?
                     .clone();
 
                 Ok(ResourceTypeCountSummary {
-                    schema: row.schema,
+                    schema,
                     name,
                     total_count: row.total_count,
                     phase_counts: row.phase_counts,
@@ -144,7 +145,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .await?;
 
         let names_by_schema = self.resource_kind_names_by_schema();
-        resource_identity_from_snapshot::<GetResourceError>(snapshot, &names_by_schema)
+        resource_identity_from_snapshot(snapshot, &names_by_schema).map_err(Into::into)
     }
 
     async fn get_identities(
@@ -335,8 +336,8 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         let names_by_schema = self.resource_kind_names_by_schema();
         let items = rows
             .into_iter()
-            .map(|row| resource_identity_from_row::<ListResourcesError>(row, &names_by_schema))
-            .collect::<Result<Vec<_>, _>>()?;
+            .map(|row| resource_identity_from_row(row, &names_by_schema))
+            .collect::<Result<Vec<_>, InternalError>>()?;
 
         Ok(SearchResourceIdentitiesResponse { items, total_count })
     }
@@ -504,8 +505,11 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         }
 
         if !ids_to_delete.is_empty() {
+            // `schema` was resolved from a registered selector above, so a
+            // missing dispatcher is a data-integrity catastrophe, not a user
+            // error.
             let dispatcher =
-                get_resource_crud_dispatcher::<BatchResourceError>(&self.catalog, &schema)?;
+                get_resource_crud_dispatcher_for_trusted_schema(&self.catalog, schema.as_str())?;
             dispatcher
                 .delete(ResourceCrudDispatcherDeleteRequest {
                     account_id: target_account.id.clone(),
@@ -557,10 +561,10 @@ impl LocalResourceFacadeImpl {
                 .get(&self.catalog)
                 .expect("Resource presentation dispatcher construction failed");
 
-            let descriptor = dispatcher.descriptor();
+            let schema = dispatcher.schema();
             let presentation = dispatcher.presentation();
 
-            if seen.insert(descriptor.schema) {
+            if seen.insert(schema) {
                 descriptors.push(ResourceKindDescriptor {
                     name: presentation.resource_name.to_string(),
                     short_names: presentation
@@ -568,7 +572,7 @@ impl LocalResourceFacadeImpl {
                         .iter()
                         .map(ToString::to_string)
                         .collect(),
-                    schema: descriptor.schema.to_string(),
+                    schema: schema.clone(),
                     list_columns: presentation
                         .list_columns
                         .iter()
@@ -584,22 +588,22 @@ impl LocalResourceFacadeImpl {
         descriptors
     }
 
-    fn resource_kind_names_by_schema(&self) -> HashMap<String, String> {
+    fn resource_kind_names_by_schema(&self) -> HashMap<TypeUri, String> {
         self.list_resource_kind_descriptors()
             .into_iter()
             .map(|descriptor| (descriptor.schema, descriptor.name))
             .collect()
     }
 
-    fn resolve_schema_for_selector<E>(&self, selector: &str) -> Result<String, E>
+    fn resolve_schema_for_selector<E>(&self, selector: &str) -> Result<TypeUri, E>
     where
-        E: From<UnsupportedResourceDescriptorError>,
+        E: From<UnsupportedResourceSelectorError>,
     {
         self.list_resource_kind_descriptors()
             .into_iter()
             .find(|descriptor| descriptor.matches_selector(selector))
             .map(|descriptor| descriptor.schema)
-            .ok_or_else(|| UnsupportedResourceDescriptorError::SelectorNotFound {
+            .ok_or_else(|| UnsupportedResourceSelectorError::NotFound {
                 selector: selector.to_string(),
             })
             .map_err(Into::into)
@@ -609,7 +613,7 @@ impl LocalResourceFacadeImpl {
     where
         E: From<ResolveManifestAccountError>
             + From<ResourceLookupProblem>
-            + From<UnsupportedResourceDescriptorError>
+            + From<UnsupportedResourceSelectorError>
             + From<InternalError>
             + From<GetResourceCrudDispatcherError>,
     {
@@ -631,7 +635,12 @@ impl LocalResourceFacadeImpl {
             .resolve_snapshot_for_schema::<E>(&schema, &target_account.id, id)
             .await?;
 
-        let dispatcher = get_resource_crud_dispatcher::<E>(&self.catalog, &snapshot.schema)?;
+        // The schema was resolved from a registered selector above, so a missing
+        // dispatcher here is a data-integrity catastrophe, not a user error.
+        let dispatcher = get_resource_crud_dispatcher_for_trusted_schema(
+            &self.catalog,
+            snapshot.schema.as_str(),
+        )?;
 
         let view = dispatcher
             .get(ResourceCrudDispatcherGetRequest {
@@ -706,15 +715,19 @@ impl LocalResourceFacadeImpl {
                     ensure_schema_matches::<ResourceLookupProblem>(
                         snapshot.id,
                         &schema,
-                        &snapshot.schema,
+                        snapshot.schema.as_str(),
                     )?;
                     Ok(snapshot)
                 }) {
                 Ok(snapshot) => {
                     if !names_by_schema.contains_key(&snapshot.schema) {
-                        return Err(UnsupportedResourceDescriptorError::NotFound {
-                            schema: snapshot.schema.clone(),
-                        }
+                        // A stored snapshot whose schema has no registered
+                        // descriptor is a data-integrity catastrophe (it could
+                        // not have been stored without one), not a user error.
+                        return Err(InternalError::new(format!(
+                            "Stored resource {} has unregistered schema '{}'",
+                            snapshot.id, snapshot.schema
+                        ))
                         .into());
                     }
 
@@ -753,10 +766,10 @@ impl LocalResourceFacadeImpl {
     async fn resolve_id_identity_groups(
         &self,
         account_id: &odf::AccountID,
-        schema: &str,
+        schema: &TypeUri,
         id_entries: BatchIdEntries,
         mut problems: Vec<BatchResourceProblem<ResourceLookupProblem>>,
-        names_by_schema: &HashMap<String, String>,
+        names_by_schema: &HashMap<TypeUri, String>,
     ) -> Result<
         (
             Vec<IndexedResource<ResourceIdentityView>>,
@@ -784,8 +797,7 @@ impl LocalResourceFacadeImpl {
                 validate_identity_row(row, schema, ensure_schema_matches::<ResourceLookupProblem>)
             }) {
                 Ok(row) => {
-                    let identity =
-                        resource_identity_from_row::<BatchResourceError>(row, names_by_schema)?;
+                    let identity = resource_identity_from_row(row, names_by_schema)?;
                     identities.push(IndexedResource {
                         request_index,
                         item: identity,
@@ -806,7 +818,7 @@ impl LocalResourceFacadeImpl {
 
     async fn resolve_snapshot_for_schema<E>(
         &self,
-        schema: &str,
+        schema: &TypeUri,
         account_id: &odf::AccountID,
         id: ResourceID,
     ) -> Result<ResourceSnapshot, E>
@@ -817,7 +829,7 @@ impl LocalResourceFacadeImpl {
             return Err(ResourceLookupProblem::IDNotFound(ResourceIDNotFoundError(id)).into());
         };
 
-        ensure_schema_matches::<E>(id, schema, &snapshot.schema)?;
+        ensure_schema_matches::<E>(id, schema, snapshot.schema.as_str())?;
 
         Ok(snapshot)
     }
@@ -844,7 +856,7 @@ impl LocalResourceFacadeImpl {
 
     async fn ensure_manifest_id_is_accessible(
         &self,
-        schema: &str,
+        schema: &TypeUri,
         account_id: &odf::AccountID,
         maybe_id: Option<ResourceID>,
     ) -> Result<(), ApplyManifestError> {
@@ -856,10 +868,8 @@ impl LocalResourceFacadeImpl {
             return Err(ResourceIDNotFoundError(id).into());
         };
 
-        if snapshot.schema != schema {
-            return Err(
-                ResourceTypeMismatchError::new(id, schema.to_string(), snapshot.schema).into(),
-            );
+        if snapshot.schema != *schema {
+            return Err(ResourceTypeMismatchError::new(id, schema.clone(), snapshot.schema).into());
         }
 
         Ok(())
@@ -924,7 +934,7 @@ impl LocalResourceFacadeImpl {
         let header_warnings = collect_manifest_header_warnings(&manifest);
 
         self.ensure_manifest_id_is_accessible(
-            manifest.schema.as_str(),
+            manifest.schema.typ(),
             &target_account.id,
             manifest.headers.id,
         )
@@ -942,7 +952,7 @@ impl LocalResourceFacadeImpl {
 
     fn try_resolve_spec_view_dispatcher(
         &self,
-        schema: &str,
+        schema: &TypeUri,
         spec_view_mode: SpecViewMode,
     ) -> Option<Arc<dyn ResourceSpecViewDispatcher>> {
         if spec_view_mode == SpecViewMode::Revealed {

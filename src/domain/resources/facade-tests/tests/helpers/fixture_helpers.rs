@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use kamu_configuration::{SecretSetResource, VariableSetResource};
-use kamu_resources::{ApplyResourceOutcome, ResourceID};
+use kamu_resources::{ApplyResourceOutcome, ResourceID, TypeUri};
 use kamu_resources_facade::{ApplyManifestRequest, ResourceManifestFormat};
 
 use crate::harness::{FacadeContractHarness, TestAccount};
@@ -17,10 +17,10 @@ use crate::helpers::assert_applied_outcome;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub const VARIABLE_SET_KIND: &str = VariableSetResource::RESOURCE_NAME;
-pub const VARIABLE_SET_SCHEMA: &str = VariableSetResource::SCHEMA;
+pub const VARIABLE_SET_SCHEMA_STR: &str = VariableSetResource::SCHEMA_STR;
 
 pub const SECRET_SET_KIND: &str = SecretSetResource::RESOURCE_NAME;
-pub const SECRET_SET_SCHEMA: &str = SecretSetResource::SCHEMA;
+pub const SECRET_SET_SCHEMA_STR: &str = SecretSetResource::SCHEMA_STR;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -55,7 +55,7 @@ pub fn variable_set_manifest_json(
     indoc::formatdoc!(
         r#"
         {{
-            "$schema": "{VARIABLE_SET_SCHEMA}",
+            "$schema": "{VARIABLE_SET_SCHEMA_STR}",
             "headers": {{"name": "{name}"}},
             {account_field}"spec": {{
                 "variables": {{
@@ -95,7 +95,7 @@ pub fn variable_set_manifest_yaml(
         .join("\n");
     indoc::formatdoc!(
         "
-        $schema: {VARIABLE_SET_SCHEMA}
+        $schema: {VARIABLE_SET_SCHEMA_STR}
         headers:
           name: {name}
         {account_section}spec:
@@ -115,11 +115,11 @@ pub fn sorted_identity_names(mut items: Vec<kamu_resources::ResourceIdentityView
         .collect()
 }
 
-pub fn total_kind_count(summary: kamu_resources::ResourcesSummary, kind: &str) -> u64 {
+pub fn total_schema_count(summary: kamu_resources::ResourcesSummary, schema: &TypeUri) -> u64 {
     summary
         .resource_counts
         .into_iter()
-        .find(|count| count.schema == kind)
+        .find(|count| count.schema == *schema)
         .map_or(0, |count| count.total_count)
 }
 
@@ -175,7 +175,7 @@ pub fn secret_set_manifest_json(
     indoc::formatdoc!(
         r#"
         {{
-            "$schema": "{SECRET_SET_SCHEMA}",
+            "$schema": "{SECRET_SET_SCHEMA_STR}",
             "headers": {{"name": "{name}"}},
             {account_field}"spec": {{
                 "secrets": {{

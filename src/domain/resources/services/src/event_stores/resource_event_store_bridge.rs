@@ -20,24 +20,19 @@ use event_sourcing::{
     SaveEventsItem,
 };
 use internal_error::{InternalError, ResultIntoInternal};
+use kamu_resources::ResourceSchemaProvider;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use tokio_stream::StreamExt;
 
 use crate::ResourceBridgeEvent;
-use crate::domain::{
-    ResourceDescriptorProvider,
-    ResourceID,
-    ResourceRawEvent,
-    ResourceRawEventQuery,
-    ResourceRawEventStore,
-};
+use crate::domain::{ResourceID, ResourceRawEvent, ResourceRawEventQuery, ResourceRawEventStore};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct RawResourceEventStoreBridge<TResource, TState, TEvent>
 where
-    TResource: ResourceDescriptorProvider,
+    TResource: ResourceSchemaProvider,
     TState: Projection<Query = ResourceID, Event = TEvent>,
     TEvent: ResourceBridgeEvent + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
 {
@@ -46,23 +41,23 @@ where
 
 impl<TResource, TState, TEvent> RawResourceEventStoreBridge<TResource, TState, TEvent>
 where
-    TResource: ResourceDescriptorProvider,
+    TResource: ResourceSchemaProvider,
     TState: Projection<Query = ResourceID, Event = TEvent>,
     TEvent: ResourceBridgeEvent + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
 {
     fn make_raw_query(id: &ResourceID) -> ResourceRawEventQuery {
         ResourceRawEventQuery {
-            schema: TResource::DESCRIPTOR.schema.to_string(),
+            schema: TResource::schema().clone(),
             id: *id,
         }
     }
 
     fn decode_raw_event(raw: ResourceRawEvent) -> Result<(EventID, TEvent), InternalError> {
-        if raw.query.schema != TResource::DESCRIPTOR.schema {
+        if raw.query.schema != *TResource::schema() {
             return InternalError::bail(format!(
                 "Unexpected resource schema in resource event store bridge: expected='{}', \
                  actual='{}'",
-                TResource::DESCRIPTOR.schema,
+                TResource::schema(),
                 raw.query.schema
             ));
         }
@@ -109,7 +104,7 @@ where
         raw_event_store: &dyn ResourceRawEventStore,
     ) -> Result<usize, InternalError> {
         raw_event_store
-            .total_events_stored_by_schema(TResource::DESCRIPTOR.schema)
+            .total_events_stored_by_schema(TResource::schema().as_str())
             .await
     }
 
@@ -119,7 +114,7 @@ where
     ) -> EventStream<'_, TEvent> {
         Box::pin(
             raw_event_store
-                .get_all_events_by_schema(TResource::DESCRIPTOR.schema, opts)
+                .get_all_events_by_schema(TResource::schema().as_str(), opts)
                 .map(|result| {
                     result.and_then(|(_, raw_event)| {
                         Self::decode_raw_event(raw_event).map_err(GetEventsError::Internal)

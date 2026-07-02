@@ -19,7 +19,9 @@ use kamu_resources::{
     ResourceIDNotFoundError,
     ResourceInvalidSpecError,
     ResourceNameNotFoundError,
+    TypeUri,
     UnsupportedResourceDescriptorError,
+    UnsupportedResourceSelectorError,
 };
 use thiserror::Error;
 
@@ -91,7 +93,7 @@ pub enum ListSupportedResourceKindsError {
 #[derive(Debug, Error)]
 pub enum GetResourceError {
     #[error(transparent)]
-    UnsupportedDescriptor(#[from] UnsupportedResourceDescriptorError),
+    UnsupportedSelector(#[from] UnsupportedResourceSelectorError),
 
     #[error(transparent)]
     BadAccount(#[from] ResolveManifestAccountError),
@@ -142,7 +144,7 @@ pub enum ResourceLookupProblem {
 #[derive(Debug, Error)]
 pub enum BatchResourceError {
     #[error(transparent)]
-    UnsupportedDescriptor(#[from] UnsupportedResourceDescriptorError),
+    UnsupportedSelector(#[from] UnsupportedResourceSelectorError),
 
     #[error(transparent)]
     BadAccount(#[from] ResolveManifestAccountError),
@@ -159,7 +161,7 @@ pub enum BatchResourceError {
 #[derive(Debug, Error)]
 pub enum RenderResourceManifestError {
     #[error(transparent)]
-    UnsupportedDescriptor(#[from] UnsupportedResourceDescriptorError),
+    UnsupportedSelector(#[from] UnsupportedResourceSelectorError),
 
     #[error(transparent)]
     BadAccount(#[from] ResolveManifestAccountError),
@@ -196,7 +198,7 @@ impl From<GetResourceCrudDispatcherError> for RenderResourceManifestError {
 #[derive(Debug, Error)]
 pub enum ListResourcesError {
     #[error(transparent)]
-    UnsupportedDescriptor(#[from] UnsupportedResourceDescriptorError),
+    UnsupportedSelector(#[from] UnsupportedResourceSelectorError),
 
     #[error(transparent)]
     BadAccount(#[from] ResolveManifestAccountError),
@@ -250,7 +252,7 @@ pub enum ResourcesSummaryError {
 #[derive(Debug, Error)]
 pub enum DeleteResourceError {
     #[error(transparent)]
-    UnsupportedDescriptor(#[from] UnsupportedResourceDescriptorError),
+    UnsupportedSelector(#[from] UnsupportedResourceSelectorError),
 
     #[error(transparent)]
     BadAccount(#[from] ResolveManifestAccountError),
@@ -279,7 +281,7 @@ impl From<DeleteResourcesCrudDispatcherError> for DeleteResourceError {
 impl From<BatchResourceError> for DeleteResourceError {
     fn from(err: BatchResourceError) -> Self {
         match err {
-            BatchResourceError::UnsupportedDescriptor(err) => Self::UnsupportedDescriptor(err),
+            BatchResourceError::UnsupportedSelector(err) => Self::UnsupportedSelector(err),
             BatchResourceError::BadAccount(err) => Self::BadAccount(err),
             BatchResourceError::RemoteRequest(err) => Self::RemoteRequest(err),
             BatchResourceError::Internal(err) => Self::Internal(err),
@@ -366,8 +368,8 @@ pub struct ParseResourceManifestError {
 #[error("Resource id {id} refers to schema '{actual_schema}', expected '{expected_schema}'")]
 pub struct ResourceSchemaMismatchError {
     pub id: ResourceID,
-    pub expected_schema: String,
-    pub actual_schema: String,
+    pub expected_schema: TypeUri,
+    pub actual_schema: TypeUri,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

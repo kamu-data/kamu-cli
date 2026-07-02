@@ -19,8 +19,8 @@ use pretty_assertions::assert_eq;
 
 use crate::utils::{BaseGQLResourceHarness, PredefinedAccountOpts, authentication_catalogs_ext};
 
-const VARIABLE_SET_SCHEMA: &str = "https://opendatafabric.org/schemas/config/v1alpha1/VariableSet";
-const SECRET_SET_SCHEMA: &str = "https://opendatafabric.org/schemas/config/v1alpha1/SecretSet";
+const VARIABLE_SET_SCHEMA: &str = odf::metadata::config::VariableSet::schema_str();
+const SECRET_SET_SCHEMA: &str = odf::metadata::config::SecretSet::schema_str();
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

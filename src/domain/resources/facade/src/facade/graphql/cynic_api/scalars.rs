@@ -18,6 +18,7 @@ cynic::impl_scalar!(DateTime<Utc>, schema::DateTime);
 cynic::impl_scalar!(odf::AccountID, schema::AccountID);
 cynic::impl_scalar!(domain::ResourceID, schema::ResourceID);
 cynic::impl_scalar!(domain::ResourceName, schema::ResourceName);
+cynic::impl_scalar!(domain::TypeUri, schema::TypeUri);
 cynic::impl_scalar!(serde_json::Value, schema::JSON);
 cynic::impl_scalar!(Uint64, schema::Uint64);
 

@@ -18,7 +18,7 @@ macro_rules! declare_resource_crud_dispatcher {
         #[dill::component]
         #[dill::interface(dyn $crate::ResourceCrudDispatcher)]
         #[dill::meta(kamu_resources::ResourceDispatcherMeta {
-            schema: <$resource as kamu_resources::ResourceDescriptorProvider>::DESCRIPTOR.schema,
+            schema: <$resource>::SCHEMA_STR,
             name: <$resource as kamu_resources::ResourcePresentation>::PRESENTATION.resource_name,
             short_names:
                 <$resource as kamu_resources::ResourcePresentation>::PRESENTATION.resource_short_names,
@@ -40,7 +40,7 @@ macro_rules! declare_resource_crud_dispatcher {
         impl $crate::ResourceCrudDispatcher for $dispatcher
         where
             $resource: kamu_resources::ReconcilableEventSourcedResource
-                + kamu_resources::ResourceDescriptorProvider
+                + kamu_resources::ResourceSchemaProvider
                 + kamu_resources::ResourcePresentation,
             <$resource as kamu_resources::DeclarativeResource>::Spec:
                 serde::de::DeserializeOwned + serde::Serialize,
@@ -56,8 +56,7 @@ macro_rules! declare_resource_crud_dispatcher {
                 kamu_resources::ApplyManifestPlanningDecision,
                 $crate::ApplyResourceCrudDispatcherError,
             > {
-                let schema =
-                    <$resource as kamu_resources::ResourceDescriptorProvider>::DESCRIPTOR.schema;
+                let schema = <$resource as kamu_resources::ResourceSchemaProvider>::schema();
                 let spec = $crate::decode_resource_spec::<$resource>(schema, request.spec)?;
 
                 let plan = self
@@ -85,8 +84,7 @@ macro_rules! declare_resource_crud_dispatcher {
                 kamu_resources::ApplyManifestApplicationDecision,
                 $crate::ApplyResourceCrudDispatcherError,
             > {
-                let schema =
-                    <$resource as kamu_resources::ResourceDescriptorProvider>::DESCRIPTOR.schema;
+                let schema = <$resource as kamu_resources::ResourceSchemaProvider>::schema();
                 let spec = $crate::decode_resource_spec::<$resource>(schema, request.spec)?;
 
                 let result = self

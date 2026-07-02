@@ -12,7 +12,7 @@ use std::sync::Arc;
 use dill::Catalog;
 use internal_error::InternalError;
 
-use crate::{ResourceSnapshot, get_resource_dispatcher_from_catalog};
+use crate::{ResourceSnapshot, TypeUri, get_resource_dispatcher_from_catalog};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -37,7 +37,7 @@ pub trait ResourceLifecycleEventDispatcher: Send + Sync {
 
 pub fn get_resource_lifecycle_dispatcher_from_catalog(
     target_catalog: &Catalog,
-    schema: &str,
+    schema: &TypeUri,
 ) -> Result<Arc<dyn ResourceLifecycleEventDispatcher>, InternalError> {
     get_resource_dispatcher_from_catalog(target_catalog, schema, "resource lifecycle dispatcher")
 }

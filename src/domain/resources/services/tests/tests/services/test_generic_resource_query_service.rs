@@ -13,15 +13,32 @@ use kamu_resources::{
     FindOwnedSnapshotsOutcome,
     ResourceHeaders,
     ResourceID,
+    ResourceSchemaProvider,
     ResourceSnapshot,
+    TypeUri,
 };
 use kamu_resources_services::testing::BaseResourceServiceHarness;
 
 use crate::tests::utils::{TestResource, make_account_id};
 
-const OTHER_SCHEMA: &str = "https://test.kamu.dev/schemas/test/v1/OtherResource";
-const LEGACY_SCHEMA: &str = "https://test.kamu.dev/schemas/test/v0/TestResource";
-const NEWER_SCHEMA: &str = "https://test.kamu.dev/schemas/test/v2/TestResource";
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+static OTHER_SCHEMA: std::sync::LazyLock<kamu_resources::TypeUri> =
+    std::sync::LazyLock::new(|| {
+        kamu_resources::TypeUri::new_unchecked(
+            "https://test.kamu.dev/schemas/test/v1/OtherResource",
+        )
+    });
+
+static LEGACY_SCHEMA: std::sync::LazyLock<kamu_resources::TypeUri> =
+    std::sync::LazyLock::new(|| {
+        kamu_resources::TypeUri::new_unchecked("https://test.kamu.dev/schemas/test/v0/TestResource")
+    });
+
+static NEWER_SCHEMA: std::sync::LazyLock<kamu_resources::TypeUri> =
+    std::sync::LazyLock::new(|| {
+        kamu_resources::TypeUri::new_unchecked("https://test.kamu.dev/schemas/test/v2/TestResource")
+    });
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // find_owned_snapshot tests
@@ -34,16 +51,16 @@ async fn test_find_owned_snapshot_success() {
     let id = harness.allocate_id().await;
 
     harness
-        .insert_snapshot(id, account_a.clone(), TestResource::SCHEMA, "res-a")
+        .insert_snapshot(id, account_a.clone(), TestResource::schema(), "res-a")
         .await;
 
     let result = harness
-        .find_owned_snapshot(&account_a, TestResource::SCHEMA, id)
+        .find_owned_snapshot(&account_a, TestResource::schema(), id)
         .await;
 
     let snapshot = result.unwrap().unwrap();
     assert_eq!(snapshot.id, id);
-    assert_eq!(snapshot.schema, TestResource::SCHEMA);
+    assert_eq!(snapshot.schema, *TestResource::schema());
     assert_eq!(snapshot.headers.account, account_a);
 }
 
@@ -56,7 +73,7 @@ async fn test_find_owned_snapshot_not_found() {
     let id = harness.allocate_id().await;
 
     let result = harness
-        .find_owned_snapshot(&account_a, TestResource::SCHEMA, id)
+        .find_owned_snapshot(&account_a, TestResource::schema(), id)
         .await;
 
     assert!(result.unwrap().is_none());
@@ -72,11 +89,11 @@ async fn test_find_owned_snapshot_access_denied() {
     let id = harness.allocate_id().await;
 
     harness
-        .insert_snapshot(id, account_a.clone(), TestResource::SCHEMA, "res-a")
+        .insert_snapshot(id, account_a.clone(), TestResource::schema(), "res-a")
         .await;
 
     let result = harness
-        .find_owned_snapshot(&account_b, TestResource::SCHEMA, id)
+        .find_owned_snapshot(&account_b, TestResource::schema(), id)
         .await;
 
     assert!(
@@ -97,11 +114,11 @@ async fn test_find_owned_snapshot_schema_mismatch_by_query() {
     let id = harness.allocate_id().await;
 
     harness
-        .insert_snapshot(id, account_a.clone(), TestResource::SCHEMA, "res-a")
+        .insert_snapshot(id, account_a.clone(), TestResource::schema(), "res-a")
         .await;
 
     let result = harness
-        .find_owned_snapshot(&account_a, OTHER_SCHEMA, id)
+        .find_owned_snapshot(&account_a, &OTHER_SCHEMA, id)
         .await;
 
     // The repository filters by kind in find_resource_snapshot, so a wrong kind
@@ -121,11 +138,11 @@ async fn test_find_owned_snapshot_schema_mismatch_by_type() {
     let id = harness.allocate_id().await;
 
     harness
-        .insert_snapshot(id, account_a.clone(), TestResource::SCHEMA, "res-a")
+        .insert_snapshot(id, account_a.clone(), TestResource::schema(), "res-a")
         .await;
 
     let result = harness
-        .find_owned_snapshot(&account_a, NEWER_SCHEMA, id)
+        .find_owned_snapshot(&account_a, &NEWER_SCHEMA, id)
         .await;
 
     assert!(result.unwrap().is_none());
@@ -146,12 +163,12 @@ async fn test_find_owned_snapshots_all_found() {
 
     for (id, name) in [(uid_1, "res-1"), (uid_2, "res-2"), (uid_3, "res-3")] {
         harness
-            .insert_snapshot(id, account_a.clone(), TestResource::SCHEMA, name)
+            .insert_snapshot(id, account_a.clone(), TestResource::schema(), name)
             .await;
     }
 
     let outcome = harness
-        .find_owned_snapshots(&account_a, TestResource::SCHEMA, &[uid_1, uid_2, uid_3])
+        .find_owned_snapshots(&account_a, TestResource::schema(), &[uid_1, uid_2, uid_3])
         .await;
 
     assert_eq!(outcome.found.len(), 3);
@@ -172,7 +189,7 @@ async fn test_find_owned_snapshots_not_found() {
     let uid_2 = harness.allocate_id().await;
 
     let outcome = harness
-        .find_owned_snapshots(&account_a, TestResource::SCHEMA, &[uid_1, uid_2])
+        .find_owned_snapshots(&account_a, TestResource::schema(), &[uid_1, uid_2])
         .await;
 
     assert!(outcome.found.is_empty());
@@ -190,11 +207,11 @@ async fn test_find_owned_snapshots_access_denied() {
     let id = harness.allocate_id().await;
 
     harness
-        .insert_snapshot(id, account_a.clone(), TestResource::SCHEMA, "res-a")
+        .insert_snapshot(id, account_a.clone(), TestResource::schema(), "res-a")
         .await;
 
     let outcome = harness
-        .find_owned_snapshots(&account_b, TestResource::SCHEMA, &[id])
+        .find_owned_snapshots(&account_b, TestResource::schema(), &[id])
         .await;
 
     assert!(outcome.found.is_empty());
@@ -210,17 +227,17 @@ async fn test_find_owned_snapshots_schema_mismatch_by_type() {
     let id = harness.allocate_id().await;
 
     harness
-        .insert_snapshot(id, account_a.clone(), OTHER_SCHEMA, "res-a")
+        .insert_snapshot(id, account_a.clone(), &OTHER_SCHEMA, "res-a")
         .await;
 
     let outcome = harness
-        .find_owned_snapshots(&account_a, TestResource::SCHEMA, &[id])
+        .find_owned_snapshots(&account_a, TestResource::schema(), &[id])
         .await;
 
     assert!(outcome.found.is_empty());
     assert_eq!(outcome.schema_mismatch.len(), 1);
     assert_eq!(outcome.schema_mismatch[0].0, id);
-    assert_eq!(outcome.schema_mismatch[0].1, OTHER_SCHEMA);
+    assert_eq!(outcome.schema_mismatch[0].1, *OTHER_SCHEMA);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -232,17 +249,17 @@ async fn test_find_owned_snapshots_schema_mismatch_by_version() {
     let id = harness.allocate_id().await;
 
     harness
-        .insert_snapshot(id, account_a.clone(), LEGACY_SCHEMA, "res-a")
+        .insert_snapshot(id, account_a.clone(), &LEGACY_SCHEMA, "res-a")
         .await;
 
     let outcome = harness
-        .find_owned_snapshots(&account_a, TestResource::SCHEMA, &[id])
+        .find_owned_snapshots(&account_a, TestResource::schema(), &[id])
         .await;
 
     assert!(outcome.found.is_empty());
     assert_eq!(outcome.schema_mismatch.len(), 1);
     assert_eq!(outcome.schema_mismatch[0].0, id);
-    assert_eq!(outcome.schema_mismatch[0].1, LEGACY_SCHEMA);
+    assert_eq!(outcome.schema_mismatch[0].1, *LEGACY_SCHEMA);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -259,7 +276,7 @@ async fn test_find_owned_snapshots_mixed_outcomes() {
         .insert_snapshot(
             uid_found,
             account_a.clone(),
-            TestResource::SCHEMA,
+            TestResource::schema(),
             "res-found",
         )
         .await;
@@ -270,7 +287,7 @@ async fn test_find_owned_snapshots_mixed_outcomes() {
         .insert_snapshot(
             uid_schema_mismatch,
             account_a.clone(),
-            OTHER_SCHEMA,
+            &OTHER_SCHEMA,
             "res-other-kind",
         )
         .await;
@@ -281,7 +298,7 @@ async fn test_find_owned_snapshots_mixed_outcomes() {
         .insert_snapshot(
             uid_access_denied,
             account_b.clone(),
-            TestResource::SCHEMA,
+            TestResource::schema(),
             "res-denied",
         )
         .await;
@@ -292,7 +309,7 @@ async fn test_find_owned_snapshots_mixed_outcomes() {
     let outcome = harness
         .find_owned_snapshots(
             &account_a,
-            TestResource::SCHEMA,
+            TestResource::schema(),
             &[
                 uid_found,
                 uid_schema_mismatch,
@@ -332,12 +349,12 @@ impl GenericResourceQueryServiceHarness {
         &self,
         id: ResourceID,
         owner_account_id: odf::AccountID,
-        schema: &str,
+        schema: &TypeUri,
         name: &str,
     ) {
         let snapshot = ResourceSnapshot {
             id,
-            schema: schema.to_string(),
+            schema: schema.clone(),
             headers: ResourceHeaders::simple(Utc::now(), owner_account_id, name),
             spec: serde_json::json!({"value": name}),
             status: None,
@@ -354,7 +371,7 @@ impl GenericResourceQueryServiceHarness {
     async fn find_owned_snapshot(
         &self,
         account_id: &odf::AccountID,
-        schema: &'static str,
+        schema: &'static TypeUri,
         id: ResourceID,
     ) -> Result<Option<ResourceSnapshot>, FindOwnedResourceError> {
         self.generic_query_svc()
@@ -365,7 +382,7 @@ impl GenericResourceQueryServiceHarness {
     async fn find_owned_snapshots(
         &self,
         account_id: &odf::AccountID,
-        schema: &'static str,
+        schema: &'static TypeUri,
         ids: &[ResourceID],
     ) -> FindOwnedSnapshotsOutcome {
         self.generic_query_svc()

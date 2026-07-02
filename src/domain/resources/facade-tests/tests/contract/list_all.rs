@@ -14,8 +14,8 @@ use pretty_assertions::assert_eq;
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
 use crate::helpers::{
-    SECRET_SET_SCHEMA,
-    VARIABLE_SET_SCHEMA,
+    SECRET_SET_SCHEMA_STR,
+    VARIABLE_SET_SCHEMA_STR,
     apply_manifest_and_get_id,
     normalize_identity_views,
     normalize_summary_views,
@@ -29,7 +29,7 @@ fn summary_keys(mut items: Vec<kamu_resources::ResourceSummaryView>) -> Vec<(Str
     normalize_summary_views(&mut items);
     items
         .into_iter()
-        .map(|item| (item.schema, item.name.to_string()))
+        .map(|item| (item.schema.to_string(), item.name.to_string()))
         .collect()
 }
 
@@ -37,7 +37,7 @@ fn identity_keys(mut items: Vec<kamu_resources::ResourceIdentityView>) -> Vec<(S
     normalize_identity_views(&mut items);
     items
         .into_iter()
-        .map(|item| (item.schema, item.name.to_string()))
+        .map(|item| (item.schema.to_string(), item.name.to_string()))
         .collect()
 }
 
@@ -82,10 +82,13 @@ pub async fn test_list_all_summaries_across_supported_kinds(h: &impl FacadeContr
         summary_keys(summaries),
         vec![
             (
-                SECRET_SET_SCHEMA.to_string(),
+                SECRET_SET_SCHEMA_STR.to_string(),
                 "all-secret-alice".to_string()
             ),
-            (VARIABLE_SET_SCHEMA.to_string(), "all-var-alice".to_string(),),
+            (
+                VARIABLE_SET_SCHEMA_STR.to_string(),
+                "all-var-alice".to_string(),
+            ),
         ]
     );
 }
@@ -130,8 +133,14 @@ pub async fn test_list_all_identities_across_supported_kinds(h: &impl FacadeCont
     assert_eq!(
         identity_keys(identities),
         vec![
-            (SECRET_SET_SCHEMA.to_string(), "all-id-secret".to_string()),
-            (VARIABLE_SET_SCHEMA.to_string(), "all-id-var".to_string()),
+            (
+                SECRET_SET_SCHEMA_STR.to_string(),
+                "all-id-secret".to_string()
+            ),
+            (
+                VARIABLE_SET_SCHEMA_STR.to_string(),
+                "all-id-var".to_string()
+            ),
         ]
     );
 }

@@ -13,11 +13,11 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu_configuration::{SecretSetResource, SecretSetSpec, SecretSpec};
 use kamu_datasets::SecretsEncryptionConfig;
 use kamu_resources::{
-    ResourceDescriptor,
-    ResourceDescriptorProvider,
     ResourceDispatcherMeta,
     ResourcePresentation,
+    ResourceSchemaProvider,
     ResourceSpecViewDispatcher,
+    TypeUri,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -25,7 +25,7 @@ use kamu_resources::{
 #[dill::component]
 #[dill::interface(dyn ResourceSpecViewDispatcher)]
 #[dill::meta(ResourceDispatcherMeta {
-    schema: <SecretSetResource as ResourceDescriptorProvider>::DESCRIPTOR.schema,
+    schema: SecretSetResource::SCHEMA_STR,
     name: <SecretSetResource as ResourcePresentation>::PRESENTATION.resource_name,
     short_names: <SecretSetResource as ResourcePresentation>::PRESENTATION.resource_short_names,
 })]
@@ -36,8 +36,8 @@ pub struct SecretSetSpecViewDispatcher {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl ResourceSpecViewDispatcher for SecretSetSpecViewDispatcher {
-    fn descriptor(&self) -> ResourceDescriptor {
-        SecretSetResource::DESCRIPTOR
+    fn schema(&self) -> &'static TypeUri {
+        SecretSetResource::schema()
     }
 
     fn reveal_spec(

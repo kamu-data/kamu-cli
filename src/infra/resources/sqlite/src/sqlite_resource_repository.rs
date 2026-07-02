@@ -36,6 +36,7 @@ use kamu_resources::{
     ResourceSnapshotRow,
     ResourceSnapshotStream,
     ResourceSummaryRow,
+    TypeUri,
     UpdateResourceError,
 };
 use odf::metadata::AsStackString;
@@ -65,6 +66,7 @@ impl ResourceRepository for SqliteResourceRepository {
 
         let account_id_stack = resource_snapshot.headers.account.as_stack_string();
         let account_id_str = account_id_stack.as_str();
+        let resource_snapshot_schema = resource_snapshot.schema.as_str();
         let name_str = resource_snapshot.headers.name.as_str();
         let labels = serde_json::to_value(&resource_snapshot.headers.labels).unwrap();
         let annotations = serde_json::to_value(&resource_snapshot.headers.annotations).unwrap();
@@ -95,7 +97,7 @@ impl ResourceRepository for SqliteResourceRepository {
             "#,
             resource_id,
             account_id_str,
-            resource_snapshot.schema,
+            resource_snapshot_schema,
             name_str,
             resource_snapshot.headers.description,
             labels,
@@ -135,6 +137,7 @@ impl ResourceRepository for SqliteResourceRepository {
 
         let account_id_stack = resource_snapshot.headers.account.as_stack_string();
         let account_id_str = account_id_stack.as_str();
+        let resource_snapshot_schema = resource_snapshot.schema.as_str();
         let name_str = resource_snapshot.headers.name.as_str();
         let labels = serde_json::to_value(&resource_snapshot.headers.labels).unwrap();
         let annotations = serde_json::to_value(&resource_snapshot.headers.annotations).unwrap();
@@ -168,7 +171,7 @@ impl ResourceRepository for SqliteResourceRepository {
             "#,
             resource_id,
             account_id_str,
-            resource_snapshot.schema,
+            resource_snapshot_schema,
             name_str,
             resource_snapshot.headers.description,
             labels,
@@ -205,7 +208,7 @@ impl ResourceRepository for SqliteResourceRepository {
     async fn find_resource_id_by_name(
         &self,
         account_id: &odf::AccountID,
-        schema: &str,
+        schema: &TypeUri,
         name: &ResourceName,
     ) -> Result<Option<ResourceID>, InternalError> {
         let mut tr = self.transaction.lock().await;
@@ -213,6 +216,7 @@ impl ResourceRepository for SqliteResourceRepository {
 
         let account_id_stack = account_id.as_stack_string();
         let account_id_str = account_id_stack.as_str();
+        let schema = schema.as_str();
         let name_str = name.as_str();
 
         let maybe_resource_id = sqlx::query_scalar!(
@@ -279,7 +283,7 @@ impl ResourceRepository for SqliteResourceRepository {
     async fn find_resource_identities_by_names(
         &self,
         account_id: &odf::AccountID,
-        schema: &str,
+        schema: &TypeUri,
         names: &[ResourceName],
     ) -> Result<Vec<ResourceIdentityRow>, InternalError> {
         if names.is_empty() {
@@ -311,7 +315,7 @@ impl ResourceRepository for SqliteResourceRepository {
 
         let mut query = sqlx::query_as::<_, ResourceIdentityRow>(&query_str)
             .bind(account_id_str)
-            .bind(schema);
+            .bind(schema.as_str());
         for name in names {
             query = query.bind(name.to_string());
         }
@@ -324,7 +328,7 @@ impl ResourceRepository for SqliteResourceRepository {
     async fn search_resource_identities(
         &self,
         account_id: &odf::AccountID,
-        schemas: &[String],
+        schemas: &[TypeUri],
         exact_names: Option<&[ResourceName]>,
         name_pattern: Option<&str>,
         pagination: PaginationOpts,
@@ -356,7 +360,7 @@ impl ResourceRepository for SqliteResourceRepository {
         {
             let mut separated = query_builder.separated(", ");
             for schema in schemas {
-                separated.push_bind(schema);
+                separated.push_bind(schema.as_str());
             }
         }
         query_builder.push(")");
@@ -392,7 +396,7 @@ impl ResourceRepository for SqliteResourceRepository {
     async fn count_search_resource_identities(
         &self,
         account_id: &odf::AccountID,
-        schemas: &[String],
+        schemas: &[TypeUri],
         exact_names: Option<&[ResourceName]>,
         name_pattern: Option<&str>,
     ) -> Result<usize, InternalError> {
@@ -418,7 +422,7 @@ impl ResourceRepository for SqliteResourceRepository {
         {
             let mut separated = query_builder.separated(", ");
             for schema in schemas {
-                separated.push_bind(schema);
+                separated.push_bind(schema.as_str());
             }
         }
         query_builder.push(")");
@@ -455,6 +459,7 @@ impl ResourceRepository for SqliteResourceRepository {
         let connection_mut = tr.connection_mut().await?;
 
         let query_id: &uuid::Uuid = query.id.as_ref();
+        let query_schema = query.schema.as_str();
         let maybe_row = sqlx::query!(
             r#"
             SELECT
@@ -479,7 +484,7 @@ impl ResourceRepository for SqliteResourceRepository {
               AND deleted_at IS NULL
             "#,
             query_id,
-            query.schema,
+            query_schema,
         )
         .fetch_optional(connection_mut)
         .await
@@ -487,7 +492,7 @@ impl ResourceRepository for SqliteResourceRepository {
 
         Ok(maybe_row.map(|row| ResourceSnapshot {
             id: ResourceID::new(row.id),
-            schema: row.resource_schema,
+            schema: TypeUri::new_unchecked(row.resource_schema),
             headers: ResourceHeaders {
                 account: row.account_id,
                 name: kamu_resources::ResourceName::new_unchecked(&row.resource_name),
@@ -508,7 +513,7 @@ impl ResourceRepository for SqliteResourceRepository {
 
     async fn find_resource_snapshots_by_schema_and_ids(
         &self,
-        schema: &str,
+        schema: &TypeUri,
         ids: &[ResourceID],
     ) -> Result<Vec<ResourceSnapshot>, InternalError> {
         if ids.is_empty() {
@@ -546,7 +551,7 @@ impl ResourceRepository for SqliteResourceRepository {
             "#,
         );
 
-        let mut query = sqlx::query_as::<_, ResourceSnapshotRow>(&query_str).bind(schema);
+        let mut query = sqlx::query_as::<_, ResourceSnapshotRow>(&query_str).bind(schema.as_str());
         for id in ids {
             query = query.bind(*id.as_ref());
         }
@@ -603,7 +608,7 @@ impl ResourceRepository for SqliteResourceRepository {
 
         Ok(maybe_row.map(|row| ResourceSnapshot {
             id: ResourceID::new(row.id),
-            schema: row.resource_schema,
+            schema: TypeUri::new_unchecked(row.resource_schema),
             headers: ResourceHeaders {
                 account: row.account_id,
                 name: kamu_resources::ResourceName::new_unchecked(&row.resource_name),
@@ -675,7 +680,7 @@ impl ResourceRepository for SqliteResourceRepository {
             .into_iter()
             .map(|row| ResourceSnapshot {
                 id: ResourceID::new(row.id),
-                schema: row.resource_schema,
+                schema: TypeUri::new_unchecked(row.resource_schema),
                 headers: ResourceHeaders {
                     account: row.account_id,
                     name: kamu_resources::ResourceName::new_unchecked(&row.resource_name),
@@ -698,10 +703,10 @@ impl ResourceRepository for SqliteResourceRepository {
     fn list_resource_ids(
         &self,
         account_id: odf::AccountID,
-        schema: &str,
+        schema: &TypeUri,
         pagination: PaginationOpts,
     ) -> ResourceIDStream<'_> {
-        let resource_schema = schema.to_owned();
+        let resource_schema = schema.as_str().to_owned();
 
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
@@ -739,10 +744,10 @@ impl ResourceRepository for SqliteResourceRepository {
     fn list_resource_snapshots_by_schema(
         &self,
         account_id: odf::AccountID,
-        schema: &str,
+        schema: &TypeUri,
         pagination: PaginationOpts,
     ) -> ResourceSnapshotStream<'_> {
-        let resource_schema = schema.to_owned();
+        let resource_schema = schema.as_str().to_owned();
 
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
@@ -789,7 +794,7 @@ impl ResourceRepository for SqliteResourceRepository {
             while let Some(row) = query_stream.try_next().await? {
                 yield Ok(ResourceSnapshot {
                     id: ResourceID::new(row.id),
-                    schema: row.resource_schema,
+                    schema: TypeUri::new_unchecked(row.resource_schema),
                     headers: ResourceHeaders {
                         account: row.account_id,
                         name: kamu_resources::ResourceName::new_unchecked(&row.resource_name),
@@ -858,7 +863,7 @@ impl ResourceRepository for SqliteResourceRepository {
             while let Some(row) = query_stream.try_next().await? {
                 yield Ok(ResourceSnapshot {
                     id: ResourceID::new(row.id),
-                    schema: row.resource_schema,
+                    schema: TypeUri::new_unchecked(row.resource_schema),
                     headers: ResourceHeaders {
                         account: row.account_id,
                         name: kamu_resources::ResourceName::new_unchecked(&row.resource_name),
@@ -882,13 +887,14 @@ impl ResourceRepository for SqliteResourceRepository {
     async fn count_resources(
         &self,
         account_id: odf::AccountID,
-        schema: &str,
+        schema: &TypeUri,
     ) -> Result<usize, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
         let account_id_stack = account_id.as_stack_string();
         let account_id_str = account_id_stack.as_str();
+        let schema = schema.as_str();
 
         let count = sqlx::query_scalar!(
             r#"

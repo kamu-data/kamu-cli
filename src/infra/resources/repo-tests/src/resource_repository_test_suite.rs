@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::sync::LazyLock;
+
 use chrono::Utc;
 use database_common::PaginationOpts;
 use dill::Catalog;
@@ -22,15 +24,29 @@ use kamu_resources::{
     ResourceSnapshot,
     ResourceSnapshotUpdate,
     ResourceSummaryRow,
+    TypeUri,
     UpdateResourceError,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn make_test_snapshot(account_id: odf::AccountID, kind: &str, name: &str) -> ResourceSnapshot {
+static TEST_KIND: LazyLock<TypeUri> = LazyLock::new(|| TypeUri::new_unchecked("TestKind"));
+static OTHER_KIND: LazyLock<TypeUri> = LazyLock::new(|| TypeUri::new_unchecked("OtherKind"));
+static KIND_A: LazyLock<TypeUri> = LazyLock::new(|| TypeUri::new_unchecked("KindA"));
+static KIND_A_V2: LazyLock<TypeUri> = LazyLock::new(|| TypeUri::new_unchecked("KindA-v2"));
+static KIND_B: LazyLock<TypeUri> = LazyLock::new(|| TypeUri::new_unchecked("KindB"));
+static KIND_C: LazyLock<TypeUri> = LazyLock::new(|| TypeUri::new_unchecked("KindC"));
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn make_test_snapshot(
+    account_id: odf::AccountID,
+    schema: &TypeUri,
+    name: &str,
+) -> ResourceSnapshot {
     ResourceSnapshot {
         id: ResourceID::new(uuid::Uuid::new_v4()),
-        schema: kind.to_string(),
+        schema: schema.clone(),
         headers: ResourceHeaders::simple(Utc::now(), account_id, name),
         spec: serde_json::json!({"key": "value"}),
         status: None,
@@ -46,7 +62,7 @@ pub async fn test_no_resources_initially(catalog: &Catalog) {
     let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
 
     let count = repo
-        .count_resources(account_id.clone(), "TestKind")
+        .count_resources(account_id.clone(), &TEST_KIND)
         .await
         .unwrap();
     assert_eq!(0, count);
@@ -54,7 +70,7 @@ pub async fn test_no_resources_initially(catalog: &Catalog) {
     let ids: Vec<_> = repo
         .list_resource_ids(
             account_id.clone(),
-            "TestKind",
+            &TEST_KIND,
             PaginationOpts::from_max_results(100),
         )
         .try_collect()
@@ -76,7 +92,7 @@ pub async fn test_create_and_find_resource(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
     let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
 
-    let mut snapshot = make_test_snapshot(account_id.clone(), "TestKind", "my-resource");
+    let mut snapshot = make_test_snapshot(account_id.clone(), &TEST_KIND, "my-resource");
     snapshot.id = repo.new_resource_id().await.unwrap();
     let id = snapshot.id;
 
@@ -87,13 +103,13 @@ pub async fn test_create_and_find_resource(catalog: &Catalog) {
     assert!(found.is_some());
     let found = found.unwrap();
     assert_eq!(found.id, id);
-    assert_eq!(found.schema, "TestKind");
+    assert_eq!(found.schema, *TEST_KIND);
     assert_eq!(found.headers.name, "my-resource");
     assert_eq!(found.last_event_id, None);
 
     // find by name
     let found_id = repo
-        .find_resource_id_by_name(&account_id, "TestKind", &"my-resource".parse().unwrap())
+        .find_resource_id_by_name(&account_id, &TEST_KIND, &"my-resource".parse().unwrap())
         .await
         .unwrap();
     assert_eq!(found_id, Some(id));
@@ -101,7 +117,7 @@ pub async fn test_create_and_find_resource(catalog: &Catalog) {
     // find via raw event query
     let found = repo
         .find_resource_snapshot(&ResourceRawEventQuery {
-            schema: "TestKind".to_string(),
+            schema: TEST_KIND.clone(),
             id,
         })
         .await
@@ -112,7 +128,7 @@ pub async fn test_create_and_find_resource(catalog: &Catalog) {
     // wrong kind returns nothing
     let not_found = repo
         .find_resource_snapshot(&ResourceRawEventQuery {
-            schema: "OtherKind".to_string(),
+            schema: OTHER_KIND.clone(),
             id,
         })
         .await
@@ -127,11 +143,11 @@ pub async fn test_find_resource_snapshots_by_ids(catalog: &Catalog) {
     let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
     let other_account_id = odf::AccountID::new_seeded_ed25519(b"other-account");
 
-    let mut first = make_test_snapshot(account_id.clone(), "TestKind", "first");
+    let mut first = make_test_snapshot(account_id.clone(), &TEST_KIND, "first");
     first.id = repo.new_resource_id().await.unwrap();
-    let mut second = make_test_snapshot(account_id.clone(), "OtherKind", "second");
+    let mut second = make_test_snapshot(account_id.clone(), &OTHER_KIND, "second");
     second.id = repo.new_resource_id().await.unwrap();
-    let mut other_account = make_test_snapshot(other_account_id, "TestKind", "other-account");
+    let mut other_account = make_test_snapshot(other_account_id, &TEST_KIND, "other-account");
     other_account.id = repo.new_resource_id().await.unwrap();
     let missing_id = repo.new_resource_id().await.unwrap();
 
@@ -161,11 +177,11 @@ pub async fn test_find_resource_snapshots_by_schema_and_ids(catalog: &Catalog) {
     let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
     let other_account_id = odf::AccountID::new_seeded_ed25519(b"other-account");
 
-    let mut first = make_test_snapshot(account_id.clone(), "TestKind", "first");
+    let mut first = make_test_snapshot(account_id.clone(), &TEST_KIND, "first");
     first.id = repo.new_resource_id().await.unwrap();
-    let mut second = make_test_snapshot(account_id.clone(), "OtherKind", "second");
+    let mut second = make_test_snapshot(account_id.clone(), &OTHER_KIND, "second");
     second.id = repo.new_resource_id().await.unwrap();
-    let mut third = make_test_snapshot(other_account_id, "TestKind", "third");
+    let mut third = make_test_snapshot(other_account_id, &TEST_KIND, "third");
     third.id = repo.new_resource_id().await.unwrap();
     let missing_id = repo.new_resource_id().await.unwrap();
 
@@ -175,7 +191,7 @@ pub async fn test_find_resource_snapshots_by_schema_and_ids(catalog: &Catalog) {
 
     let found = repo
         .find_resource_snapshots_by_schema_and_ids(
-            "TestKind",
+            &TEST_KIND,
             &[second.id, missing_id, third.id, first.id],
         )
         .await
@@ -200,7 +216,7 @@ pub async fn test_search_resource_identities(catalog: &Catalog) {
     let rows = repo
         .search_resource_identities(
             &account_id,
-            &["TestKind".to_string()],
+            std::slice::from_ref(&TEST_KIND),
             None,
             Some("app-%"),
             PaginationOpts::from_max_results(10),
@@ -214,7 +230,7 @@ pub async fn test_search_resource_identities(catalog: &Catalog) {
     let rows = repo
         .search_resource_identities(
             &account_id,
-            &["TestKind".to_string()],
+            std::slice::from_ref(&TEST_KIND),
             None,
             Some("APP-%"),
             PaginationOpts::from_max_results(10),
@@ -228,7 +244,7 @@ pub async fn test_search_resource_identities(catalog: &Catalog) {
     let rows = repo
         .search_resource_identities(
             &account_id,
-            &["TestKind".to_string()],
+            std::slice::from_ref(&TEST_KIND),
             Some(&["app-alpha".parse().unwrap(), "db-alpha".parse().unwrap()]),
             None,
             PaginationOpts::from_max_results(10),
@@ -243,7 +259,7 @@ pub async fn test_search_resource_identities(catalog: &Catalog) {
     let rows = repo
         .search_resource_identities(
             &account_id,
-            &["TestKind".to_string()],
+            std::slice::from_ref(&TEST_KIND),
             Some(&["App-Alpha".parse().unwrap(), "DB-ALPHA".parse().unwrap()]),
             None,
             PaginationOpts::from_max_results(10),
@@ -258,7 +274,7 @@ pub async fn test_search_resource_identities(catalog: &Catalog) {
     let rows = repo
         .search_resource_identities(
             &account_id,
-            &["TestKind".to_string(), "OtherKind".to_string()],
+            &[TEST_KIND.clone(), OTHER_KIND.clone()],
             None,
             Some("app-%"),
             PaginationOpts::from_max_results(10),
@@ -276,7 +292,7 @@ pub async fn test_search_resource_identities(catalog: &Catalog) {
     let rows = repo
         .search_resource_identities(
             &account_id,
-            &["TestKind".to_string()],
+            std::slice::from_ref(&TEST_KIND),
             None,
             None,
             PaginationOpts::from_max_results(10),
@@ -289,7 +305,7 @@ pub async fn test_search_resource_identities(catalog: &Catalog) {
     let rows = repo
         .search_resource_identities(
             &account_id,
-            &["TestKind".to_string()],
+            std::slice::from_ref(&TEST_KIND),
             None,
             Some("app-other-%"),
             PaginationOpts::from_max_results(10),
@@ -310,7 +326,7 @@ pub async fn test_count_search_resource_identities(catalog: &Catalog) {
     let count = repo
         .count_search_resource_identities(
             &account_id,
-            &["TestKind".to_string()],
+            std::slice::from_ref(&TEST_KIND),
             None,
             Some("app-%"),
         )
@@ -321,7 +337,7 @@ pub async fn test_count_search_resource_identities(catalog: &Catalog) {
     let count = repo
         .count_search_resource_identities(
             &account_id,
-            &["TestKind".to_string()],
+            std::slice::from_ref(&TEST_KIND),
             Some(&["App-Alpha".parse().unwrap(), "DB-ALPHA".parse().unwrap()]),
             None,
         )
@@ -332,7 +348,7 @@ pub async fn test_count_search_resource_identities(catalog: &Catalog) {
     let count = repo
         .count_search_resource_identities(
             &account_id,
-            &["TestKind".to_string(), "OtherKind".to_string()],
+            &[TEST_KIND.clone(), OTHER_KIND.clone()],
             None,
             Some("app-%"),
         )
@@ -343,7 +359,7 @@ pub async fn test_count_search_resource_identities(catalog: &Catalog) {
     let count = repo
         .count_search_resource_identities(
             &account_id,
-            &["TestKind".to_string()],
+            std::slice::from_ref(&TEST_KIND),
             None,
             Some("app-other-%"),
         )
@@ -352,7 +368,12 @@ pub async fn test_count_search_resource_identities(catalog: &Catalog) {
     assert_eq!(count, 0);
 
     let count = repo
-        .count_search_resource_identities(&account_id, &["TestKind".to_string()], Some(&[]), None)
+        .count_search_resource_identities(
+            &account_id,
+            std::slice::from_ref(&TEST_KIND),
+            Some(&[]),
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(count, 0);
@@ -365,24 +386,24 @@ pub async fn test_resource_name_case_insensitive(catalog: &Catalog) {
     let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
 
     // Stored names are always lowercase (as produced by try_new).
-    let mut alpha = make_test_snapshot(account_id.clone(), "TestKind", "my-resource");
+    let mut alpha = make_test_snapshot(account_id.clone(), &TEST_KIND, "my-resource");
     alpha.id = repo.new_resource_id().await.unwrap();
     let id = alpha.id;
     repo.create_resource(&alpha).await.unwrap();
 
-    let mut beta = make_test_snapshot(account_id.clone(), "TestKind", "other-resource");
+    let mut beta = make_test_snapshot(account_id.clone(), &TEST_KIND, "other-resource");
     beta.id = repo.new_resource_id().await.unwrap();
     repo.create_resource(&beta).await.unwrap();
 
     // --- find_resource_id_by_name is case-insensitive ---
     let found = repo
-        .find_resource_id_by_name(&account_id, "TestKind", &"My-Resource".parse().unwrap())
+        .find_resource_id_by_name(&account_id, &TEST_KIND, &"My-Resource".parse().unwrap())
         .await
         .unwrap();
     assert_eq!(found, Some(id));
 
     let found = repo
-        .find_resource_id_by_name(&account_id, "TestKind", &"MY-RESOURCE".parse().unwrap())
+        .find_resource_id_by_name(&account_id, &TEST_KIND, &"MY-RESOURCE".parse().unwrap())
         .await
         .unwrap();
     assert_eq!(found, Some(id));
@@ -391,7 +412,7 @@ pub async fn test_resource_name_case_insensitive(catalog: &Catalog) {
     let rows = repo
         .find_resource_identities_by_names(
             &account_id,
-            "TestKind",
+            &TEST_KIND,
             &[
                 "My-Resource".parse().unwrap(),
                 "OTHER-RESOURCE".parse().unwrap(),
@@ -407,7 +428,7 @@ pub async fn test_resource_name_case_insensitive(catalog: &Catalog) {
     let rows = repo
         .search_resource_identities(
             &account_id,
-            &["TestKind".to_string()],
+            std::slice::from_ref(&TEST_KIND),
             Some(&["MY-RESOURCE".parse().unwrap()]),
             None,
             PaginationOpts::from_max_results(10),
@@ -421,7 +442,7 @@ pub async fn test_resource_name_case_insensitive(catalog: &Catalog) {
     let rows = repo
         .search_resource_identities(
             &account_id,
-            &["TestKind".to_string()],
+            std::slice::from_ref(&TEST_KIND),
             None,
             Some("MY-%"),
             PaginationOpts::from_max_results(10),
@@ -441,12 +462,12 @@ async fn seed_search_resource_identities(
     let other_account_id = odf::AccountID::new_seeded_ed25519(b"other-account");
 
     for (kind, name, account) in [
-        ("TestKind", "app-alpha", account_id.clone()),
-        ("TestKind", "app-beta", account_id.clone()),
-        ("TestKind", "db-alpha", account_id.clone()),
-        ("OtherKind", "app-gamma", account_id.clone()),
-        ("OtherKind", "app-delta", account_id.clone()),
-        ("TestKind", "app-other-account", other_account_id),
+        (&*TEST_KIND, "app-alpha", account_id.clone()),
+        (&*TEST_KIND, "app-beta", account_id.clone()),
+        (&*TEST_KIND, "db-alpha", account_id.clone()),
+        (&*OTHER_KIND, "app-gamma", account_id.clone()),
+        (&*OTHER_KIND, "app-delta", account_id.clone()),
+        (&*TEST_KIND, "app-other-account", other_account_id),
     ] {
         let mut snapshot = make_test_snapshot(account, kind, name);
         snapshot.id = repo.new_resource_id().await.unwrap();
@@ -460,12 +481,12 @@ pub async fn test_create_resource_duplicate_fails(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
     let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
 
-    let mut first = make_test_snapshot(account_id.clone(), "TestKind", "duplicate-resource");
+    let mut first = make_test_snapshot(account_id.clone(), &TEST_KIND, "duplicate-resource");
     first.id = repo.new_resource_id().await.unwrap();
     repo.create_resource(&first).await.unwrap();
 
     // Same name - should be considered duplicate
-    let mut second = make_test_snapshot(account_id.clone(), "TestKind", "duplicate-resource");
+    let mut second = make_test_snapshot(account_id.clone(), &TEST_KIND, "duplicate-resource");
     second.id = repo.new_resource_id().await.unwrap();
 
     let result = repo.create_resource(&second).await;
@@ -478,12 +499,12 @@ pub async fn test_create_resource_duplicate_ignore_case_fails(catalog: &Catalog)
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
     let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
 
-    let mut first = make_test_snapshot(account_id.clone(), "TestKind", "duplicate-resource");
+    let mut first = make_test_snapshot(account_id.clone(), &TEST_KIND, "duplicate-resource");
     first.id = repo.new_resource_id().await.unwrap();
     repo.create_resource(&first).await.unwrap();
 
     // Same name but different case - should still be considered duplicate
-    let mut second = make_test_snapshot(account_id, "TestKind", "Duplicate-Resource");
+    let mut second = make_test_snapshot(account_id, &TEST_KIND, "Duplicate-Resource");
     second.id = repo.new_resource_id().await.unwrap();
 
     let result = repo.create_resource(&second).await;
@@ -496,7 +517,7 @@ pub async fn test_update_resource(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
     let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
 
-    let mut snapshot = make_test_snapshot(account_id.clone(), "TestKind", "update-me");
+    let mut snapshot = make_test_snapshot(account_id.clone(), &TEST_KIND, "update-me");
     snapshot.id = repo.new_resource_id().await.unwrap();
     let id = snapshot.id;
     repo.create_resource(&snapshot).await.unwrap();
@@ -534,7 +555,7 @@ pub async fn test_update_resource_wrong_event_id_fails(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
     let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
 
-    let mut snapshot = make_test_snapshot(account_id, "TestKind", "concurrent-resource");
+    let mut snapshot = make_test_snapshot(account_id, &TEST_KIND, "concurrent-resource");
     snapshot.id = repo.new_resource_id().await.unwrap();
     repo.create_resource(&snapshot).await.unwrap();
 
@@ -554,7 +575,7 @@ pub async fn test_update_resource_optimistic_locking(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
     let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
 
-    let mut snapshot = make_test_snapshot(account_id, "TestKind", "locked-resource");
+    let mut snapshot = make_test_snapshot(account_id, &TEST_KIND, "locked-resource");
     snapshot.id = repo.new_resource_id().await.unwrap();
     repo.create_resource(&snapshot).await.unwrap();
 
@@ -596,9 +617,9 @@ pub async fn test_update_resources(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
     let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
 
-    let mut first = make_test_snapshot(account_id.clone(), "TestKind", "bulk-first");
+    let mut first = make_test_snapshot(account_id.clone(), &TEST_KIND, "bulk-first");
     first.id = repo.new_resource_id().await.unwrap();
-    let mut second = make_test_snapshot(account_id, "TestKind", "bulk-second");
+    let mut second = make_test_snapshot(account_id, &TEST_KIND, "bulk-second");
     second.id = repo.new_resource_id().await.unwrap();
 
     repo.create_resource(&first).await.unwrap();
@@ -673,9 +694,9 @@ pub async fn test_update_resources_wrong_event_id_fails(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
     let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
 
-    let mut first = make_test_snapshot(account_id.clone(), "TestKind", "bulk-concurrent-first");
+    let mut first = make_test_snapshot(account_id.clone(), &TEST_KIND, "bulk-concurrent-first");
     first.id = repo.new_resource_id().await.unwrap();
-    let mut second = make_test_snapshot(account_id, "TestKind", "bulk-concurrent-second");
+    let mut second = make_test_snapshot(account_id, &TEST_KIND, "bulk-concurrent-second");
     second.id = repo.new_resource_id().await.unwrap();
 
     repo.create_resource(&first).await.unwrap();
@@ -741,7 +762,7 @@ pub async fn test_list_resource_ids_with_pagination(catalog: &Catalog) {
 
     for i in 1..=5_u32 {
         let mut snapshot =
-            make_test_snapshot(account_id.clone(), "TestKind", &format!("resource-{i}"));
+            make_test_snapshot(account_id.clone(), &TEST_KIND, &format!("resource-{i}"));
         snapshot.id = repo.new_resource_id().await.unwrap();
         repo.create_resource(&snapshot).await.unwrap();
     }
@@ -749,7 +770,7 @@ pub async fn test_list_resource_ids_with_pagination(catalog: &Catalog) {
     let first_page: Vec<_> = repo
         .list_resource_ids(
             account_id.clone(),
-            "TestKind",
+            &TEST_KIND,
             PaginationOpts::from_max_results(3),
         )
         .try_collect()
@@ -760,7 +781,7 @@ pub async fn test_list_resource_ids_with_pagination(catalog: &Catalog) {
     let second_page: Vec<_> = repo
         .list_resource_ids(
             account_id.clone(),
-            "TestKind",
+            &TEST_KIND,
             PaginationOpts::from_page(1, 3),
         )
         .try_collect()
@@ -785,13 +806,13 @@ pub async fn test_list_resource_snapshots_by_schema(catalog: &Catalog) {
 
     for i in 1..=3_u32 {
         let mut snapshot =
-            make_test_snapshot(account_id.clone(), "KindA", &format!("resource-a-{i}"));
+            make_test_snapshot(account_id.clone(), &KIND_A, &format!("resource-a-{i}"));
         snapshot.id = repo.new_resource_id().await.unwrap();
         repo.create_resource(&snapshot).await.unwrap();
     }
     for i in 1..=2_u32 {
         let mut snapshot =
-            make_test_snapshot(account_id.clone(), "KindB", &format!("resource-b-{i}"));
+            make_test_snapshot(account_id.clone(), &KIND_B, &format!("resource-b-{i}"));
         snapshot.id = repo.new_resource_id().await.unwrap();
         repo.create_resource(&snapshot).await.unwrap();
     }
@@ -799,31 +820,31 @@ pub async fn test_list_resource_snapshots_by_schema(catalog: &Catalog) {
     let kind_a: Vec<_> = repo
         .list_resource_snapshots_by_schema(
             account_id.clone(),
-            "KindA",
+            &KIND_A,
             PaginationOpts::from_max_results(100),
         )
         .try_collect()
         .await
         .unwrap();
     assert_eq!(kind_a.len(), 3);
-    assert!(kind_a.iter().all(|s| s.schema == "KindA"));
+    assert!(kind_a.iter().all(|s| s.schema == *KIND_A));
 
     let kind_b: Vec<_> = repo
         .list_resource_snapshots_by_schema(
             account_id.clone(),
-            "KindB",
+            &KIND_B,
             PaginationOpts::from_max_results(100),
         )
         .try_collect()
         .await
         .unwrap();
     assert_eq!(kind_b.len(), 2);
-    assert!(kind_b.iter().all(|s| s.schema == "KindB"));
+    assert!(kind_b.iter().all(|s| s.schema == *KIND_B));
 
     let kind_c: Vec<_> = repo
         .list_resource_snapshots_by_schema(
             account_id,
-            "KindC",
+            &KIND_C,
             PaginationOpts::from_max_results(100),
         )
         .try_collect()
@@ -841,19 +862,19 @@ pub async fn test_list_all_resource_snapshots(catalog: &Catalog) {
 
     for i in 1..=2_u32 {
         let mut snapshot =
-            make_test_snapshot(account_id.clone(), "KindA", &format!("resource-a-{i}"));
+            make_test_snapshot(account_id.clone(), &KIND_A, &format!("resource-a-{i}"));
         snapshot.id = repo.new_resource_id().await.unwrap();
         repo.create_resource(&snapshot).await.unwrap();
     }
     for i in 1..=2_u32 {
         let mut snapshot =
-            make_test_snapshot(account_id.clone(), "KindB", &format!("resource-b-{i}"));
+            make_test_snapshot(account_id.clone(), &KIND_B, &format!("resource-b-{i}"));
         snapshot.id = repo.new_resource_id().await.unwrap();
         repo.create_resource(&snapshot).await.unwrap();
     }
 
     // Resources for a different account — must not appear in results
-    let mut other = make_test_snapshot(other_account_id, "KindA", "other-resource");
+    let mut other = make_test_snapshot(other_account_id, &KIND_A, "other-resource");
     other.id = repo.new_resource_id().await.unwrap();
     repo.create_resource(&other).await.unwrap();
 
@@ -873,18 +894,18 @@ pub async fn test_count_resources(catalog: &Catalog) {
 
     for i in 1..=3_u32 {
         let mut snapshot =
-            make_test_snapshot(account_id.clone(), "TestKind", &format!("resource-{i}"));
+            make_test_snapshot(account_id.clone(), &TEST_KIND, &format!("resource-{i}"));
         snapshot.id = repo.new_resource_id().await.unwrap();
         repo.create_resource(&snapshot).await.unwrap();
     }
 
     let count = repo
-        .count_resources(account_id.clone(), "TestKind")
+        .count_resources(account_id.clone(), &TEST_KIND)
         .await
         .unwrap();
     assert_eq!(3, count);
 
-    let count_other = repo.count_resources(account_id, "OtherKind").await.unwrap();
+    let count_other = repo.count_resources(account_id, &OTHER_KIND).await.unwrap();
     assert_eq!(0, count_other);
 }
 
@@ -895,33 +916,33 @@ pub async fn test_summarize_resources(catalog: &Catalog) {
     let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
     let other_account_id = odf::AccountID::new_seeded_ed25519(b"other-account");
 
-    let mut pending = make_test_snapshot(account_id.clone(), "KindA", "pending");
+    let mut pending = make_test_snapshot(account_id.clone(), &KIND_A, "pending");
     pending.id = repo.new_resource_id().await.unwrap();
     pending.status = None;
     repo.create_resource(&pending).await.unwrap();
 
-    let mut ready = make_test_snapshot(account_id.clone(), "KindA", "ready");
+    let mut ready = make_test_snapshot(account_id.clone(), &KIND_A, "ready");
     ready.id = repo.new_resource_id().await.unwrap();
     ready.status = Some(serde_json::json!({ "phase": "Ready" }));
     repo.create_resource(&ready).await.unwrap();
 
-    let mut degraded_v2 = make_test_snapshot(account_id.clone(), "KindA", "degraded-v2");
+    let mut degraded_v2 = make_test_snapshot(account_id.clone(), &KIND_A, "degraded-v2");
     degraded_v2.id = repo.new_resource_id().await.unwrap();
-    degraded_v2.schema = "KindA-v2".to_string();
+    degraded_v2.schema = KIND_A_V2.clone();
     degraded_v2.status = Some(serde_json::json!({ "phase": "Degraded" }));
     repo.create_resource(&degraded_v2).await.unwrap();
 
-    let mut failed = make_test_snapshot(account_id.clone(), "KindB", "failed");
+    let mut failed = make_test_snapshot(account_id.clone(), &KIND_B, "failed");
     failed.id = repo.new_resource_id().await.unwrap();
     failed.status = Some(serde_json::json!({ "phase": "Failed" }));
     repo.create_resource(&failed).await.unwrap();
 
-    let mut unknown_phase = make_test_snapshot(account_id.clone(), "KindB", "unknown");
+    let mut unknown_phase = make_test_snapshot(account_id.clone(), &KIND_B, "unknown");
     unknown_phase.id = repo.new_resource_id().await.unwrap();
     unknown_phase.status = Some(serde_json::json!({ "phase": "UnknownFuturePhase" }));
     repo.create_resource(&unknown_phase).await.unwrap();
 
-    let mut deleted = make_test_snapshot(account_id.clone(), "KindB", "deleted");
+    let mut deleted = make_test_snapshot(account_id.clone(), &KIND_B, "deleted");
     deleted.id = repo.new_resource_id().await.unwrap();
     deleted.status = Some(serde_json::json!({ "phase": "Reconciling" }));
     repo.create_resource(&deleted).await.unwrap();
@@ -934,7 +955,7 @@ pub async fn test_summarize_resources(catalog: &Catalog) {
     };
     repo.update_resource(&deleted, None).await.unwrap();
 
-    let mut other_account = make_test_snapshot(other_account_id, "KindA", "other-account");
+    let mut other_account = make_test_snapshot(other_account_id, &KIND_A, "other-account");
     other_account.id = repo.new_resource_id().await.unwrap();
     other_account.status = Some(serde_json::json!({ "phase": "Reconciling" }));
     repo.create_resource(&other_account).await.unwrap();
@@ -987,7 +1008,7 @@ pub async fn test_find_deleted_resource_not_returned(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
     let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
 
-    let mut snapshot = make_test_snapshot(account_id.clone(), "TestKind", "to-delete");
+    let mut snapshot = make_test_snapshot(account_id.clone(), &TEST_KIND, "to-delete");
     snapshot.id = repo.new_resource_id().await.unwrap();
     let id = snapshot.id;
     repo.create_resource(&snapshot).await.unwrap();
@@ -1007,7 +1028,7 @@ pub async fn test_find_deleted_resource_not_returned(catalog: &Catalog) {
 
     let by_query = repo
         .find_resource_snapshot(&ResourceRawEventQuery {
-            schema: "TestKind".to_string(),
+            schema: TEST_KIND.clone(),
             id,
         })
         .await
@@ -1015,13 +1036,13 @@ pub async fn test_find_deleted_resource_not_returned(catalog: &Catalog) {
     assert!(by_query.is_none());
 
     let by_name = repo
-        .find_resource_id_by_name(&account_id, "TestKind", &"to-delete".parse().unwrap())
+        .find_resource_id_by_name(&account_id, &TEST_KIND, &"to-delete".parse().unwrap())
         .await
         .unwrap();
     assert!(by_name.is_none());
 
     let count = repo
-        .count_resources(account_id.clone(), "TestKind")
+        .count_resources(account_id.clone(), &TEST_KIND)
         .await
         .unwrap();
     assert_eq!(0, count);
@@ -1029,7 +1050,7 @@ pub async fn test_find_deleted_resource_not_returned(catalog: &Catalog) {
     let ids: Vec<_> = repo
         .list_resource_ids(
             account_id.clone(),
-            "TestKind",
+            &TEST_KIND,
             PaginationOpts::from_max_results(100),
         )
         .try_collect()

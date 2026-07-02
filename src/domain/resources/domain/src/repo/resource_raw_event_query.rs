@@ -7,13 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::ResourceID;
+use crate::{ResourceID, TypeUri};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ResourceRawEventQuery {
-    pub schema: String,
+    pub schema: TypeUri,
     pub id: ResourceID,
 }
 

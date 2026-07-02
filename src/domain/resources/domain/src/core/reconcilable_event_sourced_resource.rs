@@ -17,7 +17,6 @@ use crate::{
     InvariantViolationOf,
     ReconcilableResource,
     ReconcilableResourceEvent,
-    ResourceDescriptorProvider,
     ResourceEventCreated,
     ResourceEventDeleted,
     ResourceEventHeadersUpdated,
@@ -29,6 +28,7 @@ use crate::{
     ResourceID,
     ResourceName,
     ResourceReconcileError,
+    ResourceSchemaProvider,
     ResourceSnapshot,
     ResourceStatusLike,
     make_typed_resource_snapshot,
@@ -127,13 +127,13 @@ pub trait ReconcilableEventSourcedResource:
 
     fn make_resource_snapshot(&self) -> Result<ResourceSnapshot, InternalError>
     where
-        Self: ResourceDescriptorProvider,
+        Self: ResourceSchemaProvider,
         Self::Spec: Serialize,
         Self::Status: Serialize + ResourceStatusLike,
     {
         make_typed_resource_snapshot(
             *self.id(),
-            Self::DESCRIPTOR.schema,
+            Self::schema(),
             self.headers().clone(),
             self.spec(),
             self.status(),

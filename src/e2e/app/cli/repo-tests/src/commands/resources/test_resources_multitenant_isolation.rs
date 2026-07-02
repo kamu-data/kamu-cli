@@ -39,14 +39,17 @@ pub async fn test_resources_multitenant_isolation(kamu: KamuCliPuppet) {
     let alice_shared = ctx.get_one(["get", "vs", "shared"]).await;
     assert_eq!(
         alice_shared.ident(),
-        (fixtures::VARIABLE_SET_KIND, "shared")
+        (fixtures::VARIABLE_SET_SCHEMA, "shared")
     );
     assert_eq!(alice_shared.variable("MESSAGE"), Some("alice-value"));
     let alice_shared_id = alice_shared.id();
 
     ctx.set_account(Some(bob.clone()));
     let bob_shared = ctx.get_one(["get", "vs", "shared"]).await;
-    assert_eq!(bob_shared.ident(), (fixtures::VARIABLE_SET_KIND, "shared"));
+    assert_eq!(
+        bob_shared.ident(),
+        (fixtures::VARIABLE_SET_SCHEMA, "shared")
+    );
     assert_eq!(bob_shared.variable("MESSAGE"), Some("bob-value"));
     let bob_shared_id = bob_shared.id();
 
@@ -64,7 +67,7 @@ pub async fn test_resources_multitenant_isolation(kamu: KamuCliPuppet) {
         ctx.get_idents(["get", "vs", "app-%"]).await,
         ["app-a", "app-b"].map(vs_ident),
     );
-    assert_eq!(ctx.summary_count(fixtures::VARIABLE_SET_KIND).await, 4);
+    assert_eq!(ctx.summary_count(fixtures::VARIABLE_SET_SCHEMA).await, 4);
 
     ctx.set_account(Some(bob.clone()));
     pretty_assertions::assert_eq!(
@@ -75,7 +78,7 @@ pub async fn test_resources_multitenant_isolation(kamu: KamuCliPuppet) {
         ctx.get_idents(["get", "vs", "app-%"]).await,
         ["app-c"].map(vs_ident),
     );
-    assert_eq!(ctx.summary_count(fixtures::VARIABLE_SET_KIND).await, 3);
+    assert_eq!(ctx.summary_count(fixtures::VARIABLE_SET_SCHEMA).await, 3);
 
     ctx.set_account(Some(alice));
     ctx.assert_success(
@@ -105,7 +108,7 @@ pub async fn test_resources_multitenant_isolation(kamu: KamuCliPuppet) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn vs_ident(name: &str) -> (String, String) {
-    (fixtures::VARIABLE_SET_KIND.to_string(), name.to_string())
+    (fixtures::VARIABLE_SET_SCHEMA.to_string(), name.to_string())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

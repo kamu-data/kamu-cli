@@ -9,7 +9,7 @@
 
 use like::ILike;
 
-use crate::ResourceListColumnDescriptor;
+use crate::{ResourceListColumnDescriptor, TypeUri};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -18,7 +18,7 @@ use crate::ResourceListColumnDescriptor;
 pub struct ResourceKindDescriptor {
     pub name: String,
     pub short_names: Vec<String>,
-    pub schema: String,
+    pub schema: TypeUri,
     pub list_columns: Vec<ResourceListColumnDescriptor>,
 }
 
@@ -62,7 +62,7 @@ mod tests {
         let descriptor = ResourceKindDescriptor {
             name: "variablesets".to_owned(),
             short_names: vec!["vs".to_owned()],
-            schema: "https://opendatafabric.org/schemas/config/v1alpha1/VariableSet".to_owned(),
+            schema: odf::metadata::config::VariableSet::schema().clone(),
             list_columns: Vec::new(),
         };
 
@@ -75,7 +75,7 @@ mod tests {
         let descriptor = ResourceKindDescriptor {
             name: "secretsets".to_owned(),
             short_names: vec!["ss".to_owned()],
-            schema: "https://opendatafabric.org/schemas/config/v1alpha1/SecretSet".to_owned(),
+            schema: odf::metadata::config::SecretSet::schema().clone(),
             list_columns: Vec::new(),
         };
 

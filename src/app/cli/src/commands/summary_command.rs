@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use datafusion::arrow::array::{RecordBatch, StringArray, UInt64Array};
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
+use kamu_resources::resource_kind_display_name;
 
 use super::{CLIError, Command};
 use crate::cli::SummaryOutputFormat;
@@ -50,6 +51,13 @@ impl SummaryCommand {
         println!();
         println!("Resource Counts");
 
+        let kind_names = summary
+            .resource_counts
+            .iter()
+            .map(|item| resource_kind_display_name(&item.schema))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(CLIError::critical)?;
+
         let schema = Arc::new(Schema::new(vec![
             Field::new("Name", DataType::Utf8, false),
             Field::new("Schema", DataType::Utf8, false),
@@ -71,13 +79,7 @@ impl SummaryCommand {
                         .map(|item| item.name.clone())
                         .collect::<Vec<_>>(),
                 )),
-                Arc::new(StringArray::from(
-                    summary
-                        .resource_counts
-                        .iter()
-                        .map(|item| item.schema.clone())
-                        .collect::<Vec<_>>(),
-                )),
+                Arc::new(StringArray::from(kind_names)),
                 Arc::new(UInt64Array::from(
                     summary
                         .resource_counts

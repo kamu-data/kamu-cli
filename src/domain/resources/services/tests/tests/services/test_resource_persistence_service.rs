@@ -19,6 +19,7 @@ use kamu_resources::{
     ResourcePersistenceError,
     ResourcePersistenceService,
     ResourceRawEventQuery,
+    ResourceSchemaProvider,
     ResourceSnapshot,
 };
 use kamu_resources_services::testing::BaseResourceServiceHarness;
@@ -260,7 +261,7 @@ impl ResourcePersistenceServiceHarness {
     async fn find_snapshot(&self, id: &ResourceID) -> ResourceSnapshot {
         self.resource_repo()
             .find_resource_snapshot(&ResourceRawEventQuery {
-                schema: TestResource::SCHEMA.to_string(),
+                schema: TestResource::schema().clone(),
                 id: *id,
             })
             .await
@@ -271,7 +272,7 @@ impl ResourcePersistenceServiceHarness {
     async fn snapshot_not_found(&self, id: &ResourceID) -> bool {
         self.resource_repo()
             .find_resource_snapshot(&ResourceRawEventQuery {
-                schema: TestResource::SCHEMA.to_string(),
+                schema: TestResource::schema().clone(),
                 id: *id,
             })
             .await

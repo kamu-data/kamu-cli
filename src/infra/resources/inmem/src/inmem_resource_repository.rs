@@ -28,6 +28,7 @@ use kamu_resources::{
     ResourceSnapshotStream,
     ResourceSnapshotUpdate,
     ResourceSummaryRow,
+    TypeUri,
     UpdateResourceError,
 };
 
@@ -36,7 +37,7 @@ use kamu_resources::{
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct ResourceLookupKey {
     account_id: odf::AccountID,
-    schema: String,
+    schema: TypeUri,
     name: ResourceName,
 }
 
@@ -178,7 +179,7 @@ impl ResourceRepository for InMemoryResourceRepository {
     async fn find_resource_id_by_name(
         &self,
         account_id: &odf::AccountID,
-        schema: &str,
+        schema: &TypeUri,
         name: &ResourceName,
     ) -> Result<Option<ResourceID>, InternalError> {
         let guard = self.state.lock().unwrap();
@@ -187,7 +188,7 @@ impl ResourceRepository for InMemoryResourceRepository {
             .ids_by_lookup_key
             .get(&ResourceLookupKey {
                 account_id: account_id.clone(),
-                schema: schema.to_owned(),
+                schema: schema.clone(),
                 name: name.clone(),
             })
             .and_then(|id| guard.snapshots_by_id.get(id))
@@ -210,7 +211,7 @@ impl ResourceRepository for InMemoryResourceRepository {
             })
             .map(|snapshot| ResourceIdentityRow {
                 id: *snapshot.id.as_ref(),
-                schema: snapshot.schema.clone(),
+                schema: snapshot.schema.to_string(),
                 name: snapshot.headers.name.to_string(),
             })
             .collect())
@@ -219,7 +220,7 @@ impl ResourceRepository for InMemoryResourceRepository {
     async fn find_resource_identities_by_names(
         &self,
         account_id: &odf::AccountID,
-        schema: &str,
+        schema: &TypeUri,
         names: &[ResourceName],
     ) -> Result<Vec<ResourceIdentityRow>, InternalError> {
         let guard = self.state.lock().unwrap();
@@ -231,7 +232,7 @@ impl ResourceRepository for InMemoryResourceRepository {
                     .ids_by_lookup_key
                     .get(&ResourceLookupKey {
                         account_id: account_id.clone(),
-                        schema: schema.to_owned(),
+                        schema: schema.clone(),
                         name: name.clone(),
                     })
                     .and_then(|id| guard.snapshots_by_id.get(id))
@@ -239,7 +240,7 @@ impl ResourceRepository for InMemoryResourceRepository {
             .filter(|snapshot| snapshot.headers.deleted_at.is_none())
             .map(|snapshot| ResourceIdentityRow {
                 id: *snapshot.id.as_ref(),
-                schema: snapshot.schema.clone(),
+                schema: snapshot.schema.to_string(),
                 name: snapshot.headers.name.to_string(),
             })
             .collect())
@@ -248,7 +249,7 @@ impl ResourceRepository for InMemoryResourceRepository {
     async fn search_resource_identities(
         &self,
         account_id: &odf::AccountID,
-        schemas: &[String],
+        schemas: &[TypeUri],
         exact_names: Option<&[ResourceName]>,
         name_pattern: Option<&str>,
         pagination: PaginationOpts,
@@ -275,7 +276,7 @@ impl ResourceRepository for InMemoryResourceRepository {
             .take(pagination.limit)
             .map(|snapshot| ResourceIdentityRow {
                 id: *snapshot.id.as_ref(),
-                schema: snapshot.schema.clone(),
+                schema: snapshot.schema.to_string(),
                 name: snapshot.headers.name.to_string(),
             })
             .collect())
@@ -284,7 +285,7 @@ impl ResourceRepository for InMemoryResourceRepository {
     async fn count_search_resource_identities(
         &self,
         account_id: &odf::AccountID,
-        schemas: &[String],
+        schemas: &[TypeUri],
         exact_names: Option<&[ResourceName]>,
         name_pattern: Option<&str>,
     ) -> Result<usize, InternalError> {
@@ -312,7 +313,7 @@ impl ResourceRepository for InMemoryResourceRepository {
 
     async fn find_resource_snapshots_by_schema_and_ids(
         &self,
-        schema: &str,
+        schema: &TypeUri,
         ids: &[ResourceID],
     ) -> Result<Vec<ResourceSnapshot>, InternalError> {
         let guard = self.state.lock().unwrap();
@@ -320,7 +321,7 @@ impl ResourceRepository for InMemoryResourceRepository {
         Ok(ids
             .iter()
             .filter_map(|id| guard.snapshots_by_id.get(id))
-            .filter(|snapshot| snapshot.schema == schema)
+            .filter(|snapshot| snapshot.schema == *schema)
             .filter(|snapshot| snapshot.headers.deleted_at.is_none())
             .cloned()
             .collect())
@@ -359,7 +360,7 @@ impl ResourceRepository for InMemoryResourceRepository {
     fn list_resource_ids(
         &self,
         account_id: odf::AccountID,
-        schema: &str,
+        schema: &TypeUri,
         pagination: PaginationOpts,
     ) -> ResourceIDStream<'_> {
         let mut resource_ids_page: Vec<_> = {
@@ -369,7 +370,7 @@ impl ResourceRepository for InMemoryResourceRepository {
                 .values()
                 .filter(|snapshot| {
                     snapshot.headers.account == account_id
-                        && snapshot.schema == schema
+                        && snapshot.schema == *schema
                         && snapshot.headers.deleted_at.is_none()
                 })
                 .cloned()
@@ -396,7 +397,7 @@ impl ResourceRepository for InMemoryResourceRepository {
     fn list_resource_snapshots_by_schema(
         &self,
         account_id: odf::AccountID,
-        schema: &str,
+        schema: &TypeUri,
         pagination: PaginationOpts,
     ) -> ResourceSnapshotStream<'_> {
         let mut snapshots_page: Vec<_> = {
@@ -406,7 +407,7 @@ impl ResourceRepository for InMemoryResourceRepository {
                 .values()
                 .filter(|snapshot| {
                     snapshot.headers.account == account_id
-                        && snapshot.schema == schema
+                        && snapshot.schema == *schema
                         && snapshot.headers.deleted_at.is_none()
                 })
                 .cloned()
@@ -467,7 +468,7 @@ impl ResourceRepository for InMemoryResourceRepository {
     async fn count_resources(
         &self,
         account_id: odf::AccountID,
-        schema: &str,
+        schema: &TypeUri,
     ) -> Result<usize, InternalError> {
         let guard = self.state.lock().unwrap();
 
@@ -476,7 +477,7 @@ impl ResourceRepository for InMemoryResourceRepository {
             .values()
             .filter(|snapshot| {
                 snapshot.headers.account == account_id
-                    && snapshot.schema == schema
+                    && snapshot.schema == *schema
                     && snapshot.headers.deleted_at.is_none()
             })
             .count())
@@ -488,7 +489,7 @@ impl ResourceRepository for InMemoryResourceRepository {
     ) -> Result<Vec<ResourceSummaryRow>, InternalError> {
         let guard = self.state.lock().unwrap();
 
-        let mut rows_by_key = HashMap::<String, ResourceSummaryRow>::new();
+        let mut rows_by_key = HashMap::<TypeUri, ResourceSummaryRow>::new();
 
         for snapshot in guard.snapshots_by_id.values().filter(|snapshot| {
             snapshot.headers.account == account_id && snapshot.headers.deleted_at.is_none()
@@ -496,7 +497,7 @@ impl ResourceRepository for InMemoryResourceRepository {
             let row = rows_by_key
                 .entry(snapshot.schema.clone())
                 .or_insert_with(|| ResourceSummaryRow {
-                    schema: snapshot.schema.clone(),
+                    schema: snapshot.schema.to_string(),
                     total_count: 0,
                     phase_counts: ResourcePhaseCounts::default(),
                 });
@@ -573,7 +574,7 @@ fn resource_name_matches_pattern(name: &str, pattern: &str) -> bool {
 fn filter_search_snapshots<'a>(
     guard: &'a State,
     account_id: &odf::AccountID,
-    schemas: &[String],
+    schemas: &[TypeUri],
     exact_names: Option<&[ResourceName]>,
     name_pattern: Option<&str>,
 ) -> Vec<&'a ResourceSnapshot> {

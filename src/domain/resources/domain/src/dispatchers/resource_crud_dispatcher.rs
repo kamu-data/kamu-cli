@@ -25,6 +25,7 @@ use crate::{
     ResourceSummaryView,
     ResourceTypeMismatchError,
     ResourceView,
+    TypeUri,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -95,7 +96,7 @@ pub struct ResourceCrudDispatcherDeleteRequest {
 #[derive(Debug, Error)]
 pub enum ApplyResourceCrudDispatcherError {
     #[error("Invalid spec for resource {schema}: {message}")]
-    InvalidSpec { schema: String, message: String },
+    InvalidSpec { schema: TypeUri, message: String },
 
     #[error(transparent)]
     NotFound(#[from] ResourceIDNotFoundError),
@@ -140,19 +141,28 @@ pub enum DeleteResourcesCrudDispatcherError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// A resource kind was addressed by its canonical schema URI, but the registry
+/// has no descriptor for it (or more than one). Produced only where a schema
+/// URI is the lookup key — e.g. apply, which reads `$schema` from the manifest.
 #[derive(Debug, Error)]
 pub enum UnsupportedResourceDescriptorError {
     #[error("Unsupported resource descriptor {schema}")]
-    NotFound { schema: String },
+    NotFound { schema: TypeUri },
 
     #[error("Duplicate resource CRUD dispatcher registered for {schema}")]
-    Duplicate { schema: String },
+    Duplicate { schema: TypeUri },
+}
 
+/// A resource kind was addressed by a short selector (main name or alias, e.g.
+/// `vs`), but the registry has no descriptor matching it (or more than one).
+/// Produced only on selector-based lookups; the selector is never a schema URI.
+#[derive(Debug, Error)]
+pub enum UnsupportedResourceSelectorError {
     #[error("Unsupported resource selector {selector}")]
-    SelectorNotFound { selector: String },
+    NotFound { selector: String },
 
     #[error("Duplicate resource CRUD dispatcher registered for selector {selector}")]
-    SelectorDuplicate { selector: String },
+    Duplicate { selector: String },
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

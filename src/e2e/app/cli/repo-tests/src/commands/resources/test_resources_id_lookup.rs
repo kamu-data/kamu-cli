@@ -31,7 +31,7 @@ pub async fn test_resources_id_lookup(ctx: ResourceCtx) {
     let view_by_id = ctx.get_one(["get", "variablesets", &resource_id]).await;
     assert_eq!(
         view_by_id.ident(),
-        (fixtures::VARIABLE_SET_KIND, resource_name)
+        (fixtures::VARIABLE_SET_SCHEMA, resource_name)
     );
     assert_eq!(view_by_id.variable("MESSAGE"), Some(initial_value));
 
@@ -40,7 +40,7 @@ pub async fn test_resources_id_lookup(ctx: ResourceCtx) {
     let updated_view_by_id = ctx.get_one(["get", "variablesets", &resource_id]).await;
     assert_eq!(
         updated_view_by_id.ident(),
-        (fixtures::VARIABLE_SET_KIND, resource_name)
+        (fixtures::VARIABLE_SET_SCHEMA, resource_name)
     );
     assert_eq!(updated_view_by_id.variable("MESSAGE"), Some(updated_value));
 

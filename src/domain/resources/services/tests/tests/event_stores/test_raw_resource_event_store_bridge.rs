@@ -13,7 +13,13 @@ use chrono::Utc;
 use database_common::NoOpDatabasePlugin;
 use dill::CatalogBuilder;
 use event_sourcing::{GetEventsOpts, SaveEventsItem};
-use kamu_resources::{ResourceID, ResourceRawEvent, ResourceRawEventQuery, ResourceRawEventStore};
+use kamu_resources::{
+    ResourceID,
+    ResourceRawEvent,
+    ResourceRawEventQuery,
+    ResourceRawEventStore,
+    TypeUri,
+};
 use kamu_resources_inmem::InMemoryRawResourceEventStore;
 use tokio_stream::StreamExt;
 
@@ -64,7 +70,7 @@ async fn test_kind_filtering_excludes_unrelated_raw_events() {
     harness.save_events(id, vec![created]).await;
 
     let wrong_query = ResourceRawEventQuery {
-        schema: "OtherResource".to_string(),
+        schema: TypeUri::new_unchecked("OtherKind"),
         id,
     };
     let wrong_raw = ResourceRawEvent {

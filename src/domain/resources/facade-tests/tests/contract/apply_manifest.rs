@@ -7,10 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use kamu_configuration::VariableSetResource;
 use kamu_resources::{
     ApplyManifestApplicationDecision,
     ApplyManifestPlanningDecision,
     ApplyResourceOutcome,
+    ResourceSchemaProvider,
 };
 use kamu_resources_facade::{
     ApplyManifestError,
@@ -27,7 +29,7 @@ use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
 use crate::helpers::{
     VARIABLE_SET_KIND,
-    VARIABLE_SET_SCHEMA,
+    VARIABLE_SET_SCHEMA_STR,
     assert_applied_outcome,
     assert_planning_outcome,
     assert_resource_view_fields,
@@ -68,17 +70,12 @@ pub async fn test_plan_create_json(h: &impl FacadeContractHarness) {
         unreachable!()
     };
     assert!(plan.executable, "plan must be executable");
-    assert_resource_view_fields(
-        &plan.resource,
-        VARIABLE_SET_KIND,
-        VARIABLE_SET_SCHEMA,
-        "my-vars",
-    );
+    assert_resource_view_fields(&plan.resource, VariableSetResource::schema(), "my-vars");
 
     // Verify no side effect - resource must not exist yet
     let get_result = facade
         .get(
-            make_selector(VARIABLE_SET_KIND, VARIABLE_SET_SCHEMA, "my-vars"),
+            make_selector(VARIABLE_SET_KIND, VARIABLE_SET_SCHEMA_STR, "my-vars"),
             SpecViewMode::Encrypted,
         )
         .await;
@@ -113,15 +110,14 @@ pub async fn test_plan_create_yaml(h: &impl FacadeContractHarness) {
     assert!(plan.executable, "plan must be executable");
     assert_resource_view_fields(
         &plan.resource,
-        VARIABLE_SET_KIND,
-        VARIABLE_SET_SCHEMA,
+        VariableSetResource::schema(),
         "my-yaml-vars",
     );
 
     // Verify no side effect - resource must not exist yet
     let get_result = facade
         .get(
-            make_selector(VARIABLE_SET_KIND, VARIABLE_SET_SCHEMA, "my-yaml-vars"),
+            make_selector(VARIABLE_SET_KIND, VARIABLE_SET_SCHEMA_STR, "my-yaml-vars"),
             SpecViewMode::Encrypted,
         )
         .await;
@@ -172,7 +168,7 @@ pub async fn test_plan_update(h: &impl FacadeContractHarness) {
     // Resource in store must remain unchanged (no side effect)
     let stored = facade
         .get(
-            make_selector(VARIABLE_SET_KIND, VARIABLE_SET_SCHEMA, "plan-upd-vars"),
+            make_selector(VARIABLE_SET_KIND, VARIABLE_SET_SCHEMA_STR, "plan-upd-vars"),
             SpecViewMode::Encrypted,
         )
         .await
@@ -261,7 +257,7 @@ pub async fn test_plan_rejects_schema_invalid_manifest(h: &impl FacadeContractHa
 
     // Missing `spec` field entirely — fails spec deserialization
     let bad_manifest = serde_json::json!({
-        "$schema": VARIABLE_SET_SCHEMA,
+        "$schema": VARIABLE_SET_SCHEMA_STR,
         "headers": {"name": "schema-invalid-vars"}
         // no "spec"
     })
@@ -289,7 +285,7 @@ pub async fn test_plan_rejects_schema_invalid_manifest(h: &impl FacadeContractHa
         .get(
             make_selector(
                 VARIABLE_SET_KIND,
-                VARIABLE_SET_SCHEMA,
+                VARIABLE_SET_SCHEMA_STR,
                 "schema-invalid-vars",
             ),
             SpecViewMode::Encrypted,
@@ -322,7 +318,7 @@ pub async fn test_apply_rejects_business_invalid_spec(h: &impl FacadeContractHar
     // VariableSetSpec::validate() inside the lifecycle; the facade surfaces
     // this as Ok(Rejected(BusinessValidationFailed)).
     let empty_vars = serde_json::json!({
-        "$schema": VARIABLE_SET_SCHEMA,
+        "$schema": VARIABLE_SET_SCHEMA_STR,
         "headers": {"name": "biz-invalid-vars"},
         "spec": {"variables": {}}
     })
@@ -371,7 +367,11 @@ pub async fn test_apply_rejects_business_invalid_spec(h: &impl FacadeContractHar
     // Resource must not have been created
     let get = facade
         .get(
-            make_selector(VARIABLE_SET_KIND, VARIABLE_SET_SCHEMA, "biz-invalid-vars"),
+            make_selector(
+                VARIABLE_SET_KIND,
+                VARIABLE_SET_SCHEMA_STR,
+                "biz-invalid-vars",
+            ),
             SpecViewMode::Encrypted,
         )
         .await;
@@ -399,7 +399,7 @@ pub async fn test_apply_create_json(h: &impl FacadeContractHarness) {
         .unwrap();
 
     let view = assert_applied_outcome(&decision, ApplyResourceOutcome::Created);
-    assert_resource_view_fields(view, VARIABLE_SET_KIND, VARIABLE_SET_SCHEMA, "alpha");
+    assert_resource_view_fields(view, VariableSetResource::schema(), "alpha");
     assert_eq!(view.headers.generation, 1, "initial generation must be 1");
 
     let id = view.headers.id;
@@ -407,13 +407,13 @@ pub async fn test_apply_create_json(h: &impl FacadeContractHarness) {
     // Verify resource is readable via get
     let fetched = facade
         .get(
-            make_selector(VARIABLE_SET_KIND, VARIABLE_SET_SCHEMA, "alpha"),
+            make_selector(VARIABLE_SET_KIND, VARIABLE_SET_SCHEMA_STR, "alpha"),
             SpecViewMode::Encrypted,
         )
         .await
         .unwrap();
     assert_eq!(fetched.headers.id, id, "id must match after apply");
-    assert_resource_view_fields(&fetched, VARIABLE_SET_KIND, VARIABLE_SET_SCHEMA, "alpha");
+    assert_resource_view_fields(&fetched, VariableSetResource::schema(), "alpha");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -434,24 +434,19 @@ pub async fn test_apply_create_yaml(h: &impl FacadeContractHarness) {
         .unwrap();
 
     let view = assert_applied_outcome(&decision, ApplyResourceOutcome::Created);
-    assert_resource_view_fields(view, VARIABLE_SET_KIND, VARIABLE_SET_SCHEMA, "yaml-vars");
+    assert_resource_view_fields(view, VariableSetResource::schema(), "yaml-vars");
     assert_eq!(view.headers.generation, 1, "initial generation must be 1");
 
     // Semantic equivalence: same resource via get, just like after JSON apply
     let fetched = facade
         .get(
-            make_selector(VARIABLE_SET_KIND, VARIABLE_SET_SCHEMA, "yaml-vars"),
+            make_selector(VARIABLE_SET_KIND, VARIABLE_SET_SCHEMA_STR, "yaml-vars"),
             SpecViewMode::Encrypted,
         )
         .await
         .unwrap();
     assert_eq!(fetched.headers.id, view.headers.id);
-    assert_resource_view_fields(
-        &fetched,
-        VARIABLE_SET_KIND,
-        VARIABLE_SET_SCHEMA,
-        "yaml-vars",
-    );
+    assert_resource_view_fields(&fetched, VariableSetResource::schema(), "yaml-vars");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -502,7 +497,7 @@ pub async fn test_apply_update(h: &impl FacadeContractHarness) {
     // Verify via get
     let fetched = facade
         .get(
-            make_selector(VARIABLE_SET_KIND, VARIABLE_SET_SCHEMA, "upd-vars"),
+            make_selector(VARIABLE_SET_KIND, VARIABLE_SET_SCHEMA_STR, "upd-vars"),
             SpecViewMode::Encrypted,
         )
         .await
@@ -570,9 +565,9 @@ pub async fn test_apply_rejects_duplicate_header_key(h: &impl FacadeContractHarn
     // YAML: serde_yaml visits both duplicate key occurrences so the custom
     // deserialize_string_entries visitor detects the second one and returns a
     // parse error. Expected: Err(ParseManifest).
-    let yaml_with_dup_label = indoc::indoc!(
+    let yaml_with_dup_label = indoc::formatdoc!(
         r#"
-        $schema: https://opendatafabric.org/schemas/config/v1alpha1/VariableSet
+        $schema: {VARIABLE_SET_SCHEMA_STR}
         headers:
           name: dup-label-yaml
           labels:
@@ -582,8 +577,7 @@ pub async fn test_apply_rejects_duplicate_header_key(h: &impl FacadeContractHarn
           variables:
             KEY: value
         "#
-    )
-    .to_string();
+    );
 
     let yaml_result = facade
         .apply_manifest(ApplyManifestRequest {
@@ -643,7 +637,7 @@ pub async fn test_apply_rejects_invalid_headers(h: &impl FacadeContractHarness) 
     let facade = h.facade_for(TestAccount::Alice);
 
     let empty_name_manifest = serde_json::json!({
-        "$schema": VARIABLE_SET_SCHEMA,
+        "$schema": VARIABLE_SET_SCHEMA_STR,
         "headers": {"name": ""},
         "spec": {"variables": {"K": {"value": "v"}}}
     })
@@ -687,7 +681,7 @@ pub async fn test_apply_rejects_grammatically_invalid_name(h: &impl FacadeContra
     let facade = h.facade_for(TestAccount::Alice);
 
     let invalid_name_manifest = serde_json::json!({
-        "$schema": VARIABLE_SET_SCHEMA,
+        "$schema": VARIABLE_SET_SCHEMA_STR,
         "headers": {"name": "invalid_name"},
         "spec": {"variables": {"K": {"value": "v"}}}
     })
@@ -738,7 +732,7 @@ pub async fn test_apply_invalid_spec_carries_schema(h: &impl FacadeContractHarne
     // `variables` is a string, not an object — fails serde deserialization →
     // InvalidSpec
     let malformed_spec = serde_json::json!({
-        "$schema": VARIABLE_SET_SCHEMA,
+        "$schema": VARIABLE_SET_SCHEMA_STR,
         "headers": {"name": "spec-schema-check"},
         "spec": {"variables": "not-an-object"}
     })
@@ -754,7 +748,8 @@ pub async fn test_apply_invalid_spec_carries_schema(h: &impl FacadeContractHarne
     match result {
         Err(ApplyManifestError::InvalidSpec(e)) => {
             assert_eq!(
-                e.schema, VARIABLE_SET_SCHEMA,
+                e.schema.as_str(),
+                VARIABLE_SET_SCHEMA_STR,
                 "InvalidSpec must carry the correct schema"
             );
         }

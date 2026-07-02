@@ -22,14 +22,15 @@ use kamu_resources::{
     ReconcilableEventSourcedResource,
     ResourceConditionStatus,
     ResourceConditionType,
-    ResourceDescriptorProvider,
     ResourcePresentation,
+    ResourceSchemaProvider,
     ResourceSnapshot,
     ResourceStatusLike,
     ResourceStatusSummaryView,
     ResourceSummaryView,
     ResourceView,
     ResourceViewHeaders,
+    TypeUri,
 };
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -39,7 +40,7 @@ use crate::{load_previous_resource_view, make_apply_manifest_changes};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn decode_resource_spec<R>(
-    schema: &str,
+    schema: &TypeUri,
     spec: serde_json::Value,
 ) -> Result<R::Spec, ApplyResourceCrudDispatcherError>
 where
@@ -47,7 +48,7 @@ where
     R::Spec: DeserializeOwned,
 {
     serde_json::from_value(spec).map_err(|e| ApplyResourceCrudDispatcherError::InvalidSpec {
-        schema: schema.to_string(),
+        schema: schema.clone(),
         message: e.to_string(),
     })
 }
@@ -59,7 +60,7 @@ pub async fn map_apply_resource_planning_decision<R>(
     generic_resource_query_service: &dyn GenericResourceQueryService,
 ) -> Result<ApplyManifestPlanningDecision, InternalError>
 where
-    R: ResourceDescriptorProvider + DeclarativeResource,
+    R: ResourceSchemaProvider + DeclarativeResource,
     R::Spec: Serialize,
     R::Status: Serialize + ResourceStatusLike,
 {
@@ -100,7 +101,7 @@ pub fn map_apply_resource_application_decision<R>(
     decision: ApplyResourceApplicationDecision<R>,
 ) -> Result<ApplyManifestApplicationDecision, InternalError>
 where
-    R: ResourceDescriptorProvider + DeclarativeResource,
+    R: ResourceSchemaProvider + DeclarativeResource,
     R::Spec: Serialize,
     R::Status: Serialize + ResourceStatusLike,
 {
@@ -132,14 +133,14 @@ pub fn typed_resource_state_to_view<R>(
     state: R::ResourceState,
 ) -> Result<ResourceView, InternalError>
 where
-    R: ResourceDescriptorProvider + DeclarativeResource,
+    R: ResourceSchemaProvider + DeclarativeResource,
     R::Spec: Serialize,
     R::Status: Serialize + ResourceStatusLike,
 {
     let (id, headers, spec, status) = state.into_parts();
 
     Ok(ResourceView {
-        schema: R::DESCRIPTOR.schema.to_string(),
+        schema: R::schema().clone(),
         headers: ResourceViewHeaders::from_owned(id, headers),
         last_reconciled_at: status.resource_status().last_reconciled_at(),
         spec: serde_json::to_value(spec).int_err()?,
@@ -151,11 +152,11 @@ where
 
 pub fn typed_resource_state_to_summary_view<R>(state: &R::ResourceState) -> ResourceSummaryView
 where
-    R: ResourceDescriptorProvider + DeclarativeResource + ResourcePresentation,
+    R: ResourceSchemaProvider + DeclarativeResource + ResourcePresentation,
     R::Status: ResourceStatusLike,
 {
     ResourceSummaryView {
-        schema: R::DESCRIPTOR.schema.to_string(),
+        schema: R::schema().clone(),
         id: *state.id(),
         name: state.headers().name.clone(),
         description: state.headers().description.clone(),

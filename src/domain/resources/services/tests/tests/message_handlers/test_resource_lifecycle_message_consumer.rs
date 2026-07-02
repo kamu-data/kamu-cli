@@ -18,10 +18,12 @@ use kamu_resources::{
     ResourceID,
     ResourceLifecycleMessage,
     ResourceLifecycleMessageOutcome,
+    ResourceSchemaProvider,
     ResourceSnapshot,
 };
 use messaging_outbox::{MessageConsumerT, OutboxProvider, register_message_dispatcher};
 use mockall::mock;
+use odf::metadata::resource::TypeUri;
 
 use crate::tests::utils::{
     TestResource,
@@ -110,8 +112,7 @@ async fn test_applied_message_with_unregistered_kind_returns_error() {
             ResourceLifecycleMessageOutcome::Created,
             ResourceLifecycleConsumerHarness::make_snapshot_with_kind(
                 id,
-                "UnknownKind",
-                "unknown.dev/v1",
+                &TypeUri::new_unchecked("UnknownKind"),
             ),
         ))
         .await;
@@ -181,17 +182,13 @@ impl ResourceLifecycleConsumerHarness {
     }
 
     fn make_snapshot(id: ResourceID) -> ResourceSnapshot {
-        Self::make_snapshot_with_kind(id, TestResource::SCHEMA, "")
+        Self::make_snapshot_with_kind(id, TestResource::schema())
     }
 
-    fn make_snapshot_with_kind(
-        id: ResourceID,
-        schema: &str,
-        _api_version: &str,
-    ) -> ResourceSnapshot {
+    fn make_snapshot_with_kind(id: ResourceID, schema: &TypeUri) -> ResourceSnapshot {
         ResourceSnapshot {
             id,
-            schema: schema.to_string(),
+            schema: schema.clone(),
             headers: ResourceHeaders::simple(Utc::now(), make_account_id(), "res"),
             spec: serde_json::json!({ "value": "x" }),
             status: None,

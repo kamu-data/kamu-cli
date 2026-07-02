@@ -95,7 +95,7 @@ pub(crate) fn resource_view_to_manifest(
     // `schema` originates from a stored, already-canonical resource, so parsing it
     // back into a `ResourceSchema` is infallible in practice; treat a failure as a
     // store-integrity bug.
-    let schema = kamu_resources::ResourceSchemaId::parse(&schema).int_err()?;
+    let schema = kamu_resources::ResourceSchemaId::parse(schema.as_str()).int_err()?;
 
     Ok(ResourceManifest {
         schema,

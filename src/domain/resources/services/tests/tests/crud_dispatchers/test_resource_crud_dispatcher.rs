@@ -15,6 +15,7 @@ use kamu_resources::{
     ApplyResourceOutcome,
     ResourceCrudDispatcher,
     ResourceCrudDispatcherApplyRequest,
+    ResourceSchemaProvider,
 };
 use kamu_resources_services::testing::BaseResourceServiceHarness;
 
@@ -42,7 +43,7 @@ async fn test_apply_rejects_invalid_json_shape() {
         ApplyResourceCrudDispatcherError::InvalidSpec {
             ref schema,
             ..
-        } if schema == TestResource::SCHEMA,
+        } if schema == TestResource::schema(),
         "expected InvalidSpec error, got: {err:?}"
     );
 }
@@ -155,7 +156,7 @@ async fn test_apply_creates_resource_and_returns_view() {
     let applied = decision.expect_applied();
 
     assert_eq!(applied.outcome, ApplyResourceOutcome::Created);
-    assert_eq!(applied.resource.schema, TestResource::SCHEMA);
+    assert_eq!(applied.resource.schema, *TestResource::schema());
     assert_eq!(
         applied.resource.spec,
         serde_json::json!({ "value": "hello" })

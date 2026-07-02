@@ -28,6 +28,7 @@ use kamu_resources::{
     ResourceListColumnValue,
     ResourceListColumnVisibility,
     ResourceSummaryView,
+    resource_kind_display_name,
 };
 use kamu_resources_facade::ResourceFacade;
 use odf::utils::data::format::RecordsWriter;
@@ -353,7 +354,10 @@ impl ListResourcesCommand {
         (schema, writer)
     }
 
-    fn generic_resource_arrays(&self, resources: &[ResourceSummaryView]) -> Vec<ArrayRef> {
+    fn generic_resource_arrays(
+        &self,
+        resources: &[ResourceSummaryView],
+    ) -> Result<Vec<ArrayRef>, CLIError> {
         let mut columns: Vec<ArrayRef> = Vec::new();
 
         for column in self.generic_resource_columns() {
@@ -367,8 +371,9 @@ impl ListResourcesCommand {
                 ResourceGenericColumn::Kind => Arc::new(StringArray::from(
                     resources
                         .iter()
-                        .map(|resource| resource.schema.clone())
-                        .collect::<Vec<_>>(),
+                        .map(|resource| resource_kind_display_name(&resource.schema))
+                        .collect::<Result<Vec<_>, _>>()
+                        .map_err(CLIError::critical)?,
                 )),
                 ResourceGenericColumn::Id => Arc::new(StringArray::from(
                     resources
@@ -437,7 +442,7 @@ impl ListResourcesCommand {
             });
         }
 
-        columns
+        Ok(columns)
     }
 
     fn extra_resource_arrays(
@@ -479,7 +484,7 @@ impl ListResourcesCommand {
         resources: &[ResourceSummaryView],
         extra_columns: &[ResourceListColumnDescriptor],
     ) -> Result<RecordBatch, CLIError> {
-        let mut columns = self.generic_resource_arrays(resources);
+        let mut columns = self.generic_resource_arrays(resources)?;
         columns.extend(self.extra_resource_arrays(resources, extra_columns)?);
 
         Ok(RecordBatch::try_new(schema, columns).unwrap())

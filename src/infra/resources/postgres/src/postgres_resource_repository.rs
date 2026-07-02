@@ -30,6 +30,7 @@ use kamu_resources::{
     ResourceSnapshotStream,
     ResourceSnapshotUpdate,
     ResourceSummaryRow,
+    TypeUri,
     UpdateResourceError,
 };
 use odf::metadata::AsStackString;
@@ -88,7 +89,7 @@ impl ResourceRepository for PostgresResourceRepository {
             "#,
             resource_id,
             account_id_str,
-            resource_snapshot.schema,
+            resource_snapshot.schema.as_str(),
             resource_snapshot.headers.name.as_str(),
             resource_snapshot.headers.description,
             labels,
@@ -176,7 +177,7 @@ impl ResourceRepository for PostgresResourceRepository {
                         .as_stack_string()
                         .to_string(),
                 )
-                .push_bind(resource_snapshot.schema.clone())
+                .push_bind(resource_snapshot.schema.to_string())
                 .push_bind(resource_snapshot.headers.name.to_string())
                 .push_bind(resource_snapshot.headers.description.clone())
                 .push_bind(serde_json::to_value(&resource_snapshot.headers.labels).unwrap())
@@ -256,7 +257,7 @@ impl ResourceRepository for PostgresResourceRepository {
     async fn find_resource_id_by_name(
         &self,
         account_id: &odf::AccountID,
-        schema: &str,
+        schema: &TypeUri,
         name: &ResourceName,
     ) -> Result<Option<ResourceID>, InternalError> {
         let mut tr = self.transaction.lock().await;
@@ -274,7 +275,7 @@ impl ResourceRepository for PostgresResourceRepository {
               AND deleted_at IS NULL
             "#,
             account_id_stack.as_str(),
-            schema,
+            schema.as_str(),
             name.as_str(),
         )
         .fetch_optional(connection_mut)
@@ -324,7 +325,7 @@ impl ResourceRepository for PostgresResourceRepository {
     async fn find_resource_identities_by_names(
         &self,
         account_id: &odf::AccountID,
-        schema: &str,
+        schema: &TypeUri,
         names: &[ResourceName],
     ) -> Result<Vec<ResourceIdentityRow>, InternalError> {
         if names.is_empty() {
@@ -350,7 +351,7 @@ impl ResourceRepository for PostgresResourceRepository {
               AND deleted_at IS NULL
             "#,
             account_id_stack.as_str(),
-            schema,
+            schema.as_str(),
             names
                 .iter()
                 .map(|n| n.to_ascii_lowercase())
@@ -366,7 +367,7 @@ impl ResourceRepository for PostgresResourceRepository {
     async fn search_resource_identities(
         &self,
         account_id: &odf::AccountID,
-        schemas: &[String],
+        schemas: &[TypeUri],
         exact_names: Option<&[ResourceName]>,
         name_pattern: Option<&str>,
         pagination: PaginationOpts,
@@ -379,6 +380,7 @@ impl ResourceRepository for PostgresResourceRepository {
         let connection_mut = tr.connection_mut().await?;
 
         let account_id_stack = account_id.as_stack_string();
+        let schema_strs = schemas.iter().map(TypeUri::as_str).collect::<Vec<_>>();
         let limit = i64::try_from(pagination.limit).int_err()?;
         let offset = i64::try_from(pagination.offset).int_err()?;
         let exact_names = exact_names.map(|ns| {
@@ -405,7 +407,7 @@ impl ResourceRepository for PostgresResourceRepository {
             LIMIT $5 OFFSET $6
             "#,
             account_id_stack.as_str(),
-            schemas as _,
+            schema_strs as _,
             exact_names.as_deref() as _,
             name_pattern.as_deref(),
             limit,
@@ -421,7 +423,7 @@ impl ResourceRepository for PostgresResourceRepository {
     async fn count_search_resource_identities(
         &self,
         account_id: &odf::AccountID,
-        schemas: &[String],
+        schemas: &[TypeUri],
         exact_names: Option<&[ResourceName]>,
         name_pattern: Option<&str>,
     ) -> Result<usize, InternalError> {
@@ -433,6 +435,7 @@ impl ResourceRepository for PostgresResourceRepository {
         let connection_mut = tr.connection_mut().await?;
 
         let account_id_stack = account_id.as_stack_string();
+        let schema_strs = schemas.iter().map(TypeUri::as_str).collect::<Vec<_>>();
         let exact_names = exact_names.map(|ns| {
             ns.iter()
                 .map(|n| n.to_ascii_lowercase())
@@ -451,7 +454,7 @@ impl ResourceRepository for PostgresResourceRepository {
               AND deleted_at IS NULL
             "#,
             account_id_stack.as_str(),
-            schemas as _,
+            schema_strs as _,
             exact_names.as_deref() as _,
             name_pattern.as_deref(),
         )
@@ -470,6 +473,7 @@ impl ResourceRepository for PostgresResourceRepository {
         let connection_mut = tr.connection_mut().await?;
 
         let query_id: &uuid::Uuid = query.id.as_ref();
+        let query_schema = query.schema.as_str();
         let maybe_row = sqlx::query!(
             r#"
             SELECT
@@ -494,7 +498,7 @@ impl ResourceRepository for PostgresResourceRepository {
               AND deleted_at IS NULL
             "#,
             query_id,
-            query.schema,
+            query_schema,
         )
         .fetch_optional(connection_mut)
         .await
@@ -502,7 +506,7 @@ impl ResourceRepository for PostgresResourceRepository {
 
         Ok(maybe_row.map(|row| ResourceSnapshot {
             id: ResourceID::new(row.id),
-            schema: row.resource_schema,
+            schema: TypeUri::new_unchecked(row.resource_schema),
             headers: ResourceHeaders {
                 account: row.account_id,
                 name: kamu_resources::ResourceName::new_unchecked(&row.resource_name),
@@ -523,7 +527,7 @@ impl ResourceRepository for PostgresResourceRepository {
 
     async fn find_resource_snapshots_by_schema_and_ids(
         &self,
-        schema: &str,
+        schema: &TypeUri,
         ids: &[ResourceID],
     ) -> Result<Vec<ResourceSnapshot>, InternalError> {
         if ids.is_empty() {
@@ -558,7 +562,7 @@ impl ResourceRepository for PostgresResourceRepository {
               AND deleted_at IS NULL
             "#,
         )
-        .bind(schema)
+        .bind(schema.as_str())
         .bind(&ids)
         .fetch_all(connection_mut)
         .await
@@ -614,7 +618,7 @@ impl ResourceRepository for PostgresResourceRepository {
 
         Ok(maybe_row.map(|row| ResourceSnapshot {
             id: ResourceID::new(row.id),
-            schema: row.resource_schema,
+            schema: TypeUri::new_unchecked(row.resource_schema),
             headers: ResourceHeaders {
                 account: row.account_id,
                 name: kamu_resources::ResourceName::new_unchecked(&row.resource_name),
@@ -681,7 +685,7 @@ impl ResourceRepository for PostgresResourceRepository {
             .into_iter()
             .map(|row| ResourceSnapshot {
                 id: ResourceID::new(row.id),
-                schema: row.resource_schema,
+                schema: TypeUri::new_unchecked(row.resource_schema),
                 headers: ResourceHeaders {
                     account: row.account_id,
                     name: kamu_resources::ResourceName::new_unchecked(&row.resource_name),
@@ -704,10 +708,10 @@ impl ResourceRepository for PostgresResourceRepository {
     fn list_resource_ids(
         &self,
         account_id: odf::AccountID,
-        schema: &str,
+        schema: &TypeUri,
         pagination: PaginationOpts,
     ) -> ResourceIDStream<'_> {
-        let resource_schema = schema.to_owned();
+        let resource_schema = schema.as_str().to_owned();
 
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
@@ -744,10 +748,10 @@ impl ResourceRepository for PostgresResourceRepository {
     fn list_resource_snapshots_by_schema(
         &self,
         account_id: odf::AccountID,
-        schema: &str,
+        schema: &TypeUri,
         pagination: PaginationOpts,
     ) -> ResourceSnapshotStream<'_> {
-        let resource_schema = schema.to_owned();
+        let resource_schema = schema.as_str().to_owned();
 
         Box::pin(async_stream::stream! {
             let mut tr = self.transaction.lock().await;
@@ -793,7 +797,7 @@ impl ResourceRepository for PostgresResourceRepository {
             while let Some(row) = query_stream.try_next().await? {
                 yield Ok(ResourceSnapshot {
                     id: ResourceID::new(row.id),
-                    schema: row.resource_schema,
+                    schema: TypeUri::new_unchecked(row.resource_schema),
                     headers: ResourceHeaders {
                         account: row.account_id,
                         name: kamu_resources::ResourceName::new_unchecked(&row.resource_name),
@@ -861,7 +865,7 @@ impl ResourceRepository for PostgresResourceRepository {
             while let Some(row) = query_stream.try_next().await? {
                 yield Ok(ResourceSnapshot {
                     id: ResourceID::new(row.id),
-                    schema: row.resource_schema,
+                    schema: TypeUri::new_unchecked(row.resource_schema),
                     headers: ResourceHeaders {
                         account: row.account_id,
                         name: kamu_resources::ResourceName::new_unchecked(&row.resource_name),
@@ -885,7 +889,7 @@ impl ResourceRepository for PostgresResourceRepository {
     async fn count_resources(
         &self,
         account_id: odf::AccountID,
-        schema: &str,
+        schema: &TypeUri,
     ) -> Result<usize, InternalError> {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
@@ -901,7 +905,7 @@ impl ResourceRepository for PostgresResourceRepository {
               AND deleted_at IS NULL
             "#,
             account_id_stack.as_str(),
-            schema,
+            schema.as_str(),
         )
         .fetch_one(connection_mut)
         .await

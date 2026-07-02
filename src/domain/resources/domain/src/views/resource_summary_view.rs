@@ -19,13 +19,14 @@ use crate::{
     ResourcePhase,
     ResourceSnapshot,
     ResourceStatus,
+    TypeUri,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceSummaryView {
-    pub schema: String,
+    pub schema: TypeUri,
     pub id: ResourceID,
     pub name: ResourceName,
     pub description: Option<String>,

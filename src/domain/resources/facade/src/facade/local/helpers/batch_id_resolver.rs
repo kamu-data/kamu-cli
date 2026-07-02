@@ -15,6 +15,8 @@ use kamu_resources::{
     ResourceIDNotFoundError,
     ResourceName,
     ResourceNameNotFoundError,
+    TypeUri,
+    resource_kind_display_name,
 };
 
 use crate::{
@@ -81,7 +83,7 @@ pub(crate) fn group_batch_resource_refs(selector: ResourceBatchSelector) -> Batc
 pub(crate) async fn resolve_batch_ids(
     query_service: &dyn GenericResourceQueryService,
     account_id: &odf::AccountID,
-    kind: &str,
+    kind: &TypeUri,
     groups: BatchResourceRefGroups,
 ) -> Result<BatchIdsResolutionResponse, BatchResourceError> {
     let mut id_entries = groups.id_entries;
@@ -112,7 +114,7 @@ pub(crate) async fn resolve_batch_ids(
                 None => problems.push(BatchResourceProblem {
                     request_index,
                     error: ResourceLookupProblem::NameNotFound(ResourceNameNotFoundError {
-                        kind: kind.to_string(),
+                        kind: resource_kind_display_name(kind)?,
                         name,
                     }),
                 }),
@@ -132,7 +134,7 @@ pub(crate) async fn resolve_batch_ids(
 /// the caller's error type so it can be used in both batch and scalar paths.
 pub(crate) async fn resolve_resource_id<E>(
     query_service: &dyn GenericResourceQueryService,
-    kind: &str,
+    kind: &TypeUri,
     account_id: &odf::AccountID,
     resource_ref: &ResourceRef,
 ) -> Result<ResourceID, E>
@@ -141,16 +143,21 @@ where
 {
     match resource_ref {
         ResourceRef::ById(id) => Ok(*id),
-        ResourceRef::ByName(name) => query_service
-            .find_resource_id_by_name(account_id, kind, name)
-            .await?
-            .ok_or_else(|| {
-                ResourceLookupProblem::NameNotFound(ResourceNameNotFoundError {
-                    kind: kind.to_string(),
-                    name: name.clone(),
-                })
-                .into()
-            }),
+        ResourceRef::ByName(name) => {
+            match query_service
+                .find_resource_id_by_name(account_id, kind, name)
+                .await?
+            {
+                Some(id) => Ok(id),
+                None => Err(
+                    ResourceLookupProblem::NameNotFound(ResourceNameNotFoundError {
+                        kind: resource_kind_display_name(kind)?,
+                        name: name.clone(),
+                    })
+                    .into(),
+                ),
+            }
+        }
     }
 }
 

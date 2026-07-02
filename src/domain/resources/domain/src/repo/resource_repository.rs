@@ -21,6 +21,7 @@ use crate::{
     ResourceSnapshot,
     ResourceSnapshotStream,
     ResourceSummaryRow,
+    TypeUri,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -58,7 +59,7 @@ pub trait ResourceRepository: Send + Sync {
     async fn find_resource_id_by_name(
         &self,
         account_id: &odf::AccountID,
-        schema: &str,
+        schema: &TypeUri,
         name: &ResourceName,
     ) -> Result<Option<ResourceID>, InternalError>;
 
@@ -71,14 +72,14 @@ pub trait ResourceRepository: Send + Sync {
     async fn find_resource_identities_by_names(
         &self,
         account_id: &odf::AccountID,
-        schema: &str,
+        schema: &TypeUri,
         names: &[ResourceName],
     ) -> Result<Vec<ResourceIdentityRow>, InternalError>;
 
     async fn search_resource_identities(
         &self,
         account_id: &odf::AccountID,
-        schemas: &[String],
+        schemas: &[TypeUri],
         exact_names: Option<&[ResourceName]>,
         name_pattern: Option<&str>,
         pagination: PaginationOpts,
@@ -87,7 +88,7 @@ pub trait ResourceRepository: Send + Sync {
     async fn count_search_resource_identities(
         &self,
         account_id: &odf::AccountID,
-        schemas: &[String],
+        schemas: &[TypeUri],
         exact_names: Option<&[ResourceName]>,
         name_pattern: Option<&str>,
     ) -> Result<usize, InternalError>;
@@ -99,7 +100,7 @@ pub trait ResourceRepository: Send + Sync {
 
     async fn find_resource_snapshots_by_schema_and_ids(
         &self,
-        schema: &str,
+        schema: &TypeUri,
         ids: &[ResourceID],
     ) -> Result<Vec<ResourceSnapshot>, InternalError>;
 
@@ -117,14 +118,14 @@ pub trait ResourceRepository: Send + Sync {
     fn list_resource_ids(
         &self,
         account_id: odf::AccountID,
-        schema: &str,
+        schema: &TypeUri,
         pagination: PaginationOpts,
     ) -> ResourceIDStream<'_>;
 
     fn list_resource_snapshots_by_schema(
         &self,
         account_id: odf::AccountID,
-        schema: &str,
+        schema: &TypeUri,
         pagination: PaginationOpts,
     ) -> ResourceSnapshotStream<'_>;
 
@@ -137,7 +138,7 @@ pub trait ResourceRepository: Send + Sync {
     async fn count_resources(
         &self,
         account_id: odf::AccountID,
-        schema: &str,
+        schema: &TypeUri,
     ) -> Result<usize, InternalError>;
 
     async fn summarize_resources(
@@ -191,7 +192,7 @@ pub struct ResourceSnapshotUpdate {
 #[error("Resource already exists: account_id={account_id}, schema='{schema}', name='{name}'")]
 pub struct ResourceDuplicateError {
     pub account_id: odf::AccountID,
-    pub schema: String,
+    pub schema: TypeUri,
     pub name: ResourceName,
 }
 
@@ -231,7 +232,7 @@ impl ResourceSnapshotRow {
     pub fn into_snapshot(self) -> ResourceSnapshot {
         ResourceSnapshot {
             id: ResourceID::new(self.id),
-            schema: self.resource_schema,
+            schema: TypeUri::new_unchecked(self.resource_schema),
             headers: crate::ResourceHeaders {
                 account: self.account_id,
                 name: ResourceName::new_unchecked(&self.resource_name),

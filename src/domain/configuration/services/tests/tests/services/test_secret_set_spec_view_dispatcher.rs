@@ -12,7 +12,7 @@ use kamu_configuration_services::testing::BaseConfigurationServiceHarness;
 use kamu_resources::{
     ApplyResourceApplicationDecision,
     ApplyResourceParams,
-    ResourceDescriptorProvider,
+    ResourceSchemaProvider,
     get_resource_spec_view_dispatcher_from_catalog,
 };
 use kamu_resources_services::testing::BaseResourceServiceHarness;
@@ -78,7 +78,7 @@ async fn test_spec_view_dispatcher_reveals_encrypted_secrets_as_plaintext() {
     // Resolve the view dispatcher from catalog and call reveal_spec
     let dispatcher = get_resource_spec_view_dispatcher_from_catalog(
         harness.catalog(),
-        SecretSetResource::DESCRIPTOR.schema,
+        SecretSetResource::schema(),
     )
     .expect("SecretSetSpecViewDispatcher must be registered");
 

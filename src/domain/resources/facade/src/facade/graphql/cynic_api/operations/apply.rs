@@ -239,7 +239,7 @@ impl From<ResourceInvalidHeaderProblem> for crate::ApplyManifestError {
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct ResourceInvalidSpecProblem {
-    pub schema: String,
+    pub schema: kamu_resources::TypeUri,
     pub message: String,
 }
 

@@ -15,7 +15,7 @@ use crate::facade::graphql::cynic_api::fragments::{
     ResourceBadAccountProblem,
     ResourceIdentity,
     ResourceSelectorProblemResult,
-    ResourceUnsupportedDescriptorProblem,
+    ResourceUnsupportedSelectorProblem,
 };
 use crate::facade::graphql::cynic_api::inputs::{
     ResourceBatchSelectorInput,
@@ -79,7 +79,7 @@ pub(crate) struct ResourceIdentitiesResources {
 #[derive(cynic::InlineFragments, Debug, Clone)]
 pub(crate) enum BatchResourceIdentitiesOutcome {
     BatchResourceIdentitiesResult(BatchResourceIdentitiesResult),
-    ResourceUnsupportedDescriptorProblem(ResourceUnsupportedDescriptorProblem),
+    ResourceUnsupportedSelectorProblem(ResourceUnsupportedSelectorProblem),
     ResourceBadAccountProblem(ResourceBadAccountProblem),
     #[cynic(fallback)]
     Unknown,

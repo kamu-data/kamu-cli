@@ -15,6 +15,7 @@ use kamu_resources::{
     ResourceIdentityView,
     ResourceSummaryView,
     ResourceView,
+    TypeUri,
 };
 use kamu_resources_facade::BatchResourceResponse;
 use pretty_assertions::assert_eq;
@@ -26,11 +27,10 @@ use pretty_assertions::assert_eq;
 #[track_caller]
 pub fn assert_resource_view_fields(
     view: &ResourceView,
-    _expected_kind: &str,
-    expected_schema: &str,
+    expected_schema: &TypeUri,
     expected_name: &str,
 ) {
-    assert_eq!(view.schema, expected_schema, "schema mismatch");
+    assert_eq!(view.schema, *expected_schema, "schema mismatch");
     assert_eq!(view.headers.name, expected_name, "name mismatch");
     assert!(
         view.headers.deleted_at.is_none(),
@@ -44,12 +44,14 @@ pub fn assert_resource_view_fields(
 #[track_caller]
 pub fn assert_identity_fields(
     identity: &ResourceIdentityView,
-    _expected_kind: &str,
-    expected_schema: &str,
+    expected_schema: &TypeUri,
     expected_name: &str,
     expected_uid: &ResourceID,
 ) {
-    assert_eq!(identity.schema, expected_schema, "identity schema mismatch");
+    assert_eq!(
+        identity.schema, *expected_schema,
+        "identity schema mismatch"
+    );
     assert_eq!(identity.name, expected_name, "identity name mismatch");
     assert_eq!(identity.id, *expected_uid, "identity id mismatch");
 }

@@ -173,7 +173,7 @@ pub struct ResourceByNameSelectorInput {
 pub struct ResourceKindDescriptor {
     pub name: String,
     pub short_names: Vec<String>,
-    pub schema: String,
+    pub schema: TypeUri<'static>,
     pub list_columns: Vec<ResourceListColumnDescriptor>,
 }
 
@@ -182,7 +182,7 @@ impl From<kamu_resources::ResourceKindDescriptor> for ResourceKindDescriptor {
         Self {
             name: value.name,
             short_names: value.short_names,
-            schema: value.schema,
+            schema: value.schema.into(),
             list_columns: value.list_columns.into_iter().map(Into::into).collect(),
         }
     }
@@ -190,39 +190,58 @@ impl From<kamu_resources::ResourceKindDescriptor> for ResourceKindDescriptor {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// A resource kind was addressed by its canonical schema URI, but no descriptor
+/// is registered for it. This is reachable *only* on the apply-manifest path,
+/// where the `$schema` URI comes straight from the user's manifest; selector
+/// lookups surface [`ResourceUnsupportedSelectorProblem`] instead, so this
+/// field never carries a short selector masquerading as a URI.
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceUnsupportedDescriptorProblem {
-    pub code: ResourceUnsupportedDescriptorProblemCode,
-    pub schema: String,
+    pub schema: TypeUri<'static>,
     pub message: String,
 }
 
-impl From<kamu_resources::UnsupportedResourceDescriptorError>
-    for ResourceUnsupportedDescriptorProblem
-{
-    fn from(value: kamu_resources::UnsupportedResourceDescriptorError) -> Self {
-        use kamu_resources::UnsupportedResourceDescriptorError as E;
+/// A resource kind was addressed by a short selector (main name or alias, e.g.
+/// `vs`), but no descriptor matches it. The `selector` is the raw user-supplied
+/// string — never a schema URI (the public API only selects kinds by name).
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ResourceUnsupportedSelectorProblem {
+    pub selector: String,
+    pub message: String,
+}
 
-        let message = value.to_string();
-        match value {
-            E::NotFound { schema } | E::SelectorNotFound { selector: schema } => Self {
-                code: ResourceUnsupportedDescriptorProblemCode::NotFound,
-                schema,
-                message,
-            },
-            E::Duplicate { schema } | E::SelectorDuplicate { selector: schema } => Self {
-                code: ResourceUnsupportedDescriptorProblemCode::Duplicate,
-                schema,
-                message,
-            },
-        }
+/// Maps an [`UnsupportedResourceDescriptorError`] (apply/URI path) to the
+/// apply-path problem. `Duplicate` means two dispatchers registered for one URI
+/// — a static wiring bug, not a user error — so it is promoted to an internal
+/// error rather than shown to the user.
+pub(crate) fn map_unsupported_descriptor_problem(
+    err: kamu_resources::UnsupportedResourceDescriptorError,
+) -> Result<ResourceUnsupportedDescriptorProblem, GqlError> {
+    use kamu_resources::UnsupportedResourceDescriptorError as E;
+
+    let message = err.to_string();
+    match err {
+        E::NotFound { schema } => Ok(ResourceUnsupportedDescriptorProblem {
+            schema: schema.into(),
+            message,
+        }),
+        err @ E::Duplicate { .. } => Err(err.int_err().into()),
     }
 }
 
-#[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ResourceUnsupportedDescriptorProblemCode {
-    NotFound,
-    Duplicate,
+/// Maps an [`UnsupportedResourceSelectorError`] (selector path) to the
+/// selector-path problem. `Duplicate` means two descriptors claim one
+/// name/alias — a static wiring bug — so it is promoted to an internal error.
+pub(crate) fn map_unsupported_selector_problem(
+    err: kamu_resources::UnsupportedResourceSelectorError,
+) -> Result<ResourceUnsupportedSelectorProblem, GqlError> {
+    use kamu_resources::UnsupportedResourceSelectorError as E;
+
+    let message = err.to_string();
+    match err {
+        E::NotFound { selector } => Ok(ResourceUnsupportedSelectorProblem { selector, message }),
+        err @ E::Duplicate { .. } => Err(err.int_err().into()),
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -314,8 +333,8 @@ pub struct ResourceNameNotFoundProblem {
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceSchemaMismatchProblem {
     pub id: ResourceID<'static>,
-    pub expected_schema: String,
-    pub actual_schema: String,
+    pub expected_schema: TypeUri<'static>,
+    pub actual_schema: TypeUri<'static>,
     pub message: String,
 }
 
@@ -341,12 +360,15 @@ impl From<kamu_resources_facade::ResourceLookupProblem> for ResourceLookupProble
                 name: e.name.clone().into(),
                 message: e.to_string(),
             }),
-            P::SchemaMismatch(e) => Self::SchemaMismatch(ResourceSchemaMismatchProblem {
-                id: e.id.into(),
-                expected_schema: e.expected_schema.clone(),
-                actual_schema: e.actual_schema.clone(),
-                message: e.to_string(),
-            }),
+            P::SchemaMismatch(e) => {
+                let message = e.to_string();
+                Self::SchemaMismatch(ResourceSchemaMismatchProblem {
+                    id: e.id.into(),
+                    expected_schema: e.expected_schema.into(),
+                    actual_schema: e.actual_schema.into(),
+                    message,
+                })
+            }
         }
     }
 }
@@ -358,7 +380,7 @@ pub enum ResourceSelectorProblem {
     UidNotFound(ResourceIDNotFoundProblem),
     NameNotFound(ResourceNameNotFoundProblem),
     SchemaMismatch(ResourceSchemaMismatchProblem),
-    UnsupportedDescriptor(ResourceUnsupportedDescriptorProblem),
+    UnsupportedSelector(ResourceUnsupportedSelectorProblem),
     BadAccount(ResourceBadAccountProblem),
 }
 
@@ -372,9 +394,13 @@ impl From<kamu_resources_facade::ResourceLookupProblem> for ResourceSelectorProb
     }
 }
 
-impl From<kamu_resources::UnsupportedResourceDescriptorError> for ResourceSelectorProblem {
-    fn from(e: kamu_resources::UnsupportedResourceDescriptorError) -> Self {
-        Self::UnsupportedDescriptor(e.into())
+impl TryFrom<kamu_resources::UnsupportedResourceSelectorError> for ResourceSelectorProblem {
+    type Error = GqlError;
+
+    fn try_from(e: kamu_resources::UnsupportedResourceSelectorError) -> Result<Self, GqlError> {
+        Ok(Self::UnsupportedSelector(map_unsupported_selector_problem(
+            e,
+        )?))
     }
 }
 
@@ -393,9 +419,13 @@ impl From<kamu_resources_facade::ResourceLookupProblem> for ResourceSelectorProb
     }
 }
 
-impl From<kamu_resources::UnsupportedResourceDescriptorError> for ResourceSelectorProblemResult {
-    fn from(e: kamu_resources::UnsupportedResourceDescriptorError) -> Self {
-        Self { problem: e.into() }
+impl TryFrom<kamu_resources::UnsupportedResourceSelectorError> for ResourceSelectorProblemResult {
+    type Error = GqlError;
+
+    fn try_from(e: kamu_resources::UnsupportedResourceSelectorError) -> Result<Self, GqlError> {
+        Ok(Self {
+            problem: e.try_into()?,
+        })
     }
 }
 
@@ -437,7 +467,7 @@ pub struct ResourceRenderManifestResult {
 
 #[derive(SimpleObject, Debug, Clone)]
 pub struct Resource {
-    pub schema: String,
+    pub schema: TypeUri<'static>,
     pub headers: ResourceHeaders,
     pub spec: serde_json::Value,
     pub status: Option<serde_json::Value>,
@@ -448,7 +478,7 @@ impl From<kamu_resources::ResourceView> for Resource {
         let headers = ResourceHeaders::from(value.clone());
 
         Self {
-            schema: value.schema,
+            schema: value.schema.into(),
             headers,
             spec: value.spec,
             status: value.status,
@@ -461,7 +491,7 @@ impl From<kamu_resources::ResourceView> for Resource {
 #[derive(Union, Debug, Clone)]
 pub enum BatchResourcesOutcome {
     Success(BatchResourcesResult),
-    UnsupportedDescriptor(ResourceUnsupportedDescriptorProblem),
+    UnsupportedSelector(ResourceUnsupportedSelectorProblem),
     BadAccount(ResourceBadAccountProblem),
 }
 
@@ -500,7 +530,7 @@ pub struct BatchResourceSuccess {
 #[derive(Union, Debug, Clone)]
 pub enum BatchResourceManifestsOutcome {
     Success(BatchResourceManifestsResult),
-    UnsupportedDescriptor(ResourceUnsupportedDescriptorProblem),
+    UnsupportedSelector(ResourceUnsupportedSelectorProblem),
     BadAccount(ResourceBadAccountProblem),
 }
 
@@ -542,7 +572,7 @@ pub struct BatchResourceManifestSuccess {
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceIdentity {
     pub id: ResourceID<'static>,
-    pub schema: String,
+    pub schema: TypeUri<'static>,
     pub canonical_kind_name: String,
     pub name: ResourceName<'static>,
 }
@@ -551,7 +581,7 @@ impl From<kamu_resources::ResourceIdentityView> for ResourceIdentity {
     fn from(value: kamu_resources::ResourceIdentityView) -> Self {
         Self {
             id: value.id.into(),
-            schema: value.schema,
+            schema: value.schema.into(),
             canonical_kind_name: value.canonical_kind_name,
             name: value.name.into(),
         }
@@ -563,7 +593,7 @@ impl From<kamu_resources::ResourceIdentityView> for ResourceIdentity {
 #[derive(Union, Debug, Clone)]
 pub enum BatchResourceIdentitiesOutcome {
     Success(BatchResourceIdentitiesResult),
-    UnsupportedDescriptor(ResourceUnsupportedDescriptorProblem),
+    UnsupportedSelector(ResourceUnsupportedSelectorProblem),
     BadAccount(ResourceBadAccountProblem),
 }
 
@@ -666,7 +696,7 @@ impl From<kamu_resources::ResourceView> for ResourceHeaders {
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceSummary {
     pub id: ResourceID<'static>,
-    pub schema: String,
+    pub schema: TypeUri<'static>,
     pub name: ResourceName<'static>,
     pub description: Option<String>,
     pub generation: UInt64,
@@ -680,7 +710,7 @@ impl From<kamu_resources::ResourceSummaryView> for ResourceSummary {
     fn from(value: kamu_resources::ResourceSummaryView) -> Self {
         Self {
             id: value.id.into(),
-            schema: value.schema,
+            schema: value.schema.into(),
             name: value.name.clone().into(),
             description: value.description,
             generation: value.generation.into(),
@@ -809,7 +839,7 @@ impl From<kamu_resources::ResourcesSummary> for ResourcesSummary {
 
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceTypeCountSummary {
-    pub schema: String,
+    pub schema: TypeUri<'static>,
     pub name: String,
     pub total_count: UInt64,
     pub phase_counts: ResourcePhaseCounts,
@@ -818,7 +848,7 @@ pub struct ResourceTypeCountSummary {
 impl From<kamu_resources::ResourceTypeCountSummary> for ResourceTypeCountSummary {
     fn from(value: kamu_resources::ResourceTypeCountSummary) -> Self {
         Self {
-            schema: value.schema,
+            schema: value.schema.into(),
             name: value.name,
             total_count: value.total_count.into(),
             phase_counts: value.phase_counts.into(),

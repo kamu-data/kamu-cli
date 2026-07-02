@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources::ResourceID;
+use kamu_resources::{ResourceID, TypeUri};
 
 use crate::{ResourceLookupProblem, ResourceSchemaMismatchError};
 
@@ -15,18 +15,18 @@ use crate::{ResourceLookupProblem, ResourceSchemaMismatchError};
 
 pub(crate) fn ensure_schema_matches<E>(
     id: ResourceID,
-    expected_schema: &str,
+    expected_schema: &TypeUri,
     actual_schema: &str,
 ) -> Result<(), E>
 where
     E: From<ResourceLookupProblem>,
 {
-    if actual_schema != expected_schema {
+    if actual_schema != expected_schema.as_str() {
         return Err(
             ResourceLookupProblem::SchemaMismatch(ResourceSchemaMismatchError {
                 id,
-                expected_schema: expected_schema.to_string(),
-                actual_schema: actual_schema.to_string(),
+                expected_schema: expected_schema.clone(),
+                actual_schema: TypeUri::new_unchecked(actual_schema),
             })
             .into(),
         );

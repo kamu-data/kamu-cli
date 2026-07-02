@@ -15,7 +15,7 @@ use crate::facade::graphql::cynic_api::fragments::{
     ResourceBadAccountProblem,
     ResourceIdentityConnection,
     ResourceInvalidSearchQueryProblem,
-    ResourceUnsupportedDescriptorProblem,
+    ResourceUnsupportedSelectorProblem,
 };
 use crate::facade::graphql::cynic_api::inputs::SearchResourceIdentitiesInput;
 use crate::facade::graphql::cynic_api::schema;
@@ -40,7 +40,7 @@ pub(crate) struct SearchIdentitiesResources {
 #[derive(cynic::InlineFragments, Debug, Clone)]
 pub(crate) enum ResourceIdentityListOutcome {
     ResourceIdentityConnection(ResourceIdentityConnection),
-    ResourceUnsupportedDescriptorProblem(ResourceUnsupportedDescriptorProblem),
+    ResourceUnsupportedSelectorProblem(ResourceUnsupportedSelectorProblem),
     ResourceBadAccountProblem(ResourceBadAccountProblem),
     ResourceInvalidSearchQueryProblem(ResourceInvalidSearchQueryProblem),
     #[cynic(fallback)]

@@ -18,7 +18,7 @@ macro_rules! declare_resource_lifecycle_reconcile_dispatcher {
         #[dill::component]
         #[dill::interface(dyn kamu_resources::ResourceLifecycleEventDispatcher)]
         #[dill::meta(kamu_resources::ResourceDispatcherMeta {
-            schema: <$resource as kamu_resources::ResourceDescriptorProvider>::DESCRIPTOR.schema,
+            schema: <$resource>::SCHEMA_STR,
             name: <$resource as kamu_resources::ResourcePresentation>::PRESENTATION.resource_name,
             short_names:
                 <$resource as kamu_resources::ResourcePresentation>::PRESENTATION.resource_short_names,

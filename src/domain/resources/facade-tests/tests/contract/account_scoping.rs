@@ -8,7 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use database_common::PaginationOpts;
-use kamu_resources::{ResourceAccountRef, ResourceID};
+use kamu_configuration::VariableSetResource;
+use kamu_resources::{ResourceAccountRef, ResourceID, ResourceSchemaProvider};
 use kamu_resources_facade::{
     ApplyManifestError,
     ApplyManifestRequest,
@@ -33,10 +34,10 @@ use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
 use crate::helpers::{
     VARIABLE_SET_KIND,
-    VARIABLE_SET_SCHEMA,
+    VARIABLE_SET_SCHEMA_STR,
     apply_manifest_and_get_id,
     sorted_identity_names,
-    total_kind_count,
+    total_schema_count,
     variable_set_manifest_json,
 };
 
@@ -81,7 +82,7 @@ fn variable_set_manifest_json_with_account(name: &str, account: &ResourceAccount
     indoc::formatdoc!(
         r#"
         {{
-            "$schema": "{VARIABLE_SET_SCHEMA}",
+            "$schema": "{VARIABLE_SET_SCHEMA_STR}",
             "headers": {{
                 "name": "{name}",
                 "account": {{ {account_fields} }}
@@ -468,21 +469,21 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
     assert_eq!(bob_all_names, vec!["acct-bob-only", "acct-isolated"]);
 
     assert_eq!(
-        total_kind_count(
+        total_schema_count(
             alice
                 .summary(ResourcesSummaryRequest { account: None })
                 .await
                 .unwrap(),
-            VARIABLE_SET_SCHEMA,
+            VariableSetResource::schema(),
         ),
         2
     );
     assert_eq!(
-        total_kind_count(
+        total_schema_count(
             bob.summary(ResourcesSummaryRequest { account: None })
                 .await
                 .unwrap(),
-            VARIABLE_SET_SCHEMA,
+            VariableSetResource::schema(),
         ),
         2
     );

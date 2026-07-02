@@ -19,6 +19,7 @@ use crate::{
     ResourceID,
     ResourceStatus,
     ResourceStatusLike,
+    TypeUri,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -26,7 +27,7 @@ use crate::{
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceSnapshot {
     pub id: ResourceID,
-    pub schema: String,
+    pub schema: TypeUri,
     pub headers: ResourceHeaders,
 
     pub spec: serde_json::Value,
@@ -84,7 +85,7 @@ where
 
 pub fn make_typed_resource_snapshot<TSpec, TStatus>(
     id: ResourceID,
-    schema: &'static str,
+    schema: &TypeUri,
     headers: ResourceHeaders,
     spec: &TSpec,
     status: &TStatus,
@@ -100,7 +101,7 @@ where
 
     Ok(ResourceSnapshot {
         id,
-        schema: schema.to_string(),
+        schema: schema.clone(),
         headers,
         spec,
         status: Some(status_json),

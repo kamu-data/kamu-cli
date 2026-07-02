@@ -13,11 +13,11 @@ use tokio_stream::StreamExt;
 
 use crate::domain::{
     DeclarativeResource,
-    ResourceDescriptorProvider,
     ResourceID,
     ResourceIDNotFoundError,
     ResourceRawEventQuery,
     ResourceRepository,
+    ResourceSchemaProvider,
     ResourceSnapshot,
     ResourceTypeMismatchError,
     TypedResourceQueryError,
@@ -27,7 +27,7 @@ use crate::domain::{
 
 pub struct TypedResourceQueryServiceHelper<'a, R>
 where
-    R: ResourceDescriptorProvider,
+    R: ResourceSchemaProvider,
 {
     resource_repository: &'a dyn ResourceRepository,
     _marker: std::marker::PhantomData<R>,
@@ -35,7 +35,7 @@ where
 
 impl<'a, R> TypedResourceQueryServiceHelper<'a, R>
 where
-    R: ResourceDescriptorProvider,
+    R: ResourceSchemaProvider,
 {
     pub fn new(resource_repository: &'a dyn ResourceRepository) -> Self {
         Self {
@@ -54,13 +54,10 @@ where
             .await?
             .ok_or(ResourceIDNotFoundError(*id))?;
 
-        if snapshot.schema != R::DESCRIPTOR.schema {
-            return Err(ResourceTypeMismatchError::new(
-                *id,
-                R::DESCRIPTOR.schema.to_string(),
-                snapshot.schema,
-            )
-            .into());
+        if snapshot.schema != *R::schema() {
+            return Err(
+                ResourceTypeMismatchError::new(*id, R::schema().clone(), snapshot.schema).into(),
+            );
         }
 
         Ok(snapshot)
@@ -71,7 +68,7 @@ where
         id: &ResourceID,
     ) -> Result<Option<ResourceSnapshot>, InternalError> {
         let query = ResourceRawEventQuery {
-            schema: R::DESCRIPTOR.schema.to_string(),
+            schema: R::schema().clone(),
             id: *id,
         };
 
@@ -83,7 +80,7 @@ where
 
 impl<R> TypedResourceQueryServiceHelper<'_, R>
 where
-    R: DeclarativeResource + ResourceDescriptorProvider,
+    R: DeclarativeResource + ResourceSchemaProvider,
 {
     pub async fn get_state_by_id(
         &self,
@@ -98,7 +95,7 @@ where
             return Err(ResourceIDNotFoundError(*id).into());
         }
 
-        if resource_snapshot.schema != R::DESCRIPTOR.schema {
+        if resource_snapshot.schema != *R::schema() {
             return Err(Self::type_mismatch(&resource_snapshot));
         }
 
@@ -112,13 +109,13 @@ where
     ) -> Result<Vec<R::ResourceState>, InternalError> {
         let mut resource_snapshots_stream = self
             .resource_repository
-            .list_resource_snapshots_by_schema(account_id, R::DESCRIPTOR.schema, pagination);
+            .list_resource_snapshots_by_schema(account_id, R::schema(), pagination);
 
         let mut resource_states = Vec::new();
         while let Some(resource_snapshot) = resource_snapshots_stream.next().await {
             let resource_snapshot = resource_snapshot?;
 
-            if resource_snapshot.schema != R::DESCRIPTOR.schema {
+            if resource_snapshot.schema != *R::schema() {
                 return Err(Self::type_mismatch(&resource_snapshot).int_err());
             }
 
@@ -131,7 +128,7 @@ where
     fn type_mismatch(resource_snapshot: &ResourceSnapshot) -> TypedResourceQueryError {
         ResourceTypeMismatchError::new(
             resource_snapshot.id,
-            R::DESCRIPTOR.schema.to_string(),
+            R::schema().clone(),
             resource_snapshot.schema.clone(),
         )
         .into()

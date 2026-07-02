@@ -7,7 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources::{ApplyResourceOutcome, ResourceAccountRef};
+use kamu_configuration::VariableSetResource;
+use kamu_resources::{ApplyResourceOutcome, ResourceAccountRef, ResourceSchemaProvider};
 use kamu_resources_facade::{
     ApplyManifestRequest,
     BatchResourceError,
@@ -26,7 +27,7 @@ use crate::harness::{FacadeContractHarness, TestAccount};
 use crate::helpers::{
     SECRET_SET_KIND,
     VARIABLE_SET_KIND,
-    VARIABLE_SET_SCHEMA,
+    VARIABLE_SET_SCHEMA_STR,
     assert_applied_outcome,
     assert_batch_indexes,
     assert_resource_view_fields,
@@ -85,10 +86,10 @@ pub async fn test_get_many_all_successes(h: &impl FacadeContractHarness) {
     let view_a = by_index[&0];
     let view_b = by_index[&1];
 
-    assert_resource_view_fields(view_a, VARIABLE_SET_KIND, VARIABLE_SET_SCHEMA, "batch-a");
+    assert_resource_view_fields(view_a, VariableSetResource::schema(), "batch-a");
     assert_eq!(view_a.headers.id, id_a);
 
-    assert_resource_view_fields(view_b, VARIABLE_SET_KIND, VARIABLE_SET_SCHEMA, "batch-b");
+    assert_resource_view_fields(view_b, VariableSetResource::schema(), "batch-b");
     assert_eq!(view_b.headers.id, id_b);
 }
 
@@ -222,7 +223,7 @@ pub async fn test_get_many_empty_refs_validates_unsupported_kind(h: &impl Facade
 
     assert_matches!(
         result,
-        Err(BatchResourceError::UnsupportedDescriptor(_)),
+        Err(BatchResourceError::UnsupportedSelector(_)),
         "empty batch with unsupported kind must still be rejected"
     );
 }
@@ -285,7 +286,7 @@ pub async fn test_batch_empty_refs_validation_is_consistent(h: &impl FacadeContr
         .await;
     assert_matches!(
         gi_kind,
-        Err(BatchResourceError::UnsupportedDescriptor(_)),
+        Err(BatchResourceError::UnsupportedSelector(_)),
         "get_identities empty+bad kind must be rejected"
     );
 
@@ -317,7 +318,7 @@ pub async fn test_batch_empty_refs_validation_is_consistent(h: &impl FacadeContr
         .await;
     assert_matches!(
         rm_kind,
-        Err(BatchResourceError::UnsupportedDescriptor(_)),
+        Err(BatchResourceError::UnsupportedSelector(_)),
         "render_manifests empty+bad kind must be rejected"
     );
 
@@ -349,7 +350,7 @@ pub async fn test_batch_empty_refs_validation_is_consistent(h: &impl FacadeContr
         .await;
     assert_matches!(
         dm_kind,
-        Err(BatchResourceError::UnsupportedDescriptor(_)),
+        Err(BatchResourceError::UnsupportedSelector(_)),
         "delete_many empty+bad kind must be rejected"
     );
 
@@ -497,8 +498,11 @@ pub async fn test_render_manifests_all_successes(h: &impl FacadeContractHarness)
                     serde_json::to_value(y).unwrap()
                 }
             };
-            assert_eq!(parsed["$schema"], VARIABLE_SET_SCHEMA, "schema mismatch");
-            assert_eq!(parsed["$schema"], VARIABLE_SET_SCHEMA);
+            assert_eq!(
+                parsed["$schema"], VARIABLE_SET_SCHEMA_STR,
+                "schema mismatch"
+            );
+            assert_eq!(parsed["$schema"], VARIABLE_SET_SCHEMA_STR);
         }
     }
 }
@@ -726,7 +730,7 @@ pub async fn test_delete_many_duplicate_refs_is_deterministic(h: &impl FacadeCon
 
 // RF-061
 // Unsupported kind must produce a batch-level
-// Err(BatchResourceError::UnsupportedDescriptor), not Ok with per-item
+// Err(BatchResourceError::UnsupportedSelector), not Ok with per-item
 // problems.  The CRUD dispatcher registry rejects the kind before any refs are
 // processed, for all four batch APIs.
 contract_test!(
@@ -749,14 +753,14 @@ pub async fn test_batch_apis_reject_unsupported_kind(h: &impl FacadeContractHarn
         .get_many(selector.clone(), SpecViewMode::Encrypted)
         .await;
     assert!(
-        matches!(gm, Err(BatchResourceError::UnsupportedDescriptor(_))),
-        "get_many: unsupported kind must be a batch-level UnsupportedDescriptor, got: {gm:?}"
+        matches!(gm, Err(BatchResourceError::UnsupportedSelector(_))),
+        "get_many: unsupported kind must be a batch-level UnsupportedSelector, got: {gm:?}"
     );
 
     let gi = facade.get_identities(selector.clone()).await;
     assert!(
-        matches!(gi, Err(BatchResourceError::UnsupportedDescriptor(_))),
-        "get_identities: unsupported kind must be a batch-level UnsupportedDescriptor, got: {gi:?}"
+        matches!(gi, Err(BatchResourceError::UnsupportedSelector(_))),
+        "get_identities: unsupported kind must be a batch-level UnsupportedSelector, got: {gi:?}"
     );
 
     let rm = facade
@@ -767,15 +771,14 @@ pub async fn test_batch_apis_reject_unsupported_kind(h: &impl FacadeContractHarn
         )
         .await;
     assert!(
-        matches!(rm, Err(BatchResourceError::UnsupportedDescriptor(_))),
-        "render_manifests: unsupported kind must be a batch-level UnsupportedDescriptor, got: \
-         {rm:?}"
+        matches!(rm, Err(BatchResourceError::UnsupportedSelector(_))),
+        "render_manifests: unsupported kind must be a batch-level UnsupportedSelector, got: {rm:?}"
     );
 
     let dm = facade.delete_many(selector.clone()).await;
     assert!(
-        matches!(dm, Err(BatchResourceError::UnsupportedDescriptor(_))),
-        "delete_many: unsupported kind must be a batch-level UnsupportedDescriptor, got: {dm:?}"
+        matches!(dm, Err(BatchResourceError::UnsupportedSelector(_))),
+        "delete_many: unsupported kind must be a batch-level UnsupportedSelector, got: {dm:?}"
     );
 }
 

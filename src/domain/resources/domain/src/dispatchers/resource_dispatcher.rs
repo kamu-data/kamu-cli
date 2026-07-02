@@ -12,8 +12,16 @@ use std::sync::Arc;
 use dill::Catalog;
 use internal_error::{InternalError, ResultIntoInternal};
 
+use crate::TypeUri;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Registry key for a per-kind dispatcher.
+///
+/// `schema` is intentionally a `&'static str` (not a [`TypeUri`]): dill's
+/// `#[meta(...)]` emits the metadata as a `const`, so the value must be
+/// const-evaluable. It is only ever used as an internal registry key; the
+/// public schema identity type is [`TypeUri`] everywhere else.
 #[derive(Debug, Clone)]
 pub struct ResourceDispatcherMeta {
     pub schema: &'static str,
@@ -25,12 +33,13 @@ pub struct ResourceDispatcherMeta {
 
 pub fn get_resource_dispatcher_from_catalog<TDispatcher: ?Sized + 'static>(
     target_catalog: &Catalog,
-    schema: &str,
+    schema: &TypeUri,
     dispatcher_name: &str,
 ) -> Result<Arc<TDispatcher>, InternalError> {
+    let schema_str = schema.as_str();
     let mut dispatchers =
         target_catalog.builders_for_with_meta::<TDispatcher, _>(|meta: &ResourceDispatcherMeta| {
-            meta.schema == schema
+            meta.schema == schema_str
         });
 
     dispatchers

@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use internal_error::{BoxedError, InternalError};
-use kamu_resources::ResourceID;
+use kamu_resources::{ResourceID, TypeUri};
 use kamu_resources_facade::{
     BatchResourceError,
     ResourceBatchSelector,
@@ -217,7 +217,7 @@ impl DeleteResourcesCommand {
 
         // The facade batches by descriptor, so cross-kind selections are split into one
         // `delete_many(...)` call per resolved schema.
-        for (schema, entries) in Self::group_targets_by_descriptor(targets) {
+        for (_schema, entries) in Self::group_targets_by_schema(targets) {
             match self
                 .resource_facade
                 .delete_many(ResourceBatchSelector {
@@ -225,7 +225,7 @@ impl DeleteResourcesCommand {
                     kind: entries
                         .first()
                         .map(|(_, target)| target.kind.clone())
-                        .unwrap_or(schema),
+                        .expect("non-empty entries"),
                     resource_refs: entries
                         .iter()
                         .map(|(_, target)| ResourceRef::ById(target.id))
@@ -259,9 +259,9 @@ impl DeleteResourcesCommand {
         }
     }
 
-    fn group_targets_by_descriptor(
+    fn group_targets_by_schema(
         targets: Vec<DeleteResourceTarget>,
-    ) -> BTreeMap<String, Vec<(usize, DeleteResourceTarget)>> {
+    ) -> BTreeMap<TypeUri, Vec<(usize, DeleteResourceTarget)>> {
         let mut groups = BTreeMap::new();
 
         for (index, target) in targets.into_iter().enumerate() {
@@ -369,7 +369,7 @@ pub(super) struct PreparedDeleteTargets {
 #[derive(Debug, Clone)]
 struct DeleteResourceTarget {
     kind: String,
-    schema: String,
+    schema: TypeUri,
     canonical_kind_name: String,
     id: ResourceID,
     name: String,

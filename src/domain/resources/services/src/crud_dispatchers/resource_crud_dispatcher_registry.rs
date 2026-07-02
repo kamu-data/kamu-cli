@@ -11,7 +11,9 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu_resources::{
     ResourceCrudDispatcher,
     ResourceDispatcherMeta,
+    TypeUri,
     UnsupportedResourceDescriptorError,
+    UnsupportedResourceSelectorError,
     resource_kind_matches_selector,
 };
 
@@ -30,14 +32,14 @@ where
 
     let Some(builder) = handlers.next() else {
         return Err(UnsupportedResourceDescriptorError::NotFound {
-            schema: schema.to_string(),
+            schema: TypeUri::new_unchecked(schema),
         }
         .into());
     };
 
     if handlers.next().is_some() {
         return Err(UnsupportedResourceDescriptorError::Duplicate {
-            schema: schema.to_string(),
+            schema: TypeUri::new_unchecked(schema),
         }
         .into());
     }
@@ -47,12 +49,42 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Resolves a CRUD dispatcher for a schema that is already known to be valid
+/// (e.g. read from a stored snapshot, or resolved from a registered selector).
+/// A missing/duplicate dispatcher is therefore a data-integrity catastrophe, so
+/// every failure — including "not found" — is surfaced as an [`InternalError`]
+/// rather than a user-facing unsupported-descriptor error.
+pub fn get_resource_crud_dispatcher_for_trusted_schema(
+    target_catalog: &dill::Catalog,
+    schema: &str,
+) -> Result<std::sync::Arc<dyn ResourceCrudDispatcher>, InternalError> {
+    let mut handlers = target_catalog.builders_for_with_meta::<dyn ResourceCrudDispatcher, _>(
+        |meta: &ResourceDispatcherMeta| meta.schema == schema,
+    );
+
+    let Some(builder) = handlers.next() else {
+        return Err(InternalError::new(format!(
+            "No CRUD dispatcher registered for trusted schema '{schema}'"
+        )));
+    };
+
+    if handlers.next().is_some() {
+        return Err(InternalError::new(format!(
+            "Multiple CRUD dispatchers registered for trusted schema '{schema}'"
+        )));
+    }
+
+    builder.get(target_catalog).int_err()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub fn get_resource_crud_dispatcher_by_selector<E>(
     target_catalog: &dill::Catalog,
     selector: &str,
 ) -> Result<std::sync::Arc<dyn ResourceCrudDispatcher>, E>
 where
-    E: From<UnsupportedResourceDescriptorError> + From<InternalError>,
+    E: From<UnsupportedResourceSelectorError> + From<InternalError>,
 {
     let mut handlers = target_catalog.builders_for_with_meta::<dyn ResourceCrudDispatcher, _>(
         |meta: &ResourceDispatcherMeta| {
@@ -61,14 +93,14 @@ where
     );
 
     let Some(builder) = handlers.next() else {
-        return Err(UnsupportedResourceDescriptorError::SelectorNotFound {
+        return Err(UnsupportedResourceSelectorError::NotFound {
             selector: selector.to_string(),
         }
         .into());
     };
 
     if handlers.next().is_some() {
-        return Err(UnsupportedResourceDescriptorError::SelectorDuplicate {
+        return Err(UnsupportedResourceSelectorError::Duplicate {
             selector: selector.to_string(),
         }
         .into());

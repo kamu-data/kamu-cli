@@ -29,7 +29,7 @@ pub async fn test_resources_output_formats(ctx: ResourceCtx) {
     let json_view = ctx.get_one(["get", "vs", resource_name]).await;
     assert_eq!(
         json_view.ident(),
-        (fixtures::VARIABLE_SET_KIND, resource_name)
+        (fixtures::VARIABLE_SET_SCHEMA, resource_name)
     );
     assert_eq!(json_view.variable("MESSAGE"), Some(resource_value));
 
@@ -42,7 +42,7 @@ pub async fn test_resources_output_formats(ctx: ResourceCtx) {
         get_yaml
             .pointer("/$schema")
             .and_then(serde_json::Value::as_str),
-        Some(fixtures::VARIABLE_SET_KIND)
+        Some(fixtures::VARIABLE_SET_SCHEMA)
     );
     assert_eq!(
         get_yaml
@@ -71,7 +71,7 @@ pub async fn test_resources_output_formats(ctx: ResourceCtx) {
         &list_json,
         "list all -o json",
         resource_name,
-        fixtures::VARIABLE_SET_KIND,
+        fixtures::VARIABLE_SET_SHORT_NAME,
     );
 
     // `list all -o csv`: header + row are present. We do not parse full CSV
@@ -81,7 +81,7 @@ pub async fn test_resources_output_formats(ctx: ResourceCtx) {
         &list_csv,
         "list all -o csv",
         resource_name,
-        fixtures::VARIABLE_SET_KIND,
+        fixtures::VARIABLE_SET_SHORT_NAME,
     );
 
     // `summary -o json` / `summary -o yaml`: parseable and count the created
@@ -91,7 +91,7 @@ pub async fn test_resources_output_formats(ctx: ResourceCtx) {
         resources::summary_count(
             &summary_json,
             "summary -o json",
-            fixtures::VARIABLE_SET_KIND
+            fixtures::VARIABLE_SET_SCHEMA
         ),
         1
     );
@@ -101,7 +101,7 @@ pub async fn test_resources_output_formats(ctx: ResourceCtx) {
         resources::summary_count(
             &summary_yaml,
             "summary -o yaml",
-            fixtures::VARIABLE_SET_KIND
+            fixtures::VARIABLE_SET_SCHEMA
         ),
         1
     );
@@ -116,12 +116,12 @@ pub async fn test_resources_output_formats(ctx: ResourceCtx) {
     assert_api_resources_has_kind(
         &api_resources_json,
         "context api-resources -o json",
-        fixtures::VARIABLE_SET_KIND,
+        fixtures::VARIABLE_SET_SCHEMA,
     );
     assert_api_resources_has_kind(
         &api_resources_json,
         "context api-resources -o json",
-        fixtures::SECRET_SET_KIND,
+        fixtures::SECRET_SET_SCHEMA,
     );
 }
 

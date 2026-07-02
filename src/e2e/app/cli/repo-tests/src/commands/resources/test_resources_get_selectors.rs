@@ -37,10 +37,10 @@ use crate::resources::{ResourceCtx, fixtures};
 // Identity constants — kept terse so assertions read as "which resources came
 // back". `vs(..)`/`ss(..)` build the `(kind, name)` pairs `get_idents` returns.
 fn vs(name: &str) -> (String, String) {
-    (fixtures::VARIABLE_SET_KIND.to_string(), name.to_string())
+    (fixtures::VARIABLE_SET_SCHEMA.to_string(), name.to_string())
 }
 fn ss(name: &str) -> (String, String) {
-    (fixtures::SECRET_SET_KIND.to_string(), name.to_string())
+    (fixtures::SECRET_SET_SCHEMA.to_string(), name.to_string())
 }
 
 pub async fn test_resources_get_selectors(ctx: ResourceCtx) {
@@ -68,7 +68,7 @@ pub async fn test_resources_get_selectors(ctx: ResourceCtx) {
         let view = ctx.get_one(form.clone()).await;
         assert_eq!(
             view.ident(),
-            (fixtures::VARIABLE_SET_KIND, "app-vars"),
+            (fixtures::VARIABLE_SET_SCHEMA, "app-vars"),
             "`{}` resolved to the wrong resource",
             form.join(" ")
         );
@@ -100,7 +100,7 @@ pub async fn test_resources_get_selectors(ctx: ResourceCtx) {
     // Only vs/app-vars matches `app-%` (vs/db-creds does not). Single result.
 
     let view = ctx.get_one(["get", "vs", "app-%"]).await;
-    assert_eq!(view.ident(), (fixtures::VARIABLE_SET_KIND, "app-vars"));
+    assert_eq!(view.ident(), (fixtures::VARIABLE_SET_SCHEMA, "app-vars"));
     assert_eq!(view.variable("MESSAGE"), Some(app_vars_value));
 
     // ── 5. Kind pattern + exact name: `get s%/db-creds` ───────────────────────
@@ -109,7 +109,7 @@ pub async fn test_resources_get_selectors(ctx: ResourceCtx) {
     // selects exactly the SecretSet (not the VariableSet of the same name).
 
     let view = ctx.get_one(["get", "s%/db-creds"]).await;
-    assert_eq!(view.ident(), (fixtures::SECRET_SET_KIND, "db-creds"));
+    assert_eq!(view.ident(), (fixtures::SECRET_SET_SCHEMA, "db-creds"));
     assert!(
         view.has_secret("API_TOKEN"),
         "ss/db-creds should expose its API_TOKEN secret key:\n{}",
@@ -121,7 +121,7 @@ pub async fn test_resources_get_selectors(ctx: ResourceCtx) {
     // Kind starts `s`, name starts `db-` → only ss/db-creds.
 
     let view = ctx.get_one(["get", "s%/db-%"]).await;
-    assert_eq!(view.ident(), (fixtures::SECRET_SET_KIND, "db-creds"));
+    assert_eq!(view.ident(), (fixtures::SECRET_SET_SCHEMA, "db-creds"));
 
     // ── 7. Kind pattern spanning kinds: `get %sets db-creds` ──────────────────
     //
@@ -140,7 +140,7 @@ pub async fn test_resources_get_selectors(ctx: ResourceCtx) {
     let view = ctx
         .get_one(["get", "vs", "%-creds", "--max-results", "1"])
         .await;
-    assert_eq!(view.ident(), (fixtures::VARIABLE_SET_KIND, "db-creds"));
+    assert_eq!(view.ident(), (fixtures::VARIABLE_SET_SCHEMA, "db-creds"));
     assert_eq!(view.variable("MESSAGE"), Some(db_creds_value));
 
     // ── 9. `--unbounded`: every resource ──────────────────────────────────────

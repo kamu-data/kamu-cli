@@ -65,7 +65,7 @@ pub async fn test_resources_secretset_lifecycle(ctx: ResourceCtx) {
     // view; the no-plaintext crux is asserted on the raw YAML so it also covers
     // any leakage outside `spec.secrets`.
     let view = ctx.get_one(["get", "ss", resource_name]).await;
-    assert_eq!(view.ident(), (fixtures::SECRET_SET_KIND, resource_name));
+    assert_eq!(view.ident(), (fixtures::SECRET_SET_SCHEMA, resource_name));
     assert!(
         view.has_secret("API_TOKEN") && view.has_secret("DB_PASSWORD"),
         "`get ss` should expose both secret keys:\n{}",
@@ -94,7 +94,7 @@ pub async fn test_resources_secretset_lifecycle(ctx: ResourceCtx) {
     //       still no plaintext) ────────────────────────────────────────────────
     let spec_out = ctx.stdout(["get", "ss", resource_name, "--spec"]).await;
     assert!(
-        spec_out.contains("$schema") && spec_out.contains(fixtures::SECRET_SET_KIND),
+        spec_out.contains("$schema") && spec_out.contains(fixtures::SECRET_SET_SCHEMA),
         "`get ss --spec` should emit a SecretSet schema manifest, got:\n{spec_out}"
     );
     assert!(

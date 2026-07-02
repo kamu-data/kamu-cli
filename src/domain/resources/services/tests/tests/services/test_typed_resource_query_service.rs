@@ -18,6 +18,7 @@ use kamu_resources::{
     ResourceHeaders,
     ResourceID,
     ResourceSnapshot,
+    TypeUri,
     TypedResourceQueryError,
     TypedResourceQueryService,
 };
@@ -30,6 +31,11 @@ use crate::tests::utils::{
     make_resource_params,
     register_test_resource_resource_service_layer,
 };
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+static OTHER_SCHEMA: std::sync::LazyLock<TypeUri> =
+    std::sync::LazyLock::new(|| TypeUri::new_unchecked("OtherKind"));
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Tests
@@ -99,7 +105,7 @@ async fn test_get_state_by_id_type_mismatch() {
     let id = harness.allocate_id().await;
 
     harness
-        .insert_snapshot_with_kind(id, account_a.clone(), "OtherKind", "other.dev/v1", "res-a")
+        .insert_snapshot_with_kind(id, account_a.clone(), &OTHER_SCHEMA, "res-a")
         .await;
 
     let result = harness
@@ -175,7 +181,7 @@ async fn test_ensure_id_matches_type_mismatch() {
     let id = harness.allocate_id().await;
 
     harness
-        .insert_snapshot_with_kind(id, account_a, "OtherKind", "other.dev/v1", "res-a")
+        .insert_snapshot_with_kind(id, account_a, &OTHER_SCHEMA, "res-a")
         .await;
 
     let result = harness
@@ -239,13 +245,12 @@ impl TypedResourceQueryServiceHarness {
         &self,
         id: ResourceID,
         owner_account_id: odf::AccountID,
-        schema: &str,
-        _api_version: &str,
+        schema: &TypeUri,
         name: &str,
     ) {
         let snapshot = ResourceSnapshot {
             id,
-            schema: schema.to_string(),
+            schema: schema.clone(),
             headers: ResourceHeaders::simple(Utc::now(), owner_account_id, name),
             spec: serde_json::json!({"value": name}),
             status: None,

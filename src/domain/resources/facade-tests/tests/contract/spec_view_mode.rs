@@ -15,7 +15,8 @@
 //! `Encrypted` (default) returns the ciphertext blob; `Revealed` decrypts it
 //! back to the `Literal` plaintext.
 
-use kamu_resources::ApplyResourceOutcome;
+use kamu_configuration::SecretSetResource;
+use kamu_resources::{ApplyResourceOutcome, ResourceSchemaProvider};
 use kamu_resources_facade::{
     ApplyManifestRequest,
     ResourceBatchSelector,
@@ -30,7 +31,7 @@ use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
 use crate::helpers::{
     SECRET_SET_KIND,
-    SECRET_SET_SCHEMA,
+    SECRET_SET_SCHEMA_STR,
     assert_applied_outcome,
     assert_batch_indexes,
     secret_set_manifest_json,
@@ -122,8 +123,7 @@ pub async fn test_revealed_spec_view_exposes_plaintext(h: &impl FacadeContractHa
 
     // Non-secret identity fields are unchanged
     assert_eq!(view.headers.name, "sv-revealed");
-    assert_eq!(view.schema, SECRET_SET_SCHEMA);
-    assert_eq!(view.schema, SECRET_SET_SCHEMA);
+    assert_eq!(view.schema, *SecretSetResource::schema());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -221,7 +221,7 @@ pub async fn test_spec_view_mode_applies_to_render(h: &impl FacadeContractHarnes
     // Parsed revealed manifest has the secret in the spec
     let parsed: serde_json::Value =
         serde_json::from_str(&rev_result.manifest).expect("must be valid JSON");
-    assert_eq!(parsed["$schema"], SECRET_SET_SCHEMA, "schema mismatch");
+    assert_eq!(parsed["$schema"], SECRET_SET_SCHEMA_STR, "schema mismatch");
     assert!(
         parsed["headers"]["id"].is_null(),
         "rendered manifest must not include id"

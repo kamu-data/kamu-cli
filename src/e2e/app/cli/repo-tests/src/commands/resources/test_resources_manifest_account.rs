@@ -31,7 +31,7 @@ pub async fn test_resources_manifest_account(kamu: KamuCliPuppet) {
     let alice_resource = ctx.get_one(["get", "vs", "from-manifest"]).await;
     assert_eq!(
         alice_resource.ident(),
-        (fixtures::VARIABLE_SET_KIND, "from-manifest")
+        (fixtures::VARIABLE_SET_SCHEMA, "from-manifest")
     );
     assert_eq!(alice_resource.variable("MESSAGE"), Some("alice-value"));
 
@@ -54,11 +54,11 @@ pub async fn test_resources_manifest_account(kamu: KamuCliPuppet) {
     .await;
 
     pretty_assertions::assert_eq!(ctx.list_names("vs").await, vec!["from-manifest"]);
-    assert_eq!(ctx.summary_count(fixtures::VARIABLE_SET_KIND).await, 1);
+    assert_eq!(ctx.summary_count(fixtures::VARIABLE_SET_SCHEMA).await, 1);
 
     ctx.set_account(Some(bob));
     pretty_assertions::assert_eq!(ctx.list_names("vs").await, Vec::<String>::new());
-    assert_eq!(ctx.summary_count(fixtures::VARIABLE_SET_KIND).await, 0);
+    assert_eq!(ctx.summary_count(fixtures::VARIABLE_SET_SCHEMA).await, 0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

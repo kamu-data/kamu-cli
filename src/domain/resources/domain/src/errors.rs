@@ -9,7 +9,7 @@
 
 use event_sourcing::{LoadError, Projection};
 
-use crate::{ResourceDescriptor, ResourceID, ResourceName, ResourceSnapshot};
+use crate::{ResourceID, ResourceName, ResourceSnapshot, TypeUri};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -37,7 +37,7 @@ pub struct ResourceNameNotFoundError {
 #[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
 #[error("Invalid spec for resource {schema}: {message}")]
 pub struct ResourceInvalidSpecError {
-    pub schema: String,
+    pub schema: TypeUri,
     pub message: String,
 }
 
@@ -47,7 +47,7 @@ pub struct ResourceInvalidSpecError {
 #[error("Resource '{id}' of type '{resource_type}' is not owned by the specified account")]
 pub struct ResourceNotOwnedByAccountError {
     pub id: ResourceID,
-    pub resource_type: &'static str,
+    pub resource_type: &'static TypeUri,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -56,12 +56,12 @@ pub struct ResourceNotOwnedByAccountError {
 #[error("Resource id {id} refers to {actual_schema}, expected {expected_schema}")]
 pub struct ResourceTypeMismatchError {
     pub id: ResourceID,
-    pub expected_schema: String,
-    pub actual_schema: String,
+    pub expected_schema: TypeUri,
+    pub actual_schema: TypeUri,
 }
 
 impl ResourceTypeMismatchError {
-    pub fn new(id: ResourceID, expected_schema: String, actual_schema: String) -> Self {
+    pub fn new(id: ResourceID, expected_schema: TypeUri, actual_schema: TypeUri) -> Self {
         Self {
             id,
             expected_schema,
@@ -71,10 +71,10 @@ impl ResourceTypeMismatchError {
 
     pub fn from_expected_and_actual(
         id: ResourceID,
-        expected: &ResourceDescriptor,
+        expected: &TypeUri,
         actual: &ResourceSnapshot,
     ) -> Self {
-        Self::new(id, expected.schema.to_string(), actual.schema.clone())
+        Self::new(id, expected.clone(), actual.schema.clone())
     }
 }
 

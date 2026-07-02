@@ -46,6 +46,7 @@ use kamu_resources::{
     ResourceHeadersInput,
     ResourceID,
     ResourceName,
+    ResourceSchemaProvider,
     UnsupportedResourceDescriptorError,
 };
 use kamu_resources_services::get_resource_crud_dispatcher;
@@ -215,7 +216,7 @@ impl DatasetEnvVarMutationAdapterImpl {
         let new_spec = serde_json::to_value(VariableSetSpec { variables }).int_err()?;
         let headers = self.make_headers(account_id.clone(), resource_name);
 
-        let dispatcher = self.get_dispatcher::<InternalError>(VariableSetResource::SCHEMA)?;
+        let dispatcher = self.get_dispatcher::<InternalError>(VariableSetResource::SCHEMA_STR)?;
 
         let resource_id = self
             .apply_and_handle_rejection::<InternalError>(
@@ -280,7 +281,7 @@ impl DatasetEnvVarMutationAdapterImpl {
         let new_spec = serde_json::to_value(SecretSetSpec { secrets }).int_err()?;
         let headers = self.make_headers(account_id.clone(), resource_name);
 
-        let dispatcher = self.get_dispatcher::<InternalError>(SecretSetResource::SCHEMA)?;
+        let dispatcher = self.get_dispatcher::<InternalError>(SecretSetResource::SCHEMA_STR)?;
 
         let resource_id = self
             .apply_and_handle_rejection::<InternalError>(
@@ -347,7 +348,7 @@ impl DatasetEnvVarMutationAdapterImpl {
         spec.variables.remove(key);
 
         let dispatcher = self
-            .get_dispatcher(VariableSetResource::SCHEMA)
+            .get_dispatcher(VariableSetResource::SCHEMA_STR)
             .map_err(DeleteDatasetEnvVarError::Internal)?;
 
         if spec.variables.is_empty() {
@@ -409,7 +410,7 @@ impl DatasetEnvVarMutationAdapterImpl {
         decrypted.remove(key);
 
         let dispatcher = self
-            .get_dispatcher(SecretSetResource::SCHEMA)
+            .get_dispatcher(SecretSetResource::SCHEMA_STR)
             .map_err(DeleteDatasetEnvVarError::Internal)?;
 
         if decrypted.is_empty() {
@@ -575,7 +576,7 @@ impl DatasetEnvVarMutationAdapterImpl {
     ) -> Result<(Option<ResourceID>, BTreeMap<String, VariableSpec>), InternalError> {
         let id = self
             .generic_resource_query_service
-            .find_resource_id_by_name(account_id, VariableSetResource::SCHEMA, resource_name)
+            .find_resource_id_by_name(account_id, VariableSetResource::schema(), resource_name)
             .await?;
 
         let Some(id) = id else {
@@ -600,7 +601,7 @@ impl DatasetEnvVarMutationAdapterImpl {
     ) -> Result<(Option<ResourceID>, BTreeMap<String, SecretSpec>), InternalError> {
         let id = self
             .generic_resource_query_service
-            .find_resource_id_by_name(account_id, SecretSetResource::SCHEMA, resource_name)
+            .find_resource_id_by_name(account_id, SecretSetResource::schema(), resource_name)
             .await?;
 
         let Some(id) = id else {

@@ -560,7 +560,7 @@ enum ClassifiedSlashDeleteRequest {
 
 #[cfg(test)]
 mod tests {
-    use kamu_resources::ResourceKindDescriptor;
+    use kamu_resources::{ResourceKindDescriptor, TypeUri};
 
     use super::{ClassifiedSlashDeleteRequest, DeleteRequestResolver};
 
@@ -669,13 +669,13 @@ mod tests {
             ResourceKindDescriptor {
                 name: "variablesets".to_owned(),
                 short_names: vec!["vs".to_owned()],
-                schema: "dev.kamu/variableset/v1".to_owned(),
+                schema: TypeUri::new_unchecked("dev.kamu/variableset/v1"),
                 list_columns: Vec::new(),
             },
             ResourceKindDescriptor {
                 name: "secretsets".to_owned(),
                 short_names: vec!["ss".to_owned()],
-                schema: "dev.kamu/secretset/v1".to_owned(),
+                schema: TypeUri::new_unchecked("dev.kamu/secretset/v1"),
                 list_columns: Vec::new(),
             },
         ];

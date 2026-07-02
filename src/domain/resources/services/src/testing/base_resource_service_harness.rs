@@ -25,6 +25,7 @@ use kamu_resources::{
     ResourceRepository,
     ResourceSnapshot,
     ResourceStatus,
+    TypeUri,
 };
 use kamu_resources_inmem::{InMemoryRawResourceEventStore, InMemoryResourceRepository};
 use messaging_outbox::{MockOutbox, Outbox, OutboxProvider, register_message_dispatcher};
@@ -145,13 +146,13 @@ impl BaseResourceServiceHarness {
     pub async fn resource_id_by_name(
         &self,
         account_id: &odf::AccountID,
-        kind: &str,
+        schema: &TypeUri,
         name: &str,
     ) -> Option<ResourceID> {
         self.generic_query_svc
             .find_resource_id_by_name(
                 account_id,
-                kind,
+                schema,
                 &kamu_resources::ResourceName::new_unchecked(name),
             )
             .await

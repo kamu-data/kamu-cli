@@ -44,7 +44,7 @@ use crate::harness::{FacadeContractHarness, TestAccount};
 use crate::helpers::{
     SECRET_SET_KIND,
     VARIABLE_SET_KIND,
-    VARIABLE_SET_SCHEMA,
+    VARIABLE_SET_SCHEMA_STR,
     assert_applied_outcome,
     variable_set_manifest_json,
 };
@@ -472,7 +472,7 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
         .apply_manifest(ApplyManifestRequest {
             format: ResourceManifestFormat::Json,
             manifest: serde_json::json!({
-                "$schema": VARIABLE_SET_SCHEMA,
+                "$schema": VARIABLE_SET_SCHEMA_STR,
                 "headers": {
                     "name": "bad-acct-apply",
                     "account": { "name": "unknown-resource-contract-account" }
@@ -518,7 +518,7 @@ pub async fn test_apply_rejection_taxonomy(h: &impl FacadeContractHarness) {
     // VariableSetSpec::validate() inside the lifecycle; both plan and apply
     // return Ok(Rejected(BusinessValidationFailed)).
     let empty_vars_manifest = serde_json::json!({
-        "$schema": VARIABLE_SET_SCHEMA,
+        "$schema": VARIABLE_SET_SCHEMA_STR,
         "headers": {"name": "tax-biz-invalid"},
         "spec": {"variables": {}}
     })

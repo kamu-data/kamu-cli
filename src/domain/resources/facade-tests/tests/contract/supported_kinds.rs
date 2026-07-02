@@ -8,6 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use database_common::PaginationOpts;
+use kamu_configuration::{SecretSetResource, VariableSetResource};
+use kamu_resources::ResourceSchemaProvider;
 use kamu_resources_facade::{
     GetResourceError,
     ListResourceIdentitiesRequest,
@@ -19,13 +21,7 @@ use kamu_resources_facade::{
 
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
-use crate::helpers::{
-    SECRET_SET_SCHEMA,
-    VARIABLE_SET_KIND,
-    VARIABLE_SET_SCHEMA,
-    apply_manifest_and_get_id,
-    variable_set_manifest_json,
-};
+use crate::helpers::{VARIABLE_SET_KIND, apply_manifest_and_get_id, variable_set_manifest_json};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -40,8 +36,6 @@ pub async fn test_lists_supported_kinds(h: &impl FacadeContractHarness) {
 
     for d in &descriptors {
         assert!(!d.name.is_empty(), "descriptor name must not be empty");
-        assert!(!d.schema.is_empty(), "descriptor kind must not be empty");
-        assert!(!d.schema.is_empty(), "descriptor schema must not be empty");
     }
 
     // Descriptor names are unique
@@ -65,8 +59,12 @@ pub async fn test_lists_supported_kinds(h: &impl FacadeContractHarness) {
     );
 
     // VariableSet and SecretSet must be present
-    let has_variable_set = descriptors.iter().any(|d| d.schema == VARIABLE_SET_SCHEMA);
-    let has_secret_set = descriptors.iter().any(|d| d.schema == SECRET_SET_SCHEMA);
+    let has_variable_set = descriptors
+        .iter()
+        .any(|d| d.schema == *VariableSetResource::schema());
+    let has_secret_set = descriptors
+        .iter()
+        .any(|d| d.schema == *SecretSetResource::schema());
     assert!(has_variable_set, "VariableSet kind must be present");
     assert!(has_secret_set, "SecretSet kind must be present");
 }
@@ -77,7 +75,7 @@ pub async fn test_lists_supported_kinds(h: &impl FacadeContractHarness) {
 // Current behavior: kind short names ("vs", "ss") are informational only and
 // are NOT accepted as kind selectors in facade APIs.  The dispatcher registry
 // matches on the exact canonical resource_type string, so passing "vs" to
-// list/get/etc. returns UnsupportedDescriptor just like any other unknown kind
+// list/get/etc. returns UnsupportedSelector just like any other unknown kind
 // string. This test documents the current contract.  If short-name resolution
 // is added to the dispatcher lookup in the future, update this test
 // accordingly.
@@ -107,7 +105,8 @@ pub async fn test_kind_aliases_resolve_consistently(h: &impl FacadeContractHarne
         .expect("list with canonical kind must succeed");
     for s in &summaries {
         assert_eq!(
-            s.schema, VARIABLE_SET_SCHEMA,
+            s.schema,
+            *VariableSetResource::schema(),
             "list schema must be canonical"
         );
     }
@@ -122,7 +121,8 @@ pub async fn test_kind_aliases_resolve_consistently(h: &impl FacadeContractHarne
         .expect("list_identities with canonical kind must succeed");
     for i in &identities {
         assert_eq!(
-            i.schema, VARIABLE_SET_SCHEMA,
+            i.schema,
+            *VariableSetResource::schema(),
             "list_identities schema must be canonical"
         );
     }
@@ -152,7 +152,8 @@ pub async fn test_kind_aliases_resolve_consistently(h: &impl FacadeContractHarne
         .expect("short name 'vs' must resolve for list");
     for s in &short_name_summaries {
         assert_eq!(
-            s.schema, VARIABLE_SET_SCHEMA,
+            s.schema,
+            *VariableSetResource::schema(),
             "short name list schema must be canonical"
         );
     }
@@ -163,17 +164,17 @@ pub async fn test_kind_aliases_resolve_consistently(h: &impl FacadeContractHarne
 // RF-003
 // Unsupported kind rejection behavior by API:
 //
-// - list / list_identities: UnsupportedDescriptor (kind validated before DB
+// - list / list_identities: UnsupportedSelector (kind validated before DB
 //   query)
 // - apply_manifest: UnsupportedDescriptor (kind validated from manifest)
-// - delete (by UID): UnsupportedDescriptor (kind validated before UID lookup)
+// - delete (by UID): UnsupportedSelector (kind validated before UID lookup)
 //
 // Known gap — get / get_identity by ByName with an unknown kind:
 //   The facade resolves the UID via a DB name lookup first, passing the raw
 // kind   string as a filter column.  For an unknown kind, nothing matches →
-//   LookupProblem(NameNotFound) is returned instead of UnsupportedDescriptor.
+//   LookupProblem(NameNotFound) is returned instead of UnsupportedSelector.
 //   This is an implementation detail of the current ByName resolution path.
-//   get / get_identity by ById does return UnsupportedDescriptor because the
+//   get / get_identity by ById does return UnsupportedSelector because the
 // kind   is validated when the CRUD dispatcher is resolved after the UID is
 // known.
 contract_test!(
@@ -207,11 +208,11 @@ pub async fn test_unsupported_kind_rejected_consistently(h: &impl FacadeContract
         )
         .await;
     assert!(
-        matches!(get_by_name, Err(GetResourceError::UnsupportedDescriptor(_))),
-        "get by ByName with unknown kind returns UnsupportedDescriptor, got: {get_by_name:?}"
+        matches!(get_by_name, Err(GetResourceError::UnsupportedSelector(_))),
+        "get by ByName with unknown kind returns UnsupportedSelector, got: {get_by_name:?}"
     );
 
-    // get_identity by ByName — same UnsupportedDescriptor behavior
+    // get_identity by ByName — same UnsupportedSelector behavior
     let gi_by_name = facade
         .get_identity(ResourceSelector {
             account: None,
@@ -222,12 +223,11 @@ pub async fn test_unsupported_kind_rejected_consistently(h: &impl FacadeContract
         })
         .await;
     assert!(
-        matches!(gi_by_name, Err(GetResourceError::UnsupportedDescriptor(_))),
-        "get_identity by ByName with unknown kind returns UnsupportedDescriptor, got: \
-         {gi_by_name:?}"
+        matches!(gi_by_name, Err(GetResourceError::UnsupportedSelector(_))),
+        "get_identity by ByName with unknown kind returns UnsupportedSelector, got: {gi_by_name:?}"
     );
 
-    // list — UnsupportedDescriptor (kind validated before DB query)
+    // list — UnsupportedSelector (kind validated before DB query)
     let list_result = facade
         .list(ListResourcesRequest {
             kind: bad_kind.to_string(),
@@ -236,14 +236,11 @@ pub async fn test_unsupported_kind_rejected_consistently(h: &impl FacadeContract
         })
         .await;
     assert!(
-        matches!(
-            list_result,
-            Err(ListResourcesError::UnsupportedDescriptor(_))
-        ),
-        "list: unsupported kind must return UnsupportedDescriptor, got: {list_result:?}"
+        matches!(list_result, Err(ListResourcesError::UnsupportedSelector(_))),
+        "list: unsupported kind must return UnsupportedSelector, got: {list_result:?}"
     );
 
-    // list_identities — UnsupportedDescriptor
+    // list_identities — UnsupportedSelector
     let li_result = facade
         .list_identities(ListResourceIdentitiesRequest {
             kind: bad_kind.to_string(),
@@ -252,8 +249,8 @@ pub async fn test_unsupported_kind_rejected_consistently(h: &impl FacadeContract
         })
         .await;
     assert!(
-        matches!(li_result, Err(ListResourcesError::UnsupportedDescriptor(_))),
-        "list_identities: unsupported kind must return UnsupportedDescriptor, got: {li_result:?}"
+        matches!(li_result, Err(ListResourcesError::UnsupportedSelector(_))),
+        "list_identities: unsupported kind must return UnsupportedSelector, got: {li_result:?}"
     );
 
     // apply_manifest — UnsupportedDescriptor
@@ -273,7 +270,7 @@ pub async fn test_unsupported_kind_rejected_consistently(h: &impl FacadeContract
         "apply_manifest: unsupported kind must return UnsupportedDescriptor, got: {apply_result:?}"
     );
 
-    // delete by ById — UnsupportedDescriptor (kind validated after UID is known)
+    // delete by ById — UnsupportedSelector (kind validated after UID is known)
     let delete_result = facade
         .delete(ResourceSelector {
             account: None,
@@ -284,10 +281,9 @@ pub async fn test_unsupported_kind_rejected_consistently(h: &impl FacadeContract
     assert!(
         matches!(
             delete_result,
-            Err(kamu_resources_facade::DeleteResourceError::UnsupportedDescriptor(_))
+            Err(kamu_resources_facade::DeleteResourceError::UnsupportedSelector(_))
         ),
-        "delete by ById: unsupported kind must return UnsupportedDescriptor, got: \
-         {delete_result:?}"
+        "delete by ById: unsupported kind must return UnsupportedSelector, got: {delete_result:?}"
     );
 }
 

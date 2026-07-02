@@ -6,6 +6,8 @@ This file provides Claude Code-specific guidance. For the full agent guide, read
 
 Always set `SQLX_OFFLINE=true` when running any `cargo` command. The postgres crates fail to compile without it because the SQLx offline cache is used instead of a live database connection during compilation.
 
+**NEVER use `-p <crate>` (or `--package`) to scope `cargo build`/`check`/`clippy`/`nextest run` to a single crate.** Always build/check/lint the full workspace. This has been requested repeatedly — do not reintroduce `-p` scoping.
+
 ```bash
 SQLX_OFFLINE=true cargo nextest run -E 'test(test_name_here)'
 SQLX_OFFLINE=true cargo build

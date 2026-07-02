@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources::{ResourceID, ResourceKindDescriptor, ResourceName};
+use kamu_resources::{ResourceID, ResourceKindDescriptor, ResourceName, TypeUri};
 use kamu_resources_facade::ResourceFacade;
 
 use crate::CLIError;
@@ -46,7 +46,7 @@ pub struct ResourceSelectionResolution {
 #[derive(Debug, Clone)]
 pub struct ResourceTarget {
     pub kind: String,
-    pub schema: String,
+    pub schema: TypeUri,
     pub canonical_kind_name: String,
     pub id: ResourceID,
     pub name: ResourceName,

@@ -71,7 +71,7 @@ impl MessageConsumerT<ResourceLifecycleMessage> for ConfigurationResourceLifecyc
         match message {
             ResourceLifecycleMessage::ReconciliationSucceeded(succeeded_message) => {
                 match succeeded_message.resource.schema.as_str() {
-                    VariableSetResource::SCHEMA => {
+                    VariableSetResource::SCHEMA_STR => {
                         let repo = target_catalog
                             .get_one::<dyn VariableSetProjectionRepository>()
                             .map_err(ErrorIntoInternal::int_err)?;
@@ -82,7 +82,7 @@ impl MessageConsumerT<ResourceLifecycleMessage> for ConfigurationResourceLifecyc
                         )
                         .await
                     }
-                    SecretSetResource::SCHEMA => {
+                    SecretSetResource::SCHEMA_STR => {
                         let repo = target_catalog
                             .get_one::<dyn SecretSetProjectionRepository>()
                             .map_err(ErrorIntoInternal::int_err)?;
@@ -103,7 +103,7 @@ impl MessageConsumerT<ResourceLifecycleMessage> for ConfigurationResourceLifecyc
                 );
 
                 match deleted_message.resources[0].schema.as_str() {
-                    VariableSetResource::SCHEMA => {
+                    VariableSetResource::SCHEMA_STR => {
                         let repo = target_catalog
                             .get_one::<dyn VariableSetProjectionRepository>()
                             .map_err(ErrorIntoInternal::int_err)?;
@@ -112,7 +112,7 @@ impl MessageConsumerT<ResourceLifecycleMessage> for ConfigurationResourceLifecyc
                             deleted_message.resources.iter().map(|r| r.id).collect();
                         repo.delete_all_entries(&ids).await
                     }
-                    SecretSetResource::SCHEMA => {
+                    SecretSetResource::SCHEMA_STR => {
                         let repo = target_catalog
                             .get_one::<dyn SecretSetProjectionRepository>()
                             .map_err(ErrorIntoInternal::int_err)?;

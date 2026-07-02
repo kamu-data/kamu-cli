@@ -22,7 +22,9 @@ use kamu_resources::{
     ResourceID,
     ResourceLifecycleMessage,
     ResourceRepository,
+    ResourceSchemaProvider,
     ResourceSnapshot,
+    TypeUri,
 };
 use kamu_resources_inmem::{InMemoryRawResourceEventStore, InMemoryResourceRepository};
 use messaging_outbox::{OutboxProvider, register_message_dispatcher};
@@ -81,8 +83,7 @@ impl BaseGQLResourceHarness {
         catalog: &dill::Catalog,
         account_id: &odf::AccountID,
         name: &str,
-        kind: &str,
-        _api_version: &str,
+        schema: &TypeUri,
         spec: serde_json::Value,
     ) -> ResourceID {
         let resource_repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
@@ -91,7 +92,7 @@ impl BaseGQLResourceHarness {
         resource_repo
             .create_resource(&ResourceSnapshot {
                 id,
-                schema: kind.to_string(),
+                schema: schema.clone(),
                 headers: ResourceHeaders::simple(Utc::now(), account_id.clone(), name),
                 spec,
                 status: None,
@@ -140,8 +141,7 @@ impl BaseGQLResourceHarness {
             catalog,
             account_id,
             name,
-            VariableSetResource::SCHEMA,
-            "",
+            VariableSetResource::schema(),
             spec,
         )
         .await
@@ -153,15 +153,7 @@ impl BaseGQLResourceHarness {
         name: &str,
         spec: serde_json::Value,
     ) -> ResourceID {
-        Self::create_resource(
-            catalog,
-            account_id,
-            name,
-            SecretSetResource::SCHEMA,
-            "",
-            spec,
-        )
-        .await
+        Self::create_resource(catalog, account_id, name, SecretSetResource::schema(), spec).await
     }
 }
 

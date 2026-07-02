@@ -7,14 +7,17 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::{ResourcePresentationDefinition, TypeUri};
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub trait ResourcePresentationDispatcher: Send + Sync {
-    fn schema(&self) -> &'static TypeUri;
+/// Canonical schema URL that identifies a resource type, e.g.
+/// `https://opendatafabric.org/schemas/config/v1alpha1/VariableSet`.
+///
+/// This is the ODF-canonical representation of what the framework calls the
+/// resource "schema". See [`crate::ResourceSchemaId`] for the parsed lens over
+/// a `TypeUri` (base/context/version/name decomposition).
+pub type TypeUri = odf::metadata::resource::TypeUri;
 
-    fn presentation(&self) -> ResourcePresentationDefinition;
-}
+/// CRD-style short type name of a resource, e.g. `VariableSet`.
+pub type TypeName = odf::metadata::resource::TypeName;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
