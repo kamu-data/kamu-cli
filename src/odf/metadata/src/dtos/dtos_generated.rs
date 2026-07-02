@@ -53,6 +53,9 @@ pub mod auth {
         pub fn schema() -> &'static TypeUri {
             &ACCOUNT_SCHEMA
         }
+        pub fn schema_str() -> &'static str {
+            ACCOUNT_SCHEMA_STR
+        }
     }
 
     static ACCOUNT_SCHEMA_STR: &str = "https://opendatafabric.org/schemas/auth/v1alpha1/Account";
@@ -166,6 +169,9 @@ pub mod auth {
         pub fn schema() -> &'static TypeUri {
             &RELATIONS_SCHEMA
         }
+        pub fn schema_str() -> &'static str {
+            RELATIONS_SCHEMA_STR
+        }
     }
 
     static RELATIONS_SCHEMA_STR: &str =
@@ -222,6 +228,9 @@ pub mod config {
     impl SecretSet {
         pub fn schema() -> &'static TypeUri {
             &SECRET_SET_SCHEMA
+        }
+        pub fn schema_str() -> &'static str {
+            SECRET_SET_SCHEMA_STR
         }
     }
 
@@ -287,6 +296,9 @@ pub mod config {
     impl VariableSet {
         pub fn schema() -> &'static TypeUri {
             &VARIABLE_SET_SCHEMA
+        }
+        pub fn schema_str() -> &'static str {
+            VARIABLE_SET_SCHEMA_STR
         }
     }
 
@@ -824,6 +836,9 @@ pub mod dataset {
         pub fn schema() -> &'static TypeUri {
             &DATASET_SCHEMA
         }
+        pub fn schema_str() -> &'static str {
+            DATASET_SCHEMA_STR
+        }
     }
 
     static DATASET_SCHEMA_STR: &str = "https://opendatafabric.org/schemas/dataset/v1alpha1/Dataset";
@@ -1133,6 +1148,9 @@ pub mod dataset {
     impl Projection {
         pub fn schema() -> &'static TypeUri {
             &PROJECTION_SCHEMA
+        }
+        pub fn schema_str() -> &'static str {
+            PROJECTION_SCHEMA_STR
         }
     }
 
@@ -1566,6 +1584,9 @@ pub mod flow {
         pub fn schema() -> &'static TypeUri {
             &FLOW_SCHEMA
         }
+        pub fn schema_str() -> &'static str {
+            FLOW_SCHEMA_STR
+        }
     }
 
     static FLOW_SCHEMA_STR: &str = "https://opendatafabric.org/schemas/flow/v1alpha1/Flow";
@@ -1675,6 +1696,9 @@ pub mod flow {
     impl Task {
         pub fn schema() -> &'static TypeUri {
             &TASK_SCHEMA
+        }
+        pub fn schema_str() -> &'static str {
+            TASK_SCHEMA_STR
         }
     }
 
@@ -2091,6 +2115,9 @@ pub mod sink {
     impl WebhookTarget {
         pub fn schema() -> &'static TypeUri {
             &WEBHOOK_TARGET_SCHEMA
+        }
+        pub fn schema_str() -> &'static str {
+            WEBHOOK_TARGET_SCHEMA_STR
         }
     }
 
@@ -3022,6 +3049,9 @@ pub mod source {
         pub fn schema() -> &'static TypeUri {
             &SOURCE_SCHEMA
         }
+        pub fn schema_str() -> &'static str {
+            SOURCE_SCHEMA_STR
+        }
     }
 
     static SOURCE_SCHEMA_STR: &str = "https://opendatafabric.org/schemas/source/v1alpha1/Source";
@@ -3127,6 +3157,9 @@ pub mod storage {
     impl PersistentVolume {
         pub fn schema() -> &'static TypeUri {
             &PERSISTENT_VOLUME_SCHEMA
+        }
+        pub fn schema_str() -> &'static str {
+            PERSISTENT_VOLUME_SCHEMA_STR
         }
     }
 
