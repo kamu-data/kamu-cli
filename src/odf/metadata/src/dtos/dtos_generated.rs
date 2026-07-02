@@ -55,9 +55,10 @@ pub mod auth {
         }
     }
 
-    static ACCOUNT_SCHEMA: std::sync::LazyLock<TypeUri> = std::sync::LazyLock::new(|| {
-        TypeUri::new_unchecked("https://opendatafabric.org/schemas/auth/v1alpha1/Account")
-    });
+    static ACCOUNT_SCHEMA_STR: &str = "https://opendatafabric.org/schemas/auth/v1alpha1/Account";
+
+    static ACCOUNT_SCHEMA: std::sync::LazyLock<TypeUri> =
+        std::sync::LazyLock::new(|| TypeUri::new_unchecked(ACCOUNT_SCHEMA_STR));
 
     pub use crate::auth::AccountRef;
 
@@ -167,9 +168,11 @@ pub mod auth {
         }
     }
 
-    static RELATIONS_SCHEMA: std::sync::LazyLock<TypeUri> = std::sync::LazyLock::new(|| {
-        TypeUri::new_unchecked("https://opendatafabric.org/schemas/auth/v1alpha1/Relations")
-    });
+    static RELATIONS_SCHEMA_STR: &str =
+        "https://opendatafabric.org/schemas/auth/v1alpha1/Relations";
+
+    static RELATIONS_SCHEMA: std::sync::LazyLock<TypeUri> =
+        std::sync::LazyLock::new(|| TypeUri::new_unchecked(RELATIONS_SCHEMA_STR));
 
     /// Specifies resource attributes and relations between resources on which
     /// auth policies act upon.
@@ -222,9 +225,11 @@ pub mod config {
         }
     }
 
-    static SECRET_SET_SCHEMA: std::sync::LazyLock<TypeUri> = std::sync::LazyLock::new(|| {
-        TypeUri::new_unchecked("https://opendatafabric.org/schemas/config/v1alpha1/SecretSet")
-    });
+    static SECRET_SET_SCHEMA_STR: &str =
+        "https://opendatafabric.org/schemas/config/v1alpha1/SecretSet";
+
+    static SECRET_SET_SCHEMA: std::sync::LazyLock<TypeUri> =
+        std::sync::LazyLock::new(|| TypeUri::new_unchecked(SECRET_SET_SCHEMA_STR));
 
     /// Defines a set of secrets stored and managed by the ODF node and
     /// accessible via embedded sercets provider.
@@ -285,9 +290,11 @@ pub mod config {
         }
     }
 
-    static VARIABLE_SET_SCHEMA: std::sync::LazyLock<TypeUri> = std::sync::LazyLock::new(|| {
-        TypeUri::new_unchecked("https://opendatafabric.org/schemas/config/v1alpha1/VariableSet")
-    });
+    static VARIABLE_SET_SCHEMA_STR: &str =
+        "https://opendatafabric.org/schemas/config/v1alpha1/VariableSet";
+
+    static VARIABLE_SET_SCHEMA: std::sync::LazyLock<TypeUri> =
+        std::sync::LazyLock::new(|| TypeUri::new_unchecked(VARIABLE_SET_SCHEMA_STR));
 
     /// Defines a set of variables stored and managed by the ODF node and
     /// accessible via embedded variables provider.
@@ -819,9 +826,10 @@ pub mod dataset {
         }
     }
 
-    static DATASET_SCHEMA: std::sync::LazyLock<TypeUri> = std::sync::LazyLock::new(|| {
-        TypeUri::new_unchecked("https://opendatafabric.org/schemas/dataset/v1alpha1/Dataset")
-    });
+    static DATASET_SCHEMA_STR: &str = "https://opendatafabric.org/schemas/dataset/v1alpha1/Dataset";
+
+    static DATASET_SCHEMA: std::sync::LazyLock<TypeUri> =
+        std::sync::LazyLock::new(|| TypeUri::new_unchecked(DATASET_SCHEMA_STR));
 
     /// Represents type of the dataset.
     ///
@@ -1128,9 +1136,11 @@ pub mod dataset {
         }
     }
 
-    static PROJECTION_SCHEMA: std::sync::LazyLock<TypeUri> = std::sync::LazyLock::new(|| {
-        TypeUri::new_unchecked("https://opendatafabric.org/schemas/dataset/v1alpha1/Projection")
-    });
+    static PROJECTION_SCHEMA_STR: &str =
+        "https://opendatafabric.org/schemas/dataset/v1alpha1/Projection";
+
+    static PROJECTION_SCHEMA: std::sync::LazyLock<TypeUri> =
+        std::sync::LazyLock::new(|| TypeUri::new_unchecked(PROJECTION_SCHEMA_STR));
 
     /// Represents a projection of a dataaset history into a state for fast
     /// lookups.
@@ -1558,9 +1568,10 @@ pub mod flow {
         }
     }
 
-    static FLOW_SCHEMA: std::sync::LazyLock<TypeUri> = std::sync::LazyLock::new(|| {
-        TypeUri::new_unchecked("https://opendatafabric.org/schemas/flow/v1alpha1/Flow")
-    });
+    static FLOW_SCHEMA_STR: &str = "https://opendatafabric.org/schemas/flow/v1alpha1/Flow";
+
+    static FLOW_SCHEMA: std::sync::LazyLock<TypeUri> =
+        std::sync::LazyLock::new(|| TypeUri::new_unchecked(FLOW_SCHEMA_STR));
 
     /// Defines a sequence of tasks to be executed upon certain trigger
     /// conditions.
@@ -1667,9 +1678,10 @@ pub mod flow {
         }
     }
 
-    static TASK_SCHEMA: std::sync::LazyLock<TypeUri> = std::sync::LazyLock::new(|| {
-        TypeUri::new_unchecked("https://opendatafabric.org/schemas/flow/v1alpha1/Task")
-    });
+    static TASK_SCHEMA_STR: &str = "https://opendatafabric.org/schemas/flow/v1alpha1/Task";
+
+    static TASK_SCHEMA: std::sync::LazyLock<TypeUri> =
+        std::sync::LazyLock::new(|| TypeUri::new_unchecked(TASK_SCHEMA_STR));
 
     /// An individual work item to be executed as part of a flow.
     ///
@@ -2082,9 +2094,11 @@ pub mod sink {
         }
     }
 
-    static WEBHOOK_TARGET_SCHEMA: std::sync::LazyLock<TypeUri> = std::sync::LazyLock::new(|| {
-        TypeUri::new_unchecked("https://opendatafabric.org/schemas/sink/v1alpha1/WebhookTarget")
-    });
+    static WEBHOOK_TARGET_SCHEMA_STR: &str =
+        "https://opendatafabric.org/schemas/sink/v1alpha1/WebhookTarget";
+
+    static WEBHOOK_TARGET_SCHEMA: std::sync::LazyLock<TypeUri> =
+        std::sync::LazyLock::new(|| TypeUri::new_unchecked(WEBHOOK_TARGET_SCHEMA_STR));
 
     /// Defines a webhook target endpoint that can receive event notifications
     /// and data.
@@ -3010,9 +3024,10 @@ pub mod source {
         }
     }
 
-    static SOURCE_SCHEMA: std::sync::LazyLock<TypeUri> = std::sync::LazyLock::new(|| {
-        TypeUri::new_unchecked("https://opendatafabric.org/schemas/source/v1alpha1/Source")
-    });
+    static SOURCE_SCHEMA_STR: &str = "https://opendatafabric.org/schemas/source/v1alpha1/Source";
+
+    static SOURCE_SCHEMA: std::sync::LazyLock<TypeUri> =
+        std::sync::LazyLock::new(|| TypeUri::new_unchecked(SOURCE_SCHEMA_STR));
 
     /// Defines how external data should be cached.
     ///
@@ -3115,12 +3130,11 @@ pub mod storage {
         }
     }
 
+    static PERSISTENT_VOLUME_SCHEMA_STR: &str =
+        "https://opendatafabric.org/schemas/storage/v1alpha1/PersistentVolume";
+
     static PERSISTENT_VOLUME_SCHEMA: std::sync::LazyLock<TypeUri> =
-        std::sync::LazyLock::new(|| {
-            TypeUri::new_unchecked(
-                "https://opendatafabric.org/schemas/storage/v1alpha1/PersistentVolume",
-            )
-        });
+        std::sync::LazyLock::new(|| TypeUri::new_unchecked(PERSISTENT_VOLUME_SCHEMA_STR));
 
     pub use crate::storage::PersistentVolumeRef;
 
