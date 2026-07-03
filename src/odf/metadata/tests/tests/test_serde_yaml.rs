@@ -1452,3 +1452,42 @@ fn test_serde_resource_ref() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_serde_account_ref() {
+    let id = AccountID::new_generated_ed25519().1;
+
+    assert_matches!(
+        serde_json::from_value::<AccountRef>(json!({ "id": id.to_string() })).unwrap(),
+        AccountRef::Id(actual) if actual == id
+    );
+
+    assert_matches!(
+        serde_json::from_value::<AccountRef>(json!({ "name": "alice" })).unwrap(),
+        AccountRef::Name(name) if name.as_str() == "alice"
+    );
+
+    assert_matches!(
+        serde_json::from_value::<AccountRef>(json!({ "id": id.to_string(), "name": "alice" }))
+            .unwrap(),
+        AccountRef::Both { id: actual_id, name } if actual_id == id && name.as_str() == "alice"
+    );
+
+    let error = serde_json::from_value::<AccountRef>(json!({})).unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("must specify id or name or both"),
+        "unexpected error message: {error}"
+    );
+
+    let both = AccountRef::Both {
+        id: id.clone(),
+        name: "alice".parse().unwrap(),
+    };
+    let round_tripped: AccountRef =
+        serde_json::from_value(serde_json::to_value(&both).unwrap()).unwrap();
+    assert_eq!(round_tripped, both);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

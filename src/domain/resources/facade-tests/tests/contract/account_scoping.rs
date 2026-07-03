@@ -28,7 +28,7 @@ use kamu_resources_facade::{
     SearchResourceIdentitiesRequest,
     SpecViewMode,
 };
-use pretty_assertions::assert_eq;
+use pretty_assertions::{assert_eq, assert_matches};
 
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
@@ -72,10 +72,10 @@ async fn create_with_account_selector(
 
 fn variable_set_manifest_json_with_account(name: &str, account: &ResourceAccountRef) -> String {
     let mut account_fields = Vec::new();
-    if let Some(n) = &account.name {
+    if let Some(n) = account.name() {
         account_fields.push(format!(r#""name": "{n}""#));
     }
-    if let Some(id) = &account.id {
+    if let Some(id) = account.id() {
         account_fields.push(format!(r#""id": "{id}""#));
     }
     let account_fields = account_fields.join(", ");
@@ -97,38 +97,28 @@ fn variable_set_manifest_json_with_account(name: &str, account: &ResourceAccount
 }
 
 fn account_by_name(name: &odf::AccountName) -> ResourceAccountRef {
-    ResourceAccountRef {
-        name: Some(name.to_string()),
-        id: None,
-    }
+    ResourceAccountRef::Name(name.clone())
 }
 
 fn account_by_id(id: odf::AccountID) -> ResourceAccountRef {
-    ResourceAccountRef {
-        name: None,
-        id: Some(id),
-    }
+    ResourceAccountRef::Id(id)
 }
 
 fn account_by_name_and_id(name: &odf::AccountName, id: odf::AccountID) -> ResourceAccountRef {
-    ResourceAccountRef {
-        name: Some(name.to_string()),
-        id: Some(id),
+    ResourceAccountRef::Both {
+        id,
+        name: name.clone(),
     }
 }
 
 fn unknown_account_by_name() -> ResourceAccountRef {
-    ResourceAccountRef {
-        name: Some("unknown-resource-contract-account".to_string()),
-        id: None,
-    }
+    ResourceAccountRef::Name(odf::AccountName::new_unchecked(
+        "unknown-resource-contract-account",
+    ))
 }
 
 fn unknown_account_by_id() -> ResourceAccountRef {
-    ResourceAccountRef {
-        name: None,
-        id: Some(odf::AccountID::new_generated_ed25519().1),
-    }
+    ResourceAccountRef::Id(odf::AccountID::new_generated_ed25519().1)
 }
 
 fn selector_by_name(name: &str, account: Option<ResourceAccountRef>) -> ResourceSelector {
@@ -236,6 +226,34 @@ pub async fn test_account_by_id_resolves_correctly(h: &impl FacadeContractHarnes
                 "acct-by-id",
                 Some(account_by_id(h.account_id(TestAccount::Alice))),
             ),
+            SpecViewMode::Encrypted,
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(view.headers.account.id, h.account_id(TestAccount::Alice));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-122B
+contract_test!(
+    account_by_name_and_id_agree_resolves_correctly,
+    super::test_account_by_name_and_id_agree_resolves_correctly
+);
+
+pub async fn test_account_by_name_and_id_agree_resolves_correctly(h: &impl FacadeContractHarness) {
+    let agreeing = account_by_name_and_id(
+        &h.account_name(TestAccount::Alice),
+        h.account_id(TestAccount::Alice),
+    );
+
+    create_with_account_selector(h, TestAccount::Alice, "acct-both-agree", agreeing.clone()).await;
+
+    let view = h
+        .facade_for(TestAccount::Alice)
+        .get(
+            selector_by_name("acct-both-agree", Some(agreeing)),
             SpecViewMode::Encrypted,
         )
         .await
@@ -486,6 +504,52 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
             VariableSetResource::schema(),
         ),
         2
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-126
+contract_test!(
+    empty_account_selector_is_rejected,
+    super::test_empty_account_selector_is_rejected
+);
+
+/// An explicit `"account": {}` in the manifest — distinct from omitting the
+/// `account` key entirely (which defaults to the caller's own account, see
+/// RF-120). `ResourceAccountRef` cannot represent this state once resolved
+/// (it's an `Id | Name | Both` enum with no empty variant), so this must be
+/// rejected at manifest deserialization time.
+pub async fn test_empty_account_selector_is_rejected(h: &impl FacadeContractHarness) {
+    let manifest = indoc::formatdoc!(
+        r#"
+        {{
+            "$schema": "{VARIABLE_SET_SCHEMA_STR}",
+            "headers": {{
+                "name": "acct-empty-selector",
+                "account": {{}}
+            }},
+            "spec": {{
+                "variables": {{
+                    "K": {{"value": "v"}}
+                }}
+            }}
+        }}"#
+    );
+
+    let result = h
+        .facade_for(TestAccount::Alice)
+        .apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest,
+        })
+        .await;
+
+    assert_matches!(
+        result,
+        Err(ApplyManifestError::ParseManifest(_)),
+        "an empty account selector `{{}}` must be rejected while parsing the manifest, got: \
+         {result:?}"
     );
 }
 

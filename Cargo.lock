@@ -8905,6 +8905,7 @@ dependencies = [
  "messaging-outbox",
  "mockall",
  "opendatafabric",
+ "pretty_assertions",
  "serde",
  "serde_json",
  "sqlx",

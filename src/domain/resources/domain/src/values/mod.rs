@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod resource_account_ref;
 mod resource_condition;
 mod resource_headers;
 mod resource_headers_input;
@@ -17,6 +18,7 @@ mod resource_type_selector;
 mod resource_type_uri;
 mod resource_warning;
 
+pub use resource_account_ref::*;
 pub use resource_condition::*;
 pub use resource_headers::*;
 pub use resource_headers_input::*;

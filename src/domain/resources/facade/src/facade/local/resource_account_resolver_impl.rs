@@ -52,23 +52,44 @@ impl ResourceAccountResolverImpl {
             return self.resolve_current_subject_account();
         };
 
-        match (&selector.id, &selector.name) {
-            (Some(id), maybe_name) => {
+        match selector {
+            ResourceAccountRef::Id(id) => {
                 let account = self
                     .account_service
                     .get_account_by_id(id)
                     .await
                     .map_err(ResolveManifestAccountError::from)?;
 
-                if let Some(expected_name) = maybe_name {
-                    let expected_name = odf::AccountName::new_unchecked(expected_name);
-                    if account.account_name != expected_name {
-                        return Err(ResolveManifestAccountError::IdNameMismatch {
-                            account_id: account.id,
-                            expected_name,
-                            actual_name: account.account_name,
-                        });
-                    }
+                Ok(ResolvedAccount {
+                    id: account.id,
+                    name: account.account_name,
+                })
+            }
+            ResourceAccountRef::Name(name) => {
+                let account = self
+                    .account_service
+                    .get_account_by_name(name)
+                    .await
+                    .map_err(ResolveManifestAccountError::from)?;
+
+                Ok(ResolvedAccount {
+                    id: account.id,
+                    name: account.account_name,
+                })
+            }
+            ResourceAccountRef::Both { id, name } => {
+                let account = self
+                    .account_service
+                    .get_account_by_id(id)
+                    .await
+                    .map_err(ResolveManifestAccountError::from)?;
+
+                if account.account_name != *name {
+                    return Err(ResolveManifestAccountError::IdNameMismatch {
+                        account_id: account.id,
+                        expected_name: name.clone(),
+                        actual_name: account.account_name,
+                    });
                 }
 
                 Ok(ResolvedAccount {
@@ -76,20 +97,6 @@ impl ResourceAccountResolverImpl {
                     name: account.account_name,
                 })
             }
-            (None, Some(name)) => {
-                let account_name = odf::AccountName::new_unchecked(name);
-                let account = self
-                    .account_service
-                    .get_account_by_name(&account_name)
-                    .await
-                    .map_err(ResolveManifestAccountError::from)?;
-
-                Ok(ResolvedAccount {
-                    id: account.id,
-                    name: account.account_name,
-                })
-            }
-            (None, None) => Err(ResolveManifestAccountError::EmptySelector),
         }
     }
 

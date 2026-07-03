@@ -36,9 +36,6 @@ pub enum ResolveManifestAccountError {
     #[error("Anonymous subject cannot resolve a target account")]
     AnonymousSubject,
 
-    #[error("Account selector must contain either id or name")]
-    EmptySelector,
-
     #[error(transparent)]
     AccountNotFoundById(kamu_accounts::AccountNotFoundByIdError),
 

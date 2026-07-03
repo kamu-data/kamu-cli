@@ -281,6 +281,11 @@ type AccountQuotasUsageStorage {
 	limitTotalBytes: Int!
 }
 
+type AccountRef {
+	id: AccountID
+	name: AccountName
+}
+
 enum AccountType {
 	USER
 	ORGANIZATION
@@ -3857,14 +3862,15 @@ type Resource {
 	status: JSON
 }
 
-type ResourceAccount {
+input ResourceAccountByIdAndNameInput {
 	id: AccountID!
-	name: AccountName
+	name: AccountName!
 }
 
-input ResourceAccountSelectorInput {
+input ResourceAccountSelectorInput @oneOf {
 	byId: AccountID
 	byName: AccountName
+	both: ResourceAccountByIdAndNameInput
 }
 
 type ResourceApplyChange {
@@ -3930,7 +3936,6 @@ type ResourceBadAccountProblem {
 }
 
 enum ResourceBadAccountProblemCode {
-	EMPTY_SELECTOR
 	ACCOUNT_NOT_FOUND_BY_ID
 	ACCOUNT_NOT_FOUND_BY_NAME
 	ID_NAME_MISMATCH
@@ -4005,7 +4010,7 @@ enum ResourceHeaderValidationProblemCode {
 
 type ResourceHeaders {
 	id: ResourceID!
-	account: ResourceAccount!
+	account: AccountRef!
 	name: ResourceName!
 	description: String
 	labels: JSON!

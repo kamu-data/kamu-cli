@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use flatbuffers::{FlatBufferBuilder, WIPOffset};
+use serde::{Deserialize, Serialize};
 
 use super::*;
 use crate::formats::*;
@@ -19,7 +20,12 @@ use crate::serde::flatbuffers::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+type AccountRefProxy = crate::serde::yaml::StructOrString<crate::serde::yaml::auth::AccountRef>;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(try_from = "AccountRefProxy", into = "AccountRefProxy")]
 pub enum AccountRef {
     Id(AccountID),
     Name(AccountName),

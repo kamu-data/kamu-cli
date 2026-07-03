@@ -85,8 +85,7 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
     ) -> Result<domain::ResourcesSummary, ResourcesSummaryError> {
         use cynic_api::operations::summary as Operation;
 
-        let variables =
-            Operation::SummaryVariables::new(&request).map_err(ResourcesSummaryError::Internal)?;
+        let variables = Operation::SummaryVariables::new(&request);
 
         let response: Operation::SummaryQuery = self
             .graphql_client

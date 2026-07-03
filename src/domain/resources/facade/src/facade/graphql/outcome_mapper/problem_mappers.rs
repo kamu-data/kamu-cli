@@ -57,7 +57,6 @@ pub(crate) fn bad_account_problem_error(
     use cynic_api::fragments::ResourceBadAccountProblemCode as C;
 
     Ok(match problem.code {
-        C::EmptySelector => crate::ResolveManifestAccountError::EmptySelector,
         C::AccountNotFoundById => crate::ResolveManifestAccountError::AccountNotFoundById(
             kamu_accounts::AccountNotFoundByIdError {
                 account_id: problem.account_id.ok_or_else(|| {

@@ -97,14 +97,19 @@ pub(crate) fn resource_view_to_manifest(
     // store-integrity bug.
     let schema = kamu_resources::ResourceSchemaId::parse(schema.as_str()).int_err()?;
 
+    let account = Some(match headers.account.name {
+        Some(name) => kamu_resources::ResourceAccountRef::Both {
+            id: headers.account.id,
+            name,
+        },
+        None => kamu_resources::ResourceAccountRef::Id(headers.account.id),
+    });
+
     Ok(ResourceManifest {
         schema,
         headers: kamu_resources::ResourceManifestHeaders {
             id: None,
-            account: Some(kamu_resources::ResourceAccountRef {
-                id: Some(headers.account.id),
-                name: headers.account.name.map(|name| name.to_string()),
-            }),
+            account,
             name: headers.name.to_string(),
             description: headers.description,
             labels: headers.labels.into_iter().collect(),

@@ -55,7 +55,11 @@ impl TryFrom<fragments::Resource> for domain::ResourceView {
             headers: domain::ResourceViewHeaders {
                 id: value.headers.id,
                 account: domain::ResourceViewAccount {
-                    id: value.headers.account.id,
+                    id: value.headers.account.id.ok_or_else(|| {
+                        InternalError::new(
+                            "ResourceHeaders.account.id is required but missing".to_string(),
+                        )
+                    })?,
                     name: value
                         .headers
                         .account

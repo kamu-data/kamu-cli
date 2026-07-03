@@ -11,7 +11,7 @@ use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
 
 use crate::prelude::*;
-use crate::scalars::{AccountID, AccountName, UInt64};
+use crate::scalars::{AccountID, AccountName, AccountRef, UInt64};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Type aliases for cleaner From implementations
@@ -50,16 +50,29 @@ impl ResourceTypeSelectorInput {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(InputObject, Debug, Clone)]
-pub struct ResourceAccountSelectorInput {
-    pub by_id: Option<AccountID<'static>>,
-    pub by_name: Option<AccountName<'static>>,
+pub struct ResourceAccountByIdAndNameInput {
+    pub id: AccountID<'static>,
+    pub name: AccountName<'static>,
+}
+
+#[derive(OneofObject, Debug, Clone)]
+pub enum ResourceAccountSelectorInput {
+    ById(AccountID<'static>),
+    ByName(AccountName<'static>),
+    Both(ResourceAccountByIdAndNameInput),
 }
 
 impl ResourceAccountSelectorInput {
     pub fn into_manifest_account(self) -> kamu_resources::ResourceAccountRef {
-        kamu_resources::ResourceAccountRef {
-            id: self.by_id.map(Into::into),
-            name: self.by_name.map(|name| name.to_string()),
+        match self {
+            Self::ById(id) => kamu_resources::ResourceAccountRef::Id(id.into()),
+            Self::ByName(name) => kamu_resources::ResourceAccountRef::Name(name.into()),
+            Self::Both(ResourceAccountByIdAndNameInput { id, name }) => {
+                kamu_resources::ResourceAccountRef::Both {
+                    id: id.into(),
+                    name: name.into(),
+                }
+            }
         }
     }
 }
@@ -263,14 +276,6 @@ impl From<kamu_resources_facade::ResolveManifestAccountError> for ResourceBadAcc
 
         let message = value.to_string();
         match value {
-            E::EmptySelector => Self {
-                code: ResourceBadAccountProblemCode::EmptySelector,
-                account_id: None,
-                account_name: None,
-                expected_name: None,
-                actual_name: None,
-                message,
-            },
             E::AccountNotFoundById(error) => Self {
                 code: ResourceBadAccountProblemCode::AccountNotFoundById,
                 account_id: Some(error.account_id.into()),
@@ -310,7 +315,6 @@ impl From<kamu_resources_facade::ResolveManifestAccountError> for ResourceBadAcc
 
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ResourceBadAccountProblemCode {
-    EmptySelector,
     AccountNotFoundById,
     AccountNotFoundByName,
     IdNameMismatch,
@@ -650,7 +654,7 @@ impl From<BatchGetResourceProblem> for BatchResourceProblem {
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceHeaders {
     pub id: ResourceID<'static>,
-    pub account: ResourceAccount,
+    pub account: AccountRef,
     pub name: ResourceName<'static>,
     pub description: Option<String>,
     pub labels: serde_json::Value,
@@ -662,23 +666,22 @@ pub struct ResourceHeaders {
     pub last_reconciled_at: Option<DateTime<Utc>>,
 }
 
-#[derive(SimpleObject, Debug, Clone)]
-pub struct ResourceAccount {
-    pub id: AccountID<'static>,
-    pub name: Option<AccountName<'static>>,
-}
-
 impl From<kamu_resources::ResourceView> for ResourceHeaders {
     fn from(value: kamu_resources::ResourceView) -> Self {
         let labels = serde_json::to_value(value.headers.labels).unwrap();
         let annotations = serde_json::to_value(value.headers.annotations).unwrap();
 
+        let account = match value.headers.account.name {
+            Some(name) => kamu_resources::ResourceAccountRef::Both {
+                id: value.headers.account.id,
+                name,
+            },
+            None => kamu_resources::ResourceAccountRef::Id(value.headers.account.id),
+        };
+
         Self {
             id: value.headers.id.into(),
-            account: ResourceAccount {
-                id: value.headers.account.id.into(),
-                name: value.headers.account.name.map(Into::into),
-            },
+            account: account.into(),
             name: value.headers.name.clone().into(),
             description: value.headers.description,
             labels,

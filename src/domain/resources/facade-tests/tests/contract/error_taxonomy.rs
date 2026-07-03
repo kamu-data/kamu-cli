@@ -343,10 +343,9 @@ contract_test!(bad_account_taxonomy, super::test_bad_account_taxonomy);
 pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
-    let unknown_account = ResourceAccountRef {
-        name: Some("unknown-resource-contract-account".to_string()),
-        id: None,
-    };
+    let unknown_account = ResourceAccountRef::Name(odf::AccountName::new_unchecked(
+        "unknown-resource-contract-account",
+    ));
 
     // --- get ---
     let result = facade

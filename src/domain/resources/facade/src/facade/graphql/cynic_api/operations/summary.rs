@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use cynic::QueryBuilder;
-use internal_error::InternalError;
 
 use crate::ResourcesSummaryRequest;
 use crate::facade::graphql::cynic_api::fragments::{ResourceBadAccountProblem, ResourcesSummary};
@@ -48,14 +47,10 @@ pub(crate) struct SummaryVariables {
 }
 
 impl SummaryVariables {
-    pub(crate) fn new(request: &ResourcesSummaryRequest) -> Result<Self, InternalError> {
-        Ok(Self {
-            account: request
-                .account
-                .as_ref()
-                .map(TryInto::try_into)
-                .transpose()?,
-        })
+    pub(crate) fn new(request: &ResourcesSummaryRequest) -> Self {
+        Self {
+            account: request.account.as_ref().map(Into::into),
+        }
     }
 }
 

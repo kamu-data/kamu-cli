@@ -116,7 +116,6 @@ pub(crate) struct ResourceBadAccountProblem {
 
 #[derive(cynic::Enum, Debug, Clone, Copy)]
 pub(crate) enum ResourceBadAccountProblemCode {
-    EmptySelector,
     AccountNotFoundById,
     AccountNotFoundByName,
     IdNameMismatch,
@@ -214,7 +213,7 @@ pub(crate) struct Resource {
 #[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct ResourceHeaders {
     pub id: kamu_resources::ResourceID,
-    pub account: ResourceAccount,
+    pub account: AccountRef,
     pub name: kamu_resources::ResourceName,
     pub description: Option<String>,
     pub labels: serde_json::Value,
@@ -229,8 +228,8 @@ pub(crate) struct ResourceHeaders {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
-pub(crate) struct ResourceAccount {
-    pub id: odf::AccountID,
+pub(crate) struct AccountRef {
+    pub id: Option<odf::AccountID>,
     pub name: Option<AccountName>,
 }
 

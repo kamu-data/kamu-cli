@@ -35,7 +35,7 @@ impl ListByResourceTypeVariables {
         let (page, per_page) = pagination.as_page_params(Self::DEFAULT_PAGE_SIZE)?;
         Ok(Self {
             resource_type: ResourceTypeSelectorInput::from_resource_type(resource_type),
-            account: account.map(TryInto::try_into).transpose()?,
+            account: account.map(Into::into),
             page,
             per_page,
         })
@@ -60,7 +60,7 @@ impl ListAllVariables {
     ) -> Result<Self, InternalError> {
         let (page, per_page) = pagination.as_page_params(Self::DEFAULT_PAGE_SIZE)?;
         Ok(Self {
-            account: account.map(TryInto::try_into).transpose()?,
+            account: account.map(Into::into),
             page,
             per_page,
         })

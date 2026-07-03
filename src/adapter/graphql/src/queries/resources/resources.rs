@@ -646,10 +646,9 @@ pub(crate) fn map_resolve_manifest_account_error(
         E::AnonymousSubject => GqlError::Access(odf::AccessError::Unauthenticated(
             "Anonymous subject cannot resolve a target account".into(),
         )),
-        E::EmptySelector
-        | E::IdNameMismatch { .. }
-        | E::AccountNotFoundById(_)
-        | E::AccountNotFoundByName(_) => GqlError::gql(error.to_string()),
+        E::IdNameMismatch { .. } | E::AccountNotFoundById(_) | E::AccountNotFoundByName(_) => {
+            GqlError::gql(error.to_string())
+        }
         E::Access(error) => error.into(),
         E::Internal(error) => error.into(),
     }
@@ -663,10 +662,9 @@ pub(crate) fn map_bad_account_problem(
     use kamu_resources_facade::ResolveManifestAccountError as E;
 
     match error {
-        E::EmptySelector
-        | E::IdNameMismatch { .. }
-        | E::AccountNotFoundById(_)
-        | E::AccountNotFoundByName(_) => Ok(error.into()),
+        E::IdNameMismatch { .. } | E::AccountNotFoundById(_) | E::AccountNotFoundByName(_) => {
+            Ok(error.into())
+        }
         E::AnonymousSubject | E::Access(_) | E::Internal(_) => {
             Err(map_resolve_manifest_account_error(error))
         }

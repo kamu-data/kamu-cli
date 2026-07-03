@@ -37,20 +37,32 @@ impl ResourceTypeSelectorInput {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::InputObject, Debug, Clone)]
-#[cynic(graphql_type = "ResourceAccountSelectorInput")]
-pub(crate) struct ResourceAccountSelectorInput {
-    pub by_id: Option<odf::AccountID>,
-    pub by_name: Option<AccountName>,
+#[cynic(graphql_type = "ResourceAccountByIdAndNameInput")]
+pub(crate) struct ResourceAccountByIdAndNameInput {
+    pub id: odf::AccountID,
+    pub name: AccountName,
 }
 
-impl TryFrom<&domain::ResourceAccountRef> for ResourceAccountSelectorInput {
-    type Error = internal_error::InternalError;
+#[derive(cynic::InputObject, Debug, Clone)]
+#[cynic(graphql_type = "ResourceAccountSelectorInput")]
+pub(crate) enum ResourceAccountSelectorInput {
+    ById(odf::AccountID),
+    ByName(AccountName),
+    Both(ResourceAccountByIdAndNameInput),
+}
 
-    fn try_from(value: &domain::ResourceAccountRef) -> Result<Self, Self::Error> {
-        Ok(Self {
-            by_id: value.id.clone(),
-            by_name: value.name.clone().map(AccountName),
-        })
+impl From<&domain::ResourceAccountRef> for ResourceAccountSelectorInput {
+    fn from(value: &domain::ResourceAccountRef) -> Self {
+        match value {
+            domain::ResourceAccountRef::Id(id) => Self::ById(id.clone()),
+            domain::ResourceAccountRef::Name(name) => Self::ByName(AccountName(name.to_string())),
+            domain::ResourceAccountRef::Both { id, name } => {
+                Self::Both(ResourceAccountByIdAndNameInput {
+                    id: id.clone(),
+                    name: AccountName(name.to_string()),
+                })
+            }
+        }
     }
 }
 
@@ -102,7 +114,7 @@ impl TryFrom<&ResourceSelector> for ResourceSelectorInput {
         Ok(Self {
             resource_type: ResourceTypeSelectorInput::from_resource_type(&value.resource_type),
             ref_: (&value.resource_ref).into(),
-            account: value.account.as_ref().map(TryInto::try_into).transpose()?,
+            account: value.account.as_ref().map(Into::into),
         })
     }
 }
@@ -124,7 +136,7 @@ impl TryFrom<&ResourceBatchSelector> for ResourceBatchSelectorInput {
         Ok(Self {
             resource_type: ResourceTypeSelectorInput::from_resource_type(&value.resource_type),
             refs: value.resource_refs.iter().map(Into::into).collect(),
-            account: value.account.as_ref().map(TryInto::try_into).transpose()?,
+            account: value.account.as_ref().map(Into::into),
         })
     }
 }
@@ -152,7 +164,7 @@ impl TryFrom<&SearchResourceIdentitiesRequest> for SearchResourceIdentitiesInput
                 .collect(),
             names: value.exact_names.clone(),
             name_pattern: value.name_pattern.clone(),
-            account: value.account.as_ref().map(TryInto::try_into).transpose()?,
+            account: value.account.as_ref().map(Into::into),
         })
     }
 }

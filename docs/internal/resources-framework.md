@@ -350,7 +350,7 @@ pub struct ResourceManifest {
 pub struct ResourceManifestHeaders {
     pub id: Option<ResourceID>,              // optional — NOT assignable; an exact pointer to an
                                              // existing resource for updates (e.g. when renaming)
-    pub account: Option<ResourceManifestAccount>, // optional — by name OR id; defaults to caller
+    pub account: Option<ResourceAccountRef>, // optional — by name, id, or both; defaults to caller
     pub name: ResourceName,                  // required
     pub description: Option<String>,
     pub labels: Vec<(String, String)>,
@@ -370,6 +370,16 @@ timestamps, or `generation` — those are server-owned.
 > `ResourceSchemaId` (so a malformed URL is rejected at parse time and the segments are available);
 > everything downstream carries the plain `TypeUri`. Both serialize byte-identically to the schema
 > URL string, so there is no wire or storage difference between them.
+
+> **`ResourceAccountRef`** is a re-export of ODF's generated `auth::AccountRef` enum
+> (`Id(AccountID) | Name(AccountName) | Both { id, name }`), reused verbatim rather than
+> hand-rolled — the same "adopt the codegen type directly" pattern as `ResourceID`/`ResourceName`.
+> A manifest's `account` field, and every facade selector's `account` field, share this one type.
+> Because the enum has no empty variant, `headers.account: {}` is rejected at manifest
+> deserialization time (via the ODF codegen's own YAML/JSON serde proxy for this type) with the
+> message "AccountRef must specify id or name or both" — a manifest can no longer represent the
+> nonsensical "account block present but empty" state that the old hand-rolled
+> `{name: Option<String>, id: Option<AccountID>}` struct allowed.
 
 The `id` is **not** something the user assigns — a new resource's UID is always allocated by the
 server. It may only be *supplied* on a manifest to point at an already-existing resource for an
@@ -496,8 +506,11 @@ Resolution + permission checks live in `ResourceAccountResolverImpl`
   the calling subject's own account**. To target *another* account, the resolver requires the caller
   to be an **admin** (`rebac_service.is_account_admin`); otherwise it returns
   `AccessError::Unauthorized`. An **anonymous** subject cannot resolve any account (rejected).
-- **Account selector forms.** `account` may be given by name or by id; if both, they must agree
-  (mismatch → error). Resolution maps the selector to a concrete `(AccountID, AccountName)`.
+- **Account selector forms.** `account` (`ResourceAccountRef`) may be given by name, by id, or both
+  (agreement checked when both are given — mismatch → error). Resolution maps the selector to a
+  concrete `(AccountID, AccountName)`. An empty selector (`{}`) is rejected while the manifest is
+  being deserialized — the enum has no empty variant, so this is a parse-time failure, not a
+  resolution-time one; the resolver itself never sees an empty selector.
 - **Remote calls.** For a remote context the CLI authenticates with an access token; the server then
   resolves the *authenticated principal* into the current account subject exactly as above — the
   client never asserts its own account id, the server derives it.
