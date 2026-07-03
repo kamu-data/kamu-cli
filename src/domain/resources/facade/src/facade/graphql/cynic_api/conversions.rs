@@ -11,23 +11,25 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu_resources as domain;
 
 use crate::facade::graphql::cynic_api::fragments;
-use crate::facade::graphql::cynic_api::operations::supported_kinds;
+use crate::facade::graphql::cynic_api::operations::supported_resource_types;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<supported_kinds::ResourceKindDescriptor> for domain::ResourceKindDescriptor {
-    fn from(value: supported_kinds::ResourceKindDescriptor) -> Self {
+impl From<supported_resource_types::ResourceTypeDescriptor> for domain::ResourceTypeDescriptor {
+    fn from(value: supported_resource_types::ResourceTypeDescriptor) -> Self {
         Self {
-            name: value.name,
-            short_names: value.short_names,
+            canonical_selector: value.canonical_selector,
+            selector_aliases: value.selector_aliases,
             schema: value.schema,
             list_columns: value.list_columns.into_iter().map(Into::into).collect(),
         }
     }
 }
 
-impl From<supported_kinds::ResourceListColumnDescriptor> for domain::ResourceListColumnDescriptor {
-    fn from(value: supported_kinds::ResourceListColumnDescriptor) -> Self {
+impl From<supported_resource_types::ResourceListColumnDescriptor>
+    for domain::ResourceListColumnDescriptor
+{
+    fn from(value: supported_resource_types::ResourceListColumnDescriptor) -> Self {
         Self {
             key: value.key,
             header: value.header,
@@ -82,7 +84,7 @@ impl From<fragments::ResourceIdentity> for domain::ResourceIdentityView {
     fn from(value: fragments::ResourceIdentity) -> Self {
         Self {
             schema: value.schema,
-            canonical_kind_name: value.canonical_kind_name,
+            canonical_selector: value.canonical_selector,
             id: value.id,
             name: value.name,
         }
@@ -175,7 +177,7 @@ impl TryFrom<fragments::ResourceTypeCountSummary> for domain::ResourceTypeCountS
     fn try_from(value: fragments::ResourceTypeCountSummary) -> Result<Self, Self::Error> {
         Ok(Self {
             schema: value.schema,
-            name: value.name,
+            canonical_selector: value.canonical_selector,
             total_count: value.total_count.into(),
             phase_counts: domain::ResourcePhaseCounts {
                 pending: value.phase_counts.pending.into(),

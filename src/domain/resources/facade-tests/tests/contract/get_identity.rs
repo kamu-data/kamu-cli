@@ -24,8 +24,8 @@ use pretty_assertions::assert_eq;
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
 use crate::helpers::{
-    SECRET_SET_KIND,
-    VARIABLE_SET_KIND,
+    SECRET_SET_CANONICAL_SELECTOR,
+    VARIABLE_SET_CANONICAL_SELECTOR,
     VARIABLE_SET_SCHEMA_STR,
     assert_applied_outcome,
     assert_identity_fields,
@@ -38,7 +38,7 @@ use crate::helpers::{
 fn by_name_selector(name: &str) -> ResourceSelector {
     ResourceSelector {
         account: None,
-        kind: VARIABLE_SET_KIND.to_string(),
+        resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
         resource_ref: ResourceRef::ByName(name.parse().unwrap()),
     }
 }
@@ -46,7 +46,7 @@ fn by_name_selector(name: &str) -> ResourceSelector {
 fn by_id_selector(id: &kamu_resources::ResourceID) -> ResourceSelector {
     ResourceSelector {
         account: None,
-        kind: VARIABLE_SET_KIND.to_string(),
+        resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
         resource_ref: ResourceRef::ById(*id),
     }
 }
@@ -127,7 +127,7 @@ pub async fn test_get_identity_by_name(h: &impl FacadeContractHarness) {
         "ident-name-test",
         &id,
     );
-    assert!(!identity.canonical_kind_name.is_empty());
+    assert!(!identity.canonical_selector.as_str().is_empty());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -246,7 +246,7 @@ pub async fn test_get_wrong_schema_returns_mismatch(h: &impl FacadeContractHarne
 
     let wrong_schema_selector = ResourceSelector {
         account: None,
-        kind: SECRET_SET_KIND.to_string(),
+        resource_type: SECRET_SET_CANONICAL_SELECTOR.parse().unwrap(),
         resource_ref: ResourceRef::ById(id),
     };
 
@@ -279,24 +279,24 @@ pub async fn test_get_wrong_schema_returns_mismatch(h: &impl FacadeContractHarne
 
 // RF-037
 contract_test!(
-    get_wrong_kind_returns_kind_mismatch,
-    super::test_get_wrong_kind_returns_kind_mismatch
+    get_wrong_schema_returns_schema_mismatch,
+    super::test_get_wrong_schema_returns_schema_mismatch
 );
 
-pub async fn test_get_wrong_kind_returns_kind_mismatch(h: &impl FacadeContractHarness) {
+pub async fn test_get_wrong_schema_returns_schema_mismatch(h: &impl FacadeContractHarness) {
     use crate::helpers::SECRET_SET_SCHEMA_STR;
 
-    let id = create_test_resource(h, "kind-mismatch-test").await;
+    let id = create_test_resource(h, "schema-mismatch-test").await;
     let facade = h.facade_for(TestAccount::Alice);
 
-    let wrong_kind_selector = ResourceSelector {
+    let wrong_schema_selector = ResourceSelector {
         account: None,
-        kind: SECRET_SET_KIND.to_string(),
+        resource_type: SECRET_SET_CANONICAL_SELECTOR.parse().unwrap(),
         resource_ref: ResourceRef::ById(id),
     };
 
     let result = facade
-        .get(wrong_kind_selector.clone(), SpecViewMode::Encrypted)
+        .get(wrong_schema_selector.clone(), SpecViewMode::Encrypted)
         .await;
     match &result {
         Err(GetResourceError::LookupProblem(ResourceLookupProblem::SchemaMismatch(
@@ -309,18 +309,18 @@ pub async fn test_get_wrong_kind_returns_kind_mismatch(h: &impl FacadeContractHa
             assert_eq!(
                 expected_schema.as_str(),
                 SECRET_SET_SCHEMA_STR,
-                "expected_schema must be the requested kind"
+                "expected_schema must be the requested schema"
             );
             assert_eq!(
                 actual_schema.as_str(),
                 VARIABLE_SET_SCHEMA_STR,
-                "actual_schema must be the stored kind"
+                "actual_schema must be the stored schema"
             );
         }
         other => panic!("expected SchemaMismatch, got: {other:?}"),
     }
 
-    let identity_result = facade.get_identity(wrong_kind_selector).await;
+    let identity_result = facade.get_identity(wrong_schema_selector).await;
     assert!(
         matches!(
             identity_result,

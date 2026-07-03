@@ -38,7 +38,7 @@ use pretty_assertions::{assert_eq, assert_matches};
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
 use crate::helpers::{
-    VARIABLE_SET_KIND,
+    VARIABLE_SET_CANONICAL_SELECTOR,
     VARIABLE_SET_SCHEMA_STR,
     assert_applied_outcome,
     assert_batch_indexes,
@@ -51,7 +51,7 @@ use crate::helpers::{
 fn by_name(name: &str) -> ResourceSelector {
     ResourceSelector {
         account: None,
-        kind: VARIABLE_SET_KIND.to_string(),
+        resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
         resource_ref: ResourceRef::ByName(name.parse().unwrap()),
     }
 }
@@ -59,22 +59,22 @@ fn by_name(name: &str) -> ResourceSelector {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // RF-150
-contract_test!(same_supported_kinds, super::test_same_supported_kinds);
+contract_test!(same_supported_types, super::test_same_supported_types);
 
-pub async fn test_same_supported_kinds(h: &impl FacadeContractHarness) {
+pub async fn test_same_supported_types(h: &impl FacadeContractHarness) {
     let local = h.local_facade_for(TestAccount::Alice);
     let remote = h.facade_for(TestAccount::Alice);
 
-    let mut local_kinds = local.list_supported_kinds().await.unwrap();
-    let mut remote_kinds = remote.list_supported_kinds().await.unwrap();
+    let mut local_types = local.list_supported_resource_types().await.unwrap();
+    let mut remote_types = remote.list_supported_resource_types().await.unwrap();
 
-    local_kinds.sort_by(|a, b| a.schema.cmp(&b.schema));
-    remote_kinds.sort_by(|a, b| a.schema.cmp(&b.schema));
+    local_types.sort_by(|a, b| a.schema.cmp(&b.schema));
+    remote_types.sort_by(|a, b| a.schema.cmp(&b.schema));
 
-    assert!(!local_kinds.is_empty(), "descriptors must not be empty");
+    assert!(!local_types.is_empty(), "descriptors must not be empty");
     assert_eq!(
-        local_kinds, remote_kinds,
-        "local and remote must report identical supported kinds"
+        local_types, remote_types,
+        "local and remote must report identical supported resource types"
     );
 }
 
@@ -270,7 +270,7 @@ pub async fn test_batch_equivalence(h: &impl FacadeContractHarness) {
 
     let batch_selector = ResourceBatchSelector {
         account: None,
-        kind: VARIABLE_SET_KIND.to_string(),
+        resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
         resource_refs: vec![
             ResourceRef::ByName("cross-batch-a".parse().unwrap()), // idx 0 — exists
             ResourceRef::ByName("cross-batch-missing".parse().unwrap()), // idx 1 — missing name

@@ -9,6 +9,7 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[rustfmt::skip]
 #[macro_export]
 macro_rules! declare_resource_lifecycle_reconcile_dispatcher {
     (
@@ -19,9 +20,8 @@ macro_rules! declare_resource_lifecycle_reconcile_dispatcher {
         #[dill::interface(dyn kamu_resources::ResourceLifecycleEventDispatcher)]
         #[dill::meta(kamu_resources::ResourceDispatcherMeta {
             schema: <$resource>::SCHEMA_STR,
-            name: <$resource as kamu_resources::ResourcePresentation>::PRESENTATION.resource_name,
-            short_names:
-                <$resource as kamu_resources::ResourcePresentation>::PRESENTATION.resource_short_names,
+            canonical_selector: <$resource>::CANONICAL_SELECTOR_NAME_STR,
+            selector_aliases: <$resource>::SELECTOR_ALIAS_STRS,
         })]
         pub struct $dispatcher {
             reconcile_resource_use_case:
@@ -57,7 +57,10 @@ macro_rules! declare_resource_lifecycle_reconcile_dispatcher {
                 Ok(())
             }
 
-            async fn handle_deleted(&self, resource: &kamu_resources::ResourceSnapshot) -> Result<(), internal_error::InternalError> {
+            async fn handle_deleted(
+                &self,
+                _resource: &kamu_resources::ResourceSnapshot,
+            ) -> Result<(), internal_error::InternalError> {
                 Ok(())
             }
         }

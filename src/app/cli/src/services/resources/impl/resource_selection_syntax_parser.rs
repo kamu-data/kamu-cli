@@ -17,22 +17,22 @@ pub(super) const ALL_SELECTOR: &str = "all";
 
 #[derive(Debug)]
 pub(super) enum ParsedSyntax<'a> {
-    /// `all` — all resources across supported kinds; other args are shadowed.
+    /// `all` — all resources across supported types; other args are shadowed.
     All {
         shadowed_inputs: Vec<ShadowedParsedInput<'a>>,
     },
-    /// `kind sel1 sel2 ...` — kind is a plain word, selectors have no `/`
-    SameKind {
-        kind_str: &'a str,
+    /// `type sel1 sel2 ...` — type is a plain word, selectors have no `/`
+    SameType {
+        type_str: &'a str,
         selector_inputs: Vec<&'a str>,
     },
-    /// `kind/sel1 kind/sel2 ...` — every arg contains exactly one `/`
+    /// `type/sel1 type/sel2 ...` — every arg contains exactly one `/`
     RefForm { pairs: Vec<(&'a str, &'a str)> },
 }
 
 #[derive(Debug)]
 pub(super) struct ShadowedParsedInput<'a> {
-    pub(super) kind_str: Option<&'a str>,
+    pub(super) type_str: Option<&'a str>,
     pub(super) display: &'a str,
 }
 
@@ -44,14 +44,14 @@ impl ResourceSelectionSyntaxParser {
     /// Parses raw CLI `args` into a [`ParsedSyntax`] variant.
     ///
     /// Accepted forms:
-    /// - Same-kind: first arg has no `/`, remaining args have no `/`, at least
+    /// - Same-type: first arg has no `/`, remaining args have no `/`, at least
     ///   two args total.
     /// - Ref form: every arg contains exactly one `/` with non-empty parts on
     ///   both sides.
     /// - Mixed forms are rejected.
     pub(super) fn parse(args: &[String]) -> Result<ParsedSyntax<'_>, CLIError> {
         if args.is_empty() {
-            return Err(CLIError::usage_error("Expected `kind name` or `kind/name`"));
+            return Err(CLIError::usage_error("Expected `type name` or `type/name`"));
         }
 
         let has_slash = args.iter().any(|a| a.contains('/'));
@@ -69,14 +69,14 @@ impl ResourceSelectionSyntaxParser {
                     }
 
                     if arg.contains('/') {
-                        let (kind_str, _) = Self::parse_ref_arg(arg)?;
+                        let (type_str, _) = Self::parse_ref_arg(arg)?;
                         shadowed_inputs.push(ShadowedParsedInput {
-                            kind_str: Some(kind_str),
+                            type_str: Some(type_str),
                             display: arg,
                         });
                     } else {
                         shadowed_inputs.push(ShadowedParsedInput {
-                            kind_str: None,
+                            type_str: None,
                             display: arg,
                         });
                     }
@@ -85,13 +85,13 @@ impl ResourceSelectionSyntaxParser {
             }
 
             return Err(CLIError::usage_error(
-                "Cannot mix positional `kind name` and slash `kind/name` syntax in the same \
+                "Cannot mix positional `type name` and slash `type/name` syntax in the same \
                  command",
             ));
         }
 
         if has_slash {
-            // Ref form: every arg must be `kind/selector`
+            // Ref form: every arg must be `type/selector`
             let mut pairs = Vec::with_capacity(args.len());
             for arg in args {
                 pairs.push(Self::parse_ref_arg(arg)?);
@@ -102,24 +102,24 @@ impl ResourceSelectionSyntaxParser {
                 let shadowed_inputs = args[1..]
                     .iter()
                     .map(|arg| ShadowedParsedInput {
-                        kind_str: None,
+                        type_str: None,
                         display: arg.as_str(),
                     })
                     .collect();
                 return Ok(ParsedSyntax::All { shadowed_inputs });
             }
 
-            // Same-kind form: `kind sel1 sel2 ...`
+            // Same-type form: `type sel1 sel2 ...`
             if args.len() < 2 {
                 return Err(CLIError::usage_error(format!(
-                    "Invalid resource reference `{}`. Expected `kind/name`",
+                    "Invalid resource reference `{}`. Expected `type/name`",
                     args[0]
                 )));
             }
-            let kind_str = args[0].as_str();
+            let type_str = args[0].as_str();
             let selector_inputs = args[1..].iter().map(String::as_str).collect();
-            Ok(ParsedSyntax::SameKind {
-                kind_str,
+            Ok(ParsedSyntax::SameType {
+                type_str,
                 selector_inputs,
             })
         }
@@ -135,7 +135,7 @@ impl ResourceSelectionSyntaxParser {
             Ok((parts[0], parts[1]))
         } else {
             Err(CLIError::usage_error(format!(
-                "Invalid resource reference `{arg}`. Expected `kind/name`"
+                "Invalid resource reference `{arg}`. Expected `type/name`"
             )))
         }
     }
@@ -158,20 +158,20 @@ mod tests {
         let a = args(&["vs", "my-vars"]);
         assert_matches!(
             ResourceSelectionSyntaxParser::parse(&a),
-            Ok(ParsedSyntax::SameKind {
-                kind_str: "vs",
+            Ok(ParsedSyntax::SameType {
+                type_str: "vs",
                 selector_inputs,
             }) if selector_inputs == vec!["my-vars"]
         );
     }
 
     #[test]
-    fn test_parse_syntax_same_kind_multiple() {
+    fn test_parse_syntax_same_type_multiple() {
         let a = args(&["vs", "vars-a", "vars-b"]);
         assert_matches!(
             ResourceSelectionSyntaxParser::parse(&a),
-            Ok(ParsedSyntax::SameKind {
-                kind_str: "vs",
+            Ok(ParsedSyntax::SameType {
+                type_str: "vs",
                 selector_inputs,
             }) if selector_inputs == vec!["vars-a", "vars-b"]
         );
@@ -234,7 +234,7 @@ mod tests {
             Ok(ParsedSyntax::All {
                 shadowed_inputs,
             }) if shadowed_inputs.len() == 1
-                && shadowed_inputs[0].kind_str.is_none()
+                && shadowed_inputs[0].type_str.is_none()
                 && shadowed_inputs[0].display == "some-name"
         );
     }
@@ -247,7 +247,7 @@ mod tests {
             Ok(ParsedSyntax::All {
                 shadowed_inputs,
             }) if shadowed_inputs.len() == 1
-                && shadowed_inputs[0].kind_str == Some("vs")
+                && shadowed_inputs[0].type_str == Some("vs")
                 && shadowed_inputs[0].display == "vs/my-vars"
         );
     }
@@ -259,9 +259,9 @@ mod tests {
             ResourceSelectionSyntaxParser::parse(&a),
             Ok(ParsedSyntax::All { shadowed_inputs })
             if shadowed_inputs.len() == 2
-                && shadowed_inputs[0].kind_str == Some("vs")
+                && shadowed_inputs[0].type_str == Some("vs")
                 && shadowed_inputs[0].display == "vs/my-vars"
-                && shadowed_inputs[1].kind_str.is_none()
+                && shadowed_inputs[1].type_str.is_none()
                 && shadowed_inputs[1].display == "some-name"
         );
     }
@@ -273,27 +273,27 @@ mod tests {
             ResourceSelectionSyntaxParser::parse(&a),
             Ok(ParsedSyntax::All { shadowed_inputs })
             if shadowed_inputs.len() == 2
-                && shadowed_inputs[0].kind_str == Some("vs")
+                && shadowed_inputs[0].type_str == Some("vs")
                 && shadowed_inputs[0].display == "vs/my-vars"
-                && shadowed_inputs[1].kind_str.is_none()
+                && shadowed_inputs[1].type_str.is_none()
                 && shadowed_inputs[1].display == "some-name"
         );
     }
 
     #[test]
-    fn test_parse_syntax_same_kind_all() {
+    fn test_parse_syntax_same_type_all() {
         let a = args(&["vs", "all", "my-vars"]);
         assert_matches!(
             ResourceSelectionSyntaxParser::parse(&a),
-            Ok(ParsedSyntax::SameKind {
-                kind_str: "vs",
+            Ok(ParsedSyntax::SameType {
+                type_str: "vs",
                 selector_inputs,
             }) if selector_inputs == vec!["all", "my-vars"]
         );
     }
 
     #[test]
-    fn test_parse_syntax_slash_form_all_by_kind_single() {
+    fn test_parse_syntax_slash_form_all_by_type_single() {
         let a = args(&["vs/all"]);
         assert_matches!(
             ResourceSelectionSyntaxParser::parse(&a),
@@ -302,7 +302,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_syntax_slash_form_all_by_kind_with_shadowed() {
+    fn test_parse_syntax_slash_form_all_by_type_with_shadowed() {
         let a = args(&["vs/all", "vs/my-vars"]);
         assert_matches!(
             ResourceSelectionSyntaxParser::parse(&a),
@@ -320,24 +320,24 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_syntax_same_kind_name_pattern() {
+    fn test_parse_syntax_same_type_name_pattern() {
         let a = args(&["vs", "app-%"]);
         assert_matches!(
             ResourceSelectionSyntaxParser::parse(&a),
-            Ok(ParsedSyntax::SameKind {
-                kind_str: "vs",
+            Ok(ParsedSyntax::SameType {
+                type_str: "vs",
                 selector_inputs,
             }) if selector_inputs == vec!["app-%"]
         );
     }
 
     #[test]
-    fn test_parse_syntax_same_kind_kind_pattern() {
+    fn test_parse_syntax_same_type_pattern() {
         let a = args(&["s%", "db-creds"]);
         assert_matches!(
             ResourceSelectionSyntaxParser::parse(&a),
-            Ok(ParsedSyntax::SameKind {
-                kind_str: "s%",
+            Ok(ParsedSyntax::SameType {
+                type_str: "s%",
                 selector_inputs,
             }) if selector_inputs == vec!["db-creds"]
         );
@@ -353,7 +353,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_syntax_slash_form_kind_pattern() {
+    fn test_parse_syntax_slash_form_type_pattern() {
         let a = args(&["s%/db-creds"]);
         assert_matches!(
             ResourceSelectionSyntaxParser::parse(&a),
@@ -388,7 +388,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_syntax_slash_missing_kind_is_error() {
+    fn test_parse_syntax_slash_missing_type_is_error() {
         let a = args(&["/my-vars"]);
         assert_matches!(ResourceSelectionSyntaxParser::parse(&a), Err(_));
     }

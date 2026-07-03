@@ -229,6 +229,15 @@ pub struct TestResource(pub(crate) Aggregate<TestResourceState, dyn TestResource
 
 impl TestResource {
     pub const SCHEMA_STR: &'static str = "https://test.kamu.dev/schemas/test/v1/TestResource";
+
+    pub const CANONICAL_SELECTOR_NAME_STR: &'static str = "testresources";
+    pub const CANONICAL_SELECTOR_NAME: kamu_resources::ResourceSelectorName =
+        kamu_resources::ResourceSelectorName::new_unchecked_static(
+            Self::CANONICAL_SELECTOR_NAME_STR,
+        );
+
+    pub const SELECTOR_ALIAS_STRS: &'static [&'static str] = &[];
+    pub const SELECTOR_ALIASES: &'static [kamu_resources::ResourceSelectorName] = &[];
 }
 
 impl ResourceSchemaProvider for TestResource {
@@ -249,8 +258,8 @@ impl DeclarativeResource for TestResource {
 
 impl ResourcePresentation for TestResource {
     const PRESENTATION: ResourcePresentationDefinition = ResourcePresentationDefinition::new(
-        "testresources",
-        &[],
+        Self::CANONICAL_SELECTOR_NAME,
+        Self::SELECTOR_ALIASES,
         &[ResourceListColumnDefinition {
             key: "value",
             header: "Value",

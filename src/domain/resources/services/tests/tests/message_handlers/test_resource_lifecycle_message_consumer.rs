@@ -97,9 +97,9 @@ async fn test_deleted_message_is_no_op_for_reconciler() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_applied_message_with_unregistered_kind_returns_error() {
-    // Applied message for an unknown kind: dispatcher lookup fails because no
-    // lifecycle dispatcher is registered for "UnknownKind".
+async fn test_applied_message_with_unregistered_schema_returns_error() {
+    // Applied message for an unknown schema: dispatcher lookup fails because no
+    // lifecycle dispatcher is registered for "UnknownSchema".
     let id = make_id();
 
     let harness = ResourceLifecycleConsumerHarness::new(
@@ -110,16 +110,16 @@ async fn test_applied_message_with_unregistered_kind_returns_error() {
         .consume_message(&ResourceLifecycleMessage::applied(
             Utc::now(),
             ResourceLifecycleMessageOutcome::Created,
-            ResourceLifecycleConsumerHarness::make_snapshot_with_kind(
+            ResourceLifecycleConsumerHarness::make_snapshot_with_schema(
                 id,
-                &TypeUri::new_unchecked("UnknownKind"),
+                &TypeUri::new_unchecked("UnknownSchema"),
             ),
         ))
         .await;
 
     assert!(
         result.is_err(),
-        "consumer must return an error for an unregistered resource kind"
+        "consumer must return an error for an unregistered resource schema"
     );
 }
 
@@ -182,10 +182,10 @@ impl ResourceLifecycleConsumerHarness {
     }
 
     fn make_snapshot(id: ResourceID) -> ResourceSnapshot {
-        Self::make_snapshot_with_kind(id, TestResource::schema())
+        Self::make_snapshot_with_schema(id, TestResource::schema())
     }
 
-    fn make_snapshot_with_kind(id: ResourceID, schema: &TypeUri) -> ResourceSnapshot {
+    fn make_snapshot_with_schema(id: ResourceID, schema: &TypeUri) -> ResourceSnapshot {
         ResourceSnapshot {
             id,
             schema: schema.clone(),

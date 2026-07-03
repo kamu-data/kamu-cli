@@ -33,7 +33,7 @@ use pretty_assertions::assert_eq;
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
 use crate::helpers::{
-    VARIABLE_SET_KIND,
+    VARIABLE_SET_CANONICAL_SELECTOR,
     VARIABLE_SET_SCHEMA_STR,
     apply_manifest_and_get_id,
     sorted_identity_names,
@@ -134,7 +134,7 @@ fn unknown_account_by_id() -> ResourceAccountRef {
 fn selector_by_name(name: &str, account: Option<ResourceAccountRef>) -> ResourceSelector {
     ResourceSelector {
         account,
-        kind: VARIABLE_SET_KIND.to_string(),
+        resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
         resource_ref: ResourceRef::ByName(name.parse().unwrap()),
     }
 }
@@ -145,7 +145,7 @@ fn batch_selector_by_name(
 ) -> ResourceBatchSelector {
     ResourceBatchSelector {
         account,
-        kind: VARIABLE_SET_KIND.to_string(),
+        resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
         resource_refs: vec![ResourceRef::ByName(name.parse().unwrap())],
     }
 }
@@ -286,7 +286,7 @@ pub async fn test_account_name_id_mismatch_is_rejected(h: &impl FacadeContractHa
     let list = h
         .facade_for(TestAccount::Alice)
         .list(ListResourcesRequest {
-            kind: VARIABLE_SET_KIND.to_string(),
+            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
@@ -308,7 +308,7 @@ pub async fn test_unknown_account_is_rejected(h: &impl FacadeContractHarness) {
 
     let by_name = facade
         .list(ListResourcesRequest {
-            kind: VARIABLE_SET_KIND.to_string(),
+            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             account: Some(unknown_account_by_name()),
             pagination: PaginationOpts::from_max_results(1000),
         })
@@ -391,7 +391,7 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
 
     let alice_list = alice
         .list_identities(ListResourceIdentitiesRequest {
-            kind: VARIABLE_SET_KIND.to_string(),
+            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
@@ -399,7 +399,7 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
         .unwrap();
     let bob_list = bob
         .list_identities(ListResourceIdentitiesRequest {
-            kind: VARIABLE_SET_KIND.to_string(),
+            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
@@ -416,7 +416,7 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
 
     let alice_search = alice
         .search_identities(SearchResourceIdentitiesRequest {
-            kinds: vec![VARIABLE_SET_KIND.to_string()],
+            raw_type_selectors: vec![VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()],
             exact_names: None,
             name_pattern: Some("acct-%".to_string()),
             account: None,
@@ -426,7 +426,7 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
         .unwrap();
     let bob_search = bob
         .search_identities(SearchResourceIdentitiesRequest {
-            kinds: vec![VARIABLE_SET_KIND.to_string()],
+            raw_type_selectors: vec![VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()],
             exact_names: None,
             name_pattern: Some("acct-%".to_string()),
             account: None,

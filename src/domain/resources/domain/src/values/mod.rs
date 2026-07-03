@@ -13,6 +13,7 @@ mod resource_headers_input;
 mod resource_id;
 mod resource_phase;
 mod resource_schema_id;
+mod resource_type_selector;
 mod resource_type_uri;
 mod resource_warning;
 
@@ -22,5 +23,6 @@ pub use resource_headers_input::*;
 pub use resource_id::*;
 pub use resource_phase::*;
 pub use resource_schema_id::*;
+pub use resource_type_selector::*;
 pub use resource_type_uri::*;
 pub use resource_warning::*;

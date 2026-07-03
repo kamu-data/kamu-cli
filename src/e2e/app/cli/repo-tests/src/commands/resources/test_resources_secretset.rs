@@ -44,7 +44,7 @@ pub async fn test_resources_secretset_lifecycle(ctx: ResourceCtx) {
     )
     .await;
 
-    // ── 3. list secretsets — full kind name + alias; name + count visible, no
+    // ── 3. list secretsets — full type name + alias; name + count visible, no
     //       plaintext ────────────────────────────────────────────────────────
     for list_args in [["list", "secretsets"], ["list", "ss"]] {
         let list_out = ctx.stdout(list_args).await;
@@ -136,7 +136,7 @@ pub async fn test_resources_secretset_lifecycle(ctx: ResourceCtx) {
     );
     ctx.assert_failure(
         ["get", "ss", resource_name],
-        Some(&[r#"Resource 'app-secrets' of kind 'SecretSet' was not found"#]),
+        Some(&[r#"Resource 'app-secrets' of type 'secretsets' was not found"#]),
     )
     .await;
 }

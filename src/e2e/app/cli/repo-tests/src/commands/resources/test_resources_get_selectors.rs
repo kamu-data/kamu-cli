@@ -19,23 +19,24 @@ use crate::resources::{ResourceCtx, fixtures};
 //   ss/app-secrets SecretSet
 //
 // This is a *selector* test: each case asserts which resources a selector
-// resolves to (the sorted `(kind, name)` identity set) and — where it adds
+// resolves to (the sorted `(schema, name)` identity set) and — where it adds
 // signal — the one spec field the form is about. It deliberately does NOT
 // compare whole `get -o json` documents: the reconciler status block, volatile
 // headers (id/account/timestamps), and encrypted secret blobs are not what
 // the selector grammar is about, and re-asserting them here would break these
-// tests on unrelated changes. The full document shape is pinned once, per kind,
+// tests on unrelated changes. The full document shape is pinned once, per type,
 // by `test_resources_golden_view`.
 //
 // Covers:
 //   - Three equivalent selector forms for one resource
-//   - Multi-name same-kind, mixed ref-form
-//   - Name pattern, kind pattern, kind+name pattern, `%sets`
+//   - Multi-name same-type, mixed ref-form
+//   - Name pattern, type pattern, type+name pattern, `%sets`
 //   - `--max-results` truncation and `--unbounded`
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Identity constants — kept terse so assertions read as "which resources came
-// back". `vs(..)`/`ss(..)` build the `(kind, name)` pairs `get_idents` returns.
+// back". `vs(..)`/`ss(..)` build the `(schema, name)` pairs `get_idents`
+// returns.
 fn vs(name: &str) -> (String, String) {
     (fixtures::VARIABLE_SET_SCHEMA.to_string(), name.to_string())
 }
@@ -81,7 +82,7 @@ pub async fn test_resources_get_selectors(ctx: ResourceCtx) {
         assert_eq!(view.description(), Some(fixtures::DEFAULT_DESCRIPTION));
     }
 
-    // ── 2. Multi-name same-kind: `get vs app-vars db-creds` ───────────────────
+    // ── 2. Multi-name same-type: `get vs app-vars db-creds` ───────────────────
     //
     // Two names → both VariableSets, nothing else.
 
@@ -90,7 +91,7 @@ pub async fn test_resources_get_selectors(ctx: ResourceCtx) {
 
     // ── 3. Mixed ref-form: `get vs/app-vars ss/db-creds` ──────────────────────
     //
-    // Two different kinds, one name each.
+    // Two different types, one name each.
 
     let idents = ctx.get_idents(["get", "vs/app-vars", "ss/db-creds"]).await;
     assert_eq!(idents, [ss("db-creds"), vs("app-vars")]);
@@ -103,9 +104,9 @@ pub async fn test_resources_get_selectors(ctx: ResourceCtx) {
     assert_eq!(view.ident(), (fixtures::VARIABLE_SET_SCHEMA, "app-vars"));
     assert_eq!(view.variable("MESSAGE"), Some(app_vars_value));
 
-    // ── 5. Kind pattern + exact name: `get s%/db-creds` ───────────────────────
+    // ── 5. Type pattern + exact name: `get s%/db-creds` ───────────────────────
     //
-    // Case-insensitive kind prefix `s%` matches SecretSet only; `db-creds`
+    // Case-insensitive type prefix `s%` matches SecretSet only; `db-creds`
     // selects exactly the SecretSet (not the VariableSet of the same name).
 
     let view = ctx.get_one(["get", "s%/db-creds"]).await;
@@ -116,14 +117,14 @@ pub async fn test_resources_get_selectors(ctx: ResourceCtx) {
         view.as_json()
     );
 
-    // ── 6. Kind + name pattern: `get s%/db-%` ─────────────────────────────────
+    // ── 6. Type + name pattern: `get s%/db-%` ─────────────────────────────────
     //
-    // Kind starts `s`, name starts `db-` → only ss/db-creds.
+    // Type starts `s`, name starts `db-` → only ss/db-creds.
 
     let view = ctx.get_one(["get", "s%/db-%"]).await;
     assert_eq!(view.ident(), (fixtures::SECRET_SET_SCHEMA, "db-creds"));
 
-    // ── 7. Kind pattern spanning kinds: `get %sets db-creds` ──────────────────
+    // ── 7. Type pattern spanning types: `get %sets db-creds` ──────────────────
     //
     // `%sets` matches both variablesets and secretsets; name `db-creds` exists
     // in both → exactly those two.

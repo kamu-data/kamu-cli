@@ -34,9 +34,6 @@ pub(crate) fn map_batch_lookup_problem(
 pub(crate) fn unsupported_descriptor_problem_error(
     problem: cynic_api::fragments::ResourceUnsupportedDescriptorProblem,
 ) -> domain::UnsupportedResourceDescriptorError {
-    // The wire type only ever conveys a "not found" descriptor: `Duplicate` is a
-    // static wiring bug the server promotes to an internal error, never a union
-    // arm, so it cannot reach the client.
     domain::UnsupportedResourceDescriptorError::NotFound {
         schema: problem.schema,
     }
@@ -47,10 +44,8 @@ pub(crate) fn unsupported_descriptor_problem_error(
 pub(crate) fn unsupported_selector_problem_error(
     problem: cynic_api::fragments::ResourceUnsupportedSelectorProblem,
 ) -> domain::UnsupportedResourceSelectorError {
-    // Likewise, only "not found" selectors cross the wire; `Duplicate` is a
-    // wiring bug promoted to an internal error server-side.
     domain::UnsupportedResourceSelectorError::NotFound {
-        selector: problem.selector,
+        raw_selector: problem.selector,
     }
 }
 
@@ -114,7 +109,7 @@ pub(crate) fn map_name_not_found(
     p: cynic_api::fragments::ResourceNameNotFoundProblem,
 ) -> ResourceLookupProblem {
     ResourceLookupProblem::NameNotFound(domain::ResourceNameNotFoundError {
-        kind: p.kind,
+        canonical_selector: p.canonical_selector,
         name: p.name,
     })
 }

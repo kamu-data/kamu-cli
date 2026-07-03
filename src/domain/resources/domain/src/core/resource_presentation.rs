@@ -10,7 +10,7 @@
 use serde::{Deserialize, Serialize};
 use strum::{Display, EnumString};
 
-use crate::{DeclarativeResource, ResourceSchemaProvider};
+use crate::{DeclarativeResource, ResourceSchemaProvider, ResourceSelectorName};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -22,22 +22,22 @@ pub trait ResourcePresentation: ResourceSchemaProvider + DeclarativeResource {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResourcePresentationDefinition {
-    pub resource_name: &'static str,
-    pub resource_short_names: &'static [&'static str],
+    pub canonical_selector: ResourceSelectorName,
+    pub selector_aliases: &'static [ResourceSelectorName],
     pub list_columns: &'static [ResourceListColumnDefinition],
 }
 
 impl ResourcePresentationDefinition {
     pub const fn new(
-        resource_name: &'static str,
-        resource_short_names: &'static [&'static str],
+        canonical_selector: ResourceSelectorName,
+        selector_aliases: &'static [ResourceSelectorName],
         list_columns: &'static [ResourceListColumnDefinition],
     ) -> Self {
         Self {
-            resource_name,
-            resource_short_names,
+            canonical_selector,
+            selector_aliases,
             list_columns,
         }
     }

@@ -17,10 +17,10 @@ use crate::{
     ResourceID,
     ResourceIDStream,
     ResourceName,
+    ResourcePhaseCounts,
     ResourceRawEventQuery,
     ResourceSnapshot,
     ResourceSnapshotStream,
-    ResourceSummaryRow,
     TypeUri,
 };
 
@@ -145,6 +145,16 @@ pub trait ResourceRepository: Send + Sync {
         &self,
         account_id: odf::AccountID,
     ) -> Result<Vec<ResourceSummaryRow>, InternalError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResourceSummaryRow {
+    pub schema: String,
+    pub total_count: u64,
+    pub phase_counts: ResourcePhaseCounts,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

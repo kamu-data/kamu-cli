@@ -90,7 +90,7 @@ pub async fn test_summary_counts_resources(h: &impl FacadeContractHarness) {
         .iter()
         .find(|r| r.schema == *VariableSetResource::schema())
         .map(|r| r.total_count)
-        .expect("VariableSet kind must appear in summary");
+        .expect("VariableSet type must appear in summary");
 
     assert_eq!(alice_vs_count, 2, "Alice must have exactly 2 VariableSets");
 

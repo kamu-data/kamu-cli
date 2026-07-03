@@ -19,8 +19,8 @@ use crate::output::OutputConfig;
 use crate::resource_context::{ResourceContextReporter, ResourceContextResolver};
 use crate::resources::{
     ResourceFacadeFactory,
-    ResourceKindLookupErrorOptions,
-    ResourceKindLookupService,
+    ResourceTypeLookupErrorOptions,
+    ResourceTypeLookupService,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -39,7 +39,7 @@ pub struct ListCommand {
     remote_alias_reg: Arc<dyn RemoteAliasesRegistry>,
     rebac_service: Arc<dyn kamu_auth_rebac::RebacService>,
     resource_facade_factory: Arc<dyn ResourceFacadeFactory>,
-    resource_kind_lookup_service: Arc<dyn ResourceKindLookupService>,
+    resource_type_lookup_service: Arc<dyn ResourceTypeLookupService>,
     resource_context_resolver: Arc<ResourceContextResolver>,
     resource_context_reporter: Arc<ResourceContextReporter>,
 
@@ -76,7 +76,7 @@ impl ListCommand {
             None => ListMode::Datasets,
             Some(target) if target.eq_ignore_ascii_case(DATASETS_TARGET) => ListMode::Datasets,
             Some(target) if target.eq_ignore_ascii_case(ALL_TARGET) => ListMode::ResourcesAll,
-            Some(_) => ListMode::ResourcesByKind,
+            Some(_) => ListMode::ResourcesByType,
         }
     }
 
@@ -110,12 +110,12 @@ impl ListCommand {
 
         let scope = match self.mode() {
             ListMode::ResourcesAll => ListResourcesScope::All,
-            ListMode::ResourcesByKind => ListResourcesScope::ByKind(
-                self.resource_kind_lookup_service
-                    .resolve_kind_descriptor(
+            ListMode::ResourcesByType => ListResourcesScope::ByType(
+                self.resource_type_lookup_service
+                    .resolve_type_descriptor(
                         self.explicit_context_name.as_deref(),
                         self.target.as_deref().unwrap(),
-                        ResourceKindLookupErrorOptions::new("Unsupported list target")
+                        ResourceTypeLookupErrorOptions::new("Unsupported list target")
                             .with_additional_targets([DATASETS_TARGET, ALL_TARGET]),
                     )
                     .await?,
@@ -155,7 +155,7 @@ impl Command for ListCommand {
 
                 self.make_list_datasets_command().validate_args().await
             }
-            ListMode::ResourcesAll | ListMode::ResourcesByKind => {
+            ListMode::ResourcesAll | ListMode::ResourcesByType => {
                 if self.related_account.is_explicit() {
                     return Err(CLIError::usage_error(
                         "Listing resources does not support --target-account or --all-accounts",
@@ -170,7 +170,7 @@ impl Command for ListCommand {
     async fn run(&self) -> Result<(), CLIError> {
         match self.mode() {
             ListMode::Datasets => self.make_list_datasets_command().run().await,
-            ListMode::ResourcesAll | ListMode::ResourcesByKind => {
+            ListMode::ResourcesAll | ListMode::ResourcesByType => {
                 self.resolve_list_resources_command().await?.run().await
             }
         }
@@ -183,7 +183,7 @@ impl Command for ListCommand {
 enum ListMode {
     Datasets,
     ResourcesAll,
-    ResourcesByKind,
+    ResourcesByType,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

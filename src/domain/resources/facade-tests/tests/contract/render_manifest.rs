@@ -26,7 +26,7 @@ use pretty_assertions::assert_eq;
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
 use crate::helpers::{
-    VARIABLE_SET_KIND,
+    VARIABLE_SET_CANONICAL_SELECTOR,
     VARIABLE_SET_SCHEMA_STR,
     assert_applied_outcome,
     variable_set_manifest_json,
@@ -37,7 +37,7 @@ use crate::helpers::{
 fn by_name(name: &str) -> ResourceSelector {
     ResourceSelector {
         account: None,
-        kind: VARIABLE_SET_KIND.to_string(),
+        resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
         resource_ref: ResourceRef::ByName(name.parse().unwrap()),
     }
 }
@@ -45,7 +45,7 @@ fn by_name(name: &str) -> ResourceSelector {
 fn by_id(id: &kamu_resources::ResourceID) -> ResourceSelector {
     ResourceSelector {
         account: None,
-        kind: VARIABLE_SET_KIND.to_string(),
+        resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
         resource_ref: ResourceRef::ById(*id),
     }
 }
@@ -251,14 +251,14 @@ contract_test!(
 );
 
 pub async fn test_render_wrong_schema_returns_mismatch(h: &impl FacadeContractHarness) {
-    use crate::helpers::SECRET_SET_KIND;
+    use crate::helpers::SECRET_SET_CANONICAL_SELECTOR;
 
     let id = create_resource(h, "render-mismatch").await;
     let facade = h.facade_for(TestAccount::Alice);
 
     let wrong_schema_selector = ResourceSelector {
         account: None,
-        kind: SECRET_SET_KIND.to_string(),
+        resource_type: SECRET_SET_CANONICAL_SELECTOR.parse().unwrap(),
         resource_ref: ResourceRef::ById(id),
     };
     let result = facade
@@ -280,7 +280,7 @@ pub async fn test_render_wrong_schema_returns_mismatch(h: &impl FacadeContractHa
 
     let wrong_kind = ResourceSelector {
         account: None,
-        kind: SECRET_SET_KIND.to_string(),
+        resource_type: SECRET_SET_CANONICAL_SELECTOR.parse().unwrap(),
         resource_ref: ResourceRef::ById(id),
     };
     let result = facade

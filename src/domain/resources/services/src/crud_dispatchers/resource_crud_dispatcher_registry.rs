@@ -11,10 +11,11 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu_resources::{
     ResourceCrudDispatcher,
     ResourceDispatcherMeta,
+    ResourceTypeSelectorRaw,
     TypeUri,
     UnsupportedResourceDescriptorError,
     UnsupportedResourceSelectorError,
-    resource_kind_matches_selector,
+    resource_selector_parts_match,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -38,9 +39,9 @@ where
     };
 
     if handlers.next().is_some() {
-        return Err(UnsupportedResourceDescriptorError::Duplicate {
-            schema: TypeUri::new_unchecked(schema),
-        }
+        return Err(InternalError::new(format!(
+            "Multiple CRUD dispatchers registered for schema '{schema}'"
+        ))
         .into());
     }
 
@@ -79,30 +80,34 @@ pub fn get_resource_crud_dispatcher_for_trusted_schema(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn get_resource_crud_dispatcher_by_selector<E>(
+pub fn get_resource_crud_dispatcher_by_raw_selector<E>(
     target_catalog: &dill::Catalog,
-    selector: &str,
+    raw_selector: &ResourceTypeSelectorRaw,
 ) -> Result<std::sync::Arc<dyn ResourceCrudDispatcher>, E>
 where
     E: From<UnsupportedResourceSelectorError> + From<InternalError>,
 {
     let mut handlers = target_catalog.builders_for_with_meta::<dyn ResourceCrudDispatcher, _>(
         |meta: &ResourceDispatcherMeta| {
-            resource_kind_matches_selector(meta.name, meta.short_names, selector)
+            resource_selector_parts_match(
+                meta.canonical_selector,
+                meta.selector_aliases.iter().copied(),
+                raw_selector,
+            )
         },
     );
 
     let Some(builder) = handlers.next() else {
         return Err(UnsupportedResourceSelectorError::NotFound {
-            selector: selector.to_string(),
+            raw_selector: raw_selector.clone(),
         }
         .into());
     };
 
     if handlers.next().is_some() {
-        return Err(UnsupportedResourceSelectorError::Duplicate {
-            selector: selector.to_string(),
-        }
+        return Err(InternalError::new(format!(
+            "Multiple CRUD dispatchers registered for selector '{raw_selector}'"
+        ))
         .into());
     }
 

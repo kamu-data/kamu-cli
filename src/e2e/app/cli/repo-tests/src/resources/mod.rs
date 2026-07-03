@@ -40,9 +40,9 @@ pub fn assert_output_contains_all(output: &str, expected_lines: &[&str], command
 
 /// Assert that a JSON records array (e.g. `list -o json`,
 /// `context api-resources -o json`) contains at least one row whose `"Name"`
-/// and `"Kind"` columns both match. Column names follow the Arrow/RecordsWriter
+/// and `"Type"` columns both match. Column names follow the Arrow/RecordsWriter
 /// convention used by the CLI: title-cased strings, not camelCase.
-pub fn assert_record_row(doc: &serde_json::Value, label: &str, name: &str, kind: &str) {
+pub fn assert_record_row(doc: &serde_json::Value, label: &str, name: &str, type_name: &str) {
     let rows = doc
         .as_array()
         .unwrap_or_else(|| panic!("`{label}` should be a JSON array of records:\n{doc}"));
@@ -50,9 +50,9 @@ pub fn assert_record_row(doc: &serde_json::Value, label: &str, name: &str, kind:
     assert!(
         rows.iter().any(|row| {
             row.get("Name").and_then(serde_json::Value::as_str) == Some(name)
-                && row.get("Kind").and_then(serde_json::Value::as_str) == Some(kind)
+                && row.get("Type").and_then(serde_json::Value::as_str) == Some(type_name)
         }),
-        "`{label}` should contain a row with Name={name} Kind={kind}, got:\n{doc}"
+        "`{label}` should contain a row with Name={name} Type={type_name}, got:\n{doc}"
     );
 }
 
@@ -60,14 +60,14 @@ pub fn assert_record_row(doc: &serde_json::Value, label: &str, name: &str, kind:
 
 /// Return the `totalCount` for a resource schema from `summary -o json/yaml`
 /// output converted to JSON.
-pub fn summary_count(doc: &serde_json::Value, label: &str, kind: &str) -> u64 {
-    let Some(row) = summary_row(doc, label, kind) else {
+pub fn summary_count(doc: &serde_json::Value, label: &str, schema: &str) -> u64 {
+    let Some(row) = summary_row(doc, label, schema) else {
         return 0;
     };
 
     row.get("totalCount")
         .and_then(serde_json::Value::as_u64)
-        .unwrap_or_else(|| panic!("`{label}` row for {kind} has no numeric totalCount:\n{doc}"))
+        .unwrap_or_else(|| panic!("`{label}` row for {schema} has no numeric totalCount:\n{doc}"))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -75,7 +75,7 @@ pub fn summary_count(doc: &serde_json::Value, label: &str, kind: &str) -> u64 {
 fn summary_row<'a>(
     doc: &'a serde_json::Value,
     label: &str,
-    kind: &str,
+    schema: &str,
 ) -> Option<&'a serde_json::Value> {
     let rows = doc
         .get("resourceCounts")
@@ -83,7 +83,7 @@ fn summary_row<'a>(
         .unwrap_or_else(|| panic!("`{label}` should contain resourceCounts array:\n{doc}"));
 
     rows.iter()
-        .find(|row| row.get("schema").and_then(serde_json::Value::as_str) == Some(kind))
+        .find(|row| row.get("schema").and_then(serde_json::Value::as_str) == Some(schema))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

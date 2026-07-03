@@ -71,7 +71,8 @@ async fn test_create_duplicate_id_returns_error() {
     let (_, mut agg) = make_fresh_aggregate(account_id.clone(), "res-a");
     harness.persistence_svc().create(&mut agg).await.unwrap();
 
-    // Same account + kind + name but a fresh UID — repository duplicate check fires
+    // Same account + schema + name but a fresh UID — repository duplicate check
+    // fires
     let (_, mut agg2) = make_fresh_aggregate(account_id, "res-a");
     let result = harness.persistence_svc().create(&mut agg2).await;
 

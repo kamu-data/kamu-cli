@@ -160,12 +160,12 @@ async fn test_plan_type_mismatch_rejects() {
     let account_id = make_account_id();
     let id = harness.base.allocate_resource_id().await;
 
-    // Insert a snapshot with the wrong kind directly into the repository
+    // Insert a snapshot with the wrong schema directly into the repository
     harness
         .resource_repo()
         .create_resource(&ResourceSnapshot {
             id,
-            schema: TypeUri::new_unchecked("OtherKind"),
+            schema: TypeUri::new_unchecked("OtherSchema"),
             headers: ResourceHeaders::simple(Utc::now(), account_id.clone(), "res-a"),
             spec: serde_json::json!({}),
             status: None,
@@ -181,7 +181,7 @@ async fn test_plan_type_mismatch_rejects() {
 
     assert!(
         result.is_err(),
-        "expected type-mismatch error when UID points to a different kind"
+        "expected type-mismatch error when UID points to a different schema"
     );
 }
 

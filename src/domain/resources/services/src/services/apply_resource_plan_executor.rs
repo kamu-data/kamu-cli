@@ -174,7 +174,7 @@ where
                 "Resource create hit duplicate constraint, but no existing resource was found"
                     .int_err()
                     .with_context(format!(
-                        "account_id={}, kind='{}', name='{}'",
+                        "account_id={}, schema='{}', name='{}'",
                         headers_input.account,
                         R::schema(),
                         headers_input.name
@@ -207,7 +207,7 @@ where
                     "Resource duplicate create retry unexpectedly produced a create plan"
                         .int_err()
                         .with_context(format!(
-                            "account_id={}, kind='{}', name='{}'",
+                            "account_id={}, schema='{}', name='{}'",
                             plan.resource.headers().account,
                             R::schema(),
                             plan.resource.headers().name

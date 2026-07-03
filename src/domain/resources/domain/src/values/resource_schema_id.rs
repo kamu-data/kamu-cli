@@ -12,7 +12,7 @@ use std::str::FromStr;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use url::Url;
 
-use crate::TypeUri;
+use crate::{TypeName, TypeUri};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -30,7 +30,7 @@ pub struct ResourceSchemaId {
     base: String,
     context: String,
     version: String,
-    name: String,
+    type_name: TypeName,
 }
 
 impl ResourceSchemaId {
@@ -61,7 +61,9 @@ impl ResourceSchemaId {
 
         let context = segments[segments.len() - 3].to_owned();
         let version = segments[segments.len() - 2].to_owned();
-        let name = segments[segments.len() - 1].to_owned();
+        let type_name = segments[segments.len() - 1]
+            .parse::<TypeName>()
+            .map_err(|_| ParseResourceSchemaError::new(schema))?;
         let base_path = &segments[..segments.len() - 3];
         let mut base = format!(
             "{}://{}",
@@ -85,7 +87,7 @@ impl ResourceSchemaId {
             base,
             context,
             version,
-            name,
+            type_name,
         })
     }
 
@@ -110,12 +112,13 @@ impl ResourceSchemaId {
         &self.version
     }
 
-    pub fn name(&self) -> &str {
-        &self.name
+    pub fn type_name(&self) -> &TypeName {
+        &self.type_name
     }
 }
 
-/// The short display name (RFC-018 CRD-style type name, e.g. `VariableSet`) of
+/// The short schema type name (RFC-018 CRD-style type name, e.g.
+/// `VariableSet`) of
 /// a schema [`TypeUri`], for human-facing output and error messages.
 ///
 /// Callers pass a `TypeUri` that is expected to already be a valid canonical
@@ -123,15 +126,9 @@ impl ResourceSchemaId {
 /// selectors). A parse failure therefore means the identity is corrupt, which
 /// is a data-integrity catastrophe — it is surfaced as an [`InternalError`],
 /// never silently rendered as the raw URL.
-// TODO(typeuri-followup): when RFC-018 `TypeName` is adopted for the schema's
-// last segment, return `&TypeName` from a `ResourceSchemaId::type_name()`
-// method and/or source known kinds from `ResourcePresentation` instead of URL
-// parsing.
-pub fn resource_kind_display_name(
-    schema: &TypeUri,
-) -> Result<String, internal_error::InternalError> {
+pub fn resource_type_name(schema: &TypeUri) -> Result<TypeName, internal_error::InternalError> {
     ResourceSchemaId::try_from(schema)
-        .map(|schema_id| schema_id.name().to_string())
+        .map(|schema_id| schema_id.type_name().clone())
         .map_err(|err| {
             internal_error::InternalError::new(format!(
                 "Stored resource schema '{schema}' is not a valid canonical schema URL: {err}"
@@ -202,7 +199,7 @@ mod tests {
         assert_eq!(schema.base(), "https://opendatafabric.org/schemas");
         assert_eq!(schema.context(), "config");
         assert_eq!(schema.version(), "v1alpha1");
-        assert_eq!(schema.name(), "VariableSet");
+        assert_eq!(schema.type_name().as_str(), "VariableSet");
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -219,7 +216,7 @@ mod tests {
         assert_eq!(schema.base(), "https://schemas.partner.org");
         assert_eq!(schema.context(), "billing");
         assert_eq!(schema.version(), "v1");
-        assert_eq!(schema.name(), "Invoice");
+        assert_eq!(schema.type_name().as_str(), "Invoice");
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

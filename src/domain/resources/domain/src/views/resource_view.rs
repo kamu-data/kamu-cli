@@ -12,14 +12,14 @@ use std::collections::BTreeMap;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::{ResourceHeaders, ResourceID, ResourceName, TypeUri};
+use crate::{ResourceHeaders, ResourceID, ResourceName, ResourceSelectorName, TypeUri};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceIdentityView {
     pub schema: TypeUri,
-    pub canonical_kind_name: String,
+    pub canonical_selector: ResourceSelectorName,
     pub id: ResourceID,
     pub name: ResourceName,
 }

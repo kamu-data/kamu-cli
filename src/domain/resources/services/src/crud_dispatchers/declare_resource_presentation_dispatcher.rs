@@ -9,6 +9,7 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[rustfmt::skip]
 #[macro_export]
 macro_rules! declare_resource_presentation_dispatcher {
     (
@@ -19,22 +20,22 @@ macro_rules! declare_resource_presentation_dispatcher {
         #[dill::interface(dyn kamu_resources::ResourcePresentationDispatcher)]
         #[dill::meta(kamu_resources::ResourceDispatcherMeta {
             schema: <$resource>::SCHEMA_STR,
-            name: <$resource as kamu_resources::ResourcePresentation>::PRESENTATION.resource_name,
-            short_names:
-                <$resource as kamu_resources::ResourcePresentation>::PRESENTATION.resource_short_names,
+            canonical_selector: <$resource>::CANONICAL_SELECTOR_NAME_STR,
+            selector_aliases: <$resource>::SELECTOR_ALIAS_STRS,
         })]
         pub struct $dispatcher;
 
         impl kamu_resources::ResourcePresentationDispatcher for $dispatcher
         where
-            $resource: kamu_resources::ResourceSchemaProvider + kamu_resources::ResourcePresentation,
+            $resource:
+                kamu_resources::ResourceSchemaProvider + kamu_resources::ResourcePresentation,
         {
             fn schema(&self) -> &'static kamu_resources::TypeUri {
                 <$resource as kamu_resources::ResourceSchemaProvider>::schema()
             }
 
             fn presentation(&self) -> kamu_resources::ResourcePresentationDefinition {
-                <$resource as kamu_resources::ResourcePresentation>::PRESENTATION
+                <$resource as kamu_resources::ResourcePresentation>::PRESENTATION.clone()
             }
         }
     };

@@ -16,10 +16,10 @@ use crate::helpers::assert_applied_outcome;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub const VARIABLE_SET_KIND: &str = VariableSetResource::RESOURCE_NAME;
+pub const VARIABLE_SET_CANONICAL_SELECTOR: &str = VariableSetResource::CANONICAL_SELECTOR_NAME_STR;
 pub const VARIABLE_SET_SCHEMA_STR: &str = VariableSetResource::SCHEMA_STR;
 
-pub const SECRET_SET_KIND: &str = SecretSetResource::RESOURCE_NAME;
+pub const SECRET_SET_CANONICAL_SELECTOR: &str = SecretSetResource::CANONICAL_SELECTOR_NAME_STR;
 pub const SECRET_SET_SCHEMA_STR: &str = SecretSetResource::SCHEMA_STR;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

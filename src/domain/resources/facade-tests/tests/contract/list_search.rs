@@ -19,9 +19,9 @@ use pretty_assertions::{assert_eq, assert_matches};
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
 use crate::helpers::{
-    SECRET_SET_KIND,
+    SECRET_SET_CANONICAL_SELECTOR,
     SECRET_SET_SCHEMA_STR,
-    VARIABLE_SET_KIND,
+    VARIABLE_SET_CANONICAL_SELECTOR,
     VARIABLE_SET_SCHEMA_STR,
     apply_manifest_and_get_id,
     normalize_identity_views,
@@ -60,7 +60,7 @@ pub async fn test_list_summaries_for_account(h: &impl FacadeContractHarness) {
 
     let mut summaries = facade
         .list(ListResourcesRequest {
-            kind: VARIABLE_SET_KIND.to_string(),
+            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             account: None, // default = alice
             pagination: PaginationOpts::from_max_results(1000),
         })
@@ -110,7 +110,7 @@ pub async fn test_list_identities_for_account(h: &impl FacadeContractHarness) {
 
     let mut identities = facade
         .list_identities(ListResourceIdentitiesRequest {
-            kind: VARIABLE_SET_KIND.to_string(),
+            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
@@ -127,7 +127,7 @@ pub async fn test_list_identities_for_account(h: &impl FacadeContractHarness) {
     for i in &identities {
         assert_eq!(i.schema.as_str(), VARIABLE_SET_SCHEMA_STR);
         assert_eq!(i.schema.as_str(), VARIABLE_SET_SCHEMA_STR);
-        assert!(!i.canonical_kind_name.is_empty());
+        assert!(!i.canonical_selector.as_str().is_empty());
     }
 }
 
@@ -147,7 +147,7 @@ pub async fn test_list_supports_pagination_limit(h: &impl FacadeContractHarness)
     let facade = h.facade_for(TestAccount::Alice);
     let summaries = facade
         .list(ListResourcesRequest {
-            kind: VARIABLE_SET_KIND.to_string(),
+            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             account: None,
             pagination: PaginationOpts::from_page(0, 2),
         })
@@ -178,7 +178,7 @@ pub async fn test_list_supports_pagination_offset(h: &impl FacadeContractHarness
     let facade = h.facade_for(TestAccount::Alice);
     let first_page = facade
         .list(ListResourcesRequest {
-            kind: VARIABLE_SET_KIND.to_string(),
+            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             account: None,
             pagination: PaginationOpts::from_page(0, 2),
         })
@@ -186,7 +186,7 @@ pub async fn test_list_supports_pagination_offset(h: &impl FacadeContractHarness
         .unwrap();
     let second_page = facade
         .list(ListResourcesRequest {
-            kind: VARIABLE_SET_KIND.to_string(),
+            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             account: None,
             pagination: PaginationOpts::from_page(1, 2),
         })
@@ -220,7 +220,7 @@ pub async fn test_list_identities_pagination_mirrors_list(h: &impl FacadeContrac
     let facade = h.facade_for(TestAccount::Alice);
     let summaries = facade
         .list(ListResourcesRequest {
-            kind: VARIABLE_SET_KIND.to_string(),
+            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             account: None,
             pagination: PaginationOpts::from_page(1, 2),
         })
@@ -228,7 +228,7 @@ pub async fn test_list_identities_pagination_mirrors_list(h: &impl FacadeContrac
         .unwrap();
     let identities = facade
         .list_identities(ListResourceIdentitiesRequest {
-            kind: VARIABLE_SET_KIND.to_string(),
+            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             account: None,
             pagination: PaginationOpts::from_page(1, 2),
         })
@@ -261,7 +261,7 @@ pub async fn test_list_empty_account_returns_empty(h: &impl FacadeContractHarnes
 
     let summaries = facade
         .list(ListResourcesRequest {
-            kind: VARIABLE_SET_KIND.to_string(),
+            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
@@ -269,7 +269,7 @@ pub async fn test_list_empty_account_returns_empty(h: &impl FacadeContractHarnes
         .unwrap();
     let identities = facade
         .list_identities(ListResourceIdentitiesRequest {
-            kind: VARIABLE_SET_KIND.to_string(),
+            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
@@ -290,29 +290,36 @@ contract_test!(
 
 pub async fn test_list_unsupported_kind_returns_error(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
+    let unsupported_selector = "NoSuchResourceKind";
 
     let summaries = facade
         .list(ListResourcesRequest {
-            kind: "NoSuchResourceKind".to_string(),
+            raw_type_selector: unsupported_selector.parse().unwrap(),
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await;
     let identities = facade
         .list_identities(ListResourceIdentitiesRequest {
-            kind: "NoSuchResourceKind".to_string(),
+            raw_type_selector: unsupported_selector.parse().unwrap(),
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await;
 
-    assert!(
-        matches!(summaries, Err(ListResourcesError::UnsupportedSelector(_))),
-        "unsupported kind must be rejected, got: {summaries:?}"
+    assert_matches!(
+        summaries,
+        Err(ListResourcesError::UnsupportedSelector(
+            kamu_resources::UnsupportedResourceSelectorError::NotFound { raw_selector }
+        )) if raw_selector.as_str() == unsupported_selector,
+        "unsupported selector must be rejected, got: {summaries:?}"
     );
-    assert!(
-        matches!(identities, Err(ListResourcesError::UnsupportedSelector(_))),
-        "unsupported kind must be rejected, got: {identities:?}"
+    assert_matches!(
+        identities,
+        Err(ListResourcesError::UnsupportedSelector(
+            kamu_resources::UnsupportedResourceSelectorError::NotFound { raw_selector }
+        )) if raw_selector.as_str() == unsupported_selector,
+        "unsupported selector must be rejected, got: {identities:?}"
     );
 }
 
@@ -329,7 +336,7 @@ pub async fn test_search_by_exact_names(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
     let response = facade
         .search_identities(SearchResourceIdentitiesRequest {
-            kinds: vec![VARIABLE_SET_KIND.to_string()],
+            raw_type_selectors: vec![VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()],
             exact_names: Some(vec![
                 "search-exact-alpha".parse().unwrap(),
                 "search-exact-beta".parse().unwrap(),
@@ -362,7 +369,7 @@ pub async fn test_search_exact_names_ignores_missing(h: &impl FacadeContractHarn
     let facade = h.facade_for(TestAccount::Alice);
     let response = facade
         .search_identities(SearchResourceIdentitiesRequest {
-            kinds: vec![VARIABLE_SET_KIND.to_string()],
+            raw_type_selectors: vec![VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()],
             exact_names: Some(vec![
                 "search-missing-present".parse().unwrap(),
                 "search-missing-absent".parse().unwrap(),
@@ -394,7 +401,7 @@ pub async fn test_search_by_name_pattern(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
     let response = facade
         .search_identities(SearchResourceIdentitiesRequest {
-            kinds: vec![VARIABLE_SET_KIND.to_string()],
+            raw_type_selectors: vec![VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()],
             exact_names: None,
             name_pattern: Some("search-pattern-%".to_string()),
             account: None,
@@ -413,20 +420,20 @@ pub async fn test_search_by_name_pattern(h: &impl FacadeContractHarness) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // RF-093
-contract_test!(search_multi_kind, super::test_search_multi_kind);
+contract_test!(search_multi_type, super::test_search_multi_type);
 
-pub async fn test_search_multi_kind(h: &impl FacadeContractHarness) {
+pub async fn test_search_multi_type(h: &impl FacadeContractHarness) {
     // Create one VariableSet and one SecretSet with a shared name prefix
     apply_manifest_and_get_id(
         h,
         TestAccount::Alice,
-        variable_set_manifest_json("multi-kind-vs", None, &[("K", "v")]),
+        variable_set_manifest_json("multi-type-vs", None, &[("K", "v")]),
     )
     .await;
     apply_manifest_and_get_id(
         h,
         TestAccount::Alice,
-        secret_set_manifest_json("multi-kind-ss", None, &[("K", "v")]),
+        secret_set_manifest_json("multi-type-ss", None, &[("K", "v")]),
     )
     .await;
     // A third resource that must not appear in results
@@ -440,9 +447,12 @@ pub async fn test_search_multi_kind(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
     let response = facade
         .search_identities(SearchResourceIdentitiesRequest {
-            kinds: vec![VARIABLE_SET_KIND.to_string(), SECRET_SET_KIND.to_string()],
+            raw_type_selectors: vec![
+                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+                SECRET_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            ],
             exact_names: None,
-            name_pattern: Some("multi-kind-%".to_string()),
+            name_pattern: Some("multi-type-%".to_string()),
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
@@ -451,28 +461,28 @@ pub async fn test_search_multi_kind(h: &impl FacadeContractHarness) {
 
     assert_eq!(
         response.total_count, 2,
-        "must find exactly the two multi-kind resources"
+        "must find exactly the two multi-type resources"
     );
 
     let names = sorted_identity_names(response.items.clone());
     assert!(
-        names.contains(&"multi-kind-vs".to_string()),
-        "VariableSet resource must appear in multi-kind search"
+        names.contains(&"multi-type-vs".to_string()),
+        "VariableSet resource must appear in multi-type search"
     );
     assert!(
-        names.contains(&"multi-kind-ss".to_string()),
-        "SecretSet resource must appear in multi-kind search"
+        names.contains(&"multi-type-ss".to_string()),
+        "SecretSet resource must appear in multi-type search"
     );
 
-    // Both kinds must be represented in the result
-    let kinds: std::collections::HashSet<_> =
+    // Both schemas must be represented in the result
+    let schemas: std::collections::HashSet<_> =
         response.items.iter().map(|i| i.schema.as_str()).collect();
     assert!(
-        kinds.contains(VARIABLE_SET_SCHEMA_STR),
+        schemas.contains(VARIABLE_SET_SCHEMA_STR),
         "result must include VariableSet schema"
     );
     assert!(
-        kinds.contains(SECRET_SET_SCHEMA_STR),
+        schemas.contains(SECRET_SET_SCHEMA_STR),
         "result must include SecretSet schema"
     );
 }
@@ -490,7 +500,7 @@ pub async fn test_search_empty_criteria_returns_error(h: &impl FacadeContractHar
 
     let result = facade
         .search_identities(SearchResourceIdentitiesRequest {
-            kinds: vec![VARIABLE_SET_KIND.to_string()],
+            raw_type_selectors: vec![VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()],
             exact_names: None,
             name_pattern: None,
             account: None,
@@ -517,7 +527,7 @@ pub async fn test_search_pagination_and_total_count(h: &impl FacadeContractHarne
     let facade = h.facade_for(TestAccount::Alice);
     let response = facade
         .search_identities(SearchResourceIdentitiesRequest {
-            kinds: vec![VARIABLE_SET_KIND.to_string()],
+            raw_type_selectors: vec![VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()],
             exact_names: None,
             name_pattern: Some("search-page-%".to_string()),
             account: None,
@@ -544,7 +554,7 @@ pub async fn test_search_account_scoping(h: &impl FacadeContractHarness) {
     let alice_response = h
         .facade_for(TestAccount::Alice)
         .search_identities(SearchResourceIdentitiesRequest {
-            kinds: vec![VARIABLE_SET_KIND.to_string()],
+            raw_type_selectors: vec![VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()],
             exact_names: None,
             name_pattern: Some("search-scope-%".to_string()),
             account: None,
@@ -555,7 +565,7 @@ pub async fn test_search_account_scoping(h: &impl FacadeContractHarness) {
     let bob_response = h
         .facade_for(TestAccount::Bob)
         .search_identities(SearchResourceIdentitiesRequest {
-            kinds: vec![VARIABLE_SET_KIND.to_string()],
+            raw_type_selectors: vec![VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()],
             exact_names: None,
             name_pattern: Some("search-scope-%".to_string()),
             account: None,

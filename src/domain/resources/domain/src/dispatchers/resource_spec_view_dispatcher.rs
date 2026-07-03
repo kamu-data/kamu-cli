@@ -24,7 +24,7 @@ pub trait ResourceSpecViewDispatcher: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Returns the spec view dispatcher for the given resource kind, or
+/// Returns the spec view dispatcher for the given resource schema, or
 /// `None` if none is registered. Absence is normal for resource types that have
 /// no sensitive fields.
 pub fn get_resource_spec_view_dispatcher_from_catalog(

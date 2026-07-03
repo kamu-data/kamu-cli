@@ -107,18 +107,19 @@ pub async fn test_resources_output_formats(ctx: ResourceCtx) {
     );
 
     // `context api-resources -o json`: parseable records array listing the
-    // supported resource kinds. The `"Kind"` column carries the PascalCase kind
-    // name; `"Name"` carries the canonical lowercase plural (e.g. "variablesets").
-    // Assert by Kind only — the plural name is an implementation detail.
+    // supported resource types. The `"Schema"` column carries the canonical
+    // `$schema` URI; `"Name"` carries the canonical lowercase plural (e.g.
+    // "variablesets"). Assert by Schema only — the plural name is an
+    // implementation detail.
     let api_resources_json = ctx
         .stdout_json(["context", "api-resources", "-o", "json"])
         .await;
-    assert_api_resources_has_kind(
+    assert_api_resources_has_schema(
         &api_resources_json,
         "context api-resources -o json",
         fixtures::VARIABLE_SET_SCHEMA,
     );
-    assert_api_resources_has_kind(
+    assert_api_resources_has_schema(
         &api_resources_json,
         "context api-resources -o json",
         fixtures::SECRET_SET_SCHEMA,
@@ -129,33 +130,33 @@ pub async fn test_resources_output_formats(ctx: ResourceCtx) {
 // Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn assert_csv_contains_resource(raw: &str, label: &str, name: &str, kind: &str) {
+fn assert_csv_contains_resource(raw: &str, label: &str, name: &str, type_name: &str) {
     let mut lines = raw.lines();
     let header = lines
         .next()
         .unwrap_or_else(|| panic!("`{label}` should include a CSV header, got empty output"));
 
     assert!(
-        header.contains("Name") && header.contains("Kind"),
-        "`{label}` header should contain Name and Kind columns, got:\n{raw}"
+        header.contains("Name") && header.contains("Type"),
+        "`{label}` header should contain Name and Type columns, got:\n{raw}"
     );
     assert!(
-        lines.any(|line| line.contains(name) && line.contains(kind)),
-        "`{label}` should contain a row for {kind}/{name}, got:\n{raw}"
+        lines.any(|line| line.contains(name) && line.contains(type_name)),
+        "`{label}` should contain a row for {type_name}/{name}, got:\n{raw}"
     );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn assert_api_resources_has_kind(doc: &serde_json::Value, label: &str, kind: &str) {
+fn assert_api_resources_has_schema(doc: &serde_json::Value, label: &str, schema: &str) {
     let rows = doc
         .as_array()
         .unwrap_or_else(|| panic!("`{label}` should be a JSON array of records:\n{doc}"));
 
     assert!(
         rows.iter()
-            .any(|row| row.get("Schema").and_then(serde_json::Value::as_str) == Some(kind)),
-        "`{label}` should list supported kind {kind}, got:\n{doc}"
+            .any(|row| row.get("Schema").and_then(serde_json::Value::as_str) == Some(schema)),
+        "`{label}` should list supported schema {schema}, got:\n{doc}"
     );
 }
 

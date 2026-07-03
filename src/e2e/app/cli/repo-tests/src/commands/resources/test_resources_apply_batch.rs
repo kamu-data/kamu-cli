@@ -13,7 +13,7 @@ use crate::resources::{ResourceCtx, fixtures};
 // Scenario: batch apply — success & failure semantics (QA scenario 6)
 //
 // `apply` accepts multiple manifest paths in one invocation. This covers:
-//   - ordered multi-manifest success across kinds (VariableSet + SecretSet),
+//   - ordered multi-manifest success across types (VariableSet + SecretSet),
 //   - later-wins when the same resource appears twice (last write applies),
 //   - stop-on-error (default): a rejected manifest aborts the batch, so items
 //     listed *after* it are never applied,
@@ -30,7 +30,7 @@ use crate::resources::{ResourceCtx, fixtures};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_resources_apply_batch(ctx: ResourceCtx) {
-    // ── 1. Ordered multi-manifest success across kinds ────────────────────────
+    // ── 1. Ordered multi-manifest success across types ────────────────────────
     {
         let vs_name = "batch-vars";
         let ss_name = "batch-secrets";

@@ -18,8 +18,8 @@ use crate::resources::{ResourceCtx, fixtures};
 // in `get_resource_command.rs` changes shape, so a human decides whether the
 // change was intended.
 //
-// Everywhere else, resource tests assert identity (`(kind, name)`) plus the one
-// field under test via `ResourceView` accessors — deliberately ignoring the
+// Everywhere else, resource tests assert identity (`(schema, name)`) plus the
+// one field under test via `ResourceView` accessors — deliberately ignoring the
 // status block and volatile fields so they don't break for the wrong reason.
 // Concentrating the full-shape assertion here keeps that rigor without paying
 // its brittleness at every call site.

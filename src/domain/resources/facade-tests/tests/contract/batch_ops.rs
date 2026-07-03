@@ -25,8 +25,8 @@ use pretty_assertions::{assert_eq, assert_matches};
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
 use crate::helpers::{
-    SECRET_SET_KIND,
-    VARIABLE_SET_KIND,
+    SECRET_SET_CANONICAL_SELECTOR,
+    VARIABLE_SET_CANONICAL_SELECTOR,
     VARIABLE_SET_SCHEMA_STR,
     assert_applied_outcome,
     assert_batch_indexes,
@@ -62,7 +62,7 @@ pub async fn test_get_many_all_successes(h: &impl FacadeContractHarness) {
 
     let selector = ResourceBatchSelector {
         account: None,
-        kind: VARIABLE_SET_KIND.to_string(),
+        resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
         resource_refs: vec![
             ResourceRef::ByName("batch-a".parse().unwrap()),
             ResourceRef::ById(id_b),
@@ -110,7 +110,7 @@ pub async fn test_get_many_mixed_successes_problems(h: &impl FacadeContractHarne
         .get_many(
             ResourceBatchSelector {
                 account: None,
-                kind: VARIABLE_SET_KIND.to_string(),
+                resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
                 resource_refs: vec![
                     ResourceRef::ByName("mixed-a".parse().unwrap()), // idx 0 — exists
                     ResourceRef::ByName("no-such-name".parse().unwrap()), // idx 1 — missing name
@@ -157,7 +157,7 @@ pub async fn test_get_many_duplicate_refs(h: &impl FacadeContractHarness) {
         .get_many(
             ResourceBatchSelector {
                 account: None,
-                kind: VARIABLE_SET_KIND.to_string(),
+                resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
                 resource_refs: vec![
                     ResourceRef::ByName("dup-ref".parse().unwrap()), // idx 0
                     ResourceRef::ByName("dup-ref".parse().unwrap()), // idx 1 — same ref
@@ -187,7 +187,7 @@ pub async fn test_get_many_empty_refs(h: &impl FacadeContractHarness) {
         .get_many(
             ResourceBatchSelector {
                 account: None,
-                kind: VARIABLE_SET_KIND.to_string(),
+                resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
                 resource_refs: vec![],
             },
             SpecViewMode::Encrypted,
@@ -214,7 +214,7 @@ pub async fn test_get_many_empty_refs_validates_unsupported_kind(h: &impl Facade
         .get_many(
             ResourceBatchSelector {
                 account: None,
-                kind: "NoSuchResourceKindXYZ".to_string(),
+                resource_type: "NoSuchResourceKindXYZ".parse().unwrap(),
                 resource_refs: vec![],
             },
             SpecViewMode::Encrypted,
@@ -224,7 +224,7 @@ pub async fn test_get_many_empty_refs_validates_unsupported_kind(h: &impl Facade
     assert_matches!(
         result,
         Err(BatchResourceError::UnsupportedSelector(_)),
-        "empty batch with unsupported kind must still be rejected"
+        "empty batch with unsupported type must still be rejected"
     );
 }
 
@@ -246,7 +246,7 @@ pub async fn test_get_many_empty_refs_validates_bad_account(h: &impl FacadeContr
                     name: Some("unknown-resource-contract-account".to_string()),
                     id: None,
                 }),
-                kind: VARIABLE_SET_KIND.to_string(),
+                resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
                 resource_refs: vec![],
             },
             SpecViewMode::Encrypted,
@@ -270,31 +270,31 @@ contract_test!(
 
 pub async fn test_batch_empty_refs_validation_is_consistent(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
-    let bad_kind = "NoSuchResourceKindXYZ";
+    let bad_type = "NoSuchResourceTypeXYZ";
     let bad_account = Some(ResourceAccountRef {
         name: Some("unknown-resource-contract-account".to_string()),
         id: None,
     });
 
-    // get_identities: unsupported kind
-    let gi_kind = facade
+    // get_identities: unsupported type
+    let gi_type = facade
         .get_identities(ResourceBatchSelector {
             account: None,
-            kind: bad_kind.to_string(),
+            resource_type: bad_type.parse().unwrap(),
             resource_refs: vec![],
         })
         .await;
     assert_matches!(
-        gi_kind,
+        gi_type,
         Err(BatchResourceError::UnsupportedSelector(_)),
-        "get_identities empty+bad kind must be rejected"
+        "get_identities empty+bad type must be rejected"
     );
 
     // get_identities: bad account
     let gi_acct = facade
         .get_identities(ResourceBatchSelector {
             account: bad_account.clone(),
-            kind: VARIABLE_SET_KIND.to_string(),
+            resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             resource_refs: vec![],
         })
         .await;
@@ -304,12 +304,12 @@ pub async fn test_batch_empty_refs_validation_is_consistent(h: &impl FacadeContr
         "get_identities empty+bad account must be rejected"
     );
 
-    // render_manifests: unsupported kind
-    let rm_kind = facade
+    // render_manifests: unsupported type
+    let rm_type = facade
         .render_manifests(
             ResourceBatchSelector {
                 account: None,
-                kind: bad_kind.to_string(),
+                resource_type: bad_type.parse().unwrap(),
                 resource_refs: vec![],
             },
             ResourceManifestFormat::Json,
@@ -317,9 +317,9 @@ pub async fn test_batch_empty_refs_validation_is_consistent(h: &impl FacadeContr
         )
         .await;
     assert_matches!(
-        rm_kind,
+        rm_type,
         Err(BatchResourceError::UnsupportedSelector(_)),
-        "render_manifests empty+bad kind must be rejected"
+        "render_manifests empty+bad type must be rejected"
     );
 
     // render_manifests: bad account
@@ -327,7 +327,7 @@ pub async fn test_batch_empty_refs_validation_is_consistent(h: &impl FacadeContr
         .render_manifests(
             ResourceBatchSelector {
                 account: bad_account.clone(),
-                kind: VARIABLE_SET_KIND.to_string(),
+                resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
                 resource_refs: vec![],
             },
             ResourceManifestFormat::Json,
@@ -340,25 +340,25 @@ pub async fn test_batch_empty_refs_validation_is_consistent(h: &impl FacadeContr
         "render_manifests empty+bad account must be rejected"
     );
 
-    // delete_many: unsupported kind
-    let dm_kind = facade
+    // delete_many: unsupported type
+    let dm_type = facade
         .delete_many(ResourceBatchSelector {
             account: None,
-            kind: bad_kind.to_string(),
+            resource_type: bad_type.parse().unwrap(),
             resource_refs: vec![],
         })
         .await;
     assert_matches!(
-        dm_kind,
+        dm_type,
         Err(BatchResourceError::UnsupportedSelector(_)),
-        "delete_many empty+bad kind must be rejected"
+        "delete_many empty+bad type must be rejected"
     );
 
     // delete_many: bad account
     let dm_acct = facade
         .delete_many(ResourceBatchSelector {
             account: bad_account.clone(),
-            kind: VARIABLE_SET_KIND.to_string(),
+            resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             resource_refs: vec![],
         })
         .await;
@@ -382,7 +382,7 @@ pub async fn test_get_many_wrong_schema(h: &impl FacadeContractHarness) {
         .get_many(
             ResourceBatchSelector {
                 account: None,
-                kind: SECRET_SET_KIND.to_string(),
+                resource_type: SECRET_SET_CANONICAL_SELECTOR.parse().unwrap(),
                 resource_refs: vec![
                     ResourceRef::ById(id), // idx 0 — exists but wrong schema
                 ],
@@ -419,7 +419,7 @@ pub async fn test_get_identities_mirrors_get_many(h: &impl FacadeContractHarness
     let response = facade
         .get_identities(ResourceBatchSelector {
             account: None,
-            kind: VARIABLE_SET_KIND.to_string(),
+            resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             resource_refs: vec![
                 ResourceRef::ByName("idents-a".parse().unwrap()), // idx 0 — exists
                 ResourceRef::ByName("no-such-ident".parse().unwrap()), // idx 1 — missing
@@ -466,7 +466,7 @@ pub async fn test_render_manifests_all_successes(h: &impl FacadeContractHarness)
             .render_manifests(
                 ResourceBatchSelector {
                     account: None,
-                    kind: VARIABLE_SET_KIND.to_string(),
+                    resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
                     resource_refs: vec![
                         ResourceRef::ById(id_a), // idx 0
                         ResourceRef::ById(id_b), // idx 1
@@ -524,7 +524,7 @@ pub async fn test_render_manifests_mixed_successes_problems(h: &impl FacadeContr
         .render_manifests(
             ResourceBatchSelector {
                 account: None,
-                kind: VARIABLE_SET_KIND.to_string(),
+                resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
                 resource_refs: vec![
                     ResourceRef::ById(uid_existing), // idx 0 — exists
                     ResourceRef::ByName("render-missing".parse().unwrap()), // idx 1 — missing
@@ -570,7 +570,7 @@ pub async fn test_delete_many_all_successes(h: &impl FacadeContractHarness) {
     let response = facade
         .delete_many(ResourceBatchSelector {
             account: None,
-            kind: VARIABLE_SET_KIND.to_string(),
+            resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             resource_refs: vec![
                 ResourceRef::ByName("del-many-a".parse().unwrap()), // idx 0
                 ResourceRef::ById(id_b),                            // idx 1
@@ -602,7 +602,7 @@ pub async fn test_delete_many_all_successes(h: &impl FacadeContractHarness) {
             .get(
                 ResourceSelector {
                     account: None,
-                    kind: VARIABLE_SET_KIND.to_string(),
+                    resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
                     resource_ref: ResourceRef::ByName(name.parse().unwrap()),
                 },
                 SpecViewMode::Encrypted,
@@ -631,7 +631,7 @@ pub async fn test_delete_many_mixed_successes_problems(h: &impl FacadeContractHa
     let response = facade
         .delete_many(ResourceBatchSelector {
             account: None,
-            kind: VARIABLE_SET_KIND.to_string(),
+            resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             resource_refs: vec![
                 ResourceRef::ByName("del-mix-exists".parse().unwrap()), // idx 0 — exists
                 ResourceRef::ByName("del-mix-missing".parse().unwrap()), // idx 1 — missing name
@@ -686,7 +686,7 @@ pub async fn test_delete_many_duplicate_refs_is_deterministic(h: &impl FacadeCon
     let response = facade
         .delete_many(ResourceBatchSelector {
             account: None,
-            kind: VARIABLE_SET_KIND.to_string(),
+            resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             resource_refs: vec![
                 ResourceRef::ByName("del-dup-ref".parse().unwrap()), // idx 0
                 ResourceRef::ByName("del-dup-ref".parse().unwrap()), // idx 1 — duplicate
@@ -729,23 +729,23 @@ pub async fn test_delete_many_duplicate_refs_is_deterministic(h: &impl FacadeCon
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // RF-061
-// Unsupported kind must produce a batch-level
+// Unsupported type must produce a batch-level
 // Err(BatchResourceError::UnsupportedSelector), not Ok with per-item
-// problems.  The CRUD dispatcher registry rejects the kind before any refs are
+// problems.  The CRUD dispatcher registry rejects the type before any refs are
 // processed, for all four batch APIs.
 contract_test!(
-    batch_apis_reject_unsupported_kind,
-    super::test_batch_apis_reject_unsupported_kind
+    batch_apis_reject_unsupported_type,
+    super::test_batch_apis_reject_unsupported_type
 );
 
-pub async fn test_batch_apis_reject_unsupported_kind(h: &impl FacadeContractHarness) {
-    let id = create_resource(h, "batch-bad-kind-base").await;
+pub async fn test_batch_apis_reject_unsupported_type(h: &impl FacadeContractHarness) {
+    let id = create_resource(h, "batch-bad-type-base").await;
     let facade = h.facade_for(TestAccount::Alice);
-    let bad_kind = "NoSuchResourceKindXYZ";
+    let bad_type = "NoSuchResourceTypeXYZ";
 
     let selector = ResourceBatchSelector {
         account: None,
-        kind: bad_kind.to_string(),
+        resource_type: bad_type.parse().unwrap(),
         resource_refs: vec![ResourceRef::ById(id)],
     };
 
@@ -754,13 +754,13 @@ pub async fn test_batch_apis_reject_unsupported_kind(h: &impl FacadeContractHarn
         .await;
     assert!(
         matches!(gm, Err(BatchResourceError::UnsupportedSelector(_))),
-        "get_many: unsupported kind must be a batch-level UnsupportedSelector, got: {gm:?}"
+        "get_many: unsupported type must be a batch-level UnsupportedSelector, got: {gm:?}"
     );
 
     let gi = facade.get_identities(selector.clone()).await;
     assert!(
         matches!(gi, Err(BatchResourceError::UnsupportedSelector(_))),
-        "get_identities: unsupported kind must be a batch-level UnsupportedSelector, got: {gi:?}"
+        "get_identities: unsupported type must be a batch-level UnsupportedSelector, got: {gi:?}"
     );
 
     let rm = facade
@@ -772,13 +772,13 @@ pub async fn test_batch_apis_reject_unsupported_kind(h: &impl FacadeContractHarn
         .await;
     assert!(
         matches!(rm, Err(BatchResourceError::UnsupportedSelector(_))),
-        "render_manifests: unsupported kind must be a batch-level UnsupportedSelector, got: {rm:?}"
+        "render_manifests: unsupported type must be a batch-level UnsupportedSelector, got: {rm:?}"
     );
 
     let dm = facade.delete_many(selector.clone()).await;
     assert!(
         matches!(dm, Err(BatchResourceError::UnsupportedSelector(_))),
-        "delete_many: unsupported kind must be a batch-level UnsupportedSelector, got: {dm:?}"
+        "delete_many: unsupported type must be a batch-level UnsupportedSelector, got: {dm:?}"
     );
 }
 

@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::TypeUri;
+use crate::{ResourceSelectorName, TypeUri};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -23,17 +23,7 @@ pub struct ResourcesSummary {
 #[serde(rename_all = "camelCase")]
 pub struct ResourceTypeCountSummary {
     pub schema: TypeUri,
-    pub name: String,
-    pub total_count: u64,
-    pub phase_counts: ResourcePhaseCounts,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ResourceSummaryRow {
-    pub schema: String,
+    pub canonical_selector: ResourceSelectorName,
     pub total_count: u64,
     pub phase_counts: ResourcePhaseCounts,
 }

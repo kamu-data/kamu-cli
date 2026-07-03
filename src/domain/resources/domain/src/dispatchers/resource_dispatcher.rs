@@ -16,7 +16,7 @@ use crate::TypeUri;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Registry key for a per-kind dispatcher.
+/// Registry key for a per-type resource dispatcher.
 ///
 /// `schema` is intentionally a `&'static str` (not a [`TypeUri`]): dill's
 /// `#[meta(...)]` emits the metadata as a `const`, so the value must be
@@ -25,8 +25,8 @@ use crate::TypeUri;
 #[derive(Debug, Clone)]
 pub struct ResourceDispatcherMeta {
     pub schema: &'static str,
-    pub name: &'static str,
-    pub short_names: &'static [&'static str],
+    pub canonical_selector: &'static str,
+    pub selector_aliases: &'static [&'static str],
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

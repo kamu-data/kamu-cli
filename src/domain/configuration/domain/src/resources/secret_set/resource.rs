@@ -19,6 +19,7 @@ use kamu_resources::{
     ResourcePresentation,
     ResourcePresentationDefinition,
     ResourceSchemaProvider,
+    ResourceSelectorName,
     TypeUri,
 };
 
@@ -37,8 +38,14 @@ impl SecretSetResource {
     /// Used as the const dill-registry key (dill `#[meta]` requires a const);
     /// the typed identity is [`Self::schema`] returning a `TypeUri`.
     pub const SCHEMA_STR: &'static str = odf::metadata::config::SecretSet::schema_str();
-    pub const RESOURCE_NAME: &'static str = "secretsets";
-    pub const RESOURCE_SHORT_NAMES: &'static [&'static str] = &["ss"];
+
+    pub const CANONICAL_SELECTOR_NAME_STR: &'static str = "secretsets";
+    pub const CANONICAL_SELECTOR_NAME: ResourceSelectorName =
+        ResourceSelectorName::new_unchecked_static(Self::CANONICAL_SELECTOR_NAME_STR);
+
+    pub const SELECTOR_ALIAS_STRS: &'static [&'static str] = &["ss"];
+    pub const SELECTOR_ALIASES: &'static [ResourceSelectorName] =
+        &[ResourceSelectorName::new_unchecked_static("ss")];
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -61,8 +68,8 @@ impl DeclarativeResource for SecretSetResource {
 
 impl ResourcePresentation for SecretSetResource {
     const PRESENTATION: ResourcePresentationDefinition = ResourcePresentationDefinition::new(
-        Self::RESOURCE_NAME,
-        Self::RESOURCE_SHORT_NAMES,
+        Self::CANONICAL_SELECTOR_NAME,
+        Self::SELECTOR_ALIASES,
         &[ResourceListColumnDefinition {
             key: "secrets",
             header: "Secrets",
@@ -78,6 +85,30 @@ impl ResourcePresentation for SecretSetResource {
                 u64::try_from(state.status().stats.total_secrets).unwrap(),
             ),
         }]
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    #[test]
+    fn selector_constants_stay_in_sync() {
+        assert_eq!(
+            SecretSetResource::CANONICAL_SELECTOR_NAME_STR,
+            SecretSetResource::CANONICAL_SELECTOR_NAME.as_str()
+        );
+        assert_eq!(
+            SecretSetResource::SELECTOR_ALIAS_STRS,
+            SecretSetResource::SELECTOR_ALIASES
+                .iter()
+                .map(ResourceSelectorName::as_str)
+                .collect::<Vec<_>>()
+        );
     }
 }
 

@@ -13,14 +13,14 @@ use crate::domain::{ReconcilableEventSourcedResource, TypedResourceQueryService}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct ListResourcesByKindUseCaseHelper<'a, R>
+pub struct ListResourcesByTypeUseCaseHelper<'a, R>
 where
     R: ReconcilableEventSourcedResource,
 {
     typed_resource_query_service: &'a dyn TypedResourceQueryService<R>,
 }
 
-impl<'a, R> ListResourcesByKindUseCaseHelper<'a, R>
+impl<'a, R> ListResourcesByTypeUseCaseHelper<'a, R>
 where
     R: ReconcilableEventSourcedResource,
 {
@@ -36,7 +36,7 @@ where
         pagination: PaginationOpts,
     ) -> Result<Vec<R::ResourceState>, internal_error::InternalError> {
         self.typed_resource_query_service
-            .list_states_by_kind(account_id, pagination)
+            .list_states(account_id, pagination)
             .await
     }
 }
@@ -44,20 +44,20 @@ where
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[macro_export]
-macro_rules! declare_list_resources_by_kind_use_case {
+macro_rules! declare_list_resources_by_type_use_case {
     (
         use_case = $use_case:ident,
         resource = $resource:ty
     ) => {
         #[dill::component]
-        #[dill::interface(dyn kamu_resources::ListResourcesByKindUseCase<$resource>)]
+        #[dill::interface(dyn kamu_resources::ListResourcesByTypeUseCase<$resource>)]
         pub struct $use_case {
             typed_resource_query_service:
                 std::sync::Arc<dyn kamu_resources::TypedResourceQueryService<$resource>>,
         }
 
         #[async_trait::async_trait]
-        impl kamu_resources::ListResourcesByKindUseCase<$resource> for $use_case {
+        impl kamu_resources::ListResourcesByTypeUseCase<$resource> for $use_case {
             async fn execute(
                 &self,
                 account_id: odf::AccountID,
@@ -66,7 +66,7 @@ macro_rules! declare_list_resources_by_kind_use_case {
                 Vec<<$resource as kamu_resources::DeclarativeResource>::ResourceState>,
                 internal_error::InternalError,
             > {
-                let helper = $crate::ListResourcesByKindUseCaseHelper::<$resource>::new(
+                let helper = $crate::ListResourcesByTypeUseCaseHelper::<$resource>::new(
                     self.typed_resource_query_service.as_ref(),
                 );
 

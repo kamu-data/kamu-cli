@@ -28,7 +28,7 @@ use pretty_assertions::{assert_eq, assert_matches};
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
 use crate::helpers::{
-    VARIABLE_SET_KIND,
+    VARIABLE_SET_CANONICAL_SELECTOR,
     VARIABLE_SET_SCHEMA_STR,
     assert_applied_outcome,
     assert_planning_outcome,
@@ -39,10 +39,10 @@ use crate::helpers::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn make_selector(kind: &str, _schema: &str, name: &str) -> ResourceSelector {
+fn make_selector(resource_type: &str, _schema: &str, name: &str) -> ResourceSelector {
     ResourceSelector {
         account: None,
-        kind: kind.to_string(),
+        resource_type: resource_type.parse().unwrap(),
         resource_ref: ResourceRef::ByName(name.parse().unwrap()),
     }
 }
@@ -75,7 +75,11 @@ pub async fn test_plan_create_json(h: &impl FacadeContractHarness) {
     // Verify no side effect - resource must not exist yet
     let get_result = facade
         .get(
-            make_selector(VARIABLE_SET_KIND, VARIABLE_SET_SCHEMA_STR, "my-vars"),
+            make_selector(
+                VARIABLE_SET_CANONICAL_SELECTOR,
+                VARIABLE_SET_SCHEMA_STR,
+                "my-vars",
+            ),
             SpecViewMode::Encrypted,
         )
         .await;
@@ -117,7 +121,11 @@ pub async fn test_plan_create_yaml(h: &impl FacadeContractHarness) {
     // Verify no side effect - resource must not exist yet
     let get_result = facade
         .get(
-            make_selector(VARIABLE_SET_KIND, VARIABLE_SET_SCHEMA_STR, "my-yaml-vars"),
+            make_selector(
+                VARIABLE_SET_CANONICAL_SELECTOR,
+                VARIABLE_SET_SCHEMA_STR,
+                "my-yaml-vars",
+            ),
             SpecViewMode::Encrypted,
         )
         .await;
@@ -168,7 +176,11 @@ pub async fn test_plan_update(h: &impl FacadeContractHarness) {
     // Resource in store must remain unchanged (no side effect)
     let stored = facade
         .get(
-            make_selector(VARIABLE_SET_KIND, VARIABLE_SET_SCHEMA_STR, "plan-upd-vars"),
+            make_selector(
+                VARIABLE_SET_CANONICAL_SELECTOR,
+                VARIABLE_SET_SCHEMA_STR,
+                "plan-upd-vars",
+            ),
             SpecViewMode::Encrypted,
         )
         .await
@@ -284,7 +296,7 @@ pub async fn test_plan_rejects_schema_invalid_manifest(h: &impl FacadeContractHa
     let get = facade
         .get(
             make_selector(
-                VARIABLE_SET_KIND,
+                VARIABLE_SET_CANONICAL_SELECTOR,
                 VARIABLE_SET_SCHEMA_STR,
                 "schema-invalid-vars",
             ),
@@ -368,7 +380,7 @@ pub async fn test_apply_rejects_business_invalid_spec(h: &impl FacadeContractHar
     let get = facade
         .get(
             make_selector(
-                VARIABLE_SET_KIND,
+                VARIABLE_SET_CANONICAL_SELECTOR,
                 VARIABLE_SET_SCHEMA_STR,
                 "biz-invalid-vars",
             ),
@@ -407,7 +419,11 @@ pub async fn test_apply_create_json(h: &impl FacadeContractHarness) {
     // Verify resource is readable via get
     let fetched = facade
         .get(
-            make_selector(VARIABLE_SET_KIND, VARIABLE_SET_SCHEMA_STR, "alpha"),
+            make_selector(
+                VARIABLE_SET_CANONICAL_SELECTOR,
+                VARIABLE_SET_SCHEMA_STR,
+                "alpha",
+            ),
             SpecViewMode::Encrypted,
         )
         .await
@@ -440,7 +456,11 @@ pub async fn test_apply_create_yaml(h: &impl FacadeContractHarness) {
     // Semantic equivalence: same resource via get, just like after JSON apply
     let fetched = facade
         .get(
-            make_selector(VARIABLE_SET_KIND, VARIABLE_SET_SCHEMA_STR, "yaml-vars"),
+            make_selector(
+                VARIABLE_SET_CANONICAL_SELECTOR,
+                VARIABLE_SET_SCHEMA_STR,
+                "yaml-vars",
+            ),
             SpecViewMode::Encrypted,
         )
         .await
@@ -497,7 +517,11 @@ pub async fn test_apply_update(h: &impl FacadeContractHarness) {
     // Verify via get
     let fetched = facade
         .get(
-            make_selector(VARIABLE_SET_KIND, VARIABLE_SET_SCHEMA_STR, "upd-vars"),
+            make_selector(
+                VARIABLE_SET_CANONICAL_SELECTOR,
+                VARIABLE_SET_SCHEMA_STR,
+                "upd-vars",
+            ),
             SpecViewMode::Encrypted,
         )
         .await
@@ -546,9 +570,9 @@ pub async fn test_apply_idempotent(h: &impl FacadeContractHarness) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // RF-024 (deferred): apply rejects immutable field change.
-// Requires a resource kind with at least one immutable spec or headers field
+// Requires a resource type with at least one immutable spec or headers field
 // that the facade contract forbids changing after creation. No current resource
-// kind (VariableSet, SecretSet) has such a field. Add once a suitable kind
+// type (VariableSet, SecretSet) has such a field. Add once a suitable type
 // exists.
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -761,10 +785,10 @@ pub async fn test_apply_invalid_spec_carries_schema(h: &impl FacadeContractHarne
 
 // RF-143 note: ImmutableFieldChanged, ReferencedObjectMissing, and
 // LifecycleRuleConflict rejection categories are defined in the schema but not
-// naturally triggerable through the current resource kinds (VariableSet,
+// naturally triggerable through the current resource types (VariableSet,
 // SecretSet). BusinessValidationFailed is now triggerable via empty variables
 // (or empty secrets) — see apply_rejects_business_invalid_spec above. The
-// remaining three are deferred until a resource kind is added that can trigger
+// remaining three are deferred until a resource type is added that can trigger
 // them.
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -102,7 +102,7 @@ where
         R::ResourceState::try_from(resource_snapshot).map_err(TypedResourceQueryError::Internal)
     }
 
-    pub async fn list_states_by_kind(
+    pub async fn list_states(
         &self,
         account_id: odf::AccountID,
         pagination: PaginationOpts,
@@ -177,7 +177,7 @@ macro_rules! declare_typed_resource_query_service {
                 helper.get_state_by_id(account_id, id).await
             }
 
-            async fn list_states_by_kind(
+            async fn list_states(
                 &self,
                 account_id: odf::AccountID,
                 pagination: database_common::PaginationOpts,
@@ -189,7 +189,7 @@ macro_rules! declare_typed_resource_query_service {
                     self.resource_repository.as_ref(),
                 );
 
-                helper.list_states_by_kind(account_id, pagination).await
+                helper.list_states(account_id, pagination).await
             }
         }
     };

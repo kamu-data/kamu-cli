@@ -9,7 +9,7 @@
 
 use event_sourcing::{LoadError, Projection};
 
-use crate::{ResourceID, ResourceName, ResourceSnapshot, TypeUri};
+use crate::{ResourceID, ResourceName, ResourceSelectorName, ResourceSnapshot, TypeUri};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -26,9 +26,9 @@ pub struct ResourceIDNotFoundError(pub ResourceID);
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
-#[error("Resource '{name}' of kind '{kind}' was not found")]
+#[error("Resource '{name}' of type '{canonical_selector}' was not found")]
 pub struct ResourceNameNotFoundError {
-    pub kind: String,
+    pub canonical_selector: ResourceSelectorName,
     pub name: ResourceName,
 }
 

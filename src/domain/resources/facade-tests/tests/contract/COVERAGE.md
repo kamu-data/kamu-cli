@@ -4,9 +4,9 @@ Each RF scenario from the original plan is listed with its status.
 
 | RF ID   | File                | Status   | Description                                                           | Notes                                                                  |
 |---------|---------------------|----------|-----------------------------------------------------------------------|------------------------------------------------------------------------|
-| RF-001  | supported_kinds.rs  | Active   | Lists supported resource kinds                                        |                                                                        |
-| RF-002  | supported_kinds.rs  | Active   | Supported kind aliases resolve to usable facade selectors             |                                                                        |
-| RF-003  | supported_kinds.rs  | Active   | Unsupported kind is rejected consistently across all APIs             |                                                                        |
+| RF-001  | supported_resource_types.rs  | Active   | Lists supported resource types                                       |                                                                        |
+| RF-002  | supported_resource_types.rs  | Active   | Supported selector aliases resolve to usable facade selectors         |                                                                        |
+| RF-003  | supported_resource_types.rs  | Active   | Unsupported type is rejected consistently across all APIs             |                                                                        |
 | RF-010  | apply_manifest.rs   | Active   | Plan create from JSON manifest                                        |                                                                        |
 | RF-011  | apply_manifest.rs   | Active   | Plan create from YAML manifest                                        |                                                                        |
 | RF-012  | apply_manifest.rs   | Active   | Plan update of existing resource                                      |                                                                        |
@@ -18,7 +18,7 @@ Each RF scenario from the original plan is listed with its status.
 | RF-021  | apply_manifest.rs   | Active   | Apply create from YAML manifest                                       |                                                                        |
 | RF-022  | apply_manifest.rs   | Active   | Apply update changes headers/spec                                    |                                                                        |
 | RF-023  | apply_manifest.rs   | Active   | Apply unchanged manifest is idempotent                                |                                                                        |
-| RF-024  | apply_manifest.rs   | Deferred | Apply rejects immutable field change                                  | Requires a resource kind with an immutable field                       |
+| RF-024  | apply_manifest.rs   | Deferred | Apply rejects immutable field change                                  | Requires a resource type with an immutable field                      |
 | RF-025  | apply_manifest.rs   | Active   | Apply rejects invalid spec                                            | Combined with RF-016 in one test                                       |
 | RF-026  | apply_manifest.rs   | Active   | Apply preserves duplicate header-key validation                     |                                                                        |
 | RF-030  | get_identity.rs     | Active   | Get by name returns full resource view                                |                                                                        |
@@ -37,7 +37,7 @@ Each RF scenario from the original plan is listed with its status.
 | RF-051  | batch_ops.rs        | Active   | get_many mixed successes and lookup problems                          |                                                                        |
 | RF-052  | batch_ops.rs        | Active   | get_many duplicate refs preserve request indexes                      |                                                                        |
 | RF-053  | batch_ops.rs        | Active   | get_many empty refs returns empty result                              |                                                                        |
-| RF-053A | batch_ops.rs        | Active   | Empty batch still validates unsupported kind                          | Extension beyond original plan                                         |
+| RF-053A | batch_ops.rs        | Active   | Empty batch still validates unsupported type                          | Extension beyond original plan                                         |
 | RF-053B | batch_ops.rs        | Active   | Empty batch still validates bad account                               | Extension beyond original plan                                         |
 | RF-053C | batch_ops.rs        | Active   | Empty-batch validation mirrors RF-053A/B across all batch ops         | Extension beyond original plan                                         |
 | RF-054  | batch_ops.rs        | Active   | get_many wrong schema produces per-item mismatch problems        |                                                                        |
@@ -47,32 +47,32 @@ Each RF scenario from the original plan is listed with its status.
 | RF-058  | batch_ops.rs        | Active   | delete_many all successes                                             |                                                                        |
 | RF-059  | batch_ops.rs        | Active   | delete_many mixed successes and problems                              |                                                                        |
 | RF-060  | batch_ops.rs        | Active   | delete_many duplicate refs is deterministic                           |                                                                        |
-| RF-061  | batch_ops.rs        | Active   | Batch APIs reject unsupported kind at batch level                     |                                                                        |
+| RF-061  | batch_ops.rs        | Active   | Batch APIs reject unsupported type at batch level                     |                                                                        |
 | RF-070  | render_manifest.rs  | Active   | Render JSON manifest by name                                          |                                                                        |
 | RF-071  | render_manifest.rs  | Active   | Render YAML manifest by UID                                           |                                                                        |
 | RF-072  | render_manifest.rs  | Active   | Rendered manifest can be reapplied unchanged                          |                                                                        |
 | RF-073  | render_manifest.rs  | Active   | Render missing resource returns lookup problem                        |                                                                        |
 | RF-074  | render_manifest.rs  | Active   | Render wrong schema returns mismatch problem                |                                                                        |
-| RF-080  | list_search.rs      | Active   | List by kind returns summaries for account                            |                                                                        |
-| RF-081  | list_search.rs      | Active   | list_identities by kind returns identities for account                |                                                                        |
+| RF-080  | list_search.rs      | Active   | List by type returns summaries for account                            |                                                                        |
+| RF-081  | list_search.rs      | Active   | list_identities by type returns identities for account                |                                                                        |
 | RF-082  | list_search.rs      | Active   | List supports pagination limit                                        |                                                                        |
 | RF-083  | list_search.rs      | Active   | List supports pagination offset                                       |                                                                        |
 | RF-084  | list_search.rs      | Active   | list_identities pagination mirrors list pagination                    |                                                                        |
-| RF-085  | list_search.rs      | Active   | List empty account/kind returns empty result                          |                                                                        |
-| RF-086  | list_search.rs      | Active   | List unsupported kind returns unsupported descriptor error            |                                                                        |
+| RF-085  | list_search.rs      | Active   | List empty account/type returns empty result                          |                                                                        |
+| RF-086  | list_search.rs      | Active   | List unsupported type returns unsupported descriptor error            |                                                                        |
 | RF-090  | list_search.rs      | Active   | Search by exact names                                                 |                                                                        |
 | RF-091  | list_search.rs      | Active   | Search by exact names with missing names                              |                                                                        |
 | RF-092  | list_search.rs      | Active   | Search by name pattern                                                |                                                                        |
-| RF-093  | list_search.rs      | Active   | Search by multiple kinds                                              |                                                                        |
+| RF-093  | list_search.rs      | Active   | Search by multiple types                                              |                                                                        |
 | RF-094  | list_search.rs      | Active   | Search with neither exact names nor pattern is rejected               |                                                                        |
 | RF-095  | list_search.rs      | Active   | Search pagination and total_count                                     |                                                                        |
 | RF-096  | list_search.rs      | Active   | Search account scoping                                                |                                                                        |
-| RF-100  | list_all.rs         | Active   | list_all returns summaries across supported kinds                     |                                                                        |
-| RF-101  | list_all.rs         | Active   | list_all_identities returns identities across supported kinds         |                                                                        |
+| RF-100  | list_all.rs         | Active   | list_all returns summaries across supported types                     |                                                                        |
+| RF-101  | list_all.rs         | Active   | list_all_identities returns identities across supported types         |                                                                        |
 | RF-102  | list_all.rs         | Active   | list_all pagination                                                   |                                                                        |
 | RF-103  | list_all.rs         | Active   | list_all empty account returns empty result                           |                                                                        |
 | RF-110  | summary.rs          | Active   | Summary for empty account                                             |                                                                        |
-| RF-111  | summary.rs          | Active   | Summary counts resources by kind                                      |                                                                        |
+| RF-111  | summary.rs          | Active   | Summary counts resources by type                                      |                                                                        |
 | RF-112  | summary.rs          | Active   | Summary phase counts (pending → ready transition)                     | Reconciling is an internal transient not observable at facade granularity |
 | RF-113  | summary.rs          | Active   | Summary account scoping                                               |                                                                        |
 | RF-120  | account_scoping.rs  | Active   | Default account selector resolves to current account                  |                                                                        |
@@ -90,9 +90,9 @@ Each RF scenario from the original plan is listed with its status.
 | RF-136  | delete.rs           | Active   | Repeated delete returns not found                                     |                                                                        |
 | RF-140  | error_taxonomy.rs   | Active   | Single-resource lookup error taxonomy is consistent across get/render/delete |                                                                 |
 | RF-141  | error_taxonomy.rs   | Active   | Batch lookup problem taxonomy mirrors single-resource taxonomy        |                                                                        |
-| RF-142  | error_taxonomy.rs   | Active   | Batch-level error taxonomy (unsupported kind, bad account)            |                                                                        |
+| RF-142  | error_taxonomy.rs   | Active   | Batch-level error taxonomy (unsupported type, bad account)            |                                                                        |
 | RF-143  | error_taxonomy.rs   | Active   | Apply rejection taxonomy (InvalidHeaders, InvalidSpec, Rejected)     | Also split into apply_manifest.rs for apply-specific rejection cases   |
-| RF-150  | cross_impl.rs       | Active   | Local and remote expose same supported kind descriptors               | Verified via `contract_test!` macro, not side-by-side comparison       |
+| RF-150  | cross_impl.rs       | Active   | Local and remote expose same supported type descriptors               | Verified via `contract_test!` macro, not side-by-side comparison       |
 | RF-151  | cross_impl.rs       | Active   | Local-created resource is readable remotely                           | True cross-facade test                                                 |
 | RF-152  | cross_impl.rs       | Active   | Remote-created resource is readable locally                           | True cross-facade test                                                 |
 | RF-153  | cross_impl.rs       | Active   | Local and remote render equivalent manifests                          | True cross-facade test                                                 |

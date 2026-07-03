@@ -13,6 +13,11 @@ use crate::prelude::*;
 
 simple_string_scalar!(ResourceID, odf::metadata::resource::ResourceID);
 simple_string_scalar!(ResourceName, odf::metadata::resource::ResourceName);
+simple_string_scalar!(ResourceSelectorName, kamu_resources::ResourceSelectorName);
+simple_string_scalar!(
+    ResourceTypeSelectorRaw,
+    kamu_resources::ResourceTypeSelectorRaw
+);
 simple_string_scalar!(TypeName, odf::metadata::resource::TypeName);
 simple_string_scalar!(TypeUri, odf::metadata::resource::TypeUri);
 simple_string_scalar!(TypeRef, odf::metadata::resource::TypeRef);
@@ -142,6 +147,38 @@ impl From<odf::metadata::config::ValueRef> for ValueRef {
 impl From<ValueRef> for odf::metadata::config::ValueRef {
     fn from(value: ValueRef) -> Self {
         value.0
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use async_graphql::{ScalarType, Value};
+
+    use super::*;
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    #[test]
+    fn resource_type_selector_scalar_rejects_empty_and_whitespace() {
+        for value in ["", " variablesets", "variablesets ", " "] {
+            assert!(
+                <ResourceTypeSelectorRaw<'_> as ScalarType>::parse(Value::String(value.to_owned()))
+                    .is_err()
+            );
+        }
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    #[test]
+    fn resource_type_selector_scalar_preserves_raw_value() {
+        let selector =
+            <ResourceTypeSelectorRaw<'_> as ScalarType>::parse(Value::String("Vs".to_owned()))
+                .unwrap();
+
+        assert_eq!(selector.to_string(), "Vs");
     }
 }
 

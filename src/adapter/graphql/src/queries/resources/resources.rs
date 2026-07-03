@@ -23,14 +23,14 @@ use crate::queries::{
     ResourceIdentity,
     ResourceIdentityConnection,
     ResourceInvalidSearchQueryProblem,
-    ResourceKindDescriptor,
-    ResourceKindInput,
     ResourceManifestFormat,
     ResourceRenderManifestResult,
     ResourceSelectorInput,
     ResourceSelectorProblem,
     ResourceSelectorProblemResult,
     ResourceSummary,
+    ResourceTypeDescriptor,
+    ResourceTypeSelectorInput,
     ResourceUnsupportedSelectorProblem,
     ResourcesSummary,
     SearchResourceIdentitiesInput,
@@ -48,22 +48,25 @@ pub struct Resources;
 impl Resources {
     const DEFAULT_PER_PAGE: usize = 15;
 
-    /// Returns resource kinds supported by the current server
-    #[tracing::instrument(level = "info", name = Resources_supported_kinds, skip_all)]
-    async fn supported_kinds(&self, ctx: &Context<'_>) -> Result<Vec<ResourceKindDescriptor>> {
+    /// Returns resource types supported by the current server
+    #[tracing::instrument(level = "info", name = Resources_supported_resource_types, skip_all)]
+    async fn supported_resource_types(
+        &self,
+        ctx: &Context<'_>,
+    ) -> Result<Vec<ResourceTypeDescriptor>> {
         let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
 
         // TODO: Memoize supported resource kinds on the server side. This is
         // effectively static metadata and only changes when the deployed build
         // changes its registered resource kinds.
         let items = resource_facade
-            .list_supported_kinds()
+            .list_supported_resource_types()
             .await
             .map_err(|error| match error {
-                kamu_resources_facade::ListSupportedResourceKindsError::RemoteRequest(error) => {
+                kamu_resources_facade::ListSupportedResourceTypesError::RemoteRequest(error) => {
                     GqlError::from(error.int_err())
                 }
-                kamu_resources_facade::ListSupportedResourceKindsError::Internal(error) => {
+                kamu_resources_facade::ListSupportedResourceTypesError::Internal(error) => {
                     GqlError::from(error)
                 }
             })?;
@@ -148,7 +151,7 @@ impl Resources {
         {
             Ok(response) => Ok(BatchResourcesOutcome::Success(response.into())),
             Err(kamu_resources_facade::BatchResourceError::UnsupportedSelector(e)) => Ok(
-                BatchResourcesOutcome::UnsupportedSelector(map_unsupported_selector_problem(e)?),
+                BatchResourcesOutcome::UnsupportedSelector(map_unsupported_selector_problem(e)),
             ),
             Err(kamu_resources_facade::BatchResourceError::BadAccount(e)) => Ok(
                 BatchResourcesOutcome::BadAccount(map_bad_account_problem(e)?),
@@ -198,7 +201,7 @@ impl Resources {
             Ok(response) => Ok(BatchResourceIdentitiesOutcome::Success(response.into())),
             Err(kamu_resources_facade::BatchResourceError::UnsupportedSelector(e)) => {
                 Ok(BatchResourceIdentitiesOutcome::UnsupportedSelector(
-                    map_unsupported_selector_problem(e)?,
+                    map_unsupported_selector_problem(e),
                 ))
             }
             Err(kamu_resources_facade::BatchResourceError::BadAccount(e)) => Ok(
@@ -208,13 +211,13 @@ impl Resources {
         }
     }
 
-    /// Returns resources of the specified kind
-    #[tracing::instrument(level = "info", name = Resources_list_by_kind, skip_all, fields(?kind, ?page, ?per_page))]
+    /// Returns resources of the specified resource type
+    #[tracing::instrument(level = "info", name = Resources_list_by_resource_type, skip_all, fields(?resource_type, ?page, ?per_page))]
     #[graphql(guard = "LoggedInGuard::new()")]
-    async fn list_by_kind(
+    async fn list_by_resource_type(
         &self,
         ctx: &Context<'_>,
-        kind: ResourceKindInput,
+        resource_type: ResourceTypeSelectorInput,
         account: Option<ResourceAccountSelectorInput>,
         page: Option<usize>,
         per_page: Option<usize>,
@@ -225,7 +228,7 @@ impl Resources {
 
         match resource_facade
             .list(kamu_resources_facade::ListResourcesRequest {
-                kind: kind.into_resource_type(),
+                raw_type_selector: resource_type.into_resource_type_selector(),
                 account: account.map(ResourceAccountSelectorInput::into_manifest_account),
                 pagination: PaginationOpts::from_page(page, per_page),
             })
@@ -242,7 +245,7 @@ impl Resources {
                 )))
             }
             Err(kamu_resources_facade::ListResourcesError::UnsupportedSelector(error)) => Ok(
-                ResourceListOutcome::UnsupportedSelector(map_unsupported_selector_problem(error)?),
+                ResourceListOutcome::UnsupportedSelector(map_unsupported_selector_problem(error)),
             ),
             Err(kamu_resources_facade::ListResourcesError::BadAccount(error)) => Ok(
                 ResourceListOutcome::BadAccount(map_bad_account_problem(error)?),
@@ -251,13 +254,13 @@ impl Resources {
         }
     }
 
-    /// Returns resource identities of the specified kind
-    #[tracing::instrument(level = "info", name = Resources_list_identities_by_kind, skip_all, fields(?kind, ?page, ?per_page))]
+    /// Returns resource identities of the specified resource type
+    #[tracing::instrument(level = "info", name = Resources_list_identities_by_resource_type, skip_all, fields(?resource_type, ?page, ?per_page))]
     #[graphql(guard = "LoggedInGuard::new()")]
-    async fn list_identities_by_kind(
+    async fn list_identities_by_resource_type(
         &self,
         ctx: &Context<'_>,
-        kind: ResourceKindInput,
+        resource_type: ResourceTypeSelectorInput,
         account: Option<ResourceAccountSelectorInput>,
         page: Option<usize>,
         per_page: Option<usize>,
@@ -268,7 +271,7 @@ impl Resources {
 
         match resource_facade
             .list_identities(kamu_resources_facade::ListResourceIdentitiesRequest {
-                kind: kind.into_resource_type(),
+                raw_type_selector: resource_type.into_resource_type_selector(),
                 account: account.map(ResourceAccountSelectorInput::into_manifest_account),
                 pagination: PaginationOpts::from_page(page, per_page),
             })
@@ -283,7 +286,7 @@ impl Resources {
             }
             Err(kamu_resources_facade::ListResourcesError::UnsupportedSelector(error)) => {
                 Ok(ResourceIdentityListOutcome::UnsupportedSelector(
-                    map_unsupported_selector_problem(error)?,
+                    map_unsupported_selector_problem(error),
                 ))
             }
             Err(kamu_resources_facade::ListResourcesError::BadAccount(error)) => Ok(
@@ -296,7 +299,7 @@ impl Resources {
         }
     }
 
-    /// Searches resource identities across the specified exact kinds
+    /// Searches resource identities across the specified exact resource types
     #[tracing::instrument(level = "info", name = Resources_search_identities, skip_all, fields(?page, ?per_page))]
     #[graphql(guard = "LoggedInGuard::new()")]
     async fn search_identities(
@@ -327,7 +330,7 @@ impl Resources {
             }
             Err(kamu_resources_facade::ListResourcesError::UnsupportedSelector(error)) => {
                 Ok(ResourceIdentityListOutcome::UnsupportedSelector(
-                    map_unsupported_selector_problem(error)?,
+                    map_unsupported_selector_problem(error),
                 ))
             }
             Err(kamu_resources_facade::ListResourcesError::BadAccount(error)) => Ok(
@@ -340,7 +343,7 @@ impl Resources {
         }
     }
 
-    /// Returns resources across all kinds
+    /// Returns resources across all resource types
     #[tracing::instrument(level = "info", name = Resources_list_all, skip_all, fields(?page, ?per_page))]
     #[graphql(guard = "LoggedInGuard::new()")]
     async fn list_all(
@@ -378,7 +381,7 @@ impl Resources {
         }
     }
 
-    /// Returns resource identities across all kinds
+    /// Returns resource identities across all resource types
     #[tracing::instrument(level = "info", name = Resources_list_all_identities, skip_all, fields(?page, ?per_page))]
     #[graphql(guard = "LoggedInGuard::new()")]
     async fn list_all_identities(
@@ -473,7 +476,7 @@ impl Resources {
             Ok(response) => Ok(BatchResourceManifestsOutcome::Success(response.into())),
             Err(kamu_resources_facade::BatchResourceError::UnsupportedSelector(e)) => {
                 Ok(BatchResourceManifestsOutcome::UnsupportedSelector(
-                    map_unsupported_selector_problem(e)?,
+                    map_unsupported_selector_problem(e),
                 ))
             }
             Err(kamu_resources_facade::BatchResourceError::BadAccount(e)) => Ok(
@@ -599,7 +602,7 @@ fn map_batch_resource_error(error: kamu_resources_facade::BatchResourceError) ->
     use kamu_resources_facade::BatchResourceError as E;
 
     match error {
-        E::UnsupportedSelector(_) => GqlError::gql("Unsupported resource kind"),
+        E::UnsupportedSelector(_) => GqlError::gql("Unsupported resource type selector"),
         E::BadAccount(error) => map_resolve_manifest_account_error(error),
         E::RemoteRequest(error) => error.int_err().into(),
         E::Internal(error) => error.into(),
@@ -612,7 +615,7 @@ fn map_list_resources_error(error: kamu_resources_facade::ListResourcesError) ->
     use kamu_resources_facade::ListResourcesError as E;
 
     match error {
-        E::UnsupportedSelector(_) => GqlError::gql("Unsupported resource kind"),
+        E::UnsupportedSelector(_) => GqlError::gql("Unsupported resource type selector"),
         E::BadAccount(error) => map_resolve_manifest_account_error(error),
         E::InvalidSearchQuery(error) => GqlError::gql(error.to_string()),
         E::RemoteRequest(error) => error.int_err().into(),

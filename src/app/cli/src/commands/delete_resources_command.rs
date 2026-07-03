@@ -215,16 +215,20 @@ impl DeleteResourcesCommand {
             return;
         }
 
-        // The facade batches by descriptor, so cross-kind selections are split into one
+        // The facade batches by descriptor, so cross-type selections are split into one
         // `delete_many(...)` call per resolved schema.
         for (_schema, entries) in Self::group_targets_by_schema(targets) {
             match self
                 .resource_facade
                 .delete_many(ResourceBatchSelector {
                     account: None,
-                    kind: entries
+                    resource_type: entries
                         .first()
-                        .map(|(_, target)| target.kind.clone())
+                        .map(|(_, target)| {
+                            kamu_resources::ResourceTypeSelectorRaw::from(
+                                &target.canonical_selector,
+                            )
+                        })
                         .expect("non-empty entries"),
                     resource_refs: entries
                         .iter()
@@ -368,9 +372,8 @@ pub(super) struct PreparedDeleteTargets {
 
 #[derive(Debug, Clone)]
 struct DeleteResourceTarget {
-    kind: String,
+    canonical_selector: kamu_resources::ResourceSelectorName,
     schema: TypeUri,
-    canonical_kind_name: String,
     id: ResourceID,
     name: String,
 }
@@ -378,16 +381,15 @@ struct DeleteResourceTarget {
 impl DeleteResourceTarget {
     fn from_resource_target(target: ResourceTarget) -> Self {
         Self {
-            kind: target.kind,
+            canonical_selector: target.canonical_selector,
             schema: target.schema,
-            canonical_kind_name: target.canonical_kind_name,
             id: target.id,
             name: target.name.to_string(),
         }
     }
 
     fn display_name(&self) -> String {
-        format!("{}/{}", self.canonical_kind_name, self.name)
+        format!("{}/{}", self.canonical_selector, self.name)
     }
 }
 

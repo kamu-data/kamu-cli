@@ -352,11 +352,15 @@ impl ResourceCtx {
             .await;
     }
 
-    /// Assert a resource is present in both `get <kind> <name>` and
-    /// `list <kind>` outputs.
-    pub async fn assert_resource_present(&self, kind: &str, name: &str) {
+    /// Assert a resource is present in both `get <type> <name>` and
+    /// `list <type>` outputs.
+    pub async fn assert_resource_present(&self, type_selector: &str, name: &str) {
         let get_stdout = self
-            .stdout(["get".to_string(), kind.to_string(), name.to_string()])
+            .stdout([
+                "get".to_string(),
+                type_selector.to_string(),
+                name.to_string(),
+            ])
             .await;
         assert!(
             get_stdout.contains(name),
@@ -364,21 +368,23 @@ impl ResourceCtx {
              it:\n{get_stdout}"
         );
 
-        let list_stdout = self.stdout(["list".to_string(), kind.to_string()]).await;
+        let list_stdout = self
+            .stdout(["list".to_string(), type_selector.to_string()])
+            .await;
         assert!(
             list_stdout.contains(name),
-            "expected resource '{name}' present in `list {kind}`, but it did not \
+            "expected resource '{name}' present in `list {type_selector}`, but it did not \
              appear:\n{list_stdout}"
         );
     }
 
-    /// Assert a resource is not present: `get <kind> <name> --ignore-not-found`
-    /// succeeds and its name does not appear in `list <kind>`.
-    pub async fn assert_resource_absent(&self, kind: &str, name: &str) {
+    /// Assert a resource is not present: `get <type> <name> --ignore-not-found`
+    /// succeeds and its name does not appear in `list <type>`.
+    pub async fn assert_resource_absent(&self, type_selector: &str, name: &str) {
         let get_stdout = self
             .stdout([
                 "get".to_string(),
-                kind.to_string(),
+                type_selector.to_string(),
                 name.to_string(),
                 "--ignore-not-found".to_string(),
             ])
@@ -388,10 +394,13 @@ impl ResourceCtx {
             "expected resource '{name}' to be absent, but `get` output mentioned it:\n{get_stdout}"
         );
 
-        let list_stdout = self.stdout(["list".to_string(), kind.to_string()]).await;
+        let list_stdout = self
+            .stdout(["list".to_string(), type_selector.to_string()])
+            .await;
         assert!(
             !list_stdout.contains(name),
-            "expected resource '{name}' absent from `list {kind}`, but it appeared:\n{list_stdout}"
+            "expected resource '{name}' absent from `list {type_selector}`, but it \
+             appeared:\n{list_stdout}"
         );
     }
 
@@ -425,16 +434,18 @@ impl ResourceCtx {
         );
     }
 
-    /// Fetch a resource as JSON (`get <kind> <name> -o json`) and extract its
+    /// Fetch a resource as JSON (`get <type> <name> -o json`) and extract its
     /// stable ID. Looks for a `id` field anywhere in the parsed document.
-    pub async fn resource_id(&self, kind: &str, name: &str) -> String {
-        self.get_one(["get", kind, name]).await.id()
+    pub async fn resource_id(&self, type_selector: &str, name: &str) -> String {
+        self.get_one(["get", type_selector, name]).await.id()
     }
 
-    /// Run `list <kind> -o json` and return the sorted resource names.
-    pub async fn list_names(&self, kind: &str) -> Vec<String> {
-        let label = format!("list {kind} -o json");
-        let doc = self.stdout_json(["list", kind, "-o", "json"]).await;
+    /// Run `list <type> -o json` and return the sorted resource names.
+    pub async fn list_names(&self, type_selector: &str) -> Vec<String> {
+        let label = format!("list {type_selector} -o json");
+        let doc = self
+            .stdout_json(["list", type_selector, "-o", "json"])
+            .await;
 
         let mut names: Vec<String> = doc
             .as_array()
@@ -451,10 +462,10 @@ impl ResourceCtx {
         names
     }
 
-    /// Return the `summary -o json` total count for a resource kind.
-    pub async fn summary_count(&self, kind: &str) -> u64 {
+    /// Return the `summary -o json` total count for a resource type.
+    pub async fn summary_count(&self, type_selector: &str) -> u64 {
         let doc = self.stdout_json(["summary", "-o", "json"]).await;
-        summary_count(&doc, "summary -o json", kind)
+        summary_count(&doc, "summary -o json", type_selector)
     }
 }
 

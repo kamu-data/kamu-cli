@@ -12,8 +12,8 @@ use crate::resources::{ResourceCtx, assert_output_contains_all};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Scenario: resource delete semantics (QA scenario 10)
 //
-// Covers explicit selectors, slash selectors, name patterns, kind-scoped
-// `--all`, and cross-kind `all` deletion. Wired (via
+// Covers explicit selectors, slash selectors, name patterns, type-scoped
+// `--all`, and cross-type `all` deletion. Wired (via
 // `kamu_cli_resource_e2e_test!`) to run against both local and remote contexts.
 //
 // IMPORTANT: this scenario applies `SecretSet` resources, so it must be wired
@@ -29,7 +29,7 @@ pub async fn test_resources_delete_semantics(ctx: ResourceCtx) {
     // -- 1. Seed two VariableSets and two SecretSets --------------------------
     seed_delete_fixtures(&ctx, app_vars, temp_vars, app_secrets, temp_secrets).await;
 
-    // -- 2. Explicit kind/name selector deletes only the selected VariableSet -
+    // -- 2. Explicit type/name selector deletes only the selected VariableSet -
     ctx.assert_success(
         ["delete", "vs", app_vars, "--force"],
         Some(&[
@@ -71,7 +71,7 @@ pub async fn test_resources_delete_semantics(ctx: ResourceCtx) {
     ctx.assert_resource_present("ss", app_secrets).await;
     ctx.assert_resource_absent("ss", temp_secrets).await;
 
-    // -- 5. Kind-scoped --all dry-run previews only VariableSets --------------
+    // -- 5. Type-scoped --all dry-run previews only VariableSets --------------
     ctx.apply_variable_set(app_vars, "app-value").await;
     ctx.apply_variable_set(temp_vars, "temp-value").await;
 
@@ -93,7 +93,7 @@ pub async fn test_resources_delete_semantics(ctx: ResourceCtx) {
     ctx.assert_resource_present("ss", app_secrets).await;
     ctx.assert_resource_absent("ss", temp_secrets).await;
 
-    // -- 6. Kind-scoped --all deletes only VariableSets -----------------------
+    // -- 6. Type-scoped --all deletes only VariableSets -----------------------
     let variableset_delete = ctx
         .stderr(["delete", "variablesets", "--all", "--force"])
         .await;
@@ -111,7 +111,7 @@ pub async fn test_resources_delete_semantics(ctx: ResourceCtx) {
     ctx.assert_resource_absent("vs", temp_vars).await;
     ctx.assert_resource_present("ss", app_secrets).await;
 
-    // -- 7. Cross-kind all dry-run previews every remaining resource ----------
+    // -- 7. Cross-type all dry-run previews every remaining resource ----------
     ctx.apply_variable_set(app_vars, "app-value").await;
     ctx.apply_variable_set(temp_vars, "temp-value").await;
     ctx.apply_secret_set(temp_secrets, "temp-token", "temp-password")
@@ -135,7 +135,7 @@ pub async fn test_resources_delete_semantics(ctx: ResourceCtx) {
     ctx.assert_resource_present("ss", app_secrets).await;
     ctx.assert_resource_present("ss", temp_secrets).await;
 
-    // -- 8. Cross-kind all deletes everything ---------------------------------
+    // -- 8. Cross-type all deletes everything ---------------------------------
     let all_delete = ctx.stderr(["delete", "all", "--force"]).await;
     assert_output_contains_all(
         &all_delete,

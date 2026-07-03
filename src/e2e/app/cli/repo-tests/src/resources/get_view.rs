@@ -31,7 +31,7 @@
 //! tests assert on. New volatile/server fields are ignored by construction, so
 //! they never make a test flaky or break it for the wrong reason. The one place
 //! that *does* want the full shape — catching drift in the `get` render struct
-//! — is a deliberate, single "golden" test per kind (see
+//! — is a deliberate, single "golden" test per type (see
 //! `test_resources_golden_view`), which owns its own volatile-field handling.
 //!
 //! ## Cardinality
@@ -57,7 +57,7 @@ pub struct ResourceView(Value);
 
 impl ResourceView {
     /// The resource schema URL (`/$schema`).
-    pub fn kind(&self) -> &str {
+    pub fn schema(&self) -> &str {
         self.str_at("/$schema", "$schema")
     }
 
@@ -69,7 +69,7 @@ impl ResourceView {
     /// `(schema, name)` — the resource's identity. The primary assertion target
     /// for selector tests: collect these across a result and compare the set.
     pub fn ident(&self) -> (&str, &str) {
-        (self.kind(), self.name())
+        (self.schema(), self.name())
     }
 
     /// `headers.description`, if present.
@@ -213,7 +213,7 @@ impl ResourceCtx {
             .get_views(args)
             .await
             .iter()
-            .map(|v| (v.kind().to_string(), v.name().to_string()))
+            .map(|v| (v.schema().to_string(), v.name().to_string()))
             .collect();
         idents.sort();
         idents

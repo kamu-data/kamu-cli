@@ -28,7 +28,7 @@ use kamu_resources_facade::{
     GetResourceError,
     ListAllResourcesError,
     ListResourcesError,
-    ListSupportedResourceKindsError,
+    ListSupportedResourceTypesError,
     RenderResourceManifestError,
     ResourceLookupProblem,
     ResourcesSummaryError,
@@ -274,11 +274,11 @@ impl From<ResourcesSummaryError> for CLIError {
     }
 }
 
-impl From<ListSupportedResourceKindsError> for CLIError {
-    fn from(e: ListSupportedResourceKindsError) -> Self {
+impl From<ListSupportedResourceTypesError> for CLIError {
+    fn from(e: ListSupportedResourceTypesError) -> Self {
         match e {
-            ListSupportedResourceKindsError::RemoteRequest(err) => Self::from(err),
-            ListSupportedResourceKindsError::Internal(err) => Self::critical(err),
+            ListSupportedResourceTypesError::RemoteRequest(err) => Self::from(err),
+            ListSupportedResourceTypesError::Internal(err) => Self::critical(err),
         }
     }
 }
@@ -445,8 +445,8 @@ enum ResourceLookupCliError {
     #[error("Resource with id {0} was not found")]
     IDNotFound(kamu_resources::ResourceID),
 
-    #[error("Resource '{name}' of kind '{kind}' was not found")]
-    NameNotFound { kind: String, name: String },
+    #[error("Resource '{name}' of type '{resource_type}' was not found")]
+    NameNotFound { resource_type: String, name: String },
 
     #[error("Resource id {id} refers to schema '{actual_schema}', expected '{expected_schema}'")]
     SchemaMismatch {
@@ -461,7 +461,7 @@ impl From<ResourceLookupProblem> for ResourceLookupCliError {
         match problem {
             ResourceLookupProblem::IDNotFound(err) => Self::IDNotFound(err.0),
             ResourceLookupProblem::NameNotFound(err) => Self::NameNotFound {
-                kind: err.kind,
+                resource_type: err.canonical_selector.to_string(),
                 name: err.name.to_string(),
             },
             ResourceLookupProblem::SchemaMismatch(err) => Self::SchemaMismatch {

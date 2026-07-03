@@ -10,11 +10,11 @@
 ## Agent / newcomer quick-start
 
 **One-paragraph mental model.** The resources framework is a generic, event-sourced,
-Kubernetes-inspired subsystem for *declarative* management of arbitrary "resource kinds". A user
+Kubernetes-inspired subsystem for *declarative* management of arbitrary "resource types". A user
 authors a **manifest** (`$schema` + `headers` + `spec`); the framework stores it as an event-sourced
 aggregate, fills in server-owned headers (id, timestamps, `generation`) and an **initial**
 server-owned `status`, then **asynchronously reconciles** it toward the desired state (the status
-progresses `Pending → Reconciling → Ready`/`Failed`). Every kind (today: `VariableSet`, `SecretSet`)
+progresses `Pending → Reconciling → Ready`/`Failed`). Every type (today: `VariableSet`, `SecretSet`)
 implements a small set of traits and registers a **dispatcher** keyed by its canonical schema URL.
 All callers — the CLI and the GraphQL API — go through a single seam, the **`ResourceFacade`** trait,
 which has an in-process (`Local`) implementation and a `RemoteGraphql` implementation that talks to
@@ -30,7 +30,7 @@ a remote server.
 | Understand storage, uniqueness, soft-delete | [§6 Persistence model](#6-persistence-model) |
 | Understand account scoping & permissions | [§7 Account resolution & authorization](#7-account-resolution--authorization) |
 | Trace an `apply` / reconcile end-to-end | [§13 Data flow](#13-data-flow-walkthroughs) |
-| Add a new resource kind | [§14 Concrete kinds + recipe](#14-concrete-resource-kinds-kamu-configuration) |
+| Add a new resource type | [§14 Concrete types + recipe](#14-concrete-resource-types-kamu-configuration) |
 | Find the file for X | [§16 Reference map](#16-filecrate-reference-map) |
 | Avoid common traps | [§17 Gotchas](#17-extension-points--gotchas) |
 
@@ -78,9 +78,9 @@ make clippy
     - [Outbox connections](#outbox-connections)
     - [How reconciliation is scheduled](#how-reconciliation-is-scheduled)
     - [Lifecycle state machine](#lifecycle-state-machine)
-  - [14. Concrete resource kinds (`kamu-configuration`)](#14-concrete-resource-kinds-kamu-configuration)
+  - [14. Concrete resource types (`kamu-configuration`)](#14-concrete-resource-types-kamu-configuration)
     - [Secret handling invariant](#secret-handling-invariant)
-    - [Recipe: how to add a new resource kind](#recipe-how-to-add-a-new-resource-kind)
+    - [Recipe: how to add a new resource type](#recipe-how-to-add-a-new-resource-type)
   - [15. Tests](#15-tests)
     - [Testing policy — what belongs where](#testing-policy--what-belongs-where)
   - [16. File/crate reference map](#16-filecrate-reference-map)
@@ -100,16 +100,16 @@ The framework provides a uniform way to **declaratively manage** typed resources
   maintains the remaining headers — including `generation` (the desired-state revision, bumped on
   each spec/headers change) — and a `status` with `phase`, `observedGeneration` (reconciliation
   progress), and `conditions`. Reconciliation is needed whenever `observedGeneration < generation`.
-- **Pluggable kinds** — the generic machinery is type-parameterized over a resource type `R`;
-  concrete kinds plug in via traits + registered dispatchers keyed by canonical schema URL.
+- **Pluggable types** — the generic machinery is type-parameterized over a resource type `R`;
+  concrete types plug in via traits + registered dispatchers keyed by canonical schema URL.
 - **Local & remote symmetry** — the same operations run in-process or against a remote server behind
   one trait (`ResourceFacade`).
 - **Event-sourced & transactional** — mutations are recorded as immutable events; lifecycle changes
   are announced on the transactional **outbox**.
 
-**Not in scope here:** the supported / production-ready kinds today are `VariableSet` and `SecretSet`
-(below). A third kind, `Storage`, is already **registered** in the CLI catalog and wired through the
-same machinery but is **incomplete / WIP** — see [§14](#14-concrete-resource-kinds-kamu-configuration).
+**Not in scope here:** the supported / production-ready types today are `VariableSet` and `SecretSet`
+(below). A third type, `Storage`, is already **registered** in the CLI catalog and wired through the
+same machinery but is **incomplete / WIP** — see [§14](#14-concrete-resource-types-kamu-configuration).
 Datasets and flows are **not** resources today, though bringing them under the framework is a
 long-term goal. This page documents what exists now.
 
@@ -119,11 +119,11 @@ long-term goal. This page documents what exists now.
 
 | Term | Meaning |
 | --- | --- |
-| **Resource** | A single managed object instance of a given kind, identified by a `ResourceID`. |
-| **Schema** | The canonical resource type identity URL, e.g. `https://opendatafabric.org/schemas/config/v1alpha1/VariableSet`. Carried in code as a `TypeUri` (opaque identity value); a parsed lens over it is `ResourceSchemaId` (see [§5a](#5a-resource-anatomy--input-vs-auto-generated)). |
-| **Kind name** | User-facing selector / presentation name, e.g. `variablesets`, `secretsets`. Not persisted as the resource type identity. |
-| **Short name** | Selector alias, e.g. `vs`, `ss`. |
-| **Descriptor** | The schema (`TypeUri`) identifying a resource kind for dispatcher routing; carried in the `dill` registry as `ResourceDispatcherMeta`. |
+| **Resource** | A single managed object instance of a given type, identified by a `ResourceID`. |
+| **Schema** | The canonical resource type identity URL, e.g. `https://opendatafabric.org/schemas/config/v1alpha1/VariableSet`. Carried in code as a `TypeUri` (opaque identity value); a parsed lens over it is `ResourceSchemaId` (see [§5a](#5a-resource-anatomy--input-vs-auto-generated)). Its last path segment is a `TypeName` (ODF RFC-018 schema type name, e.g. `VariableSet`), obtained via `ResourceSchemaId::type_name()`. |
+| **Selector name / alias** | A resource *type's* user-facing name: either the canonical presentation name, e.g. `variablesets`, `secretsets`, or a short alias, e.g. `vs`, `ss`. Both are carried as `ResourceSelectorName` — the canonical/alias distinction is a matter of which field holds the value (`canonical_selector` vs. `selector_aliases`), not a separate type. Not an ODF `TypeName` and not persisted as the resource type identity. |
+| **Resource type selector** | Raw user/API input identifying a resource *type* before resolution (matches either a selector name or alias); carried as `ResourceTypeSelectorRaw`. Not to be confused with **Selector** below, which identifies a resource *instance*. |
+| **Descriptor** | The schema (`TypeUri`) plus selector name/aliases identifying a resource type for dispatcher routing and presentation; the domain type is `ResourceTypeDescriptor`, carried in the `dill` registry as `ResourceDispatcherMeta`. |
 | **Manifest** | The user-authored wire document (`$schema`/`headers`/`spec`) in YAML or JSON. |
 | **Spec** | The desired-state portion authored by the user; stored as `serde_json::Value`. |
 | **Status** | Server-owned observed state (`phase`, `observedGeneration`, `conditions`). Note `generation` lives in **headers**, not status. |
@@ -132,9 +132,9 @@ long-term goal. This page documents what exists now.
 | **Condition** | A K8s-style condition entry contributing to the overall phase. |
 | **generation / observedGeneration** | `generation` bumps on each spec/headers change; `observedGeneration` records the last generation reconciliation observed. Drift ⇒ reconcile. |
 | **Reconciliation** | The act of driving actual state toward the spec (e.g. `SecretSet` materializes its encrypted read-side projection). |
-| **Selector** | Identifies one (`ResourceSelector`) or many (`ResourceBatchSelector`) resources, by name or UID, optionally scoped to an account. |
+| **Selector** | Identifies one (`ResourceSelector`) or many (`ResourceBatchSelector`) resource *instances*, by name or UID, optionally scoped to an account. Distinct from **Resource type selector** above, which identifies a *type*, not an instance. |
 | **SpecViewMode** | How sensitive spec fields are rendered. Two modes only: `Encrypted` (default — the stored ciphertext envelope is returned as-is) and `Revealed` (decrypted plaintext). There is no separate "redacted/placeholder" mode today. |
-| **Dispatcher** | Per-kind adapter (`ResourceCrudDispatcher`, …) registered in `dill` and looked up by schema or selector metadata. |
+| **Dispatcher** | Per-type adapter (`ResourceCrudDispatcher`, …) registered in `dill` and looked up by schema or selector metadata. |
 | **Facade** | The single API seam (`ResourceFacade`) used by all callers; local or remote-GraphQL impl. |
 
 ---
@@ -149,14 +149,14 @@ not break; most are enforced in code and exercised by tests — pointers given w
   changes (it is the primary key — see [§6](#6-persistence-model)).
 - **`(account_id, schema, name)` is unique.** Enforced by a DB unique constraint
   `UNIQUE (account_id, resource_schema, resource_name)`. Names are stored lowercased.
-- **`$schema` is the resource type identity.** Manifests no longer carry top-level `apiVersion` or
-  `kind`; both are rejected as unknown fields. A schema URL is parsed into base/context/version/name
+- **`$schema` is the resource type identity.** A schema URL is parsed into base/context/version/name
   for validation and display, but dispatch and persistence compare the full canonical schema — carried
   as a `TypeUri` and string-equal on the wire/in storage (the dill registry key is an equivalent
   `&'static str`, see [§9](#9-services-kamu-resources-services)).
 - **Selectors are presentation names, not manifest identity.** CLI and GraphQL selectors still use
-  friendly kind names and short names (`variablesets`, `vs`, `secretsets`, `ss`), which are resolved
-  to a `ResourceKindDescriptor.schema` before repository or dispatcher access.
+  friendly selector names and aliases (`variablesets`, `vs`, `secretsets`, `ss`), typed as
+  `ResourceTypeSelectorRaw` before resolution, which are resolved to a `ResourceTypeDescriptor.schema`
+  before repository or dispatcher access.
 - **`headers.generation` changes only when desired state changes.** It starts at 1 on create and is
   bumped by the aggregate only when an apply produces a real headers/spec change (`Update`); an
   unchanged apply is `Untouched` and does not bump it.
@@ -198,7 +198,7 @@ flowchart TD
 
     subgraph domain["Domain + services"]
       REG["Dispatcher registry<br/>lookup by schema<br/>or selector metadata"]
-      DISP["ResourceCrudDispatcher&lt;R&gt;<br/>per-kind"]
+      DISP["ResourceCrudDispatcher&lt;R&gt;<br/>per-type"]
       UC["Use cases&lt;R&gt;<br/>apply / reconcile / get / list / delete"]
     end
 
@@ -227,7 +227,7 @@ behavior (verified by the same contract tests — see [§15](#15-tests)).
 | `kamu-resources-services` | `src/domain/resources/services` | Implementations: loaders, persistence, query services, use-case macros, dispatcher macros + registry, message handlers. |
 | `kamu-resources-facade` | `src/domain/resources/facade` | The `ResourceFacade` trait + `Local` and `RemoteGraphql` implementations. |
 | `kamu-resources-facade-tests` | `src/domain/resources/facade-tests` | Cross-implementation contract tests enforcing local/remote symmetry for covered behavior. |
-| `kamu-configuration` / `kamu-configuration-services` | `src/domain/configuration/{domain,services}` | Concrete kinds: `VariableSet`, `SecretSet`. |
+| `kamu-configuration` / `kamu-configuration-services` | `src/domain/configuration/{domain,services}` | Concrete types: `VariableSet`, `SecretSet`. |
 
 ---
 
@@ -291,13 +291,15 @@ and an aggregate. This is the bound that all generic use cases require.
 - **`ResourceSchemaProvider`** — exposes `fn schema() -> &'static TypeUri`, the canonical schema URL
   (as a `TypeUri`) for the resource, backed by a `'static` value (a `LazyLock<TypeUri>` from the ODF
   codegen) ([`core/resource_descriptor.rs`](/src/domain/resources/domain/src/core/resource_descriptor.rs)).
-- **`ResourcePresentation`** — selector name, short names, and per-kind list columns for
-  table/`list` rendering.
+- **`ResourcePresentation`** — exposes a `ResourcePresentationDefinition` with `canonical_selector:
+  ResourceSelectorName`, `selector_aliases: &'static [ResourceSelectorName]`, and per-type list
+  columns for table/`list` rendering.
 
   > Routing to the right dispatcher no longer goes through a `ResourceDescriptor`/`DESCRIPTOR`
   > const — the registry keys dispatchers on `dill` metadata (`ResourceDispatcherMeta`, carrying the
-  > schema as a `&'static str` plus selector name/short-names) and compares it against the target
-  > `TypeUri` / selector. See [§9](#9-services-kamu-resources-services).
+  > schema as a `&'static str` plus selector name/aliases as raw `&'static str`/`&'static [&'static
+  > str]`, since dill's `#[meta]` requires const-evaluable values) and compares it against the
+  > target `TypeUri` / selector. See [§9](#9-services-kamu-resources-services).
 
 ### Events
 
@@ -324,7 +326,7 @@ schema plus presentation metadata as `dill` metadata for registry lookup
 ### Use-case traits
 
 Generic, `R`-parameterized contracts in `use_cases/`: `ApplyResourceUseCase<R>` (two-phase, below),
-`ReconcileResourceUseCase<R>`, `GetResourceByUidUseCase<R>`, `ListResourcesByKindUseCase<R>`,
+`ReconcileResourceUseCase<R>`, `GetResourceByUidUseCase<R>`, `ListResourcesByTypeUseCase<R>`,
 `DeleteResourcesUseCase<R>`, plus the non-generic `ListAllResourcesUseCase` and
 `DeleteAccountResourcesUseCase`.
 
@@ -341,7 +343,7 @@ pub struct ResourceManifest {
     #[serde(rename = "$schema")]
     pub schema: ResourceSchemaId,            // required — canonical schema URL
     pub headers: ResourceManifestHeaders,
-    pub spec: serde_json::Value,             // desired state; kind-specific shape
+    pub spec: serde_json::Value,             // desired state; type-specific shape
 }
 
 #[serde(deny_unknown_fields)]                // ← unknown fields (e.g. `status`) are rejected
@@ -358,8 +360,7 @@ pub struct ResourceManifestHeaders {
 
 A user may write **only**: `$schema`, `headers.{id?, account?, name, description?, labels,
 annotations}`, and `spec`. `deny_unknown_fields` means a manifest **cannot** carry `status`,
-timestamps, `generation`, or the legacy top-level `apiVersion`/`kind` fields — those are
-server-owned or no longer part of the manifest envelope.
+timestamps, or `generation` — those are server-owned.
 
 > **`TypeUri` vs `ResourceSchemaId`.** Both model the *same* `$schema` attribute at two levels.
 > `TypeUri` is the opaque identity value carried through fields, storage, and the wire
@@ -474,12 +475,12 @@ methods filter `WHERE deleted_at IS NULL`, so tombstones are invisible to normal
 **Migration / backfill.** Schema changes are ordinary SQLx migrations under `migrations/{postgres,sqlite}`.
 There is a precedent for data backfill into resources —
 `20260513120000_backfill_env_var_resources.sql` migrates legacy dataset env-vars into `VariableSet`
-resources; new kinds that supersede existing data should follow that pattern (additive migration +
+resources; new types that supersede existing data should follow that pattern (additive migration +
 backfill, never rewriting the event log in place).
 
 **Schema/version upgrades.** The schema URL is part of resource identity, including its version
 segment. Supporting a new schema version therefore requires an explicit compatibility/migration
-story for that resource kind: update manifests, projections, dispatcher registration, and any
+story for that resource type: update manifests, projections, dispatcher registration, and any
 existing rows/events that should move to the new schema. Do not assume the pre-`$schema` version
 conversion rules still apply.
 
@@ -554,8 +555,8 @@ This crate turns the domain traits into running code. Module layout: `services/`
   save / delete, with `delete_many`).
 - **`GenericResourceQueryService`** (impl `GenericResourceQueryServiceImpl`) — descriptor-agnostic
   queries (allocate UID, find by name, search identities) delegating to `ResourceRepository`.
-- **`TypedResourceQueryService<R>`** — type-safe queries for a single kind.
-- **`Reconciler<R>`** — the per-kind reconcile engine (implemented in the kind's crate).
+- **`TypedResourceQueryService<R>`** — type-safe queries for a single type.
+- **`Reconciler<R>`** — the per-type reconcile engine (implemented in the type's crate).
 
 **Two-phase apply.** `ApplyResourceUseCase<R>` separates *planning* (validate, diff, decide
 create/update/untouched, without writing) from *application* (persist + publish)
@@ -576,12 +577,12 @@ pub enum ApplyResourceOutcome { Created, Updated, Untouched }
 ```
 
 The `--dry-run` path uses `plan`; a live apply uses `apply`. Use-case implementations are generated
-by **`declare_*_use_case!`** macros so each kind gets a fully-wired instance without boilerplate.
+by **`declare_*_use_case!`** macros so each type gets a fully-wired instance without boilerplate.
 
-**Dispatchers + registry.** Each kind registers a `ResourceCrudDispatcher` via
+**Dispatchers + registry.** Each type registers a `ResourceCrudDispatcher` via
 `declare_resource_crud_dispatcher!` (and a presentation dispatcher). Lookup is by schema or selector
 metadata through `dill` — the registry key is `ResourceDispatcherMeta` (schema `&'static str` +
-selector name/short-names). There are **three** lookup entry points, differing only in how a missing
+selector name/aliases). There are **three** lookup entry points, differing only in how a missing
 dispatcher is reported
 ([`crud_dispatchers/resource_crud_dispatcher_registry.rs`](/src/domain/resources/services/src/crud_dispatchers/resource_crud_dispatcher_registry.rs)):
 
@@ -590,8 +591,8 @@ dispatcher is reported
 pub fn get_resource_crud_dispatcher<E>(target_catalog, schema: &str) -> Result<Arc<dyn …>, E>
     where E: From<UnsupportedResourceDescriptorError> + From<InternalError>;
 
-// (2) By selector name/short-name (from a CLI/GraphQL selector) — a miss is a user error.
-pub fn get_resource_crud_dispatcher_by_selector<E>(target_catalog, selector: &str) -> Result<…, E>
+// (2) By selector name/alias (from a CLI/GraphQL selector) — a miss is a user error.
+pub fn get_resource_crud_dispatcher_by_raw_selector<E>(target_catalog, raw_selector: &ResourceTypeSelectorRaw) -> Result<…, E>
     where E: From<UnsupportedResourceSelectorError> + From<InternalError>;
 
 // (3) By a schema already known valid (stored snapshot, or an already-resolved selector) —
@@ -611,22 +612,22 @@ not a bad request.
 `ResourceLifecycleMessageConsumer` and `AccountLifecycleMessageConsumer`.
 
 **DI registration** — [`dependencies.rs`](/src/domain/resources/services/src/dependencies.rs) is the
-single place where this crate's `dill` catalog components (base query services, the cross-kind use
-cases, and the outbox message consumers) are registered. Per-kind use cases and dispatchers are
-registered separately by the kind's own crate (see [§14](#14-concrete-resource-kinds-kamu-configuration)).
+single place where this crate's `dill` catalog components (base query services, the cross-type use
+cases, and the outbox message consumers) are registered. Per-type use cases and dispatchers are
+registered separately by the type's own crate (see [§14](#14-concrete-resource-types-kamu-configuration)).
 
 ---
 
 ## 10. Facade (`kamu-resources-facade`)
 
-`ResourceFacade` is the **single API seam** every caller uses. It hides the per-kind generics behind
+`ResourceFacade` is the **single API seam** every caller uses. It hides the per-type generics behind
 descriptor-keyed dispatch and gives local/remote symmetry. Selected signature
 ([`facade/resource_facade.rs`](/src/domain/resources/facade/src/facade/resource_facade.rs)):
 
 ```rust
 #[async_trait]
 pub trait ResourceFacade: Send + Sync {
-    async fn list_supported_kinds(&self) -> Result<Vec<ResourceKindDescriptor>, ...>;
+    async fn list_supported_resource_types(&self) -> Result<Vec<ResourceTypeDescriptor>, ...>;
     async fn summary(&self, request: ResourcesSummaryRequest) -> Result<ResourcesSummary, ...>;
 
     async fn get(&self, selector: ResourceSelector, spec_view_mode: SpecViewMode) -> Result<ResourceView, ...>;
@@ -650,7 +651,8 @@ pub trait ResourceFacade: Send + Sync {
 **Selectors & view modes:**
 
 ```rust
-pub struct ResourceSelector { pub account: Option<ResourceManifestAccount>, pub kind: String,
+pub struct ResourceSelector { pub account: Option<ResourceAccountRef>,
+                              pub resource_type: ResourceTypeSelectorRaw,
                               pub resource_ref: ResourceRef }
 pub enum   ResourceRef { ById(ResourceID), ByName(ResourceName) }
 pub enum   ResourceManifestFormat { Json, Yaml }
@@ -662,8 +664,8 @@ Batch operations return `BatchResourceResponse<T, E>` with positional `successes
 
 **Implementations:**
 
-- **`LocalResourceFacadeImpl`** — resolves account → resolves selector kind name/short name to a
-  schema and UID/snapshot → looks up the per-kind dispatcher via `get_resource_crud_dispatcher` →
+- **`LocalResourceFacadeImpl`** — resolves account → resolves selector name/alias to a
+  schema and UID/snapshot → looks up the per-type dispatcher via `get_resource_crud_dispatcher` →
   calls it. Holds the `dill::Catalog`,
   a `ResourceAccountResolver`, and `GenericResourceQueryService`.
 - **`RemoteGraphqlResourceFacadeImpl`** — a `cynic`-based GraphQL client that issues the queries /
@@ -683,10 +685,10 @@ Files: [`adapter/graphql/src/queries/resources/`](/src/adapter/graphql/src/queri
 and [`adapter/graphql/src/mutations/resources_mut/`](/src/adapter/graphql/src/mutations/resources_mut).
 Every resolver delegates to `ResourceFacade`.
 
-**Queries (`Resources`):** `supported_kinds`, `summary`, `resource` / `resources`,
-`resource_identity` / `resource_identities`, `list_by_kind` / `list_identities_by_kind`,
-`search_identities`, `list_all` / `list_all_identities`, `render_manifest` / `render_manifests`.
-The `revealed: bool` argument maps to `SpecViewMode`.
+**Queries (`Resources`):** `supported_resource_types`, `summary`, `resource` / `resources`,
+`resource_identity` / `resource_identities`, `list_by_resource_type` /
+`list_identities_by_resource_type`, `search_identities`, `list_all` / `list_all_identities`,
+`render_manifest` / `render_manifests`. The `revealed: bool` argument maps to `SpecViewMode`.
 
 **Mutations (`ResourcesMut`):** `apply_manifest(manifest, format, dry_run?)`, `delete(selector)`,
 `delete_many(selector)`. `dry_run` routes to `plan_apply_manifest`, otherwise `apply_manifest`.
@@ -723,12 +725,13 @@ implementation files carry `_resource(s)_` names:
 | Subcommand | Implementation file | Purpose |
 | --- | --- | --- |
 | `kamu apply` | `apply_command.rs` | Discover manifests (files/dir/stdin) and apply/plan them; `--dry-run`, `--recursive`, `--stdin`, `--continue-on-error`. |
-| `kamu list` | `list_resources_command.rs` | List resources by kind or all; renders Table/CSV/JSON/Parquet. |
+| `kamu list` | `list_resources_command.rs` | List resources by type or all; renders Table/CSV/JSON/Parquet. |
 | `kamu get` | `get_resource_command.rs` | Get resource(s) by selector(s); names or full manifest; `--spec`, `--revealed`. |
 | `kamu delete` | `delete_resources_command.rs` | Delete by selector(s); `--force`, `--ignore-not-found`, `--dry-run`. |
 
 **Context commands** (manage which server/workspace resources target): `kamu context add` / `list` /
-`check` / `use` / `delete`, and `kamu context api-resources` (list supported kinds for a context).
+`check` / `use` / `delete`, and `kamu context api-resources` (list supported resource types for a
+context).
 
 **CLI-side services** ([`app/cli/src/services/resources/`](/src/app/cli/src/services/resources),
 implementations under `impl/`):
@@ -738,14 +741,14 @@ implementations under `impl/`):
 | `ResourceFacadeFactory` | Returns the right `ResourceFacade` for a context — local for the workspace, or a `RemoteGraphqlResourceFacadeImpl` (with access token) for a remote context. |
 | `ResourceManifestDiscoveryService` | Finds `.yaml`/`.yml`/`.json` manifests from paths/stdin (recursive optional). |
 | `ResourceManifestExecutionService` | Reads a discovered manifest and calls `plan_apply_manifest` / `apply_manifest`. |
-| `ResourceKindLookupService` | Resolves a kind by name/short-name/kind string; caches `list_supported_kinds` per context. |
+| `ResourceTypeLookupService` | Resolves a resource type by selector name/alias/raw string; caches `list_supported_resource_types` per context. |
 | `ResourceSelectionSyntaxService` | Parses the `get`/`delete` selector grammar. |
 | `ResourceSelectionResolutionService` | Expands parsed selectors into concrete targets via facade queries. |
 | `ResourceSelectorResolutionService` | Resolves a single selector string to a `ResourceRef`. |
-| `ResourceSummaryService` | Produces the dashboard summary (context info + per-kind counts). |
+| `ResourceSummaryService` | Produces the dashboard summary (context info + per-type counts). |
 
-**Selector grammar** (used by `get`/`delete`): `all`; `kind all` or `kind/all`; same-kind list
-`kind name1 name2 …` (no slash); slash form `kind/name …` (exactly one `/` each); plus name patterns.
+**Selector grammar** (used by `get`/`delete`): `all`; `type all` or `type/all`; same-type list
+`type name1 name2 …` (no slash); slash form `type/name …` (exactly one `/` each); plus name patterns.
 
 Local-vs-remote is chosen entirely by `ResourceFacadeFactory` + the context resolver — commands
 themselves are agnostic.
@@ -754,11 +757,11 @@ themselves are agnostic.
 
 | Aspect | `apply` | `get` | `list` | `delete` |
 | --- | --- | --- | --- | --- |
-| Input | manifest(s): `-f <file>`, dir + `--recursive`, or `--stdin` | selector(s) | positional `target` (a kind or `all`) | selector(s) |
+| Input | manifest(s): `-f <file>`, dir + `--recursive`, or `--stdin` | selector(s) | positional `target` (a type or `all`) | selector(s) |
 | Selector / target examples | n/a (identity from manifest) | `vs my-vars`, `vs/my-vars`, `secretset/db%`, `vs all` | `kamu list variablesets` (or `vs`, `secretsets`, `ss`, `all`) | `vs my-vars`, `vs/my%`, `vs all` |
-| `%` name patterns | n/a | **yes** | n/a (lists whole kind) | **yes** |
+| `%` name patterns | n/a | **yes** | n/a (lists whole type) | **yes** |
 | May return / act on multiple | yes (per manifest) | **yes, but bounded** — selector-driven, capped by `max_results` (default), `--unbounded` to lift | yes (bounded by `--max-results`/`--unbounded`) | yes |
-| `get` ≠ `list` | — | `get` resolves explicit selectors to specific resources and is **bounded by design** so it doesn't degrade into a kind-wide listing; use `list` to enumerate a kind | enumerates a kind/all | — |
+| `get` ≠ `list` | — | `get` resolves explicit selectors to specific resources and is **bounded by design** so it doesn't degrade into a type-wide listing; use `list` to enumerate a type | enumerates a type/all | — |
 | Output modes | summary + changes (`--dry-run`)/warnings; verbose | `-o name` \| `-o json` \| `-o yaml`; `--spec` for apply-compatible spec | Table/CSV/JSON/Parquet (via `OutputConfig`), `-w` for wider detail | summary / dry-run preview |
 | Default secret visibility | n/a | **`Encrypted`** (ciphertext); `--revealed` to decrypt | secrets not expanded in list columns | n/a |
 | Relevant flags | `--dry-run`, `--recursive`, `--stdin`, `--continue-on-error` | `--ignore-not-found`, `--spec`, `--revealed`, `--max-results`/`--unbounded` | `--max-results`/`--unbounded`, `-w`, `-o` | `--force`, `--ignore-not-found`, `--dry-run` |
@@ -770,18 +773,18 @@ themselves are agnostic.
 
 **Selector grammar — accepted forms** (parsed by `ResourceSelectionSyntaxParser`,
 [`resource_selection_syntax_parser.rs`](/src/app/cli/src/services/resources/impl/resource_selection_syntax_parser.rs)):
-`all`; same-kind list `kind name1 name2 …` (no slash); slash form `kind/name …` (each arg exactly one
-`/`); `kind all` or `kind/all`; names may use `%` patterns.
+`all`; same-type list `type name1 name2 …` (no slash); slash form `type/name …` (each arg exactly one
+`/`); `type all` or `type/all`; names may use `%` patterns.
 
 **Intentionally rejected** (documented as a contract, not just left implicit):
 
-- `kamu get vs/foo bar` — **mixing** slash and same-kind list forms in one command is rejected
-  ("Cannot mix positional `kind name` and slash `kind/name` syntax"). The one exception is a leading
+- `kamu get vs/foo bar` — **mixing** slash and same-type list forms in one command is rejected
+  ("Cannot mix positional `type name` and slash `type/name` syntax"). The one exception is a leading
   `all` (e.g. `all vs/foo` is accepted, with the rest treated as shadowed).
 - `kamu get vs/foo/extra` — the slash form must contain **exactly one** `/` (rejected: "Invalid
   resource reference").
-- `kamu get vs` — a bare kind with **no selector** is rejected ("Expected `kind/name`"); use
-  `kamu get vs all` / `kamu get vs/all`, or `kamu list vs`, to enumerate the kind.
+- `kamu get vs` — a bare type with **no selector** is rejected ("Expected `type/name`"); use
+  `kamu get vs all` / `kamu get vs/all`, or `kamu list vs`, to enumerate the type.
 
 > Note: `kamu get all` *is* accepted by the parser (resolves all resources, **bounded** by
 > `--max-results`/`--unbounded`). For unbounded enumeration prefer `kamu list all` — this is a
@@ -862,7 +865,7 @@ flowchart LR
 
     MSG --> OB[("Outbox")]
 
-    OB --> BRIDGE["ResourceLifecycleMessageConsumer<br/>(MESSAGE_CONSUMER_..._RESOURCE_LIFECYCLE_EVENT_BRIDGE)<br/>→ ResourceLifecycleEventDispatcher (per-kind)"]
+    OB --> BRIDGE["ResourceLifecycleMessageConsumer<br/>(MESSAGE_CONSUMER_..._RESOURCE_LIFECYCLE_EVENT_BRIDGE)<br/>→ ResourceLifecycleEventDispatcher (per-type)"]
     OB --> CFG["configuration crate:<br/>ConfigurationResourceLifecycleMessageConsumer"]
 
     ACC[["AccountLifecycleMessage::Deleted"]] --> OB2[("Outbox")]
@@ -871,7 +874,7 @@ flowchart LR
 
 - **Resource lifecycle** — `Applied` (from `use_cases/apply.rs`), `ReconciliationSucceeded` /
   `ReconciliationFailed` (`use_cases/reconcile.rs`), `Deleted` (`use_cases/delete.rs`). Consumed by
-  the **event bridge** (routes to the per-kind `ResourceLifecycleEventDispatcher` — this is what
+  the **event bridge** (routes to the per-type `ResourceLifecycleEventDispatcher` — this is what
   schedules reconciliation) and by the configuration crate's projection-maintenance consumer. See
   [How reconciliation is scheduled](#how-reconciliation-is-scheduled) for the split of duties.
 - **Account cascade** — when an account is deleted, `AccountLifecycleMessage::Deleted` is consumed by
@@ -886,7 +889,7 @@ Reconciliation is **not** synchronous within `apply` — it is driven by the out
 flowchart LR
     A["apply use case<br/>(persist + produce Applied)"] --> OB[("Outbox")]
     OB --> C["ResourceLifecycleMessageConsumer<br/>(event bridge)"]
-    C -->|lookup by schema| D["per-kind ResourceLifecycleEventDispatcher<br/>handle_applied()"]
+    C -->|lookup by schema| D["per-type ResourceLifecycleEventDispatcher<br/>handle_applied()"]
     D --> R["ReconcileResourceUseCase::execute(id)"]
     R --> Rec["Reconciler&lt;R&gt;"]
 ```
@@ -895,15 +898,15 @@ flowchart LR
 2. The generic **`ResourceLifecycleMessageConsumer`** (the "event bridge",
    `MESSAGE_CONSUMER_KAMU_RESOURCE_LIFECYCLE_EVENT_BRIDGE`,
    [`message_handlers/resource_lifecycle_message_consumer.rs`](/src/domain/resources/services/src/message_handlers/resource_lifecycle_message_consumer.rs))
-   consumes it and looks up the per-kind `ResourceLifecycleEventDispatcher` by descriptor.
+   consumes it and looks up the per-type `ResourceLifecycleEventDispatcher` by descriptor.
 3. That dispatcher's `handle_applied` calls **`ReconcileResourceUseCase::execute(id)`**, which loads
-   the aggregate, marks reconciliation started, invokes the kind's `Reconciler<R>`, and records the
+   the aggregate, marks reconciliation started, invokes the type's `Reconciler<R>`, and records the
    outcome (producing `ReconciliationSucceeded` / `ReconciliationFailed`).
 
-The per-kind dispatcher + reconcile use case are generated and registered together by the
+The per-type dispatcher + reconcile use case are generated and registered together by the
 `declare_resource_service_layer!` umbrella macro
 ([`resources/mod.rs`](/src/domain/resources/services/src/resources/mod.rs)); its
-`register_<kind>_resource_service_layer(builder)` is called from the kind's crate
+`register_<type>_resource_service_layer(builder)` is called from the type's crate
 (e.g. `configuration/services/src/dependencies.rs`). In the current dispatcher
 ([`resource_lifecycle_reconcile_dispatcher.rs`](/src/domain/resources/services/src/message_handlers/resource_lifecycle_reconcile_dispatcher.rs))
 only `handle_applied` triggers work; `handle_reconciliation_succeeded/failed/deleted` are no-ops.
@@ -955,11 +958,11 @@ stateDiagram-v2
 
 ---
 
-## 14. Concrete resource kinds (`kamu-configuration`)
+## 14. Concrete resource types (`kamu-configuration`)
 
-Two kinds are functional today, both under the config `v1alpha1` schema namespace. (A third, `Storage`
+Two types are functional today, both under the config `v1alpha1` schema namespace. (A third, `Storage`
 (`st`/`storage`), lives under `src/domain/storage/` and is wired through the same machinery but is
-**work in progress / not yet complete** — treat it as an in-flight example, not a supported kind.)
+**work in progress / not yet complete** — treat it as an in-flight example, not a supported type.)
 
 | Schema | Selector name | Short name | Spec | Reconciliation |
 | --- | --- | --- | --- | --- |
@@ -997,7 +1000,7 @@ exposes `reveal_spec`, used only when `SpecViewMode::Revealed` is requested — 
 `SecretSpec::Encrypted` back to a literal. With the default `SpecViewMode::Encrypted`, the stored
 ciphertext envelope is returned unchanged (no decryption).
 
-Domain types live in `src/domain/configuration/domain/src/resources/<kind>/`
+Domain types live in `src/domain/configuration/domain/src/resources/<type>/`
 (`resource.rs`, `spec.rs`, `state.rs`, `status.rs`, `event.rs`, `reconciliation.rs`, …). Each
 resource declares its identity and implements the core traits, e.g.:
 
@@ -1007,8 +1010,15 @@ impl VariableSetResource {
     // Const `&'static str`, reused straight from the ODF codegen (no re-declared URL literal).
     // Used only as the const dill-registry key (dill `#[meta]` requires a const).
     pub const SCHEMA_STR: &'static str = odf::metadata::config::VariableSet::schema_str();
-    pub const RESOURCE_NAME: &'static str = "variablesets";
-    pub const RESOURCE_SHORT_NAMES: &'static [&'static str] = &["vs"];
+    // Raw consts feed the dill-registry `ResourceDispatcherMeta` (const-only); the typed
+    // `CANONICAL_SELECTOR_NAME`/`SELECTOR_ALIASES` feed `ResourcePresentationDefinition`. A unit test
+    // (`selector_constants_stay_in_sync`) guards the two staying identical.
+    pub const CANONICAL_SELECTOR_NAME_STR: &'static str = "variablesets";
+    pub const CANONICAL_SELECTOR_NAME: ResourceSelectorName =
+        ResourceSelectorName::new_unchecked_static(Self::CANONICAL_SELECTOR_NAME_STR);
+    pub const SELECTOR_ALIAS_STRS: &'static [&'static str] = &["vs"];
+    pub const SELECTOR_ALIASES: &'static [ResourceSelectorName] =
+        &[ResourceSelectorName::new_unchecked_static("vs")];
 }
 // The typed schema identity is a `TypeUri` accessor (LazyLock-backed in the codegen), not a const;
 // it and SCHEMA_STR derive from the same generated static, so they cannot drift.
@@ -1016,10 +1026,10 @@ impl ResourceSchemaProvider for VariableSetResource {
     fn schema() -> &'static TypeUri { odf::metadata::config::VariableSet::schema() }
 }
 impl DeclarativeResource for VariableSetResource { /* … */ }
-impl ResourcePresentation for VariableSetResource { /* short names + list columns */ }
+impl ResourcePresentation for VariableSetResource { /* selector name/aliases + list columns */ }
 ```
 
-Registration is in `src/domain/configuration/services/src/resource_crud_dispatchers/<kind>.rs`
+Registration is in `src/domain/configuration/services/src/resource_crud_dispatchers/<type>.rs`
 using the framework macros:
 
 ```rust
@@ -1034,51 +1044,51 @@ pub fn register_variable_set_resource_crud_dispatcher(catalog_builder: &mut dill
 }
 ```
 
-### Recipe: how to add a new resource kind
+### Recipe: how to add a new resource type
 
-1. **Define the domain types** under `configuration/domain/src/resources/<kind>/`: `spec.rs`
+1. **Define the domain types** under `configuration/domain/src/resources/<type>/`: `spec.rs`
    (`#[serde(deny_unknown_fields)]`, with validation + lint), `status.rs`, `state.rs`, `event.rs`,
    and `resource.rs` implementing `ResourceSchemaProvider`, `DeclarativeResource`,
    `ReconcilableResource`/`ReconcilableEventSourcedResource`, and `ResourcePresentation`
-   (implement `schema() -> &'static TypeUri`, and set `SCHEMA_STR`, `RESOURCE_NAME`,
-   `RESOURCE_SHORT_NAMES`).
+   (implement `schema() -> &'static TypeUri`, and set `SCHEMA_STR`, `CANONICAL_SELECTOR_NAME_STR`,
+   `SELECTOR_ALIAS_STRS`, `CANONICAL_SELECTOR_NAME`, `SELECTOR_ALIASES`).
 2. **Implement a `Reconciler<R>`** in `configuration/services/src/reconcilers/` (no-op projection is
    fine if there's nothing to do; transform the spec here if needed — see `SecretSet`).
 3. **Declare dispatchers** with `declare_resource_crud_dispatcher!` /
-   `declare_resource_presentation_dispatcher!` (and a spec-view dispatcher if the kind has sensitive
-   fields) and add a `register_<kind>_resource_crud_dispatcher(builder)` function.
-4. **Wire it into DI** — generate the per-kind service layer (event-store bridge, loader,
+   `declare_resource_presentation_dispatcher!` (and a spec-view dispatcher if the type has sensitive
+   fields) and add a `register_<type>_resource_crud_dispatcher(builder)` function.
+4. **Wire it into DI** — generate the per-type service layer (event-store bridge, loader,
    persistence, typed query, all use cases, and the lifecycle reconcile dispatcher) with the
    `declare_resource_service_layer!` umbrella macro, then call its
-   `register_<kind>_resource_service_layer(builder)` plus your CRUD/presentation/spec-view
+   `register_<type>_resource_service_layer(builder)` plus your CRUD/presentation/spec-view
    `register_*` from the crate's `dependencies.rs`, and `add` the `Reconciler<R>` impl.
 5. **Test all three tiers** (see [§15](#15-tests)): a reconciler/service unit test, a facade contract
    case, and an E2E lifecycle test (apply → list → get → update → delete) plus a golden-view test.
 
 The dispatcher registry then resolves your resource by schema or selector metadata, so the generic CRUD
 operations work everywhere without changing the CLI command or GraphQL resolver code. **But "no
-changes" is only true for the generic path** — in practice a complete kind still needs:
+changes" is only true for the generic path** — in practice a complete type still needs:
 
-- **DI registration** and **presentation metadata** (short names + list columns) for it to appear and
-  render at all;
+- **DI registration** and **presentation metadata** (selector aliases + list columns) for it to appear
+  and render at all;
 - **facade contract coverage** (the `contract_test!` suite) so local/remote behavior is exercised;
 - **schema / codegen validation** if the remote GraphQL client's generated `cynic` types depend on
-  kind-specific shapes;
-- **CLI golden-output coverage** (the per-kind golden-view E2E test) so output formatting is pinned;
-- any **kind-specific spec-view / sanitizer** logic (e.g. encryption) and its tests.
+  type-specific shapes;
+- **CLI golden-output coverage** (the per-type golden-view E2E test) so output formatting is pinned;
+- any **type-specific spec-view / sanitizer** logic (e.g. encryption) and its tests.
 
 ---
 
 ## 15. Tests
 
-Three tiers, all exercising the real `VariableSet` / `SecretSet` kinds:
+Three tiers, all exercising the real `VariableSet` / `SecretSet` types:
 
 **Service-level (unit/integration)** —
 [`src/domain/resources/services/tests`](/src/domain/resources/services/tests) and
 [`src/domain/configuration/services/tests`](/src/domain/configuration/services/tests). Cover the
 apply planner/executor, reconcile transitions, CRUD dispatch, persistence, the event-store bridge,
 and the message consumers. A `TestResource` mock and `BaseResourceServiceHarness`
-(`services/src/testing/`) provide a kind-agnostic harness; configuration tests cover the real
+(`services/src/testing/`) provide a type-agnostic harness; configuration tests cover the real
 reconcilers (incl. the `SecretSet` spec sanitizer, encrypted projection, and `reveal_spec`).
 
 **Facade contract tests** —
@@ -1086,8 +1096,8 @@ reconcilers (incl. the `SecretSet` spec sanitizer, encrypted projection, and `re
 `contract_test!` macro runs **each** case against **both** a `LocalFacadeHarness` and a
 `RemoteGraphqlFacadeHarness`, so the suite **enforces local/remote symmetry for the behavior it
 covers** (it doesn't guarantee parity for untested paths). Suites cover apply, batch ops, account scoping,
-list/search, supported kinds, get-identity, error taxonomy, delete, render-manifest, list-all,
-summary, and spec view modes.
+list/search, supported resource types, get-identity, error taxonomy, delete, render-manifest,
+list-all, summary, and spec view modes.
 
 **E2E (CLI)** —
 [`src/e2e/app/cli/repo-tests/src/commands/resources`](/src/e2e/app/cli/repo-tests/src/commands/resources/).
@@ -1095,7 +1105,7 @@ Drive the real CLI binary via `KamuCliPuppet`. A `ResourceCtx` abstraction
 (`repo-tests/src/resources/context.rs`) runs every scenario against **both** an implicit local
 context and a registered remote context. The `get_view.rs` helper parses `get -o json` into a
 queryable `ResourceView` (`ident()`, `variable()`, `has_secret()`, `id()`, …) so assertions are
-targeted rather than brittle; a golden-view test pins the whole-document shape once per kind.
+targeted rather than brittle; a golden-view test pins the whole-document shape once per type.
 
 ### Testing policy — what belongs where
 
@@ -1127,9 +1137,9 @@ Otherwise the behavior is already guaranteed for both implementations by the con
 | Facade | `kamu-resources-facade` | `src/domain/resources/facade/src/facade` | `resource_facade.rs`, `local/`, `graphql/` |
 | GraphQL | (adapter) | `src/adapter/graphql/src` | `queries/resources/`, `mutations/resources_mut/` |
 | CLI commands | (app/cli) | `src/app/cli/src/commands` | `apply_command.rs`, `list_resources_command.rs`, `get_resource_command.rs`, `delete_resources_command.rs`, `context_*_command.rs` |
-| CLI services | (app/cli) | `src/app/cli/src/services/resources` | `resource_facade_factory.rs`, `resource_manifest_{discovery,execution}_service.rs`, `resource_kind_lookup_service.rs`, `resource_selection_*_service.rs`, `resource_summary_service.rs`, `impl/` |
-| Concrete kinds | `kamu-configuration` / `-services` | `src/domain/configuration/{domain,services}/src` | `resources/{variable_set,secret_set}/`, `reconcilers/`, `resource_crud_dispatchers/`, `dependencies.rs` |
-| Concrete kind (WIP) | `kamu-storage` / `-services` | `src/domain/storage/{domain,services}/src` | `Storage` kind (`st`/`storage`) — registered in the CLI catalog but incomplete; same machinery as above |
+| CLI services | (app/cli) | `src/app/cli/src/services/resources` | `resource_facade_factory.rs`, `resource_manifest_{discovery,execution}_service.rs`, `resource_type_lookup_service.rs`, `resource_selection_*_service.rs`, `resource_summary_service.rs`, `impl/` |
+| Concrete types | `kamu-configuration` / `-services` | `src/domain/configuration/{domain,services}/src` | `resources/{variable_set,secret_set}/`, `reconcilers/`, `resource_crud_dispatchers/`, `dependencies.rs` |
+| Concrete type (WIP) | `kamu-storage` / `-services` | `src/domain/storage/{domain,services}/src` | `Storage` type (`st`/`storage`) — registered in the CLI catalog but incomplete; same machinery as above |
 | Tests | several | see [§15](#15-tests) | `resources/services/tests`, `resources/facade-tests`, `e2e/app/cli/repo-tests/src/commands/resources` |
 
 ---
@@ -1145,11 +1155,10 @@ Otherwise the behavior is already guaranteed for both implementations by the con
   Selector-based lookup (`variablesets`, `vs`, etc.) is a separate metadata path and yields
   selector-specific not-found/duplicate errors.
 - **Manifests are strict** — `#[serde(deny_unknown_fields)]` means a manifest cannot carry
-  `status`, timestamps, `generation`, or legacy top-level `apiVersion`/`kind`. Those are
-  server-owned or no longer accepted in the manifest envelope
+  `status`, timestamps, or `generation`. Those are server-owned
   ([§5a](#5a-resource-anatomy--input-vs-auto-generated)).
-- **`spec` is stored as `serde_json::Value`** — the framework is schema-agnostic; per-kind structure
-  and validation live in the kind's `spec.rs`.
+- **`spec` is stored as `serde_json::Value`** — the framework is schema-agnostic; per-type structure
+  and validation live in the type's `spec.rs`.
 - **Schema strings are validated, not normalized** — `ResourceSchemaId::parse` rejects malformed
   URLs, whitespace, query strings, fragments, trailing slashes, and too-few path segments, but it
   preserves the accepted string (stored as the inner `TypeUri`) and allows non-`opendatafabric.org`

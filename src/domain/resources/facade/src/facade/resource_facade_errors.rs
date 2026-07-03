@@ -80,7 +80,7 @@ use crate::ResolveManifestAccountError;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
-pub enum ListSupportedResourceKindsError {
+pub enum ListSupportedResourceTypesError {
     #[error(transparent)]
     RemoteRequest(#[from] GraphqlHttpRequestError),
 

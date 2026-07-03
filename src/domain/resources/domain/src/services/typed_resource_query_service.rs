@@ -27,7 +27,7 @@ pub trait TypedResourceQueryService<R: DeclarativeResource>: Send + Sync {
         id: &ResourceID,
     ) -> Result<R::ResourceState, TypedResourceQueryError>;
 
-    async fn list_states_by_kind(
+    async fn list_states(
         &self,
         account_id: odf::AccountID,
         pagination: PaginationOpts,

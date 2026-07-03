@@ -14,9 +14,10 @@ use domain::{
     ResourceAccountRef,
     ResourceID,
     ResourceIdentityView,
-    ResourceKindDescriptor,
     ResourceName,
     ResourceSummaryView,
+    ResourceTypeDescriptor,
+    ResourceTypeSelectorRaw,
     ResourceView,
     ResourcesSummary,
 };
@@ -29,7 +30,7 @@ use crate::{
     GetResourceError,
     ListAllResourcesError,
     ListResourcesError,
-    ListSupportedResourceKindsError,
+    ListSupportedResourceTypesError,
     RenderResourceManifestError,
     ResourceLookupProblem,
     ResourcesSummaryError,
@@ -40,9 +41,9 @@ use crate::{
 #[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait ResourceFacade: Send + Sync {
-    async fn list_supported_kinds(
+    async fn list_supported_resource_types(
         &self,
-    ) -> Result<Vec<ResourceKindDescriptor>, ListSupportedResourceKindsError>;
+    ) -> Result<Vec<ResourceTypeDescriptor>, ListSupportedResourceTypesError>;
 
     async fn summary(
         &self,
@@ -139,7 +140,7 @@ pub trait ResourceFacade: Send + Sync {
 #[derive(Debug, Clone)]
 pub struct ResourceSelector {
     pub account: Option<ResourceAccountRef>,
-    pub kind: String,
+    pub resource_type: ResourceTypeSelectorRaw,
     pub resource_ref: ResourceRef,
 }
 
@@ -148,7 +149,7 @@ pub struct ResourceSelector {
 #[derive(Debug, Clone)]
 pub struct ResourceBatchSelector {
     pub account: Option<ResourceAccountRef>,
-    pub kind: String,
+    pub resource_type: ResourceTypeSelectorRaw,
     pub resource_refs: Vec<ResourceRef>,
 }
 
@@ -210,7 +211,7 @@ pub enum ResourceRef {
 
 #[derive(Debug, Clone)]
 pub struct ListResourcesRequest {
-    pub kind: String,
+    pub raw_type_selector: ResourceTypeSelectorRaw,
     pub account: Option<ResourceAccountRef>,
     pub pagination: PaginationOpts,
 }
@@ -219,7 +220,7 @@ pub struct ListResourcesRequest {
 
 #[derive(Debug, Clone)]
 pub struct ListResourceIdentitiesRequest {
-    pub kind: String,
+    pub raw_type_selector: ResourceTypeSelectorRaw,
     pub account: Option<ResourceAccountRef>,
     pub pagination: PaginationOpts,
 }
@@ -228,7 +229,7 @@ pub struct ListResourceIdentitiesRequest {
 
 #[derive(Debug, Clone)]
 pub struct SearchResourceIdentitiesRequest {
-    pub kinds: Vec<String>,
+    pub raw_type_selectors: Vec<ResourceTypeSelectorRaw>,
     pub exact_names: Option<Vec<ResourceName>>,
     pub name_pattern: Option<String>,
     pub account: Option<ResourceAccountRef>,

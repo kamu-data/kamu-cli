@@ -105,7 +105,7 @@ async fn test_get_state_by_id_type_mismatch() {
     let id = harness.allocate_id().await;
 
     harness
-        .insert_snapshot_with_kind(id, account_a.clone(), &OTHER_SCHEMA, "res-a")
+        .insert_snapshot_with_schema(id, account_a.clone(), &OTHER_SCHEMA, "res-a")
         .await;
 
     let result = harness
@@ -113,20 +113,20 @@ async fn test_get_state_by_id_type_mismatch() {
         .get_state_by_id(account_a, &id)
         .await;
 
-    // get_state_by_id uses get_snapshot_by_query which filters by kind, so a
-    // snapshot with a different kind is invisible to this query → NotFound, not
+    // get_state_by_id uses get_snapshot_by_query which filters by schema, so a
+    // snapshot with a different schema is invisible to this query → NotFound, not
     // TypeMismatch. TypeMismatch is covered by ensure_resource_id_matches_type
-    // which uses load_snapshot_by_id (kind-agnostic lookup).
+    // which uses load_snapshot_by_id (schema-agnostic lookup).
     assert!(
         matches!(result, Err(TypedResourceQueryError::NotFound(_))),
-        "expected NotFound for wrong-kind snapshot (kind filter hides it), got {result:?}"
+        "expected NotFound for wrong-schema snapshot (schema filter hides it), got {result:?}"
     );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_list_states_by_kind_filters_by_account() {
+async fn test_list_states_filters_by_account() {
     let harness = TypedResourceQueryServiceHarness::new();
     let account_a = make_account_id();
     let account_b = make_account_id();
@@ -141,7 +141,7 @@ async fn test_list_states_by_kind_filters_by_account() {
 
     let states_a = harness
         .typed_query_svc()
-        .list_states_by_kind(account_a, PaginationOpts::from_max_results(usize::MAX))
+        .list_states(account_a, PaginationOpts::from_max_results(usize::MAX))
         .await
         .unwrap();
 
@@ -149,7 +149,7 @@ async fn test_list_states_by_kind_filters_by_account() {
 
     let states_b = harness
         .typed_query_svc()
-        .list_states_by_kind(account_b, PaginationOpts::from_max_results(usize::MAX))
+        .list_states(account_b, PaginationOpts::from_max_results(usize::MAX))
         .await
         .unwrap();
 
@@ -181,7 +181,7 @@ async fn test_ensure_id_matches_type_mismatch() {
     let id = harness.allocate_id().await;
 
     harness
-        .insert_snapshot_with_kind(id, account_a, &OTHER_SCHEMA, "res-a")
+        .insert_snapshot_with_schema(id, account_a, &OTHER_SCHEMA, "res-a")
         .await;
 
     let result = harness
@@ -241,7 +241,7 @@ impl TypedResourceQueryServiceHarness {
         }
     }
 
-    async fn insert_snapshot_with_kind(
+    async fn insert_snapshot_with_schema(
         &self,
         id: ResourceID,
         owner_account_id: odf::AccountID,

@@ -21,8 +21,8 @@ use kamu_cli::services::resources::{
 use kamu_resources::{
     ResourceID,
     ResourceIdentityView,
-    ResourceKindDescriptor,
     ResourceNameNotFoundError,
+    ResourceTypeDescriptor,
     TypeUri,
 };
 use kamu_resources_facade::{
@@ -56,20 +56,29 @@ const STORAGES_SHORT_NAME: &str = "st";
 
 const NAME_APP_PATTERN: &str = "app-%";
 const NAME_MISSING_PATTERN: &str = "missing-%";
-const KIND_PATTERN_S: &str = "S%";
+const TYPE_PATTERN_S: &str = "S%";
 const RESOURCE_DB_CREDS: &str = "db-creds";
+
+fn raw_selector_strings(selectors: &[kamu_resources::ResourceTypeSelectorRaw]) -> Vec<&str> {
+    selectors
+        .iter()
+        .map(kamu_resources::ResourceTypeSelectorRaw::as_str)
+        .collect()
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn resolves_exact_kind_name_patterns_via_search() {
+async fn resolves_exact_type_name_patterns_via_search() {
     let mut harness = ResourceSelectionResolutionHarness::new();
     let search_requests = Arc::new(Mutex::new(Vec::new()));
     harness.expect_search_identities(
         1,
         vec![ResourceIdentityView {
             schema: variableset_type_uri().clone(),
-            canonical_kind_name: VARIABLESETS_NAME.to_string(),
+            canonical_selector: kamu_resources::ResourceSelectorName::new_unchecked(
+                VARIABLESETS_NAME,
+            ),
             id: ResourceID::new(uuid::Uuid::new_v4()),
             name: "app-alpha".parse().unwrap(),
         }],
@@ -81,7 +90,7 @@ async fn resolves_exact_kind_name_patterns_via_search() {
         .resolve(
             ResourceSelectionSyntax {
                 items: vec![ResourceSelectionItem::NamePattern {
-                    kind_descriptor: harness.variableset_kind_descriptor(),
+                    type_descriptor: harness.variableset_type_descriptor(),
                     selector_input: NAME_APP_PATTERN.to_string(),
                     name_pattern: NAME_APP_PATTERN.to_string(),
                 }],
@@ -101,7 +110,10 @@ async fn resolves_exact_kind_name_patterns_via_search() {
 
     let requests = search_requests.lock().unwrap();
     assert_eq!(requests.len(), 1);
-    assert_eq!(requests[0].kinds, vec![VARIABLESETS_NAME]);
+    assert_eq!(
+        raw_selector_strings(&requests[0].raw_type_selectors),
+        vec![VARIABLESETS_NAME]
+    );
     assert_eq!(requests[0].name_pattern.as_deref(), Some(NAME_APP_PATTERN));
 }
 
@@ -117,7 +129,7 @@ async fn ignores_unmatched_name_patterns_when_requested() {
         .resolve(
             ResourceSelectionSyntax {
                 items: vec![ResourceSelectionItem::NamePattern {
-                    kind_descriptor: harness.variableset_kind_descriptor(),
+                    type_descriptor: harness.variableset_type_descriptor(),
                     selector_input: NAME_MISSING_PATTERN.to_string(),
                     name_pattern: NAME_MISSING_PATTERN.to_string(),
                 }],
@@ -152,7 +164,7 @@ async fn errors_on_unmatched_name_patterns_by_default() {
         .resolve(
             ResourceSelectionSyntax {
                 items: vec![ResourceSelectionItem::NamePattern {
-                    kind_descriptor: harness.variableset_kind_descriptor(),
+                    type_descriptor: harness.variableset_type_descriptor(),
                     selector_input: NAME_MISSING_PATTERN.to_string(),
                     name_pattern: NAME_MISSING_PATTERN.to_string(),
                 }],
@@ -176,11 +188,11 @@ async fn errors_on_unmatched_name_patterns_by_default() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn resolves_kind_patterns_with_exact_names_in_supported_kind_order() {
+async fn resolves_type_patterns_with_exact_names_in_supported_type_order() {
     let mut harness = ResourceSelectionResolutionHarness::new();
-    harness.expect_list_supported_kinds(vec![
-        harness.secretset_kind_descriptor(),
-        harness.storage_kind_descriptor(),
+    harness.expect_list_supported_resource_types(vec![
+        harness.secretset_type_descriptor(),
+        harness.storage_type_descriptor(),
     ]);
 
     let get_identity_requests = Arc::new(Mutex::new(Vec::new()));
@@ -191,7 +203,9 @@ async fn resolves_kind_patterns_with_exact_names_in_supported_kind_order() {
                 SECRETSETS_NAME.to_string(),
                 Some(ResourceIdentityView {
                     schema: secretset_type_uri().clone(),
-                    canonical_kind_name: SECRETSETS_NAME.to_string(),
+                    canonical_selector: kamu_resources::ResourceSelectorName::new_unchecked(
+                        SECRETSETS_NAME,
+                    ),
                     id: ResourceID::new(uuid::Uuid::new_v4()),
                     name: RESOURCE_DB_CREDS.parse().unwrap(),
                 }),
@@ -200,7 +214,9 @@ async fn resolves_kind_patterns_with_exact_names_in_supported_kind_order() {
                 STORAGES_NAME.to_string(),
                 Some(ResourceIdentityView {
                     schema: STORAGE_TYPE_URI.clone(),
-                    canonical_kind_name: STORAGES_NAME.to_string(),
+                    canonical_selector: kamu_resources::ResourceSelectorName::new_unchecked(
+                        STORAGES_NAME,
+                    ),
                     id: ResourceID::new(uuid::Uuid::new_v4()),
                     name: RESOURCE_DB_CREDS.parse().unwrap(),
                 }),
@@ -213,9 +229,9 @@ async fn resolves_kind_patterns_with_exact_names_in_supported_kind_order() {
         .service
         .resolve(
             ResourceSelectionSyntax {
-                items: vec![ResourceSelectionItem::KindPatternExactName {
-                    kind_pattern: KIND_PATTERN_S.to_string(),
-                    selector_input: format!("{KIND_PATTERN_S}/{RESOURCE_DB_CREDS}"),
+                items: vec![ResourceSelectionItem::TypePatternExactName {
+                    type_pattern: TYPE_PATTERN_S.to_string(),
+                    selector_input: format!("{TYPE_PATTERN_S}/{RESOURCE_DB_CREDS}"),
                     resource_ref: kamu_resources_facade::ResourceRef::ByName(
                         RESOURCE_DB_CREDS.parse().unwrap(),
                     ),
@@ -232,29 +248,32 @@ async fn resolves_kind_patterns_with_exact_names_in_supported_kind_order() {
         .unwrap();
 
     assert_eq!(result.targets.len(), 2);
-    assert_eq!(result.targets[0].canonical_kind_name, SECRETSETS_NAME);
-    assert_eq!(result.targets[1].canonical_kind_name, STORAGES_NAME);
+    assert_eq!(
+        result.targets[0].canonical_selector.as_str(),
+        SECRETSETS_NAME
+    );
+    assert_eq!(result.targets[1].canonical_selector.as_str(), STORAGES_NAME);
     assert!(
         result
             .targets
             .iter()
-            .all(|target| target.selector_input == format!("{KIND_PATTERN_S}/{RESOURCE_DB_CREDS}"))
+            .all(|target| target.selector_input == format!("{TYPE_PATTERN_S}/{RESOURCE_DB_CREDS}"))
     );
 
     let requests = get_identity_requests.lock().unwrap();
     assert_eq!(requests.len(), 2);
-    assert_eq!(requests[0].kind, SECRETSETS_NAME);
-    assert_eq!(requests[1].kind, STORAGES_NAME);
+    assert_eq!(requests[0].resource_type.as_str(), SECRETSETS_NAME);
+    assert_eq!(requests[1].resource_type.as_str(), STORAGES_NAME);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn resolves_kind_pattern_all_via_search_across_matched_kinds() {
+async fn resolves_type_pattern_all_via_search_across_matched_types() {
     let mut harness = ResourceSelectionResolutionHarness::new();
-    harness.expect_list_supported_kinds(vec![
-        harness.secretset_kind_descriptor(),
-        harness.storage_kind_descriptor(),
+    harness.expect_list_supported_resource_types(vec![
+        harness.secretset_type_descriptor(),
+        harness.storage_type_descriptor(),
     ]);
 
     let search_requests = Arc::new(Mutex::new(Vec::new()));
@@ -263,13 +282,17 @@ async fn resolves_kind_pattern_all_via_search_across_matched_kinds() {
         vec![
             ResourceIdentityView {
                 schema: secretset_type_uri().clone(),
-                canonical_kind_name: SECRETSETS_NAME.to_string(),
+                canonical_selector: kamu_resources::ResourceSelectorName::new_unchecked(
+                    SECRETSETS_NAME,
+                ),
                 id: ResourceID::new(uuid::Uuid::new_v4()),
                 name: "db-creds".parse().unwrap(),
             },
             ResourceIdentityView {
                 schema: STORAGE_TYPE_URI.clone(),
-                canonical_kind_name: STORAGES_NAME.to_string(),
+                canonical_selector: kamu_resources::ResourceSelectorName::new_unchecked(
+                    STORAGES_NAME,
+                ),
                 id: ResourceID::new(uuid::Uuid::new_v4()),
                 name: "warehouse".parse().unwrap(),
             },
@@ -281,8 +304,8 @@ async fn resolves_kind_pattern_all_via_search_across_matched_kinds() {
         .service
         .resolve(
             ResourceSelectionSyntax {
-                items: vec![ResourceSelectionItem::KindPatternAll {
-                    kind_pattern: KIND_PATTERN_S.to_string(),
+                items: vec![ResourceSelectionItem::TypePatternAll {
+                    type_pattern: TYPE_PATTERN_S.to_string(),
                     selector_input: "%".to_string(),
                 }],
                 shadowed_selectors: Vec::new(),
@@ -297,14 +320,17 @@ async fn resolves_kind_pattern_all_via_search_across_matched_kinds() {
         .unwrap();
 
     assert_eq!(result.targets.len(), 2);
-    assert_eq!(result.targets[0].canonical_kind_name, SECRETSETS_NAME);
-    assert_eq!(result.targets[1].canonical_kind_name, STORAGES_NAME);
+    assert_eq!(
+        result.targets[0].canonical_selector.as_str(),
+        SECRETSETS_NAME
+    );
+    assert_eq!(result.targets[1].canonical_selector.as_str(), STORAGES_NAME);
 
     let requests = search_requests.lock().unwrap();
     assert_eq!(requests.len(), 1);
     assert_eq!(
-        requests[0].kinds,
-        vec![SECRETSETS_NAME.to_string(), STORAGES_NAME.to_string()]
+        raw_selector_strings(&requests[0].raw_type_selectors),
+        vec![SECRETSETS_NAME, STORAGES_NAME]
     );
     assert_eq!(requests[0].exact_names, None);
     assert_eq!(requests[0].name_pattern, None);
@@ -313,11 +339,11 @@ async fn resolves_kind_pattern_all_via_search_across_matched_kinds() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn resolves_kind_pattern_name_patterns_via_single_search_across_matched_kinds() {
+async fn resolves_type_pattern_name_patterns_via_single_search_across_matched_types() {
     let mut harness = ResourceSelectionResolutionHarness::new();
-    harness.expect_list_supported_kinds(vec![
-        harness.secretset_kind_descriptor(),
-        harness.storage_kind_descriptor(),
+    harness.expect_list_supported_resource_types(vec![
+        harness.secretset_type_descriptor(),
+        harness.storage_type_descriptor(),
     ]);
 
     let search_requests = Arc::new(Mutex::new(Vec::new()));
@@ -326,13 +352,17 @@ async fn resolves_kind_pattern_name_patterns_via_single_search_across_matched_ki
         vec![
             ResourceIdentityView {
                 schema: secretset_type_uri().clone(),
-                canonical_kind_name: SECRETSETS_NAME.to_string(),
+                canonical_selector: kamu_resources::ResourceSelectorName::new_unchecked(
+                    SECRETSETS_NAME,
+                ),
                 id: ResourceID::new(uuid::Uuid::new_v4()),
                 name: "db-creds".parse().unwrap(),
             },
             ResourceIdentityView {
                 schema: STORAGE_TYPE_URI.clone(),
-                canonical_kind_name: STORAGES_NAME.to_string(),
+                canonical_selector: kamu_resources::ResourceSelectorName::new_unchecked(
+                    STORAGES_NAME,
+                ),
                 id: ResourceID::new(uuid::Uuid::new_v4()),
                 name: "db-warehouse".parse().unwrap(),
             },
@@ -344,9 +374,9 @@ async fn resolves_kind_pattern_name_patterns_via_single_search_across_matched_ki
         .service
         .resolve(
             ResourceSelectionSyntax {
-                items: vec![ResourceSelectionItem::KindPatternNamePattern {
-                    kind_pattern: KIND_PATTERN_S.to_string(),
-                    selector_input: format!("{KIND_PATTERN_S}/db-%"),
+                items: vec![ResourceSelectionItem::TypePatternNamePattern {
+                    type_pattern: TYPE_PATTERN_S.to_string(),
+                    selector_input: format!("{TYPE_PATTERN_S}/db-%"),
                     name_pattern: "db-%".to_string(),
                 }],
                 shadowed_selectors: Vec::new(),
@@ -361,20 +391,23 @@ async fn resolves_kind_pattern_name_patterns_via_single_search_across_matched_ki
         .unwrap();
 
     assert_eq!(result.targets.len(), 2);
-    assert_eq!(result.targets[0].canonical_kind_name, SECRETSETS_NAME);
-    assert_eq!(result.targets[1].canonical_kind_name, STORAGES_NAME);
+    assert_eq!(
+        result.targets[0].canonical_selector.as_str(),
+        SECRETSETS_NAME
+    );
+    assert_eq!(result.targets[1].canonical_selector.as_str(), STORAGES_NAME);
     assert!(
         result
             .targets
             .iter()
-            .all(|target| target.selector_input == format!("{KIND_PATTERN_S}/db-%"))
+            .all(|target| target.selector_input == format!("{TYPE_PATTERN_S}/db-%"))
     );
 
     let requests = search_requests.lock().unwrap();
     assert_eq!(requests.len(), 1);
     assert_eq!(
-        requests[0].kinds,
-        vec![SECRETSETS_NAME.to_string(), STORAGES_NAME.to_string()]
+        raw_selector_strings(&requests[0].raw_type_selectors),
+        vec![SECRETSETS_NAME, STORAGES_NAME]
     );
     assert_eq!(requests[0].exact_names, None);
     assert_eq!(requests[0].name_pattern.as_deref(), Some("db-%"));
@@ -383,12 +416,12 @@ async fn resolves_kind_pattern_name_patterns_via_single_search_across_matched_ki
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn kind_pattern_exact_id_tries_every_matched_kind() {
+async fn type_pattern_exact_id_tries_every_matched_type() {
     let mut harness = ResourceSelectionResolutionHarness::new();
     let id = ResourceID::new(uuid::Uuid::new_v4());
-    harness.expect_list_supported_kinds(vec![
-        harness.secretset_kind_descriptor(),
-        harness.storage_kind_descriptor(),
+    harness.expect_list_supported_resource_types(vec![
+        harness.secretset_type_descriptor(),
+        harness.storage_type_descriptor(),
     ]);
 
     let get_identity_requests = Arc::new(Mutex::new(Vec::new()));
@@ -398,7 +431,9 @@ async fn kind_pattern_exact_id_tries_every_matched_kind() {
             STORAGES_NAME.to_string(),
             Some(ResourceIdentityView {
                 schema: STORAGE_TYPE_URI.clone(),
-                canonical_kind_name: STORAGES_NAME.to_string(),
+                canonical_selector: kamu_resources::ResourceSelectorName::new_unchecked(
+                    STORAGES_NAME,
+                ),
                 id,
                 name: RESOURCE_DB_CREDS.parse().unwrap(),
             }),
@@ -410,9 +445,9 @@ async fn kind_pattern_exact_id_tries_every_matched_kind() {
         .service
         .resolve(
             ResourceSelectionSyntax {
-                items: vec![ResourceSelectionItem::KindPatternExactName {
-                    kind_pattern: KIND_PATTERN_S.to_string(),
-                    selector_input: format!("{KIND_PATTERN_S}/{id}"),
+                items: vec![ResourceSelectionItem::TypePatternExactName {
+                    type_pattern: TYPE_PATTERN_S.to_string(),
+                    selector_input: format!("{TYPE_PATTERN_S}/{id}"),
                     resource_ref: kamu_resources_facade::ResourceRef::ById(id),
                 }],
                 shadowed_selectors: Vec::new(),
@@ -427,29 +462,29 @@ async fn kind_pattern_exact_id_tries_every_matched_kind() {
         .unwrap();
 
     assert_eq!(result.targets.len(), 1);
-    assert_eq!(result.targets[0].canonical_kind_name, STORAGES_NAME);
+    assert_eq!(result.targets[0].canonical_selector.as_str(), STORAGES_NAME);
 
     let requests = get_identity_requests.lock().unwrap();
     assert_eq!(requests.len(), 2);
-    assert_eq!(requests[0].kind, SECRETSETS_NAME);
-    assert_eq!(requests[1].kind, STORAGES_NAME);
+    assert_eq!(requests[0].resource_type.as_str(), SECRETSETS_NAME);
+    assert_eq!(requests[1].resource_type.as_str(), STORAGES_NAME);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn ignores_unmatched_kind_pattern_exact_selectors_when_requested() {
+async fn ignores_unmatched_type_pattern_exact_selectors_when_requested() {
     let mut harness = ResourceSelectionResolutionHarness::new();
-    harness.expect_list_supported_kinds(vec![harness.secretset_kind_descriptor()]);
+    harness.expect_list_supported_resource_types(vec![harness.secretset_type_descriptor()]);
     harness.expect_get_identity(1, HashMap::new(), Arc::new(Mutex::new(Vec::new())));
 
     let result = harness
         .service
         .resolve(
             ResourceSelectionSyntax {
-                items: vec![ResourceSelectionItem::KindPatternExactName {
-                    kind_pattern: KIND_PATTERN_S.to_string(),
-                    selector_input: format!("{KIND_PATTERN_S}/missing"),
+                items: vec![ResourceSelectionItem::TypePatternExactName {
+                    type_pattern: TYPE_PATTERN_S.to_string(),
+                    selector_input: format!("{TYPE_PATTERN_S}/missing"),
                     resource_ref: kamu_resources_facade::ResourceRef::ByName(
                         "missing".parse().unwrap(),
                     ),
@@ -469,25 +504,25 @@ async fn ignores_unmatched_kind_pattern_exact_selectors_when_requested() {
     assert_eq!(result.ignored_selectors.len(), 1);
     assert_eq!(
         result.ignored_selectors[0].selector_input,
-        format!("{KIND_PATTERN_S}/missing")
+        format!("{TYPE_PATTERN_S}/missing")
     );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn errors_on_unmatched_kind_pattern_exact_selectors_by_default() {
+async fn errors_on_unmatched_type_pattern_exact_selectors_by_default() {
     let mut harness = ResourceSelectionResolutionHarness::new();
-    harness.expect_list_supported_kinds(vec![harness.secretset_kind_descriptor()]);
+    harness.expect_list_supported_resource_types(vec![harness.secretset_type_descriptor()]);
     harness.expect_get_identity(1, HashMap::new(), Arc::new(Mutex::new(Vec::new())));
 
     let error = harness
         .service
         .resolve(
             ResourceSelectionSyntax {
-                items: vec![ResourceSelectionItem::KindPatternExactName {
-                    kind_pattern: KIND_PATTERN_S.to_string(),
-                    selector_input: format!("{KIND_PATTERN_S}/missing"),
+                items: vec![ResourceSelectionItem::TypePatternExactName {
+                    type_pattern: TYPE_PATTERN_S.to_string(),
+                    selector_input: format!("{TYPE_PATTERN_S}/missing"),
                     resource_ref: kamu_resources_facade::ResourceRef::ByName(
                         "missing".parse().unwrap(),
                     ),
@@ -505,25 +540,25 @@ async fn errors_on_unmatched_kind_pattern_exact_selectors_by_default() {
 
     assert_eq!(
         error.to_string(),
-        format!("Selector `missing` did not match any resource kind matched by `{KIND_PATTERN_S}`")
+        format!("Selector `missing` did not match any resource type matched by `{TYPE_PATTERN_S}`")
     );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn ignores_unmatched_kind_pattern_name_patterns_when_requested() {
+async fn ignores_unmatched_type_pattern_name_patterns_when_requested() {
     let mut harness = ResourceSelectionResolutionHarness::new();
-    harness.expect_list_supported_kinds(vec![harness.secretset_kind_descriptor()]);
+    harness.expect_list_supported_resource_types(vec![harness.secretset_type_descriptor()]);
     harness.expect_search_identities(1, Vec::new(), Arc::new(Mutex::new(Vec::new())));
 
     let result = harness
         .service
         .resolve(
             ResourceSelectionSyntax {
-                items: vec![ResourceSelectionItem::KindPatternNamePattern {
-                    kind_pattern: KIND_PATTERN_S.to_string(),
-                    selector_input: format!("{KIND_PATTERN_S}/{NAME_MISSING_PATTERN}"),
+                items: vec![ResourceSelectionItem::TypePatternNamePattern {
+                    type_pattern: TYPE_PATTERN_S.to_string(),
+                    selector_input: format!("{TYPE_PATTERN_S}/{NAME_MISSING_PATTERN}"),
                     name_pattern: NAME_MISSING_PATTERN.to_string(),
                 }],
                 shadowed_selectors: Vec::new(),
@@ -541,25 +576,25 @@ async fn ignores_unmatched_kind_pattern_name_patterns_when_requested() {
     assert_eq!(result.ignored_selectors.len(), 1);
     assert_eq!(
         result.ignored_selectors[0].selector_input,
-        format!("{KIND_PATTERN_S}/{NAME_MISSING_PATTERN}")
+        format!("{TYPE_PATTERN_S}/{NAME_MISSING_PATTERN}")
     );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn errors_on_unmatched_kind_pattern_name_patterns_by_default() {
+async fn errors_on_unmatched_type_pattern_name_patterns_by_default() {
     let mut harness = ResourceSelectionResolutionHarness::new();
-    harness.expect_list_supported_kinds(vec![harness.secretset_kind_descriptor()]);
+    harness.expect_list_supported_resource_types(vec![harness.secretset_type_descriptor()]);
     harness.expect_search_identities(1, Vec::new(), Arc::new(Mutex::new(Vec::new())));
 
     let error = harness
         .service
         .resolve(
             ResourceSelectionSyntax {
-                items: vec![ResourceSelectionItem::KindPatternNamePattern {
-                    kind_pattern: KIND_PATTERN_S.to_string(),
-                    selector_input: format!("{KIND_PATTERN_S}/{NAME_MISSING_PATTERN}"),
+                items: vec![ResourceSelectionItem::TypePatternNamePattern {
+                    type_pattern: TYPE_PATTERN_S.to_string(),
+                    selector_input: format!("{TYPE_PATTERN_S}/{NAME_MISSING_PATTERN}"),
                     name_pattern: NAME_MISSING_PATTERN.to_string(),
                 }],
                 shadowed_selectors: Vec::new(),
@@ -576,8 +611,8 @@ async fn errors_on_unmatched_kind_pattern_name_patterns_by_default() {
     assert_eq!(
         error.to_string(),
         format!(
-            "Pattern `{NAME_MISSING_PATTERN}` did not match any resource kind matched by \
-             `{KIND_PATTERN_S}`"
+            "Pattern `{NAME_MISSING_PATTERN}` did not match any resource type matched by \
+             `{TYPE_PATTERN_S}`"
         )
     );
 }
@@ -593,7 +628,9 @@ async fn deduplicates_overlapping_name_patterns_before_counting_max_results() {
         2,
         vec![ResourceIdentityView {
             schema: variableset_type_uri().clone(),
-            canonical_kind_name: VARIABLESETS_NAME.to_string(),
+            canonical_selector: kamu_resources::ResourceSelectorName::new_unchecked(
+                VARIABLESETS_NAME,
+            ),
             id: shared_id,
             name: "app-alpha".parse().unwrap(),
         }],
@@ -606,12 +643,12 @@ async fn deduplicates_overlapping_name_patterns_before_counting_max_results() {
             ResourceSelectionSyntax {
                 items: vec![
                     ResourceSelectionItem::NamePattern {
-                        kind_descriptor: harness.variableset_kind_descriptor(),
+                        type_descriptor: harness.variableset_type_descriptor(),
                         selector_input: NAME_APP_PATTERN.to_string(),
                         name_pattern: NAME_APP_PATTERN.to_string(),
                     },
                     ResourceSelectionItem::NamePattern {
-                        kind_descriptor: harness.variableset_kind_descriptor(),
+                        type_descriptor: harness.variableset_type_descriptor(),
                         selector_input: "%alpha".to_string(),
                         name_pattern: "%alpha".to_string(),
                     },
@@ -638,10 +675,10 @@ async fn deduplicates_overlapping_name_patterns_before_counting_max_results() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn deduplicates_repeated_kind_pattern_exact_name_matches() {
+async fn deduplicates_repeated_type_pattern_exact_name_matches() {
     let mut harness = ResourceSelectionResolutionHarness::new();
     let shared_id = ResourceID::new(uuid::Uuid::new_v4());
-    harness.expect_list_supported_kinds(vec![harness.secretset_kind_descriptor()]);
+    harness.expect_list_supported_resource_types(vec![harness.secretset_type_descriptor()]);
 
     let get_identity_requests = Arc::new(Mutex::new(Vec::new()));
     harness.expect_get_identity(
@@ -650,7 +687,9 @@ async fn deduplicates_repeated_kind_pattern_exact_name_matches() {
             SECRETSETS_NAME.to_string(),
             Some(ResourceIdentityView {
                 schema: secretset_type_uri().clone(),
-                canonical_kind_name: SECRETSETS_NAME.to_string(),
+                canonical_selector: kamu_resources::ResourceSelectorName::new_unchecked(
+                    SECRETSETS_NAME,
+                ),
                 id: shared_id,
                 name: RESOURCE_DB_CREDS.parse().unwrap(),
             }),
@@ -663,16 +702,16 @@ async fn deduplicates_repeated_kind_pattern_exact_name_matches() {
         .resolve(
             ResourceSelectionSyntax {
                 items: vec![
-                    ResourceSelectionItem::KindPatternExactName {
-                        kind_pattern: KIND_PATTERN_S.to_string(),
-                        selector_input: format!("{KIND_PATTERN_S}/{RESOURCE_DB_CREDS}"),
+                    ResourceSelectionItem::TypePatternExactName {
+                        type_pattern: TYPE_PATTERN_S.to_string(),
+                        selector_input: format!("{TYPE_PATTERN_S}/{RESOURCE_DB_CREDS}"),
                         resource_ref: kamu_resources_facade::ResourceRef::ByName(
                             RESOURCE_DB_CREDS.parse().unwrap(),
                         ),
                     },
-                    ResourceSelectionItem::KindPatternExactName {
-                        kind_pattern: KIND_PATTERN_S.to_string(),
-                        selector_input: format!("{KIND_PATTERN_S}/{RESOURCE_DB_CREDS}"),
+                    ResourceSelectionItem::TypePatternExactName {
+                        type_pattern: TYPE_PATTERN_S.to_string(),
+                        selector_input: format!("{TYPE_PATTERN_S}/{RESOURCE_DB_CREDS}"),
                         resource_ref: kamu_resources_facade::ResourceRef::ByName(
                             RESOURCE_DB_CREDS.parse().unwrap(),
                         ),
@@ -699,17 +738,19 @@ async fn deduplicates_repeated_kind_pattern_exact_name_matches() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn deduplicates_kind_pattern_all_before_counting_max_results() {
+async fn deduplicates_type_pattern_all_before_counting_max_results() {
     let mut harness = ResourceSelectionResolutionHarness::new();
     let shared_id = ResourceID::new(uuid::Uuid::new_v4());
-    harness.expect_list_supported_kinds(vec![harness.secretset_kind_descriptor()]);
+    harness.expect_list_supported_resource_types(vec![harness.secretset_type_descriptor()]);
 
     let search_requests = Arc::new(Mutex::new(Vec::new()));
     harness.expect_search_identities(
         1,
         vec![ResourceIdentityView {
             schema: secretset_type_uri().clone(),
-            canonical_kind_name: SECRETSETS_NAME.to_string(),
+            canonical_selector: kamu_resources::ResourceSelectorName::new_unchecked(
+                SECRETSETS_NAME,
+            ),
             id: shared_id,
             name: RESOURCE_DB_CREDS.parse().unwrap(),
         }],
@@ -723,7 +764,9 @@ async fn deduplicates_kind_pattern_all_before_counting_max_results() {
             SECRETSETS_NAME.to_string(),
             Some(ResourceIdentityView {
                 schema: secretset_type_uri().clone(),
-                canonical_kind_name: SECRETSETS_NAME.to_string(),
+                canonical_selector: kamu_resources::ResourceSelectorName::new_unchecked(
+                    SECRETSETS_NAME,
+                ),
                 id: shared_id,
                 name: RESOURCE_DB_CREDS.parse().unwrap(),
             }),
@@ -736,13 +779,13 @@ async fn deduplicates_kind_pattern_all_before_counting_max_results() {
         .resolve(
             ResourceSelectionSyntax {
                 items: vec![
-                    ResourceSelectionItem::KindPatternAll {
-                        kind_pattern: KIND_PATTERN_S.to_string(),
+                    ResourceSelectionItem::TypePatternAll {
+                        type_pattern: TYPE_PATTERN_S.to_string(),
                         selector_input: "%".to_string(),
                     },
-                    ResourceSelectionItem::KindPatternExactName {
-                        kind_pattern: KIND_PATTERN_S.to_string(),
-                        selector_input: format!("{KIND_PATTERN_S}/{RESOURCE_DB_CREDS}"),
+                    ResourceSelectionItem::TypePatternExactName {
+                        type_pattern: TYPE_PATTERN_S.to_string(),
+                        selector_input: format!("{TYPE_PATTERN_S}/{RESOURCE_DB_CREDS}"),
                         resource_ref: kamu_resources_facade::ResourceRef::ByName(
                             RESOURCE_DB_CREDS.parse().unwrap(),
                         ),
@@ -772,17 +815,19 @@ async fn deduplicates_kind_pattern_all_before_counting_max_results() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn deduplicates_kind_pattern_name_patterns_before_counting_max_results() {
+async fn deduplicates_type_pattern_name_patterns_before_counting_max_results() {
     let mut harness = ResourceSelectionResolutionHarness::new();
     let shared_id = ResourceID::new(uuid::Uuid::new_v4());
-    harness.expect_list_supported_kinds(vec![harness.secretset_kind_descriptor()]);
+    harness.expect_list_supported_resource_types(vec![harness.secretset_type_descriptor()]);
 
     let search_requests = Arc::new(Mutex::new(Vec::new()));
     harness.expect_search_identities(
         2,
         vec![ResourceIdentityView {
             schema: secretset_type_uri().clone(),
-            canonical_kind_name: SECRETSETS_NAME.to_string(),
+            canonical_selector: kamu_resources::ResourceSelectorName::new_unchecked(
+                SECRETSETS_NAME,
+            ),
             id: shared_id,
             name: RESOURCE_DB_CREDS.parse().unwrap(),
         }],
@@ -794,14 +839,14 @@ async fn deduplicates_kind_pattern_name_patterns_before_counting_max_results() {
         .resolve(
             ResourceSelectionSyntax {
                 items: vec![
-                    ResourceSelectionItem::KindPatternNamePattern {
-                        kind_pattern: KIND_PATTERN_S.to_string(),
-                        selector_input: format!("{KIND_PATTERN_S}/db-%"),
+                    ResourceSelectionItem::TypePatternNamePattern {
+                        type_pattern: TYPE_PATTERN_S.to_string(),
+                        selector_input: format!("{TYPE_PATTERN_S}/db-%"),
                         name_pattern: "db-%".to_string(),
                     },
-                    ResourceSelectionItem::KindPatternNamePattern {
-                        kind_pattern: KIND_PATTERN_S.to_string(),
-                        selector_input: format!("{KIND_PATTERN_S}/%creds"),
+                    ResourceSelectionItem::TypePatternNamePattern {
+                        type_pattern: TYPE_PATTERN_S.to_string(),
+                        selector_input: format!("{TYPE_PATTERN_S}/%creds"),
                         name_pattern: "%creds".to_string(),
                     },
                 ],
@@ -820,7 +865,7 @@ async fn deduplicates_kind_pattern_name_patterns_before_counting_max_results() {
     assert_eq!(result.targets[0].id, shared_id);
     assert_eq!(
         result.targets[0].selector_input,
-        format!("{KIND_PATTERN_S}/db-%")
+        format!("{TYPE_PATTERN_S}/db-%")
     );
 
     let requests = search_requests.lock().unwrap();
@@ -840,13 +885,17 @@ async fn errors_when_unique_targets_exceed_max_results_after_deduplication() {
         vec![
             ResourceIdentityView {
                 schema: variableset_type_uri().clone(),
-                canonical_kind_name: VARIABLESETS_NAME.to_string(),
+                canonical_selector: kamu_resources::ResourceSelectorName::new_unchecked(
+                    VARIABLESETS_NAME,
+                ),
                 id: shared_id,
                 name: "app-alpha".parse().unwrap(),
             },
             ResourceIdentityView {
                 schema: variableset_type_uri().clone(),
-                canonical_kind_name: VARIABLESETS_NAME.to_string(),
+                canonical_selector: kamu_resources::ResourceSelectorName::new_unchecked(
+                    VARIABLESETS_NAME,
+                ),
                 id: second_id,
                 name: "app-beta".parse().unwrap(),
             },
@@ -860,12 +909,12 @@ async fn errors_when_unique_targets_exceed_max_results_after_deduplication() {
             ResourceSelectionSyntax {
                 items: vec![
                     ResourceSelectionItem::NamePattern {
-                        kind_descriptor: harness.variableset_kind_descriptor(),
+                        type_descriptor: harness.variableset_type_descriptor(),
                         selector_input: NAME_APP_PATTERN.to_string(),
                         name_pattern: NAME_APP_PATTERN.to_string(),
                     },
                     ResourceSelectionItem::NamePattern {
-                        kind_descriptor: harness.variableset_kind_descriptor(),
+                        type_descriptor: harness.variableset_type_descriptor(),
                         selector_input: "%beta".to_string(),
                         name_pattern: "%beta".to_string(),
                     },
@@ -920,11 +969,14 @@ impl ResourceSelectionResolutionHarness {
         catalog_builder.build()
     }
 
-    fn expect_list_supported_kinds(&mut self, supported_kinds: Vec<ResourceKindDescriptor>) {
+    fn expect_list_supported_resource_types(
+        &mut self,
+        supported_resource_types: Vec<ResourceTypeDescriptor>,
+    ) {
         self.facade
-            .expect_list_supported_kinds()
+            .expect_list_supported_resource_types()
             .times(1)
-            .returning(move || Ok(supported_kinds.clone()));
+            .returning(move || Ok(supported_resource_types.clone()));
     }
 
     fn expect_get_identity(
@@ -939,10 +991,19 @@ impl ResourceSelectionResolutionHarness {
             .returning(move |selector| {
                 get_identity_requests.lock().unwrap().push(selector.clone());
 
-                if let Some(identity) = get_identity_results.get(&selector.kind).cloned().flatten()
+                if let Some(identity) = get_identity_results
+                    .get(selector.resource_type.as_str())
+                    .cloned()
+                    .flatten()
                 {
                     return Ok(identity);
                 }
+
+                // The resolution service always calls `get_identity` with the
+                // already-resolved canonical selector name, never a raw alias.
+                let canonical_selector = kamu_resources::ResourceSelectorName::new_unchecked(
+                    selector.resource_type.as_str(),
+                );
 
                 match selector.resource_ref {
                     ResourceRef::ById(id) => Err(ResourceLookupProblem::IDNotFound(
@@ -951,7 +1012,7 @@ impl ResourceSelectionResolutionHarness {
                     .into()),
                     ResourceRef::ByName(name) => Err(ResourceLookupProblem::NameNotFound(
                         ResourceNameNotFoundError {
-                            kind: selector.kind,
+                            canonical_selector,
                             name,
                         },
                     )
@@ -978,28 +1039,35 @@ impl ResourceSelectionResolutionHarness {
             });
     }
 
-    fn variableset_kind_descriptor(&self) -> ResourceKindDescriptor {
-        ResourceKindDescriptor {
-            name: VARIABLESETS_NAME.to_string(),
-            short_names: vec![VARIABLESETS_SHORT_NAME.to_string()],
+    fn variableset_type_descriptor(&self) -> ResourceTypeDescriptor {
+        ResourceTypeDescriptor {
+            canonical_selector: kamu_resources::ResourceSelectorName::new(VARIABLESETS_NAME)
+                .unwrap(),
+            selector_aliases: vec![
+                kamu_resources::ResourceSelectorName::new(VARIABLESETS_SHORT_NAME).unwrap(),
+            ],
             schema: variableset_type_uri().clone(),
             list_columns: Vec::new(),
         }
     }
 
-    fn secretset_kind_descriptor(&self) -> ResourceKindDescriptor {
-        ResourceKindDescriptor {
-            name: SECRETSETS_NAME.to_string(),
-            short_names: vec![SECRETSETS_SHORT_NAME.to_string()],
+    fn secretset_type_descriptor(&self) -> ResourceTypeDescriptor {
+        ResourceTypeDescriptor {
+            canonical_selector: kamu_resources::ResourceSelectorName::new(SECRETSETS_NAME).unwrap(),
+            selector_aliases: vec![
+                kamu_resources::ResourceSelectorName::new(SECRETSETS_SHORT_NAME).unwrap(),
+            ],
             schema: secretset_type_uri().clone(),
             list_columns: Vec::new(),
         }
     }
 
-    fn storage_kind_descriptor(&self) -> ResourceKindDescriptor {
-        ResourceKindDescriptor {
-            name: STORAGES_NAME.to_string(),
-            short_names: vec![STORAGES_SHORT_NAME.to_string()],
+    fn storage_type_descriptor(&self) -> ResourceTypeDescriptor {
+        ResourceTypeDescriptor {
+            canonical_selector: kamu_resources::ResourceSelectorName::new(STORAGES_NAME).unwrap(),
+            selector_aliases: vec![
+                kamu_resources::ResourceSelectorName::new(STORAGES_SHORT_NAME).unwrap(),
+            ],
             schema: STORAGE_TYPE_URI.clone(),
             list_columns: Vec::new(),
         }

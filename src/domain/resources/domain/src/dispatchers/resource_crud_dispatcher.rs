@@ -24,6 +24,7 @@ use crate::{
     ResourceIDNotFoundError,
     ResourceSummaryView,
     ResourceTypeMismatchError,
+    ResourceTypeSelectorRaw,
     ResourceView,
     TypeUri,
 };
@@ -141,28 +142,28 @@ pub enum DeleteResourcesCrudDispatcherError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// A resource kind was addressed by its canonical schema URI, but the registry
-/// has no descriptor for it (or more than one). Produced only where a schema
-/// URI is the lookup key — e.g. apply, which reads `$schema` from the manifest.
+/// A resource type was addressed by its canonical schema URI, but the registry
+/// has no descriptor for it. Produced only where a schema URI is the lookup
+/// key — e.g. apply, which reads `$schema` from the manifest. A duplicate
+/// registration is a static wiring bug, so it is surfaced as an
+/// [`InternalError`] instead of a variant here.
 #[derive(Debug, Error)]
 pub enum UnsupportedResourceDescriptorError {
     #[error("Unsupported resource descriptor {schema}")]
     NotFound { schema: TypeUri },
-
-    #[error("Duplicate resource CRUD dispatcher registered for {schema}")]
-    Duplicate { schema: TypeUri },
 }
 
-/// A resource kind was addressed by a short selector (main name or alias, e.g.
-/// `vs`), but the registry has no descriptor matching it (or more than one).
-/// Produced only on selector-based lookups; the selector is never a schema URI.
+/// A resource type was addressed by a short selector (main name or alias, e.g.
+/// `vs`), but the registry has no descriptor matching it. Produced only on
+/// selector-based lookups; the selector is never a schema URI. A duplicate
+/// registration is a static wiring bug, so it is surfaced as an
+/// [`InternalError`] instead of a variant here.
 #[derive(Debug, Error)]
 pub enum UnsupportedResourceSelectorError {
-    #[error("Unsupported resource selector {selector}")]
-    NotFound { selector: String },
-
-    #[error("Duplicate resource CRUD dispatcher registered for selector {selector}")]
-    Duplicate { selector: String },
+    #[error("Unsupported resource selector {raw_selector}")]
+    NotFound {
+        raw_selector: ResourceTypeSelectorRaw,
+    },
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

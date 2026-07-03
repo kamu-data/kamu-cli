@@ -25,7 +25,7 @@ pub async fn test_resources_empty_context_baseline(ctx: ResourceCtx) {
         "`context` should report a context row, got:\n{context_out}"
     );
 
-    // `context api-resources` lists the supported resource kinds. This is also
+    // `context api-resources` lists the supported resource types. This is also
     // where we exercise the per-command `--context` override path: every
     // resource command (incl. `context api-resources`) accepts `--context`, so
     // appending it must target the same context as the active switch. For the
@@ -33,10 +33,10 @@ pub async fn test_resources_empty_context_baseline(ctx: ResourceCtx) {
     let mut api_resources_args = vec!["context".to_string(), "api-resources".to_string()];
     api_resources_args.extend(ctx.context_override_arg());
     let api_resources = ctx.stdout(api_resources_args).await;
-    for kind in ["variablesets", "secretsets"] {
+    for resource_type in ["variablesets", "secretsets"] {
         assert!(
-            api_resources.contains(kind),
-            "`context api-resources` should list '{kind}', got:\n{api_resources}"
+            api_resources.contains(resource_type),
+            "`context api-resources` should list `{resource_type}`, got:\n{api_resources}"
         );
     }
 
@@ -55,7 +55,7 @@ pub async fn test_resources_empty_context_baseline(ctx: ResourceCtx) {
     // `get vs <missing>` fails with a not-found error...
     ctx.assert_failure(
         ["get", "vs", "missing"],
-        Some(&[r#"Resource 'missing' of kind 'VariableSet' was not found"#]),
+        Some(&[r#"Resource 'missing' of type 'variablesets' was not found"#]),
     )
     .await;
 

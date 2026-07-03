@@ -15,7 +15,7 @@ use crate::DeclarativeResource;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait ListResourcesByKindUseCase<R: DeclarativeResource>: Send + Sync {
+pub trait ListResourcesByTypeUseCase<R: DeclarativeResource>: Send + Sync {
     async fn execute(
         &self,
         account_id: odf::AccountID,

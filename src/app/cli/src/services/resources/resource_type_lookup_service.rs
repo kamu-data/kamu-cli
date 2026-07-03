@@ -7,42 +7,42 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources::ResourceKindDescriptor;
+use kamu_resources::ResourceTypeDescriptor;
 
 use crate::CLIError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-pub trait ResourceKindLookupService: Send + Sync {
-    async fn list_supported_kinds(
+pub trait ResourceTypeLookupService: Send + Sync {
+    async fn list_supported_resource_types(
         &self,
         explicit_context_name: Option<&str>,
-    ) -> Result<Vec<ResourceKindDescriptor>, CLIError>;
+    ) -> Result<Vec<ResourceTypeDescriptor>, CLIError>;
 
-    async fn resolve_kind_descriptor(
+    async fn resolve_type_descriptor(
         &self,
         explicit_context_name: Option<&str>,
         target: &str,
-        error_options: ResourceKindLookupErrorOptions,
-    ) -> Result<ResourceKindDescriptor, CLIError>;
+        error_options: ResourceTypeLookupErrorOptions,
+    ) -> Result<ResourceTypeDescriptor, CLIError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
-pub struct ResourceKindLookupErrorOptions {
+pub struct ResourceTypeLookupErrorOptions {
     /// Command-specific prefix for the "selector not found" usage error.
     /// Example: "Unsupported list target".
     pub unsupported_prefix: String,
 
     /// Extra selectors to include in the "Supported targets" hint even if
-    /// they are CLI-level aliases rather than real backend resource kinds.
+    /// they are CLI-level aliases rather than real backend resource types.
     /// Example: `list` adds `datasets` here.
     pub additional_targets: Vec<String>,
 }
 
-impl ResourceKindLookupErrorOptions {
+impl ResourceTypeLookupErrorOptions {
     pub fn new(unsupported_prefix: impl Into<String>) -> Self {
         Self {
             unsupported_prefix: unsupported_prefix.into(),

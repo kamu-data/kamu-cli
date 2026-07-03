@@ -15,20 +15,20 @@ use crate::facade::graphql::cynic_api::schema;
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
 #[cynic(graphql_type = "Query")]
-pub(crate) struct SupportedKindsQuery {
-    pub resources: SupportedKindsResources,
+pub(crate) struct SupportedResourceTypesQuery {
+    pub resources: SupportedResourceTypesRoot,
 }
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
 #[cynic(graphql_type = "Resources")]
-pub(crate) struct SupportedKindsResources {
-    pub supported_kinds: Vec<ResourceKindDescriptor>,
+pub(crate) struct SupportedResourceTypesRoot {
+    pub supported_resource_types: Vec<ResourceTypeDescriptor>,
 }
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
-pub(crate) struct ResourceKindDescriptor {
-    pub name: String,
-    pub short_names: Vec<String>,
+pub(crate) struct ResourceTypeDescriptor {
+    pub canonical_selector: kamu_resources::ResourceSelectorName,
+    pub selector_aliases: Vec<kamu_resources::ResourceSelectorName>,
     pub schema: kamu_resources::TypeUri,
     pub list_columns: Vec<ResourceListColumnDescriptor>,
 }
@@ -80,8 +80,8 @@ impl From<ResourceListColumnVisibility> for kamu_resources::ResourceListColumnVi
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn build_operation() -> cynic::Operation<SupportedKindsQuery, ()> {
-    SupportedKindsQuery::build(())
+pub(crate) fn build_operation() -> cynic::Operation<SupportedResourceTypesQuery, ()> {
+    SupportedResourceTypesQuery::build(())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

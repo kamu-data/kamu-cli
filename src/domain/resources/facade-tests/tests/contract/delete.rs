@@ -25,8 +25,8 @@ use pretty_assertions::assert_eq;
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
 use crate::helpers::{
-    SECRET_SET_KIND,
-    VARIABLE_SET_KIND,
+    SECRET_SET_CANONICAL_SELECTOR,
+    VARIABLE_SET_CANONICAL_SELECTOR,
     assert_applied_outcome,
     variable_set_manifest_json,
 };
@@ -50,7 +50,7 @@ async fn create_resource(h: &impl FacadeContractHarness, name: &str) -> kamu_res
 fn by_name(name: &str) -> ResourceSelector {
     ResourceSelector {
         account: None,
-        kind: VARIABLE_SET_KIND.to_string(),
+        resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
         resource_ref: ResourceRef::ByName(name.parse().unwrap()),
     }
 }
@@ -58,7 +58,7 @@ fn by_name(name: &str) -> ResourceSelector {
 fn by_id(id: &kamu_resources::ResourceID) -> ResourceSelector {
     ResourceSelector {
         account: None,
-        kind: VARIABLE_SET_KIND.to_string(),
+        resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
         resource_ref: ResourceRef::ById(*id),
     }
 }
@@ -95,7 +95,7 @@ pub async fn test_delete_by_name(h: &impl FacadeContractHarness) {
     // Resource must not appear in list
     let list = facade
         .list(ListResourcesRequest {
-            kind: VARIABLE_SET_KIND.to_string(),
+            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             account: None,
             pagination: PaginationOpts {
                 limit: 1000,
@@ -193,7 +193,7 @@ pub async fn test_delete_wrong_schema_returns_mismatch(h: &impl FacadeContractHa
 
     let wrong_schema_selector = ResourceSelector {
         account: None,
-        kind: SECRET_SET_KIND.to_string(),
+        resource_type: SECRET_SET_CANONICAL_SELECTOR.parse().unwrap(),
         resource_ref: ResourceRef::ById(id),
     };
     let result = facade.delete(wrong_schema_selector).await;
@@ -209,7 +209,7 @@ pub async fn test_delete_wrong_schema_returns_mismatch(h: &impl FacadeContractHa
 
     let wrong_kind = ResourceSelector {
         account: None,
-        kind: SECRET_SET_KIND.to_string(),
+        resource_type: SECRET_SET_CANONICAL_SELECTOR.parse().unwrap(),
         resource_ref: ResourceRef::ById(id),
     };
     let result = facade.delete(wrong_kind).await;

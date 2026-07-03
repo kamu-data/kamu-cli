@@ -356,7 +356,7 @@ Manage resource contexts
 * `list [ls]` — List configured resource contexts
 * `delete [rm]` — Delete a remote resource context
 * `check` — Check connectivity and authorization for a remote resource context
-* `api-resources` — List supported resource kinds in the active context
+* `api-resources` — List supported resource types in the active context
 * `use` — Switch the current resource context
 
 **Arguments:**
@@ -404,11 +404,11 @@ Register a user-scoped remote context:
 
     kamu context add prod --url https://api.kamu.dev --user
 
-List supported resource kinds in the active context:
+List supported resource types in the active context:
 
     kamu ctx api-resources
 
-List supported resource kinds from a specific context:
+List supported resource types from a specific context:
 
     kamu ctx api-resources --context prod
 
@@ -573,7 +573,7 @@ Check all remote contexts:
 
 ## `kamu context api-resources`
 
-List supported resource kinds in the active context
+List supported resource types in the active context
 
 **Usage:** `kamu context api-resources [OPTIONS]`
 
@@ -599,7 +599,7 @@ List supported resource kinds in the active context
     Parquet columnar storage. Only available when exporting to file(s)
 
 
-Lists resource kinds supported by the active context.
+Lists resource types supported by the active context.
 
 If the active context is `local`, this targets the current workspace. If the
 active context points to a remote server, this targets that remote GraphQL API.
@@ -608,15 +608,15 @@ Use `--context` to override the current context for this invocation only.
 
 **Examples:**
 
-List supported resource kinds in the active context:
+List supported resource types in the active context:
 
     kamu ctx api-resources
 
-List supported resource kinds from a specific context:
+List supported resource types from a specific context:
 
     kamu ctx api-resources --context prod
 
-List supported resource kinds in JSON:
+List supported resource types in JSON:
 
     kamu ctx api-resources -o json
 
@@ -685,7 +685,7 @@ Delete datasets explicitly:
 
     kamu delete datasets my.dataset
 
-Delete a dataset using the dataset pseudo-kind selector:
+Delete a dataset using the dataset pseudo-type selector:
 
     kamu delete dataset/my.dataset
 
@@ -697,15 +697,15 @@ Delete a single resource:
 
     kamu delete storages warehouse
 
-Delete same-kind resources by name pattern:
+Delete same-type resources by name pattern:
 
     kamu delete vs app-%
 
-Delete all resources of a kind:
+Delete all resources of a type:
 
     kamu delete storages --all
 
-Delete all resources across kinds:
+Delete all resources across types:
 
     kamu delete all
 
@@ -713,15 +713,15 @@ Delete resources using slash selectors:
 
     kamu delete vs/my-vars ss/my-secrets
 
-Delete the same exact name across a matched kind pattern:
+Delete the same exact name across a matched type pattern:
 
     kamu delete s% db-creds
 
-Delete matched resources across a kind pattern and name pattern:
+Delete matched resources across a type pattern and name pattern:
 
     kamu delete s%/db-%
 
-Delete all resources of a kind using a slash selector:
+Delete all resources of a type using a slash selector:
 
     kamu delete storages/all
 
@@ -777,7 +777,7 @@ Returns manifest representation of a resource
 
 **Arguments:**
 
-* `<ARGS>` — Resource selector(s): `kind name...` or `kind/name...`
+* `<ARGS>` — Resource selector(s): `type name...` or `type/name...`
 
 **Options:**
 
@@ -798,7 +798,7 @@ Returns manifest representation of a resource
 
 Returns the current state of one or more resources as YAML or JSON.
 
-Only real resource kinds supported by the active context are accepted.
+Only real resource types supported by the active context are accepted.
 Datasets are intentionally not supported by this command.
 
 By default this command returns the full resource view, including status.
@@ -820,11 +820,11 @@ Get the apply-compatible spec manifest:
 
     kamu get vs my-vars --spec
 
-Get multiple resources of the same kind:
+Get multiple resources of the same type:
 
     kamu get variablesets vars-a vars-b
 
-Get same-kind resources by name pattern:
+Get same-type resources by name pattern:
 
     kamu get vs app-%
 
@@ -832,11 +832,11 @@ Get multiple resources by slash-separated ref form:
 
     kamu get vs/vars-a ss/db-creds
 
-Get the same exact name across a matched kind pattern:
+Get the same exact name across a matched type pattern:
 
     kamu get s% db-creds
 
-Get matched resources across a kind pattern and name pattern:
+Get matched resources across a type pattern and name pattern:
 
     kamu get s%/db-%
 
@@ -1063,7 +1063,7 @@ To list datasets explicitly:
 
     kamu list datasets
 
-To list all resources across all kinds:
+To list all resources across all types:
 
     kamu list all
 
@@ -1796,7 +1796,7 @@ Show resource summary for the active context
   Possible values: `table`, `json`, `yaml`
 
 
-Shows resource counts by kind and reconciliation phase for the active context.
+Shows resource counts by type and reconciliation phase for the active context.
 
 If the active context is `local`, commands target the current workspace. If the
 active context points to a remote server, commands target that remote GraphQL

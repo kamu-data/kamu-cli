@@ -14,7 +14,7 @@ use internal_error::InternalError;
 use kamu_resources::*;
 use kamu_resources_services::{
     get_resource_crud_dispatcher,
-    get_resource_crud_dispatcher_by_selector,
+    get_resource_crud_dispatcher_by_raw_selector,
     get_resource_crud_dispatcher_for_trusted_schema,
 };
 
@@ -35,10 +35,10 @@ pub struct LocalResourceFacadeImpl {
 
 #[async_trait::async_trait]
 impl ResourceFacade for LocalResourceFacadeImpl {
-    async fn list_supported_kinds(
+    async fn list_supported_resource_types(
         &self,
-    ) -> Result<Vec<ResourceKindDescriptor>, ListSupportedResourceKindsError> {
-        Ok(self.list_resource_kind_descriptors())
+    ) -> Result<Vec<ResourceTypeDescriptor>, ListSupportedResourceTypesError> {
+        Ok(self.list_resource_type_descriptors())
     }
 
     async fn summary(
@@ -50,7 +50,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .resolve_target_account(request.account.as_ref())
             .await?;
 
-        let names_by_schema = self.resource_kind_names_by_schema();
+        let canonical_selectors_by_schema = self.resource_canonical_selectors_by_schema();
 
         let resource_counts = self
             .generic_resource_query_service
@@ -59,7 +59,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .into_iter()
             .map(|row| {
                 let schema = TypeUri::new_unchecked(row.schema);
-                let name = names_by_schema
+                let canonical_selector = canonical_selectors_by_schema
                     .get(&schema)
                     .ok_or_else(|| {
                         ResourcesSummaryError::Internal(InternalError::new(format!(
@@ -70,7 +70,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 
                 Ok(ResourceTypeCountSummary {
                     schema,
-                    name,
+                    canonical_selector,
                     total_count: row.total_count,
                     phase_counts: row.phase_counts,
                 })
@@ -130,11 +130,20 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .resource_account_resolver
             .resolve_target_account(selector.account.as_ref())
             .await?;
-        let schema = self.resolve_schema_for_selector::<GetResourceError>(&selector.kind)?;
+
+        let schema =
+            self.resolve_schema_for_selector::<GetResourceError>(&selector.resource_type)?;
+
+        let canonical_selectors_by_schema = self.resource_canonical_selectors_by_schema();
+        let canonical_selector = self.canonical_selector_for_schema::<GetResourceError>(
+            &schema,
+            &canonical_selectors_by_schema,
+        )?;
 
         let id = resolve_resource_id::<GetResourceError>(
             self.generic_resource_query_service.as_ref(),
             &schema,
+            &canonical_selector,
             &target_account.id,
             &selector.resource_ref,
         )
@@ -144,8 +153,8 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .resolve_snapshot_for_schema::<GetResourceError>(&schema, &target_account.id, id)
             .await?;
 
-        let names_by_schema = self.resource_kind_names_by_schema();
-        resource_identity_from_snapshot(snapshot, &names_by_schema).map_err(Into::into)
+        resource_identity_from_snapshot(snapshot, &canonical_selectors_by_schema)
+            .map_err(Into::into)
     }
 
     async fn get_identities(
@@ -160,14 +169,21 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .resolve_target_account(selector.account.as_ref())
             .await?;
 
-        let names_by_schema = self.resource_kind_names_by_schema();
-        let schema = self.resolve_schema_for_selector::<BatchResourceError>(&selector.kind)?;
+        let schema =
+            self.resolve_schema_for_selector::<BatchResourceError>(&selector.resource_type)?;
+
+        let canonical_selectors_by_schema = self.resource_canonical_selectors_by_schema();
+        let canonical_selector = self.canonical_selector_for_schema::<BatchResourceError>(
+            &schema,
+            &canonical_selectors_by_schema,
+        )?;
 
         let groups = group_batch_resource_refs(selector);
         let resolution_response = resolve_batch_ids(
             self.generic_resource_query_service.as_ref(),
             &target_account.id,
             &schema,
+            &canonical_selector,
             groups,
         )
         .await?;
@@ -178,7 +194,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
                 &schema,
                 resolution_response.id_entries,
                 resolution_response.problems,
-                &names_by_schema,
+                &canonical_selectors_by_schema,
             )
             .await?;
 
@@ -260,9 +276,9 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .resolve_target_account(request.account.as_ref())
             .await?;
 
-        let dispatcher = get_resource_crud_dispatcher_by_selector::<ListResourcesError>(
+        let dispatcher = get_resource_crud_dispatcher_by_raw_selector::<ListResourcesError>(
             &self.catalog,
-            &request.kind,
+            &request.raw_type_selector,
         )?;
 
         dispatcher
@@ -283,15 +299,16 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .resolve_target_account(request.account.as_ref())
             .await?;
 
-        let schema = self.resolve_schema_for_selector::<ListResourcesError>(&request.kind)?;
+        let schema =
+            self.resolve_schema_for_selector::<ListResourcesError>(&request.raw_type_selector)?;
 
         let snapshots = self
             .generic_resource_query_service
             .list_snapshots_by_schema(target_account.id, &schema, request.pagination)
             .await?;
 
-        let names_by_schema = self.resource_kind_names_by_schema();
-        map_snapshots_to_identities(snapshots, &names_by_schema).map_err(Into::into)
+        let canonical_selectors_by_schema = self.resource_canonical_selectors_by_schema();
+        map_snapshots_to_identities(snapshots, &canonical_selectors_by_schema).map_err(Into::into)
     }
 
     async fn search_identities(
@@ -308,9 +325,11 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .await?;
 
         let schemas = request
-            .kinds
+            .raw_type_selectors
             .iter()
-            .map(|kind| self.resolve_schema_for_selector::<ListResourcesError>(kind))
+            .map(|resource_type| {
+                self.resolve_schema_for_selector::<ListResourcesError>(resource_type)
+            })
             .collect::<Result<Vec<_>, _>>()?;
 
         let rows = self
@@ -333,10 +352,11 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             )
             .await?;
 
-        let names_by_schema = self.resource_kind_names_by_schema();
+        let canonical_selectors_by_schema = self.resource_canonical_selectors_by_schema();
+
         let items = rows
             .into_iter()
-            .map(|row| resource_identity_from_row(row, &names_by_schema))
+            .map(|row| resource_identity_from_row(row, &canonical_selectors_by_schema))
             .collect::<Result<Vec<_>, InternalError>>()?;
 
         Ok(SearchResourceIdentitiesResponse { items, total_count })
@@ -373,8 +393,8 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .list_all_snapshots(target_account.id, request.pagination)
             .await?;
 
-        let names_by_schema = self.resource_kind_names_by_schema();
-        map_snapshots_to_identities(snapshots, &names_by_schema).map_err(Into::into)
+        let canonical_selectors_by_schema = self.resource_canonical_selectors_by_schema();
+        map_snapshots_to_identities(snapshots, &canonical_selectors_by_schema).map_err(Into::into)
     }
 
     async fn plan_apply_manifest(
@@ -448,13 +468,21 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .resolve_target_account(selector.account.as_ref())
             .await?;
 
-        let schema = self.resolve_schema_for_selector::<BatchResourceError>(&selector.kind)?;
+        let schema =
+            self.resolve_schema_for_selector::<BatchResourceError>(&selector.resource_type)?;
+
+        let canonical_selectors_by_schema = self.resource_canonical_selectors_by_schema();
+        let canonical_selector = self.canonical_selector_for_schema::<BatchResourceError>(
+            &schema,
+            &canonical_selectors_by_schema,
+        )?;
 
         let groups = group_batch_resource_refs(selector);
         let resolution_response = resolve_batch_ids(
             self.generic_resource_query_service.as_ref(),
             &target_account.id,
             &schema,
+            &canonical_selector,
             groups,
         )
         .await?;
@@ -531,7 +559,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         let response = self
             .delete_many(ResourceBatchSelector {
                 account: selector.account,
-                kind: selector.kind,
+                resource_type: selector.resource_type,
                 resource_refs: vec![selector.resource_ref],
             })
             .await?;
@@ -549,7 +577,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl LocalResourceFacadeImpl {
-    fn list_resource_kind_descriptors(&self) -> Vec<ResourceKindDescriptor> {
+    fn list_resource_type_descriptors(&self) -> Vec<ResourceTypeDescriptor> {
         let mut seen = HashSet::new();
         let mut descriptors = Vec::new();
 
@@ -565,13 +593,9 @@ impl LocalResourceFacadeImpl {
             let presentation = dispatcher.presentation();
 
             if seen.insert(schema) {
-                descriptors.push(ResourceKindDescriptor {
-                    name: presentation.resource_name.to_string(),
-                    short_names: presentation
-                        .resource_short_names
-                        .iter()
-                        .map(ToString::to_string)
-                        .collect(),
+                descriptors.push(ResourceTypeDescriptor {
+                    canonical_selector: presentation.canonical_selector,
+                    selector_aliases: presentation.selector_aliases.to_vec(),
                     schema: schema.clone(),
                     list_columns: presentation
                         .list_columns
@@ -588,25 +612,47 @@ impl LocalResourceFacadeImpl {
         descriptors
     }
 
-    fn resource_kind_names_by_schema(&self) -> HashMap<TypeUri, String> {
-        self.list_resource_kind_descriptors()
+    fn resource_canonical_selectors_by_schema(&self) -> HashMap<TypeUri, ResourceSelectorName> {
+        self.list_resource_type_descriptors()
             .into_iter()
-            .map(|descriptor| (descriptor.schema, descriptor.name))
+            .map(|descriptor| (descriptor.schema, descriptor.canonical_selector))
             .collect()
     }
 
-    fn resolve_schema_for_selector<E>(&self, selector: &str) -> Result<TypeUri, E>
+    fn resolve_schema_for_selector<E>(
+        &self,
+        selector: &ResourceTypeSelectorRaw,
+    ) -> Result<TypeUri, E>
     where
         E: From<UnsupportedResourceSelectorError>,
     {
-        self.list_resource_kind_descriptors()
+        self.list_resource_type_descriptors()
             .into_iter()
             .find(|descriptor| descriptor.matches_selector(selector))
             .map(|descriptor| descriptor.schema)
             .ok_or_else(|| UnsupportedResourceSelectorError::NotFound {
-                selector: selector.to_string(),
+                raw_selector: selector.clone(),
             })
             .map_err(Into::into)
+    }
+
+    /// Looks up the canonical selector name for a `schema` already resolved
+    /// from a registered selector, so a miss is a data-integrity catastrophe,
+    /// not a user-facing error.
+    fn canonical_selector_for_schema<E>(
+        &self,
+        schema: &TypeUri,
+        canonical_selectors_by_schema: &HashMap<TypeUri, ResourceSelectorName>,
+    ) -> Result<ResourceSelectorName, E>
+    where
+        E: From<InternalError>,
+    {
+        canonical_selectors_by_schema
+            .get(schema)
+            .cloned()
+            .ok_or_else(|| {
+                InternalError::new(format!("No resource descriptor registered for {schema}")).into()
+            })
     }
 
     async fn resolve_resource_view<E>(&self, selector: ResourceSelector) -> Result<ResourceView, E>
@@ -621,11 +667,17 @@ impl LocalResourceFacadeImpl {
             .resource_account_resolver
             .resolve_target_account(selector.account.as_ref())
             .await?;
-        let schema = self.resolve_schema_for_selector::<E>(&selector.kind)?;
+
+        let schema = self.resolve_schema_for_selector::<E>(&selector.resource_type)?;
+
+        let canonical_selectors_by_schema = self.resource_canonical_selectors_by_schema();
+        let canonical_selector =
+            self.canonical_selector_for_schema::<E>(&schema, &canonical_selectors_by_schema)?;
 
         let id = resolve_resource_id::<E>(
             self.generic_resource_query_service.as_ref(),
             &schema,
+            &canonical_selector,
             &target_account.id,
             &selector.resource_ref,
         )
@@ -673,9 +725,14 @@ impl LocalResourceFacadeImpl {
             .resolve_target_account(selector.account.as_ref())
             .await?;
 
-        let names_by_schema = self.resource_kind_names_by_schema();
+        let schema =
+            self.resolve_schema_for_selector::<BatchResourceError>(&selector.resource_type)?;
 
-        let schema = self.resolve_schema_for_selector::<BatchResourceError>(&selector.kind)?;
+        let canonical_selectors_by_schema = self.resource_canonical_selectors_by_schema();
+        let canonical_selector = self.canonical_selector_for_schema::<BatchResourceError>(
+            &schema,
+            &canonical_selectors_by_schema,
+        )?;
 
         let groups = group_batch_resource_refs(selector);
 
@@ -683,6 +740,7 @@ impl LocalResourceFacadeImpl {
             self.generic_resource_query_service.as_ref(),
             &target_account.id,
             &schema,
+            &canonical_selector,
             groups,
         )
         .await?;
@@ -720,7 +778,7 @@ impl LocalResourceFacadeImpl {
                     Ok(snapshot)
                 }) {
                 Ok(snapshot) => {
-                    if !names_by_schema.contains_key(&snapshot.schema) {
+                    if !canonical_selectors_by_schema.contains_key(&snapshot.schema) {
                         // A stored snapshot whose schema has no registered
                         // descriptor is a data-integrity catastrophe (it could
                         // not have been stored without one), not a user error.
@@ -769,7 +827,7 @@ impl LocalResourceFacadeImpl {
         schema: &TypeUri,
         id_entries: BatchIdEntries,
         mut problems: Vec<BatchResourceProblem<ResourceLookupProblem>>,
-        names_by_schema: &HashMap<TypeUri, String>,
+        canonical_selectors_by_schema: &HashMap<TypeUri, ResourceSelectorName>,
     ) -> Result<
         (
             Vec<IndexedResource<ResourceIdentityView>>,
@@ -797,7 +855,7 @@ impl LocalResourceFacadeImpl {
                 validate_identity_row(row, schema, ensure_schema_matches::<ResourceLookupProblem>)
             }) {
                 Ok(row) => {
-                    let identity = resource_identity_from_row(row, names_by_schema)?;
+                    let identity = resource_identity_from_row(row, canonical_selectors_by_schema)?;
                     identities.push(IndexedResource {
                         request_index,
                         item: identity,

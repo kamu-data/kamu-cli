@@ -104,8 +104,8 @@ async fn test_find_owned_snapshot_access_denied() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// When find_owned_snapshot is called with a different kind,
-// find_resource_snapshot filters by kind in the query and returns None — no
+// When find_owned_snapshot is called with a different schema,
+// find_resource_snapshot filters by schema in the query and returns None — no
 // snapshot is found.
 #[test_log::test(tokio::test)]
 async fn test_find_owned_snapshot_schema_mismatch_by_query() {
@@ -121,8 +121,8 @@ async fn test_find_owned_snapshot_schema_mismatch_by_query() {
         .find_owned_snapshot(&account_a, &OTHER_SCHEMA, id)
         .await;
 
-    // The repository filters by kind in find_resource_snapshot, so a wrong kind
-    // returns None rather than a type-mismatch error.
+    // The repository filters by schema in find_resource_snapshot, so a wrong
+    // schema returns None rather than a type-mismatch error.
     assert!(result.unwrap().is_none());
 }
 
@@ -288,7 +288,7 @@ async fn test_find_owned_snapshots_mixed_outcomes() {
             uid_schema_mismatch,
             account_a.clone(),
             &OTHER_SCHEMA,
-            "res-other-kind",
+            "res-other-schema",
         )
         .await;
 

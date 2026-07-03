@@ -45,11 +45,11 @@ fn identity_keys(mut items: Vec<kamu_resources::ResourceIdentityView>) -> Vec<(S
 
 // RF-100
 contract_test!(
-    list_all_summaries_across_supported_kinds,
-    super::test_list_all_summaries_across_supported_kinds
+    list_all_summaries_across_supported_resource_types,
+    super::list_all_summaries_across_supported_resource_types
 );
 
-pub async fn test_list_all_summaries_across_supported_kinds(h: &impl FacadeContractHarness) {
+pub async fn list_all_summaries_across_supported_resource_types(h: &impl FacadeContractHarness) {
     apply_manifest_and_get_id(
         h,
         TestAccount::Alice,
@@ -97,11 +97,13 @@ pub async fn test_list_all_summaries_across_supported_kinds(h: &impl FacadeContr
 
 // RF-101
 contract_test!(
-    list_all_identities_across_supported_kinds,
-    super::test_list_all_identities_across_supported_kinds
+    list_all_identities_across_supported_resource_types,
+    super::test_list_all_identities_across_supported_resource_types
 );
 
-pub async fn test_list_all_identities_across_supported_kinds(h: &impl FacadeContractHarness) {
+pub async fn test_list_all_identities_across_supported_resource_types(
+    h: &impl FacadeContractHarness,
+) {
     apply_manifest_and_get_id(
         h,
         TestAccount::Alice,

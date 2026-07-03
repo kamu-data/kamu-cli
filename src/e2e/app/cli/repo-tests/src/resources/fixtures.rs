@@ -28,7 +28,7 @@
 pub const VARIABLE_SET_SCHEMA: &str = odf::metadata::config::VariableSet::schema_str();
 pub const SECRET_SET_SCHEMA: &str = odf::metadata::config::SecretSet::schema_str();
 
-/// Short CRD-style type name (the `Kind` column in `list`/`summary` output),
+/// Short CRD-style type name (the `Type` column in `list`/`summary` output),
 /// as opposed to [`VARIABLE_SET_SCHEMA`]/[`SECRET_SET_SCHEMA`] which are the
 /// full canonical `$schema` URIs.
 pub const VARIABLE_SET_SHORT_NAME: &str = "VariableSet";

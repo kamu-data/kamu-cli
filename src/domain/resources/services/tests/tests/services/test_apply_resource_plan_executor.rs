@@ -201,7 +201,7 @@ async fn test_execute_create_duplicate_retries_as_update() {
     // plan_create_resource allocates a new UID without doing a name lookup,
     // so the plan carries action=Create. When the executor calls
     // persistence_svc.create(), the store rejects it with Duplicate (same
-    // account + kind + name already exists). The executor then retries via
+    // account + schema + name already exists). The executor then retries via
     // the update path, which resolves the conflict by name lookup.
     let create_plan = harness
         .make_plan(

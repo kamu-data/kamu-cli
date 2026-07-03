@@ -12,7 +12,7 @@ use std::sync::Arc;
 use kamu::domain::TenancyConfig;
 use kamu_accounts::CurrentAccountSubject;
 use kamu_datasets::{DatasetRegistry, DeleteDatasetUseCase};
-use kamu_resources::ResourceKindDescriptor;
+use kamu_resources::ResourceTypeDescriptor;
 
 use super::{CLIError, Command, DeleteDatasetsCommand, DeleteResourcesCommand};
 use crate::cli_commands::validate_many_dataset_patterns_with_workspace;
@@ -20,10 +20,10 @@ use crate::output::OutputConfig;
 use crate::resource_context::{ResourceContextReporter, ResourceContextResolver};
 use crate::resources::{
     ResourceFacadeFactory,
-    ResourceKindLookupService,
     ResourceSelectionResolutionService,
     ResourceSelectionSyntax,
     ResourceSelectionSyntaxService,
+    ResourceTypeLookupService,
 };
 use crate::{ConfirmDeleteService, Interact, WorkspaceService, cli_value_parser as parsers};
 
@@ -44,7 +44,7 @@ pub struct DeleteCommand {
     delete_dataset: Arc<dyn DeleteDatasetUseCase>,
     confirm_delete_service: Arc<ConfirmDeleteService>,
     resource_facade_factory: Arc<dyn ResourceFacadeFactory>,
-    resource_kind_lookup_service: Arc<dyn ResourceKindLookupService>,
+    resource_type_lookup_service: Arc<dyn ResourceTypeLookupService>,
     resource_selection_syntax_service: Arc<dyn ResourceSelectionSyntaxService>,
     resource_selection_resolution_service: Arc<dyn ResourceSelectionResolutionService>,
     resource_context_resolver: Arc<ResourceContextResolver>,
@@ -82,7 +82,7 @@ pub struct DeleteCommand {
 impl DeleteCommand {
     async fn resolved_request(&self) -> Result<ResolvedDeleteRequest, CLIError> {
         DeleteRequestResolver::new(
-            self.resource_kind_lookup_service.as_ref(),
+            self.resource_type_lookup_service.as_ref(),
             self.resource_selection_syntax_service.as_ref(),
             DeleteRequestResolverParams {
                 target: self.target.as_deref(),
@@ -304,19 +304,19 @@ struct DeleteRequestResolverParams<'a> {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct DeleteRequestResolver<'a> {
-    resource_kind_lookup_service: &'a dyn ResourceKindLookupService,
+    resource_type_lookup_service: &'a dyn ResourceTypeLookupService,
     resource_selection_syntax_service: &'a dyn ResourceSelectionSyntaxService,
     params: DeleteRequestResolverParams<'a>,
 }
 
 impl<'a> DeleteRequestResolver<'a> {
     fn new(
-        resource_kind_lookup_service: &'a dyn ResourceKindLookupService,
+        resource_type_lookup_service: &'a dyn ResourceTypeLookupService,
         resource_selection_syntax_service: &'a dyn ResourceSelectionSyntaxService,
         params: DeleteRequestResolverParams<'a>,
     ) -> Self {
         Self {
-            resource_kind_lookup_service,
+            resource_type_lookup_service,
             resource_selection_syntax_service,
             params,
         }
@@ -325,10 +325,10 @@ impl<'a> DeleteRequestResolver<'a> {
     // Mirrors `list` dispatch, but with delete-specific dataset/resource
     // precedence:
     // - `kamu delete` / `kamu delete datasets ...` => datasets mode
-    // - `kamu delete all` => resource all-kinds mode
-    // - `kamu delete storages warehouse` => resource same-kind mode
+    // - `kamu delete all` => resource all-types mode
+    // - `kamu delete storages warehouse` => resource same-type mode
     // - `kamu delete foo.bar` => datasets mode when `foo.bar` is not a known
-    //   resource kind
+    //   resource type
     // - `kamu delete vs/foo` => resource slash mode when `vs` is a known resource
     //   prefix
     async fn resolve(&self) -> Result<ResolvedDeleteRequest, CLIError> {
@@ -428,13 +428,13 @@ impl<'a> DeleteRequestResolver<'a> {
     }
 
     async fn matches_resource_target_prefix(&self, prefix: &str) -> Result<bool, CLIError> {
-        let supported_kinds = self
-            .resource_kind_lookup_service
-            .list_supported_kinds(self.params.explicit_context_name)
+        let supported_resource_types = self
+            .resource_type_lookup_service
+            .list_supported_resource_types(self.params.explicit_context_name)
             .await?;
 
         Ok(Self::matches_resource_target_prefix_with(
-            &supported_kinds,
+            &supported_resource_types,
             prefix,
         ))
     }
@@ -443,22 +443,22 @@ impl<'a> DeleteRequestResolver<'a> {
         &self,
         raw_args: Vec<String>,
     ) -> Result<ClassifiedSlashDeleteRequest, CLIError> {
-        let supported_kinds = self
-            .resource_kind_lookup_service
-            .list_supported_kinds(self.params.explicit_context_name)
+        let supported_resource_types = self
+            .resource_type_lookup_service
+            .list_supported_resource_types(self.params.explicit_context_name)
             .await?;
 
         Ok(Self::classify_slash_request_with(raw_args, |prefix| {
-            Self::matches_resource_target_prefix_with(&supported_kinds, prefix)
+            Self::matches_resource_target_prefix_with(&supported_resource_types, prefix)
         }))
     }
 
     fn matches_resource_target_prefix_with(
-        supported_kinds: &[ResourceKindDescriptor],
+        supported_resource_types: &[ResourceTypeDescriptor],
         prefix: &str,
     ) -> bool {
-        supported_kinds.iter().any(|descriptor| {
-            if Self::is_potential_resource_kind_pattern(prefix) {
+        supported_resource_types.iter().any(|descriptor| {
+            if Self::is_potential_resource_type_pattern(prefix) {
                 descriptor.matches_selector_pattern(prefix)
             } else {
                 descriptor.matches_selector(prefix)
@@ -483,7 +483,7 @@ impl<'a> DeleteRequestResolver<'a> {
 
             // `dataset/...` and `datasets/...` are an explicit escape hatch that forces
             // legacy dataset interpretation even if the prefix collides with a resource
-            // kind.
+            // type.
             if prefix.eq_ignore_ascii_case("dataset")
                 || prefix.eq_ignore_ascii_case(DATASETS_TARGET)
             {
@@ -542,7 +542,7 @@ impl<'a> DeleteRequestResolver<'a> {
         Ok(syntax)
     }
 
-    fn is_potential_resource_kind_pattern(prefix: &str) -> bool {
+    fn is_potential_resource_type_pattern(prefix: &str) -> bool {
         prefix.contains('%')
     }
 }
@@ -560,7 +560,7 @@ enum ClassifiedSlashDeleteRequest {
 
 #[cfg(test)]
 mod tests {
-    use kamu_resources::{ResourceKindDescriptor, TypeUri};
+    use kamu_resources::{ResourceTypeDescriptor, TypeUri};
 
     use super::{ClassifiedSlashDeleteRequest, DeleteRequestResolver};
 
@@ -593,7 +593,7 @@ mod tests {
     }
 
     #[test]
-    fn test_classify_slash_request_strips_dataset_pseudo_kind_prefix() {
+    fn test_classify_slash_request_strips_dataset_pseudo_type_prefix() {
         let request = DeleteRequestResolver::classify_slash_request_with(
             vec!["datasets/foo".to_owned(), "dataset/bar".to_owned()],
             |_| false,
@@ -622,7 +622,7 @@ mod tests {
     }
 
     #[test]
-    fn test_classify_slash_request_routes_matching_kind_patterns_to_resources() {
+    fn test_classify_slash_request_routes_matching_type_patterns_to_resources() {
         let request = DeleteRequestResolver::classify_slash_request_with(
             vec!["s%/db-creds".to_owned()],
             |prefix| prefix.eq_ignore_ascii_case("s%"),
@@ -636,7 +636,7 @@ mod tests {
     }
 
     #[test]
-    fn test_classify_slash_request_keeps_unknown_kind_patterns_on_dataset_path() {
+    fn test_classify_slash_request_keeps_unknown_type_patterns_on_dataset_path() {
         let request = DeleteRequestResolver::classify_slash_request_with(
             vec!["unknown%/db-creds".to_owned()],
             |_| false,
@@ -664,32 +664,34 @@ mod tests {
     }
 
     #[test]
-    fn test_matches_resource_target_prefix_with_kind_patterns_case_insensitively() {
-        let supported_kinds = vec![
-            ResourceKindDescriptor {
-                name: "variablesets".to_owned(),
-                short_names: vec!["vs".to_owned()],
+    fn test_matches_resource_target_prefix_with_type_patterns_case_insensitively() {
+        let supported_resource_types = vec![
+            ResourceTypeDescriptor {
+                canonical_selector: kamu_resources::ResourceSelectorName::new("variablesets")
+                    .unwrap(),
+                selector_aliases: vec![kamu_resources::ResourceSelectorName::new("vs").unwrap()],
                 schema: TypeUri::new_unchecked("dev.kamu/variableset/v1"),
                 list_columns: Vec::new(),
             },
-            ResourceKindDescriptor {
-                name: "secretsets".to_owned(),
-                short_names: vec!["ss".to_owned()],
+            ResourceTypeDescriptor {
+                canonical_selector: kamu_resources::ResourceSelectorName::new("secretsets")
+                    .unwrap(),
+                selector_aliases: vec![kamu_resources::ResourceSelectorName::new("ss").unwrap()],
                 schema: TypeUri::new_unchecked("dev.kamu/secretset/v1"),
                 list_columns: Vec::new(),
             },
         ];
 
         assert!(DeleteRequestResolver::matches_resource_target_prefix_with(
-            &supported_kinds,
+            &supported_resource_types,
             "VS",
         ));
         assert!(DeleteRequestResolver::matches_resource_target_prefix_with(
-            &supported_kinds,
+            &supported_resource_types,
             "S%",
         ));
         assert!(!DeleteRequestResolver::matches_resource_target_prefix_with(
-            &supported_kinds,
+            &supported_resource_types,
             "X%",
         ));
     }

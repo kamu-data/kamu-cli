@@ -15,6 +15,7 @@ use kamu_resources::{
     ResourceIdentityRow,
     ResourceIdentityView,
     ResourceName,
+    ResourceSelectorName,
     ResourceSnapshot,
     TypeUri,
 };
@@ -25,14 +26,14 @@ use crate::ResourceLookupProblem;
 
 pub(crate) fn resource_identity_from_snapshot(
     snapshot: ResourceSnapshot,
-    descriptors_by_schema: &HashMap<TypeUri, String>,
+    canonical_selectors_by_schema: &HashMap<TypeUri, ResourceSelectorName>,
 ) -> Result<ResourceIdentityView, InternalError> {
-    let canonical_kind_name =
-        canonical_kind_name_for_stored_schema(&snapshot.schema, descriptors_by_schema)?;
+    let canonical_selector =
+        canonical_selector_for_stored_schema(&snapshot.schema, canonical_selectors_by_schema)?;
 
     Ok(ResourceIdentityView {
         schema: snapshot.schema,
-        canonical_kind_name,
+        canonical_selector,
         id: snapshot.id,
         name: snapshot.headers.name,
     })
@@ -42,15 +43,15 @@ pub(crate) fn resource_identity_from_snapshot(
 
 pub(crate) fn resource_identity_from_row(
     row: ResourceIdentityRow,
-    descriptors_by_schema: &HashMap<TypeUri, String>,
+    canonical_selectors_by_schema: &HashMap<TypeUri, ResourceSelectorName>,
 ) -> Result<ResourceIdentityView, InternalError> {
     let schema = TypeUri::new_unchecked(row.schema);
-    let canonical_kind_name =
-        canonical_kind_name_for_stored_schema(&schema, descriptors_by_schema)?;
+    let canonical_selector =
+        canonical_selector_for_stored_schema(&schema, canonical_selectors_by_schema)?;
 
     Ok(ResourceIdentityView {
         schema,
-        canonical_kind_name,
+        canonical_selector,
         id: ResourceID::new(row.id),
         name: ResourceName::new_unchecked(&row.name),
     })
@@ -58,19 +59,22 @@ pub(crate) fn resource_identity_from_row(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Resolves a stored schema to its canonical kind name. A miss is a
+/// Resolves a stored schema to its canonical selector name. A miss is a
 /// data-integrity catastrophe — the resource could not have been stored without
 /// a registered descriptor — so it is surfaced as an internal error, never a
 /// user-facing "unsupported" outcome.
-fn canonical_kind_name_for_stored_schema(
+fn canonical_selector_for_stored_schema(
     schema: &TypeUri,
-    descriptors_by_schema: &HashMap<TypeUri, String>,
-) -> Result<String, InternalError> {
-    descriptors_by_schema.get(schema).cloned().ok_or_else(|| {
-        InternalError::new(format!(
-            "Stored resource has unregistered schema '{schema}'"
-        ))
-    })
+    canonical_selectors_by_schema: &HashMap<TypeUri, ResourceSelectorName>,
+) -> Result<ResourceSelectorName, InternalError> {
+    canonical_selectors_by_schema
+        .get(schema)
+        .cloned()
+        .ok_or_else(|| {
+            InternalError::new(format!(
+                "Stored resource has unregistered schema '{schema}'"
+            ))
+        })
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -92,11 +96,11 @@ where
 
 pub(crate) fn map_snapshots_to_identities(
     snapshots: Vec<ResourceSnapshot>,
-    descriptors_by_schema: &HashMap<TypeUri, String>,
+    canonical_selectors_by_schema: &HashMap<TypeUri, ResourceSelectorName>,
 ) -> Result<Vec<ResourceIdentityView>, InternalError> {
     snapshots
         .into_iter()
-        .map(|snapshot| resource_identity_from_snapshot(snapshot, descriptors_by_schema))
+        .map(|snapshot| resource_identity_from_snapshot(snapshot, canonical_selectors_by_schema))
         .collect()
 }
 

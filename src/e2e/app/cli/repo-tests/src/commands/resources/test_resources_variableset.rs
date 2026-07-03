@@ -12,7 +12,7 @@ use crate::resources::{ResourceCtx, fixtures};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Scenario: VariableSet basic lifecycle (QA scenario 2)
 //
-// apply → list (full kind + alias) shows it → get full view → get --spec
+// apply → list (full type + alias) shows it → get full view → get --spec
 // apply-compatible manifest → re-apply idempotent → apply updated manifest →
 // summary reflects count → delete → list empty → get --ignore-not-found empty
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -37,7 +37,7 @@ pub async fn test_resources_variableset_lifecycle(ctx: ResourceCtx) {
     )
     .await;
 
-    // ── 3. list variablesets — full kind name ─────────────────────────────────
+    // ── 3. list variablesets — full type name ─────────────────────────────────
     let list_out = ctx.stdout(["list", "variablesets"]).await;
     assert!(
         list_out.contains(resource_name),

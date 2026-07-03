@@ -15,8 +15,8 @@ use kamu_resources::{
     ResourceIDNotFoundError,
     ResourceName,
     ResourceNameNotFoundError,
+    ResourceSelectorName,
     TypeUri,
-    resource_kind_display_name,
 };
 
 use crate::{
@@ -51,7 +51,7 @@ pub(crate) struct BatchIdsResolutionResponse {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Split a flat list of requests into those already keyed by UID and those
-/// that still need a name→UID lookup, grouped by kind.
+/// that still need a name→UID lookup.
 pub(crate) fn group_batch_resource_refs(selector: ResourceBatchSelector) -> BatchResourceRefGroups {
     let mut uid_entries = Vec::new();
     let mut name_entries = Vec::new();
@@ -77,13 +77,14 @@ pub(crate) fn group_batch_resource_refs(selector: ResourceBatchSelector) -> Batc
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Resolve all `ByName` groups to UIDs using a single batched query per kind.
+/// Resolve all `ByName` groups to UIDs using a single batched query per schema.
 /// Returns a combined list of `(request_index, request, id)` entries plus any
 /// name-not-found problems.
 pub(crate) async fn resolve_batch_ids(
     query_service: &dyn GenericResourceQueryService,
     account_id: &odf::AccountID,
-    kind: &TypeUri,
+    schema: &TypeUri,
+    canonical_selector: &ResourceSelectorName,
     groups: BatchResourceRefGroups,
 ) -> Result<BatchIdsResolutionResponse, BatchResourceError> {
     let mut id_entries = groups.id_entries;
@@ -97,7 +98,7 @@ pub(crate) async fn resolve_batch_ids(
             .collect::<Vec<_>>();
 
         let id_by_name = query_service
-            .find_resource_identities_by_names(account_id, kind, &names)
+            .find_resource_identities_by_names(account_id, schema, &names)
             .await?
             .into_iter()
             .map(|row| {
@@ -114,7 +115,7 @@ pub(crate) async fn resolve_batch_ids(
                 None => problems.push(BatchResourceProblem {
                     request_index,
                     error: ResourceLookupProblem::NameNotFound(ResourceNameNotFoundError {
-                        kind: resource_kind_display_name(kind)?,
+                        canonical_selector: canonical_selector.clone(),
                         name,
                     }),
                 }),
@@ -134,7 +135,8 @@ pub(crate) async fn resolve_batch_ids(
 /// the caller's error type so it can be used in both batch and scalar paths.
 pub(crate) async fn resolve_resource_id<E>(
     query_service: &dyn GenericResourceQueryService,
-    kind: &TypeUri,
+    schema: &TypeUri,
+    canonical_selector: &ResourceSelectorName,
     account_id: &odf::AccountID,
     resource_ref: &ResourceRef,
 ) -> Result<ResourceID, E>
@@ -145,13 +147,13 @@ where
         ResourceRef::ById(id) => Ok(*id),
         ResourceRef::ByName(name) => {
             match query_service
-                .find_resource_id_by_name(account_id, kind, name)
+                .find_resource_id_by_name(account_id, schema, name)
                 .await?
             {
                 Some(id) => Ok(id),
                 None => Err(
                     ResourceLookupProblem::NameNotFound(ResourceNameNotFoundError {
-                        kind: resource_kind_display_name(kind)?,
+                        canonical_selector: canonical_selector.clone(),
                         name: name.clone(),
                     })
                     .into(),

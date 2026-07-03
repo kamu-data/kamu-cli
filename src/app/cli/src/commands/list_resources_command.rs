@@ -22,13 +22,13 @@ use datafusion::arrow::datatypes::{DataType, Field, Schema, TimeUnit};
 use datafusion::arrow::record_batch::RecordBatch;
 use internal_error::InternalError;
 use kamu_resources::{
-    ResourceKindDescriptor,
     ResourceListColumnDataType,
     ResourceListColumnDescriptor,
     ResourceListColumnValue,
     ResourceListColumnVisibility,
     ResourceSummaryView,
-    resource_kind_display_name,
+    ResourceTypeDescriptor,
+    resource_type_name,
 };
 use kamu_resources_facade::ResourceFacade;
 use odf::utils::data::format::RecordsWriter;
@@ -84,7 +84,7 @@ impl ListResourcesCommand {
         let mut columns = vec![ResourceGenericColumn::Name];
 
         if self.is_all_scope() {
-            columns.push(ResourceGenericColumn::Kind);
+            columns.push(ResourceGenericColumn::Type);
         }
 
         if self.detail_level > 0 {
@@ -112,7 +112,7 @@ impl ListResourcesCommand {
     fn selected_resource_columns(&self) -> Vec<ResourceListColumnDescriptor> {
         match &self.scope {
             ListResourcesScope::All => Vec::new(),
-            ListResourcesScope::ByKind(kind_descriptor) => kind_descriptor
+            ListResourcesScope::ByType(type_descriptor) => type_descriptor
                 .list_columns
                 .iter()
                 .filter(|column| {
@@ -136,7 +136,7 @@ impl ListResourcesCommand {
         for column in self.generic_resource_columns() {
             fields.push(match column {
                 ResourceGenericColumn::Name => Field::new("Name", DataType::Utf8, false),
-                ResourceGenericColumn::Kind => Field::new("Kind", DataType::Utf8, false),
+                ResourceGenericColumn::Type => Field::new("Type", DataType::Utf8, false),
                 ResourceGenericColumn::Id => Field::new("ID", DataType::Utf8, false),
                 ResourceGenericColumn::Phase => Field::new("Phase", DataType::Utf8, true),
                 ResourceGenericColumn::Readiness => {
@@ -185,7 +185,7 @@ impl ListResourcesCommand {
         for column in self.generic_resource_columns() {
             column_formats.push(match column {
                 ResourceGenericColumn::Name
-                | ResourceGenericColumn::Kind
+                | ResourceGenericColumn::Type
                 | ResourceGenericColumn::Id
                 | ResourceGenericColumn::Description => ColumnFormat::new().with_style_spec("l"),
                 ResourceGenericColumn::Phase | ResourceGenericColumn::Readiness => {
@@ -270,14 +270,14 @@ impl ListResourcesCommand {
         }
     }
 
-    async fn list_resources_by_kind(
+    async fn list_resources_by_selector(
         &self,
-        kind: &str,
+        selector_name: &kamu_resources::ResourceSelectorName,
     ) -> Result<Vec<ResourceSummaryView>, CLIError> {
         if let Some(max_results) = self.max_results {
             self.resource_facade
                 .list(kamu_resources_facade::ListResourcesRequest {
-                    kind: kind.to_string(),
+                    raw_type_selector: selector_name.into(),
                     account: None,
                     pagination: PaginationOpts::from_max_results(max_results.get()),
                 })
@@ -287,7 +287,7 @@ impl ListResourcesCommand {
             collect_all_pages(RESOURCE_PAGE_SIZE, |pagination| async move {
                 self.resource_facade
                     .list(kamu_resources_facade::ListResourcesRequest {
-                        kind: kind.to_string(),
+                        raw_type_selector: selector_name.into(),
                         account: None,
                         pagination,
                     })
@@ -323,8 +323,10 @@ impl ListResourcesCommand {
 
     async fn load_resources(&self) -> Result<Vec<ResourceSummaryView>, CLIError> {
         match &self.scope {
-            ListResourcesScope::ByKind(kind_descriptor) => {
-                let mut resources = self.list_resources_by_kind(&kind_descriptor.name).await?;
+            ListResourcesScope::ByType(type_descriptor) => {
+                let mut resources = self
+                    .list_resources_by_selector(&type_descriptor.canonical_selector)
+                    .await?;
                 resources.sort_by(|lhs, rhs| lhs.name.cmp(&rhs.name));
                 Ok(resources)
             }
@@ -368,10 +370,13 @@ impl ListResourcesCommand {
                         .map(|resource| resource.name.to_string())
                         .collect::<Vec<_>>(),
                 )),
-                ResourceGenericColumn::Kind => Arc::new(StringArray::from(
+                ResourceGenericColumn::Type => Arc::new(StringArray::from(
                     resources
                         .iter()
-                        .map(|resource| resource_kind_display_name(&resource.schema))
+                        .map(|resource| {
+                            resource_type_name(&resource.schema)
+                                .map(|type_name| type_name.to_string())
+                        })
                         .collect::<Result<Vec<_>, _>>()
                         .map_err(CLIError::critical)?,
                 )),
@@ -527,7 +532,7 @@ impl Command for ListResourcesCommand {
 
 #[derive(Debug, Clone)]
 pub enum ListResourcesScope {
-    ByKind(ResourceKindDescriptor),
+    ByType(ResourceTypeDescriptor),
     All,
 }
 
@@ -536,7 +541,7 @@ pub enum ListResourcesScope {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ResourceGenericColumn {
     Name,
-    Kind,
+    Type,
     Id,
     Phase,
     Readiness,

@@ -20,23 +20,23 @@ use crate::facade::graphql::cynic_api::schema;
 use crate::facade::graphql::cynic_api::variables::{
     ListAllVariables,
     ListAllVariablesFields,
-    ListByKindVariables,
-    ListByKindVariablesFields,
+    ListByResourceTypeVariables,
+    ListByResourceTypeVariablesFields,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
-#[cynic(graphql_type = "Query", variables = "ListByKindVariables")]
-pub(crate) struct ListByKindQuery {
-    pub resources: ListByKindResources,
+#[cynic(graphql_type = "Query", variables = "ListByResourceTypeVariables")]
+pub(crate) struct ListByResourceTypeQuery {
+    pub resources: ListByResourceTypeResources,
 }
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
-#[cynic(graphql_type = "Resources", variables = "ListByKindVariables")]
-pub(crate) struct ListByKindResources {
-    #[arguments(kind: $kind, account: $account, page: $page, perPage: $per_page)]
-    pub list_by_kind: ResourceListOutcome,
+#[cynic(graphql_type = "Resources", variables = "ListByResourceTypeVariables")]
+pub(crate) struct ListByResourceTypeResources {
+    #[arguments(resourceType: $resource_type, account: $account, page: $page, perPage: $per_page)]
+    pub list_by_resource_type: ResourceListOutcome,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -57,16 +57,16 @@ pub(crate) struct ListAllResources {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
-#[cynic(graphql_type = "Query", variables = "ListByKindVariables")]
-pub(crate) struct ListIdentitiesByKindQuery {
-    pub resources: ListIdentitiesByKindResources,
+#[cynic(graphql_type = "Query", variables = "ListByResourceTypeVariables")]
+pub(crate) struct ListIdentitiesByResourceTypeQuery {
+    pub resources: ListIdentitiesByResourceTypeResources,
 }
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
-#[cynic(graphql_type = "Resources", variables = "ListByKindVariables")]
-pub(crate) struct ListIdentitiesByKindResources {
-    #[arguments(kind: $kind, account: $account, page: $page, perPage: $per_page)]
-    pub list_identities_by_kind: ResourceIdentityListOutcome,
+#[cynic(graphql_type = "Resources", variables = "ListByResourceTypeVariables")]
+pub(crate) struct ListIdentitiesByResourceTypeResources {
+    #[arguments(resourceType: $resource_type, account: $account, page: $page, perPage: $per_page)]
+    pub list_identities_by_resource_type: ResourceIdentityListOutcome,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -129,10 +129,10 @@ pub(crate) enum ResourceIdentityListAllOutcome {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn build_list_by_kind_operation(
-    variables: ListByKindVariables,
-) -> cynic::Operation<ListByKindQuery, ListByKindVariables> {
-    ListByKindQuery::build(variables)
+pub(crate) fn build_list_by_resource_type_operation(
+    variables: ListByResourceTypeVariables,
+) -> cynic::Operation<ListByResourceTypeQuery, ListByResourceTypeVariables> {
+    ListByResourceTypeQuery::build(variables)
 }
 
 pub(crate) fn build_list_all_operation(
@@ -141,10 +141,10 @@ pub(crate) fn build_list_all_operation(
     ListAllQuery::build(variables)
 }
 
-pub(crate) fn build_list_identities_by_kind_operation(
-    variables: ListByKindVariables,
-) -> cynic::Operation<ListIdentitiesByKindQuery, ListByKindVariables> {
-    ListIdentitiesByKindQuery::build(variables)
+pub(crate) fn build_list_identities_by_resource_type_operation(
+    variables: ListByResourceTypeVariables,
+) -> cynic::Operation<ListIdentitiesByResourceTypeQuery, ListByResourceTypeVariables> {
+    ListIdentitiesByResourceTypeQuery::build(variables)
 }
 
 pub(crate) fn build_list_all_identities_operation(

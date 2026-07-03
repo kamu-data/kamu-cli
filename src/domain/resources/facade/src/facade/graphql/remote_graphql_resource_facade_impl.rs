@@ -25,7 +25,7 @@ use crate::{
     ListResourceIdentitiesRequest,
     ListResourcesError,
     ListResourcesRequest,
-    ListSupportedResourceKindsError,
+    ListSupportedResourceTypesError,
     RenderResourceManifestError,
     RenderResourceManifestResult,
     ResourceBatchSelector,
@@ -61,19 +61,19 @@ impl RemoteGraphqlResourceFacadeImpl {
 
 #[async_trait::async_trait]
 impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
-    async fn list_supported_kinds(
+    async fn list_supported_resource_types(
         &self,
-    ) -> Result<Vec<domain::ResourceKindDescriptor>, ListSupportedResourceKindsError> {
-        use cynic_api::operations::supported_kinds as Operation;
+    ) -> Result<Vec<domain::ResourceTypeDescriptor>, ListSupportedResourceTypesError> {
+        use cynic_api::operations::supported_resource_types as Operation;
 
-        let response: Operation::SupportedKindsQuery = self
+        let response: Operation::SupportedResourceTypesQuery = self
             .graphql_client
             .execute_operation(Operation::build_operation())
             .await?;
 
         Ok(response
             .resources
-            .supported_kinds
+            .supported_resource_types
             .into_iter()
             .map(Into::into)
             .collect())
@@ -223,19 +223,19 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
     ) -> Result<Vec<domain::ResourceSummaryView>, ListResourcesError> {
         use cynic_api::operations::list as Operation;
 
-        let variables = cynic_api::variables::ListByKindVariables::new(
-            &request.kind,
+        let variables = cynic_api::variables::ListByResourceTypeVariables::new(
+            &request.raw_type_selector,
             request.account.as_ref(),
             request.pagination,
         )
         .map_err(ListResourcesError::Internal)?;
 
-        let response: Operation::ListByKindQuery = self
+        let response: Operation::ListByResourceTypeQuery = self
             .graphql_client
-            .execute_operation(Operation::build_list_by_kind_operation(variables))
+            .execute_operation(Operation::build_list_by_resource_type_operation(variables))
             .await?;
 
-        outcome_mapper::map_list_outcome(response.resources.list_by_kind)
+        outcome_mapper::map_list_outcome(response.resources.list_by_resource_type)
     }
 
     async fn list_identities(
@@ -244,21 +244,23 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
     ) -> Result<Vec<domain::ResourceIdentityView>, ListResourcesError> {
         use cynic_api::operations::list as Operation;
 
-        let variables = cynic_api::variables::ListByKindVariables::new(
-            &request.kind,
+        let variables = cynic_api::variables::ListByResourceTypeVariables::new(
+            &request.raw_type_selector,
             request.account.as_ref(),
             request.pagination,
         )
         .map_err(ListResourcesError::Internal)?;
 
-        let response: Operation::ListIdentitiesByKindQuery = self
+        let response: Operation::ListIdentitiesByResourceTypeQuery = self
             .graphql_client
-            .execute_operation(Operation::build_list_identities_by_kind_operation(
+            .execute_operation(Operation::build_list_identities_by_resource_type_operation(
                 variables,
             ))
             .await?;
 
-        outcome_mapper::map_list_identities_outcome(response.resources.list_identities_by_kind)
+        outcome_mapper::map_list_identities_outcome(
+            response.resources.list_identities_by_resource_type,
+        )
     }
 
     async fn search_identities(

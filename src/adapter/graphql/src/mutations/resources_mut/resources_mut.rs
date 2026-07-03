@@ -76,15 +76,15 @@ impl ResourcesMut {
         let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
 
         let ResourceSelectorInput {
-            kind,
+            resource_type,
             resource_ref,
             account,
         } = selector;
-        let kind = kind.into_resource_type();
+        let resource_type = resource_type.selector.into();
 
         match resource_facade
             .delete(kamu_resources_facade::ResourceSelector {
-                kind,
+                resource_type,
                 account: account.map(ResourceAccountSelectorInput::into_manifest_account),
                 resource_ref: resource_ref.into(),
             })
@@ -118,26 +118,24 @@ impl ResourcesMut {
         let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
 
         let ResourceBatchSelectorInput {
-            kind,
+            resource_type,
             resource_refs,
             account,
         } = selector;
-        let kind = kind.into_resource_type();
+        let resource_type_selector = resource_type.into_resource_type_selector();
 
         match resource_facade
             .delete_many(kamu_resources_facade::ResourceBatchSelector {
                 account: account.map(ResourceAccountSelectorInput::into_manifest_account),
-                kind,
+                resource_type: resource_type_selector,
                 resource_refs: resource_refs.into_iter().map(Into::into).collect(),
             })
             .await
         {
             Ok(response) => Ok(ResourceDeleteManyOutcome::Success(response.into())),
-            Err(kamu_resources_facade::BatchResourceError::UnsupportedSelector(e)) => {
-                Ok(ResourceDeleteManyOutcome::UnsupportedSelector(
-                    map_unsupported_selector_problem(e)?,
-                ))
-            }
+            Err(kamu_resources_facade::BatchResourceError::UnsupportedSelector(e)) => Ok(
+                ResourceDeleteManyOutcome::UnsupportedSelector(map_unsupported_selector_problem(e)),
+            ),
             Err(kamu_resources_facade::BatchResourceError::BadAccount(e)) => Ok(
                 ResourceDeleteManyOutcome::BadAccount(map_bad_account_problem(e)?),
             ),
@@ -219,7 +217,7 @@ fn map_apply_resource_error(
             },
         )),
         E::UnsupportedDescriptor(e) => Ok(ResourceApplyOutcome::UnsupportedDescriptor(
-            map_unsupported_descriptor_problem(e)?,
+            map_unsupported_descriptor_problem(e),
         )),
         E::BadAccount(e) => map_bad_account_problem(e).map(ResourceApplyOutcome::BadAccount),
         E::InvalidHeaders(e) => Ok(ResourceApplyOutcome::InvalidHeader(e.into())),
@@ -241,7 +239,7 @@ fn map_batch_delete_resource_error(error: kamu_resources_facade::BatchResourceEr
     use kamu_resources_facade::BatchResourceError as E;
 
     match error {
-        E::UnsupportedSelector(_) => GqlError::gql("Unsupported resource kind"),
+        E::UnsupportedSelector(_) => GqlError::gql("Unsupported resource type selector"),
         E::BadAccount(error) => map_resolve_manifest_account_error(error),
         E::RemoteRequest(error) => error.int_err().into(),
         E::Internal(error) => error.into(),

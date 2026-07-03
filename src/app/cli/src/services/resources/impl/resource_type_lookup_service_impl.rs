@@ -11,25 +11,25 @@ use std::collections::HashMap;
 use std::fmt::Write as _;
 use std::sync::{Arc, Mutex};
 
-use kamu_resources::ResourceKindDescriptor;
+use kamu_resources::ResourceTypeDescriptor;
 
 use crate::CLIError;
 use crate::resources::{
     ResourceFacadeFactory,
-    ResourceKindLookupErrorOptions,
-    ResourceKindLookupService,
+    ResourceTypeLookupErrorOptions,
+    ResourceTypeLookupService,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct ResourceKindLookupServiceImpl {
+pub struct ResourceTypeLookupServiceImpl {
     resource_facade_factory: Arc<dyn ResourceFacadeFactory>,
-    cache: Mutex<HashMap<Option<String>, Vec<ResourceKindDescriptor>>>,
+    cache: Mutex<HashMap<Option<String>, Vec<ResourceTypeDescriptor>>>,
 }
 
 #[dill::component(pub)]
-#[dill::interface(dyn ResourceKindLookupService)]
-impl ResourceKindLookupServiceImpl {
+#[dill::interface(dyn ResourceTypeLookupService)]
+impl ResourceTypeLookupServiceImpl {
     pub fn new(resource_facade_factory: Arc<dyn ResourceFacadeFactory>) -> Self {
         Self {
             resource_facade_factory,
@@ -41,11 +41,11 @@ impl ResourceKindLookupServiceImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
-impl ResourceKindLookupService for ResourceKindLookupServiceImpl {
-    async fn list_supported_kinds(
+impl ResourceTypeLookupService for ResourceTypeLookupServiceImpl {
+    async fn list_supported_resource_types(
         &self,
         explicit_context_name: Option<&str>,
-    ) -> Result<Vec<ResourceKindDescriptor>, CLIError> {
+    ) -> Result<Vec<ResourceTypeDescriptor>, CLIError> {
         let cache_key = explicit_context_name.map(str::to_owned);
 
         {
@@ -59,26 +59,28 @@ impl ResourceKindLookupService for ResourceKindLookupServiceImpl {
             .resource_facade_factory
             .get_resource_facade(explicit_context_name)?;
 
-        let supported_kinds = resource_facade.list_supported_kinds().await?;
-        Self::assert_unique_selectors(&supported_kinds);
+        let supported_resource_types = resource_facade.list_supported_resource_types().await?;
+        Self::assert_unique_selectors(&supported_resource_types);
 
         self.cache
             .lock()
             .unwrap()
-            .insert(cache_key, supported_kinds.clone());
+            .insert(cache_key, supported_resource_types.clone());
 
-        Ok(supported_kinds)
+        Ok(supported_resource_types)
     }
 
-    async fn resolve_kind_descriptor(
+    async fn resolve_type_descriptor(
         &self,
         explicit_context_name: Option<&str>,
         target: &str,
-        error_options: ResourceKindLookupErrorOptions,
-    ) -> Result<ResourceKindDescriptor, CLIError> {
-        let supported_kinds = self.list_supported_kinds(explicit_context_name).await?;
+        error_options: ResourceTypeLookupErrorOptions,
+    ) -> Result<ResourceTypeDescriptor, CLIError> {
+        let supported_resource_types = self
+            .list_supported_resource_types(explicit_context_name)
+            .await?;
 
-        supported_kinds
+        supported_resource_types
             .iter()
             .find(|descriptor| descriptor.matches_selector(target))
             .cloned()
@@ -86,8 +88,11 @@ impl ResourceKindLookupService for ResourceKindLookupServiceImpl {
                 CLIError::usage_error(format!(
                     "{} '{target}'. Supported targets: {}",
                     error_options.unsupported_prefix,
-                    Self::supported_targets(&supported_kinds, &error_options.additional_targets)
-                        .join(", ")
+                    Self::supported_targets(
+                        &supported_resource_types,
+                        &error_options.additional_targets
+                    )
+                    .join(", ")
                 ))
             })
     }
@@ -95,25 +100,25 @@ impl ResourceKindLookupService for ResourceKindLookupServiceImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl ResourceKindLookupServiceImpl {
-    fn assert_unique_selectors(supported_kinds: &[ResourceKindDescriptor]) {
-        let mut selector_to_kinds: HashMap<String, Vec<&str>> = HashMap::new();
+impl ResourceTypeLookupServiceImpl {
+    fn assert_unique_selectors(supported_resource_types: &[ResourceTypeDescriptor]) {
+        let mut selector_to_resource_types: HashMap<String, Vec<&str>> = HashMap::new();
 
-        for descriptor in supported_kinds {
-            selector_to_kinds
-                .entry(descriptor.name.to_ascii_lowercase())
+        for descriptor in supported_resource_types {
+            selector_to_resource_types
+                .entry(descriptor.canonical_selector.as_str().to_ascii_lowercase())
                 .or_default()
-                .push(descriptor.name.as_str());
+                .push(descriptor.canonical_selector.as_str());
 
-            for short_name in &descriptor.short_names {
-                selector_to_kinds
-                    .entry(short_name.to_ascii_lowercase())
+            for alias in &descriptor.selector_aliases {
+                selector_to_resource_types
+                    .entry(alias.as_str().to_ascii_lowercase())
                     .or_default()
-                    .push(descriptor.name.as_str());
+                    .push(descriptor.canonical_selector.as_str());
             }
         }
 
-        let duplicates = selector_to_kinds
+        let duplicates = selector_to_resource_types
             .into_iter()
             .filter(|(_, kinds)| kinds.len() > 1)
             .collect::<Vec<_>>();
@@ -134,14 +139,14 @@ impl ResourceKindLookupServiceImpl {
     }
 
     fn supported_targets(
-        supported_kinds: &[ResourceKindDescriptor],
+        supported_resource_types: &[ResourceTypeDescriptor],
         additional_targets: &[String],
     ) -> Vec<String> {
         let mut targets = additional_targets.to_vec();
 
-        for descriptor in supported_kinds {
-            targets.push(descriptor.name.clone());
-            targets.extend(descriptor.short_names.iter().cloned());
+        for descriptor in supported_resource_types {
+            targets.push(descriptor.canonical_selector.to_string());
+            targets.extend(descriptor.selector_aliases.iter().map(ToString::to_string));
         }
 
         targets.sort();

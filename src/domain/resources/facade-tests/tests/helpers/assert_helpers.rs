@@ -139,12 +139,12 @@ pub fn assert_batch_indexes<T, E>(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Normalizes a slice of `ResourceSummaryView` by sorting by `(kind, name)`.
+/// Normalizes a slice of `ResourceSummaryView` by sorting by `(schema, name)`.
 pub fn normalize_summary_views(views: &mut [ResourceSummaryView]) {
     views.sort_by(|a, b| (&a.schema, &a.name).cmp(&(&b.schema, &b.name)));
 }
 
-/// Normalizes a slice of `ResourceIdentityView` by sorting by `(kind, name)`.
+/// Normalizes a slice of `ResourceIdentityView` by sorting by `(schema, name)`.
 pub fn normalize_identity_views(views: &mut [ResourceIdentityView]) {
     views.sort_by(|a, b| (&a.schema, &a.name).cmp(&(&b.schema, &b.name)));
 }

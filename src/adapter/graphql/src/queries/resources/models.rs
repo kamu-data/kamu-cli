@@ -37,13 +37,13 @@ type BatchGetResourceProblem =
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(InputObject, Debug, Clone)]
-pub struct ResourceKindInput {
-    pub kind: String,
+pub struct ResourceTypeSelectorInput {
+    pub selector: ResourceTypeSelectorRaw<'static>,
 }
 
-impl ResourceKindInput {
-    pub fn into_resource_type(self) -> String {
-        self.kind
+impl ResourceTypeSelectorInput {
+    pub fn into_resource_type_selector(self) -> kamu_resources::ResourceTypeSelectorRaw {
+        self.selector.into()
     }
 }
 
@@ -68,7 +68,7 @@ impl ResourceAccountSelectorInput {
 
 #[derive(InputObject, Debug, Clone)]
 pub struct ResourceSelectorInput {
-    pub kind: ResourceKindInput,
+    pub resource_type: ResourceTypeSelectorInput,
     #[graphql(name = "ref")]
     pub resource_ref: ResourceRefInput,
     pub account: Option<ResourceAccountSelectorInput>,
@@ -78,7 +78,7 @@ pub struct ResourceSelectorInput {
 
 #[derive(InputObject, Debug, Clone)]
 pub struct ResourceBatchSelectorInput {
-    pub kind: ResourceKindInput,
+    pub resource_type: ResourceTypeSelectorInput,
     #[graphql(name = "refs")]
     pub resource_refs: Vec<ResourceRefInput>,
     pub account: Option<ResourceAccountSelectorInput>,
@@ -90,7 +90,7 @@ impl From<ResourceSelectorInput> for kamu_resources_facade::ResourceSelector {
             account: value
                 .account
                 .map(ResourceAccountSelectorInput::into_manifest_account),
-            kind: value.kind.into_resource_type(),
+            resource_type: value.resource_type.into_resource_type_selector(),
             resource_ref: value.resource_ref.into(),
         }
     }
@@ -104,7 +104,7 @@ impl From<ResourceBatchSelectorInput> for kamu_resources_facade::ResourceBatchSe
             account: value
                 .account
                 .map(ResourceAccountSelectorInput::into_manifest_account),
-            kind: value.kind.into_resource_type(),
+            resource_type: value.resource_type.into_resource_type_selector(),
             resource_refs: value.resource_refs.into_iter().map(Into::into).collect(),
         }
     }
@@ -114,7 +114,7 @@ impl From<ResourceBatchSelectorInput> for kamu_resources_facade::ResourceBatchSe
 
 #[derive(InputObject, Debug, Clone)]
 pub struct SearchResourceIdentitiesInput {
-    pub kinds: Vec<ResourceKindInput>,
+    pub resource_types: Vec<ResourceTypeSelectorInput>,
     pub names: Option<Vec<ResourceName<'static>>>,
     pub name_pattern: Option<String>,
     pub account: Option<ResourceAccountSelectorInput>,
@@ -126,10 +126,10 @@ impl SearchResourceIdentitiesInput {
         pagination: PaginationOpts,
     ) -> kamu_resources_facade::SearchResourceIdentitiesRequest {
         kamu_resources_facade::SearchResourceIdentitiesRequest {
-            kinds: self
-                .kinds
+            raw_type_selectors: self
+                .resource_types
                 .into_iter()
-                .map(ResourceKindInput::into_resource_type)
+                .map(ResourceTypeSelectorInput::into_resource_type_selector)
                 .collect(),
             exact_names: self
                 .names
@@ -170,18 +170,18 @@ pub struct ResourceByNameSelectorInput {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject, Debug, Clone, PartialEq, Eq)]
-pub struct ResourceKindDescriptor {
-    pub name: String,
-    pub short_names: Vec<String>,
+pub struct ResourceTypeDescriptor {
+    pub canonical_selector: ResourceSelectorName<'static>,
+    pub selector_aliases: Vec<ResourceSelectorName<'static>>,
     pub schema: TypeUri<'static>,
     pub list_columns: Vec<ResourceListColumnDescriptor>,
 }
 
-impl From<kamu_resources::ResourceKindDescriptor> for ResourceKindDescriptor {
-    fn from(value: kamu_resources::ResourceKindDescriptor) -> Self {
+impl From<kamu_resources::ResourceTypeDescriptor> for ResourceTypeDescriptor {
+    fn from(value: kamu_resources::ResourceTypeDescriptor) -> Self {
         Self {
-            name: value.name,
-            short_names: value.short_names,
+            canonical_selector: value.canonical_selector.into(),
+            selector_aliases: value.selector_aliases.into_iter().map(Into::into).collect(),
             schema: value.schema.into(),
             list_columns: value.list_columns.into_iter().map(Into::into).collect(),
         }
@@ -190,7 +190,7 @@ impl From<kamu_resources::ResourceKindDescriptor> for ResourceKindDescriptor {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// A resource kind was addressed by its canonical schema URI, but no descriptor
+/// A resource type was addressed by its canonical schema URI, but no descriptor
 /// is registered for it. This is reachable *only* on the apply-manifest path,
 /// where the `$schema` URI comes straight from the user's manifest; selector
 /// lookups surface [`ResourceUnsupportedSelectorProblem`] instead, so this
@@ -201,46 +201,47 @@ pub struct ResourceUnsupportedDescriptorProblem {
     pub message: String,
 }
 
-/// A resource kind was addressed by a short selector (main name or alias, e.g.
+/// A resource type was addressed by a short selector (main name or alias, e.g.
 /// `vs`), but no descriptor matches it. The `selector` is the raw user-supplied
-/// string — never a schema URI (the public API only selects kinds by name).
+/// string — never a schema URI (the public API selects resource types by
+/// selector).
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceUnsupportedSelectorProblem {
-    pub selector: String,
+    pub selector: ResourceTypeSelectorRaw<'static>,
     pub message: String,
 }
 
 /// Maps an [`UnsupportedResourceDescriptorError`] (apply/URI path) to the
-/// apply-path problem. `Duplicate` means two dispatchers registered for one URI
-/// — a static wiring bug, not a user error — so it is promoted to an internal
-/// error rather than shown to the user.
+/// apply-path problem.
 pub(crate) fn map_unsupported_descriptor_problem(
     err: kamu_resources::UnsupportedResourceDescriptorError,
-) -> Result<ResourceUnsupportedDescriptorProblem, GqlError> {
+) -> ResourceUnsupportedDescriptorProblem {
     use kamu_resources::UnsupportedResourceDescriptorError as E;
 
     let message = err.to_string();
     match err {
-        E::NotFound { schema } => Ok(ResourceUnsupportedDescriptorProblem {
+        E::NotFound { schema } => ResourceUnsupportedDescriptorProblem {
             schema: schema.into(),
             message,
-        }),
-        err @ E::Duplicate { .. } => Err(err.int_err().into()),
+        },
     }
 }
 
 /// Maps an [`UnsupportedResourceSelectorError`] (selector path) to the
-/// selector-path problem. `Duplicate` means two descriptors claim one
-/// name/alias — a static wiring bug — so it is promoted to an internal error.
+/// selector-path problem.
 pub(crate) fn map_unsupported_selector_problem(
     err: kamu_resources::UnsupportedResourceSelectorError,
-) -> Result<ResourceUnsupportedSelectorProblem, GqlError> {
+) -> ResourceUnsupportedSelectorProblem {
     use kamu_resources::UnsupportedResourceSelectorError as E;
 
     let message = err.to_string();
     match err {
-        E::NotFound { selector } => Ok(ResourceUnsupportedSelectorProblem { selector, message }),
-        err @ E::Duplicate { .. } => Err(err.int_err().into()),
+        E::NotFound {
+            raw_selector: selector,
+        } => ResourceUnsupportedSelectorProblem {
+            selector: selector.into(),
+            message,
+        },
     }
 }
 
@@ -325,7 +326,7 @@ pub struct ResourceIDNotFoundProblem {
 
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceNameNotFoundProblem {
-    pub kind: String,
+    pub canonical_selector: ResourceSelectorName<'static>,
     pub name: ResourceName<'static>,
     pub message: String,
 }
@@ -356,7 +357,7 @@ impl From<kamu_resources_facade::ResourceLookupProblem> for ResourceLookupProble
                 message: e.to_string(),
             }),
             P::NameNotFound(e) => Self::NameNotFound(ResourceNameNotFoundProblem {
-                kind: e.kind.clone(),
+                canonical_selector: e.canonical_selector.clone().into(),
                 name: e.name.clone().into(),
                 message: e.to_string(),
             }),
@@ -400,7 +401,7 @@ impl TryFrom<kamu_resources::UnsupportedResourceSelectorError> for ResourceSelec
     fn try_from(e: kamu_resources::UnsupportedResourceSelectorError) -> Result<Self, GqlError> {
         Ok(Self::UnsupportedSelector(map_unsupported_selector_problem(
             e,
-        )?))
+        )))
     }
 }
 
@@ -573,7 +574,7 @@ pub struct BatchResourceManifestSuccess {
 pub struct ResourceIdentity {
     pub id: ResourceID<'static>,
     pub schema: TypeUri<'static>,
-    pub canonical_kind_name: String,
+    pub canonical_selector: ResourceSelectorName<'static>,
     pub name: ResourceName<'static>,
 }
 
@@ -582,7 +583,7 @@ impl From<kamu_resources::ResourceIdentityView> for ResourceIdentity {
         Self {
             id: value.id.into(),
             schema: value.schema.into(),
-            canonical_kind_name: value.canonical_kind_name,
+            canonical_selector: value.canonical_selector.into(),
             name: value.name.into(),
         }
     }
@@ -840,7 +841,7 @@ impl From<kamu_resources::ResourcesSummary> for ResourcesSummary {
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceTypeCountSummary {
     pub schema: TypeUri<'static>,
-    pub name: String,
+    pub canonical_selector: ResourceSelectorName<'static>,
     pub total_count: UInt64,
     pub phase_counts: ResourcePhaseCounts,
 }
@@ -849,7 +850,7 @@ impl From<kamu_resources::ResourceTypeCountSummary> for ResourceTypeCountSummary
     fn from(value: kamu_resources::ResourceTypeCountSummary) -> Self {
         Self {
             schema: value.schema.into(),
-            name: value.name,
+            canonical_selector: value.canonical_selector.into(),
             total_count: value.total_count.into(),
             phase_counts: value.phase_counts.into(),
         }

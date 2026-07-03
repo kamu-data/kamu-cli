@@ -30,7 +30,7 @@ use pretty_assertions::assert_eq;
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
 use crate::helpers::{
-    SECRET_SET_KIND,
+    SECRET_SET_CANONICAL_SELECTOR,
     SECRET_SET_SCHEMA_STR,
     assert_applied_outcome,
     assert_batch_indexes,
@@ -42,7 +42,7 @@ use crate::helpers::{
 fn secret_selector(name: &str) -> ResourceSelector {
     ResourceSelector {
         account: None,
-        kind: SECRET_SET_KIND.to_string(),
+        resource_type: SECRET_SET_CANONICAL_SELECTOR.parse().unwrap(),
         resource_ref: ResourceRef::ByName(name.parse().unwrap()),
     }
 }
@@ -141,7 +141,7 @@ pub async fn test_spec_view_mode_applies_to_batch_get(h: &impl FacadeContractHar
 
     let batch_selector = ResourceBatchSelector {
         account: None,
-        kind: SECRET_SET_KIND.to_string(),
+        resource_type: SECRET_SET_CANONICAL_SELECTOR.parse().unwrap(),
         resource_refs: vec![ResourceRef::ById(id_a), ResourceRef::ById(id_b)],
     };
 

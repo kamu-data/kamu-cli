@@ -19,6 +19,7 @@ use kamu_resources::{
     ResourcePresentation,
     ResourcePresentationDefinition,
     ResourceSchemaProvider,
+    ResourceSelectorName,
     TypeUri,
 };
 
@@ -38,8 +39,14 @@ impl VariableSetResource {
     /// the typed identity is [`Self::schema`] returning a `TypeUri`. Both
     /// derive from the same generated static, so they cannot drift.
     pub const SCHEMA_STR: &'static str = odf::metadata::config::VariableSet::schema_str();
-    pub const RESOURCE_NAME: &'static str = "variablesets";
-    pub const RESOURCE_SHORT_NAMES: &'static [&'static str] = &["vs"];
+
+    pub const CANONICAL_SELECTOR_NAME_STR: &'static str = "variablesets";
+    pub const CANONICAL_SELECTOR_NAME: ResourceSelectorName =
+        ResourceSelectorName::new_unchecked_static(Self::CANONICAL_SELECTOR_NAME_STR);
+
+    pub const SELECTOR_ALIAS_STRS: &'static [&'static str] = &["vs"];
+    pub const SELECTOR_ALIASES: &'static [ResourceSelectorName] =
+        &[ResourceSelectorName::new_unchecked_static("vs")];
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -62,8 +69,8 @@ impl DeclarativeResource for VariableSetResource {
 
 impl ResourcePresentation for VariableSetResource {
     const PRESENTATION: ResourcePresentationDefinition = ResourcePresentationDefinition::new(
-        Self::RESOURCE_NAME,
-        Self::RESOURCE_SHORT_NAMES,
+        Self::CANONICAL_SELECTOR_NAME,
+        Self::SELECTOR_ALIASES,
         &[ResourceListColumnDefinition {
             key: "variables",
             header: "Variables",
@@ -79,6 +86,30 @@ impl ResourcePresentation for VariableSetResource {
                 u64::try_from(state.status().stats.total_variables).unwrap(),
             ),
         }]
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    #[test]
+    fn selector_constants_stay_in_sync() {
+        assert_eq!(
+            VariableSetResource::CANONICAL_SELECTOR_NAME_STR,
+            VariableSetResource::CANONICAL_SELECTOR_NAME.as_str()
+        );
+        assert_eq!(
+            VariableSetResource::SELECTOR_ALIAS_STRS,
+            VariableSetResource::SELECTOR_ALIASES
+                .iter()
+                .map(ResourceSelectorName::as_str)
+                .collect::<Vec<_>>()
+        );
     }
 }
 

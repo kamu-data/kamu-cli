@@ -193,7 +193,7 @@ impl GetResourceCommand {
 
     fn print_name(&self, target: &ResourceTarget) -> Result<(), CLIError> {
         let mut stdout = std::io::stdout();
-        writeln!(stdout, "{}/{}", target.canonical_kind_name, target.name).int_err()?;
+        writeln!(stdout, "{}/{}", target.canonical_selector, target.name).int_err()?;
         Ok(())
     }
 
@@ -223,9 +223,13 @@ impl GetResourceCommand {
                     .render_manifests(
                         ResourceBatchSelector {
                             account: None,
-                            kind: chunk
+                            resource_type: chunk
                                 .first()
-                                .map(|(_, target)| target.kind.clone())
+                                .map(|(_, target)| {
+                                    kamu_resources::ResourceTypeSelectorRaw::from(
+                                        &target.canonical_selector,
+                                    )
+                                })
                                 .expect("non-empty chunk"),
                             resource_refs: chunk
                                 .iter()
@@ -263,10 +267,12 @@ impl GetResourceCommand {
                     .get_many(
                         ResourceBatchSelector {
                             account: None,
-                            kind: chunk
-                                .first()
-                                .map(|(_, target)| target.kind.clone())
-                                .unwrap_or_default(),
+                            resource_type: kamu_resources::ResourceTypeSelectorRaw::new_unchecked(
+                                chunk
+                                    .first()
+                                    .map(|(_, target)| target.canonical_selector.to_string())
+                                    .unwrap_or_default(),
+                            ),
                             resource_refs: chunk
                                 .iter()
                                 .map(|(_, target)| ResourceRef::ById(target.id))

@@ -14,7 +14,6 @@ use kamu_configuration::{SecretSetResource, SecretSetSpec, SecretSpec};
 use kamu_datasets::SecretsEncryptionConfig;
 use kamu_resources::{
     ResourceDispatcherMeta,
-    ResourcePresentation,
     ResourceSchemaProvider,
     ResourceSpecViewDispatcher,
     TypeUri,
@@ -26,8 +25,8 @@ use kamu_resources::{
 #[dill::interface(dyn ResourceSpecViewDispatcher)]
 #[dill::meta(ResourceDispatcherMeta {
     schema: SecretSetResource::SCHEMA_STR,
-    name: <SecretSetResource as ResourcePresentation>::PRESENTATION.resource_name,
-    short_names: <SecretSetResource as ResourcePresentation>::PRESENTATION.resource_short_names,
+    canonical_selector: SecretSetResource::CANONICAL_SELECTOR_NAME_STR,
+    selector_aliases: SecretSetResource::SELECTOR_ALIAS_STRS,
 })]
 pub struct SecretSetSpecViewDispatcher {
     secrets_encryption_config: Arc<SecretsEncryptionConfig>,

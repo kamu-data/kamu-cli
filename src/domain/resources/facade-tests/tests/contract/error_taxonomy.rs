@@ -42,8 +42,8 @@ use pretty_assertions::assert_matches;
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
 use crate::helpers::{
-    SECRET_SET_KIND,
-    VARIABLE_SET_KIND,
+    SECRET_SET_CANONICAL_SELECTOR,
+    VARIABLE_SET_CANONICAL_SELECTOR,
     VARIABLE_SET_SCHEMA_STR,
     assert_applied_outcome,
     variable_set_manifest_json,
@@ -54,7 +54,7 @@ use crate::helpers::{
 fn by_name(name: &str) -> ResourceSelector {
     ResourceSelector {
         account: None,
-        kind: VARIABLE_SET_KIND.to_string(),
+        resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
         resource_ref: ResourceRef::ByName(name.parse().unwrap()),
     }
 }
@@ -62,7 +62,7 @@ fn by_name(name: &str) -> ResourceSelector {
 fn by_id(id: &kamu_resources::ResourceID) -> ResourceSelector {
     ResourceSelector {
         account: None,
-        kind: VARIABLE_SET_KIND.to_string(),
+        resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
         resource_ref: ResourceRef::ById(*id),
     }
 }
@@ -70,7 +70,7 @@ fn by_id(id: &kamu_resources::ResourceID) -> ResourceSelector {
 fn batch_by_name(name: &str) -> ResourceBatchSelector {
     ResourceBatchSelector {
         account: None,
-        kind: VARIABLE_SET_KIND.to_string(),
+        resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
         resource_refs: vec![ResourceRef::ByName(name.parse().unwrap())],
     }
 }
@@ -78,7 +78,7 @@ fn batch_by_name(name: &str) -> ResourceBatchSelector {
 fn batch_by_id(id: kamu_resources::ResourceID) -> ResourceBatchSelector {
     ResourceBatchSelector {
         account: None,
-        kind: VARIABLE_SET_KIND.to_string(),
+        resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
         resource_refs: vec![ResourceRef::ById(id)],
     }
 }
@@ -206,7 +206,7 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
     // --- SchemaMismatch ---
     let wrong_schema_selector = ResourceSelector {
         account: None,
-        kind: SECRET_SET_KIND.to_string(),
+        resource_type: SECRET_SET_CANONICAL_SELECTOR.parse().unwrap(),
         resource_ref: ResourceRef::ById(id),
     };
 
@@ -353,7 +353,7 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
         .get(
             ResourceSelector {
                 account: Some(unknown_account.clone()),
-                kind: VARIABLE_SET_KIND.to_string(),
+                resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
                 resource_ref: ResourceRef::ByName("bad-acct-get".parse().unwrap()),
             },
             SpecViewMode::Encrypted,
@@ -370,7 +370,7 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
         .get_many(
             ResourceBatchSelector {
                 account: Some(unknown_account.clone()),
-                kind: VARIABLE_SET_KIND.to_string(),
+                resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
                 resource_refs: vec![ResourceRef::ByName("bad-acct-get-many".parse().unwrap())],
             },
             SpecViewMode::Encrypted,
@@ -387,7 +387,7 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
         .render_manifest(
             ResourceSelector {
                 account: Some(unknown_account.clone()),
-                kind: VARIABLE_SET_KIND.to_string(),
+                resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
                 resource_ref: ResourceRef::ByName("bad-acct-render".parse().unwrap()),
             },
             ResourceManifestFormat::Json,
@@ -404,7 +404,7 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
     let result = facade
         .delete(ResourceSelector {
             account: Some(unknown_account.clone()),
-            kind: VARIABLE_SET_KIND.to_string(),
+            resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             resource_ref: ResourceRef::ByName("bad-acct-delete".parse().unwrap()),
         })
         .await;
@@ -418,7 +418,7 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
     let result = facade
         .delete_many(ResourceBatchSelector {
             account: Some(unknown_account.clone()),
-            kind: VARIABLE_SET_KIND.to_string(),
+            resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             resource_refs: vec![ResourceRef::ByName("bad-acct-delete-many".parse().unwrap())],
         })
         .await;
@@ -432,7 +432,7 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
     let result = facade
         .list(ListResourcesRequest {
             account: Some(unknown_account.clone()),
-            kind: VARIABLE_SET_KIND.to_string(),
+            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             pagination: PaginationOpts::from_max_results(1),
         })
         .await;

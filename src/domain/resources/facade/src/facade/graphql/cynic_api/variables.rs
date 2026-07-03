@@ -10,28 +10,31 @@
 use database_common::PaginationOpts;
 use internal_error::InternalError;
 
-use crate::facade::graphql::cynic_api::inputs::{ResourceAccountSelectorInput, ResourceKindInput};
+use crate::facade::graphql::cynic_api::inputs::{
+    ResourceAccountSelectorInput,
+    ResourceTypeSelectorInput,
+};
 use crate::facade::graphql::cynic_api::schema;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::QueryVariables, Debug, Clone)]
-pub(crate) struct ListByKindVariables {
-    pub kind: ResourceKindInput,
+pub(crate) struct ListByResourceTypeVariables {
+    pub resource_type: ResourceTypeSelectorInput,
     pub account: Option<ResourceAccountSelectorInput>,
     pub page: i32,
     pub per_page: i32,
 }
 
-impl ListByKindVariables {
+impl ListByResourceTypeVariables {
     pub(crate) fn new(
-        kind: &str,
+        resource_type: &kamu_resources::ResourceTypeSelectorRaw,
         account: Option<&kamu_resources::ResourceAccountRef>,
         pagination: PaginationOpts,
     ) -> Result<Self, InternalError> {
         let (page, per_page) = pagination.as_page_params(Self::DEFAULT_PAGE_SIZE)?;
         Ok(Self {
-            kind: ResourceKindInput::from_kind(kind),
+            resource_type: ResourceTypeSelectorInput::from_resource_type(resource_type),
             account: account.map(TryInto::try_into).transpose()?,
             page,
             per_page,

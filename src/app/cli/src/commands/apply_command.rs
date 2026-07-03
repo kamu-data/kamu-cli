@@ -21,7 +21,7 @@ use kamu_resources::{
     ApplyResourceOutcome,
     ResourceView,
     ResourceWarning,
-    resource_kind_display_name,
+    resource_type_name,
 };
 use kamu_resources_facade::ResourceManifestFormat as FacadeResourceManifestFormat;
 use thiserror::Error;
@@ -723,8 +723,9 @@ impl ApplyPrinter<'_> {
             ApplyResourceOutcome::Untouched => console::style(label).yellow().bold(),
         };
 
-        let kind_name =
-            resource_kind_display_name(&result.resource.schema).map_err(CLIError::critical)?;
+        let kind_name = resource_type_name(&result.resource.schema)
+            .map(|type_name| type_name.to_string())
+            .map_err(CLIError::critical)?;
 
         Ok(format!(
             "{}: {} -> {}/{}",

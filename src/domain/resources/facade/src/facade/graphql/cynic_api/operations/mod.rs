@@ -16,4 +16,4 @@ pub(crate) mod list;
 pub(crate) mod render_manifest;
 pub(crate) mod search;
 pub(crate) mod summary;
-pub(crate) mod supported_kinds;
+pub(crate) mod supported_resource_types;

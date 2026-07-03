@@ -9,6 +9,7 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[rustfmt::skip]
 #[macro_export]
 macro_rules! declare_resource_crud_dispatcher {
     (
@@ -19,9 +20,8 @@ macro_rules! declare_resource_crud_dispatcher {
         #[dill::interface(dyn $crate::ResourceCrudDispatcher)]
         #[dill::meta(kamu_resources::ResourceDispatcherMeta {
             schema: <$resource>::SCHEMA_STR,
-            name: <$resource as kamu_resources::ResourcePresentation>::PRESENTATION.resource_name,
-            short_names:
-                <$resource as kamu_resources::ResourcePresentation>::PRESENTATION.resource_short_names,
+            canonical_selector: <$resource>::CANONICAL_SELECTOR_NAME_STR,
+            selector_aliases: <$resource>::SELECTOR_ALIAS_STRS,
         })]
         pub struct $dispatcher {
             apply_resource_use_case:
@@ -30,8 +30,8 @@ macro_rules! declare_resource_crud_dispatcher {
                 std::sync::Arc<dyn kamu_resources::GenericResourceQueryService>,
             get_resource_by_id_use_case:
                 std::sync::Arc<dyn kamu_resources::GetResourceByIdUseCase<$resource>>,
-            list_resources_by_kind_use_case:
-                std::sync::Arc<dyn kamu_resources::ListResourcesByKindUseCase<$resource>>,
+            list_resources_by_type_use_case:
+                std::sync::Arc<dyn kamu_resources::ListResourcesByTypeUseCase<$resource>>,
             delete_resources_use_case:
                 std::sync::Arc<dyn kamu_resources::DeleteResourcesUseCase<$resource>>,
         }
@@ -119,7 +119,7 @@ macro_rules! declare_resource_crud_dispatcher {
                 request: $crate::ResourceCrudDispatcherListRequest,
             ) -> Result<Vec<kamu_resources::ResourceSummaryView>, internal_error::InternalError> {
                 let states = self
-                    .list_resources_by_kind_use_case
+                    .list_resources_by_type_use_case
                     .execute(request.account_id, request.pagination)
                     .await?;
 

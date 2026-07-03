@@ -39,17 +39,23 @@ impl ContextApiResourcesCommand {
             .resource_facade_factory
             .get_resource_facade(self.explicit_context_name.as_deref())?;
 
-        let supported_kinds = resource_facade.list_supported_kinds().await?;
+        let supported_resource_types = resource_facade.list_supported_resource_types().await?;
 
-        let col_name: Vec<_> = supported_kinds
+        let col_name: Vec<_> = supported_resource_types
             .iter()
-            .map(|item| item.name.clone())
+            .map(|item| item.canonical_selector.to_string())
             .collect();
-        let col_short_names: Vec<_> = supported_kinds
+        let col_short_names: Vec<_> = supported_resource_types
             .iter()
-            .map(|item| item.short_names.join(","))
+            .map(|item| {
+                item.selector_aliases
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(",")
+            })
             .collect();
-        let col_schema: Vec<_> = supported_kinds
+        let col_schema: Vec<_> = supported_resource_types
             .iter()
             .map(|item| item.schema.to_string())
             .collect();
@@ -73,7 +79,7 @@ impl Command for ContextApiResourcesCommand {
             .resolve(self.explicit_context_name.as_deref())?;
         if self.output_config.format == OutputFormat::Table {
             self.resource_context_reporter.report_usage(
-                "Fetching supported resource kinds from context",
+                "Fetching supported resource types from context",
                 &resolved_context,
             );
         }

@@ -3937,7 +3937,7 @@ enum ResourceBadAccountProblemCode {
 }
 
 input ResourceBatchSelectorInput {
-	kind: ResourceKindInput!
+	resourceType: ResourceTypeSelectorInput!
 	refs: [ResourceRefInput!]!
 	account: ResourceAccountSelectorInput
 }
@@ -4027,7 +4027,7 @@ type ResourceIDNotFoundProblem {
 type ResourceIdentity {
 	id: ResourceID!
 	schema: TypeUri!
-	canonicalKindName: String!
+	canonicalSelector: ResourceSelectorName!
 	name: ResourceName!
 }
 
@@ -4075,17 +4075,6 @@ type ResourceInvalidSpecProblem {
 	message: String!
 }
 
-type ResourceKindDescriptor {
-	name: String!
-	shortNames: [String!]!
-	schema: TypeUri!
-	listColumns: [ResourceListColumnDescriptor!]!
-}
-
-input ResourceKindInput {
-	kind: String!
-}
-
 union ResourceListAllOutcome = ResourceConnection | ResourceBadAccountProblem
 
 enum ResourceListColumnDataType {
@@ -4125,7 +4114,7 @@ enum ResourceManifestFormat {
 scalar ResourceName
 
 type ResourceNameNotFoundProblem {
-	kind: String!
+	canonicalSelector: ResourceSelectorName!
 	name: ResourceName!
 	message: String!
 }
@@ -4166,10 +4155,12 @@ type ResourceSchemaMismatchProblem {
 }
 
 input ResourceSelectorInput {
-	kind: ResourceKindInput!
+	resourceType: ResourceTypeSelectorInput!
 	ref: ResourceRefInput!
 	account: ResourceAccountSelectorInput
 }
+
+scalar ResourceSelectorName
 
 union ResourceSelectorProblem = ResourceIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceSchemaMismatchProblem | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem
 
@@ -4197,13 +4188,26 @@ type ResourceSummary {
 
 type ResourceTypeCountSummary {
 	schema: TypeUri!
-	name: String!
+	canonicalSelector: ResourceSelectorName!
 	totalCount: Uint64!
 	phaseCounts: ResourcePhaseCounts!
 }
 
+type ResourceTypeDescriptor {
+	canonicalSelector: ResourceSelectorName!
+	selectorAliases: [ResourceSelectorName!]!
+	schema: TypeUri!
+	listColumns: [ResourceListColumnDescriptor!]!
+}
+
+input ResourceTypeSelectorInput {
+	selector: ResourceTypeSelectorRaw!
+}
+
+scalar ResourceTypeSelectorRaw
+
 """
-A resource kind was addressed by its canonical schema URI, but no descriptor
+A resource type was addressed by its canonical schema URI, but no descriptor
 is registered for it. This is reachable *only* on the apply-manifest path,
 where the `$schema` URI comes straight from the user's manifest; selector
 lookups surface [`ResourceUnsupportedSelectorProblem`] instead, so this
@@ -4215,20 +4219,21 @@ type ResourceUnsupportedDescriptorProblem {
 }
 
 """
-A resource kind was addressed by a short selector (main name or alias, e.g.
+A resource type was addressed by a short selector (main name or alias, e.g.
 `vs`), but no descriptor matches it. The `selector` is the raw user-supplied
-string — never a schema URI (the public API only selects kinds by name).
+string — never a schema URI (the public API selects resource types by
+selector).
 """
 type ResourceUnsupportedSelectorProblem {
-	selector: String!
+	selector: ResourceTypeSelectorRaw!
 	message: String!
 }
 
 type Resources {
 	"""
-	Returns resource kinds supported by the current server
+	Returns resource types supported by the current server
 	"""
-	supportedKinds: [ResourceKindDescriptor!]!
+	supportedResourceTypes: [ResourceTypeDescriptor!]!
 	"""
 	Returns a summary-oriented dashboard for the current or specified
 	subject
@@ -4251,23 +4256,23 @@ type Resources {
 	"""
 	resourceIdentities(selector: ResourceBatchSelectorInput!): BatchResourceIdentitiesOutcome!
 	"""
-	Returns resources of the specified kind
+	Returns resources of the specified resource type
 	"""
-	listByKind(kind: ResourceKindInput!, account: ResourceAccountSelectorInput, page: Int, perPage: Int): ResourceListOutcome!
+	listByResourceType(resourceType: ResourceTypeSelectorInput!, account: ResourceAccountSelectorInput, page: Int, perPage: Int): ResourceListOutcome!
 	"""
-	Returns resource identities of the specified kind
+	Returns resource identities of the specified resource type
 	"""
-	listIdentitiesByKind(kind: ResourceKindInput!, account: ResourceAccountSelectorInput, page: Int, perPage: Int): ResourceIdentityListOutcome!
+	listIdentitiesByResourceType(resourceType: ResourceTypeSelectorInput!, account: ResourceAccountSelectorInput, page: Int, perPage: Int): ResourceIdentityListOutcome!
 	"""
-	Searches resource identities across the specified exact kinds
+	Searches resource identities across the specified exact resource types
 	"""
 	searchIdentities(query: SearchResourceIdentitiesInput!, page: Int, perPage: Int): ResourceIdentityListOutcome!
 	"""
-	Returns resources across all kinds
+	Returns resources across all resource types
 	"""
 	listAll(account: ResourceAccountSelectorInput, page: Int, perPage: Int): ResourceListAllOutcome!
 	"""
-	Returns resource identities across all kinds
+	Returns resource identities across all resource types
 	"""
 	listAllIdentities(account: ResourceAccountSelectorInput, page: Int, perPage: Int): ResourceIdentityListAllOutcome!
 	"""
@@ -4367,7 +4372,7 @@ enum SearchEntityName {
 }
 
 input SearchResourceIdentitiesInput {
-	kinds: [ResourceKindInput!]!
+	resourceTypes: [ResourceTypeSelectorInput!]!
 	names: [ResourceName!]
 	namePattern: String
 	account: ResourceAccountSelectorInput

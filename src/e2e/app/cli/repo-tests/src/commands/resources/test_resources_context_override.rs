@@ -69,10 +69,10 @@ pub async fn test_resources_context_override_isolation(mut client: KamuApiServer
     let remote_api_resources = ctx
         .stdout(ctx.args_with_context(["context", "api-resources"], prod_context))
         .await;
-    for kind in ["variablesets", "secretsets"] {
+    for resource_type in ["variablesets", "secretsets"] {
         assert!(
-            remote_api_resources.contains(kind),
-            "`context api-resources --context prod` should list '{kind}', \
+            remote_api_resources.contains(resource_type),
+            "`context api-resources --context prod` should list `{resource_type}`, \
              got:\n{remote_api_resources}"
         );
     }

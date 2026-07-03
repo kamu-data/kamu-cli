@@ -219,7 +219,7 @@ pub enum GetOutputFormat {
 /// Show resource summary for the active context
 #[derive(Debug, clap::Args)]
 #[command(after_help = r#"
-Shows resource counts by kind and reconciliation phase for the active context.
+Shows resource counts by type and reconciliation phase for the active context.
 
 If the active context is `local`, commands target the current workspace. If the
 active context points to a remote server, commands target that remote GraphQL
@@ -342,11 +342,11 @@ Register a user-scoped remote context:
 
     kamu context add prod --url https://api.kamu.dev --user
 
-List supported resource kinds in the active context:
+List supported resource types in the active context:
 
     kamu ctx api-resources
 
-List supported resource kinds from a specific context:
+List supported resource types from a specific context:
 
     kamu ctx api-resources --context prod
 "#)]
@@ -372,10 +372,10 @@ pub enum ContextSubCommand {
     Use(ContextUse),
 }
 
-/// List supported resource kinds in the active context
+/// List supported resource types in the active context
 #[derive(Debug, clap::Args)]
 #[command(after_help = r#"
-Lists resource kinds supported by the active context.
+Lists resource types supported by the active context.
 
 If the active context is `local`, this targets the current workspace. If the
 active context points to a remote server, this targets that remote GraphQL API.
@@ -384,15 +384,15 @@ Use `--context` to override the current context for this invocation only.
 
 **Examples:**
 
-List supported resource kinds in the active context:
+List supported resource types in the active context:
 
     kamu ctx api-resources
 
-List supported resource kinds from a specific context:
+List supported resource types from a specific context:
 
     kamu ctx api-resources --context prod
 
-List supported resource kinds in JSON:
+List supported resource types in JSON:
 
     kamu ctx api-resources -o json
 "#)]
@@ -802,7 +802,7 @@ Delete datasets explicitly:
 
     kamu delete datasets my.dataset
 
-Delete a dataset using the dataset pseudo-kind selector:
+Delete a dataset using the dataset pseudo-type selector:
 
     kamu delete dataset/my.dataset
 
@@ -814,15 +814,15 @@ Delete a single resource:
 
     kamu delete storages warehouse
 
-Delete same-kind resources by name pattern:
+Delete same-type resources by name pattern:
 
     kamu delete vs app-%
 
-Delete all resources of a kind:
+Delete all resources of a type:
 
     kamu delete storages --all
 
-Delete all resources across kinds:
+Delete all resources across types:
 
     kamu delete all
 
@@ -830,15 +830,15 @@ Delete resources using slash selectors:
 
     kamu delete vs/my-vars ss/my-secrets
 
-Delete the same exact name across a matched kind pattern:
+Delete the same exact name across a matched type pattern:
 
     kamu delete s% db-creds
 
-Delete matched resources across a kind pattern and name pattern:
+Delete matched resources across a type pattern and name pattern:
 
     kamu delete s%/db-%
 
-Delete all resources of a kind using a slash selector:
+Delete all resources of a type using a slash selector:
 
     kamu delete storages/all
 
@@ -928,7 +928,7 @@ pub struct Export {
 #[command(after_help = r#"
 Returns the current state of one or more resources as YAML or JSON.
 
-Only real resource kinds supported by the active context are accepted.
+Only real resource types supported by the active context are accepted.
 Datasets are intentionally not supported by this command.
 
 By default this command returns the full resource view, including status.
@@ -950,11 +950,11 @@ Get the apply-compatible spec manifest:
 
     kamu get vs my-vars --spec
 
-Get multiple resources of the same kind:
+Get multiple resources of the same type:
 
     kamu get variablesets vars-a vars-b
 
-Get same-kind resources by name pattern:
+Get same-type resources by name pattern:
 
     kamu get vs app-%
 
@@ -962,11 +962,11 @@ Get multiple resources by slash-separated ref form:
 
     kamu get vs/vars-a ss/db-creds
 
-Get the same exact name across a matched kind pattern:
+Get the same exact name across a matched type pattern:
 
     kamu get s% db-creds
 
-Get matched resources across a kind pattern and name pattern:
+Get matched resources across a type pattern and name pattern:
 
     kamu get s%/db-%
 
@@ -983,7 +983,7 @@ Ignore missing resources:
     kamu get secretsets missing-a missing-b --ignore-not-found
 "#)]
 pub struct Get {
-    /// Resource selector(s): `kind name...` or `kind/name...`
+    /// Resource selector(s): `type name...` or `type/name...`
     #[arg(num_args = 1..)]
     pub args: Vec<String>,
 
@@ -1223,7 +1223,7 @@ To list datasets explicitly:
 
     kamu list datasets
 
-To list all resources across all kinds:
+To list all resources across all types:
 
     kamu list all
 
