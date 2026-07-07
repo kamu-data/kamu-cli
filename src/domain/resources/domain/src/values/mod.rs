@@ -9,6 +9,7 @@
 
 mod resource_account_ref;
 mod resource_condition;
+mod resource_conditions;
 mod resource_headers;
 mod resource_headers_input;
 mod resource_id;
@@ -21,6 +22,7 @@ mod resource_warning;
 
 pub use resource_account_ref::*;
 pub use resource_condition::*;
+pub use resource_conditions::*;
 pub use resource_headers::*;
 pub use resource_headers_input::*;
 pub use resource_id::*;

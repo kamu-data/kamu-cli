@@ -21,7 +21,6 @@ use kamu_resources::{
     GenericResourceQueryService,
     ReconcilableEventSourcedResource,
     ResourceConditionStatus,
-    ResourceConditionType,
     ResourcePresentation,
     ResourceSchemaProvider,
     ResourceSnapshot,
@@ -195,10 +194,8 @@ pub(crate) fn resource_snapshot_to_view(snapshot: ResourceSnapshot) -> ResourceV
 fn resource_status_summary_view(status: &impl ResourceStatusLike) -> ResourceStatusSummaryView {
     let resource_status = status.resource_status();
     let ready = resource_status
-        .conditions
-        .iter()
-        .find(|condition| condition.type_ == ResourceConditionType::Ready)
-        .map(|condition| match condition.status {
+        .ready_condition_status()
+        .map(|status| match status {
             ResourceConditionStatus::True => true,
             ResourceConditionStatus::False | ResourceConditionStatus::Unknown => false,
         });

@@ -14,8 +14,10 @@ use kamu_resources::{
     ApplyResourceParams,
     ApplyResourcePlanningDecision,
     ResourceConditionStatus,
-    ResourceConditionType,
     ResourcePhase,
+    accepted_condition_type_ref,
+    ready_condition_type_ref,
+    reconciling_condition_type_ref,
 };
 use kamu_resources_services::testing::{
     BaseResourceServiceHarness,
@@ -71,21 +73,21 @@ async fn test_apply_end_to_end_create_and_retrieve() {
     );
     BaseResourceServiceHarness::assert_condition(
         &status,
-        ResourceConditionType::Ready,
+        &ready_condition_type_ref(),
         ResourceConditionStatus::True,
         Some("Reconciled"),
         None,
     );
     BaseResourceServiceHarness::assert_condition(
         &status,
-        ResourceConditionType::Accepted,
+        &accepted_condition_type_ref(),
         ResourceConditionStatus::True,
         None,
         None,
     );
     BaseResourceServiceHarness::assert_condition(
         &status,
-        ResourceConditionType::Reconciling,
+        &reconciling_condition_type_ref(),
         ResourceConditionStatus::False,
         Some("Idle"),
         None,
@@ -284,7 +286,7 @@ async fn test_apply_update_resets_status_to_pending() {
     assert_eq!(status.phase, ResourcePhase::Ready);
     BaseResourceServiceHarness::assert_condition(
         &status,
-        ResourceConditionType::Ready,
+        &ready_condition_type_ref(),
         ResourceConditionStatus::True,
         Some("Reconciled"),
         None,

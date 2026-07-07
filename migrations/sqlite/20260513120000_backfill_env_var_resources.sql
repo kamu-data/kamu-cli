@@ -50,6 +50,27 @@ SELECT
     )                                                                           AS spec,
     json_object(
         'phase', 'Ready',
+        'observedGeneration', 1,
+        'conditions', json_object(
+            'https://kamu.dev/schemas/resource/v1alpha1/conditions/Accepted',
+            json_object(
+                'status', 'True',
+                'reason', 'ValidationPassed',
+                'lastTransitionTime', MIN(dev.created_at)
+            ),
+            'https://kamu.dev/schemas/resource/v1alpha1/conditions/Ready',
+            json_object(
+                'status', 'True',
+                'reason', 'Reconciled',
+                'lastTransitionTime', MIN(dev.created_at)
+            ),
+            'https://kamu.dev/schemas/resource/v1alpha1/conditions/Reconciling',
+            json_object(
+                'status', 'False',
+                'reason', 'Idle',
+                'lastTransitionTime', MIN(dev.created_at)
+            )
+        ),
         'stats', json_object(
             'totalVariables', COUNT(*),
             'validVariables', COUNT(*),
@@ -163,6 +184,27 @@ SELECT
     )                                                                           AS spec,
     json_object(
         'phase', 'Ready',
+        'observedGeneration', 1,
+        'conditions', json_object(
+            'https://kamu.dev/schemas/resource/v1alpha1/conditions/Accepted',
+            json_object(
+                'status', 'True',
+                'reason', 'ValidationPassed',
+                'lastTransitionTime', MIN(dev.created_at)
+            ),
+            'https://kamu.dev/schemas/resource/v1alpha1/conditions/Ready',
+            json_object(
+                'status', 'True',
+                'reason', 'Reconciled',
+                'lastTransitionTime', MIN(dev.created_at)
+            ),
+            'https://kamu.dev/schemas/resource/v1alpha1/conditions/Reconciling',
+            json_object(
+                'status', 'False',
+                'reason', 'Idle',
+                'lastTransitionTime', MIN(dev.created_at)
+            )
+        ),
         'stats', json_object(
             'totalSecrets', COUNT(*),
             'validSecrets', COUNT(*),

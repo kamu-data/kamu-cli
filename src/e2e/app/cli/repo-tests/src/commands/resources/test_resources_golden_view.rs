@@ -28,7 +28,7 @@ use crate::resources::{ResourceCtx, fixtures};
 //   - headers.id / account / generation / createdAt / updatedAt — per-run /
 //     per-context
 //   - lastReconciledAt — reconciler timestamp
-//   - status.conditions[*].lastTransitionTime — reconciler timestamps
+//   - status.conditions.*.lastTransitionTime — reconciler timestamps
 // Everything else is asserted verbatim against an expected document built from
 // the fixture constants.
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -98,11 +98,7 @@ fn expected_variable_set(name: &str, message_value: &str) -> serde_json::Value {
         },
         "spec": { "variables": { "MESSAGE": message_value } },
         "status": {
-            "conditions": [
-                { "reason": "Idle", "status": "False", "type": "Reconciling", "message": null },
-                { "reason": "ValidationPassed", "status": "True", "type": "Accepted", "message": null },
-                { "reason": "Reconciled", "status": "True", "type": "Ready", "message": null }
-            ],
+            "conditions": successful_conditions(),
             "observedGeneration": 1,
             "phase": "Ready",
             "stats": { "invalidVariables": 0, "totalVariables": 1, "validVariables": 1 }
@@ -127,11 +123,7 @@ fn expected_variable_set_with_labels(name: &str, message_value: &str) -> serde_j
         },
         "spec": { "variables": { "MESSAGE": message_value } },
         "status": {
-            "conditions": [
-                { "reason": "Idle", "status": "False", "type": "Reconciling", "message": null },
-                { "reason": "ValidationPassed", "status": "True", "type": "Accepted", "message": null },
-                { "reason": "Reconciled", "status": "True", "type": "Ready", "message": null }
-            ],
+            "conditions": successful_conditions(),
             "observedGeneration": 1,
             "phase": "Ready",
             "stats": { "invalidVariables": 0, "totalVariables": 1, "validVariables": 1 }
@@ -153,11 +145,7 @@ fn expected_secret_set_without_secrets(name: &str) -> serde_json::Value {
         // the non-deterministic encrypted values, leaving `spec` empty here.
         "spec": {},
         "status": {
-            "conditions": [
-                { "reason": "Idle", "status": "False", "type": "Reconciling", "message": null },
-                { "reason": "ValidationPassed", "status": "True", "type": "Accepted", "message": null },
-                { "reason": "Reconciled", "status": "True", "type": "Ready", "message": null }
-            ],
+            "conditions": successful_conditions(),
             "observedGeneration": 1,
             "phase": "Ready",
             "stats": { "totalSecrets": 2, "validSecrets": 2, "invalidSecrets": 0 }
@@ -167,6 +155,25 @@ fn expected_secret_set_without_secrets(name: &str) -> serde_json::Value {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Helpers (local to the golden test — the only place that touches whole docs)
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn successful_conditions() -> serde_json::Value {
+    serde_json::json!({
+        "https://kamu.dev/schemas/resource/v1alpha1/conditions/Accepted": {
+            "reason": "ValidationPassed",
+            "status": "True"
+        },
+        "https://kamu.dev/schemas/resource/v1alpha1/conditions/Ready": {
+            "reason": "Reconciled",
+            "status": "True"
+        },
+        "https://kamu.dev/schemas/resource/v1alpha1/conditions/Reconciling": {
+            "reason": "Idle",
+            "status": "False"
+        }
+    })
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Remove fields that vary per run or per context so the remaining document is
@@ -182,9 +189,9 @@ fn strip_volatile(mut doc: serde_json::Value) -> serde_json::Value {
         if let Some(conditions) = obj
             .get_mut("status")
             .and_then(|s| s.get_mut("conditions"))
-            .and_then(|c| c.as_array_mut())
+            .and_then(|c| c.as_object_mut())
         {
-            for condition in conditions {
+            for condition in conditions.values_mut() {
                 if let Some(c) = condition.as_object_mut() {
                     c.remove("lastTransitionTime");
                 }

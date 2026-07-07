@@ -126,10 +126,10 @@ long-term goal. This page documents what exists now.
 | **Descriptor** | The schema (`TypeUri`) plus selector name/aliases identifying a resource type for dispatcher routing and presentation; the domain type is `ResourceTypeDescriptor`, carried in the `dill` registry as `ResourceDispatcherMeta`. |
 | **Manifest** | The user-authored wire document (`$schema`/`headers`/`spec`) in YAML or JSON. |
 | **Spec** | The desired-state portion authored by the user; stored as `serde_json::Value`. |
-| **Status** | Server-owned observed state (`phase`, `observedGeneration`, `conditions`). Note `generation` lives in **headers**, not status. |
+| **Status** | Server-owned observed state (`phase`, `observedGeneration`, `conditions`). `conditions` is a schema-keyed `TypeRef → JSON` map. Note `generation` lives in **headers**, not status. |
 | **Snapshot** | The persisted materialized form of a resource (`ResourceSnapshot`). |
 | **Phase** | Lifecycle stage: `Pending`, `Reconciling`, `Ready`, `Failed` — matches ODF RFC-018's `ResourcePhase` exactly (see [§13 state machine](#lifecycle-state-machine)). |
-| **Condition** | A K8s-style condition entry contributing to the overall phase. |
+| **Condition** | A built-in or controller-added status signal keyed by a condition schema URI. Kamu's built-ins are `Accepted`, `Ready`, and `Reconciling`; each value carries `status`, `reason`, optional `message`, and `lastTransitionTime`. |
 | **generation / observedGeneration** | `generation` bumps on each spec/headers change; `observedGeneration` records the last generation reconciliation observed. Drift ⇒ reconcile. |
 | **Reconciliation** | The act of driving actual state toward the spec (e.g. `SecretSet` materializes its encrypted read-side projection). |
 | **Selector** | Identifies one (`ResourceSelector`) or many (`ResourceBatchSelector`) resource *instances*, by name or UID, optionally scoped to an account. Distinct from **Resource type selector** above, which identifies a *type*, not an instance. |
@@ -408,7 +408,7 @@ pub struct ResourceHeaders {
 pub struct ResourceStatus {                  // entirely server-owned
     pub phase: ResourcePhase,                // Pending|Reconciling|Ready|Failed
     pub observed_generation: u64,
-    pub conditions: Vec<ResourceCondition>,
+    pub conditions: ResourceConditions,      // defaulted BTreeMap<TypeRef, serde_json::Value>
 }
 ```
 
@@ -421,6 +421,17 @@ pub struct ResourceStatus {                  // entirely server-owned
 > is a deliberate per-field compromise, not a bug; `Display`/`FromStr` are provided directly on the
 > ODF dto (`src/odf/metadata/src/serde/yaml/derivations_extra.rs`) so CLI/string round-tripping needs
 > no per-crate workaround.
+
+> **`ResourceConditions`** follows the RFC-018 map shape:
+> `pub type ResourceConditions = odf::metadata::resource::ResourceConditions`, i.e.
+> `{ entries: BTreeMap<TypeRef, serde_json::Value> }`. Built-in conditions are Kamu extensions keyed
+> by stable schema URIs under
+> `https://kamu.dev/schemas/resource/v1alpha1/conditions/{Accepted,Ready,Reconciling}`; the value
+> carries `status`, `reason`, optional `message`, and `lastTransitionTime`. The domain status field
+> uses the ODF YAML shadow proxy for serde and has an empty-map default, so legacy cached status blobs
+> that omit `conditions` can still be decoded. Informational schema documents for those built-ins live
+> under `src/domain/resources/schemas/resource/v1alpha1/conditions/`. They are not validated or
+> registered yet.
 
 > **`ResourceLabels`/`ResourceAnnotations`** follow the same `#[serde_as]` pattern as `ResourcePhase`
 > above — `pub type ResourceLabels = odf::metadata::resource::ResourceLabels;` (and the annotations
@@ -458,6 +469,8 @@ pub struct ResourceStatus {                  // entirely server-owned
 > (`MAX_LABELS`/`MAX_ANNOTATIONS`) are still enforced.
 
 Also generated: `id` (allocated if the manifest omitted it) and `last_reconciled_at`.
+`last_reconciled_at` is derived from the built-in Ready condition's `lastTransitionTime`, not stored
+inside the status object as its own field.
 
 **(3) Persisted form — the snapshot.** `ResourceSnapshot`
 ([`core/resource_snapshot.rs`](/src/domain/resources/domain/src/core/resource_snapshot.rs))
@@ -1200,6 +1213,7 @@ Otherwise the behavior is already guaranteed for both implementations by the con
 | Layer | Crate | Directory | Key files |
 | --- | --- | --- | --- |
 | Domain model | `kamu-resources` | `src/domain/resources/domain/src` | `core/`, `state/`, `values/`, `manifests/`, `repo/`, `dispatchers/`, `messages/`, `use_cases/`, `views/` |
+| Domain schemas | `kamu-resources` | `src/domain/resources/schemas` | Informational JSON schemas for framework-owned resource extensions, currently built-in status conditions. |
 | Services | `kamu-resources-services` | `src/domain/resources/services/src` | `use_cases/{apply,reconcile,delete}.rs`, `crud_dispatchers/resource_crud_dispatcher_registry.rs`, `message_handlers/`, `event_stores/`, `dependencies.rs` |
 | Facade | `kamu-resources-facade` | `src/domain/resources/facade/src/facade` | `resource_facade.rs`, `local/`, `graphql/` |
 | GraphQL | (adapter) | `src/adapter/graphql/src` | `queries/resources/`, `mutations/resources_mut/` |

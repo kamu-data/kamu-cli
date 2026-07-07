@@ -52,6 +52,27 @@ SELECT
     )                                                                           AS spec,
     jsonb_build_object(
         'phase', 'Ready',
+        'observedGeneration', 1,
+        'conditions', jsonb_build_object(
+            'https://kamu.dev/schemas/resource/v1alpha1/conditions/Accepted',
+            jsonb_build_object(
+                'status', 'True',
+                'reason', 'ValidationPassed',
+                'lastTransitionTime', MIN(dev.created_at)
+            ),
+            'https://kamu.dev/schemas/resource/v1alpha1/conditions/Ready',
+            jsonb_build_object(
+                'status', 'True',
+                'reason', 'Reconciled',
+                'lastTransitionTime', MIN(dev.created_at)
+            ),
+            'https://kamu.dev/schemas/resource/v1alpha1/conditions/Reconciling',
+            jsonb_build_object(
+                'status', 'False',
+                'reason', 'Idle',
+                'lastTransitionTime', MIN(dev.created_at)
+            )
+        ),
         'stats', jsonb_build_object(
             'totalVariables', COUNT(*),
             'validVariables', COUNT(*),
@@ -160,6 +181,27 @@ SELECT
     )                                                                           AS spec,
     jsonb_build_object(
         'phase', 'Ready',
+        'observedGeneration', 1,
+        'conditions', jsonb_build_object(
+            'https://kamu.dev/schemas/resource/v1alpha1/conditions/Accepted',
+            jsonb_build_object(
+                'status', 'True',
+                'reason', 'ValidationPassed',
+                'lastTransitionTime', MIN(dev.created_at)
+            ),
+            'https://kamu.dev/schemas/resource/v1alpha1/conditions/Ready',
+            jsonb_build_object(
+                'status', 'True',
+                'reason', 'Reconciled',
+                'lastTransitionTime', MIN(dev.created_at)
+            ),
+            'https://kamu.dev/schemas/resource/v1alpha1/conditions/Reconciling',
+            jsonb_build_object(
+                'status', 'False',
+                'reason', 'Idle',
+                'lastTransitionTime', MIN(dev.created_at)
+            )
+        ),
         'stats', jsonb_build_object(
             'totalSecrets', COUNT(*),
             'validSecrets', COUNT(*),

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://www.opendatafabric.org/schemas/metaschemas/v1alpha1/ResourceCondition",
+  "$id": "https://kamu.dev/schemas/resource/v1alpha1/conditions/Reconciling",
+  "title": "Reconciling Resource Condition",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "status",
+    "reason",
+    "lastTransitionTime"
+  ],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": [
+        "True",
+        "False",
+        "Unknown"
+      ]
+    },
+    "reason": {
+      "type": "string"
+    },
+    "message": {
+      "type": "string"
+    },
+    "lastTransitionTime": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

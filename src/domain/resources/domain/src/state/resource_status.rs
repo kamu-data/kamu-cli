@@ -10,7 +10,14 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::{ResourceCondition, ResourcePhase};
+use crate::{
+    ResourceConditionStatus,
+    ResourceConditionValue,
+    ResourceConditions,
+    ResourcePhase,
+    empty_resource_conditions,
+    ready_condition_type_ref,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -21,7 +28,9 @@ pub struct ResourceStatus {
     #[serde_as(as = "odf::metadata::serde::yaml::resource::ResourcePhase")]
     pub phase: ResourcePhase,
     pub observed_generation: u64,
-    pub conditions: Vec<ResourceCondition>,
+    #[serde_as(as = "odf::metadata::serde::yaml::resource::ResourceConditions")]
+    #[serde(default = "empty_resource_conditions")]
+    pub conditions: ResourceConditions,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -40,10 +49,9 @@ impl ResourceStatus {
         let mut status_json = serde_json::Map::with_capacity(3);
         status_json.insert("phase".to_string(), status_map.get("phase")?.clone());
         status_json.insert("observedGeneration".to_string(), observed_generation);
-        status_json.insert(
-            "conditions".to_string(),
-            status_map.get("conditions")?.clone(),
-        );
+        if let Some(conditions) = status_map.get("conditions") {
+            status_json.insert("conditions".to_string(), conditions.clone());
+        }
 
         serde_json::from_value(serde_json::Value::Object(status_json)).ok()
     }
@@ -52,7 +60,7 @@ impl ResourceStatus {
         Self {
             phase: ResourcePhase::Pending,
             observed_generation: 0,
-            conditions: Vec::new(),
+            conditions: empty_resource_conditions(),
         }
     }
 
@@ -61,20 +69,19 @@ impl ResourceStatus {
     }
 
     pub fn last_reconciled_at(&self) -> Option<DateTime<Utc>> {
-        self.conditions.iter().find_map(|condition| {
-            if condition.type_ == crate::ResourceConditionType::Ready {
-                Some(condition.last_transition_time)
-            } else {
-                None
-            }
-        })
+        self.ready_condition()
+            .map(|condition| condition.last_transition_time)
+    }
+
+    pub fn ready_condition_status(&self) -> Option<ResourceConditionStatus> {
+        self.ready_condition().map(|condition| condition.status)
     }
 
     pub fn mark_reconciling(&mut self, now: DateTime<Utc>) {
         self.phase = ResourcePhase::Reconciling;
-        ResourceCondition::set_condition(
-            &mut self.conditions,
-            ResourceCondition::reconciling_true(now),
+        ResourceConditionValue::set_condition(
+            &mut self.conditions.entries,
+            ResourceConditionValue::reconciling_true(now),
         );
     }
 
@@ -82,14 +89,17 @@ impl ResourceStatus {
         self.phase = ResourcePhase::Ready;
         self.observed_generation = observed_generation;
 
-        ResourceCondition::set_condition(
-            &mut self.conditions,
-            ResourceCondition::accepted_true(now),
+        ResourceConditionValue::set_condition(
+            &mut self.conditions.entries,
+            ResourceConditionValue::accepted_true(now),
         );
-        ResourceCondition::set_condition(&mut self.conditions, ResourceCondition::ready_true(now));
-        ResourceCondition::set_condition(
-            &mut self.conditions,
-            ResourceCondition::reconciling_false(now),
+        ResourceConditionValue::set_condition(
+            &mut self.conditions.entries,
+            ResourceConditionValue::ready_true(now),
+        );
+        ResourceConditionValue::set_condition(
+            &mut self.conditions.entries,
+            ResourceConditionValue::reconciling_false(now),
         );
     }
 
@@ -103,23 +113,30 @@ impl ResourceStatus {
         self.phase = ResourcePhase::Failed;
         self.observed_generation = observed_generation;
 
-        ResourceCondition::set_condition(
-            &mut self.conditions,
-            ResourceCondition::accepted_true(now),
+        ResourceConditionValue::set_condition(
+            &mut self.conditions.entries,
+            ResourceConditionValue::accepted_true(now),
         );
-        ResourceCondition::set_condition(
-            &mut self.conditions,
-            ResourceCondition::ready_false(now, reason, message),
+        ResourceConditionValue::set_condition(
+            &mut self.conditions.entries,
+            ResourceConditionValue::ready_false(now, reason, message),
         );
-        ResourceCondition::set_condition(
-            &mut self.conditions,
-            ResourceCondition::reconciling_false(now),
+        ResourceConditionValue::set_condition(
+            &mut self.conditions.entries,
+            ResourceConditionValue::reconciling_false(now),
         );
     }
 
     pub fn mark_pending_for_new_generation(&mut self) {
         self.phase = ResourcePhase::Pending;
-        self.conditions.clear();
+        self.conditions.entries.clear();
+    }
+
+    fn ready_condition(&self) -> Option<ResourceConditionValue> {
+        self.conditions
+            .entries
+            .get(&ready_condition_type_ref())
+            .and_then(|value| serde_json::from_value(value.clone()).ok())
     }
 }
 

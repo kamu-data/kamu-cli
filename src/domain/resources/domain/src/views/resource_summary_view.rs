@@ -12,7 +12,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     ResourceConditionStatus,
-    ResourceConditionType,
     ResourceID,
     ResourceListColumnValueView,
     ResourceName,
@@ -72,14 +71,10 @@ impl From<ResourceSnapshot> for ResourceSummaryView {
 
 impl From<ResourceStatus> for ResourceStatusSummaryView {
     fn from(value: ResourceStatus) -> Self {
-        let ready = value
-            .conditions
-            .iter()
-            .find(|condition| condition.type_ == ResourceConditionType::Ready)
-            .map(|condition| match condition.status {
-                ResourceConditionStatus::True => true,
-                ResourceConditionStatus::False | ResourceConditionStatus::Unknown => false,
-            });
+        let ready = value.ready_condition_status().map(|status| match status {
+            ResourceConditionStatus::True => true,
+            ResourceConditionStatus::False | ResourceConditionStatus::Unknown => false,
+        });
 
         Self {
             phase: Some(value.phase),

@@ -16,9 +16,11 @@ use kamu_resources::{
     Reconciler,
     ResourceAggregateLoader,
     ResourceConditionStatus,
-    ResourceConditionType,
     ResourcePersistenceService,
     ResourcePhase,
+    accepted_condition_type_ref,
+    ready_condition_type_ref,
+    reconciling_condition_type_ref,
 };
 use kamu_resources_services::ReconcileResourceUseCaseHelper;
 use kamu_resources_services::testing::{
@@ -78,7 +80,7 @@ async fn test_start_phase_transitions_resource_to_reconciling() {
     assert_eq!(status.phase, ResourcePhase::Reconciling);
     BaseResourceServiceHarness::assert_condition(
         &status,
-        ResourceConditionType::Reconciling,
+        &reconciling_condition_type_ref(),
         ResourceConditionStatus::True,
         Some("Processing"),
         None,
@@ -114,21 +116,21 @@ async fn test_reconcile_success_transitions_resource_to_ready() {
 
     BaseResourceServiceHarness::assert_condition(
         &status,
-        ResourceConditionType::Ready,
+        &ready_condition_type_ref(),
         ResourceConditionStatus::True,
         Some("Reconciled"),
         None,
     );
     BaseResourceServiceHarness::assert_condition(
         &status,
-        ResourceConditionType::Accepted,
+        &accepted_condition_type_ref(),
         ResourceConditionStatus::True,
         None,
         None,
     );
     BaseResourceServiceHarness::assert_condition(
         &status,
-        ResourceConditionType::Reconciling,
+        &reconciling_condition_type_ref(),
         ResourceConditionStatus::False,
         Some("Idle"),
         None,
@@ -158,14 +160,14 @@ async fn test_reconcile_failure_transitions_resource_to_failed() {
 
     BaseResourceServiceHarness::assert_condition(
         &status,
-        ResourceConditionType::Ready,
+        &ready_condition_type_ref(),
         ResourceConditionStatus::False,
         Some("internal_error"),
         Some(true), // must carry a message describing the failure
     );
     BaseResourceServiceHarness::assert_condition(
         &status,
-        ResourceConditionType::Reconciling,
+        &reconciling_condition_type_ref(),
         ResourceConditionStatus::False,
         None,
         None,

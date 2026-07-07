@@ -17,7 +17,7 @@ use kamu_resources::{
     GenericResourceQueryService,
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
     ResourceConditionStatus,
-    ResourceConditionType,
+    ResourceConditionValue,
     ResourceHeadersInput,
     ResourceID,
     ResourceLifecycleMessage,
@@ -237,36 +237,42 @@ impl BaseResourceServiceHarness {
     #[track_caller]
     pub fn assert_condition(
         resource_status: &ResourceStatus,
-        type_: ResourceConditionType,
+        condition_key: &kamu_resources::TypeRef,
         expected_status: ResourceConditionStatus,
         expected_reason: Option<&str>,
         expect_message: Option<bool>,
     ) {
-        let cond = resource_status
+        let condition_name = condition_key.to_string();
+        let cond_value = resource_status
             .conditions
-            .iter()
-            .find(|c| c.type_ == type_)
-            .unwrap_or_else(|| panic!("{type_:?} condition must be present in status"));
+            .entries
+            .get(condition_key)
+            .unwrap_or_else(|| panic!("{condition_name} condition must be present in status"));
+        let cond: ResourceConditionValue = serde_json::from_value(cond_value.clone())
+            .unwrap_or_else(|e| panic!("{condition_name} condition must be decodable: {e}"));
 
         assert_eq!(
             cond.status, expected_status,
-            "{type_:?} condition status mismatch"
+            "{condition_name} condition status mismatch"
         );
 
         if let Some(reason) = expected_reason {
-            assert_eq!(cond.reason, reason, "{type_:?} condition reason mismatch");
+            assert_eq!(
+                cond.reason, reason,
+                "{condition_name} condition reason mismatch"
+            );
         }
 
         if let Some(should_have_message) = expect_message {
             if should_have_message {
                 assert!(
                     cond.message.is_some(),
-                    "{type_:?} condition must carry a message"
+                    "{condition_name} condition must carry a message"
                 );
             } else {
                 assert!(
                     cond.message.is_none(),
-                    "{type_:?} condition must not carry a message"
+                    "{condition_name} condition must not carry a message"
                 );
             }
         }
