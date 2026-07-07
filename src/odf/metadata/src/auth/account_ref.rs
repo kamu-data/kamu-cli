@@ -23,21 +23,23 @@ use crate::serde::flatbuffers::{
 pub enum AccountRef {
     Id(AccountID),
     Name(AccountName),
-    Both { id: AccountID, name: AccountName },
+    Handle(AccountHandle),
 }
 
 impl AccountRef {
     pub fn id(&self) -> Option<&AccountID> {
         match self {
-            AccountRef::Id(id) | AccountRef::Both { id, .. } => Some(id),
+            AccountRef::Id(id) => Some(id),
             AccountRef::Name(_) => None,
+            AccountRef::Handle(hdl) => Some(&hdl.id),
         }
     }
 
     pub fn name(&self) -> Option<&AccountName> {
         match self {
-            AccountRef::Name(name) | AccountRef::Both { name, .. } => Some(name),
+            AccountRef::Name(name) => Some(name),
             AccountRef::Id(_) => None,
+            AccountRef::Handle(hdl) => Some(&hdl.name),
         }
     }
 }
@@ -53,6 +55,21 @@ impl From<AccountID> for AccountRef {
 impl From<AccountName> for AccountRef {
     fn from(value: AccountName) -> Self {
         Self::Name(value)
+    }
+}
+
+impl From<AccountHandle> for AccountRef {
+    fn from(value: AccountHandle) -> Self {
+        Self::Handle(value)
+    }
+}
+
+impl From<AccountRef> for crate::resource::ResourceRef {
+    fn from(_v: AccountRef) -> Self {
+        todo!(
+            "We need a way to use DIDs in ResourceRef to implement this. ResourceRef likely \
+             should have some ResourceIDRef type that allows both UUIDs and DIDs"
+        )
     }
 }
 
@@ -78,27 +95,12 @@ impl<'fb> FlatbuffersSerializable<'fb> for AccountRef {
 
     fn serialize(&self, _fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
         todo!()
-        // let id_offset = self.id.as_ref().map(|v|
-        // fb.create_vector(&v.as_bytes())); let name_offset =
-        // self.name.as_ref().map(|v| fb.create_string(&v.to_string()));
-        // let mut builder = fb::AccountRefBuilder::new(fb);
-        // id_offset.map(|off| builder.add_id(off));
-        // name_offset.map(|off| builder.add_name(off));
-        // builder.finish()
     }
 }
 
 impl<'fb> FlatbuffersDeserializable<fb::AccountRef<'fb>> for AccountRef {
     fn deserialize(_proxy: fb::AccountRef<'fb>) -> Self {
         todo!()
-        // Self {
-        //     id: proxy
-        //         .id()
-        //         .map(|v| AccountID::from_bytes(v.bytes()).unwrap()),
-        //     name: proxy
-        //         .name()
-        //         .map(|v| super::AccountName::try_from(v).unwrap()),
-        // }
     }
 }
 

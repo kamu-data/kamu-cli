@@ -48,6 +48,34 @@ impl From<AccountRef> for odf::metadata::auth::AccountRef {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone)]
+pub struct AccountHandle(odf::metadata::auth::AccountHandle);
+
+#[Object]
+impl AccountHandle {
+    pub async fn id(&self) -> AccountID<'_> {
+        AccountID::from(&self.0.id)
+    }
+
+    pub async fn name(&self) -> AccountName<'_> {
+        AccountName::from(&self.0.name)
+    }
+}
+
+impl From<odf::metadata::auth::AccountHandle> for AccountHandle {
+    fn from(value: odf::metadata::auth::AccountHandle) -> Self {
+        Self(value)
+    }
+}
+
+impl From<AccountHandle> for odf::metadata::auth::AccountHandle {
+    fn from(value: AccountHandle) -> Self {
+        value.0
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // AccountDisplayName
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

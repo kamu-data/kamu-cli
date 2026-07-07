@@ -13,6 +13,56 @@ use std::fmt::Display;
 use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Resource
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl<SpecT, SpecTInput> From<resource::Resource<SpecT>> for resource::ResourceInput<SpecTInput>
+where
+    SpecT: Into<SpecTInput>,
+{
+    fn from(value: resource::Resource<SpecT>) -> Self {
+        let resource::Resource {
+            schema,
+            headers,
+            spec,
+            status: _,
+        } = value;
+        Self {
+            schema,
+            headers: headers.into(),
+            spec: spec.into(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ResourceHeaders
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl From<resource::ResourceHeaders> for resource::ResourceHeadersInput {
+    fn from(value: resource::ResourceHeaders) -> Self {
+        let resource::ResourceHeaders {
+            id,
+            name,
+            account,
+            labels,
+            annotations,
+            generation: _,
+            created_at: _,
+            updated_at: _,
+            deleted_at: _,
+        } = value;
+        Self {
+            id: Some(id),
+            name,
+            account: Some(account.into()),
+            labels: Some(labels),
+            annotations: Some(annotations),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // OffsetInterval
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -406,6 +456,17 @@ impl dataset::MetadataEventTypeFlags {
 
     pub fn has_key_block_flags(&self) -> bool {
         !(*self & Self::KEY_BLOCK).is_empty()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// SecretSetSpec
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl From<config::SecretSetSpec> for config::SecretSetSpecInput {
+    fn from(v: config::SecretSetSpec) -> Self {
+        let config::SecretSetSpec { secrets } = v;
+        Self { secrets }
     }
 }
 
