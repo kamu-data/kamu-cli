@@ -15,45 +15,9 @@ use crate::{
     ReconcilableStateModel,
     ResourceHeaders,
     ResourceState,
-    ResourceStatus,
     ResourceStatusExt,
-    ResourceStatusLike,
     new_pending_resource_status,
 };
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub trait PendingStatusFromSpec<TSpec>: Sized {
-    fn pending_from_spec(spec: &TSpec) -> Self;
-
-    fn reset_pending_from_spec(&mut self, spec: &TSpec);
-}
-
-impl<TSpec> PendingStatusFromSpec<TSpec> for ResourceStatus {
-    fn pending_from_spec(_spec: &TSpec) -> Self {
-        new_pending_resource_status()
-    }
-
-    fn reset_pending_from_spec(&mut self, _spec: &TSpec) {}
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub trait ReconcilableStatusProjector<TSpec, TSuccess, TFailureDetails> {
-    type Status: PendingStatusFromSpec<TSpec>;
-
-    fn new_pending(spec: &TSpec) -> Self::Status {
-        Self::Status::pending_from_spec(spec)
-    }
-
-    fn on_spec_updated(status: &mut Self::Status, spec: &TSpec) {
-        status.reset_pending_from_spec(spec);
-    }
-
-    fn on_reconciliation_succeeded(status: &mut Self::Status, success: TSuccess);
-
-    fn on_reconciliation_failed(status: &mut Self::Status, details: TFailureDetails);
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -67,16 +31,13 @@ where
     use ReconcilableResourceEvent as E;
 
     match (state, event) {
-        (None, E::Created(e)) => {
-            let pending_status = TModel::StatusProjector::new_pending(&e.spec);
-            Ok(ResourceState::new(
-                e.id,
-                ResourceHeaders::from_input(e.event_time, e.headers),
-                e.spec,
-                pending_status,
-            )
-            .into())
-        }
+        (None, E::Created(e)) => Ok(ResourceState::new(
+            e.id,
+            ResourceHeaders::from_input(e.event_time, e.headers),
+            e.spec,
+            new_pending_resource_status(),
+        )
+        .into()),
 
         (Some(s), event) if s.headers().deleted_at.is_some() => {
             Err(ProjectionError::new(Some(s), event))
@@ -97,12 +58,7 @@ where
             s.headers_mut().generation = e.new_generation;
             s.headers_mut().updated_at = e.event_time;
 
-            s.status_mut()
-                .resource_status_mut()
-                .mark_pending_for_new_generation();
-
-            let spec = s.spec().clone();
-            TModel::StatusProjector::on_spec_updated(s.status_mut(), &spec);
+            s.status_mut().mark_pending_for_new_generation();
 
             Ok(s)
         }
@@ -120,9 +76,7 @@ where
         (Some(mut s), E::ReconciliationStarted(e)) => {
             assert_eq!(s.id(), &e.id);
 
-            s.status_mut()
-                .resource_status_mut()
-                .mark_reconciling(e.event_time);
+            s.status_mut().mark_reconciling(e.event_time);
 
             Ok(s)
         }
@@ -130,10 +84,7 @@ where
         (Some(mut s), E::ReconciliationSucceeded(e)) => {
             assert_eq!(s.id(), &e.id);
 
-            s.status_mut()
-                .resource_status_mut()
-                .mark_ready(e.event_time, e.generation);
-            TModel::StatusProjector::on_reconciliation_succeeded(s.status_mut(), e.success);
+            s.status_mut().mark_ready(e.event_time, e.generation);
 
             Ok(s)
         }
@@ -141,13 +92,8 @@ where
         (Some(mut s), E::ReconciliationFailed(e)) => {
             assert_eq!(s.id(), &e.id);
 
-            s.status_mut().resource_status_mut().mark_failed(
-                e.event_time,
-                e.generation,
-                e.reason,
-                e.message,
-            );
-            TModel::StatusProjector::on_reconciliation_failed(s.status_mut(), e.details);
+            s.status_mut()
+                .mark_failed(e.event_time, e.generation, e.reason, e.message);
 
             Ok(s)
         }

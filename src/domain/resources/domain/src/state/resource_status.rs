@@ -139,54 +139,6 @@ impl ResourceStatusExt for ResourceStatus {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub trait ResourceStatusLike: Send + Sync {
-    fn resource_status(&self) -> &ResourceStatus;
-    fn resource_status_mut(&mut self) -> &mut ResourceStatus;
-}
-
-impl ResourceStatusLike for ResourceStatus {
-    fn resource_status(&self) -> &ResourceStatus {
-        self
-    }
-
-    fn resource_status_mut(&mut self) -> &mut ResourceStatus {
-        self
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub trait ResourceStatusJson: ResourceStatusLike + Sized {
-    fn status_from_json<TSpec>(
-        value: serde_json::Value,
-        spec: &TSpec,
-    ) -> Result<Self, serde_json::Error>
-    where
-        Self: crate::PendingStatusFromSpec<TSpec>;
-
-    fn status_to_json(&self) -> serde_json::Value;
-}
-
-impl ResourceStatusJson for ResourceStatus {
-    fn status_from_json<TSpec>(
-        value: serde_json::Value,
-        _spec: &TSpec,
-    ) -> Result<Self, serde_json::Error>
-    where
-        Self: crate::PendingStatusFromSpec<TSpec>,
-    {
-        let proxy: odf::metadata::serde::yaml::resource::ResourceStatus =
-            serde_json::from_value(value)?;
-        proxy.try_into().map_err(serde::de::Error::custom)
-    }
-
-    fn status_to_json(&self) -> serde_json::Value {
-        resource_status_to_json(self)
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 fn ready_condition(status: &ResourceStatus) -> Option<ResourceConditionValue> {
     status
         .conditions

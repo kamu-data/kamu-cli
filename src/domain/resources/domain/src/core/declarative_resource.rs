@@ -9,7 +9,7 @@
 
 use internal_error::InternalError;
 
-use crate::{ResourceHeaders, ResourceID, ResourceSnapshot, ResourceStatusLike};
+use crate::{ResourceHeaders, ResourceID, ResourceSnapshot, ResourceStatus};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -17,8 +17,7 @@ pub trait DeclarativeResource:
     Sized + Send + Sync + std::fmt::Debug + AsRef<Self::ResourceState>
 {
     type Spec: std::fmt::Debug + Send + Sync;
-    type Status: ResourceStatusLike + std::fmt::Debug;
-    type ResourceState: DeclarativeResourceState<Spec = Self::Spec, Status = Self::Status>
+    type ResourceState: DeclarativeResourceState<Spec = Self::Spec>
         + TryFrom<ResourceSnapshot, Error = InternalError>
         + From<Self>;
 
@@ -34,7 +33,7 @@ pub trait DeclarativeResource:
         self.as_ref().spec()
     }
 
-    fn status(&self) -> &Self::Status {
+    fn status(&self) -> &ResourceStatus {
         self.as_ref().status()
     }
 }
@@ -43,7 +42,6 @@ pub trait DeclarativeResource:
 
 pub trait DeclarativeResourceState: Send + Sync + std::fmt::Debug {
     type Spec: std::fmt::Debug + Send + Sync;
-    type Status: ResourceStatusLike + std::fmt::Debug;
 
     fn id(&self) -> &ResourceID;
 
@@ -53,10 +51,10 @@ pub trait DeclarativeResourceState: Send + Sync + std::fmt::Debug {
     fn spec(&self) -> &Self::Spec;
     fn spec_mut(&mut self) -> &mut Self::Spec;
 
-    fn status(&self) -> &Self::Status;
-    fn status_mut(&mut self) -> &mut Self::Status;
+    fn status(&self) -> &ResourceStatus;
+    fn status_mut(&mut self) -> &mut ResourceStatus;
 
-    fn into_parts(self) -> (ResourceID, ResourceHeaders, Self::Spec, Self::Status)
+    fn into_parts(self) -> (ResourceID, ResourceHeaders, Self::Spec, ResourceStatus)
     where
         Self: Sized;
 }

@@ -20,8 +20,6 @@ use crate::domain::{
     ResourceRepository,
     ResourceSchemaProvider,
     ResourceSnapshotUpdate,
-    ResourceStatusJson,
-    ResourceStatusLike,
     UpdateResourceError,
 };
 
@@ -40,7 +38,6 @@ where
     R: ReconcilableEventSourcedResource + ResourceSchemaProvider,
     R::LifecycleError: InvariantViolationOf<<R as DeclarativeResource>::ResourceState>,
     R::Spec: serde::Serialize,
-    R::Status: ResourceStatusJson + ResourceStatusLike,
 {
     pub fn new(resource_repository: &'a dyn ResourceRepository, event_store: &'a R::Store) -> Self {
         Self {
@@ -98,7 +95,6 @@ where
     R::LifecycleError:
         InvariantViolationOf<<R as DeclarativeResource>::ResourceState> + std::fmt::Display,
     R::Spec: serde::Serialize,
-    R::Status: ResourceStatusJson + ResourceStatusLike,
 {
     pub async fn delete(
         &self,
@@ -155,7 +151,6 @@ where
     R: ReconcilableEventSourcedResource + ResourceSchemaProvider,
     R::LifecycleError: InvariantViolationOf<<R as DeclarativeResource>::ResourceState>,
     R::Spec: serde::Serialize,
-    R::Status: ResourceStatusJson + ResourceStatusLike,
 {
     async fn sync_snapshot(
         &self,

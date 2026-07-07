@@ -23,7 +23,7 @@ use kamu_resources::{
     TypeUri,
 };
 
-use crate::{StorageEventStore, StorageProviderSpec, StorageSpec, StorageState, StorageStatus};
+use crate::{StorageEventStore, StorageProviderSpec, StorageSpec, StorageState};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -79,7 +79,6 @@ impl ResourceSchemaProvider for StorageResource {
 
 impl DeclarativeResource for StorageResource {
     type Spec = StorageSpec;
-    type Status = StorageStatus;
     type ResourceState = StorageState;
 }
 

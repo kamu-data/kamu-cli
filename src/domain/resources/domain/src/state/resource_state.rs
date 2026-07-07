@@ -12,36 +12,35 @@ use serde::de::DeserializeOwned;
 
 use crate::{
     DeclarativeResourceState,
-    PendingStatusFromSpec,
     ResourceHeaders,
     ResourceID,
     ResourceSnapshot,
-    ResourceStatusJson,
-    ResourceStatusLike,
+    ResourceStatus,
     decode_typed_resource_snapshot,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
-pub struct ResourceState<
-    TSpec: std::fmt::Debug + Clone + Send + Sync,
-    TStatus: ResourceStatusLike + std::fmt::Debug + Clone,
-> {
+pub struct ResourceState<TSpec: std::fmt::Debug + Clone + Send + Sync> {
     pub id: ResourceID,
     pub headers: ResourceHeaders,
     pub spec: TSpec,
-    pub status: TStatus,
+    pub status: ResourceStatus,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<TSpec, TStatus> ResourceState<TSpec, TStatus>
+impl<TSpec> ResourceState<TSpec>
 where
     TSpec: std::fmt::Debug + Clone + Send + Sync,
-    TStatus: ResourceStatusLike + std::fmt::Debug + Clone,
 {
-    pub fn new(id: ResourceID, headers: ResourceHeaders, spec: TSpec, status: TStatus) -> Self {
+    pub fn new(
+        id: ResourceID,
+        headers: ResourceHeaders,
+        spec: TSpec,
+        status: ResourceStatus,
+    ) -> Self {
         Self {
             id,
             headers,
@@ -53,13 +52,11 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<TSpec, TStatus> DeclarativeResourceState for ResourceState<TSpec, TStatus>
+impl<TSpec> DeclarativeResourceState for ResourceState<TSpec>
 where
     TSpec: std::fmt::Debug + Clone + Send + Sync,
-    TStatus: ResourceStatusLike + std::fmt::Debug + Clone,
 {
     type Spec = TSpec;
-    type Status = TStatus;
 
     fn id(&self) -> &ResourceID {
         &self.id
@@ -81,35 +78,29 @@ where
         &mut self.spec
     }
 
-    fn status(&self) -> &Self::Status {
+    fn status(&self) -> &ResourceStatus {
         &self.status
     }
 
-    fn status_mut(&mut self) -> &mut Self::Status {
+    fn status_mut(&mut self) -> &mut ResourceStatus {
         &mut self.status
     }
 
-    fn into_parts(self) -> (ResourceID, ResourceHeaders, Self::Spec, Self::Status) {
+    fn into_parts(self) -> (ResourceID, ResourceHeaders, Self::Spec, ResourceStatus) {
         (self.id, self.headers, self.spec, self.status)
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<TSpec, TStatus> TryFrom<ResourceSnapshot> for ResourceState<TSpec, TStatus>
+impl<TSpec> TryFrom<ResourceSnapshot> for ResourceState<TSpec>
 where
     TSpec: std::fmt::Debug + Clone + Send + Sync + DeserializeOwned,
-    TStatus: ResourceStatusLike
-        + std::fmt::Debug
-        + Clone
-        + ResourceStatusJson
-        + PendingStatusFromSpec<TSpec>,
 {
     type Error = InternalError;
 
     fn try_from(snapshot: ResourceSnapshot) -> Result<Self, Self::Error> {
-        let (id, headers, spec, status) =
-            decode_typed_resource_snapshot::<TSpec, TStatus>(snapshot)?;
+        let (id, headers, spec, status) = decode_typed_resource_snapshot::<TSpec>(snapshot)?;
 
         Ok(Self {
             id,

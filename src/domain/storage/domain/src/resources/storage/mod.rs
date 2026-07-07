@@ -14,7 +14,6 @@ mod repo;
 mod resource;
 mod spec;
 mod state;
-mod status;
 
 pub use event::*;
 pub use lifecycle_error::*;
@@ -23,4 +22,3 @@ pub use repo::*;
 pub use resource::*;
 pub use spec::*;
 pub use state::*;
-pub use status::*;

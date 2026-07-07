@@ -28,8 +28,6 @@ use crate::domain::{
     ResourcePersistenceError,
     ResourcePersistenceService,
     ResourceSchemaProvider,
-    ResourceStatusJson,
-    ResourceStatusLike,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -51,7 +49,6 @@ where
     R::LifecycleError:
         InvariantViolationOf<<R as DeclarativeResource>::ResourceState> + std::fmt::Display,
     R::Spec: Serialize,
-    R::Status: ResourceStatusJson + ResourceStatusLike,
 {
     pub fn new(
         generic_resource_query_service: &'a dyn GenericResourceQueryService,

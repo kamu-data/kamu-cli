@@ -9,31 +9,18 @@
 
 use event_sourcing::Projection;
 
-use crate::{
-    DeclarativeResourceState,
-    ReconcilableResourceEvent,
-    ReconcilableStatusProjector,
-    ResourceState,
-    ResourceStatusLike,
-};
+use crate::{DeclarativeResourceState, ReconcilableResourceEvent, ResourceState};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub trait ReconcilableStateModel {
     type Spec: std::fmt::Debug + Clone + Send + Sync;
-    type Status: ResourceStatusLike + std::fmt::Debug + Clone;
     type Success: std::fmt::Debug + Clone + Send + Sync + 'static;
     type FailureDetails: std::fmt::Debug + Clone + Send + Sync + 'static;
-    type State: DeclarativeResourceState<Spec = Self::Spec, Status = Self::Status>
-        + From<ResourceState<Self::Spec, Self::Status>>
+    type State: DeclarativeResourceState<Spec = Self::Spec>
+        + From<ResourceState<Self::Spec>>
         + Projection<
             Event = ReconcilableResourceEvent<Self::Spec, Self::Success, Self::FailureDetails>,
-        >;
-    type StatusProjector: ReconcilableStatusProjector<
-            Self::Spec,
-            Self::Success,
-            Self::FailureDetails,
-            Status = Self::Status,
         >;
 }
 

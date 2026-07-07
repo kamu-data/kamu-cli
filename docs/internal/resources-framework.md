@@ -242,23 +242,25 @@ Module layout: `core/`, `state/`, `values/`, `validation/`, `views/`, `manifests
 ### Core traits
 
 A resource is layered as a stack of traits. The base is **`DeclarativeResource`** — a resource has a
-`Spec`, a `Status`, and a backing `ResourceState`
-([`core/declarative_resource.rs`](/src/domain/resources/domain/src/core/declarative_resource.rs)):
+`Spec` (per-kind) and a backing `ResourceState`
+([`core/declarative_resource.rs`](/src/domain/resources/domain/src/core/declarative_resource.rs)).
+Unlike `Spec`, status is **not** an associated type: every resource kind shares one canonical
+`ResourceStatus` (the ODF RFC-018 shape — phase/conditions/observed-generation), so there is no
+per-kind variation to parameterize over. `status()` returns the concrete `ResourceStatus` directly:
 
 ```rust
 pub trait DeclarativeResource:
     Sized + Send + Sync + std::fmt::Debug + AsRef<Self::ResourceState>
 {
     type Spec: std::fmt::Debug + Send + Sync;
-    type Status: ResourceStatusLike + std::fmt::Debug;
-    type ResourceState: DeclarativeResourceState<Spec = Self::Spec, Status = Self::Status>
+    type ResourceState: DeclarativeResourceState<Spec = Self::Spec>
         + TryFrom<ResourceSnapshot, Error = InternalError>
         + From<Self>;
 
     fn id(&self) -> &ResourceID;
     fn headers(&self) -> &ResourceHeaders;
     fn spec(&self) -> &Self::Spec;
-    fn status(&self) -> &Self::Status;
+    fn status(&self) -> &ResourceStatus;
 }
 ```
 
@@ -1088,8 +1090,9 @@ exposes `reveal_spec`, used only when `SpecViewMode::Revealed` is requested — 
 ciphertext envelope is returned unchanged (no decryption).
 
 Domain types live in `src/domain/configuration/domain/src/resources/<type>/`
-(`resource.rs`, `spec.rs`, `state.rs`, `status.rs`, `event.rs`, `reconciliation.rs`, …). Each
-resource declares its identity and implements the core traits, e.g.:
+(`resource.rs`, `spec.rs`, `state.rs`, `event.rs`, `reconciliation.rs`, …) — there is no per-kind
+`status.rs`; status is the shared, non-generic `ResourceStatus` (see [Core traits](#core-traits)).
+Each resource declares its identity and implements the core traits, e.g.:
 
 ```rust
 // variable_set/resource.rs
@@ -1134,11 +1137,13 @@ pub fn register_variable_set_resource_crud_dispatcher(catalog_builder: &mut dill
 ### Recipe: how to add a new resource type
 
 1. **Define the domain types** under `configuration/domain/src/resources/<type>/`: `spec.rs`
-   (`#[serde(deny_unknown_fields)]`, with validation + lint), `status.rs`, `state.rs`, `event.rs`,
+   (`#[serde(deny_unknown_fields)]`, with validation + lint), `state.rs`, `event.rs`,
    and `resource.rs` implementing `ResourceSchemaProvider`, `DeclarativeResource`,
    `ReconcilableResource`/`ReconcilableEventSourcedResource`, and `ResourcePresentation`
    (implement `schema() -> &'static TypeUri`, and set `SCHEMA_STR`, `CANONICAL_SELECTOR_NAME_STR`,
-   `SELECTOR_ALIAS_STRS`, `CANONICAL_SELECTOR_NAME`, `SELECTOR_ALIASES`).
+   `SELECTOR_ALIAS_STRS`, `CANONICAL_SELECTOR_NAME`, `SELECTOR_ALIASES`). No `status.rs` is needed —
+   status is inherited automatically via the shared `ResourceStatus`/`ResourceStatusExt`, driven
+   purely by the generic reconciliation-event projector.
 2. **Implement a `Reconciler<R>`** in `configuration/services/src/reconcilers/` (no-op projection is
    fine if there's nothing to do; transform the spec here if needed — see `SecretSet`).
 3. **Declare dispatchers** with `declare_resource_crud_dispatcher!` /

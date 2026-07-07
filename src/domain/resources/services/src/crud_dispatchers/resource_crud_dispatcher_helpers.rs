@@ -24,9 +24,8 @@ use kamu_resources::{
     ResourcePresentation,
     ResourceSchemaProvider,
     ResourceSnapshot,
+    ResourceStatus,
     ResourceStatusExt,
-    ResourceStatusJson,
-    ResourceStatusLike,
     ResourceStatusSummaryView,
     ResourceSummaryView,
     ResourceView,
@@ -63,7 +62,6 @@ pub async fn map_apply_resource_planning_decision<R>(
 where
     R: ResourceSchemaProvider + DeclarativeResource,
     R::Spec: Serialize,
-    R::Status: ResourceStatusJson + ResourceStatusLike,
 {
     Ok(match decision {
         ApplyResourcePlanningDecision::Planned(plan) => {
@@ -104,7 +102,6 @@ pub fn map_apply_resource_application_decision<R>(
 where
     R: ResourceSchemaProvider + DeclarativeResource,
     R::Spec: Serialize,
-    R::Status: ResourceStatusJson + ResourceStatusLike,
 {
     Ok(match decision {
         ApplyResourceApplicationDecision::Applied(result) => {
@@ -136,7 +133,6 @@ pub fn typed_resource_state_to_view<R>(
 where
     R: ResourceSchemaProvider + DeclarativeResource,
     R::Spec: Serialize,
-    R::Status: ResourceStatusJson + ResourceStatusLike,
 {
     let (id, headers, spec, status) = state.into_parts();
 
@@ -144,7 +140,7 @@ where
         schema: R::schema().clone(),
         headers: ResourceViewHeaders::from_owned(id, headers),
         spec: serde_json::to_value(spec).int_err()?,
-        status: Some(status.resource_status().clone()),
+        status: Some(status),
     })
 }
 
@@ -153,7 +149,6 @@ where
 pub fn typed_resource_state_to_summary_view<R>(state: &R::ResourceState) -> ResourceSummaryView
 where
     R: ResourceSchemaProvider + DeclarativeResource + ResourcePresentation,
-    R::Status: ResourceStatusLike,
 {
     ResourceSummaryView {
         schema: R::schema().clone(),
@@ -190,18 +185,15 @@ pub(crate) fn resource_snapshot_to_view(snapshot: ResourceSnapshot) -> ResourceV
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn resource_status_summary_view(status: &impl ResourceStatusLike) -> ResourceStatusSummaryView {
-    let resource_status = status.resource_status();
-    let ready = resource_status
-        .ready_condition_status()
-        .map(|status| match status {
-            ResourceConditionStatus::True => true,
-            ResourceConditionStatus::False | ResourceConditionStatus::Unknown => false,
-        });
+fn resource_status_summary_view(status: &ResourceStatus) -> ResourceStatusSummaryView {
+    let ready = status.ready_condition_status().map(|status| match status {
+        ResourceConditionStatus::True => true,
+        ResourceConditionStatus::False | ResourceConditionStatus::Unknown => false,
+    });
 
     ResourceStatusSummaryView {
-        phase: Some(resource_status.phase),
-        observed_generation: resource_status.observed_generation,
+        phase: Some(status.phase),
+        observed_generation: status.observed_generation,
         ready,
     }
 }

@@ -10,8 +10,7 @@
 use kamu_configuration::ValueRef;
 use kamu_resources::{ResourceLinterSpec, ResourceValidateSpec, ResourceWarning};
 use serde::{Deserialize, Serialize};
-
-use crate::StorageProviderKind;
+use strum::Display;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -19,6 +18,17 @@ use crate::StorageProviderKind;
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct StorageSpec {
     pub provider: StorageProviderSpec,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Display, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[strum(serialize_all = "camelCase")]
+pub enum StorageProviderKind {
+    LocalFs,
+    S3,
+    Ipfs,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

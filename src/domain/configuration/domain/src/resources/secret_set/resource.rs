@@ -23,7 +23,7 @@ use kamu_resources::{
     TypeUri,
 };
 
-use crate::{SecretSetEventStore, SecretSetSpec, SecretSetState, SecretSetStatus};
+use crate::{SecretSetEventStore, SecretSetSpec, SecretSetState};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -60,7 +60,6 @@ impl ResourceSchemaProvider for SecretSetResource {
 
 impl DeclarativeResource for SecretSetResource {
     type Spec = SecretSetSpec;
-    type Status = SecretSetStatus;
     type ResourceState = SecretSetState;
 }
 

@@ -55,20 +55,6 @@ impl ResourceLinterSpec for TestResourceSpec {
     }
 }
 
-// TestResourceStatusProjector
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub struct TestResourceStatusProjector;
-
-impl ReconcilableStatusProjector<TestResourceSpec, (), String> for TestResourceStatusProjector {
-    type Status = ResourceStatus;
-
-    fn on_reconciliation_succeeded(_status: &mut Self::Status, _success: ()) {}
-
-    fn on_reconciliation_failed(_status: &mut Self::Status, _details: String) {}
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // TestResourceStateModel
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -76,11 +62,9 @@ pub struct TestResourceStateModel;
 
 impl ReconcilableStateModel for TestResourceStateModel {
     type Spec = TestResourceSpec;
-    type Status = ResourceStatus;
     type Success = ();
     type FailureDetails = String;
     type State = TestResourceState;
-    type StatusProjector = TestResourceStatusProjector;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -207,7 +191,6 @@ impl ResourceSchemaProvider for TestResource {
 
 impl DeclarativeResource for TestResource {
     type Spec = TestResourceSpec;
-    type Status = ResourceStatus;
     type ResourceState = TestResourceState;
 }
 

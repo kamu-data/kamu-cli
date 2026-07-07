@@ -13,13 +13,11 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    PendingStatusFromSpec,
     ResourceHeaders,
     ResourceID,
     ResourceStatus,
-    ResourceStatusJson,
-    ResourceStatusLike,
     TypeUri,
+    new_pending_resource_status,
     resource_status_from_json,
 };
 
@@ -71,37 +69,30 @@ pub type ResourceSnapshotStream<'a> = std::pin::Pin<
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn decode_typed_resource_snapshot<TSpec, TStatus>(
+pub fn decode_typed_resource_snapshot<TSpec>(
     snapshot: ResourceSnapshot,
-) -> Result<(ResourceID, ResourceHeaders, TSpec, TStatus), InternalError>
+) -> Result<(ResourceID, ResourceHeaders, TSpec, ResourceStatus), InternalError>
 where
     TSpec: DeserializeOwned,
-    TStatus: ResourceStatusJson + PendingStatusFromSpec<TSpec>,
 {
     let spec = serde_json::from_value(snapshot.spec).int_err()?;
-    let status = match snapshot.status {
-        Some(status) => {
-            TStatus::status_from_json(crate::resource_status_to_json(&status), &spec).int_err()?
-        }
-        None => TStatus::pending_from_spec(&spec),
-    };
+    let status = snapshot.status.unwrap_or_else(new_pending_resource_status);
 
     Ok((snapshot.id, snapshot.headers, spec, status))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn make_typed_resource_snapshot<TSpec, TStatus>(
+pub fn make_typed_resource_snapshot<TSpec>(
     id: ResourceID,
     schema: &TypeUri,
     headers: ResourceHeaders,
     spec: &TSpec,
-    status: &TStatus,
+    status: &ResourceStatus,
     last_event_id: Option<EventID>,
 ) -> Result<ResourceSnapshot, InternalError>
 where
     TSpec: Serialize,
-    TStatus: ResourceStatusJson + ResourceStatusLike,
 {
     let spec = serde_json::to_value(spec).int_err()?;
 
@@ -110,7 +101,7 @@ where
         schema: schema.clone(),
         headers,
         spec,
-        status: Some(status.resource_status().clone()),
+        status: Some(status.clone()),
         last_event_id,
     })
 }

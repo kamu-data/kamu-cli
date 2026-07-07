@@ -30,8 +30,6 @@ use crate::{
     ResourceReconcileError,
     ResourceSchemaProvider,
     ResourceSnapshot,
-    ResourceStatusJson,
-    ResourceStatusLike,
     make_typed_resource_snapshot,
 };
 
@@ -130,7 +128,6 @@ pub trait ReconcilableEventSourcedResource:
     where
         Self: ResourceSchemaProvider,
         Self::Spec: Serialize,
-        Self::Status: ResourceStatusJson + ResourceStatusLike,
     {
         make_typed_resource_snapshot(
             *self.id(),

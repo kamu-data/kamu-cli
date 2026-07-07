@@ -20,10 +20,9 @@ pub trait ReconcilableResource: DeclarativeResource {
     type LifecycleError;
 
     fn needs_reconciliation(&self) -> bool {
-        use crate::{ResourceStatusExt, ResourceStatusLike};
+        use crate::ResourceStatusExt;
 
         self.status()
-            .resource_status()
             .needs_reconciliation(self.headers().generation)
     }
 

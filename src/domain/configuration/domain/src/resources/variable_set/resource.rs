@@ -23,7 +23,7 @@ use kamu_resources::{
     TypeUri,
 };
 
-use crate::{VariableSetEventStore, VariableSetSpec, VariableSetState, VariableSetStatus};
+use crate::{VariableSetEventStore, VariableSetSpec, VariableSetState};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -61,7 +61,6 @@ impl ResourceSchemaProvider for VariableSetResource {
 
 impl DeclarativeResource for VariableSetResource {
     type Spec = VariableSetSpec;
-    type Status = VariableSetStatus;
     type ResourceState = VariableSetState;
 }
 

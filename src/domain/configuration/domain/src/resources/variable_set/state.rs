@@ -9,13 +9,7 @@
 
 use kamu_resources::{ReconcilableResourceState, ReconcilableStateModel};
 
-use crate::{
-    VariableSetFailureDetails,
-    VariableSetReconcileSuccess,
-    VariableSetSpec,
-    VariableSetStatus,
-    VariableSetStatusProjector,
-};
+use crate::{VariableSetFailureDetails, VariableSetReconcileSuccess, VariableSetSpec};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -27,11 +21,9 @@ pub struct VariableSetStateModel {}
 
 impl ReconcilableStateModel for VariableSetStateModel {
     type Spec = VariableSetSpec;
-    type Status = VariableSetStatus;
     type Success = VariableSetReconcileSuccess;
     type FailureDetails = VariableSetFailureDetails;
     type State = VariableSetState;
-    type StatusProjector = VariableSetStatusProjector;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

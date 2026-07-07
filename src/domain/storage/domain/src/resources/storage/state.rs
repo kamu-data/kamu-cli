@@ -9,13 +9,7 @@
 
 use kamu_resources::{ReconcilableResourceState, ReconcilableStateModel};
 
-use crate::{
-    StorageFailureDetails,
-    StorageReconcileSuccess,
-    StorageSpec,
-    StorageStatus,
-    StorageStatusProjector,
-};
+use crate::{StorageFailureDetails, StorageReconcileSuccess, StorageSpec};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -27,11 +21,9 @@ pub struct StorageStateModel {}
 
 impl ReconcilableStateModel for StorageStateModel {
     type Spec = StorageSpec;
-    type Status = StorageStatus;
     type Success = StorageReconcileSuccess;
     type FailureDetails = StorageFailureDetails;
     type State = StorageState;
-    type StatusProjector = StorageStatusProjector;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

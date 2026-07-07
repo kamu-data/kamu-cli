@@ -146,8 +146,7 @@ where
         return Ok(());
     }
 
-    use crate::ResourceStatusLike;
-    if resource.status().resource_status().phase == ResourcePhase::Reconciling {
+    if resource.status().phase == ResourcePhase::Reconciling {
         return Ok(());
     }
 

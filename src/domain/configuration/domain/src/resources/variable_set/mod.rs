@@ -14,7 +14,6 @@ mod reconciliation;
 mod resource;
 mod spec;
 mod state;
-mod status;
 
 pub use event::*;
 pub use event_store::*;
@@ -23,4 +22,3 @@ pub use reconciliation::*;
 pub use resource::*;
 pub use spec::*;
 pub use state::*;
-pub use status::*;

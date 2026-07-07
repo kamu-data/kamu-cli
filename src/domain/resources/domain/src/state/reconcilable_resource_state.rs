@@ -17,6 +17,7 @@ use crate::{
     ResourceID,
     ResourceSnapshot,
     ResourceState,
+    ResourceStatus,
     project_reconcilable_resource_state,
 };
 
@@ -26,7 +27,7 @@ pub struct ReconcilableResourceState<TModel>
 where
     TModel: ReconcilableStateModel,
 {
-    inner: ResourceState<TModel::Spec, TModel::Status>,
+    inner: ResourceState<TModel::Spec>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -35,7 +36,7 @@ impl<TModel> ReconcilableResourceState<TModel>
 where
     TModel: ReconcilableStateModel,
 {
-    pub fn into_inner(self) -> ResourceState<TModel::Spec, TModel::Status> {
+    pub fn into_inner(self) -> ResourceState<TModel::Spec> {
         self.inner
     }
 }
@@ -68,7 +69,7 @@ impl<TModel> std::ops::Deref for ReconcilableResourceState<TModel>
 where
     TModel: ReconcilableStateModel,
 {
-    type Target = ResourceState<TModel::Spec, TModel::Status>;
+    type Target = ResourceState<TModel::Spec>;
 
     fn deref(&self) -> &Self::Target {
         &self.inner
@@ -86,11 +87,11 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<TModel> From<ResourceState<TModel::Spec, TModel::Status>> for ReconcilableResourceState<TModel>
+impl<TModel> From<ResourceState<TModel::Spec>> for ReconcilableResourceState<TModel>
 where
     TModel: ReconcilableStateModel,
 {
-    fn from(value: ResourceState<TModel::Spec, TModel::Status>) -> Self {
+    fn from(value: ResourceState<TModel::Spec>) -> Self {
         Self { inner: value }
     }
 }
@@ -102,7 +103,6 @@ where
     TModel: ReconcilableStateModel,
 {
     type Spec = TModel::Spec;
-    type Status = TModel::Status;
 
     fn id(&self) -> &ResourceID {
         &self.inner.id
@@ -124,15 +124,22 @@ where
         &mut self.inner.spec
     }
 
-    fn status(&self) -> &Self::Status {
+    fn status(&self) -> &ResourceStatus {
         &self.inner.status
     }
 
-    fn status_mut(&mut self) -> &mut Self::Status {
+    fn status_mut(&mut self) -> &mut ResourceStatus {
         &mut self.inner.status
     }
 
-    fn into_parts(self) -> (ResourceID, crate::ResourceHeaders, Self::Spec, Self::Status) {
+    fn into_parts(
+        self,
+    ) -> (
+        ResourceID,
+        crate::ResourceHeaders,
+        Self::Spec,
+        ResourceStatus,
+    ) {
         self.inner.into_parts()
     }
 }
@@ -156,12 +163,12 @@ where
 impl<TModel> TryFrom<ResourceSnapshot> for ReconcilableResourceState<TModel>
 where
     TModel: ReconcilableStateModel,
-    ResourceState<TModel::Spec, TModel::Status>: TryFrom<ResourceSnapshot, Error = InternalError>,
+    ResourceState<TModel::Spec>: TryFrom<ResourceSnapshot, Error = InternalError>,
 {
     type Error = InternalError;
 
     fn try_from(snapshot: ResourceSnapshot) -> Result<Self, Self::Error> {
-        ResourceState::<TModel::Spec, TModel::Status>::try_from(snapshot).map(Into::into)
+        ResourceState::<TModel::Spec>::try_from(snapshot).map(Into::into)
     }
 }
 
