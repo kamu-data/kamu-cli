@@ -39,8 +39,10 @@ pub struct ResourceSummaryView {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[serde_with::serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceStatusSummaryView {
+    #[serde_as(as = "Option<odf::metadata::serde::yaml::resource::ResourcePhase>")]
     pub phase: Option<ResourcePhase>,
     pub observed_generation: Option<u64>,
     pub ready: Option<bool>,

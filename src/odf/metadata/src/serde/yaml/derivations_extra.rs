@@ -307,6 +307,34 @@ impl TryFrom<proxies::resource::ResourceSelector> for dtos::resource::ResourceSe
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+impl std::fmt::Display for dtos::resource::ResourcePhase {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            Self::Pending => "Pending",
+            Self::Reconciling => "Reconciling",
+            Self::Ready => "Ready",
+            Self::Failed => "Failed",
+        };
+        write!(f, "{s}")
+    }
+}
+
+impl std::str::FromStr for dtos::resource::ResourcePhase {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Pending" | "pending" => Ok(Self::Pending),
+            "Reconciling" | "reconciling" => Ok(Self::Reconciling),
+            "Ready" | "ready" => Ok(Self::Ready),
+            "Failed" | "failed" => Ok(Self::Failed),
+            _ => Err(format!("Unrecognized resource phase: {s}")),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl std::str::FromStr for proxies::dataset::DatasetSelector {
     type Err = String;
 

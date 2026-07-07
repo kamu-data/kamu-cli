@@ -931,7 +931,6 @@ impl ResourceRepository for SqliteResourceRepository {
                 COUNT(*) as "total_count!: i64",
                 SUM(CASE WHEN phase = 'Reconciling' THEN 1 ELSE 0 END) as "reconciling_count!: i64",
                 SUM(CASE WHEN phase = 'Ready' THEN 1 ELSE 0 END) as "ready_count!: i64",
-                SUM(CASE WHEN phase = 'Degraded' THEN 1 ELSE 0 END) as "degraded_count!: i64",
                 SUM(CASE WHEN phase = 'Failed' THEN 1 ELSE 0 END) as "failed_count!: i64",
                 SUM(CASE WHEN phase = 'Pending' THEN 1 ELSE 0 END) as "pending_count!: i64"
             FROM (
@@ -940,7 +939,6 @@ impl ResourceRepository for SqliteResourceRepository {
                     CASE COALESCE(json_extract(status, '$.phase'), 'Pending')
                         WHEN 'Reconciling' THEN 'Reconciling'
                         WHEN 'Ready' THEN 'Ready'
-                        WHEN 'Degraded' THEN 'Degraded'
                         WHEN 'Failed' THEN 'Failed'
                         ELSE 'Pending'
                     END as phase
@@ -966,7 +964,6 @@ impl ResourceRepository for SqliteResourceRepository {
                     pending: u64::try_from(row.pending_count).unwrap(),
                     reconciling: u64::try_from(row.reconciling_count).unwrap(),
                     ready: u64::try_from(row.ready_count).unwrap(),
-                    degraded: u64::try_from(row.degraded_count).unwrap(),
                     failed: u64::try_from(row.failed_count).unwrap(),
                 },
             })

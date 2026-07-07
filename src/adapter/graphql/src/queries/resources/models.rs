@@ -11,7 +11,7 @@ use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
 
 use crate::prelude::*;
-use crate::scalars::{AccountID, AccountName, AccountRef, UInt64};
+use crate::scalars::{AccountID, AccountName, AccountRef, ResourcePhase, UInt64};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Type aliases for cleaner From implementations
@@ -795,18 +795,6 @@ impl From<kamu_resources::ResourceListColumnValueView> for ResourceListColumnVal
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
-#[graphql(remote = "kamu_resources::ResourcePhase")]
-pub enum ResourcePhase {
-    Pending,
-    Reconciling,
-    Ready,
-    Degraded,
-    Failed,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceStatusSummary {
     pub phase: Option<ResourcePhase>,
@@ -867,7 +855,6 @@ pub struct ResourcePhaseCounts {
     pub pending: UInt64,
     pub reconciling: UInt64,
     pub ready: UInt64,
-    pub degraded: UInt64,
     pub failed: UInt64,
 }
 
@@ -877,7 +864,6 @@ impl From<kamu_resources::ResourcePhaseCounts> for ResourcePhaseCounts {
             pending: value.pending.into(),
             reconciling: value.reconciling.into(),
             ready: value.ready.into(),
-            degraded: value.degraded.into(),
             failed: value.failed.into(),
         }
     }

@@ -4124,11 +4124,15 @@ type ResourceNameNotFoundProblem {
 	message: String!
 }
 
+"""
+Represents the lifecycle stage of a resource.
+
+Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourcePhase
+"""
 enum ResourcePhase {
 	PENDING
 	RECONCILING
 	READY
-	DEGRADED
 	FAILED
 }
 
@@ -4136,7 +4140,6 @@ type ResourcePhaseCounts {
 	pending: Uint64!
 	reconciling: Uint64!
 	ready: Uint64!
-	degraded: Uint64!
 	failed: Uint64!
 }
 

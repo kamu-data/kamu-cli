@@ -43,7 +43,6 @@ pub(crate) enum ResourcePhase {
     Pending,
     Reconciling,
     Ready,
-    Degraded,
     Failed,
 }
 
@@ -53,7 +52,6 @@ impl From<ResourcePhase> for kamu_resources::ResourcePhase {
             ResourcePhase::Pending => Self::Pending,
             ResourcePhase::Reconciling => Self::Reconciling,
             ResourcePhase::Ready => Self::Ready,
-            ResourcePhase::Degraded => Self::Degraded,
             ResourcePhase::Failed => Self::Failed,
         }
     }
@@ -194,7 +192,6 @@ pub(crate) struct ResourcePhaseCounts {
     pub pending: Uint64,
     pub reconciling: Uint64,
     pub ready: Uint64,
-    pub degraded: Uint64,
     pub failed: Uint64,
 }
 

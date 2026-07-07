@@ -926,11 +926,11 @@ pub async fn test_summarize_resources(catalog: &Catalog) {
     ready.status = Some(serde_json::json!({ "phase": "Ready" }));
     repo.create_resource(&ready).await.unwrap();
 
-    let mut degraded_v2 = make_test_snapshot(account_id.clone(), &KIND_A, "degraded-v2");
-    degraded_v2.id = repo.new_resource_id().await.unwrap();
-    degraded_v2.schema = KIND_A_V2.clone();
-    degraded_v2.status = Some(serde_json::json!({ "phase": "Degraded" }));
-    repo.create_resource(&degraded_v2).await.unwrap();
+    let mut unknown_phase_v2 = make_test_snapshot(account_id.clone(), &KIND_A, "unknown-phase-v2");
+    unknown_phase_v2.id = repo.new_resource_id().await.unwrap();
+    unknown_phase_v2.schema = KIND_A_V2.clone();
+    unknown_phase_v2.status = Some(serde_json::json!({ "phase": "UnknownFuturePhase" }));
+    repo.create_resource(&unknown_phase_v2).await.unwrap();
 
     let mut failed = make_test_snapshot(account_id.clone(), &KIND_B, "failed");
     failed.id = repo.new_resource_id().await.unwrap();
@@ -972,7 +972,6 @@ pub async fn test_summarize_resources(catalog: &Catalog) {
                     pending: 1,
                     reconciling: 0,
                     ready: 1,
-                    degraded: 0,
                     failed: 0,
                 },
             },
@@ -980,10 +979,9 @@ pub async fn test_summarize_resources(catalog: &Catalog) {
                 schema: "KindA-v2".to_string(),
                 total_count: 1,
                 phase_counts: ResourcePhaseCounts {
-                    pending: 0,
+                    pending: 1,
                     reconciling: 0,
                     ready: 0,
-                    degraded: 1,
                     failed: 0,
                 },
             },
@@ -994,7 +992,6 @@ pub async fn test_summarize_resources(catalog: &Catalog) {
                     pending: 1,
                     reconciling: 0,
                     ready: 0,
-                    degraded: 0,
                     failed: 1,
                 },
             },

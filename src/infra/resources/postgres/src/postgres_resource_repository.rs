@@ -930,7 +930,6 @@ impl ResourceRepository for PostgresResourceRepository {
                 COUNT(*) as "total_count!",
                 COUNT(*) FILTER (WHERE phase = 'Reconciling') as "reconciling_count!",
                 COUNT(*) FILTER (WHERE phase = 'Ready') as "ready_count!",
-                COUNT(*) FILTER (WHERE phase = 'Degraded') as "degraded_count!",
                 COUNT(*) FILTER (WHERE phase = 'Failed') as "failed_count!",
                 COUNT(*) FILTER (WHERE phase = 'Pending') as "pending_count!"
             FROM (
@@ -939,7 +938,6 @@ impl ResourceRepository for PostgresResourceRepository {
                     CASE COALESCE(status ->> 'phase', 'Pending')
                         WHEN 'Reconciling' THEN 'Reconciling'
                         WHEN 'Ready' THEN 'Ready'
-                        WHEN 'Degraded' THEN 'Degraded'
                         WHEN 'Failed' THEN 'Failed'
                         ELSE 'Pending'
                     END as phase
@@ -965,7 +963,6 @@ impl ResourceRepository for PostgresResourceRepository {
                     pending: u64::try_from(row.pending_count).unwrap(),
                     reconciling: u64::try_from(row.reconciling_count).unwrap(),
                     ready: u64::try_from(row.ready_count).unwrap(),
-                    degraded: u64::try_from(row.degraded_count).unwrap(),
                     failed: u64::try_from(row.failed_count).unwrap(),
                 },
             })

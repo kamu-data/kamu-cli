@@ -187,7 +187,6 @@ impl TryFrom<fragments::ResourceTypeCountSummary> for domain::ResourceTypeCountS
                 pending: value.phase_counts.pending.into(),
                 reconciling: value.phase_counts.reconciling.into(),
                 ready: value.phase_counts.ready.into(),
-                degraded: value.phase_counts.degraded.into(),
                 failed: value.phase_counts.failed.into(),
             },
         })

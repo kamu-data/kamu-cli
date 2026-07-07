@@ -128,7 +128,7 @@ long-term goal. This page documents what exists now.
 | **Spec** | The desired-state portion authored by the user; stored as `serde_json::Value`. |
 | **Status** | Server-owned observed state (`phase`, `observedGeneration`, `conditions`). Note `generation` lives in **headers**, not status. |
 | **Snapshot** | The persisted materialized form of a resource (`ResourceSnapshot`). |
-| **Phase** | Lifecycle stage: `Pending`, `Reconciling`, `Ready`, `Failed`. (`Degraded` exists in the enum but is reserved/unused today — see [§13 state machine](#lifecycle-state-machine).) |
+| **Phase** | Lifecycle stage: `Pending`, `Reconciling`, `Ready`, `Failed` — matches ODF RFC-018's `ResourcePhase` exactly (see [§13 state machine](#lifecycle-state-machine)). |
 | **Condition** | A K8s-style condition entry contributing to the overall phase. |
 | **generation / observedGeneration** | `generation` bumps on each spec/headers change; `observedGeneration` records the last generation reconciliation observed. Drift ⇒ reconcile. |
 | **Reconciliation** | The act of driving actual state toward the spec (e.g. `SecretSet` materializes its encrypted read-side projection). |
@@ -404,11 +404,21 @@ pub struct ResourceHeaders {
 }
 
 pub struct ResourceStatus {                  // entirely server-owned
-    pub phase: ResourcePhase,                // Pending|Reconciling|Ready|Degraded|Failed
+    pub phase: ResourcePhase,                // Pending|Reconciling|Ready|Failed
     pub observed_generation: u64,
     pub conditions: Vec<ResourceCondition>,
 }
 ```
+
+> **`ResourcePhase`** is a `pub type ResourcePhase = odf::metadata::resource::ResourcePhase;` alias —
+> the same "adopt the codegen type directly" pattern as `ResourceID`/`TypeUri`/`ResourceAccountRef`
+> above. Because the ODF dto has no direct `Serialize`/`Deserialize` (only the YAML-manifest layer
+> does, via its own codegen'd shadow proxy), every struct with a `ResourcePhase`-typed field annotates
+> that field with `#[serde_with::serde_as] ... #[serde_as(as =
+> "odf::metadata::serde::yaml::resource::ResourcePhase")]` rather than deriving serde for free — this
+> is a deliberate per-field compromise, not a bug; `Display`/`FromStr` are provided directly on the
+> ODF dto (`src/odf/metadata/src/serde/yaml/derivations_extra.rs`) so CLI/string round-tripping needs
+> no per-crate workaround.
 
 Also generated: `id` (allocated if the manifest omitted it) and `last_reconciled_at`.
 
@@ -958,10 +968,13 @@ stateDiagram-v2
 
 **Notes on current behavior (stage-1):**
 
-- **`Degraded` is not reachable today.** The variant exists in `ResourcePhase` (and the GraphQL
-  schema) but no code path assigns it; treat it as reserved for future, richer resources. `Failed`
-  is the only unhealthy phase currently produced — set by `mark_failed` when the reconciler returns
-  an error, alongside a `Ready=false` condition carrying the reason/message.
+- **`Failed` is the only unhealthy phase.** `ResourcePhase` is adopted directly from ODF RFC-018's
+  codegen'd `resource::ResourcePhase` (`Pending`, `Reconciling`, `Ready`, `Failed`) — same "adopt the
+  codegen type directly" pattern as `ResourceID`/`TypeUri`/`ResourceAccountRef` (see
+  [§5a](#5a-resource-anatomy--input-vs-auto-generated)). A previously-reserved, never-produced
+  `Degraded` variant (kamu-side only, not part of the RFC) was dropped in this migration. `Failed` is
+  set by `mark_failed` when the reconciler returns an error, alongside a `Ready=false` condition
+  carrying the reason/message.
 - **`Failed` is status, not terminal and not auto-retried.** There is no background reconcile
   worker or scheduler yet. Recovery is driven by the **user re-applying** the manifest: a changed
   spec bumps `generation`, which moves the resource back to `Pending` (clearing conditions) and makes

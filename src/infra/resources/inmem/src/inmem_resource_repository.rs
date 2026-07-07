@@ -21,6 +21,7 @@ use kamu_resources::{
     ResourceIDStream,
     ResourceIdentityRow,
     ResourceName,
+    ResourcePhase,
     ResourcePhaseCounts,
     ResourceRawEventQuery,
     ResourceRepository,
@@ -509,12 +510,12 @@ impl ResourceRepository for InMemoryResourceRepository {
                 .as_ref()
                 .and_then(|status| status.get("phase"))
                 .and_then(|phase| phase.as_str())
+                .and_then(|phase| phase.parse::<ResourcePhase>().ok())
             {
-                Some("Reconciling") => row.phase_counts.increment_reconciling(),
-                Some("Ready") => row.phase_counts.increment_ready(),
-                Some("Degraded") => row.phase_counts.increment_degraded(),
-                Some("Failed") => row.phase_counts.increment_failed(),
-                _ => row.phase_counts.increment_pending(),
+                Some(ResourcePhase::Reconciling) => row.phase_counts.increment_reconciling(),
+                Some(ResourcePhase::Ready) => row.phase_counts.increment_ready(),
+                Some(ResourcePhase::Failed) => row.phase_counts.increment_failed(),
+                Some(ResourcePhase::Pending) | None => row.phase_counts.increment_pending(),
             }
         }
 

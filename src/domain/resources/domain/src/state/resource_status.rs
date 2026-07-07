@@ -14,9 +14,11 @@ use crate::{ResourceCondition, ResourcePhase};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[serde_with::serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ResourceStatus {
+    #[serde_as(as = "odf::metadata::serde::yaml::resource::ResourcePhase")]
     pub phase: ResourcePhase,
     pub observed_generation: u64,
     pub conditions: Vec<ResourceCondition>,

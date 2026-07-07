@@ -7,18 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use serde::{Deserialize, Serialize};
-use strum::{Display, EnumString};
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Display, EnumString, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub enum ResourcePhase {
-    Pending,
-    Reconciling,
-    Ready,
-    Degraded,
-    Failed,
-}
+pub type ResourcePhase = odf::metadata::resource::ResourcePhase;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
