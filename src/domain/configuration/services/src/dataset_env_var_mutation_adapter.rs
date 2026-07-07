@@ -654,8 +654,12 @@ impl DatasetEnvVarMutationAdapterImpl {
             account: account_id,
             name: resource_name,
             description: None,
-            labels: BTreeMap::new(),
-            annotations: BTreeMap::new(),
+            labels: kamu_resources::ResourceLabels {
+                entries: BTreeMap::new(),
+            },
+            annotations: kamu_resources::ResourceAnnotations {
+                entries: BTreeMap::new(),
+            },
         }
     }
 }

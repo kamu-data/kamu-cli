@@ -105,15 +105,15 @@ fn append_headers_changes(
         changes,
         ApplyManifestChangeKind::Headers,
         "headers.labels",
-        before.map(|view| &view.headers.labels),
-        Some(&after.headers.labels),
+        before.map(|view| &view.headers.labels.entries),
+        Some(&after.headers.labels.entries),
     )?;
     push_headers_change(
         changes,
         ApplyManifestChangeKind::Headers,
         "headers.annotations",
-        before.map(|view| &view.headers.annotations),
-        Some(&after.headers.annotations),
+        before.map(|view| &view.headers.annotations.entries),
+        Some(&after.headers.annotations.entries),
     )?;
     push_headers_change(
         changes,

@@ -13,7 +13,7 @@ use serde::de::{MapAccess, SeqAccess, Visitor};
 use serde::ser::SerializeMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::{ResourceAccountRef, ResourceID, ResourceSchemaId};
+use crate::{ResourceAccountRef, ResourceID, ResourceSchemaId, TypeRef};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -38,22 +38,22 @@ pub struct ResourceManifestHeaders {
     pub description: Option<String>,
     #[serde(
         default,
-        serialize_with = "serialize_string_entries",
-        deserialize_with = "deserialize_string_entries"
+        serialize_with = "serialize_entries",
+        deserialize_with = "deserialize_entries"
     )]
-    pub labels: Vec<(String, String)>,
+    pub labels: Vec<(TypeRef, serde_json::Value)>,
     #[serde(
         default,
-        serialize_with = "serialize_string_entries",
-        deserialize_with = "deserialize_string_entries"
+        serialize_with = "serialize_entries",
+        deserialize_with = "deserialize_entries"
     )]
-    pub annotations: Vec<(String, String)>,
+    pub annotations: Vec<(TypeRef, serde_json::Value)>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn serialize_string_entries<S>(
-    entries: &[(String, String)],
+fn serialize_entries<S>(
+    entries: &[(TypeRef, serde_json::Value)],
     serializer: S,
 ) -> Result<S::Ok, S::Error>
 where
@@ -71,7 +71,9 @@ where
     map.end()
 }
 
-fn deserialize_string_entries<'de, D>(deserializer: D) -> Result<Vec<(String, String)>, D::Error>
+fn deserialize_entries<'de, D>(
+    deserializer: D,
+) -> Result<Vec<(TypeRef, serde_json::Value)>, D::Error>
 where
     D: Deserializer<'de>,
 {
@@ -81,10 +83,10 @@ where
     struct EntriesVisitor;
 
     impl<'de> Visitor<'de> for EntriesVisitor {
-        type Value = Vec<(String, String)>;
+        type Value = Vec<(TypeRef, serde_json::Value)>;
 
         fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            formatter.write_str("a map or sequence of string key/value entries")
+            formatter.write_str("a map or sequence of key/value entries")
         }
 
         fn visit_none<E>(self) -> Result<Self::Value, E>
@@ -108,7 +110,7 @@ where
             let mut entries = Vec::new();
             let mut seen = BTreeSet::new();
 
-            while let Some((key, value)) = map.next_entry::<String, String>()? {
+            while let Some((key, value)) = map.next_entry::<TypeRef, serde_json::Value>()? {
                 if !seen.insert(key.clone()) {
                     return Err(serde::de::Error::custom(format!(
                         "duplicate header key '{key}'"
@@ -127,7 +129,7 @@ where
             let mut entries = Vec::new();
             let mut seen = BTreeSet::new();
 
-            while let Some((key, value)) = seq.next_element::<(String, String)>()? {
+            while let Some((key, value)) = seq.next_element::<(TypeRef, serde_json::Value)>()? {
                 if !seen.insert(key.clone()) {
                     return Err(serde::de::Error::custom(format!(
                         "duplicate header key '{key}'"
@@ -169,6 +171,71 @@ mod tests {
         let round_tripped: ResourceManifestHeaders =
             serde_json::from_str(&serde_json::to_string(&headers).unwrap()).unwrap();
         assert_matches!(round_tripped.account, Some(ResourceAccountRef::Id(actual)) if actual == id);
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    #[test]
+    fn labels_and_annotations_accept_short_name_and_uri_keys_with_nested_values() {
+        let json = r#"{
+            "id": null, "account": null, "name": "n", "description": null,
+            "labels": {
+                "env": "prod",
+                "https://opendatafabric.org/schemas/labels/v1/Team": {"name": "data-platform"}
+            },
+            "annotations": {
+                "owner": "https://github.com/open-data-fabric"
+            }
+        }"#;
+
+        let headers: ResourceManifestHeaders = serde_json::from_str(json).unwrap();
+        assert_eq!(headers.labels.len(), 2);
+        assert_eq!(headers.annotations.len(), 1);
+
+        let round_tripped: ResourceManifestHeaders =
+            serde_json::from_str(&serde_json::to_string(&headers).unwrap()).unwrap();
+        assert_eq!(round_tripped.labels.len(), 2);
+        assert_eq!(round_tripped.annotations.len(), 1);
+    }
+
+    #[test]
+    fn rejects_duplicate_label_key_on_deserialize() {
+        let json = r#"{
+            "id": null, "account": null, "name": "n", "description": null,
+            "labels": {"env": "prod"},
+            "annotations": {}
+        }"#;
+        // Manually crafted with a duplicate `env` key — serde_json's `Value`
+        // route collapses duplicates before we ever see them, so exercise the
+        // visitor directly via a sequence form instead, which our custom
+        // deserializer also accepts and does not collapse.
+        let seq_json = r#"{
+            "id": null, "account": null, "name": "n", "description": null,
+            "labels": [["env", "prod"], ["env", "staging"]],
+            "annotations": {}
+        }"#;
+
+        // Sanity: the map form above parses fine (no duplicates).
+        let _: ResourceManifestHeaders = serde_json::from_str(json).unwrap();
+
+        let err = serde_json::from_str::<ResourceManifestHeaders>(seq_json).unwrap_err();
+        assert!(err.to_string().contains("duplicate header key 'env'"));
+    }
+
+    #[test]
+    fn rejects_invalid_label_key_on_deserialize() {
+        // Not a `https:`-prefixed URI and not a valid short type name grammar
+        // (spaces are not allowed) — this is now a parse-time failure, not a
+        // `ResourceHeadersValidationError::InvalidLabelKey`.
+        let json = r#"{
+            "id": null, "account": null, "name": "n", "description": null,
+            "labels": {"not a valid key!": "prod"},
+            "annotations": {}
+        }"#;
+
+        let err = serde_json::from_str::<ResourceManifestHeaders>(json).unwrap_err();
+        // The error surfaces from `TypeRef`'s own `FromStr`/`Deserialize`.
+        assert!(!err.to_string().is_empty());
     }
 }
 

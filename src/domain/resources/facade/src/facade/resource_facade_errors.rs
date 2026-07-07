@@ -34,13 +34,9 @@ pub enum ResourceHeadersValidationProblemCode {
     InvalidName,
     DescriptionTooLong,
     TooManyLabels,
-    InvalidLabelKey,
     DuplicateLabelKey,
-    LabelValueTooLong,
     TooManyAnnotations,
-    InvalidAnnotationKey,
     DuplicateAnnotationKey,
-    AnnotationValueTooLong,
 }
 
 #[derive(Debug, Error)]
@@ -60,13 +56,9 @@ impl From<ResourceHeadersValidationError> for ResourceInvalidHeadersError {
             E::InvalidName { .. } => C::InvalidName,
             E::DescriptionTooLong { .. } => C::DescriptionTooLong,
             E::TooManyLabels { .. } => C::TooManyLabels,
-            E::InvalidLabelKey { .. } => C::InvalidLabelKey,
             E::DuplicateLabelKey { .. } => C::DuplicateLabelKey,
-            E::LabelValueTooLong { .. } => C::LabelValueTooLong,
             E::TooManyAnnotations { .. } => C::TooManyAnnotations,
-            E::InvalidAnnotationKey { .. } => C::InvalidAnnotationKey,
             E::DuplicateAnnotationKey { .. } => C::DuplicateAnnotationKey,
-            E::AnnotationValueTooLong { .. } => C::AnnotationValueTooLong,
         };
         Self {
             code,

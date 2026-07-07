@@ -61,6 +61,25 @@ pub async fn test_resources_golden_view(ctx: ResourceCtx) {
         actual_ss,
         expected_secret_set_without_secrets("app-secrets")
     );
+
+    // ── VariableSet with populated labels/annotations ───────────────────────────
+    //
+    // Pins the canonical `TypeRef`-keyed rendering: a short `TypeName` label key
+    // (`env`), a full `TypeUri` label key with a nested-object value, and one
+    // annotation.
+
+    ctx.apply_variable_set_with_labels("app-vars-labeled", "hi")
+        .await;
+
+    let actual_vs_labeled = strip_volatile(
+        ctx.get_one(["get", "vs", "app-vars-labeled"])
+            .await
+            .into_json(),
+    );
+    pretty_assertions::assert_eq!(
+        actual_vs_labeled,
+        expected_variable_set_with_labels("app-vars-labeled", "hi")
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -75,6 +94,35 @@ fn expected_variable_set(name: &str, message_value: &str) -> serde_json::Value {
             "description": fixtures::DEFAULT_DESCRIPTION,
             "labels": {},
             "annotations": {},
+            "deletedAt": null,
+        },
+        "spec": { "variables": { "MESSAGE": message_value } },
+        "status": {
+            "conditions": [
+                { "reason": "Idle", "status": "False", "type": "Reconciling", "message": null },
+                { "reason": "ValidationPassed", "status": "True", "type": "Accepted", "message": null },
+                { "reason": "Reconciled", "status": "True", "type": "Ready", "message": null }
+            ],
+            "observedGeneration": 1,
+            "phase": "Ready",
+            "stats": { "invalidVariables": 0, "totalVariables": 1, "validVariables": 1 }
+        }
+    })
+}
+
+fn expected_variable_set_with_labels(name: &str, message_value: &str) -> serde_json::Value {
+    serde_json::json!({
+        "$schema": fixtures::VARIABLE_SET_SCHEMA,
+        "headers": {
+            "name": name,
+            "description": fixtures::DEFAULT_DESCRIPTION,
+            "labels": {
+                "env": "prod",
+                "https://opendatafabric.org/schemas/labels/v1/Team": { "name": "data-platform" }
+            },
+            "annotations": {
+                "owner": "https://github.com/open-data-fabric"
+            },
             "deletedAt": null,
         },
         "spec": { "variables": { "MESSAGE": message_value } },

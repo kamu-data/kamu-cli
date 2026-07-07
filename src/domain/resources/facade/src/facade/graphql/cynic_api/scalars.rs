@@ -26,6 +26,8 @@ cynic::impl_scalar!(
 cynic::impl_scalar!(domain::TypeUri, schema::TypeUri);
 cynic::impl_scalar!(serde_json::Value, schema::JSON);
 cynic::impl_scalar!(Uint64, schema::Uint64);
+cynic::impl_scalar!(ResourceLabels, schema::ResourceLabels);
+cynic::impl_scalar!(ResourceAnnotations, schema::ResourceAnnotations);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -71,6 +73,60 @@ impl<'de> serde::Deserialize<'de> for Uint64 {
 #[derive(cynic::Scalar, Debug, Clone)]
 #[cynic(graphql_type = "AccountName")]
 pub(crate) struct AccountName(pub(crate) String);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Cynic-side mirror of the `ResourceLabels` scalar — wraps the domain DTO,
+/// which has no direct serde of its own (only via the YAML shadow proxy), so
+/// this newtype reuses that proxy to serialize/deserialize on the wire.
+#[derive(Debug, Clone)]
+pub(crate) struct ResourceLabels(pub(crate) domain::ResourceLabels);
+
+impl serde::Serialize for ResourceLabels {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let proxy: odf::metadata::serde::yaml::resource::ResourceLabels = self.0.clone().into();
+        proxy.serialize(serializer)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for ResourceLabels {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let proxy =
+            odf::metadata::serde::yaml::resource::ResourceLabels::deserialize(deserializer)?;
+        let dto = proxy
+            .try_into()
+            .map_err(|e: odf::metadata::errors::ValidationError| {
+                serde::de::Error::custom(e.to_string())
+            })?;
+        Ok(Self(dto))
+    }
+}
+
+/// Cynic-side mirror of the `ResourceAnnotations` scalar — see
+/// [`ResourceLabels`] for why this wraps rather than binding the DTO directly.
+#[derive(Debug, Clone)]
+pub(crate) struct ResourceAnnotations(pub(crate) domain::ResourceAnnotations);
+
+impl serde::Serialize for ResourceAnnotations {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let proxy: odf::metadata::serde::yaml::resource::ResourceAnnotations =
+            self.0.clone().into();
+        proxy.serialize(serializer)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for ResourceAnnotations {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let proxy =
+            odf::metadata::serde::yaml::resource::ResourceAnnotations::deserialize(deserializer)?;
+        let dto = proxy
+            .try_into()
+            .map_err(|e: odf::metadata::errors::ValidationError| {
+                serde::de::Error::custom(e.to_string())
+            })?;
+        Ok(Self(dto))
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

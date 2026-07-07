@@ -197,13 +197,9 @@ pub(crate) enum ResourceHeaderValidationProblemCode {
     InvalidName,
     DescriptionTooLong,
     TooManyLabels,
-    InvalidLabelKey,
     DuplicateLabelKey,
-    LabelValueTooLong,
     TooManyAnnotations,
-    InvalidAnnotationKey,
     DuplicateAnnotationKey,
-    AnnotationValueTooLong,
 }
 
 impl From<ResourceHeaderValidationProblemCode> for crate::ResourceHeadersValidationProblemCode {
@@ -215,13 +211,9 @@ impl From<ResourceHeaderValidationProblemCode> for crate::ResourceHeadersValidat
             C::InvalidName => Self::InvalidName,
             C::DescriptionTooLong => Self::DescriptionTooLong,
             C::TooManyLabels => Self::TooManyLabels,
-            C::InvalidLabelKey => Self::InvalidLabelKey,
             C::DuplicateLabelKey => Self::DuplicateLabelKey,
-            C::LabelValueTooLong => Self::LabelValueTooLong,
             C::TooManyAnnotations => Self::TooManyAnnotations,
-            C::InvalidAnnotationKey => Self::InvalidAnnotationKey,
             C::DuplicateAnnotationKey => Self::DuplicateAnnotationKey,
-            C::AnnotationValueTooLong => Self::AnnotationValueTooLong,
         }
     }
 }

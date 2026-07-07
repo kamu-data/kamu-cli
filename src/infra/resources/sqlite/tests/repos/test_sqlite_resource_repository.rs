@@ -34,6 +34,15 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
+    fixture =
+        resource_repo_suite::test_create_find_update_resource_with_populated_labels_annotations,
+    harness = SqliteResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
     fixture = resource_repo_suite::test_find_resource_snapshots_by_ids,
     harness = SqliteResourceRepositoryHarness
 );

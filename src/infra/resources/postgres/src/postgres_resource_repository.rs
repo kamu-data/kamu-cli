@@ -60,8 +60,9 @@ impl ResourceRepository for PostgresResourceRepository {
 
         let account_id_stack = resource_snapshot.headers.account.as_stack_string();
         let account_id_str = account_id_stack.as_str();
-        let labels = serde_json::to_value(&resource_snapshot.headers.labels).unwrap();
-        let annotations = serde_json::to_value(&resource_snapshot.headers.annotations).unwrap();
+        let labels = kamu_resources::resource_labels_to_json(&resource_snapshot.headers.labels);
+        let annotations =
+            kamu_resources::resource_annotations_to_json(&resource_snapshot.headers.annotations);
         let generation = i64::try_from(resource_snapshot.headers.generation).unwrap();
         let last_event_id = resource_snapshot.last_event_id.map(EventID::into_inner);
         let resource_id: &uuid::Uuid = resource_snapshot.id.as_ref();
@@ -180,8 +181,12 @@ impl ResourceRepository for PostgresResourceRepository {
                 .push_bind(resource_snapshot.schema.to_string())
                 .push_bind(resource_snapshot.headers.name.to_string())
                 .push_bind(resource_snapshot.headers.description.clone())
-                .push_bind(serde_json::to_value(&resource_snapshot.headers.labels).unwrap())
-                .push_bind(serde_json::to_value(&resource_snapshot.headers.annotations).unwrap())
+                .push_bind(kamu_resources::resource_labels_to_json(
+                    &resource_snapshot.headers.labels,
+                ))
+                .push_bind(kamu_resources::resource_annotations_to_json(
+                    &resource_snapshot.headers.annotations,
+                ))
                 .push_bind(resource_snapshot.spec.clone())
                 .push_bind(resource_snapshot.status.clone())
                 .push_bind(i64::try_from(resource_snapshot.headers.generation).unwrap())
@@ -511,8 +516,8 @@ impl ResourceRepository for PostgresResourceRepository {
                 account: row.account_id,
                 name: kamu_resources::ResourceName::new_unchecked(&row.resource_name),
                 description: row.description,
-                labels: serde_json::from_value(row.labels).unwrap(),
-                annotations: serde_json::from_value(row.annotations).unwrap(),
+                labels: kamu_resources::resource_labels_from_json(row.labels),
+                annotations: kamu_resources::resource_annotations_from_json(row.annotations),
                 generation: u64::try_from(row.generation).unwrap(),
                 created_at: row.created_at,
                 updated_at: row.updated_at,
@@ -623,8 +628,8 @@ impl ResourceRepository for PostgresResourceRepository {
                 account: row.account_id,
                 name: kamu_resources::ResourceName::new_unchecked(&row.resource_name),
                 description: row.description,
-                labels: serde_json::from_value(row.labels).unwrap(),
-                annotations: serde_json::from_value(row.annotations).unwrap(),
+                labels: kamu_resources::resource_labels_from_json(row.labels),
+                annotations: kamu_resources::resource_annotations_from_json(row.annotations),
                 generation: u64::try_from(row.generation).unwrap(),
                 created_at: row.created_at,
                 updated_at: row.updated_at,
@@ -690,8 +695,8 @@ impl ResourceRepository for PostgresResourceRepository {
                     account: row.account_id,
                     name: kamu_resources::ResourceName::new_unchecked(&row.resource_name),
                     description: row.description,
-                    labels: serde_json::from_value(row.labels).unwrap(),
-                    annotations: serde_json::from_value(row.annotations).unwrap(),
+                    labels: kamu_resources::resource_labels_from_json(row.labels),
+                    annotations: kamu_resources::resource_annotations_from_json(row.annotations),
                     generation: u64::try_from(row.generation).unwrap(),
                     created_at: row.created_at,
                     updated_at: row.updated_at,
@@ -802,8 +807,8 @@ impl ResourceRepository for PostgresResourceRepository {
                         account: row.account_id,
                         name: kamu_resources::ResourceName::new_unchecked(&row.resource_name),
                         description: row.description,
-                        labels: serde_json::from_value(row.labels).unwrap(),
-                        annotations: serde_json::from_value(row.annotations).unwrap(),
+                        labels: kamu_resources::resource_labels_from_json(row.labels),
+                        annotations: kamu_resources::resource_annotations_from_json(row.annotations),
                         generation: u64::try_from(row.generation).unwrap(),
                         created_at: row.created_at,
                         updated_at: row.updated_at,
@@ -870,8 +875,8 @@ impl ResourceRepository for PostgresResourceRepository {
                         account: row.account_id,
                         name: kamu_resources::ResourceName::new_unchecked(&row.resource_name),
                         description: row.description,
-                        labels: serde_json::from_value(row.labels).unwrap(),
-                        annotations: serde_json::from_value(row.annotations).unwrap(),
+                        labels: kamu_resources::resource_labels_from_json(row.labels),
+                        annotations: kamu_resources::resource_annotations_from_json(row.annotations),
                         generation: u64::try_from(row.generation).unwrap(),
                         created_at: row.created_at,
                         updated_at: row.updated_at,

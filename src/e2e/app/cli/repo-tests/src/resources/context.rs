@@ -341,6 +341,14 @@ impl ResourceCtx {
             .await;
     }
 
+    /// Apply a `VariableSet` fixture carrying a populated
+    /// `labels`/`annotations` block via stdin, asserting success.
+    pub async fn apply_variable_set_with_labels(&self, name: &str, value: &str) {
+        let manifest = fixtures::variable_set_manifest_yaml_with_labels(name, value);
+        self.assert_success_with_stdin(["apply", "--stdin"], &manifest, None)
+            .await;
+    }
+
     /// Apply a canonical `SecretSet` fixture via stdin, asserting success.
     ///
     /// The caller must wire the e2e fixture with

@@ -8012,6 +8012,7 @@ dependencies = [
  "secrecy",
  "serde",
  "serde_json",
+ "serde_with",
  "serde_yaml_ng",
  "server-console",
  "setty",

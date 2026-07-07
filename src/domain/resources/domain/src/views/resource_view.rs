@@ -7,12 +7,18 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::BTreeMap;
-
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::{ResourceHeaders, ResourceID, ResourceName, ResourceSelectorName, TypeUri};
+use crate::{
+    ResourceAnnotations,
+    ResourceHeaders,
+    ResourceID,
+    ResourceLabels,
+    ResourceName,
+    ResourceSelectorName,
+    TypeUri,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -45,14 +51,17 @@ pub struct ResourceViewAccount {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[serde_with::serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceViewHeaders {
     pub id: ResourceID,
     pub account: ResourceViewAccount,
     pub name: ResourceName,
     pub description: Option<String>,
-    pub labels: BTreeMap<String, String>,
-    pub annotations: BTreeMap<String, String>,
+    #[serde_as(as = "odf::metadata::serde::yaml::resource::ResourceLabels")]
+    pub labels: ResourceLabels,
+    #[serde_as(as = "odf::metadata::serde::yaml::resource::ResourceAnnotations")]
+    pub annotations: ResourceAnnotations,
     pub generation: u64,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -73,8 +82,12 @@ impl ResourceViewHeaders {
             account,
             name: ResourceName::new_unchecked(name),
             description: None,
-            labels: BTreeMap::new(),
-            annotations: BTreeMap::new(),
+            labels: ResourceLabels {
+                entries: std::collections::BTreeMap::new(),
+            },
+            annotations: ResourceAnnotations {
+                entries: std::collections::BTreeMap::new(),
+            },
             generation: 0,
             created_at: now,
             updated_at: now,

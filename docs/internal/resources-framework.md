@@ -136,6 +136,8 @@ long-term goal. This page documents what exists now.
 | **SpecViewMode** | How sensitive spec fields are rendered. Two modes only: `Encrypted` (default — the stored ciphertext envelope is returned as-is) and `Revealed` (decrypted plaintext). There is no separate "redacted/placeholder" mode today. |
 | **Dispatcher** | Per-type adapter (`ResourceCrudDispatcher`, …) registered in `dill` and looked up by schema or selector metadata. |
 | **Facade** | The single API seam (`ResourceFacade`) used by all callers; local or remote-GraphQL impl. |
+| **TypeRef** | A label/annotation *key*: either a short `TypeName` (e.g. `env`) or a full `TypeUri` schema URI (e.g. `https://opendatafabric.org/schemas/labels/v1/Team`), per ODF RFC-018. Carried as `odf::metadata::resource::TypeRef` (`Uri(TypeUri) \| Name(TypeName)`); `Ord`, so usable as a `BTreeMap` key; serializes as a plain string. |
+| **Labels / Annotations** | `headers.labels`/`headers.annotations` are `BTreeMap<TypeRef, serde_json::Value>` (`ResourceLabels`/`ResourceAnnotations` — thin aliases over the ODF-generated containers), i.e. arbitrary hierarchical JSON values keyed by `TypeRef`, not flat `String → String` maps. Per RFC-018 the only semantic difference is that labels are meant to be indexed/queryable via selectors and annotations are not — **indexing is not yet implemented** (deferred). |
 
 ---
 
@@ -353,8 +355,8 @@ pub struct ResourceManifestHeaders {
     pub account: Option<ResourceAccountRef>, // optional — by name, id, or both; defaults to caller
     pub name: ResourceName,                  // required
     pub description: Option<String>,
-    pub labels: Vec<(String, String)>,
-    pub annotations: Vec<(String, String)>,
+    pub labels: Vec<(TypeRef, serde_json::Value)>,
+    pub annotations: Vec<(TypeRef, serde_json::Value)>,
 }
 ```
 
@@ -395,8 +397,8 @@ pub struct ResourceHeaders {
     pub account: odf::AccountID,             // resolved from manifest account / caller
     pub name: ResourceName,                  // (authored)
     pub description: Option<String>,         // (authored)
-    pub labels: BTreeMap<String, String>,    // (authored)
-    pub annotations: BTreeMap<String, String>, // (authored)
+    pub labels: ResourceLabels,              // (authored) BTreeMap<TypeRef, serde_json::Value>
+    pub annotations: ResourceAnnotations,    // (authored) BTreeMap<TypeRef, serde_json::Value>
     pub generation: u64,                     // generated — bumps on spec/headers change
     pub created_at: DateTime<Utc>,           // generated
     pub updated_at: DateTime<Utc>,           // generated
@@ -419,6 +421,41 @@ pub struct ResourceStatus {                  // entirely server-owned
 > is a deliberate per-field compromise, not a bug; `Display`/`FromStr` are provided directly on the
 > ODF dto (`src/odf/metadata/src/serde/yaml/derivations_extra.rs`) so CLI/string round-tripping needs
 > no per-crate workaround.
+
+> **`ResourceLabels`/`ResourceAnnotations`** follow the same `#[serde_as]` pattern as `ResourcePhase`
+> above — `pub type ResourceLabels = odf::metadata::resource::ResourceLabels;` (and the annotations
+> equivalent), each a thin `{ entries: BTreeMap<TypeRef, serde_json::Value> }` container with no direct
+> `Serialize`/`Deserialize` of its own, only via the YAML shadow proxy
+> (`odf::metadata::serde::yaml::resource::{ResourceLabels, ResourceAnnotations}`). Every struct with a
+> `ResourceLabels`/`ResourceAnnotations`-typed field (`ResourceHeaders`, `ResourceHeadersInput`,
+> `ResourceViewHeaders`, and the local CLI render structs) annotates that field with
+> `#[serde_as(as = "odf::metadata::serde::yaml::resource::ResourceLabels")]` (or the annotations
+> variant). Repositories that round-trip through raw `serde_json::Value` columns (Postgres/SQLite) go
+> through the free functions `resource_labels_from_json`/`resource_labels_to_json` (and the annotations
+> equivalents) in `values/resource_labels_annotations.rs` rather than repeating the proxy dance inline.
+> The Cynic (remote-facade) client mirrors the same idea with its own `scalars::{ResourceLabels,
+> ResourceAnnotations}` newtypes implementing `Serialize`/`Deserialize` by hand against the proxy, since
+> `cynic::impl_scalar!` needs a concrete local type to bind to the GraphQL scalar.
+>
+> **Manifest-layer duplicate-key detection cannot reuse the ODF proxy as-is.** The proxy's
+> `#[serde(flatten)] #[serde(with = "map_value_limited_precision")]` deserializes straight into a
+> `BTreeMap`, which silently drops duplicate keys (last write wins) rather than erroring — exactly the
+> hazard the manifest layer's hand-rolled `EntriesVisitor` exists to catch. So
+> `ResourceManifestHeaders.labels`/`.annotations` stay `Vec<(TypeRef, serde_json::Value)>` with a custom
+> visitor that walks map/seq entries and rejects a repeated key before it can collapse, only widened
+> from `Vec<(String, String)>` to swap in `TypeRef` keys and arbitrary JSON values.
+>
+> **A bad label/annotation key is now a parse-time failure, not a headers-validation failure.** Because
+> `TypeRef`'s own `FromStr`/`Deserialize` runs *during* `serde_json`/`serde_yaml::from_str` on the whole
+> manifest, an invalid key (fails both the `https:` URI check and the `TypeName` grammar) surfaces as
+> `ParseResourceManifestError` → `ApplyManifestError::ParseManifest`, the same category as malformed
+> YAML/JSON — not as a `ResourceHeadersValidationError`/`InvalidHeaders` problem. The
+> `InvalidLabelKey`/`InvalidAnnotationKey` problem-code variants (facade errors, the GraphQL
+> `ResourceHeaderValidationProblemCode` enum, the Cynic mirror, and `resources/schema.gql`) were removed
+> end to end as now-unreachable, the same treatment `ResourcePhase::Degraded` got. There is also no
+> longer a per-value size limit on labels/annotations (`LabelValueTooLong`/`AnnotationValueTooLong` were
+> dropped too) — values are arbitrary JSON and may be arbitrarily large/nested; only entry *counts*
+> (`MAX_LABELS`/`MAX_ANNOTATIONS`) are still enforced.
 
 Also generated: `id` (allocated if the manifest omitted it) and `last_reconciled_at`.
 
@@ -472,7 +509,11 @@ Resources are **event-sourced with a materialized snapshot per resource**. Stora
   `deleted_at` (nullable), `last_reconciled_at`, `last_event_id`. **Uniqueness:**
   `UNIQUE (account_id, resource_schema, resource_name)`.
   A partial index on `(account_id, resource_schema, status->>'phase') WHERE deleted_at IS NULL`
-  backs the summary projection.
+  backs the summary projection. The `labels`/`annotations` columns are untyped JSONB with **no
+  index** — the migration to the canonical `TypeRef`-keyed shape (see [§5a](#5a-resource-anatomy--input-vs-auto-generated))
+  needed no schema change, since an empty map (`{}`) is valid under both the old and new
+  representations and the columns were never more specifically typed than "some JSON object". Label
+  indexing for selector queries is a deferred future addition, not yet implemented.
 - **`resource_events`** — append-only log: `event_id` (BIGINT from a sequence, PK), `resource_id`
   (FK → `resources`), `resource_schema`, `event_time`, `event_type`, `event_payload` (JSONB).
 

@@ -77,6 +77,30 @@ pub fn variable_set_manifest_yaml(name: &str, value: &str) -> String {
     )
 }
 
+/// Same as [`variable_set_manifest_yaml`] but carries a populated
+/// `headers.labels`/`headers.annotations` block — a short `TypeName` label
+/// key, a full `TypeUri` label key with a nested-object value, and one
+/// annotation — to pin the ODF `TypeRef`-keyed canonical shape end-to-end.
+pub fn variable_set_manifest_yaml_with_labels(name: &str, value: &str) -> String {
+    indoc::formatdoc!(
+        r#"
+        $schema: {VARIABLE_SET_SCHEMA}
+        headers:
+          name: {name}
+          description: {DEFAULT_DESCRIPTION}
+          labels:
+            env: prod
+            https://opendatafabric.org/schemas/labels/v1/Team:
+              name: data-platform
+          annotations:
+            owner: https://github.com/open-data-fabric
+        spec:
+          variables:
+            MESSAGE: {value}
+        "#
+    )
+}
+
 /// The same `VariableSet` manifest as [`variable_set_manifest_yaml`] but in
 /// JSON.
 pub fn variable_set_manifest_json(name: &str, value: &str) -> String {

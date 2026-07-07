@@ -20,4 +20,8 @@ pub type TypeUri = odf::metadata::resource::TypeUri;
 /// CRD-style short type name of a resource, e.g. `VariableSet`.
 pub type TypeName = odf::metadata::resource::TypeName;
 
+/// A label/annotation key: either a short [`TypeName`] (e.g. `env`) or a full
+/// [`TypeUri`] schema URI.
+pub type TypeRef = odf::metadata::resource::TypeRef;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

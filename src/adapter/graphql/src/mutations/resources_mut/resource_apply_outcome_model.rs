@@ -47,13 +47,9 @@ pub enum ResourceHeaderValidationProblemCode {
     InvalidName,
     DescriptionTooLong,
     TooManyLabels,
-    InvalidLabelKey,
     DuplicateLabelKey,
-    LabelValueTooLong,
     TooManyAnnotations,
-    InvalidAnnotationKey,
     DuplicateAnnotationKey,
-    AnnotationValueTooLong,
 }
 
 impl From<kamu_resources::ResourceHeadersValidationError> for ResourceInvalidHeaderProblem {
@@ -71,16 +67,10 @@ impl From<kamu_resources_facade::ResourceInvalidHeadersError> for ResourceInvali
             C::InvalidName => ResourceHeaderValidationProblemCode::InvalidName,
             C::DescriptionTooLong => ResourceHeaderValidationProblemCode::DescriptionTooLong,
             C::TooManyLabels => ResourceHeaderValidationProblemCode::TooManyLabels,
-            C::InvalidLabelKey => ResourceHeaderValidationProblemCode::InvalidLabelKey,
             C::DuplicateLabelKey => ResourceHeaderValidationProblemCode::DuplicateLabelKey,
-            C::LabelValueTooLong => ResourceHeaderValidationProblemCode::LabelValueTooLong,
             C::TooManyAnnotations => ResourceHeaderValidationProblemCode::TooManyAnnotations,
-            C::InvalidAnnotationKey => ResourceHeaderValidationProblemCode::InvalidAnnotationKey,
             C::DuplicateAnnotationKey => {
                 ResourceHeaderValidationProblemCode::DuplicateAnnotationKey
-            }
-            C::AnnotationValueTooLong => {
-                ResourceHeaderValidationProblemCode::AnnotationValueTooLong
             }
         };
         Self {

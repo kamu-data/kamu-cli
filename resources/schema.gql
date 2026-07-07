@@ -3873,6 +3873,8 @@ input ResourceAccountSelectorInput @oneOf {
 	both: ResourceAccountByIdAndNameInput
 }
 
+scalar ResourceAnnotations
+
 type ResourceApplyChange {
 	kind: ResourceApplyChangeKind!
 	path: String!
@@ -3999,13 +4001,9 @@ enum ResourceHeaderValidationProblemCode {
 	INVALID_NAME
 	DESCRIPTION_TOO_LONG
 	TOO_MANY_LABELS
-	INVALID_LABEL_KEY
 	DUPLICATE_LABEL_KEY
-	LABEL_VALUE_TOO_LONG
 	TOO_MANY_ANNOTATIONS
-	INVALID_ANNOTATION_KEY
 	DUPLICATE_ANNOTATION_KEY
-	ANNOTATION_VALUE_TOO_LONG
 }
 
 type ResourceHeaders {
@@ -4013,8 +4011,8 @@ type ResourceHeaders {
 	account: AccountRef!
 	name: ResourceName!
 	description: String
-	labels: JSON!
-	annotations: JSON!
+	labels: ResourceLabels!
+	annotations: ResourceAnnotations!
 	generation: Uint64!
 	createdAt: DateTime!
 	updatedAt: DateTime!
@@ -4079,6 +4077,8 @@ type ResourceInvalidSpecProblem {
 	schema: TypeUri!
 	message: String!
 }
+
+scalar ResourceLabels
 
 union ResourceListAllOutcome = ResourceConnection | ResourceBadAccountProblem
 

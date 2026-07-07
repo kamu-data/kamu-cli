@@ -134,8 +134,12 @@ impl BaseResourceServiceHarness {
             account: account_id,
             name: kamu_resources::ResourceName::new_unchecked(name),
             description: None,
-            labels: BTreeMap::new(),
-            annotations: BTreeMap::new(),
+            labels: kamu_resources::ResourceLabels {
+                entries: BTreeMap::new(),
+            },
+            annotations: kamu_resources::ResourceAnnotations {
+                entries: BTreeMap::new(),
+            },
         }
     }
 

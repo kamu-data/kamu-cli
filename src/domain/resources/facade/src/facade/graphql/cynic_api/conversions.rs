@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::InternalError;
 use kamu_resources as domain;
 
 use crate::facade::graphql::cynic_api::fragments;
@@ -45,11 +45,6 @@ impl TryFrom<fragments::Resource> for domain::ResourceView {
     type Error = InternalError;
 
     fn try_from(value: fragments::Resource) -> Result<Self, Self::Error> {
-        let labels: std::collections::BTreeMap<String, String> =
-            serde_json::from_value(value.headers.labels).int_err()?;
-        let annotations: std::collections::BTreeMap<String, String> =
-            serde_json::from_value(value.headers.annotations).int_err()?;
-
         Ok(Self {
             schema: value.schema,
             headers: domain::ResourceViewHeaders {
@@ -68,8 +63,8 @@ impl TryFrom<fragments::Resource> for domain::ResourceView {
                 },
                 name: value.headers.name,
                 description: value.headers.description,
-                labels,
-                annotations,
+                labels: value.headers.labels.0,
+                annotations: value.headers.annotations.0,
                 generation: value.headers.generation.into(),
                 created_at: value.headers.created_at,
                 updated_at: value.headers.updated_at,

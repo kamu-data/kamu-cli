@@ -112,6 +112,7 @@ impl GetResourceCommand {
         resource: &kamu_resources::ResourceView,
         format: FacadeResourceManifestFormat,
     ) -> Result<String, CLIError> {
+        #[serde_with::serde_as]
         #[derive(serde::Serialize)]
         #[serde(rename_all = "camelCase")]
         struct RenderedResourceViewHeaders<'a> {
@@ -119,8 +120,10 @@ impl GetResourceCommand {
             account: &'a kamu_resources::ResourceViewAccount,
             name: &'a str,
             description: &'a Option<String>,
-            labels: &'a BTreeMap<String, String>,
-            annotations: &'a BTreeMap<String, String>,
+            #[serde_as(as = "odf::metadata::serde::yaml::resource::ResourceLabels")]
+            labels: &'a kamu_resources::ResourceLabels,
+            #[serde_as(as = "odf::metadata::serde::yaml::resource::ResourceAnnotations")]
+            annotations: &'a kamu_resources::ResourceAnnotations,
             generation: u64,
             created_at: &'a DateTime<Utc>,
             updated_at: &'a DateTime<Utc>,

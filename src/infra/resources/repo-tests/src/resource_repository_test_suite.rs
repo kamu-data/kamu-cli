@@ -138,6 +138,83 @@ pub async fn test_create_and_find_resource(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_create_find_update_resource_with_populated_labels_annotations(catalog: &Catalog) {
+    let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+    let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
+
+    let mut snapshot = make_test_snapshot(account_id.clone(), &TEST_KIND, "labeled-resource");
+    snapshot.id = repo.new_resource_id().await.unwrap();
+    let id = snapshot.id;
+
+    snapshot
+        .headers
+        .labels
+        .entries
+        .insert("env".parse().unwrap(), serde_json::json!("prod"));
+    snapshot.headers.labels.entries.insert(
+        "https://opendatafabric.org/schemas/labels/v1/Team"
+            .parse()
+            .unwrap(),
+        serde_json::json!({ "name": "data-platform", "oncall": ["alice", "bob"] }),
+    );
+    snapshot.headers.annotations.entries.insert(
+        "https://opendatafabric.org/schemas/labels/v1/Repo"
+            .parse()
+            .unwrap(),
+        serde_json::json!("https://github.com/open-data-fabric/spec"),
+    );
+
+    repo.create_resource(&snapshot).await.unwrap();
+
+    let found = repo
+        .find_resource_snapshot_by_id(&id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(found.headers.labels, snapshot.headers.labels);
+    assert_eq!(found.headers.annotations, snapshot.headers.annotations);
+
+    // update: change a value, add a key, remove a key
+    let mut updated_headers = found.headers.clone();
+    updated_headers
+        .labels
+        .entries
+        .insert("env".parse().unwrap(), serde_json::json!("staging"));
+    updated_headers.labels.entries.remove(
+        &"https://opendatafabric.org/schemas/labels/v1/Team"
+            .parse()
+            .unwrap(),
+    );
+    updated_headers.annotations.entries.insert(
+        "owner".parse().unwrap(),
+        serde_json::json!("https://github.com/open-data-fabric"),
+    );
+
+    let event_id = EventID::new(1);
+    let updated_snapshot = ResourceSnapshot {
+        headers: updated_headers.clone(),
+        last_event_id: Some(event_id),
+        ..found.clone()
+    };
+
+    repo.update_resource(&updated_snapshot, found.last_event_id)
+        .await
+        .unwrap();
+
+    let found_after_update = repo
+        .find_resource_snapshot_by_id(&id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(found_after_update.headers.labels, updated_headers.labels);
+    assert_eq!(
+        found_after_update.headers.annotations,
+        updated_headers.annotations
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_find_resource_snapshots_by_ids(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
     let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");

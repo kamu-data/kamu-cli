@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::BTreeMap;
 use std::io::Read as _;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -657,6 +656,7 @@ impl ApplyPrinter<'_> {
     }
 
     fn render_verbose_resource(resource: &ResourceView) -> Result<String, CLIError> {
+        #[serde_with::serde_as]
         #[derive(serde::Serialize)]
         #[serde(rename_all = "camelCase")]
         struct RenderedResourceViewHeaders<'a> {
@@ -664,8 +664,10 @@ impl ApplyPrinter<'_> {
             account: &'a kamu_resources::ResourceViewAccount,
             name: &'a str,
             description: &'a Option<String>,
-            labels: &'a BTreeMap<String, String>,
-            annotations: &'a BTreeMap<String, String>,
+            #[serde_as(as = "odf::metadata::serde::yaml::resource::ResourceLabels")]
+            labels: &'a kamu_resources::ResourceLabels,
+            #[serde_as(as = "odf::metadata::serde::yaml::resource::ResourceAnnotations")]
+            annotations: &'a kamu_resources::ResourceAnnotations,
             generation: u64,
             created_at: &'a DateTime<Utc>,
             updated_at: &'a DateTime<Utc>,

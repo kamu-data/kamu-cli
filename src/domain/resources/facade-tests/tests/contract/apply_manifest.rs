@@ -648,6 +648,116 @@ pub async fn test_apply_rejects_duplicate_header_key(h: &impl FacadeContractHarn
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// RF-026 (extension): an invalid label/annotation key is now rejected at
+// manifest-parse time (via `TypeRef`'s own `FromStr`), not by
+// `ResourceHeadersInput` validation — confirms this is a compile-time-style
+// rejection (`ParseManifest`), not a semantic `InvalidHeaders` problem.
+contract_test!(
+    apply_rejects_invalid_header_key,
+    super::test_apply_rejects_invalid_header_key
+);
+
+pub async fn test_apply_rejects_invalid_header_key(h: &impl FacadeContractHarness) {
+    let facade = h.facade_for(TestAccount::Alice);
+
+    // Spaces and `!` are not valid in a short `TypeName`, and the key does not
+    // start with `https:`, so `TypeRef::from_str` rejects it during
+    // deserialization of the manifest itself.
+    let yaml_with_invalid_label_key = indoc::formatdoc!(
+        r#"
+        $schema: {VARIABLE_SET_SCHEMA_STR}
+        headers:
+          name: invalid-label-key-yaml
+          labels:
+            "not a valid key!": prod
+        spec:
+          variables:
+            KEY: value
+        "#
+    );
+
+    let result = facade
+        .apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Yaml,
+            manifest: yaml_with_invalid_label_key,
+        })
+        .await;
+
+    assert_matches!(
+        result,
+        Err(ApplyManifestError::ParseManifest(_)),
+        "invalid label key must fail with ParseManifest, got: {result:?}"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-026 (extension): a successful apply carrying both a short `TypeName`
+// label key and a full `TypeUri` label key, plus a nested-object annotation
+// value, round-trips into the stored resource unchanged.
+contract_test!(
+    apply_round_trips_populated_labels_annotations,
+    super::test_apply_round_trips_populated_labels_annotations
+);
+
+pub async fn test_apply_round_trips_populated_labels_annotations(h: &impl FacadeContractHarness) {
+    let facade = h.facade_for(TestAccount::Alice);
+
+    let manifest = indoc::formatdoc!(
+        r#"
+        $schema: {VARIABLE_SET_SCHEMA_STR}
+        headers:
+          name: labeled-vars
+          labels:
+            env: prod
+            https://opendatafabric.org/schemas/labels/v1/Team:
+              name: data-platform
+              oncall:
+                - alice
+                - bob
+          annotations:
+            owner: https://github.com/open-data-fabric
+        spec:
+          variables:
+            KEY: value
+        "#
+    );
+
+    let decision = facade
+        .apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Yaml,
+            manifest,
+        })
+        .await
+        .unwrap();
+
+    let view = assert_applied_outcome(&decision, ApplyResourceOutcome::Created);
+    assert_resource_view_fields(view, VariableSetResource::schema(), "labeled-vars");
+
+    assert_eq!(view.headers.labels.entries.len(), 2);
+    assert_eq!(
+        view.headers.labels.entries.get(&"env".parse().unwrap()),
+        Some(&serde_json::json!("prod"))
+    );
+    assert_eq!(
+        view.headers.labels.entries.get(
+            &"https://opendatafabric.org/schemas/labels/v1/Team"
+                .parse()
+                .unwrap()
+        ),
+        Some(&serde_json::json!({ "name": "data-platform", "oncall": ["alice", "bob"] }))
+    );
+    assert_eq!(
+        view.headers
+            .annotations
+            .entries
+            .get(&"owner".parse().unwrap()),
+        Some(&serde_json::json!("https://github.com/open-data-fabric"))
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // RF-143 / apply error taxonomy — InvalidHeaders
 // Empty resource name fails headers validation before the use case runs.
 // Both local and remote facades must return Err(InvalidHeaders(_)) with the

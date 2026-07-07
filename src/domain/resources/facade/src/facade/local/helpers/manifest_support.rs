@@ -112,8 +112,8 @@ pub(crate) fn resource_view_to_manifest(
             account,
             name: headers.name.to_string(),
             description: headers.description,
-            labels: headers.labels.into_iter().collect(),
-            annotations: headers.annotations.into_iter().collect(),
+            labels: headers.labels.entries.into_iter().collect(),
+            annotations: headers.annotations.entries.into_iter().collect(),
         },
         spec,
     })

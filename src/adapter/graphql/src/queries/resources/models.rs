@@ -11,7 +11,15 @@ use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
 
 use crate::prelude::*;
-use crate::scalars::{AccountID, AccountName, AccountRef, ResourcePhase, UInt64};
+use crate::scalars::{
+    AccountID,
+    AccountName,
+    AccountRef,
+    ResourceAnnotations,
+    ResourceLabels,
+    ResourcePhase,
+    UInt64,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Type aliases for cleaner From implementations
@@ -657,8 +665,8 @@ pub struct ResourceHeaders {
     pub account: AccountRef,
     pub name: ResourceName<'static>,
     pub description: Option<String>,
-    pub labels: serde_json::Value,
-    pub annotations: serde_json::Value,
+    pub labels: ResourceLabels,
+    pub annotations: ResourceAnnotations,
     pub generation: UInt64,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -668,9 +676,6 @@ pub struct ResourceHeaders {
 
 impl From<kamu_resources::ResourceView> for ResourceHeaders {
     fn from(value: kamu_resources::ResourceView) -> Self {
-        let labels = serde_json::to_value(value.headers.labels).unwrap();
-        let annotations = serde_json::to_value(value.headers.annotations).unwrap();
-
         let account = match value.headers.account.name {
             Some(name) => kamu_resources::ResourceAccountRef::Both {
                 id: value.headers.account.id,
@@ -684,8 +689,8 @@ impl From<kamu_resources::ResourceView> for ResourceHeaders {
             account: account.into(),
             name: value.headers.name.clone().into(),
             description: value.headers.description,
-            labels,
-            annotations,
+            labels: value.headers.labels.into(),
+            annotations: value.headers.annotations.into(),
             generation: value.headers.generation.into(),
             created_at: value.headers.created_at,
             updated_at: value.headers.updated_at,

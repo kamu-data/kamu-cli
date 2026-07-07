@@ -123,10 +123,10 @@ fn test_make_changes_detects_label_added() {
     after.headers.updated_at = before.headers.updated_at;
     before.headers.generation = 1;
     after.headers.generation = 1;
-    after
-        .headers
-        .labels
-        .insert("env".to_string(), "prod".to_string());
+    after.headers.labels.entries.insert(
+        "env".parse().unwrap(),
+        serde_json::Value::String("prod".to_string()),
+    );
 
     let changes = make_apply_manifest_changes(Some(&before), &after).unwrap();
 
@@ -183,8 +183,12 @@ fn test_make_changes_identical_before_after_returns_no_field_changes() {
             },
             name: kamu_resources::ResourceName::new_unchecked("res"),
             description: None,
-            labels: Default::default(),
-            annotations: Default::default(),
+            labels: kamu_resources::ResourceLabels {
+                entries: Default::default(),
+            },
+            annotations: kamu_resources::ResourceAnnotations {
+                entries: Default::default(),
+            },
             generation: 2,
             created_at: ts,
             updated_at: ts,
@@ -231,8 +235,12 @@ fn test_timestamp_precision_normalized_avoids_spurious_diffs() {
             },
             name: kamu_resources::ResourceName::new_unchecked("res"),
             description: None,
-            labels: Default::default(),
-            annotations: Default::default(),
+            labels: kamu_resources::ResourceLabels {
+                entries: Default::default(),
+            },
+            annotations: kamu_resources::ResourceAnnotations {
+                entries: Default::default(),
+            },
             generation: 1,
             created_at: ts_base,
             updated_at,

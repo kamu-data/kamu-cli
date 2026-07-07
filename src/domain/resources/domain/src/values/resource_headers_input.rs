@@ -11,17 +11,20 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{ResourceName, ResourceValidateHeaders};
+use crate::{ResourceAnnotations, ResourceLabels, ResourceName, ResourceValidateHeaders, TypeRef};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[serde_with::serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceHeadersInput {
     pub account: odf::AccountID,
     pub name: ResourceName,
     pub description: Option<String>,
-    pub labels: BTreeMap<String, String>,
-    pub annotations: BTreeMap<String, String>,
+    #[serde_as(as = "odf::metadata::serde::yaml::resource::ResourceLabels")]
+    pub labels: ResourceLabels,
+    #[serde_as(as = "odf::metadata::serde::yaml::resource::ResourceAnnotations")]
+    pub annotations: ResourceAnnotations,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -30,25 +33,14 @@ impl ResourceHeadersInput {
     pub const MAX_NAME_LEN: usize = 128;
     pub const MAX_DESCRIPTION_LEN: usize = 4096;
     pub const MAX_LABELS: usize = 64;
-    pub const MAX_LABEL_VALUE_LEN: usize = 256;
     pub const MAX_ANNOTATIONS: usize = 128;
-    pub const MAX_ANNOTATION_VALUE_LEN: usize = 16 * 1024;
-
-    fn is_valid_header_key(key: &str) -> bool {
-        if key.is_empty() {
-            return false;
-        }
-
-        key.chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.' || c == '/')
-    }
 
     pub fn try_new(
         account: odf::AccountID,
         name: &str,
         description: Option<String>,
-        labels: Vec<(String, String)>,
-        annotations: Vec<(String, String)>,
+        labels: Vec<(TypeRef, serde_json::Value)>,
+        annotations: Vec<(TypeRef, serde_json::Value)>,
     ) -> Result<Self, ResourceHeadersValidationError> {
         if name.is_empty() {
             return Err(ResourceHeadersValidationError::EmptyName);
@@ -64,8 +56,12 @@ impl ResourceHeadersInput {
             account,
             name,
             description,
-            labels: Self::entries_to_map(labels, ResourceHeaderField::Labels)?,
-            annotations: Self::entries_to_map(annotations, ResourceHeaderField::Annotations)?,
+            labels: ResourceLabels {
+                entries: Self::entries_to_map(labels, ResourceHeaderField::Labels)?,
+            },
+            annotations: ResourceAnnotations {
+                entries: Self::entries_to_map(annotations, ResourceHeaderField::Annotations)?,
+            },
         };
 
         headers.validate()?;
@@ -74,19 +70,23 @@ impl ResourceHeadersInput {
     }
 
     fn entries_to_map(
-        entries: Vec<(String, String)>,
+        entries: Vec<(TypeRef, serde_json::Value)>,
         field: ResourceHeaderField,
-    ) -> Result<BTreeMap<String, String>, ResourceHeadersValidationError> {
+    ) -> Result<BTreeMap<TypeRef, serde_json::Value>, ResourceHeadersValidationError> {
         let mut map = BTreeMap::new();
 
         for (key, value) in entries {
             if map.insert(key.clone(), value).is_some() {
                 return Err(match field {
                     ResourceHeaderField::Labels => {
-                        ResourceHeadersValidationError::DuplicateLabelKey { key }
+                        ResourceHeadersValidationError::DuplicateLabelKey {
+                            key: key.to_string(),
+                        }
                     }
                     ResourceHeaderField::Annotations => {
-                        ResourceHeadersValidationError::DuplicateAnnotationKey { key }
+                        ResourceHeadersValidationError::DuplicateAnnotationKey {
+                            key: key.to_string(),
+                        }
                     }
                 });
             }
@@ -130,48 +130,18 @@ impl ResourceValidateHeaders for ResourceHeadersInput {
             });
         }
 
-        if self.labels.len() > Self::MAX_LABELS {
+        if self.labels.entries.len() > Self::MAX_LABELS {
             return Err(ResourceHeadersValidationError::TooManyLabels {
-                actual: self.labels.len(),
+                actual: self.labels.entries.len(),
                 max: Self::MAX_LABELS,
             });
         }
 
-        for (key, value) in &self.labels {
-            if !Self::is_valid_header_key(key) {
-                return Err(ResourceHeadersValidationError::InvalidLabelKey { key: key.clone() });
-            }
-
-            if value.len() > Self::MAX_LABEL_VALUE_LEN {
-                return Err(ResourceHeadersValidationError::LabelValueTooLong {
-                    key: key.clone(),
-                    actual: value.len(),
-                    max: Self::MAX_LABEL_VALUE_LEN,
-                });
-            }
-        }
-
-        if self.annotations.len() > Self::MAX_ANNOTATIONS {
+        if self.annotations.entries.len() > Self::MAX_ANNOTATIONS {
             return Err(ResourceHeadersValidationError::TooManyAnnotations {
-                actual: self.annotations.len(),
+                actual: self.annotations.entries.len(),
                 max: Self::MAX_ANNOTATIONS,
             });
-        }
-
-        for (key, value) in &self.annotations {
-            if !Self::is_valid_header_key(key) {
-                return Err(ResourceHeadersValidationError::InvalidAnnotationKey {
-                    key: key.clone(),
-                });
-            }
-
-            if value.len() > Self::MAX_ANNOTATION_VALUE_LEN {
-                return Err(ResourceHeadersValidationError::AnnotationValueTooLong {
-                    key: key.clone(),
-                    actual: value.len(),
-                    max: Self::MAX_ANNOTATION_VALUE_LEN,
-                });
-            }
         }
 
         Ok(())
@@ -197,34 +167,144 @@ pub enum ResourceHeadersValidationError {
     #[error("too many labels: got {actual}, max is {max}")]
     TooManyLabels { actual: usize, max: usize },
 
-    #[error("invalid label key '{key}'")]
-    InvalidLabelKey { key: String },
-
     #[error("duplicate label key '{key}'")]
     DuplicateLabelKey { key: String },
-
-    #[error("label '{key}' value is too long: got {actual}, max is {max}")]
-    LabelValueTooLong {
-        key: String,
-        actual: usize,
-        max: usize,
-    },
 
     #[error("too many annotations: got {actual}, max is {max}")]
     TooManyAnnotations { actual: usize, max: usize },
 
-    #[error("invalid annotation key '{key}'")]
-    InvalidAnnotationKey { key: String },
-
     #[error("duplicate annotation key '{key}'")]
     DuplicateAnnotationKey { key: String },
+}
 
-    #[error("annotation '{key}' value is too long: got {actual}, max is {max}")]
-    AnnotationValueTooLong {
-        key: String,
-        actual: usize,
-        max: usize,
-    },
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use pretty_assertions::assert_matches;
+
+    use super::*;
+
+    fn account() -> odf::AccountID {
+        odf::AccountID::new_seeded_ed25519(b"test-account")
+    }
+
+    fn entry(key: &str, value: serde_json::Value) -> (TypeRef, serde_json::Value) {
+        (key.parse().unwrap(), value)
+    }
+
+    #[test]
+    fn accepts_short_name_and_full_uri_keys_with_nested_values() {
+        let headers = ResourceHeadersInput::try_new(
+            account(),
+            "n",
+            None,
+            vec![
+                entry("env", serde_json::json!("prod")),
+                entry(
+                    "https://opendatafabric.org/schemas/labels/v1/Team",
+                    serde_json::json!({ "name": "data-platform", "oncall": ["a", "b"] }),
+                ),
+            ],
+            vec![entry(
+                "owner",
+                serde_json::json!("https://github.com/open-data-fabric"),
+            )],
+        )
+        .unwrap();
+
+        assert_eq!(headers.labels.entries.len(), 2);
+        assert_eq!(headers.annotations.entries.len(), 1);
+    }
+
+    #[test]
+    fn rejects_duplicate_label_key() {
+        let result = ResourceHeadersInput::try_new(
+            account(),
+            "n",
+            None,
+            vec![
+                entry("env", serde_json::json!("prod")),
+                entry("env", serde_json::json!("staging")),
+            ],
+            vec![],
+        );
+
+        assert_matches!(
+            result,
+            Err(ResourceHeadersValidationError::DuplicateLabelKey { key }) if key == "env"
+        );
+    }
+
+    #[test]
+    fn rejects_duplicate_annotation_key() {
+        let result = ResourceHeadersInput::try_new(
+            account(),
+            "n",
+            None,
+            vec![],
+            vec![
+                entry("owner", serde_json::json!("a")),
+                entry("owner", serde_json::json!("b")),
+            ],
+        );
+
+        assert_matches!(
+            result,
+            Err(ResourceHeadersValidationError::DuplicateAnnotationKey { key }) if key == "owner"
+        );
+    }
+
+    #[test]
+    fn rejects_too_many_labels() {
+        let labels = (0..=ResourceHeadersInput::MAX_LABELS)
+            .map(|i| entry(&format!("label{i}"), serde_json::json!(i)))
+            .collect();
+
+        let result = ResourceHeadersInput::try_new(account(), "n", None, labels, vec![]);
+
+        assert_matches!(
+            result,
+            Err(ResourceHeadersValidationError::TooManyLabels { actual, max })
+                if actual == ResourceHeadersInput::MAX_LABELS + 1 && max == ResourceHeadersInput::MAX_LABELS
+        );
+    }
+
+    #[test]
+    fn rejects_too_many_annotations() {
+        let annotations = (0..=ResourceHeadersInput::MAX_ANNOTATIONS)
+            .map(|i| entry(&format!("annotation{i}"), serde_json::json!(i)))
+            .collect();
+
+        let result = ResourceHeadersInput::try_new(account(), "n", None, vec![], annotations);
+
+        assert_matches!(
+            result,
+            Err(ResourceHeadersValidationError::TooManyAnnotations { actual, max })
+                if actual == ResourceHeadersInput::MAX_ANNOTATIONS + 1
+                    && max == ResourceHeadersInput::MAX_ANNOTATIONS
+        );
+    }
+
+    #[test]
+    fn accepts_arbitrarily_large_label_value() {
+        // Values can be arbitrarily complex JSON — no size limit is enforced.
+        let large_value = serde_json::json!("x".repeat(100_000));
+
+        let headers = ResourceHeadersInput::try_new(
+            account(),
+            "n",
+            None,
+            vec![entry("big", large_value.clone())],
+            vec![],
+        )
+        .unwrap();
+
+        assert_eq!(
+            headers.labels.entries.get(&"big".parse().unwrap()),
+            Some(&large_value)
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

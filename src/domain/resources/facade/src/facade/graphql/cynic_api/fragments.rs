@@ -9,7 +9,12 @@
 
 use chrono::{DateTime, Utc};
 
-use crate::facade::graphql::cynic_api::scalars::{AccountName, Uint64};
+use crate::facade::graphql::cynic_api::scalars::{
+    AccountName,
+    ResourceAnnotations,
+    ResourceLabels,
+    Uint64,
+};
 use crate::facade::graphql::cynic_api::schema;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -213,8 +218,8 @@ pub(crate) struct ResourceHeaders {
     pub account: AccountRef,
     pub name: kamu_resources::ResourceName,
     pub description: Option<String>,
-    pub labels: serde_json::Value,
-    pub annotations: serde_json::Value,
+    pub labels: ResourceLabels,
+    pub annotations: ResourceAnnotations,
     pub generation: Uint64,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
