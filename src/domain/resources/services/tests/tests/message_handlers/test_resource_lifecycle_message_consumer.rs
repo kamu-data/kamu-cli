@@ -192,7 +192,6 @@ impl ResourceLifecycleConsumerHarness {
             headers: ResourceHeaders::simple(Utc::now(), make_account_id(), "res"),
             spec: serde_json::json!({ "value": "x" }),
             status: None,
-            last_reconciled_at: None,
             last_event_id: None,
         }
     }

@@ -24,7 +24,6 @@ INSERT OR IGNORE INTO resources (
     created_at,
     updated_at,
     deleted_at,
-    last_reconciled_at,
     last_event_id
 )
 SELECT
@@ -51,6 +50,7 @@ SELECT
     json_object(
         'phase', 'Ready',
         'observedGeneration', 1,
+        'reconciledAt', MIN(dev.created_at),
         'conditions', json_object(
             'https://kamu.dev/schemas/resource/v1alpha1/conditions/Accepted',
             json_object(
@@ -70,18 +70,12 @@ SELECT
                 'reason', 'Idle',
                 'lastTransitionTime', MIN(dev.created_at)
             )
-        ),
-        'stats', json_object(
-            'totalVariables', COUNT(*),
-            'validVariables', COUNT(*),
-            'invalidVariables', 0
         )
     )                                                                           AS status,
     1                                                                           AS generation,
     MIN(dev.created_at)                                                         AS created_at,
     MIN(dev.created_at)                                                         AS updated_at,
     NULL                                                                        AS deleted_at,
-    MIN(dev.created_at)                                                         AS last_reconciled_at,
     NULL                                                                        AS last_event_id
 FROM dataset_env_vars dev
 JOIN dataset_entries de ON de.dataset_id = dev.dataset_id
@@ -158,7 +152,6 @@ INSERT OR IGNORE INTO resources (
     created_at,
     updated_at,
     deleted_at,
-    last_reconciled_at,
     last_event_id
 )
 SELECT
@@ -185,6 +178,7 @@ SELECT
     json_object(
         'phase', 'Ready',
         'observedGeneration', 1,
+        'reconciledAt', MIN(dev.created_at),
         'conditions', json_object(
             'https://kamu.dev/schemas/resource/v1alpha1/conditions/Accepted',
             json_object(
@@ -204,18 +198,12 @@ SELECT
                 'reason', 'Idle',
                 'lastTransitionTime', MIN(dev.created_at)
             )
-        ),
-        'stats', json_object(
-            'totalSecrets', COUNT(*),
-            'validSecrets', COUNT(*),
-            'invalidSecrets', 0
         )
     )                                                                           AS status,
     1                                                                           AS generation,
     MIN(dev.created_at)                                                         AS created_at,
     MIN(dev.created_at)                                                         AS updated_at,
     NULL                                                                        AS deleted_at,
-    MIN(dev.created_at)                                                         AS last_reconciled_at,
     NULL                                                                        AS last_event_id
 FROM dataset_env_vars dev
 JOIN dataset_entries de ON de.dataset_id = dev.dataset_id
@@ -320,7 +308,7 @@ SELECT
     r.created_at,
     'ReconciliationSucceeded',
     '{"ReconciliationSucceeded":{"event_time":"' || r.created_at || '","id":"' || r.resource_id
-        || '","generation":1,"success":{"stats":' || json_extract(r.status, '$.stats') || '}}}'
+        || '","generation":1,"success":{}}}'
 FROM resources r
 WHERE r.resource_schema = 'https://opendatafabric.org/schemas/config/v1alpha1/VariableSet'
   AND r.resource_name LIKE 'legacy-vars-%'
@@ -382,7 +370,7 @@ SELECT
     r.created_at,
     'ReconciliationSucceeded',
     '{"ReconciliationSucceeded":{"event_time":"' || r.created_at || '","id":"' || r.resource_id
-        || '","generation":1,"success":{"stats":' || json_extract(r.status, '$.stats') || '}}}'
+        || '","generation":1,"success":{}}}'
 FROM resources r
 WHERE r.resource_schema = 'https://opendatafabric.org/schemas/config/v1alpha1/SecretSet'
   AND r.resource_name LIKE 'legacy-secrets-%'

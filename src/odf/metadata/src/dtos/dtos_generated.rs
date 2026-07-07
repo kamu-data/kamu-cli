@@ -1993,7 +1993,7 @@ pub mod resource {
         pub headers: resource::ResourceHeaders,
         /// Specifies the desired state of a resource.
         pub spec: SpecT,
-        /// Resource lifecycle and reconciliation inforamtion.
+        /// Resource lifecycle and reconciliation information.
         pub status: Option<resource::ResourceStatus>,
     }
 
@@ -2072,7 +2072,7 @@ pub mod resource {
 
     pub use crate::resource::{ResourceRef, ResourceSelector};
 
-    /// Resource lifecycle and reconciliation inforamtion.
+    /// Resource lifecycle and reconciliation information.
     ///
     /// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceStatus
     #[derive(Clone, Debug, Eq, PartialEq)]

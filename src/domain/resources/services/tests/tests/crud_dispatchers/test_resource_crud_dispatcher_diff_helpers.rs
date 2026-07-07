@@ -36,7 +36,6 @@ fn make_view(name: &str, value: &str) -> ResourceView {
             },
             name,
         ),
-        last_reconciled_at: None,
         spec: serde_json::json!({ "value": value }),
         status: None,
     }
@@ -194,7 +193,6 @@ fn test_make_changes_identical_before_after_returns_no_field_changes() {
             updated_at: ts,
             deleted_at: None,
         },
-        last_reconciled_at: None,
         spec: serde_json::json!({ "value": "same" }),
         status: None,
     };
@@ -246,7 +244,6 @@ fn test_timestamp_precision_normalized_avoids_spurious_diffs() {
             updated_at,
             deleted_at: None,
         },
-        last_reconciled_at: None,
         spec: serde_json::json!({ "value": "same" }),
         status: None,
     };

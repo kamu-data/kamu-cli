@@ -18,6 +18,7 @@ use crate::{
     ResourcePhase,
     ResourceSnapshot,
     ResourceStatus,
+    ResourceStatusExt,
     TypeUri,
 };
 
@@ -78,7 +79,7 @@ impl From<ResourceStatus> for ResourceStatusSummaryView {
 
         Self {
             phase: Some(value.phase),
-            observed_generation: Some(value.observed_generation),
+            observed_generation: value.observed_generation,
             ready,
         }
     }

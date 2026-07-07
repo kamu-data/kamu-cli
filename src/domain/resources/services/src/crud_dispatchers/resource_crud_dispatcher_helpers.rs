@@ -24,6 +24,8 @@ use kamu_resources::{
     ResourcePresentation,
     ResourceSchemaProvider,
     ResourceSnapshot,
+    ResourceStatusExt,
+    ResourceStatusJson,
     ResourceStatusLike,
     ResourceStatusSummaryView,
     ResourceSummaryView,
@@ -61,7 +63,7 @@ pub async fn map_apply_resource_planning_decision<R>(
 where
     R: ResourceSchemaProvider + DeclarativeResource,
     R::Spec: Serialize,
-    R::Status: Serialize + ResourceStatusLike,
+    R::Status: ResourceStatusJson + ResourceStatusLike,
 {
     Ok(match decision {
         ApplyResourcePlanningDecision::Planned(plan) => {
@@ -102,7 +104,7 @@ pub fn map_apply_resource_application_decision<R>(
 where
     R: ResourceSchemaProvider + DeclarativeResource,
     R::Spec: Serialize,
-    R::Status: Serialize + ResourceStatusLike,
+    R::Status: ResourceStatusJson + ResourceStatusLike,
 {
     Ok(match decision {
         ApplyResourceApplicationDecision::Applied(result) => {
@@ -134,16 +136,15 @@ pub fn typed_resource_state_to_view<R>(
 where
     R: ResourceSchemaProvider + DeclarativeResource,
     R::Spec: Serialize,
-    R::Status: Serialize + ResourceStatusLike,
+    R::Status: ResourceStatusJson + ResourceStatusLike,
 {
     let (id, headers, spec, status) = state.into_parts();
 
     Ok(ResourceView {
         schema: R::schema().clone(),
         headers: ResourceViewHeaders::from_owned(id, headers),
-        last_reconciled_at: status.resource_status().last_reconciled_at(),
         spec: serde_json::to_value(spec).int_err()?,
-        status: Some(serde_json::to_value(status).int_err()?),
+        status: Some(status.resource_status().clone()),
     })
 }
 
@@ -176,14 +177,12 @@ pub(crate) fn resource_snapshot_to_view(snapshot: ResourceSnapshot) -> ResourceV
         headers,
         spec,
         status,
-        last_reconciled_at,
         ..
     } = snapshot;
 
     ResourceView {
         schema,
         headers: ResourceViewHeaders::from_owned(id, headers),
-        last_reconciled_at,
         spec,
         status,
     }
@@ -202,7 +201,7 @@ fn resource_status_summary_view(status: &impl ResourceStatusLike) -> ResourceSta
 
     ResourceStatusSummaryView {
         phase: Some(resource_status.phase),
-        observed_generation: Some(resource_status.observed_generation),
+        observed_generation: resource_status.observed_generation,
         ready,
     }
 }

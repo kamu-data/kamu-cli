@@ -35,6 +35,7 @@ use crate::domain::{
     ResourcePersistenceError,
     ResourcePersistenceService,
     ResourceSchemaProvider,
+    ResourceStatusJson,
     ResourceStatusLike,
     ResourceValidateSpec,
     TypedResourceQueryService,
@@ -59,7 +60,7 @@ impl<'a, R> ApplyResourcePlanExecutor<'a, R>
 where
     R: ReconcilableEventSourcedResource + ResourceSchemaProvider,
     R::Spec: Serialize + PartialEq + Clone + ResourceValidateSpec + ResourceLinterSpec,
-    R::Status: Serialize + ResourceStatusLike,
+    R::Status: ResourceStatusJson + ResourceStatusLike,
     R::LifecycleError: InvariantViolationOf<<R as DeclarativeResource>::ResourceState>
         + From<ResourceHeadersValidationError>
         + From<<R::Spec as ResourceValidateSpec>::ValidationError>

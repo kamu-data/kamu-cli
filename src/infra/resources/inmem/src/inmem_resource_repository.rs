@@ -505,13 +505,7 @@ impl ResourceRepository for InMemoryResourceRepository {
 
             row.total_count += 1;
 
-            match snapshot
-                .status
-                .as_ref()
-                .and_then(|status| status.get("phase"))
-                .and_then(|phase| phase.as_str())
-                .and_then(|phase| phase.parse::<ResourcePhase>().ok())
-            {
+            match snapshot.status.as_ref().map(|status| status.phase) {
                 Some(ResourcePhase::Reconciling) => row.phase_counts.increment_reconciling(),
                 Some(ResourcePhase::Ready) => row.phase_counts.increment_ready(),
                 Some(ResourcePhase::Failed) => row.phase_counts.increment_failed(),

@@ -83,7 +83,7 @@ impl ResourcePresentation for VariableSetResource {
         vec![ResourceListColumnValueView {
             key: "variables".to_string(),
             value: ResourceListColumnValue::UInt64(
-                u64::try_from(state.status().stats.total_variables).unwrap(),
+                u64::try_from(state.spec().variables.len()).unwrap(),
             ),
         }]
     }

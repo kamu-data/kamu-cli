@@ -11,7 +11,7 @@ use event_sourcing::ConcurrentModificationError;
 use kamu_resources::ResourceReconcileError;
 use serde::{Deserialize, Serialize};
 
-use crate::{SecretSetFailureDetails, SecretSetLifecycleError, SecretSetResource, SecretSetStats};
+use crate::{SecretSetFailureDetails, SecretSetLifecycleError, SecretSetResource};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -21,19 +21,13 @@ kamu_resources::impl_reconcilable_event_sourced_resource!(
     reconcile_error = SecretSetReconcileError,
     reconcile_failure_details = SecretSetFailureDetails,
     lifecycle_error = SecretSetLifecycleError,
-    reconcile_failure_details_fn = |_error| {
-        SecretSetFailureDetails {
-            stats: SecretSetStats::default(),
-        }
-    }
+    reconcile_failure_details_fn = |_error| { SecretSetFailureDetails {} }
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SecretSetReconcileSuccess {
-    pub stats: SecretSetStats,
-}
+pub struct SecretSetReconcileSuccess {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

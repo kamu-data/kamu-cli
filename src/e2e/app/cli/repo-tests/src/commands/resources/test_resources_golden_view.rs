@@ -27,7 +27,7 @@ use crate::resources::{ResourceCtx, fixtures};
 // Volatile fields are stripped from the actual document before comparison:
 //   - headers.id / account / generation / createdAt / updatedAt — per-run /
 //     per-context
-//   - lastReconciledAt — reconciler timestamp
+//   - status.reconciledAt — reconciler timestamp
 //   - status.conditions.*.lastTransitionTime — reconciler timestamps
 // Everything else is asserted verbatim against an expected document built from
 // the fixture constants.
@@ -100,8 +100,7 @@ fn expected_variable_set(name: &str, message_value: &str) -> serde_json::Value {
         "status": {
             "conditions": successful_conditions(),
             "observedGeneration": 1,
-            "phase": "Ready",
-            "stats": { "invalidVariables": 0, "totalVariables": 1, "validVariables": 1 }
+            "phase": "Ready"
         }
     })
 }
@@ -125,8 +124,7 @@ fn expected_variable_set_with_labels(name: &str, message_value: &str) -> serde_j
         "status": {
             "conditions": successful_conditions(),
             "observedGeneration": 1,
-            "phase": "Ready",
-            "stats": { "invalidVariables": 0, "totalVariables": 1, "validVariables": 1 }
+            "phase": "Ready"
         }
     })
 }
@@ -147,8 +145,7 @@ fn expected_secret_set_without_secrets(name: &str) -> serde_json::Value {
         "status": {
             "conditions": successful_conditions(),
             "observedGeneration": 1,
-            "phase": "Ready",
-            "stats": { "totalSecrets": 2, "validSecrets": 2, "invalidSecrets": 0 }
+            "phase": "Ready"
         }
     })
 }
@@ -185,7 +182,9 @@ fn strip_volatile(mut doc: serde_json::Value) -> serde_json::Value {
         }
     }
     if let Some(obj) = doc.as_object_mut() {
-        obj.remove("lastReconciledAt");
+        if let Some(status) = obj.get_mut("status").and_then(|s| s.as_object_mut()) {
+            status.remove("reconciledAt");
+        }
         if let Some(conditions) = obj
             .get_mut("status")
             .and_then(|s| s.get_mut("conditions"))

@@ -96,10 +96,11 @@ The framework provides a uniform way to **declaratively manage** typed resources
   name patterns), plus a `reconcile` step (outbox-driven, asynchronous — see
   [How reconciliation is scheduled](#how-reconciliation-is-scheduled)) that drives a resource toward
   its desired state.
-- **Kubernetes-style model** — every resource carries user-authored `headers` + `spec`. The server
+- **ODF resource model** — every resource carries user-authored `headers` + `spec`. The server
   maintains the remaining headers — including `generation` (the desired-state revision, bumped on
-  each spec/headers change) — and a `status` with `phase`, `observedGeneration` (reconciliation
-  progress), and `conditions`. Reconciliation is needed whenever `observedGeneration < generation`.
+  each spec/headers change) — and the generated ODF `status` with `phase`, optional
+  `observedGeneration`, optional `reconciledAt`, and optional `conditions`. Reconciliation is needed
+  when `observedGeneration` is absent or lower than `generation`.
 - **Pluggable types** — the generic machinery is type-parameterized over a resource type `R`;
   concrete types plug in via traits + registered dispatchers keyed by canonical schema URL.
 - **Local & remote symmetry** — the same operations run in-process or against a remote server behind
@@ -126,11 +127,11 @@ long-term goal. This page documents what exists now.
 | **Descriptor** | The schema (`TypeUri`) plus selector name/aliases identifying a resource type for dispatcher routing and presentation; the domain type is `ResourceTypeDescriptor`, carried in the `dill` registry as `ResourceDispatcherMeta`. |
 | **Manifest** | The user-authored wire document (`$schema`/`headers`/`spec`) in YAML or JSON. |
 | **Spec** | The desired-state portion authored by the user; stored as `serde_json::Value`. |
-| **Status** | Server-owned observed state (`phase`, `observedGeneration`, `conditions`). `conditions` is a schema-keyed `TypeRef → JSON` map. Note `generation` lives in **headers**, not status. |
+| **Status** | Server-owned observed state (`phase`, optional `observedGeneration`, optional `reconciledAt`, optional `conditions`) using the generated ODF `ResourceStatus` DTO. `conditions` is a schema-keyed `TypeRef → JSON` map. Note `generation` lives in **headers**, not status. |
 | **Snapshot** | The persisted materialized form of a resource (`ResourceSnapshot`). |
 | **Phase** | Lifecycle stage: `Pending`, `Reconciling`, `Ready`, `Failed` — matches ODF RFC-018's `ResourcePhase` exactly (see [§13 state machine](#lifecycle-state-machine)). |
 | **Condition** | A built-in or controller-added status signal keyed by a condition schema URI. Kamu's built-ins are `Accepted`, `Ready`, and `Reconciling`; each value carries `status`, `reason`, optional `message`, and `lastTransitionTime`. |
-| **generation / observedGeneration** | `generation` bumps on each spec/headers change; `observedGeneration` records the last generation reconciliation observed. Drift ⇒ reconcile. |
+| **generation / observedGeneration** | `generation` bumps on each spec/headers change; `observedGeneration` records the last generation reconciliation observed. If absent or lower than `generation`, reconcile. |
 | **Reconciliation** | The act of driving actual state toward the spec (e.g. `SecretSet` materializes its encrypted read-side projection). |
 | **Selector** | Identifies one (`ResourceSelector`) or many (`ResourceBatchSelector`) resource *instances*, by name or UID, optionally scoped to an account. Distinct from **Resource type selector** above, which identifies a *type*, not an instance. |
 | **SpecViewMode** | How sensitive spec fields are rendered. Two modes only: `Encrypted` (default — the stored ciphertext envelope is returned as-is) and `Revealed` (decrypted plaintext). There is no separate "redacted/placeholder" mode today. |
@@ -162,9 +163,9 @@ not break; most are enforced in code and exercised by tests — pointers given w
 - **`headers.generation` changes only when desired state changes.** It starts at 1 on create and is
   bumped by the aggregate only when an apply produces a real headers/spec change (`Update`); an
   unchanged apply is `Untouched` and does not bump it.
-- **`status.observedGeneration <= headers.generation`** always. Reconciliation sets
-  `observedGeneration` to the generation it just processed; `needs_reconciliation()` is exactly
-  `observedGeneration < generation`.
+- **`status.observedGeneration <= headers.generation`** when present. A new resource has no
+  observed generation. Reconciliation sets `observedGeneration` to the generation it just processed;
+  `needs_reconciliation()` is true when `observedGeneration` is absent or lower than `generation`.
 - **`status` is never accepted from manifests.** It is server-owned end to end; manifests use
   `deny_unknown_fields`, so a `status` key is rejected ([§5a](#5a-resource-anatomy--input-vs-auto-generated)).
 - **`SecretSet` plaintext never crosses a durable boundary.** It is encrypted by the spec sanitizer
@@ -405,10 +406,11 @@ pub struct ResourceHeaders {
     pub deleted_at: Option<DateTime<Utc>>,   // generated (soft-delete tombstone)
 }
 
-pub struct ResourceStatus {                  // entirely server-owned
+pub struct ResourceStatus {                  // ODF-generated; entirely server-owned
     pub phase: ResourcePhase,                // Pending|Reconciling|Ready|Failed
-    pub observed_generation: u64,
-    pub conditions: ResourceConditions,      // defaulted BTreeMap<TypeRef, serde_json::Value>
+    pub observed_generation: Option<u64>,
+    pub reconciled_at: Option<DateTime<Utc>>,
+    pub conditions: Option<ResourceConditions>,
 }
 ```
 
@@ -428,8 +430,10 @@ pub struct ResourceStatus {                  // entirely server-owned
 > by stable schema URIs under
 > `https://kamu.dev/schemas/resource/v1alpha1/conditions/{Accepted,Ready,Reconciling}`; the value
 > carries `status`, `reason`, optional `message`, and `lastTransitionTime`. The domain status field
-> uses the ODF YAML shadow proxy for serde and has an empty-map default, so legacy cached status blobs
-> that omit `conditions` can still be decoded. Informational schema documents for those built-ins live
+> is optional because it follows the generated ODF DTO: new resources start with no conditions, and a
+> spec update clears them while preserving the last observed generation/reconciliation timestamp.
+> `ResourceConditions` uses the ODF YAML shadow proxy for serde; a status blob that omits `conditions`
+> decodes to `None`, not an empty map. Informational schema documents for those built-ins live
 > under `src/domain/resources/schemas/resource/v1alpha1/conditions/`. They are not validated or
 > registered yet.
 
@@ -468,9 +472,8 @@ pub struct ResourceStatus {                  // entirely server-owned
 > dropped too) — values are arbitrary JSON and may be arbitrarily large/nested; only entry *counts*
 > (`MAX_LABELS`/`MAX_ANNOTATIONS`) are still enforced.
 
-Also generated: `id` (allocated if the manifest omitted it) and `last_reconciled_at`.
-`last_reconciled_at` is derived from the built-in Ready condition's `lastTransitionTime`, not stored
-inside the status object as its own field.
+Also generated: `id` (allocated if the manifest omitted it). Reconciliation time is represented
+inside the status object as `status.reconciledAt`; there is no separate top-level timestamp.
 
 **(3) Persisted form — the snapshot.** `ResourceSnapshot`
 ([`core/resource_snapshot.rs`](/src/domain/resources/domain/src/core/resource_snapshot.rs))
@@ -482,8 +485,7 @@ pub struct ResourceSnapshot {
     pub schema: TypeUri,                      // canonical schema URL (identity value)
     pub headers: ResourceHeaders,            // authored fields + generated fields
     pub spec: serde_json::Value,             // authored (may be transformed — see SecretSet)
-    pub status: Option<serde_json::Value>,   // generated
-    pub last_reconciled_at: Option<DateTime<Utc>>, // generated
+    pub status: Option<ResourceStatus>,      // generated ODF status
     pub last_event_id: Option<EventID>,      // event-sourcing cursor (optimistic concurrency)
 }
 ```
@@ -492,7 +494,7 @@ pub struct ResourceSnapshot {
 flowchart LR
     M["Manifest (authored)<br/>$schema<br/>headers: name, account?, id?,<br/>description?, labels, annotations<br/>spec"]
     A["apply use case<br/>(resolve account, allocate id,<br/>bump generation, set timestamps)"]
-    S["Snapshot / State<br/>= authored fields<br/>+ <b>generated</b>: account(ID), id,<br/>generation, created/updated/deleted_at,<br/>status{phase, observedGeneration, conditions}"]
+    S["Snapshot / State<br/>= authored fields<br/>+ <b>generated</b>: account(ID), id,<br/>generation, created/updated/deleted_at,<br/>status{phase, observedGeneration, reconciledAt, conditions}"]
     M --> A --> S
 ```
 
@@ -519,7 +521,7 @@ Resources are **event-sourced with a materialized snapshot per resource**. Stora
 - **`resources`** — one row per resource (the snapshot): `resource_id` (UUID, **PK**),
   `account_id`, `resource_schema`, `resource_name`, `description`, `labels`/`annotations`
   (JSONB), `spec` (JSONB), `status` (JSONB, nullable), `generation`, `created_at`/`updated_at`,
-  `deleted_at` (nullable), `last_reconciled_at`, `last_event_id`. **Uniqueness:**
+  `deleted_at` (nullable), `last_event_id`. **Uniqueness:**
   `UNIQUE (account_id, resource_schema, resource_name)`.
   A partial index on `(account_id, resource_schema, status->>'phase') WHERE deleted_at IS NULL`
   backs the summary projection. The `labels`/`annotations` columns are untyped JSONB with **no
@@ -534,6 +536,11 @@ Resources are **event-sourced with a materialized snapshot per resource**. Stora
 (`ResourceAggregateLoader`). The `resources` row is a **derived snapshot** maintained in the same
 transaction as the event append; it exists for efficient queries/listing/uniqueness and should never
 diverge. If they ever disagree, the events win and the snapshot is the bug.
+
+**List columns.** Concrete resources no longer extend status with per-type `stats`. Presentation
+columns are derived from the current spec/read model instead: `VariableSet.variables` is
+`spec.variables.len()`, `SecretSet.secrets` is `spec.secrets.len()`, and `Storage.provider` /
+`Storage.detail` are derived from the storage spec.
 
 **Optimistic concurrency.** `update_resource` is a compare-and-set on `last_event_id`: the update
 only applies if the stored `last_event_id` equals the caller's `expected_last_event_id`; otherwise it
@@ -1010,7 +1017,7 @@ transitions come from `ResourceStatus` in
 ```mermaid
 stateDiagram-v2
     [*] --> Pending: apply (Created)
-    Pending --> Reconciling: reconcile starts<br/>(observedGeneration < generation)
+    Pending --> Reconciling: reconcile starts<br/>(observedGeneration absent or < generation)
     Reconciling --> Ready: reconciliation succeeded
     Reconciling --> Failed: reconciliation failed
     Ready --> Pending: spec/headers changed<br/>(generation bumps, conditions cleared)
@@ -1046,7 +1053,7 @@ Two types are functional today, both under the config `v1alpha1` schema namespac
 
 | Schema | Selector name | Short name | Spec | Reconciliation |
 | --- | --- | --- | --- | --- |
-| `https://opendatafabric.org/schemas/config/v1alpha1/VariableSet` | `variablesets` | `vs` | `spec.variables` (name → value, scalar or `{ value }`) | Projects status; lint warnings (e.g. reserved `KAMU_` prefix). |
+| `https://opendatafabric.org/schemas/config/v1alpha1/VariableSet` | `variablesets` | `vs` | `spec.variables` (name → value, scalar or `{ value }`) | Projects variable entries; status uses the standard ODF resource status. |
 | `https://opendatafabric.org/schemas/config/v1alpha1/SecretSet` | `secretsets` | `ss` | `spec.secrets` (name → plaintext / `{ value }` / encrypted) | Materializes an **encrypted** read-side projection (`SecretSetEntry`) for consumers (see [Secret handling](#secret-handling-invariant) for where encryption actually happens). |
 
 ### Secret handling invariant

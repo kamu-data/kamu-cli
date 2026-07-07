@@ -99,7 +99,7 @@ macro_rules! declare_apply_resource_use_case {
             <$resource as kamu_resources::DeclarativeResource>::Spec:
                 serde::Serialize + PartialEq + Clone + kamu_resources::ResourceValidateSpec,
             <$resource as kamu_resources::DeclarativeResource>::Status:
-                serde::Serialize + kamu_resources::ResourceStatusLike,
+                kamu_resources::ResourceStatusJson + kamu_resources::ResourceStatusLike,
             <$resource as kamu_resources::ReconcilableResource>::LifecycleError:
                 kamu_resources::IntoApplyResourceRejection
                     + kamu_resources::InvariantViolationOf<

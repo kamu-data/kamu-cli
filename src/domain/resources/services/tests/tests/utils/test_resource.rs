@@ -55,62 +55,17 @@ impl ResourceLinterSpec for TestResourceSpec {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// TestResourceStatus
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TestResourceStatus {
-    #[serde(flatten)]
-    pub resource_status: ResourceStatus,
-}
-
-impl Default for TestResourceStatus {
-    fn default() -> Self {
-        Self {
-            resource_status: ResourceStatus::new_pending(),
-        }
-    }
-}
-
-impl ResourceStatusLike for TestResourceStatus {
-    fn resource_status(&self) -> &ResourceStatus {
-        &self.resource_status
-    }
-
-    fn resource_status_mut(&mut self) -> &mut ResourceStatus {
-        &mut self.resource_status
-    }
-}
-
-impl PendingStatusFromSpec<TestResourceSpec> for TestResourceStatus {
-    fn pending_from_spec(_spec: &TestResourceSpec) -> Self {
-        Self {
-            resource_status: ResourceStatus::new_pending(),
-        }
-    }
-
-    fn reset_pending_from_spec(&mut self, _spec: &TestResourceSpec) {
-        self.resource_status = ResourceStatus::new_pending();
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // TestResourceStatusProjector
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct TestResourceStatusProjector;
 
 impl ReconcilableStatusProjector<TestResourceSpec, (), String> for TestResourceStatusProjector {
-    type Status = TestResourceStatus;
+    type Status = ResourceStatus;
 
-    fn on_reconciliation_succeeded(status: &mut Self::Status, _success: ()) {
-        status.resource_status.phase = ResourcePhase::Ready;
-    }
+    fn on_reconciliation_succeeded(_status: &mut Self::Status, _success: ()) {}
 
-    fn on_reconciliation_failed(status: &mut Self::Status, _details: String) {
-        status.resource_status.phase = ResourcePhase::Failed;
-    }
+    fn on_reconciliation_failed(_status: &mut Self::Status, _details: String) {}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -121,7 +76,7 @@ pub struct TestResourceStateModel;
 
 impl ReconcilableStateModel for TestResourceStateModel {
     type Spec = TestResourceSpec;
-    type Status = TestResourceStatus;
+    type Status = ResourceStatus;
     type Success = ();
     type FailureDetails = String;
     type State = TestResourceState;
@@ -252,7 +207,7 @@ impl ResourceSchemaProvider for TestResource {
 
 impl DeclarativeResource for TestResource {
     type Spec = TestResourceSpec;
-    type Status = TestResourceStatus;
+    type Status = ResourceStatus;
     type ResourceState = TestResourceState;
 }
 

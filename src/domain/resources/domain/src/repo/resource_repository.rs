@@ -234,7 +234,6 @@ pub struct ResourceSnapshotRow {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub deleted_at: Option<DateTime<Utc>>,
-    pub last_reconciled_at: Option<DateTime<Utc>>,
     pub last_event_id: Option<i64>,
 }
 
@@ -255,8 +254,10 @@ impl ResourceSnapshotRow {
                 deleted_at: self.deleted_at,
             },
             spec: self.spec,
-            status: self.status,
-            last_reconciled_at: self.last_reconciled_at,
+            status: self
+                .status
+                .as_ref()
+                .and_then(ResourceSnapshot::basic_status_from_json),
             last_event_id: self.last_event_id.map(EventID::new),
         }
     }

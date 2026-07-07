@@ -245,6 +245,8 @@ impl BaseResourceServiceHarness {
         let condition_name = condition_key.to_string();
         let cond_value = resource_status
             .conditions
+            .as_ref()
+            .unwrap_or_else(|| panic!("status conditions must be present"))
             .entries
             .get(condition_key)
             .unwrap_or_else(|| panic!("{condition_name} condition must be present in status"));

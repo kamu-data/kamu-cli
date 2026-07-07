@@ -65,7 +65,6 @@ async fn make_secret_set_resource(catalog: &Catalog) -> ResourceID {
         })
         .unwrap(),
         status: None,
-        last_reconciled_at: None,
         last_event_id: None,
     })
     .await

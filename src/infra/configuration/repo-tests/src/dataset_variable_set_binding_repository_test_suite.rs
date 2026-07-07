@@ -228,7 +228,6 @@ async fn create_resource(
             })
             .unwrap(),
             status: None,
-            last_reconciled_at: None,
             last_event_id: None,
         })
         .await

@@ -66,6 +66,10 @@ impl ResourceRepository for PostgresResourceRepository {
         let generation = i64::try_from(resource_snapshot.headers.generation).unwrap();
         let last_event_id = resource_snapshot.last_event_id.map(EventID::into_inner);
         let resource_id: &uuid::Uuid = resource_snapshot.id.as_ref();
+        let status = resource_snapshot
+            .status
+            .as_ref()
+            .map(kamu_resources::resource_status_to_json);
 
         sqlx::query!(
             r#"
@@ -83,10 +87,9 @@ impl ResourceRepository for PostgresResourceRepository {
                 created_at,
                 updated_at,
                 deleted_at,
-                last_reconciled_at,
                 last_event_id
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
             "#,
             resource_id,
             account_id_str,
@@ -96,12 +99,11 @@ impl ResourceRepository for PostgresResourceRepository {
             labels,
             annotations,
             resource_snapshot.spec,
-            resource_snapshot.status,
+            status,
             generation,
             resource_snapshot.headers.created_at,
             resource_snapshot.headers.updated_at,
             resource_snapshot.headers.deleted_at,
-            resource_snapshot.last_reconciled_at,
             last_event_id,
         )
         .execute(connection_mut)
@@ -160,7 +162,6 @@ impl ResourceRepository for PostgresResourceRepository {
                 generation,
                 updated_at,
                 deleted_at,
-                last_reconciled_at,
                 last_event_id,
                 expected_last_event_id
             ) AS (
@@ -188,11 +189,15 @@ impl ResourceRepository for PostgresResourceRepository {
                     &resource_snapshot.headers.annotations,
                 ))
                 .push_bind(resource_snapshot.spec.clone())
-                .push_bind(resource_snapshot.status.clone())
+                .push_bind(
+                    resource_snapshot
+                        .status
+                        .as_ref()
+                        .map(kamu_resources::resource_status_to_json),
+                )
                 .push_bind(i64::try_from(resource_snapshot.headers.generation).unwrap())
                 .push_bind(resource_snapshot.headers.updated_at)
                 .push_bind(resource_snapshot.headers.deleted_at)
-                .push_bind(resource_snapshot.last_reconciled_at)
                 .push_bind(resource_snapshot.last_event_id.map(EventID::into_inner))
                 .push_bind(
                     resource_update
@@ -227,7 +232,6 @@ impl ResourceRepository for PostgresResourceRepository {
                 generation = u.generation,
                 updated_at = u.updated_at,
                 deleted_at = u.deleted_at,
-                last_reconciled_at = u.last_reconciled_at,
                 last_event_id = u.last_event_id
             FROM matched_resource_updates AS u
             WHERE r.resource_id = u.resource_id
@@ -495,7 +499,6 @@ impl ResourceRepository for PostgresResourceRepository {
                 created_at,
                 updated_at,
                 deleted_at,
-                last_reconciled_at,
                 last_event_id
             FROM resources
             WHERE resource_id = $1
@@ -524,8 +527,10 @@ impl ResourceRepository for PostgresResourceRepository {
                 deleted_at: row.deleted_at,
             },
             spec: row.spec,
-            status: row.status,
-            last_reconciled_at: row.last_reconciled_at,
+            status: row
+                .status
+                .as_ref()
+                .and_then(ResourceSnapshot::basic_status_from_json),
             last_event_id: row.last_event_id.map(EventID::new),
         }))
     }
@@ -559,7 +564,6 @@ impl ResourceRepository for PostgresResourceRepository {
                 created_at,
                 updated_at,
                 deleted_at,
-                last_reconciled_at,
                 last_event_id
             FROM resources
             WHERE resource_schema = $1
@@ -609,7 +613,6 @@ impl ResourceRepository for PostgresResourceRepository {
                 created_at,
                 updated_at,
                 deleted_at,
-                last_reconciled_at,
                 last_event_id
             FROM resources
             WHERE resource_id = $1
@@ -636,8 +639,10 @@ impl ResourceRepository for PostgresResourceRepository {
                 deleted_at: row.deleted_at,
             },
             spec: row.spec,
-            status: row.status,
-            last_reconciled_at: row.last_reconciled_at,
+            status: row
+                .status
+                .as_ref()
+                .and_then(ResourceSnapshot::basic_status_from_json),
             last_event_id: row.last_event_id.map(EventID::new),
         }))
     }
@@ -672,7 +677,6 @@ impl ResourceRepository for PostgresResourceRepository {
                 created_at,
                 updated_at,
                 deleted_at,
-                last_reconciled_at,
                 last_event_id
             FROM resources
             WHERE account_id = $1
@@ -703,8 +707,10 @@ impl ResourceRepository for PostgresResourceRepository {
                     deleted_at: row.deleted_at,
                 },
                 spec: row.spec,
-                status: row.status,
-                last_reconciled_at: row.last_reconciled_at,
+                status: row
+                    .status
+                    .as_ref()
+                    .and_then(ResourceSnapshot::basic_status_from_json),
                 last_event_id: row.last_event_id.map(EventID::new),
             })
             .collect())
@@ -782,7 +788,6 @@ impl ResourceRepository for PostgresResourceRepository {
                     created_at,
                     updated_at,
                     deleted_at,
-                    last_reconciled_at,
                     last_event_id
                 FROM resources
                 WHERE account_id = $1
@@ -815,8 +820,10 @@ impl ResourceRepository for PostgresResourceRepository {
                         deleted_at: row.deleted_at,
                     },
                     spec: row.spec,
-                    status: row.status,
-                    last_reconciled_at: row.last_reconciled_at,
+                    status: row
+                        .status
+                        .as_ref()
+                        .and_then(ResourceSnapshot::basic_status_from_json),
                     last_event_id: row.last_event_id.map(EventID::new),
                 });
             }
@@ -852,7 +859,6 @@ impl ResourceRepository for PostgresResourceRepository {
                     created_at,
                     updated_at,
                     deleted_at,
-                    last_reconciled_at,
                     last_event_id
                 FROM resources
                 WHERE account_id = $1
@@ -883,8 +889,10 @@ impl ResourceRepository for PostgresResourceRepository {
                         deleted_at: row.deleted_at,
                     },
                     spec: row.spec,
-                    status: row.status,
-                    last_reconciled_at: row.last_reconciled_at,
+                    status: row
+                        .status
+                        .as_ref()
+                        .and_then(ResourceSnapshot::basic_status_from_json),
                     last_event_id: row.last_event_id.map(EventID::new),
                 });
             }
@@ -933,23 +941,15 @@ impl ResourceRepository for PostgresResourceRepository {
             SELECT
                 resource_schema,
                 COUNT(*) as "total_count!",
-                COUNT(*) FILTER (WHERE phase = 'Reconciling') as "reconciling_count!",
-                COUNT(*) FILTER (WHERE phase = 'Ready') as "ready_count!",
-                COUNT(*) FILTER (WHERE phase = 'Failed') as "failed_count!",
-                COUNT(*) FILTER (WHERE phase = 'Pending') as "pending_count!"
-            FROM (
-                SELECT
-                    resource_schema,
-                    CASE COALESCE(status ->> 'phase', 'Pending')
-                        WHEN 'Reconciling' THEN 'Reconciling'
-                        WHEN 'Ready' THEN 'Ready'
-                        WHEN 'Failed' THEN 'Failed'
-                        ELSE 'Pending'
-                    END as phase
-                FROM resources
-                WHERE account_id = $1
-                  AND deleted_at IS NULL
-            ) as normalized_resources
+                COUNT(*) FILTER (WHERE status ->> 'phase' = 'Reconciling') as "reconciling_count!",
+                COUNT(*) FILTER (WHERE status ->> 'phase' = 'Ready') as "ready_count!",
+                COUNT(*) FILTER (WHERE status ->> 'phase' = 'Failed') as "failed_count!",
+                COUNT(*) FILTER (
+                    WHERE COALESCE(status ->> 'phase', 'Pending') = 'Pending'
+                ) as "pending_count!"
+            FROM resources
+            WHERE account_id = $1
+              AND deleted_at IS NULL
             GROUP BY resource_schema
             ORDER BY resource_schema ASC
             "#,

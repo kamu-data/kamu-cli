@@ -70,10 +70,22 @@ impl TryFrom<fragments::Resource> for domain::ResourceView {
                 updated_at: value.headers.updated_at,
                 deleted_at: value.headers.deleted_at,
             },
-            last_reconciled_at: value.headers.last_reconciled_at,
             spec: value.spec,
-            status: value.status,
+            status: value.status.map(Into::into),
         })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl From<fragments::ResourceStatus> for domain::ResourceStatus {
+    fn from(value: fragments::ResourceStatus) -> Self {
+        Self {
+            phase: value.phase.into(),
+            observed_generation: value.observed_generation.map(Into::into),
+            reconciled_at: value.reconciled_at,
+            conditions: value.conditions.map(|conditions| conditions.0),
+        }
     }
 }
 

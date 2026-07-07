@@ -109,7 +109,7 @@ impl ResourcePresentation for StorageResource {
         vec![
             ResourceListColumnValueView {
                 key: "provider".to_string(),
-                value: ResourceListColumnValue::String(state.status().provider_kind.to_string()),
+                value: ResourceListColumnValue::String(state.spec().provider.kind().to_string()),
             },
             ResourceListColumnValueView {
                 key: "detail".to_string(),

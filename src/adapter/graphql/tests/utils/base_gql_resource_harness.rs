@@ -96,7 +96,6 @@ impl BaseGQLResourceHarness {
                 headers: ResourceHeaders::simple(Utc::now(), account_id.clone(), name),
                 spec,
                 status: None,
-                last_reconciled_at: None,
                 last_event_id: None,
             })
             .await

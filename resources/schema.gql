@@ -414,7 +414,7 @@ type AddData {
 	Last offset of the previous data slice, if any. Must be equal to the
 	last non-empty `newData.offsetInterval.end`.
 	"""
-	prevOffset: Int
+	prevOffset: Uint64
 	"""
 	Describes output data written during this transaction, if any.
 	"""
@@ -656,7 +656,7 @@ type Checkpoint {
 	"""
 	Size of checkpoint file in bytes.
 	"""
-	size: Int!
+	size: Uint64!
 }
 
 type CliProtocolDesc {
@@ -1116,7 +1116,7 @@ type DataSlice {
 	"""
 	Size of data file in bytes.
 	"""
-	size: Int!
+	size: Uint64!
 }
 
 input DataTypeInput {
@@ -2061,7 +2061,7 @@ type ExecuteTransform {
 	Last offset of the previous data slice, if any. Must be equal to the
 	last non-empty `newData.offsetInterval.end`.
 	"""
-	prevOffset: Int
+	prevOffset: Uint64
 	"""
 	Describes output data written during this transaction, if any.
 	"""
@@ -2114,14 +2114,14 @@ type ExecuteTransformInput {
 	half-open `(prevOffset, newOffset]` interval of data records that will
 	be considered in this transaction.
 	"""
-	prevOffset: Int
+	prevOffset: Uint64
 	"""
 	Offset of the last data record that will be incorporated into the
 	derivative transformation, if any. When present, defines a half-open
 	`(prevOffset, newOffset]` interval of data records that will be
 	considered in this transaction.
 	"""
-	newOffset: Int
+	newOffset: Uint64
 }
 
 scalar ExtraAttributes
@@ -2172,7 +2172,7 @@ type FetchStepEthereumLogs {
 	for RPC endpoint lookup as well as asserting that provided `nodeUrl`
 	corresponds to the expected chain.
 	"""
-	chainId: Int
+	chainId: Uint64
 	"""
 	Url of the node.
 	"""
@@ -3340,11 +3340,11 @@ type OffsetInterval {
 	"""
 	Start of the closed interval [start; end].
 	"""
-	start: Int!
+	start: Uint64!
 	"""
 	End of the closed interval [start; end].
 	"""
-	end: Int!
+	end: Uint64!
 }
 
 enum OrderingDirection {
@@ -3859,7 +3859,7 @@ type Resource {
 	schema: TypeUri!
 	headers: ResourceHeaders!
 	spec: JSON!
-	status: JSON
+	status: ResourceStatus
 }
 
 input ResourceAccountByIdAndNameInput {
@@ -3953,6 +3953,8 @@ input ResourceByNameSelectorInput {
 	name: ResourceName!
 }
 
+scalar ResourceConditions
+
 type ResourceConnection {
 	"""
 	A shorthand for `edges { node { ... } }`
@@ -4017,7 +4019,6 @@ type ResourceHeaders {
 	createdAt: DateTime!
 	updatedAt: DateTime!
 	deletedAt: DateTime
-	lastReconciledAt: DateTime
 }
 
 scalar ResourceID
@@ -4174,6 +4175,33 @@ union ResourceSelectorProblem = ResourceIDNotFoundProblem | ResourceNameNotFound
 
 type ResourceSelectorProblemResult {
 	problem: ResourceSelectorProblem!
+}
+
+"""
+Resource lifecycle and reconciliation information.
+
+Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceStatus
+"""
+type ResourceStatus {
+	"""
+	Represents the lifecycle stage of a resource.
+	"""
+	phase: ResourcePhase!
+	"""
+	Resource generation that was last processed by the main resource
+	controller.
+	"""
+	observedGeneration: Uint64
+	"""
+	Time when the controller last reconciled the desired resource state as
+	defined in `observedGeneration`.
+	"""
+	reconciledAt: DateTime
+	"""
+	Detailed conditions describing the state of the resource that are added
+	by controllers.
+	"""
+	conditions: ResourceConditions
 }
 
 type ResourceStatusSummary {

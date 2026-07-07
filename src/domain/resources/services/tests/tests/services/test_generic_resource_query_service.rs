@@ -358,7 +358,6 @@ impl GenericResourceQueryServiceHarness {
             headers: ResourceHeaders::simple(Utc::now(), owner_account_id, name),
             spec: serde_json::json!({"value": name}),
             status: None,
-            last_reconciled_at: None,
             last_event_id: None,
         };
 

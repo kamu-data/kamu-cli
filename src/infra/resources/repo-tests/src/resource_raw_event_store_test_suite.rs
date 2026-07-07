@@ -38,7 +38,6 @@ async fn make_resource(catalog: &Catalog, kind: &str) -> ResourceRawEventQuery {
         ),
         spec: serde_json::json!({}),
         status: None,
-        last_reconciled_at: None,
         last_event_id: None,
     };
 

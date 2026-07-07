@@ -469,7 +469,6 @@ fn make_snapshot(id: ResourceID, schema: &'static TypeUri, generation: u64) -> R
         headers,
         spec: serde_json::json!({}),
         status: None,
-        last_reconciled_at: None,
         last_event_id: None,
     }
 }

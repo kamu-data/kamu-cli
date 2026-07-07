@@ -175,7 +175,7 @@ table ResourceConditions {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // ResourceStatus
-// Resource lifecycle and reconciliation inforamtion.
+// Resource lifecycle and reconciliation information.
 //
 // Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceStatus
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2397,7 +2397,7 @@ table Resource {
   headers: ResourceHeaders;
   // Specifies the desired state of a resource.
   spec: [ubyte];
-  // Resource lifecycle and reconciliation inforamtion.
+  // Resource lifecycle and reconciliation information.
   status: ResourceStatus;
 }
 

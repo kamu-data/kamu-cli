@@ -17,6 +17,7 @@ use crate::{
     ResourceLabels,
     ResourceName,
     ResourceSelectorName,
+    ResourceStatus,
     TypeUri,
 };
 
@@ -32,13 +33,14 @@ pub struct ResourceIdentityView {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[serde_with::serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceView {
     pub schema: TypeUri,
     pub headers: ResourceViewHeaders,
-    pub last_reconciled_at: Option<DateTime<Utc>>,
     pub spec: serde_json::Value,
-    pub status: Option<serde_json::Value>,
+    #[serde_as(as = "Option<odf::metadata::serde::yaml::resource::ResourceStatus>")]
+    pub status: Option<ResourceStatus>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -82,7 +82,7 @@ impl ResourcePresentation for SecretSetResource {
         vec![ResourceListColumnValueView {
             key: "secrets".to_string(),
             value: ResourceListColumnValue::UInt64(
-                u64::try_from(state.status().stats.total_secrets).unwrap(),
+                u64::try_from(state.spec().secrets.len()).unwrap(),
             ),
         }]
     }

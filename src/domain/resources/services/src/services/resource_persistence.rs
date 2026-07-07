@@ -10,7 +10,6 @@
 use chrono::{DateTime, Utc};
 use event_sourcing::{EventID, SaveError};
 use internal_error::ErrorIntoInternal;
-use serde::Serialize;
 
 use crate::domain::{
     CreateResourceError,
@@ -21,6 +20,7 @@ use crate::domain::{
     ResourceRepository,
     ResourceSchemaProvider,
     ResourceSnapshotUpdate,
+    ResourceStatusJson,
     ResourceStatusLike,
     UpdateResourceError,
 };
@@ -39,8 +39,8 @@ impl<'a, R> ResourcePersistenceServiceHelper<'a, R>
 where
     R: ReconcilableEventSourcedResource + ResourceSchemaProvider,
     R::LifecycleError: InvariantViolationOf<<R as DeclarativeResource>::ResourceState>,
-    R::Spec: Serialize,
-    R::Status: Serialize + ResourceStatusLike,
+    R::Spec: serde::Serialize,
+    R::Status: ResourceStatusJson + ResourceStatusLike,
 {
     pub fn new(resource_repository: &'a dyn ResourceRepository, event_store: &'a R::Store) -> Self {
         Self {
@@ -97,8 +97,8 @@ where
     R: ReconcilableEventSourcedResource + ResourceSchemaProvider,
     R::LifecycleError:
         InvariantViolationOf<<R as DeclarativeResource>::ResourceState> + std::fmt::Display,
-    R::Spec: Serialize,
-    R::Status: Serialize + ResourceStatusLike,
+    R::Spec: serde::Serialize,
+    R::Status: ResourceStatusJson + ResourceStatusLike,
 {
     pub async fn delete(
         &self,
@@ -154,8 +154,8 @@ impl<R> ResourcePersistenceServiceHelper<'_, R>
 where
     R: ReconcilableEventSourcedResource + ResourceSchemaProvider,
     R::LifecycleError: InvariantViolationOf<<R as DeclarativeResource>::ResourceState>,
-    R::Spec: Serialize,
-    R::Status: Serialize + ResourceStatusLike,
+    R::Spec: serde::Serialize,
+    R::Status: ResourceStatusJson + ResourceStatusLike,
 {
     async fn sync_snapshot(
         &self,

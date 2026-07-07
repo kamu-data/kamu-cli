@@ -483,7 +483,7 @@ pub struct Resource {
     pub schema: TypeUri<'static>,
     pub headers: ResourceHeaders,
     pub spec: serde_json::Value,
-    pub status: Option<serde_json::Value>,
+    pub status: Option<ResourceStatus>,
 }
 
 impl From<kamu_resources::ResourceView> for Resource {
@@ -494,7 +494,7 @@ impl From<kamu_resources::ResourceView> for Resource {
             schema: value.schema.into(),
             headers,
             spec: value.spec,
-            status: value.status,
+            status: value.status.map(Into::into),
         }
     }
 }
@@ -671,7 +671,6 @@ pub struct ResourceHeaders {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub deleted_at: Option<DateTime<Utc>>,
-    pub last_reconciled_at: Option<DateTime<Utc>>,
 }
 
 impl From<kamu_resources::ResourceView> for ResourceHeaders {
@@ -695,7 +694,6 @@ impl From<kamu_resources::ResourceView> for ResourceHeaders {
             created_at: value.headers.created_at,
             updated_at: value.headers.updated_at,
             deleted_at: value.headers.deleted_at,
-            last_reconciled_at: value.last_reconciled_at,
         }
     }
 }

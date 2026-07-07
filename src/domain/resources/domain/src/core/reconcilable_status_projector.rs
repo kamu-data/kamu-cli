@@ -15,7 +15,10 @@ use crate::{
     ReconcilableStateModel,
     ResourceHeaders,
     ResourceState,
+    ResourceStatus,
+    ResourceStatusExt,
     ResourceStatusLike,
+    new_pending_resource_status,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -24,6 +27,14 @@ pub trait PendingStatusFromSpec<TSpec>: Sized {
     fn pending_from_spec(spec: &TSpec) -> Self;
 
     fn reset_pending_from_spec(&mut self, spec: &TSpec);
+}
+
+impl<TSpec> PendingStatusFromSpec<TSpec> for ResourceStatus {
+    fn pending_from_spec(_spec: &TSpec) -> Self {
+        new_pending_resource_status()
+    }
+
+    fn reset_pending_from_spec(&mut self, _spec: &TSpec) {}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

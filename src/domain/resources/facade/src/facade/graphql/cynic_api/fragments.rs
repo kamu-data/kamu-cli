@@ -12,6 +12,7 @@ use chrono::{DateTime, Utc};
 use crate::facade::graphql::cynic_api::scalars::{
     AccountName,
     ResourceAnnotations,
+    ResourceConditions,
     ResourceLabels,
     Uint64,
 };
@@ -207,7 +208,17 @@ pub(crate) struct Resource {
     pub schema: kamu_resources::TypeUri,
     pub headers: ResourceHeaders,
     pub spec: serde_json::Value,
-    pub status: Option<serde_json::Value>,
+    pub status: Option<ResourceStatus>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
+pub(crate) struct ResourceStatus {
+    pub phase: ResourcePhase,
+    pub observed_generation: Option<Uint64>,
+    pub reconciled_at: Option<DateTime<Utc>>,
+    pub conditions: Option<ResourceConditions>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -224,7 +235,6 @@ pub(crate) struct ResourceHeaders {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub deleted_at: Option<DateTime<Utc>>,
-    pub last_reconciled_at: Option<DateTime<Utc>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

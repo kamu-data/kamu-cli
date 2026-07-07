@@ -25,6 +25,7 @@ use crate::domain::{
     ResourceLoadError,
     ResourcePersistenceService,
     ResourceSchemaProvider,
+    ResourceStatusJson,
     ResourceStatusLike,
 };
 
@@ -46,7 +47,7 @@ where
     R: ReconcilableEventSourcedResource + ResourceSchemaProvider,
     R::LifecycleError: InvariantViolationOf<<R as DeclarativeResource>::ResourceState>,
     R::Spec: Serialize,
-    R::Status: Serialize + ResourceStatusLike,
+    R::Status: ResourceStatusJson + ResourceStatusLike,
 {
     pub fn new(
         resource_aggregate_loader: &'a dyn ResourceAggregateLoader<R>,

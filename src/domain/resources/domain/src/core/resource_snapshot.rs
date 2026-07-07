@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::{DateTime, Utc};
 use event_sourcing::EventID;
 use internal_error::{InternalError, ResultIntoInternal};
 use serde::de::DeserializeOwned;
@@ -18,12 +17,15 @@ use crate::{
     ResourceHeaders,
     ResourceID,
     ResourceStatus,
+    ResourceStatusJson,
     ResourceStatusLike,
     TypeUri,
+    resource_status_from_json,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[serde_with::serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceSnapshot {
     pub id: ResourceID,
@@ -31,9 +33,9 @@ pub struct ResourceSnapshot {
     pub headers: ResourceHeaders,
 
     pub spec: serde_json::Value,
-    pub status: Option<serde_json::Value>,
+    #[serde_as(as = "Option<odf::metadata::serde::yaml::resource::ResourceStatus>")]
+    pub status: Option<ResourceStatus>,
 
-    pub last_reconciled_at: Option<DateTime<Utc>>,
     pub last_event_id: Option<EventID>,
 }
 
@@ -41,7 +43,11 @@ pub struct ResourceSnapshot {
 
 impl ResourceSnapshot {
     pub fn basic_status(&self) -> Option<ResourceStatus> {
-        self.status.as_ref().and_then(ResourceStatus::from_json)
+        self.status.clone()
+    }
+
+    pub fn basic_status_from_json(value: &serde_json::Value) -> Option<ResourceStatus> {
+        resource_status_from_json(value)
     }
 
     pub fn check_homogeneous(snapshots: &[ResourceSnapshot]) -> bool {
@@ -70,11 +76,13 @@ pub fn decode_typed_resource_snapshot<TSpec, TStatus>(
 ) -> Result<(ResourceID, ResourceHeaders, TSpec, TStatus), InternalError>
 where
     TSpec: DeserializeOwned,
-    TStatus: DeserializeOwned + PendingStatusFromSpec<TSpec>,
+    TStatus: ResourceStatusJson + PendingStatusFromSpec<TSpec>,
 {
     let spec = serde_json::from_value(snapshot.spec).int_err()?;
     let status = match snapshot.status {
-        Some(status) => serde_json::from_value(status).int_err()?,
+        Some(status) => {
+            TStatus::status_from_json(crate::resource_status_to_json(&status), &spec).int_err()?
+        }
         None => TStatus::pending_from_spec(&spec),
     };
 
@@ -93,19 +101,16 @@ pub fn make_typed_resource_snapshot<TSpec, TStatus>(
 ) -> Result<ResourceSnapshot, InternalError>
 where
     TSpec: Serialize,
-    TStatus: Serialize + ResourceStatusLike,
+    TStatus: ResourceStatusJson + ResourceStatusLike,
 {
     let spec = serde_json::to_value(spec).int_err()?;
-    let status_json = serde_json::to_value(status).int_err()?;
-    let last_reconciled_at = status.resource_status().last_reconciled_at();
 
     Ok(ResourceSnapshot {
         id,
         schema: schema.clone(),
         headers,
         spec,
-        status: Some(status_json),
-        last_reconciled_at,
+        status: Some(status.resource_status().clone()),
         last_event_id,
     })
 }

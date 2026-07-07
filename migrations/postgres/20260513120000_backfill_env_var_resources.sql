@@ -30,7 +30,6 @@ INSERT INTO resources (
     created_at,
     updated_at,
     deleted_at,
-    last_reconciled_at,
     last_event_id
 )
 SELECT
@@ -53,6 +52,7 @@ SELECT
     jsonb_build_object(
         'phase', 'Ready',
         'observedGeneration', 1,
+        'reconciledAt', MIN(dev.created_at),
         'conditions', jsonb_build_object(
             'https://kamu.dev/schemas/resource/v1alpha1/conditions/Accepted',
             jsonb_build_object(
@@ -72,18 +72,12 @@ SELECT
                 'reason', 'Idle',
                 'lastTransitionTime', MIN(dev.created_at)
             )
-        ),
-        'stats', jsonb_build_object(
-            'totalVariables', COUNT(*),
-            'validVariables', COUNT(*),
-            'invalidVariables', 0
         )
     )                                                                           AS status,
     1                                                                           AS generation,
     MIN(dev.created_at)                                                         AS created_at,
     MIN(dev.created_at)                                                         AS updated_at,
     NULL                                                                        AS deleted_at,
-    MIN(dev.created_at)                                                         AS last_reconciled_at,
     NULL                                                                        AS last_event_id
 FROM dataset_env_vars dev
 JOIN dataset_entries de ON de.dataset_id = dev.dataset_id
@@ -159,7 +153,6 @@ INSERT INTO resources (
     created_at,
     updated_at,
     deleted_at,
-    last_reconciled_at,
     last_event_id
 )
 SELECT
@@ -182,6 +175,7 @@ SELECT
     jsonb_build_object(
         'phase', 'Ready',
         'observedGeneration', 1,
+        'reconciledAt', MIN(dev.created_at),
         'conditions', jsonb_build_object(
             'https://kamu.dev/schemas/resource/v1alpha1/conditions/Accepted',
             jsonb_build_object(
@@ -201,18 +195,12 @@ SELECT
                 'reason', 'Idle',
                 'lastTransitionTime', MIN(dev.created_at)
             )
-        ),
-        'stats', jsonb_build_object(
-            'totalSecrets', COUNT(*),
-            'validSecrets', COUNT(*),
-            'invalidSecrets', 0
         )
     )                                                                           AS status,
     1                                                                           AS generation,
     MIN(dev.created_at)                                                         AS created_at,
     MIN(dev.created_at)                                                         AS updated_at,
     NULL                                                                        AS deleted_at,
-    MIN(dev.created_at)                                                         AS last_reconciled_at,
     NULL                                                                        AS last_event_id
 FROM dataset_env_vars dev
 JOIN dataset_entries de ON de.dataset_id = dev.dataset_id
@@ -332,7 +320,7 @@ ins_succeeded AS (
             'event_time', r.created_at,
             'id',        r.resource_id::text,
             'generation', 1,
-            'success',    jsonb_build_object('stats', r.status -> 'stats')
+            'success',    jsonb_build_object()
         ))
     FROM var_resources r
     RETURNING resource_id, event_id
@@ -402,7 +390,7 @@ ins_succeeded AS (
             'event_time', r.created_at,
             'id',        r.resource_id::text,
             'generation', 1,
-            'success',    jsonb_build_object('stats', r.status -> 'stats')
+            'success',    jsonb_build_object()
         ))
     FROM secret_resources r
     RETURNING resource_id, event_id

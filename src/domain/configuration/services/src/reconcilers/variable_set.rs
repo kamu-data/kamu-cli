@@ -17,7 +17,6 @@ use kamu_configuration::{
     VariableSetReconcileError,
     VariableSetReconcileSuccess,
     VariableSetResource,
-    VariableSetStats,
 };
 use kamu_resources::{DeclarativeResource, ReconcilableResource, Reconciler, ResourceID};
 use time_source::SystemTimeSource;
@@ -45,7 +44,6 @@ impl Reconciler<VariableSetResource> for VariableSetReconcilerImpl {
         <VariableSetResource as ReconcilableResource>::ReconcileSuccess,
         <VariableSetResource as ReconcilableResource>::ReconcileError,
     > {
-        let total = resource.spec().variables.len();
         let now = self.time_source.now();
         let resource_id = *resource.id();
         let resource_generation = resource.headers().generation;
@@ -88,13 +86,7 @@ impl Reconciler<VariableSetResource> for VariableSetReconcilerImpl {
                 }
             })?;
 
-        Ok(VariableSetReconcileSuccess {
-            stats: VariableSetStats {
-                total_variables: total,
-                valid_variables: total,
-                invalid_variables: 0,
-            },
-        })
+        Ok(VariableSetReconcileSuccess {})
     }
 }
 

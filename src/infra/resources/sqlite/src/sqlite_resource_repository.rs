@@ -74,6 +74,10 @@ impl ResourceRepository for SqliteResourceRepository {
         let generation = i64::try_from(resource_snapshot.headers.generation).unwrap();
         let last_event_id = resource_snapshot.last_event_id.map(EventID::into_inner);
         let resource_id: &uuid::Uuid = resource_snapshot.id.as_ref();
+        let status = resource_snapshot
+            .status
+            .as_ref()
+            .map(kamu_resources::resource_status_to_json);
 
         sqlx::query!(
             r#"
@@ -91,10 +95,9 @@ impl ResourceRepository for SqliteResourceRepository {
                 created_at,
                 updated_at,
                 deleted_at,
-                last_reconciled_at,
                 last_event_id
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
             "#,
             resource_id,
             account_id_str,
@@ -104,12 +107,11 @@ impl ResourceRepository for SqliteResourceRepository {
             labels,
             annotations,
             resource_snapshot.spec,
-            resource_snapshot.status,
+            status,
             generation,
             resource_snapshot.headers.created_at,
             resource_snapshot.headers.updated_at,
             resource_snapshot.headers.deleted_at,
-            resource_snapshot.last_reconciled_at,
             last_event_id,
         )
         .execute(connection_mut)
@@ -147,6 +149,10 @@ impl ResourceRepository for SqliteResourceRepository {
         let last_event_id = resource_snapshot.last_event_id.map(EventID::into_inner);
         let expected_last_event_id = expected_last_event_id.map(EventID::into_inner);
         let resource_id: &uuid::Uuid = resource_snapshot.id.as_ref();
+        let status = resource_snapshot
+            .status
+            .as_ref()
+            .map(kamu_resources::resource_status_to_json);
 
         let update_result = sqlx::query!(
             r#"
@@ -163,12 +169,11 @@ impl ResourceRepository for SqliteResourceRepository {
                 generation = $10,
                 updated_at = $11,
                 deleted_at = $12,
-                last_reconciled_at = $13,
-                last_event_id = $14
+                last_event_id = $13
             WHERE resource_id = $1
               AND (
-                    last_event_id IS NULL AND CAST($15 as INT8) IS NULL OR
-                    last_event_id IS NOT NULL AND CAST($15 as INT8) IS NOT NULL AND last_event_id = $15
+                    last_event_id IS NULL AND CAST($14 as INT8) IS NULL OR
+                    last_event_id IS NOT NULL AND CAST($14 as INT8) IS NOT NULL AND last_event_id = $14
               )
             "#,
             resource_id,
@@ -179,11 +184,10 @@ impl ResourceRepository for SqliteResourceRepository {
             labels,
             annotations,
             resource_snapshot.spec,
-            resource_snapshot.status,
+            status,
             generation,
             resource_snapshot.headers.updated_at,
             resource_snapshot.headers.deleted_at,
-            resource_snapshot.last_reconciled_at,
             last_event_id,
             expected_last_event_id,
         )
@@ -478,7 +482,6 @@ impl ResourceRepository for SqliteResourceRepository {
                 created_at as "created_at: DateTime<Utc>",
                 updated_at as "updated_at: DateTime<Utc>",
                 deleted_at as "deleted_at: DateTime<Utc>",
-                last_reconciled_at as "last_reconciled_at: DateTime<Utc>",
                 last_event_id
             FROM resources
             WHERE resource_id = $1
@@ -507,8 +510,10 @@ impl ResourceRepository for SqliteResourceRepository {
                 deleted_at: row.deleted_at,
             },
             spec: row.spec,
-            status: row.status,
-            last_reconciled_at: row.last_reconciled_at,
+            status: row
+                .status
+                .as_ref()
+                .and_then(ResourceSnapshot::basic_status_from_json),
             last_event_id: row.last_event_id.map(EventID::new),
         }))
     }
@@ -544,7 +549,6 @@ impl ResourceRepository for SqliteResourceRepository {
                 created_at,
                 updated_at,
                 deleted_at,
-                last_reconciled_at,
                 last_event_id
             FROM resources
             WHERE resource_schema = $1
@@ -596,7 +600,6 @@ impl ResourceRepository for SqliteResourceRepository {
                 created_at as "created_at: DateTime<Utc>",
                 updated_at as "updated_at: DateTime<Utc>",
                 deleted_at as "deleted_at: DateTime<Utc>",
-                last_reconciled_at as "last_reconciled_at: DateTime<Utc>",
                 last_event_id
             FROM resources
             WHERE resource_id = $1
@@ -623,8 +626,10 @@ impl ResourceRepository for SqliteResourceRepository {
                 deleted_at: row.deleted_at,
             },
             spec: row.spec,
-            status: row.status,
-            last_reconciled_at: row.last_reconciled_at,
+            status: row
+                .status
+                .as_ref()
+                .and_then(ResourceSnapshot::basic_status_from_json),
             last_event_id: row.last_event_id.map(EventID::new),
         }))
     }
@@ -662,7 +667,6 @@ impl ResourceRepository for SqliteResourceRepository {
                 created_at,
                 updated_at,
                 deleted_at,
-                last_reconciled_at,
                 last_event_id
             FROM resources
             WHERE account_id = $1
@@ -695,8 +699,10 @@ impl ResourceRepository for SqliteResourceRepository {
                     deleted_at: row.deleted_at,
                 },
                 spec: row.spec,
-                status: row.status,
-                last_reconciled_at: row.last_reconciled_at,
+                status: row
+                    .status
+                    .as_ref()
+                    .and_then(ResourceSnapshot::basic_status_from_json),
                 last_event_id: row.last_event_id.map(EventID::new),
             })
             .collect())
@@ -776,7 +782,6 @@ impl ResourceRepository for SqliteResourceRepository {
                     created_at as "created_at: DateTime<Utc>",
                     updated_at as "updated_at: DateTime<Utc>",
                     deleted_at as "deleted_at: DateTime<Utc>",
-                    last_reconciled_at as "last_reconciled_at: DateTime<Utc>",
                     last_event_id
                 FROM resources
                 WHERE account_id = $1
@@ -809,8 +814,10 @@ impl ResourceRepository for SqliteResourceRepository {
                         deleted_at: row.deleted_at,
                     },
                     spec: row.spec,
-                    status: row.status,
-                    last_reconciled_at: row.last_reconciled_at,
+                    status: row
+                        .status
+                        .as_ref()
+                        .and_then(ResourceSnapshot::basic_status_from_json),
                     last_event_id: row.last_event_id.map(EventID::new),
                 });
             }
@@ -847,7 +854,6 @@ impl ResourceRepository for SqliteResourceRepository {
                     created_at as "created_at: DateTime<Utc>",
                     updated_at as "updated_at: DateTime<Utc>",
                     deleted_at as "deleted_at: DateTime<Utc>",
-                    last_reconciled_at as "last_reconciled_at: DateTime<Utc>",
                     last_event_id
                 FROM resources
                 WHERE account_id = $1
@@ -878,8 +884,10 @@ impl ResourceRepository for SqliteResourceRepository {
                         deleted_at: row.deleted_at,
                     },
                     spec: row.spec,
-                    status: row.status,
-                    last_reconciled_at: row.last_reconciled_at,
+                    status: row
+                        .status
+                        .as_ref()
+                        .and_then(ResourceSnapshot::basic_status_from_json),
                     last_event_id: row.last_event_id.map(EventID::new),
                 });
             }
@@ -931,23 +939,25 @@ impl ResourceRepository for SqliteResourceRepository {
             SELECT
                 resource_schema,
                 COUNT(*) as "total_count!: i64",
-                SUM(CASE WHEN phase = 'Reconciling' THEN 1 ELSE 0 END) as "reconciling_count!: i64",
-                SUM(CASE WHEN phase = 'Ready' THEN 1 ELSE 0 END) as "ready_count!: i64",
-                SUM(CASE WHEN phase = 'Failed' THEN 1 ELSE 0 END) as "failed_count!: i64",
-                SUM(CASE WHEN phase = 'Pending' THEN 1 ELSE 0 END) as "pending_count!: i64"
-            FROM (
-                SELECT
-                    resource_schema,
-                    CASE COALESCE(json_extract(status, '$.phase'), 'Pending')
-                        WHEN 'Reconciling' THEN 'Reconciling'
-                        WHEN 'Ready' THEN 'Ready'
-                        WHEN 'Failed' THEN 'Failed'
-                        ELSE 'Pending'
-                    END as phase
-                FROM resources
-                WHERE account_id = $1
-                  AND deleted_at IS NULL
-            ) as normalized_resources
+                SUM(
+                    CASE WHEN json_extract(status, '$.phase') = 'Reconciling' THEN 1 ELSE 0 END
+                ) as "reconciling_count!: i64",
+                SUM(
+                    CASE WHEN json_extract(status, '$.phase') = 'Ready' THEN 1 ELSE 0 END
+                ) as "ready_count!: i64",
+                SUM(
+                    CASE WHEN json_extract(status, '$.phase') = 'Failed' THEN 1 ELSE 0 END
+                ) as "failed_count!: i64",
+                SUM(
+                    CASE
+                        WHEN COALESCE(json_extract(status, '$.phase'), 'Pending') = 'Pending'
+                        THEN 1
+                        ELSE 0
+                    END
+                ) as "pending_count!: i64"
+            FROM resources
+            WHERE account_id = $1
+              AND deleted_at IS NULL
             GROUP BY resource_schema
             ORDER BY resource_schema ASC
             "#,

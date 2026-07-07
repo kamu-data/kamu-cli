@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                resource_id as \"id: uuid::Uuid\",\n                account_id as \"account_id: odf::AccountID\",\n                resource_schema,\n                resource_name,\n                description,\n                labels,\n                annotations,\n                spec,\n                status,\n                generation,\n                created_at,\n                updated_at,\n                deleted_at,\n                last_reconciled_at,\n                last_event_id\n            FROM resources\n            WHERE account_id = $1\n              AND resource_id = ANY($2)\n              AND deleted_at IS NULL\n            ",
+  "query": "\n                SELECT\n                    resource_id as \"id: uuid::Uuid\",\n                    account_id as \"account_id: odf::AccountID\",\n                    resource_schema,\n                    resource_name,\n                    description,\n                    labels,\n                    annotations,\n                    spec,\n                    status,\n                    generation,\n                    created_at,\n                    updated_at,\n                    deleted_at,\n                    last_event_id\n                FROM resources\n                WHERE account_id = $1\n                  AND resource_schema = $2\n                  AND deleted_at IS NULL\n                ORDER BY updated_at DESC, resource_id DESC\n                LIMIT $3 OFFSET $4\n                ",
   "describe": {
     "columns": [
       {
@@ -70,11 +70,6 @@
       },
       {
         "ordinal": 13,
-        "name": "last_reconciled_at",
-        "type_info": "Timestamptz"
-      },
-      {
-        "ordinal": 14,
         "name": "last_event_id",
         "type_info": "Int8"
       }
@@ -82,7 +77,9 @@
     "parameters": {
       "Left": [
         "Text",
-        "UuidArray"
+        "Text",
+        "Int8",
+        "Int8"
       ]
     },
     "nullable": [
@@ -99,9 +96,8 @@
       false,
       false,
       true,
-      true,
       true
     ]
   },
-  "hash": "d29956c5b04d8044b76a9354442bab3448edd1e6d7690cba8551131481fca400"
+  "hash": "2a79950770542317eed523cff62db86c59f814bbecf2f324648474234822e380"
 }

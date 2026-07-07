@@ -796,7 +796,6 @@ impl LocalResourceFacadeImpl {
                                 id: target_account.id.clone(),
                                 name: Some(target_account.name.clone()),
                             }),
-                        last_reconciled_at: snapshot.last_reconciled_at,
                         spec: snapshot.spec,
                         status: snapshot.status,
                     };

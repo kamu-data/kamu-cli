@@ -66,10 +66,10 @@ async fn test_apply_end_to_end_create_and_retrieve() {
     // after apply, so the resource must already be Ready at this point.
     let status = snapshot.basic_status().unwrap();
     assert_eq!(status.phase, ResourcePhase::Ready);
-    assert_eq!(status.observed_generation, 1);
+    assert_eq!(status.observed_generation, Some(1));
     assert!(
-        snapshot.last_reconciled_at.is_some(),
-        "last_reconciled_at must be populated after auto-reconcile"
+        status.reconciled_at.is_some(),
+        "status.reconciledAt must be populated after auto-reconcile"
     );
     BaseResourceServiceHarness::assert_condition(
         &status,
@@ -233,7 +233,7 @@ async fn test_apply_rejected_when_sanitized_spec_fails_validation() {
 async fn test_apply_create_initial_status_is_pending() {
     // With a Dispatching outbox the Applied message is queued but not processed,
     // so auto-reconcile does not run. The resource must be in Pending phase with
-    // generation=1 and observed_generation=0 immediately after apply.
+    // generation=1 and observedGeneration absent immediately after apply.
     let harness = ResourceUseCaseBaseHarness::new_with_opts(ResourceUseCaseBaseHarnessOpts {
         base_opts: BaseResourceServiceHarnessOpts {
             outbox_provider: OutboxProvider::Dispatching,
@@ -254,10 +254,10 @@ async fn test_apply_create_initial_status_is_pending() {
 
     assert_eq!(status.phase, ResourcePhase::Pending);
     assert_eq!(snapshot.headers.generation, 1);
-    assert_eq!(status.observed_generation, 0);
+    assert_eq!(status.observed_generation, None);
     assert!(
-        snapshot.last_reconciled_at.is_none(),
-        "last_reconciled_at must be absent before first reconcile"
+        status.reconciled_at.is_none(),
+        "status.reconciledAt must be absent before first reconcile"
     );
 }
 
@@ -312,12 +312,10 @@ async fn test_apply_update_resets_status_to_pending() {
 
     assert_eq!(status.phase, ResourcePhase::Pending);
     assert_eq!(snapshot.headers.generation, 2);
-    // reset_pending_from_spec creates a fresh ResourceStatus, so
-    // observed_generation resets to 0 on every spec update —
-    // needs_reconciliation() is still true (0 < 2).
     assert_eq!(
-        status.observed_generation, 0,
-        "observed_generation must be reset to 0 by the spec update"
+        status.observed_generation,
+        Some(1),
+        "observedGeneration must keep the last reconciled generation after spec update"
     );
 }
 

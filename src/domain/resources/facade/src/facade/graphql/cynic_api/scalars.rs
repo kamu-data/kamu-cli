@@ -28,6 +28,7 @@ cynic::impl_scalar!(serde_json::Value, schema::JSON);
 cynic::impl_scalar!(Uint64, schema::Uint64);
 cynic::impl_scalar!(ResourceLabels, schema::ResourceLabels);
 cynic::impl_scalar!(ResourceAnnotations, schema::ResourceAnnotations);
+cynic::impl_scalar!(ResourceConditions, schema::ResourceConditions);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -119,6 +120,33 @@ impl<'de> serde::Deserialize<'de> for ResourceAnnotations {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let proxy =
             odf::metadata::serde::yaml::resource::ResourceAnnotations::deserialize(deserializer)?;
+        let dto = proxy
+            .try_into()
+            .map_err(|e: odf::metadata::errors::ValidationError| {
+                serde::de::Error::custom(e.to_string())
+            })?;
+        Ok(Self(dto))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Cynic-side mirror of the `ResourceConditions` scalar — wraps the ODF DTO and
+/// serializes through the generated YAML proxy.
+#[derive(Debug, Clone)]
+pub(crate) struct ResourceConditions(pub(crate) domain::ResourceConditions);
+
+impl serde::Serialize for ResourceConditions {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let proxy: odf::metadata::serde::yaml::resource::ResourceConditions = self.0.clone().into();
+        proxy.serialize(serializer)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for ResourceConditions {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let proxy =
+            odf::metadata::serde::yaml::resource::ResourceConditions::deserialize(deserializer)?;
         let dto = proxy
             .try_into()
             .map_err(|e: odf::metadata::errors::ValidationError| {

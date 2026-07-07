@@ -20,7 +20,6 @@ use kamu_configuration::{
     SecretSetReconcileError,
     SecretSetReconcileSuccess,
     SecretSetResource,
-    SecretSetStats,
 };
 use kamu_datasets::SecretsEncryptionConfig;
 use kamu_resources::{DeclarativeResource, ReconcilableResource, Reconciler, ResourceID};
@@ -51,7 +50,6 @@ impl Reconciler<SecretSetResource> for SecretSetReconcilerImpl {
         <SecretSetResource as ReconcilableResource>::ReconcileSuccess,
         <SecretSetResource as ReconcilableResource>::ReconcileError,
     > {
-        let total = resource.spec().secrets.len();
         let now = self.time_source.now();
         let resource_id = *resource.id();
         let resource_generation = resource.headers().generation;
@@ -83,13 +81,7 @@ impl Reconciler<SecretSetResource> for SecretSetReconcilerImpl {
                 }
             })?;
 
-        Ok(SecretSetReconcileSuccess {
-            stats: SecretSetStats {
-                total_secrets: total,
-                valid_secrets: total,
-                invalid_secrets: 0,
-            },
-        })
+        Ok(SecretSetReconcileSuccess {})
     }
 }
 

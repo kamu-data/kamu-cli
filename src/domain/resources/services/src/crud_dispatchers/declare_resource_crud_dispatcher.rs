@@ -45,7 +45,7 @@ macro_rules! declare_resource_crud_dispatcher {
             <$resource as kamu_resources::DeclarativeResource>::Spec:
                 serde::de::DeserializeOwned + serde::Serialize,
             <$resource as kamu_resources::DeclarativeResource>::Status:
-                serde::Serialize + kamu_resources::ResourceStatusLike,
+                kamu_resources::ResourceStatusJson + kamu_resources::ResourceStatusLike,
             <$resource as kamu_resources::ReconcilableResource>::LifecycleError:
                 std::error::Error + Send + Sync + 'static,
         {

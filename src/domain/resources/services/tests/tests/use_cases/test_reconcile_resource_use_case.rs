@@ -108,10 +108,10 @@ async fn test_reconcile_success_transitions_resource_to_ready() {
 
     assert_eq!(status.phase, ResourcePhase::Ready);
     assert_eq!(snapshot.headers.generation, 1);
-    assert_eq!(status.observed_generation, 1);
+    assert_eq!(status.observed_generation, Some(1));
     assert!(
-        snapshot.last_reconciled_at.is_some(),
-        "last_reconciled_at must be set after successful reconcile"
+        status.reconciled_at.is_some(),
+        "status.reconciledAt must be set after successful reconcile"
     );
 
     BaseResourceServiceHarness::assert_condition(
@@ -156,7 +156,7 @@ async fn test_reconcile_failure_transitions_resource_to_failed() {
 
     assert_eq!(status.phase, ResourcePhase::Failed);
     assert_eq!(snapshot.headers.generation, 1);
-    assert_eq!(status.observed_generation, 1);
+    assert_eq!(status.observed_generation, Some(1));
 
     BaseResourceServiceHarness::assert_condition(
         &status,
@@ -234,7 +234,7 @@ async fn test_already_reconciled_is_no_op_and_reconciler_is_not_called() {
     let status = snapshot.basic_status().unwrap();
     assert_eq!(status.phase, ResourcePhase::Ready);
     assert_eq!(snapshot.headers.generation, 1);
-    assert_eq!(status.observed_generation, 1);
+    assert_eq!(status.observed_generation, Some(1));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

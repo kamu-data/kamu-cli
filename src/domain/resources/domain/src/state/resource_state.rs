@@ -16,6 +16,7 @@ use crate::{
     ResourceHeaders,
     ResourceID,
     ResourceSnapshot,
+    ResourceStatusJson,
     ResourceStatusLike,
     decode_typed_resource_snapshot,
 };
@@ -101,7 +102,7 @@ where
     TStatus: ResourceStatusLike
         + std::fmt::Debug
         + Clone
-        + DeserializeOwned
+        + ResourceStatusJson
         + PendingStatusFromSpec<TSpec>,
 {
     type Error = InternalError;

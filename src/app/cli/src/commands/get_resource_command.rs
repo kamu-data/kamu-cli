@@ -152,10 +152,8 @@ impl GetResourceCommand {
             #[serde(rename = "$schema")]
             schema: &'a str,
             headers: RenderedResourceViewHeaders<'a>,
-            #[serde(rename = "lastReconciledAt")]
-            last_reconciled_at: &'a Option<DateTime<Utc>>,
             spec: &'a serde_json::Value,
-            status: Option<&'a serde_json::Value>,
+            status: Option<serde_json::Value>,
         }
 
         #[derive(serde::Serialize)]
@@ -163,8 +161,6 @@ impl GetResourceCommand {
             #[serde(rename = "$schema")]
             schema: &'a str,
             headers: RenderedResourceViewHeaders<'a>,
-            #[serde(rename = "lastReconciledAt")]
-            last_reconciled_at: &'a Option<DateTime<Utc>>,
             spec: serde_yaml::Value,
             status: Option<serde_yaml::Value>,
         }
@@ -174,9 +170,11 @@ impl GetResourceCommand {
                 serde_json::to_string_pretty(&RenderedResourceViewJson {
                     schema: resource.schema.as_str(),
                     headers: RenderedResourceViewHeaders::new(resource),
-                    last_reconciled_at: &resource.last_reconciled_at,
                     spec: &resource.spec,
-                    status: resource.status.as_ref(),
+                    status: resource
+                        .status
+                        .as_ref()
+                        .map(kamu_resources::resource_status_to_json),
                 })
                 .map_err(CLIError::critical)
             }
@@ -185,9 +183,12 @@ impl GetResourceCommand {
                 serde_yaml::to_string(&RenderedResourceViewYaml {
                     schema: resource.schema.as_str(),
                     headers: RenderedResourceViewHeaders::new(resource),
-                    last_reconciled_at: &resource.last_reconciled_at,
                     spec: common::json_to_yaml_value(&resource.spec),
-                    status: resource.status.as_ref().map(common::json_to_yaml_value),
+                    status: resource
+                        .status
+                        .as_ref()
+                        .map(kamu_resources::resource_status_to_json)
+                        .map(|status| common::json_to_yaml_value(&status)),
                 })
                 .map_err(CLIError::critical)
             }

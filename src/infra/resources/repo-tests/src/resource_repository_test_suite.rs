@@ -18,6 +18,7 @@ use kamu_resources::{
     CreateResourceError,
     ResourceHeaders,
     ResourceID,
+    ResourcePhase,
     ResourcePhaseCounts,
     ResourceRawEventQuery,
     ResourceRepository,
@@ -26,6 +27,7 @@ use kamu_resources::{
     ResourceSummaryRow,
     TypeUri,
     UpdateResourceError,
+    new_pending_resource_status,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -50,9 +52,14 @@ fn make_test_snapshot(
         headers: ResourceHeaders::simple(Utc::now(), account_id, name),
         spec: serde_json::json!({"key": "value"}),
         status: None,
-        last_reconciled_at: None,
         last_event_id: None,
     }
+}
+
+fn status_with_phase(phase: ResourcePhase) -> kamu_resources::ResourceStatus {
+    let mut status = new_pending_resource_status();
+    status.phase = phase;
+    status
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1000,28 +1007,28 @@ pub async fn test_summarize_resources(catalog: &Catalog) {
 
     let mut ready = make_test_snapshot(account_id.clone(), &KIND_A, "ready");
     ready.id = repo.new_resource_id().await.unwrap();
-    ready.status = Some(serde_json::json!({ "phase": "Ready" }));
+    ready.status = Some(status_with_phase(ResourcePhase::Ready));
     repo.create_resource(&ready).await.unwrap();
 
-    let mut unknown_phase_v2 = make_test_snapshot(account_id.clone(), &KIND_A, "unknown-phase-v2");
-    unknown_phase_v2.id = repo.new_resource_id().await.unwrap();
-    unknown_phase_v2.schema = KIND_A_V2.clone();
-    unknown_phase_v2.status = Some(serde_json::json!({ "phase": "UnknownFuturePhase" }));
-    repo.create_resource(&unknown_phase_v2).await.unwrap();
+    let mut pending_v2 = make_test_snapshot(account_id.clone(), &KIND_A, "pending-v2");
+    pending_v2.id = repo.new_resource_id().await.unwrap();
+    pending_v2.schema = KIND_A_V2.clone();
+    pending_v2.status = None;
+    repo.create_resource(&pending_v2).await.unwrap();
 
     let mut failed = make_test_snapshot(account_id.clone(), &KIND_B, "failed");
     failed.id = repo.new_resource_id().await.unwrap();
-    failed.status = Some(serde_json::json!({ "phase": "Failed" }));
+    failed.status = Some(status_with_phase(ResourcePhase::Failed));
     repo.create_resource(&failed).await.unwrap();
 
-    let mut unknown_phase = make_test_snapshot(account_id.clone(), &KIND_B, "unknown");
-    unknown_phase.id = repo.new_resource_id().await.unwrap();
-    unknown_phase.status = Some(serde_json::json!({ "phase": "UnknownFuturePhase" }));
-    repo.create_resource(&unknown_phase).await.unwrap();
+    let mut pending_b = make_test_snapshot(account_id.clone(), &KIND_B, "pending-b");
+    pending_b.id = repo.new_resource_id().await.unwrap();
+    pending_b.status = None;
+    repo.create_resource(&pending_b).await.unwrap();
 
     let mut deleted = make_test_snapshot(account_id.clone(), &KIND_B, "deleted");
     deleted.id = repo.new_resource_id().await.unwrap();
-    deleted.status = Some(serde_json::json!({ "phase": "Reconciling" }));
+    deleted.status = Some(status_with_phase(ResourcePhase::Reconciling));
     repo.create_resource(&deleted).await.unwrap();
     let deleted = ResourceSnapshot {
         headers: ResourceHeaders {
@@ -1034,7 +1041,7 @@ pub async fn test_summarize_resources(catalog: &Catalog) {
 
     let mut other_account = make_test_snapshot(other_account_id, &KIND_A, "other-account");
     other_account.id = repo.new_resource_id().await.unwrap();
-    other_account.status = Some(serde_json::json!({ "phase": "Reconciling" }));
+    other_account.status = Some(status_with_phase(ResourcePhase::Reconciling));
     repo.create_resource(&other_account).await.unwrap();
 
     let summary = repo.summarize_resources(account_id).await.unwrap();

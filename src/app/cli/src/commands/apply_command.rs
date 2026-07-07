@@ -696,8 +696,6 @@ impl ApplyPrinter<'_> {
             #[serde(rename = "$schema")]
             schema: &'a str,
             headers: RenderedResourceViewHeaders<'a>,
-            #[serde(rename = "lastReconciledAt")]
-            last_reconciled_at: &'a Option<DateTime<Utc>>,
             spec: serde_yaml::Value,
             status: Option<serde_yaml::Value>,
         }
@@ -705,9 +703,12 @@ impl ApplyPrinter<'_> {
         serde_yaml::to_string(&RenderedResourceView {
             schema: resource.schema.as_str(),
             headers: RenderedResourceViewHeaders::new(resource),
-            last_reconciled_at: &resource.last_reconciled_at,
             spec: common::json_to_yaml_value(&resource.spec),
-            status: resource.status.as_ref().map(common::json_to_yaml_value),
+            status: resource
+                .status
+                .as_ref()
+                .map(kamu_resources::resource_status_to_json)
+                .map(|status| common::json_to_yaml_value(&status)),
         })
         .map_err(CLIError::critical)
     }
