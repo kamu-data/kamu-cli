@@ -5587,6 +5587,9 @@ pub mod resource {
     pub struct ResourceHeaders {
         pub id: ResourceID,
         pub name: ResourceName,
+        #[serde(default)]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub description: Option<String>,
         pub account: auth::AccountHandle,
         pub labels: resource::ResourceLabels,
         pub annotations: resource::ResourceAnnotations,
@@ -5613,6 +5616,7 @@ pub mod resource {
             Self {
                 id: v.id,
                 name: v.name,
+                description: v.description,
                 account: v.account.into(),
                 labels: v.labels.into(),
                 annotations: v.annotations.into(),
@@ -5630,6 +5634,7 @@ pub mod resource {
             Ok(Self {
                 id: v.id,
                 name: v.name,
+                description: v.description,
                 account: dtos::auth::AccountHandle::try_from(v.account)?,
                 labels: dtos::resource::ResourceLabels::try_from(v.labels)?,
                 annotations: dtos::resource::ResourceAnnotations::try_from(v.annotations)?,
@@ -5654,6 +5659,9 @@ pub mod resource {
         pub name: ResourceName,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
+        pub description: Option<String>,
+        #[serde(default)]
+        #[serde(skip_serializing_if = "Option::is_none")]
         pub account: Option<StructOrString<auth::AccountRef>>,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -5675,6 +5683,7 @@ pub mod resource {
             Self {
                 id: v.id,
                 name: v.name,
+                description: v.description,
                 account: v.account.map(|v| v.into()),
                 labels: v.labels.map(|v| v.into()),
                 annotations: v.annotations.map(|v| v.into()),
@@ -5688,6 +5697,7 @@ pub mod resource {
             Ok(Self {
                 id: v.id,
                 name: v.name,
+                description: v.description,
                 account: v
                     .account
                     .map(|v| dtos::auth::AccountRef::try_from(v))

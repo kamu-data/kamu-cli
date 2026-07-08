@@ -2189,6 +2189,8 @@ pub mod resource {
         /// Symbolic name of a resource that identifies it within a scope of an
         /// onwing account.
         pub name: ResourceName,
+        /// Human-friendly resource description.
+        pub description: Option<String>,
         /// Link to the account that owns the resource.
         pub account: auth::AccountHandle,
         /// Map of string keys and values that can be used to organize,
@@ -2223,6 +2225,8 @@ pub mod resource {
         /// Symbolic name of a resource that identifies it within a scope of an
         /// onwing account.
         pub name: ResourceName,
+        /// Human-friendly resource description.
+        pub description: Option<String>,
         /// Reference to the account that owns the resource.
         pub account: Option<auth::AccountRef>,
         /// Map of string keys and values that can be used to organize,

@@ -76,6 +76,8 @@ table ResourceHeadersInput {
   id: [ubyte];
   // Symbolic name of a resource that identifies it within a scope of an onwing account.
   name: string;
+  // Human-friendly resource description.
+  description: string;
   // Reference to the account that owns the resource.
   account: AccountRef;
   // Map of string keys and values that can be used to organize, categorize, and query resources.
@@ -2542,6 +2544,8 @@ table ResourceHeaders {
   id: [ubyte];
   // Symbolic name of a resource that identifies it within a scope of an onwing account.
   name: string;
+  // Human-friendly resource description.
+  description: string;
   // Link to the account that owns the resource.
   account: AccountHandle;
   // Map of string keys and values that can be used to organize, categorize, and query resources.

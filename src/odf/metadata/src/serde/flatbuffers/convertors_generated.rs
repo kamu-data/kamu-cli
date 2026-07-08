@@ -4758,12 +4758,14 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::resource::ResourceHeaders {
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
         let id_offset = { fb.create_vector(&self.id.as_bytes()) };
         let name_offset = { fb.create_string(&self.name.to_string()) };
+        let description_offset = self.description.as_ref().map(|v| fb.create_string(&v));
         let account_offset = { self.account.serialize(fb) };
         let labels_offset = { self.labels.serialize(fb) };
         let annotations_offset = { self.annotations.serialize(fb) };
         let mut builder = fb::ResourceHeadersBuilder::new(fb);
         builder.add_id(id_offset);
         builder.add_name(name_offset);
+        description_offset.map(|off| builder.add_description(off));
         builder.add_account(account_offset);
         builder.add_labels(labels_offset);
         builder.add_annotations(annotations_offset);
@@ -4787,6 +4789,7 @@ impl<'fb> FlatbuffersDeserializable<fb::ResourceHeaders<'fb>> for odf::resource:
                 .name()
                 .map(|v| odf::resource::ResourceName::try_from(v).unwrap())
                 .unwrap(),
+            description: proxy.description().map(|v| v.to_owned()),
             account: proxy
                 .account()
                 .map(|v| odf::auth::AccountHandle::deserialize(v))
@@ -4818,12 +4821,14 @@ impl<'fb> FlatbuffersSerializable<'fb> for odf::resource::ResourceHeadersInput {
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
         let id_offset = self.id.as_ref().map(|v| fb.create_vector(&v.as_bytes()));
         let name_offset = { fb.create_string(&self.name.to_string()) };
+        let description_offset = self.description.as_ref().map(|v| fb.create_string(&v));
         let account_offset = self.account.as_ref().map(|v| v.serialize(fb));
         let labels_offset = self.labels.as_ref().map(|v| v.serialize(fb));
         let annotations_offset = self.annotations.as_ref().map(|v| v.serialize(fb));
         let mut builder = fb::ResourceHeadersInputBuilder::new(fb);
         id_offset.map(|off| builder.add_id(off));
         builder.add_name(name_offset);
+        description_offset.map(|off| builder.add_description(off));
         account_offset.map(|off| builder.add_account(off));
         labels_offset.map(|off| builder.add_labels(off));
         annotations_offset.map(|off| builder.add_annotations(off));
@@ -4843,6 +4848,7 @@ impl<'fb> FlatbuffersDeserializable<fb::ResourceHeadersInput<'fb>>
                 .name()
                 .map(|v| odf::resource::ResourceName::try_from(v).unwrap())
                 .unwrap(),
+            description: proxy.description().map(|v| v.to_owned()),
             account: proxy
                 .account()
                 .map(|v| odf::auth::AccountRef::deserialize(v)),
