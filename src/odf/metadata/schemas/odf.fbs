@@ -65,31 +65,23 @@ table ResourceAnnotations {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// ResourceHeaders
+// ResourceHeadersInput
 // Container for identity and ownership information of a resource.
 //
-// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceHeaders
+// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceHeadersInput
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-table ResourceHeaders {
+table ResourceHeadersInput {
   // Unique identifier of a resource within entire ODF node. Automatically assigned upon resource creation.
   id: [ubyte];
   // Symbolic name of a resource that identifies it within a scope of an onwing account.
   name: string;
-  // Reference to an account that owns the resource.
+  // Reference to the account that owns the resource.
   account: AccountRef;
   // Map of string keys and values that can be used to organize, categorize, and query resources.
   labels: ResourceLabels;
-  // Annotations is an unstructured key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. Unlike labels, annotations are not indexed and cannot be queried by.
+  // Annotations is a key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. Unlike labels, annotations are not indexed and cannot be queried by.
   annotations: ResourceAnnotations;
-  // A sequential number that changes every time the resource header and spec are updated. Does not increment on status changes, thus signifying changes to the desired state. Populated by the system. Starts with `1`.
-  generation: uint64 = null;
-  // Time when the resource was first applied and assigned an identity.
-  created_at: Timestamp;
-  // Time when the resource was last updated, including header, spec, and status updates.
-  updated_at: Timestamp;
-  // Time when the resource was deleted.
-  deleted_at: Timestamp;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -119,6 +111,44 @@ table Secret {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// AccountSpecInput
+// Predefined account specification.
+//
+// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/AccountSpecInput
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table AccountSpecInput {
+  // DID associated with the account by ODF or an external system
+  did: [ubyte];
+  // Type of the account.
+  //
+  // Defaults to: "User"
+  account_type: AccountType = null;
+  // Human-friendly display name.
+  display_name: string;
+  // Email address of the account.
+  email: string;
+  // URL of the account's avatar image.
+  avatar_url: string;
+  // Password for local authentication. Absent for SSO or DID-based accounts.
+  password: Secret;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// AccountHandle
+// Link to an account.
+//
+// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/AccountHandle
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table AccountHandle {
+  // DID of the account.
+  id: [ubyte];
+  // Name of the account.
+  name: string;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // AccountSpec
 // Predefined account specification.
 //
@@ -140,55 +170,6 @@ table AccountSpec {
   avatar_url: string;
   // Password for local authentication. Absent for SSO or DID-based accounts.
   password: Secret;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// ResourcePhase
-// Represents the lifecycle stage of a resource.
-//
-// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourcePhase
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-enum ResourcePhase: int32 {
-  Pending,
-  Reconciling,
-  Ready,
-  Failed,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// ResourceConditions
-// Container of feneric contditions that can be added by contollers to provide additional information about the state of a resource. Keys uniquely identify the condition and should be in the form of URL to a schema describing this condition, e.g. `https://opendatafabric.org/schemas/resource/ConditionReady.json`.
-//
-// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceConditions
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-table ResourceConditionsEntry {
-  key: string (key);
-  // JSON encoded
-  value: string (json);
-}
-table ResourceConditions {
-  // Key-value map
-  entries: [ResourceConditionsEntry];
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// ResourceStatus
-// Resource lifecycle and reconciliation information.
-//
-// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceStatus
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-table ResourceStatus {
-  // Represents the lifecycle stage of a resource.
-  phase: ResourcePhase;
-  // Resource generation that was last processed by the main resource controller.
-  observed_generation: uint64 = null;
-  // Time when the controller last reconciled the desired resource state as defined in `observedGeneration`.
-  reconciled_at: Timestamp;
-  // Detailed conditions describing the state of the resource that are added by controllers.
-  conditions: ResourceConditions;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1697,13 +1678,13 @@ table PersistentVolumeRef {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// DatasetSpec
+// DatasetSpecInput
 // Represents a desired state of the dataset metadata.
 //
-// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/DatasetSpec
+// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/DatasetSpecInput
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-table DatasetSpec {
+table DatasetSpecInput {
   // DID of the dataset in global ODF network
   did: [ubyte];
   // Type of the dataset.
@@ -1771,6 +1752,24 @@ table DatasetSnapshot {
   kind: DatasetKind;
   // An array of metadata events that will be used to populate the chain. Here you can define polling and push sources, set licenses, add attachments etc.
   metadata: [MetadataEventWrapper];
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// DatasetSpec
+// Represents a desired state of the dataset metadata.
+//
+// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/DatasetSpec
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table DatasetSpec {
+  // DID of the dataset in global ODF network
+  did: [ubyte];
+  // Type of the dataset.
+  kind: DatasetKind;
+  // An array of metadata events that will be used to populate the chain. Here you can define polling and push sources, set licenses, add attachments etc.
+  metadata: [MetadataEventWrapper];
+  // Reference to a storage volume where dataset data will be stored. If omitted, the node's default storage is used.
+  volume: PersistentVolumeRef;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1918,17 +1917,17 @@ table FlowTriggerWrapper {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// TaskSpec
+// TaskSpecInput
 // An individual work item to be executed as part of a flow.
 //
-// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/TaskSpec
+// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/TaskSpecInput
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-union TaskSpec {
-  TaskSpecIngest,
-  TaskSpecCompaction,
-  TaskSpecGarbageCollection,
-  TaskSpecWebhookCall,
+union TaskSpecInput {
+  TaskSpecInputIngest,
+  TaskSpecInputCompaction,
+  TaskSpecInputGarbageCollection,
+  TaskSpecInputWebhookCall,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1941,6 +1940,90 @@ union TaskSpec {
 table IngestParams {
   // Target number of records to ingest per data slice.
   target_slice_records: uint64 = null;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TaskSpecInputIngest
+// Fetches data from a source and appends it to a dataset.
+//
+// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/TaskSpecInput#/$defs/Ingest
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table TaskSpecInputIngest {
+  // Reference to the source resource that defines how to fetch data.
+  source: ResourceRef;
+  // Optional parameters to control ingestion behavior.
+  params: IngestParams;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TaskSpecInputCompaction
+// Compacts data files in matching datasets to improve query performance.
+//
+// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/TaskSpecInput#/$defs/Compaction
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table TaskSpecInputCompaction {
+  // Optional parameters to control ingestion behavior.
+  params: CompactionParams;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TaskSpecInputGarbageCollection
+// Removes unreferenced data files from matching datasets.
+//
+// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/TaskSpecInput#/$defs/GarbageCollection
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table TaskSpecInputGarbageCollection {
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TaskSpecInputWebhookCall
+// Dispatches a certain payload to a specific `WebhookTarget`.
+//
+// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/TaskSpecInput#/$defs/WebhookCall
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table TaskSpecInputWebhookCall {
+  // Reference to the `WebhookTarget`.
+  target: ResourceRef;
+  // The payload to send. May include templating.
+  payload: string;
+}
+
+table TaskSpecInputWrapper {
+  value: TaskSpecInput;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// FlowSpecInput
+// Defines a sequence of tasks to be executed upon certain trigger conditions.
+//
+// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowSpecInput
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table FlowSpecInput {
+  // Defines resources for which this flow will be instantiated.
+  target: ResourceSelector;
+  // Conditions that cause this flow to execute.
+  triggers: [FlowTriggerWrapper];
+  // List of tasks to run consecutively.
+  tasks: [TaskSpecInputWrapper];
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// TaskSpec
+// An individual work item to be executed as part of a flow.
+//
+// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/TaskSpec
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+union TaskSpec {
+  TaskSpecIngest,
+  TaskSpecCompaction,
+  TaskSpecGarbageCollection,
+  TaskSpecWebhookCall,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2212,14 +2295,14 @@ enum OperationType: ubyte {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// PersistentVolumeSpec
+// PersistentVolumeSpecInput
 // Defines a storage volume where data can be stored and its access credentials.
 //
-// Schema: https://opendatafabric.org/schemas/storage/v1alpha1/PersistentVolumeSpec
+// Schema: https://opendatafabric.org/schemas/storage/v1alpha1/PersistentVolumeSpecInput
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-union PersistentVolumeSpec {
-  PersistentVolumeSpecS3,
+union PersistentVolumeSpecInput {
+  PersistentVolumeSpecInputS3,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2232,6 +2315,32 @@ union PersistentVolumeSpec {
 table VolumeCapacity {
   // Maximum storage size e.g. `10Gi`.
   storage: uint64 = null;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// PersistentVolumeSpecInputS3
+// An Amazon S3 or S3-compatible object storage bucket.
+//
+// Schema: https://opendatafabric.org/schemas/storage/v1alpha1/PersistentVolumeSpecInput#/$defs/S3
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table PersistentVolumeSpecInputS3 {
+  // S3 endpoint URL. If omitted, defaults to AWS S3. Use for S3-compatible stores e.g. `https://s3.amazonaws.com`.
+  endpoint: string;
+  // AWS region where the bucket is located e.g. `us-west-2`.
+  region: string;
+  // Name of the S3 bucket.
+  bucket: string;
+  // Optional path prefix within the bucket.
+  prefix: string;
+  // Storage capacity allocation.
+  capacity: VolumeCapacity;
+  // Access credentials for the bucket.
+  credentials: AwsCredentials;
+}
+
+union PersistentVolumeSpec {
+  PersistentVolumeSpecS3,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2254,6 +2363,30 @@ table PersistentVolumeSpecS3 {
   capacity: VolumeCapacity;
   // Access credentials for the bucket.
   credentials: AwsCredentials;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// PersistentVolumeSpecRoot
+//
+// Schema: https://opendatafabric.org/schemas/storage/v1alpha1/PersistentVolumeSpecRoot
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table PersistentVolumeSpecRoot {
+  value: PersistentVolumeSpec;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ProjectionSpecInput
+// Represents a projection of a dataaset history into a state for fast lookups.
+//
+// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/ProjectionSpecInput
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table ProjectionSpecInput {
+  // Datasets that will be used as sources.
+  inputs: [TransformInput];
+  // Transformation that will be applied to produce new data.
+  project: Transform;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2370,6 +2503,20 @@ table Relation {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// RelationsSpecInput
+// Specifies resource attributes and relations between resources on which auth policies act upon.
+//
+// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/RelationsSpecInput
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table RelationsSpecInput {
+  // Relations between resources.
+  relations: [Relation];
+  // Resource attributes.
+  attributes: [Attribute];
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // RelationsSpec
 // Specifies resource attributes and relations between resources on which auth policies act upon.
 //
@@ -2384,8 +2531,85 @@ table RelationsSpec {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ResourceHeaders
+// Container for identity and ownership information of a resource.
+//
+// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceHeaders
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table ResourceHeaders {
+  // Unique identifier of a resource within entire ODF node. Automatically assigned upon resource creation.
+  id: [ubyte];
+  // Symbolic name of a resource that identifies it within a scope of an onwing account.
+  name: string;
+  // Link to the account that owns the resource.
+  account: AccountHandle;
+  // Map of string keys and values that can be used to organize, categorize, and query resources.
+  labels: ResourceLabels;
+  // Annotations is a key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. Unlike labels, annotations are not indexed and cannot be queried by.
+  annotations: ResourceAnnotations;
+  // A sequential number that changes every time the resource header and spec are updated. Does not increment on status changes, thus signifying changes to the desired state. Populated by the system. Starts with `1`.
+  generation: uint64;
+  // Time when the resource was first applied and assigned an identity.
+  created_at: Timestamp;
+  // Time when the resource was last updated, including header, spec, and status updates.
+  updated_at: Timestamp;
+  // Time when the resource was deleted.
+  deleted_at: Timestamp;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ResourcePhase
+// Represents the lifecycle stage of a resource.
+//
+// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourcePhase
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+enum ResourcePhase: int32 {
+  Pending,
+  Reconciling,
+  Ready,
+  Failed,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ResourceConditions
+// Container of feneric contditions that can be added by contollers to provide additional information about the state of a resource. Keys uniquely identify the condition and should be in the form of URL to a schema describing this condition, e.g. `https://opendatafabric.org/schemas/resource/ConditionReady.json`.
+//
+// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceConditions
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table ResourceConditionsEntry {
+  key: string (key);
+  // JSON encoded
+  value: string (json);
+}
+table ResourceConditions {
+  // Key-value map
+  entries: [ResourceConditionsEntry];
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ResourceStatus
+// Resource lifecycle and reconciliation information.
+//
+// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceStatus
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table ResourceStatus {
+  // Represents the lifecycle stage of a resource.
+  phase: ResourcePhase;
+  // Resource generation that was last processed by the main resource controller.
+  observed_generation: uint64 = null;
+  // Time when the controller last reconciled the desired resource state as defined in `observedGeneration`.
+  reconciled_at: Timestamp;
+  // Detailed conditions describing the state of the resource that are added by controllers.
+  conditions: ResourceConditions;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Resource
-// Top-level container for resources that specifies the type and version of the resource it's specifying and carries identity, ownership, and status information.
+// Top-level container for canonical representation of a resource that specifies the type and version of the resource, carries identity, ownership, and status information.
 //
 // Schema: https://opendatafabric.org/schemas/resource/v1alpha1/Resource
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2402,6 +2626,22 @@ table Resource {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ResourceInput
+// Top-level container for user-authored representation of a resource that specifies the type and version of the resource and its desired state.
+//
+// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceInput
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table ResourceInput {
+  // Identifies the controlling entity, a bounded context that this resource belongs to, and the version. Url should follow the pattern `{base-url}/{context}/{version}/{name}.json` e.g. `https://opendatafabric.org/schemas/dataset/v1/Dataset.json`.
+  schema: string;
+  // Container for identity and ownership information of a resource.
+  headers: ResourceHeadersInput;
+  // Specifies the desired state of a resource.
+  spec: [ubyte];
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Secrets
 // Container for key-value secrets. Every key must be a string. Values may be strings with raw unencrypted data or objects that signify the encoding.
 //
@@ -2415,6 +2655,18 @@ table SecretsEntry {
 table Secrets {
   // Key-value map
   entries: [SecretsEntry];
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// SecretSetSpecInput
+// Defines a set of secrets stored and managed by the ODF node and accessible via embedded sercets provider.
+//
+// Schema: https://opendatafabric.org/schemas/config/v1alpha1/SecretSetSpecInput
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table SecretSetSpecInput {
+  // Key value pairs of secrets.
+  secrets: Secrets;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2443,6 +2695,30 @@ table ValueRefsEntry {
 table ValueRefs {
   // Key-value map
   entries: [ValueRefsEntry];
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// SourceSpecInput
+// Specifies an external source of data for ingestion.
+//
+// Schema: https://opendatafabric.org/schemas/source/v1alpha1/SourceSpecInput
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table SourceSpecInput {
+  // Brings the configuration values into the local `config` context.
+  config: ValueRefs;
+  // Determines where data is sourced from.
+  ingress: Ingress;
+  // Defines how raw data is prepared before reading.
+  prepare: [PrepStepWrapper];
+  // Defines how data is read into structured format.
+  read: ReadStep;
+  // Pre-processing query that shapes the data.
+  preprocess: Transform;
+  // Determines how newly-ingested data should be merged with existing history.
+  merge: MergeStrategy;
+  // Defines the mapping of system fields to dataset column names.
+  vocab: DatasetVocabulary;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2635,6 +2911,18 @@ table Variables {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// VariableSetSpecInput
+// Defines a set of variables stored and managed by the ODF node and accessible via embedded variables provider.
+//
+// Schema: https://opendatafabric.org/schemas/config/v1alpha1/VariableSetSpecInput
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table VariableSetSpecInput {
+  // Key value pairs of variables.
+  variables: Variables;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // VariableSetSpec
 // Defines a set of variables stored and managed by the ODF node and accessible via embedded variables provider.
 //
@@ -2644,6 +2932,20 @@ table Variables {
 table VariableSetSpec {
   // Key value pairs of variables.
   variables: Variables;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// WebhookTargetSpecInput
+// Defines a webhook target endpoint that can receive event notifications and data.
+//
+// Schema: https://opendatafabric.org/schemas/sink/v1alpha1/WebhookTargetSpecInput
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table WebhookTargetSpecInput {
+  // Target url of the webhook.
+  url: string;
+  // Shared secret used for HMAC signature of the request payload for authentication.
+  secret: Secret;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
