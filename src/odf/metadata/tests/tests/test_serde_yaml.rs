@@ -999,7 +999,7 @@ fn serde_enum_short_form() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
-fn test_serde_resource_generics() {
+fn test_serde_resource_input_generics() {
     use ::serde::de::IgnoredAny as Ignore;
 
     let data = indoc!(
@@ -1015,53 +1015,46 @@ fn test_serde_resource_generics() {
     );
 
     // Read only header ignoring the rest
-    let val = serde_yaml::from_str::<serde::resource::Resource<Ignore>>(data)
+    let val = serde_yaml::from_str::<serde::resource::ResourceInput<Ignore>>(data)
         .unwrap()
         .into_dto()
         .unwrap();
 
     pretty_assertions::assert_eq!(
         val,
-        Resource {
+        ResourceInput {
             schema: SecretSet::schema().clone(),
-            headers: ResourceHeaders {
+            headers: ResourceHeadersInput {
                 id: None,
                 name: "my-secret".parse().unwrap(),
                 account: None,
                 labels: None,
                 annotations: None,
-                generation: None,
-                created_at: None,
-                updated_at: None,
-                deleted_at: None,
             },
             spec: Ignore,
-            status: None,
         }
     );
 
     // Read & write typed spec
-    let val = serde_yaml::from_str::<serde::resource::Resource<serde::config::SecretSetSpec>>(data)
-        .unwrap()
-        .into_dto()
-        .unwrap();
+    let val = serde_yaml::from_str::<
+        serde::resource::ResourceInput<serde::config::SecretSetSpecInput>,
+    >(data)
+    .unwrap()
+    .into_dto()
+    .unwrap();
 
     pretty_assertions::assert_eq!(
         val,
-        Resource {
+        ResourceInput {
             schema: SecretSet::schema().clone(),
-            headers: ResourceHeaders {
+            headers: ResourceHeadersInput {
                 id: None,
                 name: "my-secret".parse().unwrap(),
                 account: None,
                 labels: None,
                 annotations: None,
-                generation: None,
-                created_at: None,
-                updated_at: None,
-                deleted_at: None,
             },
-            spec: SecretSetSpec {
+            spec: SecretSetSpecInput {
                 secrets: Secrets {
                     entries: BTreeMap::from_iter([(
                         "tls".to_string(),
@@ -1072,38 +1065,33 @@ fn test_serde_resource_generics() {
                     )]),
                 }
             },
-            status: None,
         }
     );
 
     pretty_assertions::assert_eq!(
-        serde_yaml::to_string(
-            &serde::resource::Resource::<serde::config::SecretSetSpec>::from(val)
-        )
+        serde_yaml::to_string(&serde::resource::ResourceInput::<
+            serde::config::SecretSetSpecInput,
+        >::from(val))
         .unwrap(),
         data
     );
 
     // Read & write generic spec
-    let val = serde_yaml::from_str::<serde::resource::Resource<serde_json::Value>>(data)
+    let val = serde_yaml::from_str::<serde::resource::ResourceInput<serde_json::Value>>(data)
         .unwrap()
         .into_dto()
         .unwrap();
 
     pretty_assertions::assert_eq!(
         val,
-        Resource {
+        ResourceInput {
             schema: SecretSet::schema().clone(),
-            headers: ResourceHeaders {
+            headers: ResourceHeadersInput {
                 id: None,
                 name: "my-secret".parse().unwrap(),
                 account: None,
                 labels: None,
                 annotations: None,
-                generation: None,
-                created_at: None,
-                updated_at: None,
-                deleted_at: None,
             },
             spec: json!({
                 "secrets": {
@@ -1111,17 +1099,226 @@ fn test_serde_resource_generics() {
                         "value": "<cert>",
                     }
                 }
-            }),
-            status: None,
+            })
         }
     );
 
     pretty_assertions::assert_eq!(
-        serde_yaml::to_string(&serde::resource::Resource::<serde_json::Value>::from(val)).unwrap(),
+        serde_yaml::to_string(&serde::resource::ResourceInput::<serde_json::Value>::from(
+            val
+        ))
+        .unwrap(),
         data
     );
+}
 
-    // Read & write typed spec - all fields
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_serde_resource_input_short_forms() {
+    #[serde_with::serde_as]
+    #[derive(Debug, PartialEq, Eq, ::serde::Serialize, ::serde::Deserialize)]
+    struct MySpec {
+        #[serde_as(as = "serde::config::Secrets")]
+        secrets: Secrets,
+        #[serde_as(as = "serde::config::Variables")]
+        variables: Variables,
+    }
+
+    impl IntoDto for MySpec {
+        type Dto = Self;
+        fn into_dto(self) -> Result<Self::Dto, ValidationError> {
+            Ok(self)
+        }
+    }
+
+    let data = indoc!(
+        r#"
+        $schema: https://kamu.dev/schemas/core/v1/MyResource
+        headers:
+          name: my-thing
+          account: sergiimk
+        spec:
+          secrets:
+            tls: <cert>
+          variables:
+            poolSize: '10'
+        "#
+    );
+
+    let val = serde_yaml::from_str::<serde::resource::ResourceInput<MySpec>>(data)
+        .unwrap()
+        .into_dto()
+        .unwrap();
+
+    pretty_assertions::assert_eq!(
+        val,
+        ResourceInput {
+            schema: "https://kamu.dev/schemas/core/v1/MyResource"
+                .parse()
+                .unwrap(),
+            headers: ResourceHeadersInput {
+                id: None,
+                name: "my-thing".parse().unwrap(),
+                account: Some("sergiimk".parse().unwrap()),
+                labels: None,
+                annotations: None,
+            },
+            spec: MySpec {
+                secrets: Secrets {
+                    entries: BTreeMap::from_iter([(
+                        "tls".to_string(),
+                        Secret {
+                            value: "<cert>".into(),
+                            content_encoding: None,
+                        }
+                    )]),
+                },
+                variables: Variables {
+                    entries: BTreeMap::from_iter([(
+                        "poolSize".to_string(),
+                        Variable { value: "10".into() }
+                    )]),
+                }
+            }
+        }
+    );
+
+    pretty_assertions::assert_eq!(
+        serde_yaml::to_string(&serde::resource::ResourceInput::<MySpec>::from(val)).unwrap(),
+        indoc!(
+            r#"
+            $schema: https://kamu.dev/schemas/core/v1/MyResource
+            headers:
+              name: my-thing
+              account:
+                name: sergiimk
+            spec:
+              secrets:
+                tls:
+                  value: <cert>
+              variables:
+                poolSize:
+                  value: '10'
+            "#
+        )
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_serde_resource_input_refs() {
+    let data = indoc!(
+        r#"
+        $schema: https://opendatafabric.org/schemas/auth/v1alpha1/Relations
+        headers:
+          name: alice-bob
+        spec:
+          relations:
+            - subject:
+                type: Account
+                name: alice
+              relation: role
+              value: maintainer
+              object:
+                type: Dataset
+                account: bob
+                name: bobs-dataset
+          attributes:
+            - object: Dataset:bob/bobs-dataset # Short form of `{ type: Dataset, account: bob, name: bobs-dataset }`
+              name: allowPublicRead
+              value: true
+        "#
+    );
+
+    let val =
+        serde_yaml::from_str::<serde::resource::ResourceInput<serde::auth::RelationsSpecInput>>(
+            data,
+        )
+        .unwrap()
+        .into_dto()
+        .unwrap();
+
+    pretty_assertions::assert_eq!(
+        val,
+        ResourceInput {
+            schema: Relations::schema().clone(),
+            headers: ResourceHeadersInput {
+                id: None,
+                name: "alice-bob".parse().unwrap(),
+                account: None,
+                labels: None,
+                annotations: None,
+            },
+            spec: RelationsSpecInput {
+                relations: Some(vec![Relation {
+                    subject: ResourceRef::Name {
+                        account: None,
+                        typ: TypeRef::Name("Account".parse().unwrap()),
+                        name: "alice".parse().unwrap(),
+                    },
+                    relation: "role".to_string(),
+                    value: Some(json!("maintainer")),
+                    object: ResourceRef::Name {
+                        account: Some(AccountRef::Name("bob".parse().unwrap())),
+                        typ: TypeRef::Name("Dataset".parse().unwrap()),
+                        name: "bobs-dataset".parse().unwrap(),
+                    },
+                }]),
+                attributes: Some(vec![Attribute {
+                    object: ResourceRef::Name {
+                        account: Some(AccountRef::Name("bob".parse().unwrap())),
+                        typ: TypeRef::Name("Dataset".parse().unwrap()),
+                        name: "bobs-dataset".parse().unwrap(),
+                    },
+                    name: "allowPublicRead".to_string(),
+                    value: json!(true),
+                },],),
+            },
+        }
+    );
+
+    pretty_assertions::assert_eq!(
+        serde_yaml::to_string(&serde::resource::ResourceInput::<
+            serde::auth::RelationsSpecInput,
+        >::from(val))
+        .unwrap(),
+        indoc!(
+            r#"
+            $schema: https://opendatafabric.org/schemas/auth/v1alpha1/Relations
+            headers:
+              name: alice-bob
+            spec:
+              relations:
+              - subject:
+                  type: Account
+                  name: alice
+                relation: role
+                value: maintainer
+                object:
+                  account:
+                    name: bob
+                  type: Dataset
+                  name: bobs-dataset
+              attributes:
+              - object:
+                  account:
+                    name: bob
+                  type: Dataset
+                  name: bobs-dataset
+                name: allowPublicRead
+                value: true
+            "#
+        )
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_serde_resource_canonical() {
+    // Canonical resource representation
     let data = indoc!(
         r#"
         $schema: https://opendatafabric.org/schemas/config/v1alpha1/SecretSet
@@ -1129,6 +1326,7 @@ fn test_serde_resource_generics() {
           id: aa-12345
           name: my-secret
           account:
+            id: did:odf:fed01816ef0a9abe93aba816ef0a9abe93aba90e6065747170300c0d3d30c2cd8d7a4
             name: sergiimk
           labels:
             nested:
@@ -1176,24 +1374,27 @@ fn test_serde_resource_generics() {
         Resource {
             schema: SecretSet::schema().clone(),
             headers: ResourceHeaders {
-                id: Some("aa-12345".parse().unwrap()),
+                id: "aa-12345".parse().unwrap(),
                 name: "my-secret".parse().unwrap(),
-                account: Some("sergiimk".parse().unwrap()),
-                labels: Some(ResourceLabels {
+                account: AccountHandle {
+                    id: AccountID::from_did_str("did:odf:fed01816ef0a9abe93aba816ef0a9abe93aba90e6065747170300c0d3d30c2cd8d7a4").unwrap(),
+                    name: "sergiimk".parse().unwrap(),
+                },
+                labels: ResourceLabels {
                     entries: BTreeMap::from_iter([
                         ("string".parse().unwrap(), json!("foo")),
                         ("nested".parse().unwrap(), json!({"a": "x", "b": "y"}))
                     ])
-                }),
-                annotations: Some(ResourceAnnotations {
+                },
+                annotations: ResourceAnnotations {
                     entries: BTreeMap::from_iter([
                         ("string".parse().unwrap(), json!("foo")),
                         ("nested".parse().unwrap(), json!({"a": "x", "b": "y"}))
                     ])
-                }),
-                generation: Some(1),
-                created_at: Some("2026-01-01T00:00:00Z".parse().unwrap()),
-                updated_at: Some("2026-01-01T00:00:00Z".parse().unwrap()),
+                },
+                generation: 1,
+                created_at: "2026-01-01T00:00:00Z".parse().unwrap(),
+                updated_at: "2026-01-01T00:00:00Z".parse().unwrap(),
                 deleted_at: Some("2026-01-01T00:00:00Z".parse().unwrap()),
             },
             spec: SecretSetSpec {
@@ -1207,11 +1408,11 @@ fn test_serde_resource_generics() {
                     )]),
                 }
             },
-            status: Some(ResourceStatus {
+            status: ResourceStatus {
                 phase: ResourcePhase::Ready,
                 observed_generation: Some(1),
                 reconciled_at: Some("2026-01-01T00:00:00Z".parse().unwrap()),
-                conditions: Some(ResourceConditions {
+                conditions: ResourceConditions {
                     entries: BTreeMap::from_iter([
                         (
                             "https://opendatafabric.org/core/v1/Str".parse().unwrap(),
@@ -1230,222 +1431,50 @@ fn test_serde_resource_generics() {
                             json!({"value": {"a": "x", "b": "y"}})
                         )
                     ])
-                }),
-            }),
+                },
+            },
         }
     );
 
     pretty_assertions::assert_eq!(
         serde_yaml::to_string(
-            &serde::resource::Resource::<serde::config::SecretSetSpec>::from(val)
+            &serde::resource::Resource::<serde::config::SecretSetSpec>::from(val.clone())
         )
         .unwrap(),
         data
     );
-}
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test]
-fn test_serde_resource_short_forms() {
-    #[serde_with::serde_as]
-    #[derive(Debug, PartialEq, Eq, ::serde::Serialize, ::serde::Deserialize)]
-    struct MySpec {
-        #[serde_as(as = "serde::config::Secrets")]
-        secrets: Secrets,
-        #[serde_as(as = "serde::config::Variables")]
-        variables: Variables,
-    }
-
-    impl IntoDto for MySpec {
-        type Dto = Self;
-        fn into_dto(self) -> Result<Self::Dto, ValidationError> {
-            Ok(self)
-        }
-    }
-
-    let data = indoc!(
-        r#"
-        $schema: https://kamu.dev/schemas/core/v1/MyResource
-        headers:
-          name: my-thing
-          account: sergiimk
-        spec:
-          secrets:
-            tls: <cert>
-          variables:
-            poolSize: '10'
-        "#
-    );
-
-    let val = serde_yaml::from_str::<serde::resource::Resource<MySpec>>(data)
-        .unwrap()
-        .into_dto()
-        .unwrap();
+    // Map from canonical to input type
+    let ival: ResourceInput<SecretSetSpecInput> = val.into();
 
     pretty_assertions::assert_eq!(
-        val,
-        Resource {
-            schema: "https://kamu.dev/schemas/core/v1/MyResource"
-                .parse()
-                .unwrap(),
-            headers: ResourceHeaders {
-                id: None,
-                name: "my-thing".parse().unwrap(),
-                account: Some("sergiimk".parse().unwrap()),
-                labels: None,
-                annotations: None,
-                generation: None,
-                created_at: None,
-                updated_at: None,
-                deleted_at: None,
-            },
-            spec: MySpec {
-                secrets: Secrets {
-                    entries: BTreeMap::from_iter([(
-                        "tls".to_string(),
-                        Secret {
-                            value: "<cert>".into(),
-                            content_encoding: None,
-                        }
-                    )]),
-                },
-                variables: Variables {
-                    entries: BTreeMap::from_iter([(
-                        "poolSize".to_string(),
-                        Variable { value: "10".into() }
-                    )]),
-                }
-            },
-            status: None,
-        }
-    );
-
-    pretty_assertions::assert_eq!(
-        serde_yaml::to_string(&serde::resource::Resource::<MySpec>::from(val)).unwrap(),
+        serde_yaml::to_string(&serde::resource::ResourceInput::<
+            serde::config::SecretSetSpecInput,
+        >::from(ival))
+        .unwrap(),
         indoc!(
             r#"
-            $schema: https://kamu.dev/schemas/core/v1/MyResource
+            $schema: https://opendatafabric.org/schemas/config/v1alpha1/SecretSet
             headers:
-              name: my-thing
+              id: aa-12345
+              name: my-secret
               account:
+                id: did:odf:fed01816ef0a9abe93aba816ef0a9abe93aba90e6065747170300c0d3d30c2cd8d7a4
                 name: sergiimk
+              labels:
+                nested:
+                  a: x
+                  b: y
+                string: foo
+              annotations:
+                nested:
+                  a: x
+                  b: y
+                string: foo
             spec:
               secrets:
                 tls:
                   value: <cert>
-              variables:
-                poolSize:
-                  value: '10'
-            "#
-        )
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test]
-fn test_serde_resource_ref() {
-    let data = indoc!(
-        r#"
-        $schema: https://opendatafabric.org/schemas/auth/v1alpha1/Relations
-        headers:
-          name: alice-bob
-        spec:
-          relations:
-            - subject:
-                type: Account
-                name: alice
-              relation: role
-              value: maintainer
-              object:
-                type: Dataset
-                account: bob
-                name: bobs-dataset
-          attributes:
-            - object: Dataset:bob/bobs-dataset # Short form of `{ type: Dataset, account: bob, name: bobs-dataset }`
-              name: allowPublicRead
-              value: true
-        "#
-    );
-
-    let val = serde_yaml::from_str::<serde::resource::Resource<serde::auth::RelationsSpec>>(data)
-        .unwrap()
-        .into_dto()
-        .unwrap();
-
-    pretty_assertions::assert_eq!(
-        val,
-        Resource {
-            schema: Relations::schema().clone(),
-            headers: ResourceHeaders {
-                id: None,
-                name: "alice-bob".parse().unwrap(),
-                account: None,
-                labels: None,
-                annotations: None,
-                generation: None,
-                created_at: None,
-                updated_at: None,
-                deleted_at: None,
-            },
-            spec: RelationsSpec {
-                relations: Some(vec![Relation {
-                    subject: ResourceRef::Name {
-                        account: None,
-                        typ: TypeRef::Name("Account".parse().unwrap()),
-                        name: "alice".parse().unwrap(),
-                    },
-                    relation: "role".to_string(),
-                    value: Some(json!("maintainer")),
-                    object: ResourceRef::Name {
-                        account: Some(AccountRef::Name("bob".parse().unwrap())),
-                        typ: TypeRef::Name("Dataset".parse().unwrap()),
-                        name: "bobs-dataset".parse().unwrap(),
-                    },
-                }]),
-                attributes: Some(vec![Attribute {
-                    object: ResourceRef::Name {
-                        account: Some(AccountRef::Name("bob".parse().unwrap())),
-                        typ: TypeRef::Name("Dataset".parse().unwrap()),
-                        name: "bobs-dataset".parse().unwrap(),
-                    },
-                    name: "allowPublicRead".to_string(),
-                    value: json!(true),
-                },],),
-            },
-            status: None,
-        }
-    );
-
-    pretty_assertions::assert_eq!(
-        serde_yaml::to_string(&serde::resource::Resource::<serde::auth::RelationsSpec>::from(val))
-            .unwrap(),
-        indoc!(
-            r#"
-            $schema: https://opendatafabric.org/schemas/auth/v1alpha1/Relations
-            headers:
-              name: alice-bob
-            spec:
-              relations:
-              - subject:
-                  type: Account
-                  name: alice
-                relation: role
-                value: maintainer
-                object:
-                  account:
-                    name: bob
-                  type: Dataset
-                  name: bobs-dataset
-              attributes:
-              - object:
-                  account:
-                    name: bob
-                  type: Dataset
-                  name: bobs-dataset
-                name: allowPublicRead
-                value: true
             "#
         )
     );
