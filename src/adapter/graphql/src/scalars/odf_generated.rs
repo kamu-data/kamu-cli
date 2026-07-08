@@ -63,42 +63,6 @@ impl From<odf::metadata::auth::AccountSpec> for AccountSpec {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Predefined account specification.
-///
-/// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/AccountSpecInput
-#[derive(SimpleObject, Debug, Clone)]
-pub struct AccountSpecInput {
-    /// DID associated with the account by ODF or an external system
-    pub did: Option<AccountID<'static>>,
-    /// Type of the account.
-    ///
-    /// Defaults to: "User"
-    pub account_type: Option<AccountType>,
-    /// Human-friendly display name.
-    pub display_name: Option<String>,
-    /// Email address of the account.
-    pub email: String,
-    /// URL of the account's avatar image.
-    pub avatar_url: Option<String>,
-    /// Password for local authentication. Absent for SSO or DID-based accounts.
-    pub password: Option<Secret>,
-}
-
-impl From<odf::metadata::auth::AccountSpecInput> for AccountSpecInput {
-    fn from(v: odf::metadata::auth::AccountSpecInput) -> Self {
-        Self {
-            did: v.did.map(Into::into),
-            account_type: v.account_type.map(Into::into),
-            display_name: v.display_name.map(Into::into),
-            email: v.email.into(),
-            avatar_url: v.avatar_url.map(Into::into),
-            password: v.password.map(Into::into),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 /// Represents the type of an account.
 ///
 /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/AccountType
@@ -426,37 +390,6 @@ impl From<odf::metadata::legacy::DatasetSnapshot> for DatasetSnapshot {
 #[derive(SimpleObject, Debug, Clone)]
 pub struct DatasetSpec {
     /// DID of the dataset in global ODF network
-    pub did: DatasetID<'static>,
-    /// Type of the dataset.
-    pub kind: DatasetKind,
-    /// An array of metadata events that will be used to populate the chain.
-    /// Here you can define polling and push sources, set licenses, add
-    /// attachments etc.
-    pub metadata: Vec<MetadataEvent>,
-    /// Reference to a storage volume where dataset data will be stored. If
-    /// omitted, the node's default storage is used.
-    pub volume: PersistentVolumeRef,
-}
-
-impl From<odf::metadata::dataset::DatasetSpec> for DatasetSpec {
-    fn from(v: odf::metadata::dataset::DatasetSpec) -> Self {
-        Self {
-            did: v.did.into(),
-            kind: v.kind.into(),
-            metadata: v.metadata.into_iter().map(Into::into).collect(),
-            volume: v.volume.into(),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Represents a desired state of the dataset metadata.
-///
-/// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/DatasetSpecInput
-#[derive(SimpleObject, Debug, Clone)]
-pub struct DatasetSpecInput {
-    /// DID of the dataset in global ODF network
     pub did: Option<DatasetID<'static>>,
     /// Type of the dataset.
     pub kind: DatasetKind,
@@ -469,8 +402,8 @@ pub struct DatasetSpecInput {
     pub volume: Option<PersistentVolumeRef>,
 }
 
-impl From<odf::metadata::dataset::DatasetSpecInput> for DatasetSpecInput {
-    fn from(v: odf::metadata::dataset::DatasetSpecInput) -> Self {
+impl From<odf::metadata::dataset::DatasetSpec> for DatasetSpec {
+    fn from(v: odf::metadata::dataset::DatasetSpec) -> Self {
         Self {
             did: v.did.map(Into::into),
             kind: v.kind.into(),
@@ -997,31 +930,6 @@ pub struct FlowSpec {
 
 impl From<odf::metadata::flow::FlowSpec> for FlowSpec {
     fn from(v: odf::metadata::flow::FlowSpec) -> Self {
-        Self {
-            target: v.target.into(),
-            triggers: v.triggers.into_iter().map(Into::into).collect(),
-            tasks: v.tasks.into_iter().map(Into::into).collect(),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Defines a sequence of tasks to be executed upon certain trigger conditions.
-///
-/// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowSpecInput
-#[derive(SimpleObject, Debug, Clone)]
-pub struct FlowSpecInput {
-    /// Defines resources for which this flow will be instantiated.
-    pub target: ResourceSelector,
-    /// Conditions that cause this flow to execute.
-    pub triggers: Vec<FlowTrigger>,
-    /// List of tasks to run consecutively.
-    pub tasks: Vec<TaskSpecInput>,
-}
-
-impl From<odf::metadata::flow::FlowSpecInput> for FlowSpecInput {
-    fn from(v: odf::metadata::flow::FlowSpecInput) -> Self {
         Self {
             target: v.target.into(),
             triggers: v.triggers.into_iter().map(Into::into).collect(),
@@ -1818,59 +1726,6 @@ impl From<odf::metadata::storage::PersistentVolumeSpecS3> for PersistentVolumeSp
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Defines a storage volume where data can be stored and its access
-/// credentials.
-///
-/// Schema: https://opendatafabric.org/schemas/storage/v1alpha1/PersistentVolumeSpecInput
-#[derive(Union, Debug, Clone)]
-pub enum PersistentVolumeSpecInput {
-    S3(PersistentVolumeSpecInputS3),
-}
-
-impl From<odf::metadata::storage::PersistentVolumeSpecInput> for PersistentVolumeSpecInput {
-    fn from(v: odf::metadata::storage::PersistentVolumeSpecInput) -> Self {
-        match v {
-            odf::metadata::storage::PersistentVolumeSpecInput::S3(v) => Self::S3(v.into()),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// An Amazon S3 or S3-compatible object storage bucket.
-///
-/// Schema: https://opendatafabric.org/schemas/storage/v1alpha1/PersistentVolumeSpecInput#/$defs/S3
-#[derive(SimpleObject, Debug, Clone)]
-pub struct PersistentVolumeSpecInputS3 {
-    /// S3 endpoint URL. If omitted, defaults to AWS S3. Use for S3-compatible stores e.g. `https://s3.amazonaws.com`.
-    pub endpoint: Option<String>,
-    /// AWS region where the bucket is located e.g. `us-west-2`.
-    pub region: Option<String>,
-    /// Name of the S3 bucket.
-    pub bucket: String,
-    /// Optional path prefix within the bucket.
-    pub prefix: Option<String>,
-    /// Storage capacity allocation.
-    pub capacity: Option<VolumeCapacity>,
-    /// Access credentials for the bucket.
-    pub credentials: Option<AwsCredentials>,
-}
-
-impl From<odf::metadata::storage::PersistentVolumeSpecInputS3> for PersistentVolumeSpecInputS3 {
-    fn from(v: odf::metadata::storage::PersistentVolumeSpecInputS3) -> Self {
-        Self {
-            endpoint: v.endpoint.map(Into::into),
-            region: v.region.map(Into::into),
-            bucket: v.bucket.into(),
-            prefix: v.prefix.map(Into::into),
-            capacity: v.capacity.map(Into::into),
-            credentials: v.credentials.map(Into::into),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 /// Defines the steps to prepare raw data for ingestion.
 ///
 /// Schema: https://opendatafabric.org/schemas/source/v1alpha1/PrepStep
@@ -1946,28 +1801,6 @@ pub struct ProjectionSpec {
 
 impl From<odf::metadata::dataset::ProjectionSpec> for ProjectionSpec {
     fn from(v: odf::metadata::dataset::ProjectionSpec) -> Self {
-        Self {
-            inputs: v.inputs.into_iter().map(Into::into).collect(),
-            project: v.project.into(),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Represents a projection of a dataaset history into a state for fast lookups.
-///
-/// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/ProjectionSpecInput
-#[derive(SimpleObject, Debug, Clone)]
-pub struct ProjectionSpecInput {
-    /// Datasets that will be used as sources.
-    pub inputs: Vec<TransformInput>,
-    /// Transformation that will be applied to produce new data.
-    pub project: Transform,
-}
-
-impl From<odf::metadata::dataset::ProjectionSpecInput> for ProjectionSpecInput {
-    fn from(v: odf::metadata::dataset::ProjectionSpecInput) -> Self {
         Self {
             inputs: v.inputs.into_iter().map(Into::into).collect(),
             project: v.project.into(),
@@ -2634,36 +2467,13 @@ impl From<odf::metadata::auth::Relation> for Relation {
 #[derive(SimpleObject, Debug, Clone)]
 pub struct RelationsSpec {
     /// Relations between resources.
-    pub relations: Vec<Relation>,
-    /// Resource attributes.
-    pub attributes: Vec<Attribute>,
-}
-
-impl From<odf::metadata::auth::RelationsSpec> for RelationsSpec {
-    fn from(v: odf::metadata::auth::RelationsSpec) -> Self {
-        Self {
-            relations: v.relations.into_iter().map(Into::into).collect(),
-            attributes: v.attributes.into_iter().map(Into::into).collect(),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Specifies resource attributes and relations between resources on which auth
-/// policies act upon.
-///
-/// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/RelationsSpecInput
-#[derive(SimpleObject, Debug, Clone)]
-pub struct RelationsSpecInput {
-    /// Relations between resources.
     pub relations: Option<Vec<Relation>>,
     /// Resource attributes.
     pub attributes: Option<Vec<Attribute>>,
 }
 
-impl From<odf::metadata::auth::RelationsSpecInput> for RelationsSpecInput {
-    fn from(v: odf::metadata::auth::RelationsSpecInput) -> Self {
+impl From<odf::metadata::auth::RelationsSpec> for RelationsSpec {
+    fn from(v: odf::metadata::auth::RelationsSpec) -> Self {
         Self {
             relations: v.relations.map(|v| v.into_iter().map(Into::into).collect()),
             attributes: v
@@ -2697,9 +2507,9 @@ impl From<odf::metadata::source::RequestHeader> for RequestHeader {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Top-level container for canonical representation of a resource that
-/// specifies the type and version of the resource, carries identity, ownership,
-/// and status information.
+/// Top-level container for resources that specifies the type and version of the
+/// resource it's specifying and carries identity, ownership, and status
+/// information.
 ///
 /// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/Resource
 #[derive(SimpleObject, Debug, Clone)]
@@ -2711,7 +2521,7 @@ pub struct Resource {
     /// Specifies the desired state of a resource.
     pub spec: serde_json::Value,
     /// Resource lifecycle and reconciliation information.
-    pub status: ResourceStatus,
+    pub status: Option<ResourceStatus>,
 }
 
 impl From<odf::metadata::resource::Resource<serde_json::Value>> for Resource {
@@ -2720,7 +2530,7 @@ impl From<odf::metadata::resource::Resource<serde_json::Value>> for Resource {
             schema: v.schema.into(),
             headers: v.headers.into(),
             spec: v.spec.into(),
-            status: v.status.into(),
+            status: v.status.map(Into::into),
         }
     }
 }
@@ -2794,28 +2604,28 @@ impl async_graphql::ScalarType for ResourceConditions {
 pub struct ResourceHeaders {
     /// Unique identifier of a resource within entire ODF node. Automatically
     /// assigned upon resource creation.
-    pub id: ResourceID<'static>,
+    pub id: Option<ResourceID<'static>>,
     /// Symbolic name of a resource that identifies it within a scope of an
     /// onwing account.
     pub name: ResourceName<'static>,
-    /// Link to the account that owns the resource.
-    pub account: AccountHandle,
+    /// Reference to an account that owns the resource.
+    pub account: Option<AccountRef>,
     /// Map of string keys and values that can be used to organize, categorize,
     /// and query resources.
-    pub labels: ResourceLabels,
-    /// Annotations is a key value map stored with a resource that may be set by
-    /// external tools to store and retrieve arbitrary metadata. Unlike labels,
-    /// annotations are not indexed and cannot be queried by.
-    pub annotations: ResourceAnnotations,
+    pub labels: Option<ResourceLabels>,
+    /// Annotations is an unstructured key value map stored with a resource that
+    /// may be set by external tools to store and retrieve arbitrary metadata.
+    /// Unlike labels, annotations are not indexed and cannot be queried by.
+    pub annotations: Option<ResourceAnnotations>,
     /// A sequential number that changes every time the resource header and spec
     /// are updated. Does not increment on status changes, thus signifying
     /// changes to the desired state. Populated by the system. Starts with `1`.
-    pub generation: UInt64,
+    pub generation: Option<UInt64>,
     /// Time when the resource was first applied and assigned an identity.
-    pub created_at: DateTime<Utc>,
+    pub created_at: Option<DateTime<Utc>>,
     /// Time when the resource was last updated, including header, spec, and
     /// status updates.
-    pub updated_at: DateTime<Utc>,
+    pub updated_at: Option<DateTime<Utc>>,
     /// Time when the resource was deleted.
     pub deleted_at: Option<DateTime<Utc>>,
 }
@@ -2823,77 +2633,15 @@ pub struct ResourceHeaders {
 impl From<odf::metadata::resource::ResourceHeaders> for ResourceHeaders {
     fn from(v: odf::metadata::resource::ResourceHeaders) -> Self {
         Self {
-            id: v.id.into(),
-            name: v.name.into(),
-            account: v.account.into(),
-            labels: v.labels.into(),
-            annotations: v.annotations.into(),
-            generation: v.generation.into(),
-            created_at: v.created_at.into(),
-            updated_at: v.updated_at.into(),
-            deleted_at: v.deleted_at.map(Into::into),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Container for identity and ownership information of a resource.
-///
-/// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceHeadersInput
-#[derive(SimpleObject, Debug, Clone)]
-pub struct ResourceHeadersInput {
-    /// Unique identifier of a resource within entire ODF node. Automatically
-    /// assigned upon resource creation.
-    pub id: Option<ResourceID<'static>>,
-    /// Symbolic name of a resource that identifies it within a scope of an
-    /// onwing account.
-    pub name: ResourceName<'static>,
-    /// Reference to the account that owns the resource.
-    pub account: Option<AccountRef>,
-    /// Map of string keys and values that can be used to organize, categorize,
-    /// and query resources.
-    pub labels: Option<ResourceLabels>,
-    /// Annotations is a key value map stored with a resource that may be set by
-    /// external tools to store and retrieve arbitrary metadata. Unlike labels,
-    /// annotations are not indexed and cannot be queried by.
-    pub annotations: Option<ResourceAnnotations>,
-}
-
-impl From<odf::metadata::resource::ResourceHeadersInput> for ResourceHeadersInput {
-    fn from(v: odf::metadata::resource::ResourceHeadersInput) -> Self {
-        Self {
             id: v.id.map(Into::into),
             name: v.name.into(),
             account: v.account.map(Into::into),
             labels: v.labels.map(Into::into),
             annotations: v.annotations.map(Into::into),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Top-level container for user-authored representation of a resource that
-/// specifies the type and version of the resource and its desired state.
-///
-/// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceInput
-#[derive(SimpleObject, Debug, Clone)]
-pub struct ResourceInput {
-    /// Identifies the controlling entity, a bounded context that this resource belongs to, and the version. Url should follow the pattern `{base-url}/{context}/{version}/{name}.json` e.g. `https://opendatafabric.org/schemas/dataset/v1/Dataset.json`.
-    pub schema: TypeUri<'static>,
-    /// Container for identity and ownership information of a resource.
-    pub headers: ResourceHeadersInput,
-    /// Specifies the desired state of a resource.
-    pub spec: serde_json::Value,
-}
-
-impl From<odf::metadata::resource::ResourceInput<serde_json::Value>> for ResourceInput {
-    fn from(v: odf::metadata::resource::ResourceInput<serde_json::Value>) -> Self {
-        Self {
-            schema: v.schema.into(),
-            headers: v.headers.into(),
-            spec: v.spec.into(),
+            generation: v.generation.map(Into::into),
+            created_at: v.created_at.map(Into::into),
+            updated_at: v.updated_at.map(Into::into),
+            deleted_at: v.deleted_at.map(Into::into),
         }
     }
 }
@@ -2959,7 +2707,7 @@ pub struct ResourceStatus {
     pub reconciled_at: Option<DateTime<Utc>>,
     /// Detailed conditions describing the state of the resource that are added
     /// by controllers.
-    pub conditions: ResourceConditions,
+    pub conditions: Option<ResourceConditions>,
 }
 
 impl From<odf::metadata::resource::ResourceStatus> for ResourceStatus {
@@ -2968,7 +2716,7 @@ impl From<odf::metadata::resource::ResourceStatus> for ResourceStatus {
             phase: v.phase.into(),
             observed_generation: v.observed_generation.map(Into::into),
             reconciled_at: v.reconciled_at.map(Into::into),
-            conditions: v.conditions.into(),
+            conditions: v.conditions.map(Into::into),
         }
     }
 }
@@ -3010,26 +2758,6 @@ pub struct SecretSetSpec {
 
 impl From<odf::metadata::config::SecretSetSpec> for SecretSetSpec {
     fn from(v: odf::metadata::config::SecretSetSpec) -> Self {
-        Self {
-            secrets: v.secrets.into(),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Defines a set of secrets stored and managed by the ODF node and accessible
-/// via embedded sercets provider.
-///
-/// Schema: https://opendatafabric.org/schemas/config/v1alpha1/SecretSetSpecInput
-#[derive(SimpleObject, Debug, Clone)]
-pub struct SecretSetSpecInput {
-    /// Key value pairs of secrets.
-    pub secrets: Secrets,
-}
-
-impl From<odf::metadata::config::SecretSetSpecInput> for SecretSetSpecInput {
-    fn from(v: odf::metadata::config::SecretSetSpecInput) -> Self {
         Self {
             secrets: v.secrets.into(),
         }
@@ -3355,44 +3083,6 @@ impl From<odf::metadata::source::SourceSpec> for SourceSpec {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Specifies an external source of data for ingestion.
-///
-/// Schema: https://opendatafabric.org/schemas/source/v1alpha1/SourceSpecInput
-#[derive(SimpleObject, Debug, Clone)]
-pub struct SourceSpecInput {
-    /// Brings the configuration values into the local `config` context.
-    pub config: Option<ValueRefs>,
-    /// Determines where data is sourced from.
-    pub ingress: Option<Ingress>,
-    /// Defines how raw data is prepared before reading.
-    pub prepare: Option<Vec<PrepStep>>,
-    /// Defines how data is read into structured format.
-    pub read: ReadStep,
-    /// Pre-processing query that shapes the data.
-    pub preprocess: Option<Transform>,
-    /// Determines how newly-ingested data should be merged with existing
-    /// history.
-    pub merge: Option<MergeStrategy>,
-    /// Defines the mapping of system fields to dataset column names.
-    pub vocab: Option<DatasetVocabulary>,
-}
-
-impl From<odf::metadata::source::SourceSpecInput> for SourceSpecInput {
-    fn from(v: odf::metadata::source::SourceSpecInput) -> Self {
-        Self {
-            config: v.config.map(Into::into),
-            ingress: v.ingress.map(Into::into),
-            prepare: v.prepare.map(|v| v.into_iter().map(Into::into).collect()),
-            read: v.read.into(),
-            preprocess: v.preprocess.map(Into::into),
-            merge: v.merge.map(Into::into),
-            vocab: v.vocab.map(Into::into),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 /// The state of the source the data was added from to allow fast resuming.
 ///
 /// Schema: https://opendatafabric.org/schemas/source/v1alpha1/SourceState
@@ -3539,111 +3229,6 @@ pub struct TaskSpecWebhookCall {
 
 impl From<odf::metadata::flow::TaskSpecWebhookCall> for TaskSpecWebhookCall {
     fn from(v: odf::metadata::flow::TaskSpecWebhookCall) -> Self {
-        Self {
-            target: v.target.into(),
-            payload: v.payload.map(Into::into),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// An individual work item to be executed as part of a flow.
-///
-/// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/TaskSpecInput
-#[derive(Union, Debug, Clone)]
-pub enum TaskSpecInput {
-    Ingest(TaskSpecInputIngest),
-    Compaction(TaskSpecInputCompaction),
-    GarbageCollection(TaskSpecInputGarbageCollection),
-    WebhookCall(TaskSpecInputWebhookCall),
-}
-
-impl From<odf::metadata::flow::TaskSpecInput> for TaskSpecInput {
-    fn from(v: odf::metadata::flow::TaskSpecInput) -> Self {
-        match v {
-            odf::metadata::flow::TaskSpecInput::Ingest(v) => Self::Ingest(v.into()),
-            odf::metadata::flow::TaskSpecInput::Compaction(v) => Self::Compaction(v.into()),
-            odf::metadata::flow::TaskSpecInput::GarbageCollection(v) => {
-                Self::GarbageCollection(v.into())
-            }
-            odf::metadata::flow::TaskSpecInput::WebhookCall(v) => Self::WebhookCall(v.into()),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Compacts data files in matching datasets to improve query performance.
-///
-/// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/TaskSpecInput#/$defs/Compaction
-#[derive(SimpleObject, Debug, Clone)]
-pub struct TaskSpecInputCompaction {
-    /// Optional parameters to control ingestion behavior.
-    pub params: Option<CompactionParams>,
-}
-
-impl From<odf::metadata::flow::TaskSpecInputCompaction> for TaskSpecInputCompaction {
-    fn from(v: odf::metadata::flow::TaskSpecInputCompaction) -> Self {
-        Self {
-            params: v.params.map(Into::into),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Removes unreferenced data files from matching datasets.
-///
-/// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/TaskSpecInput#/$defs/GarbageCollection
-#[derive(SimpleObject, Debug, Clone)]
-pub struct TaskSpecInputGarbageCollection {
-    pub _dummy: Option<String>,
-}
-
-impl From<odf::metadata::flow::TaskSpecInputGarbageCollection> for TaskSpecInputGarbageCollection {
-    fn from(v: odf::metadata::flow::TaskSpecInputGarbageCollection) -> Self {
-        Self { _dummy: None }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Fetches data from a source and appends it to a dataset.
-///
-/// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/TaskSpecInput#/$defs/Ingest
-#[derive(SimpleObject, Debug, Clone)]
-pub struct TaskSpecInputIngest {
-    /// Reference to the source resource that defines how to fetch data.
-    pub source: ResourceRef,
-    /// Optional parameters to control ingestion behavior.
-    pub params: Option<IngestParams>,
-}
-
-impl From<odf::metadata::flow::TaskSpecInputIngest> for TaskSpecInputIngest {
-    fn from(v: odf::metadata::flow::TaskSpecInputIngest) -> Self {
-        Self {
-            source: v.source.into(),
-            params: v.params.map(Into::into),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Dispatches a certain payload to a specific `WebhookTarget`.
-///
-/// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/TaskSpecInput#/$defs/WebhookCall
-#[derive(SimpleObject, Debug, Clone)]
-pub struct TaskSpecInputWebhookCall {
-    /// Reference to the `WebhookTarget`.
-    pub target: ResourceRef,
-    /// The payload to send. May include templating.
-    pub payload: Option<String>,
-}
-
-impl From<odf::metadata::flow::TaskSpecInputWebhookCall> for TaskSpecInputWebhookCall {
-    fn from(v: odf::metadata::flow::TaskSpecInputWebhookCall) -> Self {
         Self {
             target: v.target.into(),
             payload: v.payload.map(Into::into),
@@ -4075,26 +3660,6 @@ impl From<odf::metadata::config::VariableSetSpec> for VariableSetSpec {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Defines a set of variables stored and managed by the ODF node and accessible
-/// via embedded variables provider.
-///
-/// Schema: https://opendatafabric.org/schemas/config/v1alpha1/VariableSetSpecInput
-#[derive(SimpleObject, Debug, Clone)]
-pub struct VariableSetSpecInput {
-    /// Key value pairs of variables.
-    pub variables: Variables,
-}
-
-impl From<odf::metadata::config::VariableSetSpecInput> for VariableSetSpecInput {
-    fn from(v: odf::metadata::config::VariableSetSpecInput) -> Self {
-        Self {
-            variables: v.variables.into(),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 /// Container for key-value variables. Every key must be a string. Values may be
 /// raw strings or objects that incorporate the encoding.
 ///
@@ -4180,30 +3745,6 @@ pub struct WebhookTargetSpec {
 
 impl From<odf::metadata::sink::WebhookTargetSpec> for WebhookTargetSpec {
     fn from(v: odf::metadata::sink::WebhookTargetSpec) -> Self {
-        Self {
-            url: v.url.into(),
-            secret: v.secret.map(Into::into),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Defines a webhook target endpoint that can receive event notifications and
-/// data.
-///
-/// Schema: https://opendatafabric.org/schemas/sink/v1alpha1/WebhookTargetSpecInput
-#[derive(SimpleObject, Debug, Clone)]
-pub struct WebhookTargetSpecInput {
-    /// Target url of the webhook.
-    pub url: String,
-    /// Shared secret used for HMAC signature of the request payload for
-    /// authentication.
-    pub secret: Option<Secret>,
-}
-
-impl From<odf::metadata::sink::WebhookTargetSpecInput> for WebhookTargetSpecInput {
-    fn from(v: odf::metadata::sink::WebhookTargetSpecInput) -> Self {
         Self {
             url: v.url.into(),
             secret: v.secret.map(Into::into),

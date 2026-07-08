@@ -42,9 +42,11 @@ pub mod auth {
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct Account {
         /// Container for identity and ownership information of a resource.
-        pub headers: resource::ResourceHeadersInput,
+        pub headers: resource::ResourceHeaders,
         /// Specifies the desired state of the resource.
-        pub spec: auth::AccountSpecInput,
+        pub spec: auth::AccountSpec,
+        /// Resource lifecycle and reconciliation information.
+        pub status: Option<resource::ResourceStatus>,
     }
 
     impl Account {
@@ -61,7 +63,7 @@ pub mod auth {
     static ACCOUNT_SCHEMA: std::sync::LazyLock<TypeUri> =
         std::sync::LazyLock::new(|| TypeUri::new_unchecked(ACCOUNT_SCHEMA_STR));
 
-    pub use crate::auth::{AccountHandle, AccountRef};
+    pub use crate::auth::AccountRef;
 
     /// Predefined account specification.
     ///
@@ -95,53 +97,6 @@ pub mod auth {
     }
 
     impl PartialEq for AccountSpec {
-        fn eq(&self, other: &Self) -> bool {
-            self.did == other.did
-                && self
-                    .account_type
-                    .or_else(|| Some(Self::default_account_type()))
-                    == other
-                        .account_type
-                        .or_else(|| Some(Self::default_account_type()))
-                && self.display_name == other.display_name
-                && self.email == other.email
-                && self.avatar_url == other.avatar_url
-                && self.password == other.password
-        }
-    }
-
-    /// Predefined account specification.
-    ///
-    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/AccountSpecInput
-    #[derive(Clone, Debug, Eq)]
-    pub struct AccountSpecInput {
-        /// DID associated with the account by ODF or an external system
-        pub did: Option<AccountID>,
-        /// Type of the account.
-        ///
-        /// Defaults to: "User"
-        pub account_type: Option<auth::AccountType>,
-        /// Human-friendly display name.
-        pub display_name: Option<String>,
-        /// Email address of the account.
-        pub email: String,
-        /// URL of the account's avatar image.
-        pub avatar_url: Option<String>,
-        /// Password for local authentication. Absent for SSO or DID-based
-        /// accounts.
-        pub password: Option<config::Secret>,
-    }
-
-    impl AccountSpecInput {
-        pub fn default_account_type() -> auth::AccountType {
-            auth::AccountType::User
-        }
-        pub fn account_type(&self) -> auth::AccountType {
-            self.account_type.unwrap_or(Self::default_account_type())
-        }
-    }
-
-    impl PartialEq for AccountSpecInput {
         fn eq(&self, other: &Self) -> bool {
             self.did == other.did
                 && self
@@ -203,9 +158,11 @@ pub mod auth {
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct Relations {
         /// Container for identity and ownership information of a resource.
-        pub headers: resource::ResourceHeadersInput,
+        pub headers: resource::ResourceHeaders,
         /// Specifies the desired state of the resource.
-        pub spec: auth::RelationsSpecInput,
+        pub spec: auth::RelationsSpec,
+        /// Resource lifecycle and reconciliation information.
+        pub status: Option<resource::ResourceStatus>,
     }
 
     impl Relations {
@@ -227,20 +184,8 @@ pub mod auth {
     /// auth policies act upon.
     ///
     /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/RelationsSpec
-    #[derive(Clone, Debug, Eq, PartialEq)]
-    pub struct RelationsSpec {
-        /// Relations between resources.
-        pub relations: Vec<auth::Relation>,
-        /// Resource attributes.
-        pub attributes: Vec<auth::Attribute>,
-    }
-
-    /// Specifies resource attributes and relations between resources on which
-    /// auth policies act upon.
-    ///
-    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/RelationsSpecInput
     #[derive(Clone, Debug, Eq, PartialEq, Default)]
-    pub struct RelationsSpecInput {
+    pub struct RelationsSpec {
         /// Relations between resources.
         pub relations: Option<Vec<auth::Relation>>,
         /// Resource attributes.
@@ -273,9 +218,11 @@ pub mod config {
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct SecretSet {
         /// Container for identity and ownership information of a resource.
-        pub headers: resource::ResourceHeadersInput,
+        pub headers: resource::ResourceHeaders,
         /// Specifies the desired state of the secret set.
-        pub spec: config::SecretSetSpecInput,
+        pub spec: config::SecretSetSpec,
+        /// Resource lifecycle and reconciliation information.
+        pub status: Option<resource::ResourceStatus>,
     }
 
     impl SecretSet {
@@ -299,16 +246,6 @@ pub mod config {
     /// Schema: https://opendatafabric.org/schemas/config/v1alpha1/SecretSetSpec
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct SecretSetSpec {
-        /// Key value pairs of secrets.
-        pub secrets: config::Secrets,
-    }
-
-    /// Defines a set of secrets stored and managed by the ODF node and
-    /// accessible via embedded sercets provider.
-    ///
-    /// Schema: https://opendatafabric.org/schemas/config/v1alpha1/SecretSetSpecInput
-    #[derive(Clone, Debug, Eq, PartialEq)]
-    pub struct SecretSetSpecInput {
         /// Key value pairs of secrets.
         pub secrets: config::Secrets,
     }
@@ -349,9 +286,11 @@ pub mod config {
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct VariableSet {
         /// Container for identity and ownership information of a resource.
-        pub headers: resource::ResourceHeadersInput,
+        pub headers: resource::ResourceHeaders,
         /// Specifies the desired state of the variable set.
-        pub spec: config::VariableSetSpecInput,
+        pub spec: config::VariableSetSpec,
+        /// Resource lifecycle and reconciliation information.
+        pub status: Option<resource::ResourceStatus>,
     }
 
     impl VariableSet {
@@ -375,16 +314,6 @@ pub mod config {
     /// Schema: https://opendatafabric.org/schemas/config/v1alpha1/VariableSetSpec
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct VariableSetSpec {
-        /// Key value pairs of variables.
-        pub variables: config::Variables,
-    }
-
-    /// Defines a set of variables stored and managed by the ODF node and
-    /// accessible via embedded variables provider.
-    ///
-    /// Schema: https://opendatafabric.org/schemas/config/v1alpha1/VariableSetSpecInput
-    #[derive(Clone, Debug, Eq, PartialEq)]
-    pub struct VariableSetSpecInput {
         /// Key value pairs of variables.
         pub variables: config::Variables,
     }
@@ -896,9 +825,11 @@ pub mod dataset {
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct Dataset {
         /// Container for identity and ownership information of a resource.
-        pub headers: resource::ResourceHeadersInput,
+        pub headers: resource::ResourceHeaders,
         /// Specifies the desired state of the resource.
-        pub spec: dataset::DatasetSpecInput,
+        pub spec: dataset::DatasetSpec,
+        /// Resource lifecycle and reconciliation information.
+        pub status: Option<resource::ResourceStatus>,
     }
 
     impl Dataset {
@@ -931,24 +862,6 @@ pub mod dataset {
     /// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/DatasetSpec
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct DatasetSpec {
-        /// DID of the dataset in global ODF network
-        pub did: DatasetID,
-        /// Type of the dataset.
-        pub kind: dataset::DatasetKind,
-        /// An array of metadata events that will be used to populate the chain.
-        /// Here you can define polling and push sources, set licenses, add
-        /// attachments etc.
-        pub metadata: Vec<dataset::MetadataEvent>,
-        /// Reference to a storage volume where dataset data will be stored. If
-        /// omitted, the node's default storage is used.
-        pub volume: storage::PersistentVolumeRef,
-    }
-
-    /// Represents a desired state of the dataset metadata.
-    ///
-    /// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/DatasetSpecInput
-    #[derive(Clone, Debug, Eq, PartialEq)]
-    pub struct DatasetSpecInput {
         /// DID of the dataset in global ODF network
         pub did: Option<DatasetID>,
         /// Type of the dataset.
@@ -1225,9 +1138,11 @@ pub mod dataset {
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct Projection {
         /// Container for identity and ownership information of a resource.
-        pub headers: resource::ResourceHeadersInput,
+        pub headers: resource::ResourceHeaders,
         /// Specifies the desired state of the resource.
-        pub spec: dataset::ProjectionSpecInput,
+        pub spec: dataset::ProjectionSpec,
+        /// Resource lifecycle and reconciliation information.
+        pub status: Option<resource::ResourceStatus>,
     }
 
     impl Projection {
@@ -1251,18 +1166,6 @@ pub mod dataset {
     /// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/ProjectionSpec
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct ProjectionSpec {
-        /// Datasets that will be used as sources.
-        pub inputs: Vec<dataset::TransformInput>,
-        /// Transformation that will be applied to produce new data.
-        pub project: dataset::Transform,
-    }
-
-    /// Represents a projection of a dataaset history into a state for fast
-    /// lookups.
-    ///
-    /// Schema: https://opendatafabric.org/schemas/dataset/v1alpha1/ProjectionSpecInput
-    #[derive(Clone, Debug, Eq, PartialEq)]
-    pub struct ProjectionSpecInput {
         /// Datasets that will be used as sources.
         pub inputs: Vec<dataset::TransformInput>,
         /// Transformation that will be applied to produce new data.
@@ -1670,9 +1573,11 @@ pub mod flow {
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct Flow {
         /// Container for identity and ownership information of a resource.
-        pub headers: resource::ResourceHeadersInput,
+        pub headers: resource::ResourceHeaders,
         /// Specifies the desired state of the flow.
-        pub spec: flow::FlowSpecInput,
+        pub spec: flow::FlowSpec,
+        /// Resource lifecycle and reconciliation information.
+        pub status: Option<resource::ResourceStatus>,
     }
 
     impl Flow {
@@ -1701,20 +1606,6 @@ pub mod flow {
         pub triggers: Vec<flow::FlowTrigger>,
         /// List of tasks to run consecutively.
         pub tasks: Vec<flow::TaskSpec>,
-    }
-
-    /// Defines a sequence of tasks to be executed upon certain trigger
-    /// conditions.
-    ///
-    /// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowSpecInput
-    #[derive(Clone, Debug, Eq, PartialEq)]
-    pub struct FlowSpecInput {
-        /// Defines resources for which this flow will be instantiated.
-        pub target: resource::ResourceSelector,
-        /// Conditions that cause this flow to execute.
-        pub triggers: Vec<flow::FlowTrigger>,
-        /// List of tasks to run consecutively.
-        pub tasks: Vec<flow::TaskSpecInput>,
     }
 
     /// Condition that causes a flow to be executed.
@@ -1795,9 +1686,11 @@ pub mod flow {
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct Task {
         /// Container for identity and ownership information of a resource.
-        pub headers: resource::ResourceHeadersInput,
+        pub headers: resource::ResourceHeaders,
         /// Specifies the desired state of the task.
-        pub spec: Option<flow::TaskSpecInput>,
+        pub spec: Option<flow::TaskSpec>,
+        /// Resource lifecycle and reconciliation information.
+        pub status: Option<resource::ResourceStatus>,
     }
 
     impl Task {
@@ -1855,62 +1748,6 @@ pub mod flow {
         pub source: resource::ResourceRef,
         /// Optional parameters to control ingestion behavior.
         pub params: Option<source::IngestParams>,
-    }
-
-    /// An individual work item to be executed as part of a flow.
-    ///
-    /// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/TaskSpecInput
-    #[derive(Clone, PartialEq, Eq, Debug)]
-    pub enum TaskSpecInput {
-        Ingest(flow::TaskSpecInputIngest),
-        Compaction(flow::TaskSpecInputCompaction),
-        GarbageCollection(flow::TaskSpecInputGarbageCollection),
-        WebhookCall(flow::TaskSpecInputWebhookCall),
-    }
-
-    impl_enum_with_variants!(TaskSpecInput);
-    impl_enum_variant!(TaskSpecInput::Ingest(flow::TaskSpecInputIngest));
-    impl_enum_variant!(TaskSpecInput::Compaction(flow::TaskSpecInputCompaction));
-    impl_enum_variant!(TaskSpecInput::GarbageCollection(
-        flow::TaskSpecInputGarbageCollection
-    ));
-    impl_enum_variant!(TaskSpecInput::WebhookCall(flow::TaskSpecInputWebhookCall));
-
-    /// Compacts data files in matching datasets to improve query performance.
-    ///
-    /// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/TaskSpecInput#/$defs/Compaction
-    #[derive(Clone, Debug, Eq, PartialEq, Default)]
-    pub struct TaskSpecInputCompaction {
-        /// Optional parameters to control ingestion behavior.
-        pub params: Option<dataset::CompactionParams>,
-    }
-
-    /// Removes unreferenced data files from matching datasets.
-    ///
-    /// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/TaskSpecInput#/$defs/GarbageCollection
-    #[derive(Clone, Debug, Eq, PartialEq, Default)]
-    pub struct TaskSpecInputGarbageCollection {}
-
-    /// Fetches data from a source and appends it to a dataset.
-    ///
-    /// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/TaskSpecInput#/$defs/Ingest
-    #[derive(Clone, Debug, Eq, PartialEq)]
-    pub struct TaskSpecInputIngest {
-        /// Reference to the source resource that defines how to fetch data.
-        pub source: resource::ResourceRef,
-        /// Optional parameters to control ingestion behavior.
-        pub params: Option<source::IngestParams>,
-    }
-
-    /// Dispatches a certain payload to a specific `WebhookTarget`.
-    ///
-    /// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/TaskSpecInput#/$defs/WebhookCall
-    #[derive(Clone, Debug, Eq, PartialEq)]
-    pub struct TaskSpecInputWebhookCall {
-        /// Reference to the `WebhookTarget`.
-        pub target: resource::ResourceRef,
-        /// The payload to send. May include templating.
-        pub payload: Option<String>,
     }
 
     /// Dispatches a certain payload to a specific `WebhookTarget`.
@@ -2143,9 +1980,9 @@ pub mod resource {
         pub entries: std::collections::BTreeMap<String, serde_json::Value>,
     }
 
-    /// Top-level container for canonical representation of a resource that
-    /// specifies the type and version of the resource, carries identity,
-    /// ownership, and status information.
+    /// Top-level container for resources that specifies the type and version of
+    /// the resource it's specifying and carries identity, ownership, and status
+    /// information.
     ///
     /// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/Resource
     #[derive(Clone, Debug, Eq, PartialEq)]
@@ -2157,7 +1994,7 @@ pub mod resource {
         /// Specifies the desired state of a resource.
         pub spec: SpecT,
         /// Resource lifecycle and reconciliation information.
-        pub status: resource::ResourceStatus,
+        pub status: Option<resource::ResourceStatus>,
     }
 
     /// Annotations is an unstructured key value map stored with a resource that
@@ -2185,67 +2022,32 @@ pub mod resource {
     pub struct ResourceHeaders {
         /// Unique identifier of a resource within entire ODF node.
         /// Automatically assigned upon resource creation.
-        pub id: ResourceID,
-        /// Symbolic name of a resource that identifies it within a scope of an
-        /// onwing account.
-        pub name: ResourceName,
-        /// Link to the account that owns the resource.
-        pub account: auth::AccountHandle,
-        /// Map of string keys and values that can be used to organize,
-        /// categorize, and query resources.
-        pub labels: resource::ResourceLabels,
-        /// Annotations is a key value map stored with a resource that may be
-        /// set by external tools to store and retrieve arbitrary metadata.
-        /// Unlike labels, annotations are not indexed and cannot be queried by.
-        pub annotations: resource::ResourceAnnotations,
-        /// A sequential number that changes every time the resource header and
-        /// spec are updated. Does not increment on status changes, thus
-        /// signifying changes to the desired state. Populated by the system.
-        /// Starts with `1`.
-        pub generation: u64,
-        /// Time when the resource was first applied and assigned an identity.
-        pub created_at: DateTime<Utc>,
-        /// Time when the resource was last updated, including header, spec, and
-        /// status updates.
-        pub updated_at: DateTime<Utc>,
-        /// Time when the resource was deleted.
-        pub deleted_at: Option<DateTime<Utc>>,
-    }
-
-    /// Container for identity and ownership information of a resource.
-    ///
-    /// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceHeadersInput
-    #[derive(Clone, Debug, Eq, PartialEq)]
-    pub struct ResourceHeadersInput {
-        /// Unique identifier of a resource within entire ODF node.
-        /// Automatically assigned upon resource creation.
         pub id: Option<ResourceID>,
         /// Symbolic name of a resource that identifies it within a scope of an
         /// onwing account.
         pub name: ResourceName,
-        /// Reference to the account that owns the resource.
+        /// Reference to an account that owns the resource.
         pub account: Option<auth::AccountRef>,
         /// Map of string keys and values that can be used to organize,
         /// categorize, and query resources.
         pub labels: Option<resource::ResourceLabels>,
-        /// Annotations is a key value map stored with a resource that may be
-        /// set by external tools to store and retrieve arbitrary metadata.
-        /// Unlike labels, annotations are not indexed and cannot be queried by.
+        /// Annotations is an unstructured key value map stored with a resource
+        /// that may be set by external tools to store and retrieve arbitrary
+        /// metadata. Unlike labels, annotations are not indexed and cannot be
+        /// queried by.
         pub annotations: Option<resource::ResourceAnnotations>,
-    }
-
-    /// Top-level container for user-authored representation of a resource that
-    /// specifies the type and version of the resource and its desired state.
-    ///
-    /// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceInput
-    #[derive(Clone, Debug, Eq, PartialEq)]
-    pub struct ResourceInput<SpecT> {
-        /// Identifies the controlling entity, a bounded context that this resource belongs to, and the version. Url should follow the pattern `{base-url}/{context}/{version}/{name}.json` e.g. `https://opendatafabric.org/schemas/dataset/v1/Dataset.json`.
-        pub schema: TypeUri,
-        /// Container for identity and ownership information of a resource.
-        pub headers: resource::ResourceHeadersInput,
-        /// Specifies the desired state of a resource.
-        pub spec: SpecT,
+        /// A sequential number that changes every time the resource header and
+        /// spec are updated. Does not increment on status changes, thus
+        /// signifying changes to the desired state. Populated by the system.
+        /// Starts with `1`.
+        pub generation: Option<u64>,
+        /// Time when the resource was first applied and assigned an identity.
+        pub created_at: Option<DateTime<Utc>>,
+        /// Time when the resource was last updated, including header, spec, and
+        /// status updates.
+        pub updated_at: Option<DateTime<Utc>>,
+        /// Time when the resource was deleted.
+        pub deleted_at: Option<DateTime<Utc>>,
     }
 
     /// Map of string keys and values that can be used to organize, categorize,
@@ -2285,7 +2087,7 @@ pub mod resource {
         pub reconciled_at: Option<DateTime<Utc>>,
         /// Detailed conditions describing the state of the resource that are
         /// added by controllers.
-        pub conditions: resource::ResourceConditions,
+        pub conditions: Option<resource::ResourceConditions>,
     }
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2303,9 +2105,11 @@ pub mod sink {
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct WebhookTarget {
         /// Container for identity and ownership information of a resource.
-        pub headers: resource::ResourceHeadersInput,
+        pub headers: resource::ResourceHeaders,
         /// Specifies the desired state of the resource.
-        pub spec: sink::WebhookTargetSpecInput,
+        pub spec: sink::WebhookTargetSpec,
+        /// Resource lifecycle and reconciliation information.
+        pub status: Option<resource::ResourceStatus>,
     }
 
     impl WebhookTarget {
@@ -2329,19 +2133,6 @@ pub mod sink {
     /// Schema: https://opendatafabric.org/schemas/sink/v1alpha1/WebhookTargetSpec
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct WebhookTargetSpec {
-        /// Target url of the webhook.
-        pub url: String,
-        /// Shared secret used for HMAC signature of the request payload for
-        /// authentication.
-        pub secret: Option<config::Secret>,
-    }
-
-    /// Defines a webhook target endpoint that can receive event notifications
-    /// and data.
-    ///
-    /// Schema: https://opendatafabric.org/schemas/sink/v1alpha1/WebhookTargetSpecInput
-    #[derive(Clone, Debug, Eq, PartialEq)]
-    pub struct WebhookTargetSpecInput {
         /// Target url of the webhook.
         pub url: String,
         /// Shared secret used for HMAC signature of the request payload for
@@ -3247,9 +3038,11 @@ pub mod source {
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct Source {
         /// Container for identity and ownership information of a resource.
-        pub headers: resource::ResourceHeadersInput,
+        pub headers: resource::ResourceHeaders,
         /// Specifies the desired state of the resource.
-        pub spec: source::SourceSpecInput,
+        pub spec: source::SourceSpec,
+        /// Resource lifecycle and reconciliation information.
+        pub status: Option<resource::ResourceStatus>,
     }
 
     impl Source {
@@ -3314,28 +3107,6 @@ pub mod source {
         pub vocab: Option<dataset::DatasetVocabulary>,
     }
 
-    /// Specifies an external source of data for ingestion.
-    ///
-    /// Schema: https://opendatafabric.org/schemas/source/v1alpha1/SourceSpecInput
-    #[derive(Clone, Debug, Eq, PartialEq)]
-    pub struct SourceSpecInput {
-        /// Brings the configuration values into the local `config` context.
-        pub config: Option<config::ValueRefs>,
-        /// Determines where data is sourced from.
-        pub ingress: Option<source::Ingress>,
-        /// Defines how raw data is prepared before reading.
-        pub prepare: Option<Vec<source::PrepStep>>,
-        /// Defines how data is read into structured format.
-        pub read: source::ReadStep,
-        /// Pre-processing query that shapes the data.
-        pub preprocess: Option<dataset::Transform>,
-        /// Determines how newly-ingested data should be merged with existing
-        /// history.
-        pub merge: Option<source::MergeStrategy>,
-        /// Defines the mapping of system fields to dataset column names.
-        pub vocab: Option<dataset::DatasetVocabulary>,
-    }
-
     /// The state of the source the data was added from to allow fast resuming.
     ///
     /// Schema: https://opendatafabric.org/schemas/source/v1alpha1/SourceState
@@ -3376,9 +3147,11 @@ pub mod storage {
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct PersistentVolume {
         /// Container for identity and ownership information of a resource.
-        pub headers: resource::ResourceHeadersInput,
+        pub headers: resource::ResourceHeaders,
         /// Specifies the desired state of the resource.
-        pub spec: storage::PersistentVolumeSpecInput,
+        pub spec: storage::PersistentVolumeSpec,
+        /// Resource lifecycle and reconciliation information.
+        pub status: Option<resource::ResourceStatus>,
     }
 
     impl PersistentVolume {
@@ -3409,39 +3182,6 @@ pub mod storage {
 
     impl_enum_with_variants!(PersistentVolumeSpec);
     impl_enum_variant!(PersistentVolumeSpec::S3(storage::PersistentVolumeSpecS3));
-
-    /// Defines a storage volume where data can be stored and its access
-    /// credentials.
-    ///
-    /// Schema: https://opendatafabric.org/schemas/storage/v1alpha1/PersistentVolumeSpecInput
-    #[derive(Clone, PartialEq, Eq, Debug)]
-    pub enum PersistentVolumeSpecInput {
-        S3(storage::PersistentVolumeSpecInputS3),
-    }
-
-    impl_enum_with_variants!(PersistentVolumeSpecInput);
-    impl_enum_variant!(PersistentVolumeSpecInput::S3(
-        storage::PersistentVolumeSpecInputS3
-    ));
-
-    /// An Amazon S3 or S3-compatible object storage bucket.
-    ///
-    /// Schema: https://opendatafabric.org/schemas/storage/v1alpha1/PersistentVolumeSpecInput#/$defs/S3
-    #[derive(Clone, Debug, Eq, PartialEq)]
-    pub struct PersistentVolumeSpecInputS3 {
-        /// S3 endpoint URL. If omitted, defaults to AWS S3. Use for S3-compatible stores e.g. `https://s3.amazonaws.com`.
-        pub endpoint: Option<String>,
-        /// AWS region where the bucket is located e.g. `us-west-2`.
-        pub region: Option<String>,
-        /// Name of the S3 bucket.
-        pub bucket: String,
-        /// Optional path prefix within the bucket.
-        pub prefix: Option<String>,
-        /// Storage capacity allocation.
-        pub capacity: Option<storage::VolumeCapacity>,
-        /// Access credentials for the bucket.
-        pub credentials: Option<storage::AwsCredentials>,
-    }
 
     /// An Amazon S3 or S3-compatible object storage bucket.
     ///
