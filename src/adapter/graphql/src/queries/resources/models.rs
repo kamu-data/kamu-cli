@@ -58,16 +58,27 @@ impl ResourceTypeSelectorInput {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(InputObject, Debug, Clone)]
-pub struct ResourceAccountByIdAndNameInput {
+pub struct AccountHandleInput {
     pub id: AccountID<'static>,
     pub name: AccountName<'static>,
 }
+
+impl From<AccountHandleInput> for odf::metadata::auth::AccountHandle {
+    fn from(value: AccountHandleInput) -> Self {
+        Self {
+            id: value.id.into(),
+            name: value.name.into(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(OneofObject, Debug, Clone)]
 pub enum ResourceAccountSelectorInput {
     ById(AccountID<'static>),
     ByName(AccountName<'static>),
-    Both(ResourceAccountByIdAndNameInput),
+    Handle(AccountHandleInput),
 }
 
 impl ResourceAccountSelectorInput {
@@ -75,12 +86,7 @@ impl ResourceAccountSelectorInput {
         match self {
             Self::ById(id) => kamu_resources::ResourceAccountRef::Id(id.into()),
             Self::ByName(name) => kamu_resources::ResourceAccountRef::Name(name.into()),
-            Self::Both(ResourceAccountByIdAndNameInput { id, name }) => {
-                kamu_resources::ResourceAccountRef::Both {
-                    id: id.into(),
-                    name: name.into(),
-                }
-            }
+            Self::Handle(h) => kamu_resources::ResourceAccountRef::Handle(h.into()),
         }
     }
 }
@@ -676,10 +682,12 @@ pub struct ResourceHeaders {
 impl From<kamu_resources::ResourceView> for ResourceHeaders {
     fn from(value: kamu_resources::ResourceView) -> Self {
         let account = match value.headers.account.name {
-            Some(name) => kamu_resources::ResourceAccountRef::Both {
-                id: value.headers.account.id,
-                name,
-            },
+            Some(name) => {
+                kamu_resources::ResourceAccountRef::Handle(odf::metadata::auth::AccountHandle {
+                    id: value.headers.account.id,
+                    name,
+                })
+            }
             None => kamu_resources::ResourceAccountRef::Id(value.headers.account.id),
         };
 

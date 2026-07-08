@@ -218,7 +218,7 @@ pub(crate) struct ResourceStatus {
     pub phase: ResourcePhase,
     pub observed_generation: Option<Uint64>,
     pub reconciled_at: Option<DateTime<Utc>>,
-    pub conditions: Option<ResourceConditions>,
+    pub conditions: ResourceConditions,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

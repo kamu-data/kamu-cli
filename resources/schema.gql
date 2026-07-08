@@ -198,6 +198,11 @@ type AccountFlowsMut {
 	triggers: AccountFlowTriggersMut!
 }
 
+input AccountHandleInput {
+	id: AccountID!
+	name: AccountName!
+}
+
 scalar AccountID
 
 input AccountLookupFilter {
@@ -3862,15 +3867,10 @@ type Resource {
 	status: ResourceStatus
 }
 
-input ResourceAccountByIdAndNameInput {
-	id: AccountID!
-	name: AccountName!
-}
-
 input ResourceAccountSelectorInput @oneOf {
 	byId: AccountID
 	byName: AccountName
-	both: ResourceAccountByIdAndNameInput
+	handle: AccountHandleInput
 }
 
 scalar ResourceAnnotations
@@ -4201,7 +4201,7 @@ type ResourceStatus {
 	Detailed conditions describing the state of the resource that are added
 	by controllers.
 	"""
-	conditions: ResourceConditions
+	conditions: ResourceConditions!
 }
 
 type ResourceStatusSummary {

@@ -98,10 +98,12 @@ pub(crate) fn resource_view_to_manifest(
     let schema = kamu_resources::ResourceSchemaId::parse(schema.as_str()).int_err()?;
 
     let account = Some(match headers.account.name {
-        Some(name) => kamu_resources::ResourceAccountRef::Both {
-            id: headers.account.id,
-            name,
-        },
+        Some(name) => {
+            kamu_resources::ResourceAccountRef::Handle(odf::metadata::auth::AccountHandle {
+                id: headers.account.id,
+                name,
+            })
+        }
         None => kamu_resources::ResourceAccountRef::Id(headers.account.id),
     });
 

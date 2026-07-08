@@ -1456,7 +1456,7 @@ fn test_serde_resource_canonical() {
             r#"
             $schema: https://opendatafabric.org/schemas/config/v1alpha1/SecretSet
             headers:
-              id: aa-12345
+              id: 7149c2f9-41f2-4cbb-be8f-7d7747525f9a
               name: my-secret
               account:
                 id: did:odf:fed01816ef0a9abe93aba816ef0a9abe93aba90e6065747170300c0d3d30c2cd8d7a4

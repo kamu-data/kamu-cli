@@ -37,8 +37,8 @@ impl ResourceTypeSelectorInput {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::InputObject, Debug, Clone)]
-#[cynic(graphql_type = "ResourceAccountByIdAndNameInput")]
-pub(crate) struct ResourceAccountByIdAndNameInput {
+#[cynic(graphql_type = "AccountHandleInput")]
+pub(crate) struct AccountHandleInput {
     pub id: odf::AccountID,
     pub name: AccountName,
 }
@@ -48,7 +48,7 @@ pub(crate) struct ResourceAccountByIdAndNameInput {
 pub(crate) enum ResourceAccountSelectorInput {
     ById(odf::AccountID),
     ByName(AccountName),
-    Both(ResourceAccountByIdAndNameInput),
+    Handle(AccountHandleInput),
 }
 
 impl From<&domain::ResourceAccountRef> for ResourceAccountSelectorInput {
@@ -56,8 +56,8 @@ impl From<&domain::ResourceAccountRef> for ResourceAccountSelectorInput {
         match value {
             domain::ResourceAccountRef::Id(id) => Self::ById(id.clone()),
             domain::ResourceAccountRef::Name(name) => Self::ByName(AccountName(name.to_string())),
-            domain::ResourceAccountRef::Both { id, name } => {
-                Self::Both(ResourceAccountByIdAndNameInput {
+            domain::ResourceAccountRef::Handle(odf::metadata::auth::AccountHandle { id, name }) => {
+                Self::Handle(AccountHandleInput {
                     id: id.clone(),
                     name: AccountName(name.to_string()),
                 })

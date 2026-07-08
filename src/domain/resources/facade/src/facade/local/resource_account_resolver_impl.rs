@@ -13,6 +13,7 @@ use internal_error::ResultIntoInternal;
 use kamu_accounts::{AccountService, CurrentAccountSubject};
 use kamu_auth_rebac::{RebacService, RebacServiceExt};
 use kamu_resources::ResourceAccountRef;
+use odf::metadata::auth::AccountHandle;
 
 use crate::{ResolveManifestAccountError, ResolvedAccount, ResourceAccountResolver};
 
@@ -77,7 +78,7 @@ impl ResourceAccountResolverImpl {
                     name: account.account_name,
                 })
             }
-            ResourceAccountRef::Both { id, name } => {
+            ResourceAccountRef::Handle(AccountHandle { id, name }) => {
                 let account = self
                     .account_service
                     .get_account_by_id(id)

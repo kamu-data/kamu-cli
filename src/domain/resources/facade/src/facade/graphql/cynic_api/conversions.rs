@@ -84,7 +84,7 @@ impl From<fragments::ResourceStatus> for domain::ResourceStatus {
             phase: value.phase.into(),
             observed_generation: value.observed_generation.map(Into::into),
             reconciled_at: value.reconciled_at,
-            conditions: value.conditions.map(|conditions| conditions.0),
+            conditions: value.conditions.0,
         }
     }
 }

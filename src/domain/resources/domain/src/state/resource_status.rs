@@ -28,7 +28,7 @@ pub fn new_pending_resource_status() -> ResourceStatus {
         phase: ResourcePhase::Pending,
         observed_generation: None,
         reconciled_at: None,
-        conditions: None,
+        conditions: empty_resource_conditions(),
     }
 }
 
@@ -72,11 +72,8 @@ impl ResourceStatusExt for ResourceStatus {
 
     fn mark_reconciling(&mut self, now: DateTime<Utc>) {
         self.phase = ResourcePhase::Reconciling;
-        let conditions = self
-            .conditions
-            .get_or_insert_with(empty_resource_conditions);
         ResourceConditionValue::set_condition(
-            &mut conditions.entries,
+            &mut self.conditions.entries,
             ResourceConditionValue::reconciling_true(now),
         );
     }
@@ -86,19 +83,16 @@ impl ResourceStatusExt for ResourceStatus {
         self.observed_generation = Some(observed_generation);
         self.reconciled_at = Some(now);
 
-        let conditions = self
-            .conditions
-            .get_or_insert_with(empty_resource_conditions);
         ResourceConditionValue::set_condition(
-            &mut conditions.entries,
+            &mut self.conditions.entries,
             ResourceConditionValue::accepted_true(now),
         );
         ResourceConditionValue::set_condition(
-            &mut conditions.entries,
+            &mut self.conditions.entries,
             ResourceConditionValue::ready_true(now),
         );
         ResourceConditionValue::set_condition(
-            &mut conditions.entries,
+            &mut self.conditions.entries,
             ResourceConditionValue::reconciling_false(now),
         );
     }
@@ -114,26 +108,23 @@ impl ResourceStatusExt for ResourceStatus {
         self.observed_generation = Some(observed_generation);
         self.reconciled_at = Some(now);
 
-        let conditions = self
-            .conditions
-            .get_or_insert_with(empty_resource_conditions);
         ResourceConditionValue::set_condition(
-            &mut conditions.entries,
+            &mut self.conditions.entries,
             ResourceConditionValue::accepted_true(now),
         );
         ResourceConditionValue::set_condition(
-            &mut conditions.entries,
+            &mut self.conditions.entries,
             ResourceConditionValue::ready_false(now, reason, message),
         );
         ResourceConditionValue::set_condition(
-            &mut conditions.entries,
+            &mut self.conditions.entries,
             ResourceConditionValue::reconciling_false(now),
         );
     }
 
     fn mark_pending_for_new_generation(&mut self) {
         self.phase = ResourcePhase::Pending;
-        self.conditions = None;
+        self.conditions = empty_resource_conditions();
     }
 }
 
@@ -142,7 +133,6 @@ impl ResourceStatusExt for ResourceStatus {
 fn ready_condition(status: &ResourceStatus) -> Option<ResourceConditionValue> {
     status
         .conditions
-        .as_ref()?
         .entries
         .get(&ready_condition_type_ref())
         .and_then(|value| serde_json::from_value(value.clone()).ok())
