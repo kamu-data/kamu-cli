@@ -60,9 +60,9 @@ impl From<dtos::auth::AccountRef> for proxies::auth::AccountRef {
                 id: None,
                 name: Some(name),
             },
-            dtos::auth::AccountRef::Both { id, name } => Self {
-                id: Some(id),
-                name: Some(name),
+            dtos::auth::AccountRef::Handle(hdl) => Self {
+                id: Some(hdl.id),
+                name: Some(hdl.name),
             },
         }
     }
@@ -89,8 +89,25 @@ impl TryFrom<proxies::auth::AccountRef> for dtos::auth::AccountRef {
             proxies::auth::AccountRef {
                 id: Some(id),
                 name: Some(name),
-            } => Ok(Self::Both { id, name }),
+            } => Ok(Self::Handle(dtos::auth::AccountHandle::new(id, name))),
         }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl From<dtos::auth::AccountHandle> for proxies::auth::AccountHandle {
+    fn from(v: dtos::auth::AccountHandle) -> Self {
+        let dtos::auth::AccountHandle { id, name } = v;
+        Self { id, name }
+    }
+}
+
+impl TryFrom<proxies::auth::AccountHandle> for dtos::auth::AccountHandle {
+    type Error = ValidationError;
+    fn try_from(v: proxies::auth::AccountHandle) -> Result<Self, ValidationError> {
+        let proxies::auth::AccountHandle { id, name } = v;
+        Ok(Self { id, name })
     }
 }
 
