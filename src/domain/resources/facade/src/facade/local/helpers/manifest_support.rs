@@ -8,14 +8,15 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_resources::{ResourceHeadersInput, ResourceManifest, ResourceView, ResourceWarning};
-
-use crate::{
-    ApplyManifestError,
-    ParseResourceManifestError,
-    ResolvedAccount,
-    ResourceManifestFormat,
+use kamu_resources::{
+    ResourceHeadersInput,
+    ResourceHeadersInputExt,
+    ResourceManifest,
+    ResourceView,
+    ResourceWarning,
 };
+
+use crate::{ApplyManifestError, ParseResourceManifestError, ResourceManifestFormat};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -45,10 +46,10 @@ pub(crate) fn parse_manifest(
 
 pub(crate) fn make_headers_input(
     manifest: &ResourceManifest,
-    target_account: &ResolvedAccount,
+    target_account: &odf::AccountHandle,
 ) -> Result<ResourceHeadersInput, ApplyManifestError> {
-    ResourceHeadersInput::try_new(
-        target_account.id.clone(),
+    ResourceHeadersInputExt::try_new(
+        Some(target_account.clone().into()),
         manifest.headers.name.as_str(),
         manifest.headers.description.clone(),
         manifest.headers.labels.clone(),
@@ -97,15 +98,7 @@ pub(crate) fn resource_view_to_manifest(
     // store-integrity bug.
     let schema = kamu_resources::ResourceSchemaId::parse(schema.as_str()).int_err()?;
 
-    let account = Some(match headers.account.name {
-        Some(name) => {
-            kamu_resources::ResourceAccountRef::Handle(odf::metadata::auth::AccountHandle {
-                id: headers.account.id,
-                name,
-            })
-        }
-        None => kamu_resources::ResourceAccountRef::Id(headers.account.id),
-    });
+    let account = Some(kamu_resources::ResourceAccountRef::Handle(headers.account));
 
     Ok(ResourceManifest {
         schema,

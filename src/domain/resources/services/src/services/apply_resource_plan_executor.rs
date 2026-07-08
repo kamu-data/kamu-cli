@@ -150,11 +150,12 @@ where
         let headers = plan.resource.headers();
 
         let headers_input = ResourceHeadersInput {
-            account: headers.account.clone(),
+            id: Some(headers.id),
+            account: Some(headers.account.clone().into()),
             name: headers.name.clone(),
             description: headers.description.clone(),
-            labels: headers.labels.clone(),
-            annotations: headers.annotations.clone(),
+            labels: Some(headers.labels.clone()),
+            annotations: Some(headers.annotations.clone()),
         };
 
         let planner = ApplyResourcePlanner::<R>::new(
@@ -172,7 +173,7 @@ where
                 "Resource create hit duplicate constraint, but no existing resource was found"
                     .int_err()
                     .with_context(format!(
-                        "account_id={}, schema='{}', name='{}'",
+                        "account_id={:?}, schema='{}', name='{}'",
                         headers_input.account,
                         R::schema(),
                         headers_input.name
@@ -205,7 +206,7 @@ where
                     "Resource duplicate create retry unexpectedly produced a create plan"
                         .int_err()
                         .with_context(format!(
-                            "account_id={}, schema='{}', name='{}'",
+                            "account_id={:?}, schema='{}', name='{}'",
                             plan.resource.headers().account,
                             R::schema(),
                             plan.resource.headers().name

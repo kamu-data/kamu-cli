@@ -555,7 +555,7 @@ impl<'a> PullGraphDepthFirstTraversal<'a> {
                             if let CurrentAccountSubject::Logged(l) =
                                 self.current_account_subject.as_ref()
                             {
-                                if *resolved_account_name != l.account_name {
+                                if *resolved_account_name != l.account_handle.name {
                                     return Err(PullError::SaveUnderDifferentAlias(
                                         resolved_local_handle.alias.to_string(),
                                     ));

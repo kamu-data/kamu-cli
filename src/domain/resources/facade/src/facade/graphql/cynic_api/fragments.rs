@@ -226,7 +226,7 @@ pub(crate) struct ResourceStatus {
 #[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct ResourceHeaders {
     pub id: kamu_resources::ResourceID,
-    pub account: AccountRef,
+    pub account: AccountHandle,
     pub name: kamu_resources::ResourceName,
     pub description: Option<String>,
     pub labels: ResourceLabels,
@@ -240,9 +240,9 @@ pub(crate) struct ResourceHeaders {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
-pub(crate) struct AccountRef {
-    pub id: Option<odf::AccountID>,
-    pub name: Option<AccountName>,
+pub(crate) struct AccountHandle {
+    pub id: odf::AccountID,
+    pub name: AccountName,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

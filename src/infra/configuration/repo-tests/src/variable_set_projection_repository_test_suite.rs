@@ -20,6 +20,7 @@ use kamu_configuration::{
 };
 use kamu_resources::{
     ResourceHeaders,
+    ResourceHeadersExt,
     ResourceID,
     ResourceRepository,
     ResourceSchemaProvider,
@@ -47,12 +48,15 @@ async fn make_variable_set_resource(catalog: &Catalog) -> ResourceID {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
     let variable_set_id = ResourceID::new(uuid::Uuid::new_v4());
 
+    let account_handle = odf::AccountHandle::new_test("test-account");
+
     repo.create_resource(&ResourceSnapshot {
         id: variable_set_id,
         schema: VariableSetResource::schema().clone(),
         headers: ResourceHeaders::simple(
             Utc::now(),
-            odf::AccountID::new_seeded_ed25519(b"test-account"),
+            variable_set_id,
+            account_handle,
             &variable_set_id.to_string(),
         ),
         spec: serde_json::to_value(VariableSetSpec {

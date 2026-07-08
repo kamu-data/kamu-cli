@@ -9,6 +9,7 @@
 
 use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
+use kamu_accounts_inmem::InMemoryAccountRepository;
 use kamu_resources_inmem::{InMemoryRawResourceEventStore, InMemoryResourceRepository};
 use kamu_resources_repo_tests::resource_raw_event_store_test_suite as event_store_suite;
 
@@ -110,6 +111,7 @@ impl InMemoryRawResourceEventStoreHarness {
     pub fn new() -> Self {
         let mut catalog_builder = CatalogBuilder::new();
         catalog_builder.add::<InMemoryResourceRepository>();
+        catalog_builder.add::<InMemoryAccountRepository>();
         catalog_builder.add::<InMemoryRawResourceEventStore>();
         Self {
             catalog: catalog_builder.build(),

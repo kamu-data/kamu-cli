@@ -26,7 +26,7 @@ use kamu_configuration_inmem::{
     InMemoryVariableSetProjectionRepository,
 };
 use kamu_datasets::SecretsEncryptionConfig;
-use kamu_resources::{ApplyResourceUseCase, ResourceID};
+use kamu_resources::ApplyResourceUseCase;
 use kamu_resources_services::testing::BaseResourceServiceHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -86,10 +86,6 @@ impl BaseConfigurationServiceHarness {
 
     pub fn apply_secret_use_case(&self) -> Arc<dyn ApplyResourceUseCase<SecretSetResource>> {
         self.catalog.get_one().unwrap()
-    }
-
-    pub async fn allocate_resource_id(&self) -> ResourceID {
-        self.base.allocate_resource_id().await
     }
 
     pub async fn variable_bindings(

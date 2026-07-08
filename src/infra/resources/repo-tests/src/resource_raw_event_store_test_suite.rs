@@ -13,6 +13,7 @@ use event_sourcing::{EventID, GetEventsOpts, SaveEventsError, SaveEventsItem};
 use futures::TryStreamExt;
 use kamu_resources::{
     ResourceHeaders,
+    ResourceHeadersExt,
     ResourceID,
     ResourceRawEvent,
     ResourceRawEventQuery,
@@ -27,15 +28,12 @@ use kamu_resources::{
 async fn make_resource(catalog: &Catalog, kind: &str) -> ResourceRawEventQuery {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
     let id = ResourceID::new(uuid::Uuid::new_v4());
+    let account_handle = odf::AccountHandle::new_test("test-account");
 
     let snapshot = ResourceSnapshot {
         id,
         schema: TypeUri::new_unchecked(kind),
-        headers: ResourceHeaders::simple(
-            Utc::now(),
-            odf::AccountID::new_seeded_ed25519(b"test-account"),
-            &id.to_string(),
-        ),
+        headers: ResourceHeaders::simple(Utc::now(), id, account_handle, &id.to_string()),
         spec: serde_json::json!({}),
         status: None,
         last_event_id: None,

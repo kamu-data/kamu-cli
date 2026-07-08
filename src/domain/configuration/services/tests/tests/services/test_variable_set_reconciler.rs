@@ -17,7 +17,7 @@ use kamu_resources_services::testing::BaseResourceServiceHarness;
 #[test_log::test(tokio::test)]
 async fn test_reconcile_variable_set_populates_projection_entries() {
     let harness = BaseConfigurationServiceHarness::new();
-    let (_, account_id) = odf::AccountID::new_generated_ed25519();
+    let account_handle = odf::AccountHandle::new_test("test-owner");
 
     let spec = VariableSetSpec {
         variables: [
@@ -38,7 +38,7 @@ async fn test_reconcile_variable_set_populates_projection_entries() {
         .apply_variable_use_case()
         .apply(ApplyResourceParams {
             id: None,
-            headers: BaseResourceServiceHarness::make_headers_input(account_id, "test-vars"),
+            headers: BaseResourceServiceHarness::make_headers_input(account_handle, "test-vars"),
             spec,
         })
         .await
@@ -73,7 +73,7 @@ async fn test_reconcile_variable_set_populates_projection_entries() {
 #[test_log::test(tokio::test)]
 async fn test_reconcile_variable_set_preserves_entry_id_across_reconciliations() {
     let harness = BaseConfigurationServiceHarness::new();
-    let (_, account_id) = odf::AccountID::new_generated_ed25519();
+    let account_handle = odf::AccountHandle::new_test("test-owner");
 
     let spec = VariableSetSpec {
         variables: [
@@ -96,7 +96,7 @@ async fn test_reconcile_variable_set_preserves_entry_id_across_reconciliations()
         .apply(ApplyResourceParams {
             id: None,
             headers: BaseResourceServiceHarness::make_headers_input(
-                account_id.clone(),
+                account_handle.clone(),
                 "test-vars",
             ),
             spec,
@@ -139,7 +139,7 @@ async fn test_reconcile_variable_set_preserves_entry_id_across_reconciliations()
         .apply(ApplyResourceParams {
             id: Some(id),
             headers: BaseResourceServiceHarness::make_headers_input(
-                account_id.clone(),
+                account_handle.clone(),
                 "test-vars",
             ),
             spec: spec2,

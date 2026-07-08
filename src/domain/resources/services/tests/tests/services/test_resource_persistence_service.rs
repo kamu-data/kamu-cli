@@ -28,7 +28,6 @@ use crate::tests::utils::{
     TestResource,
     TestResourceReconciler,
     TestResourceSpec,
-    make_account_id,
     make_fresh_aggregate,
     register_test_resource_resource_service_layer,
 };
@@ -40,8 +39,7 @@ use crate::tests::utils::{
 #[test_log::test(tokio::test)]
 async fn test_create_resource_persists_snapshot_and_events() {
     let harness = ResourcePersistenceServiceHarness::new();
-    let account_id = make_account_id();
-    let (id, mut agg) = make_fresh_aggregate(account_id, "res-a");
+    let (id, mut agg) = make_fresh_aggregate(harness.account_handle.clone(), "res-a");
 
     harness.persistence_svc().create(&mut agg).await.unwrap();
 
@@ -66,14 +64,13 @@ async fn test_create_resource_persists_snapshot_and_events() {
 #[test_log::test(tokio::test)]
 async fn test_create_duplicate_id_returns_error() {
     let harness = ResourcePersistenceServiceHarness::new();
-    let account_id = make_account_id();
 
-    let (_, mut agg) = make_fresh_aggregate(account_id.clone(), "res-a");
+    let (_, mut agg) = make_fresh_aggregate(harness.account_handle.clone(), "res-a");
     harness.persistence_svc().create(&mut agg).await.unwrap();
 
     // Same account + schema + name but a fresh UID — repository duplicate check
     // fires
-    let (_, mut agg2) = make_fresh_aggregate(account_id, "res-a");
+    let (_, mut agg2) = make_fresh_aggregate(harness.account_handle.clone(), "res-a");
     let result = harness.persistence_svc().create(&mut agg2).await;
 
     assert!(
@@ -87,8 +84,7 @@ async fn test_create_duplicate_id_returns_error() {
 #[test_log::test(tokio::test)]
 async fn test_save_resource_updates_snapshot() {
     let harness = ResourcePersistenceServiceHarness::new();
-    let account_id = make_account_id();
-    let (id, mut agg) = make_fresh_aggregate(account_id, "res-a");
+    let (id, mut agg) = make_fresh_aggregate(harness.account_handle.clone(), "res-a");
     harness.persistence_svc().create(&mut agg).await.unwrap();
 
     let mut loaded = harness.aggregate_loader().load(&id).await.unwrap();
@@ -115,8 +111,7 @@ async fn test_save_resource_updates_snapshot() {
 #[test_log::test(tokio::test)]
 async fn test_delete_resource_marks_deleted() {
     let harness = ResourcePersistenceServiceHarness::new();
-    let account_id = make_account_id();
-    let (id, mut agg) = make_fresh_aggregate(account_id, "res-a");
+    let (id, mut agg) = make_fresh_aggregate(harness.account_handle.clone(), "res-a");
     harness.persistence_svc().create(&mut agg).await.unwrap();
 
     let mut loaded = harness.aggregate_loader().load(&id).await.unwrap();
@@ -145,11 +140,10 @@ async fn test_delete_resource_marks_deleted() {
 #[test_log::test(tokio::test)]
 async fn test_delete_many_resources_batch() {
     let harness = ResourcePersistenceServiceHarness::new();
-    let account_id = make_account_id();
 
-    let (id_a, mut agg_a) = make_fresh_aggregate(account_id.clone(), "res-a");
-    let (id_b, mut agg_b) = make_fresh_aggregate(account_id.clone(), "res-b");
-    let (id_c, mut agg_c) = make_fresh_aggregate(account_id, "res-c");
+    let (id_a, mut agg_a) = make_fresh_aggregate(harness.account_handle.clone(), "res-a");
+    let (id_b, mut agg_b) = make_fresh_aggregate(harness.account_handle.clone(), "res-b");
+    let (id_c, mut agg_c) = make_fresh_aggregate(harness.account_handle.clone(), "res-c");
 
     harness.persistence_svc().create(&mut agg_a).await.unwrap();
     harness.persistence_svc().create(&mut agg_b).await.unwrap();
@@ -186,8 +180,7 @@ async fn test_delete_many_resources_batch() {
 #[test_log::test(tokio::test)]
 async fn test_concurrent_modification_detected() {
     let harness = ResourcePersistenceServiceHarness::new();
-    let account_id = make_account_id();
-    let (id, mut agg) = make_fresh_aggregate(account_id, "res-a");
+    let (id, mut agg) = make_fresh_aggregate(harness.account_handle.clone(), "res-a");
     harness.persistence_svc().create(&mut agg).await.unwrap();
 
     // Load the same aggregate into two independent instances
@@ -235,6 +228,7 @@ async fn test_concurrent_modification_detected() {
 struct ResourcePersistenceServiceHarness {
     base: BaseResourceServiceHarness,
     catalog: dill::Catalog,
+    account_handle: odf::AccountHandle,
 }
 
 impl ResourcePersistenceServiceHarness {
@@ -248,6 +242,7 @@ impl ResourcePersistenceServiceHarness {
         Self {
             base,
             catalog: b.build(),
+            account_handle: odf::AccountHandle::new_test("test"),
         }
     }
 

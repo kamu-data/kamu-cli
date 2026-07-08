@@ -105,7 +105,7 @@ fn account_by_id(id: odf::AccountID) -> ResourceAccountRef {
 }
 
 fn account_by_name_and_id(name: &odf::AccountName, id: odf::AccountID) -> ResourceAccountRef {
-    ResourceAccountRef::Handle(odf::metadata::auth::AccountHandle {
+    ResourceAccountRef::Handle(odf::AccountHandle {
         id,
         name: name.clone(),
     })
@@ -165,7 +165,7 @@ pub async fn test_default_account_selector_resolves_current_account(
     assert_eq!(view.headers.account.id, h.account_id(TestAccount::Alice));
     assert_eq!(
         view.headers.account.name,
-        Some(h.account_name(TestAccount::Alice))
+        h.account_name(TestAccount::Alice)
     );
 }
 

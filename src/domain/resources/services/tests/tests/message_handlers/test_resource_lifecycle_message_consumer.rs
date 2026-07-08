@@ -15,6 +15,7 @@ use kamu_resources::{
     ReconcileResourceUseCase,
     ReconcileResourceUseCaseError,
     ResourceHeaders,
+    ResourceHeadersExt,
     ResourceID,
     ResourceLifecycleMessage,
     ResourceLifecycleMessageOutcome,
@@ -25,12 +26,7 @@ use messaging_outbox::{MessageConsumerT, OutboxProvider, register_message_dispat
 use mockall::mock;
 use odf::metadata::resource::TypeUri;
 
-use crate::tests::utils::{
-    TestResource,
-    TestResourceResourceLifecycleDispatcher,
-    make_account_id,
-    make_id,
-};
+use crate::tests::utils::{TestResource, TestResourceResourceLifecycleDispatcher, make_id};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Mock
@@ -186,10 +182,12 @@ impl ResourceLifecycleConsumerHarness {
     }
 
     fn make_snapshot_with_schema(id: ResourceID, schema: &TypeUri) -> ResourceSnapshot {
+        let account_handle = odf::AccountHandle::new_test("test-oowner");
+
         ResourceSnapshot {
             id,
             schema: schema.clone(),
-            headers: ResourceHeaders::simple(Utc::now(), make_account_id(), "res"),
+            headers: ResourceHeaders::simple(Utc::now(), id, account_handle, "res"),
             spec: serde_json::json!({ "value": "x" }),
             status: None,
             last_event_id: None,

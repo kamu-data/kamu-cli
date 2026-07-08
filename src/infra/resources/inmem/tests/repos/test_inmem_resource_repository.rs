@@ -9,6 +9,7 @@
 
 use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
+use kamu_accounts_inmem::InMemoryAccountRepository;
 use kamu_resources_inmem::InMemoryResourceRepository;
 use kamu_resources_repo_tests::resource_repository_test_suite as resource_repo_suite;
 
@@ -183,6 +184,14 @@ database_transactional_test!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+database_transactional_test!(
+    storage = inmem,
+    fixture = resource_repo_suite::test_account_rename_reflected_immediately_in_headers,
+    harness = InMemoryResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct InMemoryResourceRepositoryHarness {
     catalog: Catalog,
 }
@@ -191,6 +200,7 @@ impl InMemoryResourceRepositoryHarness {
     pub fn new() -> Self {
         let mut catalog_builder = CatalogBuilder::new();
         catalog_builder.add::<InMemoryResourceRepository>();
+        catalog_builder.add::<InMemoryAccountRepository>();
         Self {
             catalog: catalog_builder.build(),
         }

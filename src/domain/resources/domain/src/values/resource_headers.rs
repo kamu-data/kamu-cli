@@ -8,9 +8,9 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use odf::metadata::auth;
 
-use crate::{ResourceAnnotations, ResourceHeadersInput, ResourceLabels};
+use crate::{ResourceHeadersInput, ResourceID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -18,32 +18,55 @@ pub type ResourceName = odf::metadata::resource::ResourceName;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[serde_with::serde_as]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ResourceHeaders {
-    pub account: odf::AccountID,
-    pub name: ResourceName,
-    pub description: Option<String>,
-    #[serde_as(as = "odf::metadata::serde::yaml::resource::ResourceLabels")]
-    pub labels: ResourceLabels,
-    #[serde_as(as = "odf::metadata::serde::yaml::resource::ResourceAnnotations")]
-    pub annotations: ResourceAnnotations,
-    pub generation: u64,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-    pub deleted_at: Option<DateTime<Utc>>,
+pub type ResourceHeaders = odf::metadata::resource::ResourceHeaders;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Placeholder account name used when a resource's owning account can no
+/// longer be found (e.g. account deletion raced ahead of the async outbox
+/// cleanup of that account's resources). Repos substitute this instead of
+/// failing the read, since `resource_id` FK on `account_id` is not
+/// cascade-enforced across this bounded-context boundary.
+///
+/// Postgres/SQLite embed this same literal directly in their
+/// `COALESCE(a.account_name, 'deleted-account')` queries. It cannot be
+/// spliced in via this constant: `sqlx::query!` inspects its SQL argument as
+/// a raw token *before* macro expansion, so neither this `const` nor a
+/// `concat!`-based `macro_rules!` twin of it can be substituted in — the
+/// macro requires a literal written out in place. Keep both in sync by hand
+/// if this value ever changes.
+pub const DELETED_ACCOUNT_NAME_SENTINEL: &str = "deleted-account";
+
+pub fn deleted_account_name_sentinel() -> auth::AccountName {
+    auth::AccountName::new_unchecked(DELETED_ACCOUNT_NAME_SENTINEL)
 }
 
-impl ResourceHeaders {
-    pub fn simple(now: DateTime<Utc>, account: odf::AccountID, name: &str) -> Self {
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub trait ResourceHeadersExt {
+    fn simple(now: DateTime<Utc>, id: ResourceID, account: auth::AccountHandle, name: &str)
+    -> Self;
+    fn from_input(now: DateTime<Utc>, id: ResourceID, input: ResourceHeadersInput) -> Self;
+    fn is_equivalent_to(&self, input: &ResourceHeadersInput) -> bool;
+    fn apply_update(&mut self, now: DateTime<Utc>, input: ResourceHeadersInput);
+}
+
+impl ResourceHeadersExt for ResourceHeaders {
+    fn simple(
+        now: DateTime<Utc>,
+        id: ResourceID,
+        account: auth::AccountHandle,
+        name: &str,
+    ) -> Self {
         Self {
+            id,
             account,
             name: ResourceName::new_unchecked(name),
             description: None,
-            labels: ResourceLabels {
+            labels: odf::metadata::resource::ResourceLabels {
                 entries: std::collections::BTreeMap::new(),
             },
-            annotations: ResourceAnnotations {
+            annotations: odf::metadata::resource::ResourceAnnotations {
                 entries: std::collections::BTreeMap::new(),
             },
             generation: 0,
@@ -53,13 +76,24 @@ impl ResourceHeaders {
         }
     }
 
-    pub fn from_input(now: DateTime<Utc>, input: ResourceHeadersInput) -> Self {
+    fn from_input(now: DateTime<Utc>, id: ResourceID, input: ResourceHeadersInput) -> Self {
+        let account = account_handle_from_input(&input);
+
         Self {
-            account: input.account,
+            id,
+            account,
             name: input.name,
             description: input.description,
-            labels: input.labels,
-            annotations: input.annotations,
+            labels: input
+                .labels
+                .unwrap_or_else(|| odf::metadata::resource::ResourceLabels {
+                    entries: std::collections::BTreeMap::new(),
+                }),
+            annotations: input.annotations.unwrap_or_else(|| {
+                odf::metadata::resource::ResourceAnnotations {
+                    entries: std::collections::BTreeMap::new(),
+                }
+            }),
             generation: 1,
             created_at: now,
             updated_at: now,
@@ -67,22 +101,62 @@ impl ResourceHeaders {
         }
     }
 
-    pub fn is_equivalent_to(&self, input: &ResourceHeadersInput) -> bool {
-        self.account == input.account
+    fn is_equivalent_to(&self, input: &ResourceHeadersInput) -> bool {
+        let empty_map = std::collections::BTreeMap::new();
+        let input_labels = input.labels.as_ref().map_or(&empty_map, |l| &l.entries);
+        let input_annotations = input
+            .annotations
+            .as_ref()
+            .map_or(&empty_map, |a| &a.entries);
+
+        self.account == account_handle_from_input(input)
             && self.name == input.name
             && self.description == input.description
-            && self.labels == input.labels
-            && self.annotations == input.annotations
+            && self.labels.entries == *input_labels
+            && self.annotations.entries == *input_annotations
     }
 
-    pub fn apply_update(&mut self, now: DateTime<Utc>, input: ResourceHeadersInput) {
-        self.account = input.account;
+    fn apply_update(&mut self, now: DateTime<Utc>, input: ResourceHeadersInput) {
+        self.account = account_handle_from_input(&input);
         self.name = input.name;
         self.description = input.description;
-        self.labels = input.labels;
-        self.annotations = input.annotations;
+        self.labels = input
+            .labels
+            .unwrap_or_else(|| odf::metadata::resource::ResourceLabels {
+                entries: std::collections::BTreeMap::new(),
+            });
+        self.annotations =
+            input
+                .annotations
+                .unwrap_or_else(|| odf::metadata::resource::ResourceAnnotations {
+                    entries: std::collections::BTreeMap::new(),
+                });
 
         self.updated_at = now;
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Account resolution (id + name lookup) happens upstream, as part of the
+/// apply process (see `ResourceAccountResolver`), before a
+/// [`ResourceHeadersInput`] is ever constructed — every production caller
+/// populates `account` with an already-resolved [`auth::AccountRef::Handle`].
+/// The facade also overwrites the resulting header's `account` with the
+/// freshly-resolved handle at the view boundary on every read, so the name
+/// carried here is never persisted or relied upon (see plan
+/// `.spec/022.resource-headers.plan.md` — avoiding name denormalization is
+/// the point of that JOIN-on-read design). This function only exists to
+/// satisfy the aliased struct's mandatory `account` field during
+/// construction and panics if handed an unresolved reference, which would
+/// indicate a caller bypassed account resolution.
+fn account_handle_from_input(input: &ResourceHeadersInput) -> auth::AccountHandle {
+    match &input.account {
+        Some(auth::AccountRef::Handle(handle)) => handle.clone(),
+        other => panic!(
+            "ResourceHeadersInput.account must be a resolved AccountRef::Handle by the time \
+             headers are constructed, got: {other:?}"
+        ),
     }
 }
 

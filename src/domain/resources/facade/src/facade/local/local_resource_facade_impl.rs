@@ -415,9 +415,9 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         Ok(match plan {
             ApplyManifestPlanningDecision::Planned(mut plan) => {
                 plan.warnings.splice(0..0, prepared.header_warnings);
-                plan.resource.headers.account = ResourceViewAccount {
+                plan.resource.headers.account = odf::AccountHandle {
                     id: prepared.target_account.id,
-                    name: Some(prepared.target_account.name),
+                    name: prepared.target_account.name,
                 };
 
                 ApplyManifestPlanningDecision::Planned(plan)
@@ -446,9 +446,9 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         Ok(match result {
             ApplyManifestApplicationDecision::Applied(mut result) => {
                 result.warnings.splice(0..0, prepared.header_warnings);
-                result.resource.headers.account = ResourceViewAccount {
+                result.resource.headers.account = odf::AccountHandle {
                     id: prepared.target_account.id,
-                    name: Some(prepared.target_account.name),
+                    name: prepared.target_account.name,
                 };
 
                 ApplyManifestApplicationDecision::Applied(result)
@@ -702,10 +702,13 @@ impl LocalResourceFacadeImpl {
             .await?;
 
         Ok(ResourceView {
-            headers: view.headers.with_account(ResourceViewAccount {
-                id: target_account.id,
-                name: Some(target_account.name),
-            }),
+            headers: kamu_resources::ResourceHeaders {
+                account: odf::AccountHandle {
+                    id: target_account.id,
+                    name: target_account.name,
+                },
+                ..view.headers
+            },
             ..view
         })
     }
@@ -791,11 +794,13 @@ impl LocalResourceFacadeImpl {
 
                     let resource = ResourceView {
                         schema: snapshot.schema,
-                        headers: ResourceViewHeaders::from_owned(id, snapshot.headers)
-                            .with_account(ResourceViewAccount {
+                        headers: kamu_resources::ResourceHeaders {
+                            account: odf::AccountHandle {
                                 id: target_account.id.clone(),
-                                name: Some(target_account.name.clone()),
-                            }),
+                                name: target_account.name.clone(),
+                            },
+                            ..snapshot.headers
+                        },
                         spec: snapshot.spec,
                         status: snapshot.status,
                     };
@@ -904,7 +909,7 @@ impl LocalResourceFacadeImpl {
             return Ok(None);
         };
 
-        if snapshot.headers.account != *account_id {
+        if snapshot.headers.account.id != *account_id {
             return Ok(None);
         }
 
@@ -1027,7 +1032,7 @@ struct PreparedApplyManifest {
     id: Option<ResourceID>,
     header: ResourceHeadersInput,
     header_warnings: Vec<ResourceWarning>,
-    target_account: ResolvedAccount,
+    target_account: odf::AccountHandle,
     spec: serde_json::Value,
 }
 

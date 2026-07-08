@@ -661,7 +661,8 @@ impl ApplyPrinter<'_> {
         #[serde(rename_all = "camelCase")]
         struct RenderedResourceViewHeaders<'a> {
             id: &'a kamu_resources::ResourceID,
-            account: &'a kamu_resources::ResourceViewAccount,
+            #[serde_as(as = "odf::metadata::serde::yaml::auth::AccountHandle")]
+            account: &'a odf::AccountHandle,
             name: &'a str,
             description: &'a Option<String>,
             #[serde_as(as = "odf::metadata::serde::yaml::resource::ResourceLabels")]

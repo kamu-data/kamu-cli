@@ -56,7 +56,7 @@ impl From<&domain::ResourceAccountRef> for ResourceAccountSelectorInput {
         match value {
             domain::ResourceAccountRef::Id(id) => Self::ById(id.clone()),
             domain::ResourceAccountRef::Name(name) => Self::ByName(AccountName(name.to_string())),
-            domain::ResourceAccountRef::Handle(odf::metadata::auth::AccountHandle { id, name }) => {
+            domain::ResourceAccountRef::Handle(odf::AccountHandle { id, name }) => {
                 Self::Handle(AccountHandleInput {
                     id: id.clone(),
                     name: AccountName(name.to_string()),

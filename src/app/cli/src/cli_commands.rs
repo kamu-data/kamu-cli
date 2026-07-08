@@ -528,7 +528,7 @@ pub fn get_command(
             let current_account_subject = cli_catalog.get_one::<CurrentAccountSubject>()?;
 
             let current_account_name = match current_account_subject.as_ref() {
-                CurrentAccountSubject::Logged(l) => l.account_name.clone(),
+                CurrentAccountSubject::Logged(l) => l.account_handle.name.clone(),
                 CurrentAccountSubject::Anonymous(_) => {
                     panic!("Cannot launch Web UI with anonymous account")
                 }

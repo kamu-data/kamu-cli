@@ -30,7 +30,7 @@ use crate::tests::use_cases::resource_use_case_base_harness::{
     ResourceUseCaseBaseHarnessOpts,
     SanitizerKind,
 };
-use crate::tests::utils::{TestResourceSpec, make_account_id};
+use crate::tests::utils::TestResourceSpec;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Tests
@@ -48,11 +48,11 @@ async fn test_apply_end_to_end_create_and_retrieve() {
     // Smoke test: verifies planner → executor → persistence wiring is correct.
     // No sanitizer; just confirms the resource is created and retrievable.
     let harness = ResourceUseCaseBaseHarness::new();
-    let account_id = make_account_id();
+    let account_handle = odf::AccountHandle::new_test("test-owner");
 
     let decision = harness
         .apply_test_uc()
-        .apply(make_params(account_id, "res-a", "res-a"))
+        .apply(make_params(&account_handle, "res-a", "res-a"))
         .await
         .unwrap();
 
@@ -102,11 +102,11 @@ async fn test_sanitizer_modifies_spec_on_create() {
         sanitizer: SanitizerKind::Appending,
         ..Default::default()
     });
-    let account_id = make_account_id();
+    let account_handle = odf::AccountHandle::new_test("test-owner");
 
     let decision = harness
         .apply_test_uc()
-        .apply(make_params(account_id, "res-a", "original"))
+        .apply(make_params(&account_handle, "res-a", "original"))
         .await
         .unwrap();
 
@@ -129,10 +129,10 @@ async fn test_sanitizer_receives_current_spec_on_update() {
         sanitizer: SanitizerKind::Appending,
         ..Default::default()
     });
-    let account_id = make_account_id();
+    let account_handle = odf::AccountHandle::new_test("test-owner");
 
     let (id, initial_snapshot) = harness
-        .apply_and_assert_snapshot(account_id.clone(), "res-a")
+        .apply_and_assert_snapshot(&account_handle, "res-a")
         .await;
     // Sanitizer appends "-sanitized" even during initial apply
     pretty_assertions::assert_eq!(
@@ -142,7 +142,7 @@ async fn test_sanitizer_receives_current_spec_on_update() {
 
     let params = ApplyResourceParams {
         id: Some(id),
-        ..make_params(account_id, "res-a", "updated")
+        ..make_params(&account_handle, "res-a", "updated")
     };
 
     let decision = harness.apply_test_uc().apply(params).await.unwrap();
@@ -169,11 +169,11 @@ async fn test_sanitizer_modifies_spec_in_plan() {
         sanitizer: SanitizerKind::Appending,
         ..Default::default()
     });
-    let account_id = make_account_id();
+    let account_handle = odf::AccountHandle::new_test("test-owner");
 
     let decision = harness
         .apply_test_uc()
-        .plan(make_params(account_id, "res-a", "original"))
+        .plan(make_params(&account_handle, "res-a", "original"))
         .await
         .unwrap();
 
@@ -190,11 +190,11 @@ async fn test_sanitizer_modifies_spec_in_plan() {
 #[test_log::test(tokio::test)]
 async fn test_no_sanitizer_passes_spec_unchanged() {
     let harness = ResourceUseCaseBaseHarness::new();
-    let account_id = make_account_id();
+    let account_handle = odf::AccountHandle::new_test("test-owner");
 
     let decision = harness
         .apply_test_uc()
-        .apply(make_params(account_id, "res-a", "original"))
+        .apply(make_params(&account_handle, "res-a", "original"))
         .await
         .unwrap();
 
@@ -215,10 +215,11 @@ async fn test_apply_rejected_when_sanitized_spec_fails_validation() {
         ..Default::default()
     });
 
-    let account_id = make_account_id();
+    let account_handle = odf::AccountHandle::new_test("test-owner");
+
     let decision = harness
         .apply_test_uc()
-        .apply(make_params(account_id, "res-a", "non-empty"))
+        .apply(make_params(&account_handle, "res-a", "non-empty"))
         .await
         .unwrap();
 
@@ -240,11 +241,11 @@ async fn test_apply_create_initial_status_is_pending() {
         },
         ..Default::default()
     });
-    let account_id = make_account_id();
+    let account_handle = odf::AccountHandle::new_test("test-owner");
 
     let result = harness
         .apply_test_uc()
-        .apply(make_params(account_id, "res-a", "res-a"))
+        .apply(make_params(&account_handle, "res-a", "res-a"))
         .await
         .unwrap()
         .expect_applied();
@@ -274,10 +275,10 @@ async fn test_apply_update_resets_status_to_pending() {
         },
         ..Default::default()
     });
-    let account_id = make_account_id();
+    let account_handle = odf::AccountHandle::new_test("test-owner");
 
     // Create + reconcile → gen=1, observed_gen=1, phase=Ready
-    let id = harness.apply_and_get_id(account_id.clone(), "res-a").await;
+    let id = harness.apply_and_get_id(&account_handle, "res-a").await;
     harness.reconcile_test_uc().execute(&id).await.unwrap();
     harness.flush_outbox().await;
 
@@ -295,7 +296,7 @@ async fn test_apply_update_resets_status_to_pending() {
     // Spec update → gen bumped to 2, phase reset to Pending
     let update_params = ApplyResourceParams {
         id: Some(id),
-        headers: BaseResourceServiceHarness::make_headers_input(account_id, "res-a"),
+        headers: BaseResourceServiceHarness::make_headers_input(account_handle, "res-a"),
         spec: TestResourceSpec {
             value: "updated".to_string(),
         },
@@ -324,13 +325,13 @@ async fn test_apply_update_resets_status_to_pending() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn make_params(
-    account_id: odf::AccountID,
+    account_handle: &odf::AccountHandle,
     name: &str,
     value: &str,
 ) -> ApplyResourceParams<crate::tests::utils::TestResource> {
     ApplyResourceParams {
         id: None,
-        headers: BaseResourceServiceHarness::make_headers_input(account_id, name),
+        headers: BaseResourceServiceHarness::make_headers_input(account_handle.clone(), name),
         spec: TestResourceSpec {
             value: value.to_string(),
         },

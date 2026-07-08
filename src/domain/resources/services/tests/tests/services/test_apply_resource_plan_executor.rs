@@ -34,7 +34,6 @@ use crate::tests::utils::{
     TestResource,
     TestResourceReconciler,
     TestResourceSpec,
-    make_account_id,
     make_fresh_aggregate,
     register_test_resource_resource_service_layer,
 };
@@ -53,11 +52,11 @@ async fn test_execute_create_returns_applied_created() {
     );
 
     let harness = ApplyResourcePlanExecutorHarness::new(mock_outbox);
-    let account_id = make_account_id();
+    let account_handle = odf::AccountHandle::new_test("test");
 
     let plan = harness
         .make_plan(
-            account_id,
+            account_handle,
             "res-a",
             TestResourceSpec {
                 value: "res-a".to_string(),
@@ -89,12 +88,12 @@ async fn test_execute_update_returns_applied_updated() {
     );
 
     let harness = ApplyResourcePlanExecutorHarness::new(mock_outbox);
-    let account_id = make_account_id();
+    let account_handle = odf::AccountHandle::new_test("test");
 
     // Create first
     let create_plan = harness
         .make_plan(
-            account_id.clone(),
+            account_handle.clone(),
             "res-a",
             TestResourceSpec {
                 value: "initial".to_string(),
@@ -106,7 +105,7 @@ async fn test_execute_update_returns_applied_updated() {
     // Then update
     let update_plan = harness
         .make_plan(
-            account_id,
+            account_handle,
             "res-a",
             TestResourceSpec {
                 value: "updated".to_string(),
@@ -134,12 +133,12 @@ async fn test_execute_untouched_returns_applied_no_outbox_call() {
     );
 
     let harness = ApplyResourcePlanExecutorHarness::new(mock_outbox);
-    let account_id = make_account_id();
+    let account_handle = odf::AccountHandle::new_test("test");
 
     // Create the resource first (sends one outbox message)
     let create_plan = harness
         .make_plan(
-            account_id.clone(),
+            account_handle.clone(),
             "res-a",
             TestResourceSpec {
                 value: "res-a".to_string(),
@@ -151,7 +150,7 @@ async fn test_execute_untouched_returns_applied_no_outbox_call() {
     // Re-plan with identical spec — action = Untouched, no outbox call
     let untouched_plan = harness
         .make_plan(
-            account_id,
+            account_handle,
             "res-a",
             TestResourceSpec {
                 value: "res-a".to_string(),
@@ -186,11 +185,11 @@ async fn test_execute_create_duplicate_retries_as_update() {
     );
 
     let harness = ApplyResourcePlanExecutorHarness::new(mock_outbox);
-    let account_id = make_account_id();
+    let account_handle = odf::AccountHandle::new_test("test");
 
     // Persist the resource directly so it already exists in the store —
     // bypassing the outbox path so no message is expected for this step.
-    let (_, mut existing_agg) = make_fresh_aggregate(account_id.clone(), "res-a");
+    let (_, mut existing_agg) = make_fresh_aggregate(account_handle.clone(), "res-a");
     harness
         .persistence_svc
         .create(&mut existing_agg)
@@ -205,7 +204,7 @@ async fn test_execute_create_duplicate_retries_as_update() {
     // the update path, which resolves the conflict by name lookup.
     let create_plan = harness
         .make_plan(
-            account_id,
+            account_handle,
             "res-a",
             TestResourceSpec {
                 value: "new-value".to_string(),
@@ -279,13 +278,13 @@ impl ApplyResourcePlanExecutorHarness {
 
     async fn make_plan(
         &self,
-        account_id: odf::AccountID,
+        account: odf::AccountHandle,
         name: &str,
         spec: TestResourceSpec,
     ) -> PlannedApplyResource<TestResource> {
         let params = ApplyResourceParams {
             id: None,
-            headers: BaseResourceServiceHarness::make_headers_input(account_id, name),
+            headers: BaseResourceServiceHarness::make_headers_input(account, name),
             spec,
         };
 

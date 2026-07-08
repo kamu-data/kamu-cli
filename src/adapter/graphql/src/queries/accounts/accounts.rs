@@ -27,8 +27,8 @@ impl Accounts {
 
         match subject.as_ref() {
             CurrentAccountSubject::Logged(account) => Ok(Account::new(
-                account.account_id.clone().into(),
-                account.account_name.clone().into(),
+                account.account_handle.id.clone().into(),
+                account.account_handle.name.clone().into(),
             )),
             CurrentAccountSubject::Anonymous(_) => {
                 Err(GqlError::gql(ANONYMOUS_ACCESS_FORBIDDEN_MESSAGE))

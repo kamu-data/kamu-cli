@@ -55,7 +55,7 @@ impl SearchCommand {
         let is_admin = match self.current_account_subject.as_ref() {
             CurrentAccountSubject::Logged(a) => self
                 .rebac_svc
-                .is_account_admin(&a.account_id)
+                .is_account_admin(&a.account_handle.id)
                 .await
                 .int_err()?,
             _ => false,

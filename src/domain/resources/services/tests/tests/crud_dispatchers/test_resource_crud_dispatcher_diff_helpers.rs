@@ -10,14 +10,14 @@
 use chrono::{SubsecRound as _, Utc};
 use kamu_resources::{
     ApplyManifestChangeKind,
+    ResourceHeaders,
+    ResourceHeadersExt,
     ResourceSchemaProvider,
     ResourceView,
-    ResourceViewAccount,
-    ResourceViewHeaders,
 };
 use kamu_resources_services::make_apply_manifest_changes;
 
-use crate::tests::utils::{TestResource, make_account_id, make_id};
+use crate::tests::utils::{TestResource, make_id};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Helpers
@@ -25,15 +25,13 @@ use crate::tests::utils::{TestResource, make_account_id, make_id};
 
 fn make_view(name: &str, value: &str) -> ResourceView {
     let id = make_id();
+
     ResourceView {
         schema: TestResource::schema().clone(),
-        headers: ResourceViewHeaders::simple(
+        headers: ResourceHeaders::simple(
             Utc::now(),
             id,
-            ResourceViewAccount {
-                id: make_account_id(),
-                name: None,
-            },
+            odf::AccountHandle::new_test("test-owner"),
             name,
         ),
         spec: serde_json::json!({ "value": value }),
@@ -170,16 +168,12 @@ fn test_make_changes_detects_spec_field_change() {
 fn test_make_changes_identical_before_after_returns_no_field_changes() {
     let ts = chrono::Utc::now().trunc_subsecs(6);
     let id = make_id();
-    let account_id = make_account_id();
 
     let make = || ResourceView {
         schema: TestResource::schema().clone(),
-        headers: ResourceViewHeaders {
+        headers: ResourceHeaders {
             id,
-            account: ResourceViewAccount {
-                id: account_id.clone(),
-                name: None,
-            },
+            account: odf::AccountHandle::new_test("test-owner"),
             name: kamu_resources::ResourceName::new_unchecked("res"),
             description: None,
             labels: kamu_resources::ResourceLabels {
@@ -221,16 +215,12 @@ fn test_timestamp_precision_normalized_avoids_spurious_diffs() {
     let ts_noisy = ts_base + chrono::Duration::nanoseconds(1);
 
     let id = make_id();
-    let account_id = make_account_id();
 
     let make_view_ts = |updated_at| ResourceView {
         schema: TestResource::schema().clone(),
-        headers: ResourceViewHeaders {
+        headers: ResourceHeaders {
             id,
-            account: ResourceViewAccount {
-                id: account_id.clone(),
-                name: None,
-            },
+            account: odf::AccountHandle::new_test("test-owner"),
             name: kamu_resources::ResourceName::new_unchecked("res"),
             description: None,
             labels: kamu_resources::ResourceLabels {

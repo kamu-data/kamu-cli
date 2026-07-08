@@ -13,6 +13,8 @@ use std::sync::Arc;
 use chrono::Utc;
 use database_common::NoOpDatabasePlugin;
 use dill::CatalogBuilder;
+use kamu_accounts::{Account, AccountRepository, AccountType};
+use kamu_accounts_inmem::InMemoryAccountRepository;
 use kamu_resources::{
     GenericResourceQueryService,
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
@@ -77,7 +79,8 @@ impl BaseResourceServiceHarness {
         }
 
         b.add::<InMemoryResourceRepository>()
-            .add::<InMemoryRawResourceEventStore>();
+            .add::<InMemoryRawResourceEventStore>()
+            .add::<InMemoryAccountRepository>();
 
         NoOpDatabasePlugin::init_database_components(&mut b);
 
@@ -129,17 +132,63 @@ impl BaseResourceServiceHarness {
         self.generic_query_svc.allocate_id().await.unwrap()
     }
 
-    pub fn make_headers_input(account_id: odf::AccountID, name: &str) -> ResourceHeadersInput {
+    /// Registers the given test account handle (see [`test_account_handle`])
+    /// in this harness's in-memory `AccountRepository`, so live lookups
+    /// (e.g. `InMemoryResourceRepository`'s per-read account-name resolution)
+    /// find a match instead of falling back to the deleted-account sentinel.
+    /// Idempotent: registering the same handle twice is a no-op.
+    pub async fn register_test_account(&self, account: &odf::AccountHandle) {
+        let account_repository = self.catalog.get_one::<dyn AccountRepository>().unwrap();
+
+        if account_repository
+            .get_account_by_id(&account.id)
+            .await
+            .is_ok()
+        {
+            return;
+        }
+
+        let name = account.name.as_str();
+        account_repository
+            .save_account(&Account {
+                id: account.id.clone(),
+                account_name: account.name.clone(),
+                email: email_utils::Email::parse(&format!("{name}@example.com")).unwrap(),
+                display_name: name.to_string(),
+                account_type: AccountType::User,
+                avatar_url: None,
+                registered_at: Utc::now(),
+                provider: "unit-test-provider".to_string(),
+                provider_identity_key: name.to_string(),
+            })
+            .await
+            .unwrap();
+    }
+
+    /// Convenience: derives a handle from `account_name` (see
+    /// [`test_account_handle`]) and registers it in one step.
+    pub async fn ensure_test_account(&self, account_name: &str) -> odf::AccountHandle {
+        let handle = odf::AccountHandle::new_test(account_name);
+        self.register_test_account(&handle).await;
+        handle
+    }
+
+    /// Builds headers input for an already-resolved account handle (see
+    /// [`Self::ensure_test_account`]). `account_id`/`account_name` must
+    /// belong together — they are not independently derivable from one
+    /// another.
+    pub fn make_headers_input(account: odf::AccountHandle, name: &str) -> ResourceHeadersInput {
         ResourceHeadersInput {
-            account: account_id,
+            id: None,
+            account: Some(odf::metadata::auth::AccountRef::Handle(account)),
             name: kamu_resources::ResourceName::new_unchecked(name),
             description: None,
-            labels: kamu_resources::ResourceLabels {
+            labels: Some(kamu_resources::ResourceLabels {
                 entries: BTreeMap::new(),
-            },
-            annotations: kamu_resources::ResourceAnnotations {
+            }),
+            annotations: Some(kamu_resources::ResourceAnnotations {
                 entries: BTreeMap::new(),
-            },
+            }),
         }
     }
 

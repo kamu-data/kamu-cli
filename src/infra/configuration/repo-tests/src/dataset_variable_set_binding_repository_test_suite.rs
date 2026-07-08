@@ -25,6 +25,7 @@ use kamu_configuration::{
 use kamu_datasets::{DatasetEntry, DatasetEntryRepository};
 use kamu_resources::{
     ResourceHeaders,
+    ResourceHeadersExt,
     ResourceID,
     ResourceRepository,
     ResourceSchemaProvider,
@@ -214,7 +215,11 @@ async fn create_resource(
             schema: VariableSetResource::schema().clone(),
             headers: ResourceHeaders::simple(
                 Utc::now(),
-                account.id.clone(),
+                resource_id,
+                odf::AccountHandle {
+                    id: account.id.clone(),
+                    name: account.account_name.clone(),
+                },
                 &resource_id.to_string(),
             ),
             spec: serde_json::to_value(VariableSetSpec {

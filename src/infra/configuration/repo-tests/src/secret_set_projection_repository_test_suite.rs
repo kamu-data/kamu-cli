@@ -20,6 +20,7 @@ use kamu_configuration::{
 };
 use kamu_resources::{
     ResourceHeaders,
+    ResourceHeadersExt,
     ResourceID,
     ResourceRepository,
     ResourceSchemaProvider,
@@ -46,12 +47,15 @@ async fn make_secret_set_resource(catalog: &Catalog) -> ResourceID {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
     let secret_set_id = ResourceID::new(uuid::Uuid::new_v4());
 
+    let account_handle = odf::AccountHandle::new_test("test-account");
+
     repo.create_resource(&ResourceSnapshot {
         id: secret_set_id,
         schema: SecretSetResource::schema().clone(),
         headers: ResourceHeaders::simple(
             Utc::now(),
-            odf::AccountID::new_seeded_ed25519(b"test-account"),
+            secret_set_id,
+            account_handle,
             &secret_set_id.to_string(),
         ),
         spec: serde_json::to_value(SecretSetSpec {

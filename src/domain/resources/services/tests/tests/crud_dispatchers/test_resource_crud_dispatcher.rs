@@ -20,7 +20,7 @@ use kamu_resources::{
 use kamu_resources_services::testing::BaseResourceServiceHarness;
 
 use crate::tests::use_cases::ResourceUseCaseBaseHarness;
-use crate::tests::utils::{TestResource, make_account_id};
+use crate::tests::utils::TestResource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Tests — spec decoding / validation
@@ -199,10 +199,10 @@ async fn test_apply_update_returns_applied_updated() {
     let id = applied1.resource.headers.id;
 
     // Second apply with same account but different spec value — Update
-    let account_id = applied1.resource.headers.account.id.clone();
+    let account = applied1.resource.headers.account.clone();
     let req2 = ResourceCrudDispatcherApplyRequest {
         id: Some(id),
-        headers: BaseResourceServiceHarness::make_headers_input(account_id, "res-a"),
+        headers: BaseResourceServiceHarness::make_headers_input(account, "res-a"),
         spec: serde_json::json!({ "value": "value-v2" }),
     };
     let decision2 = harness.dispatcher().apply(req2).await.unwrap();
@@ -225,12 +225,12 @@ async fn test_apply_untouched_returns_applied_untouched() {
     let decision1 = harness.dispatcher().apply(req1).await.unwrap();
     let applied1 = decision1.expect_applied();
     let id = applied1.resource.headers.id;
-    let account_id = applied1.resource.headers.account.id.clone();
+    let account = applied1.resource.headers.account.clone();
 
     // Second apply — identical spec and headers
     let req2 = ResourceCrudDispatcherApplyRequest {
         id: Some(id),
-        headers: BaseResourceServiceHarness::make_headers_input(account_id, "res-a"),
+        headers: BaseResourceServiceHarness::make_headers_input(account, "res-a"),
         spec: serde_json::json!({ "value": "same-value" }),
     };
     let decision2 = harness.dispatcher().apply(req2).await.unwrap();
@@ -259,10 +259,12 @@ impl ResourceCrudDispatcherHarness {
     }
 
     fn make_apply_request(name: &str, value: &str) -> ResourceCrudDispatcherApplyRequest {
-        let account_id = make_account_id();
         ResourceCrudDispatcherApplyRequest {
             id: None,
-            headers: BaseResourceServiceHarness::make_headers_input(account_id, name),
+            headers: BaseResourceServiceHarness::make_headers_input(
+                odf::AccountHandle::new_test("test"),
+                name,
+            ),
             spec: serde_json::json!({ "value": value }),
         }
     }
@@ -271,10 +273,12 @@ impl ResourceCrudDispatcherHarness {
         name: &str,
         spec: serde_json::Value,
     ) -> ResourceCrudDispatcherApplyRequest {
-        let account_id = make_account_id();
         ResourceCrudDispatcherApplyRequest {
             id: None,
-            headers: BaseResourceServiceHarness::make_headers_input(account_id, name),
+            headers: BaseResourceServiceHarness::make_headers_input(
+                odf::AccountHandle::new_test("test"),
+                name,
+            ),
             spec,
         }
     }

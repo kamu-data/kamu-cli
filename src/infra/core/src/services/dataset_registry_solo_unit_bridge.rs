@@ -55,7 +55,7 @@ impl DatasetRegistrySoloUnitBridge {
                             panic!("Anonymous account misused, use multi-tenant alias");
                         }
                         CurrentAccountSubject::Logged(l) => odf::DatasetAlias::new(
-                            Some(l.account_name.clone()),
+                            Some(l.account_handle.name.clone()),
                             alias.dataset_name.clone(),
                         ),
                     }
@@ -239,7 +239,7 @@ impl DatasetRegistry for DatasetRegistrySoloUnitBridge {
                             panic!("Logged subject only");
                         }
                         CurrentAccountSubject::Logged(l) => {
-                            if l.account_id == owner_id {
+                            if l.account_handle.id == owner_id {
                                 Some(dataset_handle)
                             } else {
                                 None

@@ -67,7 +67,7 @@ impl APIServerRunCommand {
         api_server_catalog: &dill::Catalog,
     ) -> Result<String, CLIError> {
         let current_account_name = match self.account_subject.as_ref() {
-            CurrentAccountSubject::Logged(l) => l.account_name.clone(),
+            CurrentAccountSubject::Logged(l) => l.account_handle.name.clone(),
             CurrentAccountSubject::Anonymous(_) => {
                 unreachable!("Cannot launch API server with anonymous account")
             }

@@ -198,6 +198,11 @@ type AccountFlowsMut {
 	triggers: AccountFlowTriggersMut!
 }
 
+type AccountHandle {
+	id: AccountID!
+	name: AccountName!
+}
+
 input AccountHandleInput {
 	id: AccountID!
 	name: AccountName!
@@ -284,11 +289,6 @@ type AccountQuotasUsageStorage {
 	Total bytes limit for this account.
 	"""
 	limitTotalBytes: Int!
-}
-
-type AccountRef {
-	id: AccountID
-	name: AccountName
 }
 
 enum AccountType {
@@ -4008,16 +4008,59 @@ enum ResourceHeaderValidationProblemCode {
 	DUPLICATE_ANNOTATION_KEY
 }
 
+"""
+Container for identity and ownership information of a resource.
+
+Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceHeaders
+"""
 type ResourceHeaders {
+	"""
+	Unique identifier of a resource within entire ODF node. Automatically
+	assigned upon resource creation.
+	"""
 	id: ResourceID!
-	account: AccountRef!
+	"""
+	Symbolic name of a resource that identifies it within a scope of an
+	onwing account.
+	"""
 	name: ResourceName!
+	"""
+	Human-friendly resource description.
+	"""
 	description: String
+	"""
+	Link to the account that owns the resource.
+	"""
+	account: AccountHandle!
+	"""
+	Map of string keys and values that can be used to organize, categorize,
+	and query resources.
+	"""
 	labels: ResourceLabels!
+	"""
+	Annotations is a key value map stored with a resource that may be set by
+	external tools to store and retrieve arbitrary metadata. Unlike labels,
+	annotations are not indexed and cannot be queried by.
+	"""
 	annotations: ResourceAnnotations!
+	"""
+	A sequential number that changes every time the resource header and spec
+	are updated. Does not increment on status changes, thus signifying
+	changes to the desired state. Populated by the system. Starts with `1`.
+	"""
 	generation: Uint64!
+	"""
+	Time when the resource was first applied and assigned an identity.
+	"""
 	createdAt: DateTime!
+	"""
+	Time when the resource was last updated, including header, spec, and
+	status updates.
+	"""
 	updatedAt: DateTime!
+	"""
+	Time when the resource was deleted.
+	"""
 	deletedAt: DateTime
 }
 

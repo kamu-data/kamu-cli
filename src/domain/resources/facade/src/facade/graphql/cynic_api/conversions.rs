@@ -47,19 +47,11 @@ impl TryFrom<fragments::Resource> for domain::ResourceView {
     fn try_from(value: fragments::Resource) -> Result<Self, Self::Error> {
         Ok(Self {
             schema: value.schema,
-            headers: domain::ResourceViewHeaders {
+            headers: domain::ResourceHeaders {
                 id: value.headers.id,
-                account: domain::ResourceViewAccount {
-                    id: value.headers.account.id.ok_or_else(|| {
-                        InternalError::new(
-                            "ResourceHeaders.account.id is required but missing".to_string(),
-                        )
-                    })?,
-                    name: value
-                        .headers
-                        .account
-                        .name
-                        .map(|name| odf::AccountName::new_unchecked(&name.0)),
+                account: odf::AccountHandle {
+                    id: value.headers.account.id,
+                    name: odf::AccountName::new_unchecked(&value.headers.account.name.0),
                 },
                 name: value.headers.name,
                 description: value.headers.description,

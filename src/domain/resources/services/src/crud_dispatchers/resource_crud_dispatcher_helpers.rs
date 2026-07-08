@@ -29,7 +29,6 @@ use kamu_resources::{
     ResourceStatusSummaryView,
     ResourceSummaryView,
     ResourceView,
-    ResourceViewHeaders,
     TypeUri,
 };
 use serde::Serialize;
@@ -134,11 +133,11 @@ where
     R: ResourceSchemaProvider + DeclarativeResource,
     R::Spec: Serialize,
 {
-    let (id, headers, spec, status) = state.into_parts();
+    let (_id, headers, spec, status) = state.into_parts();
 
     Ok(ResourceView {
         schema: R::schema().clone(),
-        headers: ResourceViewHeaders::from_owned(id, headers),
+        headers,
         spec: serde_json::to_value(spec).int_err()?,
         status: Some(status),
     })
@@ -167,7 +166,6 @@ where
 
 pub(crate) fn resource_snapshot_to_view(snapshot: ResourceSnapshot) -> ResourceView {
     let ResourceSnapshot {
-        id,
         schema,
         headers,
         spec,
@@ -177,7 +175,7 @@ pub(crate) fn resource_snapshot_to_view(snapshot: ResourceSnapshot) -> ResourceV
 
     ResourceView {
         schema,
-        headers: ResourceViewHeaders::from_owned(id, headers),
+        headers,
         spec,
         status,
     }

@@ -58,7 +58,7 @@ impl ResourceRepository for PostgresResourceRepository {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
-        let account_id_stack = resource_snapshot.headers.account.as_stack_string();
+        let account_id_stack = resource_snapshot.headers.account.id.as_stack_string();
         let account_id_str = account_id_stack.as_str();
         let labels = kamu_resources::resource_labels_to_json(&resource_snapshot.headers.labels);
         let annotations =
@@ -111,7 +111,7 @@ impl ResourceRepository for PostgresResourceRepository {
         .map_err(|e: sqlx::Error| match e {
             sqlx::Error::Database(e) if e.is_unique_violation() => {
                 CreateResourceError::Duplicate(ResourceDuplicateError {
-                    account_id: resource_snapshot.headers.account.clone(),
+                    account_id: resource_snapshot.headers.account.id.clone(),
                     schema: resource_snapshot.schema.clone(),
                     name: resource_snapshot.headers.name.clone(),
                 })
@@ -176,6 +176,7 @@ impl ResourceRepository for PostgresResourceRepository {
                     resource_snapshot
                         .headers
                         .account
+                        .id
                         .as_stack_string()
                         .to_string(),
                 )
@@ -248,7 +249,7 @@ impl ResourceRepository for PostgresResourceRepository {
                 sqlx::Error::Database(e) if e.is_unique_violation() => {
                     let resource_snapshot = &resource_updates[0].snapshot;
                     UpdateResourceError::Duplicate(ResourceDuplicateError {
-                        account_id: resource_snapshot.headers.account.clone(),
+                        account_id: resource_snapshot.headers.account.id.clone(),
                         schema: resource_snapshot.schema.clone(),
                         name: resource_snapshot.headers.name.clone(),
                     })
@@ -486,27 +487,30 @@ impl ResourceRepository for PostgresResourceRepository {
         let maybe_row = sqlx::query!(
             r#"
             SELECT
-                resource_id as "id: uuid::Uuid",
-                account_id as "account_id: odf::AccountID",
-                resource_schema,
-                resource_name,
-                description,
-                labels,
-                annotations,
-                spec,
-                status,
-                generation,
-                created_at,
-                updated_at,
-                deleted_at,
-                last_event_id
-            FROM resources
-            WHERE resource_id = $1
-              AND resource_schema = $2
-              AND deleted_at IS NULL
+                r.resource_id as "id: uuid::Uuid",
+                r.account_id as "account_id: odf::AccountID",
+                COALESCE(a.account_name, $3) as "account_name!",
+                r.resource_schema,
+                r.resource_name,
+                r.description,
+                r.labels,
+                r.annotations,
+                r.spec,
+                r.status,
+                r.generation,
+                r.created_at,
+                r.updated_at,
+                r.deleted_at,
+                r.last_event_id
+            FROM resources r
+            LEFT JOIN accounts a ON a.id = r.account_id
+            WHERE r.resource_id = $1
+              AND r.resource_schema = $2
+              AND r.deleted_at IS NULL
             "#,
             query_id,
             query_schema,
+            kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL,
         )
         .fetch_optional(connection_mut)
         .await
@@ -516,7 +520,11 @@ impl ResourceRepository for PostgresResourceRepository {
             id: ResourceID::new(row.id),
             schema: TypeUri::new_unchecked(row.resource_schema),
             headers: ResourceHeaders {
-                account: row.account_id,
+                id: ResourceID::new(row.id),
+                account: odf::AccountHandle {
+                    id: row.account_id,
+                    name: odf::AccountName::new_unchecked(&row.account_name),
+                },
                 name: kamu_resources::ResourceName::new_unchecked(&row.resource_name),
                 description: row.description,
                 labels: kamu_resources::resource_labels_from_json(row.labels),
@@ -551,28 +559,31 @@ impl ResourceRepository for PostgresResourceRepository {
         let rows = sqlx::query_as::<_, ResourceSnapshotRow>(
             r#"
             SELECT
-            resource_id as id,
-            account_id,
-                resource_schema,
-                resource_name,
-                description,
-                labels,
-                annotations,
-                spec,
-                status,
-                generation,
-                created_at,
-                updated_at,
-                deleted_at,
-                last_event_id
-            FROM resources
-            WHERE resource_schema = $1
-              AND resource_id = ANY($2)
-              AND deleted_at IS NULL
+                r.resource_id as id,
+                r.account_id,
+                COALESCE(a.account_name, $3) as account_name,
+                r.resource_schema,
+                r.resource_name,
+                r.description,
+                r.labels,
+                r.annotations,
+                r.spec,
+                r.status,
+                r.generation,
+                r.created_at,
+                r.updated_at,
+                r.deleted_at,
+                r.last_event_id
+            FROM resources r
+            LEFT JOIN accounts a ON a.id = r.account_id
+            WHERE r.resource_schema = $1
+              AND r.resource_id = ANY($2)
+              AND r.deleted_at IS NULL
             "#,
         )
         .bind(schema.as_str())
         .bind(&ids)
+        .bind(kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL)
         .fetch_all(connection_mut)
         .await
         .int_err()?;
@@ -600,25 +611,28 @@ impl ResourceRepository for PostgresResourceRepository {
         let maybe_row = sqlx::query!(
             r#"
             SELECT
-                resource_id as "id: uuid::Uuid",
-                account_id as "account_id: odf::AccountID",
-                resource_schema,
-                resource_name,
-                description,
-                labels,
-                annotations,
-                spec,
-                status,
-                generation,
-                created_at,
-                updated_at,
-                deleted_at,
-                last_event_id
-            FROM resources
-            WHERE resource_id = $1
-              AND deleted_at IS NULL
+                r.resource_id as "id: uuid::Uuid",
+                r.account_id as "account_id: odf::AccountID",
+                COALESCE(a.account_name, $2) as "account_name!",
+                r.resource_schema,
+                r.resource_name,
+                r.description,
+                r.labels,
+                r.annotations,
+                r.spec,
+                r.status,
+                r.generation,
+                r.created_at,
+                r.updated_at,
+                r.deleted_at,
+                r.last_event_id
+            FROM resources r
+            LEFT JOIN accounts a ON a.id = r.account_id
+            WHERE r.resource_id = $1
+              AND r.deleted_at IS NULL
             "#,
             resource_id,
+            kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL,
         )
         .fetch_optional(connection_mut)
         .await
@@ -628,7 +642,11 @@ impl ResourceRepository for PostgresResourceRepository {
             id: ResourceID::new(row.id),
             schema: TypeUri::new_unchecked(row.resource_schema),
             headers: ResourceHeaders {
-                account: row.account_id,
+                id: ResourceID::new(row.id),
+                account: odf::AccountHandle {
+                    id: row.account_id,
+                    name: odf::AccountName::new_unchecked(&row.account_name),
+                },
                 name: kamu_resources::ResourceName::new_unchecked(&row.resource_name),
                 description: row.description,
                 labels: kamu_resources::resource_labels_from_json(row.labels),
@@ -664,27 +682,30 @@ impl ResourceRepository for PostgresResourceRepository {
         let rows = sqlx::query!(
             r#"
             SELECT
-                resource_id as "id: uuid::Uuid",
-                account_id as "account_id: odf::AccountID",
-                resource_schema,
-                resource_name,
-                description,
-                labels,
-                annotations,
-                spec,
-                status,
-                generation,
-                created_at,
-                updated_at,
-                deleted_at,
-                last_event_id
-            FROM resources
-            WHERE account_id = $1
-              AND resource_id = ANY($2)
-              AND deleted_at IS NULL
+                r.resource_id as "id: uuid::Uuid",
+                r.account_id as "account_id: odf::AccountID",
+                COALESCE(a.account_name, $3) as "account_name!",
+                r.resource_schema,
+                r.resource_name,
+                r.description,
+                r.labels,
+                r.annotations,
+                r.spec,
+                r.status,
+                r.generation,
+                r.created_at,
+                r.updated_at,
+                r.deleted_at,
+                r.last_event_id
+            FROM resources r
+            LEFT JOIN accounts a ON a.id = r.account_id
+            WHERE r.account_id = $1
+              AND r.resource_id = ANY($2)
+              AND r.deleted_at IS NULL
             "#,
             account_id_stack.as_str(),
             &ids,
+            kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL,
         )
         .fetch_all(connection_mut)
         .await
@@ -696,7 +717,11 @@ impl ResourceRepository for PostgresResourceRepository {
                 id: ResourceID::new(row.id),
                 schema: TypeUri::new_unchecked(row.resource_schema),
                 headers: ResourceHeaders {
-                    account: row.account_id,
+                    id: ResourceID::new(row.id),
+                    account: odf::AccountHandle {
+                        id: row.account_id,
+                        name: odf::AccountName::new_unchecked(&row.account_name),
+                    },
                     name: kamu_resources::ResourceName::new_unchecked(&row.resource_name),
                     description: row.description,
                     labels: kamu_resources::resource_labels_from_json(row.labels),
@@ -775,31 +800,34 @@ impl ResourceRepository for PostgresResourceRepository {
             let mut query_stream = sqlx::query!(
                 r#"
                 SELECT
-                    resource_id as "id: uuid::Uuid",
-                    account_id as "account_id: odf::AccountID",
-                    resource_schema,
-                    resource_name,
-                    description,
-                    labels,
-                    annotations,
-                    spec,
-                    status,
-                    generation,
-                    created_at,
-                    updated_at,
-                    deleted_at,
-                    last_event_id
-                FROM resources
-                WHERE account_id = $1
-                  AND resource_schema = $2
-                  AND deleted_at IS NULL
-                ORDER BY updated_at DESC, resource_id DESC
+                    r.resource_id as "id: uuid::Uuid",
+                    r.account_id as "account_id: odf::AccountID",
+                    COALESCE(a.account_name, $5) as "account_name!",
+                    r.resource_schema,
+                    r.resource_name,
+                    r.description,
+                    r.labels,
+                    r.annotations,
+                    r.spec,
+                    r.status,
+                    r.generation,
+                    r.created_at,
+                    r.updated_at,
+                    r.deleted_at,
+                    r.last_event_id
+                FROM resources r
+                LEFT JOIN accounts a ON a.id = r.account_id
+                WHERE r.account_id = $1
+                  AND r.resource_schema = $2
+                  AND r.deleted_at IS NULL
+                ORDER BY r.updated_at DESC, r.resource_id DESC
                 LIMIT $3 OFFSET $4
                 "#,
                 account_id_stack.as_str(),
                 resource_schema,
                 limit,
                 offset,
+                kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL,
             )
             .fetch(connection_mut)
             .map_err(ErrorIntoInternal::int_err);
@@ -809,7 +837,11 @@ impl ResourceRepository for PostgresResourceRepository {
                     id: ResourceID::new(row.id),
                     schema: TypeUri::new_unchecked(row.resource_schema),
                     headers: ResourceHeaders {
-                        account: row.account_id,
+                        id: ResourceID::new(row.id),
+                        account: odf::AccountHandle {
+                            id: row.account_id,
+                            name: odf::AccountName::new_unchecked(&row.account_name),
+                        },
                         name: kamu_resources::ResourceName::new_unchecked(&row.resource_name),
                         description: row.description,
                         labels: kamu_resources::resource_labels_from_json(row.labels),
@@ -846,29 +878,32 @@ impl ResourceRepository for PostgresResourceRepository {
             let mut query_stream = sqlx::query!(
                 r#"
                 SELECT
-                    resource_id as "id: uuid::Uuid",
-                    account_id as "account_id: odf::AccountID",
-                    resource_schema,
-                    resource_name,
-                    description,
-                    labels,
-                    annotations,
-                    spec,
-                    status,
-                    generation,
-                    created_at,
-                    updated_at,
-                    deleted_at,
-                    last_event_id
-                FROM resources
-                WHERE account_id = $1
-                  AND deleted_at IS NULL
-                ORDER BY updated_at DESC, resource_id DESC
+                    r.resource_id as "id: uuid::Uuid",
+                    r.account_id as "account_id: odf::AccountID",
+                    COALESCE(a.account_name, $4) as "account_name!",
+                    r.resource_schema,
+                    r.resource_name,
+                    r.description,
+                    r.labels,
+                    r.annotations,
+                    r.spec,
+                    r.status,
+                    r.generation,
+                    r.created_at,
+                    r.updated_at,
+                    r.deleted_at,
+                    r.last_event_id
+                FROM resources r
+                LEFT JOIN accounts a ON a.id = r.account_id
+                WHERE r.account_id = $1
+                  AND r.deleted_at IS NULL
+                ORDER BY r.updated_at DESC, r.resource_id DESC
                 LIMIT $2 OFFSET $3
                 "#,
                 account_id_stack.as_str(),
                 limit,
                 offset,
+                kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL,
             )
             .fetch(connection_mut)
             .map_err(ErrorIntoInternal::int_err);
@@ -878,7 +913,11 @@ impl ResourceRepository for PostgresResourceRepository {
                     id: ResourceID::new(row.id),
                     schema: TypeUri::new_unchecked(row.resource_schema),
                     headers: ResourceHeaders {
-                        account: row.account_id,
+                        id: ResourceID::new(row.id),
+                        account: odf::AccountHandle {
+                            id: row.account_id,
+                            name: odf::AccountName::new_unchecked(&row.account_name),
+                        },
                         name: kamu_resources::ResourceName::new_unchecked(&row.resource_name),
                         description: row.description,
                         labels: kamu_resources::resource_labels_from_json(row.labels),

@@ -121,7 +121,7 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
             return Ok(None);
         };
 
-        if resource_snapshot.headers.account != *account_id {
+        if resource_snapshot.headers.account.id != *account_id {
             return Err(odf::AccessError::Unauthorized(
                 ResourceNotOwnedByAccountError {
                     id: resource_snapshot.id,

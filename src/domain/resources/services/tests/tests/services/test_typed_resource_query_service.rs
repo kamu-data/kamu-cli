@@ -16,6 +16,7 @@ use kamu_resources::{
     ApplyResourceUseCase,
     DeclarativeResourceState,
     ResourceHeaders,
+    ResourceHeadersExt,
     ResourceID,
     ResourceSnapshot,
     TypeUri,
@@ -27,7 +28,6 @@ use kamu_resources_services::testing::BaseResourceServiceHarness;
 use crate::tests::utils::{
     TestResource,
     TestResourceReconciler,
-    make_account_id,
     make_resource_params,
     register_test_resource_resource_service_layer,
 };
@@ -44,12 +44,12 @@ static OTHER_SCHEMA: std::sync::LazyLock<TypeUri> =
 #[test_log::test(tokio::test)]
 async fn test_get_state_by_id_success() {
     let harness = TypedResourceQueryServiceHarness::new();
-    let account_a = make_account_id();
-    let id = harness.apply_and_get_id(account_a.clone(), "res-a").await;
+    let account_handle = odf::AccountHandle::new_test("test-owner");
+    let id = harness.apply_and_get_id(&account_handle, "res-a").await;
 
     let state = harness
         .typed_query_svc()
-        .get_state_by_id(account_a, &id)
+        .get_state_by_id(account_handle.id, &id)
         .await
         .unwrap();
 
@@ -61,12 +61,12 @@ async fn test_get_state_by_id_success() {
 #[test_log::test(tokio::test)]
 async fn test_get_state_by_id_not_found() {
     let harness = TypedResourceQueryServiceHarness::new();
-    let account_a = make_account_id();
+    let account_handle = odf::AccountHandle::new_test("test-owner");
     let id = harness.allocate_id().await;
 
     let result = harness
         .typed_query_svc()
-        .get_state_by_id(account_a, &id)
+        .get_state_by_id(account_handle.id, &id)
         .await;
 
     assert!(
@@ -80,13 +80,13 @@ async fn test_get_state_by_id_not_found() {
 #[test_log::test(tokio::test)]
 async fn test_get_state_by_id_wrong_account() {
     let harness = TypedResourceQueryServiceHarness::new();
-    let account_a = make_account_id();
-    let account_b = make_account_id();
-    let id = harness.apply_and_get_id(account_a, "res-a").await;
+    let account_handle_a = odf::AccountHandle::new_test("test-owner-a");
+    let account_handle_b = odf::AccountHandle::new_test("test-owner-b");
+    let id = harness.apply_and_get_id(&account_handle_a, "res-a").await;
 
     let result = harness
         .typed_query_svc()
-        .get_state_by_id(account_b, &id)
+        .get_state_by_id(account_handle_b.id, &id)
         .await;
 
     // Wrong account: implementation returns NotFound to avoid information leakage
@@ -101,16 +101,16 @@ async fn test_get_state_by_id_wrong_account() {
 #[test_log::test(tokio::test)]
 async fn test_get_state_by_id_type_mismatch() {
     let harness = TypedResourceQueryServiceHarness::new();
-    let account_a = make_account_id();
+    let account_handle = odf::AccountHandle::new_test("test-owner");
     let id = harness.allocate_id().await;
 
     harness
-        .insert_snapshot_with_schema(id, account_a.clone(), &OTHER_SCHEMA, "res-a")
+        .insert_snapshot_with_schema(id, &account_handle, &OTHER_SCHEMA, "res-a")
         .await;
 
     let result = harness
         .typed_query_svc()
-        .get_state_by_id(account_a, &id)
+        .get_state_by_id(account_handle.id, &id)
         .await;
 
     // get_state_by_id uses get_snapshot_by_query which filters by schema, so a
@@ -127,21 +127,24 @@ async fn test_get_state_by_id_type_mismatch() {
 
 #[test_log::test(tokio::test)]
 async fn test_list_states_filters_by_account() {
-    let harness = TypedResourceQueryServiceHarness::new();
-    let account_a = make_account_id();
-    let account_b = make_account_id();
+    let harness: TypedResourceQueryServiceHarness = TypedResourceQueryServiceHarness::new();
+    let account_handle_a = odf::AccountHandle::new_test("test-owner-a");
+    let account_handle_b = odf::AccountHandle::new_test("test-owner-b");
 
     for name in ["res-a1", "res-a2", "res-a3"] {
-        harness.apply_and_get_id(account_a.clone(), name).await;
+        harness.apply_and_get_id(&account_handle_a, name).await;
     }
 
     for name in ["res-b1", "res-b2"] {
-        harness.apply_and_get_id(account_b.clone(), name).await;
+        harness.apply_and_get_id(&account_handle_b, name).await;
     }
 
     let states_a = harness
         .typed_query_svc()
-        .list_states(account_a, PaginationOpts::from_max_results(usize::MAX))
+        .list_states(
+            account_handle_a.id,
+            PaginationOpts::from_max_results(usize::MAX),
+        )
         .await
         .unwrap();
 
@@ -149,7 +152,10 @@ async fn test_list_states_filters_by_account() {
 
     let states_b = harness
         .typed_query_svc()
-        .list_states(account_b, PaginationOpts::from_max_results(usize::MAX))
+        .list_states(
+            account_handle_b.id,
+            PaginationOpts::from_max_results(usize::MAX),
+        )
         .await
         .unwrap();
 
@@ -161,8 +167,8 @@ async fn test_list_states_filters_by_account() {
 #[test_log::test(tokio::test)]
 async fn test_ensure_id_matches_type_success() {
     let harness = TypedResourceQueryServiceHarness::new();
-    let account_a = make_account_id();
-    let id = harness.apply_and_get_id(account_a, "res-a").await;
+    let account_handle = odf::AccountHandle::new_test("test-owner");
+    let id = harness.apply_and_get_id(&account_handle, "res-a").await;
 
     let result = harness
         .typed_query_svc()
@@ -177,11 +183,11 @@ async fn test_ensure_id_matches_type_success() {
 #[test_log::test(tokio::test)]
 async fn test_ensure_id_matches_type_mismatch() {
     let harness = TypedResourceQueryServiceHarness::new();
-    let account_a = make_account_id();
+    let account_handle = odf::AccountHandle::new_test("test-owner");
     let id = harness.allocate_id().await;
 
     harness
-        .insert_snapshot_with_schema(id, account_a, &OTHER_SCHEMA, "res-a")
+        .insert_snapshot_with_schema(id, &account_handle, &OTHER_SCHEMA, "res-a")
         .await;
 
     let result = harness
@@ -227,10 +233,10 @@ impl TypedResourceQueryServiceHarness {
         self.catalog.get_one().unwrap()
     }
 
-    async fn apply_and_get_id(&self, account_id: odf::AccountID, name: &str) -> ResourceID {
+    async fn apply_and_get_id(&self, owner_handle: &odf::AccountHandle, name: &str) -> ResourceID {
         use kamu_resources::ApplyResourceApplicationDecision;
 
-        let params = make_resource_params(account_id, name);
+        let params = make_resource_params(owner_handle.clone(), name);
         let decision = self.apply_svc().apply(params).await.unwrap();
 
         match decision {
@@ -244,14 +250,14 @@ impl TypedResourceQueryServiceHarness {
     async fn insert_snapshot_with_schema(
         &self,
         id: ResourceID,
-        owner_account_id: odf::AccountID,
+        owner_handle: &odf::AccountHandle,
         schema: &TypeUri,
         name: &str,
     ) {
         let snapshot = ResourceSnapshot {
             id,
             schema: schema.clone(),
-            headers: ResourceHeaders::simple(Utc::now(), owner_account_id, name),
+            headers: ResourceHeaders::simple(Utc::now(), id, owner_handle.clone(), name),
             spec: serde_json::json!({"value": name}),
             status: None,
             last_event_id: None,

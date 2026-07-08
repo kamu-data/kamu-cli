@@ -28,6 +28,13 @@ impl AccountHandle {
     pub fn new(id: AccountID, name: AccountName) -> Self {
         Self { id, name }
     }
+
+    pub fn new_test(name: &str) -> AccountHandle {
+        AccountHandle {
+            id: AccountID::new_seeded_ed25519(name.as_bytes()),
+            name: AccountName::new_unchecked(name),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -223,6 +223,7 @@ pub struct ResourceIdentityRow {
 pub struct ResourceSnapshotRow {
     pub id: uuid::Uuid,
     pub account_id: odf::AccountID,
+    pub account_name: String,
     pub resource_schema: String,
     pub resource_name: String,
     pub description: Option<String>,
@@ -239,11 +240,17 @@ pub struct ResourceSnapshotRow {
 
 impl ResourceSnapshotRow {
     pub fn into_snapshot(self) -> ResourceSnapshot {
+        let id = ResourceID::new(self.id);
+
         ResourceSnapshot {
-            id: ResourceID::new(self.id),
+            id,
             schema: TypeUri::new_unchecked(self.resource_schema),
             headers: crate::ResourceHeaders {
-                account: self.account_id,
+                id,
+                account: odf::AccountHandle {
+                    id: self.account_id,
+                    name: odf::AccountName::new_unchecked(&self.account_name),
+                },
                 name: ResourceName::new_unchecked(&self.resource_name),
                 description: self.description,
                 labels: crate::resource_labels_from_json(self.labels),

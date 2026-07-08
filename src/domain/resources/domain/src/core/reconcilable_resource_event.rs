@@ -29,18 +29,22 @@ pub enum ReconcilableResourceEvent<TSpec, TSuccess, TFailureDetails> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[serde_with::serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceEventCreated<TSpec> {
     pub event_time: DateTime<Utc>,
     pub id: ResourceID,
+    #[serde_as(as = "odf::metadata::serde::yaml::resource::ResourceHeadersInput")]
     pub headers: ResourceHeadersInput,
     pub spec: TSpec,
 }
 
+#[serde_with::serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceEventHeadersUpdated {
     pub event_time: DateTime<Utc>,
     pub id: ResourceID,
+    #[serde_as(as = "odf::metadata::serde::yaml::resource::ResourceHeadersInput")]
     pub new_headers: ResourceHeadersInput,
 }
 

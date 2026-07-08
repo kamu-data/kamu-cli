@@ -50,7 +50,7 @@ impl From<AccountRef> for odf::metadata::auth::AccountRef {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
-pub struct AccountHandle(odf::metadata::auth::AccountHandle);
+pub struct AccountHandle(odf::AccountHandle);
 
 #[Object]
 impl AccountHandle {
@@ -63,13 +63,13 @@ impl AccountHandle {
     }
 }
 
-impl From<odf::metadata::auth::AccountHandle> for AccountHandle {
-    fn from(value: odf::metadata::auth::AccountHandle) -> Self {
+impl From<odf::AccountHandle> for AccountHandle {
+    fn from(value: odf::AccountHandle) -> Self {
         Self(value)
     }
 }
 
-impl From<AccountHandle> for odf::metadata::auth::AccountHandle {
+impl From<AccountHandle> for odf::AccountHandle {
     fn from(value: AccountHandle) -> Self {
         value.0
     }

@@ -10,6 +10,7 @@
 use database_common::SqliteTransactionManager;
 use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
+use kamu_accounts_sqlite::SqliteAccountRepository;
 use kamu_resources_repo_tests::resource_repository_test_suite as resource_repo_suite;
 use kamu_resources_sqlite::SqliteResourceRepository;
 use sqlx::SqlitePool;
@@ -185,6 +186,14 @@ database_transactional_test!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+database_transactional_test!(
+    storage = sqlite,
+    fixture = resource_repo_suite::test_account_rename_reflected_immediately_in_headers,
+    harness = SqliteResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct SqliteResourceRepositoryHarness {
     catalog: Catalog,
 }
@@ -195,6 +204,7 @@ impl SqliteResourceRepositoryHarness {
         catalog_builder.add_value(sqlite_pool);
         catalog_builder.add::<SqliteTransactionManager>();
         catalog_builder.add::<SqliteResourceRepository>();
+        catalog_builder.add::<SqliteAccountRepository>();
         Self {
             catalog: catalog_builder.build(),
         }

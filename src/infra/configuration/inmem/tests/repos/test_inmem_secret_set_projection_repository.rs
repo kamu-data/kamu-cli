@@ -9,6 +9,7 @@
 
 use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
+use kamu_accounts_inmem::InMemoryAccountRepository;
 use kamu_configuration_inmem::InMemorySecretSetProjectionRepository;
 use kamu_configuration_repo_tests::secret_set_projection_repository_test_suite as secret_set_repo;
 use kamu_resources_inmem::InMemoryResourceRepository;
@@ -119,6 +120,7 @@ impl InMemorySecretSetProjectionRepositoryHarness {
     pub fn new() -> Self {
         let mut catalog_builder = CatalogBuilder::new();
         catalog_builder.add::<InMemoryResourceRepository>();
+        catalog_builder.add::<InMemoryAccountRepository>();
         catalog_builder.add::<InMemorySecretSetProjectionRepository>();
         Self {
             catalog: catalog_builder.build(),

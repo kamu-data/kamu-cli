@@ -22,19 +22,13 @@ use crate::tests::utils::{TestResource, TestResourceSpec};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn make_account_id() -> odf::AccountID {
-    odf::AccountID::new_generated_ed25519().1
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 pub fn make_resource_params(
-    account_id: odf::AccountID,
+    account: odf::AccountHandle,
     name: &str,
 ) -> ApplyResourceParams<TestResource> {
     ApplyResourceParams {
         id: None,
-        headers: BaseResourceServiceHarness::make_headers_input(account_id, name),
+        headers: BaseResourceServiceHarness::make_headers_input(account, name),
         spec: TestResourceSpec {
             value: name.to_string(),
         },
@@ -50,12 +44,12 @@ pub fn make_id() -> ResourceID {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn make_fresh_aggregate(
-    account_id: odf::AccountID,
+    account: odf::AccountHandle,
     name: &str,
 ) -> (ResourceID, crate::tests::utils::TestResource) {
     use crate::tests::utils::TestResourceSpec;
     let id = make_id();
-    let headers = BaseResourceServiceHarness::make_headers_input(account_id, name);
+    let headers = BaseResourceServiceHarness::make_headers_input(account, name);
     let spec = TestResourceSpec {
         value: name.to_string(),
     };
@@ -68,11 +62,13 @@ pub fn make_fresh_aggregate(
 pub type TestEvent = ReconcilableResourceEvent<TestResourceSpec, (), String>;
 
 pub fn make_created_event(id: ResourceID, name: &str, value: &str) -> TestEvent {
-    let account_id = make_account_id();
     TestEvent::Created(ResourceEventCreated {
         event_time: Utc::now(),
         id,
-        headers: BaseResourceServiceHarness::make_headers_input(account_id, name),
+        headers: BaseResourceServiceHarness::make_headers_input(
+            odf::AccountHandle::new_test("test"),
+            name,
+        ),
         spec: TestResourceSpec {
             value: value.to_string(),
         },

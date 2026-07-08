@@ -94,7 +94,7 @@ impl AccountAuthorizationHelper for AccountAuthorizationHelperImpl {
                 use kamu_auth_rebac::RebacServiceExt;
 
                 self.rebac_service
-                    .is_account_admin(&l.account_id)
+                    .is_account_admin(&l.account_handle.id)
                     .await
                     .int_err()
             }
@@ -107,12 +107,12 @@ impl AccountAuthorizationHelper for AccountAuthorizationHelperImpl {
     ) -> Result<bool, InternalError> {
         match self.current_account_subject.as_ref() {
             CurrentAccountSubject::Anonymous(_) => Ok(false),
-            CurrentAccountSubject::Logged(l) if l.account_name == *account_name => Ok(true),
+            CurrentAccountSubject::Logged(l) if l.account_handle.name == *account_name => Ok(true),
             CurrentAccountSubject::Logged(l) => {
                 use kamu_auth_rebac::RebacServiceExt;
 
                 self.rebac_service
-                    .is_account_admin(&l.account_id)
+                    .is_account_admin(&l.account_handle.id)
                     .await
                     .int_err()
             }

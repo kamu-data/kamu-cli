@@ -17,7 +17,7 @@ use kamu_resources_services::testing::BaseResourceServiceHarness;
 #[test_log::test(tokio::test)]
 async fn test_apply_secret_set_encrypts_literal_values() {
     let harness = BaseConfigurationServiceHarness::new();
-    let (_, account_id) = odf::AccountID::new_generated_ed25519();
+    let account_handle = odf::AccountHandle::new_test("test-owner");
 
     let spec = SecretSetSpec {
         secrets: [
@@ -40,7 +40,7 @@ async fn test_apply_secret_set_encrypts_literal_values() {
         .apply_secret_use_case()
         .apply(ApplyResourceParams {
             id: None,
-            headers: BaseResourceServiceHarness::make_headers_input(account_id, "test-secrets"),
+            headers: BaseResourceServiceHarness::make_headers_input(account_handle, "test-secrets"),
             spec,
         })
         .await
@@ -89,7 +89,7 @@ async fn test_apply_secret_set_encrypts_literal_values() {
 #[test_log::test(tokio::test)]
 async fn test_apply_secret_set_already_encrypted_passes_through_idempotently() {
     let harness = BaseConfigurationServiceHarness::new();
-    let (_, account_id) = odf::AccountID::new_generated_ed25519();
+    let account_handle = odf::AccountHandle::new_test("test-owner");
 
     // First apply with a Literal value to produce an encrypted snapshot
     let spec = SecretSetSpec {
@@ -106,7 +106,7 @@ async fn test_apply_secret_set_already_encrypted_passes_through_idempotently() {
         .apply(ApplyResourceParams {
             id: None,
             headers: BaseResourceServiceHarness::make_headers_input(
-                account_id.clone(),
+                account_handle.clone(),
                 "test-secrets",
             ),
             spec,
@@ -144,7 +144,7 @@ async fn test_apply_secret_set_already_encrypted_passes_through_idempotently() {
         .apply_secret_use_case()
         .apply(ApplyResourceParams {
             id: Some(id),
-            headers: BaseResourceServiceHarness::make_headers_input(account_id, "test-secrets"),
+            headers: BaseResourceServiceHarness::make_headers_input(account_handle, "test-secrets"),
             spec: encrypted_spec.clone(),
         })
         .await
@@ -190,7 +190,7 @@ async fn test_apply_secret_set_already_encrypted_passes_through_idempotently() {
 #[test_log::test(tokio::test)]
 async fn test_apply_secret_set_same_plaintext_is_untouched() {
     let harness = BaseConfigurationServiceHarness::new();
-    let (_, account_id) = odf::AccountID::new_generated_ed25519();
+    let account_handle = odf::AccountHandle::new_test("test-owner");
 
     let spec = SecretSetSpec {
         secrets: [(
@@ -206,7 +206,7 @@ async fn test_apply_secret_set_same_plaintext_is_untouched() {
         .apply(ApplyResourceParams {
             id: None,
             headers: BaseResourceServiceHarness::make_headers_input(
-                account_id.clone(),
+                account_handle.clone(),
                 "test-secrets",
             ),
             spec: spec.clone(),
@@ -235,7 +235,7 @@ async fn test_apply_secret_set_same_plaintext_is_untouched() {
         .apply_secret_use_case()
         .apply(ApplyResourceParams {
             id: Some(id),
-            headers: BaseResourceServiceHarness::make_headers_input(account_id, "test-secrets"),
+            headers: BaseResourceServiceHarness::make_headers_input(account_handle, "test-secrets"),
             spec,
         })
         .await

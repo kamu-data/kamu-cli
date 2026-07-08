@@ -149,12 +149,12 @@ impl AccountConfig {
     // TODO: Do not use the method outside of tests
     // #[cfg(any(feature = "testing", test))]
     pub fn test_config_from_subject(subject: LoggedAccount) -> Self {
-        let email = Email::parse(&format!("{}@example.com", subject.account_name)).unwrap();
-        let password = Self::generate_password(&subject.account_name);
+        let email = Email::parse(&format!("{}@example.com", subject.account_handle.name)).unwrap();
+        let password = Self::generate_password(&subject.account_handle.name);
 
         Self {
-            id: Some(subject.account_id),
-            account_name: subject.account_name,
+            id: Some(subject.account_handle.id),
+            account_name: subject.account_handle.name,
             password,
             email,
             display_name: None,

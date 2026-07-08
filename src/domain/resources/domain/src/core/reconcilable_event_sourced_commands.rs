@@ -13,6 +13,7 @@ use event_sourcing::{Projection, ProjectionError};
 use crate::{
     ReconcilableEventSourcedResource,
     ReconcilableResourceEvent,
+    ResourceHeadersExt,
     ResourceHeadersInput,
     ResourceHeadersValidationError,
     ResourceName,

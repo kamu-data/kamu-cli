@@ -47,7 +47,7 @@ impl Reconciler<VariableSetResource> for VariableSetReconcilerImpl {
         let now = self.time_source.now();
         let resource_id = *resource.id();
         let resource_generation = resource.headers().generation;
-        let account_id = &resource.headers().account;
+        let account_id = &resource.headers().account.id;
 
         let previous_entries_by_key = self
             .load_previous_entries_by_key(&resource_id, resource_generation)

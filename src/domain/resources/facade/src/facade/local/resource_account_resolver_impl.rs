@@ -13,9 +13,8 @@ use internal_error::ResultIntoInternal;
 use kamu_accounts::{AccountService, CurrentAccountSubject};
 use kamu_auth_rebac::{RebacService, RebacServiceExt};
 use kamu_resources::ResourceAccountRef;
-use odf::metadata::auth::AccountHandle;
 
-use crate::{ResolveManifestAccountError, ResolvedAccount, ResourceAccountResolver};
+use crate::{ResolveManifestAccountError, ResourceAccountResolver};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -34,7 +33,7 @@ impl ResourceAccountResolver for ResourceAccountResolverImpl {
     async fn resolve_target_account(
         &self,
         selector: Option<&ResourceAccountRef>,
-    ) -> Result<ResolvedAccount, ResolveManifestAccountError> {
+    ) -> Result<odf::AccountHandle, ResolveManifestAccountError> {
         let target_account = self.resolve_account(selector).await?;
         self.ensure_can_use_account_resources(&target_account)
             .await?;
@@ -48,7 +47,7 @@ impl ResourceAccountResolverImpl {
     async fn resolve_account(
         &self,
         selector: Option<&ResourceAccountRef>,
-    ) -> Result<ResolvedAccount, ResolveManifestAccountError> {
+    ) -> Result<odf::AccountHandle, ResolveManifestAccountError> {
         let Some(selector) = selector else {
             return self.resolve_current_subject_account();
         };
@@ -61,7 +60,7 @@ impl ResourceAccountResolverImpl {
                     .await
                     .map_err(ResolveManifestAccountError::from)?;
 
-                Ok(ResolvedAccount {
+                Ok(odf::AccountHandle {
                     id: account.id,
                     name: account.account_name,
                 })
@@ -73,12 +72,12 @@ impl ResourceAccountResolverImpl {
                     .await
                     .map_err(ResolveManifestAccountError::from)?;
 
-                Ok(ResolvedAccount {
+                Ok(odf::AccountHandle {
                     id: account.id,
                     name: account.account_name,
                 })
             }
-            ResourceAccountRef::Handle(AccountHandle { id, name }) => {
+            ResourceAccountRef::Handle(odf::AccountHandle { id, name }) => {
                 let account = self
                     .account_service
                     .get_account_by_id(id)
@@ -93,7 +92,7 @@ impl ResourceAccountResolverImpl {
                     });
                 }
 
-                Ok(ResolvedAccount {
+                Ok(odf::AccountHandle {
                     id: account.id,
                     name: account.account_name,
                 })
@@ -103,12 +102,9 @@ impl ResourceAccountResolverImpl {
 
     fn resolve_current_subject_account(
         &self,
-    ) -> Result<ResolvedAccount, ResolveManifestAccountError> {
+    ) -> Result<odf::AccountHandle, ResolveManifestAccountError> {
         match self.current_account_subject.as_ref() {
-            CurrentAccountSubject::Logged(account) => Ok(ResolvedAccount {
-                id: account.account_id.clone(),
-                name: account.account_name.clone(),
-            }),
+            CurrentAccountSubject::Logged(account) => Ok(account.account_handle.clone()),
             CurrentAccountSubject::Anonymous(_) => {
                 Err(ResolveManifestAccountError::AnonymousSubject)
             }
@@ -117,16 +113,18 @@ impl ResourceAccountResolverImpl {
 
     async fn ensure_can_use_account_resources(
         &self,
-        target_account: &ResolvedAccount,
+        target_account: &odf::AccountHandle,
     ) -> Result<(), ResolveManifestAccountError> {
         match self.current_account_subject.as_ref() {
-            CurrentAccountSubject::Logged(current) if current.account_id == target_account.id => {
+            CurrentAccountSubject::Logged(current)
+                if current.account_handle.id == target_account.id =>
+            {
                 Ok(())
             }
             CurrentAccountSubject::Logged(current) => {
                 let is_admin = self
                     .rebac_service
-                    .is_account_admin(&current.account_id)
+                    .is_account_admin(&current.account_handle.id)
                     .await
                     .int_err()?;
                 if is_admin {

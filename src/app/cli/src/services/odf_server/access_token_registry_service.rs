@@ -57,7 +57,7 @@ impl AccessTokenRegistryService {
 
     fn account_name(&self) -> &odf::AccountName {
         match self.current_account_subject.as_ref() {
-            CurrentAccountSubject::Logged(l) => &l.account_name,
+            CurrentAccountSubject::Logged(l) => &l.account_handle.name,
             CurrentAccountSubject::Anonymous(_) => panic!("Anonymous current account unexpected"),
         }
     }

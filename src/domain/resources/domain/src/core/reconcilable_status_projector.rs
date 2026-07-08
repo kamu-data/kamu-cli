@@ -14,6 +14,7 @@ use crate::{
     ReconcilableResourceEvent,
     ReconcilableStateModel,
     ResourceHeaders,
+    ResourceHeadersExt,
     ResourceState,
     ResourceStatusExt,
     new_pending_resource_status,
@@ -33,7 +34,7 @@ where
     match (state, event) {
         (None, E::Created(e)) => Ok(ResourceState::new(
             e.id,
-            ResourceHeaders::from_input(e.event_time, e.headers),
+            ResourceHeaders::from_input(e.event_time, e.id, e.headers),
             e.spec,
             new_pending_resource_status(),
         )

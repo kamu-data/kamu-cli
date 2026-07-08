@@ -397,7 +397,8 @@ and `ResourceStatus` ([`state/resource_status.rs`](/src/domain/resources/domain/
 
 ```rust
 pub struct ResourceHeaders {
-    pub account: odf::AccountID,             // resolved from manifest account / caller
+    pub id: ResourceID,                      // generated — stable identity, assigned once
+    pub account: auth::AccountHandle,        // resolved id+name of the owning account
     pub name: ResourceName,                  // (authored)
     pub description: Option<String>,         // (authored)
     pub labels: ResourceLabels,              // (authored) BTreeMap<TypeRef, serde_json::Value>
@@ -415,6 +416,36 @@ pub struct ResourceStatus {                  // ODF-generated; entirely server-o
     pub conditions: Option<ResourceConditions>,
 }
 ```
+
+> **`ResourceHeaders`/`ResourceHeadersInput`** are `pub type` aliases of ODF's generated
+> `resource::ResourceHeaders`/`resource::ResourceHeadersInput` — the same "adopt the codegen type
+> directly" pattern as `ResourcePhase`/`ResourceConditions`/labels above, closing the last hand-rolled
+> value in this area. Two consequences follow from adopting the generated shape verbatim:
+> - **`account` is a mandatory `auth::AccountHandle` (id *and* name), not a bare `AccountID`.**
+>   Because the `resources` table only stores `account_id`, repositories resolve the name on every
+>   read — Postgres/SQLite via a `JOIN accounts`, the in-memory backend via an injected
+>   `AccountRepository` lookup (batched with `get_accounts_by_ids` for multi-row reads, so there is no
+>   N+1). The name is **never denormalized/persisted** — only `account_id` is written. This means an
+>   account rename is reflected immediately on the next read with no backfill; it's covered by
+>   [`test_account_rename_reflected_immediately_in_headers`](/src/infra/resources/repo-tests/src/resource_repository_test_suite.rs).
+>   If a resource's owning account can no longer be found (e.g. an account deletion racing ahead of
+>   async resource cleanup), repos substitute the sentinel name `deleted-account`
+>   (`DELETED_ACCOUNT_NAME_SENTINEL` in
+>   [`values/resource_headers.rs`](/src/domain/resources/domain/src/values/resource_headers.rs))
+>   rather than failing the read.
+> - **`id: ResourceID` now lives inline on `ResourceHeaders` itself** (the old hand-rolled struct had
+>   no `id` field; the resource's identity was tracked elsewhere). Construction sites building headers
+>   from an input (`ResourceHeadersExt::from_input`/`simple`) take `id` as an explicit parameter.
+>
+> **Precondition, not resolution, at the use-case boundary.** `ResourceHeadersInput.account` is
+> `Option<auth::AccountRef>` (an id/name/handle selector), but by the time headers reach
+> `ApplyResourceUseCase::plan`/`apply` it must already be a resolved `Some(AccountRef::Handle(_))` —
+> resolving an id/name selector is the caller's responsibility, via the facade's
+> `ResourceAccountResolver` (which also performs the authorization check) or by threading an
+> already-known handle (e.g. `DatasetEnvVarMutationAdapterImpl` builds one directly from
+> `DatasetEntry.owner_id`/`owner_name`, which it already has in hand). The use case enforces this
+> defensively rather than silently trusting it or re-resolving itself, since the event-sourced
+> projector downstream is pure/sync and cannot resolve accounts.
 
 > **`ResourcePhase`** is a `pub type ResourcePhase = odf::metadata::resource::ResourcePhase;` alias —
 > the same "adopt the codegen type directly" pattern as `ResourceID`/`TypeUri`/`ResourceAccountRef`

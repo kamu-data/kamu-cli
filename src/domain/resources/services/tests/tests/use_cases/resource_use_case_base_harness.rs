@@ -177,18 +177,22 @@ impl ResourceUseCaseBaseHarness {
 
     pub async fn apply_and_assert_snapshot(
         &self,
-        account_id: odf::AccountID,
+        account_handle: &odf::AccountHandle,
         name: &str,
     ) -> (ResourceID, kamu_resources::ResourceSnapshot) {
-        let id = self.apply_and_get_id(account_id, name).await;
+        let id = self.apply_and_get_id(account_handle, name).await;
         let snapshot = self.get_snapshot_by_id(&id).await.unwrap();
         (id, snapshot)
     }
 
-    pub async fn apply_and_get_id(&self, account_id: odf::AccountID, name: &str) -> ResourceID {
+    pub async fn apply_and_get_id(
+        &self,
+        account_handle: &odf::AccountHandle,
+        name: &str,
+    ) -> ResourceID {
         let params = ApplyResourceParams {
             id: None,
-            headers: BaseResourceServiceHarness::make_headers_input(account_id, name),
+            headers: BaseResourceServiceHarness::make_headers_input(account_handle.clone(), name),
             spec: TestResourceSpec {
                 value: name.to_string(),
             },

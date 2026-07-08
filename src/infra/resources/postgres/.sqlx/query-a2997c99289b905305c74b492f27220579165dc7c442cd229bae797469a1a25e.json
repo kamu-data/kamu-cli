@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                resource_id as \"id: uuid::Uuid\",\n                account_id as \"account_id: odf::AccountID\",\n                resource_schema,\n                resource_name,\n                description,\n                labels,\n                annotations,\n                spec,\n                status,\n                generation,\n                created_at,\n                updated_at,\n                deleted_at,\n                last_event_id\n            FROM resources\n            WHERE resource_id = $1\n              AND deleted_at IS NULL\n            ",
+  "query": "\n            SELECT\n                r.resource_id as \"id: uuid::Uuid\",\n                r.account_id as \"account_id: odf::AccountID\",\n                COALESCE(a.account_name, $3) as \"account_name!\",\n                r.resource_schema,\n                r.resource_name,\n                r.description,\n                r.labels,\n                r.annotations,\n                r.spec,\n                r.status,\n                r.generation,\n                r.created_at,\n                r.updated_at,\n                r.deleted_at,\n                r.last_event_id\n            FROM resources r\n            LEFT JOIN accounts a ON a.id = r.account_id\n            WHERE r.account_id = $1\n              AND r.resource_id = ANY($2)\n              AND r.deleted_at IS NULL\n            ",
   "describe": {
     "columns": [
       {
@@ -15,73 +15,81 @@
       },
       {
         "ordinal": 2,
+        "name": "account_name!",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
         "name": "resource_schema",
         "type_info": "Text"
       },
       {
-        "ordinal": 3,
+        "ordinal": 4,
         "name": "resource_name",
         "type_info": "Varchar"
       },
       {
-        "ordinal": 4,
+        "ordinal": 5,
         "name": "description",
         "type_info": "Text"
       },
       {
-        "ordinal": 5,
+        "ordinal": 6,
         "name": "labels",
         "type_info": "Jsonb"
       },
       {
-        "ordinal": 6,
+        "ordinal": 7,
         "name": "annotations",
         "type_info": "Jsonb"
       },
       {
-        "ordinal": 7,
+        "ordinal": 8,
         "name": "spec",
         "type_info": "Jsonb"
       },
       {
-        "ordinal": 8,
+        "ordinal": 9,
         "name": "status",
         "type_info": "Jsonb"
       },
       {
-        "ordinal": 9,
+        "ordinal": 10,
         "name": "generation",
         "type_info": "Int8"
       },
       {
-        "ordinal": 10,
+        "ordinal": 11,
         "name": "created_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 11,
+        "ordinal": 12,
         "name": "updated_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 12,
+        "ordinal": 13,
         "name": "deleted_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 13,
+        "ordinal": 14,
         "name": "last_event_id",
         "type_info": "Int8"
       }
     ],
     "parameters": {
       "Left": [
-        "Uuid"
+        "Text",
+        "UuidArray",
+        "Varchar"
       ]
     },
     "nullable": [
       false,
       false,
+      null,
       false,
       false,
       true,
@@ -96,5 +104,5 @@
       true
     ]
   },
-  "hash": "f1698036f207d13c5ea0e102a57df6fd2ebff3e83e4907ecc3609fd7ad0c869d"
+  "hash": "a2997c99289b905305c74b492f27220579165dc7c442cd229bae797469a1a25e"
 }

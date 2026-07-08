@@ -23,16 +23,18 @@ doctest = false
 
 [features]
 default = []
-testing = ["dep:kamu-resources-inmem", "dep:kamu-messaging-outbox-inmem"]
+testing = ["dep:kamu-resources-inmem", "dep:kamu-accounts-inmem", "dep:kamu-messaging-outbox-inmem"]
 
 
 [dependencies]
 database-common = { workspace = true }
+email-utils = { workspace = true }
 event-sourcing = { workspace = true }
 internal-error = { workspace = true }
 messaging-outbox = { workspace = true }
 time-source = { workspace = true }
 kamu-accounts = { workspace = true }
+kamu-accounts-inmem = { workspace = true, optional = true }
 kamu-resources = { workspace = true }
 kamu-resources-inmem = { workspace = true, optional = true }
 kamu-messaging-outbox-inmem = { workspace = true, optional = true }
@@ -54,6 +56,7 @@ paste = { version = "1", default-features = false }
 [dev-dependencies]
 kamu-resources-services       = { workspace = true, features = ["testing"] }
 kamu-resources-inmem          = { workspace = true }
+kamu-accounts-inmem           = { workspace = true }
 kamu-messaging-outbox-inmem   = { workspace = true }
 database-common               = { workspace = true }
 database-common-macros        = { workspace = true }

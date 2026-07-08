@@ -14,9 +14,11 @@ use database_common::PaginationOpts;
 use dill::Catalog;
 use event_sourcing::EventID;
 use futures::TryStreamExt;
+use kamu_accounts::{Account, AccountRepository, AccountType};
 use kamu_resources::{
     CreateResourceError,
     ResourceHeaders,
+    ResourceHeadersExt,
     ResourceID,
     ResourcePhase,
     ResourcePhaseCounts,
@@ -42,14 +44,16 @@ static KIND_C: LazyLock<TypeUri> = LazyLock::new(|| TypeUri::new_unchecked("Kind
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn make_test_snapshot(
-    account_id: odf::AccountID,
+    account: &odf::AccountHandle,
     schema: &TypeUri,
     name: &str,
 ) -> ResourceSnapshot {
+    let id = ResourceID::new(uuid::Uuid::new_v4());
+
     ResourceSnapshot {
-        id: ResourceID::new(uuid::Uuid::new_v4()),
+        id,
         schema: schema.clone(),
-        headers: ResourceHeaders::simple(Utc::now(), account_id, name),
+        headers: ResourceHeaders::simple(Utc::now(), id, account.clone(), name),
         spec: serde_json::json!({"key": "value"}),
         status: None,
         last_event_id: None,
@@ -66,7 +70,9 @@ fn status_with_phase(phase: ResourcePhase) -> kamu_resources::ResourceStatus {
 
 pub async fn test_no_resources_initially(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
-    let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
+
+    let account_name = odf::AccountName::new_unchecked("test-account");
+    let account_id = odf::AccountID::new_seeded_ed25519(account_name.as_bytes());
 
     let count = repo
         .count_resources(account_id.clone(), &TEST_KIND)
@@ -97,9 +103,10 @@ pub async fn test_no_resources_initially(catalog: &Catalog) {
 
 pub async fn test_create_and_find_resource(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
-    let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
 
-    let mut snapshot = make_test_snapshot(account_id.clone(), &TEST_KIND, "my-resource");
+    let account_handle = odf::AccountHandle::new_test("test-account");
+
+    let mut snapshot = make_test_snapshot(&account_handle, &TEST_KIND, "my-resource");
     snapshot.id = repo.new_resource_id().await.unwrap();
     let id = snapshot.id;
 
@@ -116,7 +123,11 @@ pub async fn test_create_and_find_resource(catalog: &Catalog) {
 
     // find by name
     let found_id = repo
-        .find_resource_id_by_name(&account_id, &TEST_KIND, &"my-resource".parse().unwrap())
+        .find_resource_id_by_name(
+            &account_handle.id,
+            &TEST_KIND,
+            &"my-resource".parse().unwrap(),
+        )
         .await
         .unwrap();
     assert_eq!(found_id, Some(id));
@@ -147,9 +158,10 @@ pub async fn test_create_and_find_resource(catalog: &Catalog) {
 
 pub async fn test_create_find_update_resource_with_populated_labels_annotations(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
-    let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
 
-    let mut snapshot = make_test_snapshot(account_id.clone(), &TEST_KIND, "labeled-resource");
+    let account_handle = odf::AccountHandle::new_test("test-account");
+
+    let mut snapshot = make_test_snapshot(&account_handle, &TEST_KIND, "labeled-resource");
     snapshot.id = repo.new_resource_id().await.unwrap();
     let id = snapshot.id;
 
@@ -224,14 +236,15 @@ pub async fn test_create_find_update_resource_with_populated_labels_annotations(
 
 pub async fn test_find_resource_snapshots_by_ids(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
-    let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
-    let other_account_id = odf::AccountID::new_seeded_ed25519(b"other-account");
 
-    let mut first = make_test_snapshot(account_id.clone(), &TEST_KIND, "first");
+    let account_handle = odf::AccountHandle::new_test("test-account");
+    let other_account_handle = odf::AccountHandle::new_test("other-account");
+
+    let mut first = make_test_snapshot(&account_handle, &TEST_KIND, "first");
     first.id = repo.new_resource_id().await.unwrap();
-    let mut second = make_test_snapshot(account_id.clone(), &OTHER_KIND, "second");
+    let mut second = make_test_snapshot(&account_handle, &OTHER_KIND, "second");
     second.id = repo.new_resource_id().await.unwrap();
-    let mut other_account = make_test_snapshot(other_account_id, &TEST_KIND, "other-account");
+    let mut other_account = make_test_snapshot(&other_account_handle, &TEST_KIND, "other-account");
     other_account.id = repo.new_resource_id().await.unwrap();
     let missing_id = repo.new_resource_id().await.unwrap();
 
@@ -241,7 +254,7 @@ pub async fn test_find_resource_snapshots_by_ids(catalog: &Catalog) {
 
     let found = repo
         .find_resource_snapshots_by_ids(
-            &account_id,
+            &account_handle.id,
             &[second.id, missing_id, first.id, other_account.id],
         )
         .await
@@ -258,14 +271,15 @@ pub async fn test_find_resource_snapshots_by_ids(catalog: &Catalog) {
 
 pub async fn test_find_resource_snapshots_by_schema_and_ids(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
-    let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
-    let other_account_id = odf::AccountID::new_seeded_ed25519(b"other-account");
 
-    let mut first = make_test_snapshot(account_id.clone(), &TEST_KIND, "first");
+    let account_handle = odf::AccountHandle::new_test("test-account");
+    let other_account_handle = odf::AccountHandle::new_test("other-account");
+
+    let mut first = make_test_snapshot(&account_handle, &TEST_KIND, "first");
     first.id = repo.new_resource_id().await.unwrap();
-    let mut second = make_test_snapshot(account_id.clone(), &OTHER_KIND, "second");
+    let mut second = make_test_snapshot(&account_handle, &OTHER_KIND, "second");
     second.id = repo.new_resource_id().await.unwrap();
-    let mut third = make_test_snapshot(other_account_id, &TEST_KIND, "third");
+    let mut third = make_test_snapshot(&other_account_handle, &TEST_KIND, "third");
     third.id = repo.new_resource_id().await.unwrap();
     let missing_id = repo.new_resource_id().await.unwrap();
 
@@ -292,14 +306,16 @@ pub async fn test_find_resource_snapshots_by_schema_and_ids(catalog: &Catalog) {
 
 pub async fn test_search_resource_identities(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
-    let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
-    seed_search_resource_identities(repo.as_ref(), &account_id).await;
+
+    let account_handle = odf::AccountHandle::new_test("test-account");
+
+    seed_search_resource_identities(repo.as_ref(), &account_handle).await;
 
     // --- name_pattern: prefix wildcard matches only TestKind items for this
     // account ---
     let rows = repo
         .search_resource_identities(
-            &account_id,
+            &account_handle.id,
             std::slice::from_ref(&TEST_KIND),
             None,
             Some("app-%"),
@@ -313,7 +329,7 @@ pub async fn test_search_resource_identities(catalog: &Catalog) {
     // --- name_pattern is case-insensitive ---
     let rows = repo
         .search_resource_identities(
-            &account_id,
+            &account_handle.id,
             std::slice::from_ref(&TEST_KIND),
             None,
             Some("APP-%"),
@@ -327,7 +343,7 @@ pub async fn test_search_resource_identities(catalog: &Catalog) {
     // --- exact_names filter ---
     let rows = repo
         .search_resource_identities(
-            &account_id,
+            &account_handle.id,
             std::slice::from_ref(&TEST_KIND),
             Some(&["app-alpha".parse().unwrap(), "db-alpha".parse().unwrap()]),
             None,
@@ -342,7 +358,7 @@ pub async fn test_search_resource_identities(catalog: &Catalog) {
     // --- exact_names filter is case-insensitive ---
     let rows = repo
         .search_resource_identities(
-            &account_id,
+            &account_handle.id,
             std::slice::from_ref(&TEST_KIND),
             Some(&["App-Alpha".parse().unwrap(), "DB-ALPHA".parse().unwrap()]),
             None,
@@ -357,7 +373,7 @@ pub async fn test_search_resource_identities(catalog: &Catalog) {
     // --- multi-kind search ---
     let rows = repo
         .search_resource_identities(
-            &account_id,
+            &account_handle.id,
             &[TEST_KIND.clone(), OTHER_KIND.clone()],
             None,
             Some("app-%"),
@@ -375,7 +391,7 @@ pub async fn test_search_resource_identities(catalog: &Catalog) {
     // --- no name_pattern and no exact_names returns all for the kind ---
     let rows = repo
         .search_resource_identities(
-            &account_id,
+            &account_handle.id,
             std::slice::from_ref(&TEST_KIND),
             None,
             None,
@@ -388,7 +404,7 @@ pub async fn test_search_resource_identities(catalog: &Catalog) {
     // --- other account's resources are never returned ---
     let rows = repo
         .search_resource_identities(
-            &account_id,
+            &account_handle.id,
             std::slice::from_ref(&TEST_KIND),
             None,
             Some("app-other-%"),
@@ -403,13 +419,14 @@ pub async fn test_search_resource_identities(catalog: &Catalog) {
 
 pub async fn test_count_search_resource_identities(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
-    let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
 
-    seed_search_resource_identities(repo.as_ref(), &account_id).await;
+    let account_handle = odf::AccountHandle::new_test("test-account");
+
+    seed_search_resource_identities(repo.as_ref(), &account_handle).await;
 
     let count = repo
         .count_search_resource_identities(
-            &account_id,
+            &account_handle.id,
             std::slice::from_ref(&TEST_KIND),
             None,
             Some("app-%"),
@@ -420,7 +437,7 @@ pub async fn test_count_search_resource_identities(catalog: &Catalog) {
 
     let count = repo
         .count_search_resource_identities(
-            &account_id,
+            &account_handle.id,
             std::slice::from_ref(&TEST_KIND),
             Some(&["App-Alpha".parse().unwrap(), "DB-ALPHA".parse().unwrap()]),
             None,
@@ -431,7 +448,7 @@ pub async fn test_count_search_resource_identities(catalog: &Catalog) {
 
     let count = repo
         .count_search_resource_identities(
-            &account_id,
+            &account_handle.id,
             &[TEST_KIND.clone(), OTHER_KIND.clone()],
             None,
             Some("app-%"),
@@ -442,7 +459,7 @@ pub async fn test_count_search_resource_identities(catalog: &Catalog) {
 
     let count = repo
         .count_search_resource_identities(
-            &account_id,
+            &account_handle.id,
             std::slice::from_ref(&TEST_KIND),
             None,
             Some("app-other-%"),
@@ -453,7 +470,7 @@ pub async fn test_count_search_resource_identities(catalog: &Catalog) {
 
     let count = repo
         .count_search_resource_identities(
-            &account_id,
+            &account_handle.id,
             std::slice::from_ref(&TEST_KIND),
             Some(&[]),
             None,
@@ -467,27 +484,36 @@ pub async fn test_count_search_resource_identities(catalog: &Catalog) {
 
 pub async fn test_resource_name_case_insensitive(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
-    let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
+
+    let account_handle = odf::AccountHandle::new_test("test-account");
 
     // Stored names are always lowercase (as produced by try_new).
-    let mut alpha = make_test_snapshot(account_id.clone(), &TEST_KIND, "my-resource");
+    let mut alpha = make_test_snapshot(&account_handle, &TEST_KIND, "my-resource");
     alpha.id = repo.new_resource_id().await.unwrap();
     let id = alpha.id;
     repo.create_resource(&alpha).await.unwrap();
 
-    let mut beta = make_test_snapshot(account_id.clone(), &TEST_KIND, "other-resource");
+    let mut beta = make_test_snapshot(&account_handle, &TEST_KIND, "other-resource");
     beta.id = repo.new_resource_id().await.unwrap();
     repo.create_resource(&beta).await.unwrap();
 
     // --- find_resource_id_by_name is case-insensitive ---
     let found = repo
-        .find_resource_id_by_name(&account_id, &TEST_KIND, &"My-Resource".parse().unwrap())
+        .find_resource_id_by_name(
+            &account_handle.id,
+            &TEST_KIND,
+            &"My-Resource".parse().unwrap(),
+        )
         .await
         .unwrap();
     assert_eq!(found, Some(id));
 
     let found = repo
-        .find_resource_id_by_name(&account_id, &TEST_KIND, &"MY-RESOURCE".parse().unwrap())
+        .find_resource_id_by_name(
+            &account_handle.id,
+            &TEST_KIND,
+            &"MY-RESOURCE".parse().unwrap(),
+        )
         .await
         .unwrap();
     assert_eq!(found, Some(id));
@@ -495,7 +521,7 @@ pub async fn test_resource_name_case_insensitive(catalog: &Catalog) {
     // --- find_resource_identities_by_names is case-insensitive ---
     let rows = repo
         .find_resource_identities_by_names(
-            &account_id,
+            &account_handle.id,
             &TEST_KIND,
             &[
                 "My-Resource".parse().unwrap(),
@@ -511,7 +537,7 @@ pub async fn test_resource_name_case_insensitive(catalog: &Catalog) {
     // --- search_resource_identities exact_names is case-insensitive ---
     let rows = repo
         .search_resource_identities(
-            &account_id,
+            &account_handle.id,
             std::slice::from_ref(&TEST_KIND),
             Some(&["MY-RESOURCE".parse().unwrap()]),
             None,
@@ -525,7 +551,7 @@ pub async fn test_resource_name_case_insensitive(catalog: &Catalog) {
     // --- name_pattern search is case-insensitive ---
     let rows = repo
         .search_resource_identities(
-            &account_id,
+            &account_handle.id,
             std::slice::from_ref(&TEST_KIND),
             None,
             Some("MY-%"),
@@ -541,19 +567,19 @@ pub async fn test_resource_name_case_insensitive(catalog: &Catalog) {
 
 async fn seed_search_resource_identities(
     repo: &dyn ResourceRepository,
-    account_id: &odf::AccountID,
+    account_handle: &odf::AccountHandle,
 ) {
-    let other_account_id = odf::AccountID::new_seeded_ed25519(b"other-account");
+    let other_account_handle = odf::AccountHandle::new_test("other-account");
 
     for (kind, name, account) in [
-        (&*TEST_KIND, "app-alpha", account_id.clone()),
-        (&*TEST_KIND, "app-beta", account_id.clone()),
-        (&*TEST_KIND, "db-alpha", account_id.clone()),
-        (&*OTHER_KIND, "app-gamma", account_id.clone()),
-        (&*OTHER_KIND, "app-delta", account_id.clone()),
-        (&*TEST_KIND, "app-other-account", other_account_id),
+        (&*TEST_KIND, "app-alpha", account_handle.clone()),
+        (&*TEST_KIND, "app-beta", account_handle.clone()),
+        (&*TEST_KIND, "db-alpha", account_handle.clone()),
+        (&*OTHER_KIND, "app-gamma", account_handle.clone()),
+        (&*OTHER_KIND, "app-delta", account_handle.clone()),
+        (&*TEST_KIND, "app-other-account", other_account_handle),
     ] {
-        let mut snapshot = make_test_snapshot(account, kind, name);
+        let mut snapshot = make_test_snapshot(&account, kind, name);
         snapshot.id = repo.new_resource_id().await.unwrap();
         repo.create_resource(&snapshot).await.unwrap();
     }
@@ -563,14 +589,15 @@ async fn seed_search_resource_identities(
 
 pub async fn test_create_resource_duplicate_fails(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
-    let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
 
-    let mut first = make_test_snapshot(account_id.clone(), &TEST_KIND, "duplicate-resource");
+    let account_handle = odf::AccountHandle::new_test("test-account");
+
+    let mut first = make_test_snapshot(&account_handle, &TEST_KIND, "duplicate-resource");
     first.id = repo.new_resource_id().await.unwrap();
     repo.create_resource(&first).await.unwrap();
 
     // Same name - should be considered duplicate
-    let mut second = make_test_snapshot(account_id.clone(), &TEST_KIND, "duplicate-resource");
+    let mut second = make_test_snapshot(&account_handle, &TEST_KIND, "duplicate-resource");
     second.id = repo.new_resource_id().await.unwrap();
 
     let result = repo.create_resource(&second).await;
@@ -581,14 +608,15 @@ pub async fn test_create_resource_duplicate_fails(catalog: &Catalog) {
 
 pub async fn test_create_resource_duplicate_ignore_case_fails(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
-    let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
 
-    let mut first = make_test_snapshot(account_id.clone(), &TEST_KIND, "duplicate-resource");
+    let account_handle = odf::AccountHandle::new_test("test-account");
+
+    let mut first = make_test_snapshot(&account_handle, &TEST_KIND, "duplicate-resource");
     first.id = repo.new_resource_id().await.unwrap();
     repo.create_resource(&first).await.unwrap();
 
     // Same name but different case - should still be considered duplicate
-    let mut second = make_test_snapshot(account_id, &TEST_KIND, "Duplicate-Resource");
+    let mut second = make_test_snapshot(&account_handle, &TEST_KIND, "Duplicate-Resource");
     second.id = repo.new_resource_id().await.unwrap();
 
     let result = repo.create_resource(&second).await;
@@ -599,9 +627,10 @@ pub async fn test_create_resource_duplicate_ignore_case_fails(catalog: &Catalog)
 
 pub async fn test_update_resource(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
-    let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
 
-    let mut snapshot = make_test_snapshot(account_id.clone(), &TEST_KIND, "update-me");
+    let account_handle = odf::AccountHandle::new_test("test-account");
+
+    let mut snapshot = make_test_snapshot(&account_handle, &TEST_KIND, "update-me");
     snapshot.id = repo.new_resource_id().await.unwrap();
     let id = snapshot.id;
     repo.create_resource(&snapshot).await.unwrap();
@@ -637,9 +666,10 @@ pub async fn test_update_resource(catalog: &Catalog) {
 
 pub async fn test_update_resource_wrong_event_id_fails(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
-    let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
 
-    let mut snapshot = make_test_snapshot(account_id, &TEST_KIND, "concurrent-resource");
+    let account_handle = odf::AccountHandle::new_test("test-account");
+
+    let mut snapshot = make_test_snapshot(&account_handle, &TEST_KIND, "concurrent-resource");
     snapshot.id = repo.new_resource_id().await.unwrap();
     repo.create_resource(&snapshot).await.unwrap();
 
@@ -657,9 +687,10 @@ pub async fn test_update_resource_wrong_event_id_fails(catalog: &Catalog) {
 
 pub async fn test_update_resource_optimistic_locking(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
-    let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
 
-    let mut snapshot = make_test_snapshot(account_id, &TEST_KIND, "locked-resource");
+    let account_handle = odf::AccountHandle::new_test("test-account");
+
+    let mut snapshot = make_test_snapshot(&account_handle, &TEST_KIND, "locked-resource");
     snapshot.id = repo.new_resource_id().await.unwrap();
     repo.create_resource(&snapshot).await.unwrap();
 
@@ -699,11 +730,12 @@ pub async fn test_update_resource_optimistic_locking(catalog: &Catalog) {
 
 pub async fn test_update_resources(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
-    let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
 
-    let mut first = make_test_snapshot(account_id.clone(), &TEST_KIND, "bulk-first");
+    let account_handle = odf::AccountHandle::new_test("test-account");
+
+    let mut first = make_test_snapshot(&account_handle, &TEST_KIND, "bulk-first");
     first.id = repo.new_resource_id().await.unwrap();
-    let mut second = make_test_snapshot(account_id, &TEST_KIND, "bulk-second");
+    let mut second = make_test_snapshot(&account_handle, &TEST_KIND, "bulk-second");
     second.id = repo.new_resource_id().await.unwrap();
 
     repo.create_resource(&first).await.unwrap();
@@ -776,11 +808,12 @@ pub async fn test_update_resources(catalog: &Catalog) {
 
 pub async fn test_update_resources_wrong_event_id_fails(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
-    let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
 
-    let mut first = make_test_snapshot(account_id.clone(), &TEST_KIND, "bulk-concurrent-first");
+    let account_handle = odf::AccountHandle::new_test("test-account");
+
+    let mut first = make_test_snapshot(&account_handle, &TEST_KIND, "bulk-concurrent-first");
     first.id = repo.new_resource_id().await.unwrap();
-    let mut second = make_test_snapshot(account_id, &TEST_KIND, "bulk-concurrent-second");
+    let mut second = make_test_snapshot(&account_handle, &TEST_KIND, "bulk-concurrent-second");
     second.id = repo.new_resource_id().await.unwrap();
 
     repo.create_resource(&first).await.unwrap();
@@ -842,18 +875,19 @@ pub async fn test_update_resources_wrong_event_id_fails(catalog: &Catalog) {
 
 pub async fn test_list_resource_ids_with_pagination(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
-    let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
+
+    let account_handle = odf::AccountHandle::new_test("test-account");
 
     for i in 1..=5_u32 {
         let mut snapshot =
-            make_test_snapshot(account_id.clone(), &TEST_KIND, &format!("resource-{i}"));
+            make_test_snapshot(&account_handle, &TEST_KIND, &format!("resource-{i}"));
         snapshot.id = repo.new_resource_id().await.unwrap();
         repo.create_resource(&snapshot).await.unwrap();
     }
 
     let first_page: Vec<_> = repo
         .list_resource_ids(
-            account_id.clone(),
+            account_handle.id.clone(),
             &TEST_KIND,
             PaginationOpts::from_max_results(3),
         )
@@ -864,7 +898,7 @@ pub async fn test_list_resource_ids_with_pagination(catalog: &Catalog) {
 
     let second_page: Vec<_> = repo
         .list_resource_ids(
-            account_id.clone(),
+            account_handle.id.clone(),
             &TEST_KIND,
             PaginationOpts::from_page(1, 3),
         )
@@ -886,24 +920,23 @@ pub async fn test_list_resource_ids_with_pagination(catalog: &Catalog) {
 
 pub async fn test_list_resource_snapshots_by_schema(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
-    let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
+
+    let account_handle = odf::AccountHandle::new_test("test-account");
 
     for i in 1..=3_u32 {
-        let mut snapshot =
-            make_test_snapshot(account_id.clone(), &KIND_A, &format!("resource-a-{i}"));
+        let mut snapshot = make_test_snapshot(&account_handle, &KIND_A, &format!("resource-a-{i}"));
         snapshot.id = repo.new_resource_id().await.unwrap();
         repo.create_resource(&snapshot).await.unwrap();
     }
     for i in 1..=2_u32 {
-        let mut snapshot =
-            make_test_snapshot(account_id.clone(), &KIND_B, &format!("resource-b-{i}"));
+        let mut snapshot = make_test_snapshot(&account_handle, &KIND_B, &format!("resource-b-{i}"));
         snapshot.id = repo.new_resource_id().await.unwrap();
         repo.create_resource(&snapshot).await.unwrap();
     }
 
     let kind_a: Vec<_> = repo
         .list_resource_snapshots_by_schema(
-            account_id.clone(),
+            account_handle.id.clone(),
             &KIND_A,
             PaginationOpts::from_max_results(100),
         )
@@ -915,7 +948,7 @@ pub async fn test_list_resource_snapshots_by_schema(catalog: &Catalog) {
 
     let kind_b: Vec<_> = repo
         .list_resource_snapshots_by_schema(
-            account_id.clone(),
+            account_handle.id.clone(),
             &KIND_B,
             PaginationOpts::from_max_results(100),
         )
@@ -927,7 +960,7 @@ pub async fn test_list_resource_snapshots_by_schema(catalog: &Catalog) {
 
     let kind_c: Vec<_> = repo
         .list_resource_snapshots_by_schema(
-            account_id,
+            account_handle.id,
             &KIND_C,
             PaginationOpts::from_max_results(100),
         )
@@ -941,29 +974,28 @@ pub async fn test_list_resource_snapshots_by_schema(catalog: &Catalog) {
 
 pub async fn test_list_all_resource_snapshots(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
-    let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
-    let other_account_id = odf::AccountID::new_seeded_ed25519(b"other-account");
+
+    let account_handle = odf::AccountHandle::new_test("test-account");
+    let other_account_handle = odf::AccountHandle::new_test("other-account");
 
     for i in 1..=2_u32 {
-        let mut snapshot =
-            make_test_snapshot(account_id.clone(), &KIND_A, &format!("resource-a-{i}"));
+        let mut snapshot = make_test_snapshot(&account_handle, &KIND_A, &format!("resource-a-{i}"));
         snapshot.id = repo.new_resource_id().await.unwrap();
         repo.create_resource(&snapshot).await.unwrap();
     }
     for i in 1..=2_u32 {
-        let mut snapshot =
-            make_test_snapshot(account_id.clone(), &KIND_B, &format!("resource-b-{i}"));
+        let mut snapshot = make_test_snapshot(&account_handle, &KIND_B, &format!("resource-b-{i}"));
         snapshot.id = repo.new_resource_id().await.unwrap();
         repo.create_resource(&snapshot).await.unwrap();
     }
 
     // Resources for a different account — must not appear in results
-    let mut other = make_test_snapshot(other_account_id, &KIND_A, "other-resource");
+    let mut other = make_test_snapshot(&other_account_handle, &KIND_A, "other-resource");
     other.id = repo.new_resource_id().await.unwrap();
     repo.create_resource(&other).await.unwrap();
 
     let all: Vec<_> = repo
-        .list_all_resource_snapshots(account_id, PaginationOpts::from_max_results(100))
+        .list_all_resource_snapshots(account_handle.id, PaginationOpts::from_max_results(100))
         .try_collect()
         .await
         .unwrap();
@@ -974,22 +1006,26 @@ pub async fn test_list_all_resource_snapshots(catalog: &Catalog) {
 
 pub async fn test_count_resources(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
-    let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
+
+    let account_handle = odf::AccountHandle::new_test("test-account");
 
     for i in 1..=3_u32 {
         let mut snapshot =
-            make_test_snapshot(account_id.clone(), &TEST_KIND, &format!("resource-{i}"));
+            make_test_snapshot(&account_handle, &TEST_KIND, &format!("resource-{i}"));
         snapshot.id = repo.new_resource_id().await.unwrap();
         repo.create_resource(&snapshot).await.unwrap();
     }
 
     let count = repo
-        .count_resources(account_id.clone(), &TEST_KIND)
+        .count_resources(account_handle.id.clone(), &TEST_KIND)
         .await
         .unwrap();
     assert_eq!(3, count);
 
-    let count_other = repo.count_resources(account_id, &OTHER_KIND).await.unwrap();
+    let count_other = repo
+        .count_resources(account_handle.id, &OTHER_KIND)
+        .await
+        .unwrap();
     assert_eq!(0, count_other);
 }
 
@@ -997,36 +1033,37 @@ pub async fn test_count_resources(catalog: &Catalog) {
 
 pub async fn test_summarize_resources(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
-    let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
-    let other_account_id = odf::AccountID::new_seeded_ed25519(b"other-account");
 
-    let mut pending = make_test_snapshot(account_id.clone(), &KIND_A, "pending");
+    let account_handle = odf::AccountHandle::new_test("test-account");
+    let other_account_handle = odf::AccountHandle::new_test("other-account");
+
+    let mut pending = make_test_snapshot(&account_handle, &KIND_A, "pending");
     pending.id = repo.new_resource_id().await.unwrap();
     pending.status = None;
     repo.create_resource(&pending).await.unwrap();
 
-    let mut ready = make_test_snapshot(account_id.clone(), &KIND_A, "ready");
+    let mut ready = make_test_snapshot(&account_handle, &KIND_A, "ready");
     ready.id = repo.new_resource_id().await.unwrap();
     ready.status = Some(status_with_phase(ResourcePhase::Ready));
     repo.create_resource(&ready).await.unwrap();
 
-    let mut pending_v2 = make_test_snapshot(account_id.clone(), &KIND_A, "pending-v2");
+    let mut pending_v2 = make_test_snapshot(&account_handle, &KIND_A, "pending-v2");
     pending_v2.id = repo.new_resource_id().await.unwrap();
     pending_v2.schema = KIND_A_V2.clone();
     pending_v2.status = None;
     repo.create_resource(&pending_v2).await.unwrap();
 
-    let mut failed = make_test_snapshot(account_id.clone(), &KIND_B, "failed");
+    let mut failed = make_test_snapshot(&account_handle, &KIND_B, "failed");
     failed.id = repo.new_resource_id().await.unwrap();
     failed.status = Some(status_with_phase(ResourcePhase::Failed));
     repo.create_resource(&failed).await.unwrap();
 
-    let mut pending_b = make_test_snapshot(account_id.clone(), &KIND_B, "pending-b");
+    let mut pending_b = make_test_snapshot(&account_handle, &KIND_B, "pending-b");
     pending_b.id = repo.new_resource_id().await.unwrap();
     pending_b.status = None;
     repo.create_resource(&pending_b).await.unwrap();
 
-    let mut deleted = make_test_snapshot(account_id.clone(), &KIND_B, "deleted");
+    let mut deleted = make_test_snapshot(&account_handle, &KIND_B, "deleted");
     deleted.id = repo.new_resource_id().await.unwrap();
     deleted.status = Some(status_with_phase(ResourcePhase::Reconciling));
     repo.create_resource(&deleted).await.unwrap();
@@ -1039,12 +1076,12 @@ pub async fn test_summarize_resources(catalog: &Catalog) {
     };
     repo.update_resource(&deleted, None).await.unwrap();
 
-    let mut other_account = make_test_snapshot(other_account_id, &KIND_A, "other-account");
+    let mut other_account = make_test_snapshot(&other_account_handle, &KIND_A, "other-account");
     other_account.id = repo.new_resource_id().await.unwrap();
     other_account.status = Some(status_with_phase(ResourcePhase::Reconciling));
     repo.create_resource(&other_account).await.unwrap();
 
-    let summary = repo.summarize_resources(account_id).await.unwrap();
+    let summary = repo.summarize_resources(account_handle.id).await.unwrap();
 
     assert_eq!(
         summary,
@@ -1087,9 +1124,10 @@ pub async fn test_summarize_resources(catalog: &Catalog) {
 
 pub async fn test_find_deleted_resource_not_returned(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
-    let account_id = odf::AccountID::new_seeded_ed25519(b"test-account");
 
-    let mut snapshot = make_test_snapshot(account_id.clone(), &TEST_KIND, "to-delete");
+    let account_handle = odf::AccountHandle::new_test("test-account");
+
+    let mut snapshot = make_test_snapshot(&account_handle, &TEST_KIND, "to-delete");
     snapshot.id = repo.new_resource_id().await.unwrap();
     let id = snapshot.id;
     repo.create_resource(&snapshot).await.unwrap();
@@ -1117,20 +1155,24 @@ pub async fn test_find_deleted_resource_not_returned(catalog: &Catalog) {
     assert!(by_query.is_none());
 
     let by_name = repo
-        .find_resource_id_by_name(&account_id, &TEST_KIND, &"to-delete".parse().unwrap())
+        .find_resource_id_by_name(
+            &account_handle.id,
+            &TEST_KIND,
+            &"to-delete".parse().unwrap(),
+        )
         .await
         .unwrap();
     assert!(by_name.is_none());
 
     let count = repo
-        .count_resources(account_id.clone(), &TEST_KIND)
+        .count_resources(account_handle.id.clone(), &TEST_KIND)
         .await
         .unwrap();
     assert_eq!(0, count);
 
     let ids: Vec<_> = repo
         .list_resource_ids(
-            account_id.clone(),
+            account_handle.id,
             &TEST_KIND,
             PaginationOpts::from_max_results(100),
         )
@@ -1138,6 +1180,103 @@ pub async fn test_find_deleted_resource_not_returned(catalog: &Catalog) {
         .await
         .unwrap();
     assert!(ids.is_empty());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn make_test_account(handle: &odf::AccountHandle) -> Account {
+    let name = handle.name.as_str();
+    Account {
+        id: handle.id.clone(),
+        account_name: handle.name.clone(),
+        email: email_utils::Email::parse(&format!("{name}@example.com")).unwrap(),
+        display_name: name.to_string(),
+        account_type: AccountType::User,
+        avatar_url: None,
+        registered_at: Utc::now(),
+        provider: "unit-test-provider".to_string(),
+        provider_identity_key: name.to_string(),
+    }
+}
+
+/// Pins the JOIN-on-read design's key correctness property: because the
+/// owning account's name is never denormalized into the `resources`
+/// row/snapshot, an account rename is reflected **immediately** on the next
+/// read — no stale name, no backfill required. This is the reason a JOIN
+/// (or, for the inmem backend, a live account-repo lookup) was chosen over
+/// copying the name at write time.
+pub async fn test_account_rename_reflected_immediately_in_headers(catalog: &Catalog) {
+    let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+
+    let original_handle = odf::AccountHandle::new_test("rename-me");
+    let original_account = make_test_account(&original_handle);
+    account_repo.save_account(&original_account).await.unwrap();
+
+    let mut snapshot = make_test_snapshot(&original_handle, &TEST_KIND, "owned-resource");
+    snapshot.id = repo.new_resource_id().await.unwrap();
+    let id = snapshot.id;
+    repo.create_resource(&snapshot).await.unwrap();
+
+    let before_rename = repo
+        .find_resource_snapshot_by_id(&id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(before_rename.headers.account.id, original_account.id);
+    assert_eq!(before_rename.headers.account.name, original_handle.name);
+
+    let new_name = odf::AccountName::new_unchecked("renamed");
+    let renamed_account = Account {
+        account_name: new_name.clone(),
+        ..original_account
+    };
+    account_repo.update_account(&renamed_account).await.unwrap();
+
+    let after_rename = repo
+        .find_resource_snapshot_by_id(&id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(after_rename.headers.account.id, original_handle.id);
+    assert_eq!(
+        after_rename.headers.account.name, new_name,
+        "account rename must be reflected immediately on re-read, without any resource-side update"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// `resources.account_id` has no FK-cascade tie to the `accounts` table
+/// (different bounded context; cleanup of a deleted account's resources is
+/// async, via outbox handlers), so a resource can transiently reference an
+/// account that no longer exists. Reads must not fail in that window — they
+/// fall back to a sentinel account name instead of erroring or panicking.
+pub async fn test_deleted_account_falls_back_to_sentinel_name(catalog: &Catalog) {
+    let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+
+    // Deliberately do NOT seed an `accounts` row for this id — simulates the
+    // account having been deleted (or never synced) while its resources
+    // still exist.
+    let account_handle = odf::AccountHandle::new_test("no-such-account");
+
+    let mut snapshot = make_test_snapshot(&account_handle, &TEST_KIND, "orphaned-resource");
+    snapshot.id = repo.new_resource_id().await.unwrap();
+    let id = snapshot.id;
+    repo.create_resource(&snapshot).await.unwrap();
+
+    let found = repo
+        .find_resource_snapshot_by_id(&id)
+        .await
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(found.headers.account.id, account_handle.id);
+    assert_eq!(
+        found.headers.account.name,
+        kamu_resources::deleted_account_name_sentinel(),
+        "reads for a resource whose account is gone must fall back to the sentinel name, not fail"
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

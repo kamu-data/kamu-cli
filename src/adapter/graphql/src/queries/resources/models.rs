@@ -11,15 +11,7 @@ use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
 
 use crate::prelude::*;
-use crate::scalars::{
-    AccountID,
-    AccountName,
-    AccountRef,
-    ResourceAnnotations,
-    ResourceLabels,
-    ResourcePhase,
-    UInt64,
-};
+use crate::scalars::{AccountID, AccountName, ResourcePhase, UInt64};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Type aliases for cleaner From implementations
@@ -63,7 +55,7 @@ pub struct AccountHandleInput {
     pub name: AccountName<'static>,
 }
 
-impl From<AccountHandleInput> for odf::metadata::auth::AccountHandle {
+impl From<AccountHandleInput> for odf::AccountHandle {
     fn from(value: AccountHandleInput) -> Self {
         Self {
             id: value.id.into(),
@@ -494,11 +486,9 @@ pub struct Resource {
 
 impl From<kamu_resources::ResourceView> for Resource {
     fn from(value: kamu_resources::ResourceView) -> Self {
-        let headers = ResourceHeaders::from(value.clone());
-
         Self {
             schema: value.schema.into(),
-            headers,
+            headers: value.headers.into(),
             spec: value.spec,
             status: value.status.map(Into::into),
         }
@@ -665,46 +655,7 @@ impl From<BatchGetResourceProblem> for BatchResourceProblem {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Debug, Clone)]
-pub struct ResourceHeaders {
-    pub id: ResourceID<'static>,
-    pub account: AccountRef,
-    pub name: ResourceName<'static>,
-    pub description: Option<String>,
-    pub labels: ResourceLabels,
-    pub annotations: ResourceAnnotations,
-    pub generation: UInt64,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-    pub deleted_at: Option<DateTime<Utc>>,
-}
-
-impl From<kamu_resources::ResourceView> for ResourceHeaders {
-    fn from(value: kamu_resources::ResourceView) -> Self {
-        let account = match value.headers.account.name {
-            Some(name) => {
-                kamu_resources::ResourceAccountRef::Handle(odf::metadata::auth::AccountHandle {
-                    id: value.headers.account.id,
-                    name,
-                })
-            }
-            None => kamu_resources::ResourceAccountRef::Id(value.headers.account.id),
-        };
-
-        Self {
-            id: value.headers.id.into(),
-            account: account.into(),
-            name: value.headers.name.clone().into(),
-            description: value.headers.description,
-            labels: value.headers.labels.into(),
-            annotations: value.headers.annotations.into(),
-            generation: value.headers.generation.into(),
-            created_at: value.headers.created_at,
-            updated_at: value.headers.updated_at,
-            deleted_at: value.headers.deleted_at,
-        }
-    }
-}
+pub use crate::scalars::ResourceHeaders;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -26,6 +26,11 @@ use crate::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Precondition: `params.headers.account` must already be a resolved
+/// `AccountRef::Handle` — neither `plan` nor `apply` resolve an id/name
+/// selector themselves. Resolution is the caller's responsibility (via the
+/// facade's `ResourceAccountResolver`, or by threading an already-known
+/// handle).
 #[async_trait::async_trait]
 pub trait ApplyResourceUseCase<R: ReconcilableEventSourcedResource>: Send + Sync {
     async fn plan(
@@ -43,6 +48,8 @@ pub trait ApplyResourceUseCase<R: ReconcilableEventSourcedResource>: Send + Sync
 
 pub struct ApplyResourceParams<R: DeclarativeResource> {
     pub id: Option<ResourceID>,
+    /// `headers.account` must be `Some(AccountRef::Handle(_))` — see
+    /// [`ApplyResourceUseCase`].
     pub headers: crate::ResourceHeadersInput,
     pub spec: R::Spec,
 }

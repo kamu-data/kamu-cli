@@ -28,6 +28,7 @@ use crate::{
 pub struct ResourceSnapshot {
     pub id: ResourceID,
     pub schema: TypeUri,
+    #[serde_as(as = "odf::metadata::serde::yaml::resource::ResourceHeaders")]
     pub headers: ResourceHeaders,
 
     pub spec: serde_json::Value,

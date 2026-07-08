@@ -120,11 +120,21 @@ where
     ) -> Result<Option<ResourceID>, ApplyResourceUseCaseError<R>> {
         match id {
             Some(id) => Ok(Some(id)),
-            None => self
-                .generic_resource_query_service
-                .find_resource_id_by_name(&headers.account, R::schema(), &headers.name)
-                .await
-                .map_err(ApplyResourceUseCaseError::Internal),
+            None => {
+                // Account resolution (id + name lookup) already happened upstream, as
+                // part of the apply process (see `ResourceAccountResolver`); `headers.account`
+                // is always a resolved `Some(AccountRef::Handle(_))` by this point.
+                let account_id = headers
+                    .account
+                    .as_ref()
+                    .and_then(kamu_resources::ResourceAccountRef::id)
+                    .expect("resource headers must carry a resolved account by apply time");
+
+                self.generic_resource_query_service
+                    .find_resource_id_by_name(account_id, R::schema(), &headers.name)
+                    .await
+                    .map_err(ApplyResourceUseCaseError::Internal)
+            }
         }
     }
 

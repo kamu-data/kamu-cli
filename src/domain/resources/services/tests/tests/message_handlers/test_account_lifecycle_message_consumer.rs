@@ -15,24 +15,21 @@ use kamu_accounts::{AccountLifecycleMessage, MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERV
 use kamu_resources::{DeleteAccountResourcesUseCase, MockDeleteAccountResourcesUseCase};
 use messaging_outbox::{OutboxProvider, register_message_dispatcher};
 
-use crate::tests::utils::make_account_id;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Tests
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_deleted_message_triggers_cascade_delete() {
-    let account_id = make_account_id();
-    let account_id_clone = account_id.clone();
+    let account_handle = odf::AccountHandle::new_test("test-owner");
 
     let harness = AccountLifecycleConsumerHarness::new(
-        AccountLifecycleConsumerHarness::expect_execute_once(account_id_clone),
+        AccountLifecycleConsumerHarness::expect_execute_once(account_handle.id.clone()),
     );
 
     let message = AccountLifecycleMessage::deleted(
         Utc::now(),
-        account_id,
+        account_handle.id,
         Email::parse("test@example.com").unwrap(),
         "Test User".to_string(),
     );
@@ -48,9 +45,11 @@ async fn test_created_message_is_no_op() {
     let harness =
         AccountLifecycleConsumerHarness::new(AccountLifecycleConsumerHarness::expect_no_execute());
 
+    let account_handle = odf::AccountHandle::new_test("test-owner");
+
     let message = AccountLifecycleMessage::created(
         Utc::now(),
-        make_account_id(),
+        account_handle.id,
         Email::parse("test@example.com").unwrap(),
         odf::AccountName::new_unchecked("testuser"),
         "Test User".to_string(),
@@ -66,9 +65,11 @@ async fn test_updated_message_is_no_op() {
     let harness =
         AccountLifecycleConsumerHarness::new(AccountLifecycleConsumerHarness::expect_no_execute());
 
+    let account_handle = odf::AccountHandle::new_test("oldname");
+
     let message = AccountLifecycleMessage::updated(
         Utc::now(),
-        make_account_id(),
+        account_handle.id,
         Email::parse("old@example.com").unwrap(),
         Email::parse("new@example.com").unwrap(),
         odf::AccountName::new_unchecked("oldname"),

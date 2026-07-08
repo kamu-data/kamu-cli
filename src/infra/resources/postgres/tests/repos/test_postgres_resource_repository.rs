@@ -10,6 +10,7 @@
 use database_common::PostgresTransactionManager;
 use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
+use kamu_accounts_postgres::PostgresAccountRepository;
 use kamu_resources_postgres::PostgresResourceRepository;
 use kamu_resources_repo_tests::resource_repository_test_suite as resource_repo_suite;
 use sqlx::PgPool;
@@ -185,6 +186,14 @@ database_transactional_test!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+database_transactional_test!(
+    storage = postgres,
+    fixture = resource_repo_suite::test_account_rename_reflected_immediately_in_headers,
+    harness = PostgresResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct PostgresResourceRepositoryHarness {
     catalog: Catalog,
 }
@@ -195,6 +204,7 @@ impl PostgresResourceRepositoryHarness {
         catalog_builder.add_value(pg_pool);
         catalog_builder.add::<PostgresTransactionManager>();
         catalog_builder.add::<PostgresResourceRepository>();
+        catalog_builder.add::<PostgresAccountRepository>();
         Self {
             catalog: catalog_builder.build(),
         }

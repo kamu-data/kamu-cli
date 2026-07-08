@@ -19,6 +19,7 @@ use kamu_core::TenancyConfig;
 use kamu_resources::{
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
     ResourceHeaders,
+    ResourceHeadersExt,
     ResourceID,
     ResourceLifecycleMessage,
     ResourceRepository,
@@ -81,7 +82,7 @@ impl BaseGQLResourceHarness {
 
     pub async fn create_resource(
         catalog: &dill::Catalog,
-        account_id: &odf::AccountID,
+        account: &odf::AccountHandle,
         name: &str,
         schema: &TypeUri,
         spec: serde_json::Value,
@@ -93,7 +94,7 @@ impl BaseGQLResourceHarness {
             .create_resource(&ResourceSnapshot {
                 id,
                 schema: schema.clone(),
-                headers: ResourceHeaders::simple(Utc::now(), account_id.clone(), name),
+                headers: ResourceHeaders::simple(Utc::now(), id, account.clone(), name),
                 spec,
                 status: None,
                 last_event_id: None,
@@ -132,27 +133,20 @@ impl BaseGQLResourceHarness {
 
     pub async fn create_variable_set_resource(
         catalog: &dill::Catalog,
-        account_id: &odf::AccountID,
+        account: &odf::AccountHandle,
         name: &str,
         spec: serde_json::Value,
     ) -> ResourceID {
-        Self::create_resource(
-            catalog,
-            account_id,
-            name,
-            VariableSetResource::schema(),
-            spec,
-        )
-        .await
+        Self::create_resource(catalog, account, name, VariableSetResource::schema(), spec).await
     }
 
     pub async fn create_secret_set_resource(
         catalog: &dill::Catalog,
-        account_id: &odf::AccountID,
+        account: &odf::AccountHandle,
         name: &str,
         spec: serde_json::Value,
     ) -> ResourceID {
-        Self::create_resource(catalog, account_id, name, SecretSetResource::schema(), spec).await
+        Self::create_resource(catalog, account, name, SecretSetResource::schema(), spec).await
     }
 }
 

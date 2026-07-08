@@ -22,7 +22,7 @@ use kamu_resources_services::testing::BaseResourceServiceHarness;
 #[test_log::test(tokio::test)]
 async fn test_spec_view_dispatcher_reveals_encrypted_secrets_as_plaintext() {
     let harness = BaseConfigurationServiceHarness::new();
-    let (_, account_id) = odf::AccountID::new_generated_ed25519();
+    let account_handle = odf::AccountHandle::new_test("test-owner");
 
     let spec = SecretSetSpec {
         secrets: [
@@ -45,7 +45,7 @@ async fn test_spec_view_dispatcher_reveals_encrypted_secrets_as_plaintext() {
         .apply_secret_use_case()
         .apply(ApplyResourceParams {
             id: None,
-            headers: BaseResourceServiceHarness::make_headers_input(account_id, "test-secrets"),
+            headers: BaseResourceServiceHarness::make_headers_input(account_handle, "test-secrets"),
             spec,
         })
         .await

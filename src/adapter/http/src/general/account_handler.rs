@@ -63,7 +63,7 @@ async fn get_account(catalog: &Catalog) -> Result<Json<AccountResponse>, ApiErro
         CurrentAccountSubject::Logged(account) => {
             let account_service = catalog.get_one::<dyn AccountService>().unwrap();
             match account_service
-                .try_get_account_by_id(&account.account_id)
+                .try_get_account_by_id(&account.account_handle.id)
                 .await?
             {
                 Some(full_account_info) => Ok(Json(full_account_info.into())),

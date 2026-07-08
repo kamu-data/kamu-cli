@@ -92,13 +92,13 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
         // into organization-level permissions.
         //
         // See: https://github.com/kamu-data/kamu-node/issues/233
-        if target_account_id != subject.account_id {
+        if target_account_id != subject.account_handle.id {
             let _ = self
                 .rebac_svc
                 .get()
                 .int_err()?
                 .set_account_dataset_relation(
-                    &subject.account_id,
+                    &subject.account_handle.id,
                     kamu_auth_rebac::AccountToDatasetRelation::Maintainer,
                     &store_result.dataset_id,
                 )

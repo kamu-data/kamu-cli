@@ -26,6 +26,7 @@ use kamu_configuration_services::ConfigurationResourceLifecycleMessageConsumer;
 use kamu_resources::{
     MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
     ResourceHeaders,
+    ResourceHeadersExt,
     ResourceID,
     ResourceLifecycleMessage,
     ResourceSchemaProvider,
@@ -43,7 +44,6 @@ use uuid::Uuid;
 async fn test_reconciliation_succeeded_for_variable_set_cleans_up_old_entries() {
     let harness = ConfigurationResourceLifecycleConsumerHarness::new();
     let id = harness.alloc_id();
-    let (_, account_id) = odf::AccountID::new_generated_ed25519();
 
     let now = Utc::now();
 
@@ -55,7 +55,7 @@ async fn test_reconciliation_succeeded_for_variable_set_cleans_up_old_entries() 
             1,
             &[kamu_configuration::VariableSetEntry {
                 entry_id: Uuid::new_v4(),
-                account_id: account_id.clone(),
+                account_id: harness.account_handle.id.clone(),
                 key: "K".to_string(),
                 value: "v1".to_string(),
                 created_at: now,
@@ -73,7 +73,7 @@ async fn test_reconciliation_succeeded_for_variable_set_cleans_up_old_entries() 
             2,
             &[kamu_configuration::VariableSetEntry {
                 entry_id: Uuid::new_v4(),
-                account_id: account_id.clone(),
+                account_id: harness.account_handle.id.clone(),
                 key: "K".to_string(),
                 value: "v2".to_string(),
                 created_at: now,
@@ -87,7 +87,12 @@ async fn test_reconciliation_succeeded_for_variable_set_cleans_up_old_entries() 
     harness
         .consume_message(&ResourceLifecycleMessage::reconciliation_succeeded(
             Utc::now(),
-            make_snapshot(id, VariableSetResource::schema(), 2),
+            make_snapshot(
+                id,
+                VariableSetResource::schema(),
+                &harness.account_handle,
+                2,
+            ),
         ))
         .await
         .unwrap();
@@ -107,7 +112,6 @@ async fn test_reconciliation_succeeded_for_variable_set_cleans_up_old_entries() 
 async fn test_reconciliation_succeeded_for_secret_set_cleans_up_old_entries() {
     let harness = ConfigurationResourceLifecycleConsumerHarness::new();
     let id = harness.alloc_id();
-    let (_, account_id) = odf::AccountID::new_generated_ed25519();
 
     let now = Utc::now();
 
@@ -118,7 +122,7 @@ async fn test_reconciliation_succeeded_for_secret_set_cleans_up_old_entries() {
             1,
             &[kamu_configuration::SecretSetEntry {
                 entry_id: Uuid::new_v4(),
-                account_id: account_id.clone(),
+                account_id: harness.account_handle.id.clone(),
                 key: "S".to_string(),
                 value: b"enc1".to_vec(),
                 secret_nonce: b"n1".to_vec(),
@@ -136,7 +140,7 @@ async fn test_reconciliation_succeeded_for_secret_set_cleans_up_old_entries() {
             2,
             &[kamu_configuration::SecretSetEntry {
                 entry_id: Uuid::new_v4(),
-                account_id: account_id.clone(),
+                account_id: harness.account_handle.id.clone(),
                 key: "S".to_string(),
                 value: b"enc2".to_vec(),
                 secret_nonce: b"n2".to_vec(),
@@ -150,7 +154,7 @@ async fn test_reconciliation_succeeded_for_secret_set_cleans_up_old_entries() {
     harness
         .consume_message(&ResourceLifecycleMessage::reconciliation_succeeded(
             Utc::now(),
-            make_snapshot(id, SecretSetResource::schema(), 2),
+            make_snapshot(id, SecretSetResource::schema(), &harness.account_handle, 2),
         ))
         .await
         .unwrap();
@@ -176,7 +180,7 @@ async fn test_reconciliation_succeeded_for_unknown_kind_is_no_op() {
     harness
         .consume_message(&ResourceLifecycleMessage::reconciliation_succeeded(
             Utc::now(),
-            make_snapshot(id, &UNKNOWN_SCHEMA, 1),
+            make_snapshot(id, &UNKNOWN_SCHEMA, &harness.account_handle, 1),
         ))
         .await
         .unwrap();
@@ -188,7 +192,6 @@ async fn test_reconciliation_succeeded_for_unknown_kind_is_no_op() {
 async fn test_deleted_for_variable_set_removes_all_projection_entries() {
     let harness = ConfigurationResourceLifecycleConsumerHarness::new();
     let id = harness.alloc_id();
-    let (_, account_id) = odf::AccountID::new_generated_ed25519();
 
     let now = Utc::now();
 
@@ -199,7 +202,7 @@ async fn test_deleted_for_variable_set_removes_all_projection_entries() {
             1,
             &[kamu_configuration::VariableSetEntry {
                 entry_id: Uuid::new_v4(),
-                account_id: account_id.clone(),
+                account_id: harness.account_handle.id.clone(),
                 key: "K".to_string(),
                 value: "v".to_string(),
                 created_at: now,
@@ -212,7 +215,12 @@ async fn test_deleted_for_variable_set_removes_all_projection_entries() {
     harness
         .consume_message(&ResourceLifecycleMessage::deleted(
             Utc::now(),
-            vec![make_snapshot(id, VariableSetResource::schema(), 1)],
+            vec![make_snapshot(
+                id,
+                VariableSetResource::schema(),
+                &harness.account_handle,
+                1,
+            )],
         ))
         .await
         .unwrap();
@@ -231,7 +239,6 @@ async fn test_deleted_for_variable_set_removes_all_projection_entries() {
 async fn test_deleted_for_secret_set_removes_all_projection_entries() {
     let harness = ConfigurationResourceLifecycleConsumerHarness::new();
     let id = harness.alloc_id();
-    let (_, account_id) = odf::AccountID::new_generated_ed25519();
 
     let now = Utc::now();
 
@@ -242,7 +249,7 @@ async fn test_deleted_for_secret_set_removes_all_projection_entries() {
             1,
             &[kamu_configuration::SecretSetEntry {
                 entry_id: Uuid::new_v4(),
-                account_id: account_id.clone(),
+                account_id: harness.account_handle.id.clone(),
                 key: "S".to_string(),
                 value: b"enc".to_vec(),
                 secret_nonce: b"n".to_vec(),
@@ -256,7 +263,12 @@ async fn test_deleted_for_secret_set_removes_all_projection_entries() {
     harness
         .consume_message(&ResourceLifecycleMessage::deleted(
             Utc::now(),
-            vec![make_snapshot(id, SecretSetResource::schema(), 1)],
+            vec![make_snapshot(
+                id,
+                SecretSetResource::schema(),
+                &harness.account_handle,
+                1,
+            )],
         ))
         .await
         .unwrap();
@@ -273,7 +285,6 @@ async fn test_deleted_for_variable_set_with_multiple_ids_removes_all() {
     let harness = ConfigurationResourceLifecycleConsumerHarness::new();
     let id_a = harness.alloc_id();
     let id_b = harness.alloc_id();
-    let (_, account_id) = odf::AccountID::new_generated_ed25519();
 
     let now = Utc::now();
 
@@ -285,7 +296,7 @@ async fn test_deleted_for_variable_set_with_multiple_ids_removes_all() {
                 1,
                 &[kamu_configuration::VariableSetEntry {
                     entry_id: Uuid::new_v4(),
-                    account_id: account_id.clone(),
+                    account_id: harness.account_handle.id.clone(),
                     key: "K".to_string(),
                     value: "v".to_string(),
                     created_at: now,
@@ -300,8 +311,18 @@ async fn test_deleted_for_variable_set_with_multiple_ids_removes_all() {
         .consume_message(&ResourceLifecycleMessage::deleted(
             Utc::now(),
             vec![
-                make_snapshot(id_a, VariableSetResource::schema(), 1),
-                make_snapshot(id_b, VariableSetResource::schema(), 1),
+                make_snapshot(
+                    id_a,
+                    VariableSetResource::schema(),
+                    &harness.account_handle,
+                    1,
+                ),
+                make_snapshot(
+                    id_b,
+                    VariableSetResource::schema(),
+                    &harness.account_handle,
+                    1,
+                ),
             ],
         ))
         .await
@@ -329,7 +350,6 @@ async fn test_deleted_for_variable_set_removes_only_targeted_id() {
     let harness = ConfigurationResourceLifecycleConsumerHarness::new();
     let id_deleted = harness.alloc_id();
     let id_other = harness.alloc_id();
-    let (_, account_id) = odf::AccountID::new_generated_ed25519();
 
     let now = Utc::now();
 
@@ -341,7 +361,7 @@ async fn test_deleted_for_variable_set_removes_only_targeted_id() {
                 1,
                 &[kamu_configuration::VariableSetEntry {
                     entry_id: Uuid::new_v4(),
-                    account_id: account_id.clone(),
+                    account_id: harness.account_handle.id.clone(),
                     key: "K".to_string(),
                     value: "v".to_string(),
                     created_at: now,
@@ -356,7 +376,12 @@ async fn test_deleted_for_variable_set_removes_only_targeted_id() {
     harness
         .consume_message(&ResourceLifecycleMessage::deleted(
             Utc::now(),
-            vec![make_snapshot(id_deleted, VariableSetResource::schema(), 1)],
+            vec![make_snapshot(
+                id_deleted,
+                VariableSetResource::schema(),
+                &harness.account_handle,
+                1,
+            )],
         ))
         .await
         .unwrap();
@@ -389,7 +414,6 @@ async fn test_deleted_for_secret_set_with_multiple_ids_removes_all() {
     let harness = ConfigurationResourceLifecycleConsumerHarness::new();
     let id_a = harness.alloc_id();
     let id_b = harness.alloc_id();
-    let (_, account_id) = odf::AccountID::new_generated_ed25519();
 
     let now = Utc::now();
 
@@ -401,7 +425,7 @@ async fn test_deleted_for_secret_set_with_multiple_ids_removes_all() {
                 1,
                 &[kamu_configuration::SecretSetEntry {
                     entry_id: Uuid::new_v4(),
-                    account_id: account_id.clone(),
+                    account_id: harness.account_handle.id.clone(),
                     key: "S".to_string(),
                     value: b"enc".to_vec(),
                     secret_nonce: b"n".to_vec(),
@@ -417,8 +441,18 @@ async fn test_deleted_for_secret_set_with_multiple_ids_removes_all() {
         .consume_message(&ResourceLifecycleMessage::deleted(
             Utc::now(),
             vec![
-                make_snapshot(id_a, SecretSetResource::schema(), 1),
-                make_snapshot(id_b, SecretSetResource::schema(), 1),
+                make_snapshot(
+                    id_a,
+                    SecretSetResource::schema(),
+                    &harness.account_handle,
+                    1,
+                ),
+                make_snapshot(
+                    id_b,
+                    SecretSetResource::schema(),
+                    &harness.account_handle,
+                    1,
+                ),
             ],
         ))
         .await
@@ -448,7 +482,12 @@ async fn test_applied_message_is_no_op() {
         .consume_message(&ResourceLifecycleMessage::applied(
             Utc::now(),
             kamu_resources::ResourceLifecycleMessageOutcome::Created,
-            make_snapshot(id, VariableSetResource::schema(), 1),
+            make_snapshot(
+                id,
+                VariableSetResource::schema(),
+                &harness.account_handle,
+                1,
+            ),
         ))
         .await
         .unwrap();
@@ -458,10 +497,14 @@ async fn test_applied_message_is_no_op() {
 // Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn make_snapshot(id: ResourceID, schema: &'static TypeUri, generation: u64) -> ResourceSnapshot {
-    let (_, account_id) = odf::AccountID::new_generated_ed25519();
+fn make_snapshot(
+    id: ResourceID,
+    schema: &'static TypeUri,
+    account: &odf::AccountHandle,
+    generation: u64,
+) -> ResourceSnapshot {
     let now = Utc::now();
-    let mut headers = ResourceHeaders::simple(now, account_id, "test-res");
+    let mut headers = ResourceHeaders::simple(now, id, account.clone(), "test-res");
     headers.generation = generation;
     ResourceSnapshot {
         id,
@@ -479,6 +522,7 @@ fn make_snapshot(id: ResourceID, schema: &'static TypeUri, generation: u64) -> R
 
 struct ConfigurationResourceLifecycleConsumerHarness {
     catalog: dill::Catalog,
+    account_handle: odf::AccountHandle,
 }
 
 impl ConfigurationResourceLifecycleConsumerHarness {
@@ -499,7 +543,10 @@ impl ConfigurationResourceLifecycleConsumerHarness {
             MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
         );
 
-        Self { catalog: b.build() }
+        Self {
+            catalog: b.build(),
+            account_handle: odf::AccountHandle::new_test("test-owner"),
+        }
     }
 
     fn alloc_id(&self) -> ResourceID {

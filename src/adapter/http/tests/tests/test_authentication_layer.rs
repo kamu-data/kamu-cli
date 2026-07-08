@@ -221,7 +221,7 @@ impl ServerHarness {
         let current_account_subject = catalog.get_one::<CurrentAccountSubject>().unwrap();
         match current_account_subject.as_ref() {
             CurrentAccountSubject::Anonymous(r) => Ok(format!("{r:?}")),
-            CurrentAccountSubject::Logged(l) => Ok(l.account_name.to_string()),
+            CurrentAccountSubject::Logged(l) => Ok(l.account_handle.name.to_string()),
         }
     }
 }

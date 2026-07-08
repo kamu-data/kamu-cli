@@ -33,6 +33,27 @@ macro_rules! declare_apply_resource_use_case {
         }
 
         impl $use_case {
+            /// `headers.account` must already be a resolved `AccountRef::Handle` by
+            /// the time it reaches `plan`/`apply` — resolving an id/name selector is
+            /// the caller's responsibility (via the facade's
+            /// `ResourceAccountResolver`, or by threading an already-known handle, as
+            /// `DatasetEnvVarMutationAdapterImpl` does). This is enforced here rather
+            /// than silently trusted, since the event-sourced projector downstream is
+            /// pure/sync and cannot resolve accounts itself.
+            fn ensure_params_account_resolved(
+                params: &kamu_resources::ApplyResourceParams<$resource>,
+            ) -> Result<(), kamu_resources::ApplyResourceUseCaseError<$resource>> {
+                match &params.headers.account {
+                    Some(odf::metadata::auth::AccountRef::Handle(_)) => Ok(()),
+                    other => Err(kamu_resources::ApplyResourceUseCaseError::Internal(
+                        internal_error::InternalError::new(format!(
+                            "resource headers must carry a resolved account handle \
+                             by the time it reaches the apply use case, got: {other:?}"
+                        )),
+                    )),
+                }
+            }
+
             async fn sanitize_params(
                 &self,
                 params: kamu_resources::ApplyResourceParams<$resource>,
@@ -48,15 +69,23 @@ macro_rules! declare_apply_resource_use_case {
                 // Find the resource UID if not provided
                 let maybe_resource_id = match params.id {
                     Some(id) => Some(id),
-                    None => self
-                        .generic_resource_query_service
-                        .find_resource_id_by_name(
-                            &params.headers.account,
-                            <$resource as kamu_resources::ResourceSchemaProvider>::schema(),
-                            &params.headers.name,
-                        )
-                        .await
-                        .map_err(kamu_resources::ApplyResourceUseCaseError::Internal)?,
+                    None => {
+                        let account_id = params
+                            .headers
+                            .account
+                            .as_ref()
+                            .and_then(kamu_resources::ResourceAccountRef::id)
+                            .expect("resource headers account must be resolved by this point");
+
+                        self.generic_resource_query_service
+                            .find_resource_id_by_name(
+                                account_id,
+                                <$resource as kamu_resources::ResourceSchemaProvider>::schema(),
+                                &params.headers.name,
+                            )
+                            .await
+                            .map_err(kamu_resources::ApplyResourceUseCaseError::Internal)?
+                    }
                 };
 
                 // Load the current spec if the resource exists to provide it to the sanitizer for comparison
@@ -115,6 +144,7 @@ macro_rules! declare_apply_resource_use_case {
                 kamu_resources::ApplyResourcePlanningDecision<$resource>,
                 kamu_resources::ApplyResourceUseCaseError<$resource>,
             > {
+                Self::ensure_params_account_resolved(&params)?;
                 let params = self.sanitize_params(params).await?;
 
                 let planner = $crate::ApplyResourcePlanner::<$resource>::new(
@@ -134,6 +164,7 @@ macro_rules! declare_apply_resource_use_case {
                 kamu_resources::ApplyResourceApplicationDecision<$resource>,
                 kamu_resources::ApplyResourceUseCaseError<$resource>,
             > {
+                Self::ensure_params_account_resolved(&params)?;
                 let params = self.sanitize_params(params).await?;
 
                 let planner = $crate::ApplyResourcePlanner::<$resource>::new(

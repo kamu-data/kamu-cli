@@ -23,7 +23,9 @@ doctest = false
 
 [dependencies]
 database-common = { workspace = true }
+email-utils = { workspace = true }
 event-sourcing = { workspace = true }
+kamu-accounts = { workspace = true }
 kamu-resources = { workspace = true }
 odf = { workspace = true }
 internal-error = { workspace = true }

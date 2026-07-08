@@ -91,7 +91,7 @@ where
             return Err(ResourceIDNotFoundError(*id).into());
         };
 
-        if resource_snapshot.headers.account != account_id {
+        if resource_snapshot.headers.account.id != account_id {
             return Err(ResourceIDNotFoundError(*id).into());
         }
 

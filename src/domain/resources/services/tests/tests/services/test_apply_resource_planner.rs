@@ -20,6 +20,7 @@ use kamu_resources::{
     ApplyResourceUseCaseError,
     ResourceAggregateLoader,
     ResourceHeaders,
+    ResourceHeadersExt,
     ResourceID,
     ResourceSnapshot,
     TypedResourceQueryService,
@@ -32,7 +33,6 @@ use crate::tests::utils::{
     TestResource,
     TestResourceReconciler,
     TestResourceSpec,
-    make_account_id,
     make_id,
     make_resource_params,
     register_test_resource_resource_service_layer,
@@ -45,8 +45,7 @@ use crate::tests::utils::{
 #[test_log::test(tokio::test)]
 async fn test_plan_create_new_resource() {
     let harness = ApplyResourcePlannerHarness::new();
-    let account_id = make_account_id();
-    let params = make_resource_params(account_id, "res-a");
+    let params = make_resource_params(harness.account_handle.clone(), "res-a");
 
     let decision = harness.plan(params).await;
 
@@ -61,10 +60,9 @@ async fn test_plan_create_new_resource() {
 #[test_log::test(tokio::test)]
 async fn test_plan_with_unknown_id_returns_not_found() {
     let harness = ApplyResourcePlannerHarness::new();
-    let account_id = make_account_id();
     let id = make_id();
 
-    let params = harness.make_apply_params(Some(id), account_id, "res-a", "res-a");
+    let params = harness.make_apply_params(Some(id), "res-a", "res-a");
 
     let result = harness.plan_result(params).await;
 
@@ -79,11 +77,10 @@ async fn test_plan_with_unknown_id_returns_not_found() {
 #[test_log::test(tokio::test)]
 async fn test_plan_update_with_spec_change() {
     let harness = ApplyResourcePlannerHarness::new();
-    let account_id = make_account_id();
 
-    let id = harness.apply_and_get_id(account_id.clone(), "res-a").await;
+    let id = harness.apply_and_get_id("res-a").await;
 
-    let params = harness.make_apply_params(Some(id), account_id.clone(), "res-a", "changed-value");
+    let params = harness.make_apply_params(Some(id), "res-a", "changed-value");
 
     let decision = harness.plan(params).await;
 
@@ -98,11 +95,10 @@ async fn test_plan_update_with_spec_change() {
 #[test_log::test(tokio::test)]
 async fn test_plan_untouched_no_changes() {
     let harness = ApplyResourcePlannerHarness::new();
-    let account_id = make_account_id();
 
-    let id = harness.apply_and_get_id(account_id.clone(), "res-a").await;
+    let id = harness.apply_and_get_id("res-a").await;
 
-    let params = harness.make_apply_params(Some(id), account_id.clone(), "res-a", "res-a");
+    let params = harness.make_apply_params(Some(id), "res-a", "res-a");
 
     let decision = harness.plan(params).await;
 
@@ -117,12 +113,11 @@ async fn test_plan_untouched_no_changes() {
 #[test_log::test(tokio::test)]
 async fn test_plan_update_via_name_lookup() {
     let harness = ApplyResourcePlannerHarness::new();
-    let account_id = make_account_id();
 
-    harness.apply_and_get_id(account_id.clone(), "res-a").await;
+    harness.apply_and_get_id("res-a").await;
 
     // Plan with same name but no UID — planner resolves via name lookup
-    let params = harness.make_apply_params(None, account_id, "res-a", "new-value");
+    let params = harness.make_apply_params(None, "res-a", "new-value");
 
     let decision = harness.plan(params).await;
 
@@ -137,12 +132,11 @@ async fn test_plan_update_via_name_lookup() {
 #[test_log::test(tokio::test)]
 async fn test_plan_with_unknown_id_returns_not_found_even_if_name_exists() {
     let harness = ApplyResourcePlannerHarness::new();
-    let account_id = make_account_id();
 
-    harness.apply_and_get_id(account_id.clone(), "res-a").await;
+    harness.apply_and_get_id("res-a").await;
 
     let stale_id = make_id();
-    let params = harness.make_apply_params(Some(stale_id), account_id, "res-a", "new-value");
+    let params = harness.make_apply_params(Some(stale_id), "res-a", "new-value");
 
     let result = harness.plan_result(params).await;
 
@@ -157,7 +151,6 @@ async fn test_plan_with_unknown_id_returns_not_found_even_if_name_exists() {
 #[test_log::test(tokio::test)]
 async fn test_plan_type_mismatch_rejects() {
     let harness = ApplyResourcePlannerHarness::new();
-    let account_id = make_account_id();
     let id = harness.base.allocate_resource_id().await;
 
     // Insert a snapshot with the wrong schema directly into the repository
@@ -166,7 +159,12 @@ async fn test_plan_type_mismatch_rejects() {
         .create_resource(&ResourceSnapshot {
             id,
             schema: TypeUri::new_unchecked("OtherSchema"),
-            headers: ResourceHeaders::simple(Utc::now(), account_id.clone(), "res-a"),
+            headers: ResourceHeaders::simple(
+                Utc::now(),
+                id,
+                harness.account_handle.clone(),
+                "res-a",
+            ),
             spec: serde_json::json!({}),
             status: None,
             last_event_id: None,
@@ -174,7 +172,7 @@ async fn test_plan_type_mismatch_rejects() {
         .await
         .unwrap();
 
-    let params = harness.make_apply_params(Some(id), account_id, "res-a", "val");
+    let params = harness.make_apply_params(Some(id), "res-a", "val");
 
     let result = harness.plan_result(params).await;
 
@@ -195,6 +193,7 @@ struct ApplyResourcePlannerHarness {
     typed_query_svc: Arc<dyn TypedResourceQueryService<TestResource>>,
     aggregate_loader: Arc<dyn ResourceAggregateLoader<TestResource>>,
     apply_svc: Arc<dyn ApplyResourceUseCase<TestResource>>,
+    account_handle: odf::AccountHandle,
 }
 
 impl ApplyResourcePlannerHarness {
@@ -217,6 +216,7 @@ impl ApplyResourcePlannerHarness {
             typed_query_svc,
             aggregate_loader,
             apply_svc,
+            account_handle: odf::AccountHandle::new_test("test"),
         }
     }
 
@@ -247,21 +247,23 @@ impl ApplyResourcePlannerHarness {
     fn make_apply_params(
         &self,
         id: Option<ResourceID>,
-        account_id: odf::AccountID,
         name: &str,
         value: impl Into<String>,
     ) -> ApplyResourceParams<TestResource> {
         ApplyResourceParams {
             id,
-            headers: BaseResourceServiceHarness::make_headers_input(account_id, name),
+            headers: BaseResourceServiceHarness::make_headers_input(
+                self.account_handle.clone(),
+                name,
+            ),
             spec: TestResourceSpec {
                 value: value.into(),
             },
         }
     }
 
-    async fn apply_and_get_id(&self, account_id: odf::AccountID, name: &str) -> ResourceID {
-        let params = make_resource_params(account_id, name);
+    async fn apply_and_get_id(&self, name: &str) -> ResourceID {
+        let params = make_resource_params(self.account_handle.clone(), name);
         match self.apply_svc.apply(params).await.unwrap() {
             ApplyResourceApplicationDecision::Applied(result) => result.id,
             ApplyResourceApplicationDecision::Rejected(r) => {

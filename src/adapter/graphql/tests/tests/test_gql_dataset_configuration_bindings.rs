@@ -470,7 +470,7 @@ async fn test_configuration_requires_owner_access_for_mutation() {
 struct DatasetConfigurationHarness {
     base_gql_resource_harness: BaseGQLResourceHarness,
     catalog_authorized: dill::Catalog,
-    main_account_id: odf::AccountID,
+    main_account_handle: odf::AccountHandle,
 }
 
 impl DatasetConfigurationHarness {
@@ -522,11 +522,11 @@ impl DatasetConfigurationHarness {
 
         Self {
             base_gql_resource_harness,
-            main_account_id: result
+            main_account_handle: result
                 .catalog_authorized
                 .get_one::<kamu_accounts::CurrentAccountSubject>()
                 .unwrap()
-                .account_id()
+                .account_handle()
                 .clone(),
             catalog_authorized: result.catalog_authorized,
         }
@@ -561,7 +561,7 @@ impl DatasetConfigurationHarness {
     async fn create_variable_set_resource(&self, name: &str) -> ResourceID {
         BaseGQLResourceHarness::create_variable_set_resource(
             &self.catalog_authorized,
-            &self.main_account_id,
+            &self.main_account_handle,
             name,
             BaseGQLResourceHarness::dummy_variable_set_spec(),
         )
@@ -571,7 +571,7 @@ impl DatasetConfigurationHarness {
     async fn create_secret_set_resource(&self, name: &str) -> ResourceID {
         BaseGQLResourceHarness::create_secret_set_resource(
             &self.catalog_authorized,
-            &self.main_account_id,
+            &self.main_account_handle,
             name,
             BaseGQLResourceHarness::dummy_secret_set_spec(),
         )
@@ -581,12 +581,11 @@ impl DatasetConfigurationHarness {
     // Creates a VariableSet resource owned by the default test account (not the
     // current "authorized" account), to simulate a foreign resource.
     async fn create_variable_set_resource_for_default_account(&self, name: &str) -> ResourceID {
-        let account_id = kamu_accounts::CurrentAccountSubject::new_test()
-            .account_id()
-            .clone();
+        let account = kamu_accounts::CurrentAccountSubject::new_test();
+
         BaseGQLResourceHarness::create_variable_set_resource(
             &self.catalog_authorized,
-            &account_id,
+            account.account_handle(),
             name,
             BaseGQLResourceHarness::dummy_variable_set_spec(),
         )

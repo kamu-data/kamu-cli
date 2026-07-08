@@ -21,8 +21,7 @@ pub enum CurrentAccountSubject {
 
 #[derive(Debug, Clone)]
 pub struct LoggedAccount {
-    pub account_id: odf::AccountID,
-    pub account_name: odf::AccountName,
+    pub account_handle: odf::AccountHandle,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -44,8 +43,10 @@ impl CurrentAccountSubject {
 
     pub fn logged(account_id: odf::AccountID, account_name: odf::AccountName) -> Self {
         Self::Logged(LoggedAccount {
-            account_id,
-            account_name,
+            account_handle: odf::AccountHandle {
+                id: account_id,
+                name: account_name,
+            },
         })
     }
 
@@ -67,14 +68,16 @@ impl CurrentAccountSubject {
             CurrentAccountSubject::Anonymous(_) => {
                 panic!("Anonymous account misused");
             }
-            CurrentAccountSubject::Logged(l) => &l.account_id,
+            CurrentAccountSubject::Logged(l) => &l.account_handle.id,
         }
     }
 
     pub fn get_maybe_logged_account_id(&self) -> Option<&odf::AccountID> {
         match self {
             CurrentAccountSubject::Anonymous(_) => None,
-            CurrentAccountSubject::Logged(logged_account) => Some(&logged_account.account_id),
+            CurrentAccountSubject::Logged(logged_account) => {
+                Some(&logged_account.account_handle.id)
+            }
         }
     }
 
@@ -83,20 +86,20 @@ impl CurrentAccountSubject {
             CurrentAccountSubject::Anonymous(_) => {
                 panic!("Anonymous account misused");
             }
-            CurrentAccountSubject::Logged(l) => &l.account_name,
+            CurrentAccountSubject::Logged(l) => &l.account_handle.name,
         }
     }
 
     pub fn maybe_account_name(&self) -> Option<&odf::AccountName> {
         match self {
-            CurrentAccountSubject::Logged(l) => Some(&l.account_name),
+            CurrentAccountSubject::Logged(l) => Some(&l.account_handle.name),
             CurrentAccountSubject::Anonymous(_) => None,
         }
     }
 
     pub fn account_name_or_default(&self) -> &odf::AccountName {
         match self {
-            CurrentAccountSubject::Logged(l) => &l.account_name,
+            CurrentAccountSubject::Logged(l) => &l.account_handle.name,
             CurrentAccountSubject::Anonymous(_) => &DEFAULT_ACCOUNT_NAME,
         }
     }
@@ -110,6 +113,15 @@ impl CurrentAccountSubject {
             dataset_alias.account_name.as_ref().unwrap().clone()
         } else {
             self.account_name_or_default().clone()
+        }
+    }
+
+    pub fn account_handle(&self) -> &odf::AccountHandle {
+        match self {
+            CurrentAccountSubject::Anonymous(_) => {
+                panic!("Anonymous account misused");
+            }
+            CurrentAccountSubject::Logged(l) => &l.account_handle,
         }
     }
 }
