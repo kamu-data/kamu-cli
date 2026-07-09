@@ -60,6 +60,7 @@ impl ResourceSchemaProvider for SecretSetResource {
 
 impl DeclarativeResource for SecretSetResource {
     type Spec = SecretSetSpec;
+    type SpecInput = SecretSetSpec;
     type ResourceState = SecretSetState;
 }
 

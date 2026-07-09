@@ -43,7 +43,7 @@ SELECT
     jsonb_build_object(
         'variables',
         (
-            SELECT jsonb_object_agg(d2.key, convert_from(d2.value, 'UTF8'))
+            SELECT jsonb_object_agg(d2.key, jsonb_build_object('value', convert_from(d2.value, 'UTF8')))
             FROM dataset_env_vars d2
             WHERE d2.dataset_id = dev.dataset_id
               AND d2.secret_nonce IS NULL

@@ -17,10 +17,9 @@ use kamu_accounts::{Account, AccountRepository, AccountType};
 use kamu_configuration::{
     DatasetVariableSetBindingRepository,
     ReplaceDatasetBindingsError,
+    Variable,
     VariableSetResource,
     VariableSetSpec,
-    VariableSpec,
-    VariableValueSpec,
 };
 use kamu_datasets::{DatasetEntry, DatasetEntryRepository};
 use kamu_resources::{
@@ -222,15 +221,19 @@ async fn create_resource(
                 },
                 &resource_id.to_string(),
             ),
-            spec: serde_json::to_value(VariableSetSpec {
-                variables: [(
-                    "PLACEHOLDER".to_string(),
-                    VariableSpec::Value(VariableValueSpec {
-                        value: "placeholder".to_string(),
-                    }),
-                )]
-                .into(),
-            })
+            spec: serde_json::to_value(VariableSetSpec::new(
+                odf::metadata::config::VariableSetSpec {
+                    variables: odf::metadata::config::Variables {
+                        entries: [(
+                            "PLACEHOLDER".to_string(),
+                            Variable {
+                                value: "placeholder".to_string(),
+                            },
+                        )]
+                        .into(),
+                    },
+                },
+            ))
             .unwrap(),
             status: None,
             last_event_id: None,

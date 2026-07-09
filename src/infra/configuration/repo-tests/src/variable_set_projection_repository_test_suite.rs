@@ -11,12 +11,11 @@ use chrono::{SubsecRound, Utc};
 use dill::Catalog;
 use kamu_configuration::{
     ReplaceProjectionEntriesError,
+    Variable,
     VariableSetEntry,
     VariableSetProjectionRepository,
     VariableSetResource,
     VariableSetSpec,
-    VariableSpec,
-    VariableValueSpec,
 };
 use kamu_resources::{
     ResourceHeaders,
@@ -59,15 +58,19 @@ async fn make_variable_set_resource(catalog: &Catalog) -> ResourceID {
             account_handle,
             &variable_set_id.to_string(),
         ),
-        spec: serde_json::to_value(VariableSetSpec {
-            variables: [(
-                "PLACEHOLDER".to_string(),
-                VariableSpec::Value(VariableValueSpec {
-                    value: "placeholder".to_string(),
-                }),
-            )]
-            .into(),
-        })
+        spec: serde_json::to_value(VariableSetSpec::new(
+            odf::metadata::config::VariableSetSpec {
+                variables: odf::metadata::config::Variables {
+                    entries: [(
+                        "PLACEHOLDER".to_string(),
+                        Variable {
+                            value: "placeholder".to_string(),
+                        },
+                    )]
+                    .into(),
+                },
+            },
+        ))
         .unwrap(),
         status: None,
         last_event_id: None,

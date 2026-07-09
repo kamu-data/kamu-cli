@@ -21,6 +21,7 @@ mod resource_schema_id;
 mod resource_type_selector;
 mod resource_type_uri;
 mod resource_warning;
+mod rfc_spec_newtype;
 
 pub use resource::*;
 pub use resource_account_ref::*;

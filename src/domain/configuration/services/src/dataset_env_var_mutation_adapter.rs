@@ -20,10 +20,11 @@ use kamu_configuration::{
     SecretSetResource,
     SecretSetSpec,
     SecretSpec,
+    Variable,
     VariableSetProjectionRepository,
     VariableSetResource,
     VariableSetSpec,
-    VariableSpec,
+    VariableSetSpecInput,
 };
 use kamu_datasets::{
     DatasetEntryRepository,
@@ -47,6 +48,7 @@ use kamu_resources::{
     ResourceID,
     ResourceName,
     ResourceSchemaProvider,
+    ResourceSpecFromInput,
     UnsupportedResourceDescriptorError,
 };
 use kamu_resources_services::get_resource_crud_dispatcher;
@@ -213,10 +215,17 @@ impl DatasetEnvVarMutationAdapterImpl {
 
         variables.insert(
             key.to_string(),
-            VariableSpec::Literal(plaintext.to_string()),
+            Variable {
+                value: plaintext.to_string(),
+            },
         );
 
-        let new_spec = serde_json::to_value(VariableSetSpec { variables }).int_err()?;
+        let new_spec = serde_json::to_value(VariableSetSpecInput::new(
+            odf::metadata::config::VariableSetSpecInput {
+                variables: odf::metadata::config::Variables { entries: variables },
+            },
+        ))
+        .int_err()?;
         let headers = self.make_headers(account.clone(), resource_name);
 
         let dispatcher = self.get_dispatcher::<InternalError>(VariableSetResource::SCHEMA_STR)?;
@@ -348,13 +357,13 @@ impl DatasetEnvVarMutationAdapterImpl {
             })?;
 
         let mut spec: VariableSetSpec = serde_json::from_value(snapshot.spec).int_err()?;
-        spec.variables.remove(key);
+        spec.variables.entries.remove(key);
 
         let dispatcher = self
             .get_dispatcher(VariableSetResource::SCHEMA_STR)
             .map_err(DeleteDatasetEnvVarError::Internal)?;
 
-        if spec.variables.is_empty() {
+        if spec.variables.entries.is_empty() {
             dispatcher
                 .delete(ResourceCrudDispatcherDeleteRequest {
                     account_id: snapshot.headers.account.id.clone(),
@@ -381,7 +390,7 @@ impl DatasetEnvVarMutationAdapterImpl {
                 ResourceCrudDispatcherApplyRequest {
                     id: Some(resource_id),
                     headers,
-                    spec: serde_json::to_value(spec).int_err()?,
+                    spec: serde_json::to_value(spec.into_input()).int_err()?,
                 },
                 "VariableSet",
             )
@@ -578,7 +587,7 @@ impl DatasetEnvVarMutationAdapterImpl {
         &self,
         account_id: &odf::AccountID,
         resource_name: &ResourceName,
-    ) -> Result<(Option<ResourceID>, BTreeMap<String, VariableSpec>), InternalError> {
+    ) -> Result<(Option<ResourceID>, BTreeMap<String, Variable>), InternalError> {
         let id = self
             .generic_resource_query_service
             .find_resource_id_by_name(account_id, VariableSetResource::schema(), resource_name)
@@ -595,7 +604,7 @@ impl DatasetEnvVarMutationAdapterImpl {
             .ok_or_else(|| format!("VariableSet {id} missing snapshot").int_err())?;
 
         let spec: VariableSetSpec = serde_json::from_value(snapshot.spec).int_err()?;
-        Ok((Some(id), spec.variables))
+        Ok((Some(id), spec.into_dto().variables.entries))
     }
 
     // Returns (existing_id, decrypted_secrets_map)

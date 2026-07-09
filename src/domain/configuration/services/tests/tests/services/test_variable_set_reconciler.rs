@@ -7,10 +7,32 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_configuration::{VariableSetSpec, VariableSpec};
+use kamu_configuration::{Variable, VariableSetSpecInput};
 use kamu_configuration_services::testing::BaseConfigurationServiceHarness;
 use kamu_resources::ApplyResourceParams;
 use kamu_resources_services::testing::BaseResourceServiceHarness;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn make_variable_set_spec(
+    entries: impl IntoIterator<Item = (&'static str, &'static str)>,
+) -> VariableSetSpecInput {
+    VariableSetSpecInput::new(odf::metadata::config::VariableSetSpecInput {
+        variables: odf::metadata::config::Variables {
+            entries: entries
+                .into_iter()
+                .map(|(name, value)| {
+                    (
+                        name.to_string(),
+                        Variable {
+                            value: value.to_string(),
+                        },
+                    )
+                })
+                .collect(),
+        },
+    })
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -19,20 +41,7 @@ async fn test_reconcile_variable_set_populates_projection_entries() {
     let harness = BaseConfigurationServiceHarness::new();
     let account_handle = odf::AccountHandle::new_test("test-owner");
 
-    let spec = VariableSetSpec {
-        variables: [
-            (
-                "DB_HOST".to_string(),
-                VariableSpec::Literal("localhost".to_string()),
-            ),
-            (
-                "DB_PORT".to_string(),
-                VariableSpec::Literal("5432".to_string()),
-            ),
-        ]
-        .into_iter()
-        .collect(),
-    };
+    let spec = make_variable_set_spec([("DB_HOST", "localhost"), ("DB_PORT", "5432")]);
 
     let decision = harness
         .apply_variable_use_case()
@@ -75,20 +84,7 @@ async fn test_reconcile_variable_set_preserves_entry_id_across_reconciliations()
     let harness = BaseConfigurationServiceHarness::new();
     let account_handle = odf::AccountHandle::new_test("test-owner");
 
-    let spec = VariableSetSpec {
-        variables: [
-            (
-                "KEY_A".to_string(),
-                VariableSpec::Literal("value-a".to_string()),
-            ),
-            (
-                "KEY_B".to_string(),
-                VariableSpec::Literal("value-b".to_string()),
-            ),
-        ]
-        .into_iter()
-        .collect(),
-    };
+    let spec = make_variable_set_spec([("KEY_A", "value-a"), ("KEY_B", "value-b")]);
 
     // First apply — generation 0 → 1
     let decision = harness
@@ -119,20 +115,7 @@ async fn test_reconcile_variable_set_preserves_entry_id_across_reconciliations()
         .collect();
 
     // Second apply — change value of KEY_A, keep KEY_B the same; generation 1 → 2
-    let spec2 = VariableSetSpec {
-        variables: [
-            (
-                "KEY_A".to_string(),
-                VariableSpec::Literal("value-a-updated".to_string()),
-            ),
-            (
-                "KEY_B".to_string(),
-                VariableSpec::Literal("value-b".to_string()),
-            ),
-        ]
-        .into_iter()
-        .collect(),
-    };
+    let spec2 = make_variable_set_spec([("KEY_A", "value-a-updated"), ("KEY_B", "value-b")]);
 
     let decision2 = harness
         .apply_variable_use_case()

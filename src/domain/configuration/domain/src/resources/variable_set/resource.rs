@@ -23,7 +23,7 @@ use kamu_resources::{
     TypeUri,
 };
 
-use crate::{VariableSetEventStore, VariableSetSpec, VariableSetState};
+use crate::{VariableSetEventStore, VariableSetSpec, VariableSetSpecInput, VariableSetState};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -61,6 +61,7 @@ impl ResourceSchemaProvider for VariableSetResource {
 
 impl DeclarativeResource for VariableSetResource {
     type Spec = VariableSetSpec;
+    type SpecInput = VariableSetSpecInput;
     type ResourceState = VariableSetState;
 }
 
@@ -82,7 +83,7 @@ impl ResourcePresentation for VariableSetResource {
         vec![ResourceListColumnValueView {
             key: "variables".to_string(),
             value: ResourceListColumnValue::UInt64(
-                u64::try_from(state.spec().variables.len()).unwrap(),
+                u64::try_from(state.spec().variables.entries.len()).unwrap(),
             ),
         }]
     }

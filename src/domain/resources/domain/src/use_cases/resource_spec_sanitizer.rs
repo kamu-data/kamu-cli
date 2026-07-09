@@ -17,9 +17,9 @@ use crate::DeclarativeResource;
 pub trait ResourceSpecSanitizer<R: DeclarativeResource>: Send + Sync {
     async fn sanitize_new_spec(
         &self,
-        new_spec: R::Spec,
+        new_spec: R::SpecInput,
         maybe_current_spec: Option<&R::Spec>,
-    ) -> Result<R::Spec, InternalError>;
+    ) -> Result<R::SpecInput, InternalError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -253,6 +253,7 @@ pub trait DeclarativeResource:
     Sized + Send + Sync + std::fmt::Debug + AsRef<Self::ResourceState>
 {
     type Spec: std::fmt::Debug + Send + Sync;
+    type SpecInput: std::fmt::Debug + Send + Sync;
     type ResourceState: DeclarativeResourceState<Spec = Self::Spec>
         + TryFrom<ResourceSnapshot, Error = InternalError>
         + From<Self>;
@@ -263,6 +264,19 @@ pub trait DeclarativeResource:
     fn status(&self) -> &ResourceStatus;
 }
 ```
+
+**`Spec` vs `SpecInput`.** `Spec` is the resolved, stored shape — what a snapshot persists and what
+`get`/`list` return. `SpecInput` is the write-path shape decoded straight from a manifest/apply
+request; it is validated and linted (`ResourceValidateSpec`/`ResourceLinterSpec` run against
+`SpecInput`, not `Spec`), carried unconverted through `ApplyResourceParams` and into the
+`Created`/`SpecUpdated` events, and converted to `Spec` exactly once — lazily, at projection/replay
+time (`ResourceSpecFromInput::from_input`, called from `project_reconcilable_resource_state` in
+`core/reconcilable_status_projector.rs`) — mirroring how `ResourceHeadersInput` is threaded through
+events and converted to `ResourceHeaders` via `ResourceHeaders::from_input` at the same projection
+step (see below). For a resource kind with no server-side defaulting, `Spec` and `SpecInput` are the
+same type and `from_input` is the identity — `VariableSetResource` and `SecretSetResource` are both
+such cases today; `StorageResource` (WIP) is expected to be the first case where they genuinely
+diverge, once reference resolution (`ValueRef` -> concrete value) is implemented.
 
 **`ReconcilableResource`** adds the lifecycle + reconciliation transitions
 ([`core/reconcilable_resource.rs`](/src/domain/resources/domain/src/core/reconcilable_resource.rs)).
@@ -277,9 +291,9 @@ pub trait ReconcilableResource: DeclarativeResource {
 
     fn needs_reconciliation(&self) -> bool { /* observed_generation vs generation */ }
 
-    fn try_create(now, id, headers: ResourceHeadersInput, spec) -> Result<Self, LifecycleError>;
+    fn try_create(now, id, headers: ResourceHeadersInput, spec: Self::SpecInput) -> Result<Self, LifecycleError>;
     fn try_update_headers(&mut self, now, new_headers: ResourceHeadersInput) -> ...;
-    fn try_update_spec(&mut self, now, new_spec: Self::Spec) -> ...;
+    fn try_update_spec(&mut self, now, new_spec: Self::SpecInput) -> ...;
     fn try_delete(&mut self, now, tombstone_name: String) -> ...;
     fn try_mark_reconciliation_started(&mut self, now) -> ...;
     fn try_mark_reconciliation_succeeded(&mut self, now, expected_generation, success) -> ...;
@@ -308,8 +322,11 @@ and an aggregate. This is the bound that all generic use cases require.
 
 `ReconcilableResourceEvent<TSpec, TSuccess, TFailureDetails>` is the event-sourcing alphabet:
 `Created`, `HeadersUpdated`, `SpecUpdated`, `Deleted`, `ReconciliationStarted`,
-`ReconciliationSucceeded`, `ReconciliationFailed`. The `ResourceState` projection folds these into
-current state.
+`ReconciliationSucceeded`, `ReconciliationFailed`. `Created.spec` and `SpecUpdated.new_spec` are
+instantiated with `R::SpecInput`, not `R::Spec` — the event log stores what was submitted, same as
+`Created.headers`/`HeadersUpdated.new_headers` store `ResourceHeadersInput`. The `ResourceState`
+projection folds these into current state, converting `SpecInput` -> `Spec` (and `HeadersInput` ->
+`Headers`) at fold time — see `Spec` vs `SpecInput` above.
 
 ### Repository
 
@@ -429,6 +446,22 @@ pub struct ResourceStatus {                  // ODF-generated; entirely server-o
 > `canonicalSelector` + `id` + `name`), has no ODF codegen equivalent and stays hand-rolled, but is
 > named and placed the same way. The GraphQL-facing type is also `ResourceHandle` (was
 > `ResourceIdentity`).
+>
+> Per-kind `Spec`/`SpecInput` types follow the same convention where the RFC shape and the domain's
+> existing behavior (validation, linting) are compatible. `kamu_configuration::VariableSetSpec` /
+> `VariableSetSpecInput`
+> ([`variable_set/spec.rs`](/src/domain/configuration/domain/src/resources/variable_set/spec.rs)) are
+> thin newtypes around `odf::metadata::config::VariableSetSpec` / `VariableSetSpecInput` respectively —
+> a bare `pub type` alias isn't legal here because the generated DTOs have no native
+> `Serialize`/`Deserialize` (only via the YAML shadow proxy), and implementing those foreign traits
+> directly on a foreign type through an alias would violate the orphan rule. Both newtypes are declared
+> via the shared `kamu_resources::declare_rfc_spec_newtype!` macro
+> ([`values/rfc_spec_newtype.rs`](/src/domain/resources/domain/src/values/rfc_spec_newtype.rs)), which
+> derives `Serialize`/`Deserialize` via `#[serde(try_from = "…", into = "…")]` delegating through the
+> proxy — reusable for any future RFC spec adoption. The domain's `ResourceValidateSpec`/
+> `ResourceLinterSpec` impls attach to `VariableSetSpecInput` (the write-path type the framework
+> validates/lints), not `VariableSetSpec`. `SecretSetSpec` is not yet adopted this way — it has an
+> `Encrypted` variant with no RFC counterpart and needs a broader change, postponed.
 
 The behaviorally-significant consequences of adopting these shapes:
 
@@ -1006,7 +1039,7 @@ Two types are functional today, both under the config `v1alpha1` schema namespac
 
 | Schema | Selector name | Short name | Spec | Reconciliation |
 | --- | --- | --- | --- | --- |
-| `https://opendatafabric.org/schemas/config/v1alpha1/VariableSet` | `variablesets` | `vs` | `spec.variables` (name → value, scalar or `{ value }`) | Projects variable entries; status uses the standard ODF resource status. |
+| `https://opendatafabric.org/schemas/config/v1alpha1/VariableSet` | `variablesets` | `vs` | `spec.variables` (name → `{ value }`; accepts scalar shorthand on input via ODF's `StructOrString`, but always round-trips as the structured `{ value }` form once parsed — RFC-adopted, see [`VariableSetSpec`](/src/domain/configuration/domain/src/resources/variable_set/spec.rs)) | Projects variable entries; status uses the standard ODF resource status. |
 | `https://opendatafabric.org/schemas/config/v1alpha1/SecretSet` | `secretsets` | `ss` | `spec.secrets` (name → plaintext / `{ value }` / encrypted) | Materializes an **encrypted** read-side projection (`SecretSetEntry`) for consumers (see [Secret handling](#secret-handling-invariant) for where encryption actually happens). |
 
 ### Secret handling invariant

@@ -126,7 +126,11 @@ macro_rules! declare_apply_resource_use_case {
             $resource: kamu_resources::ReconcilableEventSourcedResource
                 + kamu_resources::ResourceSchemaProvider,
             <$resource as kamu_resources::DeclarativeResource>::Spec:
-                serde::Serialize + PartialEq + Clone + kamu_resources::ResourceValidateSpec,
+                serde::Serialize + PartialEq + Clone + kamu_resources::ResourceSpecFromInput<
+                    <$resource as kamu_resources::DeclarativeResource>::SpecInput,
+                >,
+            <$resource as kamu_resources::DeclarativeResource>::SpecInput:
+                serde::Serialize + Clone + kamu_resources::ResourceValidateSpec + kamu_resources::ResourceLinterSpec,
             <$resource as kamu_resources::ReconcilableResource>::LifecycleError:
                 kamu_resources::IntoApplyResourceRejection
                     + kamu_resources::InvariantViolationOf<
@@ -134,7 +138,7 @@ macro_rules! declare_apply_resource_use_case {
                     >
                     + From<kamu_resources::ResourceHeadersValidationError>
                     + From<
-                        <<$resource as kamu_resources::DeclarativeResource>::Spec as kamu_resources::ResourceValidateSpec>::ValidationError,
+                        <<$resource as kamu_resources::DeclarativeResource>::SpecInput as kamu_resources::ResourceValidateSpec>::ValidationError,
                     >,
         {
             async fn plan(

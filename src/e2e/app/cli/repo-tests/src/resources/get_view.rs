@@ -85,11 +85,13 @@ impl ResourceView {
         find_id(&self.0).unwrap_or_else(|| panic!("resource view has no string `id`:\n{}", self.0))
     }
 
-    /// The value of a `VariableSet` variable (`spec.variables.<key>`), if
-    /// present. Variables render as scalar strings.
+    /// The value of a `VariableSet` variable (`spec.variables.<key>.value`),
+    /// if present. Variables always render as the structured `{ value }`
+    /// form (RFC-adopted `VariableSetSpec`), even when applied via scalar
+    /// shorthand.
     pub fn variable(&self, key: &str) -> Option<&str> {
         self.0
-            .pointer(&format!("/spec/variables/{key}"))
+            .pointer(&format!("/spec/variables/{key}/value"))
             .and_then(Value::as_str)
     }
 

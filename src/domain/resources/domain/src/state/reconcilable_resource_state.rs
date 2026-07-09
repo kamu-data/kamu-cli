@@ -149,9 +149,11 @@ where
 impl<TModel> Projection for ReconcilableResourceState<TModel>
 where
     TModel: ReconcilableStateModel<State = Self> + 'static,
+    TModel::Spec: crate::ResourceSpecFromInput<TModel::SpecInput>,
 {
     type Query = ResourceID;
-    type Event = ReconcilableResourceEvent<TModel::Spec, TModel::Success, TModel::FailureDetails>;
+    type Event =
+        ReconcilableResourceEvent<TModel::SpecInput, TModel::Success, TModel::FailureDetails>;
 
     fn apply(state: Option<Self>, event: Self::Event) -> Result<Self, ProjectionError<Self>> {
         project_reconcilable_resource_state::<TModel>(state, event)

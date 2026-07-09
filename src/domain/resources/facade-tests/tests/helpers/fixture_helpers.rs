@@ -26,8 +26,8 @@ pub const SECRET_SET_SCHEMA_STR: &str = SecretSetResource::SCHEMA_STR;
 
 /// Builds a `VariableSet` manifest JSON string.
 ///
-/// Each variable is emitted as `{"value": "<v>"}` — the untagged `Value`
-/// variant of `VariableSpec`.
+/// Each variable is emitted as `{"value": "<v>"}` — the structured form of
+/// the RFC-derived `Variable` shape.
 pub fn variable_set_manifest_json(
     name: &str,
     account: Option<&str>,

@@ -42,10 +42,10 @@ use crate::{load_previous_resource, make_apply_manifest_changes};
 pub fn decode_resource_spec<R>(
     schema: &TypeUri,
     spec: serde_json::Value,
-) -> Result<R::Spec, ApplyResourceCrudDispatcherError>
+) -> Result<R::SpecInput, ApplyResourceCrudDispatcherError>
 where
     R: ReconcilableEventSourcedResource,
-    R::Spec: DeserializeOwned,
+    R::SpecInput: DeserializeOwned,
 {
     serde_json::from_value(spec).map_err(|e| ApplyResourceCrudDispatcherError::InvalidSpec {
         schema: schema.clone(),

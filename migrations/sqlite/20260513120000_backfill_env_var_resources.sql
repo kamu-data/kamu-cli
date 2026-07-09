@@ -41,7 +41,7 @@ SELECT
     json_object(
         'variables',
         (
-            SELECT json_group_object(d2.key, CAST(d2.value AS TEXT))
+            SELECT json_group_object(d2.key, json_object('value', CAST(d2.value AS TEXT)))
             FROM dataset_env_vars d2
             WHERE d2.dataset_id = dev.dataset_id
               AND d2.secret_nonce IS NULL

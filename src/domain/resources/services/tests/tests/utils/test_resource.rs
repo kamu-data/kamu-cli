@@ -20,6 +20,8 @@ pub struct TestResourceSpec {
     pub value: String,
 }
 
+kamu_resources::declare_identity_resource_spec_from_input!(TestResourceSpec);
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, thiserror::Error)]
@@ -62,6 +64,7 @@ pub struct TestResourceStateModel;
 
 impl ReconcilableStateModel for TestResourceStateModel {
     type Spec = TestResourceSpec;
+    type SpecInput = TestResourceSpec;
     type Success = ();
     type FailureDetails = String;
     type State = TestResourceState;
@@ -191,6 +194,7 @@ impl ResourceSchemaProvider for TestResource {
 
 impl DeclarativeResource for TestResource {
     type Spec = TestResourceSpec;
+    type SpecInput = TestResourceSpec;
     type ResourceState = TestResourceState;
 }
 

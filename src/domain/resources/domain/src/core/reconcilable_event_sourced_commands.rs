@@ -18,6 +18,7 @@ use crate::{
     ResourceHeadersValidationError,
     ResourceName,
     ResourcePhase,
+    ResourceSpecFromInput,
     ResourceValidateHeaders,
     ResourceValidateSpec,
 };
@@ -47,18 +48,18 @@ pub fn try_create_reconcilable_resource<R, TCreated, TCreate>(
     now: DateTime<Utc>,
     id: crate::ResourceID,
     headers: ResourceHeadersInput,
-    spec: R::Spec,
+    spec: R::SpecInput,
     create: TCreate,
 ) -> Result<TCreated, R::LifecycleError>
 where
     R: ReconcilableEventSourcedResource,
-    R::Spec: ResourceValidateSpec,
+    R::SpecInput: ResourceValidateSpec,
     R::LifecycleError: InvariantViolationOf<R::ResourceState>
         + From<ResourceHeadersValidationError>
-        + From<<R::Spec as ResourceValidateSpec>::ValidationError>,
+        + From<<R::SpecInput as ResourceValidateSpec>::ValidationError>,
     TCreate: FnOnce(
         crate::ResourceID,
-        ReconcilableResourceEvent<R::Spec, R::ReconcileSuccess, R::ReconcileFailureDetails>,
+        ReconcilableResourceEvent<R::SpecInput, R::ReconcileSuccess, R::ReconcileFailureDetails>,
     ) -> Result<TCreated, ProjectionError<R::ResourceState>>,
 {
     headers.validate()?;
@@ -96,17 +97,20 @@ where
 pub fn try_update_resource_spec<R>(
     resource: &mut R,
     now: DateTime<Utc>,
-    new_spec: R::Spec,
+    new_spec: R::SpecInput,
 ) -> Result<(), R::LifecycleError>
 where
     R: ReconcilableEventSourcedResource,
-    R::Spec: ResourceValidateSpec + PartialEq + Clone,
-    R::LifecycleError: From<<R::Spec as ResourceValidateSpec>::ValidationError>
+    R::SpecInput: ResourceValidateSpec + Clone,
+    R::Spec: ResourceSpecFromInput<R::SpecInput> + PartialEq,
+    R::LifecycleError: From<<R::SpecInput as ResourceValidateSpec>::ValidationError>
         + InvariantViolationOf<R::ResourceState>,
 {
     new_spec.validate()?;
 
-    if resource.spec() == &new_spec {
+    // Compare after normalizing (not the raw input) so a resubmitted-but-equivalent
+    // input is correctly detected as unchanged, even if its written form differs.
+    if resource.spec() == &R::Spec::from_input(new_spec.clone()) {
         return Ok(());
     }
 

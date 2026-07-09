@@ -20,6 +20,8 @@ pub struct StorageSpec {
     pub provider: StorageProviderSpec,
 }
 
+kamu_resources::declare_identity_resource_spec_from_input!(StorageSpec);
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Display, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

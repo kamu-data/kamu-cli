@@ -96,7 +96,7 @@ fn expected_variable_set(name: &str, message_value: &str) -> serde_json::Value {
             "annotations": {},
             "deletedAt": null,
         },
-        "spec": { "variables": { "MESSAGE": message_value } },
+        "spec": { "variables": { "MESSAGE": { "value": message_value } } },
         "status": {
             "conditions": successful_conditions(),
             "observedGeneration": 1,
@@ -120,7 +120,7 @@ fn expected_variable_set_with_labels(name: &str, message_value: &str) -> serde_j
             },
             "deletedAt": null,
         },
-        "spec": { "variables": { "MESSAGE": message_value } },
+        "spec": { "variables": { "MESSAGE": { "value": message_value } } },
         "status": {
             "conditions": successful_conditions(),
             "observedGeneration": 1,

@@ -106,15 +106,19 @@ impl BaseGQLResourceHarness {
     }
 
     pub fn dummy_variable_set_spec() -> serde_json::Value {
-        serde_json::to_value(kamu_configuration::VariableSetSpec {
-            variables: [(
-                "PLACEHOLDER".to_string(),
-                kamu_configuration::VariableSpec::Value(kamu_configuration::VariableValueSpec {
-                    value: "placeholder".to_string(),
-                }),
-            )]
-            .into(),
-        })
+        serde_json::to_value(kamu_configuration::VariableSetSpec::new(
+            odf::metadata::config::VariableSetSpec {
+                variables: odf::metadata::config::Variables {
+                    entries: [(
+                        "PLACEHOLDER".to_string(),
+                        kamu_configuration::Variable {
+                            value: "placeholder".to_string(),
+                        },
+                    )]
+                    .into(),
+                },
+            },
+        ))
         .unwrap()
     }
 

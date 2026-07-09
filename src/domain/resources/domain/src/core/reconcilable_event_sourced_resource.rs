@@ -41,7 +41,7 @@ pub trait ReconcilableEventSourcedResource:
         ResourceState: Projection<
             Query = ResourceID,
             Event = ReconcilableResourceEvent<
-                Self::Spec,
+                Self::SpecInput,
                 Self::ReconcileSuccess,
                 Self::ReconcileFailureDetails,
             >,
@@ -51,7 +51,7 @@ pub trait ReconcilableEventSourcedResource:
     fn apply_event(
         &mut self,
         event: ReconcilableResourceEvent<
-            Self::Spec,
+            Self::SpecInput,
             Self::ReconcileSuccess,
             Self::ReconcileFailureDetails,
         >,
@@ -72,9 +72,12 @@ pub trait ReconcilableEventSourcedResource:
         now: DateTime<Utc>,
         id: ResourceID,
         headers: ResourceHeadersInput,
-        spec: Self::Spec,
-    ) -> ReconcilableResourceEvent<Self::Spec, Self::ReconcileSuccess, Self::ReconcileFailureDetails>
-    {
+        spec: Self::SpecInput,
+    ) -> ReconcilableResourceEvent<
+        Self::SpecInput,
+        Self::ReconcileSuccess,
+        Self::ReconcileFailureDetails,
+    > {
         ReconcilableResourceEvent::Created(ResourceEventCreated {
             event_time: now,
             id,
@@ -87,8 +90,11 @@ pub trait ReconcilableEventSourcedResource:
         &self,
         now: DateTime<Utc>,
         new_headers: ResourceHeadersInput,
-    ) -> ReconcilableResourceEvent<Self::Spec, Self::ReconcileSuccess, Self::ReconcileFailureDetails>
-    {
+    ) -> ReconcilableResourceEvent<
+        Self::SpecInput,
+        Self::ReconcileSuccess,
+        Self::ReconcileFailureDetails,
+    > {
         ReconcilableResourceEvent::HeadersUpdated(ResourceEventHeadersUpdated {
             event_time: now,
             id: *self.id(),
@@ -99,10 +105,13 @@ pub trait ReconcilableEventSourcedResource:
     fn make_spec_updated_event(
         &self,
         now: DateTime<Utc>,
-        new_spec: Self::Spec,
+        new_spec: Self::SpecInput,
         new_generation: u64,
-    ) -> ReconcilableResourceEvent<Self::Spec, Self::ReconcileSuccess, Self::ReconcileFailureDetails>
-    {
+    ) -> ReconcilableResourceEvent<
+        Self::SpecInput,
+        Self::ReconcileSuccess,
+        Self::ReconcileFailureDetails,
+    > {
         ReconcilableResourceEvent::SpecUpdated(ResourceEventSpecUpdated {
             event_time: now,
             id: *self.id(),
@@ -115,8 +124,11 @@ pub trait ReconcilableEventSourcedResource:
         &self,
         now: DateTime<Utc>,
         tombstone_name: ResourceName,
-    ) -> ReconcilableResourceEvent<Self::Spec, Self::ReconcileSuccess, Self::ReconcileFailureDetails>
-    {
+    ) -> ReconcilableResourceEvent<
+        Self::SpecInput,
+        Self::ReconcileSuccess,
+        Self::ReconcileFailureDetails,
+    > {
         ReconcilableResourceEvent::Deleted(ResourceEventDeleted {
             event_time: now,
             id: *self.id(),
@@ -142,8 +154,11 @@ pub trait ReconcilableEventSourcedResource:
     fn make_reconciliation_started_event(
         &self,
         now: DateTime<Utc>,
-    ) -> ReconcilableResourceEvent<Self::Spec, Self::ReconcileSuccess, Self::ReconcileFailureDetails>
-    {
+    ) -> ReconcilableResourceEvent<
+        Self::SpecInput,
+        Self::ReconcileSuccess,
+        Self::ReconcileFailureDetails,
+    > {
         ReconcilableResourceEvent::ReconciliationStarted(ResourceEventReconciliationStarted {
             event_time: now,
             id: *self.id(),
@@ -156,8 +171,11 @@ pub trait ReconcilableEventSourcedResource:
         now: DateTime<Utc>,
         expected_generation: u64,
         success: Self::ReconcileSuccess,
-    ) -> ReconcilableResourceEvent<Self::Spec, Self::ReconcileSuccess, Self::ReconcileFailureDetails>
-    {
+    ) -> ReconcilableResourceEvent<
+        Self::SpecInput,
+        Self::ReconcileSuccess,
+        Self::ReconcileFailureDetails,
+    > {
         ReconcilableResourceEvent::ReconciliationSucceeded(ResourceEventReconciliationSucceeded {
             event_time: now,
             id: *self.id(),
@@ -171,8 +189,11 @@ pub trait ReconcilableEventSourcedResource:
         now: DateTime<Utc>,
         expected_generation: u64,
         error: &Self::ReconcileError,
-    ) -> ReconcilableResourceEvent<Self::Spec, Self::ReconcileSuccess, Self::ReconcileFailureDetails>
-    {
+    ) -> ReconcilableResourceEvent<
+        Self::SpecInput,
+        Self::ReconcileSuccess,
+        Self::ReconcileFailureDetails,
+    > {
         ReconcilableResourceEvent::ReconciliationFailed(ResourceEventReconciliationFailed {
             event_time: now,
             id: *self.id(),
@@ -187,14 +208,14 @@ pub trait ReconcilableEventSourcedResource:
         now: DateTime<Utc>,
         id: ResourceID,
         headers: ResourceHeadersInput,
-        spec: Self::Spec,
+        spec: Self::SpecInput,
     ) -> Result<Self, Self::LifecycleError>
     where
         Self: Sized,
-        Self::Spec: crate::ResourceValidateSpec,
+        Self::SpecInput: crate::ResourceValidateSpec,
         Self::LifecycleError: InvariantViolationOf<Self::ResourceState>
             + From<crate::ResourceHeadersValidationError>
-            + From<<Self::Spec as crate::ResourceValidateSpec>::ValidationError>,
+            + From<<Self::SpecInput as crate::ResourceValidateSpec>::ValidationError>,
     {
         crate::try_create_reconcilable_resource::<Self, _, _>(
             now,
@@ -222,12 +243,13 @@ pub trait ReconcilableEventSourcedResource:
     fn try_update_spec(
         &mut self,
         now: DateTime<Utc>,
-        new_spec: Self::Spec,
+        new_spec: Self::SpecInput,
     ) -> Result<(), Self::LifecycleError>
     where
         Self: Sized,
-        Self::Spec: crate::ResourceValidateSpec + PartialEq + Clone,
-        Self::LifecycleError: From<<Self::Spec as crate::ResourceValidateSpec>::ValidationError>
+        Self::SpecInput: crate::ResourceValidateSpec + Clone,
+        Self::Spec: crate::ResourceSpecFromInput<Self::SpecInput> + PartialEq,
+        Self::LifecycleError: From<<Self::SpecInput as crate::ResourceValidateSpec>::ValidationError>
             + InvariantViolationOf<Self::ResourceState>,
     {
         crate::try_update_resource_spec(self, now, new_spec)
@@ -260,7 +282,7 @@ macro_rules! impl_reconcilable_event_sourced_resource {
                 now: ::chrono::DateTime<::chrono::Utc>,
                 id: $crate::ResourceID,
                 headers: $crate::ResourceHeadersInput,
-                spec: Self::Spec,
+                spec: Self::SpecInput,
             ) -> Result<Self, Self::LifecycleError> {
                 <$resource as $crate::ReconcilableEventSourcedResource>::try_create(
                     now,
@@ -285,7 +307,7 @@ macro_rules! impl_reconcilable_event_sourced_resource {
             fn try_update_spec(
                 &mut self,
                 now: ::chrono::DateTime<::chrono::Utc>,
-                new_spec: Self::Spec,
+                new_spec: Self::SpecInput,
             ) -> Result<(), Self::LifecycleError> {
                 <$resource as $crate::ReconcilableEventSourcedResource>::try_update_spec(
                     self,

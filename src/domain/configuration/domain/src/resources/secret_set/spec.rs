@@ -22,6 +22,10 @@ pub struct SecretSetSpec {
     pub secrets: BTreeMap<String, SecretSpec>,
 }
 
+kamu_resources::declare_identity_resource_spec_from_input!(SecretSetSpec);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields, untagged)]
 pub enum SecretSpec {

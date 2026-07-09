@@ -10,12 +10,12 @@
 use kamu_resources::ReconcilableResourceEvent;
 use serde::{Deserialize, Serialize};
 
-use crate::{VariableSetReconcileSuccess, VariableSetSpec};
+use crate::{VariableSetReconcileSuccess, VariableSetSpecInput};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub type VariableSetEvent = ReconcilableResourceEvent<
-    VariableSetSpec,
+    VariableSetSpecInput,
     VariableSetReconcileSuccess,
     VariableSetFailureDetails,
 >;

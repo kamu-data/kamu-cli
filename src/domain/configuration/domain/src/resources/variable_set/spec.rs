@@ -7,44 +7,54 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::BTreeMap;
-
 use kamu_resources::{ResourceLinterSpec, ResourceValidateSpec, ResourceWarning};
-use serde::{Deserialize, Serialize};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct VariableSetSpec {
-    pub variables: BTreeMap<String, VariableSpec>,
-}
+/// RFC-derived variable shape (`{ value: String }`); accepts scalar-or-`{
+/// value }` shorthand on input via ODF's `StructOrString`, but always
+/// round-trips as the structured form once parsed — there is no retained
+/// flag for "was this written as shorthand."
+pub type Variable = odf::metadata::config::Variable;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields, untagged)]
-pub enum VariableSpec {
-    Literal(String),
-    Value(VariableValueSpec),
-}
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct VariableValueSpec {
-    pub value: String,
-}
+kamu_resources::declare_rfc_spec_newtype!(
+    VariableSetSpec,
+    dto = odf::metadata::config::VariableSetSpec,
+    proxy = odf::metadata::serde::yaml::config::VariableSetSpec,
+    proxy_path = "odf::metadata::serde::yaml::config::VariableSetSpec"
+);
 
-impl VariableSpec {
-    pub fn literal_value(&self) -> &str {
-        match self {
-            Self::Literal(value) => value,
-            Self::Value(value) => &value.value,
-        }
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Field-identical to `VariableSetSpec`, but kept as its own type (not a
+// `type` alias) so validation/linting attach to the write-path type the
+// framework actually asks for — see `ResourceSpecFromInput`.
+kamu_resources::declare_rfc_spec_newtype!(
+    VariableSetSpecInput,
+    dto = odf::metadata::config::VariableSetSpecInput,
+    proxy = odf::metadata::serde::yaml::config::VariableSetSpecInput,
+    proxy_path = "odf::metadata::serde::yaml::config::VariableSetSpecInput"
+);
+
+impl kamu_resources::ResourceSpecFromInput<VariableSetSpecInput> for VariableSetSpec {
+    fn from_input(input: VariableSetSpecInput) -> Self {
+        Self(odf::metadata::config::VariableSetSpec {
+            variables: input.0.variables,
+        })
+    }
+
+    fn into_input(self) -> VariableSetSpecInput {
+        VariableSetSpecInput(odf::metadata::config::VariableSetSpecInput {
+            variables: self.0.variables,
+        })
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl VariableSetSpec {
+impl VariableSetSpecInput {
     pub const MAX_VARIABLES: usize = 256;
     pub const MAX_VARIABLE_VALUE_LEN: usize = 16 * 1024;
     pub const WARNING_VARIABLE_VALUE_LEN: usize = 1024;
@@ -68,23 +78,25 @@ impl VariableSetSpec {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl ResourceValidateSpec for VariableSetSpec {
+impl ResourceValidateSpec for VariableSetSpecInput {
     type ValidationError = VariableSetSpecValidationError;
 
     fn validate(&self) -> Result<(), Self::ValidationError> {
-        if self.variables.is_empty() {
+        let entries = &self.variables.entries;
+
+        if entries.is_empty() {
             return Err(VariableSetSpecValidationError::EmptyVariables);
         }
 
-        if self.variables.len() > Self::MAX_VARIABLES {
+        if entries.len() > Self::MAX_VARIABLES {
             return Err(VariableSetSpecValidationError::TooManyVariables {
-                actual: self.variables.len(),
+                actual: entries.len(),
                 max: Self::MAX_VARIABLES,
             });
         }
 
-        for (name, variable) in &self.variables {
-            let value = variable.literal_value();
+        for (name, variable) in entries {
+            let value = variable.value.as_str();
 
             if !Self::is_valid_variable_name(name) {
                 return Err(VariableSetSpecValidationError::InvalidVariableName {
@@ -113,12 +125,12 @@ impl ResourceValidateSpec for VariableSetSpec {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl ResourceLinterSpec for VariableSetSpec {
+impl ResourceLinterSpec for VariableSetSpecInput {
     fn lint_warnings(&self) -> Vec<ResourceWarning> {
         let mut warnings = Vec::new();
 
-        for (name, variable) in &self.variables {
-            let value = variable.literal_value();
+        for (name, variable) in &self.variables.entries {
+            let value = variable.value.as_str();
 
             if name.starts_with(Self::RESERVED_VARIABLE_PREFIX) {
                 warnings.push(ResourceWarning {
@@ -146,10 +158,7 @@ impl ResourceLinterSpec for VariableSetSpec {
             if value.len() > Self::WARNING_VARIABLE_VALUE_LEN {
                 warnings.push(ResourceWarning {
                     code: Self::WARNING_CODE_LONG_VARIABLE_VALUE.to_string(),
-                    path: Some(match variable {
-                        VariableSpec::Literal(_) => format!("spec.variables.{name}"),
-                        VariableSpec::Value(_) => format!("spec.variables.{name}.value"),
-                    }),
+                    path: Some(format!("spec.variables.{name}.value")),
                     message: format!(
                         "Variable '{name}' value is unusually long: got {actual}, warning \
                          threshold is {threshold}",
@@ -195,7 +204,41 @@ pub enum VariableSetSpecValidationError {
 
 #[cfg(test)]
 mod tests {
-    use super::{VariableSetSpec, VariableSpec, VariableValueSpec};
+    use super::{Variable, VariableSetSpec, VariableSetSpecInput};
+
+    fn make_spec(
+        entries: impl IntoIterator<Item = (impl Into<String>, impl Into<String>)>,
+    ) -> VariableSetSpec {
+        VariableSetSpec(odf::metadata::config::VariableSetSpec {
+            variables: make_variables(entries),
+        })
+    }
+
+    fn make_spec_input(
+        entries: impl IntoIterator<Item = (impl Into<String>, impl Into<String>)>,
+    ) -> VariableSetSpecInput {
+        VariableSetSpecInput(odf::metadata::config::VariableSetSpecInput {
+            variables: make_variables(entries),
+        })
+    }
+
+    fn make_variables(
+        entries: impl IntoIterator<Item = (impl Into<String>, impl Into<String>)>,
+    ) -> odf::metadata::config::Variables {
+        odf::metadata::config::Variables {
+            entries: entries
+                .into_iter()
+                .map(|(name, value)| {
+                    (
+                        name.into(),
+                        Variable {
+                            value: value.into(),
+                        },
+                    )
+                })
+                .collect(),
+        }
+    }
 
     #[test]
     fn deserializes_scalar_variable_syntax() {
@@ -206,17 +249,7 @@ mod tests {
         }))
         .unwrap();
 
-        assert_eq!(
-            spec,
-            VariableSetSpec {
-                variables: [(
-                    "INPUT_TOPIC".to_string(),
-                    VariableSpec::Literal("analytics.events".to_string()),
-                )]
-                .into_iter()
-                .collect(),
-            }
-        );
+        assert_eq!(spec, make_spec([("INPUT_TOPIC", "analytics.events")]));
     }
 
     #[test]
@@ -230,56 +263,12 @@ mod tests {
         }))
         .unwrap();
 
-        assert_eq!(
-            spec,
-            VariableSetSpec {
-                variables: [(
-                    "INPUT_TOPIC".to_string(),
-                    VariableSpec::Value(VariableValueSpec {
-                        value: "analytics.events".to_string(),
-                    }),
-                )]
-                .into_iter()
-                .collect(),
-            }
-        );
+        assert_eq!(spec, make_spec([("INPUT_TOPIC", "analytics.events")]));
     }
 
     #[test]
-    fn serializes_variable_as_scalar_syntax() {
-        let value = serde_json::to_value(VariableSetSpec {
-            variables: [(
-                "INPUT_TOPIC".to_string(),
-                VariableSpec::Literal("analytics.events".to_string()),
-            )]
-            .into_iter()
-            .collect(),
-        })
-        .unwrap();
-
-        assert_eq!(
-            value,
-            serde_json::json!({
-                "variables": {
-                    "INPUT_TOPIC": "analytics.events",
-                }
-            })
-        );
-    }
-
-    #[test]
-    fn serializes_structured_variable_syntax() {
-        let value = serde_json::to_value(VariableSetSpec {
-            variables: [(
-                "INPUT_TOPIC".to_string(),
-                VariableSpec::Value(VariableValueSpec {
-                    value: "analytics.events".to_string(),
-                }),
-            )]
-            .into_iter()
-            .collect(),
-        })
-        .unwrap();
+    fn serializes_variable_as_structured_syntax() {
+        let value = serde_json::to_value(make_spec([("INPUT_TOPIC", "analytics.events")])).unwrap();
 
         assert_eq!(
             value,
@@ -297,20 +286,13 @@ mod tests {
     fn lints_reserved_prefix_warning() {
         use kamu_resources::ResourceLinterSpec;
 
-        let spec = VariableSetSpec {
-            variables: [(
-                "KAMU_INTERNAL".to_string(),
-                VariableSpec::Literal("value".to_string()),
-            )]
-            .into_iter()
-            .collect(),
-        };
+        let spec = make_spec_input([("KAMU_INTERNAL", "value")]);
 
         let warnings = spec.lint_warnings();
         assert_eq!(warnings.len(), 1);
         assert_eq!(
             warnings[0].code,
-            VariableSetSpec::WARNING_CODE_RESERVED_VARIABLE_PREFIX
+            VariableSetSpecInput::WARNING_CODE_RESERVED_VARIABLE_PREFIX
         );
         assert_eq!(
             warnings[0].path,
@@ -322,20 +304,13 @@ mod tests {
     fn lints_lowercase_name_warning() {
         use kamu_resources::ResourceLinterSpec;
 
-        let spec = VariableSetSpec {
-            variables: [(
-                "my_variable".to_string(),
-                VariableSpec::Literal("value".to_string()),
-            )]
-            .into_iter()
-            .collect(),
-        };
+        let spec = make_spec_input([("my_variable", "value")]);
 
         let warnings = spec.lint_warnings();
         assert_eq!(warnings.len(), 1);
         assert_eq!(
             warnings[0].code,
-            VariableSetSpec::WARNING_CODE_LOWERCASE_VARIABLE_NAME
+            VariableSetSpecInput::WARNING_CODE_LOWERCASE_VARIABLE_NAME
         );
         assert_eq!(
             warnings[0].path,
@@ -345,50 +320,17 @@ mod tests {
     }
 
     #[test]
-    fn lints_long_value_warning_literal() {
+    fn lints_long_value_warning() {
         use kamu_resources::ResourceLinterSpec;
 
-        let long_value = "x".repeat(VariableSetSpec::WARNING_VARIABLE_VALUE_LEN + 1);
-        let spec = VariableSetSpec {
-            variables: [(
-                "CONFIG_VALUE".to_string(),
-                VariableSpec::Literal(long_value),
-            )]
-            .into_iter()
-            .collect(),
-        };
+        let long_value = "x".repeat(VariableSetSpecInput::WARNING_VARIABLE_VALUE_LEN + 1);
+        let spec = make_spec_input([("CONFIG_VALUE", long_value)]);
 
         let warnings = spec.lint_warnings();
         assert_eq!(warnings.len(), 1);
         assert_eq!(
             warnings[0].code,
-            VariableSetSpec::WARNING_CODE_LONG_VARIABLE_VALUE
-        );
-        assert_eq!(
-            warnings[0].path,
-            Some("spec.variables.CONFIG_VALUE".to_string())
-        );
-    }
-
-    #[test]
-    fn lints_long_value_warning_structured() {
-        use kamu_resources::ResourceLinterSpec;
-
-        let long_value = "x".repeat(VariableSetSpec::WARNING_VARIABLE_VALUE_LEN + 1);
-        let spec = VariableSetSpec {
-            variables: [(
-                "CONFIG_VALUE".to_string(),
-                VariableSpec::Value(VariableValueSpec { value: long_value }),
-            )]
-            .into_iter()
-            .collect(),
-        };
-
-        let warnings = spec.lint_warnings();
-        assert_eq!(warnings.len(), 1);
-        assert_eq!(
-            warnings[0].code,
-            VariableSetSpec::WARNING_CODE_LONG_VARIABLE_VALUE
+            VariableSetSpecInput::WARNING_CODE_LONG_VARIABLE_VALUE
         );
         assert_eq!(
             warnings[0].path,
@@ -400,39 +342,32 @@ mod tests {
     fn lints_multiple_warnings() {
         use kamu_resources::ResourceLinterSpec;
 
-        let long_value = "x".repeat(VariableSetSpec::WARNING_VARIABLE_VALUE_LEN + 1);
-        let spec = VariableSetSpec {
-            variables: [
-                (
-                    "KAMU_CONFIG".to_string(),
-                    VariableSpec::Literal("short".to_string()),
-                ),
-                ("my_var".to_string(), VariableSpec::Literal(long_value)),
-            ]
-            .into_iter()
-            .collect(),
-        };
+        let long_value = "x".repeat(VariableSetSpecInput::WARNING_VARIABLE_VALUE_LEN + 1);
+        let spec = make_spec_input([
+            ("KAMU_CONFIG".to_string(), "short".to_string()),
+            ("my_var".to_string(), long_value),
+        ]);
 
         let warnings = spec.lint_warnings();
         assert_eq!(warnings.len(), 3);
         assert_eq!(
             warnings
                 .iter()
-                .filter(|w| w.code == VariableSetSpec::WARNING_CODE_RESERVED_VARIABLE_PREFIX)
+                .filter(|w| w.code == VariableSetSpecInput::WARNING_CODE_RESERVED_VARIABLE_PREFIX)
                 .count(),
             1
         );
         assert_eq!(
             warnings
                 .iter()
-                .filter(|w| w.code == VariableSetSpec::WARNING_CODE_LOWERCASE_VARIABLE_NAME)
+                .filter(|w| w.code == VariableSetSpecInput::WARNING_CODE_LOWERCASE_VARIABLE_NAME)
                 .count(),
             1
         );
         assert_eq!(
             warnings
                 .iter()
-                .filter(|w| w.code == VariableSetSpec::WARNING_CODE_LONG_VARIABLE_VALUE)
+                .filter(|w| w.code == VariableSetSpecInput::WARNING_CODE_LONG_VARIABLE_VALUE)
                 .count(),
             1
         );
@@ -442,14 +377,7 @@ mod tests {
     fn lints_no_warnings_for_valid_variable() {
         use kamu_resources::ResourceLinterSpec;
 
-        let spec = VariableSetSpec {
-            variables: [(
-                "INPUT_TOPIC".to_string(),
-                VariableSpec::Literal("analytics.events".to_string()),
-            )]
-            .into_iter()
-            .collect(),
-        };
+        let spec = make_spec_input([("INPUT_TOPIC", "analytics.events")]);
 
         let warnings = spec.lint_warnings();
         assert_eq!(warnings.len(), 0);

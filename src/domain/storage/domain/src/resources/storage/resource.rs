@@ -79,6 +79,7 @@ impl ResourceSchemaProvider for StorageResource {
 
 impl DeclarativeResource for StorageResource {
     type Spec = StorageSpec;
+    type SpecInput = StorageSpec; // first candidate for a real split once reference resolution lands
     type ResourceState = StorageState;
 }
 

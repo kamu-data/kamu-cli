@@ -21,6 +21,7 @@ pub struct StorageStateModel {}
 
 impl ReconcilableStateModel for StorageStateModel {
     type Spec = StorageSpec;
+    type SpecInput = StorageSpec;
     type Success = StorageReconcileSuccess;
     type FailureDetails = StorageFailureDetails;
     type State = StorageState;

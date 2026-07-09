@@ -35,6 +35,7 @@ use crate::domain::{
     ResourcePersistenceError,
     ResourcePersistenceService,
     ResourceSchemaProvider,
+    ResourceSpecFromInput,
     ResourceValidateSpec,
     TypedResourceQueryService,
 };
@@ -57,10 +58,11 @@ where
 impl<'a, R> ApplyResourcePlanExecutor<'a, R>
 where
     R: ReconcilableEventSourcedResource + ResourceSchemaProvider,
-    R::Spec: Serialize + PartialEq + Clone + ResourceValidateSpec + ResourceLinterSpec,
+    R::Spec: Serialize + PartialEq + Clone + ResourceSpecFromInput<R::SpecInput>,
+    R::SpecInput: ResourceValidateSpec + ResourceLinterSpec + Clone,
     R::LifecycleError: InvariantViolationOf<<R as DeclarativeResource>::ResourceState>
         + From<ResourceHeadersValidationError>
-        + From<<R::Spec as ResourceValidateSpec>::ValidationError>
+        + From<<R::SpecInput as ResourceValidateSpec>::ValidationError>
         + IntoApplyResourceRejection,
 {
     pub fn new(
@@ -190,12 +192,14 @@ where
             .map_err(ResourceLoadError)
             .map_err(ApplyResourceUseCaseError::LoadFailed)?;
 
+        let spec = plan.resource.spec().clone();
+
         let replanned = planner.plan_update_resource(
             existing_resource,
             ApplyResourceParams {
                 id: Some(id),
                 headers: headers_input,
-                spec: plan.resource.spec().clone(),
+                spec: spec.into_input(),
             },
             plan.planned_at,
         )?;

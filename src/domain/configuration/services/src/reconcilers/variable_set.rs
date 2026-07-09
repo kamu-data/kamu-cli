@@ -56,6 +56,7 @@ impl Reconciler<VariableSetResource> for VariableSetReconcilerImpl {
         let entries: Vec<_> = resource
             .spec()
             .variables
+            .entries
             .iter()
             .map(|(key, variable)| {
                 let (entry_id, created_at) = previous_entries_by_key
@@ -67,7 +68,7 @@ impl Reconciler<VariableSetResource> for VariableSetReconcilerImpl {
                     entry_id,
                     account_id: account_id.clone(),
                     key: key.clone(),
-                    value: variable.literal_value().to_string(),
+                    value: variable.value.clone(),
                     created_at,
                     updated_at: now,
                 }

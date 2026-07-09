@@ -33,6 +33,7 @@ use crate::domain::{
     ResourceLinterSpec,
     ResourceLoadError,
     ResourceSchemaProvider,
+    ResourceSpecFromInput,
     ResourceValidateSpec,
     TypedResourceQueryService,
 };
@@ -52,10 +53,11 @@ where
 impl<'a, R> ApplyResourcePlanner<'a, R>
 where
     R: ReconcilableEventSourcedResource + ResourceSchemaProvider,
-    R::Spec: Serialize + PartialEq + Clone + ResourceValidateSpec + ResourceLinterSpec,
+    R::Spec: Serialize + PartialEq + Clone + ResourceSpecFromInput<R::SpecInput>,
+    R::SpecInput: ResourceValidateSpec + ResourceLinterSpec + Clone,
     R::LifecycleError: InvariantViolationOf<<R as DeclarativeResource>::ResourceState>
         + From<ResourceHeadersValidationError>
-        + From<<R::Spec as ResourceValidateSpec>::ValidationError>
+        + From<<R::SpecInput as ResourceValidateSpec>::ValidationError>
         + IntoApplyResourceRejection,
 {
     pub fn new(
@@ -159,6 +161,8 @@ where
             .await
             .map_err(ApplyResourceUseCaseError::Internal)?;
 
+        let warnings = params.spec.lint_warnings();
+
         let resource =
             match <R as ReconcilableResource>::try_create(now, id, params.headers, params.spec) {
                 Ok(resource) => resource,
@@ -168,8 +172,6 @@ where
                     ));
                 }
             };
-
-        let warnings = resource.spec().lint_warnings();
 
         Ok(PlannedApplyResourceDecision::Planned(
             PlannedApplyResource {
@@ -196,6 +198,9 @@ where
                 Self::map_lifecycle_error(err)?,
             ));
         }
+
+        let warnings = params.spec.lint_warnings();
+
         if let Err(err) =
             <R as ReconcilableResource>::try_update_spec(&mut resource, now, params.spec)
         {
@@ -209,8 +214,6 @@ where
         } else {
             ApplyResourceAction::Untouched
         };
-
-        let warnings = resource.spec().lint_warnings();
 
         Ok(PlannedApplyResourceDecision::Planned(
             PlannedApplyResource {

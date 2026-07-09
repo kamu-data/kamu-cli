@@ -32,7 +32,7 @@ pub trait ReconcilableResource: DeclarativeResource {
         now: DateTime<Utc>,
         id: crate::ResourceID,
         headers: crate::ResourceHeadersInput,
-        spec: Self::Spec,
+        spec: Self::SpecInput,
     ) -> Result<Self, Self::LifecycleError>
     where
         Self: Sized;
@@ -46,7 +46,7 @@ pub trait ReconcilableResource: DeclarativeResource {
     fn try_update_spec(
         &mut self,
         now: DateTime<Utc>,
-        new_spec: Self::Spec,
+        new_spec: Self::SpecInput,
     ) -> Result<(), Self::LifecycleError>;
 
     fn try_delete(

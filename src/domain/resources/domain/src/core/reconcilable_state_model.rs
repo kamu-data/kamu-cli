@@ -14,13 +14,15 @@ use crate::{DeclarativeResourceState, ReconcilableResourceEvent, ResourceState};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub trait ReconcilableStateModel {
+    /// Mirrors `DeclarativeResource::Spec`/`SpecInput`.
     type Spec: std::fmt::Debug + Clone + Send + Sync;
+    type SpecInput: std::fmt::Debug + Clone + Send + Sync;
     type Success: std::fmt::Debug + Clone + Send + Sync + 'static;
     type FailureDetails: std::fmt::Debug + Clone + Send + Sync + 'static;
     type State: DeclarativeResourceState<Spec = Self::Spec>
         + From<ResourceState<Self::Spec>>
         + Projection<
-            Event = ReconcilableResourceEvent<Self::Spec, Self::Success, Self::FailureDetails>,
+            Event = ReconcilableResourceEvent<Self::SpecInput, Self::Success, Self::FailureDetails>,
         >;
 }
 

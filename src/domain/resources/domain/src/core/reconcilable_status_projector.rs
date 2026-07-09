@@ -15,6 +15,7 @@ use crate::{
     ReconcilableStateModel,
     ResourceHeaders,
     ResourceHeadersExt,
+    ResourceSpecFromInput,
     ResourceState,
     ResourceStatusExt,
     new_pending_resource_status,
@@ -24,10 +25,11 @@ use crate::{
 
 pub fn project_reconcilable_resource_state<TModel>(
     state: Option<TModel::State>,
-    event: ReconcilableResourceEvent<TModel::Spec, TModel::Success, TModel::FailureDetails>,
+    event: ReconcilableResourceEvent<TModel::SpecInput, TModel::Success, TModel::FailureDetails>,
 ) -> Result<TModel::State, ProjectionError<TModel::State>>
 where
     TModel: ReconcilableStateModel,
+    TModel::Spec: ResourceSpecFromInput<TModel::SpecInput>,
 {
     use ReconcilableResourceEvent as E;
 
@@ -35,7 +37,7 @@ where
         (None, E::Created(e)) => Ok(ResourceState::new(
             e.id,
             ResourceHeaders::from_input(e.event_time, e.id, e.headers),
-            e.spec,
+            TModel::Spec::from_input(e.spec),
             new_pending_resource_status(),
         )
         .into()),
@@ -55,7 +57,7 @@ where
         (Some(mut s), E::SpecUpdated(e)) => {
             assert_eq!(s.id(), &e.id);
 
-            *s.spec_mut() = e.new_spec;
+            *s.spec_mut() = TModel::Spec::from_input(e.new_spec);
             s.headers_mut().generation = e.new_generation;
             s.headers_mut().updated_at = e.event_time;
 

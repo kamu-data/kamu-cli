@@ -51,7 +51,7 @@ pub struct ApplyResourceParams<R: DeclarativeResource> {
     /// `headers.account` must be `Some(AccountRef::Handle(_))` — see
     /// [`ApplyResourceUseCase`].
     pub headers: crate::ResourceHeadersInput,
-    pub spec: R::Spec,
+    pub spec: R::SpecInput,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

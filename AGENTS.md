@@ -11,6 +11,15 @@ Small project-specific guidance for coding agents working in this repository.
   this workspace is usually precompiled and package narrowing is often slower for
   builds, tests, and validation commands.
 
+### Migration Review Context
+
+Do not assume edited migrations are already applied externally just because they exist in git history.
+
+Default assumption for uncommitted migration edits:
+- Treat them as branch-local development unless there is evidence they were released, shared, or applied outside this workspace.
+- Do not flag checksum drift or “already migrated database” risk based only on the migration timestamp or prior commits.
+- If external application status matters and is unclear, ask instead of making it a review finding.
+
 ## Tests
 
 - Prefer `cargo nextest run` over `cargo test` for targeted test execution.

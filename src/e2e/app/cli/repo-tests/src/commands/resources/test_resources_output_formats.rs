@@ -52,7 +52,7 @@ pub async fn test_resources_output_formats(ctx: ResourceCtx) {
     );
     assert_eq!(
         get_yaml
-            .pointer("/spec/variables/MESSAGE")
+            .pointer("/spec/variables/MESSAGE/value")
             .and_then(serde_json::Value::as_str),
         Some(resource_value)
     );

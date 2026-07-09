@@ -21,6 +21,7 @@ pub struct SecretSetStateModel {}
 
 impl ReconcilableStateModel for SecretSetStateModel {
     type Spec = SecretSetSpec;
+    type SpecInput = SecretSetSpec;
     type Success = SecretSetReconcileSuccess;
     type FailureDetails = SecretSetFailureDetails;
     type State = SecretSetState;
