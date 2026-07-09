@@ -11,8 +11,8 @@ use database_common::PaginationOpts;
 use internal_error::InternalError;
 
 use crate::{
+    ResourceHandleRow,
     ResourceID,
-    ResourceIdentityRow,
     ResourceName,
     ResourceSnapshot,
     ResourceSummaryRow,
@@ -33,29 +33,29 @@ pub trait GenericResourceQueryService: Send + Sync {
         name: &ResourceName,
     ) -> Result<Option<ResourceID>, InternalError>;
 
-    async fn find_resource_identities_by_ids(
+    async fn find_resource_handles_by_ids(
         &self,
         account_id: &odf::AccountID,
         ids: &[ResourceID],
-    ) -> Result<Vec<ResourceIdentityRow>, InternalError>;
+    ) -> Result<Vec<ResourceHandleRow>, InternalError>;
 
-    async fn find_resource_identities_by_names(
+    async fn find_resource_handles_by_names(
         &self,
         account_id: &odf::AccountID,
         schema: &TypeUri,
         names: &[ResourceName],
-    ) -> Result<Vec<ResourceIdentityRow>, InternalError>;
+    ) -> Result<Vec<ResourceHandleRow>, InternalError>;
 
-    async fn search_resource_identities(
+    async fn search_resource_handles(
         &self,
         account_id: &odf::AccountID,
         schemas: &[TypeUri],
         exact_names: Option<&[ResourceName]>,
         name_pattern: Option<&str>,
         pagination: PaginationOpts,
-    ) -> Result<Vec<ResourceIdentityRow>, InternalError>;
+    ) -> Result<Vec<ResourceHandleRow>, InternalError>;
 
-    async fn count_search_resource_identities(
+    async fn count_search_resource_handles(
         &self,
         account_id: &odf::AccountID,
         schemas: &[TypeUri],

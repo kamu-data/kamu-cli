@@ -107,8 +107,8 @@ pub fn variable_set_manifest_yaml(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn sorted_identity_names(mut items: Vec<kamu_resources::ResourceIdentityView>) -> Vec<String> {
-    crate::helpers::normalize_identity_views(&mut items);
+pub fn sorted_handle_names(mut items: Vec<kamu_resources::ResourceHandle>) -> Vec<String> {
+    crate::helpers::normalize_handles(&mut items);
     items
         .into_iter()
         .map(|item| item.name.to_string())

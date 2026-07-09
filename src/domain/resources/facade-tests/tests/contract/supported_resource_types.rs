@@ -13,7 +13,7 @@ use kamu_resources::{ResourceSchemaProvider, UnsupportedResourceSelectorError};
 use kamu_resources_facade::{
     DeleteResourceError,
     GetResourceError,
-    ListResourceIdentitiesRequest,
+    ListResourceHandlesRequest,
     ListResourcesError,
     ListResourcesRequest,
     ResourceSelector,
@@ -120,7 +120,7 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
 
     let facade = h.facade_for(TestAccount::Alice);
 
-    // Canonical selector name works for list, list_identities, and get
+    // Canonical selector name works for list, list_handles, and get
     let summaries = facade
         .list(ListResourcesRequest {
             raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
@@ -137,19 +137,19 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
         );
     }
 
-    let identities = facade
-        .list_identities(ListResourceIdentitiesRequest {
+    let handles = facade
+        .list_handles(ListResourceHandlesRequest {
             raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
-        .expect("list_identities with canonical selector must succeed");
-    for i in &identities {
+        .expect("list_handles with canonical selector must succeed");
+    for i in &handles {
         assert_eq!(
             i.schema,
             *VariableSetResource::schema(),
-            "list_identities schema must be canonical"
+            "list_handles schema must be canonical"
         );
     }
 
@@ -204,16 +204,16 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
 // RF-003
 // Unsupported selector rejection behavior by API:
 //
-// - list / list_identities: UnsupportedSelector (validated before DB query)
+// - list / list_handles: UnsupportedSelector (validated before DB query)
 // - apply_manifest: UnsupportedDescriptor (validated from manifest)
 // - delete (by UID): UnsupportedSelector (validated before UID lookup)
 //
-// Known gap — get / get_identity by ByName with an unknown resource_type:
+// Known gap — get / get_handle by ByName with an unknown resource_type:
 //   The facade resolves the UID via a DB name lookup first, passing the raw
 //   type string as a filter column.  For an unknown type, nothing matches →
 //   LookupProblem(NameNotFound) is returned instead of UnsupportedSelector.
 //   This is an implementation detail of the current ByName resolution path.
-//   get / get_identity by ById does return UnsupportedSelector because the
+//   get / get_handle by ById does return UnsupportedSelector because the
 // type is validated when the CRUD dispatcher is resolved after the UID is
 // known.
 contract_test!(
@@ -255,9 +255,9 @@ pub async fn test_unsupported_schema_rejected_consistently(h: &impl FacadeContra
         ),
     }
 
-    // get_identity by ByName — same UnsupportedSelector behavior
+    // get_handle by ByName — same UnsupportedSelector behavior
     let gi_by_name = facade
-        .get_identity(ResourceSelector {
+        .get_handle(ResourceSelector {
             account: None,
             resource_type: bad_type.parse().unwrap(),
             resource_ref: kamu_resources_facade::ResourceRef::ByName(
@@ -270,7 +270,7 @@ pub async fn test_unsupported_schema_rejected_consistently(h: &impl FacadeContra
             assert_unsupported_selector(&err, bad_type);
         }
         other => panic!(
-            "get_identity by ByName with unknown selector must return UnsupportedSelector, got: \
+            "get_handle by ByName with unknown selector must return UnsupportedSelector, got: \
              {other:?}"
         ),
     }
@@ -292,9 +292,9 @@ pub async fn test_unsupported_schema_rejected_consistently(h: &impl FacadeContra
         }
     }
 
-    // list_identities — UnsupportedSelector
+    // list_handles — UnsupportedSelector
     let li_result = facade
-        .list_identities(ListResourceIdentitiesRequest {
+        .list_handles(ListResourceHandlesRequest {
             raw_type_selector: bad_type.parse().unwrap(),
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
@@ -305,7 +305,7 @@ pub async fn test_unsupported_schema_rejected_consistently(h: &impl FacadeContra
             assert_unsupported_selector(&err, bad_type);
         }
         other => panic!(
-            "list_identities: unsupported selector must return UnsupportedSelector, got: {other:?}"
+            "list_handles: unsupported selector must return UnsupportedSelector, got: {other:?}"
         ),
     }
 

@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use database_common::PaginationOpts;
-use kamu_resources_facade::{ListAllResourceIdentitiesRequest, ListAllResourcesRequest};
+use kamu_resources_facade::{ListAllResourceHandlesRequest, ListAllResourcesRequest};
 use pretty_assertions::assert_eq;
 
 use crate::contract_test;
@@ -17,7 +17,7 @@ use crate::helpers::{
     SECRET_SET_SCHEMA_STR,
     VARIABLE_SET_SCHEMA_STR,
     apply_manifest_and_get_id,
-    normalize_identity_views,
+    normalize_handles,
     normalize_summary_views,
     secret_set_manifest_json,
     variable_set_manifest_json,
@@ -33,8 +33,8 @@ fn summary_keys(mut items: Vec<kamu_resources::ResourceSummaryView>) -> Vec<(Str
         .collect()
 }
 
-fn identity_keys(mut items: Vec<kamu_resources::ResourceIdentityView>) -> Vec<(String, String)> {
-    normalize_identity_views(&mut items);
+fn handle_keys(mut items: Vec<kamu_resources::ResourceHandle>) -> Vec<(String, String)> {
+    normalize_handles(&mut items);
     items
         .into_iter()
         .map(|item| (item.schema.to_string(), item.name.to_string()))
@@ -97,13 +97,11 @@ pub async fn list_all_summaries_across_supported_resource_types(h: &impl FacadeC
 
 // RF-101
 contract_test!(
-    list_all_identities_across_supported_resource_types,
-    super::test_list_all_identities_across_supported_resource_types
+    list_all_handles_across_supported_resource_types,
+    super::test_list_all_handles_across_supported_resource_types
 );
 
-pub async fn test_list_all_identities_across_supported_resource_types(
-    h: &impl FacadeContractHarness,
-) {
+pub async fn test_list_all_handles_across_supported_resource_types(h: &impl FacadeContractHarness) {
     apply_manifest_and_get_id(
         h,
         TestAccount::Alice,
@@ -123,9 +121,9 @@ pub async fn test_list_all_identities_across_supported_resource_types(
     )
     .await;
 
-    let identities = h
+    let handles = h
         .facade_for(TestAccount::Alice)
-        .list_all_identities(ListAllResourceIdentitiesRequest {
+        .list_all_handles(ListAllResourceHandlesRequest {
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
@@ -133,7 +131,7 @@ pub async fn test_list_all_identities_across_supported_resource_types(
         .unwrap();
 
     assert_eq!(
-        identity_keys(identities),
+        handle_keys(handles),
         vec![
             (
                 SECRET_SET_SCHEMA_STR.to_string(),
@@ -190,8 +188,8 @@ pub async fn test_list_all_supports_pagination(h: &impl FacadeContractHarness) {
         })
         .await
         .unwrap();
-    let identity_second_page = facade
-        .list_all_identities(ListAllResourceIdentitiesRequest {
+    let handle_second_page = facade
+        .list_all_handles(ListAllResourceHandlesRequest {
             account: None,
             pagination: PaginationOpts::from_page(1, 2),
         })
@@ -205,9 +203,9 @@ pub async fn test_list_all_supports_pagination(h: &impl FacadeContractHarness) {
             .iter()
             .map(|summary| summary.name.clone())
             .collect::<Vec<_>>(),
-        identity_second_page
+        handle_second_page
             .iter()
-            .map(|identity| identity.name.clone())
+            .map(|handle| handle.name.clone())
             .collect::<Vec<_>>()
     );
 }
@@ -236,8 +234,8 @@ pub async fn test_list_all_empty_account_returns_empty(h: &impl FacadeContractHa
         })
         .await
         .unwrap();
-    let identities = facade
-        .list_all_identities(ListAllResourceIdentitiesRequest {
+    let handles = facade
+        .list_all_handles(ListAllResourceHandlesRequest {
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
@@ -245,7 +243,7 @@ pub async fn test_list_all_empty_account_returns_empty(h: &impl FacadeContractHa
         .unwrap();
 
     assert!(summaries.is_empty());
-    assert!(identities.is_empty());
+    assert!(handles.is_empty());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

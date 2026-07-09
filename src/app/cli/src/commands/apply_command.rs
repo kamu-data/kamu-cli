@@ -18,7 +18,7 @@ use kamu_resources::{
     ApplyManifestChange,
     ApplyManifestRejection,
     ApplyResourceOutcome,
-    ResourceView,
+    Resource,
     ResourceWarning,
     resource_type_name,
 };
@@ -639,7 +639,7 @@ impl ApplyPrinter<'_> {
     fn print_verbose_resource(
         &self,
         progress: Option<&ApplyMultiProgress>,
-        resource: &ResourceView,
+        resource: &Resource,
     ) -> Result<(), CLIError> {
         let rendered = Self::render_verbose_resource(resource)?;
 
@@ -655,11 +655,11 @@ impl ApplyPrinter<'_> {
         Ok(())
     }
 
-    fn render_verbose_resource(resource: &ResourceView) -> Result<String, CLIError> {
+    fn render_verbose_resource(resource: &Resource) -> Result<String, CLIError> {
         #[serde_with::serde_as]
         #[derive(serde::Serialize)]
         #[serde(rename_all = "camelCase")]
-        struct RenderedResourceViewHeaders<'a> {
+        struct RenderedResourceHeaders<'a> {
             id: &'a kamu_resources::ResourceID,
             #[serde_as(as = "odf::metadata::serde::yaml::auth::AccountHandle")]
             account: &'a odf::AccountHandle,
@@ -675,8 +675,8 @@ impl ApplyPrinter<'_> {
             deleted_at: &'a Option<DateTime<Utc>>,
         }
 
-        impl<'a> RenderedResourceViewHeaders<'a> {
-            fn new(resource: &'a ResourceView) -> Self {
+        impl<'a> RenderedResourceHeaders<'a> {
+            fn new(resource: &'a Resource) -> Self {
                 Self {
                     id: &resource.headers.id,
                     account: &resource.headers.account,
@@ -693,23 +693,21 @@ impl ApplyPrinter<'_> {
         }
 
         #[derive(serde::Serialize)]
-        struct RenderedResourceView<'a> {
+        struct RenderedResource<'a> {
             #[serde(rename = "$schema")]
             schema: &'a str,
-            headers: RenderedResourceViewHeaders<'a>,
+            headers: RenderedResourceHeaders<'a>,
             spec: serde_yaml::Value,
-            status: Option<serde_yaml::Value>,
+            status: serde_yaml::Value,
         }
 
-        serde_yaml::to_string(&RenderedResourceView {
+        serde_yaml::to_string(&RenderedResource {
             schema: resource.schema.as_str(),
-            headers: RenderedResourceViewHeaders::new(resource),
+            headers: RenderedResourceHeaders::new(resource),
             spec: common::json_to_yaml_value(&resource.spec),
-            status: resource
-                .status
-                .as_ref()
-                .map(kamu_resources::resource_status_to_json)
-                .map(|status| common::json_to_yaml_value(&status)),
+            status: common::json_to_yaml_value(&kamu_resources::resource_status_to_json(
+                &resource.status,
+            )),
         })
         .map_err(CLIError::critical)
     }

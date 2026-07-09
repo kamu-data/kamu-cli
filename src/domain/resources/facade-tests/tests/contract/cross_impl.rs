@@ -328,9 +328,9 @@ pub async fn test_batch_equivalence(h: &impl FacadeContractHarness) {
         ResourceLookupProblem::IDNotFound(_)
     );
 
-    // get_identities: both facades must agree on success id and problem indexes
-    let local_id = local.get_identities(batch_selector.clone()).await.unwrap();
-    let remote_id = remote.get_identities(batch_selector.clone()).await.unwrap();
+    // get_handles: both facades must agree on success id and problem indexes
+    let local_id = local.get_handles(batch_selector.clone()).await.unwrap();
+    let remote_id = remote.get_handles(batch_selector.clone()).await.unwrap();
     assert_batch_indexes(&local_id, &[0], &[1, 2]);
     assert_batch_indexes(&remote_id, &[0], &[1, 2]);
     assert_eq!(local_id.successes[0].item.id, uid_a);

@@ -109,13 +109,13 @@ impl GetResourceCommand {
 
     fn render_full_resource(
         &self,
-        resource: &kamu_resources::ResourceView,
+        resource: &kamu_resources::Resource,
         format: FacadeResourceManifestFormat,
     ) -> Result<String, CLIError> {
         #[serde_with::serde_as]
         #[derive(serde::Serialize)]
         #[serde(rename_all = "camelCase")]
-        struct RenderedResourceViewHeaders<'a> {
+        struct RenderedResourceHeaders<'a> {
             id: &'a kamu_resources::ResourceID,
             #[serde_as(as = "odf::metadata::serde::yaml::auth::AccountHandle")]
             account: &'a odf::AccountHandle,
@@ -131,8 +131,8 @@ impl GetResourceCommand {
             deleted_at: &'a Option<DateTime<Utc>>,
         }
 
-        impl<'a> RenderedResourceViewHeaders<'a> {
-            fn new(resource: &'a kamu_resources::ResourceView) -> Self {
+        impl<'a> RenderedResourceHeaders<'a> {
+            fn new(resource: &'a kamu_resources::Resource) -> Self {
                 Self {
                     id: &resource.headers.id,
                     account: &resource.headers.account,
@@ -149,50 +149,43 @@ impl GetResourceCommand {
         }
 
         #[derive(serde::Serialize)]
-        struct RenderedResourceViewJson<'a> {
+        struct RenderedResourceJson<'a> {
             #[serde(rename = "$schema")]
             schema: &'a str,
-            headers: RenderedResourceViewHeaders<'a>,
+            headers: RenderedResourceHeaders<'a>,
             spec: &'a serde_json::Value,
-            status: Option<serde_json::Value>,
+            status: serde_json::Value,
         }
 
         #[derive(serde::Serialize)]
-        struct RenderedResourceViewYaml<'a> {
+        struct RenderedResourceYaml<'a> {
             #[serde(rename = "$schema")]
             schema: &'a str,
-            headers: RenderedResourceViewHeaders<'a>,
+            headers: RenderedResourceHeaders<'a>,
             spec: serde_yaml::Value,
-            status: Option<serde_yaml::Value>,
+            status: serde_yaml::Value,
         }
 
         match format {
             FacadeResourceManifestFormat::Json => {
-                serde_json::to_string_pretty(&RenderedResourceViewJson {
+                serde_json::to_string_pretty(&RenderedResourceJson {
                     schema: resource.schema.as_str(),
-                    headers: RenderedResourceViewHeaders::new(resource),
+                    headers: RenderedResourceHeaders::new(resource),
                     spec: &resource.spec,
-                    status: resource
-                        .status
-                        .as_ref()
-                        .map(kamu_resources::resource_status_to_json),
+                    status: kamu_resources::resource_status_to_json(&resource.status),
                 })
                 .map_err(CLIError::critical)
             }
 
-            FacadeResourceManifestFormat::Yaml => {
-                serde_yaml::to_string(&RenderedResourceViewYaml {
-                    schema: resource.schema.as_str(),
-                    headers: RenderedResourceViewHeaders::new(resource),
-                    spec: common::json_to_yaml_value(&resource.spec),
-                    status: resource
-                        .status
-                        .as_ref()
-                        .map(kamu_resources::resource_status_to_json)
-                        .map(|status| common::json_to_yaml_value(&status)),
-                })
-                .map_err(CLIError::critical)
-            }
+            FacadeResourceManifestFormat::Yaml => serde_yaml::to_string(&RenderedResourceYaml {
+                schema: resource.schema.as_str(),
+                headers: RenderedResourceHeaders::new(resource),
+                spec: common::json_to_yaml_value(&resource.spec),
+                status: common::json_to_yaml_value(&kamu_resources::resource_status_to_json(
+                    &resource.status,
+                )),
+            })
+            .map_err(CLIError::critical),
         }
     }
 

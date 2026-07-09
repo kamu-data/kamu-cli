@@ -83,8 +83,8 @@ pub(crate) struct ResourceConnection {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
-pub(crate) struct ResourceIdentityConnection {
-    pub nodes: Vec<ResourceIdentity>,
+pub(crate) struct ResourceHandleConnection {
+    pub nodes: Vec<ResourceHandle>,
     pub total_count: i32,
 }
 
@@ -208,7 +208,7 @@ pub(crate) struct Resource {
     pub schema: kamu_resources::TypeUri,
     pub headers: ResourceHeaders,
     pub spec: serde_json::Value,
-    pub status: Option<ResourceStatus>,
+    pub status: ResourceStatus,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -248,7 +248,7 @@ pub(crate) struct AccountHandle {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
-pub(crate) struct ResourceIdentity {
+pub(crate) struct ResourceHandle {
     pub id: kamu_resources::ResourceID,
     pub schema: kamu_resources::TypeUri,
     pub canonical_selector: kamu_resources::ResourceSelectorName,

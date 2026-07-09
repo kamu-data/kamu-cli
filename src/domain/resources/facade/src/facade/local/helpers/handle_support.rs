@@ -11,9 +11,9 @@ use std::collections::HashMap;
 
 use internal_error::InternalError;
 use kamu_resources::{
+    ResourceHandle,
+    ResourceHandleRow,
     ResourceID,
-    ResourceIdentityRow,
-    ResourceIdentityView,
     ResourceName,
     ResourceSelectorName,
     ResourceSnapshot,
@@ -24,14 +24,14 @@ use crate::ResourceLookupProblem;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn resource_identity_from_snapshot(
+pub(crate) fn resource_handle_from_snapshot(
     snapshot: ResourceSnapshot,
     canonical_selectors_by_schema: &HashMap<TypeUri, ResourceSelectorName>,
-) -> Result<ResourceIdentityView, InternalError> {
+) -> Result<ResourceHandle, InternalError> {
     let canonical_selector =
         canonical_selector_for_stored_schema(&snapshot.schema, canonical_selectors_by_schema)?;
 
-    Ok(ResourceIdentityView {
+    Ok(ResourceHandle {
         schema: snapshot.schema,
         canonical_selector,
         id: snapshot.id,
@@ -41,15 +41,15 @@ pub(crate) fn resource_identity_from_snapshot(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn resource_identity_from_row(
-    row: ResourceIdentityRow,
+pub(crate) fn resource_handle_from_row(
+    row: ResourceHandleRow,
     canonical_selectors_by_schema: &HashMap<TypeUri, ResourceSelectorName>,
-) -> Result<ResourceIdentityView, InternalError> {
+) -> Result<ResourceHandle, InternalError> {
     let schema = TypeUri::new_unchecked(row.schema);
     let canonical_selector =
         canonical_selector_for_stored_schema(&schema, canonical_selectors_by_schema)?;
 
-    Ok(ResourceIdentityView {
+    Ok(ResourceHandle {
         schema,
         canonical_selector,
         id: ResourceID::new(row.id),
@@ -79,11 +79,11 @@ fn canonical_selector_for_stored_schema(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn validate_identity_row<F>(
-    row: ResourceIdentityRow,
+pub(crate) fn validate_handle_row<F>(
+    row: ResourceHandleRow,
     expected_schema: &TypeUri,
     ensure_schema_matches: F,
-) -> Result<ResourceIdentityRow, ResourceLookupProblem>
+) -> Result<ResourceHandleRow, ResourceLookupProblem>
 where
     F: FnOnce(ResourceID, &TypeUri, &str) -> Result<(), ResourceLookupProblem>,
 {
@@ -94,13 +94,13 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn map_snapshots_to_identities(
+pub(crate) fn map_snapshots_to_handles(
     snapshots: Vec<ResourceSnapshot>,
     canonical_selectors_by_schema: &HashMap<TypeUri, ResourceSelectorName>,
-) -> Result<Vec<ResourceIdentityView>, InternalError> {
+) -> Result<Vec<ResourceHandle>, InternalError> {
     snapshots
         .into_iter()
-        .map(|snapshot| resource_identity_from_snapshot(snapshot, canonical_selectors_by_schema))
+        .map(|snapshot| resource_handle_from_snapshot(snapshot, canonical_selectors_by_schema))
         .collect()
 }
 

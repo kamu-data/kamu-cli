@@ -14,10 +14,10 @@ use kamu_resources_facade::{
     ApplyManifestError,
     ApplyManifestRequest,
     GetResourceError,
-    ListAllResourceIdentitiesRequest,
+    ListAllResourceHandlesRequest,
     ListAllResourcesError,
     ListAllResourcesRequest,
-    ListResourceIdentitiesRequest,
+    ListResourceHandlesRequest,
     ListResourcesError,
     ListResourcesRequest,
     ResourceBatchSelector,
@@ -25,7 +25,7 @@ use kamu_resources_facade::{
     ResourceRef,
     ResourceSelector,
     ResourcesSummaryRequest,
-    SearchResourceIdentitiesRequest,
+    SearchResourceHandlesRequest,
     SpecViewMode,
 };
 use pretty_assertions::{assert_eq, assert_matches};
@@ -36,7 +36,7 @@ use crate::helpers::{
     VARIABLE_SET_CANONICAL_SELECTOR,
     VARIABLE_SET_SCHEMA_STR,
     apply_manifest_and_get_id,
-    sorted_identity_names,
+    sorted_handle_names,
     total_schema_count,
     variable_set_manifest_json,
 };
@@ -382,19 +382,19 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
     assert_eq!(alice_view.headers.id, alice_id);
     assert_eq!(bob_view.headers.id, bob_id);
 
-    let alice_identity = alice
-        .get_identity(selector_by_name("acct-isolated", None))
+    let alice_handle = alice
+        .get_handle(selector_by_name("acct-isolated", None))
         .await
         .unwrap();
-    let bob_identity = bob
-        .get_identity(selector_by_name("acct-isolated", None))
+    let bob_handle = bob
+        .get_handle(selector_by_name("acct-isolated", None))
         .await
         .unwrap();
-    assert_eq!(alice_identity.id, alice_id);
-    assert_eq!(bob_identity.id, bob_id);
+    assert_eq!(alice_handle.id, alice_id);
+    assert_eq!(bob_handle.id, bob_id);
 
     let alice_batch = alice
-        .get_identities(batch_selector_by_name("acct-isolated", None))
+        .get_handles(batch_selector_by_name("acct-isolated", None))
         .await
         .unwrap();
     let bob_batch = bob
@@ -408,7 +408,7 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
     assert_eq!(bob_batch.successes[0].item.headers.id, bob_id);
 
     let alice_list = alice
-        .list_identities(ListResourceIdentitiesRequest {
+        .list_handles(ListResourceHandlesRequest {
             raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
@@ -416,7 +416,7 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
         .await
         .unwrap();
     let bob_list = bob
-        .list_identities(ListResourceIdentitiesRequest {
+        .list_handles(ListResourceHandlesRequest {
             raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
@@ -424,16 +424,16 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
         .await
         .unwrap();
     assert_eq!(
-        sorted_identity_names(alice_list),
+        sorted_handle_names(alice_list),
         vec!["acct-alice-only", "acct-isolated"]
     );
     assert_eq!(
-        sorted_identity_names(bob_list),
+        sorted_handle_names(bob_list),
         vec!["acct-bob-only", "acct-isolated"]
     );
 
     let alice_search = alice
-        .search_identities(SearchResourceIdentitiesRequest {
+        .search_handles(SearchResourceHandlesRequest {
             raw_type_selectors: vec![VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()],
             exact_names: None,
             name_pattern: Some("acct-%".to_string()),
@@ -443,7 +443,7 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
         .await
         .unwrap();
     let bob_search = bob
-        .search_identities(SearchResourceIdentitiesRequest {
+        .search_handles(SearchResourceHandlesRequest {
             raw_type_selectors: vec![VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()],
             exact_names: None,
             name_pattern: Some("acct-%".to_string()),
@@ -453,16 +453,16 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
         .await
         .unwrap();
     assert_eq!(
-        sorted_identity_names(alice_search.items),
+        sorted_handle_names(alice_search.items),
         vec!["acct-alice-only", "acct-isolated"]
     );
     assert_eq!(
-        sorted_identity_names(bob_search.items),
+        sorted_handle_names(bob_search.items),
         vec!["acct-bob-only", "acct-isolated"]
     );
 
     let alice_all = alice
-        .list_all_identities(ListAllResourceIdentitiesRequest {
+        .list_all_handles(ListAllResourceHandlesRequest {
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
@@ -476,7 +476,7 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
         .await
         .unwrap();
     assert_eq!(
-        sorted_identity_names(alice_all),
+        sorted_handle_names(alice_all),
         vec!["acct-alice-only", "acct-isolated"]
     );
     let mut bob_all_names: Vec<String> = bob_all

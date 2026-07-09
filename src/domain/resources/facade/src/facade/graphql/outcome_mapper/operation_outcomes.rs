@@ -33,7 +33,7 @@ use crate::{
     ResourceBatchSelector,
     ResourceLookupProblem,
     ResourcesSummaryError,
-    SearchResourceIdentitiesResponse,
+    SearchResourceHandlesResponse,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -105,13 +105,13 @@ pub(crate) fn map_list_all_outcome(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn map_list_identities_outcome(
-    outcome: cynic_api::operations::list::ResourceIdentityListOutcome,
-) -> Result<Vec<domain::ResourceIdentityView>, ListResourcesError> {
-    use cynic_api::operations::list::ResourceIdentityListOutcome as O;
+pub(crate) fn map_list_handles_outcome(
+    outcome: cynic_api::operations::list::ResourceHandleListOutcome,
+) -> Result<Vec<domain::ResourceHandle>, ListResourcesError> {
+    use cynic_api::operations::list::ResourceHandleListOutcome as O;
 
     match outcome {
-        O::ResourceIdentityConnection(connection) => {
+        O::ResourceHandleConnection(connection) => {
             Ok(connection.nodes.into_iter().map(Into::into).collect())
         }
         O::ResourceUnsupportedSelectorProblem(problem) => {
@@ -125,41 +125,40 @@ pub(crate) fn map_list_identities_outcome(
             Err(crate::InvalidResourceSearchQueryError.into())
         }
         O::Unknown => Err(ListResourcesError::Internal(InternalError::new(
-            "Remote list_identities returned an unrecognized ResourceIdentityListOutcome variant",
+            "Remote list_handles returned an unrecognized ResourceHandleListOutcome variant",
         ))),
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn map_list_all_identities_outcome(
-    outcome: cynic_api::operations::list::ResourceIdentityListAllOutcome,
-) -> Result<Vec<domain::ResourceIdentityView>, ListAllResourcesError> {
-    use cynic_api::operations::list::ResourceIdentityListAllOutcome as O;
+pub(crate) fn map_list_all_handles_outcome(
+    outcome: cynic_api::operations::list::ResourceHandleListAllOutcome,
+) -> Result<Vec<domain::ResourceHandle>, ListAllResourcesError> {
+    use cynic_api::operations::list::ResourceHandleListAllOutcome as O;
 
     match outcome {
-        O::ResourceIdentityConnection(connection) => {
+        O::ResourceHandleConnection(connection) => {
             Ok(connection.nodes.into_iter().map(Into::into).collect())
         }
         O::ResourceBadAccountProblem(problem) => Err(ListAllResourcesError::BadAccount(
             bad_account_problem_error(problem).map_err(ListAllResourcesError::Internal)?,
         )),
         O::Unknown => Err(ListAllResourcesError::Internal(InternalError::new(
-            "Remote list_all_identities returned an unrecognized ResourceIdentityListAllOutcome \
-             variant",
+            "Remote list_all_handles returned an unrecognized ResourceHandleListAllOutcome variant",
         ))),
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn map_search_identities_outcome(
-    outcome: cynic_api::operations::search::ResourceIdentityListOutcome,
-) -> Result<SearchResourceIdentitiesResponse, ListResourcesError> {
-    use cynic_api::operations::search::ResourceIdentityListOutcome as O;
+pub(crate) fn map_search_handles_outcome(
+    outcome: cynic_api::operations::search::ResourceHandleListOutcome,
+) -> Result<SearchResourceHandlesResponse, ListResourcesError> {
+    use cynic_api::operations::search::ResourceHandleListOutcome as O;
 
     match outcome {
-        O::ResourceIdentityConnection(connection) => {
+        O::ResourceHandleConnection(connection) => {
             let total_count = usize::try_from(connection.total_count).map_err(|_| {
                 ListResourcesError::Internal(InternalError::new(format!(
                     "Remote search total_count {} cannot be converted to usize",
@@ -167,7 +166,7 @@ pub(crate) fn map_search_identities_outcome(
                 )))
             })?;
 
-            Ok(SearchResourceIdentitiesResponse {
+            Ok(SearchResourceHandlesResponse {
                 items: connection.nodes.into_iter().map(Into::into).collect(),
                 total_count,
             })
@@ -183,7 +182,7 @@ pub(crate) fn map_search_identities_outcome(
             Err(crate::InvalidResourceSearchQueryError.into())
         }
         O::Unknown => Err(ListResourcesError::Internal(InternalError::new(
-            "Remote search returned an unrecognized ResourceIdentityListOutcome variant",
+            "Remote search returned an unrecognized ResourceHandleListOutcome variant",
         ))),
     }
 }
@@ -192,7 +191,7 @@ pub(crate) fn map_search_identities_outcome(
 
 pub(crate) fn map_get_resource_outcome(
     outcome: cynic_api::operations::get_resource::ResourceGetOutcome,
-) -> Result<domain::ResourceView, GetResourceError> {
+) -> Result<domain::Resource, GetResourceError> {
     use cynic_api::operations::get_resource::ResourceGetOutcome as O;
     match outcome {
         O::Resource(r) => r.try_into().map_err(GetResourceError::Internal),
@@ -211,12 +210,12 @@ pub(crate) fn map_get_resource_outcome(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn map_get_identity_outcome(
-    outcome: cynic_api::operations::identity::ResourceGetIdentityOutcome,
-) -> Result<domain::ResourceIdentityView, GetResourceError> {
-    use cynic_api::operations::identity::ResourceGetIdentityOutcome as O;
+pub(crate) fn map_get_handle_outcome(
+    outcome: cynic_api::operations::handle::ResourceGetHandleOutcome,
+) -> Result<domain::ResourceHandle, GetResourceError> {
+    use cynic_api::operations::handle::ResourceGetHandleOutcome as O;
     match outcome {
-        O::ResourceIdentity(i) => Ok(i.into()),
+        O::ResourceHandle(h) => Ok(h.into()),
         O::ResourceSelectorProblemResult(p) => Err(map_selector_problem_result(
             p,
             GetResourceError::LookupProblem,
@@ -225,7 +224,7 @@ pub(crate) fn map_get_identity_outcome(
         )
         .map_err(GetResourceError::Internal)?),
         O::Unknown => Err(GetResourceError::Internal(InternalError::new(
-            "Remote get_identity returned an unrecognized ResourceGetIdentityOutcome variant",
+            "Remote get_handle returned an unrecognized ResourceGetHandleOutcome variant",
         ))),
     }
 }
@@ -256,8 +255,7 @@ pub(crate) fn map_delete_outcome(
 pub(crate) fn map_batch_get_resources_outcome(
     outcome: cynic_api::operations::get_resources::BatchResourcesOutcome,
     selector: &ResourceBatchSelector,
-) -> Result<BatchResourceResponse<domain::ResourceView, ResourceLookupProblem>, BatchResourceError>
-{
+) -> Result<BatchResourceResponse<domain::Resource, ResourceLookupProblem>, BatchResourceError> {
     use cynic_api::operations::get_resources::BatchResourcesOutcome as O;
     match outcome {
         O::BatchResourcesResult(batch) => {
@@ -301,29 +299,27 @@ pub(crate) fn map_batch_get_resources_outcome(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn map_batch_get_identities_outcome(
-    outcome: cynic_api::operations::identity::BatchResourceIdentitiesOutcome,
+pub(crate) fn map_batch_get_handles_outcome(
+    outcome: cynic_api::operations::handle::BatchResourceHandlesOutcome,
     selector: &ResourceBatchSelector,
-) -> Result<
-    BatchResourceResponse<domain::ResourceIdentityView, ResourceLookupProblem>,
-    BatchResourceError,
-> {
-    use cynic_api::operations::identity::BatchResourceIdentitiesOutcome as O;
+) -> Result<BatchResourceResponse<domain::ResourceHandle, ResourceLookupProblem>, BatchResourceError>
+{
+    use cynic_api::operations::handle::BatchResourceHandlesOutcome as O;
     match outcome {
-        O::BatchResourceIdentitiesResult(batch) => {
+        O::BatchResourceHandlesResult(batch) => {
             let successes = collect_batch_successes(
                 selector.resource_refs.len(),
-                batch.identities,
-                "identity",
-                |s| Ok((s.request_index, s.identity.into())),
+                batch.handles,
+                "handle",
+                |s| Ok((s.request_index, s.handle.into())),
             )?;
             let problems =
-                collect_batch_problems(batch.problems, selector.resource_refs.len(), "identity")?;
+                collect_batch_problems(batch.problems, selector.resource_refs.len(), "handle")?;
             validate_batch_response_indexes(
                 &successes,
                 &problems,
                 selector.resource_refs.len(),
-                "identity",
+                "handle",
             )?;
             Ok(BatchResourceResponse {
                 successes,
@@ -337,7 +333,7 @@ pub(crate) fn map_batch_get_identities_outcome(
             bad_account_problem_error(problem).map_err(BatchResourceError::Internal)?,
         )),
         O::Unknown => Err(BatchResourceError::Internal(InternalError::new(
-            "Remote get_identities returned an unrecognized BatchResourceIdentitiesOutcome variant",
+            "Remote get_handles returned an unrecognized BatchResourceHandlesOutcome variant",
         ))),
     }
 }

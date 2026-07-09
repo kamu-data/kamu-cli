@@ -19,8 +19,8 @@ use kamu_cli::services::resources::{
     ResourceSelectionSyntax,
 };
 use kamu_resources::{
+    ResourceHandle,
     ResourceID,
-    ResourceIdentityView,
     ResourceNameNotFoundError,
     ResourceTypeDescriptor,
     TypeUri,
@@ -30,8 +30,8 @@ use kamu_resources_facade::{
     ResourceLookupProblem,
     ResourceRef,
     ResourceSelector,
-    SearchResourceIdentitiesRequest,
-    SearchResourceIdentitiesResponse,
+    SearchResourceHandlesRequest,
+    SearchResourceHandlesResponse,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -72,9 +72,9 @@ fn raw_selector_strings(selectors: &[kamu_resources::ResourceTypeSelectorRaw]) -
 async fn resolves_exact_type_name_patterns_via_search() {
     let mut harness = ResourceSelectionResolutionHarness::new();
     let search_requests = Arc::new(Mutex::new(Vec::new()));
-    harness.expect_search_identities(
+    harness.expect_search_handles(
         1,
-        vec![ResourceIdentityView {
+        vec![ResourceHandle {
             schema: variableset_type_uri().clone(),
             canonical_selector: kamu_resources::ResourceSelectorName::new_unchecked(
                 VARIABLESETS_NAME,
@@ -122,7 +122,7 @@ async fn resolves_exact_type_name_patterns_via_search() {
 #[test_log::test(tokio::test)]
 async fn ignores_unmatched_name_patterns_when_requested() {
     let mut harness = ResourceSelectionResolutionHarness::new();
-    harness.expect_search_identities(1, Vec::new(), Arc::new(Mutex::new(Vec::new())));
+    harness.expect_search_handles(1, Vec::new(), Arc::new(Mutex::new(Vec::new())));
 
     let result = harness
         .service
@@ -157,7 +157,7 @@ async fn ignores_unmatched_name_patterns_when_requested() {
 #[test_log::test(tokio::test)]
 async fn errors_on_unmatched_name_patterns_by_default() {
     let mut harness = ResourceSelectionResolutionHarness::new();
-    harness.expect_search_identities(1, Vec::new(), Arc::new(Mutex::new(Vec::new())));
+    harness.expect_search_handles(1, Vec::new(), Arc::new(Mutex::new(Vec::new())));
 
     let error = harness
         .service
@@ -195,13 +195,13 @@ async fn resolves_type_patterns_with_exact_names_in_supported_type_order() {
         harness.storage_type_descriptor(),
     ]);
 
-    let get_identity_requests = Arc::new(Mutex::new(Vec::new()));
-    harness.expect_get_identity(
+    let get_handle_requests = Arc::new(Mutex::new(Vec::new()));
+    harness.expect_get_handle(
         2,
         HashMap::from([
             (
                 SECRETSETS_NAME.to_string(),
-                Some(ResourceIdentityView {
+                Some(ResourceHandle {
                     schema: secretset_type_uri().clone(),
                     canonical_selector: kamu_resources::ResourceSelectorName::new_unchecked(
                         SECRETSETS_NAME,
@@ -212,7 +212,7 @@ async fn resolves_type_patterns_with_exact_names_in_supported_type_order() {
             ),
             (
                 STORAGES_NAME.to_string(),
-                Some(ResourceIdentityView {
+                Some(ResourceHandle {
                     schema: STORAGE_TYPE_URI.clone(),
                     canonical_selector: kamu_resources::ResourceSelectorName::new_unchecked(
                         STORAGES_NAME,
@@ -222,7 +222,7 @@ async fn resolves_type_patterns_with_exact_names_in_supported_type_order() {
                 }),
             ),
         ]),
-        Arc::clone(&get_identity_requests),
+        Arc::clone(&get_handle_requests),
     );
 
     let result = harness
@@ -260,7 +260,7 @@ async fn resolves_type_patterns_with_exact_names_in_supported_type_order() {
             .all(|target| target.selector_input == format!("{TYPE_PATTERN_S}/{RESOURCE_DB_CREDS}"))
     );
 
-    let requests = get_identity_requests.lock().unwrap();
+    let requests = get_handle_requests.lock().unwrap();
     assert_eq!(requests.len(), 2);
     assert_eq!(requests[0].resource_type.as_str(), SECRETSETS_NAME);
     assert_eq!(requests[1].resource_type.as_str(), STORAGES_NAME);
@@ -277,10 +277,10 @@ async fn resolves_type_pattern_all_via_search_across_matched_types() {
     ]);
 
     let search_requests = Arc::new(Mutex::new(Vec::new()));
-    harness.expect_search_identities(
+    harness.expect_search_handles(
         1,
         vec![
-            ResourceIdentityView {
+            ResourceHandle {
                 schema: secretset_type_uri().clone(),
                 canonical_selector: kamu_resources::ResourceSelectorName::new_unchecked(
                     SECRETSETS_NAME,
@@ -288,7 +288,7 @@ async fn resolves_type_pattern_all_via_search_across_matched_types() {
                 id: ResourceID::new(uuid::Uuid::new_v4()),
                 name: "db-creds".parse().unwrap(),
             },
-            ResourceIdentityView {
+            ResourceHandle {
                 schema: STORAGE_TYPE_URI.clone(),
                 canonical_selector: kamu_resources::ResourceSelectorName::new_unchecked(
                     STORAGES_NAME,
@@ -347,10 +347,10 @@ async fn resolves_type_pattern_name_patterns_via_single_search_across_matched_ty
     ]);
 
     let search_requests = Arc::new(Mutex::new(Vec::new()));
-    harness.expect_search_identities(
+    harness.expect_search_handles(
         1,
         vec![
-            ResourceIdentityView {
+            ResourceHandle {
                 schema: secretset_type_uri().clone(),
                 canonical_selector: kamu_resources::ResourceSelectorName::new_unchecked(
                     SECRETSETS_NAME,
@@ -358,7 +358,7 @@ async fn resolves_type_pattern_name_patterns_via_single_search_across_matched_ty
                 id: ResourceID::new(uuid::Uuid::new_v4()),
                 name: "db-creds".parse().unwrap(),
             },
-            ResourceIdentityView {
+            ResourceHandle {
                 schema: STORAGE_TYPE_URI.clone(),
                 canonical_selector: kamu_resources::ResourceSelectorName::new_unchecked(
                     STORAGES_NAME,
@@ -424,12 +424,12 @@ async fn type_pattern_exact_id_tries_every_matched_type() {
         harness.storage_type_descriptor(),
     ]);
 
-    let get_identity_requests = Arc::new(Mutex::new(Vec::new()));
-    harness.expect_get_identity(
+    let get_handle_requests = Arc::new(Mutex::new(Vec::new()));
+    harness.expect_get_handle(
         2,
         HashMap::from([(
             STORAGES_NAME.to_string(),
-            Some(ResourceIdentityView {
+            Some(ResourceHandle {
                 schema: STORAGE_TYPE_URI.clone(),
                 canonical_selector: kamu_resources::ResourceSelectorName::new_unchecked(
                     STORAGES_NAME,
@@ -438,7 +438,7 @@ async fn type_pattern_exact_id_tries_every_matched_type() {
                 name: RESOURCE_DB_CREDS.parse().unwrap(),
             }),
         )]),
-        Arc::clone(&get_identity_requests),
+        Arc::clone(&get_handle_requests),
     );
 
     let result = harness
@@ -464,7 +464,7 @@ async fn type_pattern_exact_id_tries_every_matched_type() {
     assert_eq!(result.targets.len(), 1);
     assert_eq!(result.targets[0].canonical_selector.as_str(), STORAGES_NAME);
 
-    let requests = get_identity_requests.lock().unwrap();
+    let requests = get_handle_requests.lock().unwrap();
     assert_eq!(requests.len(), 2);
     assert_eq!(requests[0].resource_type.as_str(), SECRETSETS_NAME);
     assert_eq!(requests[1].resource_type.as_str(), STORAGES_NAME);
@@ -476,7 +476,7 @@ async fn type_pattern_exact_id_tries_every_matched_type() {
 async fn ignores_unmatched_type_pattern_exact_selectors_when_requested() {
     let mut harness = ResourceSelectionResolutionHarness::new();
     harness.expect_list_supported_resource_types(vec![harness.secretset_type_descriptor()]);
-    harness.expect_get_identity(1, HashMap::new(), Arc::new(Mutex::new(Vec::new())));
+    harness.expect_get_handle(1, HashMap::new(), Arc::new(Mutex::new(Vec::new())));
 
     let result = harness
         .service
@@ -514,7 +514,7 @@ async fn ignores_unmatched_type_pattern_exact_selectors_when_requested() {
 async fn errors_on_unmatched_type_pattern_exact_selectors_by_default() {
     let mut harness = ResourceSelectionResolutionHarness::new();
     harness.expect_list_supported_resource_types(vec![harness.secretset_type_descriptor()]);
-    harness.expect_get_identity(1, HashMap::new(), Arc::new(Mutex::new(Vec::new())));
+    harness.expect_get_handle(1, HashMap::new(), Arc::new(Mutex::new(Vec::new())));
 
     let error = harness
         .service
@@ -550,7 +550,7 @@ async fn errors_on_unmatched_type_pattern_exact_selectors_by_default() {
 async fn ignores_unmatched_type_pattern_name_patterns_when_requested() {
     let mut harness = ResourceSelectionResolutionHarness::new();
     harness.expect_list_supported_resource_types(vec![harness.secretset_type_descriptor()]);
-    harness.expect_search_identities(1, Vec::new(), Arc::new(Mutex::new(Vec::new())));
+    harness.expect_search_handles(1, Vec::new(), Arc::new(Mutex::new(Vec::new())));
 
     let result = harness
         .service
@@ -586,7 +586,7 @@ async fn ignores_unmatched_type_pattern_name_patterns_when_requested() {
 async fn errors_on_unmatched_type_pattern_name_patterns_by_default() {
     let mut harness = ResourceSelectionResolutionHarness::new();
     harness.expect_list_supported_resource_types(vec![harness.secretset_type_descriptor()]);
-    harness.expect_search_identities(1, Vec::new(), Arc::new(Mutex::new(Vec::new())));
+    harness.expect_search_handles(1, Vec::new(), Arc::new(Mutex::new(Vec::new())));
 
     let error = harness
         .service
@@ -624,9 +624,9 @@ async fn deduplicates_overlapping_name_patterns_before_counting_max_results() {
     let mut harness = ResourceSelectionResolutionHarness::new();
     let shared_id = ResourceID::new(uuid::Uuid::new_v4());
     let search_requests = Arc::new(Mutex::new(Vec::new()));
-    harness.expect_search_identities(
+    harness.expect_search_handles(
         2,
-        vec![ResourceIdentityView {
+        vec![ResourceHandle {
             schema: variableset_type_uri().clone(),
             canonical_selector: kamu_resources::ResourceSelectorName::new_unchecked(
                 VARIABLESETS_NAME,
@@ -680,12 +680,12 @@ async fn deduplicates_repeated_type_pattern_exact_name_matches() {
     let shared_id = ResourceID::new(uuid::Uuid::new_v4());
     harness.expect_list_supported_resource_types(vec![harness.secretset_type_descriptor()]);
 
-    let get_identity_requests = Arc::new(Mutex::new(Vec::new()));
-    harness.expect_get_identity(
+    let get_handle_requests = Arc::new(Mutex::new(Vec::new()));
+    harness.expect_get_handle(
         2,
         HashMap::from([(
             SECRETSETS_NAME.to_string(),
-            Some(ResourceIdentityView {
+            Some(ResourceHandle {
                 schema: secretset_type_uri().clone(),
                 canonical_selector: kamu_resources::ResourceSelectorName::new_unchecked(
                     SECRETSETS_NAME,
@@ -694,7 +694,7 @@ async fn deduplicates_repeated_type_pattern_exact_name_matches() {
                 name: RESOURCE_DB_CREDS.parse().unwrap(),
             }),
         )]),
-        Arc::clone(&get_identity_requests),
+        Arc::clone(&get_handle_requests),
     );
 
     let result = harness
@@ -731,7 +731,7 @@ async fn deduplicates_repeated_type_pattern_exact_name_matches() {
     assert_eq!(result.targets.len(), 1);
     assert_eq!(result.targets[0].id, shared_id);
 
-    let requests = get_identity_requests.lock().unwrap();
+    let requests = get_handle_requests.lock().unwrap();
     assert_eq!(requests.len(), 2);
 }
 
@@ -744,9 +744,9 @@ async fn deduplicates_type_pattern_all_before_counting_max_results() {
     harness.expect_list_supported_resource_types(vec![harness.secretset_type_descriptor()]);
 
     let search_requests = Arc::new(Mutex::new(Vec::new()));
-    harness.expect_search_identities(
+    harness.expect_search_handles(
         1,
-        vec![ResourceIdentityView {
+        vec![ResourceHandle {
             schema: secretset_type_uri().clone(),
             canonical_selector: kamu_resources::ResourceSelectorName::new_unchecked(
                 SECRETSETS_NAME,
@@ -757,12 +757,12 @@ async fn deduplicates_type_pattern_all_before_counting_max_results() {
         Arc::clone(&search_requests),
     );
 
-    let get_identity_requests = Arc::new(Mutex::new(Vec::new()));
-    harness.expect_get_identity(
+    let get_handle_requests = Arc::new(Mutex::new(Vec::new()));
+    harness.expect_get_handle(
         1,
         HashMap::from([(
             SECRETSETS_NAME.to_string(),
-            Some(ResourceIdentityView {
+            Some(ResourceHandle {
                 schema: secretset_type_uri().clone(),
                 canonical_selector: kamu_resources::ResourceSelectorName::new_unchecked(
                     SECRETSETS_NAME,
@@ -771,7 +771,7 @@ async fn deduplicates_type_pattern_all_before_counting_max_results() {
                 name: RESOURCE_DB_CREDS.parse().unwrap(),
             }),
         )]),
-        Arc::clone(&get_identity_requests),
+        Arc::clone(&get_handle_requests),
     );
 
     let result = harness
@@ -808,8 +808,8 @@ async fn deduplicates_type_pattern_all_before_counting_max_results() {
     let search_requests = search_requests.lock().unwrap();
     assert_eq!(search_requests.len(), 1);
 
-    let get_identity_requests = get_identity_requests.lock().unwrap();
-    assert_eq!(get_identity_requests.len(), 1);
+    let get_handle_requests = get_handle_requests.lock().unwrap();
+    assert_eq!(get_handle_requests.len(), 1);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -821,9 +821,9 @@ async fn deduplicates_type_pattern_name_patterns_before_counting_max_results() {
     harness.expect_list_supported_resource_types(vec![harness.secretset_type_descriptor()]);
 
     let search_requests = Arc::new(Mutex::new(Vec::new()));
-    harness.expect_search_identities(
+    harness.expect_search_handles(
         2,
-        vec![ResourceIdentityView {
+        vec![ResourceHandle {
             schema: secretset_type_uri().clone(),
             canonical_selector: kamu_resources::ResourceSelectorName::new_unchecked(
                 SECRETSETS_NAME,
@@ -880,10 +880,10 @@ async fn errors_when_unique_targets_exceed_max_results_after_deduplication() {
     let shared_id = ResourceID::new(uuid::Uuid::new_v4());
     let second_id = ResourceID::new(uuid::Uuid::new_v4());
     let search_requests = Arc::new(Mutex::new(Vec::new()));
-    harness.expect_search_identities(
+    harness.expect_search_handles(
         1,
         vec![
-            ResourceIdentityView {
+            ResourceHandle {
                 schema: variableset_type_uri().clone(),
                 canonical_selector: kamu_resources::ResourceSelectorName::new_unchecked(
                     VARIABLESETS_NAME,
@@ -891,7 +891,7 @@ async fn errors_when_unique_targets_exceed_max_results_after_deduplication() {
                 id: shared_id,
                 name: "app-alpha".parse().unwrap(),
             },
-            ResourceIdentityView {
+            ResourceHandle {
                 schema: variableset_type_uri().clone(),
                 canonical_selector: kamu_resources::ResourceSelectorName::new_unchecked(
                     VARIABLESETS_NAME,
@@ -979,27 +979,27 @@ impl ResourceSelectionResolutionHarness {
             .returning(move || Ok(supported_resource_types.clone()));
     }
 
-    fn expect_get_identity(
+    fn expect_get_handle(
         &mut self,
         times: usize,
-        get_identity_results: HashMap<String, Option<ResourceIdentityView>>,
-        get_identity_requests: Arc<Mutex<Vec<ResourceSelector>>>,
+        get_handle_results: HashMap<String, Option<ResourceHandle>>,
+        get_handle_requests: Arc<Mutex<Vec<ResourceSelector>>>,
     ) {
         self.facade
-            .expect_get_identity()
+            .expect_get_handle()
             .times(times)
             .returning(move |selector| {
-                get_identity_requests.lock().unwrap().push(selector.clone());
+                get_handle_requests.lock().unwrap().push(selector.clone());
 
-                if let Some(identity) = get_identity_results
+                if let Some(handle) = get_handle_results
                     .get(selector.resource_type.as_str())
                     .cloned()
                     .flatten()
                 {
-                    return Ok(identity);
+                    return Ok(handle);
                 }
 
-                // The resolution service always calls `get_identity` with the
+                // The resolution service always calls `get_handle` with the
                 // already-resolved canonical selector name, never a raw alias.
                 let canonical_selector = kamu_resources::ResourceSelectorName::new_unchecked(
                     selector.resource_type.as_str(),
@@ -1021,18 +1021,18 @@ impl ResourceSelectionResolutionHarness {
             });
     }
 
-    fn expect_search_identities(
+    fn expect_search_handles(
         &mut self,
         times: usize,
-        search_results: Vec<ResourceIdentityView>,
-        search_requests: Arc<Mutex<Vec<SearchResourceIdentitiesRequest>>>,
+        search_results: Vec<ResourceHandle>,
+        search_requests: Arc<Mutex<Vec<SearchResourceHandlesRequest>>>,
     ) {
         self.facade
-            .expect_search_identities()
+            .expect_search_handles()
             .times(times)
             .returning(move |request| {
                 search_requests.lock().unwrap().push(request);
-                Ok(SearchResourceIdentitiesResponse {
+                Ok(SearchResourceHandlesResponse {
                     total_count: search_results.len(),
                     items: search_results.clone(),
                 })

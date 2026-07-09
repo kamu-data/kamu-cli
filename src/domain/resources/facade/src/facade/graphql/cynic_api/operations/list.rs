@@ -12,7 +12,7 @@ use cynic::QueryBuilder;
 use crate::facade::graphql::cynic_api::fragments::{
     ResourceBadAccountProblem,
     ResourceConnection,
-    ResourceIdentityConnection,
+    ResourceHandleConnection,
     ResourceInvalidSearchQueryProblem,
     ResourceUnsupportedSelectorProblem,
 };
@@ -58,30 +58,30 @@ pub(crate) struct ListAllResources {
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
 #[cynic(graphql_type = "Query", variables = "ListByResourceTypeVariables")]
-pub(crate) struct ListIdentitiesByResourceTypeQuery {
-    pub resources: ListIdentitiesByResourceTypeResources,
+pub(crate) struct ListHandlesByResourceTypeQuery {
+    pub resources: ListHandlesByResourceTypeResources,
 }
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
 #[cynic(graphql_type = "Resources", variables = "ListByResourceTypeVariables")]
-pub(crate) struct ListIdentitiesByResourceTypeResources {
+pub(crate) struct ListHandlesByResourceTypeResources {
     #[arguments(resourceType: $resource_type, account: $account, page: $page, perPage: $per_page)]
-    pub list_identities_by_resource_type: ResourceIdentityListOutcome,
+    pub list_handles_by_resource_type: ResourceHandleListOutcome,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
 #[cynic(graphql_type = "Query", variables = "ListAllVariables")]
-pub(crate) struct ListAllIdentitiesQuery {
-    pub resources: ListAllIdentitiesResources,
+pub(crate) struct ListAllHandlesQuery {
+    pub resources: ListAllHandlesResources,
 }
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
 #[cynic(graphql_type = "Resources", variables = "ListAllVariables")]
-pub(crate) struct ListAllIdentitiesResources {
+pub(crate) struct ListAllHandlesResources {
     #[arguments(account: $account, page: $page, perPage: $per_page)]
-    pub list_all_identities: ResourceIdentityListAllOutcome,
+    pub list_all_handles: ResourceHandleListAllOutcome,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -108,8 +108,8 @@ pub(crate) enum ResourceListAllOutcome {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::InlineFragments, Debug, Clone)]
-pub(crate) enum ResourceIdentityListOutcome {
-    ResourceIdentityConnection(ResourceIdentityConnection),
+pub(crate) enum ResourceHandleListOutcome {
+    ResourceHandleConnection(ResourceHandleConnection),
     ResourceUnsupportedSelectorProblem(ResourceUnsupportedSelectorProblem),
     ResourceBadAccountProblem(ResourceBadAccountProblem),
     ResourceInvalidSearchQueryProblem(ResourceInvalidSearchQueryProblem),
@@ -120,8 +120,8 @@ pub(crate) enum ResourceIdentityListOutcome {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::InlineFragments, Debug, Clone)]
-pub(crate) enum ResourceIdentityListAllOutcome {
-    ResourceIdentityConnection(ResourceIdentityConnection),
+pub(crate) enum ResourceHandleListAllOutcome {
+    ResourceHandleConnection(ResourceHandleConnection),
     ResourceBadAccountProblem(ResourceBadAccountProblem),
     #[cynic(fallback)]
     Unknown,
@@ -141,16 +141,16 @@ pub(crate) fn build_list_all_operation(
     ListAllQuery::build(variables)
 }
 
-pub(crate) fn build_list_identities_by_resource_type_operation(
+pub(crate) fn build_list_handles_by_resource_type_operation(
     variables: ListByResourceTypeVariables,
-) -> cynic::Operation<ListIdentitiesByResourceTypeQuery, ListByResourceTypeVariables> {
-    ListIdentitiesByResourceTypeQuery::build(variables)
+) -> cynic::Operation<ListHandlesByResourceTypeQuery, ListByResourceTypeVariables> {
+    ListHandlesByResourceTypeQuery::build(variables)
 }
 
-pub(crate) fn build_list_all_identities_operation(
+pub(crate) fn build_list_all_handles_operation(
     variables: ListAllVariables,
-) -> cynic::Operation<ListAllIdentitiesQuery, ListAllVariables> {
-    ListAllIdentitiesQuery::build(variables)
+) -> cynic::Operation<ListAllHandlesQuery, ListAllVariables> {
+    ListAllHandlesQuery::build(variables)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

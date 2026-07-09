@@ -77,7 +77,7 @@ pub async fn test_get_many_all_successes(h: &impl FacadeContractHarness) {
     assert_batch_indexes(&response, &[0, 1], &[]);
     assert_eq!(response.successes.len(), 2);
 
-    let by_index: std::collections::HashMap<usize, &kamu_resources::ResourceView> = response
+    let by_index: std::collections::HashMap<usize, &kamu_resources::Resource> = response
         .successes
         .iter()
         .map(|s| (s.request_index, &s.item))
@@ -274,9 +274,9 @@ pub async fn test_batch_empty_refs_validation_is_consistent(h: &impl FacadeContr
         "unknown-resource-contract-account",
     )));
 
-    // get_identities: unsupported type
+    // get_handles: unsupported type
     let gi_type = facade
-        .get_identities(ResourceBatchSelector {
+        .get_handles(ResourceBatchSelector {
             account: None,
             resource_type: bad_type.parse().unwrap(),
             resource_refs: vec![],
@@ -285,12 +285,12 @@ pub async fn test_batch_empty_refs_validation_is_consistent(h: &impl FacadeContr
     assert_matches!(
         gi_type,
         Err(BatchResourceError::UnsupportedSelector(_)),
-        "get_identities empty+bad type must be rejected"
+        "get_handles empty+bad type must be rejected"
     );
 
-    // get_identities: bad account
+    // get_handles: bad account
     let gi_acct = facade
-        .get_identities(ResourceBatchSelector {
+        .get_handles(ResourceBatchSelector {
             account: bad_account.clone(),
             resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             resource_refs: vec![],
@@ -299,7 +299,7 @@ pub async fn test_batch_empty_refs_validation_is_consistent(h: &impl FacadeContr
     assert_matches!(
         gi_acct,
         Err(BatchResourceError::BadAccount(_)),
-        "get_identities empty+bad account must be rejected"
+        "get_handles empty+bad account must be rejected"
     );
 
     // render_manifests: unsupported type
@@ -405,17 +405,17 @@ pub async fn test_get_many_wrong_schema(h: &impl FacadeContractHarness) {
 
 // RF-055
 contract_test!(
-    get_identities_mirrors_get_many,
-    super::test_get_identities_mirrors_get_many
+    get_handles_mirrors_get_many,
+    super::test_get_handles_mirrors_get_many
 );
 
-pub async fn test_get_identities_mirrors_get_many(h: &impl FacadeContractHarness) {
+pub async fn test_get_handles_mirrors_get_many(h: &impl FacadeContractHarness) {
     let uid_a = create_resource(h, "idents-a").await;
     let absent_uid = kamu_resources::ResourceID::new(uuid::Uuid::new_v4());
     let facade = h.facade_for(TestAccount::Alice);
 
     let response = facade
-        .get_identities(ResourceBatchSelector {
+        .get_handles(ResourceBatchSelector {
             account: None,
             resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             resource_refs: vec![
@@ -755,10 +755,10 @@ pub async fn test_batch_apis_reject_unsupported_type(h: &impl FacadeContractHarn
         "get_many: unsupported type must be a batch-level UnsupportedSelector, got: {gm:?}"
     );
 
-    let gi = facade.get_identities(selector.clone()).await;
+    let gi = facade.get_handles(selector.clone()).await;
     assert!(
         matches!(gi, Err(BatchResourceError::UnsupportedSelector(_))),
-        "get_identities: unsupported type must be a batch-level UnsupportedSelector, got: {gi:?}"
+        "get_handles: unsupported type must be a batch-level UnsupportedSelector, got: {gi:?}"
     );
 
     let rm = facade

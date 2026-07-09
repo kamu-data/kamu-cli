@@ -20,6 +20,7 @@ use kamu_resources::{
     DeclarativeResourceState,
     GenericResourceQueryService,
     ReconcilableEventSourcedResource,
+    Resource,
     ResourceConditionStatus,
     ResourcePresentation,
     ResourceSchemaProvider,
@@ -28,13 +29,13 @@ use kamu_resources::{
     ResourceStatusExt,
     ResourceStatusSummaryView,
     ResourceSummaryView,
-    ResourceView,
     TypeUri,
+    new_pending_resource_status,
 };
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
-use crate::{load_previous_resource_view, make_apply_manifest_changes};
+use crate::{load_previous_resource, make_apply_manifest_changes};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -73,9 +74,9 @@ where
                 warnings,
             } = plan;
 
-            let resource = typed_resource_state_to_view::<R>(state)?;
+            let resource = typed_resource_state_to_resource::<R>(state)?;
             let previous_resource =
-                load_previous_resource_view(action, id, generic_resource_query_service).await?;
+                load_previous_resource(action, id, generic_resource_query_service).await?;
             let changes = make_apply_manifest_changes(previous_resource.as_ref(), &resource)?;
 
             ApplyManifestPlanningDecision::Planned(ApplyManifestPlan {
@@ -110,7 +111,7 @@ where
                 warnings,
                 ..
             } = result;
-            let resource = typed_resource_state_to_view::<R>(state)?;
+            let resource = typed_resource_state_to_resource::<R>(state)?;
 
             ApplyManifestApplicationDecision::Applied(ApplyManifestResult {
                 resource,
@@ -126,20 +127,20 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn typed_resource_state_to_view<R>(
+pub fn typed_resource_state_to_resource<R>(
     state: R::ResourceState,
-) -> Result<ResourceView, InternalError>
+) -> Result<Resource, InternalError>
 where
     R: ResourceSchemaProvider + DeclarativeResource,
     R::Spec: Serialize,
 {
     let (_id, headers, spec, status) = state.into_parts();
 
-    Ok(ResourceView {
+    Ok(Resource {
         schema: R::schema().clone(),
         headers,
         spec: serde_json::to_value(spec).int_err()?,
-        status: Some(status),
+        status,
     })
 }
 
@@ -164,7 +165,7 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn resource_snapshot_to_view(snapshot: ResourceSnapshot) -> ResourceView {
+pub(crate) fn resource_snapshot_to_resource(snapshot: ResourceSnapshot) -> Resource {
     let ResourceSnapshot {
         schema,
         headers,
@@ -173,11 +174,11 @@ pub(crate) fn resource_snapshot_to_view(snapshot: ResourceSnapshot) -> ResourceV
         ..
     } = snapshot;
 
-    ResourceView {
+    Resource {
         schema,
         headers,
         spec,
-        status,
+        status: status.unwrap_or_else(new_pending_resource_status),
     }
 }
 

@@ -84,7 +84,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         &self,
         selector: ResourceSelector,
         spec_view_mode: SpecViewMode,
-    ) -> Result<ResourceView, GetResourceError> {
+    ) -> Result<Resource, GetResourceError> {
         let mut view = self
             .resolve_resource_view::<GetResourceError>(selector)
             .await?;
@@ -98,8 +98,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         &self,
         selector: ResourceBatchSelector,
         spec_view_mode: SpecViewMode,
-    ) -> Result<BatchResourceResponse<ResourceView, ResourceLookupProblem>, BatchResourceError>
-    {
+    ) -> Result<BatchResourceResponse<Resource, ResourceLookupProblem>, BatchResourceError> {
         let (mut indexed_resources, problems) =
             self.resolve_multiple_resource_views(selector).await?;
 
@@ -122,10 +121,10 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         })
     }
 
-    async fn get_identity(
+    async fn get_handle(
         &self,
         selector: ResourceSelector,
-    ) -> Result<ResourceIdentityView, GetResourceError> {
+    ) -> Result<ResourceHandle, GetResourceError> {
         let target_account = self
             .resource_account_resolver
             .resolve_target_account(selector.account.as_ref())
@@ -153,17 +152,14 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .resolve_snapshot_for_schema::<GetResourceError>(&schema, &target_account.id, id)
             .await?;
 
-        resource_identity_from_snapshot(snapshot, &canonical_selectors_by_schema)
-            .map_err(Into::into)
+        resource_handle_from_snapshot(snapshot, &canonical_selectors_by_schema).map_err(Into::into)
     }
 
-    async fn get_identities(
+    async fn get_handles(
         &self,
         selector: ResourceBatchSelector,
-    ) -> Result<
-        BatchResourceResponse<ResourceIdentityView, ResourceLookupProblem>,
-        BatchResourceError,
-    > {
+    ) -> Result<BatchResourceResponse<ResourceHandle, ResourceLookupProblem>, BatchResourceError>
+    {
         let target_account = self
             .resource_account_resolver
             .resolve_target_account(selector.account.as_ref())
@@ -188,8 +184,8 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         )
         .await?;
 
-        let (identities, problems) = self
-            .resolve_id_identity_groups(
+        let (handles, problems) = self
+            .resolve_id_handle_groups(
                 &target_account.id,
                 &schema,
                 resolution_response.id_entries,
@@ -199,11 +195,11 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .await?;
 
         Ok(BatchResourceResponse {
-            successes: identities
+            successes: handles
                 .into_iter()
-                .map(|identity| BatchResourceSuccess {
-                    request_index: identity.request_index,
-                    item: identity.item,
+                .map(|handle| BatchResourceSuccess {
+                    request_index: handle.request_index,
+                    item: handle.item,
                 })
                 .collect(),
             problems,
@@ -222,8 +218,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 
         self.apply_spec_view_mode::<RenderResourceManifestError>(&mut view, spec_view_mode)?;
 
-        let manifest =
-            resource_view_to_manifest(view).map_err(RenderResourceManifestError::Internal)?;
+        let manifest = resource_to_manifest(view).map_err(RenderResourceManifestError::Internal)?;
         let manifest =
             serialize_manifest(&manifest, format).map_err(RenderResourceManifestError::Internal)?;
 
@@ -250,8 +245,8 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         let successes = indexed_resources
             .into_iter()
             .map(|resource| {
-                let manifest = resource_view_to_manifest(resource.item)
-                    .map_err(BatchResourceError::Internal)?;
+                let manifest =
+                    resource_to_manifest(resource.item).map_err(BatchResourceError::Internal)?;
                 let manifest =
                     serialize_manifest(&manifest, format).map_err(BatchResourceError::Internal)?;
                 Ok(BatchResourceSuccess {
@@ -290,10 +285,10 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .map_err(Into::into)
     }
 
-    async fn list_identities(
+    async fn list_handles(
         &self,
-        request: ListResourceIdentitiesRequest,
-    ) -> Result<Vec<ResourceIdentityView>, ListResourcesError> {
+        request: ListResourceHandlesRequest,
+    ) -> Result<Vec<ResourceHandle>, ListResourcesError> {
         let target_account = self
             .resource_account_resolver
             .resolve_target_account(request.account.as_ref())
@@ -308,13 +303,13 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .await?;
 
         let canonical_selectors_by_schema = self.resource_canonical_selectors_by_schema();
-        map_snapshots_to_identities(snapshots, &canonical_selectors_by_schema).map_err(Into::into)
+        map_snapshots_to_handles(snapshots, &canonical_selectors_by_schema).map_err(Into::into)
     }
 
-    async fn search_identities(
+    async fn search_handles(
         &self,
-        request: SearchResourceIdentitiesRequest,
-    ) -> Result<SearchResourceIdentitiesResponse, ListResourcesError> {
+        request: SearchResourceHandlesRequest,
+    ) -> Result<SearchResourceHandlesResponse, ListResourcesError> {
         if request.exact_names.is_none() && request.name_pattern.is_none() {
             return Err(InvalidResourceSearchQueryError.into());
         }
@@ -334,7 +329,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 
         let rows = self
             .generic_resource_query_service
-            .search_resource_identities(
+            .search_resource_handles(
                 &target_account.id,
                 &schemas,
                 request.exact_names.as_deref(),
@@ -344,7 +339,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .await?;
         let total_count = self
             .generic_resource_query_service
-            .count_search_resource_identities(
+            .count_search_resource_handles(
                 &target_account.id,
                 &schemas,
                 request.exact_names.as_deref(),
@@ -356,10 +351,10 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 
         let items = rows
             .into_iter()
-            .map(|row| resource_identity_from_row(row, &canonical_selectors_by_schema))
+            .map(|row| resource_handle_from_row(row, &canonical_selectors_by_schema))
             .collect::<Result<Vec<_>, InternalError>>()?;
 
-        Ok(SearchResourceIdentitiesResponse { items, total_count })
+        Ok(SearchResourceHandlesResponse { items, total_count })
     }
 
     async fn list_all(
@@ -379,10 +374,10 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         Ok(snapshots.into_iter().map(Into::into).collect())
     }
 
-    async fn list_all_identities(
+    async fn list_all_handles(
         &self,
-        request: ListAllResourceIdentitiesRequest,
-    ) -> Result<Vec<ResourceIdentityView>, ListAllResourcesError> {
+        request: ListAllResourceHandlesRequest,
+    ) -> Result<Vec<ResourceHandle>, ListAllResourcesError> {
         let target_account = self
             .resource_account_resolver
             .resolve_target_account(request.account.as_ref())
@@ -394,7 +389,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .await?;
 
         let canonical_selectors_by_schema = self.resource_canonical_selectors_by_schema();
-        map_snapshots_to_identities(snapshots, &canonical_selectors_by_schema).map_err(Into::into)
+        map_snapshots_to_handles(snapshots, &canonical_selectors_by_schema).map_err(Into::into)
     }
 
     async fn plan_apply_manifest(
@@ -500,7 +495,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 
         let rows_by_id = self
             .generic_resource_query_service
-            .find_resource_identities_by_ids(&target_account.id, &ids)
+            .find_resource_handles_by_ids(&target_account.id, &ids)
             .await?
             .into_iter()
             .map(|row| (row.id, row))
@@ -513,7 +508,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
                 .ok_or_else(|| id_not_found(id));
 
             match row_result.and_then(|row| {
-                validate_identity_row(row, &schema, ensure_schema_matches::<ResourceLookupProblem>)
+                validate_handle_row(row, &schema, ensure_schema_matches::<ResourceLookupProblem>)
             }) {
                 Ok(_) => {
                     successes.push(BatchResourceSuccess {
@@ -655,7 +650,7 @@ impl LocalResourceFacadeImpl {
             })
     }
 
-    async fn resolve_resource_view<E>(&self, selector: ResourceSelector) -> Result<ResourceView, E>
+    async fn resolve_resource_view<E>(&self, selector: ResourceSelector) -> Result<Resource, E>
     where
         E: From<ResolveManifestAccountError>
             + From<ResourceLookupProblem>
@@ -701,7 +696,7 @@ impl LocalResourceFacadeImpl {
             })
             .await?;
 
-        Ok(ResourceView {
+        Ok(Resource {
             headers: kamu_resources::ResourceHeaders {
                 account: odf::AccountHandle {
                     id: target_account.id,
@@ -718,7 +713,7 @@ impl LocalResourceFacadeImpl {
         selector: ResourceBatchSelector,
     ) -> Result<
         (
-            Vec<IndexedResource<ResourceView>>,
+            Vec<IndexedResource<Resource>>,
             Vec<BatchResourceProblem<ResourceLookupProblem>>,
         ),
         BatchResourceError,
@@ -792,7 +787,7 @@ impl LocalResourceFacadeImpl {
                         .into());
                     }
 
-                    let resource = ResourceView {
+                    let resource = Resource {
                         schema: snapshot.schema,
                         headers: kamu_resources::ResourceHeaders {
                             account: odf::AccountHandle {
@@ -802,7 +797,7 @@ impl LocalResourceFacadeImpl {
                             ..snapshot.headers
                         },
                         spec: snapshot.spec,
-                        status: snapshot.status,
+                        status: snapshot.status.unwrap_or_else(new_pending_resource_status),
                     };
 
                     indexed_resources.push(IndexedResource {
@@ -825,7 +820,7 @@ impl LocalResourceFacadeImpl {
         Ok((indexed_resources, problems))
     }
 
-    async fn resolve_id_identity_groups(
+    async fn resolve_id_handle_groups(
         &self,
         account_id: &odf::AccountID,
         schema: &TypeUri,
@@ -834,7 +829,7 @@ impl LocalResourceFacadeImpl {
         canonical_selectors_by_schema: &HashMap<TypeUri, ResourceSelectorName>,
     ) -> Result<
         (
-            Vec<IndexedResource<ResourceIdentityView>>,
+            Vec<IndexedResource<ResourceHandle>>,
             Vec<BatchResourceProblem<ResourceLookupProblem>>,
         ),
         BatchResourceError,
@@ -843,26 +838,26 @@ impl LocalResourceFacadeImpl {
 
         let rows_by_id = self
             .generic_resource_query_service
-            .find_resource_identities_by_ids(account_id, &ids)
+            .find_resource_handles_by_ids(account_id, &ids)
             .await?
             .into_iter()
             .map(|row| (row.id, row))
             .collect::<HashMap<_, _>>();
 
-        let mut identities = Vec::new();
+        let mut handles = Vec::new();
         for (request_index, _, id) in id_entries {
             let row_result = rows_by_id
                 .get(id.as_ref())
                 .cloned()
                 .ok_or_else(|| id_not_found(id));
             match row_result.and_then(|row| {
-                validate_identity_row(row, schema, ensure_schema_matches::<ResourceLookupProblem>)
+                validate_handle_row(row, schema, ensure_schema_matches::<ResourceLookupProblem>)
             }) {
                 Ok(row) => {
-                    let identity = resource_identity_from_row(row, canonical_selectors_by_schema)?;
-                    identities.push(IndexedResource {
+                    let handle = resource_handle_from_row(row, canonical_selectors_by_schema)?;
+                    handles.push(IndexedResource {
                         request_index,
-                        item: identity,
+                        item: handle,
                     });
                 }
                 Err(error) => problems.push(BatchResourceProblem {
@@ -872,10 +867,10 @@ impl LocalResourceFacadeImpl {
             }
         }
 
-        identities.sort_by_key(|identity| identity.request_index);
+        handles.sort_by_key(|handle| handle.request_index);
         problems.sort_by_key(|problem| problem.request_index);
 
-        Ok((identities, problems))
+        Ok((handles, problems))
     }
 
     async fn resolve_snapshot_for_schema<E>(
@@ -939,7 +934,7 @@ impl LocalResourceFacadeImpl {
 
     fn apply_spec_view_mode<E>(
         &self,
-        view: &mut ResourceView,
+        view: &mut Resource,
         spec_view_mode: SpecViewMode,
     ) -> Result<(), E>
     where
@@ -954,7 +949,7 @@ impl LocalResourceFacadeImpl {
 
     fn apply_spec_view_mode_batch<E>(
         &self,
-        resources: &mut [IndexedResource<ResourceView>],
+        resources: &mut [IndexedResource<Resource>],
         spec_view_mode: SpecViewMode,
     ) -> Result<(), E>
     where

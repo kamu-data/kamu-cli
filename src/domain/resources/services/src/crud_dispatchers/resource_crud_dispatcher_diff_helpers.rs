@@ -16,17 +16,17 @@ use kamu_resources::{
     ApplyManifestChangeKind,
     ApplyResourceAction,
     GenericResourceQueryService,
-    ResourceView,
+    Resource,
 };
 use serde::Serialize;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) async fn load_previous_resource_view(
+pub(crate) async fn load_previous_resource(
     action: ApplyResourceAction,
     id: kamu_resources::ResourceID,
     generic_resource_query_service: &dyn GenericResourceQueryService,
-) -> Result<Option<ResourceView>, InternalError> {
+) -> Result<Option<Resource>, InternalError> {
     match action {
         ApplyResourceAction::Create => Ok(None),
         ApplyResourceAction::Update | ApplyResourceAction::Untouched => {
@@ -42,7 +42,7 @@ pub(crate) async fn load_previous_resource_view(
             };
 
             Ok(Some(
-                super::resource_crud_dispatcher_helpers::resource_snapshot_to_view(snapshot),
+                super::resource_crud_dispatcher_helpers::resource_snapshot_to_resource(snapshot),
             ))
         }
     }
@@ -51,8 +51,8 @@ pub(crate) async fn load_previous_resource_view(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn make_apply_manifest_changes(
-    before: Option<&ResourceView>,
-    after: &ResourceView,
+    before: Option<&Resource>,
+    after: &Resource,
 ) -> Result<Vec<ApplyManifestChange>, InternalError> {
     let mut changes = Vec::new();
 
@@ -77,8 +77,8 @@ pub fn make_apply_manifest_changes(
 
 fn append_headers_changes(
     changes: &mut Vec<ApplyManifestChange>,
-    before: Option<&ResourceView>,
-    after: &ResourceView,
+    before: Option<&Resource>,
+    after: &Resource,
 ) -> Result<(), InternalError> {
     push_headers_change(
         changes,

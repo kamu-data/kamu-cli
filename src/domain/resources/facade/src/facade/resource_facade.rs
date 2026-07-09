@@ -11,14 +11,14 @@ use database_common::PaginationOpts;
 use domain::{
     ApplyManifestApplicationDecision,
     ApplyManifestPlanningDecision,
+    Resource,
     ResourceAccountRef,
+    ResourceHandle,
     ResourceID,
-    ResourceIdentityView,
     ResourceName,
     ResourceSummaryView,
     ResourceTypeDescriptor,
     ResourceTypeSelectorRaw,
-    ResourceView,
     ResourcesSummary,
 };
 use kamu_resources as domain;
@@ -54,26 +54,23 @@ pub trait ResourceFacade: Send + Sync {
         &self,
         selector: ResourceSelector,
         spec_view_mode: SpecViewMode,
-    ) -> Result<ResourceView, GetResourceError>;
+    ) -> Result<Resource, GetResourceError>;
 
     async fn get_many(
         &self,
         selector: ResourceBatchSelector,
         spec_view_mode: SpecViewMode,
-    ) -> Result<BatchResourceResponse<ResourceView, ResourceLookupProblem>, BatchResourceError>;
+    ) -> Result<BatchResourceResponse<Resource, ResourceLookupProblem>, BatchResourceError>;
 
-    async fn get_identity(
+    async fn get_handle(
         &self,
         selector: ResourceSelector,
-    ) -> Result<ResourceIdentityView, GetResourceError>;
+    ) -> Result<ResourceHandle, GetResourceError>;
 
-    async fn get_identities(
+    async fn get_handles(
         &self,
         selector: ResourceBatchSelector,
-    ) -> Result<
-        BatchResourceResponse<ResourceIdentityView, ResourceLookupProblem>,
-        BatchResourceError,
-    >;
+    ) -> Result<BatchResourceResponse<ResourceHandle, ResourceLookupProblem>, BatchResourceError>;
 
     async fn render_manifest(
         &self,
@@ -97,25 +94,25 @@ pub trait ResourceFacade: Send + Sync {
         request: ListResourcesRequest,
     ) -> Result<Vec<ResourceSummaryView>, ListResourcesError>;
 
-    async fn list_identities(
+    async fn list_handles(
         &self,
-        request: ListResourceIdentitiesRequest,
-    ) -> Result<Vec<ResourceIdentityView>, ListResourcesError>;
+        request: ListResourceHandlesRequest,
+    ) -> Result<Vec<ResourceHandle>, ListResourcesError>;
 
-    async fn search_identities(
+    async fn search_handles(
         &self,
-        request: SearchResourceIdentitiesRequest,
-    ) -> Result<SearchResourceIdentitiesResponse, ListResourcesError>;
+        request: SearchResourceHandlesRequest,
+    ) -> Result<SearchResourceHandlesResponse, ListResourcesError>;
 
     async fn list_all(
         &self,
         request: ListAllResourcesRequest,
     ) -> Result<Vec<ResourceSummaryView>, ListAllResourcesError>;
 
-    async fn list_all_identities(
+    async fn list_all_handles(
         &self,
-        request: ListAllResourceIdentitiesRequest,
-    ) -> Result<Vec<ResourceIdentityView>, ListAllResourcesError>;
+        request: ListAllResourceHandlesRequest,
+    ) -> Result<Vec<ResourceHandle>, ListAllResourcesError>;
 
     async fn plan_apply_manifest(
         &self,
@@ -219,7 +216,7 @@ pub struct ListResourcesRequest {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
-pub struct ListResourceIdentitiesRequest {
+pub struct ListResourceHandlesRequest {
     pub raw_type_selector: ResourceTypeSelectorRaw,
     pub account: Option<ResourceAccountRef>,
     pub pagination: PaginationOpts,
@@ -228,7 +225,7 @@ pub struct ListResourceIdentitiesRequest {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
-pub struct SearchResourceIdentitiesRequest {
+pub struct SearchResourceHandlesRequest {
     pub raw_type_selectors: Vec<ResourceTypeSelectorRaw>,
     pub exact_names: Option<Vec<ResourceName>>,
     pub name_pattern: Option<String>,
@@ -239,8 +236,8 @@ pub struct SearchResourceIdentitiesRequest {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
-pub struct SearchResourceIdentitiesResponse {
-    pub items: Vec<ResourceIdentityView>,
+pub struct SearchResourceHandlesResponse {
+    pub items: Vec<ResourceHandle>,
     pub total_count: usize,
 }
 
@@ -255,7 +252,7 @@ pub struct ListAllResourcesRequest {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
-pub struct ListAllResourceIdentitiesRequest {
+pub struct ListAllResourceHandlesRequest {
     pub account: Option<ResourceAccountRef>,
     pub pagination: PaginationOpts,
 }

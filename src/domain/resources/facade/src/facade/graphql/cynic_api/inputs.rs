@@ -11,12 +11,7 @@ use kamu_resources as domain;
 
 use crate::facade::graphql::cynic_api::scalars::AccountName;
 use crate::facade::graphql::cynic_api::schema;
-use crate::{
-    ResourceBatchSelector,
-    ResourceRef,
-    ResourceSelector,
-    SearchResourceIdentitiesRequest,
-};
+use crate::{ResourceBatchSelector, ResourceRef, ResourceSelector, SearchResourceHandlesRequest};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -144,18 +139,18 @@ impl TryFrom<&ResourceBatchSelector> for ResourceBatchSelectorInput {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::InputObject, Debug, Clone)]
-#[cynic(graphql_type = "SearchResourceIdentitiesInput")]
-pub(crate) struct SearchResourceIdentitiesInput {
+#[cynic(graphql_type = "SearchResourceHandlesInput")]
+pub(crate) struct SearchResourceHandlesInput {
     pub resource_types: Vec<ResourceTypeSelectorInput>,
     pub names: Option<Vec<domain::ResourceName>>,
     pub name_pattern: Option<String>,
     pub account: Option<ResourceAccountSelectorInput>,
 }
 
-impl TryFrom<&SearchResourceIdentitiesRequest> for SearchResourceIdentitiesInput {
+impl TryFrom<&SearchResourceHandlesRequest> for SearchResourceHandlesInput {
     type Error = internal_error::InternalError;
 
-    fn try_from(value: &SearchResourceIdentitiesRequest) -> Result<Self, Self::Error> {
+    fn try_from(value: &SearchResourceHandlesRequest) -> Result<Self, Self::Error> {
         Ok(Self {
             resource_types: value
                 .raw_type_selectors

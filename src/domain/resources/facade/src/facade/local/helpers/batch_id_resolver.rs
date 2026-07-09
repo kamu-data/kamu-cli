@@ -98,7 +98,7 @@ pub(crate) async fn resolve_batch_ids(
             .collect::<Vec<_>>();
 
         let id_by_name = query_service
-            .find_resource_identities_by_names(account_id, schema, &names)
+            .find_resource_handles_by_names(account_id, schema, &names)
             .await?
             .into_iter()
             .map(|row| {

@@ -28,7 +28,7 @@ use crate::helpers::{
     VARIABLE_SET_CANONICAL_SELECTOR,
     VARIABLE_SET_SCHEMA_STR,
     assert_applied_outcome,
-    assert_identity_fields,
+    assert_handle_fields,
     assert_resource_view_fields,
     variable_set_manifest_json,
 };
@@ -110,48 +110,48 @@ pub async fn test_get_by_uid(h: &impl FacadeContractHarness) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // RF-032
-contract_test!(get_identity_by_name, super::test_get_identity_by_name);
+contract_test!(get_handle_by_name, super::test_get_handle_by_name);
 
-pub async fn test_get_identity_by_name(h: &impl FacadeContractHarness) {
+pub async fn test_get_handle_by_name(h: &impl FacadeContractHarness) {
     let id = create_test_resource(h, "ident-name-test").await;
     let facade = h.facade_for(TestAccount::Alice);
 
-    let identity = facade
-        .get_identity(by_name_selector("ident-name-test"))
+    let handle = facade
+        .get_handle(by_name_selector("ident-name-test"))
         .await
         .unwrap();
 
-    assert_identity_fields(
-        &identity,
+    assert_handle_fields(
+        &handle,
         VariableSetResource::schema(),
         "ident-name-test",
         &id,
     );
-    assert!(!identity.canonical_selector.as_str().is_empty());
+    assert!(!handle.canonical_selector.as_str().is_empty());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // RF-033
-contract_test!(get_identity_by_uid, super::test_get_identity_by_uid);
+contract_test!(get_handle_by_uid, super::test_get_handle_by_uid);
 
-pub async fn test_get_identity_by_uid(h: &impl FacadeContractHarness) {
+pub async fn test_get_handle_by_uid(h: &impl FacadeContractHarness) {
     let id = create_test_resource(h, "ident-id-test").await;
     let facade = h.facade_for(TestAccount::Alice);
 
-    let identity_by_name = facade
-        .get_identity(by_name_selector("ident-id-test"))
+    let handle_by_name = facade
+        .get_handle(by_name_selector("ident-id-test"))
         .await
         .unwrap();
-    let identity_by_uid = facade.get_identity(by_id_selector(&id)).await.unwrap();
+    let handle_by_uid = facade.get_handle(by_id_selector(&id)).await.unwrap();
 
     assert_eq!(
-        identity_by_name.id, identity_by_uid.id,
+        handle_by_name.id, handle_by_uid.id,
         "id must match when fetched by name vs id"
     );
-    assert_eq!(identity_by_name.name, identity_by_uid.name);
-    assert_eq!(identity_by_name.schema, identity_by_uid.schema);
-    assert_eq!(identity_by_name.schema, identity_by_uid.schema);
+    assert_eq!(handle_by_name.name, handle_by_uid.name);
+    assert_eq!(handle_by_name.schema, handle_by_uid.schema);
+    assert_eq!(handle_by_name.schema, handle_by_uid.schema);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -181,17 +181,17 @@ pub async fn test_get_missing_name_returns_not_found(h: &impl FacadeContractHarn
         "expected NameNotFound, got: {get_result:?}"
     );
 
-    let identity_result = facade
-        .get_identity(by_name_selector("no-such-resource"))
+    let handle_result = facade
+        .get_handle(by_name_selector("no-such-resource"))
         .await;
     assert!(
         matches!(
-            identity_result,
+            handle_result,
             Err(GetResourceError::LookupProblem(
                 ResourceLookupProblem::NameNotFound(_)
             ))
         ),
-        "expected NameNotFound from get_identity, got: {identity_result:?}"
+        "expected NameNotFound from get_handle, got: {handle_result:?}"
     );
 }
 
@@ -220,15 +220,15 @@ pub async fn test_get_missing_uid_returns_not_found(h: &impl FacadeContractHarne
         "expected IDNotFound, got: {get_result:?}"
     );
 
-    let identity_result = facade.get_identity(by_id_selector(&absent_uid)).await;
+    let handle_result = facade.get_handle(by_id_selector(&absent_uid)).await;
     assert!(
         matches!(
-            identity_result,
+            handle_result,
             Err(GetResourceError::LookupProblem(
                 ResourceLookupProblem::IDNotFound(_)
             ))
         ),
-        "expected IDNotFound from get_identity, got: {identity_result:?}"
+        "expected IDNotFound from get_handle, got: {handle_result:?}"
     );
 }
 
@@ -263,15 +263,15 @@ pub async fn test_get_wrong_schema_returns_mismatch(h: &impl FacadeContractHarne
         "expected SchemaMismatch, got: {result:?}"
     );
 
-    let identity_result = facade.get_identity(wrong_schema_selector).await;
+    let handle_result = facade.get_handle(wrong_schema_selector).await;
     assert!(
         matches!(
-            identity_result,
+            handle_result,
             Err(GetResourceError::LookupProblem(
                 ResourceLookupProblem::SchemaMismatch(_)
             ))
         ),
-        "expected SchemaMismatch from get_identity, got: {identity_result:?}"
+        "expected SchemaMismatch from get_handle, got: {handle_result:?}"
     );
 }
 
@@ -320,15 +320,15 @@ pub async fn test_get_wrong_schema_returns_schema_mismatch(h: &impl FacadeContra
         other => panic!("expected SchemaMismatch, got: {other:?}"),
     }
 
-    let identity_result = facade.get_identity(wrong_schema_selector).await;
+    let handle_result = facade.get_handle(wrong_schema_selector).await;
     assert!(
         matches!(
-            identity_result,
+            handle_result,
             Err(GetResourceError::LookupProblem(
                 ResourceLookupProblem::SchemaMismatch(_)
             ))
         ),
-        "expected SchemaMismatch from get_identity, got: {identity_result:?}"
+        "expected SchemaMismatch from get_handle, got: {handle_result:?}"
     );
 }
 

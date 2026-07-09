@@ -58,7 +58,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem,
-    fixture = resource_repo_suite::test_search_resource_identities,
+    fixture = resource_repo_suite::test_search_resource_handles,
     harness = InMemoryResourceRepositoryHarness
 );
 
@@ -66,7 +66,7 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem,
-    fixture = resource_repo_suite::test_count_search_resource_identities,
+    fixture = resource_repo_suite::test_count_search_resource_handles,
     harness = InMemoryResourceRepositoryHarness
 );
 

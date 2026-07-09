@@ -17,10 +17,10 @@ use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_resources::{
     CreateResourceError,
     ResourceDuplicateError,
+    ResourceHandleRow,
     ResourceHeaders,
     ResourceID,
     ResourceIDStream,
-    ResourceIdentityRow,
     ResourceName,
     ResourcePhaseCounts,
     ResourceRawEventQuery,
@@ -295,11 +295,11 @@ impl ResourceRepository for PostgresResourceRepository {
         Ok(maybe_resource_id.map(ResourceID::new))
     }
 
-    async fn find_resource_identities_by_ids(
+    async fn find_resource_handles_by_ids(
         &self,
         account_id: &odf::AccountID,
         ids: &[ResourceID],
-    ) -> Result<Vec<ResourceIdentityRow>, InternalError> {
+    ) -> Result<Vec<ResourceHandleRow>, InternalError> {
         if ids.is_empty() {
             return Ok(Vec::new());
         }
@@ -311,7 +311,7 @@ impl ResourceRepository for PostgresResourceRepository {
         let ids = ids.iter().map(|id| *id.as_ref()).collect::<Vec<_>>();
 
         let rows = sqlx::query_as!(
-            ResourceIdentityRow,
+            ResourceHandleRow,
             r#"
             SELECT
                 resource_id as "id: uuid::Uuid",
@@ -332,12 +332,12 @@ impl ResourceRepository for PostgresResourceRepository {
         Ok(rows)
     }
 
-    async fn find_resource_identities_by_names(
+    async fn find_resource_handles_by_names(
         &self,
         account_id: &odf::AccountID,
         schema: &TypeUri,
         names: &[ResourceName],
-    ) -> Result<Vec<ResourceIdentityRow>, InternalError> {
+    ) -> Result<Vec<ResourceHandleRow>, InternalError> {
         if names.is_empty() {
             return Ok(Vec::new());
         }
@@ -348,7 +348,7 @@ impl ResourceRepository for PostgresResourceRepository {
         let account_id_stack = account_id.as_stack_string();
 
         let rows = sqlx::query_as!(
-            ResourceIdentityRow,
+            ResourceHandleRow,
             r#"
             SELECT
                 resource_id as "id: uuid::Uuid",
@@ -374,14 +374,14 @@ impl ResourceRepository for PostgresResourceRepository {
         Ok(rows)
     }
 
-    async fn search_resource_identities(
+    async fn search_resource_handles(
         &self,
         account_id: &odf::AccountID,
         schemas: &[TypeUri],
         exact_names: Option<&[ResourceName]>,
         name_pattern: Option<&str>,
         pagination: PaginationOpts,
-    ) -> Result<Vec<ResourceIdentityRow>, InternalError> {
+    ) -> Result<Vec<ResourceHandleRow>, InternalError> {
         if schemas.is_empty() || exact_names.is_some_and(<[ResourceName]>::is_empty) {
             return Ok(Vec::new());
         }
@@ -401,7 +401,7 @@ impl ResourceRepository for PostgresResourceRepository {
         let name_pattern = name_pattern.map(sql_like_escape_pattern);
 
         let rows = sqlx::query_as!(
-            ResourceIdentityRow,
+            ResourceHandleRow,
             r#"
             SELECT
                 resource_id as "id: uuid::Uuid",
@@ -430,7 +430,7 @@ impl ResourceRepository for PostgresResourceRepository {
         Ok(rows)
     }
 
-    async fn count_search_resource_identities(
+    async fn count_search_resource_handles(
         &self,
         account_id: &odf::AccountID,
         schemas: &[TypeUri],

@@ -19,9 +19,9 @@ use kamu_accounts::AccountRepository;
 use kamu_resources::{
     CreateResourceError,
     ResourceDuplicateError,
+    ResourceHandleRow,
     ResourceID,
     ResourceIDStream,
-    ResourceIdentityRow,
     ResourceName,
     ResourcePhase,
     ResourcePhaseCounts,
@@ -265,11 +265,11 @@ impl ResourceRepository for InMemoryResourceRepository {
             .map(|snapshot| snapshot.id))
     }
 
-    async fn find_resource_identities_by_ids(
+    async fn find_resource_handles_by_ids(
         &self,
         account_id: &odf::AccountID,
         ids: &[ResourceID],
-    ) -> Result<Vec<ResourceIdentityRow>, InternalError> {
+    ) -> Result<Vec<ResourceHandleRow>, InternalError> {
         let guard = self.state.lock().unwrap();
 
         Ok(ids
@@ -278,7 +278,7 @@ impl ResourceRepository for InMemoryResourceRepository {
             .filter(|snapshot| {
                 snapshot.headers.account.id == *account_id && snapshot.headers.deleted_at.is_none()
             })
-            .map(|snapshot| ResourceIdentityRow {
+            .map(|snapshot| ResourceHandleRow {
                 id: *snapshot.id.as_ref(),
                 schema: snapshot.schema.to_string(),
                 name: snapshot.headers.name.to_string(),
@@ -286,12 +286,12 @@ impl ResourceRepository for InMemoryResourceRepository {
             .collect())
     }
 
-    async fn find_resource_identities_by_names(
+    async fn find_resource_handles_by_names(
         &self,
         account_id: &odf::AccountID,
         schema: &TypeUri,
         names: &[ResourceName],
-    ) -> Result<Vec<ResourceIdentityRow>, InternalError> {
+    ) -> Result<Vec<ResourceHandleRow>, InternalError> {
         let guard = self.state.lock().unwrap();
 
         Ok(names
@@ -307,7 +307,7 @@ impl ResourceRepository for InMemoryResourceRepository {
                     .and_then(|id| guard.snapshots_by_id.get(id))
             })
             .filter(|snapshot| snapshot.headers.deleted_at.is_none())
-            .map(|snapshot| ResourceIdentityRow {
+            .map(|snapshot| ResourceHandleRow {
                 id: *snapshot.id.as_ref(),
                 schema: snapshot.schema.to_string(),
                 name: snapshot.headers.name.to_string(),
@@ -315,14 +315,14 @@ impl ResourceRepository for InMemoryResourceRepository {
             .collect())
     }
 
-    async fn search_resource_identities(
+    async fn search_resource_handles(
         &self,
         account_id: &odf::AccountID,
         schemas: &[TypeUri],
         exact_names: Option<&[ResourceName]>,
         name_pattern: Option<&str>,
         pagination: PaginationOpts,
-    ) -> Result<Vec<ResourceIdentityRow>, InternalError> {
+    ) -> Result<Vec<ResourceHandleRow>, InternalError> {
         if schemas.is_empty() || exact_names.is_some_and(<[ResourceName]>::is_empty) {
             return Ok(Vec::new());
         }
@@ -346,7 +346,7 @@ impl ResourceRepository for InMemoryResourceRepository {
             .into_iter()
             .skip(pagination.offset)
             .take(pagination.limit)
-            .map(|snapshot| ResourceIdentityRow {
+            .map(|snapshot| ResourceHandleRow {
                 id: *snapshot.id.as_ref(),
                 schema: snapshot.schema.to_string(),
                 name: snapshot.headers.name.to_string(),
@@ -354,7 +354,7 @@ impl ResourceRepository for InMemoryResourceRepository {
             .collect())
     }
 
-    async fn count_search_resource_identities(
+    async fn count_search_resource_handles(
         &self,
         account_id: &odf::AccountID,
         schemas: &[TypeUri],

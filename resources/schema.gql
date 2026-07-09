@@ -577,16 +577,16 @@ Base64-encoded binary data (url-safe, no padding)
 """
 scalar Base64Usnp
 
-union BatchResourceIdentitiesOutcome = BatchResourceIdentitiesResult | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem
-
-type BatchResourceIdentitiesResult {
-	identities: [BatchResourceIdentitySuccess!]!
-	problems: [BatchResourceProblem!]!
+type BatchResourceHandleSuccess {
+	requestIndex: Int!
+	handle: ResourceHandle!
 }
 
-type BatchResourceIdentitySuccess {
-	requestIndex: Int!
-	identity: ResourceIdentity!
+union BatchResourceHandlesOutcome = BatchResourceHandlesResult | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem
+
+type BatchResourceHandlesResult {
+	handles: [BatchResourceHandleSuccess!]!
+	problems: [BatchResourceProblem!]!
 }
 
 type BatchResourceManifestSuccess {
@@ -3860,11 +3860,30 @@ type RequestHeader {
 	value: String!
 }
 
+"""
+Top-level container for canonical representation of a resource that
+specifies the type and version of the resource, carries identity, ownership,
+and status information.
+
+Schema: https://opendatafabric.org/schemas/resource/v1alpha1/Resource
+"""
 type Resource {
+	"""
+	Identifies the controlling entity, a bounded context that this resource belongs to, and the version. Url should follow the pattern `{base-url}/{context}/{version}/{name}.json` e.g. `https://opendatafabric.org/schemas/dataset/v1/Dataset.json`.
+	"""
 	schema: TypeUri!
+	"""
+	Container for identity and ownership information of a resource.
+	"""
 	headers: ResourceHeaders!
+	"""
+	Specifies the desired state of a resource.
+	"""
 	spec: JSON!
-	status: ResourceStatus
+	"""
+	Resource lifecycle and reconciliation information.
+	"""
+	status: ResourceStatus!
 }
 
 input ResourceAccountSelectorInput @oneOf {
@@ -3993,9 +4012,40 @@ type ResourceEdge {
 	node: ResourceSummary!
 }
 
-union ResourceGetIdentityOutcome = ResourceIdentity | ResourceSelectorProblemResult
+union ResourceGetHandleOutcome = ResourceHandle | ResourceSelectorProblemResult
 
 union ResourceGetOutcome = Resource | ResourceSelectorProblemResult
+
+type ResourceHandle {
+	id: ResourceID!
+	schema: TypeUri!
+	canonicalSelector: ResourceSelectorName!
+	name: ResourceName!
+}
+
+type ResourceHandleConnection {
+	"""
+	A shorthand for `edges { node { ... } }`
+	"""
+	nodes: [ResourceHandle!]!
+	"""
+	Approximate number of total nodes
+	"""
+	totalCount: Int!
+	"""
+	Page information
+	"""
+	pageInfo: PageBasedInfo!
+	edges: [ResourceHandleEdge!]!
+}
+
+type ResourceHandleEdge {
+	node: ResourceHandle!
+}
+
+union ResourceHandleListAllOutcome = ResourceHandleConnection | ResourceBadAccountProblem
+
+union ResourceHandleListOutcome = ResourceHandleConnection | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem | ResourceInvalidSearchQueryProblem
 
 enum ResourceHeaderValidationProblemCode {
 	EMPTY_NAME
@@ -4070,37 +4120,6 @@ type ResourceIDNotFoundProblem {
 	id: ResourceID!
 	message: String!
 }
-
-type ResourceIdentity {
-	id: ResourceID!
-	schema: TypeUri!
-	canonicalSelector: ResourceSelectorName!
-	name: ResourceName!
-}
-
-type ResourceIdentityConnection {
-	"""
-	A shorthand for `edges { node { ... } }`
-	"""
-	nodes: [ResourceIdentity!]!
-	"""
-	Approximate number of total nodes
-	"""
-	totalCount: Int!
-	"""
-	Page information
-	"""
-	pageInfo: PageBasedInfo!
-	edges: [ResourceIdentityEdge!]!
-}
-
-type ResourceIdentityEdge {
-	node: ResourceIdentity!
-}
-
-union ResourceIdentityListAllOutcome = ResourceIdentityConnection | ResourceBadAccountProblem
-
-union ResourceIdentityListOutcome = ResourceIdentityConnection | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem | ResourceInvalidSearchQueryProblem
 
 """
 A header field value (e.g. name, label key) failed validation.
@@ -4327,33 +4346,33 @@ type Resources {
 	"""
 	resources(selector: ResourceBatchSelectorInput!, revealed: Boolean! = false): BatchResourcesOutcome!
 	"""
-	Returns resource identity by selector, if found
+	Returns resource handle by selector, if found
 	"""
-	resourceIdentity(selector: ResourceSelectorInput!): ResourceGetIdentityOutcome!
+	resourceHandle(selector: ResourceSelectorInput!): ResourceGetHandleOutcome!
 	"""
-	Returns resource identities by selectors
+	Returns resource handles by selectors
 	"""
-	resourceIdentities(selector: ResourceBatchSelectorInput!): BatchResourceIdentitiesOutcome!
+	resourceHandles(selector: ResourceBatchSelectorInput!): BatchResourceHandlesOutcome!
 	"""
 	Returns resources of the specified resource type
 	"""
 	listByResourceType(resourceType: ResourceTypeSelectorInput!, account: ResourceAccountSelectorInput, page: Int, perPage: Int): ResourceListOutcome!
 	"""
-	Returns resource identities of the specified resource type
+	Returns resource handles of the specified resource type
 	"""
-	listIdentitiesByResourceType(resourceType: ResourceTypeSelectorInput!, account: ResourceAccountSelectorInput, page: Int, perPage: Int): ResourceIdentityListOutcome!
+	listHandlesByResourceType(resourceType: ResourceTypeSelectorInput!, account: ResourceAccountSelectorInput, page: Int, perPage: Int): ResourceHandleListOutcome!
 	"""
-	Searches resource identities across the specified exact resource types
+	Searches resource handles across the specified exact resource types
 	"""
-	searchIdentities(query: SearchResourceIdentitiesInput!, page: Int, perPage: Int): ResourceIdentityListOutcome!
+	searchHandles(query: SearchResourceHandlesInput!, page: Int, perPage: Int): ResourceHandleListOutcome!
 	"""
 	Returns resources across all resource types
 	"""
 	listAll(account: ResourceAccountSelectorInput, page: Int, perPage: Int): ResourceListAllOutcome!
 	"""
-	Returns resource identities across all resource types
+	Returns resource handles across all resource types
 	"""
-	listAllIdentities(account: ResourceAccountSelectorInput, page: Int, perPage: Int): ResourceIdentityListAllOutcome!
+	listAllHandles(account: ResourceAccountSelectorInput, page: Int, perPage: Int): ResourceHandleListAllOutcome!
 	"""
 	Renders a canonical manifest representation from a stored resource
 	"""
@@ -4450,7 +4469,7 @@ enum SearchEntityName {
 	ACCOUNTS
 }
 
-input SearchResourceIdentitiesInput {
+input SearchResourceHandlesInput {
 	resourceTypes: [ResourceTypeSelectorInput!]!
 	names: [ResourceName!]
 	namePattern: String

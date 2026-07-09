@@ -21,14 +21,14 @@ Each RF scenario from the original plan is listed with its status.
 | RF-024  | apply_manifest.rs   | Deferred | Apply rejects immutable field change                                  | Requires a resource type with an immutable field                      |
 | RF-025  | apply_manifest.rs   | Active   | Apply rejects invalid spec                                            | Combined with RF-016 in one test                                       |
 | RF-026  | apply_manifest.rs   | Active   | Apply preserves duplicate header-key validation                     |                                                                        |
-| RF-030  | get_identity.rs     | Active   | Get by name returns full resource view                                |                                                                        |
-| RF-031  | get_identity.rs     | Active   | Get by UID returns same full resource view                            |                                                                        |
-| RF-032  | get_identity.rs     | Active   | Get identity by name returns lightweight identity                     |                                                                        |
-| RF-033  | get_identity.rs     | Active   | Get identity by UID returns same identity                             |                                                                        |
-| RF-034  | get_identity.rs     | Active   | Get missing name returns NameNotFound                                 |                                                                        |
-| RF-035  | get_identity.rs     | Active   | Get missing UID returns IDNotFound                                   |                                                                        |
-| RF-036  | get_identity.rs     | Active   | Get with wrong schema returns SchemaMismatch                 |                                                                        |
-| RF-037  | get_identity.rs     | Active   | Get by UID with wrong schema returns SchemaMismatch                       |                                                                        |
+| RF-030  | get_handle.rs     | Active   | Get by name returns full resource view                                |                                                                        |
+| RF-031  | get_handle.rs     | Active   | Get by UID returns same full resource view                            |                                                                        |
+| RF-032  | get_handle.rs     | Active   | Get handle by name returns lightweight handle                     |                                                                        |
+| RF-033  | get_handle.rs     | Active   | Get handle by UID returns same handle                             |                                                                        |
+| RF-034  | get_handle.rs     | Active   | Get missing name returns NameNotFound                                 |                                                                        |
+| RF-035  | get_handle.rs     | Active   | Get missing UID returns IDNotFound                                   |                                                                        |
+| RF-036  | get_handle.rs     | Active   | Get with wrong schema returns SchemaMismatch                 |                                                                        |
+| RF-037  | get_handle.rs     | Active   | Get by UID with wrong schema returns SchemaMismatch                       |                                                                        |
 | RF-040  | spec_view_mode.rs   | Active   | Encrypted/default spec view hides secret material                     |                                                                        |
 | RF-041  | spec_view_mode.rs   | Active   | Revealed spec view exposes revealable material                        |                                                                        |
 | RF-042  | spec_view_mode.rs   | Active   | Spec view mode applies consistently to batch get                      |                                                                        |
@@ -41,7 +41,7 @@ Each RF scenario from the original plan is listed with its status.
 | RF-053B | batch_ops.rs        | Active   | Empty batch still validates bad account                               | Extension beyond original plan                                         |
 | RF-053C | batch_ops.rs        | Active   | Empty-batch validation mirrors RF-053A/B across all batch ops         | Extension beyond original plan                                         |
 | RF-054  | batch_ops.rs        | Active   | get_many wrong schema produces per-item mismatch problems        |                                                                        |
-| RF-055  | batch_ops.rs        | Active   | get_identities mirrors get_many lookup behavior                       |                                                                        |
+| RF-055  | batch_ops.rs        | Active   | get_handles mirrors get_many lookup behavior                       |                                                                        |
 | RF-056  | batch_ops.rs        | Active   | render_manifests all successes                                        |                                                                        |
 | RF-057  | batch_ops.rs        | Active   | render_manifests mixed successes and problems                         |                                                                        |
 | RF-058  | batch_ops.rs        | Active   | delete_many all successes                                             |                                                                        |
@@ -54,10 +54,10 @@ Each RF scenario from the original plan is listed with its status.
 | RF-073  | render_manifest.rs  | Active   | Render missing resource returns lookup problem                        |                                                                        |
 | RF-074  | render_manifest.rs  | Active   | Render wrong schema returns mismatch problem                |                                                                        |
 | RF-080  | list_search.rs      | Active   | List by type returns summaries for account                            |                                                                        |
-| RF-081  | list_search.rs      | Active   | list_identities by type returns identities for account                |                                                                        |
+| RF-081  | list_search.rs      | Active   | list_handles by type returns handles for account                |                                                                        |
 | RF-082  | list_search.rs      | Active   | List supports pagination limit                                        |                                                                        |
 | RF-083  | list_search.rs      | Active   | List supports pagination offset                                       |                                                                        |
-| RF-084  | list_search.rs      | Active   | list_identities pagination mirrors list pagination                    |                                                                        |
+| RF-084  | list_search.rs      | Active   | list_handles pagination mirrors list pagination                    |                                                                        |
 | RF-085  | list_search.rs      | Active   | List empty account/type returns empty result                          |                                                                        |
 | RF-086  | list_search.rs      | Active   | List unsupported type returns unsupported descriptor error            |                                                                        |
 | RF-090  | list_search.rs      | Active   | Search by exact names                                                 |                                                                        |
@@ -68,7 +68,7 @@ Each RF scenario from the original plan is listed with its status.
 | RF-095  | list_search.rs      | Active   | Search pagination and total_count                                     |                                                                        |
 | RF-096  | list_search.rs      | Active   | Search account scoping                                                |                                                                        |
 | RF-100  | list_all.rs         | Active   | list_all returns summaries across supported types                     |                                                                        |
-| RF-101  | list_all.rs         | Active   | list_all_identities returns identities across supported types         |                                                                        |
+| RF-101  | list_all.rs         | Active   | list_all_handles returns handles across supported types         |                                                                        |
 | RF-102  | list_all.rs         | Active   | list_all pagination                                                   |                                                                        |
 | RF-103  | list_all.rs         | Active   | list_all empty account returns empty result                           |                                                                        |
 | RF-110  | summary.rs          | Active   | Summary for empty account                                             |                                                                        |

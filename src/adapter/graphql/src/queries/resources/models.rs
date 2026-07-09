@@ -17,12 +17,12 @@ use crate::scalars::{AccountID, AccountName, ResourcePhase, UInt64};
 // Type aliases for cleaner From implementations
 
 type BatchGetResourcesResponse = kamu_resources_facade::BatchResourceResponse<
-    kamu_resources::ResourceView,
+    kamu_resources::Resource,
     kamu_resources_facade::ResourceLookupProblem,
 >;
 
-type BatchGetResourceIdentitiesResponse = kamu_resources_facade::BatchResourceResponse<
-    kamu_resources::ResourceIdentityView,
+type BatchGetResourceHandlesResponse = kamu_resources_facade::BatchResourceResponse<
+    kamu_resources::ResourceHandle,
     kamu_resources_facade::ResourceLookupProblem,
 >;
 
@@ -132,19 +132,19 @@ impl From<ResourceBatchSelectorInput> for kamu_resources_facade::ResourceBatchSe
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(InputObject, Debug, Clone)]
-pub struct SearchResourceIdentitiesInput {
+pub struct SearchResourceHandlesInput {
     pub resource_types: Vec<ResourceTypeSelectorInput>,
     pub names: Option<Vec<ResourceName<'static>>>,
     pub name_pattern: Option<String>,
     pub account: Option<ResourceAccountSelectorInput>,
 }
 
-impl SearchResourceIdentitiesInput {
+impl SearchResourceHandlesInput {
     pub fn into_facade_request(
         self,
         pagination: PaginationOpts,
-    ) -> kamu_resources_facade::SearchResourceIdentitiesRequest {
-        kamu_resources_facade::SearchResourceIdentitiesRequest {
+    ) -> kamu_resources_facade::SearchResourceHandlesRequest {
+        kamu_resources_facade::SearchResourceHandlesRequest {
             raw_type_selectors: self
                 .resource_types
                 .into_iter()
@@ -476,24 +476,7 @@ pub struct ResourceRenderManifestResult {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Debug, Clone)]
-pub struct Resource {
-    pub schema: TypeUri<'static>,
-    pub headers: ResourceHeaders,
-    pub spec: serde_json::Value,
-    pub status: Option<ResourceStatus>,
-}
-
-impl From<kamu_resources::ResourceView> for Resource {
-    fn from(value: kamu_resources::ResourceView) -> Self {
-        Self {
-            schema: value.schema.into(),
-            headers: value.headers.into(),
-            spec: value.spec,
-            status: value.status.map(Into::into),
-        }
-    }
-}
+pub use crate::scalars::Resource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -579,15 +562,15 @@ pub struct BatchResourceManifestSuccess {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject, Debug, Clone)]
-pub struct ResourceIdentity {
+pub struct ResourceHandle {
     pub id: ResourceID<'static>,
     pub schema: TypeUri<'static>,
     pub canonical_selector: ResourceSelectorName<'static>,
     pub name: ResourceName<'static>,
 }
 
-impl From<kamu_resources::ResourceIdentityView> for ResourceIdentity {
-    fn from(value: kamu_resources::ResourceIdentityView) -> Self {
+impl From<kamu_resources::ResourceHandle> for ResourceHandle {
+    fn from(value: kamu_resources::ResourceHandle) -> Self {
         Self {
             id: value.id.into(),
             schema: value.schema.into(),
@@ -600,27 +583,27 @@ impl From<kamu_resources::ResourceIdentityView> for ResourceIdentity {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Union, Debug, Clone)]
-pub enum BatchResourceIdentitiesOutcome {
-    Success(BatchResourceIdentitiesResult),
+pub enum BatchResourceHandlesOutcome {
+    Success(BatchResourceHandlesResult),
     UnsupportedSelector(ResourceUnsupportedSelectorProblem),
     BadAccount(ResourceBadAccountProblem),
 }
 
 #[derive(SimpleObject, Debug, Clone)]
-pub struct BatchResourceIdentitiesResult {
-    pub identities: Vec<BatchResourceIdentitySuccess>,
+pub struct BatchResourceHandlesResult {
+    pub handles: Vec<BatchResourceHandleSuccess>,
     pub problems: Vec<BatchResourceProblem>,
 }
 
-impl From<BatchGetResourceIdentitiesResponse> for BatchResourceIdentitiesResult {
-    fn from(value: BatchGetResourceIdentitiesResponse) -> Self {
+impl From<BatchGetResourceHandlesResponse> for BatchResourceHandlesResult {
+    fn from(value: BatchGetResourceHandlesResponse) -> Self {
         Self {
-            identities: value
+            handles: value
                 .successes
                 .into_iter()
-                .map(|success| BatchResourceIdentitySuccess {
+                .map(|success| BatchResourceHandleSuccess {
                     request_index: success.request_index,
-                    identity: success.item.into(),
+                    handle: success.item.into(),
                 })
                 .collect(),
             problems: value.problems.into_iter().map(Into::into).collect(),
@@ -631,9 +614,9 @@ impl From<BatchGetResourceIdentitiesResponse> for BatchResourceIdentitiesResult 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject, Debug, Clone)]
-pub struct BatchResourceIdentitySuccess {
+pub struct BatchResourceHandleSuccess {
     pub request_index: usize,
-    pub identity: ResourceIdentity,
+    pub handle: ResourceHandle,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -652,10 +635,6 @@ impl From<BatchGetResourceProblem> for BatchResourceProblem {
         }
     }
 }
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub use crate::scalars::ResourceHeaders;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -837,10 +816,6 @@ page_based_connection!(ResourceSummary, ResourceConnection, ResourceEdge);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-page_based_connection!(
-    ResourceIdentity,
-    ResourceIdentityConnection,
-    ResourceIdentityEdge
-);
+page_based_connection!(ResourceHandle, ResourceHandleConnection, ResourceHandleEdge);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

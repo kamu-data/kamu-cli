@@ -9,10 +9,10 @@
 
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_resources::{
+    Resource,
     ResourceHeadersInput,
     ResourceHeadersInputExt,
     ResourceManifest,
-    ResourceView,
     ResourceWarning,
 };
 
@@ -83,10 +83,8 @@ pub(crate) fn collect_manifest_header_warnings(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn resource_view_to_manifest(
-    view: ResourceView,
-) -> Result<ResourceManifest, InternalError> {
-    let ResourceView {
+pub(crate) fn resource_to_manifest(view: Resource) -> Result<ResourceManifest, InternalError> {
+    let Resource {
         schema,
         headers,
         spec,

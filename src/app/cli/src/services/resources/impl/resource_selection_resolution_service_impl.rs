@@ -11,16 +11,16 @@ use std::collections::{BTreeMap, HashSet};
 use std::future::Future;
 
 use database_common::PaginationOpts;
-use kamu_resources::{ResourceIdentityView, ResourceTypeDescriptor};
+use kamu_resources::{ResourceHandle, ResourceTypeDescriptor};
 use kamu_resources_facade::{
     GetResourceError,
-    ListAllResourceIdentitiesRequest,
-    ListResourceIdentitiesRequest,
+    ListAllResourceHandlesRequest,
+    ListResourceHandlesRequest,
     ResourceBatchSelector,
     ResourceFacade,
     ResourceLookupProblem,
     ResourceSelector,
-    SearchResourceIdentitiesRequest,
+    SearchResourceHandlesRequest,
 };
 
 use crate::CLIError;
@@ -213,8 +213,8 @@ impl ResourceSelectionResolutionService for ResourceSelectionResolutionServiceIm
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl ResourceSelectionResolutionServiceImpl {
-    fn target_key_from_identity(identity: &ResourceIdentityView) -> ResourceTargetKey {
-        (identity.schema.clone(), identity.id)
+    fn target_key_from_handle(handle: &ResourceHandle) -> ResourceTargetKey {
+        (handle.schema.clone(), handle.id)
     }
 
     fn target_key(target: &ResourceTarget) -> ResourceTargetKey {
@@ -261,7 +261,7 @@ impl ResourceSelectionResolutionServiceImpl {
     async fn fetch_exact_identities(
         selection: &ResourceSelectionSyntax,
         resource_facade: &dyn ResourceFacade,
-    ) -> Result<Vec<Result<ResourceIdentityView, GetResourceError>>, CLIError> {
+    ) -> Result<Vec<Result<ResourceHandle, GetResourceError>>, CLIError> {
         let exact_selectors = selection
             .items
             .iter()
@@ -284,7 +284,7 @@ impl ResourceSelectionResolutionServiceImpl {
         let exact_request_count = exact_selectors.len();
         let mut exact_results = (0..exact_request_count)
             .map(|_| None)
-            .collect::<Vec<Option<Result<ResourceIdentityView, GetResourceError>>>>();
+            .collect::<Vec<Option<Result<ResourceHandle, GetResourceError>>>>();
         let mut groups = BTreeMap::new();
 
         for (exact_index, (_, resource_type, resource_ref)) in
@@ -298,7 +298,7 @@ impl ResourceSelectionResolutionServiceImpl {
 
         for (resource_type, entries) in groups {
             let exact_batch_result = resource_facade
-                .get_identities(ResourceBatchSelector {
+                .get_handles(ResourceBatchSelector {
                     account: None,
                     resource_type,
                     resource_refs: entries
@@ -339,7 +339,7 @@ impl ResourceSelectionResolutionServiceImpl {
             seen_target_keys,
             |pagination| async move {
                 resource_facade
-                    .list_all_identities(ListAllResourceIdentitiesRequest {
+                    .list_all_handles(ListAllResourceHandlesRequest {
                         account: None,
                         pagination,
                     })
@@ -352,7 +352,7 @@ impl ResourceSelectionResolutionServiceImpl {
         Ok(collected
             .identities
             .into_iter()
-            .map(|identity| Self::target_from_identity(identity, "all".to_owned()))
+            .map(|handle| Self::target_from_handle(handle, "all".to_owned()))
             .collect())
     }
 
@@ -370,7 +370,7 @@ impl ResourceSelectionResolutionServiceImpl {
             seen_target_keys,
             |pagination| async move {
                 resource_facade
-                    .list_identities(ListResourceIdentitiesRequest {
+                    .list_handles(ListResourceHandlesRequest {
                         raw_type_selector: (&type_descriptor.canonical_selector).into(),
                         account: None,
                         pagination,
@@ -384,7 +384,7 @@ impl ResourceSelectionResolutionServiceImpl {
         Ok(collected
             .identities
             .into_iter()
-            .map(|identity| Self::target_from_identity(identity, selector_input.clone()))
+            .map(|handle| Self::target_from_handle(handle, selector_input.clone()))
             .collect())
     }
 
@@ -419,7 +419,7 @@ impl ResourceSelectionResolutionServiceImpl {
                 let raw_type_selectors = matched_resource_type_selectors.clone();
                 async move {
                     resource_facade
-                        .search_identities(SearchResourceIdentitiesRequest {
+                        .search_handles(SearchResourceHandlesRequest {
                             raw_type_selectors,
                             exact_names: None,
                             name_pattern: None,
@@ -437,7 +437,7 @@ impl ResourceSelectionResolutionServiceImpl {
         Ok(collected
             .identities
             .into_iter()
-            .map(|identity| Self::target_from_identity(identity, selector_input.clone()))
+            .map(|handle| Self::target_from_handle(handle, selector_input.clone()))
             .collect())
     }
 
@@ -459,7 +459,7 @@ impl ResourceSelectionResolutionServiceImpl {
                 let request_name_pattern = name_pattern.clone();
                 async move {
                     resource_facade
-                        .search_identities(SearchResourceIdentitiesRequest {
+                        .search_handles(SearchResourceHandlesRequest {
                             raw_type_selectors: vec![(&type_descriptor.canonical_selector).into()],
                             exact_names: None,
                             name_pattern: Some(request_name_pattern),
@@ -492,7 +492,7 @@ impl ResourceSelectionResolutionServiceImpl {
         Ok(collected
             .identities
             .into_iter()
-            .map(|identity| Self::target_from_identity(identity, selector_input.clone()))
+            .map(|handle| Self::target_from_handle(handle, selector_input.clone()))
             .collect())
     }
 
@@ -523,16 +523,16 @@ impl ResourceSelectionResolutionServiceImpl {
 
         for type_descriptor in &matched_types {
             match resource_facade
-                .get_identity(ResourceSelector {
+                .get_handle(ResourceSelector {
                     account: None,
                     resource_type: (&type_descriptor.canonical_selector).into(),
                     resource_ref: resource_ref.clone(),
                 })
                 .await
             {
-                Ok(identity) => {
+                Ok(handle) => {
                     had_any_match = true;
-                    let target_key = Self::target_key_from_identity(&identity);
+                    let target_key = Self::target_key_from_handle(&handle);
 
                     if seen_target_keys.contains(&target_key)
                         || !local_seen_target_keys.insert(target_key)
@@ -540,7 +540,7 @@ impl ResourceSelectionResolutionServiceImpl {
                         continue;
                     }
 
-                    targets.push(Self::target_from_identity(identity, selector_input.clone()));
+                    targets.push(Self::target_from_handle(handle, selector_input.clone()));
 
                     if let Some(limit) = remaining_limit
                         && targets.len() > limit
@@ -612,7 +612,7 @@ impl ResourceSelectionResolutionServiceImpl {
                 let request_name_pattern = name_pattern.clone();
                 async move {
                     resource_facade
-                        .search_identities(SearchResourceIdentitiesRequest {
+                        .search_handles(SearchResourceHandlesRequest {
                             raw_type_selectors: request_resource_types,
                             exact_names: None,
                             name_pattern: Some(request_name_pattern),
@@ -648,13 +648,13 @@ impl ResourceSelectionResolutionServiceImpl {
         Ok(collected
             .identities
             .into_iter()
-            .map(|identity| Self::target_from_identity(identity, selector_input.clone()))
+            .map(|handle| Self::target_from_handle(handle, selector_input.clone()))
             .collect())
     }
 
     fn process_exact_item(
         selector: crate::resources::ResourceExactSelector,
-        exact_results: &mut std::vec::IntoIter<Result<ResourceIdentityView, GetResourceError>>,
+        exact_results: &mut std::vec::IntoIter<Result<ResourceHandle, GetResourceError>>,
         seen_target_keys: &mut HashSet<ResourceTargetKey>,
         targets: &mut Vec<ResourceTarget>,
         ignored_selectors: &mut Vec<ResourceIgnoredSelector>,
@@ -664,8 +664,8 @@ impl ResourceSelectionResolutionServiceImpl {
             .next()
             .expect("Every exact selector must have a batch result")
         {
-            Ok(identity) => {
-                let target = Self::target_from_identity(identity, selector.selector_input);
+            Ok(handle) => {
+                let target = Self::target_from_handle(handle, selector.selector_input);
 
                 if seen_target_keys.insert(Self::target_key(&target)) {
                     targets.push(target);
@@ -692,7 +692,7 @@ impl ResourceSelectionResolutionServiceImpl {
     ) -> Result<CollectedUniqueIdentities, CLIError>
     where
         F: FnMut(PaginationOpts) -> Fut,
-        Fut: Future<Output = Result<Vec<ResourceIdentityView>, CLIError>>,
+        Fut: Future<Output = Result<Vec<ResourceHandle>, CLIError>>,
     {
         let mut offset = 0;
         let mut items = Vec::new();
@@ -708,8 +708,8 @@ impl ResourceSelectionResolutionServiceImpl {
             let fetched = page_items.len();
             had_any_match |= fetched > 0;
 
-            for identity in page_items {
-                let target_key = Self::target_key_from_identity(&identity);
+            for handle in page_items {
+                let target_key = Self::target_key_from_handle(&handle);
 
                 if seen_target_keys.contains(&target_key)
                     || !local_seen_target_keys.insert(target_key)
@@ -717,7 +717,7 @@ impl ResourceSelectionResolutionServiceImpl {
                     continue;
                 }
 
-                items.push(identity);
+                items.push(handle);
 
                 if let Some(limit) = remaining_limit
                     && items.len() > limit
@@ -824,15 +824,12 @@ impl ResourceSelectionResolutionServiceImpl {
         targets
     }
 
-    fn target_from_identity(
-        identity: ResourceIdentityView,
-        selector_input: String,
-    ) -> ResourceTarget {
+    fn target_from_handle(handle: ResourceHandle, selector_input: String) -> ResourceTarget {
         ResourceTarget {
-            canonical_selector: identity.canonical_selector,
-            schema: identity.schema,
-            id: identity.id,
-            name: identity.name,
+            canonical_selector: handle.canonical_selector,
+            schema: handle.schema,
+            id: handle.id,
+            name: handle.name,
             selector_input,
         }
     }
@@ -845,7 +842,7 @@ type ResourceTargetKey = (kamu_resources::TypeUri, kamu_resources::ResourceID);
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct CollectedUniqueIdentities {
-    identities: Vec<ResourceIdentityView>,
+    identities: Vec<ResourceHandle>,
     had_any_match: bool,
 }
 

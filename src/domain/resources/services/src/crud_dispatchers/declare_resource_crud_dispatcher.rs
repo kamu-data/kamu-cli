@@ -102,14 +102,14 @@ macro_rules! declare_resource_crud_dispatcher {
             async fn get(
                 &self,
                 request: $crate::ResourceCrudDispatcherGetRequest,
-            ) -> Result<kamu_resources::ResourceView, $crate::GetResourceCrudDispatcherError> {
+            ) -> Result<kamu_resources::Resource, $crate::GetResourceCrudDispatcherError> {
                 let state = self
                     .get_resource_by_id_use_case
                     .execute(request.account_id, &request.id)
                     .await
                     .map_err(kamu_resources::GetResourceCrudDispatcherError::from)?;
 
-                $crate::typed_resource_state_to_view::<$resource>(state).map_err(Into::into)
+                $crate::typed_resource_state_to_resource::<$resource>(state).map_err(Into::into)
             }
 
             async fn list(

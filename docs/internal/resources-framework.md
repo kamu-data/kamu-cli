@@ -127,7 +127,7 @@ long-term goal. This page documents what exists now.
 | **Descriptor** | Schema (`TypeUri`) + selector name/aliases identifying a type for routing/presentation; domain type `ResourceTypeDescriptor`, carried in `dill` as `ResourceDispatcherMeta`. |
 | **Manifest** | The user-authored wire document (`$schema`/`headers`/`spec`) in YAML or JSON. |
 | **Spec** | The desired-state portion authored by the user; stored as `serde_json::Value`. |
-| **Status** | Server-owned observed state (`ResourceStatus`: `phase`, optional `observedGeneration`/`reconciledAt`/`conditions`). `conditions` is a `TypeRef → JSON` map. `generation` lives in **headers**, not status. |
+| **Status** | Server-owned observed state (`ResourceStatus`: `phase`, optional `observedGeneration`/`reconciledAt`/`conditions`). `conditions` is a `TypeRef → JSON` map. `generation` lives in **headers**, not status. On a `Resource` (domain/GraphQL), `status` is always present — a resource with no reconciliation yet gets a synthesized `Pending` status with no conditions. The `Option` lives only in the persisted `ResourceSnapshot` row (`None` before the first write completes). |
 | **Snapshot** | The persisted materialized form of a resource (`ResourceSnapshot`). |
 | **Phase** | Lifecycle stage: `Pending`, `Reconciling`, `Ready`, `Failed` (ODF RFC-018 `ResourcePhase`; see [§13 state machine](#lifecycle-state-machine)). |
 | **Condition** | A status signal keyed by a condition schema URI. Built-ins: `Accepted`, `Ready`, `Reconciling`; each value has `status`, `reason`, optional `message`, `lastTransitionTime`. |
@@ -418,6 +418,17 @@ pub struct ResourceStatus {                  // ODF-generated; entirely server-o
 > for free. Postgres/SQLite repos round-trip labels/annotations through the
 > `resource_labels_{from,to}_json` helpers; the Cynic remote client binds its own scalar newtypes.
 > This is a deliberate per-field cost of reusing the codegen shape, not a bug.
+>
+> The whole-resource envelope follows the same convention: domain `Resource`
+> ([`values/resource.rs`](/src/domain/resources/domain/src/values/resource.rs)) is a `pub type` alias of
+> `odf::metadata::resource::Resource<serde_json::Value>`, and the GraphQL `Resource` re-exports the
+> matching generated `SimpleObject`. Both live in `values/`, not `views/` — `views/` is reserved for
+> query-shaped results (`ResourceSummaryView`, list/apply-manifest outcomes), whereas `Resource` is the
+> canonical per-instance DTO. Its identity/lookup counterpart, domain `ResourceHandle`
+> ([`values/resource_handle.rs`](/src/domain/resources/domain/src/values/resource_handle.rs) — `schema` +
+> `canonicalSelector` + `id` + `name`), has no ODF codegen equivalent and stays hand-rolled, but is
+> named and placed the same way. The GraphQL-facing type is also `ResourceHandle` (was
+> `ResourceIdentity`).
 
 The behaviorally-significant consequences of adopting these shapes:
 
@@ -684,15 +695,15 @@ pub trait ResourceFacade: Send + Sync {
     async fn list_supported_resource_types(&self) -> Result<Vec<ResourceTypeDescriptor>, ...>;
     async fn summary(&self, request: ResourcesSummaryRequest) -> Result<ResourcesSummary, ...>;
 
-    async fn get(&self, selector: ResourceSelector, spec_view_mode: SpecViewMode) -> Result<ResourceView, ...>;
+    async fn get(&self, selector: ResourceSelector, spec_view_mode: SpecViewMode) -> Result<Resource, ...>;
     async fn get_many(&self, selector: ResourceBatchSelector, spec_view_mode: SpecViewMode)
-        -> Result<BatchResourceResponse<ResourceView, ResourceLookupProblem>, ...>;
-    async fn get_identity(&self, selector: ResourceSelector) -> Result<ResourceIdentityView, ...>;
+        -> Result<BatchResourceResponse<Resource, ResourceLookupProblem>, ...>;
+    async fn get_handle(&self, selector: ResourceSelector) -> Result<ResourceHandle, ...>;
     async fn render_manifest(&self, selector, format: ResourceManifestFormat, spec_view_mode) -> ...;
 
     async fn list(&self, request: ListResourcesRequest) -> Result<Vec<ResourceSummaryView>, ...>;
-    async fn list_identities(&self, request: ListResourceIdentitiesRequest) -> ...;
-    async fn search_identities(&self, request: SearchResourceIdentitiesRequest) -> ...;
+    async fn list_handles(&self, request: ListResourceHandlesRequest) -> ...;
+    async fn search_handles(&self, request: SearchResourceHandlesRequest) -> ...;
     async fn list_all(&self, request: ListAllResourcesRequest) -> ...;
 
     async fn plan_apply_manifest(&self, request: ApplyManifestRequest) -> Result<ApplyManifestPlanningDecision, ...>;
@@ -740,8 +751,8 @@ and [`adapter/graphql/src/mutations/resources_mut/`](/src/adapter/graphql/src/mu
 Every resolver delegates to `ResourceFacade`.
 
 **Queries (`Resources`):** `supported_resource_types`, `summary`, `resource` / `resources`,
-`resource_identity` / `resource_identities`, `list_by_resource_type` /
-`list_identities_by_resource_type`, `search_identities`, `list_all` / `list_all_identities`,
+`resource_handle` / `resource_handles`, `list_by_resource_type` /
+`list_handles_by_resource_type`, `search_handles`, `list_all` / `list_all_handles`,
 `render_manifest` / `render_manifests`. The `revealed: bool` argument maps to `SpecViewMode`.
 
 **Mutations (`ResourcesMut`):** `apply_manifest(manifest, format, dry_run?)`, `delete(selector)`,

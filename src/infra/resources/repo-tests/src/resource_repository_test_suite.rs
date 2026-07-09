@@ -304,17 +304,17 @@ pub async fn test_find_resource_snapshots_by_schema_and_ids(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_search_resource_identities(catalog: &Catalog) {
+pub async fn test_search_resource_handles(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
 
     let account_handle = odf::AccountHandle::new_test("test-account");
 
-    seed_search_resource_identities(repo.as_ref(), &account_handle).await;
+    seed_search_resource_handles(repo.as_ref(), &account_handle).await;
 
     // --- name_pattern: prefix wildcard matches only TestKind items for this
     // account ---
     let rows = repo
-        .search_resource_identities(
+        .search_resource_handles(
             &account_handle.id,
             std::slice::from_ref(&TEST_KIND),
             None,
@@ -328,7 +328,7 @@ pub async fn test_search_resource_identities(catalog: &Catalog) {
 
     // --- name_pattern is case-insensitive ---
     let rows = repo
-        .search_resource_identities(
+        .search_resource_handles(
             &account_handle.id,
             std::slice::from_ref(&TEST_KIND),
             None,
@@ -342,7 +342,7 @@ pub async fn test_search_resource_identities(catalog: &Catalog) {
 
     // --- exact_names filter ---
     let rows = repo
-        .search_resource_identities(
+        .search_resource_handles(
             &account_handle.id,
             std::slice::from_ref(&TEST_KIND),
             Some(&["app-alpha".parse().unwrap(), "db-alpha".parse().unwrap()]),
@@ -357,7 +357,7 @@ pub async fn test_search_resource_identities(catalog: &Catalog) {
 
     // --- exact_names filter is case-insensitive ---
     let rows = repo
-        .search_resource_identities(
+        .search_resource_handles(
             &account_handle.id,
             std::slice::from_ref(&TEST_KIND),
             Some(&["App-Alpha".parse().unwrap(), "DB-ALPHA".parse().unwrap()]),
@@ -372,7 +372,7 @@ pub async fn test_search_resource_identities(catalog: &Catalog) {
 
     // --- multi-kind search ---
     let rows = repo
-        .search_resource_identities(
+        .search_resource_handles(
             &account_handle.id,
             &[TEST_KIND.clone(), OTHER_KIND.clone()],
             None,
@@ -390,7 +390,7 @@ pub async fn test_search_resource_identities(catalog: &Catalog) {
 
     // --- no name_pattern and no exact_names returns all for the kind ---
     let rows = repo
-        .search_resource_identities(
+        .search_resource_handles(
             &account_handle.id,
             std::slice::from_ref(&TEST_KIND),
             None,
@@ -403,7 +403,7 @@ pub async fn test_search_resource_identities(catalog: &Catalog) {
 
     // --- other account's resources are never returned ---
     let rows = repo
-        .search_resource_identities(
+        .search_resource_handles(
             &account_handle.id,
             std::slice::from_ref(&TEST_KIND),
             None,
@@ -417,15 +417,15 @@ pub async fn test_search_resource_identities(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_count_search_resource_identities(catalog: &Catalog) {
+pub async fn test_count_search_resource_handles(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
 
     let account_handle = odf::AccountHandle::new_test("test-account");
 
-    seed_search_resource_identities(repo.as_ref(), &account_handle).await;
+    seed_search_resource_handles(repo.as_ref(), &account_handle).await;
 
     let count = repo
-        .count_search_resource_identities(
+        .count_search_resource_handles(
             &account_handle.id,
             std::slice::from_ref(&TEST_KIND),
             None,
@@ -436,7 +436,7 @@ pub async fn test_count_search_resource_identities(catalog: &Catalog) {
     assert_eq!(count, 2);
 
     let count = repo
-        .count_search_resource_identities(
+        .count_search_resource_handles(
             &account_handle.id,
             std::slice::from_ref(&TEST_KIND),
             Some(&["App-Alpha".parse().unwrap(), "DB-ALPHA".parse().unwrap()]),
@@ -447,7 +447,7 @@ pub async fn test_count_search_resource_identities(catalog: &Catalog) {
     assert_eq!(count, 2);
 
     let count = repo
-        .count_search_resource_identities(
+        .count_search_resource_handles(
             &account_handle.id,
             &[TEST_KIND.clone(), OTHER_KIND.clone()],
             None,
@@ -458,7 +458,7 @@ pub async fn test_count_search_resource_identities(catalog: &Catalog) {
     assert_eq!(count, 4);
 
     let count = repo
-        .count_search_resource_identities(
+        .count_search_resource_handles(
             &account_handle.id,
             std::slice::from_ref(&TEST_KIND),
             None,
@@ -469,7 +469,7 @@ pub async fn test_count_search_resource_identities(catalog: &Catalog) {
     assert_eq!(count, 0);
 
     let count = repo
-        .count_search_resource_identities(
+        .count_search_resource_handles(
             &account_handle.id,
             std::slice::from_ref(&TEST_KIND),
             Some(&[]),
@@ -518,9 +518,9 @@ pub async fn test_resource_name_case_insensitive(catalog: &Catalog) {
         .unwrap();
     assert_eq!(found, Some(id));
 
-    // --- find_resource_identities_by_names is case-insensitive ---
+    // --- find_resource_handles_by_names is case-insensitive ---
     let rows = repo
-        .find_resource_identities_by_names(
+        .find_resource_handles_by_names(
             &account_handle.id,
             &TEST_KIND,
             &[
@@ -534,9 +534,9 @@ pub async fn test_resource_name_case_insensitive(catalog: &Catalog) {
     names.sort();
     assert_eq!(names, vec!["my-resource", "other-resource"]);
 
-    // --- search_resource_identities exact_names is case-insensitive ---
+    // --- search_resource_handles exact_names is case-insensitive ---
     let rows = repo
-        .search_resource_identities(
+        .search_resource_handles(
             &account_handle.id,
             std::slice::from_ref(&TEST_KIND),
             Some(&["MY-RESOURCE".parse().unwrap()]),
@@ -550,7 +550,7 @@ pub async fn test_resource_name_case_insensitive(catalog: &Catalog) {
 
     // --- name_pattern search is case-insensitive ---
     let rows = repo
-        .search_resource_identities(
+        .search_resource_handles(
             &account_handle.id,
             std::slice::from_ref(&TEST_KIND),
             None,
@@ -565,7 +565,7 @@ pub async fn test_resource_name_case_insensitive(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn seed_search_resource_identities(
+async fn seed_search_resource_handles(
     repo: &dyn ResourceRepository,
     account_handle: &odf::AccountHandle,
 ) {

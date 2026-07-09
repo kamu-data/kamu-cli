@@ -11,10 +11,10 @@ use kamu_resources::{
     ApplyManifestApplicationDecision,
     ApplyManifestPlanningDecision,
     ApplyResourceOutcome,
+    Resource,
+    ResourceHandle,
     ResourceID,
-    ResourceIdentityView,
     ResourceSummaryView,
-    ResourceView,
     TypeUri,
 };
 use kamu_resources_facade::BatchResourceResponse;
@@ -22,11 +22,11 @@ use pretty_assertions::assert_eq;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Asserts the stable semantic fields of a `ResourceView` without comparing
+/// Asserts the stable semantic fields of a `Resource` without comparing
 /// volatile timestamps or exact UID values.
 #[track_caller]
 pub fn assert_resource_view_fields(
-    view: &ResourceView,
+    view: &Resource,
     expected_schema: &TypeUri,
     expected_name: &str,
 ) {
@@ -40,20 +40,17 @@ pub fn assert_resource_view_fields(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Asserts the stable fields of a `ResourceIdentityView`.
+/// Asserts the stable fields of a `ResourceHandle`.
 #[track_caller]
-pub fn assert_identity_fields(
-    identity: &ResourceIdentityView,
+pub fn assert_handle_fields(
+    handle: &ResourceHandle,
     expected_schema: &TypeUri,
     expected_name: &str,
     expected_uid: &ResourceID,
 ) {
-    assert_eq!(
-        identity.schema, *expected_schema,
-        "identity schema mismatch"
-    );
-    assert_eq!(identity.name, expected_name, "identity name mismatch");
-    assert_eq!(identity.id, *expected_uid, "identity id mismatch");
+    assert_eq!(handle.schema, *expected_schema, "handle schema mismatch");
+    assert_eq!(handle.name, expected_name, "handle name mismatch");
+    assert_eq!(handle.id, *expected_uid, "handle id mismatch");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -74,12 +71,12 @@ pub fn assert_planning_outcome(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Asserts that an `ApplyManifestApplicationDecision` is `Applied` with the
-/// expected `ApplyResourceOutcome` and returns the embedded `ResourceView`.
+/// expected `ApplyResourceOutcome` and returns the embedded `Resource`.
 #[track_caller]
 pub fn assert_applied_outcome(
     decision: &ApplyManifestApplicationDecision,
     expected_outcome: ApplyResourceOutcome,
-) -> &ResourceView {
+) -> &Resource {
     let ApplyManifestApplicationDecision::Applied(result) = decision else {
         panic!("expected Applied decision, got Rejected");
     };
@@ -144,8 +141,8 @@ pub fn normalize_summary_views(views: &mut [ResourceSummaryView]) {
     views.sort_by(|a, b| (&a.schema, &a.name).cmp(&(&b.schema, &b.name)));
 }
 
-/// Normalizes a slice of `ResourceIdentityView` by sorting by `(schema, name)`.
-pub fn normalize_identity_views(views: &mut [ResourceIdentityView]) {
+/// Normalizes a slice of `ResourceHandle` by sorting by `(schema, name)`.
+pub fn normalize_handles(views: &mut [ResourceHandle]) {
     views.sort_by(|a, b| (&a.schema, &a.name).cmp(&(&b.schema, &b.name)));
 }
 

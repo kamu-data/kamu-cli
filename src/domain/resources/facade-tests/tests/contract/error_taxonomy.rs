@@ -100,7 +100,7 @@ async fn create_resource(h: &impl FacadeContractHarness, name: &str) -> kamu_res
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // RF-140: single-resource lookup error taxonomy is consistent across get,
-// get_identity, render_manifest, and delete.
+// get_handle, render_manifest, and delete.
 contract_test!(
     single_resource_lookup_taxonomy,
     super::test_single_resource_lookup_taxonomy
@@ -125,13 +125,13 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
         "get: expected NameNotFound"
     );
 
-    let get_id = facade.get_identity(by_name(missing_name)).await;
+    let get_id = facade.get_handle(by_name(missing_name)).await;
     assert_matches!(
         get_id,
         Err(GetResourceError::LookupProblem(
             ResourceLookupProblem::NameNotFound(_)
         )),
-        "get_identity: expected NameNotFound"
+        "get_handle: expected NameNotFound"
     );
 
     let render = facade
@@ -170,13 +170,13 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
         "get: expected IDNotFound"
     );
 
-    let get_id = facade.get_identity(by_id(&absent_uid)).await;
+    let get_id = facade.get_handle(by_id(&absent_uid)).await;
     assert_matches!(
         get_id,
         Err(GetResourceError::LookupProblem(
             ResourceLookupProblem::IDNotFound(_)
         )),
-        "get_identity: expected IDNotFound"
+        "get_handle: expected IDNotFound"
     );
 
     let render = facade
@@ -221,13 +221,13 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
         "get: expected SchemaMismatch"
     );
 
-    let get_id = facade.get_identity(wrong_schema_selector.clone()).await;
+    let get_id = facade.get_handle(wrong_schema_selector.clone()).await;
     assert_matches!(
         get_id,
         Err(GetResourceError::LookupProblem(
             ResourceLookupProblem::SchemaMismatch(_)
         )),
-        "get_identity: expected SchemaMismatch"
+        "get_handle: expected SchemaMismatch"
     );
 
     let render = facade
@@ -291,16 +291,16 @@ pub async fn test_batch_lookup_taxonomy(h: &impl FacadeContractHarness) {
         "get_many: expected IDNotFound problem"
     );
 
-    // --- NameNotFound in get_identities ---
+    // --- NameNotFound in get_handles ---
     let resp = facade
-        .get_identities(batch_by_name("taxonomy-batch-missing-id"))
+        .get_handles(batch_by_name("taxonomy-batch-missing-id"))
         .await
         .unwrap();
     assert_eq!(resp.problems.len(), 1);
     assert_matches!(
         &resp.problems[0].error,
         ResourceLookupProblem::NameNotFound(_),
-        "get_identities: expected NameNotFound problem"
+        "get_handles: expected NameNotFound problem"
     );
 
     // --- NameNotFound in render_manifests ---

@@ -19,13 +19,13 @@ use crate::{
     ApplyResourceUseCaseError,
     DeleteResourcesError,
     GetResourceByIdError,
+    Resource,
     ResourceHeadersInput,
     ResourceID,
     ResourceIDNotFoundError,
     ResourceSummaryView,
     ResourceTypeMismatchError,
     ResourceTypeSelectorRaw,
-    ResourceView,
     TypeUri,
 };
 
@@ -46,7 +46,7 @@ pub trait ResourceCrudDispatcher: Send + Sync {
     async fn get(
         &self,
         request: ResourceCrudDispatcherGetRequest,
-    ) -> Result<ResourceView, GetResourceCrudDispatcherError>;
+    ) -> Result<Resource, GetResourceCrudDispatcherError>;
 
     async fn list(
         &self,

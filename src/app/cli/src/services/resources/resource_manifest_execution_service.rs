@@ -11,7 +11,7 @@ use kamu_resources::{
     ApplyManifestChange,
     ApplyManifestRejection,
     ApplyResourceOutcome,
-    ResourceView,
+    Resource,
     ResourceWarning,
 };
 use kamu_resources_facade::{ApplyManifestError, ResourceFacade};
@@ -43,7 +43,7 @@ pub enum ExecuteResourceManifestOutcome {
 #[derive(Debug)]
 pub struct ExecutedResourceManifestResult {
     pub outcome: ApplyResourceOutcome,
-    pub resource: ResourceView,
+    pub resource: Resource,
     pub warnings: Vec<ResourceWarning>,
     pub changes: Vec<ApplyManifestChange>,
 }

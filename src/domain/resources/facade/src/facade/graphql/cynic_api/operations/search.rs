@@ -10,36 +10,36 @@
 use cynic::QueryBuilder;
 use internal_error::InternalError;
 
-use crate::SearchResourceIdentitiesRequest;
+use crate::SearchResourceHandlesRequest;
 use crate::facade::graphql::cynic_api::fragments::{
     ResourceBadAccountProblem,
-    ResourceIdentityConnection,
+    ResourceHandleConnection,
     ResourceInvalidSearchQueryProblem,
     ResourceUnsupportedSelectorProblem,
 };
-use crate::facade::graphql::cynic_api::inputs::SearchResourceIdentitiesInput;
+use crate::facade::graphql::cynic_api::inputs::SearchResourceHandlesInput;
 use crate::facade::graphql::cynic_api::schema;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
-#[cynic(graphql_type = "Query", variables = "SearchIdentitiesVariables")]
-pub(crate) struct SearchIdentitiesQuery {
-    pub resources: SearchIdentitiesResources,
+#[cynic(graphql_type = "Query", variables = "SearchHandlesVariables")]
+pub(crate) struct SearchHandlesQuery {
+    pub resources: SearchHandlesResources,
 }
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
-#[cynic(graphql_type = "Resources", variables = "SearchIdentitiesVariables")]
-pub(crate) struct SearchIdentitiesResources {
+#[cynic(graphql_type = "Resources", variables = "SearchHandlesVariables")]
+pub(crate) struct SearchHandlesResources {
     #[arguments(query: $query, page: $page, perPage: $per_page)]
-    pub search_identities: ResourceIdentityListOutcome,
+    pub search_handles: ResourceHandleListOutcome,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::InlineFragments, Debug, Clone)]
-pub(crate) enum ResourceIdentityListOutcome {
-    ResourceIdentityConnection(ResourceIdentityConnection),
+pub(crate) enum ResourceHandleListOutcome {
+    ResourceHandleConnection(ResourceHandleConnection),
     ResourceUnsupportedSelectorProblem(ResourceUnsupportedSelectorProblem),
     ResourceBadAccountProblem(ResourceBadAccountProblem),
     ResourceInvalidSearchQueryProblem(ResourceInvalidSearchQueryProblem),
@@ -50,14 +50,14 @@ pub(crate) enum ResourceIdentityListOutcome {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::QueryVariables, Debug, Clone)]
-pub(crate) struct SearchIdentitiesVariables {
-    pub query: SearchResourceIdentitiesInput,
+pub(crate) struct SearchHandlesVariables {
+    pub query: SearchResourceHandlesInput,
     pub page: i32,
     pub per_page: i32,
 }
 
-impl SearchIdentitiesVariables {
-    pub(crate) fn new(request: &SearchResourceIdentitiesRequest) -> Result<Self, InternalError> {
+impl SearchHandlesVariables {
+    pub(crate) fn new(request: &SearchResourceHandlesRequest) -> Result<Self, InternalError> {
         let (page, per_page) = request.pagination.as_page_params(Self::DEFAULT_PAGE_SIZE)?;
         Ok(Self {
             query: request.try_into()?,
@@ -72,9 +72,9 @@ impl SearchIdentitiesVariables {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn build_operation(
-    variables: SearchIdentitiesVariables,
-) -> cynic::Operation<SearchIdentitiesQuery, SearchIdentitiesVariables> {
-    SearchIdentitiesQuery::build(variables)
+    variables: SearchHandlesVariables,
+) -> cynic::Operation<SearchHandlesQuery, SearchHandlesVariables> {
+    SearchHandlesQuery::build(variables)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -41,7 +41,7 @@ impl From<supported_resource_types::ResourceListColumnDescriptor>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl TryFrom<fragments::Resource> for domain::ResourceView {
+impl TryFrom<fragments::Resource> for domain::Resource {
     type Error = InternalError;
 
     fn try_from(value: fragments::Resource) -> Result<Self, Self::Error> {
@@ -63,7 +63,7 @@ impl TryFrom<fragments::Resource> for domain::ResourceView {
                 deleted_at: value.headers.deleted_at,
             },
             spec: value.spec,
-            status: value.status.map(Into::into),
+            status: value.status.into(),
         })
     }
 }
@@ -83,8 +83,8 @@ impl From<fragments::ResourceStatus> for domain::ResourceStatus {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<fragments::ResourceIdentity> for domain::ResourceIdentityView {
-    fn from(value: fragments::ResourceIdentity) -> Self {
+impl From<fragments::ResourceHandle> for domain::ResourceHandle {
+    fn from(value: fragments::ResourceHandle) -> Self {
         Self {
             schema: value.schema,
             canonical_selector: value.canonical_selector,

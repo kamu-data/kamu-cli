@@ -8,11 +8,11 @@
 // by the Apache License, Version 2.0.
 
 mod batch_id_resolver;
-mod identity_support;
+mod handle_support;
 mod manifest_support;
 mod validation_helpers;
 
 pub(crate) use batch_id_resolver::*;
-pub(crate) use identity_support::*;
+pub(crate) use handle_support::*;
 pub(crate) use manifest_support::*;
 pub(crate) use validation_helpers::*;

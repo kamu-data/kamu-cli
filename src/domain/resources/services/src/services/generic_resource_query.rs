@@ -17,8 +17,8 @@ use crate::domain::{
     FindOwnedResourceError,
     FindOwnedSnapshotsOutcome,
     GenericResourceQueryService,
+    ResourceHandleRow,
     ResourceID,
-    ResourceIdentityRow,
     ResourceName,
     ResourceNotOwnedByAccountError,
     ResourceRawEventQuery,
@@ -56,41 +56,41 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
             .await
     }
 
-    async fn find_resource_identities_by_ids(
+    async fn find_resource_handles_by_ids(
         &self,
         account_id: &odf::AccountID,
         ids: &[ResourceID],
-    ) -> Result<Vec<ResourceIdentityRow>, InternalError> {
+    ) -> Result<Vec<ResourceHandleRow>, InternalError> {
         self.resource_repository
-            .find_resource_identities_by_ids(account_id, ids)
+            .find_resource_handles_by_ids(account_id, ids)
             .await
     }
 
-    async fn find_resource_identities_by_names(
+    async fn find_resource_handles_by_names(
         &self,
         account_id: &odf::AccountID,
         schema: &TypeUri,
         names: &[ResourceName],
-    ) -> Result<Vec<ResourceIdentityRow>, InternalError> {
+    ) -> Result<Vec<ResourceHandleRow>, InternalError> {
         self.resource_repository
-            .find_resource_identities_by_names(account_id, schema, names)
+            .find_resource_handles_by_names(account_id, schema, names)
             .await
     }
 
-    async fn search_resource_identities(
+    async fn search_resource_handles(
         &self,
         account_id: &odf::AccountID,
         schemas: &[TypeUri],
         exact_names: Option<&[ResourceName]>,
         name_pattern: Option<&str>,
         pagination: PaginationOpts,
-    ) -> Result<Vec<ResourceIdentityRow>, InternalError> {
+    ) -> Result<Vec<ResourceHandleRow>, InternalError> {
         self.resource_repository
-            .search_resource_identities(account_id, schemas, exact_names, name_pattern, pagination)
+            .search_resource_handles(account_id, schemas, exact_names, name_pattern, pagination)
             .await
     }
 
-    async fn count_search_resource_identities(
+    async fn count_search_resource_handles(
         &self,
         account_id: &odf::AccountID,
         schemas: &[TypeUri],
@@ -98,7 +98,7 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
         name_pattern: Option<&str>,
     ) -> Result<usize, InternalError> {
         self.resource_repository
-            .count_search_resource_identities(account_id, schemas, exact_names, name_pattern)
+            .count_search_resource_handles(account_id, schemas, exact_names, name_pattern)
             .await
     }
 

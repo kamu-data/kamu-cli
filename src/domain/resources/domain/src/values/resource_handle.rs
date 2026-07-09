@@ -9,36 +9,15 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    ResourceHeaders,
-    ResourceID,
-    ResourceName,
-    ResourceSelectorName,
-    ResourceStatus,
-    TypeUri,
-};
+use crate::{ResourceID, ResourceName, ResourceSelectorName, TypeUri};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ResourceIdentityView {
+pub struct ResourceHandle {
     pub schema: TypeUri,
     pub canonical_selector: ResourceSelectorName,
     pub id: ResourceID,
     pub name: ResourceName,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[serde_with::serde_as]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ResourceView {
-    pub schema: TypeUri,
-    #[serde_as(as = "odf::metadata::serde::yaml::resource::ResourceHeaders")]
-    pub headers: ResourceHeaders,
-    pub spec: serde_json::Value,
-    #[serde_as(as = "Option<odf::metadata::serde::yaml::resource::ResourceStatus>")]
-    pub status: Option<ResourceStatus>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

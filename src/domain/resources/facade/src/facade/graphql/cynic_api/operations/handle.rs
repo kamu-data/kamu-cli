@@ -13,7 +13,7 @@ use internal_error::InternalError;
 use crate::facade::graphql::cynic_api::fragments::{
     BatchResourceProblem,
     ResourceBadAccountProblem,
-    ResourceIdentity,
+    ResourceHandle,
     ResourceSelectorProblemResult,
     ResourceUnsupportedSelectorProblem,
 };
@@ -27,29 +27,26 @@ use crate::{ResourceBatchSelector, ResourceSelector};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
-#[cynic(
-    graphql_type = "Query",
-    variables = "ResourceIdentitySelectorVariables"
-)]
-pub(crate) struct GetResourceIdentityQuery {
-    pub resources: ResourceIdentityResources,
+#[cynic(graphql_type = "Query", variables = "ResourceHandleSelectorVariables")]
+pub(crate) struct GetResourceHandleQuery {
+    pub resources: ResourceHandleResources,
 }
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
 #[cynic(
     graphql_type = "Resources",
-    variables = "ResourceIdentitySelectorVariables"
+    variables = "ResourceHandleSelectorVariables"
 )]
-pub(crate) struct ResourceIdentityResources {
+pub(crate) struct ResourceHandleResources {
     #[arguments(selector: $selector)]
-    pub resource_identity: ResourceGetIdentityOutcome,
+    pub resource_handle: ResourceGetHandleOutcome,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::InlineFragments, Debug, Clone)]
-pub(crate) enum ResourceGetIdentityOutcome {
-    ResourceIdentity(ResourceIdentity),
+pub(crate) enum ResourceGetHandleOutcome {
+    ResourceHandle(ResourceHandle),
     ResourceSelectorProblemResult(ResourceSelectorProblemResult),
     #[cynic(fallback)]
     Unknown,
@@ -60,25 +57,25 @@ pub(crate) enum ResourceGetIdentityOutcome {
 #[derive(cynic::QueryFragment, Debug, Clone)]
 #[cynic(
     graphql_type = "Query",
-    variables = "ResourceIdentityBatchSelectorVariables"
+    variables = "ResourceHandleBatchSelectorVariables"
 )]
-pub(crate) struct GetResourceIdentitiesQuery {
-    pub resources: ResourceIdentitiesResources,
+pub(crate) struct GetResourceHandlesQuery {
+    pub resources: ResourceHandlesResources,
 }
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
 #[cynic(
     graphql_type = "Resources",
-    variables = "ResourceIdentityBatchSelectorVariables"
+    variables = "ResourceHandleBatchSelectorVariables"
 )]
-pub(crate) struct ResourceIdentitiesResources {
+pub(crate) struct ResourceHandlesResources {
     #[arguments(selector: $selector)]
-    pub resource_identities: BatchResourceIdentitiesOutcome,
+    pub resource_handles: BatchResourceHandlesOutcome,
 }
 
 #[derive(cynic::InlineFragments, Debug, Clone)]
-pub(crate) enum BatchResourceIdentitiesOutcome {
-    BatchResourceIdentitiesResult(BatchResourceIdentitiesResult),
+pub(crate) enum BatchResourceHandlesOutcome {
+    BatchResourceHandlesResult(BatchResourceHandlesResult),
     ResourceUnsupportedSelectorProblem(ResourceUnsupportedSelectorProblem),
     ResourceBadAccountProblem(ResourceBadAccountProblem),
     #[cynic(fallback)]
@@ -86,25 +83,25 @@ pub(crate) enum BatchResourceIdentitiesOutcome {
 }
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
-pub(crate) struct BatchResourceIdentitiesResult {
-    pub identities: Vec<BatchResourceIdentitySuccess>,
+pub(crate) struct BatchResourceHandlesResult {
+    pub handles: Vec<BatchResourceHandleSuccess>,
     pub problems: Vec<BatchResourceProblem>,
 }
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
-pub(crate) struct BatchResourceIdentitySuccess {
+pub(crate) struct BatchResourceHandleSuccess {
     pub request_index: i32,
-    pub identity: ResourceIdentity,
+    pub handle: ResourceHandle,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::QueryVariables, Debug, Clone)]
-pub(crate) struct ResourceIdentitySelectorVariables {
+pub(crate) struct ResourceHandleSelectorVariables {
     pub selector: ResourceSelectorInput,
 }
 
-impl ResourceIdentitySelectorVariables {
+impl ResourceHandleSelectorVariables {
     pub(crate) fn new(selector: &ResourceSelector) -> Result<Self, InternalError> {
         Ok(Self {
             selector: selector.try_into()?,
@@ -115,11 +112,11 @@ impl ResourceIdentitySelectorVariables {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::QueryVariables, Debug, Clone)]
-pub(crate) struct ResourceIdentityBatchSelectorVariables {
+pub(crate) struct ResourceHandleBatchSelectorVariables {
     pub selector: ResourceBatchSelectorInput,
 }
 
-impl ResourceIdentityBatchSelectorVariables {
+impl ResourceHandleBatchSelectorVariables {
     pub(crate) fn new(selector: &ResourceBatchSelector) -> Result<Self, InternalError> {
         Ok(Self {
             selector: selector.try_into()?,
@@ -129,16 +126,16 @@ impl ResourceIdentityBatchSelectorVariables {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn build_identity_operation(
-    variables: ResourceIdentitySelectorVariables,
-) -> cynic::Operation<GetResourceIdentityQuery, ResourceIdentitySelectorVariables> {
-    GetResourceIdentityQuery::build(variables)
+pub(crate) fn build_handle_operation(
+    variables: ResourceHandleSelectorVariables,
+) -> cynic::Operation<GetResourceHandleQuery, ResourceHandleSelectorVariables> {
+    GetResourceHandleQuery::build(variables)
 }
 
-pub(crate) fn build_identities_operation(
-    variables: ResourceIdentityBatchSelectorVariables,
-) -> cynic::Operation<GetResourceIdentitiesQuery, ResourceIdentityBatchSelectorVariables> {
-    GetResourceIdentitiesQuery::build(variables)
+pub(crate) fn build_handles_operation(
+    variables: ResourceHandleBatchSelectorVariables,
+) -> cynic::Operation<GetResourceHandlesQuery, ResourceHandleBatchSelectorVariables> {
+    GetResourceHandlesQuery::build(variables)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

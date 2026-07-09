@@ -11,7 +11,7 @@ pub(crate) mod apply;
 pub(crate) mod delete;
 pub(crate) mod get_resource;
 pub(crate) mod get_resources;
-pub(crate) mod identity;
+pub(crate) mod handle;
 pub(crate) mod list;
 pub(crate) mod render_manifest;
 pub(crate) mod search;

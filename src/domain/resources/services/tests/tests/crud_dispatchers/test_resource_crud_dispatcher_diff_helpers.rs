@@ -10,10 +10,11 @@
 use chrono::{SubsecRound as _, Utc};
 use kamu_resources::{
     ApplyManifestChangeKind,
+    Resource,
     ResourceHeaders,
     ResourceHeadersExt,
     ResourceSchemaProvider,
-    ResourceView,
+    new_pending_resource_status,
 };
 use kamu_resources_services::make_apply_manifest_changes;
 
@@ -23,10 +24,10 @@ use crate::tests::utils::{TestResource, make_id};
 // Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn make_view(name: &str, value: &str) -> ResourceView {
+fn make_view(name: &str, value: &str) -> Resource {
     let id = make_id();
 
-    ResourceView {
+    Resource {
         schema: TestResource::schema().clone(),
         headers: ResourceHeaders::simple(
             Utc::now(),
@@ -35,7 +36,7 @@ fn make_view(name: &str, value: &str) -> ResourceView {
             name,
         ),
         spec: serde_json::json!({ "value": value }),
-        status: None,
+        status: new_pending_resource_status(),
     }
 }
 
@@ -169,7 +170,7 @@ fn test_make_changes_identical_before_after_returns_no_field_changes() {
     let ts = chrono::Utc::now().trunc_subsecs(6);
     let id = make_id();
 
-    let make = || ResourceView {
+    let make = || Resource {
         schema: TestResource::schema().clone(),
         headers: ResourceHeaders {
             id,
@@ -188,7 +189,7 @@ fn test_make_changes_identical_before_after_returns_no_field_changes() {
             deleted_at: None,
         },
         spec: serde_json::json!({ "value": "same" }),
-        status: None,
+        status: new_pending_resource_status(),
     };
 
     let before = make();
@@ -216,7 +217,7 @@ fn test_timestamp_precision_normalized_avoids_spurious_diffs() {
 
     let id = make_id();
 
-    let make_view_ts = |updated_at| ResourceView {
+    let make_view_ts = |updated_at| Resource {
         schema: TestResource::schema().clone(),
         headers: ResourceHeaders {
             id,
@@ -235,7 +236,7 @@ fn test_timestamp_precision_normalized_avoids_spurious_diffs() {
             deleted_at: None,
         },
         spec: serde_json::json!({ "value": "same" }),
-        status: None,
+        status: new_pending_resource_status(),
     };
 
     let before = make_view_ts(ts_base);
