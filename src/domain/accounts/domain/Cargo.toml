@@ -34,10 +34,7 @@ email-utils = { workspace = true }
 event-sourcing = { workspace = true }
 internal-error = { workspace = true }
 messaging-outbox = { workspace = true }
-odf = { workspace = true, default-features = false, features = [
-    "did-pkh",
-    "schemars",
-] }
+odf = { workspace = true, default-features = false, features = ["schemars"] }
 random-strings = { workspace = true }
 kamu-search = { workspace = true }
 

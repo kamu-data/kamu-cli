@@ -17,11 +17,7 @@ use crate::formats::*;
 
 pub const MAX_ACCOUNT_ID_STRING_REPR_LEN: usize = {
     let a = MAX_DID_CANONICAL_STRING_REPR_LEN;
-    #[cfg(feature = "did-pkh")]
     let b = MAX_DID_PKH_STRING_REPR_LEN;
-    #[cfg(not(feature = "did-pkh"))]
-    let b = a;
-
     if a > b { a } else { b }
 };
 
@@ -29,13 +25,9 @@ pub const MAX_ACCOUNT_ID_STRING_WITHOUT_DID_PREFIX_REPR_LEN: usize = {
     let a = MAX_DID_CANONICAL_STRING_REPR_LEN
         .checked_sub(DID_ODF_PREFIX.len())
         .unwrap();
-    #[cfg(feature = "did-pkh")]
     let b = CAIP_10_ACCOUNT_ADDRESS_MAX_LENGTH
         .checked_sub(DID_PKH_PREFIX.len())
         .unwrap();
-    #[cfg(not(feature = "did-pkh"))]
-    let b = a;
-
     if a > b { a } else { b }
 };
 
@@ -45,8 +37,6 @@ pub const MAX_ACCOUNT_ID_STRING_WITHOUT_DID_PREFIX_REPR_LEN: usize = {
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum AccountID {
     Odf(DidOdf),
-
-    #[cfg(feature = "did-pkh")]
     Pkh(DidPkh),
 }
 
@@ -67,12 +57,10 @@ impl AccountID {
     pub fn as_did_odf(&self) -> Option<&DidOdf> {
         match self {
             Self::Odf(did) => Some(did),
-            #[cfg(feature = "did-pkh")]
             Self::Pkh(_) => None,
         }
     }
 
-    #[cfg(feature = "did-pkh")]
     pub fn as_did_pkh(&self) -> Option<&DidPkh> {
         match self {
             Self::Odf(_) => None,
@@ -104,7 +92,6 @@ impl AccountID {
             return Self::from_multibase_string(stripped).map_err(Into::into);
         }
 
-        #[cfg(feature = "did-pkh")]
         if let Some(stripped) = s.strip_prefix(DID_PKH_PREFIX) {
             return Self::parse_caip10_account_id(stripped).map_err(Into::into);
         }
@@ -119,7 +106,6 @@ impl AccountID {
             return Ok(id);
         }
 
-        #[cfg(feature = "did-pkh")]
         if let Ok(id) = Self::parse_caip10_account_id(s) {
             return Ok(id);
         }
@@ -136,7 +122,6 @@ impl AccountID {
 
     /// Parses `AccountID` from a CAIP-10 account ID string (without `did:pkh:`)
     /// prefix
-    #[cfg(feature = "did-pkh")]
     pub fn parse_caip10_account_id(s: &str) -> Result<Self, DidPkhParseError> {
         Ok(Self::Pkh(DidPkh::parse_caip10_account_id(s)?))
     }
@@ -170,7 +155,6 @@ impl std::fmt::Display for IdWithoutDidPrefixFmt<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.value {
             AccountID::Odf(odf) => write!(f, "{}", odf.as_multibase()),
-            #[cfg(feature = "did-pkh")]
             AccountID::Pkh(pkh) => {
                 let wallet = pkh.wallet_address();
 
@@ -199,7 +183,6 @@ pub enum AccountIdParseStrError {
     #[error(transparent)]
     OdfParseError(#[from] ParseError<DidOdf>),
 
-    #[cfg(feature = "did-pkh")]
     #[error(transparent)]
     PkhParseError(#[from] DidPkhParseError),
 
@@ -240,10 +223,18 @@ impl From<DidKey> for AccountID {
     }
 }
 
-#[cfg(feature = "did-pkh")]
 impl From<DidPkh> for AccountID {
     fn from(pkh: DidPkh) -> Self {
         Self::Pkh(pkh)
+    }
+}
+
+impl From<AccountID> for Did {
+    fn from(value: AccountID) -> Self {
+        match value {
+            AccountID::Odf(v) => Did::Odf(v),
+            AccountID::Pkh(v) => Did::Pkh(v),
+        }
     }
 }
 
@@ -256,7 +247,6 @@ impl std::fmt::Debug for AccountID {
                 .debug_tuple(&format!("AccountID<{:?}>", Multicodec::Ed25519Pub))
                 .field(&odf.as_multibase())
                 .finish(),
-            #[cfg(feature = "did-pkh")]
             Self::Pkh(pkh) => f.debug_tuple("AccountID").field(&pkh).finish(),
         }
     }
@@ -270,7 +260,6 @@ impl std::fmt::Display for AccountID {
             Self::Odf(odf) => {
                 write!(f, "{}", odf.as_did_str())
             }
-            #[cfg(feature = "did-pkh")]
             Self::Pkh(pkh) => {
                 write!(f, "{}", pkh.as_did_str())
             }
@@ -286,7 +275,6 @@ impl serde::Serialize for AccountID {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match &self {
             Self::Odf(odf) => serializer.collect_str(&odf.as_did_str()),
-            #[cfg(feature = "did-pkh")]
             Self::Pkh(pkh) => serializer.collect_str(&pkh.as_did_str()),
         }
     }
@@ -333,7 +321,6 @@ impl utoipa::PartialSchema for AccountID {
                 .schema_type(SchemaType::Type(Type::String))
                 .examples([
                     json!(AccountID::new_seeded_ed25519(b"account")),
-                    #[cfg(feature = "did-pkh")]
                     json!(
                         AccountID::parse_caip10_account_id(
                             "eip155:1:0xb9c5714089478a327f09197987f16f9e5d936e8a"

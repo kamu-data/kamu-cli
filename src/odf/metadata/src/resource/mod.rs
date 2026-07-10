@@ -11,11 +11,11 @@
 pub use crate::dtos::resource::*;
 
 mod resource_identity;
-mod resource_ref;
 mod resource_selector;
 mod resource_types;
 
 pub use resource_identity::*;
-pub use resource_ref::*;
 pub use resource_selector::*;
 pub use resource_types::*;
+
+pub trait IntoResourceRef: Into<ResourceRef> {}

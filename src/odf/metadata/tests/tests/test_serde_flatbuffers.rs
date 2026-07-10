@@ -110,7 +110,7 @@ fn test_flatbuffers_maps() {
 #[test]
 fn test_flatbuffers_any_json_property() {
     // String
-    let expected = auth::Attribute {
+    let expected = auth::AttributeInput {
         object: "X:x".parse().unwrap(),
         name: "my-attr".to_string(),
         value: json!("some-attr"),
@@ -121,11 +121,12 @@ fn test_flatbuffers_any_json_property() {
     fb.finish(offset, None);
     let data = fb.finished_data();
 
-    let actual = auth::Attribute::deserialize(::flatbuffers::root::<fb::Attribute>(data).unwrap());
+    let actual =
+        auth::AttributeInput::deserialize(::flatbuffers::root::<fb::AttributeInput>(data).unwrap());
     pretty_assertions::assert_eq!(expected, actual);
 
     // Int
-    let expected = auth::Attribute {
+    let expected = auth::AttributeInput {
         object: "X:x".parse().unwrap(),
         name: "my-attr".to_string(),
         value: json!(123),
@@ -136,11 +137,12 @@ fn test_flatbuffers_any_json_property() {
     fb.finish(offset, None);
     let data = fb.finished_data();
 
-    let actual = auth::Attribute::deserialize(::flatbuffers::root::<fb::Attribute>(data).unwrap());
+    let actual =
+        auth::AttributeInput::deserialize(::flatbuffers::root::<fb::AttributeInput>(data).unwrap());
     pretty_assertions::assert_eq!(expected, actual);
 
     // Nested
-    let expected = auth::Attribute {
+    let expected = auth::AttributeInput {
         object: "X:x".parse().unwrap(),
         name: "my-attr".to_string(),
         value: json!({"a": "x", "b": "y"}),
@@ -151,7 +153,8 @@ fn test_flatbuffers_any_json_property() {
     fb.finish(offset, None);
     let data = fb.finished_data();
 
-    let actual = auth::Attribute::deserialize(::flatbuffers::root::<fb::Attribute>(data).unwrap());
+    let actual =
+        auth::AttributeInput::deserialize(::flatbuffers::root::<fb::AttributeInput>(data).unwrap());
     pretty_assertions::assert_eq!(expected, actual);
 }
 

@@ -17,11 +17,16 @@ use crate::stack_string::StackString;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub const DID_KEY_PREFIX: &str = "did:key:";
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // TODO: Rethink after stabilization of `generic_const_exprs`
 pub const MAX_DID_KEY_LEN: usize = ed25519::PUBLIC_KEY_LENGTH;
 pub const MAX_DID_BINARY_REPR_LEN: usize = MAX_VARINT_LEN + MAX_DID_KEY_LEN;
 pub const MAX_DID_MULTIBASE_REPR_LEN: usize = 1 + MAX_DID_BINARY_REPR_LEN * 2; // Assuming base16 worst case encoding
-pub const MAX_DID_CANONICAL_STRING_REPR_LEN: usize = "did:key:".len() + MAX_DID_MULTIBASE_REPR_LEN;
+pub const MAX_DID_CANONICAL_STRING_REPR_LEN: usize =
+    DID_KEY_PREFIX.len() + MAX_DID_MULTIBASE_REPR_LEN;
 pub const DEFAULT_DID_MULTIBASE_ENCODING: Multibase = Multibase::Base58Btc;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -225,6 +230,14 @@ impl DidKeyBytes {
 
     pub fn to_vec(&self) -> Vec<u8> {
         self.as_slice().to_vec()
+    }
+}
+
+impl std::ops::Deref for DidKeyBytes {
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        self.as_slice()
     }
 }
 

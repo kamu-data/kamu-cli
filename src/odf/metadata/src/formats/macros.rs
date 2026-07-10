@@ -10,7 +10,7 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 macro_rules! impl_parse_error {
-    ($typ:ident) => {
+    ($typ:path) => {
         impl ::multiformats::Multiformat for $typ {
             fn format_name() -> &'static str {
                 stringify!($typ)
@@ -26,7 +26,7 @@ pub(crate) use impl_parse_error;
 // TODO: Replace with AsRef matcher
 // This is a workaround for: https://github.com/rust-lang/rust/issues/50133
 macro_rules! impl_try_from_str {
-    ($typ:ident) => {
+    ($typ:path) => {
         impl std::convert::TryFrom<&str> for $typ {
             type Error = ::multiformats::ParseError<$typ>;
             fn try_from(s: &str) -> Result<Self, Self::Error> {
