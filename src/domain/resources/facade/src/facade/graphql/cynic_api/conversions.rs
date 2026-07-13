@@ -49,10 +49,7 @@ impl TryFrom<fragments::Resource> for domain::Resource {
             schema: value.schema,
             headers: domain::ResourceHeaders {
                 id: value.headers.id,
-                account: odf::AccountHandle {
-                    id: value.headers.account.id,
-                    name: odf::AccountName::new_unchecked(&value.headers.account.name.0),
-                },
+                account: value.headers.account.into(),
                 name: value.headers.name,
                 labels: value.headers.labels.0,
                 annotations: value.headers.annotations.0,
@@ -87,6 +84,7 @@ impl From<fragments::ResourceHandle> for domain::ResourceHandle {
         Self {
             schema: value.schema,
             type_name: value.type_name,
+            account: value.account.into(),
             id: value.id,
             name: value.name,
         }

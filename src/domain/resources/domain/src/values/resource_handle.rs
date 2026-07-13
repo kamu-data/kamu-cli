@@ -17,6 +17,7 @@ use crate::{ResourceID, ResourceName, TypeName, TypeUri};
 pub struct ResourceHandle {
     pub schema: TypeUri,
     pub type_name: TypeName,
+    pub account: odf::AccountHandle,
     pub id: ResourceID,
     pub name: ResourceName,
 }

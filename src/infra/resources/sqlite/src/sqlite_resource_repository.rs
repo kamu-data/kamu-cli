@@ -257,22 +257,27 @@ impl ResourceRepository for SqliteResourceRepository {
         let account_id_str = account_id_stack.as_str();
 
         let uids_placeholders =
-            sqlite_generate_placeholders_list(ids.len(), NonZeroUsize::new(2).unwrap());
+            sqlite_generate_placeholders_list(ids.len(), NonZeroUsize::new(3).unwrap());
 
         let query_str = format!(
             r#"
             SELECT
-                resource_id as id,
-                resource_schema as schema,
-                resource_name as name
-            FROM resources
-            WHERE account_id = $1
-              AND resource_id IN ({uids_placeholders})
-              AND deleted_at IS NULL
+                r.resource_id as id,
+                r.resource_schema as schema,
+                r.resource_name as name,
+                r.account_id as account_id,
+                COALESCE(a.account_name, $2) as account_name
+            FROM resources r
+            LEFT JOIN accounts a ON a.id = r.account_id
+            WHERE r.account_id = $1
+              AND r.resource_id IN ({uids_placeholders})
+              AND r.deleted_at IS NULL
             "#,
         );
 
-        let mut query = sqlx::query_as::<_, ResourceHandleRow>(&query_str).bind(account_id_str);
+        let mut query = sqlx::query_as::<_, ResourceHandleRow>(&query_str)
+            .bind(account_id_str)
+            .bind(kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL);
         for id in ids {
             query = query.bind(*id.as_ref());
         }
@@ -299,25 +304,30 @@ impl ResourceRepository for SqliteResourceRepository {
         let account_id_str = account_id_stack.as_str();
 
         let names_placeholders =
-            sqlite_generate_placeholders_list(names.len(), NonZeroUsize::new(3).unwrap());
+            sqlite_generate_placeholders_list(names.len(), NonZeroUsize::new(4).unwrap());
 
         let query_str = format!(
             r#"
             SELECT
-                resource_id as id,
-                resource_schema as schema,
-                resource_name as name
-            FROM resources
-            WHERE account_id = $1
-              AND resource_schema = $2
-              AND resource_name COLLATE NOCASE IN ({names_placeholders})
-              AND deleted_at IS NULL
+                r.resource_id as id,
+                r.resource_schema as schema,
+                r.resource_name as name,
+                r.account_id as account_id,
+                COALESCE(a.account_name, $3) as account_name
+            FROM resources r
+            LEFT JOIN accounts a ON a.id = r.account_id
+            WHERE r.account_id = $1
+              AND r.resource_schema = $2
+              AND r.resource_name COLLATE NOCASE IN ({names_placeholders})
+              AND r.deleted_at IS NULL
             "#,
         );
 
         let mut query = sqlx::query_as::<_, ResourceHandleRow>(&query_str)
             .bind(account_id_str)
-            .bind(schema.as_str());
+            .bind(schema.as_str())
+            .bind(kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL);
+
         for name in names {
             query = query.bind(name.to_string());
         }
@@ -350,15 +360,22 @@ impl ResourceRepository for SqliteResourceRepository {
         let mut query_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
             r#"
             SELECT
-                resource_id as id,
-                resource_schema as schema,
-                resource_name as name
-            FROM resources
-            WHERE account_id = "#,
+                r.resource_id as id,
+                r.resource_schema as schema,
+                r.resource_name as name,
+                r.account_id as account_id,
+                COALESCE(a.account_name, "#,
+        );
+        query_builder.push_bind(kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL);
+        query_builder.push(
+            r#") as account_name
+            FROM resources r
+            LEFT JOIN accounts a ON a.id = r.account_id
+            WHERE r.account_id = "#,
         );
         query_builder
             .push_bind(account_id_str)
-            .push(" AND deleted_at IS NULL AND resource_schema IN (");
+            .push(" AND r.deleted_at IS NULL AND r.resource_schema IN (");
         {
             let mut separated = query_builder.separated(", ");
             for schema in schemas {
@@ -368,7 +385,7 @@ impl ResourceRepository for SqliteResourceRepository {
         query_builder.push(")");
 
         if let Some(exact_names) = exact_names {
-            query_builder.push(" AND resource_name COLLATE NOCASE IN (");
+            query_builder.push(" AND r.resource_name COLLATE NOCASE IN (");
             let mut separated = query_builder.separated(", ");
             for name in exact_names {
                 separated.push_bind(name.to_string());
@@ -377,13 +394,13 @@ impl ResourceRepository for SqliteResourceRepository {
         }
 
         if let Some(name_pattern) = name_pattern {
-            query_builder.push(" AND resource_name LIKE ");
+            query_builder.push(" AND r.resource_name LIKE ");
             query_builder.push_bind(sql_like_escape_pattern(name_pattern));
             query_builder.push(r#" ESCAPE '\' COLLATE NOCASE"#);
         }
 
         query_builder
-            .push(" ORDER BY updated_at DESC, resource_id DESC LIMIT ")
+            .push(" ORDER BY r.updated_at DESC, r.resource_id DESC LIMIT ")
             .push_bind(limit)
             .push(" OFFSET ")
             .push_bind(offset);

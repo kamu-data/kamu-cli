@@ -566,6 +566,7 @@ pub struct ResourceHandle {
     pub schema: TypeUri<'static>,
     pub type_name: TypeName<'static>,
     pub name: ResourceName<'static>,
+    pub account: AccountHandle,
 }
 
 impl From<kamu_resources::ResourceHandle> for ResourceHandle {
@@ -575,6 +576,7 @@ impl From<kamu_resources::ResourceHandle> for ResourceHandle {
             schema: value.schema.into(),
             type_name: value.type_name.into(),
             name: value.name.into(),
+            account: value.account.into(),
         }
     }
 }

@@ -34,6 +34,7 @@ pub(crate) fn resource_handle_from_snapshot(
     Ok(ResourceHandle {
         schema: snapshot.schema,
         type_name,
+        account: snapshot.headers.account,
         id: snapshot.id,
         name: snapshot.headers.name,
     })
@@ -46,12 +47,14 @@ pub(crate) fn resource_handle_from_snapshot(
 pub(crate) fn resource_handle_from_row(
     row: ResourceHandleRow,
 ) -> Result<ResourceHandle, InternalError> {
+    let account = row.account_handle();
     let schema = TypeUri::new_unchecked(row.schema);
     let type_name = resource_type_name(&schema)?;
 
     Ok(ResourceHandle {
         schema,
         type_name,
+        account,
         id: ResourceID::new(row.id),
         name: ResourceName::new_unchecked(&row.name),
     })
@@ -66,9 +69,12 @@ pub(crate) fn resource_handle_from_row_with_type_name(
     row: ResourceHandleRow,
     type_name: TypeName,
 ) -> ResourceHandle {
+    let account = row.account_handle();
+
     ResourceHandle {
         schema: TypeUri::new_unchecked(row.schema),
         type_name,
+        account,
         id: ResourceID::new(row.id),
         name: ResourceName::new_unchecked(&row.name),
     }

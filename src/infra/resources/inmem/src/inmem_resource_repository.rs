@@ -282,6 +282,8 @@ impl ResourceRepository for InMemoryResourceRepository {
                 id: *snapshot.id.as_ref(),
                 schema: snapshot.schema.to_string(),
                 name: snapshot.headers.name.to_string(),
+                account_id: snapshot.headers.account.id.clone(),
+                account_name: snapshot.headers.account.name.to_string(),
             })
             .collect())
     }
@@ -311,6 +313,8 @@ impl ResourceRepository for InMemoryResourceRepository {
                 id: *snapshot.id.as_ref(),
                 schema: snapshot.schema.to_string(),
                 name: snapshot.headers.name.to_string(),
+                account_id: snapshot.headers.account.id.clone(),
+                account_name: snapshot.headers.account.name.to_string(),
             })
             .collect())
     }
@@ -350,6 +354,8 @@ impl ResourceRepository for InMemoryResourceRepository {
                 id: *snapshot.id.as_ref(),
                 schema: snapshot.schema.to_string(),
                 name: snapshot.headers.name.to_string(),
+                account_id: snapshot.headers.account.id.clone(),
+                account_name: snapshot.headers.account.name.to_string(),
             })
             .collect())
     }

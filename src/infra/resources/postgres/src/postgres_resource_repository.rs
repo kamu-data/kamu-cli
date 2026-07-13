@@ -309,16 +309,20 @@ impl ResourceRepository for PostgresResourceRepository {
             ResourceHandleRow,
             r#"
             SELECT
-                resource_id as "id: uuid::Uuid",
-                resource_schema as schema,
-                resource_name as name
-            FROM resources
-            WHERE account_id = $1
-              AND resource_id = ANY($2)
-              AND deleted_at IS NULL
+                r.resource_id as "id: uuid::Uuid",
+                r.resource_schema as schema,
+                r.resource_name as name,
+                r.account_id as "account_id: odf::AccountID",
+                COALESCE(a.account_name, $3) as "account_name!"
+            FROM resources r
+            LEFT JOIN accounts a ON a.id = r.account_id
+            WHERE r.account_id = $1
+              AND r.resource_id = ANY($2)
+              AND r.deleted_at IS NULL
             "#,
             account_id_stack.as_str(),
             &ids,
+            kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL,
         )
         .fetch_all(connection_mut)
         .await
@@ -346,14 +350,17 @@ impl ResourceRepository for PostgresResourceRepository {
             ResourceHandleRow,
             r#"
             SELECT
-                resource_id as "id: uuid::Uuid",
-                resource_schema as schema,
-                resource_name as name
-            FROM resources
-            WHERE account_id = $1
-              AND resource_schema = $2
-              AND LOWER(resource_name) = ANY($3)
-              AND deleted_at IS NULL
+                r.resource_id as "id: uuid::Uuid",
+                r.resource_schema as schema,
+                r.resource_name as name,
+                r.account_id as "account_id: odf::AccountID",
+                COALESCE(a.account_name, $4) as "account_name!"
+            FROM resources r
+            LEFT JOIN accounts a ON a.id = r.account_id
+            WHERE r.account_id = $1
+              AND r.resource_schema = $2
+              AND LOWER(r.resource_name) = ANY($3)
+              AND r.deleted_at IS NULL
             "#,
             account_id_stack.as_str(),
             schema.as_str(),
@@ -361,6 +368,7 @@ impl ResourceRepository for PostgresResourceRepository {
                 .iter()
                 .map(|n| n.to_ascii_lowercase())
                 .collect::<Vec<_>>() as _,
+            kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL,
         )
         .fetch_all(connection_mut)
         .await
@@ -399,16 +407,19 @@ impl ResourceRepository for PostgresResourceRepository {
             ResourceHandleRow,
             r#"
             SELECT
-                resource_id as "id: uuid::Uuid",
-                resource_schema as schema,
-                resource_name as name
-            FROM resources
-            WHERE account_id = $1
-              AND resource_schema = ANY($2)
-              AND ($3::text[] IS NULL OR LOWER(resource_name) = ANY($3))
-              AND ($4::text IS NULL OR resource_name ILIKE $4 ESCAPE '\')
-              AND deleted_at IS NULL
-            ORDER BY updated_at DESC, resource_id DESC
+                r.resource_id as "id: uuid::Uuid",
+                r.resource_schema as schema,
+                r.resource_name as name,
+                r.account_id as "account_id: odf::AccountID",
+                COALESCE(a.account_name, $7) as "account_name!"
+            FROM resources r
+            LEFT JOIN accounts a ON a.id = r.account_id
+            WHERE r.account_id = $1
+              AND r.resource_schema = ANY($2)
+              AND ($3::text[] IS NULL OR LOWER(r.resource_name) = ANY($3))
+              AND ($4::text IS NULL OR r.resource_name ILIKE $4 ESCAPE '\')
+              AND r.deleted_at IS NULL
+            ORDER BY r.updated_at DESC, r.resource_id DESC
             LIMIT $5 OFFSET $6
             "#,
             account_id_stack.as_str(),
@@ -417,6 +428,7 @@ impl ResourceRepository for PostgresResourceRepository {
             name_pattern.as_deref(),
             limit,
             offset,
+            kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL,
         )
         .fetch_all(connection_mut)
         .await

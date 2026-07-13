@@ -214,6 +214,17 @@ pub struct ResourceHandleRow {
     pub id: uuid::Uuid,
     pub schema: String,
     pub name: String,
+    pub account_id: odf::AccountID,
+    pub account_name: String,
+}
+
+impl ResourceHandleRow {
+    pub fn account_handle(&self) -> odf::AccountHandle {
+        odf::AccountHandle::new(
+            self.account_id.clone(),
+            odf::AccountName::new_unchecked(&self.account_name),
+        )
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

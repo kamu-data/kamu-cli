@@ -244,6 +244,15 @@ pub(crate) struct AccountHandle {
     pub name: AccountName,
 }
 
+impl From<AccountHandle> for odf::AccountHandle {
+    fn from(value: AccountHandle) -> Self {
+        Self {
+            id: value.id,
+            name: odf::AccountName::new_unchecked(&value.name.0),
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
@@ -252,6 +261,7 @@ pub(crate) struct ResourceHandle {
     pub schema: kamu_resources::TypeUri,
     pub type_name: kamu_resources::TypeName,
     pub name: kamu_resources::ResourceName,
+    pub account: AccountHandle,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, LazyLock, Mutex};
 
 use dill::CatalogBuilder;
+use kamu_accounts::DEFAULT_ACCOUNT_HANDLE;
 use kamu_cli::services::resources::{
     self,
     ResourceSelectionItem,
@@ -82,6 +83,7 @@ async fn resolves_exact_type_name_patterns_via_search() {
             type_name: kamu_resources::TypeName::new_unchecked(VARIABLESET_TYPE_NAME),
             id: ResourceID::new(uuid::Uuid::new_v4()),
             name: "app-alpha".parse().unwrap(),
+            account: DEFAULT_ACCOUNT_HANDLE.clone(),
         }],
         Arc::clone(&search_requests),
     );
@@ -207,6 +209,7 @@ async fn resolves_type_patterns_with_exact_names_in_supported_type_order() {
                     type_name: kamu_resources::TypeName::new_unchecked(SECRETSET_TYPE_NAME),
                     id: ResourceID::new(uuid::Uuid::new_v4()),
                     name: RESOURCE_DB_CREDS.parse().unwrap(),
+                    account: DEFAULT_ACCOUNT_HANDLE.clone(),
                 }),
             ),
             (
@@ -216,6 +219,7 @@ async fn resolves_type_patterns_with_exact_names_in_supported_type_order() {
                     type_name: kamu_resources::TypeName::new_unchecked(STORAGE_TYPE_NAME),
                     id: ResourceID::new(uuid::Uuid::new_v4()),
                     name: RESOURCE_DB_CREDS.parse().unwrap(),
+                    account: DEFAULT_ACCOUNT_HANDLE.clone(),
                 }),
             ),
         ]),
@@ -282,12 +286,14 @@ async fn resolves_type_pattern_all_via_search_across_matched_types() {
                 type_name: kamu_resources::TypeName::new_unchecked(SECRETSET_TYPE_NAME),
                 id: ResourceID::new(uuid::Uuid::new_v4()),
                 name: "db-creds".parse().unwrap(),
+                account: DEFAULT_ACCOUNT_HANDLE.clone(),
             },
             ResourceHandle {
                 schema: STORAGE_TYPE_URI.clone(),
                 type_name: kamu_resources::TypeName::new_unchecked(STORAGE_TYPE_NAME),
                 id: ResourceID::new(uuid::Uuid::new_v4()),
                 name: "warehouse".parse().unwrap(),
+                account: DEFAULT_ACCOUNT_HANDLE.clone(),
             },
         ],
         Arc::clone(&search_requests),
@@ -348,12 +354,14 @@ async fn resolves_type_pattern_name_patterns_via_single_search_across_matched_ty
                 type_name: kamu_resources::TypeName::new_unchecked(SECRETSET_TYPE_NAME),
                 id: ResourceID::new(uuid::Uuid::new_v4()),
                 name: "db-creds".parse().unwrap(),
+                account: DEFAULT_ACCOUNT_HANDLE.clone(),
             },
             ResourceHandle {
                 schema: STORAGE_TYPE_URI.clone(),
                 type_name: kamu_resources::TypeName::new_unchecked(STORAGE_TYPE_NAME),
                 id: ResourceID::new(uuid::Uuid::new_v4()),
                 name: "db-warehouse".parse().unwrap(),
+                account: DEFAULT_ACCOUNT_HANDLE.clone(),
             },
         ],
         Arc::clone(&search_requests),
@@ -423,6 +431,7 @@ async fn type_pattern_exact_id_tries_every_matched_type() {
                 type_name: kamu_resources::TypeName::new_unchecked(STORAGE_TYPE_NAME),
                 id,
                 name: RESOURCE_DB_CREDS.parse().unwrap(),
+                account: DEFAULT_ACCOUNT_HANDLE.clone(),
             }),
         )]),
         Arc::clone(&get_handle_requests),
@@ -618,6 +627,7 @@ async fn deduplicates_overlapping_name_patterns_before_counting_max_results() {
             type_name: kamu_resources::TypeName::new_unchecked(VARIABLESET_TYPE_NAME),
             id: shared_id,
             name: "app-alpha".parse().unwrap(),
+            account: DEFAULT_ACCOUNT_HANDLE.clone(),
         }],
         Arc::clone(&search_requests),
     );
@@ -675,6 +685,7 @@ async fn deduplicates_repeated_type_pattern_exact_name_matches() {
                 type_name: kamu_resources::TypeName::new_unchecked(SECRETSET_TYPE_NAME),
                 id: shared_id,
                 name: RESOURCE_DB_CREDS.parse().unwrap(),
+                account: DEFAULT_ACCOUNT_HANDLE.clone(),
             }),
         )]),
         Arc::clone(&get_handle_requests),
@@ -734,6 +745,7 @@ async fn deduplicates_type_pattern_all_before_counting_max_results() {
             type_name: kamu_resources::TypeName::new_unchecked(SECRETSET_TYPE_NAME),
             id: shared_id,
             name: RESOURCE_DB_CREDS.parse().unwrap(),
+            account: DEFAULT_ACCOUNT_HANDLE.clone(),
         }],
         Arc::clone(&search_requests),
     );
@@ -748,6 +760,7 @@ async fn deduplicates_type_pattern_all_before_counting_max_results() {
                 type_name: kamu_resources::TypeName::new_unchecked(SECRETSET_TYPE_NAME),
                 id: shared_id,
                 name: RESOURCE_DB_CREDS.parse().unwrap(),
+                account: DEFAULT_ACCOUNT_HANDLE.clone(),
             }),
         )]),
         Arc::clone(&get_handle_requests),
@@ -807,6 +820,7 @@ async fn deduplicates_type_pattern_name_patterns_before_counting_max_results() {
             type_name: kamu_resources::TypeName::new_unchecked(SECRETSET_TYPE_NAME),
             id: shared_id,
             name: RESOURCE_DB_CREDS.parse().unwrap(),
+            account: DEFAULT_ACCOUNT_HANDLE.clone(),
         }],
         Arc::clone(&search_requests),
     );
@@ -865,12 +879,14 @@ async fn errors_when_unique_targets_exceed_max_results_after_deduplication() {
                 type_name: kamu_resources::TypeName::new_unchecked(VARIABLESET_TYPE_NAME),
                 id: shared_id,
                 name: "app-alpha".parse().unwrap(),
+                account: DEFAULT_ACCOUNT_HANDLE.clone(),
             },
             ResourceHandle {
                 schema: variableset_type_uri().clone(),
                 type_name: kamu_resources::TypeName::new_unchecked(VARIABLESET_TYPE_NAME),
                 id: second_id,
                 name: "app-beta".parse().unwrap(),
+                account: DEFAULT_ACCOUNT_HANDLE.clone(),
             },
         ],
         Arc::clone(&search_requests),

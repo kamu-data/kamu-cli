@@ -463,7 +463,7 @@ pub struct ResourceStatus {                  // ODF-generated; entirely server-o
 > query-shaped results (`ResourceSummaryView`, list/apply-manifest outcomes), whereas `Resource` is the
 > canonical per-instance DTO. Its identity/lookup counterpart, domain `ResourceHandle`
 > ([`values/resource_handle.rs`](/src/domain/resources/domain/src/values/resource_handle.rs) — `schema` +
-> `typeName` + `id` + `name`), has no ODF codegen equivalent and stays hand-rolled, but is
+> `typeName` + `account` + `id` + `name`), has no ODF codegen equivalent and stays hand-rolled, but is
 > named and placed the same way. The GraphQL-facing type is also `ResourceHandle` (was
 > `ResourceIdentity`). Its `typeName` is derived from `schema` via `resource_type_name()`;
 > handles do not carry CLI selector names.

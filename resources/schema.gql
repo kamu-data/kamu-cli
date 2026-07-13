@@ -4021,6 +4021,7 @@ type ResourceHandle {
 	schema: TypeUri!
 	typeName: TypeName!
 	name: ResourceName!
+	account: AccountHandle!
 }
 
 type ResourceHandleConnection {

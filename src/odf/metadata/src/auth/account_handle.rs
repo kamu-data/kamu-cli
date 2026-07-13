@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use flatbuffers::{FlatBufferBuilder, WIPOffset};
+use serde::{Deserialize, Serialize};
 
 use super::*;
 use crate::serde::flatbuffers::{
@@ -18,7 +19,12 @@ use crate::serde::flatbuffers::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+type AccountHandleProxy = crate::serde::yaml::auth::AccountHandle;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(try_from = "AccountHandleProxy", into = "AccountHandleProxy")]
 pub struct AccountHandle {
     pub id: AccountID,
     pub name: AccountName,
