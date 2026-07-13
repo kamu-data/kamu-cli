@@ -47,7 +47,9 @@ impl SetWatermarkUseCase for SetWatermarkUseCaseImpl {
             .await
             .map_err(|e| {
                 use kamu_auth_rebac::RebacDatasetIdUnresolvedError as E;
+
                 match e {
+                    E::NotFound(e) => SetWatermarkError::NotFound(e),
                     E::Access(e) => SetWatermarkError::Access(e),
                     e @ E::Internal(_) => SetWatermarkError::Internal(e.int_err()),
                 }

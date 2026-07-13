@@ -11,7 +11,7 @@ use chrono::{DateTime, Utc};
 use file_utils::MediaType;
 use internal_error::{InternalError, ResultIntoInternal};
 
-use crate::MoleculeDataRoomEntry;
+use crate::{MoleculeDataRoomEntry, OclId};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -36,8 +36,7 @@ pub struct MoleculeDataRoomActivity {
 
     pub activity_type: MoleculeDataRoomFileActivityType,
 
-    // TODO: typing
-    pub ipnft_uid: String,
+    pub ocl_id: OclId,
 
     pub path: kamu_datasets::CollectionPathV2,
 
@@ -73,7 +72,7 @@ impl MoleculeDataRoomActivity {
             system_time: r.system_columns.timestamp_columns.system_time,
             event_time: r.system_columns.timestamp_columns.event_time,
             activity_type: r.payload.activity_type,
-            ipnft_uid: r.payload.ipnft_uid,
+            ocl_id: r.payload.ocl_id,
             path: r.payload.path,
             r#ref: r.payload.r#ref,
             version: r.payload.version,
@@ -106,7 +105,7 @@ impl MoleculeDataRoomActivity {
             offset: record.offset,
             system_time: record.timestamp_columns.system_time,
             event_time: record.timestamp_columns.event_time,
-            ipnft_uid: record.payload.ipnft_uid,
+            ocl_id: record.payload.ocl_id,
             activity_type: record.payload.activity_type,
             path: record.payload.path,
             r#ref: record.payload.r#ref,
@@ -126,14 +125,14 @@ impl MoleculeDataRoomActivity {
         offset: u64,
         activity_type: MoleculeDataRoomFileActivityType,
         entry: MoleculeDataRoomEntry,
-        ipnft_uid: String,
+        ocl_id: OclId,
     ) -> Self {
         Self {
             offset,
             system_time: entry.system_time,
             event_time: entry.event_time,
             activity_type,
-            ipnft_uid,
+            ocl_id,
             path: entry.path,
             r#ref: entry.reference,
             version: entry.denormalized_latest_file_info.version,
@@ -155,7 +154,7 @@ impl MoleculeDataRoomActivity {
 pub struct MoleculeDataRoomActivityPayloadRecord {
     pub activity_type: MoleculeDataRoomFileActivityType,
 
-    pub ipnft_uid: String,
+    pub ocl_id: OclId,
 
     pub path: kamu_datasets::CollectionPathV2,
 
@@ -187,7 +186,7 @@ pub struct MoleculeDataRoomActivityPayloadRecord {
 impl MoleculeDataRoomActivityPayloadRecord {
     fn total_size_bytes(&self) -> usize {
         let stack_size = size_of::<Self>();
-        let heap_size = self.ipnft_uid.len()
+        let heap_size = self.ocl_id.as_ref().len()
             + self.path.len()
             + self.change_by.len()
             + self.access_level.len()

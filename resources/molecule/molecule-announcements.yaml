@@ -19,7 +19,7 @@ content:
       - name: event_time
         type:
           kind: Timestamp
-      - name: ipnft_uid
+      - name: ocl_id
         type:
           kind: String
       - name: announcement_id
@@ -66,7 +66,7 @@ content:
             kind: Option
             inner:
               kind: Timestamp
-        - name: ipnft_uid
+        - name: ocl_id
           type:
             kind: String
         - name: announcement_id

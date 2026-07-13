@@ -70,11 +70,9 @@ impl MoleculeViewProjectsUseCase for MoleculeViewProjectsUseCaseImpl {
         // Get total count before pagination
         let total_count = df.clone().count().await.int_err()?;
 
-        // Sort DF by ipnft_symbol
+        // Sort DF by project symbol
         use datafusion::logical_expr::col;
-        let df = df
-            .sort(vec![col("ipnft_symbol").sort(true, false)])
-            .int_err()?;
+        let df = df.sort(vec![col("symbol").sort(true, false)]).int_err()?;
 
         // Apply pagination
         let df = if let Some(pagination) = pagination {

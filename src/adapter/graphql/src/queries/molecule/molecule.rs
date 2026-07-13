@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::v2;
+use super::v3;
 use crate::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -19,9 +19,9 @@ pub struct Molecule;
 #[common_macros::method_names_consts(const_value_prefix = "Gql::")]
 #[Object]
 impl Molecule {
-    /// 2-nd Molecule API version (query).
-    async fn v2(&self) -> v2::MoleculeV2 {
-        v2::MoleculeV2
+    /// 3rd Molecule API version (query).
+    async fn v3(&self) -> v3::MoleculeV3 {
+        v3::MoleculeV3
     }
 }
 

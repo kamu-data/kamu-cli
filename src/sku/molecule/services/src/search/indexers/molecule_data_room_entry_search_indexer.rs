@@ -21,6 +21,7 @@ use kamu_molecule_domain::{
     MoleculeViewDataRoomEntriesMode,
     MoleculeViewDataRoomEntriesUseCase,
     MoleculeViewProjectsUseCase,
+    OclId,
     molecule_data_room_entry_search_schema as data_room_entry_schema,
     molecule_search_schema_common as molecule_schema,
 };
@@ -48,15 +49,15 @@ pub(crate) struct MoleculeDataRoomEntryIndexingHelper<'a> {
 impl MoleculeDataRoomEntryIndexingHelper<'_> {
     pub(crate) async fn index_data_room_entry_from_entity(
         &self,
-        ipnft_uid: &str,
+        ocl_id: &OclId,
         entry: &MoleculeDataRoomEntry,
         content_text: Option<&String>,
     ) -> Result<serde_json::Value, InternalError> {
         let mut index_doc = serde_json::json!({
             molecule_schema::fields::EVENT_TIME: entry.event_time,
             molecule_schema::fields::SYSTEM_TIME: entry.system_time,
-            molecule_schema::fields::MOLECULE_ACCOUNT_ID: self.molecule_account_id.to_string(),
-            molecule_schema::fields::IPNFT_UID: ipnft_uid,
+            molecule_schema::fields::MOLECULE_ACCOUNT_ID: self.molecule_account_id,
+            molecule_schema::fields::OCL_ID: ocl_id,
             molecule_schema::fields::REF: entry.reference,
             molecule_schema::fields::PATH: entry.path,
             data_room_entry_schema::fields::DEPTH: entry.path.depth(),
@@ -71,7 +72,7 @@ impl MoleculeDataRoomEntryIndexingHelper<'_> {
             molecule_schema::fields::CATEGORIES: entry.denormalized_latest_file_info.categories,
             molecule_schema::fields::TAGS: entry.denormalized_latest_file_info.tags,
             kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
-            kamu_search::fields::PRINCIPAL_IDS: vec![ self.molecule_account_id.to_string() ],
+            kamu_search::fields::PRINCIPAL_IDS: [self.molecule_account_id],
         });
 
         self.attach_embeddings(
@@ -190,7 +191,7 @@ impl IndexingDependencies {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct ProjectIndexingData {
-    molecule_subject: kamu_accounts::LoggedAccount,
+    molecule_subject: LoggedAccount,
     project: MoleculeProject,
     entries_result: Result<MoleculeDataRoomEntriesListing, InternalError>,
     versioned_files_map: HashMap<odf::DatasetID, MoleculeVersionedFileEntry>,
@@ -252,7 +253,7 @@ async fn process_projects_in_batches(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn load_project_indexing_data(
-    molecule_subject: kamu_accounts::LoggedAccount,
+    molecule_subject: LoggedAccount,
     project: MoleculeProject,
     dependencies: IndexingDependencies,
 ) -> ProjectIndexingData {
@@ -271,7 +272,7 @@ async fn load_project_indexing_data(
         .await
         .map_err(|e| {
             tracing::warn!(
-                project_ipnft_uid = project.ipnft_uid.as_str(),
+                ocl_id = %project.ocl_id,
                 error = ?e,
                 "Failed to load data room entries for project",
             );
@@ -280,7 +281,8 @@ async fn load_project_indexing_data(
         .int_err();
 
     let versioned_files_map = if let Ok(ref entries_listing) = result {
-        load_versioned_files_for_entries(entries_listing, &project.ipnft_uid, &dependencies).await
+        load_versioned_files_for_entries(entries_listing, project.ocl_id.as_ref(), &dependencies)
+            .await
     } else {
         HashMap::new()
     };
@@ -297,7 +299,7 @@ async fn load_project_indexing_data(
 
 async fn load_versioned_files_for_entries(
     entries_listing: &MoleculeDataRoomEntriesListing,
-    project_ipnft_uid: &str,
+    ocl_id: &str,
     dependencies: &IndexingDependencies,
 ) -> HashMap<odf::DatasetID, MoleculeVersionedFileEntry> {
     use futures::stream::{FuturesUnordered, StreamExt};
@@ -319,7 +321,7 @@ async fn load_versioned_files_for_entries(
     for (reference, version) in file_requests {
         let molecule_read_versioned_file_entry_uc =
             Arc::clone(&dependencies.molecule_read_versioned_file_entry_uc);
-        let ipnft_uid_for_trace = project_ipnft_uid.to_string();
+        let ocl_id_for_trace = ocl_id.to_string();
 
         file_futures.push(async move {
             let versioned_file = molecule_read_versioned_file_entry_uc
@@ -327,7 +329,7 @@ async fn load_versioned_files_for_entries(
                 .await
                 .map_err(|e| {
                     tracing::error!(
-                        project_ipnft_uid = %ipnft_uid_for_trace,
+                        ocl_id = %ocl_id_for_trace,
                         reference = %reference,
                         version = version,
                         error = ?e,
@@ -379,16 +381,12 @@ async fn index_project_data(
             .and_then(|versioned_file| versioned_file.detailed_info.content_text.as_ref());
 
         let document = indexing_helper
-            .index_data_room_entry_from_entity(
-                &project_data.project.ipnft_uid,
-                &entry,
-                content_text,
-            )
+            .index_data_room_entry_from_entity(&project_data.project.ocl_id, &entry, content_text)
             .await?;
 
         operations.push(SearchIndexUpdateOperation::Index {
             id: data_room_entry_schema::unique_id_for_data_room_entry(
-                &project_data.project.ipnft_uid,
+                &project_data.project.ocl_id,
                 &entry.path,
             ),
             doc: document,

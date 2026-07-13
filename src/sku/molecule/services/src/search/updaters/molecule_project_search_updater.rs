@@ -54,8 +54,8 @@ impl MoleculeProjectSearchUpdater {
     ) -> Result<(), InternalError> {
         let project_document = index_project_from_parts(
             &created_message.molecule_account_id,
-            &created_message.ipnft_uid,
-            &created_message.ipnft_symbol,
+            &created_message.ocl_id,
+            &created_message.symbol,
             &created_message.project_account_id,
             created_message.event_time,
             created_message.system_time,
@@ -66,7 +66,7 @@ impl MoleculeProjectSearchUpdater {
                 ctx,
                 project_schema::SCHEMA_NAME,
                 vec![SearchIndexUpdateOperation::Index {
-                    id: created_message.ipnft_uid.clone(),
+                    id: created_message.ocl_id.to_string(),
                     doc: project_document,
                 }],
             )
@@ -91,7 +91,7 @@ impl MoleculeProjectSearchUpdater {
                 ctx,
                 project_schema::SCHEMA_NAME,
                 vec![SearchIndexUpdateOperation::Update {
-                    id: disabled_message.ipnft_uid.clone(),
+                    id: disabled_message.ocl_id.to_string(),
                     doc: partial_update,
                 }],
             )
@@ -116,7 +116,7 @@ impl MoleculeProjectSearchUpdater {
                 ctx,
                 project_schema::SCHEMA_NAME,
                 vec![SearchIndexUpdateOperation::Update {
-                    id: reenabled_message.ipnft_uid.clone(),
+                    id: reenabled_message.ocl_id.to_string(),
                     doc: partial_update,
                 }],
             )

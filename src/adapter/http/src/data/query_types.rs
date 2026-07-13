@@ -21,50 +21,6 @@ use kamu_core::QueryError;
 const MAX_SOA_BUFFER_SIZE: usize = 100_000_000;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Config
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// TODO: Move into a more appropriate layer
-#[derive(Debug, Clone)]
-pub struct IdentityConfig {
-    /// Root private key that corresponds to the `authority` and is used to sign
-    /// responses
-    ///
-    /// To generate use:
-    ///
-    /// ```sh
-    /// ssh-keygen -t ed25519 -C "coo@abc.com"
-    /// ```
-    pub private_key: odf::metadata::PrivateKey,
-}
-
-impl IdentityConfig {
-    pub fn did(&self) -> odf::metadata::DidKey {
-        odf::metadata::DidKey::new_ed25519(&self.private_key.verifying_key())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn authority_config_doesnt_leak_key() {
-        let cfg = IdentityConfig {
-            private_key: ed25519_dalek::SigningKey::from_bytes(
-                &[123; ed25519_dalek::SECRET_KEY_LENGTH],
-            )
-            .into(),
-        };
-
-        assert_eq!(
-            format!("{cfg:?}"),
-            "IdentityConfig { private_key: PrivateKey(***) }"
-        );
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Request
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -356,20 +312,13 @@ pub struct Commitment {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Proof {
     /// Type of the proof provided
-    pub r#type: ProofType,
+    pub r#type: kamu_signing::common::ProofType,
 
     /// DID (public key) of the node performing the computation
     pub verification_method: odf::metadata::DidKey,
 
     /// Signature: `multibase(sign(canonicalize(commitment)))`
     pub proof_value: odf::metadata::Signature,
-}
-
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, utoipa::ToSchema,
-)]
-pub enum ProofType {
-    Ed25519Signature2020,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

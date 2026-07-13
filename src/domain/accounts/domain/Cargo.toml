@@ -69,6 +69,7 @@ uuid = { version = "1", default-features = false, features = [
     "v5",
     "serde",
 ] }
+zeroize = { version = "1", default-features = false, features = [] }
 
 # Optional
 sqlx = { optional = true, version = "0.8", default-features = false, features = [

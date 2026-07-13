@@ -40,7 +40,7 @@ impl MoleculeRemoveDataRoomEntryUseCase for MoleculeRemoveDataRoomEntryUseCaseIm
         level = "debug",
         name = MoleculeRemoveDataRoomEntryUseCaseImpl_execute,
         skip_all,
-        fields(ipnft_uid = %molecule_project.ipnft_uid, path = %path, ?expected_head)
+        fields(ocl_id = %molecule_project.ocl_id, path = %path, ?expected_head)
     )]
     async fn execute(
         &self,
@@ -138,7 +138,7 @@ impl MoleculeRemoveDataRoomEntryUseCase for MoleculeRemoveDataRoomEntryUseCaseIm
                             success.system_time,
                             molecule_subject.account_id.clone(),
                             molecule_project.account_id.clone(),
-                            molecule_project.ipnft_uid.clone(),
+                            molecule_project.ocl_id.clone(),
                             path,
                         ),
                     )

@@ -417,7 +417,7 @@ async fn test_create_account() {
         &value!({
             "accounts": {
                 "createAccount": {
-                    "message": "Non-unique account field 'name'",
+                    "message": "Non-unique account field 'Name'",
                 }
             }
         }),

@@ -11,7 +11,12 @@ use chrono::{DateTime, Utc};
 use database_common::{EntityPageListing, PaginationOpts};
 use internal_error::InternalError;
 
-use crate::{MoleculeActivitiesFilters, MoleculeDataRoomActivity, MoleculeGlobalAnnouncement};
+use crate::{
+    MoleculeActivitiesFilters,
+    MoleculeDataRoomActivity,
+    MoleculeGlobalAnnouncement,
+    OclId,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -54,10 +59,10 @@ impl MoleculeGlobalActivity {
         }
     }
 
-    pub fn ipnft_uid(&self) -> &String {
+    pub fn ocl_id(&self) -> &OclId {
         match self {
-            Self::DataRoomActivity(entity) => &entity.ipnft_uid,
-            Self::Announcement(entity) => &entity.ipnft_uid,
+            Self::DataRoomActivity(entity) => &entity.ocl_id,
+            Self::Announcement(entity) => &entity.ocl_id,
         }
     }
 }

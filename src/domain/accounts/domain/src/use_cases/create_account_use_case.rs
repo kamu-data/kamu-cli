@@ -46,6 +46,7 @@ pub struct CreateAccountUseCaseOptions {
     pub email: Option<Email>,
     pub password: Option<Password>,
     pub display_name: Option<String>,
+    pub avatar_url: Option<String>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

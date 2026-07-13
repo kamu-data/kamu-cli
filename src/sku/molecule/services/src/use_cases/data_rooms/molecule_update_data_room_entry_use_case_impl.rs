@@ -36,7 +36,7 @@ impl MoleculeUpdateDataRoomEntryUseCase for MoleculeUpdateDataRoomEntryUseCaseIm
         level = "debug",
         name = MoleculeUpdateDataRoomEntryUseCaseImpl_execute,
         skip_all,
-        fields(ipnft_uid = %molecule_project.ipnft_uid, %path, %reference, ?expected_head)
+        fields(ocl_id = %molecule_project.ocl_id, %path, %reference, ?expected_head)
     )]
     async fn execute(
         &self,
@@ -116,7 +116,7 @@ impl MoleculeUpdateDataRoomEntryUseCase for MoleculeUpdateDataRoomEntryUseCaseIm
                     data_room_entry.system_time,
                     molecule_subject.account_id.clone(),
                     molecule_project.account_id.clone(),
-                    molecule_project.ipnft_uid.clone(),
+                    molecule_project.ocl_id.clone(),
                     data_room_entry.clone(),
                     content_text.map(ToOwned::to_owned),
                 ),

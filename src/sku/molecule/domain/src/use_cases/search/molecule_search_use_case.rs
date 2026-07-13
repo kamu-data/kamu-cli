@@ -16,6 +16,7 @@ use crate::{
     MoleculeDataRoomActivity,
     MoleculeGlobalAnnouncement,
     MoleculeSearchEntityKind,
+    OclId,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -45,7 +46,7 @@ pub enum MoleculeSearchMode {
 
 #[derive(Clone, Debug)]
 pub struct MoleculeSearchFilters {
-    pub by_ipnft_uids: Option<Vec<String>>,
+    pub by_ocl_ids: Option<Vec<String>>,
     pub by_tags: Option<Vec<String>>,
     pub by_categories: Option<Vec<String>>,
     pub by_access_levels: Option<Vec<String>>,
@@ -78,10 +79,10 @@ impl MoleculeSearchHitEntity {
         }
     }
 
-    pub fn ipnft_uid(&self) -> &String {
+    pub fn ocl_id(&self) -> &OclId {
         match self {
-            Self::DataRoomActivity(entity) => &entity.ipnft_uid,
-            Self::Announcement(entity) => &entity.ipnft_uid,
+            Self::DataRoomActivity(entity) => &entity.ocl_id,
+            Self::Announcement(entity) => &entity.ocl_id,
         }
     }
 }

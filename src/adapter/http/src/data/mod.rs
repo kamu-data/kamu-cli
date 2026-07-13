@@ -12,6 +12,7 @@ pub mod metadata_handler;
 mod query_handler;
 pub mod query_types;
 mod router;
+pub mod sign;
 mod tail_handler;
 mod verify_handler;
 pub mod verify_types;

@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use super::{Multibase, MultibaseError};
+use super::{DidKey, Multibase, MultibaseError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -41,6 +41,10 @@ impl PrivateKey {
             })?;
         }
         Ok(Self::from_bytes(&buf))
+    }
+
+    pub fn verifying_key(&self) -> DidKey {
+        DidKey::new_ed25519(&self.0.verifying_key())
     }
 }
 

@@ -11,7 +11,7 @@ use super::{Multibase, MultibaseError};
 use crate::stack_string::StackString;
 
 /// Multibase-encoded signature
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Signature(ed25519_dalek::Signature);
 
 impl Signature {

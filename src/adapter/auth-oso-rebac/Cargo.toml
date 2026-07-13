@@ -53,5 +53,8 @@ time-source = { workspace = true }
 
 chrono = "0.4"
 indoc = { version = "2" }
-pretty_assertions = { version = "1" }
+pretty_assertions = { version = "1", default-features = false, features = [
+    "std",
+    "unstable",
+] }
 test-log = { version = "0.2", features = ["trace"] }

@@ -150,13 +150,10 @@ pub(crate) fn map_molecule_search_filters(filters: MoleculeSearchFilters) -> Vec
 
     let mut search_filters = vec![];
 
-    if let Some(by_ipnft_uids) = filters.by_ipnft_uids
-        && !by_ipnft_uids.is_empty()
+    if let Some(by_ocl_ids) = filters.by_ocl_ids
+        && !by_ocl_ids.is_empty()
     {
-        search_filters.push(field_in_str(
-            molecule_schema::fields::IPNFT_UID,
-            &by_ipnft_uids,
-        ));
+        search_filters.push(field_in_str(molecule_schema::fields::OCL_ID, &by_ocl_ids));
     }
 
     if let Some(by_access_levels) = filters.by_access_levels
@@ -204,10 +201,10 @@ fn map_molecule_access_level_rules_to_search(
     for rule in access_level_rules {
         or_clauses.push(filter_and!(
             // Match access levels
-            field_in_str(molecule_schema::fields::ACCESS_LEVEL, &rule.access_levels,),
-            // Match ipnft_id
-            match &rule.ipnft_uid {
-                Some(ipnft_uid) => field_eq_str(molecule_schema::fields::IPNFT_UID, ipnft_uid,),
+            field_in_str(molecule_schema::fields::ACCESS_LEVEL, &rule.access_levels),
+            // Match ocl_id
+            match &rule.ocl_id {
+                Some(ocl_id) => field_eq_str(molecule_schema::fields::OCL_ID, ocl_id.as_ref()),
                 None => unreachable!(),
             }
         ));

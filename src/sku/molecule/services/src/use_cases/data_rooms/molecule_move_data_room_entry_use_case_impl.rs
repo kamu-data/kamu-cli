@@ -40,7 +40,7 @@ impl MoleculeMoveDataRoomEntryUseCase for MoleculeMoveDataRoomEntryUseCaseImpl {
         level = "debug",
         name = MoleculeMoveDataRoomEntryUseCaseImpl_execute,
         skip_all,
-        fields(ipnft_uid = %molecule_project.ipnft_uid, path_from = %path_from, path_to = %path_to, ?expected_head)
+        fields(ocl_id = %molecule_project.ocl_id, path_from = %path_from, path_to = %path_to, ?expected_head)
     )]
     async fn execute(
         &self,
@@ -115,7 +115,7 @@ impl MoleculeMoveDataRoomEntryUseCase for MoleculeMoveDataRoomEntryUseCaseImpl {
                         success.system_time,
                         molecule_subject.account_id.clone(),
                         molecule_project.account_id.clone(),
-                        molecule_project.ipnft_uid.clone(),
+                        molecule_project.ocl_id.clone(),
                         path_from,
                         path_to,
                         MoleculeDataRoomEntry::from_collection_entry(

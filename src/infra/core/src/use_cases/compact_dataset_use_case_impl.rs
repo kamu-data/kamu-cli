@@ -57,7 +57,9 @@ impl CompactDatasetUseCase for CompactDatasetUseCaseImpl {
             .await
             .map_err(|e| {
                 use RebacDatasetIdUnresolvedError as E;
+
                 match e {
+                    E::NotFound(e) => CompactionError::NotFound(e),
                     E::Access(e) => CompactionError::Access(e),
                     e @ E::Internal(_) => CompactionError::Internal(e.int_err()),
                 }

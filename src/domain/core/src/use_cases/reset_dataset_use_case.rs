@@ -7,9 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::InternalError;
+use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_datasets::DatasetActionUnauthorizedError;
-use thiserror::Error;
 
 use crate::{ResetExecutionError, ResetPlanningError, ResetResult};
 
@@ -27,8 +26,11 @@ pub trait ResetDatasetUseCase: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Error)]
+#[derive(thiserror::Error, Debug)]
 pub enum ResetError {
+    #[error(transparent)]
+    NotFound(#[from] odf::DatasetNotFoundError),
+
     #[error(transparent)]
     Planning(
         #[from]
@@ -58,9 +60,12 @@ pub enum ResetError {
 
 impl From<DatasetActionUnauthorizedError> for ResetError {
     fn from(v: DatasetActionUnauthorizedError) -> Self {
+        use DatasetActionUnauthorizedError as E;
+
         match v {
-            DatasetActionUnauthorizedError::Access(e) => Self::Access(e),
-            DatasetActionUnauthorizedError::Internal(e) => Self::Internal(e),
+            E::NotFound(e) => Self::NotFound(e),
+            E::Access(e) => Self::Access(e),
+            e @ E::Internal(_) => Self::Internal(e.int_err()),
         }
     }
 }

@@ -37,13 +37,13 @@ impl MoleculeDisableProjectUseCase for MoleculeDisableProjectUseCaseImpl {
         level = "info",
         name = MoleculeDisableProjectUseCaseImpl_execute,
         skip_all,
-        fields(ipnft_uid)
+        fields(ocl_id)
     )]
     async fn execute(
         &self,
         molecule_subject: &LoggedAccount,
         source_event_time: Option<DateTime<Utc>>,
-        ipnft_uid: String,
+        ocl_id: OclId,
     ) -> Result<MoleculeProject, MoleculeDisableProjectError> {
         // Gain write access to projects dataset
         let projects_writer = self
@@ -55,7 +55,7 @@ impl MoleculeDisableProjectUseCase for MoleculeDisableProjectUseCaseImpl {
         // Try to find the latest project state
         let maybe_last_changelog_entry = projects_writer
             .as_reader()
-            .changelog_entry_by_ipnft_uid(&ipnft_uid)
+            .changelog_entry_by_ocl_id(&ocl_id)
             .await
             .map_err(MoleculeDatasetErrorExt::adapt::<MoleculeDisableProjectError>)?
             .map(MoleculeProjectChangelogEntry::from_json)
@@ -66,7 +66,7 @@ impl MoleculeDisableProjectUseCase for MoleculeDisableProjectUseCaseImpl {
         let Some(last_changelog_entry) = maybe_last_changelog_entry else {
             return Err(MoleculeDisableProjectError::ProjectNotFound(
                 ProjectNotFoundError {
-                    ipnft_uid: ipnft_uid.clone(),
+                    ocl_id: ocl_id.clone(),
                 },
             ));
         };
@@ -102,9 +102,9 @@ impl MoleculeDisableProjectUseCase for MoleculeDisableProjectUseCaseImpl {
                             source_event_time.unwrap_or(insertion_system_time),
                             insertion_system_time,
                             molecule_subject.account_id.clone(),
-                            new_changelog_record.payload.account_id.clone(),
-                            new_changelog_record.payload.ipnft_uid.clone(),
-                            new_changelog_record.payload.ipnft_symbol.clone(),
+                            new_changelog_record.payload.odf_account_id.clone(),
+                            new_changelog_record.payload.ocl_id.clone(),
+                            new_changelog_record.payload.symbol.clone(),
                         ),
                     )
                     .await

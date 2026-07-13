@@ -51,10 +51,13 @@ impl ProvenanceServiceImpl {
             .rebac_dataset_registry_facade
             .resolve_dataset_by_handle(dataset_handle, DatasetAction::Read)
             .await
-            .map_err(|e| match e {
-                RebacDatasetIdUnresolvedError::Access(e) => GetLineageError::Access(e),
-                e @ RebacDatasetIdUnresolvedError::Internal(_) => {
-                    GetLineageError::Internal(e.int_err())
+            .map_err(|e| {
+                use RebacDatasetIdUnresolvedError as E;
+
+                match e {
+                    E::NotFound(e) => GetLineageError::NotFound(e),
+                    E::Access(e) => GetLineageError::Access(e),
+                    e @ E::Internal(_) => GetLineageError::Internal(e.int_err()),
                 }
             })?;
 

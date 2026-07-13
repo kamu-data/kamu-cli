@@ -148,6 +148,8 @@ kamu-datasets-services = { optional = true, workspace = true, features = [
     "testing",
 ] }
 
+# TODO: Molecule: Phase 3: update to alloy@2 crate.
+#                 Blocked by datafusion-ethers & duplicate deps
 # TODO: Unpin after upgrade to `reqwests 0.13`
 # See: https://github.com/kamu-data/kamu-cli/issues/1607
 alloy = { optional = true, version = "~1.7.3", default-features = false, features = [
@@ -170,7 +172,9 @@ curl = { optional = true, version = "0.4", features = [
     "static-ssl",
 ] }
 curl-sys = { optional = true, version = "0.4" }
-datafusion-ethers = { optional = true, version = "53" }
+datafusion-ethers = { optional = true, version = "53", features = [
+    "eip712",
+] }
 datafusion-functions-json = { optional = true, version = "0.53" }
 rumqttc = { optional = true, version = "0.25", default-features = false, features = [
 ] }
@@ -207,7 +211,10 @@ filetime = "0.2"
 indoc = "2"
 mockall = { version = "0.14", default-features = false }
 nanoid = "0.5"
-pretty_assertions = { version = "1" }
+pretty_assertions = { version = "1", default-features = false, features = [
+    "std",
+    "unstable",
+] }
 test-group = { version = "1" }
 test-log = { version = "0.2", features = ["trace"] }
 testing_logger = { version = "0.1" }

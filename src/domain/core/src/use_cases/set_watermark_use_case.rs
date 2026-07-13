@@ -30,6 +30,9 @@ pub trait SetWatermarkUseCase: Send + Sync {
 #[derive(Debug, Error)]
 pub enum SetWatermarkError {
     #[error(transparent)]
+    NotFound(#[from] odf::DatasetNotFoundError),
+
+    #[error(transparent)]
     Planning(#[from] SetWatermarkPlanningError),
 
     #[error(transparent)]
@@ -54,9 +57,12 @@ pub enum SetWatermarkError {
 
 impl From<DatasetActionUnauthorizedError> for SetWatermarkError {
     fn from(v: DatasetActionUnauthorizedError) -> Self {
+        use DatasetActionUnauthorizedError as E;
+
         match v {
-            DatasetActionUnauthorizedError::Access(e) => Self::Access(e),
-            DatasetActionUnauthorizedError::Internal(e) => Self::Internal(e),
+            E::NotFound(e) => Self::NotFound(e),
+            E::Access(e) => Self::Access(e),
+            E::Internal(e) => Self::Internal(e),
         }
     }
 }

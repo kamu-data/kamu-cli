@@ -11,7 +11,6 @@ use std::collections::HashMap;
 
 use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_datasets::{DatasetAction, DatasetActionNotEnoughPermissionsError, ResolvedDataset};
-use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -85,31 +84,48 @@ impl ClassifyDatasetRefsByAllowanceResponse {
 
 #[derive(Debug)]
 pub struct ClassifyDatasetRefsByAccessResponse {
+    pub not_found: Vec<(odf::DatasetRef, odf::DatasetRefUnresolvedError)>,
     pub forbidden: Vec<(odf::DatasetRef, RebacDatasetRefUnresolvedError)>,
     pub insufficient: Vec<(odf::DatasetRef, odf::DatasetHandle)>,
     pub allowed: Vec<(odf::DatasetRef, odf::DatasetHandle)>,
 }
 
 impl ClassifyDatasetRefsByAccessResponse {
-    pub fn try_get_error_message(&self, skip_missing: bool) -> Option<String> {
-        let have_forbidden_to_report = !self.forbidden.is_empty() && !skip_missing;
+    pub fn try_get_user_error_report(&self, skip_missing: bool) -> Option<String> {
+        let have_missing = !(self.not_found.is_empty() && self.forbidden.is_empty());
+        let have_missing_to_report = have_missing && !skip_missing;
 
-        if self.insufficient.is_empty() && !have_forbidden_to_report {
+        if self.insufficient.is_empty() && !have_missing_to_report {
             return None;
         }
 
-        let error_msg = format!(
-            "Dataset access error: insufficient access level [{}]; unresolved: [{}].",
+        let unresolved = if skip_missing {
+            String::new()
+        } else {
+            // NOTE: We are preparing a report for the user, so the forbidden items are not
+            //       found ones
+            let not_found_iter = self.not_found.iter().map(|(r, _)| r);
+            let forbidden_iter = self.forbidden.iter().map(|(r, _)| r);
+
+            itertools::join(not_found_iter.chain(forbidden_iter), ",")
+        };
+
+        let report = indoc::formatdoc!(
+            r#"
+            Dataset access error:
+            - insufficient access level: [{}]
+            - unresolved: [{}]
+            "#,
             itertools::join(
                 self.insufficient
                     .iter()
-                    .map(|(r, h)| format!("{r}({})", h.alias)),
+                    .map(|(_, h)| format!("{}", h.alias)),
                 ","
             ),
-            itertools::join(self.forbidden.iter().map(|(r, _)| r), ",")
+            unresolved
         );
 
-        Some(error_msg)
+        Some(report)
     }
 }
 
@@ -117,7 +133,7 @@ impl ClassifyDatasetRefsByAccessResponse {
 // Errors
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Error, Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum RebacDatasetRefUnresolvedError {
     #[error(transparent)]
     NotFound(#[from] odf::DatasetNotFoundError),
@@ -162,8 +178,11 @@ impl From<odf::dataset::DatasetRefUnresolvedError> for RebacDatasetRefUnresolved
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Error, Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum RebacDatasetIdUnresolvedError {
+    #[error(transparent)]
+    NotFound(#[from] odf::DatasetNotFoundError),
+
     #[error(transparent)]
     Access(
         #[from]

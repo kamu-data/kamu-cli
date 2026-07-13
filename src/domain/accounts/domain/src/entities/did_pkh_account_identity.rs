@@ -83,20 +83,20 @@ mod tests {
         expected_display_name: &'static str,
     }
 
-    const WALLET_ADDRESS: &str = "0x0000000000000000000000000000000000000000";
+    const WALLET_ADDRESS: &str = "0xeCd666A695086c10D8d4AB146D2827842bd15Ef9";
 
     #[rstest::rstest]
     // EVM:
     #[case(FromDidPkhTestCase {
         input_did_str: const_concat!("did:pkh:eip155:1:", WALLET_ADDRESS),
         expected_identity_key_and_account_name: const_concat!("did.pkh.eip155.1.", WALLET_ADDRESS),
-        expected_email: "8b64fc46-d223-5eee-94ab-ef34d398c23c@example.com",
+        expected_email: "f17293eb-6b7d-5af5-a200-3ad19f2dbb9d@example.com",
         expected_display_name: WALLET_ADDRESS,
     })]
     #[case(FromDidPkhTestCase {
         input_did_str: const_concat!("did:pkh:eip155:11155111:", WALLET_ADDRESS),
         expected_identity_key_and_account_name: const_concat!("did.pkh.eip155.11155111.", WALLET_ADDRESS),
-        expected_email: "39a3abbd-0c97-53c9-9128-1de56f21bbdb@example.com",
+        expected_email: "6973df0b-5ebf-51a7-8e02-68d657a6b013@example.com",
         expected_display_name: WALLET_ADDRESS,
     })]
     fn test_from_did_pkh(

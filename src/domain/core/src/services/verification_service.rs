@@ -277,9 +277,12 @@ impl From<odf::IterBlocksError> for VerificationError {
 
 impl From<DatasetActionUnauthorizedError> for VerificationError {
     fn from(v: DatasetActionUnauthorizedError) -> Self {
+        use DatasetActionUnauthorizedError as E;
+
         match v {
-            DatasetActionUnauthorizedError::Access(e) => Self::Access(e),
-            DatasetActionUnauthorizedError::Internal(e) => Self::Internal(e),
+            E::NotFound(e) => Self::DatasetNotFound(e),
+            E::Access(e) => Self::Access(e),
+            e @ E::Internal(_) => Self::Internal(e.int_err()),
         }
     }
 }

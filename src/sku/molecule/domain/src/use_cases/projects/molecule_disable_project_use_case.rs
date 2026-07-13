@@ -11,7 +11,7 @@ use chrono::{DateTime, Utc};
 use internal_error::InternalError;
 use kamu_accounts::LoggedAccount;
 
-use crate::{MoleculeGetDatasetError, MoleculeProject};
+use crate::{MoleculeGetDatasetError, MoleculeProject, OclId};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -21,7 +21,7 @@ pub trait MoleculeDisableProjectUseCase: Send + Sync {
         &self,
         molecule_subject: &LoggedAccount,
         source_event_time: Option<DateTime<Utc>>,
-        ipnft_uid: String,
+        ocl_id: OclId,
     ) -> Result<MoleculeProject, MoleculeDisableProjectError>;
 }
 
@@ -63,9 +63,9 @@ impl From<MoleculeGetDatasetError> for MoleculeDisableProjectError {
 }
 
 #[derive(thiserror::Error, Debug)]
-#[error("Project with IPNFT UID {ipnft_uid} was not found")]
+#[error("Project with OCL ID [{ocl_id}] was not found")]
 pub struct ProjectNotFoundError {
-    pub ipnft_uid: String,
+    pub ocl_id: OclId,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

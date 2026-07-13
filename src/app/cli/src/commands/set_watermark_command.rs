@@ -100,7 +100,8 @@ impl Command for SetWatermarkCommand {
                 | SetWatermarkError::Access(_)),
             ) => Err(CLIError::failure(e)),
             Err(
-                e @ (SetWatermarkError::Execution(SetWatermarkExecutionError::Internal(_))
+                e @ (SetWatermarkError::NotFound(_)
+                | SetWatermarkError::Execution(SetWatermarkExecutionError::Internal(_))
                 | SetWatermarkError::Planning(SetWatermarkPlanningError::Internal(_))
                 | SetWatermarkError::Internal(_)),
             ) => Err(CLIError::critical(e)),

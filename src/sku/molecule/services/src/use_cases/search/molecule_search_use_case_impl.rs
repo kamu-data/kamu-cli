@@ -98,7 +98,7 @@ impl MoleculeSearchUseCaseImpl {
 
         let vocab = odf::metadata::DatasetVocabulary::default();
         // NOTE: Unlike other places, we set PK not by `path`, but by `ref`.
-        let primary_key = ["ipnft_uid", "ref"]
+        let primary_key = ["ocl_id", "ref"]
             .into_iter()
             .map(|name| col(Column::from_name(name)))
             .collect::<Vec<_>>();
@@ -165,7 +165,7 @@ impl MoleculeSearchUseCaseImpl {
         let df = if let Some(filters) = filters {
             crate::utils::apply_molecule_filters_to_df(
                 df,
-                filters.by_ipnft_uids,
+                filters.by_ocl_ids,
                 filters.by_tags,
                 filters.by_categories,
                 filters.by_access_levels,
@@ -242,7 +242,7 @@ impl MoleculeSearchUseCaseImpl {
         let df = if let Some(filters) = filters {
             crate::utils::apply_molecule_filters_to_df(
                 df,
-                filters.by_ipnft_uids,
+                filters.by_ocl_ids,
                 filters.by_tags,
                 filters.by_categories,
                 filters.by_access_levels,
@@ -366,19 +366,19 @@ impl MoleculeSearchUseCaseImpl {
                 .into_iter()
                 .map(|hit| match hit.schema_name {
                     dataroom_entry_schema::SCHEMA_NAME => {
-                        // Extract "ipnft_uid" field from source
-                        let ipnft_uid = if let Some(obj) = hit.source.as_object() {
-                            obj.get(molecule_schema::fields::IPNFT_UID)
-                                .and_then(|v| v.as_str())
-                                .map(ToString::to_string)
-                                .ok_or_else(|| {
-                                    InternalError::new(
-                                        "Missing or invalid ipnft_uid field in search hit",
-                                    )
-                                })?
-                        } else {
-                            unreachable!()
-                        };
+                        // Extract "ocl_id" field from source
+                        let ocl_id = hit
+                            .source
+                            .get(molecule_schema::fields::OCL_ID)
+                            .and_then(serde_json::Value::as_str)
+                            .and_then(|v| OclId::try_new(v).ok())
+                            .ok_or_else(|| {
+                                format!(
+                                    "Missing or invalid ocl_id field in search hit: [{}]",
+                                    hit.source
+                                )
+                                .int_err()
+                            })?;
 
                         // Recover data room entry
                         let data_room_entry =
@@ -389,10 +389,10 @@ impl MoleculeSearchUseCaseImpl {
                             0, /* unknown */
                             MoleculeDataRoomFileActivityType::Added,
                             data_room_entry,
-                            ipnft_uid,
+                            ocl_id,
                         );
 
-                        // Finally wrap as search hit
+                        // Finally, wrap as search hit
                         Ok(MoleculeSearchHit {
                             entity: MoleculeSearchHitEntity::DataRoomActivity(activity),
                             score: hit.score,

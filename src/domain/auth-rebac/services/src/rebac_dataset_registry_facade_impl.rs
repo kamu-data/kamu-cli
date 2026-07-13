@@ -10,7 +10,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use internal_error::{ErrorIntoInternal, InternalError};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_auth_rebac::{
     ClassifyDatasetRefsByAccessResponse,
     ClassifyDatasetRefsByAllowanceResponse,
@@ -66,6 +66,7 @@ impl RebacDatasetRegistryFacade for RebacDatasetRegistryFacadeImpl {
                 use DatasetActionUnauthorizedError as SourceError;
 
                 match e {
+                    SourceError::NotFound(e) => Error::NotFound(e),
                     SourceError::Access(e) => Error::Access(e),
                     e @ SourceError::Internal(_) => Error::Internal(e.int_err()),
                 }
@@ -103,6 +104,7 @@ impl RebacDatasetRegistryFacade for RebacDatasetRegistryFacadeImpl {
                 use RebacDatasetIdUnresolvedError as Error;
 
                 match e {
+                    SourceError::NotFound(e) => Error::NotFound(e),
                     SourceError::Access(e) => Error::Access(e),
                     e @ SourceError::Internal(_) => Error::Internal(e.int_err()),
                 }
@@ -188,30 +190,44 @@ impl RebacDatasetRegistryFacade for RebacDatasetRegistryFacadeImpl {
         dataset_refs: &[&odf::DatasetRef],
         action: DatasetAction,
     ) -> Result<ClassifyDatasetRefsByAccessResponse, InternalError> {
+        use kamu_datasets::DatasetActionAuthorizerExt;
+
         // The next work will be done using handles, so we need to get them first.
         let handles_resolution = self
             .dataset_registry
             .resolve_dataset_handles_by_refs(dataset_refs)
             .await?;
 
-        // If no datasets, then access to them cannot exist.
-        let mut forbidden = handles_resolution
-            .unresolved_refs
-            .into_iter()
-            .map(|(dataset_ref, e)| (dataset_ref, e.into()))
-            .collect::<Vec<_>>();
+        let not_found = handles_resolution.unresolved_refs;
 
-        // Next sort according to allowed actions
+        // Parallel execution
+        let mut tasks = tokio::task::JoinSet::<Result<_, InternalError>>::new();
+
+        for (dataset_ref, dataset_handle) in handles_resolution.resolved_handles {
+            let authorizer = self.dataset_action_authorizer.clone();
+
+            tasks.spawn(async move {
+                let allowed_actions = authorizer
+                    .get_allowed_actions_for_exist_dataset(&dataset_handle.id)
+                    .await?;
+                Ok((
+                    dataset_ref,
+                    dataset_handle,
+                    DatasetAction::resolve_access(&allowed_actions, action),
+                ))
+            });
+        }
+
+        // Next sort, according to allowed actions
+        let mut forbidden = Vec::new();
         let mut insufficient = Vec::new();
         let mut allowed = Vec::new();
 
-        for (dataset_ref, dataset_handle) in handles_resolution.resolved_handles {
-            let allowed_actions = self
-                .dataset_action_authorizer
-                .get_allowed_actions(&dataset_handle.id)
-                .await?;
+        while let Some(join_result) = tasks.join_next().await {
+            let result = join_result.int_err()?;
+            let (dataset_ref, dataset_handle, access) = result?;
 
-            match DatasetAction::resolve_access(&allowed_actions, action) {
+            match access {
                 DatasetActionAccess::Forbidden => forbidden.push((
                     dataset_ref.clone(),
                     RebacDatasetRefUnresolvedError::not_enough_permissions(dataset_ref, action),
@@ -226,6 +242,7 @@ impl RebacDatasetRegistryFacade for RebacDatasetRegistryFacadeImpl {
         }
 
         Ok(ClassifyDatasetRefsByAccessResponse {
+            not_found,
             forbidden,
             insufficient,
             allowed,

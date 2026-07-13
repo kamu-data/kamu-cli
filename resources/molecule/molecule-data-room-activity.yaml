@@ -22,7 +22,7 @@ content:
       - name: activity_type
         type:
           kind: String
-      - name: ipnft_uid
+      - name: ocl_id
         type:
           kind: String
       - name: path
@@ -80,7 +80,7 @@ content:
         - name: activity_type
           type:
             kind: String
-        - name: ipnft_uid
+        - name: ocl_id
           type:
             kind: String
         - name: path

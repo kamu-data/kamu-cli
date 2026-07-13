@@ -32,14 +32,17 @@ database-common = { workspace = true }
 database-common-macros = { workspace = true }
 email-utils = { workspace = true }
 file-utils = { workspace = true }
-internal-error = { workspace = true }
 http-common = { workspace = true }
+internal-error = { workspace = true }
 # TODO: Adapters should depend only on kamu-domain crate and be implementation-agnostic
 kamu = { workspace = true }
 kamu-accounts = { workspace = true }
 kamu-auth-rebac = { workspace = true }
-kamu-datasets = { workspace = true }
 kamu-core = { workspace = true, features = ["utoipa"] }
+kamu-datasets = { workspace = true }
+kamu-signing = { workspace = true, default-features = false, features = [
+    "utoipa",
+] }
 messaging-outbox = { workspace = true }
 odf = { workspace = true, features = ["utoipa"] }
 s3-utils = { workspace = true }
@@ -59,11 +62,6 @@ canonical_json = { version = "0.7", default-features = false }
 chrono = { version = "0.4", features = ["serde"] }
 datafusion = { version = "53", default-features = false } # TODO: Currently needed for type conversions but ideally should be encapsulated by kamu-core
 dill = { version = "0.15", default-features = false }
-ed25519-dalek = { version = "2", default-features = false, features = [
-    "std",
-    "fast",
-    "zeroize",
-] }
 flate2 = "1" # GZip decoder
 futures = "0.3"
 graphql-parser = "0.4"

@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use chrono::{TimeZone, Utc};
 use kamu::testing::BaseRepoHarness;
-use kamu_accounts::{DidEntity, DidSecretEncryptionConfig, DidSecretKeyRepository};
+use kamu_accounts::{DidEntity, DidSecretKeyRepository, SAMPLE_DID_SECRET_KEY_ENCRYPTION_KEY};
 use kamu_core::MockDidGenerator;
 use kamu_datasets::{CreateDatasetFromSnapshotUseCase, DatasetReferenceRepository};
 use kamu_datasets_services::CreateDatasetFromSnapshotUseCaseImpl;
@@ -287,13 +287,11 @@ async fn test_create_dataset_from_snapshot_creates_did_secret_key() {
         .unwrap();
 
     let did_private_key = did_secret_key
-        .get_decrypted_private_key(&DidSecretEncryptionConfig::sample().encryption_key.unwrap())
+        .get_decrypted_private_key(SAMPLE_DID_SECRET_KEY_ENCRYPTION_KEY)
         .unwrap();
 
-    let public_key = did_private_key.verifying_key().to_bytes();
-    let did_odf = odf::metadata::DidOdf::from(
-        odf::metadata::DidKey::new(odf::metadata::Multicodec::Ed25519Pub, &public_key).unwrap(),
-    );
+    let public_key = did_private_key.verifying_key();
+    let did_odf = odf::metadata::DidOdf::from(public_key);
 
     // Compare original account_id from db and id generated from a stored private
     // key

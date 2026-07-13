@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::assert_matches;
 use std::sync::Arc;
 
 use chrono::{DateTime, TimeDelta, Utc};
@@ -16,6 +15,7 @@ use kamu::*;
 use kamu_core::*;
 use kamu_datasets::{CreateDatasetResult, ResolvedDataset};
 use kamu_datasets_services::testing::MockDatasetActionAuthorizer;
+use pretty_assertions::assert_matches;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -45,6 +45,34 @@ async fn test_set_watermark_success() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[tokio::test]
+async fn test_try_set_watermark_for_not_found_dataset() {
+    let not_found_dataset_handle =
+        odf::metadata::testing::handle(&"user", &"not-found-dataset", odf::DatasetKind::Root);
+
+    let harness = SetWatermarkUseCaseHarness::new(
+        MockDatasetActionAuthorizer::new().expect_check_write_not_found_dataset(
+            &not_found_dataset_handle.id,
+            1,
+            false,
+        ),
+        MockDidGenerator::new(),
+    );
+
+    let new_watermark = Utc::now();
+
+    assert_matches!(
+        harness
+            .use_case
+            .execute(&not_found_dataset_handle, new_watermark)
+            .await,
+        Err(SetWatermarkError::NotFound(e))
+            if e.dataset_ref == not_found_dataset_handle.id.as_local_ref()
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[tokio::test]
 async fn test_set_watermark_unauthorized() {
     let alias_foo = odf::DatasetAlias::new(None, odf::DatasetName::new_unchecked("foo"));
     let (_, dataset_id_foo) = odf::DatasetID::new_generated_ed25519();
@@ -63,7 +91,7 @@ async fn test_set_watermark_unauthorized() {
             .await,
         Err(SetWatermarkError::Access(_))
     );
-    assert_eq!(harness.current_watermark(&foo).await, None,);
+    assert_eq!(harness.current_watermark(&foo).await, None);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

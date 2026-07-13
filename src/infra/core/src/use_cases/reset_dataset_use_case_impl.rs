@@ -47,7 +47,9 @@ impl ResetDatasetUseCase for ResetDatasetUseCaseImpl {
             .await
             .map_err(|e| {
                 use RebacDatasetIdUnresolvedError as E;
+
                 match e {
+                    E::NotFound(e) => ResetError::NotFound(e),
                     E::Access(e) => ResetError::Access(e),
                     e @ E::Internal(_) => ResetError::Internal(e.int_err()),
                 }

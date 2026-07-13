@@ -100,7 +100,7 @@ impl MoleculeCreateAnnouncementUseCase for MoleculeCreateAnnouncementUseCaseImpl
         let global_announcement_record = MoleculeGlobalAnnouncementChangelogInsertionRecord {
             op: odf::metadata::OperationType::Append,
             payload: MoleculeGlobalAnnouncementPayloadRecord {
-                ipnft_uid: molecule_project.ipnft_uid.clone(),
+                ocl_id: molecule_project.ocl_id.clone(),
                 announcement,
             },
         };
@@ -159,7 +159,7 @@ impl MoleculeCreateAnnouncementUseCase for MoleculeCreateAnnouncementUseCaseImpl
                             source_event_time.unwrap_or(insertion_system_time),
                             insertion_system_time,
                             molecule_subject.account_id.clone(),
-                            molecule_project.ipnft_uid.clone(),
+                            molecule_project.ocl_id.clone(),
                             project_announcement_record.payload,
                         ),
                     )
