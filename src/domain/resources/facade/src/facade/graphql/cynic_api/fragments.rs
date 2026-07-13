@@ -134,7 +134,7 @@ pub(crate) struct ResourceIDNotFoundProblem {
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct ResourceNameNotFoundProblem {
-    pub canonical_selector: kamu_resources::ResourceSelectorName,
+    pub type_name: kamu_resources::TypeName,
     pub name: kamu_resources::ResourceName,
 }
 
@@ -186,7 +186,7 @@ pub(crate) struct ResourceInvalidSearchQueryProblem {
 #[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct ResourceTypeCountSummary {
     pub schema: kamu_resources::TypeUri,
-    pub canonical_selector: kamu_resources::ResourceSelectorName,
+    pub type_name: kamu_resources::TypeName,
     pub total_count: Uint64,
     pub phase_counts: ResourcePhaseCounts,
 }
@@ -250,7 +250,7 @@ pub(crate) struct AccountHandle {
 pub(crate) struct ResourceHandle {
     pub id: kamu_resources::ResourceID,
     pub schema: kamu_resources::TypeUri,
-    pub canonical_selector: kamu_resources::ResourceSelectorName,
+    pub type_name: kamu_resources::TypeName,
     pub name: kamu_resources::ResourceName,
 }
 

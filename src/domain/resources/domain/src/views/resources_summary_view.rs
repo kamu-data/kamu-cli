@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use crate::{ResourceSelectorName, TypeUri};
+use crate::{TypeName, TypeUri};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -23,7 +23,7 @@ pub struct ResourcesSummary {
 #[serde(rename_all = "camelCase")]
 pub struct ResourceTypeCountSummary {
     pub schema: TypeUri,
-    pub canonical_selector: ResourceSelectorName,
+    pub type_name: TypeName,
     pub total_count: u64,
     pub phase_counts: ResourcePhaseCounts,
 }

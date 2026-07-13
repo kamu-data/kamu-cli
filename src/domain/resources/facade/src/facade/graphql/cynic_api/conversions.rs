@@ -86,7 +86,7 @@ impl From<fragments::ResourceHandle> for domain::ResourceHandle {
     fn from(value: fragments::ResourceHandle) -> Self {
         Self {
             schema: value.schema,
-            canonical_selector: value.canonical_selector,
+            type_name: value.type_name,
             id: value.id,
             name: value.name,
         }
@@ -179,7 +179,7 @@ impl TryFrom<fragments::ResourceTypeCountSummary> for domain::ResourceTypeCountS
     fn try_from(value: fragments::ResourceTypeCountSummary) -> Result<Self, Self::Error> {
         Ok(Self {
             schema: value.schema,
-            canonical_selector: value.canonical_selector,
+            type_name: value.type_name,
             total_count: value.total_count.into(),
             phase_counts: domain::ResourcePhaseCounts {
                 pending: value.phase_counts.pending.into(),

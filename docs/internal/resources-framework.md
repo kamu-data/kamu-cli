@@ -122,7 +122,8 @@ long-term goal. This page documents what exists now.
 | --- | --- |
 | **Resource** | A single managed object instance of a given type, identified by a `ResourceID`. |
 | **Schema** | The canonical resource-type identity URL, e.g. `.../config/v1alpha1/VariableSet`. Carried as a `TypeUri` (opaque identity); `ResourceSchemaId` is a parsed lens over it. Its last path segment is a `TypeName` (e.g. `VariableSet`). |
-| **Selector name / alias** | A resource *type's* user-facing name: canonical (`variablesets`, `secretsets`) or a short alias (`vs`, `ss`). Both carried as `ResourceSelectorName` (the distinction is which field holds it). Not an ODF `TypeName`, not persisted as identity. |
+| **Type name** | Human-facing resource type label derived from the schema's last path segment (`TypeName`, e.g. `VariableSet`). `ResourceHandle`, `ResourceTypeCountSummary`, and `ResourceNameNotFoundError` carry this value as `type_name`; it is derived via `ResourceSchemaId`/`resource_type_name()`. |
+| **Selector name / alias** | A resource *type's* CLI/API lookup name used only to resolve raw selector input before dispatch: canonical (`variablesets`, `secretsets`) or a short alias (`vs`, `ss`). Both are `ResourceSelectorName` values and live in selector-resolution structures (`ResourceTypeDescriptor`, `ResourcePresentationDefinition`, `ResourceDispatcherMeta`, CLI selector services). They are not ODF `TypeName`s and are not persisted identity. |
 | **Resource type selector** | Raw user/API input identifying a *type* before resolution (`ResourceTypeSelectorRaw`; matches a selector name or alias). Distinct from **Selector**, which identifies an *instance*. |
 | **Descriptor** | Schema (`TypeUri`) + selector name/aliases identifying a type for routing/presentation; domain type `ResourceTypeDescriptor`, carried in `dill` as `ResourceDispatcherMeta`. |
 | **Manifest** | The user-authored wire document (`$schema`/`headers`/`spec`) in YAML or JSON. |
@@ -462,9 +463,10 @@ pub struct ResourceStatus {                  // ODF-generated; entirely server-o
 > query-shaped results (`ResourceSummaryView`, list/apply-manifest outcomes), whereas `Resource` is the
 > canonical per-instance DTO. Its identity/lookup counterpart, domain `ResourceHandle`
 > ([`values/resource_handle.rs`](/src/domain/resources/domain/src/values/resource_handle.rs) — `schema` +
-> `canonicalSelector` + `id` + `name`), has no ODF codegen equivalent and stays hand-rolled, but is
+> `typeName` + `id` + `name`), has no ODF codegen equivalent and stays hand-rolled, but is
 > named and placed the same way. The GraphQL-facing type is also `ResourceHandle` (was
-> `ResourceIdentity`).
+> `ResourceIdentity`). Its `typeName` is derived from `schema` via `resource_type_name()`;
+> handles do not carry CLI selector names.
 >
 > Per-kind `Spec`/`SpecInput` types follow the same convention where the RFC shape and the domain's
 > existing behavior (validation, linting) are compatible. `kamu_configuration::VariableSetSpec` /
@@ -753,12 +755,17 @@ pub trait ResourceFacade: Send + Sync {
     async fn get_many(&self, selector: ResourceBatchSelector, spec_view_mode: SpecViewMode)
         -> Result<BatchResourceResponse<Resource, ResourceLookupProblem>, ...>;
     async fn get_handle(&self, selector: ResourceSelector) -> Result<ResourceHandle, ...>;
+    async fn get_handles(&self, selector: ResourceBatchSelector)
+        -> Result<BatchResourceResponse<ResourceHandle, ResourceLookupProblem>, ...>;
     async fn render_manifest(&self, selector, format: ResourceManifestFormat, spec_view_mode) -> ...;
+    async fn render_manifests(&self, selector: ResourceBatchSelector, format: ResourceManifestFormat, spec_view_mode)
+        -> Result<BatchResourceResponse<RenderResourceManifestResult, ResourceLookupProblem>, ...>;
 
     async fn list(&self, request: ListResourcesRequest) -> Result<Vec<ResourceSummaryView>, ...>;
     async fn list_handles(&self, request: ListResourceHandlesRequest) -> ...;
     async fn search_handles(&self, request: SearchResourceHandlesRequest) -> ...;
     async fn list_all(&self, request: ListAllResourcesRequest) -> ...;
+    async fn list_all_handles(&self, request: ListAllResourceHandlesRequest) -> ...;
 
     async fn plan_apply_manifest(&self, request: ApplyManifestRequest) -> Result<ApplyManifestPlanningDecision, ...>;
     async fn apply_manifest(&self, request: ApplyManifestRequest) -> Result<ApplyManifestApplicationDecision, ...>;

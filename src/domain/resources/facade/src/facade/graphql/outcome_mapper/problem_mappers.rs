@@ -108,7 +108,7 @@ pub(crate) fn map_name_not_found(
     p: cynic_api::fragments::ResourceNameNotFoundProblem,
 ) -> ResourceLookupProblem {
     ResourceLookupProblem::NameNotFound(domain::ResourceNameNotFoundError {
-        canonical_selector: p.canonical_selector,
+        type_name: p.type_name,
         name: p.name,
     })
 }

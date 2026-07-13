@@ -7,33 +7,33 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashMap;
-
 use internal_error::InternalError;
 use kamu_resources::{
     ResourceHandle,
     ResourceHandleRow,
     ResourceID,
     ResourceName,
-    ResourceSelectorName,
     ResourceSnapshot,
+    TypeName,
     TypeUri,
+    resource_type_name,
 };
 
 use crate::ResourceLookupProblem;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Builds a handle from a stored snapshot by deriving the display `type_name`
+/// from the stored schema. A parse failure is internal/corrupt data, because
+/// snapshots should only contain valid resource schema URIs.
 pub(crate) fn resource_handle_from_snapshot(
     snapshot: ResourceSnapshot,
-    canonical_selectors_by_schema: &HashMap<TypeUri, ResourceSelectorName>,
 ) -> Result<ResourceHandle, InternalError> {
-    let canonical_selector =
-        canonical_selector_for_stored_schema(&snapshot.schema, canonical_selectors_by_schema)?;
+    let type_name = resource_type_name(&snapshot.schema)?;
 
     Ok(ResourceHandle {
         schema: snapshot.schema,
-        canonical_selector,
+        type_name,
         id: snapshot.id,
         name: snapshot.headers.name,
     })
@@ -41,17 +41,17 @@ pub(crate) fn resource_handle_from_snapshot(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Builds a handle from a storage row by deriving the display `type_name` from
+/// the row schema. See [`resource_handle_from_snapshot`].
 pub(crate) fn resource_handle_from_row(
     row: ResourceHandleRow,
-    canonical_selectors_by_schema: &HashMap<TypeUri, ResourceSelectorName>,
 ) -> Result<ResourceHandle, InternalError> {
     let schema = TypeUri::new_unchecked(row.schema);
-    let canonical_selector =
-        canonical_selector_for_stored_schema(&schema, canonical_selectors_by_schema)?;
+    let type_name = resource_type_name(&schema)?;
 
     Ok(ResourceHandle {
         schema,
-        canonical_selector,
+        type_name,
         id: ResourceID::new(row.id),
         name: ResourceName::new_unchecked(&row.name),
     })
@@ -59,22 +59,19 @@ pub(crate) fn resource_handle_from_row(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Resolves a stored schema to its canonical selector name. A miss is a
-/// data-integrity catastrophe — the resource could not have been stored without
-/// a registered descriptor — so it is surfaced as an internal error, never a
-/// user-facing "unsupported" outcome.
-fn canonical_selector_for_stored_schema(
-    schema: &TypeUri,
-    canonical_selectors_by_schema: &HashMap<TypeUri, ResourceSelectorName>,
-) -> Result<ResourceSelectorName, InternalError> {
-    canonical_selectors_by_schema
-        .get(schema)
-        .cloned()
-        .ok_or_else(|| {
-            InternalError::new(format!(
-                "Stored resource has unregistered schema '{schema}'"
-            ))
-        })
+/// Builds a handle from a row whose schema has already been validated against
+/// a known request schema, allowing the caller to resolve `type_name` once for
+/// the whole batch.
+pub(crate) fn resource_handle_from_row_with_type_name(
+    row: ResourceHandleRow,
+    type_name: TypeName,
+) -> ResourceHandle {
+    ResourceHandle {
+        schema: TypeUri::new_unchecked(row.schema),
+        type_name,
+        id: ResourceID::new(row.id),
+        name: ResourceName::new_unchecked(&row.name),
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -94,13 +91,15 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Maps stored snapshots to handles. Each handle derives its display
+/// `type_name` from its own schema, so this supports both single-schema and
+/// cross-schema listings.
 pub(crate) fn map_snapshots_to_handles(
     snapshots: Vec<ResourceSnapshot>,
-    canonical_selectors_by_schema: &HashMap<TypeUri, ResourceSelectorName>,
 ) -> Result<Vec<ResourceHandle>, InternalError> {
     snapshots
         .into_iter()
-        .map(|snapshot| resource_handle_from_snapshot(snapshot, canonical_selectors_by_schema))
+        .map(resource_handle_from_snapshot)
         .collect()
 }
 

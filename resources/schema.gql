@@ -4019,7 +4019,7 @@ union ResourceGetOutcome = Resource | ResourceSelectorProblemResult
 type ResourceHandle {
 	id: ResourceID!
 	schema: TypeUri!
-	canonicalSelector: ResourceSelectorName!
+	typeName: TypeName!
 	name: ResourceName!
 }
 
@@ -4178,7 +4178,7 @@ enum ResourceManifestFormat {
 scalar ResourceName
 
 type ResourceNameNotFoundProblem {
-	canonicalSelector: ResourceSelectorName!
+	typeName: TypeName!
 	name: ResourceName!
 	message: String!
 }
@@ -4282,7 +4282,7 @@ type ResourceSummary {
 
 type ResourceTypeCountSummary {
 	schema: TypeUri!
-	canonicalSelector: ResourceSelectorName!
+	typeName: TypeName!
 	totalCount: Uint64!
 	phaseCounts: ResourcePhaseCounts!
 }
@@ -5008,6 +5008,8 @@ type TriggerFlowSuccess implements TriggerFlowResult {
 	flow: Flow!
 	message: String!
 }
+
+scalar TypeName
 
 scalar TypeUri
 

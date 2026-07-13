@@ -11,7 +11,7 @@ use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
 
 use crate::prelude::*;
-use crate::scalars::{AccountID, AccountName, ResourcePhase, UInt64};
+use crate::scalars::{AccountID, AccountName, ResourcePhase, TypeName, UInt64};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Type aliases for cleaner From implementations
@@ -336,7 +336,7 @@ pub struct ResourceIDNotFoundProblem {
 
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceNameNotFoundProblem {
-    pub canonical_selector: ResourceSelectorName<'static>,
+    pub type_name: TypeName<'static>,
     pub name: ResourceName<'static>,
     pub message: String,
 }
@@ -367,7 +367,7 @@ impl From<kamu_resources_facade::ResourceLookupProblem> for ResourceLookupProble
                 message: e.to_string(),
             }),
             P::NameNotFound(e) => Self::NameNotFound(ResourceNameNotFoundProblem {
-                canonical_selector: e.canonical_selector.clone().into(),
+                type_name: e.type_name.clone().into(),
                 name: e.name.clone().into(),
                 message: e.to_string(),
             }),
@@ -565,7 +565,7 @@ pub struct BatchResourceManifestSuccess {
 pub struct ResourceHandle {
     pub id: ResourceID<'static>,
     pub schema: TypeUri<'static>,
-    pub canonical_selector: ResourceSelectorName<'static>,
+    pub type_name: TypeName<'static>,
     pub name: ResourceName<'static>,
 }
 
@@ -574,7 +574,7 @@ impl From<kamu_resources::ResourceHandle> for ResourceHandle {
         Self {
             id: value.id.into(),
             schema: value.schema.into(),
-            canonical_selector: value.canonical_selector.into(),
+            type_name: value.type_name.into(),
             name: value.name.into(),
         }
     }
@@ -773,7 +773,7 @@ impl From<kamu_resources::ResourcesSummary> for ResourcesSummary {
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceTypeCountSummary {
     pub schema: TypeUri<'static>,
-    pub canonical_selector: ResourceSelectorName<'static>,
+    pub type_name: TypeName<'static>,
     pub total_count: UInt64,
     pub phase_counts: ResourcePhaseCounts,
 }
@@ -782,7 +782,7 @@ impl From<kamu_resources::ResourceTypeCountSummary> for ResourceTypeCountSummary
     fn from(value: kamu_resources::ResourceTypeCountSummary) -> Self {
         Self {
             schema: value.schema.into(),
-            canonical_selector: value.canonical_selector.into(),
+            type_name: value.type_name.into(),
             total_count: value.total_count.into(),
             phase_counts: value.phase_counts.into(),
         }

@@ -136,7 +136,7 @@ pub async fn test_resources_secretset_lifecycle(ctx: ResourceCtx) {
     );
     ctx.assert_failure(
         ["get", "ss", resource_name],
-        Some(&[r#"Resource 'app-secrets' of type 'secretsets' was not found"#]),
+        Some(&[r#"Resource 'app-secrets' of type 'SecretSet' was not found"#]),
     )
     .await;
 }

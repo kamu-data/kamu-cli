@@ -7,10 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::future::Future;
 
 use database_common::PaginationOpts;
+use internal_error::InternalError;
 use kamu_resources::{ResourceHandle, ResourceTypeDescriptor};
 use kamu_resources_facade::{
     GetResourceError,
@@ -73,8 +74,12 @@ impl ResourceSelectionResolutionService for ResourceSelectionResolutionServiceIm
         for item in selection.items {
             match item {
                 ResourceSelectionItem::All => {
+                    let matched_resource_types = supported_resource_types
+                        .as_deref()
+                        .expect("`all` requires supported types");
                     let new_targets = Self::process_all_item(
                         resource_facade,
+                        matched_resource_types,
                         &seen_target_keys,
                         expanded_results,
                         options,
@@ -245,7 +250,8 @@ impl ResourceSelectionResolutionServiceImpl {
         let needs_supported_types = selection.items.iter().any(|item| {
             matches!(
                 item,
-                ResourceSelectionItem::TypePatternExactName { .. }
+                ResourceSelectionItem::All
+                    | ResourceSelectionItem::TypePatternExactName { .. }
                     | ResourceSelectionItem::TypePatternAll { .. }
                     | ResourceSelectionItem::TypePatternNamePattern { .. }
             )
@@ -329,6 +335,7 @@ impl ResourceSelectionResolutionServiceImpl {
 
     async fn process_all_item(
         resource_facade: &dyn ResourceFacade,
+        supported_resource_types: &[ResourceTypeDescriptor],
         seen_target_keys: &HashSet<ResourceTargetKey>,
         expanded_results: usize,
         options: ResourceSelectionResolutionOptions,
@@ -349,11 +356,45 @@ impl ResourceSelectionResolutionServiceImpl {
         )
         .await?;
 
-        Ok(collected
+        // Handles intentionally carry a display TypeName, not a CLI selector.
+        // Reconstruct command-routing selectors from the descriptor set that
+        // was already loaded for this expansion.
+        let canonical_selectors_by_schema =
+            Self::canonical_selectors_by_schema(supported_resource_types);
+
+        collected
             .identities
             .into_iter()
-            .map(|handle| Self::target_from_handle(handle, "all".to_owned()))
-            .collect())
+            .map(|handle| {
+                let canonical_selector = Self::canonical_selector_for_schema(
+                    &canonical_selectors_by_schema,
+                    &handle.schema,
+                )?;
+                Ok(Self::target_from_handle(
+                    handle,
+                    canonical_selector.clone(),
+                    "all".to_owned(),
+                ))
+            })
+            .collect()
+    }
+
+    /// Resolves the canonical selector for a handle's schema against an
+    /// already-fetched descriptor set. A miss is an internal inconsistency:
+    /// the backend returned a handle outside the selector scope requested by
+    /// the CLI expansion.
+    fn canonical_selector_for_schema<'a>(
+        canonical_selectors_by_schema: &'a CanonicalSelectorsBySchema<'a>,
+        schema: &kamu_resources::TypeUri,
+    ) -> Result<&'a kamu_resources::ResourceSelectorName, CLIError> {
+        canonical_selectors_by_schema
+            .get(schema)
+            .copied()
+            .ok_or_else(|| {
+                CLIError::critical(InternalError::new(format!(
+                    "No resource descriptor registered for {schema}"
+                )))
+            })
     }
 
     async fn process_all_by_type_item(
@@ -384,7 +425,13 @@ impl ResourceSelectionResolutionServiceImpl {
         Ok(collected
             .identities
             .into_iter()
-            .map(|handle| Self::target_from_handle(handle, selector_input.clone()))
+            .map(|handle| {
+                Self::target_from_handle(
+                    handle,
+                    type_descriptor.canonical_selector.clone(),
+                    selector_input.clone(),
+                )
+            })
             .collect())
     }
 
@@ -411,6 +458,8 @@ impl ResourceSelectionResolutionServiceImpl {
             .map(|descriptor| (&descriptor.canonical_selector).into())
             .collect::<Vec<_>>();
 
+        let canonical_selectors_by_schema = Self::canonical_selectors_by_schema(&matched_types);
+
         let collected = Self::collect_unique_bounded_identities(
             Self::remaining_expanded_results(expanded_results, options),
             options.max_expanded_results,
@@ -434,11 +483,21 @@ impl ResourceSelectionResolutionServiceImpl {
         )
         .await?;
 
-        Ok(collected
+        collected
             .identities
             .into_iter()
-            .map(|handle| Self::target_from_handle(handle, selector_input.clone()))
-            .collect())
+            .map(|handle| {
+                let canonical_selector = Self::canonical_selector_for_schema(
+                    &canonical_selectors_by_schema,
+                    &handle.schema,
+                )?;
+                Ok(Self::target_from_handle(
+                    handle,
+                    canonical_selector.clone(),
+                    selector_input.clone(),
+                ))
+            })
+            .collect()
     }
 
     async fn process_name_pattern_item(
@@ -492,7 +551,13 @@ impl ResourceSelectionResolutionServiceImpl {
         Ok(collected
             .identities
             .into_iter()
-            .map(|handle| Self::target_from_handle(handle, selector_input.clone()))
+            .map(|handle| {
+                Self::target_from_handle(
+                    handle,
+                    type_descriptor.canonical_selector.clone(),
+                    selector_input.clone(),
+                )
+            })
             .collect())
     }
 
@@ -540,7 +605,11 @@ impl ResourceSelectionResolutionServiceImpl {
                         continue;
                     }
 
-                    targets.push(Self::target_from_handle(handle, selector_input.clone()));
+                    targets.push(Self::target_from_handle(
+                        handle,
+                        type_descriptor.canonical_selector.clone(),
+                        selector_input.clone(),
+                    ));
 
                     if let Some(limit) = remaining_limit
                         && targets.len() > limit
@@ -603,6 +672,8 @@ impl ResourceSelectionResolutionServiceImpl {
             .map(|descriptor| (&descriptor.canonical_selector).into())
             .collect::<Vec<_>>();
 
+        let canonical_selectors_by_schema = Self::canonical_selectors_by_schema(&matched_types);
+
         let collected = Self::collect_unique_bounded_identities(
             Self::remaining_expanded_results(expanded_results, options),
             options.max_expanded_results,
@@ -645,11 +716,21 @@ impl ResourceSelectionResolutionServiceImpl {
             ));
         }
 
-        Ok(collected
+        collected
             .identities
             .into_iter()
-            .map(|handle| Self::target_from_handle(handle, selector_input.clone()))
-            .collect())
+            .map(|handle| {
+                let canonical_selector = Self::canonical_selector_for_schema(
+                    &canonical_selectors_by_schema,
+                    &handle.schema,
+                )?;
+                Ok(Self::target_from_handle(
+                    handle,
+                    canonical_selector.clone(),
+                    selector_input.clone(),
+                ))
+            })
+            .collect()
     }
 
     fn process_exact_item(
@@ -665,7 +746,11 @@ impl ResourceSelectionResolutionServiceImpl {
             .expect("Every exact selector must have a batch result")
         {
             Ok(handle) => {
-                let target = Self::target_from_handle(handle, selector.selector_input);
+                let target = Self::target_from_handle(
+                    handle,
+                    selector.type_descriptor.canonical_selector,
+                    selector.selector_input,
+                );
 
                 if seen_target_keys.insert(Self::target_key(&target)) {
                     targets.push(target);
@@ -768,6 +853,15 @@ impl ResourceSelectionResolutionServiceImpl {
             .collect()
     }
 
+    fn canonical_selectors_by_schema(
+        resource_types: &[ResourceTypeDescriptor],
+    ) -> CanonicalSelectorsBySchema<'_> {
+        resource_types
+            .iter()
+            .map(|descriptor| (&descriptor.schema, &descriptor.canonical_selector))
+            .collect()
+    }
+
     fn unsupported_resource_type_pattern_error(
         supported_resource_types: &[ResourceTypeDescriptor],
         type_pattern: &str,
@@ -824,9 +918,13 @@ impl ResourceSelectionResolutionServiceImpl {
         targets
     }
 
-    fn target_from_handle(handle: ResourceHandle, selector_input: String) -> ResourceTarget {
+    fn target_from_handle(
+        handle: ResourceHandle,
+        canonical_selector: kamu_resources::ResourceSelectorName,
+        selector_input: String,
+    ) -> ResourceTarget {
         ResourceTarget {
-            canonical_selector: handle.canonical_selector,
+            canonical_selector,
             schema: handle.schema,
             id: handle.id,
             name: handle.name,
@@ -838,6 +936,11 @@ impl ResourceSelectionResolutionServiceImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 type ResourceTargetKey = (kamu_resources::TypeUri, kamu_resources::ResourceID);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+type CanonicalSelectorsBySchema<'a> =
+    HashMap<&'a kamu_resources::TypeUri, &'a kamu_resources::ResourceSelectorName>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

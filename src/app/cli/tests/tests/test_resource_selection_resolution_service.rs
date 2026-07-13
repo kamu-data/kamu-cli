@@ -41,18 +41,21 @@ fn variableset_type_uri() -> &'static TypeUri {
 }
 const VARIABLESETS_NAME: &str = "variablesets";
 const VARIABLESETS_SHORT_NAME: &str = "vs";
+const VARIABLESET_TYPE_NAME: &str = "VariableSet";
 
 fn secretset_type_uri() -> &'static TypeUri {
     odf::metadata::config::SecretSet::schema()
 }
 const SECRETSETS_NAME: &str = "secretsets";
 const SECRETSETS_SHORT_NAME: &str = "ss";
+const SECRETSET_TYPE_NAME: &str = "SecretSet";
 
 static STORAGE_TYPE_URI: LazyLock<TypeUri> = LazyLock::new(|| {
     TypeUri::new_unchecked("https://opendatafabric.org/schemas/config/v1alpha1/Storage")
 });
 const STORAGES_NAME: &str = "storages";
 const STORAGES_SHORT_NAME: &str = "st";
+const STORAGE_TYPE_NAME: &str = "Storage";
 
 const NAME_APP_PATTERN: &str = "app-%";
 const NAME_MISSING_PATTERN: &str = "missing-%";
@@ -76,9 +79,7 @@ async fn resolves_exact_type_name_patterns_via_search() {
         1,
         vec![ResourceHandle {
             schema: variableset_type_uri().clone(),
-            canonical_selector: kamu_resources::ResourceSelectorName::new_unchecked(
-                VARIABLESETS_NAME,
-            ),
+            type_name: kamu_resources::TypeName::new_unchecked(VARIABLESET_TYPE_NAME),
             id: ResourceID::new(uuid::Uuid::new_v4()),
             name: "app-alpha".parse().unwrap(),
         }],
@@ -203,9 +204,7 @@ async fn resolves_type_patterns_with_exact_names_in_supported_type_order() {
                 SECRETSETS_NAME.to_string(),
                 Some(ResourceHandle {
                     schema: secretset_type_uri().clone(),
-                    canonical_selector: kamu_resources::ResourceSelectorName::new_unchecked(
-                        SECRETSETS_NAME,
-                    ),
+                    type_name: kamu_resources::TypeName::new_unchecked(SECRETSET_TYPE_NAME),
                     id: ResourceID::new(uuid::Uuid::new_v4()),
                     name: RESOURCE_DB_CREDS.parse().unwrap(),
                 }),
@@ -214,9 +213,7 @@ async fn resolves_type_patterns_with_exact_names_in_supported_type_order() {
                 STORAGES_NAME.to_string(),
                 Some(ResourceHandle {
                     schema: STORAGE_TYPE_URI.clone(),
-                    canonical_selector: kamu_resources::ResourceSelectorName::new_unchecked(
-                        STORAGES_NAME,
-                    ),
+                    type_name: kamu_resources::TypeName::new_unchecked(STORAGE_TYPE_NAME),
                     id: ResourceID::new(uuid::Uuid::new_v4()),
                     name: RESOURCE_DB_CREDS.parse().unwrap(),
                 }),
@@ -282,17 +279,13 @@ async fn resolves_type_pattern_all_via_search_across_matched_types() {
         vec![
             ResourceHandle {
                 schema: secretset_type_uri().clone(),
-                canonical_selector: kamu_resources::ResourceSelectorName::new_unchecked(
-                    SECRETSETS_NAME,
-                ),
+                type_name: kamu_resources::TypeName::new_unchecked(SECRETSET_TYPE_NAME),
                 id: ResourceID::new(uuid::Uuid::new_v4()),
                 name: "db-creds".parse().unwrap(),
             },
             ResourceHandle {
                 schema: STORAGE_TYPE_URI.clone(),
-                canonical_selector: kamu_resources::ResourceSelectorName::new_unchecked(
-                    STORAGES_NAME,
-                ),
+                type_name: kamu_resources::TypeName::new_unchecked(STORAGE_TYPE_NAME),
                 id: ResourceID::new(uuid::Uuid::new_v4()),
                 name: "warehouse".parse().unwrap(),
             },
@@ -352,17 +345,13 @@ async fn resolves_type_pattern_name_patterns_via_single_search_across_matched_ty
         vec![
             ResourceHandle {
                 schema: secretset_type_uri().clone(),
-                canonical_selector: kamu_resources::ResourceSelectorName::new_unchecked(
-                    SECRETSETS_NAME,
-                ),
+                type_name: kamu_resources::TypeName::new_unchecked(SECRETSET_TYPE_NAME),
                 id: ResourceID::new(uuid::Uuid::new_v4()),
                 name: "db-creds".parse().unwrap(),
             },
             ResourceHandle {
                 schema: STORAGE_TYPE_URI.clone(),
-                canonical_selector: kamu_resources::ResourceSelectorName::new_unchecked(
-                    STORAGES_NAME,
-                ),
+                type_name: kamu_resources::TypeName::new_unchecked(STORAGE_TYPE_NAME),
                 id: ResourceID::new(uuid::Uuid::new_v4()),
                 name: "db-warehouse".parse().unwrap(),
             },
@@ -431,9 +420,7 @@ async fn type_pattern_exact_id_tries_every_matched_type() {
             STORAGES_NAME.to_string(),
             Some(ResourceHandle {
                 schema: STORAGE_TYPE_URI.clone(),
-                canonical_selector: kamu_resources::ResourceSelectorName::new_unchecked(
-                    STORAGES_NAME,
-                ),
+                type_name: kamu_resources::TypeName::new_unchecked(STORAGE_TYPE_NAME),
                 id,
                 name: RESOURCE_DB_CREDS.parse().unwrap(),
             }),
@@ -628,9 +615,7 @@ async fn deduplicates_overlapping_name_patterns_before_counting_max_results() {
         2,
         vec![ResourceHandle {
             schema: variableset_type_uri().clone(),
-            canonical_selector: kamu_resources::ResourceSelectorName::new_unchecked(
-                VARIABLESETS_NAME,
-            ),
+            type_name: kamu_resources::TypeName::new_unchecked(VARIABLESET_TYPE_NAME),
             id: shared_id,
             name: "app-alpha".parse().unwrap(),
         }],
@@ -687,9 +672,7 @@ async fn deduplicates_repeated_type_pattern_exact_name_matches() {
             SECRETSETS_NAME.to_string(),
             Some(ResourceHandle {
                 schema: secretset_type_uri().clone(),
-                canonical_selector: kamu_resources::ResourceSelectorName::new_unchecked(
-                    SECRETSETS_NAME,
-                ),
+                type_name: kamu_resources::TypeName::new_unchecked(SECRETSET_TYPE_NAME),
                 id: shared_id,
                 name: RESOURCE_DB_CREDS.parse().unwrap(),
             }),
@@ -748,9 +731,7 @@ async fn deduplicates_type_pattern_all_before_counting_max_results() {
         1,
         vec![ResourceHandle {
             schema: secretset_type_uri().clone(),
-            canonical_selector: kamu_resources::ResourceSelectorName::new_unchecked(
-                SECRETSETS_NAME,
-            ),
+            type_name: kamu_resources::TypeName::new_unchecked(SECRETSET_TYPE_NAME),
             id: shared_id,
             name: RESOURCE_DB_CREDS.parse().unwrap(),
         }],
@@ -764,9 +745,7 @@ async fn deduplicates_type_pattern_all_before_counting_max_results() {
             SECRETSETS_NAME.to_string(),
             Some(ResourceHandle {
                 schema: secretset_type_uri().clone(),
-                canonical_selector: kamu_resources::ResourceSelectorName::new_unchecked(
-                    SECRETSETS_NAME,
-                ),
+                type_name: kamu_resources::TypeName::new_unchecked(SECRETSET_TYPE_NAME),
                 id: shared_id,
                 name: RESOURCE_DB_CREDS.parse().unwrap(),
             }),
@@ -825,9 +804,7 @@ async fn deduplicates_type_pattern_name_patterns_before_counting_max_results() {
         2,
         vec![ResourceHandle {
             schema: secretset_type_uri().clone(),
-            canonical_selector: kamu_resources::ResourceSelectorName::new_unchecked(
-                SECRETSETS_NAME,
-            ),
+            type_name: kamu_resources::TypeName::new_unchecked(SECRETSET_TYPE_NAME),
             id: shared_id,
             name: RESOURCE_DB_CREDS.parse().unwrap(),
         }],
@@ -885,17 +862,13 @@ async fn errors_when_unique_targets_exceed_max_results_after_deduplication() {
         vec![
             ResourceHandle {
                 schema: variableset_type_uri().clone(),
-                canonical_selector: kamu_resources::ResourceSelectorName::new_unchecked(
-                    VARIABLESETS_NAME,
-                ),
+                type_name: kamu_resources::TypeName::new_unchecked(VARIABLESET_TYPE_NAME),
                 id: shared_id,
                 name: "app-alpha".parse().unwrap(),
             },
             ResourceHandle {
                 schema: variableset_type_uri().clone(),
-                canonical_selector: kamu_resources::ResourceSelectorName::new_unchecked(
-                    VARIABLESETS_NAME,
-                ),
+                type_name: kamu_resources::TypeName::new_unchecked(VARIABLESET_TYPE_NAME),
                 id: second_id,
                 name: "app-beta".parse().unwrap(),
             },
@@ -1001,9 +974,8 @@ impl ResourceSelectionResolutionHarness {
 
                 // The resolution service always calls `get_handle` with the
                 // already-resolved canonical selector name, never a raw alias.
-                let canonical_selector = kamu_resources::ResourceSelectorName::new_unchecked(
-                    selector.resource_type.as_str(),
-                );
+                let type_name =
+                    kamu_resources::TypeName::new_unchecked(selector.resource_type.as_str());
 
                 match selector.resource_ref {
                     ResourceRef::ById(id) => Err(ResourceLookupProblem::IDNotFound(
@@ -1011,10 +983,7 @@ impl ResourceSelectionResolutionHarness {
                     )
                     .into()),
                     ResourceRef::ByName(name) => Err(ResourceLookupProblem::NameNotFound(
-                        ResourceNameNotFoundError {
-                            canonical_selector,
-                            name,
-                        },
+                        ResourceNameNotFoundError { type_name, name },
                     )
                     .into()),
                 }

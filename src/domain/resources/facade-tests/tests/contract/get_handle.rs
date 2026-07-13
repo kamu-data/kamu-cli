@@ -127,7 +127,7 @@ pub async fn test_get_handle_by_name(h: &impl FacadeContractHarness) {
         "ident-name-test",
         &id,
     );
-    assert!(!handle.canonical_selector.as_str().is_empty());
+    assert!(!handle.type_name.as_str().is_empty());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

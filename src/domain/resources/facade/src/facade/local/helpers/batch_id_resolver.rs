@@ -15,8 +15,8 @@ use kamu_resources::{
     ResourceIDNotFoundError,
     ResourceName,
     ResourceNameNotFoundError,
-    ResourceSelectorName,
     TypeUri,
+    resource_type_name,
 };
 
 use crate::{
@@ -84,7 +84,6 @@ pub(crate) async fn resolve_batch_ids(
     query_service: &dyn GenericResourceQueryService,
     account_id: &odf::AccountID,
     schema: &TypeUri,
-    canonical_selector: &ResourceSelectorName,
     groups: BatchResourceRefGroups,
 ) -> Result<BatchIdsResolutionResponse, BatchResourceError> {
     let mut id_entries = groups.id_entries;
@@ -115,7 +114,7 @@ pub(crate) async fn resolve_batch_ids(
                 None => problems.push(BatchResourceProblem {
                     request_index,
                     error: ResourceLookupProblem::NameNotFound(ResourceNameNotFoundError {
-                        canonical_selector: canonical_selector.clone(),
+                        type_name: resource_type_name(schema)?,
                         name,
                     }),
                 }),
@@ -136,7 +135,6 @@ pub(crate) async fn resolve_batch_ids(
 pub(crate) async fn resolve_resource_id<E>(
     query_service: &dyn GenericResourceQueryService,
     schema: &TypeUri,
-    canonical_selector: &ResourceSelectorName,
     account_id: &odf::AccountID,
     resource_ref: &ResourceRef,
 ) -> Result<ResourceID, E>
@@ -153,7 +151,7 @@ where
                 Some(id) => Ok(id),
                 None => Err(
                     ResourceLookupProblem::NameNotFound(ResourceNameNotFoundError {
-                        canonical_selector: canonical_selector.clone(),
+                        type_name: resource_type_name(schema)?,
                         name: name.clone(),
                     })
                     .into(),

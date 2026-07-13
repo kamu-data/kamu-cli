@@ -9,13 +9,14 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::{ResourceID, ResourceName, ResourceSelectorName, TypeUri};
+use crate::{ResourceID, ResourceName, TypeName, TypeUri};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceHandle {
     pub schema: TypeUri,
-    pub canonical_selector: ResourceSelectorName,
+    pub type_name: TypeName,
     pub id: ResourceID,
     pub name: ResourceName,
 }

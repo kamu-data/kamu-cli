@@ -127,7 +127,7 @@ pub async fn test_list_handles_for_account(h: &impl FacadeContractHarness) {
     for i in &handles {
         assert_eq!(i.schema.as_str(), VARIABLE_SET_SCHEMA_STR);
         assert_eq!(i.schema.as_str(), VARIABLE_SET_SCHEMA_STR);
-        assert!(!i.canonical_selector.as_str().is_empty());
+        assert!(!i.type_name.as_str().is_empty());
     }
 }
 

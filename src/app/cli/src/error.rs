@@ -461,7 +461,7 @@ impl From<ResourceLookupProblem> for ResourceLookupCliError {
         match problem {
             ResourceLookupProblem::IDNotFound(err) => Self::IDNotFound(err.0),
             ResourceLookupProblem::NameNotFound(err) => Self::NameNotFound {
-                resource_type: err.canonical_selector.to_string(),
+                resource_type: err.type_name.to_string(),
                 name: err.name.to_string(),
             },
             ResourceLookupProblem::SchemaMismatch(err) => Self::SchemaMismatch {

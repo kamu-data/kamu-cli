@@ -19,6 +19,7 @@ cynic::impl_scalar!(odf::AccountID, schema::AccountID);
 cynic::impl_scalar!(domain::ResourceID, schema::ResourceID);
 cynic::impl_scalar!(domain::ResourceName, schema::ResourceName);
 cynic::impl_scalar!(domain::ResourceSelectorName, schema::ResourceSelectorName);
+cynic::impl_scalar!(domain::TypeName, schema::TypeName);
 cynic::impl_scalar!(
     domain::ResourceTypeSelectorRaw,
     schema::ResourceTypeSelectorRaw

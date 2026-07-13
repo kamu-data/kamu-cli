@@ -55,7 +55,7 @@ pub async fn test_resources_empty_context_baseline(ctx: ResourceCtx) {
     // `get vs <missing>` fails with a not-found error...
     ctx.assert_failure(
         ["get", "vs", "missing"],
-        Some(&[r#"Resource 'missing' of type 'variablesets' was not found"#]),
+        Some(&[r#"Resource 'missing' of type 'VariableSet' was not found"#]),
     )
     .await;
 

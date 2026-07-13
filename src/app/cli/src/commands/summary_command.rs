@@ -11,7 +11,6 @@ use std::sync::Arc;
 
 use datafusion::arrow::array::{RecordBatch, StringArray, UInt64Array};
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
-use kamu_resources::resource_type_name;
 
 use super::{CLIError, Command};
 use crate::cli::SummaryOutputFormat;
@@ -51,16 +50,8 @@ impl SummaryCommand {
         println!();
         println!("Resource Counts");
 
-        let type_names = summary
-            .resource_counts
-            .iter()
-            .map(|item| resource_type_name(&item.schema).map(|type_name| type_name.to_string()))
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(CLIError::critical)?;
-
         let schema = Arc::new(Schema::new(vec![
-            Field::new("Name", DataType::Utf8, false),
-            Field::new("Schema", DataType::Utf8, false),
+            Field::new("Type", DataType::Utf8, false),
             Field::new("Total", DataType::UInt64, false),
             Field::new("Pending", DataType::UInt64, false),
             Field::new("Reconciling", DataType::UInt64, false),
@@ -75,10 +66,9 @@ impl SummaryCommand {
                     summary
                         .resource_counts
                         .iter()
-                        .map(|item| item.canonical_selector.to_string())
+                        .map(|item| item.type_name.to_string())
                         .collect::<Vec<_>>(),
                 )),
-                Arc::new(StringArray::from(type_names)),
                 Arc::new(UInt64Array::from(
                     summary
                         .resource_counts
@@ -125,7 +115,6 @@ impl SummaryCommand {
         let records_format = RecordsFormat::new()
             .with_default_column_format(ColumnFormat::default())
             .with_column_formats(vec![
-                ColumnFormat::new().with_style_spec("l"),
                 ColumnFormat::new().with_style_spec("l"),
                 ColumnFormat::new().with_style_spec("l"),
                 ColumnFormat::new().with_style_spec("r"),
