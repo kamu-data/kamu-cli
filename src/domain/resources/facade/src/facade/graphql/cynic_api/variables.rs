@@ -10,10 +10,7 @@
 use database_common::PaginationOpts;
 use internal_error::InternalError;
 
-use crate::facade::graphql::cynic_api::inputs::{
-    ResourceAccountSelectorInput,
-    ResourceTypeSelectorInput,
-};
+use crate::facade::graphql::cynic_api::inputs::{AccountRefInput, ResourceTypeSelectorInput};
 use crate::facade::graphql::cynic_api::schema;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -21,7 +18,7 @@ use crate::facade::graphql::cynic_api::schema;
 #[derive(cynic::QueryVariables, Debug, Clone)]
 pub(crate) struct ListByResourceTypeVariables {
     pub resource_type: ResourceTypeSelectorInput,
-    pub account: Option<ResourceAccountSelectorInput>,
+    pub account: Option<AccountRefInput>,
     pub page: i32,
     pub per_page: i32,
 }
@@ -48,7 +45,7 @@ impl ListByResourceTypeVariables {
 
 #[derive(cynic::QueryVariables, Debug, Clone)]
 pub(crate) struct ListAllVariables {
-    pub account: Option<ResourceAccountSelectorInput>,
+    pub account: Option<AccountRefInput>,
     pub page: i32,
     pub per_page: i32,
 }

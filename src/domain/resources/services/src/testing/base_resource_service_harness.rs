@@ -180,7 +180,12 @@ impl BaseResourceServiceHarness {
     pub fn make_headers_input(account: odf::AccountHandle, name: &str) -> ResourceHeadersInput {
         ResourceHeadersInput {
             id: None,
-            account: Some(odf::metadata::auth::AccountRef::Handle(account)),
+            account: Some(odf::metadata::auth::AccountRef::IdAndName(
+                odf::metadata::auth::AccountRefByIdAndName {
+                    id: account.id,
+                    name: account.name,
+                },
+            )),
             name: kamu_resources::ResourceName::new_unchecked(name),
             labels: Some(kamu_resources::ResourceLabels {
                 entries: BTreeMap::new(),

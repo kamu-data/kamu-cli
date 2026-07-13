@@ -203,11 +203,6 @@ type AccountHandle {
 	name: AccountName!
 }
 
-input AccountHandleInput {
-	id: AccountID!
-	name: AccountName!
-}
-
 scalar AccountID
 
 input AccountLookupFilter {
@@ -289,6 +284,17 @@ type AccountQuotasUsageStorage {
 	Total bytes limit for this account.
 	"""
 	limitTotalBytes: Int!
+}
+
+input AccountRefByIdAndNameInput {
+	id: AccountID!
+	name: AccountName!
+}
+
+input AccountRefInput @oneOf {
+	byId: AccountID
+	byName: AccountName
+	byIdAndName: AccountRefByIdAndNameInput
 }
 
 enum AccountType {
@@ -3886,12 +3892,6 @@ type Resource {
 	status: ResourceStatus!
 }
 
-input ResourceAccountSelectorInput @oneOf {
-	byId: AccountID
-	byName: AccountName
-	handle: AccountHandleInput
-}
-
 scalar ResourceAnnotations
 
 type ResourceApplyChange {
@@ -3965,7 +3965,7 @@ enum ResourceBadAccountProblemCode {
 input ResourceBatchSelectorInput {
 	resourceType: ResourceTypeSelectorInput!
 	refs: [ResourceRefInput!]!
-	account: ResourceAccountSelectorInput
+	account: AccountRefInput
 }
 
 input ResourceByNameSelectorInput {
@@ -4224,7 +4224,7 @@ type ResourceSchemaMismatchProblem {
 input ResourceSelectorInput {
 	resourceType: ResourceTypeSelectorInput!
 	ref: ResourceRefInput!
-	account: ResourceAccountSelectorInput
+	account: AccountRefInput
 }
 
 scalar ResourceSelectorName
@@ -4332,7 +4332,7 @@ type Resources {
 	Returns a summary-oriented dashboard for the current or specified
 	subject
 	"""
-	summary(account: ResourceAccountSelectorInput): ResourcesSummaryOutcome!
+	summary(account: AccountRefInput): ResourcesSummaryOutcome!
 	"""
 	Returns a resource by selector, if found
 	"""
@@ -4352,11 +4352,11 @@ type Resources {
 	"""
 	Returns resources of the specified resource type
 	"""
-	listByResourceType(resourceType: ResourceTypeSelectorInput!, account: ResourceAccountSelectorInput, page: Int, perPage: Int): ResourceListOutcome!
+	listByResourceType(resourceType: ResourceTypeSelectorInput!, account: AccountRefInput, page: Int, perPage: Int): ResourceListOutcome!
 	"""
 	Returns resource handles of the specified resource type
 	"""
-	listHandlesByResourceType(resourceType: ResourceTypeSelectorInput!, account: ResourceAccountSelectorInput, page: Int, perPage: Int): ResourceHandleListOutcome!
+	listHandlesByResourceType(resourceType: ResourceTypeSelectorInput!, account: AccountRefInput, page: Int, perPage: Int): ResourceHandleListOutcome!
 	"""
 	Searches resource handles across the specified exact resource types
 	"""
@@ -4364,11 +4364,11 @@ type Resources {
 	"""
 	Returns resources across all resource types
 	"""
-	listAll(account: ResourceAccountSelectorInput, page: Int, perPage: Int): ResourceListAllOutcome!
+	listAll(account: AccountRefInput, page: Int, perPage: Int): ResourceListAllOutcome!
 	"""
 	Returns resource handles across all resource types
 	"""
-	listAllHandles(account: ResourceAccountSelectorInput, page: Int, perPage: Int): ResourceHandleListAllOutcome!
+	listAllHandles(account: AccountRefInput, page: Int, perPage: Int): ResourceHandleListAllOutcome!
 	"""
 	Renders a canonical manifest representation from a stored resource
 	"""
@@ -4469,7 +4469,7 @@ input SearchResourceHandlesInput {
 	resourceTypes: [ResourceTypeSelectorInput!]!
 	names: [ResourceName!]
 	namePattern: String
-	account: ResourceAccountSelectorInput
+	account: AccountRefInput
 }
 
 union SearchResult = Dataset

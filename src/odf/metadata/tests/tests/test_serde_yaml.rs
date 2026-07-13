@@ -1499,7 +1499,7 @@ fn test_serde_account_ref() {
     assert_matches!(
         serde_json::from_value::<AccountRef>(json!({ "id": id.to_string(), "name": "alice" }))
             .unwrap(),
-        AccountRef::Handle(handle) if handle.id == id && handle.name.as_str() == "alice"
+        AccountRef::IdAndName(handle) if handle.id == id && handle.name.as_str() == "alice"
     );
 
     let error = serde_json::from_value::<AccountRef>(json!({})).unwrap_err();
@@ -1510,7 +1510,7 @@ fn test_serde_account_ref() {
         "unexpected error message: {error}"
     );
 
-    let both = AccountRef::Handle(AccountHandle {
+    let both = AccountRef::IdAndName(AccountRefByIdAndName {
         id: id.clone(),
         name: "alice".parse().unwrap(),
     });

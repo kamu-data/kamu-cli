@@ -12,11 +12,11 @@ use database_common::PaginationOpts;
 use crate::LoggedInGuard;
 use crate::prelude::*;
 use crate::queries::{
+    AccountRefInput,
     BatchResourceHandlesOutcome,
     BatchResourceManifestsOutcome,
     BatchResourcesOutcome,
     Resource,
-    ResourceAccountSelectorInput,
     ResourceBadAccountProblem,
     ResourceBatchSelectorInput,
     ResourceConnection,
@@ -81,13 +81,13 @@ impl Resources {
     async fn summary(
         &self,
         ctx: &Context<'_>,
-        account: Option<ResourceAccountSelectorInput>,
+        account: Option<AccountRefInput>,
     ) -> Result<ResourcesSummaryOutcome> {
         let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
 
         match resource_facade
             .summary(kamu_resources_facade::ResourcesSummaryRequest {
-                account: account.map(ResourceAccountSelectorInput::into_manifest_account),
+                account: account.map(AccountRefInput::into_manifest_account),
             })
             .await
         {
@@ -218,7 +218,7 @@ impl Resources {
         &self,
         ctx: &Context<'_>,
         resource_type: ResourceTypeSelectorInput,
-        account: Option<ResourceAccountSelectorInput>,
+        account: Option<AccountRefInput>,
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<ResourceListOutcome> {
@@ -229,7 +229,7 @@ impl Resources {
         match resource_facade
             .list(kamu_resources_facade::ListResourcesRequest {
                 raw_type_selector: resource_type.into_resource_type_selector(),
-                account: account.map(ResourceAccountSelectorInput::into_manifest_account),
+                account: account.map(AccountRefInput::into_manifest_account),
                 pagination: PaginationOpts::from_page(page, per_page),
             })
             .await
@@ -261,7 +261,7 @@ impl Resources {
         &self,
         ctx: &Context<'_>,
         resource_type: ResourceTypeSelectorInput,
-        account: Option<ResourceAccountSelectorInput>,
+        account: Option<AccountRefInput>,
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<ResourceHandleListOutcome> {
@@ -272,7 +272,7 @@ impl Resources {
         match resource_facade
             .list_handles(kamu_resources_facade::ListResourceHandlesRequest {
                 raw_type_selector: resource_type.into_resource_type_selector(),
-                account: account.map(ResourceAccountSelectorInput::into_manifest_account),
+                account: account.map(AccountRefInput::into_manifest_account),
                 pagination: PaginationOpts::from_page(page, per_page),
             })
             .await
@@ -349,7 +349,7 @@ impl Resources {
     async fn list_all(
         &self,
         ctx: &Context<'_>,
-        account: Option<ResourceAccountSelectorInput>,
+        account: Option<AccountRefInput>,
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<ResourceListAllOutcome> {
@@ -359,7 +359,7 @@ impl Resources {
 
         match resource_facade
             .list_all(kamu_resources_facade::ListAllResourcesRequest {
-                account: account.map(ResourceAccountSelectorInput::into_manifest_account),
+                account: account.map(AccountRefInput::into_manifest_account),
                 pagination: PaginationOpts::from_page(page, per_page),
             })
             .await
@@ -387,7 +387,7 @@ impl Resources {
     async fn list_all_handles(
         &self,
         ctx: &Context<'_>,
-        account: Option<ResourceAccountSelectorInput>,
+        account: Option<AccountRefInput>,
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<ResourceHandleListAllOutcome> {
@@ -397,7 +397,7 @@ impl Resources {
 
         match resource_facade
             .list_all_handles(kamu_resources_facade::ListAllResourceHandlesRequest {
-                account: account.map(ResourceAccountSelectorInput::into_manifest_account),
+                account: account.map(AccountRefInput::into_manifest_account),
                 pagination: PaginationOpts::from_page(page, per_page),
             })
             .await

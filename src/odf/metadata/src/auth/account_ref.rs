@@ -24,12 +24,24 @@ type AccountRefProxy = crate::serde::yaml::StructOrString<crate::serde::yaml::au
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AccountRefByIdAndName {
+    pub id: AccountID,
+    pub name: AccountName,
+}
+
+impl AccountRefByIdAndName {
+    pub fn new(id: AccountID, name: AccountName) -> Self {
+        Self { id, name }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(try_from = "AccountRefProxy", into = "AccountRefProxy")]
 pub enum AccountRef {
     Id(AccountID),
     Name(AccountName),
-    Handle(AccountHandle),
+    IdAndName(AccountRefByIdAndName),
 }
 
 impl AccountRef {
@@ -37,7 +49,7 @@ impl AccountRef {
         match self {
             AccountRef::Id(id) => Some(id),
             AccountRef::Name(_) => None,
-            AccountRef::Handle(hdl) => Some(&hdl.id),
+            AccountRef::IdAndName(hdl) => Some(&hdl.id),
         }
     }
 
@@ -45,7 +57,7 @@ impl AccountRef {
         match self {
             AccountRef::Name(name) => Some(name),
             AccountRef::Id(_) => None,
-            AccountRef::Handle(hdl) => Some(&hdl.name),
+            AccountRef::IdAndName(hdl) => Some(&hdl.name),
         }
     }
 }
@@ -61,12 +73,6 @@ impl From<AccountID> for AccountRef {
 impl From<AccountName> for AccountRef {
     fn from(value: AccountName) -> Self {
         Self::Name(value)
-    }
-}
-
-impl From<AccountHandle> for AccountRef {
-    fn from(value: AccountHandle) -> Self {
-        Self::Handle(value)
     }
 }
 

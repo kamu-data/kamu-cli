@@ -33,7 +33,7 @@ macro_rules! declare_apply_resource_use_case {
         }
 
         impl $use_case {
-            /// `headers.account` must already be a resolved `AccountRef::Handle` by
+            /// `headers.account` must already be a resolved `AccountRef::IdAndName` by
             /// the time it reaches `plan`/`apply` — resolving an id/name selector is
             /// the caller's responsibility (via the facade's
             /// `ResourceAccountResolver`, or by threading an already-known handle, as
@@ -44,7 +44,7 @@ macro_rules! declare_apply_resource_use_case {
                 params: &kamu_resources::ApplyResourceParams<$resource>,
             ) -> Result<(), kamu_resources::ApplyResourceUseCaseError<$resource>> {
                 match &params.headers.account {
-                    Some(odf::metadata::auth::AccountRef::Handle(_)) => Ok(()),
+                    Some(odf::metadata::auth::AccountRef::IdAndName(_)) => Ok(()),
                     other => Err(kamu_resources::ApplyResourceUseCaseError::Internal(
                         internal_error::InternalError::new(format!(
                             "resource headers must carry a resolved account handle \

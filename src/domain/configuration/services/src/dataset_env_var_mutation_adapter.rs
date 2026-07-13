@@ -379,7 +379,12 @@ impl DatasetEnvVarMutationAdapterImpl {
         } else {
             let headers = ResourceHeadersInput {
                 id: Some(snapshot.headers.id),
-                account: Some(snapshot.headers.account.into()),
+                account: Some(odf::metadata::auth::AccountRef::IdAndName(
+                    odf::metadata::auth::AccountRefByIdAndName {
+                        id: snapshot.headers.account.id,
+                        name: snapshot.headers.account.name,
+                    },
+                )),
                 name: snapshot.headers.name,
                 labels: Some(snapshot.headers.labels),
                 annotations: Some(snapshot.headers.annotations),
@@ -447,7 +452,12 @@ impl DatasetEnvVarMutationAdapterImpl {
             };
             let headers = ResourceHeadersInput {
                 id: Some(snapshot.headers.id),
-                account: Some(snapshot.headers.account.into()),
+                account: Some(odf::metadata::auth::AccountRef::IdAndName(
+                    odf::metadata::auth::AccountRefByIdAndName {
+                        id: snapshot.headers.account.id,
+                        name: snapshot.headers.account.name,
+                    },
+                )),
                 name: snapshot.headers.name,
                 labels: Some(snapshot.headers.labels),
                 annotations: Some(snapshot.headers.annotations),
@@ -664,7 +674,12 @@ impl DatasetEnvVarMutationAdapterImpl {
     ) -> ResourceHeadersInput {
         ResourceHeadersInput {
             id: None,
-            account: Some(odf::metadata::auth::AccountRef::Handle(account)),
+            account: Some(odf::metadata::auth::AccountRef::IdAndName(
+                odf::metadata::auth::AccountRefByIdAndName {
+                    id: account.id,
+                    name: account.name,
+                },
+            )),
             name: resource_name,
             labels: Some(kamu_resources::ResourceLabels {
                 entries: BTreeMap::new(),

@@ -50,13 +50,13 @@ impl ResourceTypeSelectorInput {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(InputObject, Debug, Clone)]
-pub struct AccountHandleInput {
+pub struct AccountRefByIdAndNameInput {
     pub id: AccountID<'static>,
     pub name: AccountName<'static>,
 }
 
-impl From<AccountHandleInput> for odf::AccountHandle {
-    fn from(value: AccountHandleInput) -> Self {
+impl From<AccountRefByIdAndNameInput> for odf::metadata::auth::AccountRefByIdAndName {
+    fn from(value: AccountRefByIdAndNameInput) -> Self {
         Self {
             id: value.id.into(),
             name: value.name.into(),
@@ -67,18 +67,23 @@ impl From<AccountHandleInput> for odf::AccountHandle {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(OneofObject, Debug, Clone)]
-pub enum ResourceAccountSelectorInput {
-    ById(AccountID<'static>),
-    ByName(AccountName<'static>),
-    Handle(AccountHandleInput),
+pub enum AccountRefInput {
+    #[graphql(name = "byId")]
+    Id(AccountID<'static>),
+    #[graphql(name = "byName")]
+    Name(AccountName<'static>),
+    #[graphql(name = "byIdAndName")]
+    IdAndName(AccountRefByIdAndNameInput),
 }
 
-impl ResourceAccountSelectorInput {
+impl AccountRefInput {
     pub fn into_manifest_account(self) -> kamu_resources::ResourceAccountRef {
         match self {
-            Self::ById(id) => kamu_resources::ResourceAccountRef::Id(id.into()),
-            Self::ByName(name) => kamu_resources::ResourceAccountRef::Name(name.into()),
-            Self::Handle(h) => kamu_resources::ResourceAccountRef::Handle(h.into()),
+            Self::Id(id) => kamu_resources::ResourceAccountRef::Id(id.into()),
+            Self::Name(name) => kamu_resources::ResourceAccountRef::Name(name.into()),
+            Self::IdAndName(account) => {
+                kamu_resources::ResourceAccountRef::IdAndName(account.into())
+            }
         }
     }
 }
@@ -90,7 +95,7 @@ pub struct ResourceSelectorInput {
     pub resource_type: ResourceTypeSelectorInput,
     #[graphql(name = "ref")]
     pub resource_ref: ResourceRefInput,
-    pub account: Option<ResourceAccountSelectorInput>,
+    pub account: Option<AccountRefInput>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -100,15 +105,13 @@ pub struct ResourceBatchSelectorInput {
     pub resource_type: ResourceTypeSelectorInput,
     #[graphql(name = "refs")]
     pub resource_refs: Vec<ResourceRefInput>,
-    pub account: Option<ResourceAccountSelectorInput>,
+    pub account: Option<AccountRefInput>,
 }
 
 impl From<ResourceSelectorInput> for kamu_resources_facade::ResourceSelector {
     fn from(value: ResourceSelectorInput) -> Self {
         Self {
-            account: value
-                .account
-                .map(ResourceAccountSelectorInput::into_manifest_account),
+            account: value.account.map(AccountRefInput::into_manifest_account),
             resource_type: value.resource_type.into_resource_type_selector(),
             resource_ref: value.resource_ref.into(),
         }
@@ -120,9 +123,7 @@ impl From<ResourceSelectorInput> for kamu_resources_facade::ResourceSelector {
 impl From<ResourceBatchSelectorInput> for kamu_resources_facade::ResourceBatchSelector {
     fn from(value: ResourceBatchSelectorInput) -> Self {
         Self {
-            account: value
-                .account
-                .map(ResourceAccountSelectorInput::into_manifest_account),
+            account: value.account.map(AccountRefInput::into_manifest_account),
             resource_type: value.resource_type.into_resource_type_selector(),
             resource_refs: value.resource_refs.into_iter().map(Into::into).collect(),
         }
@@ -136,7 +137,7 @@ pub struct SearchResourceHandlesInput {
     pub resource_types: Vec<ResourceTypeSelectorInput>,
     pub names: Option<Vec<ResourceName<'static>>>,
     pub name_pattern: Option<String>,
-    pub account: Option<ResourceAccountSelectorInput>,
+    pub account: Option<AccountRefInput>,
 }
 
 impl SearchResourceHandlesInput {
@@ -154,9 +155,7 @@ impl SearchResourceHandlesInput {
                 .names
                 .map(|names| names.into_iter().map(Into::into).collect()),
             name_pattern: self.name_pattern,
-            account: self
-                .account
-                .map(ResourceAccountSelectorInput::into_manifest_account),
+            account: self.account.map(AccountRefInput::into_manifest_account),
             pagination,
         }
     }

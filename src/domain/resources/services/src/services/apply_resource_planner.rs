@@ -125,7 +125,7 @@ where
             None => {
                 // Account resolution (id + name lookup) already happened upstream, as
                 // part of the apply process (see `ResourceAccountResolver`); `headers.account`
-                // is always a resolved `Some(AccountRef::Handle(_))` by this point.
+                // is always a resolved `Some(AccountRef::IdAndName(_))` by this point.
                 let account_id = headers
                     .account
                     .as_ref()

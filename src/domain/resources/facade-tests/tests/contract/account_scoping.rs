@@ -105,7 +105,7 @@ fn account_by_id(id: odf::AccountID) -> ResourceAccountRef {
 }
 
 fn account_by_name_and_id(name: &odf::AccountName, id: odf::AccountID) -> ResourceAccountRef {
-    ResourceAccountRef::Handle(odf::AccountHandle {
+    ResourceAccountRef::IdAndName(odf::metadata::auth::AccountRefByIdAndName {
         id,
         name: name.clone(),
     })

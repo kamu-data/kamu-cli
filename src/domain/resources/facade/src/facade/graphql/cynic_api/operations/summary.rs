@@ -11,7 +11,7 @@ use cynic::QueryBuilder;
 
 use crate::ResourcesSummaryRequest;
 use crate::facade::graphql::cynic_api::fragments::{ResourceBadAccountProblem, ResourcesSummary};
-use crate::facade::graphql::cynic_api::inputs::ResourceAccountSelectorInput;
+use crate::facade::graphql::cynic_api::inputs::AccountRefInput;
 use crate::facade::graphql::cynic_api::schema;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -43,7 +43,7 @@ pub(crate) enum ResourcesSummaryOutcome {
 
 #[derive(cynic::QueryVariables, Debug, Clone)]
 pub(crate) struct SummaryVariables {
-    pub account: Option<ResourceAccountSelectorInput>,
+    pub account: Option<AccountRefInput>,
 }
 
 impl SummaryVariables {

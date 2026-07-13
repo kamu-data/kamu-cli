@@ -153,7 +153,12 @@ where
 
         let headers_input = ResourceHeadersInput {
             id: Some(headers.id),
-            account: Some(headers.account.clone().into()),
+            account: Some(odf::metadata::auth::AccountRef::IdAndName(
+                odf::metadata::auth::AccountRefByIdAndName {
+                    id: headers.account.id.clone(),
+                    name: headers.account.name.clone(),
+                },
+            )),
             name: headers.name.clone(),
             labels: Some(headers.labels.clone()),
             annotations: Some(headers.annotations.clone()),

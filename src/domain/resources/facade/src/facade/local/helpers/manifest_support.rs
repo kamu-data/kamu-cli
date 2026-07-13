@@ -51,7 +51,12 @@ pub(crate) fn make_headers_input(
     target_account: &odf::AccountHandle,
 ) -> Result<ResourceHeadersInput, ApplyManifestError> {
     ResourceHeadersInputExt::try_new(
-        Some(target_account.clone().into()),
+        Some(odf::metadata::auth::AccountRef::IdAndName(
+            odf::metadata::auth::AccountRefByIdAndName {
+                id: target_account.id.clone(),
+                name: target_account.name.clone(),
+            },
+        )),
         manifest.headers.name.as_str(),
         manifest.headers.labels.clone(),
         manifest.headers.annotations.clone(),
@@ -102,7 +107,12 @@ pub(crate) fn resource_to_manifest(view: Resource) -> Result<ResourceManifest, I
     // store-integrity bug.
     let schema = kamu_resources::ResourceSchemaId::parse(schema.as_str()).int_err()?;
 
-    let account = Some(kamu_resources::ResourceAccountRef::Handle(headers.account));
+    let account = Some(kamu_resources::ResourceAccountRef::IdAndName(
+        odf::metadata::auth::AccountRefByIdAndName {
+            id: headers.account.id,
+            name: headers.account.name,
+        },
+    ));
 
     Ok(ResourceManifest {
         schema,

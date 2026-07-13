@@ -137,20 +137,23 @@ impl ResourceHeadersExt for ResourceHeaders {
 /// Account resolution (id + name lookup) happens upstream, as part of the
 /// apply process (see `ResourceAccountResolver`), before a
 /// [`ResourceHeadersInput`] is ever constructed — every production caller
-/// populates `account` with an already-resolved [`auth::AccountRef::Handle`].
-/// The facade also overwrites the resulting header's `account` with the
-/// freshly-resolved handle at the view boundary on every read, so the name
-/// carried here is never persisted or relied upon (see plan
-/// `.spec/022.resource-headers.plan.md` — avoiding name denormalization is
+/// populates `account` with an already-resolved
+/// [`auth::AccountRef::IdAndName`]. The facade also overwrites the resulting
+/// header's `account` with the freshly-resolved handle at the view boundary on
+/// every read, so the name carried here is never persisted or relied upon (see
+/// plan `.spec/022.resource-headers.plan.md` — avoiding name denormalization is
 /// the point of that JOIN-on-read design). This function only exists to
 /// satisfy the aliased struct's mandatory `account` field during
 /// construction and panics if handed an unresolved reference, which would
 /// indicate a caller bypassed account resolution.
 fn account_handle_from_input(input: &ResourceHeadersInput) -> auth::AccountHandle {
     match &input.account {
-        Some(auth::AccountRef::Handle(handle)) => handle.clone(),
+        Some(auth::AccountRef::IdAndName(account)) => auth::AccountHandle {
+            id: account.id.clone(),
+            name: account.name.clone(),
+        },
         other => panic!(
-            "ResourceHeadersInput.account must be a resolved AccountRef::Handle by the time \
+            "ResourceHeadersInput.account must be a resolved AccountRef::IdAndName by the time \
              headers are constructed, got: {other:?}"
         ),
     }

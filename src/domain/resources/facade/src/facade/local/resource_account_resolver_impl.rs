@@ -77,7 +77,10 @@ impl ResourceAccountResolverImpl {
                     name: account.account_name,
                 })
             }
-            ResourceAccountRef::Handle(odf::AccountHandle { id, name }) => {
+            ResourceAccountRef::IdAndName(odf::metadata::auth::AccountRefByIdAndName {
+                id,
+                name,
+            }) => {
                 let account = self
                     .account_service
                     .get_account_by_id(id)

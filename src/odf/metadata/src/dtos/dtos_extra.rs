@@ -55,7 +55,10 @@ impl From<resource::ResourceHeaders> for resource::ResourceHeadersInput {
         Self {
             id: Some(id),
             name,
-            account: Some(account.into()),
+            account: Some(auth::AccountRef::IdAndName(auth::AccountRefByIdAndName {
+                id: account.id,
+                name: account.name,
+            })),
             labels: Some(labels),
             annotations: Some(annotations),
         }

@@ -60,7 +60,7 @@ impl From<dtos::auth::AccountRef> for proxies::auth::AccountRef {
                 id: None,
                 name: Some(name),
             },
-            dtos::auth::AccountRef::Handle(hdl) => Self {
+            dtos::auth::AccountRef::IdAndName(hdl) => Self {
                 id: Some(hdl.id),
                 name: Some(hdl.name),
             },
@@ -89,7 +89,9 @@ impl TryFrom<proxies::auth::AccountRef> for dtos::auth::AccountRef {
             proxies::auth::AccountRef {
                 id: Some(id),
                 name: Some(name),
-            } => Ok(Self::Handle(dtos::auth::AccountHandle::new(id, name))),
+            } => Ok(Self::IdAndName(crate::auth::AccountRefByIdAndName::new(
+                id, name,
+            ))),
         }
     }
 }

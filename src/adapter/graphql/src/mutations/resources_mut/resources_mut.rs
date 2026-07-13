@@ -10,8 +10,8 @@
 use crate::mutations::{ResourceApplyOutcome, ResourceApplyParseManifestProblem};
 use crate::prelude::*;
 use crate::queries::{
+    AccountRefInput,
     BatchResourceProblem,
-    ResourceAccountSelectorInput,
     ResourceBadAccountProblem,
     ResourceBatchSelectorInput,
     ResourceManifestFormat,
@@ -85,7 +85,7 @@ impl ResourcesMut {
         match resource_facade
             .delete(kamu_resources_facade::ResourceSelector {
                 resource_type,
-                account: account.map(ResourceAccountSelectorInput::into_manifest_account),
+                account: account.map(AccountRefInput::into_manifest_account),
                 resource_ref: resource_ref.into(),
             })
             .await
@@ -126,7 +126,7 @@ impl ResourcesMut {
 
         match resource_facade
             .delete_many(kamu_resources_facade::ResourceBatchSelector {
-                account: account.map(ResourceAccountSelectorInput::into_manifest_account),
+                account: account.map(AccountRefInput::into_manifest_account),
                 resource_type: resource_type_selector,
                 resource_refs: resource_refs.into_iter().map(Into::into).collect(),
             })

@@ -27,7 +27,7 @@ use crate::{
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Precondition: `params.headers.account` must already be a resolved
-/// `AccountRef::Handle` — neither `plan` nor `apply` resolve an id/name
+/// `AccountRef::IdAndName` — neither `plan` nor `apply` resolve an id/name
 /// selector themselves. Resolution is the caller's responsibility (via the
 /// facade's `ResourceAccountResolver`, or by threading an already-known
 /// handle).
@@ -48,7 +48,7 @@ pub trait ApplyResourceUseCase<R: ReconcilableEventSourcedResource>: Send + Sync
 
 pub struct ApplyResourceParams<R: DeclarativeResource> {
     pub id: Option<ResourceID>,
-    /// `headers.account` must be `Some(AccountRef::Handle(_))` — see
+    /// `headers.account` must be `Some(AccountRef::IdAndName(_))` — see
     /// [`ApplyResourceUseCase`].
     pub headers: crate::ResourceHeadersInput,
     pub spec: R::SpecInput,

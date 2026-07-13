@@ -32,31 +32,35 @@ impl ResourceTypeSelectorInput {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::InputObject, Debug, Clone)]
-#[cynic(graphql_type = "AccountHandleInput")]
-pub(crate) struct AccountHandleInput {
+#[cynic(graphql_type = "AccountRefByIdAndNameInput")]
+pub(crate) struct AccountRefByIdAndNameInput {
     pub id: odf::AccountID,
     pub name: AccountName,
 }
 
 #[derive(cynic::InputObject, Debug, Clone)]
-#[cynic(graphql_type = "ResourceAccountSelectorInput")]
-pub(crate) enum ResourceAccountSelectorInput {
-    ById(odf::AccountID),
-    ByName(AccountName),
-    Handle(AccountHandleInput),
+#[cynic(graphql_type = "AccountRefInput")]
+pub(crate) enum AccountRefInput {
+    #[cynic(rename = "byId")]
+    Id(odf::AccountID),
+    #[cynic(rename = "byName")]
+    Name(AccountName),
+    #[cynic(rename = "byIdAndName")]
+    IdAndName(AccountRefByIdAndNameInput),
 }
 
-impl From<&domain::ResourceAccountRef> for ResourceAccountSelectorInput {
+impl From<&domain::ResourceAccountRef> for AccountRefInput {
     fn from(value: &domain::ResourceAccountRef) -> Self {
         match value {
-            domain::ResourceAccountRef::Id(id) => Self::ById(id.clone()),
-            domain::ResourceAccountRef::Name(name) => Self::ByName(AccountName(name.to_string())),
-            domain::ResourceAccountRef::Handle(odf::AccountHandle { id, name }) => {
-                Self::Handle(AccountHandleInput {
-                    id: id.clone(),
-                    name: AccountName(name.to_string()),
-                })
-            }
+            domain::ResourceAccountRef::Id(id) => Self::Id(id.clone()),
+            domain::ResourceAccountRef::Name(name) => Self::Name(AccountName(name.to_string())),
+            domain::ResourceAccountRef::IdAndName(odf::metadata::auth::AccountRefByIdAndName {
+                id,
+                name,
+            }) => Self::IdAndName(AccountRefByIdAndNameInput {
+                id: id.clone(),
+                name: AccountName(name.to_string()),
+            }),
         }
     }
 }
@@ -99,7 +103,7 @@ pub(crate) struct ResourceSelectorInput {
     #[cynic(rename = "ref")]
     pub ref_: ResourceRefInput,
 
-    pub account: Option<ResourceAccountSelectorInput>,
+    pub account: Option<AccountRefInput>,
 }
 
 impl TryFrom<&ResourceSelector> for ResourceSelectorInput {
@@ -121,7 +125,7 @@ impl TryFrom<&ResourceSelector> for ResourceSelectorInput {
 pub(crate) struct ResourceBatchSelectorInput {
     pub resource_type: ResourceTypeSelectorInput,
     pub refs: Vec<ResourceRefInput>,
-    pub account: Option<ResourceAccountSelectorInput>,
+    pub account: Option<AccountRefInput>,
 }
 
 impl TryFrom<&ResourceBatchSelector> for ResourceBatchSelectorInput {
@@ -144,7 +148,7 @@ pub(crate) struct SearchResourceHandlesInput {
     pub resource_types: Vec<ResourceTypeSelectorInput>,
     pub names: Option<Vec<domain::ResourceName>>,
     pub name_pattern: Option<String>,
-    pub account: Option<ResourceAccountSelectorInput>,
+    pub account: Option<AccountRefInput>,
 }
 
 impl TryFrom<&SearchResourceHandlesRequest> for SearchResourceHandlesInput {
