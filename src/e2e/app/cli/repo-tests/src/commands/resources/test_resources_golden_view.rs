@@ -65,8 +65,8 @@ pub async fn test_resources_golden_view(ctx: ResourceCtx) {
     // ── VariableSet with populated labels/annotations ───────────────────────────
     //
     // Pins the canonical `TypeRef`-keyed rendering: a short `TypeName` label key
-    // (`env`), a full `TypeUri` label key with a nested-object value, and one
-    // annotation.
+    // (`env`), a full `TypeUri` label key with a nested-object value, and two
+    // annotations (the well-known `description` plus an `owner`).
 
     ctx.apply_variable_set_with_labels("app-vars-labeled", "hi")
         .await;
@@ -91,9 +91,8 @@ fn expected_variable_set(name: &str, message_value: &str) -> serde_json::Value {
         "$schema": fixtures::VARIABLE_SET_SCHEMA,
         "headers": {
             "name": name,
-            "description": fixtures::DEFAULT_DESCRIPTION,
             "labels": {},
-            "annotations": {},
+            "annotations": { "description": fixtures::DEFAULT_DESCRIPTION },
             "deletedAt": null,
         },
         "spec": { "variables": { "MESSAGE": { "value": message_value } } },
@@ -110,12 +109,12 @@ fn expected_variable_set_with_labels(name: &str, message_value: &str) -> serde_j
         "$schema": fixtures::VARIABLE_SET_SCHEMA,
         "headers": {
             "name": name,
-            "description": fixtures::DEFAULT_DESCRIPTION,
             "labels": {
                 "env": "prod",
                 "https://opendatafabric.org/schemas/labels/v1/Team": { "name": "data-platform" }
             },
             "annotations": {
+                "description": fixtures::DEFAULT_DESCRIPTION,
                 "owner": "https://github.com/open-data-fabric"
             },
             "deletedAt": null,
@@ -134,9 +133,8 @@ fn expected_secret_set_without_secrets(name: &str) -> serde_json::Value {
         "$schema": fixtures::SECRET_SET_SCHEMA,
         "headers": {
             "name": name,
-            "description": fixtures::DEFAULT_DESCRIPTION,
             "labels": {},
-            "annotations": {},
+            "annotations": { "description": fixtures::DEFAULT_DESCRIPTION },
             "deletedAt": null,
         },
         // `spec` is asserted separately: `take_secret_keys_encrypted` removes

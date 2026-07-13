@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                r.resource_id as \"id: uuid::Uuid\",\n                r.account_id as \"account_id: odf::AccountID\",\n                COALESCE(a.account_name, $3) as \"account_name!\",\n                r.resource_schema,\n                r.resource_name,\n                r.description,\n                r.labels,\n                r.annotations,\n                r.spec,\n                r.status,\n                r.generation,\n                r.created_at,\n                r.updated_at,\n                r.deleted_at,\n                r.last_event_id\n            FROM resources r\n            LEFT JOIN accounts a ON a.id = r.account_id\n            WHERE r.resource_id = $1\n              AND r.resource_schema = $2\n              AND r.deleted_at IS NULL\n            ",
+  "query": "\n            SELECT\n                r.resource_id as \"id: uuid::Uuid\",\n                r.account_id as \"account_id: odf::AccountID\",\n                COALESCE(a.account_name, $2) as \"account_name!\",\n                r.resource_schema,\n                r.resource_name,\n                r.labels,\n                r.annotations,\n                r.spec,\n                r.status,\n                r.generation,\n                r.created_at,\n                r.updated_at,\n                r.deleted_at,\n                r.last_event_id\n            FROM resources r\n            LEFT JOIN accounts a ON a.id = r.account_id\n            WHERE r.resource_id = $1\n              AND r.deleted_at IS NULL\n            ",
   "describe": {
     "columns": [
       {
@@ -30,51 +30,46 @@
       },
       {
         "ordinal": 5,
-        "name": "description",
-        "type_info": "Text"
-      },
-      {
-        "ordinal": 6,
         "name": "labels",
         "type_info": "Jsonb"
       },
       {
-        "ordinal": 7,
+        "ordinal": 6,
         "name": "annotations",
         "type_info": "Jsonb"
       },
       {
-        "ordinal": 8,
+        "ordinal": 7,
         "name": "spec",
         "type_info": "Jsonb"
       },
       {
-        "ordinal": 9,
+        "ordinal": 8,
         "name": "status",
         "type_info": "Jsonb"
       },
       {
-        "ordinal": 10,
+        "ordinal": 9,
         "name": "generation",
         "type_info": "Int8"
       },
       {
-        "ordinal": 11,
+        "ordinal": 10,
         "name": "created_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 12,
+        "ordinal": 11,
         "name": "updated_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 13,
+        "ordinal": 12,
         "name": "deleted_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 14,
+        "ordinal": 13,
         "name": "last_event_id",
         "type_info": "Int8"
       }
@@ -82,7 +77,6 @@
     "parameters": {
       "Left": [
         "Uuid",
-        "Text",
         "Varchar"
       ]
     },
@@ -92,7 +86,6 @@
       null,
       false,
       false,
-      true,
       false,
       false,
       false,
@@ -104,5 +97,5 @@
       true
     ]
   },
-  "hash": "0c66622a05141773ac2cbc454f6c0e724ed06dee9d5a0e03cd6883ce659ad5c9"
+  "hash": "f8e941a65caf54e98663c0cdaee341db8797dbcf20a7c4c10c41bbbe2716fa46"
 }

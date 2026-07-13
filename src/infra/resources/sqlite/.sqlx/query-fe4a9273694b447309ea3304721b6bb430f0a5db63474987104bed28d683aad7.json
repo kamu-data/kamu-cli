@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n            SELECT\n                r.resource_id as \"id: uuid::Uuid\",\n                r.account_id as \"account_id: odf::AccountID\",\n                COALESCE(a.account_name, $2) as \"account_name!: String\",\n                r.resource_schema,\n                r.resource_name,\n                r.description,\n                r.labels as \"labels: serde_json::Value\",\n                r.annotations as \"annotations: serde_json::Value\",\n                r.spec as \"spec: serde_json::Value\",\n                r.status as \"status: serde_json::Value\",\n                r.generation,\n                r.created_at as \"created_at: DateTime<Utc>\",\n                r.updated_at as \"updated_at: DateTime<Utc>\",\n                r.deleted_at as \"deleted_at: DateTime<Utc>\",\n                r.last_event_id\n            FROM resources r\n            LEFT JOIN accounts a ON a.id = r.account_id\n            WHERE r.resource_id = $1\n              AND r.deleted_at IS NULL\n            ",
+  "query": "\n                SELECT\n                    r.resource_id as \"id: uuid::Uuid\",\n                    r.account_id as \"account_id: odf::AccountID\",\n                    COALESCE(a.account_name, 'deleted-account') as \"account_name!: String\",\n                    r.resource_schema,\n                    r.resource_name,\n                    r.labels as \"labels: serde_json::Value\",\n                    r.annotations as \"annotations: serde_json::Value\",\n                    r.spec as \"spec: serde_json::Value\",\n                    r.status as \"status: serde_json::Value\",\n                    r.generation,\n                    r.created_at as \"created_at: DateTime<Utc>\",\n                    r.updated_at as \"updated_at: DateTime<Utc>\",\n                    r.deleted_at as \"deleted_at: DateTime<Utc>\",\n                    r.last_event_id\n                FROM resources r\n                LEFT JOIN accounts a ON a.id = r.account_id\n                WHERE r.account_id = $1\n                  AND r.deleted_at IS NULL\n                ORDER BY r.updated_at DESC, r.resource_id DESC\n                LIMIT $2 OFFSET $3\n                ",
   "describe": {
     "columns": [
       {
@@ -29,58 +29,53 @@
         "type_info": "Text"
       },
       {
-        "name": "description",
-        "ordinal": 5,
-        "type_info": "Text"
-      },
-      {
         "name": "labels: serde_json::Value",
-        "ordinal": 6,
+        "ordinal": 5,
         "type_info": "Null"
       },
       {
         "name": "annotations: serde_json::Value",
-        "ordinal": 7,
+        "ordinal": 6,
         "type_info": "Null"
       },
       {
         "name": "spec: serde_json::Value",
-        "ordinal": 8,
+        "ordinal": 7,
         "type_info": "Null"
       },
       {
         "name": "status: serde_json::Value",
-        "ordinal": 9,
+        "ordinal": 8,
         "type_info": "Null"
       },
       {
         "name": "generation",
-        "ordinal": 10,
+        "ordinal": 9,
         "type_info": "Integer"
       },
       {
         "name": "created_at: DateTime<Utc>",
-        "ordinal": 11,
+        "ordinal": 10,
         "type_info": "Null"
       },
       {
         "name": "updated_at: DateTime<Utc>",
-        "ordinal": 12,
+        "ordinal": 11,
         "type_info": "Null"
       },
       {
         "name": "deleted_at: DateTime<Utc>",
-        "ordinal": 13,
+        "ordinal": 12,
         "type_info": "Null"
       },
       {
         "name": "last_event_id",
-        "ordinal": 14,
+        "ordinal": 13,
         "type_info": "Integer"
       }
     ],
     "parameters": {
-      "Right": 2
+      "Right": 3
     },
     "nullable": [
       false,
@@ -88,7 +83,6 @@
       null,
       false,
       false,
-      true,
       false,
       false,
       false,
@@ -100,5 +94,5 @@
       true
     ]
   },
-  "hash": "0891b3768025e4d8939a32f0122079698c4b53407d44c1a5f012ee20ad1158ee"
+  "hash": "fe4a9273694b447309ea3304721b6bb430f0a5db63474987104bed28d683aad7"
 }

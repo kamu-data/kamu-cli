@@ -4037,10 +4037,9 @@ impl<'a> flatbuffers::Follow<'a> for ResourceHeadersInput<'a> {
 impl<'a> ResourceHeadersInput<'a> {
     pub const VT_ID: flatbuffers::VOffsetT = 4;
     pub const VT_NAME: flatbuffers::VOffsetT = 6;
-    pub const VT_DESCRIPTION: flatbuffers::VOffsetT = 8;
-    pub const VT_ACCOUNT: flatbuffers::VOffsetT = 10;
-    pub const VT_LABELS: flatbuffers::VOffsetT = 12;
-    pub const VT_ANNOTATIONS: flatbuffers::VOffsetT = 14;
+    pub const VT_ACCOUNT: flatbuffers::VOffsetT = 8;
+    pub const VT_LABELS: flatbuffers::VOffsetT = 10;
+    pub const VT_ANNOTATIONS: flatbuffers::VOffsetT = 12;
 
     #[inline]
     pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
@@ -4060,9 +4059,6 @@ impl<'a> ResourceHeadersInput<'a> {
         }
         if let Some(x) = args.account {
             builder.add_account(x);
-        }
-        if let Some(x) = args.description {
-            builder.add_description(x);
         }
         if let Some(x) = args.name {
             builder.add_name(x);
@@ -4094,18 +4090,6 @@ impl<'a> ResourceHeadersInput<'a> {
         unsafe {
             self._tab
                 .get::<flatbuffers::ForwardsUOffset<&str>>(ResourceHeadersInput::VT_NAME, None)
-        }
-    }
-    #[inline]
-    pub fn description(&self) -> Option<&'a str> {
-        // Safety:
-        // Created from valid Table for this object
-        // which contains a valid value in this slot
-        unsafe {
-            self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(
-                ResourceHeadersInput::VT_DESCRIPTION,
-                None,
-            )
         }
     }
     #[inline]
@@ -4162,11 +4146,6 @@ impl flatbuffers::Verifiable for ResourceHeadersInput<'_> {
                 false,
             )?
             .visit_field::<flatbuffers::ForwardsUOffset<&str>>("name", Self::VT_NAME, false)?
-            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
-                "description",
-                Self::VT_DESCRIPTION,
-                false,
-            )?
             .visit_field::<flatbuffers::ForwardsUOffset<AccountRef>>(
                 "account",
                 Self::VT_ACCOUNT,
@@ -4189,7 +4168,6 @@ impl flatbuffers::Verifiable for ResourceHeadersInput<'_> {
 pub struct ResourceHeadersInputArgs<'a> {
     pub id: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
     pub name: Option<flatbuffers::WIPOffset<&'a str>>,
-    pub description: Option<flatbuffers::WIPOffset<&'a str>>,
     pub account: Option<flatbuffers::WIPOffset<AccountRef<'a>>>,
     pub labels: Option<flatbuffers::WIPOffset<ResourceLabels<'a>>>,
     pub annotations: Option<flatbuffers::WIPOffset<ResourceAnnotations<'a>>>,
@@ -4200,7 +4178,6 @@ impl<'a> Default for ResourceHeadersInputArgs<'a> {
         ResourceHeadersInputArgs {
             id: None,
             name: None,
-            description: None,
             account: None,
             labels: None,
             annotations: None,
@@ -4222,13 +4199,6 @@ impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> ResourceHeadersInputBuilder<'a,
     pub fn add_name(&mut self, name: flatbuffers::WIPOffset<&'b str>) {
         self.fbb_
             .push_slot_always::<flatbuffers::WIPOffset<_>>(ResourceHeadersInput::VT_NAME, name);
-    }
-    #[inline]
-    pub fn add_description(&mut self, description: flatbuffers::WIPOffset<&'b str>) {
-        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
-            ResourceHeadersInput::VT_DESCRIPTION,
-            description,
-        );
     }
     #[inline]
     pub fn add_account(&mut self, account: flatbuffers::WIPOffset<AccountRef<'b>>) {
@@ -4279,7 +4249,6 @@ impl core::fmt::Debug for ResourceHeadersInput<'_> {
         let mut ds = f.debug_struct("ResourceHeadersInput");
         ds.field("id", &self.id());
         ds.field("name", &self.name());
-        ds.field("description", &self.description());
         ds.field("account", &self.account());
         ds.field("labels", &self.labels());
         ds.field("annotations", &self.annotations());
@@ -32662,14 +32631,13 @@ impl<'a> flatbuffers::Follow<'a> for ResourceHeaders<'a> {
 impl<'a> ResourceHeaders<'a> {
     pub const VT_ID: flatbuffers::VOffsetT = 4;
     pub const VT_NAME: flatbuffers::VOffsetT = 6;
-    pub const VT_DESCRIPTION: flatbuffers::VOffsetT = 8;
-    pub const VT_ACCOUNT: flatbuffers::VOffsetT = 10;
-    pub const VT_LABELS: flatbuffers::VOffsetT = 12;
-    pub const VT_ANNOTATIONS: flatbuffers::VOffsetT = 14;
-    pub const VT_GENERATION: flatbuffers::VOffsetT = 16;
-    pub const VT_CREATED_AT: flatbuffers::VOffsetT = 18;
-    pub const VT_UPDATED_AT: flatbuffers::VOffsetT = 20;
-    pub const VT_DELETED_AT: flatbuffers::VOffsetT = 22;
+    pub const VT_ACCOUNT: flatbuffers::VOffsetT = 8;
+    pub const VT_LABELS: flatbuffers::VOffsetT = 10;
+    pub const VT_ANNOTATIONS: flatbuffers::VOffsetT = 12;
+    pub const VT_GENERATION: flatbuffers::VOffsetT = 14;
+    pub const VT_CREATED_AT: flatbuffers::VOffsetT = 16;
+    pub const VT_UPDATED_AT: flatbuffers::VOffsetT = 18;
+    pub const VT_DELETED_AT: flatbuffers::VOffsetT = 20;
 
     #[inline]
     pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
@@ -32699,9 +32667,6 @@ impl<'a> ResourceHeaders<'a> {
         }
         if let Some(x) = args.account {
             builder.add_account(x);
-        }
-        if let Some(x) = args.description {
-            builder.add_description(x);
         }
         if let Some(x) = args.name {
             builder.add_name(x);
@@ -32733,16 +32698,6 @@ impl<'a> ResourceHeaders<'a> {
         unsafe {
             self._tab
                 .get::<flatbuffers::ForwardsUOffset<&str>>(ResourceHeaders::VT_NAME, None)
-        }
-    }
-    #[inline]
-    pub fn description(&self) -> Option<&'a str> {
-        // Safety:
-        // Created from valid Table for this object
-        // which contains a valid value in this slot
-        unsafe {
-            self._tab
-                .get::<flatbuffers::ForwardsUOffset<&str>>(ResourceHeaders::VT_DESCRIPTION, None)
         }
     }
     #[inline]
@@ -32841,11 +32796,6 @@ impl flatbuffers::Verifiable for ResourceHeaders<'_> {
                 false,
             )?
             .visit_field::<flatbuffers::ForwardsUOffset<&str>>("name", Self::VT_NAME, false)?
-            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
-                "description",
-                Self::VT_DESCRIPTION,
-                false,
-            )?
             .visit_field::<flatbuffers::ForwardsUOffset<AccountHandle>>(
                 "account",
                 Self::VT_ACCOUNT,
@@ -32872,7 +32822,6 @@ impl flatbuffers::Verifiable for ResourceHeaders<'_> {
 pub struct ResourceHeadersArgs<'a> {
     pub id: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
     pub name: Option<flatbuffers::WIPOffset<&'a str>>,
-    pub description: Option<flatbuffers::WIPOffset<&'a str>>,
     pub account: Option<flatbuffers::WIPOffset<AccountHandle<'a>>>,
     pub labels: Option<flatbuffers::WIPOffset<ResourceLabels<'a>>>,
     pub annotations: Option<flatbuffers::WIPOffset<ResourceAnnotations<'a>>>,
@@ -32887,7 +32836,6 @@ impl<'a> Default for ResourceHeadersArgs<'a> {
         ResourceHeadersArgs {
             id: None,
             name: None,
-            description: None,
             account: None,
             labels: None,
             annotations: None,
@@ -32913,13 +32861,6 @@ impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> ResourceHeadersBuilder<'a, 'b, 
     pub fn add_name(&mut self, name: flatbuffers::WIPOffset<&'b str>) {
         self.fbb_
             .push_slot_always::<flatbuffers::WIPOffset<_>>(ResourceHeaders::VT_NAME, name);
-    }
-    #[inline]
-    pub fn add_description(&mut self, description: flatbuffers::WIPOffset<&'b str>) {
-        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
-            ResourceHeaders::VT_DESCRIPTION,
-            description,
-        );
     }
     #[inline]
     pub fn add_account(&mut self, account: flatbuffers::WIPOffset<AccountHandle<'b>>) {
@@ -32990,7 +32931,6 @@ impl core::fmt::Debug for ResourceHeaders<'_> {
         let mut ds = f.debug_struct("ResourceHeaders");
         ds.field("id", &self.id());
         ds.field("name", &self.name());
-        ds.field("description", &self.description());
         ds.field("account", &self.account());
         ds.field("labels", &self.labels());
         ds.field("annotations", &self.annotations());

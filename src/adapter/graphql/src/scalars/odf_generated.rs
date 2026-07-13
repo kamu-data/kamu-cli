@@ -2798,8 +2798,6 @@ pub struct ResourceHeaders {
     /// Symbolic name of a resource that identifies it within a scope of an
     /// onwing account.
     pub name: ResourceName<'static>,
-    /// Human-friendly resource description.
-    pub description: Option<String>,
     /// Link to the account that owns the resource.
     pub account: AccountHandle,
     /// Map of string keys and values that can be used to organize, categorize,
@@ -2827,7 +2825,6 @@ impl From<odf::metadata::resource::ResourceHeaders> for ResourceHeaders {
         Self {
             id: v.id.into(),
             name: v.name.into(),
-            description: v.description.map(Into::into),
             account: v.account.into(),
             labels: v.labels.into(),
             annotations: v.annotations.into(),
@@ -2852,8 +2849,6 @@ pub struct ResourceHeadersInput {
     /// Symbolic name of a resource that identifies it within a scope of an
     /// onwing account.
     pub name: ResourceName<'static>,
-    /// Human-friendly resource description.
-    pub description: Option<String>,
     /// Reference to the account that owns the resource.
     pub account: Option<AccountRef>,
     /// Map of string keys and values that can be used to organize, categorize,
@@ -2870,7 +2865,6 @@ impl From<odf::metadata::resource::ResourceHeadersInput> for ResourceHeadersInpu
         Self {
             id: v.id.map(Into::into),
             name: v.name.into(),
-            description: v.description.map(Into::into),
             account: v.account.map(Into::into),
             labels: v.labels.map(Into::into),
             annotations: v.annotations.map(Into::into),

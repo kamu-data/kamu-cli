@@ -131,9 +131,9 @@ pub async fn test_resources_variableset_lifecycle(ctx: ResourceCtx) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Scenario: apply surfaces lint warnings but still succeeds (QA scenario 2)
 //
-// A manifest without `headers.description` applies successfully (resource is
-// created, `0 failed`) yet emits the non-fatal `missing_description` lint
-// warning and reports a non-zero warning count.
+// A manifest without a `description` annotation applies successfully
+// (resource is created, `0 failed`) yet emits the non-fatal
+// `missing_description` lint warning and reports a non-zero warning count.
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_resources_variableset_apply_warning(ctx: ResourceCtx) {
@@ -141,8 +141,8 @@ pub async fn test_resources_variableset_apply_warning(ctx: ResourceCtx) {
 
     ctx.assert_resource_absent("vs", resource_name).await;
 
-    // A manifest missing `headers.description` is applied: it succeeds (the
-    // resource is created) but surfaces a non-fatal lint warning.
+    // A manifest missing the `description` annotation is applied: it succeeds
+    // (the resource is created) but surfaces a non-fatal lint warning.
     let manifest = fixtures::variable_set_manifest_no_description(resource_name, "hello-world");
     ctx.assert_success_with_stdin(
         ["apply", "--stdin"],
@@ -151,7 +151,7 @@ pub async fn test_resources_variableset_apply_warning(ctx: ResourceCtx) {
         // `Created:` line first, then the lint warning, then the summary.
         Some(&[
             r#"Created: STDIN -> VariableSet/warn-vars"#,
-            r#"warning \[missing_description\] STDIN headers.description"#,
+            r#"warning \[missing_description\] STDIN headers\.annotations\.description"#,
             r#"Summary 1 item\(s\): 1 created, 0 updated, 0 unchanged, 0 rejected, 0 failed, 1 warning\(s\)"#,
         ]),
     )

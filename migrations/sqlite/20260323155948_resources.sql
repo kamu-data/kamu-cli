@@ -5,7 +5,6 @@ CREATE TABLE resources (
     account_id             VARCHAR(100) NOT NULL,
     resource_schema        TEXT NOT NULL,
     resource_name          VARCHAR(200) NOT NULL COLLATE NOCASE,
-    description            TEXT NULL,
     labels                 JSONB NOT NULL,
     annotations            JSONB NOT NULL,
 

@@ -62,7 +62,6 @@ impl ResourceHeadersExt for ResourceHeaders {
             id,
             account,
             name: ResourceName::new_unchecked(name),
-            description: None,
             labels: odf::metadata::resource::ResourceLabels {
                 entries: std::collections::BTreeMap::new(),
             },
@@ -83,7 +82,6 @@ impl ResourceHeadersExt for ResourceHeaders {
             id,
             account,
             name: input.name,
-            description: input.description,
             labels: input
                 .labels
                 .unwrap_or_else(|| odf::metadata::resource::ResourceLabels {
@@ -111,7 +109,6 @@ impl ResourceHeadersExt for ResourceHeaders {
 
         self.account == account_handle_from_input(input)
             && self.name == input.name
-            && self.description == input.description
             && self.labels.entries == *input_labels
             && self.annotations.entries == *input_annotations
     }
@@ -119,7 +116,6 @@ impl ResourceHeadersExt for ResourceHeaders {
     fn apply_update(&mut self, now: DateTime<Utc>, input: ResourceHeadersInput) {
         self.account = account_handle_from_input(&input);
         self.name = input.name;
-        self.description = input.description;
         self.labels = input
             .labels
             .unwrap_or_else(|| odf::metadata::resource::ResourceLabels {

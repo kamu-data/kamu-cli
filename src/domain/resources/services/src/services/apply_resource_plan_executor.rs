@@ -155,7 +155,6 @@ where
             id: Some(headers.id),
             account: Some(headers.account.clone().into()),
             name: headers.name.clone(),
-            description: headers.description.clone(),
             labels: Some(headers.labels.clone()),
             annotations: Some(headers.annotations.clone()),
         };

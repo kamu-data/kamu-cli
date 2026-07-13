@@ -44,7 +44,6 @@ impl From<resource::ResourceHeaders> for resource::ResourceHeadersInput {
         let resource::ResourceHeaders {
             id,
             name,
-            description,
             account,
             labels,
             annotations,
@@ -56,7 +55,6 @@ impl From<resource::ResourceHeaders> for resource::ResourceHeadersInput {
         Self {
             id: Some(id),
             name,
-            description,
             account: Some(account.into()),
             labels: Some(labels),
             annotations: Some(annotations),

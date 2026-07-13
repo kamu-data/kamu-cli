@@ -20,6 +20,7 @@ use crate::{
     ResourceStatus,
     ResourceStatusExt,
     TypeUri,
+    get_description,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -58,7 +59,7 @@ impl From<ResourceSnapshot> for ResourceSummaryView {
             schema: value.schema,
             id: value.id,
             name: value.headers.name,
-            description: value.headers.description,
+            description: get_description(&value.headers.annotations.entries).map(str::to_string),
             generation: value.headers.generation,
             created_at: value.headers.created_at,
             updated_at: value.headers.updated_at,

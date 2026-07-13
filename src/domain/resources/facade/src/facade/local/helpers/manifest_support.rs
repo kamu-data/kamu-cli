@@ -14,6 +14,8 @@ use kamu_resources::{
     ResourceHeadersInputExt,
     ResourceManifest,
     ResourceWarning,
+    description_annotation_short_name_type_ref,
+    description_annotation_type_ref,
 };
 
 use crate::{ApplyManifestError, ParseResourceManifestError, ResourceManifestFormat};
@@ -51,7 +53,6 @@ pub(crate) fn make_headers_input(
     ResourceHeadersInputExt::try_new(
         Some(target_account.clone().into()),
         manifest.headers.name.as_str(),
-        manifest.headers.description.clone(),
         manifest.headers.labels.clone(),
         manifest.headers.annotations.clone(),
     )
@@ -65,15 +66,20 @@ pub(crate) fn collect_manifest_header_warnings(
 ) -> Vec<ResourceWarning> {
     let mut warnings = Vec::new();
 
-    if manifest
+    let description = manifest
         .headers
-        .description
-        .as_ref()
-        .is_none_or(|description| description.trim().is_empty())
-    {
+        .annotations
+        .iter()
+        .find(|(key, _)| {
+            *key == description_annotation_type_ref()
+                || *key == description_annotation_short_name_type_ref()
+        })
+        .and_then(|(_, value)| value.as_str());
+
+    if description.is_none_or(|description| description.trim().is_empty()) {
         warnings.push(ResourceWarning {
             code: WARNING_CODE_MISSING_DESCRIPTION.to_string(),
-            path: Some("headers.description".to_string()),
+            path: Some("headers.annotations.description".to_string()),
             message: "Resource has no description".to_string(),
         });
     }
@@ -104,7 +110,6 @@ pub(crate) fn resource_to_manifest(view: Resource) -> Result<ResourceManifest, I
             id: None,
             account,
             name: headers.name.to_string(),
-            description: headers.description,
             labels: headers.labels.entries.into_iter().collect(),
             annotations: headers.annotations.entries.into_iter().collect(),
         },

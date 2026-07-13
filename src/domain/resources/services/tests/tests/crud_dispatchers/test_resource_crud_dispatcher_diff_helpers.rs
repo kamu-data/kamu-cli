@@ -85,7 +85,10 @@ fn test_make_changes_detects_name_change() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
-fn test_make_changes_detects_description_added() {
+fn test_make_changes_detects_annotation_added() {
+    // Description is no longer a dedicated header field — it is just the
+    // first well-known entry in `annotations`, so adding it surfaces as a
+    // whole-map `headers.annotations` change like any other annotation.
     let mut before = make_view("res", "val");
     let mut after = make_view("res", "val");
 
@@ -94,19 +97,19 @@ fn test_make_changes_detects_description_added() {
     after.headers.updated_at = before.headers.updated_at;
     before.headers.generation = 1;
     after.headers.generation = 1;
-    before.headers.description = None;
-    after.headers.description = Some("new desc".to_string());
+    after.headers.annotations.entries.insert(
+        kamu_resources::description_annotation_type_ref(),
+        serde_json::Value::String("new desc".to_string()),
+    );
 
     let changes = make_apply_manifest_changes(Some(&before), &after).unwrap();
 
-    let desc_changes: Vec<_> = changes
+    let annotation_changes: Vec<_> = changes
         .iter()
-        .filter(|c| c.path == "headers.description")
+        .filter(|c| c.path == "headers.annotations")
         .collect();
 
-    assert_eq!(desc_changes.len(), 1);
-    assert_eq!(desc_changes[0].before, None);
-    assert_eq!(desc_changes[0].after, Some(serde_json::json!("new desc")));
+    assert_eq!(annotation_changes.len(), 1);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -176,7 +179,6 @@ fn test_make_changes_identical_before_after_returns_no_field_changes() {
             id,
             account: odf::AccountHandle::new_test("test-owner"),
             name: kamu_resources::ResourceName::new_unchecked("res"),
-            description: None,
             labels: kamu_resources::ResourceLabels {
                 entries: Default::default(),
             },
@@ -223,7 +225,6 @@ fn test_timestamp_precision_normalized_avoids_spurious_diffs() {
             id,
             account: odf::AccountHandle::new_test("test-owner"),
             name: kamu_resources::ResourceName::new_unchecked("res"),
-            description: None,
             labels: kamu_resources::ResourceLabels {
                 entries: Default::default(),
             },

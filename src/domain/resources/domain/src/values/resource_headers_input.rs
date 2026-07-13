@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 
 use odf::metadata::auth;
 
-use crate::{ResourceValidateHeaders, TypeRef};
+use crate::{ResourceValidateHeaders, TypeRef, get_description};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -23,7 +23,6 @@ pub trait ResourceHeadersInputExt {
     fn try_new(
         account: Option<auth::AccountRef>,
         name: &str,
-        description: Option<String>,
         labels: Vec<(TypeRef, serde_json::Value)>,
         annotations: Vec<(TypeRef, serde_json::Value)>,
     ) -> Result<Self, ResourceHeadersValidationError>
@@ -35,7 +34,6 @@ impl ResourceHeadersInputExt for ResourceHeadersInput {
     fn try_new(
         account: Option<auth::AccountRef>,
         name: &str,
-        description: Option<String>,
         labels: Vec<(TypeRef, serde_json::Value)>,
         annotations: Vec<(TypeRef, serde_json::Value)>,
     ) -> Result<Self, ResourceHeadersValidationError> {
@@ -53,7 +51,6 @@ impl ResourceHeadersInputExt for ResourceHeadersInput {
             id: None,
             account,
             name,
-            description,
             labels: Some(odf::metadata::resource::ResourceLabels {
                 entries: entries_to_map(labels, ResourceHeaderField::Labels)?,
             }),
@@ -122,7 +119,8 @@ impl ResourceValidateHeaders for ResourceHeadersInput {
             });
         }
 
-        if let Some(description) = &self.description
+        if let Some(annotations) = &self.annotations
+            && let Some(description) = get_description(&annotations.entries)
             && description.len() > MAX_DESCRIPTION_LEN
         {
             return Err(ResourceHeadersValidationError::DescriptionTooLong {
@@ -203,7 +201,6 @@ mod tests {
         let headers = ResourceHeadersInput::try_new(
             Some(account()),
             "n",
-            None,
             vec![
                 entry("env", serde_json::json!("prod")),
                 entry(
@@ -227,7 +224,6 @@ mod tests {
         let result = ResourceHeadersInput::try_new(
             Some(account()),
             "n",
-            None,
             vec![
                 entry("env", serde_json::json!("prod")),
                 entry("env", serde_json::json!("staging")),
@@ -246,7 +242,6 @@ mod tests {
         let result = ResourceHeadersInput::try_new(
             Some(account()),
             "n",
-            None,
             vec![],
             vec![
                 entry("owner", serde_json::json!("a")),
@@ -266,7 +261,7 @@ mod tests {
             .map(|i| entry(&format!("label{i}"), serde_json::json!(i)))
             .collect();
 
-        let result = ResourceHeadersInput::try_new(Some(account()), "n", None, labels, vec![]);
+        let result = ResourceHeadersInput::try_new(Some(account()), "n", labels, vec![]);
 
         assert_matches!(
             result,
@@ -281,7 +276,7 @@ mod tests {
             .map(|i| entry(&format!("annotation{i}"), serde_json::json!(i)))
             .collect();
 
-        let result = ResourceHeadersInput::try_new(Some(account()), "n", None, vec![], annotations);
+        let result = ResourceHeadersInput::try_new(Some(account()), "n", vec![], annotations);
 
         assert_matches!(
             result,
@@ -299,7 +294,6 @@ mod tests {
         let headers = ResourceHeadersInput::try_new(
             Some(account()),
             "n",
-            None,
             vec![entry("big", large_value.clone())],
             vec![],
         )

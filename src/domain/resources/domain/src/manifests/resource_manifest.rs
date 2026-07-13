@@ -35,7 +35,6 @@ pub struct ResourceManifestHeaders {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub account: Option<ResourceAccountRef>,
     pub name: String,
-    pub description: Option<String>,
     #[serde(
         default,
         serialize_with = "serialize_entries",
@@ -162,7 +161,7 @@ mod tests {
     fn deserializes_and_round_trips_account_field() {
         let id = odf::AccountID::new_generated_ed25519().1;
         let json = format!(
-            r#"{{"id": null, "account": {{"id": "{id}"}}, "name": "n", "description": null, "labels": {{}}, "annotations": {{}}}}"#
+            r#"{{"id": null, "account": {{"id": "{id}"}}, "name": "n", "labels": {{}}, "annotations": {{}}}}"#
         );
 
         let headers: ResourceManifestHeaders = serde_json::from_str(&json).unwrap();
@@ -178,7 +177,7 @@ mod tests {
     #[test]
     fn labels_and_annotations_accept_short_name_and_uri_keys_with_nested_values() {
         let json = r#"{
-            "id": null, "account": null, "name": "n", "description": null,
+            "id": null, "account": null, "name": "n",
             "labels": {
                 "env": "prod",
                 "https://opendatafabric.org/schemas/labels/v1/Team": {"name": "data-platform"}
@@ -201,7 +200,7 @@ mod tests {
     #[test]
     fn rejects_duplicate_label_key_on_deserialize() {
         let json = r#"{
-            "id": null, "account": null, "name": "n", "description": null,
+            "id": null, "account": null, "name": "n",
             "labels": {"env": "prod"},
             "annotations": {}
         }"#;
@@ -210,7 +209,7 @@ mod tests {
         // visitor directly via a sequence form instead, which our custom
         // deserializer also accepts and does not collapse.
         let seq_json = r#"{
-            "id": null, "account": null, "name": "n", "description": null,
+            "id": null, "account": null, "name": "n",
             "labels": [["env", "prod"], ["env", "staging"]],
             "annotations": {}
         }"#;
@@ -228,7 +227,7 @@ mod tests {
         // (spaces are not allowed) — this is now a parse-time failure, not a
         // `ResourceHeadersValidationError::InvalidLabelKey`.
         let json = r#"{
-            "id": null, "account": null, "name": "n", "description": null,
+            "id": null, "account": null, "name": "n",
             "labels": {"not a valid key!": "prod"},
             "annotations": {}
         }"#;

@@ -50,7 +50,7 @@ pub const SECRETS_ENCRYPTION_KAMU_CONFIG: &str = indoc::indoc!(
     "#
 );
 
-/// Default `headers.description` baked into the well-formed builders. A
+/// Default `description` annotation baked into the well-formed builders. A
 /// manifest without a description applies successfully but emits a
 /// `missing_description` lint warning; the canonical fixtures include one so
 /// the common lifecycle scenarios stay warning-free. The warning path itself is
@@ -62,14 +62,16 @@ pub const DEFAULT_DESCRIPTION: &str = "e2e test fixture resource";
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// A well-formed `VariableSet` manifest in YAML with a single `MESSAGE`
-/// variable and a `description` (so it applies without lint warnings).
+/// variable and a `description` annotation (so it applies without lint
+/// warnings).
 pub fn variable_set_manifest_yaml(name: &str, value: &str) -> String {
     indoc::formatdoc!(
         r#"
         $schema: {VARIABLE_SET_SCHEMA}
         headers:
           name: {name}
-          description: {DEFAULT_DESCRIPTION}
+          annotations:
+            description: {DEFAULT_DESCRIPTION}
         spec:
           variables:
             MESSAGE: {value}
@@ -79,20 +81,21 @@ pub fn variable_set_manifest_yaml(name: &str, value: &str) -> String {
 
 /// Same as [`variable_set_manifest_yaml`] but carries a populated
 /// `headers.labels`/`headers.annotations` block — a short `TypeName` label
-/// key, a full `TypeUri` label key with a nested-object value, and one
-/// annotation — to pin the ODF `TypeRef`-keyed canonical shape end-to-end.
+/// key, a full `TypeUri` label key with a nested-object value, and two
+/// annotations (the well-known `description` plus an `owner`) — to pin the
+/// ODF `TypeRef`-keyed canonical shape end-to-end.
 pub fn variable_set_manifest_yaml_with_labels(name: &str, value: &str) -> String {
     indoc::formatdoc!(
         r#"
         $schema: {VARIABLE_SET_SCHEMA}
         headers:
           name: {name}
-          description: {DEFAULT_DESCRIPTION}
           labels:
             env: prod
             https://opendatafabric.org/schemas/labels/v1/Team:
               name: data-platform
           annotations:
+            description: {DEFAULT_DESCRIPTION}
             owner: https://github.com/open-data-fabric
         spec:
           variables:
@@ -106,7 +109,7 @@ pub fn variable_set_manifest_yaml_with_labels(name: &str, value: &str) -> String
 pub fn variable_set_manifest_json(name: &str, value: &str) -> String {
     serde_json::json!({
         "$schema": VARIABLE_SET_SCHEMA,
-        "headers": { "name": name, "description": DEFAULT_DESCRIPTION },
+        "headers": { "name": name, "annotations": { "description": DEFAULT_DESCRIPTION } },
         "spec": { "variables": { "MESSAGE": value } },
     })
     .to_string()
@@ -128,7 +131,8 @@ pub fn variable_set_manifest_yaml_for_account(
         $schema: {VARIABLE_SET_SCHEMA}
         headers:
           name: {name}
-          description: {DEFAULT_DESCRIPTION}
+          annotations:
+            description: {DEFAULT_DESCRIPTION}
           account:
             name: {account_name}
         spec:
@@ -138,7 +142,7 @@ pub fn variable_set_manifest_yaml_for_account(
     )
 }
 
-/// A `VariableSet` manifest **without** `headers.description`. Applies
+/// A `VariableSet` manifest **without** a `description` annotation. Applies
 /// successfully but emits the `missing_description` lint warning — used to
 /// cover the warning surface explicitly.
 pub fn variable_set_manifest_no_description(name: &str, value: &str) -> String {
@@ -162,7 +166,8 @@ pub fn secret_set_manifest_yaml(name: &str, token: &str, password: &str) -> Stri
         $schema: {SECRET_SET_SCHEMA}
         headers:
           name: {name}
-          description: {DEFAULT_DESCRIPTION}
+          annotations:
+            description: {DEFAULT_DESCRIPTION}
         spec:
           secrets:
             API_TOKEN:
@@ -213,7 +218,8 @@ pub fn secret_set_manifest_pre_encrypted_yaml(name: &str) -> String {
         $schema: {SECRET_SET_SCHEMA}
         headers:
           name: {name}
-          description: {DEFAULT_DESCRIPTION}
+          annotations:
+            description: {DEFAULT_DESCRIPTION}
         spec:
           secrets:
             API_TOKEN:
@@ -227,7 +233,7 @@ pub fn secret_set_manifest_pre_encrypted_yaml(name: &str) -> String {
 pub fn secret_set_manifest_json(name: &str, token: &str, password: &str) -> String {
     serde_json::json!({
         "$schema": SECRET_SET_SCHEMA,
-        "headers": { "name": name, "description": DEFAULT_DESCRIPTION },
+        "headers": { "name": name, "annotations": { "description": DEFAULT_DESCRIPTION } },
         "spec": { "secrets": {
             "API_TOKEN": { "value": token },
             "DB_PASSWORD": { "value": password },

@@ -21,7 +21,6 @@ INSERT INTO resources (
     account_id,
     resource_schema,
     resource_name,
-    description,
     labels,
     annotations,
     spec,
@@ -37,7 +36,6 @@ SELECT
     de.owner_id                                                                 AS account_id,
     'https://opendatafabric.org/schemas/config/v1alpha1/VariableSet'                 AS resource_schema,
     'legacy-vars-' || substring(dev.dataset_id, 9)                              AS resource_name,
-    NULL                                                                        AS description,
     '{}'::jsonb                                                                 AS labels,
     '{}'::jsonb                                                                 AS annotations,
     jsonb_build_object(
@@ -144,7 +142,6 @@ INSERT INTO resources (
     account_id,
     resource_schema,
     resource_name,
-    description,
     labels,
     annotations,
     spec,
@@ -160,7 +157,6 @@ SELECT
     de.owner_id                                                                 AS account_id,
     'https://opendatafabric.org/schemas/config/v1alpha1/SecretSet'                   AS resource_schema,
     'legacy-secrets-' || substring(dev.dataset_id, 9)                           AS resource_name,
-    NULL                                                                        AS description,
     '{}'::jsonb                                                                 AS labels,
     '{}'::jsonb                                                                 AS annotations,
     jsonb_build_object(
@@ -285,7 +281,6 @@ ins_created AS (
             'headers',    jsonb_build_object(
                                'account',     r.account_id,
                                'name',        r.resource_name,
-                               'description', NULL,
                                'labels',      '{}'::jsonb,
                                'annotations', '{}'::jsonb
                            ),
@@ -355,7 +350,6 @@ ins_created AS (
             'headers',    jsonb_build_object(
                                'account',     r.account_id,
                                'name',        r.resource_name,
-                               'description', NULL,
                                'labels',      '{}'::jsonb,
                                'annotations', '{}'::jsonb
                            ),

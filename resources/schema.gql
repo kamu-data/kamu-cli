@@ -4075,10 +4075,6 @@ type ResourceHeaders {
 	"""
 	name: ResourceName!
 	"""
-	Human-friendly resource description.
-	"""
-	description: String
-	"""
 	Link to the account that owns the resource.
 	"""
 	account: AccountHandle!

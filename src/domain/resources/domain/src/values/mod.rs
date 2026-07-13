@@ -9,6 +9,7 @@
 
 mod resource;
 mod resource_account_ref;
+mod resource_annotation;
 mod resource_condition;
 mod resource_conditions;
 mod resource_handle;
@@ -25,6 +26,7 @@ mod rfc_spec_newtype;
 
 pub use resource::*;
 pub use resource_account_ref::*;
+pub use resource_annotation::*;
 pub use resource_condition::*;
 pub use resource_conditions::*;
 pub use resource_handle::*;

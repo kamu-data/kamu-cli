@@ -97,13 +97,6 @@ fn append_headers_changes(
     push_headers_change(
         changes,
         ApplyManifestChangeKind::Headers,
-        "headers.description",
-        before.and_then(|view| view.headers.description.as_ref()),
-        after.headers.description.as_ref(),
-    )?;
-    push_headers_change(
-        changes,
-        ApplyManifestChangeKind::Headers,
         "headers.labels",
         before.map(|view| &view.headers.labels.entries),
         Some(&after.headers.labels.entries),

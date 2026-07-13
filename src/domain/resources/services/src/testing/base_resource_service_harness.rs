@@ -182,7 +182,6 @@ impl BaseResourceServiceHarness {
             id: None,
             account: Some(odf::metadata::auth::AccountRef::Handle(account)),
             name: kamu_resources::ResourceName::new_unchecked(name),
-            description: None,
             labels: Some(kamu_resources::ResourceLabels {
                 entries: BTreeMap::new(),
             }),

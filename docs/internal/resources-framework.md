@@ -372,15 +372,35 @@ pub struct ResourceManifestHeaders {
                                              // existing resource for updates (e.g. when renaming)
     pub account: Option<ResourceAccountRef>, // optional — by name, id, or both; defaults to caller
     pub name: ResourceName,                  // required
-    pub description: Option<String>,
     pub labels: Vec<(TypeRef, serde_json::Value)>,
     pub annotations: Vec<(TypeRef, serde_json::Value)>,
 }
 ```
 
-A user may write **only**: `$schema`, `headers.{id?, account?, name, description?, labels,
-annotations}`, and `spec`. `deny_unknown_fields` means a manifest **cannot** carry `status`,
-timestamps, or `generation` — those are server-owned.
+A user may write **only**: `$schema`, `headers.{id?, account?, name, labels, annotations}`, and
+`spec`. `deny_unknown_fields` means a manifest **cannot** carry `status`, timestamps, or
+`generation` — those are server-owned.
+
+> **Well-known annotations.** `description` is not a dedicated header field — it is the *first*
+> well-known entry in `headers.annotations`, establishing the pattern future well-known annotations
+> (e.g. an icon or docs link) will follow. A well-known annotation is declared as a schema-URI
+> constant plus a `..._type_ref()` helper (see
+> [`values/resource_annotation.rs`](/src/domain/resources/domain/src/values/resource_annotation.rs),
+> mirroring the `RESOURCE_CONDITION_*_SCHEMA_URI` convention used for conditions), with an
+> informational JSON Schema doc under `schemas/resource/v1alpha1/annotations/` (not yet validated or
+> registered, same caveat as condition schemas). **Lookup is temporarily dual-keyed**: code that reads
+> the description (the missing-description lint, the CLI render path, view derivation) checks both the
+> canonical schema URI (`https://kamu.dev/schemas/resource/v1alpha1/annotations/Description`) and the
+> short alias (`description`) as equivalent, because there is no short-name-to-URI normalization
+> mechanism yet. This is a deliberate short-term compromise, not the long-term shape — new well-known
+> annotations should not copy the dual-key lookup once normalization exists. A manifest author writes
+> it as, e.g.:
+> ```yaml
+> headers:
+>   name: my-resource
+>   annotations:
+>     description: "..."
+> ```
 
 > **`TypeUri` vs `ResourceSchemaId`.** Both model the same `$schema` at two levels. `TypeUri` is the
 > opaque identity value carried through fields, storage, and the wire (`ResourceSnapshot.schema`,
@@ -409,7 +429,6 @@ pub struct ResourceHeaders {
     pub id: ResourceID,                      // generated — stable identity, assigned once
     pub account: auth::AccountHandle,        // resolved id+name of the owning account
     pub name: ResourceName,                  // (authored)
-    pub description: Option<String>,         // (authored)
     pub labels: ResourceLabels,              // (authored) BTreeMap<TypeRef, serde_json::Value>
     pub annotations: ResourceAnnotations,    // (authored) BTreeMap<TypeRef, serde_json::Value>
     pub generation: u64,                     // generated — bumps on spec/headers change
@@ -512,7 +531,7 @@ pub struct ResourceSnapshot {
 
 ```mermaid
 flowchart LR
-    M["Manifest (authored)<br/>$schema<br/>headers: name, account?, id?,<br/>description?, labels, annotations<br/>spec"]
+    M["Manifest (authored)<br/>$schema<br/>headers: name, account?, id?,<br/>labels, annotations<br/>spec"]
     A["apply use case<br/>(resolve account, allocate id,<br/>bump generation, set timestamps)"]
     S["Snapshot / State<br/>= authored fields<br/>+ <b>generated</b>: account(ID), id,<br/>generation, created/updated/deleted_at,<br/>status{phase, observedGeneration, reconciledAt, conditions}"]
     M --> A --> S
@@ -539,13 +558,15 @@ Resources are **event-sourced with a materialized snapshot per resource**. Stora
 **Two tables:**
 
 - **`resources`** — one row per resource (the snapshot): `resource_id` (UUID, **PK**),
-  `account_id`, `resource_schema`, `resource_name`, `description`, `labels`/`annotations`
+  `account_id`, `resource_schema`, `resource_name`, `labels`/`annotations`
   (JSONB), `spec` (JSONB), `status` (JSONB, nullable), `generation`, `created_at`/`updated_at`,
   `deleted_at` (nullable), `last_event_id`. **Uniqueness:**
   `UNIQUE (account_id, resource_schema, resource_name)`.
   A partial index on `(account_id, resource_schema, status->>'phase') WHERE deleted_at IS NULL`
   backs the summary projection. `labels`/`annotations` are untyped JSONB with **no index** — label
-  indexing for selector queries is deferred, not yet implemented.
+  indexing for selector queries is deferred, not yet implemented. There is no dedicated
+  `description` column: `description` lives inside `annotations` as the first well-known
+  annotation entry, so adding future well-known annotations needs no schema change.
 - **`resource_events`** — append-only log: `event_id` (BIGINT from a sequence, PK), `resource_id`
   (FK → `resources`), `resource_schema`, `event_time`, `event_type`, `event_payload` (JSONB).
 

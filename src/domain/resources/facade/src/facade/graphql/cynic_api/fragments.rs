@@ -228,7 +228,6 @@ pub(crate) struct ResourceHeaders {
     pub id: kamu_resources::ResourceID,
     pub account: AccountHandle,
     pub name: kamu_resources::ResourceName,
-    pub description: Option<String>,
     pub labels: ResourceLabels,
     pub annotations: ResourceAnnotations,
     pub generation: Uint64,

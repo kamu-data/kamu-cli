@@ -54,7 +54,6 @@ impl TryFrom<fragments::Resource> for domain::Resource {
                     name: odf::AccountName::new_unchecked(&value.headers.account.name.0),
                 },
                 name: value.headers.name,
-                description: value.headers.description,
                 labels: value.headers.labels.0,
                 annotations: value.headers.annotations.0,
                 generation: value.headers.generation.into(),

@@ -30,6 +30,7 @@ use kamu_resources::{
     ResourceStatusSummaryView,
     ResourceSummaryView,
     TypeUri,
+    get_description,
     new_pending_resource_status,
 };
 use serde::Serialize;
@@ -154,7 +155,7 @@ where
         schema: R::schema().clone(),
         id: *state.id(),
         name: state.headers().name.clone(),
-        description: state.headers().description.clone(),
+        description: get_description(&state.headers().annotations.entries).map(str::to_string),
         generation: state.headers().generation,
         created_at: state.headers().created_at,
         updated_at: state.headers().updated_at,

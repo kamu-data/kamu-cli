@@ -29,6 +29,8 @@ use kamu_resources::{
     ResourceSummaryRow,
     TypeUri,
     UpdateResourceError,
+    description_annotation_type_ref,
+    get_description,
     new_pending_resource_status,
 };
 
@@ -636,9 +638,16 @@ pub async fn test_update_resource(catalog: &Catalog) {
     repo.create_resource(&snapshot).await.unwrap();
 
     let event_id = EventID::new(1);
+    let mut annotations = snapshot.headers.annotations.entries.clone();
+    annotations.insert(
+        description_annotation_type_ref(),
+        serde_json::json!("Updated description"),
+    );
     let updated = ResourceSnapshot {
         headers: ResourceHeaders {
-            description: Some("Updated description".to_string()),
+            annotations: kamu_resources::ResourceAnnotations {
+                entries: annotations,
+            },
             generation: 1,
             updated_at: Utc::now(),
             ..snapshot.headers.clone()
@@ -655,8 +664,8 @@ pub async fn test_update_resource(catalog: &Catalog) {
         .unwrap()
         .unwrap();
     assert_eq!(
-        found.headers.description,
-        Some("Updated description".to_string())
+        get_description(&found.headers.annotations.entries),
+        Some("Updated description")
     );
     assert_eq!(found.headers.generation, 1);
     assert_eq!(found.last_event_id, Some(event_id));
@@ -744,9 +753,22 @@ pub async fn test_update_resources(catalog: &Catalog) {
     let first_event_id = EventID::new(1);
     let second_event_id = EventID::new(2);
 
+    let mut first_annotations = first.headers.annotations.entries.clone();
+    first_annotations.insert(
+        description_annotation_type_ref(),
+        serde_json::json!("Updated first"),
+    );
+    let mut second_annotations = second.headers.annotations.entries.clone();
+    second_annotations.insert(
+        description_annotation_type_ref(),
+        serde_json::json!("Updated second"),
+    );
+
     let updated_first = ResourceSnapshot {
         headers: ResourceHeaders {
-            description: Some("Updated first".to_string()),
+            annotations: kamu_resources::ResourceAnnotations {
+                entries: first_annotations,
+            },
             generation: 1,
             updated_at: Utc::now(),
             ..first.headers.clone()
@@ -756,7 +778,9 @@ pub async fn test_update_resources(catalog: &Catalog) {
     };
     let updated_second = ResourceSnapshot {
         headers: ResourceHeaders {
-            description: Some("Updated second".to_string()),
+            annotations: kamu_resources::ResourceAnnotations {
+                entries: second_annotations,
+            },
             generation: 1,
             updated_at: Utc::now(),
             ..second.headers.clone()
@@ -790,15 +814,15 @@ pub async fn test_update_resources(catalog: &Catalog) {
         .unwrap();
 
     assert_eq!(
-        found_first.headers.description,
-        updated_first.headers.description
+        get_description(&found_first.headers.annotations.entries),
+        get_description(&updated_first.headers.annotations.entries)
     );
     assert_eq!(found_first.headers.generation, 1);
     assert_eq!(found_first.last_event_id, Some(first_event_id));
 
     assert_eq!(
-        found_second.headers.description,
-        updated_second.headers.description
+        get_description(&found_second.headers.annotations.entries),
+        get_description(&updated_second.headers.annotations.entries)
     );
     assert_eq!(found_second.headers.generation, 1);
     assert_eq!(found_second.last_event_id, Some(second_event_id));

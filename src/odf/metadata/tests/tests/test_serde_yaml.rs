@@ -1027,7 +1027,6 @@ fn test_serde_resource_input_generics() {
             headers: ResourceHeadersInput {
                 id: None,
                 name: "my-secret".parse().unwrap(),
-                description: None,
                 account: None,
                 labels: None,
                 annotations: None,
@@ -1051,7 +1050,6 @@ fn test_serde_resource_input_generics() {
             headers: ResourceHeadersInput {
                 id: None,
                 name: "my-secret".parse().unwrap(),
-                description: None,
                 account: None,
                 labels: None,
                 annotations: None,
@@ -1091,7 +1089,6 @@ fn test_serde_resource_input_generics() {
             headers: ResourceHeadersInput {
                 id: None,
                 name: "my-secret".parse().unwrap(),
-                description: None,
                 account: None,
                 labels: None,
                 annotations: None,
@@ -1163,7 +1160,6 @@ fn test_serde_resource_input_short_forms() {
             headers: ResourceHeadersInput {
                 id: None,
                 name: "my-thing".parse().unwrap(),
-                description: None,
                 account: Some("sergiimk".parse().unwrap()),
                 labels: None,
                 annotations: None,
@@ -1251,7 +1247,6 @@ fn test_serde_resource_input_refs() {
             headers: ResourceHeadersInput {
                 id: None,
                 name: "alice-bob".parse().unwrap(),
-                description: None,
                 account: None,
                 labels: None,
                 annotations: None,
@@ -1381,7 +1376,6 @@ fn test_serde_resource_canonical() {
             headers: ResourceHeaders {
                 id: "7149c2f9-41f2-4cbb-be8f-7d7747525f9a".parse().unwrap(),
                 name: "my-secret".parse().unwrap(),
-                description: None,
                 account: AccountHandle {
                     id: AccountID::from_did_str("did:odf:fed01816ef0a9abe93aba816ef0a9abe93aba90e6065747170300c0d3d30c2cd8d7a4").unwrap(),
                     name: "sergiimk".parse().unwrap(),

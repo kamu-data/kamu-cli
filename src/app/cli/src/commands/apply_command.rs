@@ -664,7 +664,6 @@ impl ApplyPrinter<'_> {
             #[serde_as(as = "odf::metadata::serde::yaml::auth::AccountHandle")]
             account: &'a odf::AccountHandle,
             name: &'a str,
-            description: &'a Option<String>,
             #[serde_as(as = "odf::metadata::serde::yaml::resource::ResourceLabels")]
             labels: &'a kamu_resources::ResourceLabels,
             #[serde_as(as = "odf::metadata::serde::yaml::resource::ResourceAnnotations")]
@@ -681,7 +680,6 @@ impl ApplyPrinter<'_> {
                     id: &resource.headers.id,
                     account: &resource.headers.account,
                     name: &resource.headers.name,
-                    description: &resource.headers.description,
                     labels: &resource.headers.labels,
                     annotations: &resource.headers.annotations,
                     generation: resource.headers.generation,

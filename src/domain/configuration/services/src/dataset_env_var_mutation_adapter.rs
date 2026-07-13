@@ -381,7 +381,6 @@ impl DatasetEnvVarMutationAdapterImpl {
                 id: Some(snapshot.headers.id),
                 account: Some(snapshot.headers.account.into()),
                 name: snapshot.headers.name,
-                description: snapshot.headers.description,
                 labels: Some(snapshot.headers.labels),
                 annotations: Some(snapshot.headers.annotations),
             };
@@ -450,7 +449,6 @@ impl DatasetEnvVarMutationAdapterImpl {
                 id: Some(snapshot.headers.id),
                 account: Some(snapshot.headers.account.into()),
                 name: snapshot.headers.name,
-                description: snapshot.headers.description,
                 labels: Some(snapshot.headers.labels),
                 annotations: Some(snapshot.headers.annotations),
             };
@@ -668,7 +666,6 @@ impl DatasetEnvVarMutationAdapterImpl {
             id: None,
             account: Some(odf::metadata::auth::AccountRef::Handle(account)),
             name: resource_name,
-            description: None,
             labels: Some(kamu_resources::ResourceLabels {
                 entries: BTreeMap::new(),
             }),

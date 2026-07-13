@@ -15,7 +15,6 @@ INSERT OR IGNORE INTO resources (
     account_id,
     resource_schema,
     resource_name,
-    description,
     labels,
     annotations,
     spec,
@@ -35,7 +34,6 @@ SELECT
     de.owner_id                                                                 AS account_id,
     'https://opendatafabric.org/schemas/config/v1alpha1/VariableSet' AS resource_schema,                                                          
     'legacy-vars-' || substr(dev.dataset_id, 9)                                 AS resource_name,
-    NULL                                                                        AS description,
     '{}'                                                                        AS labels,
     '{}'                                                                        AS annotations,
     json_object(
@@ -143,7 +141,6 @@ INSERT OR IGNORE INTO resources (
     account_id,
     resource_schema,
     resource_name,
-    description,
     labels,
     annotations,
     spec,
@@ -163,7 +160,6 @@ SELECT
     de.owner_id                                                                 AS account_id,
     'https://opendatafabric.org/schemas/config/v1alpha1/SecretSet' AS resource_schema,                                                          
     'legacy-secrets-' || substr(dev.dataset_id, 9)                              AS resource_name,
-    NULL                                                                        AS description,
     '{}'                                                                        AS labels,
     '{}'                                                                        AS annotations,
     json_object(
@@ -277,7 +273,7 @@ SELECT
     '{"Created":{"event_time":"' || r.created_at || '","id":"' || r.resource_id
         || '","headers":{"account":"' || r.account_id
         || '","name":"' || r.resource_name
-        || '","description":null,"labels":{},"annotations":{}},"spec":' || r.spec || '}}'
+        || '","labels":{},"annotations":{}},"spec":' || r.spec || '}}'
 FROM resources r
 WHERE r.resource_schema = 'https://opendatafabric.org/schemas/config/v1alpha1/VariableSet'
   AND r.resource_name LIKE 'legacy-vars-%'
@@ -339,7 +335,7 @@ SELECT
     '{"Created":{"event_time":"' || r.created_at || '","id":"' || r.resource_id
         || '","headers":{"account":"' || r.account_id
         || '","name":"' || r.resource_name
-        || '","description":null,"labels":{},"annotations":{}},"spec":' || r.spec || '}}'
+        || '","labels":{},"annotations":{}},"spec":' || r.spec || '}}'
 FROM resources r
 WHERE r.resource_schema = 'https://opendatafabric.org/schemas/config/v1alpha1/SecretSet'
   AND r.resource_name LIKE 'legacy-secrets-%'
