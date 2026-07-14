@@ -13,7 +13,7 @@ use std::sync::{Arc, Mutex};
 use dill::*;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::CurrentAccountSubject;
-use odf::metadata::serde::yaml::Manifest;
+use odf::metadata::serde::yaml::legacy::Manifest;
 use url::Url;
 
 use crate::WorkspaceLayout;

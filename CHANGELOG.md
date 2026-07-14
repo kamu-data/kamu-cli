@@ -30,6 +30,38 @@ Recommendation: for ease of reading, use the following format:
 ### Fixed
 - Elasticsearch: added ID escaping for API requests
 
+## [Unreleased]
+### Changed
+- Major reorganization of `odf::metadata` sub-crate for IaC changes (see [RFC-018](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/018-iac-resource-framework.md))
+- Added codegen types and formats for many prototype IaC resources
+
+## [0.264.0] - 2026-06-29
+### Added
+- Uniqueness constraint for wallet accounts
+- HTTP endpoint for signing EIP-712 typed data
+- Identity: secondary Secp256k1 private key
+### Changed
+- `DatasetActionAuthorizer::check_action_allowed()` now returns an error if the dataset is not found
+- Optimization: vector ReBAC access classification is now performed in parallel
+
+## [0.263.4] - 2026-06-01
+### Fixed
+- `observability`: fixed build when using the crate as an external dependency
+
+## [0.263.3] - 2026-05-29
+### Added
+- Tracing will report when DB transaction is dropped without commit or rollback
+- Tracing will report when HTTP request is aborted e.g. due to client disconnecting before receiving a response
+- New `/system/probe` HTTP endpoint to simplify E2E testing of observability stack, panic reporting, and transaction handling
+
+## [0.263.2] - 2026-05-27
+### Fixed
+- S3 PutObject hangup issue when invoked from /ingest API
+
+## [0.263.1] - 2026-05-20
+### Fixed
+- Elasticsearch: added ID escaping for API requests
+
 ## [0.263.0] - 2026-05-16
 ### Added
 - **Breaking:** The `read.schema` field now expects an ODF schema, replacing DDL schema with our unified format

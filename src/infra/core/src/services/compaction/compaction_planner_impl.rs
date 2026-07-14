@@ -168,7 +168,7 @@ impl CompactionPlannerImpl {
         Ok(CompactionPlan {
             data_slice_batches,
             old_head: head,
-            offset_column_name: vocab.offset_column,
+            offset_column_name: vocab.offset_column().into(),
             seed: maybe_seed.expect("Seed must be present"),
             old_num_blocks,
         })

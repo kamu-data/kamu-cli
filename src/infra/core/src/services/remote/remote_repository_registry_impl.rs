@@ -14,7 +14,7 @@ use std::sync::Arc;
 
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::*;
-use odf::metadata::serde::yaml::Manifest;
+use odf::metadata::serde::yaml::legacy::Manifest;
 use url::Url;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

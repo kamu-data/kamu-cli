@@ -1019,11 +1019,11 @@ impl MetadataChainVisitor for ValidateSetDataSchemaVisitor<'_> {
                 .clone()
                 .upgrade()
                 .schema
-                .field_by_name(&vocab.event_time_column)
+                .field_by_name(vocab.event_time_column())
                 .map(|f| f.r#type.clone())
         } else {
             new_schema
-                .field_by_name(&vocab.event_time_column)
+                .field_by_name(vocab.event_time_column())
                 .map(|f| f.r#type.clone())
         };
 

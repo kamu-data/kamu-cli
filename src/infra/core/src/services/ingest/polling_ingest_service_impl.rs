@@ -18,7 +18,7 @@ use kamu_core::ingest::*;
 use kamu_core::*;
 use kamu_datasets::ResolvedDataset;
 use kamu_ingest_datafusion::DataWriterDataFusion;
-use odf::metadata::serde::yaml::Manifest;
+use odf::metadata::serde::yaml::legacy::Manifest;
 use odf::utils::data::DataFrameExt;
 use random_strings::get_random_name;
 use time_source::SystemTimeSource;

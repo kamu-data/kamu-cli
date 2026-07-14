@@ -48,7 +48,10 @@ impl<'a> MetadataChainMut<'a> {
                 let de = odf::metadata::serde::yaml::YamlMetadataEventDeserializer;
                 match de.read_manifest(event.as_bytes()) {
                     Ok(event) => event,
-                    Err(e @ odf::metadata::serde::Error::SerdeError { .. }) => {
+                    Err(
+                        e @ (odf::metadata::serde::Error::SerdeError { .. }
+                        | odf::metadata::serde::Error::Validation(_)),
+                    ) => {
                         return Ok(CommitResult::Malformed(MetadataManifestMalformed {
                             message: e.to_string(),
                         }));

@@ -12,7 +12,11 @@ use std::path::Path;
 use chrono::{DateTime, Utc};
 
 use super::IDFactory;
-use crate::*;
+use crate::Multihash;
+use crate::data::*;
+use crate::dataset::*;
+use crate::legacy::*;
+use crate::source::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

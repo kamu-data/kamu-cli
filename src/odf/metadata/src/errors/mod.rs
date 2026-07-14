@@ -8,5 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod access_error;
+mod validation_error;
 
 pub use access_error::*;
+pub use validation_error::*;

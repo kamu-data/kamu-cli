@@ -27,17 +27,17 @@ fn write_test_data(path: impl AsRef<Path>) {
 
     let schema = Arc::new(Schema::new(vec![
         Field::new(
-            odf::metadata::DatasetVocabulary::DEFAULT_OFFSET_COLUMN_NAME,
+            odf::metadata::DatasetVocabulary::default_offset_column(),
             DataType::UInt64,
             false,
         ),
         Field::new(
-            odf::metadata::DatasetVocabulary::DEFAULT_SYSTEM_TIME_COLUMN_NAME,
+            odf::metadata::DatasetVocabulary::default_system_time_column(),
             DataType::Timestamp(TimeUnit::Millisecond, Some("UTC".into())),
             false,
         ),
         Field::new(
-            odf::metadata::DatasetVocabulary::DEFAULT_EVENT_TIME_COLUMN_NAME,
+            odf::metadata::DatasetVocabulary::default_event_time_column(),
             DataType::Timestamp(TimeUnit::Millisecond, Some("UTC".into())),
             false,
         ),
