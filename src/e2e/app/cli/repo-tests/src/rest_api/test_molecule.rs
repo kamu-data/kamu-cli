@@ -348,7 +348,7 @@ pub async fn test_molecule_activity_change_by_for_remove(
     // Project activity (should surface admin changeBy on remove)
     // Retrying due to eventual consistency of ES indexing
     let retry_strategy = FixedInterval::from_millis(5_000).take(6); // 30s
-    Retry::spawn(retry_strategy, || async {
+    Retry::start(retry_strategy, || async {
         let project_activity = kamu_api_server_client
             .graphql_api_call_ex(Request::new(LIST_PROJECT_ACTIVITY_QUERY).variables(
                 Variables::from_json(json!({
@@ -407,7 +407,7 @@ pub async fn test_molecule_activity_change_by_for_remove(
     // Global activity should mirror the same changeBy values
     // Retrying due to eventual consistency of ES indexing
     let retry_strategy = FixedInterval::from_millis(5_000).take(6); // 30s
-    Retry::spawn(retry_strategy, || async {
+    Retry::start(retry_strategy, || async {
         let global_activity = kamu_api_server_client
             .graphql_api_call_ex(Request::new(LIST_GLOBAL_ACTIVITY_QUERY).variables(
                 Variables::from_json(json!({

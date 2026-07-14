@@ -910,7 +910,6 @@ fn expected_ok_response_for_molecule_account_id() -> Result<serde_json::Value, S
     }))
 }
 
-#[expect(unused)]
 #[expect(clippy::unnecessary_wraps)]
 fn expected_ok_response_for_molecule_project_account_id() -> Result<serde_json::Value, String> {
     Ok(json!({
@@ -939,7 +938,6 @@ fn expected_ok_response_for_molecule_dev_account_id() -> Result<serde_json::Valu
     }))
 }
 
-#[expect(unused)]
 #[expect(clippy::unnecessary_wraps)]
 fn expected_ok_response_for_molecule_dev_project_account_id() -> Result<serde_json::Value, String> {
     Ok(json!({

@@ -166,7 +166,7 @@ impl MoleculeViewProjectActivitiesUseCaseImpl {
                 col("molecule_access_level").is_not_null().and(
                     // For any data room update, we always have two entries: -C and +C.
                     // We can ignore all -C entries.
-                    col(vocab.operation_type_column.as_str())
+                    col(vocab.operation_type_column())
                         .not_eq(lit(OperationType::CorrectFrom as i32)),
                 ),
             )
