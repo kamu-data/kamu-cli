@@ -105,6 +105,23 @@ impl DatabaseTransactionRunner {
         }
     }
 
+    pub async fn maybe_transactional<H, HFut, HFutResultT, HFutResultE>(
+        &self,
+        transactional: bool,
+        callback: H,
+    ) -> Result<HFutResultT, HFutResultE>
+    where
+        H: FnOnce(dill::Catalog) -> HFut,
+        HFut: std::future::Future<Output = Result<HFutResultT, HFutResultE>>,
+        HFutResultE: From<InternalError>,
+    {
+        if !transactional {
+            callback(self.catalog.clone()).await
+        } else {
+            self.transactional(callback).await
+        }
+    }
+
     pub async fn transactional_with<Iface, H, HFut, HFutResultT, HFutResultE>(
         &self,
         callback: H,

@@ -35,7 +35,7 @@ use datafusion::sql::sqlparser::parser::{Parser, ParserError};
 /// ensure that all times are parsed and adjusted if necessary to UTC timezone.
 pub fn parse_ddl_to_odf_schema(
     ddl: &str,
-) -> Result<odf_metadata::schema::DataSchema, odf_metadata::UnsupportedSchema> {
+) -> Result<odf_metadata::schema::DataSchema, odf_metadata::data::UnsupportedSchema> {
     use datafusion::sql::sqlparser::ast::{ColumnOption, ColumnOptionDef, Statement};
     use odf_metadata::schema::*;
 
@@ -76,7 +76,7 @@ pub fn parse_ddl_to_odf_schema(
 
 fn convert_sql_to_odf_data_type(
     data_type: &datafusion::sql::sqlparser::ast::DataType,
-) -> Result<odf_metadata::schema::DataType, odf_metadata::UnsupportedSchema> {
+) -> Result<odf_metadata::schema::DataType, odf_metadata::data::UnsupportedSchema> {
     use datafusion::sql::sqlparser::ast::DataType as SqlDataType;
     use odf_metadata::schema::*;
 

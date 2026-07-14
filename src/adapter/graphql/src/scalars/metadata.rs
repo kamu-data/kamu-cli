@@ -51,7 +51,7 @@ impl MetadataBlockExtended {
             system_time: block.system_time,
             author,
             event: block.event,
-            sequence_number: block.sequence_number,
+            sequence_number: block.sequence_number.into(),
             block: original_block,
         })
     }

@@ -128,7 +128,7 @@ impl MergeStrategySnapshot {
 
                 // Event time in `new` can be null and this alone should not be the reason to
                 // consider the row changed
-                if c != self.vocab.event_time_column {
+                if c != self.vocab.event_time_column() {
                     distinct
                 } else {
                     and(
@@ -232,7 +232,7 @@ impl MergeStrategySnapshot {
             .fields()
             .iter()
             .filter(|f| !f.is_nullable())
-            .filter(|f| *f.name() != self.vocab.event_time_column)
+            .filter(|f| *f.name() != self.vocab.event_time_column())
             .map(|f| f.name().clone())
             .collect();
 
@@ -251,7 +251,7 @@ impl MergeStrategySnapshot {
             when(old_col(pk).is_null(), lit(Op::Append as i32))
                 .when(new_col(pk).is_null(), lit(Op::Retract as i32))
                 .otherwise(lit(Op::CorrectTo as i32))?
-                .alias(&self.vocab.operation_type_column),
+                .alias(self.vocab.operation_type_column()),
         );
         select_app_retr_correct_to.extend(new.schema().fields().iter().map(|f| {
             when(new_col(pk).is_null(), old_col(f.name()))
@@ -265,7 +265,7 @@ impl MergeStrategySnapshot {
         // TODO: Cast to `u8` after Spark is updated
         // See: https://github.com/kamu-data/kamu-cli/issues/445
         select_correct_from
-            .push(lit(Op::CorrectFrom as i32).alias(&self.vocab.operation_type_column));
+            .push(lit(Op::CorrectFrom as i32).alias(self.vocab.operation_type_column()));
         select_correct_from.extend(
             new.schema()
                 .fields()
@@ -343,13 +343,13 @@ impl MergeStrategy for MergeStrategySnapshot {
             // Consider all records as appends
             let df = new
                 .with_column(
-                    &self.vocab.operation_type_column,
+                    self.vocab.operation_type_column(),
                     // TODO: Cast to `u8` after Spark is updated
                     // See: https://github.com/kamu-data/kamu-cli/issues/445
                     lit(odf::metadata::OperationType::Append as i32),
                 )
                 .int_err()?
-                .columns_to_front(&[&self.vocab.operation_type_column])
+                .columns_to_front(&[self.vocab.operation_type_column()])
                 .int_err()?;
 
             return Ok(df);
@@ -358,7 +358,10 @@ impl MergeStrategy for MergeStrategySnapshot {
         // Project existing CDC ledger into a state
         let proj = self
             .project(prev.unwrap())?
-            .without_columns(&[&self.vocab.offset_column, &self.vocab.operation_type_column])
+            .without_columns(&[
+                self.vocab.offset_column(),
+                self.vocab.operation_type_column(),
+            ])
             .int_err()?;
 
         // Diff state with new data
@@ -374,7 +377,7 @@ impl MergeStrategy for MergeStrategySnapshot {
             .iter()
             .map(|c| col(Column::from_name(c)).sort(true, true))
             .chain(std::iter::once(
-                col(Column::from_name(&self.vocab.operation_type_column)).sort(true, true),
+                col(Column::from_name(self.vocab.operation_type_column())).sort(true, true),
             ))
             .collect()
     }

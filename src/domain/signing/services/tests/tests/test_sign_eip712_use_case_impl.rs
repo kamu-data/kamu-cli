@@ -175,6 +175,12 @@ async fn test_execute_matrix() {
                     to_odf_did(&molecule_account_id()),
                     expected_ok_response_for_molecule_account_id(),
                 ),
+                // TODO: Uncomment after sku/molecule merging
+                // (
+                //     "1) Test 8",
+                //     to_odf_did(&molecule_project_account_id()),
+                //     expected_ok_response_for_molecule_project_account_id(),
+                // ),
                 (
                     "1) Test 8",
                     to_odf_did(&molecule_project_account_id()),
@@ -185,6 +191,12 @@ async fn test_execute_matrix() {
                     to_odf_did(&molecule_dev_account_id()),
                     expected_ok_response_for_molecule_dev_account_id(),
                 ),
+                // TODO: Uncomment after sku/molecule merging
+                // (
+                //     "1) Test 10",
+                //     to_odf_did(&molecule_dev_project_account_id()),
+                //     expected_ok_response_for_molecule_dev_project_account_id(),
+                // ),
                 (
                     "1) Test 10",
                     to_odf_did(&molecule_dev_project_account_id()),
@@ -250,6 +262,12 @@ async fn test_execute_matrix() {
                     to_odf_did(&molecule_account_id()),
                     expected_ok_response_for_molecule_account_id(),
                 ),
+                // TODO: Uncomment after sku/molecule merging
+                // (
+                //     "2) Test 8",
+                //     to_odf_did(&molecule_project_account_id()),
+                //     expected_ok_response_for_molecule_project_account_id(),
+                // ),
                 (
                     "2) Test 8",
                     to_odf_did(&molecule_project_account_id()),
@@ -260,6 +278,12 @@ async fn test_execute_matrix() {
                     to_odf_did(&molecule_dev_account_id()),
                     expected_not_found(to_odf_did(&molecule_dev_account_id())),
                 ),
+                // TODO: Uncomment after sku/molecule merging
+                // (
+                //     "2) Test 10",
+                //     to_odf_did(&molecule_dev_project_account_id()),
+                //     expected_not_found(to_odf_did(&molecule_dev_project_account_id())),
+                // ),
                 (
                     "2) Test 10",
                     to_odf_did(&molecule_dev_project_account_id()),
@@ -325,6 +349,12 @@ async fn test_execute_matrix() {
                     to_odf_did(&molecule_account_id()),
                     expected_not_found(to_odf_did(&molecule_account_id())),
                 ),
+                // TODO: Uncomment after sku/molecule merging
+                // (
+                //     "3) Test 8",
+                //     to_odf_did(&molecule_project_account_id()),
+                //     expected_not_found(to_odf_did(&molecule_project_account_id())),
+                // ),
                 (
                     "3) Test 8",
                     to_odf_did(&molecule_project_account_id()),
@@ -335,6 +365,12 @@ async fn test_execute_matrix() {
                     to_odf_did(&molecule_dev_account_id()),
                     expected_ok_response_for_molecule_dev_account_id(),
                 ),
+                // TODO: Uncomment after sku/molecule merging
+                // (
+                //     "3) Test 10",
+                //     to_odf_did(&molecule_dev_project_account_id()),
+                //     expected_ok_response_for_molecule_dev_project_account_id(),
+                // ),
                 (
                     "3) Test 10",
                     to_odf_did(&molecule_dev_project_account_id()),
@@ -400,6 +436,12 @@ async fn test_execute_matrix() {
                     to_odf_did(&molecule_account_id()),
                     expected_not_found(to_odf_did(&molecule_account_id())),
                 ),
+                // TODO: Uncomment after sku/molecule merging
+                // (
+                //     "4) Test 8",
+                //     to_odf_did(&molecule_project_account_id()),
+                //     expected_not_found(to_odf_did(&molecule_project_account_id())),
+                // ),
                 (
                     "4) Test 8",
                     to_odf_did(&molecule_project_account_id()),
@@ -410,6 +452,12 @@ async fn test_execute_matrix() {
                     to_odf_did(&molecule_dev_account_id()),
                     expected_not_found(to_odf_did(&molecule_dev_account_id())),
                 ),
+                // TODO: Uncomment after sku/molecule merging
+                // (
+                //     "4) Test 10",
+                //     to_odf_did(&molecule_dev_project_account_id()),
+                //     expected_not_found(to_odf_did(&molecule_dev_project_account_id())),
+                // ),
                 (
                     "4) Test 10",
                     to_odf_did(&molecule_dev_project_account_id()),
@@ -475,6 +523,12 @@ async fn test_execute_matrix() {
                     to_odf_did(&molecule_account_id()),
                     expected_not_found(to_odf_did(&molecule_account_id())),
                 ),
+                // TODO: Uncomment after sku/molecule merging
+                // (
+                //     "5) Test 8",
+                //     to_odf_did(&molecule_project_account_id()),
+                //     expected_not_found(to_odf_did(&molecule_project_account_id())),
+                // ),
                 (
                     "5) Test 8",
                     to_odf_did(&molecule_project_account_id()),
@@ -485,6 +539,12 @@ async fn test_execute_matrix() {
                     to_odf_did(&molecule_dev_account_id()),
                     expected_not_found(to_odf_did(&molecule_dev_account_id())),
                 ),
+                // TODO: Uncomment after sku/molecule merging
+                // (
+                //     "5) Test 10",
+                //     to_odf_did(&molecule_dev_project_account_id()),
+                //     expected_not_found(to_odf_did(&molecule_dev_project_account_id())),
+                // ),
                 (
                     "5) Test 10",
                     to_odf_did(&molecule_dev_project_account_id()),

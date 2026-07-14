@@ -45,12 +45,12 @@ impl CollectionEntry {
             .record
             .extra_data
             .as_mut_map()
-            .remove(&vocab.offset_column);
+            .remove(vocab.offset_column());
         event
             .record
             .extra_data
             .as_mut_map()
-            .remove(&vocab.operation_type_column);
+            .remove(vocab.operation_type_column());
 
         Ok(Self {
             system_time: event.system_time,

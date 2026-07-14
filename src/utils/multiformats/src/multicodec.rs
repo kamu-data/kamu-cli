@@ -9,6 +9,9 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+use crate::{DeserializeError, Multiformat};
+
+/// See: <https://github.com/multiformats/multicodec/blob/master/table.csv>
 #[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[allow(non_camel_case_types)]
@@ -17,6 +20,10 @@ pub enum Multicodec {
     Sha2_256 = 0x12,
     Sha3_256 = 0x16,
     Ed25519Pub = 0xed,
+
+    /// See: <https://github.com/ChainAgnostic/multidid>
+    MultiDid = 0x0d1d,
+
     // -- Private use area --
     // Arrow hashes range
     Arrow0_Sha3_256 = 0x0030_0016,
@@ -24,6 +31,23 @@ pub enum Multicodec {
     ODFMetadataBlock = 0x0040_0000,
     ODFDatasetSnapshot = 0x0040_0001,
     // When adding codes don't forget to add them into traits below
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl Multicodec {
+    pub fn decode(bytes: &[u8]) -> Result<(Multicodec, &[u8]), DeserializeError<Self>> {
+        let (code, rest) =
+            unsigned_varint::decode::u32(bytes).map_err(DeserializeError::new_from)?;
+        let mc: Self = code.try_into().map_err(DeserializeError::new_from)?;
+        Ok((mc, rest))
+    }
+}
+
+impl Multiformat for Multicodec {
+    fn format_name() -> &'static str {
+        "multicodec"
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -56,6 +80,7 @@ impl std::str::FromStr for Multicodec {
             "sha2-256" => Ok(Multicodec::Sha2_256),
             "sha3-256" => Ok(Multicodec::Sha3_256),
             "ed25519-pub" => Ok(Multicodec::Ed25519Pub),
+            "multidid" => Ok(Multicodec::MultiDid),
             "arrow0-sha3-256" => Ok(Multicodec::Arrow0_Sha3_256),
             "odf-metadata-block" => Ok(Multicodec::ODFMetadataBlock),
             "odf-dataset-snapshot" => Ok(Multicodec::ODFDatasetSnapshot),
@@ -79,6 +104,7 @@ impl std::fmt::Display for Multicodec {
             Multicodec::Sha2_256 => "sha2-256",
             Multicodec::Sha3_256 => "sha3-256",
             Multicodec::Ed25519Pub => "ed25519-pub",
+            Multicodec::MultiDid => "multidid",
             Multicodec::Arrow0_Sha3_256 => "arrow0-sha3-256",
             Multicodec::ODFMetadataBlock => "odf-metadata-block",
             Multicodec::ODFDatasetSnapshot => "odf-dataset-snapshot",

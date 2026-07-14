@@ -1654,7 +1654,7 @@ impl FlowApi<'_> {
     pub async fn wait(&self, dataset_id: &odf::DatasetID, expected_flow_count: usize) {
         let retry_strategy = FixedInterval::from_millis(5_000).take(18); // 1m 30s
 
-        Retry::spawn(retry_strategy, || async {
+        Retry::start(retry_strategy, || async {
             let response = self
                 .client
                 .graphql_api_call(

@@ -148,7 +148,7 @@ async fn init_v0_workspace(workspace_path: &Path) {
 
     // Dataset config
     let dataset_config = DatasetConfig::default();
-    let manifest = odf::metadata::serde::yaml::Manifest {
+    let manifest = odf::metadata::serde::yaml::legacy::Manifest {
         kind: "DatasetConfig".to_owned(),
         version: 1,
         content: dataset_config,

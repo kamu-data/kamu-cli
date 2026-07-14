@@ -286,7 +286,7 @@ pub struct E2EApi<'a> {
 impl E2EApi<'_> {
     pub async fn ready(&self) -> Result<(), InternalError> {
         let retry_strategy = FixedInterval::from_millis(1_000).take(10);
-        let response = Retry::spawn(retry_strategy, || async {
+        let response = Retry::start(retry_strategy, || async {
             let endpoint = self.client.server_base_url.join("e2e/health").unwrap();
             let response = self
                 .client

@@ -103,9 +103,8 @@ impl DidKey {
 
     /// Reads DID from canonical byte representation
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, DeserializeError<DidKey>> {
-        let (key_type, key_bytes) = uvar::decode::u32(bytes).map_err(DeserializeError::new_from)?;
-        let key_type: Multicodec = key_type.try_into().map_err(DeserializeError::new_from)?;
-
+        let (key_type, key_bytes) =
+            Multicodec::decode(bytes).map_err(DeserializeError::new_from)?;
         Self::new(key_type, key_bytes).map_err(DeserializeError::new_from)
     }
 

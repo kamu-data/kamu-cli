@@ -53,7 +53,7 @@ impl MergeStrategyUpsertStream {
                             .collect(),
                     )
                     .order_by(vec![
-                        col(Column::from_name(&self.vocab.offset_column)).sort(false, false),
+                        col(Column::from_name(self.vocab.offset_column())).sort(false, false),
                     ])
                     .build()
                     .int_err()?
@@ -64,15 +64,15 @@ impl MergeStrategyUpsertStream {
                 col(Column::from_name(rank_col)).eq(lit(1)).and(
                     // TODO: Cast to `u8` after Spark is updated
                     // See: https://github.com/kamu-data/kamu-cli/issues/445
-                    col(Column::from_name(&self.vocab.operation_type_column))
+                    col(Column::from_name(self.vocab.operation_type_column()))
                         .not_eq(lit(Op::Retract as i32)),
                 ),
             )
             .int_err()?
             .without_columns(&[
                 rank_col,
-                &self.vocab.offset_column,
-                &self.vocab.operation_type_column,
+                self.vocab.offset_column(),
+                self.vocab.operation_type_column(),
             ])
             .int_err()?;
 
@@ -88,7 +88,7 @@ impl MergeStrategyUpsertStream {
         let rank_col = "__rank";
 
         let with_offsets = upserts.with_column(
-            &self.vocab.offset_column,
+            self.vocab.offset_column(),
             datafusion::functions_window::row_number::row_number(),
         )?;
 
@@ -102,13 +102,13 @@ impl MergeStrategyUpsertStream {
                             .collect(),
                     )
                     .order_by(vec![
-                        col(Column::from_name(&self.vocab.offset_column)).sort(false, false),
+                        col(Column::from_name(self.vocab.offset_column())).sort(false, false),
                     ])
                     .build()?
                     .alias(rank_col),
             ])?
             .filter(col(Column::from_name(rank_col)).eq(lit(1)))?
-            .without_columns(&[rank_col, &self.vocab.offset_column])?;
+            .without_columns(&[rank_col, self.vocab.offset_column()])?;
 
         Ok(proj)
     }
@@ -132,17 +132,17 @@ impl MergeStrategyUpsertStream {
             .iter()
             .filter(|f| {
                 !self.primary_key.contains(f.name())
-                    && *f.name() != self.vocab.operation_type_column
+                    && *f.name() != self.vocab.operation_type_column()
             })
             .map(|f| f.name().as_str());
 
         or(
             // Retraction and previous state exists
-            new_col(&self.vocab.operation_type_column)
+            new_col(self.vocab.operation_type_column())
                 .eq(lit(Op::Retract as i32))
                 .and(old_col(pk).is_not_null()),
             // Upsert
-            new_col(&self.vocab.operation_type_column)
+            new_col(self.vocab.operation_type_column())
                 .not_eq(lit(Op::Retract as i32))
                 .and(
                     ordinary_columns
@@ -152,7 +152,7 @@ impl MergeStrategyUpsertStream {
 
                             // Event time in `new` can be null and this alone should not be the
                             // reason to consider the row changed
-                            if c == self.vocab.event_time_column {
+                            if c == self.vocab.event_time_column() {
                                 and(new_col(c).is_not_null(), distinct)
                             } else {
                                 distinct
@@ -361,7 +361,7 @@ impl MergeStrategyUpsertStream {
             .fields()
             .iter()
             .filter(|f| !f.is_nullable())
-            .filter(|f| *f.name() != self.vocab.event_time_column)
+            .filter(|f| *f.name() != self.vocab.event_time_column())
             .map(|f| f.name().clone())
             .collect();
 
@@ -375,7 +375,7 @@ impl MergeStrategyUpsertStream {
             .fields()
             .iter()
             .map(|f| f.name().clone())
-            .filter(|c| *c != self.vocab.operation_type_column)
+            .filter(|c| *c != self.vocab.operation_type_column())
             .collect();
 
         let without_intermediate_updates = self.without_intermediate_updates(new)?;
@@ -390,16 +390,16 @@ impl MergeStrategyUpsertStream {
             // TODO: Cast to `u8` after Spark is updated
             // See: https://github.com/kamu-data/kamu-cli/issues/445
             when(
-                new_col(&self.vocab.operation_type_column).eq(lit(Op::Retract as i32)),
+                new_col(self.vocab.operation_type_column()).eq(lit(Op::Retract as i32)),
                 lit(Op::Retract as i32),
             )
             .when(old_col(pk).is_null(), lit(Op::Append as i32))
             .otherwise(lit(Op::CorrectTo as i32))?
-            .alias(&self.vocab.operation_type_column),
+            .alias(self.vocab.operation_type_column()),
         );
         select_app_retr_correct_to.extend(data_fields.iter().map(|c| {
             when(
-                new_col(&self.vocab.operation_type_column).eq(lit(Op::Retract as i32)),
+                new_col(self.vocab.operation_type_column()).eq(lit(Op::Retract as i32)),
                 old_col(c),
             )
             .otherwise(new_col(c))
@@ -412,7 +412,7 @@ impl MergeStrategyUpsertStream {
         // TODO: Cast to `u8` after Spark is updated
         // See: https://github.com/kamu-data/kamu-cli/issues/445
         select_correct_from
-            .push(lit(Op::CorrectFrom as i32).alias(&self.vocab.operation_type_column));
+            .push(lit(Op::CorrectFrom as i32).alias(self.vocab.operation_type_column()));
         select_correct_from.extend(data_fields.iter().map(|c| old_col(c).alias(c)));
 
         // TODO: PERF: Currently DataFusion will perform full join twice, although it
@@ -423,7 +423,7 @@ impl MergeStrategyUpsertStream {
             .union(
                 LogicalPlanBuilder::from(diff)
                     .filter(
-                        new_col(&self.vocab.operation_type_column)
+                        new_col(self.vocab.operation_type_column())
                             .not_eq(lit(Op::Retract as i32))
                             .and(old_col(pk).is_not_null())
                             .and(new_col(pk).is_not_null()),
@@ -457,11 +457,11 @@ impl MergeStrategyUpsertStream {
         // Add op column if does not exist
         let new = if new
             .schema()
-            .has_column_with_unqualified_name(&self.vocab.operation_type_column)
+            .has_column_with_unqualified_name(self.vocab.operation_type_column())
         {
             new
         } else {
-            new.with_column(&self.vocab.operation_type_column, lit(Op::Append as i32))
+            new.with_column(self.vocab.operation_type_column(), lit(Op::Append as i32))
                 .int_err()?
         };
 
@@ -471,7 +471,7 @@ impl MergeStrategyUpsertStream {
     /// Create an empty prev dataset based on input schema
     fn empty_prev(&self, new: &DataFrameExt) -> Result<DataFrameExt, DataFusionErrorWrapped> {
         let mut fields: Vec<FieldRef> = new.schema().fields().iter().cloned().collect();
-        fields.push(Field::new(&self.vocab.offset_column, DataType::Int64, false).into());
+        fields.push(Field::new(self.vocab.offset_column(), DataType::Int64, false).into());
 
         let schema = DFSchema::from_unqualified_fields(Fields::from(fields), Default::default())?;
 
@@ -519,7 +519,7 @@ impl MergeStrategy for MergeStrategyUpsertStream {
             .iter()
             .map(|c| col(Column::from_name(c)).sort(true, true))
             .chain(std::iter::once(
-                col(Column::from_name(&self.vocab.operation_type_column)).sort(true, true),
+                col(Column::from_name(self.vocab.operation_type_column())).sort(true, true),
             ))
             .collect()
     }

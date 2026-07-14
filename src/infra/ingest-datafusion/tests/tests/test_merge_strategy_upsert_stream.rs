@@ -121,7 +121,7 @@ where
     let ctx = SessionContext::new();
     let strat = MergeStrategyUpsertStream::new(
         odf::metadata::DatasetVocabulary {
-            event_time_column: "year".to_string(),
+            event_time_column: Some("year".into()),
             ..Default::default()
         },
         odf::metadata::MergeStrategyUpsertStream {

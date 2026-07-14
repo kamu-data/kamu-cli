@@ -105,15 +105,15 @@ impl DataWriterDataFusion {
 
     fn validate_input(&self, df: &DataFrameExt) -> Result<(), BadInputSchemaError> {
         let mut system_columns = vec![
-            &self.meta.vocab.offset_column,
-            &self.meta.vocab.system_time_column,
+            self.meta.vocab.offset_column(),
+            self.meta.vocab.system_time_column(),
         ];
 
         match &self.meta.merge_strategy {
             odf::metadata::MergeStrategy::Append(_)
             | odf::metadata::MergeStrategy::Ledger(_)
             | odf::metadata::MergeStrategy::Snapshot(_) => {
-                system_columns.push(&self.meta.vocab.operation_type_column);
+                system_columns.push(self.meta.vocab.operation_type_column());
             }
             odf::metadata::MergeStrategy::ChangelogStream(_)
             | odf::metadata::MergeStrategy::UpsertStream(_) => (),
@@ -137,7 +137,7 @@ impl DataWriterDataFusion {
             .schema()
             .fields()
             .iter()
-            .find(|f| f.name().as_str() == self.meta.vocab.event_time_column);
+            .find(|f| *f.name() == self.meta.vocab.event_time_column());
 
         if let Some(event_time_col) = event_time_col {
             match event_time_col.data_type() {
@@ -147,7 +147,8 @@ impl DataWriterDataFusion {
                         format!(
                             "Event time column '{}' should be either Date or Timestamp, but \
                              found: {}",
-                            self.meta.vocab.event_time_column, typ
+                            self.meta.vocab.event_time_column(),
+                            typ
                         ),
                         df.schema().inner().clone(),
                     ));
@@ -202,11 +203,11 @@ impl DataWriterDataFusion {
     ) -> Result<DataFrameExt, InternalError> {
         if !df
             .schema()
-            .has_column_with_unqualified_name(&self.meta.vocab.event_time_column)
+            .has_column_with_unqualified_name(self.meta.vocab.event_time_column())
         {
             let data_type = prev_schema
                 .and_then(|s| {
-                    s.field_with_unqualified_name(&self.meta.vocab.event_time_column)
+                    s.field_with_unqualified_name(self.meta.vocab.event_time_column())
                         .ok()
                 })
                 .map_or(
@@ -216,7 +217,7 @@ impl DataWriterDataFusion {
 
             tracing::debug!("Event time column is missing - source fallback time will be used");
             df.with_column(
-                &self.meta.vocab.event_time_column,
+                self.meta.vocab.event_time_column(),
                 cast(
                     Expr::Literal(datafusion::scalar::ScalarValue::Null, None),
                     data_type,
@@ -286,15 +287,15 @@ impl DataWriterDataFusion {
             .iter()
             .map(|f| f.name().clone())
             .filter(|n| {
-                n.as_str() != self.meta.vocab.event_time_column
-                    && n.as_str() != self.meta.vocab.operation_type_column
+                *n != self.meta.vocab.event_time_column()
+                    && *n != self.meta.vocab.operation_type_column()
             })
             .collect();
 
         // System time
         let df = df
             .with_column(
-                &self.meta.vocab.system_time_column,
+                self.meta.vocab.system_time_column(),
                 Expr::Literal(
                     ScalarValue::TimestampMillisecond(
                         Some(system_time.timestamp_millis()),
@@ -311,15 +312,15 @@ impl DataWriterDataFusion {
         // event time from the data source.
         let event_time_data_type = df
             .schema()
-            .field_with_unqualified_name(&self.meta.vocab.event_time_column)
+            .field_with_unqualified_name(self.meta.vocab.event_time_column())
             .int_err()?
             .data_type()
             .clone();
         let df = df
             .with_column(
-                &self.meta.vocab.event_time_column,
+                self.meta.vocab.event_time_column(),
                 datafusion::functions::core::coalesce().call(vec![
-                    col(Column::from_name(&self.meta.vocab.event_time_column)),
+                    col(Column::from_name(self.meta.vocab.event_time_column())),
                     cast(
                         Expr::Literal(
                             ScalarValue::TimestampMillisecond(
@@ -340,7 +341,7 @@ impl DataWriterDataFusion {
         // latter.
         let df = df
             .with_column(
-                &self.meta.vocab.offset_column,
+                self.meta.vocab.offset_column(),
                 datafusion::functions_window::row_number::row_number()
                     .order_by(self.merge_strategy.sort_order())
                     .partition_by(vec![lit(1)])
@@ -351,9 +352,9 @@ impl DataWriterDataFusion {
 
         let df = df
             .with_column(
-                &self.meta.vocab.offset_column,
+                self.meta.vocab.offset_column(),
                 cast(
-                    col(Column::from_name(&self.meta.vocab.offset_column))
+                    col(Column::from_name(self.meta.vocab.offset_column()))
                         + lit(i64::try_from(start_offset).unwrap() - 1),
                     // TODO: Replace with UInt64 after Spark is updated
                     // See: https://github.com/kamu-data/kamu-cli/issues/445
@@ -364,10 +365,10 @@ impl DataWriterDataFusion {
 
         // Reorder columns for nice looks
         let mut full_columns = vec![
-            self.meta.vocab.offset_column.clone(),
-            self.meta.vocab.operation_type_column.clone(),
-            self.meta.vocab.system_time_column.clone(),
-            self.meta.vocab.event_time_column.clone(),
+            self.meta.vocab.offset_column().to_string(),
+            self.meta.vocab.operation_type_column().to_string(),
+            self.meta.vocab.system_time_column().to_string(),
+            self.meta.vocab.event_time_column().to_string(),
         ];
         full_columns.append(&mut data_columns);
         let full_columns_str: Vec<_> = full_columns.iter().map(String::as_str).collect();
@@ -377,7 +378,7 @@ impl DataWriterDataFusion {
         // Note: As the very last step we sort the data by offset to guarantee its
         // sequential layout in the parquet file
         let df = df
-            .sort(vec![col(&self.meta.vocab.offset_column).sort(true, true)])
+            .sort(vec![col(self.meta.vocab.offset_column()).sort(true, true)])
             .int_err()?;
 
         Ok(df)
@@ -527,14 +528,14 @@ impl DataWriterDataFusion {
             column_specific_options: HashMap::from([
                 (
                     // op column is low cardinality and best encoded as RLE_DICTIONARY
-                    self.meta.vocab.operation_type_column.clone(),
+                    self.meta.vocab.operation_type_column().to_string(),
                     ParquetColumnOptions {
                         dictionary_enabled: Some(true),
                         ..Default::default()
                     },
                 ),
                 (
-                    self.meta.vocab.system_time_column.clone(),
+                    self.meta.vocab.system_time_column().to_string(),
                     ParquetColumnOptions {
                         // system_time value will be the same for all rows in a batch
                         dictionary_enabled: Some(true),
@@ -642,10 +643,10 @@ impl DataWriterDataFusion {
             .aggregate(
                 vec![],
                 vec![
-                    min(col(Column::from_name(&self.meta.vocab.offset_column))),
-                    max(col(Column::from_name(&self.meta.vocab.offset_column))),
+                    min(col(Column::from_name(self.meta.vocab.offset_column()))),
+                    max(col(Column::from_name(self.meta.vocab.offset_column()))),
                     // TODO: Add support for more watermark strategies
-                    max(col(Column::from_name(&self.meta.vocab.event_time_column))),
+                    max(col(Column::from_name(self.meta.vocab.event_time_column()))),
                 ],
             )
             .int_err()?;

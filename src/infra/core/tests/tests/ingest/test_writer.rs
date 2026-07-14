@@ -1349,15 +1349,15 @@ async fn test_data_writer_schema_evolution_from_inferred() {
                 odf::schema::DataField::i32("op"),
                 odf::schema::DataField::timestamp_millis_utc("system_time"),
                 odf::schema::DataField::timestamp_millis_utc("event_time").extra(
-                    odf::metadata::ext::AttrDescription::new(
+                    odf::metadata::data::ext::AttrDescription::new(
                         "Date the census was done rounded to a year mark",
                     ),
                 ),
-                odf::schema::DataField::string("city")
-                    .optional()
-                    .extra(odf::metadata::ext::AttrDescription::new("Name of the city")),
+                odf::schema::DataField::string("city").optional().extra(
+                    odf::metadata::data::ext::AttrDescription::new("Name of the city"),
+                ),
                 odf::schema::DataField::i64("population").optional().extra(
-                    odf::metadata::ext::AttrDescription::new("Estimated population"),
+                    odf::metadata::data::ext::AttrDescription::new("Estimated population"),
                 ),
             ]),
         ))
@@ -1389,15 +1389,15 @@ async fn test_data_writer_schema_evolution_from_inferred() {
             odf::schema::DataField::i32("op"),
             odf::schema::DataField::timestamp_millis_utc("system_time"),
             odf::schema::DataField::timestamp_millis_utc("event_time").extra(
-                odf::metadata::ext::AttrDescription::new(
+                odf::metadata::data::ext::AttrDescription::new(
                     "Date the census was done rounded to a year mark",
                 ),
             ),
-            odf::schema::DataField::string("city")
-                .optional()
-                .extra(odf::metadata::ext::AttrDescription::new("Name of the city")),
+            odf::schema::DataField::string("city").optional().extra(
+                odf::metadata::data::ext::AttrDescription::new("Name of the city"),
+            ),
             odf::schema::DataField::i64("population").optional().extra(
-                odf::metadata::ext::AttrDescription::new("Estimated population"),
+                odf::metadata::data::ext::AttrDescription::new("Estimated population"),
             ),
         ]),
     );
@@ -1434,14 +1434,15 @@ async fn test_data_writer_schema_evolution_from_explicit() {
                 odf::schema::DataField::i32("op"),
                 odf::schema::DataField::timestamp_millis_utc("system_time"),
                 odf::schema::DataField::timestamp_millis_utc("event_time").extra(
-                    odf::metadata::ext::AttrDescription::new(
+                    odf::metadata::data::ext::AttrDescription::new(
                         "Date the census was done rounded to a year mark",
                     ),
                 ),
-                odf::schema::DataField::string("city")
-                    .extra(odf::metadata::ext::AttrDescription::new("Name of the city")),
+                odf::schema::DataField::string("city").extra(
+                    odf::metadata::data::ext::AttrDescription::new("Name of the city"),
+                ),
                 odf::schema::DataField::i64("population").extra(
-                    odf::metadata::ext::AttrDescription::new("Estimated population"),
+                    odf::metadata::data::ext::AttrDescription::new("Estimated population"),
                 ),
             ]),
         ))
@@ -1647,14 +1648,15 @@ async fn test_data_writer_schema_evolution_add_optional_field_merge_append() {
                 odf::schema::DataField::i32("op"),
                 odf::schema::DataField::timestamp_millis_utc("system_time"),
                 odf::schema::DataField::timestamp_millis_utc("event_time").extra(
-                    odf::metadata::ext::AttrDescription::new(
+                    odf::metadata::data::ext::AttrDescription::new(
                         "Date the census was done rounded to a year mark",
                     ),
                 ),
-                odf::schema::DataField::string("city")
-                    .extra(odf::metadata::ext::AttrDescription::new("Name of the city")),
+                odf::schema::DataField::string("city").extra(
+                    odf::metadata::data::ext::AttrDescription::new("Name of the city"),
+                ),
                 odf::schema::DataField::i64("population").extra(
-                    odf::metadata::ext::AttrDescription::new("Estimated population"),
+                    odf::metadata::data::ext::AttrDescription::new("Estimated population"),
                 ),
             ]),
         ))
@@ -1701,18 +1703,19 @@ async fn test_data_writer_schema_evolution_add_optional_field_merge_append() {
                 odf::schema::DataField::i32("op"),
                 odf::schema::DataField::timestamp_millis_utc("system_time"),
                 odf::schema::DataField::timestamp_millis_utc("event_time").extra(
-                    odf::metadata::ext::AttrDescription::new(
+                    odf::metadata::data::ext::AttrDescription::new(
                         "Date the census was done rounded to a year mark",
                     ),
                 ),
-                odf::schema::DataField::string("city")
-                    .extra(odf::metadata::ext::AttrDescription::new("Name of the city")),
+                odf::schema::DataField::string("city").extra(
+                    odf::metadata::data::ext::AttrDescription::new("Name of the city"),
+                ),
                 odf::schema::DataField::i64("population").extra(
-                    odf::metadata::ext::AttrDescription::new("Estimated population"),
+                    odf::metadata::data::ext::AttrDescription::new("Estimated population"),
                 ),
                 odf::schema::DataField::string("census_url")
                     .optional()
-                    .extra(odf::metadata::ext::AttrDescription::new(
+                    .extra(odf::metadata::data::ext::AttrDescription::new(
                         "URL of the latest published census",
                     )),
             ]),
@@ -1766,14 +1769,15 @@ async fn test_data_writer_schema_evolution_add_optional_field_merge_ledger() {
             odf::schema::DataField::i32("op"),
             odf::schema::DataField::timestamp_millis_utc("system_time"),
             odf::schema::DataField::timestamp_millis_utc("event_time").extra(
-                odf::metadata::ext::AttrDescription::new(
+                odf::metadata::data::ext::AttrDescription::new(
                     "Date the census was done rounded to a year mark",
                 ),
             ),
-            odf::schema::DataField::string("city")
-                .extra(odf::metadata::ext::AttrDescription::new("Name of the city")),
+            odf::schema::DataField::string("city").extra(
+                odf::metadata::data::ext::AttrDescription::new("Name of the city"),
+            ),
             odf::schema::DataField::i64("population").extra(
-                odf::metadata::ext::AttrDescription::new("Estimated population"),
+                odf::metadata::data::ext::AttrDescription::new("Estimated population"),
             ),
         ]))
         .into(),
@@ -1826,18 +1830,19 @@ async fn test_data_writer_schema_evolution_add_optional_field_merge_ledger() {
                 odf::schema::DataField::i32("op"),
                 odf::schema::DataField::timestamp_millis_utc("system_time"),
                 odf::schema::DataField::timestamp_millis_utc("event_time").extra(
-                    odf::metadata::ext::AttrDescription::new(
+                    odf::metadata::data::ext::AttrDescription::new(
                         "Date the census was done rounded to a year mark",
                     ),
                 ),
-                odf::schema::DataField::string("city")
-                    .extra(odf::metadata::ext::AttrDescription::new("Name of the city")),
+                odf::schema::DataField::string("city").extra(
+                    odf::metadata::data::ext::AttrDescription::new("Name of the city"),
+                ),
                 odf::schema::DataField::i64("population").extra(
-                    odf::metadata::ext::AttrDescription::new("Estimated population"),
+                    odf::metadata::data::ext::AttrDescription::new("Estimated population"),
                 ),
                 odf::schema::DataField::string("census_url")
                     .optional()
-                    .extra(odf::metadata::ext::AttrDescription::new(
+                    .extra(odf::metadata::data::ext::AttrDescription::new(
                         "URL of the latest published census",
                     )),
             ]),
@@ -1891,14 +1896,15 @@ async fn test_data_writer_schema_evolution_add_optional_field_merge_snapshot() {
             odf::schema::DataField::i32("op"),
             odf::schema::DataField::timestamp_millis_utc("system_time"),
             odf::schema::DataField::timestamp_millis_utc("event_time").extra(
-                odf::metadata::ext::AttrDescription::new(
+                odf::metadata::data::ext::AttrDescription::new(
                     "Date the census was done rounded to a year mark",
                 ),
             ),
-            odf::schema::DataField::string("city")
-                .extra(odf::metadata::ext::AttrDescription::new("Name of the city")),
+            odf::schema::DataField::string("city").extra(
+                odf::metadata::data::ext::AttrDescription::new("Name of the city"),
+            ),
             odf::schema::DataField::i64("population").extra(
-                odf::metadata::ext::AttrDescription::new("Estimated population"),
+                odf::metadata::data::ext::AttrDescription::new("Estimated population"),
             ),
         ]))
         .into(),
@@ -1952,18 +1958,19 @@ async fn test_data_writer_schema_evolution_add_optional_field_merge_snapshot() {
                 odf::schema::DataField::i32("op"),
                 odf::schema::DataField::timestamp_millis_utc("system_time"),
                 odf::schema::DataField::timestamp_millis_utc("event_time").extra(
-                    odf::metadata::ext::AttrDescription::new(
+                    odf::metadata::data::ext::AttrDescription::new(
                         "Date the census was done rounded to a year mark",
                     ),
                 ),
-                odf::schema::DataField::string("city")
-                    .extra(odf::metadata::ext::AttrDescription::new("Name of the city")),
+                odf::schema::DataField::string("city").extra(
+                    odf::metadata::data::ext::AttrDescription::new("Name of the city"),
+                ),
                 odf::schema::DataField::i64("population").extra(
-                    odf::metadata::ext::AttrDescription::new("Estimated population"),
+                    odf::metadata::data::ext::AttrDescription::new("Estimated population"),
                 ),
                 odf::schema::DataField::string("census_url")
                     .optional()
-                    .extra(odf::metadata::ext::AttrDescription::new(
+                    .extra(odf::metadata::data::ext::AttrDescription::new(
                         "URL of the latest published census",
                     )),
             ]),
@@ -2164,7 +2171,7 @@ async fn test_data_writer_builder_scan_no_source() {
             prev_watermark: None,
             prev_source_state: None,
             ..
-        } if h == head && vocab.event_time_column == "foo"
+        } if h == head && vocab.event_time_column() == "foo"
 
     );
 }

@@ -7,12 +7,153 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::collections::BTreeMap;
+
 use chrono::prelude::*;
 use digest::Digest;
-use opendatafabric_metadata::schema::ext::*;
-use opendatafabric_metadata::serde::flatbuffers::*;
+use opendatafabric_metadata::config::*;
+use opendatafabric_metadata::data::ext::*;
+use opendatafabric_metadata::data::*;
+use opendatafabric_metadata::dataset::*;
+use opendatafabric_metadata::engine::*;
+use opendatafabric_metadata::legacy::*;
+use opendatafabric_metadata::resource::*;
+use opendatafabric_metadata::serde::flatbuffers::{proxies_generated as fb, *};
 use opendatafabric_metadata::serde::*;
+use opendatafabric_metadata::source::*;
 use opendatafabric_metadata::*;
+use serde_json::json;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_flatbuffers_maps() {
+    // String -> Struct
+    let expected = Secrets {
+        entries: BTreeMap::from_iter([
+            (
+                "password".to_string(),
+                Secret {
+                    value: "swordfish".into(),
+                    content_encoding: None,
+                },
+            ),
+            (
+                "tls".to_string(),
+                Secret {
+                    value: "aabbcc".into(),
+                    content_encoding: Some("base64".into()),
+                },
+            ),
+        ]),
+    };
+
+    let mut fb = ::flatbuffers::FlatBufferBuilder::new();
+    let offset = expected.serialize(&mut fb);
+    fb.finish(offset, None);
+    let data = fb.finished_data();
+
+    let actual = Secrets::deserialize(::flatbuffers::root::<fb::Secrets>(data).unwrap());
+
+    pretty_assertions::assert_eq!(expected, actual);
+
+    // TypeRef -> AnyJson
+    let expected = ResourceLabels {
+        entries: BTreeMap::from_iter([
+            ("string".parse().unwrap(), json!("foo")),
+            ("nested".parse().unwrap(), json!({"a": "x", "b": "y"})),
+            ("https://example.com/v1/X".parse().unwrap(), json!("bar")),
+        ]),
+    };
+
+    let mut fb = ::flatbuffers::FlatBufferBuilder::new();
+    let offset = expected.serialize(&mut fb);
+    fb.finish(offset, None);
+    let data = fb.finished_data();
+
+    let actual =
+        ResourceLabels::deserialize(::flatbuffers::root::<fb::ResourceLabels>(data).unwrap());
+
+    pretty_assertions::assert_eq!(expected, actual);
+
+    // String -> AnyJson (json-encoded-string)
+    let expected = ExtraAttributes {
+        entries: BTreeMap::from_iter([
+            ("arrow.apache.org/offsetBitWidth".to_string(), json!(32)),
+            (
+                "opendatafabric.org/description".to_string(),
+                json!("foobar"),
+            ),
+            (
+                "opendatafabric.org/type".to_string(),
+                json!({
+                    "kind": "ObjectLink",
+                    "linkType": { "kind": "Multihash" }
+                }),
+            ),
+        ]),
+    };
+
+    let mut fb = ::flatbuffers::FlatBufferBuilder::new();
+    let offset = expected.serialize(&mut fb);
+    fb.finish(offset, None);
+    let data = fb.finished_data();
+
+    let actual =
+        ExtraAttributes::deserialize(::flatbuffers::root::<fb::ExtraAttributes>(data).unwrap());
+
+    pretty_assertions::assert_eq!(expected, actual);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test]
+fn test_flatbuffers_any_json_property() {
+    // String
+    let expected = auth::Attribute {
+        object: "X:x".parse().unwrap(),
+        name: "my-attr".to_string(),
+        value: json!("some-attr"),
+    };
+
+    let mut fb = ::flatbuffers::FlatBufferBuilder::new();
+    let offset = expected.serialize(&mut fb);
+    fb.finish(offset, None);
+    let data = fb.finished_data();
+
+    let actual = auth::Attribute::deserialize(::flatbuffers::root::<fb::Attribute>(data).unwrap());
+    pretty_assertions::assert_eq!(expected, actual);
+
+    // Int
+    let expected = auth::Attribute {
+        object: "X:x".parse().unwrap(),
+        name: "my-attr".to_string(),
+        value: json!(123),
+    };
+
+    let mut fb = ::flatbuffers::FlatBufferBuilder::new();
+    let offset = expected.serialize(&mut fb);
+    fb.finish(offset, None);
+    let data = fb.finished_data();
+
+    let actual = auth::Attribute::deserialize(::flatbuffers::root::<fb::Attribute>(data).unwrap());
+    pretty_assertions::assert_eq!(expected, actual);
+
+    // Nested
+    let expected = auth::Attribute {
+        object: "X:x".parse().unwrap(),
+        name: "my-attr".to_string(),
+        value: json!({"a": "x", "b": "y"}),
+    };
+
+    let mut fb = ::flatbuffers::FlatBufferBuilder::new();
+    let offset = expected.serialize(&mut fb);
+    fb.finish(offset, None);
+    let data = fb.finished_data();
+
+    let actual = auth::Attribute::deserialize(::flatbuffers::root::<fb::Attribute>(data).unwrap());
+    pretty_assertions::assert_eq!(expected, actual);
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -285,8 +426,6 @@ fn test_serializer_stability() {
 #[cfg(feature = "arrow")]
 #[test]
 fn serde_set_data_schema() {
-    use opendatafabric_metadata::ext::DataTypeExt;
-
     let expected_schema = DataSchema::builder()
         .extend(vec![
             DataField::string("city").encoding(ArrowBufferEncoding::View {

@@ -60,10 +60,10 @@ impl MoleculeDataRoomEntry {
         let Some(obj) = value.as_object_mut() else {
             unreachable!()
         };
-        let Some(raw_op) = obj[&vocab.operation_type_column].as_i64() else {
+        let Some(raw_op) = obj[vocab.operation_type_column()].as_i64() else {
             unreachable!()
         };
-        let Some(offset) = obj[&vocab.offset_column].as_u64() else {
+        let Some(offset) = obj[vocab.operation_type_column()].as_u64() else {
             unreachable!()
         };
 

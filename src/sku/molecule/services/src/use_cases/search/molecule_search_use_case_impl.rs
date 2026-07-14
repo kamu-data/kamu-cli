@@ -108,7 +108,7 @@ impl MoleculeSearchUseCaseImpl {
                 datafusion::functions_window::row_number::row_number()
                     .partition_by(primary_key)
                     .order_by(vec![
-                        col(Column::from_name(&vocab.offset_column)).sort(false, false),
+                        col(Column::from_name(vocab.offset_column())).sort(false, false),
                     ])
                     .build()?
                     .alias(RANK_COLUMN),

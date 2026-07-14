@@ -510,11 +510,12 @@ impl AsciiRenderer {
         indent: i32,
         extra: &odf::metadata::ExtraAttributes,
     ) -> Result<(), std::io::Error> {
-        let mut buf = Vec::new();
-        let mut serializer = serde_yaml::Serializer::new(&mut buf);
-        odf::metadata::serde::yaml::ExtraAttributesDef::serialize(extra, &mut serializer).unwrap();
+        let yaml_string = serde_yaml::to_string(
+            &odf::metadata::serde::yaml::data::ExtraAttributes::from(extra.clone()),
+        )
+        .unwrap();
 
-        self.render_property_multiline(output, indent, "Extra", &String::from_utf8(buf).unwrap())
+        self.render_property_multiline(output, indent, "Extra", &yaml_string)
     }
 
     fn indent(&self, output: &mut impl Write, level: i32) -> Result<(), std::io::Error> {
@@ -561,9 +562,6 @@ impl MetadataRenderer for PagedAsciiRenderer {
         blocks: odf::dataset::DynMetadataStream<'a>,
     ) -> Result<(), CLIError> {
         let mut pager = minus::Pager::new();
-        pager
-            .set_exit_strategy(minus::ExitStrategy::PagerQuit)
-            .unwrap();
         pager.set_prompt(dataset_handle.alias.to_string()).unwrap();
 
         let renderer = AsciiRenderer::new(self.id_to_name_lookup.clone(), self.limit);
@@ -670,9 +668,6 @@ impl MetadataRenderer for PagedYamlRenderer {
         blocks: odf::dataset::DynMetadataStream<'a>,
     ) -> Result<(), CLIError> {
         let mut pager = minus::Pager::new();
-        pager
-            .set_exit_strategy(minus::ExitStrategy::PagerQuit)
-            .unwrap();
         pager.set_prompt(dataset_handle.alias.to_string()).unwrap();
 
         {

@@ -229,7 +229,7 @@ impl CollectionContext for ODataCollectionContext {
             .apply(
                 df.into_inner(),
                 &self.addr,
-                &vocab.offset_column,
+                vocab.offset_column(),
                 KEY_COLUMN_ALIAS,
                 default_records_per_page,
                 MAX_RECORDS_PER_PAGE,

@@ -20,7 +20,10 @@ use internal_error::*;
 /// components simultaneously, but can be used from only one place at a time via
 /// locking. Despite its async nature, this lock must be held only for the
 /// duration of the DB query and released when passing control into other
-/// components.
+/// components. Transaction is obtained from the connection pool upon first use
+/// or when calling [`TransactionRef::begin()`]. For a typical use in
+/// repositories, a DB-specific implementation should inject a typed
+/// [`TransactionRefT`] instance directly.
 #[derive(Debug, Clone)]
 pub struct TransactionRef {
     inner: Arc<dyn TransactionStateErased + 'static>,
@@ -33,6 +36,17 @@ impl TransactionRef {
         }
     }
 
+    /// Acquires a connection from the connection pool and starts the
+    /// transaction if it's not already started. You probably should not call
+    /// this - it's only occasionally useful for testing transactions without
+    /// downcasting to specific DB type.
+    pub async fn begin(&self) -> Result<bool, InternalError> {
+        self.inner.begin().await
+    }
+
+    /// Performs dynamic downcasting into a DB-specific type. Typically you
+    /// should be able to inject [`TransactionRefT`] directly without the need
+    /// for manual downcasting.
     pub fn downcast<DB: sqlx::Database>(self) -> TransactionRefT<DB> {
         let inner_any = self.inner as Arc<dyn Any + Send + Sync>;
         let inner_typed = inner_any.downcast::<TransactionState<DB>>().unwrap();
@@ -60,7 +74,8 @@ impl<DB: sqlx::Database> From<TransactionRefT<DB>> for TransactionRef {
 /// components simultaneously, but can be used from only one place at a time via
 /// locking. Despite its async nature, this lock must be held only for the
 /// duration of the DB query and released when passing control into other
-/// components.
+/// components. Transaction is obtained from the connection pool upon first use
+/// or when calling [`TransactionRef::begin()`].
 #[derive(Debug)]
 pub struct TransactionRefT<DB: sqlx::Database> {
     inner: Arc<TransactionState<DB>>,
@@ -79,6 +94,15 @@ impl<DB: sqlx::Database> TransactionRefT<DB> {
         Self {
             inner: Arc::new(TransactionState::new(connection_pool)),
         }
+    }
+
+    /// Acquires a connection from the connection pool and starts the
+    /// transaction if it's not already started. You probably should not call
+    /// this - it's only occasionally useful for testing transactions without
+    /// downcasting to specific DB type.
+    pub async fn begin(&self) -> Result<bool, InternalError> {
+        let mut guard = self.lock().await;
+        guard.begin().await
     }
 
     pub async fn lock(&self) -> TransactionGuard<'_, DB> {
@@ -119,7 +143,23 @@ impl<DB: sqlx::Database> TransactionState<DB> {
     }
 
     fn into_inner_db_transaction(self) -> Option<sqlx::Transaction<'static, DB>> {
-        self.maybe_transaction.into_inner()
+        let mut guard = self.maybe_transaction.try_lock().expect(
+            "into_inner_db_transaction will always be called when no other references to \
+             transaction exist and the lock can be acquired without blocking",
+        );
+        guard.take()
+    }
+}
+
+impl<DB: sqlx::Database> Drop for TransactionState<DB> {
+    fn drop(&mut self) {
+        match self.maybe_transaction.try_lock() {
+            Ok(guard) if guard.is_none() => (),
+            // This log message compliments COMMIT / ROLLBACK logs we have in
+            // `DatabaseTransactionRunner` and is used to detect when transaction gets
+            // dropped without being committted or rolled back
+            _ => tracing::warn!("Transaction DROPPED"),
+        }
     }
 }
 
@@ -128,6 +168,12 @@ impl<DB: sqlx::Database> TransactionState<DB> {
 #[async_trait::async_trait]
 trait TransactionStateErased: std::fmt::Debug + Any + Send + Sync {
     fn register(self: Arc<Self>, catalog_builder: &mut dill::CatalogBuilder);
+
+    /// Acquires a connection from the connection pool and starts the
+    /// transaction if it's not already started. You probably should not call
+    /// this - it's only occasionally useful for testing transactions without
+    /// downcasting to specific DB type.
+    async fn begin(&self) -> Result<bool, InternalError>;
 }
 
 #[async_trait::async_trait]
@@ -140,6 +186,12 @@ impl<DB: sqlx::Database> TransactionStateErased for TransactionState<DB> {
 
         // Add erased wrapper
         catalog_builder.add_value(TransactionRef { inner: self });
+    }
+
+    async fn begin(&self) -> Result<bool, InternalError> {
+        let guard = self.maybe_transaction.lock().await;
+        let mut guard = TransactionGuard::new(self, guard);
+        guard.begin().await
     }
 }
 
@@ -162,13 +214,22 @@ impl<'a, DB: sqlx::Database> TransactionGuard<'a, DB> {
         Self { state, guard }
     }
 
-    pub async fn connection_mut(&mut self) -> Result<&mut DB::Connection, InternalError> {
-        if self.guard.is_none() {
-            tracing::debug!("Opening transaction");
-            let transaction = self.state.connection_pool.begin().await.int_err()?;
-            (*self.guard) = Some(transaction);
+    /// Acquires a connection from the connection pool and starts the
+    /// transaction if it's not already started
+    pub async fn begin(&mut self) -> Result<bool, InternalError> {
+        if self.guard.is_some() {
+            return Ok(false);
         }
 
+        tracing::debug!("Opening transaction");
+        let transaction = self.state.connection_pool.begin().await.int_err()?;
+        (*self.guard) = Some(transaction);
+
+        Ok(true)
+    }
+
+    pub async fn connection_mut(&mut self) -> Result<&mut DB::Connection, InternalError> {
+        self.begin().await?;
         let tx = self.guard.as_deref_mut().unwrap();
         Ok(tx)
     }

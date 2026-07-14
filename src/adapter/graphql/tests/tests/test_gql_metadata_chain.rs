@@ -181,8 +181,8 @@ async fn test_metadata_chain_events() {
                                         "prevOffset": null,
                                         "newData": {
                                             "offsetInterval": {
-                                                "start": 0,
-                                                "end": 9,
+                                                "start": "0",
+                                                "end": "9",
                                             }
                                         }
                                     }
