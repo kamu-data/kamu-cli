@@ -22,14 +22,6 @@ Recommendation: for ease of reading, use the following format:
 - Allow `molecule` and `molecule.dev` accounts separation
 - GQL: `MoleculeMut::create_project()`: generate lowercase project account name.
 
-## [0.263.2] - 2026-05-27
-### Fixed
-- S3 PutObject hangup issue when invoked from /ingest API
-
-## [0.263.1] - 2026-05-20
-### Fixed
-- Elasticsearch: added ID escaping for API requests
-
 ## [Unreleased]
 ### Changed
 - Major reorganization of `odf::metadata` sub-crate for IaC changes (see [RFC-018](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/018-iac-resource-framework.md))
