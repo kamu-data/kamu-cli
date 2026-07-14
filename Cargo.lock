@@ -636,22 +636,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "alloy-signer-local"
-version = "1.8.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f721f4bf2e4812e5505aaf5de16ef3065a8e26b9139ac885862d00b5a55a659a"
-dependencies = [
- "alloy-consensus",
- "alloy-network",
- "alloy-primitives",
- "alloy-signer",
- "async-trait",
- "k256",
- "rand 0.8.6",
- "thiserror 2.0.18",
-]
-
-[[package]]
 name = "alloy-sol-macro"
 version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
