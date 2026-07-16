@@ -16,12 +16,12 @@ use crate::{AesGcmEncryptor, Encryptor, ParseEncryptionKey};
 
 /// A symmetric-key bundle for reading and writing `SecretSet` secret values.
 ///
-/// It holds the one 32-byte key in the two forms secret handling needs:
-/// - as a JWE content-encryption key, for the current `contentEncoding: "jwe"`
-///   write/read path, and
-/// - as an [`AesGcmEncryptor`], for decrypting the legacy `contentEncoding:
-///   "aes256gcm"` form emitted only by the env-var backfill migrations
-///   (`hex(nonce ‖ ciphertext)`).
+/// It holds the one 32-byte key in the two forms secret handling needs: as a
+/// JWE content-encryption key, for the current `contentEncoding: "jwe"`
+/// write/read path and for the read-side projection's own raw-AES storage;
+/// and as an [`AesGcmEncryptor`], for decrypting the legacy `contentEncoding:
+/// "aes256gcm"` form emitted only by the env-var backfill migrations
+/// (`hex(nonce ‖ ciphertext)`).
 ///
 /// Build it once (it validates the key length up front) and pass it wherever a
 /// secret must be encrypted or decrypted.
@@ -64,6 +64,13 @@ impl SecretCryptor {
         }
         let (nonce, ciphertext) = combined.split_at(Self::AES_NONCE_LEN);
         self.aes.decrypt_bytes(ciphertext, nonce).int_err()
+    }
+
+    /// Raw AES-GCM encrypt, returning `(ciphertext, nonce)` — a separate
+    /// storage encoding from the spec's own `jwe`/`aes256gcm` forms, used by
+    /// the read-side projection.
+    pub fn encrypt_bytes(&self, plaintext: &[u8]) -> Result<(Vec<u8>, Vec<u8>), InternalError> {
+        self.aes.encrypt_bytes(plaintext).int_err()
     }
 }
 

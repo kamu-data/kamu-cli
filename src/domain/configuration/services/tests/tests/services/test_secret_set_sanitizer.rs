@@ -20,6 +20,7 @@ use kamu_resources::{
     ApplyResourceApplicationDecision,
     ApplyResourceOutcome,
     ApplyResourceParams,
+    ApplyResourceRejectionCategory,
     ResourceSpecFromInput,
 };
 use kamu_resources_services::testing::BaseResourceServiceHarness;
@@ -44,17 +45,9 @@ fn legacy_aes256gcm_secret(plaintext: &[u8]) -> odf::metadata::config::Secret {
     combined.extend_from_slice(&ciphertext);
 
     odf::metadata::config::Secret {
-        value: to_hex(&combined),
+        value: hex::encode(combined),
         content_encoding: Some(CONTENT_ENCODING_AES256GCM.to_string()),
     }
-}
-
-fn to_hex(bytes: &[u8]) -> String {
-    use std::fmt::Write;
-    bytes.iter().fold(String::new(), |mut s, b| {
-        write!(s, "{b:02x}").unwrap();
-        s
-    })
 }
 
 fn make_spec_input(
@@ -289,6 +282,55 @@ async fn test_apply_secret_set_same_plaintext_is_untouched() {
         serde_json::from_value(snapshot2.spec).expect("spec must deserialize");
 
     assert_eq!(stored_spec2, stored_spec);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_apply_secret_set_rejects_jwe_that_does_not_decrypt_under_current_key() {
+    // A `contentEncoding: jwe` secret that is well-formed but was encrypted under a
+    // different key (or tampered) must be rejected as bad business input, not
+    // persisted only to fail later in reconciliation or reveal.
+    use crypto_utils::SecretCryptor;
+
+    let harness = BaseConfigurationServiceHarness::new();
+    let account_handle = odf::AccountHandle::new_test("test-owner");
+
+    let wrong_key = "ffffffffffffffffffffffffffffffff";
+    let wrong_key_cryptor = SecretCryptor::try_new(wrong_key).unwrap();
+    let bad_token = wrong_key_cryptor
+        .encrypt_to_jwe(b"encrypted-under-the-wrong-key")
+        .unwrap();
+
+    let spec = make_spec_input([(
+        "API_TOKEN",
+        odf::metadata::config::Secret {
+            value: bad_token,
+            content_encoding: Some(CONTENT_ENCODING_JWE.to_string()),
+        },
+    )]);
+
+    let decision = harness
+        .apply_secret_use_case()
+        .apply(ApplyResourceParams {
+            id: None,
+            headers: BaseResourceServiceHarness::make_headers_input(account_handle, "test-secrets"),
+            spec,
+        })
+        .await
+        .unwrap();
+
+    match decision {
+        ApplyResourceApplicationDecision::Applied(result) => {
+            panic!("apply must be rejected, not applied: {result:?}")
+        }
+        ApplyResourceApplicationDecision::Rejected(rejection) => {
+            assert_eq!(
+                rejection.category,
+                ApplyResourceRejectionCategory::BusinessValidationFailed
+            );
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

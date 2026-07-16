@@ -165,7 +165,7 @@ SELECT
             -- Emit the legacy secret in the RFC-18 shape using the read-only
             -- `aes256gcm` encoding: hex(nonce ‖ ciphertext). SQL cannot produce a
             -- JWE token, so the node reads this legacy form and re-materializes on
-            -- the next apply. See SecretSpec::decrypt_plaintext_bytes.
+            -- the next apply. See SecretExt::decrypt_plaintext_bytes.
             SELECT jsonb_object_agg(
                 d2.key,
                 jsonb_build_object(

@@ -12,15 +12,21 @@ use std::sync::Arc;
 use crypto_utils::SecretCryptor;
 use internal_error::InternalError;
 use kamu_configuration::{
-    CONTENT_ENCODING_JWE,
+    ContentEncoding,
     Secret,
     SecretExt,
     SecretSetResource,
     SecretSetSpec,
     SecretSetSpecInput,
+    SecretSetSpecValidationError,
 };
 use kamu_datasets::SecretsEncryptionConfig;
-use kamu_resources::ResourceSpecSanitizer;
+use kamu_resources::{
+    ApplyResourceRejection,
+    ApplyResourceRejectionCategory,
+    ResourceSpecSanitizer,
+    SanitizeSpecOutcome,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -38,24 +44,34 @@ impl ResourceSpecSanitizer<SecretSetResource> for SecretSetSpecSanitizer {
         &self,
         mut new_spec: SecretSetSpecInput,
         maybe_current_spec: Option<&SecretSetSpec>,
-    ) -> Result<SecretSetSpecInput, InternalError> {
+    ) -> Result<SanitizeSpecOutcome<SecretSetResource>, InternalError> {
         let cryptor = self.secrets_encryption_config.new_secret_cryptor()?;
 
         for (name, new_secret) in &mut new_spec.secrets.entries {
-            // Only the canonical `jwe` encoding is left as-is here; anything else
-            // (plaintext, or a legacy `aes256gcm` secret carried over from the
-            // env-var backfill migrations) must be decrypted and re-encrypted into
-            // `jwe` below — `aes256gcm` is a read-only encoding the node never writes.
-            if new_secret.content_encoding.as_deref() == Some(CONTENT_ENCODING_JWE) {
+            // An already-`jwe` secret is left as-is, but only after confirming it
+            // decrypts under the current key — structural validation has no key
+            // and can't catch a wrong-key or tampered token, so trusting the tag
+            // alone would persist it and only fail later, in reconciliation or
+            // reveal. A failure here is business input, not a technical fault, so
+            // it's a rejection rather than an `InternalError`. Anything else
+            // (plaintext, or legacy `aes256gcm` from the env-var backfill
+            // migrations) is decrypted and re-encrypted to `jwe`.
+            if new_secret.content_encoding() == Some(ContentEncoding::Jwe) {
+                if let Err(reason) = new_secret.decrypt_plaintext_bytes(&cryptor) {
+                    return Ok(SanitizeSpecOutcome::Rejected(rejection_for_invalid_secret(
+                        name,
+                        &reason.to_string(),
+                    )));
+                }
                 continue;
             }
             let new_plaintext = new_secret.decrypt_plaintext_bytes(&cryptor)?;
 
-            // If the new plaintext matches the current secret (after decryption), keep the
-            // current encrypted value to avoid unnecessary changes
+            // Reuse the current ciphertext if the plaintext is unchanged, to avoid
+            // unnecessary rewrites.
             if let Some(current_secret) =
                 maybe_current_spec.and_then(|s| s.secrets.entries.get(name))
-                && current_secret.content_encoding.as_deref() == Some(CONTENT_ENCODING_JWE)
+                && current_secret.content_encoding() == Some(ContentEncoding::Jwe)
                 && Self::matches_current_plaintext(current_secret, &new_plaintext, &cryptor)?
             {
                 *new_secret = current_secret.clone();
@@ -67,17 +83,22 @@ impl ResourceSpecSanitizer<SecretSetResource> for SecretSetSpecSanitizer {
             let token = cryptor.encrypt_to_jwe(&new_plaintext)?;
             *new_secret = Secret {
                 value: token,
-                content_encoding: Some(CONTENT_ENCODING_JWE.to_string()),
+                content_encoding: Some(ContentEncoding::Jwe.as_str().to_string()),
             };
         }
 
-        Ok(new_spec)
+        Ok(SanitizeSpecOutcome::Sanitized(new_spec))
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl SecretSetSpecSanitizer {
+    /// Decrypts the *current* (already-persisted) secret to compare against
+    /// `new_plaintext`. Unlike the new-value verify-before-trust check above,
+    /// a failure here means a previously-accepted secret no longer decrypts
+    /// (e.g. the key changed underneath us) — a technical fault, not bad user
+    /// input, so it stays an `InternalError`.
     fn matches_current_plaintext(
         current_secret: &Secret,
         new_plaintext: &[u8],
@@ -85,6 +106,19 @@ impl SecretSetSpecSanitizer {
     ) -> Result<bool, InternalError> {
         let decrypted_current = current_secret.decrypt_plaintext_bytes(cryptor)?;
         Ok(decrypted_current == new_plaintext)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn rejection_for_invalid_secret(name: &str, reason: &str) -> ApplyResourceRejection {
+    let err = SecretSetSpecValidationError::InvalidEncryptedSecret {
+        name: name.to_string(),
+        reason: reason.to_string(),
+    };
+    ApplyResourceRejection {
+        category: ApplyResourceRejectionCategory::BusinessValidationFailed,
+        message: err.to_string(),
     }
 }
 

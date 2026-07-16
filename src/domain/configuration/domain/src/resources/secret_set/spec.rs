@@ -66,6 +66,38 @@ pub const CONTENT_ENCODING_JWE: &str = "jwe";
 /// by the node.
 pub const CONTENT_ENCODING_AES256GCM: &str = "aes256gcm";
 
+/// The parsed form of `Secret::content_encoding`. Every site that needs to
+/// tell encodings apart matches on this instead of comparing raw strings, so
+/// the compiler forces every such site to be revisited when a new encoding is
+/// added.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ContentEncoding {
+    /// Compact JWE token — the form the node writes on apply.
+    Jwe,
+    /// Legacy `hex(nonce ‖ ciphertext)` AES-GCM form, read-only, produced only
+    /// by the env-var backfill migrations.
+    Aes256Gcm,
+}
+
+impl ContentEncoding {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Jwe => CONTENT_ENCODING_JWE,
+            Self::Aes256Gcm => CONTENT_ENCODING_AES256GCM,
+        }
+    }
+
+    /// Parses a `contentEncoding` string, returning `None` for anything not
+    /// recognized (callers decide how to report an unknown encoding).
+    pub fn parse(content_encoding: &str) -> Option<Self> {
+        match content_encoding {
+            CONTENT_ENCODING_JWE => Some(Self::Jwe),
+            CONTENT_ENCODING_AES256GCM => Some(Self::Aes256Gcm),
+            _ => None,
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Methods on the RFC-generated [`Secret`] DTO. A bare `type` alias can't
@@ -79,6 +111,11 @@ pub trait SecretExt {
     fn literal_value(&self) -> &str;
 
     fn is_encrypted(&self) -> bool;
+
+    /// The parsed `contentEncoding`. `None` both for a plaintext secret and
+    /// for an unrecognized encoding string — validation
+    /// (`validate_encrypted_secret`) is what rejects the latter.
+    fn content_encoding(&self) -> Option<ContentEncoding>;
 
     /// The encrypted token, if this is an encrypted secret — used by the
     /// sanitizer idempotency check to compare/reuse an existing ciphertext.
@@ -103,6 +140,12 @@ impl SecretExt for Secret {
         self.content_encoding.is_some()
     }
 
+    fn content_encoding(&self) -> Option<ContentEncoding> {
+        self.content_encoding
+            .as_deref()
+            .and_then(ContentEncoding::parse)
+    }
+
     fn as_encrypted(&self) -> Option<&str> {
         self.content_encoding
             .is_some()
@@ -112,9 +155,13 @@ impl SecretExt for Secret {
     fn decrypt_plaintext_bytes(&self, cryptor: &SecretCryptor) -> Result<Vec<u8>, InternalError> {
         match self.content_encoding.as_deref() {
             None => Ok(self.value.as_bytes().to_vec()),
-            Some(CONTENT_ENCODING_JWE) => cryptor.decrypt_jwe(&self.value),
-            Some(CONTENT_ENCODING_AES256GCM) => cryptor.decrypt_legacy_aes256gcm_hex(&self.value),
-            Some(other) => InternalError::bail(format!("unknown secret contentEncoding '{other}'")),
+            Some(other) => match ContentEncoding::parse(other) {
+                Some(ContentEncoding::Jwe) => cryptor.decrypt_jwe(&self.value),
+                Some(ContentEncoding::Aes256Gcm) => {
+                    cryptor.decrypt_legacy_aes256gcm_hex(&self.value)
+                }
+                None => InternalError::bail(format!("unknown secret contentEncoding '{other}'")),
+            },
         }
     }
 }
@@ -159,13 +206,13 @@ impl SecretSetSpecInput {
             return Err(invalid("encrypted value is empty"));
         }
 
-        match content_encoding {
-            CONTENT_ENCODING_JWE => {
+        match ContentEncoding::parse(content_encoding) {
+            Some(ContentEncoding::Jwe) => {
                 if !jwe::looks_like_compact(value) {
                     return Err(invalid("value is not a compact JWE token"));
                 }
             }
-            CONTENT_ENCODING_AES256GCM => {
+            Some(ContentEncoding::Aes256Gcm) => {
                 let bytes =
                     hex::decode(value).map_err(|_| invalid("aes256gcm value is not valid hex"))?;
                 if bytes.len() <= SecretCryptor::AES_NONCE_LEN {
@@ -174,10 +221,10 @@ impl SecretSetSpecInput {
                     ));
                 }
             }
-            other => {
+            None => {
                 return Err(SecretSetSpecValidationError::UnknownContentEncoding {
                     name: name.to_string(),
-                    content_encoding: other.to_string(),
+                    content_encoding: content_encoding.to_string(),
                 });
             }
         }

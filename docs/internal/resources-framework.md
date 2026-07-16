@@ -486,8 +486,12 @@ pub struct ResourceStatus {                  // ODF-generated; entirely server-o
 > types the framework validates/lints), not `VariableSetSpec`/`SecretSetSpec`. The individual secret
 > DTO (`odf::metadata::config::Secret`, aliased as `kamu_configuration::Secret`) is a bare `type`
 > alias like `Variable` — it sits at a leaf inside a codegen-owned `BTreeMap`, so it cannot be a
-> newtype; its `literal_value`/`is_encrypted`/`as_encrypted`/`decrypt_plaintext_bytes` helpers attach
-> via the `SecretExt` extension trait instead. One user-visible consequence of the codegen adoption:
+> newtype; its `literal_value`/`is_encrypted`/`content_encoding`/`as_encrypted`/
+> `decrypt_plaintext_bytes` helpers attach via the `SecretExt` extension trait instead.
+> `content_encoding` returns the parsed `kamu_configuration::ContentEncoding` (`Jwe`/`Aes256Gcm`)
+> rather than a raw string, so every site that tells encodings apart matches on the enum — adding a
+> third encoding means the compiler forces every match to be revisited. One user-visible consequence
+> of the codegen adoption:
 > a plaintext secret written with the scalar shorthand (`API_TOKEN: hunter2`) no longer round-trips as
 > a scalar — `get ss --revealed` renders it as `{ value: hunter2 }`, matching `VariableSet`'s existing
 > behavior (there is no retained "was this shorthand" flag once parsed).
@@ -1093,9 +1097,22 @@ assumption:
    **JWE** token (`dir` + `A256GCM`, via `crypto_utils::SecretCryptor` / `crypto_utils::jwe`) and
    stores it as `Secret { value: <jwe>, contentEncoding: Some("jwe") }`, so the persisted `spec`
    **already holds ciphertext.** (If new plaintext decrypts-equal to the stored secret, the existing
-   token is reused to avoid a spurious change.) A second, read-only `contentEncoding: "aes256gcm"`
-   form (`hex(nonce ‖ ciphertext)`) exists **only** for the env-var backfill migrations, which cannot
-   compute a JWE token in pure SQL; the node reads it and re-materializes as JWE on the next apply.
+   token is reused to avoid a spurious change.) An already-`jwe` input is decrypted to confirm it
+   actually reads under the current key before being left as-is — structural validation alone
+   (`jwe::looks_like_compact`) has no key and cannot catch a wrong-key or tampered token, so this
+   check is what keeps such a token from being persisted only to fail later, in reconciliation or
+   reveal. A decrypt failure here is a **business rejection**
+   (`ApplyResourceRejectionCategory::BusinessValidationFailed`), not an internal error: `plan`/`apply`
+   return `ApplyResource*Decision::Rejected`, the same outcome `ResourceValidateSpec` produces —
+   `ResourceSpecSanitizer::sanitize_new_spec` returns `SanitizeSpecOutcome<R>`
+   (`Sanitized(SpecInput)` / `Rejected(ApplyResourceRejection)`) precisely so a sanitizer can report
+   this class of failure without needing a `LifecycleError` variant, since the check needs key
+   material `validate()` doesn't have. A second, read-only `contentEncoding: "aes256gcm"` form
+   (`hex(nonce ‖ ciphertext)`) exists
+   **only** for the env-var backfill migrations, which cannot compute a JWE token in pure SQL; the
+   node reads it, and the sanitizer re-materializes it as JWE on the next apply regardless of whether
+   the plaintext changed (it is never treated as "no change needed" the way an already-`jwe` secret
+   is).
 2. **Reconciler — encrypted read-side projection** ([`reconcilers/secret_set.rs`](/src/domain/configuration/services/src/reconcilers/secret_set.rs)).
    `SecretSetReconcilerImpl` re-encrypts into a *separate* projection (`SecretSetEntry` rows in
    `SecretSetProjectionRepository`) that downstream consumers read; ciphertext-only, and it does not

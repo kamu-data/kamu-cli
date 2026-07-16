@@ -62,6 +62,7 @@ kamu-datasets = { workspace = true, features = ["testing"] }
 kamu-datasets-inmem = { workspace = true }
 odf = { workspace = true, features = ["testing"] }
 
+hex = { version = "0.4", default-features = false, features = ["std"] }
 oop = "0.0.2"
 pretty_assertions = { version = "1", default-features = false, features = ["std", "unstable"] }
 test-log = { version = "0.2", features = ["trace"] }

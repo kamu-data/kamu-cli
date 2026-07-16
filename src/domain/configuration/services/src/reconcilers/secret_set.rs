@@ -11,8 +11,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use crypto_utils::{AesGcmEncryptor, Encryptor, SecretCryptor};
-use internal_error::ResultIntoInternal;
+use crypto_utils::SecretCryptor;
 use kamu_configuration::{
     ReplaceProjectionEntriesError,
     Secret,
@@ -62,11 +61,9 @@ impl Reconciler<SecretSetResource> for SecretSetReconcilerImpl {
             .await?;
 
         let cryptor = self.create_secret_cryptor()?;
-        let projection_encryptor = self.create_encryptor()?;
 
         let entries = self.build_secret_entries(
             &cryptor,
-            &projection_encryptor,
             &resource.spec().secrets.entries,
             &previous_entries_by_key,
             account_id,
@@ -121,12 +118,6 @@ impl SecretSetReconcilerImpl {
             .collect())
     }
 
-    fn create_encryptor(&self) -> Result<AesGcmEncryptor, SecretSetReconcileError> {
-        self.secrets_encryption_config
-            .new_encryptor()
-            .map_err(SecretSetReconcileError::Internal)
-    }
-
     fn create_secret_cryptor(&self) -> Result<SecretCryptor, SecretSetReconcileError> {
         self.secrets_encryption_config
             .new_secret_cryptor()
@@ -136,7 +127,6 @@ impl SecretSetReconcilerImpl {
     fn build_secret_entries(
         &self,
         cryptor: &SecretCryptor,
-        projection_encryptor: &AesGcmEncryptor,
         secrets: &std::collections::BTreeMap<String, Secret>,
         previous_entries_by_key: &HashMap<String, PreviousConfigurationEntry>,
         account_id: &AccountID,
@@ -151,9 +141,8 @@ impl SecretSetReconcilerImpl {
                 .map_err(SecretSetReconcileError::Internal)?;
             // ... then re-encrypt into the read-side projection's own raw-AES
             // (value, secret_nonce) columns — a separate encoding from the spec.
-            let (value, secret_nonce) = projection_encryptor
+            let (value, secret_nonce) = cryptor
                 .encrypt_bytes(&plaintext)
-                .int_err()
                 .map_err(SecretSetReconcileError::Internal)?;
 
             let (entry_id, created_at) = previous_entries_by_key

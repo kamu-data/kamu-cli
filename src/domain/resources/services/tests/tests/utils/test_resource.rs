@@ -241,9 +241,9 @@ impl ResourceSpecSanitizer<TestResource> for TestResourceSpecSanitizer {
         &self,
         mut new_spec: TestResourceSpec,
         _maybe_current_spec: Option<&TestResourceSpec>,
-    ) -> Result<TestResourceSpec, internal_error::InternalError> {
+    ) -> Result<SanitizeSpecOutcome<TestResource>, internal_error::InternalError> {
         new_spec.value.push_str(&self.suffix);
-        Ok(new_spec)
+        Ok(SanitizeSpecOutcome::Sanitized(new_spec))
     }
 }
 
@@ -257,9 +257,9 @@ impl ResourceSpecSanitizer<TestResource> for TestResourceSpecClearingSanitizer {
         &self,
         mut new_spec: TestResourceSpec,
         _maybe_current_spec: Option<&TestResourceSpec>,
-    ) -> Result<TestResourceSpec, internal_error::InternalError> {
+    ) -> Result<SanitizeSpecOutcome<TestResource>, internal_error::InternalError> {
         new_spec.value.clear();
-        Ok(new_spec)
+        Ok(SanitizeSpecOutcome::Sanitized(new_spec))
     }
 }
 

@@ -78,6 +78,81 @@ pub fn encrypt_compact(key: &[u8; JWE_KEY_LEN], plaintext: &[u8]) -> Result<Stri
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// The outcome of splitting and structurally validating a compact JWE token's
+/// five segments, shared by [`decrypt_compact`] and [`looks_like_compact`] so
+/// the segment-count/`dir`/header/base64url/length checks can never drift
+/// apart between the two.
+enum SegmentCheck<'a> {
+    /// Wrong segment count.
+    WrongCount,
+    /// Right segment count, but the `dir` (empty encrypted-key) or header
+    /// checks failed — distinguished from base64url/length problems because
+    /// callers report it as `UnsupportedAlgorithm`, not `Malformed`.
+    UnsupportedAlgorithm,
+    /// Header and `dir` are fine, but a segment isn't valid base64url, an
+    /// IV/tag decodes to the wrong length for AES-256-GCM, or the ciphertext
+    /// is empty (would decrypt to an empty secret).
+    Malformed,
+    /// All structural checks passed. Does not mean the token decrypts (no key
+    /// is used here, and the ciphertext/tag are never authenticated) — only
+    /// that reshaping it as a JWE is possible.
+    Ok {
+        encoded_header: &'a str,
+        iv: Vec<u8>,
+        ciphertext: Vec<u8>,
+        tag: Vec<u8>,
+    },
+}
+
+fn check_segments(token: &str) -> SegmentCheck<'_> {
+    let segments: Vec<&str> = token.split('.').collect();
+    if segments.len() != 5 {
+        return SegmentCheck::WrongCount;
+    }
+
+    // `dir` means there must be no encrypted key.
+    if !segments[1].is_empty() {
+        return SegmentCheck::UnsupportedAlgorithm;
+    }
+
+    // Invalid base64url is malformed; valid base64url decoding to the wrong
+    // header is an unsupported algorithm (a different `alg`/`enc` profile).
+    let Ok(header) = BASE64URL.decode(segments[0]) else {
+        return SegmentCheck::Malformed;
+    };
+    if header != PROTECTED_HEADER_JSON.as_bytes() {
+        return SegmentCheck::UnsupportedAlgorithm;
+    }
+
+    let Ok(iv) = BASE64URL.decode(segments[2]) else {
+        return SegmentCheck::Malformed;
+    };
+    let Ok(ciphertext) = BASE64URL.decode(segments[3]) else {
+        return SegmentCheck::Malformed;
+    };
+    let Ok(tag) = BASE64URL.decode(segments[4]) else {
+        return SegmentCheck::Malformed;
+    };
+
+    // A256GCM ciphertext is the same length as the plaintext (GCM is a stream
+    // cipher; the tag is separate) — an empty ciphertext means an empty
+    // secret, which the plaintext path already rejects via
+    // `EmptySecretValue`. Reject it here too so it can't sneak in disguised
+    // as `jwe`.
+    if iv.len() != 12 || tag.len() != 16 || ciphertext.is_empty() {
+        return SegmentCheck::Malformed;
+    }
+
+    SegmentCheck::Ok {
+        encoded_header: segments[0],
+        iv,
+        ciphertext,
+        tag,
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Decrypt a compact JWE token produced by [`encrypt_compact`] using the
 /// supplied 32-byte content-encryption key.
 ///
@@ -86,49 +161,16 @@ pub fn encrypt_compact(key: &[u8; JWE_KEY_LEN], plaintext: &[u8]) -> Result<Stri
 /// any token that fails AEAD authentication (wrong key, tampering, or a
 /// mismatched header).
 pub fn decrypt_compact(key: &[u8; JWE_KEY_LEN], token: &str) -> Result<Vec<u8>, JweError> {
-    let segments: Vec<&str> = token.split('.').collect();
-    if segments.len() != 5 {
-        return Err(JweError::Malformed);
-    }
-    let [
-        encoded_header,
-        encrypted_key,
-        encoded_iv,
-        encoded_ciphertext,
-        encoded_tag,
-    ] = [
-        segments[0],
-        segments[1],
-        segments[2],
-        segments[3],
-        segments[4],
-    ];
-
-    // `dir` means there must be no encrypted key.
-    if !encrypted_key.is_empty() {
-        return Err(JweError::UnsupportedAlgorithm);
-    }
-
-    let header_bytes = BASE64URL
-        .decode(encoded_header)
-        .map_err(|_| JweError::Malformed)?;
-    if header_bytes != PROTECTED_HEADER_JSON.as_bytes() {
-        return Err(JweError::UnsupportedAlgorithm);
-    }
-
-    let iv = BASE64URL
-        .decode(encoded_iv)
-        .map_err(|_| JweError::Malformed)?;
-    let mut buffer = BASE64URL
-        .decode(encoded_ciphertext)
-        .map_err(|_| JweError::Malformed)?;
-    let tag = BASE64URL
-        .decode(encoded_tag)
-        .map_err(|_| JweError::Malformed)?;
-
-    if iv.len() != 12 || tag.len() != 16 {
-        return Err(JweError::Malformed);
-    }
+    let (encoded_header, iv, mut ciphertext, tag) = match check_segments(token) {
+        SegmentCheck::WrongCount | SegmentCheck::Malformed => return Err(JweError::Malformed),
+        SegmentCheck::UnsupportedAlgorithm => return Err(JweError::UnsupportedAlgorithm),
+        SegmentCheck::Ok {
+            encoded_header,
+            iv,
+            ciphertext,
+            tag,
+        } => (encoded_header, iv, ciphertext, tag),
+    };
 
     let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(key));
 
@@ -137,47 +179,25 @@ pub fn decrypt_compact(key: &[u8; JWE_KEY_LEN], token: &str) -> Result<Vec<u8>, 
             GenericArray::from_slice(&iv),
             // AAD is the *encoded* header, verbatim, as it appeared in the token.
             encoded_header.as_bytes(),
-            &mut buffer,
+            &mut ciphertext,
             GenericArray::from_slice(&tag),
         )
         .map_err(|_| JweError::Decryption)?;
 
-    Ok(buffer)
+    Ok(ciphertext)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Structural check that `token` looks like a compact JWE: five dot-separated
-/// segments with a supported header, an empty `dir` encrypted-key segment,
-/// and IV/ciphertext/tag segments that are valid base64url of the lengths
-/// AES-256-GCM requires. Does not require the key, so it is usable in spec
-/// validation without needing to authenticate the ciphertext. A `true` result
-/// does not guarantee the token decrypts (wrong key or tampering still fail
-/// authentication), but it does rule out tokens that are malformed regardless
-/// of key — the case `decrypt_compact` would otherwise only catch later, at
-/// reconciliation or reveal time.
+/// Structural check that `token` looks like a compact JWE — see
+/// [`check_segments`] for exactly what is checked. Does not require the key,
+/// so it is usable in spec validation without needing to authenticate the
+/// ciphertext. A `true` result does not guarantee the token decrypts (wrong
+/// key or tampering still fail authentication), but it does rule out tokens
+/// that are malformed regardless of key — the case `decrypt_compact` would
+/// otherwise only catch later, at reconciliation or reveal time.
 pub fn looks_like_compact(token: &str) -> bool {
-    let segments: Vec<&str> = token.split('.').collect();
-    if segments.len() != 5 || !segments[1].is_empty() {
-        return false;
-    }
-
-    match BASE64URL.decode(segments[0]) {
-        Ok(header) if header == PROTECTED_HEADER_JSON.as_bytes() => {}
-        _ => return false,
-    }
-
-    let Ok(iv) = BASE64URL.decode(segments[2]) else {
-        return false;
-    };
-    if BASE64URL.decode(segments[3]).is_err() {
-        return false;
-    }
-    let Ok(tag) = BASE64URL.decode(segments[4]) else {
-        return false;
-    };
-
-    iv.len() == 12 && tag.len() == 16
+    matches!(check_segments(token), SegmentCheck::Ok { .. })
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -277,6 +297,44 @@ mod tests {
             !looks_like_compact(&tampered),
             "an IV segment of the wrong length must fail the structural check"
         );
+    }
+
+    #[test]
+    fn looks_like_compact_rejects_empty_ciphertext() {
+        // A JWE of empty plaintext has an empty ciphertext segment (GCM doesn't
+        // expand plaintext into ciphertext) — must not look like a valid
+        // encrypted secret, since that would let an empty value bypass the
+        // `EmptySecretValue` validation rule under the `jwe` encoding.
+        let token = encrypt_compact(KEY, b"").unwrap();
+        assert!(
+            !looks_like_compact(&token),
+            "a JWE token of empty plaintext must fail the structural check"
+        );
+        assert_matches!(decrypt_compact(KEY, &token), Err(JweError::Malformed));
+    }
+
+    #[test]
+    fn non_base64url_header_is_malformed_not_unsupported_algorithm() {
+        let token = encrypt_compact(KEY, b"x").unwrap();
+        let mut parts: Vec<&str> = token.split('.').collect();
+        parts[0] = "not!valid!base64url!!!";
+        let tampered = parts.join(".");
+        assert_matches!(decrypt_compact(KEY, &tampered), Err(JweError::Malformed));
+        assert!(!looks_like_compact(&tampered));
+    }
+
+    #[test]
+    fn valid_base64url_wrong_header_is_unsupported_algorithm() {
+        let token = encrypt_compact(KEY, b"x").unwrap();
+        let mut parts: Vec<&str> = token.split('.').collect();
+        let wrong_header = BASE64URL.encode(r#"{"alg":"dir","enc":"A128GCM"}"#);
+        parts[0] = &wrong_header;
+        let tampered = parts.join(".");
+        assert_matches!(
+            decrypt_compact(KEY, &tampered),
+            Err(JweError::UnsupportedAlgorithm)
+        );
+        assert!(!looks_like_compact(&tampered));
     }
 
     #[test]

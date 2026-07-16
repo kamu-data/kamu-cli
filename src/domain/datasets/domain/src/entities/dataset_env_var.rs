@@ -158,30 +158,14 @@ impl SecretsEncryptionConfig {
         false
     }
 
-    /// Build an [`AesGcmEncryptor`] from the configured encryption key.
-    ///
-    /// Returns a graceful error (rather than panicking) when no key is
-    /// configured — the same situation `app.rs` treats as "feature disabled".
-    /// Callers that need to encrypt/decrypt secrets (e.g. `SecretSet`
-    /// processing) use this so a missing key surfaces as an `InternalError`
-    /// instead of an `Option::unwrap()` panic.
-    pub fn new_encryptor(&self) -> Result<AesGcmEncryptor, InternalError> {
-        let Some(encryption_key) = self.encryption_key.as_ref() else {
-            return InternalError::bail(
-                "Secrets encryption key is not configured; set `secretsEncryption.encryptionKey`",
-            );
-        };
-
-        AesGcmEncryptor::try_new(encryption_key).int_err()
-    }
-
     /// Build a [`SecretCryptor`] from the configured encryption key.
     ///
     /// Used by `SecretSet` secret handling (sanitizer, reveal, reconciler) to
     /// produce/consume `contentEncoding: "jwe"` values and to decrypt the
     /// legacy `contentEncoding: "aes256gcm"` form emitted by the env-var
-    /// backfill migrations. Surfaces a missing key as an `InternalError`, like
-    /// [`Self::new_encryptor`].
+    /// backfill migrations, and to encrypt/decrypt the read-side projection's
+    /// own raw-AES storage. Surfaces a missing key as an `InternalError`
+    /// instead of an `Option::unwrap()` panic.
     pub fn new_secret_cryptor(&self) -> Result<SecretCryptor, InternalError> {
         let Some(encryption_key) = self.encryption_key.as_ref() else {
             return InternalError::bail(
