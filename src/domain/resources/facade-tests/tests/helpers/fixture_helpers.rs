@@ -146,8 +146,8 @@ pub async fn apply_manifest_and_get_id(
 
 /// Builds a `SecretSet` manifest JSON string.
 ///
-/// Each secret is emitted as `{"value": "<v>"}` — the untagged `Value`
-/// variant of `SecretSpec`.
+/// Each secret is emitted as `{"value": "<v>"}` — the structured,
+/// non-encrypted form of `odf::metadata::config::Secret`.
 pub fn secret_set_manifest_json(
     name: &str,
     account: Option<&str>,

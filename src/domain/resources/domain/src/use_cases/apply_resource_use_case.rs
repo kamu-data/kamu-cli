@@ -56,6 +56,16 @@ pub struct ApplyResourceParams<R: DeclarativeResource> {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Outcome of running a resource's sanitizer over `ApplyResourceParams`
+/// (before planning). Named rather than a nested `Result` so both `plan` and
+/// `apply` can match on it directly.
+pub enum SanitizeParamsOutcome<R: DeclarativeResource> {
+    Sanitized(ApplyResourceParams<R>),
+    Rejected(ApplyResourceRejection),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(Debug)]
 pub enum ApplyResourcePlanningDecision<R: DeclarativeResource> {
     Planned(ApplyResourcePlan<R>),

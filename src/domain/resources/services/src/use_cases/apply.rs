@@ -54,16 +54,18 @@ macro_rules! declare_apply_resource_use_case {
                 }
             }
 
+            /// Runs the optional sanitizer and surfaces sanitizer-level
+            /// business rejections before planning.
             async fn sanitize_params(
                 &self,
                 params: kamu_resources::ApplyResourceParams<$resource>,
             ) -> Result<
-                kamu_resources::ApplyResourceParams<$resource>,
+                kamu_resources::SanitizeParamsOutcome<$resource>,
                 kamu_resources::ApplyResourceUseCaseError<$resource>,
             > {
                 // If no sanitizer is provided, return the original params
                 let Some(sanitizer) = &self.resource_spec_sanitizer else {
-                    return Ok(params);
+                    return Ok(kamu_resources::SanitizeParamsOutcome::Sanitized(params));
                 };
 
                 // Find the resource UID if not provided
@@ -111,12 +113,21 @@ macro_rules! declare_apply_resource_use_case {
                 };
 
                 // Sanitize the new spec using the current spec for comparison
-                let spec = sanitizer
+                let outcome = sanitizer
                     .sanitize_new_spec(params.spec, current_spec.as_ref())
                     .await
                     .map_err(kamu_resources::ApplyResourceUseCaseError::Internal)?;
 
-                Ok(kamu_resources::ApplyResourceParams { spec, ..params })
+                let spec = match outcome {
+                    kamu_resources::SanitizeSpecOutcome::Sanitized(spec) => spec,
+                    kamu_resources::SanitizeSpecOutcome::Rejected(rejection) => {
+                        return Ok(kamu_resources::SanitizeParamsOutcome::Rejected(rejection));
+                    }
+                };
+
+                Ok(kamu_resources::SanitizeParamsOutcome::Sanitized(
+                    kamu_resources::ApplyResourceParams { spec, ..params },
+                ))
             }
         }
 
@@ -149,7 +160,14 @@ macro_rules! declare_apply_resource_use_case {
                 kamu_resources::ApplyResourceUseCaseError<$resource>,
             > {
                 Self::ensure_params_account_resolved(&params)?;
-                let params = self.sanitize_params(params).await?;
+                let params = match self.sanitize_params(params).await? {
+                    kamu_resources::SanitizeParamsOutcome::Sanitized(params) => params,
+                    kamu_resources::SanitizeParamsOutcome::Rejected(rejection) => {
+                        return Ok(kamu_resources::ApplyResourcePlanningDecision::Rejected(
+                            rejection,
+                        ));
+                    }
+                };
 
                 let planner = $crate::ApplyResourcePlanner::<$resource>::new(
                     self.generic_resource_query_service.as_ref(),
@@ -169,7 +187,14 @@ macro_rules! declare_apply_resource_use_case {
                 kamu_resources::ApplyResourceUseCaseError<$resource>,
             > {
                 Self::ensure_params_account_resolved(&params)?;
-                let params = self.sanitize_params(params).await?;
+                let params = match self.sanitize_params(params).await? {
+                    kamu_resources::SanitizeParamsOutcome::Sanitized(params) => params,
+                    kamu_resources::SanitizeParamsOutcome::Rejected(rejection) => {
+                        return Ok(kamu_resources::ApplyResourceApplicationDecision::Rejected(
+                            rejection,
+                        ));
+                    }
+                };
 
                 let planner = $crate::ApplyResourcePlanner::<$resource>::new(
                     self.generic_resource_query_service.as_ref(),

@@ -7,111 +7,170 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::BTreeMap;
-
-use crypto_utils::Encryptor;
-use internal_error::{InternalError, ResultIntoInternal};
+use crypto_utils::{SecretCryptor, jwe};
+use internal_error::InternalError;
 use kamu_resources::{ResourceLinterSpec, ResourceValidateSpec, ResourceWarning};
-use serde::{Deserialize, Serialize};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct SecretSetSpec {
-    pub secrets: BTreeMap<String, SecretSpec>,
-}
-
-kamu_resources::declare_identity_resource_spec_from_input!(SecretSetSpec);
+/// RFC-18-shaped secret: either a bare string (plaintext shorthand, accepted
+/// on input via ODF's `StructOrString`) or an object `{ value,
+/// contentEncoding? }`. `contentEncoding` labels how `value` is encoded:
+/// absent means plaintext; `"jwe"` is the encrypted form the node produces on
+/// apply (an RFC-7516 compact JWE token); `"aes256gcm"` is a legacy read-only
+/// form (`hex(nonce ‖ ciphertext)`) emitted only by the env-var backfill
+/// migrations. Once parsed, a secret always round-trips as the structured
+/// form — there is no retained flag for "was this written as shorthand."
+pub type Secret = odf::metadata::config::Secret;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields, untagged)]
-pub enum SecretSpec {
-    Literal(String),
-    Value(SecretValueSpec),
-    Encrypted(EncryptedSecretSpec),
+kamu_resources::declare_rfc_spec_newtype!(
+    SecretSetSpec,
+    dto = odf::metadata::config::SecretSetSpec,
+    proxy = odf::metadata::serde::yaml::config::SecretSetSpec,
+    proxy_path = "odf::metadata::serde::yaml::config::SecretSetSpec"
+);
+
+// Field-identical to `SecretSetSpec`, but kept as its own type (not a `type`
+// alias) so validation/linting attach to the write-path type the framework
+// actually asks for — see `ResourceSpecFromInput`.
+kamu_resources::declare_rfc_spec_newtype!(
+    SecretSetSpecInput,
+    dto = odf::metadata::config::SecretSetSpecInput,
+    proxy = odf::metadata::serde::yaml::config::SecretSetSpecInput,
+    proxy_path = "odf::metadata::serde::yaml::config::SecretSetSpecInput"
+);
+
+impl kamu_resources::ResourceSpecFromInput<SecretSetSpecInput> for SecretSetSpec {
+    fn from_input(input: SecretSetSpecInput) -> Self {
+        Self(odf::metadata::config::SecretSetSpec {
+            secrets: input.0.secrets,
+        })
+    }
+
+    fn into_input(self) -> SecretSetSpecInput {
+        SecretSetSpecInput(odf::metadata::config::SecretSetSpecInput {
+            secrets: self.0.secrets,
+        })
+    }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct SecretValueSpec {
-    pub value: String,
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// `contentEncoding` for a compact JWE token — the form written on apply.
+pub const CONTENT_ENCODING_JWE: &str = "jwe";
+
+/// `contentEncoding` for the legacy `hex(nonce ‖ ciphertext)` AES-GCM form,
+/// produced only by the env-var backfill migrations and read (never written)
+/// by the node.
+pub const CONTENT_ENCODING_AES256GCM: &str = "aes256gcm";
+
+/// The parsed form of `Secret::content_encoding`. Every site that needs to
+/// tell encodings apart matches on this instead of comparing raw strings, so
+/// the compiler forces every such site to be revisited when a new encoding is
+/// added.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ContentEncoding {
+    /// Compact JWE token — the form the node writes on apply.
+    Jwe,
+    /// Legacy `hex(nonce ‖ ciphertext)` AES-GCM form, read-only, produced only
+    /// by the env-var backfill migrations.
+    Aes256Gcm,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct EncryptedSecretSpec {
-    pub encrypted: String,
-    pub nonce: String,
-}
-
-impl SecretSpec {
-    pub fn literal_value(&self) -> &str {
+impl ContentEncoding {
+    pub fn as_str(self) -> &'static str {
         match self {
-            Self::Literal(value) => value,
-            Self::Value(value) => &value.value,
-            Self::Encrypted(_) => panic!("literal_value() called on encrypted secret"),
+            Self::Jwe => CONTENT_ENCODING_JWE,
+            Self::Aes256Gcm => CONTENT_ENCODING_AES256GCM,
         }
     }
 
-    pub fn is_encrypted(&self) -> bool {
-        matches!(self, Self::Encrypted(_))
-    }
-
-    pub fn as_encrypted(&self) -> Option<&EncryptedSecretSpec> {
-        match self {
-            Self::Encrypted(e) => Some(e),
+    /// Parses a `contentEncoding` string, returning `None` for anything not
+    /// recognized (callers decide how to report an unknown encoding).
+    pub fn parse(content_encoding: &str) -> Option<Self> {
+        match content_encoding {
+            CONTENT_ENCODING_JWE => Some(Self::Jwe),
+            CONTENT_ENCODING_AES256GCM => Some(Self::Aes256Gcm),
             _ => None,
         }
     }
-
-    pub fn decrypt_plaintext_bytes(
-        &self,
-        encryptor: &dyn Encryptor,
-    ) -> Result<Vec<u8>, InternalError> {
-        match self {
-            Self::Encrypted(encrypted) => encrypted.decrypt_plaintext_bytes(encryptor),
-            Self::Literal(_) | Self::Value(_) => Ok(self.literal_value().as_bytes().to_vec()),
-        }
-    }
 }
 
-impl EncryptedSecretSpec {
-    fn decode_encrypted_bytes(&self) -> Result<Vec<u8>, InternalError> {
-        use base64::Engine;
-        use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-        BASE64_STANDARD.decode(&self.encrypted).int_err()
+/// Methods on the RFC-generated [`Secret`] DTO. A bare `type` alias can't
+/// carry inherent impls, so these attach via an extension trait — see
+/// [`Variable`](super::Variable)'s alias for the leaf type that needed none.
+pub trait SecretExt {
+    /// The plaintext string for a non-encrypted secret.
+    ///
+    /// Panics on an encrypted secret — callers must gate on
+    /// [`Self::is_encrypted`] first.
+    fn literal_value(&self) -> &str;
+
+    fn is_encrypted(&self) -> bool;
+
+    /// The parsed `contentEncoding`. `None` both for a plaintext secret and
+    /// for an unrecognized encoding string — validation
+    /// (`validate_encrypted_secret`) is what rejects the latter.
+    fn content_encoding(&self) -> Option<ContentEncoding>;
+
+    /// The encrypted token, if this is an encrypted secret — used by the
+    /// sanitizer idempotency check to compare/reuse an existing ciphertext.
+    fn as_encrypted(&self) -> Option<&str>;
+
+    /// Decrypt to plaintext bytes, dispatching on `contentEncoding`:
+    /// `jwe` → JWE-decrypt; `aes256gcm` → legacy hex form; absent → the value
+    /// is already plaintext.
+    fn decrypt_plaintext_bytes(&self, cryptor: &SecretCryptor) -> Result<Vec<u8>, InternalError>;
+}
+
+impl SecretExt for Secret {
+    fn literal_value(&self) -> &str {
+        assert!(
+            self.content_encoding.is_none(),
+            "literal_value() called on encrypted secret"
+        );
+        &self.value
     }
 
-    fn decode_nonce_bytes(&self) -> Result<Vec<u8>, InternalError> {
-        use base64::Engine;
-        use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
-
-        BASE64_STANDARD.decode(&self.nonce).int_err()
+    fn is_encrypted(&self) -> bool {
+        self.content_encoding.is_some()
     }
 
-    pub fn decrypt_plaintext_bytes(
-        &self,
-        encryptor: &dyn Encryptor,
-    ) -> Result<Vec<u8>, InternalError> {
-        let encrypted_bytes = self.decode_encrypted_bytes()?;
-        let nonce_bytes = self.decode_nonce_bytes()?;
+    fn content_encoding(&self) -> Option<ContentEncoding> {
+        self.content_encoding
+            .as_deref()
+            .and_then(ContentEncoding::parse)
+    }
 
-        encryptor
-            .decrypt_bytes(&encrypted_bytes, &nonce_bytes)
-            .int_err()
+    fn as_encrypted(&self) -> Option<&str> {
+        self.content_encoding
+            .is_some()
+            .then_some(self.value.as_str())
+    }
+
+    fn decrypt_plaintext_bytes(&self, cryptor: &SecretCryptor) -> Result<Vec<u8>, InternalError> {
+        match self.content_encoding.as_deref() {
+            None => Ok(self.value.as_bytes().to_vec()),
+            Some(other) => match ContentEncoding::parse(other) {
+                Some(ContentEncoding::Jwe) => cryptor.decrypt_jwe(&self.value),
+                Some(ContentEncoding::Aes256Gcm) => {
+                    cryptor.decrypt_legacy_aes256gcm_hex(&self.value)
+                }
+                None => InternalError::bail(format!("unknown secret contentEncoding '{other}'")),
+            },
+        }
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl SecretSetSpec {
+impl SecretSetSpecInput {
     pub const MAX_SECRETS: usize = 256;
     pub const MAX_SECRET_VALUE_LEN: usize = 16 * 1024;
-    pub const ENCRYPTED_SECRET_NONCE_LEN: usize = 12;
     pub const WARNING_SECRET_VALUE_LEN: usize = 1024;
     pub const RESERVED_SECRET_PREFIX: &str = "KAMU_";
 
@@ -130,54 +189,44 @@ impl SecretSetSpec {
         chars.all(|c| c == '_' || c.is_ascii_alphabetic() || c.is_ascii_digit())
     }
 
+    /// Validate an encrypted secret (`content_encoding` is `Some`). Checks the
+    /// encoding is one we recognize and that `value` is structurally plausible
+    /// for it, without needing the encryption key.
     fn validate_encrypted_secret(
         name: &str,
-        secret: &EncryptedSecretSpec,
+        value: &str,
+        content_encoding: &str,
     ) -> Result<(), SecretSetSpecValidationError> {
-        if secret.encrypted.is_empty() {
-            return Err(SecretSetSpecValidationError::InvalidEncryptedSecret {
-                name: name.to_string(),
-                reason: "encrypted value is empty".to_string(),
-            });
+        let invalid = |reason: &str| SecretSetSpecValidationError::InvalidEncryptedSecret {
+            name: name.to_string(),
+            reason: reason.to_string(),
+        };
+
+        if value.is_empty() {
+            return Err(invalid("encrypted value is empty"));
         }
 
-        let encrypted_bytes = secret.decode_encrypted_bytes().map_err(|_| {
-            SecretSetSpecValidationError::InvalidEncryptedSecret {
-                name: name.to_string(),
-                reason: "encrypted value is not valid base64".to_string(),
+        match ContentEncoding::parse(content_encoding) {
+            Some(ContentEncoding::Jwe) => {
+                if !jwe::looks_like_compact(value) {
+                    return Err(invalid("value is not a compact JWE token"));
+                }
             }
-        })?;
-
-        if encrypted_bytes.is_empty() {
-            return Err(SecretSetSpecValidationError::InvalidEncryptedSecret {
-                name: name.to_string(),
-                reason: "encrypted value decodes to empty bytes".to_string(),
-            });
-        }
-
-        if secret.nonce.is_empty() {
-            return Err(SecretSetSpecValidationError::InvalidEncryptedSecret {
-                name: name.to_string(),
-                reason: "nonce is empty".to_string(),
-            });
-        }
-
-        let nonce_bytes = secret.decode_nonce_bytes().map_err(|_| {
-            SecretSetSpecValidationError::InvalidEncryptedSecret {
-                name: name.to_string(),
-                reason: "nonce is not valid base64".to_string(),
+            Some(ContentEncoding::Aes256Gcm) => {
+                let bytes =
+                    hex::decode(value).map_err(|_| invalid("aes256gcm value is not valid hex"))?;
+                if bytes.len() <= SecretCryptor::AES_NONCE_LEN {
+                    return Err(invalid(
+                        "aes256gcm value is too short to contain a nonce and ciphertext",
+                    ));
+                }
             }
-        })?;
-
-        if nonce_bytes.len() != Self::ENCRYPTED_SECRET_NONCE_LEN {
-            return Err(SecretSetSpecValidationError::InvalidEncryptedSecret {
-                name: name.to_string(),
-                reason: format!(
-                    "nonce must decode to {expected} bytes, got {actual}",
-                    expected = Self::ENCRYPTED_SECRET_NONCE_LEN,
-                    actual = nonce_bytes.len()
-                ),
-            });
+            None => {
+                return Err(SecretSetSpecValidationError::UnknownContentEncoding {
+                    name: name.to_string(),
+                    content_encoding: content_encoding.to_string(),
+                });
+            }
         }
 
         Ok(())
@@ -186,28 +235,30 @@ impl SecretSetSpec {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl ResourceValidateSpec for SecretSetSpec {
+impl ResourceValidateSpec for SecretSetSpecInput {
     type ValidationError = SecretSetSpecValidationError;
 
     fn validate(&self) -> Result<(), Self::ValidationError> {
-        if self.secrets.is_empty() {
+        let entries = &self.secrets.entries;
+
+        if entries.is_empty() {
             return Err(SecretSetSpecValidationError::EmptySecrets);
         }
 
-        if self.secrets.len() > Self::MAX_SECRETS {
+        if entries.len() > Self::MAX_SECRETS {
             return Err(SecretSetSpecValidationError::TooManySecrets {
-                actual: self.secrets.len(),
+                actual: entries.len(),
                 max: Self::MAX_SECRETS,
             });
         }
 
-        for (name, secret) in &self.secrets {
+        for (name, secret) in entries {
             if !Self::is_valid_secret_name(name) {
                 return Err(SecretSetSpecValidationError::InvalidSecretName { name: name.clone() });
             }
 
-            if let SecretSpec::Encrypted(encrypted_secret) = secret {
-                Self::validate_encrypted_secret(name, encrypted_secret)?;
+            if let Some(content_encoding) = &secret.content_encoding {
+                Self::validate_encrypted_secret(name, &secret.value, content_encoding)?;
                 continue;
             }
 
@@ -232,11 +283,11 @@ impl ResourceValidateSpec for SecretSetSpec {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl ResourceLinterSpec for SecretSetSpec {
+impl ResourceLinterSpec for SecretSetSpecInput {
     fn lint_warnings(&self) -> Vec<ResourceWarning> {
         let mut warnings = Vec::new();
 
-        for (name, secret) in &self.secrets {
+        for (name, secret) in &self.secrets.entries {
             if name.starts_with(Self::RESERVED_SECRET_PREFIX) {
                 warnings.push(ResourceWarning {
                     code: Self::WARNING_CODE_RESERVED_SECRET_PREFIX.to_string(),
@@ -265,11 +316,7 @@ impl ResourceLinterSpec for SecretSetSpec {
                 if value.len() > Self::WARNING_SECRET_VALUE_LEN {
                     warnings.push(ResourceWarning {
                         code: Self::WARNING_CODE_LONG_SECRET_VALUE.to_string(),
-                        path: Some(match secret {
-                            SecretSpec::Literal(_) => format!("spec.secrets.{name}"),
-                            SecretSpec::Value(_) => format!("spec.secrets.{name}.value"),
-                            SecretSpec::Encrypted(_) => unreachable!(),
-                        }),
+                        path: Some(format!("spec.secrets.{name}.value")),
                         message: format!(
                             "Secret '{name}' value is unusually long: got {actual}, warning \
                              threshold is {threshold}",
@@ -311,6 +358,12 @@ pub enum SecretSetSpecValidationError {
     #[error("secret '{name}' has invalid encrypted value: {reason}")]
     InvalidEncryptedSecret { name: String, reason: String },
 
+    #[error("secret '{name}' has unknown contentEncoding '{content_encoding}'")]
+    UnknownContentEncoding {
+        name: String,
+        content_encoding: String,
+    },
+
     #[error("description is too long: got {actual}, max is {max}")]
     DescriptionTooLong { actual: usize, max: usize },
 }
@@ -319,15 +372,64 @@ pub enum SecretSetSpecValidationError {
 
 #[cfg(test)]
 mod tests {
+    use std::assert_matches;
+
+    use crypto_utils::SecretCryptor;
+
     use super::{
-        EncryptedSecretSpec,
+        CONTENT_ENCODING_AES256GCM,
+        CONTENT_ENCODING_JWE,
+        Secret,
+        SecretExt,
         SecretSetSpec,
+        SecretSetSpecInput,
         SecretSetSpecValidationError,
-        SecretSpec,
-        SecretValueSpec,
     };
 
-    const VALID_ENCRYPTED_SECRET_NONCE: &str = "bm9uY2UxMjM0NTY3";
+    // A 32-byte key for building real JWE / aes256gcm test values.
+    const TEST_KEY: &str = "0123456789abcdef0123456789abcdef";
+
+    fn make_spec(entries: impl IntoIterator<Item = (impl Into<String>, Secret)>) -> SecretSetSpec {
+        SecretSetSpec(odf::metadata::config::SecretSetSpec {
+            secrets: make_secrets(entries),
+        })
+    }
+
+    fn make_spec_input(
+        entries: impl IntoIterator<Item = (impl Into<String>, Secret)>,
+    ) -> SecretSetSpecInput {
+        SecretSetSpecInput(odf::metadata::config::SecretSetSpecInput {
+            secrets: make_secrets(entries),
+        })
+    }
+
+    fn make_secrets(
+        entries: impl IntoIterator<Item = (impl Into<String>, Secret)>,
+    ) -> odf::metadata::config::Secrets {
+        odf::metadata::config::Secrets {
+            entries: entries
+                .into_iter()
+                .map(|(name, secret)| (name.into(), secret))
+                .collect(),
+        }
+    }
+
+    /// A plaintext structured secret (`{ value }`, no encoding).
+    fn plaintext_value(value: &str) -> Secret {
+        Secret {
+            value: value.to_string(),
+            content_encoding: None,
+        }
+    }
+
+    /// A real encrypted JWE secret for `plaintext`.
+    fn jwe_secret(plaintext: &str) -> Secret {
+        let cryptor = SecretCryptor::try_new(TEST_KEY).unwrap();
+        Secret {
+            value: cryptor.encrypt_to_jwe(plaintext.as_bytes()).unwrap(),
+            content_encoding: Some(CONTENT_ENCODING_JWE.to_string()),
+        }
+    }
 
     #[test]
     fn deserializes_scalar_secret_syntax() {
@@ -340,14 +442,7 @@ mod tests {
 
         assert_eq!(
             spec,
-            SecretSetSpec {
-                secrets: [(
-                    "API_TOKEN".to_string(),
-                    SecretSpec::Literal("secret-value".to_string()),
-                )]
-                .into_iter()
-                .collect(),
-            }
+            make_spec([("API_TOKEN", plaintext_value("secret-value"))])
         );
     }
 
@@ -364,54 +459,17 @@ mod tests {
 
         assert_eq!(
             spec,
-            SecretSetSpec {
-                secrets: [(
-                    "API_TOKEN".to_string(),
-                    SecretSpec::Value(SecretValueSpec {
-                        value: "secret-value".to_string(),
-                    }),
-                )]
-                .into_iter()
-                .collect(),
-            }
+            make_spec([("API_TOKEN", plaintext_value("secret-value"))])
         );
     }
 
     #[test]
-    fn serializes_secret_as_scalar_syntax() {
-        let value = serde_json::to_value(SecretSetSpec {
-            secrets: [(
-                "API_TOKEN".to_string(),
-                SecretSpec::Literal("secret-value".to_string()),
-            )]
-            .into_iter()
-            .collect(),
-        })
-        .unwrap();
-
-        assert_eq!(
-            value,
-            serde_json::json!({
-                "secrets": {
-                    "API_TOKEN": "secret-value",
-                }
-            })
-        );
-    }
-
-    #[test]
-    fn serializes_structured_secret_syntax() {
-        let value = serde_json::to_value(SecretSetSpec {
-            secrets: [(
-                "API_TOKEN".to_string(),
-                SecretSpec::Value(SecretValueSpec {
-                    value: "secret-value".to_string(),
-                }),
-            )]
-            .into_iter()
-            .collect(),
-        })
-        .unwrap();
+    fn serializes_secret_as_structured_syntax() {
+        // Scalar shorthand is accepted on input but always round-trips as the
+        // structured form once parsed — there is no retained "was shorthand" flag.
+        let value =
+            serde_json::to_value(make_spec([("API_TOKEN", plaintext_value("secret-value"))]))
+                .unwrap();
 
         assert_eq!(
             value,
@@ -429,20 +487,13 @@ mod tests {
     fn lints_reserved_prefix_warning() {
         use kamu_resources::ResourceLinterSpec;
 
-        let spec = SecretSetSpec {
-            secrets: [(
-                "KAMU_INTERNAL".to_string(),
-                SecretSpec::Literal("value".to_string()),
-            )]
-            .into_iter()
-            .collect(),
-        };
+        let spec = make_spec_input([("KAMU_INTERNAL", plaintext_value("value"))]);
 
         let warnings = spec.lint_warnings();
         assert_eq!(warnings.len(), 1);
         assert_eq!(
             warnings[0].code,
-            SecretSetSpec::WARNING_CODE_RESERVED_SECRET_PREFIX
+            SecretSetSpecInput::WARNING_CODE_RESERVED_SECRET_PREFIX
         );
         assert_eq!(
             warnings[0].path,
@@ -454,67 +505,30 @@ mod tests {
     fn lints_lowercase_name_warning() {
         use kamu_resources::ResourceLinterSpec;
 
-        let spec = SecretSetSpec {
-            secrets: [(
-                "my_secret".to_string(),
-                SecretSpec::Literal("value".to_string()),
-            )]
-            .into_iter()
-            .collect(),
-        };
+        let spec = make_spec_input([("my_secret", plaintext_value("value"))]);
 
         let warnings = spec.lint_warnings();
         assert_eq!(warnings.len(), 1);
         assert_eq!(
             warnings[0].code,
-            SecretSetSpec::WARNING_CODE_LOWERCASE_SECRET_NAME
+            SecretSetSpecInput::WARNING_CODE_LOWERCASE_SECRET_NAME
         );
         assert_eq!(warnings[0].path, Some("spec.secrets.my_secret".to_string()));
         assert!(warnings[0].message.contains("MY_SECRET"));
     }
 
     #[test]
-    fn lints_long_value_warning_literal() {
+    fn lints_long_value_warning() {
         use kamu_resources::ResourceLinterSpec;
 
-        let long_value = "x".repeat(SecretSetSpec::WARNING_SECRET_VALUE_LEN + 1);
-        let spec = SecretSetSpec {
-            secrets: [("SECRET_KEY".to_string(), SecretSpec::Literal(long_value))]
-                .into_iter()
-                .collect(),
-        };
+        let long_value = "x".repeat(SecretSetSpecInput::WARNING_SECRET_VALUE_LEN + 1);
+        let spec = make_spec_input([("SECRET_KEY", plaintext_value(&long_value))]);
 
         let warnings = spec.lint_warnings();
         assert_eq!(warnings.len(), 1);
         assert_eq!(
             warnings[0].code,
-            SecretSetSpec::WARNING_CODE_LONG_SECRET_VALUE
-        );
-        assert_eq!(
-            warnings[0].path,
-            Some("spec.secrets.SECRET_KEY".to_string())
-        );
-    }
-
-    #[test]
-    fn lints_long_value_warning_structured() {
-        use kamu_resources::ResourceLinterSpec;
-
-        let long_value = "x".repeat(SecretSetSpec::WARNING_SECRET_VALUE_LEN + 1);
-        let spec = SecretSetSpec {
-            secrets: [(
-                "SECRET_KEY".to_string(),
-                SecretSpec::Value(SecretValueSpec { value: long_value }),
-            )]
-            .into_iter()
-            .collect(),
-        };
-
-        let warnings = spec.lint_warnings();
-        assert_eq!(warnings.len(), 1);
-        assert_eq!(
-            warnings[0].code,
-            SecretSetSpec::WARNING_CODE_LONG_SECRET_VALUE
+            SecretSetSpecInput::WARNING_CODE_LONG_SECRET_VALUE
         );
         assert_eq!(
             warnings[0].path,
@@ -526,39 +540,32 @@ mod tests {
     fn lints_multiple_warnings() {
         use kamu_resources::ResourceLinterSpec;
 
-        let long_value = "x".repeat(SecretSetSpec::WARNING_SECRET_VALUE_LEN + 1);
-        let spec = SecretSetSpec {
-            secrets: [
-                (
-                    "KAMU_TOKEN".to_string(),
-                    SecretSpec::Literal("short".to_string()),
-                ),
-                ("my_key".to_string(), SecretSpec::Literal(long_value)),
-            ]
-            .into_iter()
-            .collect(),
-        };
+        let long_value = "x".repeat(SecretSetSpecInput::WARNING_SECRET_VALUE_LEN + 1);
+        let spec = make_spec_input([
+            ("KAMU_TOKEN", plaintext_value("short")),
+            ("my_key", plaintext_value(&long_value)),
+        ]);
 
         let warnings = spec.lint_warnings();
         assert_eq!(warnings.len(), 3);
         assert_eq!(
             warnings
                 .iter()
-                .filter(|w| w.code == SecretSetSpec::WARNING_CODE_RESERVED_SECRET_PREFIX)
+                .filter(|w| w.code == SecretSetSpecInput::WARNING_CODE_RESERVED_SECRET_PREFIX)
                 .count(),
             1
         );
         assert_eq!(
             warnings
                 .iter()
-                .filter(|w| w.code == SecretSetSpec::WARNING_CODE_LOWERCASE_SECRET_NAME)
+                .filter(|w| w.code == SecretSetSpecInput::WARNING_CODE_LOWERCASE_SECRET_NAME)
                 .count(),
             1
         );
         assert_eq!(
             warnings
                 .iter()
-                .filter(|w| w.code == SecretSetSpec::WARNING_CODE_LONG_SECRET_VALUE)
+                .filter(|w| w.code == SecretSetSpecInput::WARNING_CODE_LONG_SECRET_VALUE)
                 .count(),
             1
         );
@@ -568,26 +575,22 @@ mod tests {
     fn lints_no_warnings_for_valid_secret() {
         use kamu_resources::ResourceLinterSpec;
 
-        let spec = SecretSetSpec {
-            secrets: [(
-                "API_TOKEN".to_string(),
-                SecretSpec::Literal("secret-value".to_string()),
-            )]
-            .into_iter()
-            .collect(),
-        };
+        let spec = make_spec_input([("API_TOKEN", plaintext_value("secret-value"))]);
 
         let warnings = spec.lint_warnings();
         assert_eq!(warnings.len(), 0);
     }
 
     #[test]
-    fn deserializes_encrypted_secret_syntax() {
+    fn deserializes_encrypted_jwe_secret_syntax() {
+        let cryptor = SecretCryptor::try_new(TEST_KEY).unwrap();
+        let token = cryptor.encrypt_to_jwe(b"secret-value").unwrap();
+
         let spec: SecretSetSpec = serde_json::from_value(serde_json::json!({
             "secrets": {
                 "API_TOKEN": {
-                    "encrypted": "dGVzdA==",
-                    "nonce": VALID_ENCRYPTED_SECRET_NONCE,
+                    "value": token,
+                    "contentEncoding": CONTENT_ENCODING_JWE,
                 },
             }
         }))
@@ -595,33 +598,28 @@ mod tests {
 
         assert_eq!(
             spec,
-            SecretSetSpec {
-                secrets: [(
-                    "API_TOKEN".to_string(),
-                    SecretSpec::Encrypted(EncryptedSecretSpec {
-                        encrypted: "dGVzdA==".to_string(),
-                        nonce: VALID_ENCRYPTED_SECRET_NONCE.to_string(),
-                    }),
-                )]
-                .into_iter()
-                .collect(),
-            }
+            make_spec([(
+                "API_TOKEN",
+                Secret {
+                    value: token,
+                    content_encoding: Some(CONTENT_ENCODING_JWE.to_string()),
+                },
+            )])
         );
     }
 
     #[test]
-    fn serializes_encrypted_secret_syntax() {
-        let value = serde_json::to_value(SecretSetSpec {
-            secrets: [(
-                "API_TOKEN".to_string(),
-                SecretSpec::Encrypted(EncryptedSecretSpec {
-                    encrypted: "dGVzdA==".to_string(),
-                    nonce: VALID_ENCRYPTED_SECRET_NONCE.to_string(),
-                }),
-            )]
-            .into_iter()
-            .collect(),
-        })
+    fn serializes_encrypted_jwe_secret_syntax() {
+        let cryptor = SecretCryptor::try_new(TEST_KEY).unwrap();
+        let token = cryptor.encrypt_to_jwe(b"secret-value").unwrap();
+
+        let value = serde_json::to_value(make_spec([(
+            "API_TOKEN",
+            Secret {
+                value: token.clone(),
+                content_encoding: Some(CONTENT_ENCODING_JWE.to_string()),
+            },
+        )]))
         .unwrap();
 
         assert_eq!(
@@ -629,8 +627,8 @@ mod tests {
             serde_json::json!({
                 "secrets": {
                     "API_TOKEN": {
-                        "encrypted": "dGVzdA==",
-                        "nonce": VALID_ENCRYPTED_SECRET_NONCE,
+                        "value": token,
+                        "contentEncoding": CONTENT_ENCODING_JWE,
                     },
                 }
             })
@@ -638,92 +636,110 @@ mod tests {
     }
 
     #[test]
-    fn validate_accepts_encrypted_variant() {
+    fn validate_accepts_encrypted_jwe_variant() {
         use kamu_resources::ResourceValidateSpec;
 
-        let spec = SecretSetSpec {
-            secrets: [(
-                "API_TOKEN".to_string(),
-                SecretSpec::Encrypted(EncryptedSecretSpec {
-                    encrypted: "dGVzdA==".to_string(),
-                    nonce: VALID_ENCRYPTED_SECRET_NONCE.to_string(),
-                }),
-            )]
-            .into_iter()
-            .collect(),
-        };
+        let spec = make_spec_input([("API_TOKEN", jwe_secret("secret-value"))]);
 
         assert!(spec.validate().is_ok());
     }
 
     #[test]
-    fn validate_rejects_invalid_encrypted_secret() {
+    fn validate_rejects_malformed_jwe_token() {
         use kamu_resources::ResourceValidateSpec;
 
-        let spec = SecretSetSpec {
-            secrets: [(
-                "API_TOKEN".to_string(),
-                SecretSpec::Encrypted(EncryptedSecretSpec {
-                    encrypted: "not-base64!".to_string(),
-                    nonce: VALID_ENCRYPTED_SECRET_NONCE.to_string(),
-                }),
-            )]
-            .into_iter()
-            .collect(),
-        };
+        let spec = make_spec_input([(
+            "API_TOKEN",
+            Secret {
+                value: "not-a-jwe-token".to_string(),
+                content_encoding: Some(CONTENT_ENCODING_JWE.to_string()),
+            },
+        )]);
 
-        assert!(matches!(
+        assert_matches!(
             spec.validate(),
             Err(SecretSetSpecValidationError::InvalidEncryptedSecret { .. })
-        ));
+        );
     }
 
     #[test]
-    fn validate_rejects_invalid_encrypted_nonce_len() {
+    fn validate_rejects_unknown_content_encoding() {
         use kamu_resources::ResourceValidateSpec;
 
-        let spec = SecretSetSpec {
-            secrets: [(
-                "API_TOKEN".to_string(),
-                SecretSpec::Encrypted(EncryptedSecretSpec {
-                    encrypted: "dGVzdA==".to_string(),
-                    nonce: "bm9uY2U=".to_string(),
-                }),
-            )]
-            .into_iter()
-            .collect(),
+        let spec = make_spec_input([(
+            "API_TOKEN",
+            Secret {
+                value: "whatever".to_string(),
+                content_encoding: Some("rot13".to_string()),
+            },
+        )]);
+
+        assert_matches!(
+            spec.validate(),
+            Err(SecretSetSpecValidationError::UnknownContentEncoding { .. })
+        );
+    }
+
+    #[test]
+    fn validate_accepts_legacy_aes256gcm_variant() {
+        use kamu_resources::ResourceValidateSpec;
+
+        // Build a legacy aes256gcm value the same way the backfill SQL does:
+        // hex(nonce ‖ ciphertext).
+        let hex_value = hex::encode(vec![0u8; SecretCryptor::AES_NONCE_LEN + 4]);
+        let spec = make_spec_input([(
+            "API_TOKEN",
+            Secret {
+                value: hex_value,
+                content_encoding: Some(CONTENT_ENCODING_AES256GCM.to_string()),
+            },
+        )]);
+
+        assert!(spec.validate().is_ok());
+    }
+
+    #[test]
+    fn decrypts_legacy_aes256gcm_encoding() {
+        // Produce a real legacy value with the AES encryptor, packed as the
+        // backfill SQL would (hex of nonce ‖ ciphertext), and confirm the spec
+        // decrypt dispatch reads it back.
+        let cryptor = SecretCryptor::try_new(TEST_KEY).unwrap();
+
+        let secret = Secret {
+            value: legacy_aes256gcm_hex(b"legacy-secret"),
+            content_encoding: Some(CONTENT_ENCODING_AES256GCM.to_string()),
         };
 
-        assert!(matches!(
-            spec.validate(),
-            Err(SecretSetSpecValidationError::InvalidEncryptedSecret { .. })
-        ));
+        let decrypted = secret.decrypt_plaintext_bytes(&cryptor).unwrap();
+        assert_eq!(decrypted, b"legacy-secret");
     }
 
     #[test]
     fn lint_skips_value_length_for_encrypted() {
         use kamu_resources::ResourceLinterSpec;
 
-        // A ciphertext exceeding WARNING_SECRET_VALUE_LEN if treated as plaintext
-        let long_ciphertext = "x".repeat(SecretSetSpec::WARNING_SECRET_VALUE_LEN + 1);
-        let spec = SecretSetSpec {
-            secrets: [(
-                "API_TOKEN".to_string(),
-                SecretSpec::Encrypted(EncryptedSecretSpec {
-                    encrypted: long_ciphertext,
-                    nonce: VALID_ENCRYPTED_SECRET_NONCE.to_string(),
-                }),
-            )]
-            .into_iter()
-            .collect(),
-        };
+        // A JWE token can exceed WARNING_SECRET_VALUE_LEN; length checks must not
+        // apply to encrypted values (the ciphertext is not user-authored text).
+        let long_plaintext = "x".repeat(SecretSetSpecInput::WARNING_SECRET_VALUE_LEN + 1);
+        let spec = make_spec_input([("API_TOKEN", jwe_secret(&long_plaintext))]);
 
         let warnings = spec.lint_warnings();
         assert!(
             warnings
                 .iter()
-                .all(|w| w.code != SecretSetSpec::WARNING_CODE_LONG_SECRET_VALUE)
+                .all(|w| w.code != SecretSetSpecInput::WARNING_CODE_LONG_SECRET_VALUE)
         );
+    }
+
+    /// Encrypt with the legacy AES-GCM scheme and pack as `hex(nonce ‖
+    /// ciphertext)` — the exact wire form the backfill migrations emit.
+    fn legacy_aes256gcm_hex(plaintext: &[u8]) -> String {
+        use crypto_utils::{AesGcmEncryptor, Encryptor};
+        let aes = AesGcmEncryptor::try_new(TEST_KEY).unwrap();
+        let (ciphertext, nonce) = aes.encrypt_bytes(plaintext).unwrap();
+        let mut combined = nonce;
+        combined.extend_from_slice(&ciphertext);
+        hex::encode(combined)
     }
 }
 

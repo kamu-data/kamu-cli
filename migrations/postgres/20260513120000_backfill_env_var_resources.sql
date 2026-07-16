@@ -162,7 +162,17 @@ SELECT
     jsonb_build_object(
         'secrets',
         (
-            SELECT jsonb_object_agg(d2.key, '<migrated>')
+            -- Emit the legacy secret in the RFC-18 shape using the read-only
+            -- `aes256gcm` encoding: hex(nonce ‖ ciphertext). SQL cannot produce a
+            -- JWE token, so the node reads this legacy form and re-materializes on
+            -- the next apply. See SecretExt::decrypt_plaintext_bytes.
+            SELECT jsonb_object_agg(
+                d2.key,
+                jsonb_build_object(
+                    'value', encode(d2.secret_nonce || d2.value, 'hex'),
+                    'contentEncoding', 'aes256gcm'
+                )
+            )
             FROM dataset_env_vars d2
             WHERE d2.dataset_id = dev.dataset_id
               AND d2.secret_nonce IS NOT NULL

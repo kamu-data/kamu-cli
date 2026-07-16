@@ -89,12 +89,17 @@ pub async fn test_encrypted_spec_view_hides_secret_material(h: &impl FacadeContr
         "Encrypted view must not expose plaintext secret; spec: {spec_str}"
     );
 
-    // The secret entry must be present as an encrypted blob (has "encrypted" key)
+    // The secret entry must be present as an encrypted JWE value
+    // (`{ value, contentEncoding: "jwe" }`).
     let secrets = &view.spec["secrets"];
     let token = &secrets["API_TOKEN"];
+    assert_eq!(
+        token["contentEncoding"], "jwe",
+        "Encrypted view must tag the secret as JWE; spec: {spec_str}"
+    );
     assert!(
-        !token["encrypted"].is_null(),
-        "Encrypted view must return an encrypted blob; spec: {spec_str}"
+        token["value"].as_str().is_some_and(|v| !v.is_empty()),
+        "Encrypted view must carry a non-empty JWE token; spec: {spec_str}"
     );
 }
 

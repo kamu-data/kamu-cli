@@ -43,10 +43,11 @@ pub async fn test_resources_golden_view(ctx: ResourceCtx) {
 
     // ── SecretSet ─────────────────────────────────────────────────────────────
     //
-    // The encrypted secret values (and their nonces) are non-deterministic, so
-    // we cannot pin `spec.secrets.*` verbatim. We assert the full envelope +
-    // status, and that the spec carries exactly the two expected secret keys in
-    // encrypted form (`encrypted`/`nonce`), without pinning the ciphertext.
+    // The encrypted JWE secret values are non-deterministic (random IV per
+    // encryption), so we cannot pin `spec.secrets.*` verbatim. We assert the full
+    // envelope + status, and that the spec carries exactly the two expected secret
+    // keys in encrypted form (`{ value, contentEncoding: "jwe" }`), without
+    // pinning the ciphertext.
 
     ctx.apply_secret_set("app-secrets", "tok", "pw").await;
 
@@ -199,10 +200,10 @@ fn strip_volatile(mut doc: serde_json::Value) -> serde_json::Value {
 }
 
 /// Take `spec.secrets` out of a `SecretSet` document and return the sorted
-/// secret keys, asserting each value is in encrypted form
-/// (`encrypted`/`nonce`). The ciphertext itself is non-deterministic, so it is
-/// dropped rather than pinned; after this call `spec` is empty and the rest of
-/// the doc can be compared verbatim.
+/// secret keys, asserting each value is in encrypted JWE form
+/// (`{ value, contentEncoding: "jwe" }`). The ciphertext itself is
+/// non-deterministic, so it is dropped rather than pinned; after this call
+/// `spec` is empty and the rest of the doc can be compared verbatim.
 fn take_secret_keys_encrypted(doc: &mut serde_json::Value) -> Vec<String> {
     let rendered = doc.to_string();
     let spec = doc
@@ -221,8 +222,13 @@ fn take_secret_keys_encrypted(doc: &mut serde_json::Value) -> Vec<String> {
         .iter()
         .map(|(key, value)| {
             assert!(
-                value.get("encrypted").is_some() && value.get("nonce").is_some(),
-                "secret `{key}` should be in encrypted form (encrypted/nonce):\n{value}"
+                value.get("contentEncoding").and_then(|c| c.as_str()) == Some("jwe")
+                    && value
+                        .get("value")
+                        .and_then(|v| v.as_str())
+                        .is_some_and(|v| !v.is_empty()),
+                "secret `{key}` should be in encrypted JWE form (value + contentEncoding: \
+                 jwe):\n{value}"
             );
             key.clone()
         })
