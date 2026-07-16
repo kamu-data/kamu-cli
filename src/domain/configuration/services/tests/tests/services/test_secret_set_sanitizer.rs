@@ -7,8 +7,15 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_configuration::{SecretExt, SecretSetSpec, SecretSetSpecInput};
+use kamu_configuration::{
+    CONTENT_ENCODING_AES256GCM,
+    CONTENT_ENCODING_JWE,
+    SecretExt,
+    SecretSetSpec,
+    SecretSetSpecInput,
+};
 use kamu_configuration_services::testing::BaseConfigurationServiceHarness;
+use kamu_datasets::SAMPLE_SECRETS_ENCRYPTION_KEY;
 use kamu_resources::{
     ApplyResourceApplicationDecision,
     ApplyResourceOutcome,
@@ -24,6 +31,30 @@ fn plaintext_secret(value: &str) -> odf::metadata::config::Secret {
         value: value.to_string(),
         content_encoding: None,
     }
+}
+
+/// Encrypt with the legacy AES-GCM scheme and pack as `hex(nonce ‖
+/// ciphertext)` — the exact wire form the env-var backfill migrations emit.
+fn legacy_aes256gcm_secret(plaintext: &[u8]) -> odf::metadata::config::Secret {
+    use crypto_utils::{AesGcmEncryptor, Encryptor};
+
+    let aes = AesGcmEncryptor::try_new(SAMPLE_SECRETS_ENCRYPTION_KEY).unwrap();
+    let (ciphertext, nonce) = aes.encrypt_bytes(plaintext).unwrap();
+    let mut combined = nonce;
+    combined.extend_from_slice(&ciphertext);
+
+    odf::metadata::config::Secret {
+        value: to_hex(&combined),
+        content_encoding: Some(CONTENT_ENCODING_AES256GCM.to_string()),
+    }
+}
+
+fn to_hex(bytes: &[u8]) -> String {
+    use std::fmt::Write;
+    bytes.iter().fold(String::new(), |mut s, b| {
+        write!(s, "{b:02x}").unwrap();
+        s
+    })
 }
 
 fn make_spec_input(
@@ -258,6 +289,64 @@ async fn test_apply_secret_set_same_plaintext_is_untouched() {
         serde_json::from_value(snapshot2.spec).expect("spec must deserialize");
 
     assert_eq!(stored_spec2, stored_spec);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_apply_secret_set_upgrades_legacy_aes256gcm_to_jwe() {
+    // A legacy `aes256gcm` secret (as the env-var backfill migrations produce) is
+    // not the canonical write-path encoding, so applying the resource as-is must
+    // decrypt and re-encrypt it into `jwe` rather than leaving it untouched.
+    let harness = BaseConfigurationServiceHarness::new();
+    let account_handle = odf::AccountHandle::new_test("test-owner");
+
+    let legacy_spec = make_spec_input([(
+        "API_TOKEN",
+        legacy_aes256gcm_secret(b"legacy-plaintext-token"),
+    )]);
+
+    let decision = harness
+        .apply_secret_use_case()
+        .apply(ApplyResourceParams {
+            id: None,
+            headers: BaseResourceServiceHarness::make_headers_input(account_handle, "test-secrets"),
+            spec: legacy_spec,
+        })
+        .await
+        .unwrap();
+
+    let applied_id = match decision {
+        ApplyResourceApplicationDecision::Applied(result) => result.id,
+        ApplyResourceApplicationDecision::Rejected(r) => {
+            panic!("apply was rejected: {}", r.message)
+        }
+    };
+
+    let snapshot = harness
+        .generic_query_svc()
+        .get_snapshot_by_id(&applied_id)
+        .await
+        .unwrap()
+        .expect("snapshot must exist after apply");
+
+    let spec_json = snapshot.spec.to_string();
+    let stored_spec: SecretSetSpec =
+        serde_json::from_value(snapshot.spec).expect("spec must deserialize");
+
+    let stored_secret = &stored_spec.secrets.entries["API_TOKEN"];
+    assert_eq!(
+        stored_secret.content_encoding.as_deref(),
+        Some(CONTENT_ENCODING_JWE),
+        "a legacy aes256gcm secret must be upgraded to jwe on apply, got: {stored_secret:?}"
+    );
+
+    // Plaintext must not leak into the stored spec despite the round trip through
+    // the legacy encoding.
+    assert!(
+        !spec_json.contains("legacy-plaintext-token"),
+        "plaintext must not appear in stored spec after upgrading from aes256gcm"
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

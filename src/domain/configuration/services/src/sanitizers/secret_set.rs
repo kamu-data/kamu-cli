@@ -42,23 +42,29 @@ impl ResourceSpecSanitizer<SecretSetResource> for SecretSetSpecSanitizer {
         let cryptor = self.secrets_encryption_config.new_secret_cryptor()?;
 
         for (name, new_secret) in &mut new_spec.secrets.entries {
-            if new_secret.is_encrypted() {
+            // Only the canonical `jwe` encoding is left as-is here; anything else
+            // (plaintext, or a legacy `aes256gcm` secret carried over from the
+            // env-var backfill migrations) must be decrypted and re-encrypted into
+            // `jwe` below — `aes256gcm` is a read-only encoding the node never writes.
+            if new_secret.content_encoding.as_deref() == Some(CONTENT_ENCODING_JWE) {
                 continue;
             }
-            let new_plaintext = new_secret.literal_value();
+            let new_plaintext = new_secret.decrypt_plaintext_bytes(&cryptor)?;
 
             // If the new plaintext matches the current secret (after decryption), keep the
             // current encrypted value to avoid unnecessary changes
             if let Some(current_secret) =
                 maybe_current_spec.and_then(|s| s.secrets.entries.get(name))
-                && Self::matches_current_plaintext(current_secret, new_plaintext, &cryptor)?
+                && current_secret.content_encoding.as_deref() == Some(CONTENT_ENCODING_JWE)
+                && Self::matches_current_plaintext(current_secret, &new_plaintext, &cryptor)?
             {
                 *new_secret = current_secret.clone();
                 continue;
             }
 
-            // The secret value is new or has changed, encrypt it into a compact JWE token
-            let token = cryptor.encrypt_to_jwe(new_plaintext.as_bytes())?;
+            // The secret value is new, has changed, or needs upgrading from a legacy
+            // encoding — encrypt it into a compact JWE token
+            let token = cryptor.encrypt_to_jwe(&new_plaintext)?;
             *new_secret = Secret {
                 value: token,
                 content_encoding: Some(CONTENT_ENCODING_JWE.to_string()),
@@ -74,15 +80,11 @@ impl ResourceSpecSanitizer<SecretSetResource> for SecretSetSpecSanitizer {
 impl SecretSetSpecSanitizer {
     fn matches_current_plaintext(
         current_secret: &Secret,
-        new_plaintext: &str,
+        new_plaintext: &[u8],
         cryptor: &SecretCryptor,
     ) -> Result<bool, InternalError> {
-        if current_secret.as_encrypted().is_none() {
-            return Ok(false);
-        }
-
         let decrypted_current = current_secret.decrypt_plaintext_bytes(cryptor)?;
-        Ok(decrypted_current == new_plaintext.as_bytes())
+        Ok(decrypted_current == new_plaintext)
     }
 }
 
