@@ -9,7 +9,12 @@
 
 use kamu_resources::{ReconcilableResourceState, ReconcilableStateModel};
 
-use crate::{SecretSetFailureDetails, SecretSetReconcileSuccess, SecretSetSpec};
+use crate::{
+    SecretSetFailureDetails,
+    SecretSetReconcileSuccess,
+    SecretSetSpec,
+    SecretSetSpecInput,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -21,7 +26,7 @@ pub struct SecretSetStateModel {}
 
 impl ReconcilableStateModel for SecretSetStateModel {
     type Spec = SecretSetSpec;
-    type SpecInput = SecretSetSpec;
+    type SpecInput = SecretSetSpecInput;
     type Success = SecretSetReconcileSuccess;
     type FailureDetails = SecretSetFailureDetails;
     type State = SecretSetState;

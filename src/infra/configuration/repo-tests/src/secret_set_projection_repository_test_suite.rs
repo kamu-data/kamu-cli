@@ -15,8 +15,6 @@ use kamu_configuration::{
     SecretSetProjectionRepository,
     SecretSetResource,
     SecretSetSpec,
-    SecretSpec,
-    SecretValueSpec,
 };
 use kamu_resources::{
     ResourceHeaders,
@@ -58,16 +56,18 @@ async fn make_secret_set_resource(catalog: &Catalog) -> ResourceID {
             account_handle,
             &secret_set_id.to_string(),
         ),
-        spec: serde_json::to_value(SecretSetSpec {
-            secrets: [(
-                "PLACEHOLDER".to_string(),
-                SecretSpec::Value(SecretValueSpec {
-                    value: "placeholder".to_string(),
-                    content_encoding: None,
-                }),
-            )]
-            .into(),
-        })
+        spec: serde_json::to_value(SecretSetSpec::new(odf::metadata::config::SecretSetSpec {
+            secrets: odf::metadata::config::Secrets {
+                entries: [(
+                    "PLACEHOLDER".to_string(),
+                    odf::metadata::config::Secret {
+                        value: "placeholder".to_string(),
+                        content_encoding: None,
+                    },
+                )]
+                .into(),
+            },
+        }))
         .unwrap(),
         status: None,
         last_event_id: None,

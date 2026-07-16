@@ -82,9 +82,9 @@ pub trait ResourceSpecFromInput<TInput> {
 }
 
 /// Implements the identity `ResourceSpecFromInput<T> for T`. For every
-/// resource except `VariableSet` (whose `SpecInput` is a distinct type),
-/// `Spec` and `SpecInput` are the same type, so this avoids repeating the
-/// same trivial impl per resource. Not a blanket `impl<T> ... for T`: that
+/// resource except `VariableSet`/`SecretSet` (whose `SpecInput` is a distinct
+/// type), `Spec` and `SpecInput` are the same type, so this avoids repeating
+/// the same trivial impl per resource. Not a blanket `impl<T> ... for T`: that
 /// form applies to *every* type in scope and collides with unrelated
 /// same-named methods (e.g. `ResourceHeadersExt::from_input`).
 #[macro_export]

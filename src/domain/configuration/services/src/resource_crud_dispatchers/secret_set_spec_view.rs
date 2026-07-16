@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use internal_error::{InternalError, ResultIntoInternal};
-use kamu_configuration::{SecretSetResource, SecretSetSpec, SecretSpec};
+use kamu_configuration::{Secret, SecretExt, SecretSetResource, SecretSetSpec};
 use kamu_datasets::SecretsEncryptionConfig;
 use kamu_resources::{
     ResourceDispatcherMeta,
@@ -47,11 +47,14 @@ impl ResourceSpecViewDispatcher for SecretSetSpecViewDispatcher {
 
         let cryptor = self.secrets_encryption_config.new_secret_cryptor()?;
 
-        for secret in spec.secrets.values_mut() {
+        for secret in spec.secrets.entries.values_mut() {
             if secret.is_encrypted() {
                 let decrypted_bytes = secret.decrypt_plaintext_bytes(&cryptor)?;
                 let decrypted_string = String::from_utf8(decrypted_bytes).int_err()?;
-                *secret = SecretSpec::Literal(decrypted_string);
+                *secret = Secret {
+                    value: decrypted_string,
+                    content_encoding: None,
+                };
             }
         }
 

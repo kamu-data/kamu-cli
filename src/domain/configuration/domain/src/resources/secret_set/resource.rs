@@ -23,7 +23,7 @@ use kamu_resources::{
     TypeUri,
 };
 
-use crate::{SecretSetEventStore, SecretSetSpec, SecretSetState};
+use crate::{SecretSetEventStore, SecretSetSpec, SecretSetSpecInput, SecretSetState};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -60,7 +60,7 @@ impl ResourceSchemaProvider for SecretSetResource {
 
 impl DeclarativeResource for SecretSetResource {
     type Spec = SecretSetSpec;
-    type SpecInput = SecretSetSpec;
+    type SpecInput = SecretSetSpecInput;
     type ResourceState = SecretSetState;
 }
 
@@ -82,7 +82,7 @@ impl ResourcePresentation for SecretSetResource {
         vec![ResourceListColumnValueView {
             key: "secrets".to_string(),
             value: ResourceListColumnValue::UInt64(
-                u64::try_from(state.spec().secrets.len()).unwrap(),
+                u64::try_from(state.spec().secrets.entries.len()).unwrap(),
             ),
         }]
     }

@@ -10,12 +10,15 @@
 use kamu_resources::ReconcilableResourceEvent;
 use serde::{Deserialize, Serialize};
 
-use crate::{SecretSetReconcileSuccess, SecretSetSpec};
+use crate::{SecretSetReconcileSuccess, SecretSetSpecInput};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub type SecretSetEvent =
-    ReconcilableResourceEvent<SecretSetSpec, SecretSetReconcileSuccess, SecretSetFailureDetails>;
+pub type SecretSetEvent = ReconcilableResourceEvent<
+    SecretSetSpecInput,
+    SecretSetReconcileSuccess,
+    SecretSetFailureDetails,
+>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

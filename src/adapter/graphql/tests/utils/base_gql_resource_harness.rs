@@ -123,16 +123,20 @@ impl BaseGQLResourceHarness {
     }
 
     pub fn dummy_secret_set_spec() -> serde_json::Value {
-        serde_json::to_value(kamu_configuration::SecretSetSpec {
-            secrets: [(
-                "PLACEHOLDER".to_string(),
-                kamu_configuration::SecretSpec::Value(kamu_configuration::SecretValueSpec {
-                    value: "placeholder".to_string(),
-                    content_encoding: None,
-                }),
-            )]
-            .into(),
-        })
+        serde_json::to_value(kamu_configuration::SecretSetSpec::new(
+            odf::metadata::config::SecretSetSpec {
+                secrets: odf::metadata::config::Secrets {
+                    entries: [(
+                        "PLACEHOLDER".to_string(),
+                        kamu_configuration::Secret {
+                            value: "placeholder".to_string(),
+                            content_encoding: None,
+                        },
+                    )]
+                    .into(),
+                },
+            },
+        ))
         .unwrap()
     }
 

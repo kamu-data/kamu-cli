@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_configuration::{SecretSetResource, SecretSetSpec, SecretSpec, SecretValueSpec};
+use kamu_configuration::{SecretExt, SecretSetResource, SecretSetSpec, SecretSetSpecInput};
 use kamu_configuration_services::testing::BaseConfigurationServiceHarness;
 use kamu_resources::{
     ApplyResourceApplicationDecision,
@@ -24,23 +24,28 @@ async fn test_spec_view_dispatcher_reveals_encrypted_secrets_as_plaintext() {
     let harness = BaseConfigurationServiceHarness::new();
     let account_handle = odf::AccountHandle::new_test("test-owner");
 
-    let spec = SecretSetSpec {
-        secrets: [
-            (
-                "API_TOKEN".to_string(),
-                SecretSpec::Literal("my-secret-token".to_string()),
-            ),
-            (
-                "DB_PASSWORD".to_string(),
-                SecretSpec::Value(SecretValueSpec {
-                    value: "my-db-password".to_string(),
-                    content_encoding: None,
-                }),
-            ),
-        ]
-        .into_iter()
-        .collect(),
-    };
+    let spec = SecretSetSpecInput::new(odf::metadata::config::SecretSetSpecInput {
+        secrets: odf::metadata::config::Secrets {
+            entries: [
+                (
+                    "API_TOKEN".to_string(),
+                    odf::metadata::config::Secret {
+                        value: "my-secret-token".to_string(),
+                        content_encoding: None,
+                    },
+                ),
+                (
+                    "DB_PASSWORD".to_string(),
+                    odf::metadata::config::Secret {
+                        value: "my-db-password".to_string(),
+                        content_encoding: None,
+                    },
+                ),
+            ]
+            .into_iter()
+            .collect(),
+        },
+    });
 
     let decision = harness
         .apply_secret_use_case()
@@ -66,13 +71,13 @@ async fn test_spec_view_dispatcher_reveals_encrypted_secrets_as_plaintext() {
         .unwrap()
         .expect("snapshot must exist after apply");
 
-    // Confirm stored form has Encrypted variants (precondition)
+    // Confirm stored form has encrypted secrets (precondition)
     let stored_spec: SecretSetSpec =
         serde_json::from_value(snapshot.spec.clone()).expect("spec must deserialize");
-    for (name, secret) in &stored_spec.secrets {
+    for (name, secret) in &stored_spec.secrets.entries {
         assert!(
             secret.is_encrypted(),
-            "precondition: '{name}' must be Encrypted in stored spec"
+            "precondition: '{name}' must be encrypted in stored spec"
         );
     }
 
@@ -90,15 +95,22 @@ async fn test_spec_view_dispatcher_reveals_encrypted_secrets_as_plaintext() {
     let revealed_spec: SecretSetSpec =
         serde_json::from_value(revealed_json).expect("revealed spec must deserialize");
 
-    // After reveal, all variants must be Literal with original plaintext
+    // After reveal, all secrets must carry the original plaintext with no
+    // contentEncoding
     assert_eq!(
-        revealed_spec.secrets["API_TOKEN"],
-        SecretSpec::Literal("my-secret-token".to_string()),
+        revealed_spec.secrets.entries["API_TOKEN"],
+        odf::metadata::config::Secret {
+            value: "my-secret-token".to_string(),
+            content_encoding: None,
+        },
         "API_TOKEN must be revealed as its original plaintext"
     );
     assert_eq!(
-        revealed_spec.secrets["DB_PASSWORD"],
-        SecretSpec::Literal("my-db-password".to_string()),
+        revealed_spec.secrets.entries["DB_PASSWORD"],
+        odf::metadata::config::Secret {
+            value: "my-db-password".to_string(),
+            content_encoding: None,
+        },
         "DB_PASSWORD must be revealed as its original plaintext"
     );
 }

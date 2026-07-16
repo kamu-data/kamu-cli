@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_configuration::{SecretSetSpec, SecretSpec, SecretValueSpec};
+use kamu_configuration::SecretSetSpecInput;
 use kamu_configuration_services::testing::BaseConfigurationServiceHarness;
 use kamu_datasets::SAMPLE_SECRETS_ENCRYPTION_KEY;
 use kamu_resources::{ApplyResourceApplicationDecision, ApplyResourceParams};
@@ -20,23 +20,28 @@ async fn test_reconcile_secret_set_decrypts_and_reprojects_values() {
     let harness = BaseConfigurationServiceHarness::new();
     let account_handle = odf::AccountHandle::new_test("secret-set-owner");
 
-    let spec = SecretSetSpec {
-        secrets: [
-            (
-                "API_TOKEN".to_string(),
-                SecretSpec::Literal("my-secret-token".to_string()),
-            ),
-            (
-                "DB_PASSWORD".to_string(),
-                SecretSpec::Value(SecretValueSpec {
-                    value: "my-db-password".to_string(),
-                    content_encoding: None,
-                }),
-            ),
-        ]
-        .into_iter()
-        .collect(),
-    };
+    let spec = SecretSetSpecInput::new(odf::metadata::config::SecretSetSpecInput {
+        secrets: odf::metadata::config::Secrets {
+            entries: [
+                (
+                    "API_TOKEN".to_string(),
+                    odf::metadata::config::Secret {
+                        value: "my-secret-token".to_string(),
+                        content_encoding: None,
+                    },
+                ),
+                (
+                    "DB_PASSWORD".to_string(),
+                    odf::metadata::config::Secret {
+                        value: "my-db-password".to_string(),
+                        content_encoding: None,
+                    },
+                ),
+            ]
+            .into_iter()
+            .collect(),
+        },
+    });
 
     let decision = harness
         .apply_secret_use_case()

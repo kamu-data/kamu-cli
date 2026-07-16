@@ -471,20 +471,26 @@ pub struct ResourceStatus {                  // ODF-generated; entirely server-o
 > Per-kind `Spec`/`SpecInput` types follow the same convention where the RFC shape and the domain's
 > existing behavior (validation, linting) are compatible. `kamu_configuration::VariableSetSpec` /
 > `VariableSetSpecInput`
-> ([`variable_set/spec.rs`](/src/domain/configuration/domain/src/resources/variable_set/spec.rs)) are
-> thin newtypes around `odf::metadata::config::VariableSetSpec` / `VariableSetSpecInput` respectively —
-> a bare `pub type` alias isn't legal here because the generated DTOs have no native
+> ([`variable_set/spec.rs`](/src/domain/configuration/domain/src/resources/variable_set/spec.rs)) and
+> `kamu_configuration::SecretSetSpec` / `SecretSetSpecInput`
+> ([`secret_set/spec.rs`](/src/domain/configuration/domain/src/resources/secret_set/spec.rs)) are thin
+> newtypes around the corresponding `odf::metadata::config::*Spec` / `*SpecInput` DTOs — a bare
+> `pub type` alias isn't legal here because the generated DTOs have no native
 > `Serialize`/`Deserialize` (only via the YAML shadow proxy), and implementing those foreign traits
-> directly on a foreign type through an alias would violate the orphan rule. Both newtypes are declared
-> via the shared `kamu_resources::declare_rfc_spec_newtype!` macro
+> directly on a foreign type through an alias would violate the orphan rule. Both resources' newtypes
+> are declared via the shared `kamu_resources::declare_rfc_spec_newtype!` macro
 > ([`values/rfc_spec_newtype.rs`](/src/domain/resources/domain/src/values/rfc_spec_newtype.rs)), which
 > derives `Serialize`/`Deserialize` via `#[serde(try_from = "…", into = "…")]` delegating through the
 > proxy — reusable for any future RFC spec adoption. The domain's `ResourceValidateSpec`/
-> `ResourceLinterSpec` impls attach to `VariableSetSpecInput` (the write-path type the framework
-> validates/lints), not `VariableSetSpec`. `SecretSetSpec` now uses the RFC-18-aligned
-> `{ value, contentEncoding }` secret shape (the old `Encrypted { encrypted, nonce }` variant is
-> gone), but it is still a hand-written type — full ODF-codegen adoption (like `VariableSet`) is a
-> deliberate follow-up, not done here.
+> `ResourceLinterSpec` impls attach to `VariableSetSpecInput`/`SecretSetSpecInput` (the write-path
+> types the framework validates/lints), not `VariableSetSpec`/`SecretSetSpec`. The individual secret
+> DTO (`odf::metadata::config::Secret`, aliased as `kamu_configuration::Secret`) is a bare `type`
+> alias like `Variable` — it sits at a leaf inside a codegen-owned `BTreeMap`, so it cannot be a
+> newtype; its `literal_value`/`is_encrypted`/`as_encrypted`/`decrypt_plaintext_bytes` helpers attach
+> via the `SecretExt` extension trait instead. One user-visible consequence of the codegen adoption:
+> a plaintext secret written with the scalar shorthand (`API_TOKEN: hunter2`) no longer round-trips as
+> a scalar — `get ss --revealed` renders it as `{ value: hunter2 }`, matching `VariableSet`'s existing
+> behavior (there is no retained "was this shorthand" flag once parsed).
 
 The behaviorally-significant consequences of adopting these shapes:
 
@@ -581,8 +587,8 @@ diverge. If they ever disagree, the events win and the snapshot is the bug.
 
 **List columns.** Concrete resources no longer extend status with per-type `stats`. Presentation
 columns are derived from the current spec/read model instead: `VariableSet.variables` is
-`spec.variables.len()`, `SecretSet.secrets` is `spec.secrets.len()`, and `Storage.provider` /
-`Storage.detail` are derived from the storage spec.
+`spec.variables.entries.len()`, `SecretSet.secrets` is `spec.secrets.entries.len()`, and
+`Storage.provider` / `Storage.detail` are derived from the storage spec.
 
 **Optimistic concurrency.** `update_resource` is a compare-and-set on `last_event_id`: the update
 only applies if the stored `last_event_id` equals the caller's `expected_last_event_id`; otherwise it
@@ -1085,7 +1091,7 @@ assumption:
    `SecretSetSpecSanitizer` runs as the **very first step** of both `plan` and `apply`, before the
    planner and before any event/snapshot write. It encrypts each non-encrypted secret into a compact
    **JWE** token (`dir` + `A256GCM`, via `crypto_utils::SecretCryptor` / `crypto_utils::jwe`) and
-   stores it as `SecretSpec::Value { value: <jwe>, contentEncoding: "jwe" }`, so the persisted `spec`
+   stores it as `Secret { value: <jwe>, contentEncoding: Some("jwe") }`, so the persisted `spec`
    **already holds ciphertext.** (If new plaintext decrypts-equal to the stored secret, the existing
    token is reused to avoid a spurious change.) A second, read-only `contentEncoding: "aes256gcm"`
    form (`hex(nonce ‖ ciphertext)`) exists **only** for the env-var backfill migrations, which cannot

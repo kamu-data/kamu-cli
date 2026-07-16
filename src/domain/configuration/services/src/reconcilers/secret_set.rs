@@ -15,6 +15,8 @@ use crypto_utils::{AesGcmEncryptor, Encryptor, SecretCryptor};
 use internal_error::ResultIntoInternal;
 use kamu_configuration::{
     ReplaceProjectionEntriesError,
+    Secret,
+    SecretExt,
     SecretSetEntry,
     SecretSetProjectionRepository,
     SecretSetReconcileError,
@@ -65,7 +67,7 @@ impl Reconciler<SecretSetResource> for SecretSetReconcilerImpl {
         let entries = self.build_secret_entries(
             &cryptor,
             &projection_encryptor,
-            &resource.spec().secrets,
+            &resource.spec().secrets.entries,
             &previous_entries_by_key,
             account_id,
             now,
@@ -135,7 +137,7 @@ impl SecretSetReconcilerImpl {
         &self,
         cryptor: &SecretCryptor,
         projection_encryptor: &AesGcmEncryptor,
-        secrets: &std::collections::BTreeMap<String, kamu_configuration::SecretSpec>,
+        secrets: &std::collections::BTreeMap<String, Secret>,
         previous_entries_by_key: &HashMap<String, PreviousConfigurationEntry>,
         account_id: &AccountID,
         now: DateTime<Utc>,

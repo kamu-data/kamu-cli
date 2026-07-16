@@ -7,10 +7,34 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_configuration::{SecretSetSpec, SecretSpec, SecretValueSpec};
+use kamu_configuration::{SecretExt, SecretSetSpec, SecretSetSpecInput};
 use kamu_configuration_services::testing::BaseConfigurationServiceHarness;
-use kamu_resources::{ApplyResourceApplicationDecision, ApplyResourceOutcome, ApplyResourceParams};
+use kamu_resources::{
+    ApplyResourceApplicationDecision,
+    ApplyResourceOutcome,
+    ApplyResourceParams,
+    ResourceSpecFromInput,
+};
 use kamu_resources_services::testing::BaseResourceServiceHarness;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn plaintext_secret(value: &str) -> odf::metadata::config::Secret {
+    odf::metadata::config::Secret {
+        value: value.to_string(),
+        content_encoding: None,
+    }
+}
+
+fn make_spec_input(
+    entries: impl IntoIterator<Item = (impl Into<String>, odf::metadata::config::Secret)>,
+) -> SecretSetSpecInput {
+    SecretSetSpecInput::new(odf::metadata::config::SecretSetSpecInput {
+        secrets: odf::metadata::config::Secrets {
+            entries: entries.into_iter().map(|(k, v)| (k.into(), v)).collect(),
+        },
+    })
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -19,23 +43,10 @@ async fn test_apply_secret_set_encrypts_literal_values() {
     let harness = BaseConfigurationServiceHarness::new();
     let account_handle = odf::AccountHandle::new_test("test-owner");
 
-    let spec = SecretSetSpec {
-        secrets: [
-            (
-                "API_TOKEN".to_string(),
-                SecretSpec::Literal("my-secret-token".to_string()),
-            ),
-            (
-                "DB_PASSWORD".to_string(),
-                SecretSpec::Value(SecretValueSpec {
-                    value: "my-db-password".to_string(),
-                    content_encoding: None,
-                }),
-            ),
-        ]
-        .into_iter()
-        .collect(),
-    };
+    let spec = make_spec_input([
+        ("API_TOKEN", plaintext_secret("my-secret-token")),
+        ("DB_PASSWORD", plaintext_secret("my-db-password")),
+    ]);
 
     let decision = harness
         .apply_secret_use_case()
@@ -65,11 +76,11 @@ async fn test_apply_secret_set_encrypts_literal_values() {
     let stored_spec: SecretSetSpec =
         serde_json::from_value(snapshot.spec.clone()).expect("spec must deserialize");
 
-    // All values must be Encrypted — no Literal or Value variants in stored form
-    for (name, secret) in &stored_spec.secrets {
+    // All values must be encrypted — no plaintext secrets in stored form
+    for (name, secret) in &stored_spec.secrets.entries {
         assert!(
             secret.is_encrypted(),
-            "secret '{name}' must be Encrypted in stored spec, got: {secret:?}"
+            "secret '{name}' must be encrypted in stored spec, got: {secret:?}"
         );
     }
 
@@ -92,15 +103,8 @@ async fn test_apply_secret_set_already_encrypted_passes_through_idempotently() {
     let harness = BaseConfigurationServiceHarness::new();
     let account_handle = odf::AccountHandle::new_test("test-owner");
 
-    // First apply with a Literal value to produce an encrypted snapshot
-    let spec = SecretSetSpec {
-        secrets: [(
-            "API_TOKEN".to_string(),
-            SecretSpec::Literal("original-value".to_string()),
-        )]
-        .into_iter()
-        .collect(),
-    };
+    // First apply with a plaintext value to produce an encrypted snapshot
+    let spec = make_spec_input([("API_TOKEN", plaintext_secret("original-value"))]);
 
     let decision = harness
         .apply_secret_use_case()
@@ -133,10 +137,10 @@ async fn test_apply_secret_set_already_encrypted_passes_through_idempotently() {
     let encrypted_spec: SecretSetSpec =
         serde_json::from_value(snapshot.spec).expect("spec must deserialize");
 
-    // Confirm the first apply produced an Encrypted variant
+    // Confirm the first apply produced an encrypted secret
     assert!(
-        encrypted_spec.secrets["API_TOKEN"].is_encrypted(),
-        "first apply must produce an Encrypted variant"
+        encrypted_spec.secrets.entries["API_TOKEN"].is_encrypted(),
+        "first apply must produce an encrypted secret"
     );
 
     // Re-apply the already-encrypted spec — the sanitizer must pass it through
@@ -146,7 +150,7 @@ async fn test_apply_secret_set_already_encrypted_passes_through_idempotently() {
         .apply(ApplyResourceParams {
             id: Some(id),
             headers: BaseResourceServiceHarness::make_headers_input(account_handle, "test-secrets"),
-            spec: encrypted_spec.clone(),
+            spec: encrypted_spec.clone().into_input(),
         })
         .await
         .unwrap();
@@ -170,18 +174,17 @@ async fn test_apply_secret_set_already_encrypted_passes_through_idempotently() {
     let stored_spec2: SecretSetSpec =
         serde_json::from_value(snapshot2.spec).expect("spec must deserialize");
 
-    // After re-apply the value must still be an Encrypted variant (not
-    // double-wrapped)
+    // After re-apply the value must still be encrypted (not double-wrapped)
     assert!(
-        stored_spec2.secrets["API_TOKEN"].is_encrypted(),
-        "secret must remain Encrypted after idempotent re-apply"
+        stored_spec2.secrets.entries["API_TOKEN"].is_encrypted(),
+        "secret must remain encrypted after idempotent re-apply"
     );
 
     // The ciphertext must equal the original — sanitizer is a no-op on
     // already-encrypted specs
     assert_eq!(
-        stored_spec2.secrets["API_TOKEN"].as_encrypted(),
-        encrypted_spec.secrets["API_TOKEN"].as_encrypted(),
+        stored_spec2.secrets.entries["API_TOKEN"].as_encrypted(),
+        encrypted_spec.secrets.entries["API_TOKEN"].as_encrypted(),
         "ciphertext must be unchanged after idempotent re-apply"
     );
 }
@@ -193,14 +196,7 @@ async fn test_apply_secret_set_same_plaintext_is_untouched() {
     let harness = BaseConfigurationServiceHarness::new();
     let account_handle = odf::AccountHandle::new_test("test-owner");
 
-    let spec = SecretSetSpec {
-        secrets: [(
-            "API_TOKEN".to_string(),
-            SecretSpec::Literal("original-value".to_string()),
-        )]
-        .into_iter()
-        .collect(),
-    };
+    let spec = make_spec_input([("API_TOKEN", plaintext_secret("original-value"))]);
 
     let decision = harness
         .apply_secret_use_case()

@@ -16,10 +16,10 @@ use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_configuration::{
     DatasetSecretSetBindingRepository,
     DatasetVariableSetBindingRepository,
+    Secret,
     SecretSetProjectionRepository,
     SecretSetResource,
-    SecretSetSpec,
-    SecretSpec,
+    SecretSetSpecInput,
     Variable,
     VariableSetProjectionRepository,
     VariableSetResource,
@@ -288,9 +288,20 @@ impl DatasetEnvVarMutationAdapterImpl {
         };
         let is_new_key = !exists_as_secret && !existed_as_variable;
 
-        secrets.insert(key.to_string(), SecretSpec::Literal(plaintext.to_string()));
+        secrets.insert(
+            key.to_string(),
+            Secret {
+                value: plaintext.to_string(),
+                content_encoding: None,
+            },
+        );
 
-        let new_spec = serde_json::to_value(SecretSetSpec { secrets }).int_err()?;
+        let new_spec = serde_json::to_value(SecretSetSpecInput::new(
+            odf::metadata::config::SecretSetSpecInput {
+                secrets: odf::metadata::config::Secrets { entries: secrets },
+            },
+        ))
+        .int_err()?;
         let headers = self.make_headers(account.clone(), resource_name);
 
         let dispatcher = self.get_dispatcher::<InternalError>(SecretSetResource::SCHEMA_STR)?;
@@ -444,12 +455,22 @@ impl DatasetEnvVarMutationAdapterImpl {
                 .await
                 .int_err()?;
         } else {
-            let new_spec = SecretSetSpec {
-                secrets: decrypted
-                    .into_iter()
-                    .map(|(k, v)| (k, SecretSpec::Literal(v)))
-                    .collect(),
-            };
+            let new_spec = SecretSetSpecInput::new(odf::metadata::config::SecretSetSpecInput {
+                secrets: odf::metadata::config::Secrets {
+                    entries: decrypted
+                        .into_iter()
+                        .map(|(k, v)| {
+                            (
+                                k,
+                                Secret {
+                                    value: v,
+                                    content_encoding: None,
+                                },
+                            )
+                        })
+                        .collect(),
+                },
+            });
             let headers = ResourceHeadersInput {
                 id: Some(snapshot.headers.id),
                 account: Some(odf::metadata::auth::AccountRef::IdAndName(
@@ -620,7 +641,7 @@ impl DatasetEnvVarMutationAdapterImpl {
         &self,
         account_id: &odf::AccountID,
         resource_name: &ResourceName,
-    ) -> Result<(Option<ResourceID>, BTreeMap<String, SecretSpec>), InternalError> {
+    ) -> Result<(Option<ResourceID>, BTreeMap<String, Secret>), InternalError> {
         let id = self
             .generic_resource_query_service
             .find_resource_id_by_name(account_id, SecretSetResource::schema(), resource_name)
@@ -634,7 +655,15 @@ impl DatasetEnvVarMutationAdapterImpl {
 
         let secrets = decrypted
             .into_iter()
-            .map(|(k, v)| (k, SecretSpec::Literal(v)))
+            .map(|(k, v)| {
+                (
+                    k,
+                    Secret {
+                        value: v,
+                        content_encoding: None,
+                    },
+                )
+            })
             .collect();
 
         Ok((Some(id), secrets))

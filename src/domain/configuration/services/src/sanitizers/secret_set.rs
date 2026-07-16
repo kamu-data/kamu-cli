@@ -13,10 +13,11 @@ use crypto_utils::SecretCryptor;
 use internal_error::InternalError;
 use kamu_configuration::{
     CONTENT_ENCODING_JWE,
+    Secret,
+    SecretExt,
     SecretSetResource,
     SecretSetSpec,
-    SecretSpec,
-    SecretValueSpec,
+    SecretSetSpecInput,
 };
 use kamu_datasets::SecretsEncryptionConfig;
 use kamu_resources::ResourceSpecSanitizer;
@@ -35,12 +36,12 @@ pub struct SecretSetSpecSanitizer {
 impl ResourceSpecSanitizer<SecretSetResource> for SecretSetSpecSanitizer {
     async fn sanitize_new_spec(
         &self,
-        mut new_spec: SecretSetSpec,
+        mut new_spec: SecretSetSpecInput,
         maybe_current_spec: Option<&SecretSetSpec>,
-    ) -> Result<SecretSetSpec, InternalError> {
+    ) -> Result<SecretSetSpecInput, InternalError> {
         let cryptor = self.secrets_encryption_config.new_secret_cryptor()?;
 
-        for (name, new_secret) in &mut new_spec.secrets {
+        for (name, new_secret) in &mut new_spec.secrets.entries {
             if new_secret.is_encrypted() {
                 continue;
             }
@@ -48,7 +49,8 @@ impl ResourceSpecSanitizer<SecretSetResource> for SecretSetSpecSanitizer {
 
             // If the new plaintext matches the current secret (after decryption), keep the
             // current encrypted value to avoid unnecessary changes
-            if let Some(current_secret) = maybe_current_spec.and_then(|s| s.secrets.get(name))
+            if let Some(current_secret) =
+                maybe_current_spec.and_then(|s| s.secrets.entries.get(name))
                 && Self::matches_current_plaintext(current_secret, new_plaintext, &cryptor)?
             {
                 *new_secret = current_secret.clone();
@@ -57,10 +59,10 @@ impl ResourceSpecSanitizer<SecretSetResource> for SecretSetSpecSanitizer {
 
             // The secret value is new or has changed, encrypt it into a compact JWE token
             let token = cryptor.encrypt_to_jwe(new_plaintext.as_bytes())?;
-            *new_secret = SecretSpec::Value(SecretValueSpec {
+            *new_secret = Secret {
                 value: token,
                 content_encoding: Some(CONTENT_ENCODING_JWE.to_string()),
-            });
+            };
         }
 
         Ok(new_spec)
@@ -71,7 +73,7 @@ impl ResourceSpecSanitizer<SecretSetResource> for SecretSetSpecSanitizer {
 
 impl SecretSetSpecSanitizer {
     fn matches_current_plaintext(
-        current_secret: &SecretSpec,
+        current_secret: &Secret,
         new_plaintext: &str,
         cryptor: &SecretCryptor,
     ) -> Result<bool, InternalError> {
