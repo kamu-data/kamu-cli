@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 //! Minimal JWE (JSON Web Encryption, RFC 7516) support restricted to the one
-//! profile this codebase needs: **direct key agreement** (`alg=dir`) with
+//! profile this codebase needs: **direct key use** (`alg=dir`) with
 //! **AES-256-GCM** content encryption (`enc=A256GCM`), serialized in the
 //! **compact** form.
 //!
@@ -134,11 +134,9 @@ fn check_segments(token: &str) -> SegmentCheck<'_> {
         return SegmentCheck::Malformed;
     };
 
-    // A256GCM ciphertext is the same length as the plaintext (GCM is a stream
-    // cipher; the tag is separate) — an empty ciphertext means an empty
-    // secret, which the plaintext path already rejects via
-    // `EmptySecretValue`. Reject it here too so it can't sneak in disguised
-    // as `jwe`.
+    // AES-GCM ciphertext length equals plaintext length; the tag is stored
+    // separately. Reject empty ciphertext so empty secrets cannot sneak in
+    // disguised as `jwe`.
     if iv.len() != 12 || tag.len() != 16 || ciphertext.is_empty() {
         return SegmentCheck::Malformed;
     }

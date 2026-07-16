@@ -16,12 +16,10 @@ use crate::{AesGcmEncryptor, Encryptor, ParseEncryptionKey};
 
 /// A symmetric-key bundle for reading and writing `SecretSet` secret values.
 ///
-/// It holds the one 32-byte key in the two forms secret handling needs: as a
-/// JWE content-encryption key, for the current `contentEncoding: "jwe"`
-/// write/read path and for the read-side projection's own raw-AES storage;
-/// and as an [`AesGcmEncryptor`], for decrypting the legacy `contentEncoding:
-/// "aes256gcm"` form emitted only by the env-var backfill migrations
-/// (`hex(nonce ‖ ciphertext)`).
+/// It holds the one 32-byte key in the two forms secret handling needs: raw key
+/// bytes for compact JWE, and an [`AesGcmEncryptor`] for the read-side
+/// projection's raw-AES storage plus legacy `contentEncoding: "aes256gcm"`
+/// reads (`hex(nonce ‖ ciphertext)`).
 ///
 /// Build it once (it validates the key length up front) and pass it wherever a
 /// secret must be encrypted or decrypted.

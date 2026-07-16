@@ -54,12 +54,8 @@ macro_rules! declare_apply_resource_use_case {
                 }
             }
 
-            /// Runs the resource's sanitizer (if any) over `params.spec`.
-            /// `Rejected` means the sanitizer found a business-rule problem it
-            /// alone can check (e.g. an already-encrypted value that doesn't
-            /// decrypt under the current key) — same rejection shape
-            /// `ResourceValidateSpec` would use, just surfaced here because it
-            /// needs key material `validate()` doesn't have.
+            /// Runs the optional sanitizer and surfaces sanitizer-level
+            /// business rejections before planning.
             async fn sanitize_params(
                 &self,
                 params: kamu_resources::ApplyResourceParams<$resource>,
