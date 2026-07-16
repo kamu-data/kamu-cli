@@ -147,19 +147,37 @@ pub fn decrypt_compact(key: &[u8; JWE_KEY_LEN], token: &str) -> Result<Vec<u8>, 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Cheap structural check that `token` looks like a compact JWE (five
-/// dot-separated segments with a supported header). Does not require the key,
-/// so it is usable in spec validation. A `true` result does not guarantee the
-/// token decrypts.
+/// Structural check that `token` looks like a compact JWE: five dot-separated
+/// segments with a supported header, an empty `dir` encrypted-key segment,
+/// and IV/ciphertext/tag segments that are valid base64url of the lengths
+/// AES-256-GCM requires. Does not require the key, so it is usable in spec
+/// validation without needing to authenticate the ciphertext. A `true` result
+/// does not guarantee the token decrypts (wrong key or tampering still fail
+/// authentication), but it does rule out tokens that are malformed regardless
+/// of key — the case `decrypt_compact` would otherwise only catch later, at
+/// reconciliation or reveal time.
 pub fn looks_like_compact(token: &str) -> bool {
     let segments: Vec<&str> = token.split('.').collect();
     if segments.len() != 5 || !segments[1].is_empty() {
         return false;
     }
+
     match BASE64URL.decode(segments[0]) {
-        Ok(header) => header == PROTECTED_HEADER_JSON.as_bytes(),
-        Err(_) => false,
+        Ok(header) if header == PROTECTED_HEADER_JSON.as_bytes() => {}
+        _ => return false,
     }
+
+    let Ok(iv) = BASE64URL.decode(segments[2]) else {
+        return false;
+    };
+    if BASE64URL.decode(segments[3]).is_err() {
+        return false;
+    }
+    let Ok(tag) = BASE64URL.decode(segments[4]) else {
+        return false;
+    };
+
+    iv.len() == 12 && tag.len() == 16
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -232,6 +250,33 @@ mod tests {
     #[test]
     fn wrong_segment_count_is_malformed() {
         assert_matches!(decrypt_compact(KEY, "a.b.c"), Err(JweError::Malformed));
+    }
+
+    #[test]
+    fn looks_like_compact_rejects_non_base64url_segments() {
+        let token = encrypt_compact(KEY, b"x").unwrap();
+        let mut parts: Vec<&str> = token.split('.').collect();
+        parts[3] = "not!valid!base64url!!!";
+        let tampered = parts.join(".");
+        assert!(
+            !looks_like_compact(&tampered),
+            "a non-base64url ciphertext segment must fail the structural check, not just later \
+             decryption"
+        );
+    }
+
+    #[test]
+    fn looks_like_compact_rejects_wrong_segment_lengths() {
+        let token = encrypt_compact(KEY, b"x").unwrap();
+        let mut parts: Vec<&str> = token.split('.').collect();
+        // Valid base64url, but decodes to the wrong number of bytes for an IV.
+        let short_iv = BASE64URL.encode(b"short");
+        parts[2] = &short_iv;
+        let tampered = parts.join(".");
+        assert!(
+            !looks_like_compact(&tampered),
+            "an IV segment of the wrong length must fail the structural check"
+        );
     }
 
     #[test]
