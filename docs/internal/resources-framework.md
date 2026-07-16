@@ -481,8 +481,10 @@ pub struct ResourceStatus {                  // ODF-generated; entirely server-o
 > derives `Serialize`/`Deserialize` via `#[serde(try_from = "…", into = "…")]` delegating through the
 > proxy — reusable for any future RFC spec adoption. The domain's `ResourceValidateSpec`/
 > `ResourceLinterSpec` impls attach to `VariableSetSpecInput` (the write-path type the framework
-> validates/lints), not `VariableSetSpec`. `SecretSetSpec` is not yet adopted this way — it has an
-> `Encrypted` variant with no RFC counterpart and needs a broader change, postponed.
+> validates/lints), not `VariableSetSpec`. `SecretSetSpec` now uses the RFC-18-aligned
+> `{ value, contentEncoding }` secret shape (the old `Encrypted { encrypted, nonce }` variant is
+> gone), but it is still a hand-written type — full ODF-codegen adoption (like `VariableSet`) is a
+> deliberate follow-up, not done here.
 
 The behaviorally-significant consequences of adopting these shapes:
 
@@ -1068,7 +1070,7 @@ Two types are functional today, both under the config `v1alpha1` schema namespac
 | Schema | Selector name | Short name | Spec | Reconciliation |
 | --- | --- | --- | --- | --- |
 | `https://opendatafabric.org/schemas/config/v1alpha1/VariableSet` | `variablesets` | `vs` | `spec.variables` (name → `{ value }`; accepts scalar shorthand on input via ODF's `StructOrString`, but always round-trips as the structured `{ value }` form once parsed — RFC-adopted, see [`VariableSetSpec`](/src/domain/configuration/domain/src/resources/variable_set/spec.rs)) | Projects variable entries; status uses the standard ODF resource status. |
-| `https://opendatafabric.org/schemas/config/v1alpha1/SecretSet` | `secretsets` | `ss` | `spec.secrets` (name → plaintext / `{ value }` / encrypted) | Materializes an **encrypted** read-side projection (`SecretSetEntry`) for consumers (see [Secret handling](#secret-handling-invariant) for where encryption actually happens). |
+| `https://opendatafabric.org/schemas/config/v1alpha1/SecretSet` | `secretsets` | `ss` | `spec.secrets` (name → plaintext / `{ value }` / `{ value, contentEncoding: jwe }`) | Materializes an **encrypted** read-side projection (`SecretSetEntry`) for consumers (see [Secret handling](#secret-handling-invariant) for where encryption actually happens). |
 
 ### Secret handling invariant
 
@@ -1081,18 +1083,21 @@ assumption:
 
 1. **Spec sanitizer — the pre-persistence boundary** ([`sanitizers/secret_set.rs`](/src/domain/configuration/services/src/sanitizers/secret_set.rs)).
    `SecretSetSpecSanitizer` runs as the **very first step** of both `plan` and `apply`, before the
-   planner and before any event/snapshot write. It encrypts each non-encrypted secret (AES-GCM via
-   `crypto_utils::AesGcmEncryptor`) into `SecretSpec::Encrypted { encrypted, nonce }` (base64), so the
-   persisted `spec` **already holds ciphertext.** (If new plaintext decrypts-equal to the stored
-   secret, the existing ciphertext is reused to avoid a spurious change.)
+   planner and before any event/snapshot write. It encrypts each non-encrypted secret into a compact
+   **JWE** token (`dir` + `A256GCM`, via `crypto_utils::SecretCryptor` / `crypto_utils::jwe`) and
+   stores it as `SecretSpec::Value { value: <jwe>, contentEncoding: "jwe" }`, so the persisted `spec`
+   **already holds ciphertext.** (If new plaintext decrypts-equal to the stored secret, the existing
+   token is reused to avoid a spurious change.) A second, read-only `contentEncoding: "aes256gcm"`
+   form (`hex(nonce ‖ ciphertext)`) exists **only** for the env-var backfill migrations, which cannot
+   compute a JWE token in pure SQL; the node reads it and re-materializes as JWE on the next apply.
 2. **Reconciler — encrypted read-side projection** ([`reconcilers/secret_set.rs`](/src/domain/configuration/services/src/reconcilers/secret_set.rs)).
    `SecretSetReconcilerImpl` re-encrypts into a *separate* projection (`SecretSetEntry` rows in
    `SecretSetProjectionRepository`) that downstream consumers read; ciphertext-only, and it does not
    rewrite the resource `spec`.
 
-**Reading back:** the secret-set spec-view dispatcher's `reveal_spec` decrypts each
-`SecretSpec::Encrypted` only under `SpecViewMode::Revealed`; the default `Encrypted` returns the
-stored ciphertext unchanged.
+**Reading back:** the secret-set spec-view dispatcher's `reveal_spec` decrypts each encrypted
+secret (`contentEncoding` set) only under `SpecViewMode::Revealed`; the default `Encrypted` returns
+the stored ciphertext unchanged.
 
 Domain types live in `src/domain/configuration/domain/src/resources/<type>/`
 (`resource.rs`, `spec.rs`, `state.rs`, `event.rs`, `reconciliation.rs`, …) — there is no per-kind

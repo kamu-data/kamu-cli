@@ -30,6 +30,7 @@ async fn test_reconcile_secret_set_decrypts_and_reprojects_values() {
                 "DB_PASSWORD".to_string(),
                 SecretSpec::Value(SecretValueSpec {
                     value: "my-db-password".to_string(),
+                    content_encoding: None,
                 }),
             ),
         ]

@@ -74,8 +74,8 @@ pub async fn test_resources_secretset_lifecycle(ctx: ResourceCtx) {
 
     let get_out = ctx.stdout(["get", "ss", resource_name]).await;
     assert!(
-        get_out.contains("encrypted"),
-        "`get ss` (default) should show the encrypted form, got:\n{get_out}"
+        get_out.contains("contentEncoding") && get_out.contains("jwe"),
+        "`get ss` (default) should show the encrypted JWE form, got:\n{get_out}"
     );
     assert_no_plaintext(&get_out, [api_token, db_password], "get ss <name>");
 
@@ -144,13 +144,14 @@ pub async fn test_resources_secretset_lifecycle(ctx: ResourceCtx) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Scenario: apply a manifest whose secret is ALREADY encrypted (QA scenario 3)
 //
-// Exercises the `SecretSpec::Encrypted` apply path — the GitOps case where a
-// committed manifest carries `encrypted`/`nonce` instead of a plaintext value.
-// The sanitizer must accept the encrypted value as-is (not re-encrypt it), and
-// `--revealed` must decrypt it back to the original plaintext.
+// Exercises the already-encrypted apply path — the GitOps case where a
+// committed manifest carries `{ value: <jwe>, contentEncoding: jwe }` instead
+// of a plaintext value. The sanitizer must accept the encrypted value as-is
+// (not re-encrypt it), and `--revealed` must decrypt it back to the original
+// plaintext.
 //
-// The ciphertext is tied to the configured sample encryption key; see
-// `fixtures::PRE_ENCRYPTED_API_TOKEN` for how it was produced. Wire with
+// The JWE token is tied to the configured sample encryption key; see
+// `fixtures::PRE_ENCRYPTED_API_TOKEN_JWE` for how it was produced. Wire with
 // `Options::with_kamu_config(fixtures::SECRETS_ENCRYPTION_KAMU_CONFIG)`.
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

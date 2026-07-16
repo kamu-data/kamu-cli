@@ -3458,6 +3458,8 @@ version = "0.264.0"
 dependencies = [
  "aes-gcm",
  "argon2",
+ "base64",
+ "hex",
  "internal-error",
  "password-hash",
  "thiserror 2.0.18",
@@ -8191,10 +8193,10 @@ name = "kamu-configuration"
 version = "0.264.0"
 dependencies = [
  "async-trait",
- "base64",
  "chrono",
  "crypto-utils",
  "event-sourcing",
+ "hex",
  "internal-error",
  "kamu-resources",
  "opendatafabric",

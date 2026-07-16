@@ -34,6 +34,7 @@ async fn test_spec_view_dispatcher_reveals_encrypted_secrets_as_plaintext() {
                 "DB_PASSWORD".to_string(),
                 SecretSpec::Value(SecretValueSpec {
                     value: "my-db-password".to_string(),
+                    content_encoding: None,
                 }),
             ),
         ]

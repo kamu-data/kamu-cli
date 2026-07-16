@@ -128,6 +128,7 @@ impl BaseGQLResourceHarness {
                 "PLACEHOLDER".to_string(),
                 kamu_configuration::SecretSpec::Value(kamu_configuration::SecretValueSpec {
                     value: "placeholder".to_string(),
+                    content_encoding: None,
                 }),
             )]
             .into(),

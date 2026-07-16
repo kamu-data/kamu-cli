@@ -63,6 +63,7 @@ async fn make_secret_set_resource(catalog: &Catalog) -> ResourceID {
                 "PLACEHOLDER".to_string(),
                 SecretSpec::Value(SecretValueSpec {
                     value: "placeholder".to_string(),
+                    content_encoding: None,
                 }),
             )]
             .into(),

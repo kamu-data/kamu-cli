@@ -29,6 +29,7 @@ async fn test_apply_secret_set_encrypts_literal_values() {
                 "DB_PASSWORD".to_string(),
                 SecretSpec::Value(SecretValueSpec {
                     value: "my-db-password".to_string(),
+                    content_encoding: None,
                 }),
             ),
         ]

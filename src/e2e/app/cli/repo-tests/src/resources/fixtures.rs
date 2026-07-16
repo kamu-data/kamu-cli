@@ -178,41 +178,34 @@ pub fn secret_set_manifest_yaml(name: &str, token: &str, password: &str) -> Stri
     )
 }
 
-/// Plaintext that [`PRE_ENCRYPTED_API_TOKEN`] decrypts back to. A scenario that
-/// applies the pre-encrypted manifest can reveal it and assert this value.
+/// Plaintext that [`PRE_ENCRYPTED_API_TOKEN_JWE`] decrypts back to. A scenario
+/// that applies the pre-encrypted manifest can reveal it and assert this value.
 pub const PRE_ENCRYPTED_API_TOKEN_PLAINTEXT: &str = "super-secret-token";
 
-/// A `SecretSet` manifest carrying a secret that is **already encrypted** (the
-/// `Encrypted { encrypted, nonce }` form), as a GitOps-committed manifest
-/// would.
+/// A compact JWE token (`contentEncoding: "jwe"`) for
+/// [`PRE_ENCRYPTED_API_TOKEN_PLAINTEXT`], as a GitOps-committed manifest would
+/// carry an already-encrypted secret.
 ///
-/// The ciphertext below is tied to the encryption key in
-/// [`SECRETS_ENCRYPTION_KAMU_CONFIG`] (`QfnEDcnUtGSW2pwVXaFPvZOwxyFm2BOC`,
-/// i.e. `kamu_datasets::SAMPLE_SECRETS_ENCRYPTION_KEY`). It MUST be applied
-/// with that same config, otherwise `--revealed` would decrypt to garbage.
+/// The token is tied to the encryption key in
+/// [`SECRETS_ENCRYPTION_KAMU_CONFIG`] (`QfnEDcnUtGSW2pwVXaFPvZOwxyFm2BOC`, i.e.
+/// `kamu_datasets::SAMPLE_SECRETS_ENCRYPTION_KEY`). It MUST be applied with
+/// that same config, otherwise `--revealed` would fail to decrypt.
 ///
-/// How the ciphertext was produced (reproduce if the sample key ever changes):
-/// 1. In a workspace whose `.kamuconfig` is [`SECRETS_ENCRYPTION_KAMU_CONFIG`],
-///    apply a plaintext manifest: `API_TOKEN: { value: "super-secret-token" }`.
-/// 2. Run `kamu get ss <name> --spec` — the CLI emits the secret in its
-///    encrypted form (`encrypted`/`nonce`, base64). The sanitizer encrypts the
-///    plaintext with the configured key (AES-GCM, random nonce).
-/// 3. Copy the `encrypted`/`nonce` strings here verbatim.
-///
-/// (The nonce is random per encryption, so re-running step 2 yields different
-/// bytes that still decrypt to the same plaintext — any such pair is valid.)
-pub const PRE_ENCRYPTED_API_TOKEN: (&str, &str) = (
-    "mv//5YGqRqQxie9J6nvX/i+1D/db15ZQBGNBoFD2Pmi3ug==", // encrypted
-    "gMdG+g1JEBE352CW",                                 // nonce
-);
+/// How the token was produced (reproduce if the sample key ever changes): build
+/// a `crypto_utils::SecretCryptor` from the sample key and call
+/// `encrypt_to_jwe(b"super-secret-token")`. The JWE IV is random per call, so
+/// re-running yields a different token that still decrypts to the same
+/// plaintext — any such token is valid.
+pub const PRE_ENCRYPTED_API_TOKEN_JWE: &str = "eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..\
+                                               xqDKWewaviCEWvPB.-hVKByad54NGfdcYuA0lyGPm.\
+                                               vy4bkibgH2ZgDXVsFxDUmw";
 
-/// A `SecretSet` manifest whose single secret is supplied **pre-encrypted**
-/// (using [`PRE_ENCRYPTED_API_TOKEN`]). Applying it exercises the
-/// `SecretSpec::Encrypted` apply path — the sanitizer must accept the encrypted
-/// value as-is rather than re-encrypting it. Must be applied with
+/// A `SecretSet` manifest whose single secret is supplied **pre-encrypted** (as
+/// a JWE token, see [`PRE_ENCRYPTED_API_TOKEN_JWE`]). Applying it exercises the
+/// already-encrypted apply path — the sanitizer must accept the encrypted value
+/// as-is rather than re-encrypting it. Must be applied with
 /// [`SECRETS_ENCRYPTION_KAMU_CONFIG`].
 pub fn secret_set_manifest_pre_encrypted_yaml(name: &str) -> String {
-    let (encrypted, nonce) = PRE_ENCRYPTED_API_TOKEN;
     indoc::formatdoc!(
         r#"
         $schema: {SECRET_SET_SCHEMA}
@@ -223,9 +216,10 @@ pub fn secret_set_manifest_pre_encrypted_yaml(name: &str) -> String {
         spec:
           secrets:
             API_TOKEN:
-              encrypted: {encrypted}
-              nonce: {nonce}
-        "#
+              value: {token}
+              contentEncoding: jwe
+        "#,
+        token = PRE_ENCRYPTED_API_TOKEN_JWE,
     )
 }
 

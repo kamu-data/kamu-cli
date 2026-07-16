@@ -9,10 +9,15 @@
 
 use std::sync::Arc;
 
-use base64::Engine;
-use crypto_utils::{AesGcmEncryptor, Encryptor};
-use internal_error::{InternalError, ResultIntoInternal};
-use kamu_configuration::{EncryptedSecretSpec, SecretSetResource, SecretSetSpec, SecretSpec};
+use crypto_utils::SecretCryptor;
+use internal_error::InternalError;
+use kamu_configuration::{
+    CONTENT_ENCODING_JWE,
+    SecretSetResource,
+    SecretSetSpec,
+    SecretSpec,
+    SecretValueSpec,
+};
 use kamu_datasets::SecretsEncryptionConfig;
 use kamu_resources::ResourceSpecSanitizer;
 
@@ -33,9 +38,7 @@ impl ResourceSpecSanitizer<SecretSetResource> for SecretSetSpecSanitizer {
         mut new_spec: SecretSetSpec,
         maybe_current_spec: Option<&SecretSetSpec>,
     ) -> Result<SecretSetSpec, InternalError> {
-        use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
-
-        let encryptor = self.secrets_encryption_config.new_encryptor()?;
+        let cryptor = self.secrets_encryption_config.new_secret_cryptor()?;
 
         for (name, new_secret) in &mut new_spec.secrets {
             if new_secret.is_encrypted() {
@@ -46,19 +49,17 @@ impl ResourceSpecSanitizer<SecretSetResource> for SecretSetSpecSanitizer {
             // If the new plaintext matches the current secret (after decryption), keep the
             // current encrypted value to avoid unnecessary changes
             if let Some(current_secret) = maybe_current_spec.and_then(|s| s.secrets.get(name))
-                && Self::matches_current_plaintext(current_secret, new_plaintext, &encryptor)?
+                && Self::matches_current_plaintext(current_secret, new_plaintext, &cryptor)?
             {
                 *new_secret = current_secret.clone();
                 continue;
             }
 
-            // The secret value is new or has changed, encrypt it
-            let (encrypted_bytes, nonce_bytes) = encryptor
-                .encrypt_bytes(new_plaintext.as_bytes())
-                .int_err()?;
-            *new_secret = SecretSpec::Encrypted(EncryptedSecretSpec {
-                encrypted: BASE64_STANDARD.encode(&encrypted_bytes),
-                nonce: BASE64_STANDARD.encode(&nonce_bytes),
+            // The secret value is new or has changed, encrypt it into a compact JWE token
+            let token = cryptor.encrypt_to_jwe(new_plaintext.as_bytes())?;
+            *new_secret = SecretSpec::Value(SecretValueSpec {
+                value: token,
+                content_encoding: Some(CONTENT_ENCODING_JWE.to_string()),
             });
         }
 
@@ -72,13 +73,13 @@ impl SecretSetSpecSanitizer {
     fn matches_current_plaintext(
         current_secret: &SecretSpec,
         new_plaintext: &str,
-        encryptor: &AesGcmEncryptor,
+        cryptor: &SecretCryptor,
     ) -> Result<bool, InternalError> {
-        let Some(current_encrypted) = current_secret.as_encrypted() else {
+        if current_secret.as_encrypted().is_none() {
             return Ok(false);
-        };
+        }
 
-        let decrypted_current = current_encrypted.decrypt_plaintext_bytes(encryptor)?;
+        let decrypted_current = current_secret.decrypt_plaintext_bytes(cryptor)?;
         Ok(decrypted_current == new_plaintext.as_bytes())
     }
 }

@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::{DateTime, Utc};
-use crypto_utils::{AesGcmEncryptor, EncryptionError, Encryptor};
+use crypto_utils::{AesGcmEncryptor, EncryptionError, Encryptor, SecretCryptor};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use secrecy::{ExposeSecret, SecretString};
 
@@ -173,6 +173,23 @@ impl SecretsEncryptionConfig {
         };
 
         AesGcmEncryptor::try_new(encryption_key).int_err()
+    }
+
+    /// Build a [`SecretCryptor`] from the configured encryption key.
+    ///
+    /// Used by `SecretSet` secret handling (sanitizer, reveal, reconciler) to
+    /// produce/consume `contentEncoding: "jwe"` values and to decrypt the
+    /// legacy `contentEncoding: "aes256gcm"` form emitted by the env-var
+    /// backfill migrations. Surfaces a missing key as an `InternalError`, like
+    /// [`Self::new_encryptor`].
+    pub fn new_secret_cryptor(&self) -> Result<SecretCryptor, InternalError> {
+        let Some(encryption_key) = self.encryption_key.as_ref() else {
+            return InternalError::bail(
+                "Secrets encryption key is not configured; set `secretsEncryption.encryptionKey`",
+            );
+        };
+
+        SecretCryptor::try_new(encryption_key).int_err()
     }
 }
 

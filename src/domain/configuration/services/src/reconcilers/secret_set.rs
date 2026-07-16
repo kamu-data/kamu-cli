@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use crypto_utils::{AesGcmEncryptor, Encryptor};
+use crypto_utils::{AesGcmEncryptor, Encryptor, SecretCryptor};
 use internal_error::ResultIntoInternal;
 use kamu_configuration::{
     ReplaceProjectionEntriesError,
@@ -59,10 +59,12 @@ impl Reconciler<SecretSetResource> for SecretSetReconcilerImpl {
             .load_previous_entries_by_key(&resource_id, resource_generation)
             .await?;
 
-        let encryptor = self.create_encryptor()?;
+        let cryptor = self.create_secret_cryptor()?;
+        let projection_encryptor = self.create_encryptor()?;
 
         let entries = self.build_secret_entries(
-            &encryptor,
+            &cryptor,
+            &projection_encryptor,
             &resource.spec().secrets,
             &previous_entries_by_key,
             account_id,
@@ -123,9 +125,16 @@ impl SecretSetReconcilerImpl {
             .map_err(SecretSetReconcileError::Internal)
     }
 
+    fn create_secret_cryptor(&self) -> Result<SecretCryptor, SecretSetReconcileError> {
+        self.secrets_encryption_config
+            .new_secret_cryptor()
+            .map_err(SecretSetReconcileError::Internal)
+    }
+
     fn build_secret_entries(
         &self,
-        encryptor: &AesGcmEncryptor,
+        cryptor: &SecretCryptor,
+        projection_encryptor: &AesGcmEncryptor,
         secrets: &std::collections::BTreeMap<String, kamu_configuration::SecretSpec>,
         previous_entries_by_key: &HashMap<String, PreviousConfigurationEntry>,
         account_id: &AccountID,
@@ -134,10 +143,13 @@ impl SecretSetReconcilerImpl {
         let mut entries = Vec::with_capacity(secrets.len());
 
         for (key, secret) in secrets {
+            // Decrypt the spec secret (jwe / legacy aes256gcm / plaintext) ...
             let plaintext = secret
-                .decrypt_plaintext_bytes(encryptor)
+                .decrypt_plaintext_bytes(cryptor)
                 .map_err(SecretSetReconcileError::Internal)?;
-            let (value, secret_nonce) = encryptor
+            // ... then re-encrypt into the read-side projection's own raw-AES
+            // (value, secret_nonce) columns — a separate encoding from the spec.
+            let (value, secret_nonce) = projection_encryptor
                 .encrypt_bytes(&plaintext)
                 .int_err()
                 .map_err(SecretSetReconcileError::Internal)?;
