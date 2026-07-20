@@ -343,9 +343,14 @@ multiple_crate_versions = { level = "allow", priority = 1 }
 
 
 [profile.dev]
-# Change this to 1 for faster builds that still preserve enough info for backtraces.
-# Use 2 when you need to attach a debugger.
-debug = 2
+# Allows debugging for workspace crates. An override below limits the debug info for dependencies.
+debug = "full"
+# Separates debug info into sibling files, which helps with incremental linking times.
+split-debuginfo = "unpacked"
+
+[profile.dev.package."*"]
+# Limited debug info for all dependencies for backtraces only. Workspace crates still get full info (see above)
+debug = "line-tables-only"
 
 
 # Based on:
@@ -354,13 +359,14 @@ debug = 2
 opt-level = 3
 
 
-# Emit the line info tables for our crates to produce useful crash reports and backtraces.
-# We don't emit info for dependencies as this significantly increases binary size.
-# See: https://doc.rust-lang.org/cargo/reference/profiles.html#debug
-[profile.release.package]
-opendatafabric-metadata = { debug = 1 }
-kamu = { debug = 1 }
-kamu-cli = { debug = 1 }
+[profile.release]
+# Limited debug info for workspace crates for backtraces. An override below disables the debug info for dependencies.
+debug = "line-tables-only"
+
+[profile.release.package."*"]
+# No debug info for dependencies. Workspace crates still get line info (see above).
+# TODO: Split debug info and allow downloading it separately. 
+debug = "none"
 
 
 [profile.ci]
