@@ -30,27 +30,27 @@ jobs:
             runs-on: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             use-cross: true
-            features: ingest-ftp,web-ui
+            features: ingest-evm,ingest-ftp,ingest-mqtt,query-extensions-json,web-ui
           - name: Linux / x86_64 / musl
             runs-on: ubuntu-latest
             target: x86_64-unknown-linux-musl
             use-cross: true
-            features: ingest-ftp,web-ui
+            features: ingest-evm,ingest-ftp,ingest-mqtt,query-extensions-json,web-ui
           - name: Linux / aarch64 / glibc
             runs-on: ubuntu-latest
             target: aarch64-unknown-linux-gnu
             use-cross: true
-            features: ingest-ftp,web-ui
+            features: ingest-evm,ingest-ftp,ingest-mqtt,query-extensions-json,web-ui
           - name: Linux / aarch64 / musl
             runs-on: ubuntu-latest
             target: aarch64-unknown-linux-musl
             use-cross: true
-            features: ingest-ftp,web-ui
+            features: ingest-evm,ingest-ftp,ingest-mqtt,query-extensions-json,web-ui
           - name: MacOS / aarch64
             runs-on: macos-14
             target: aarch64-apple-darwin
             use-cross: false
-            features: ingest-ftp,web-ui
+            features: ingest-evm,ingest-ftp,ingest-mqtt,query-extensions-json,web-ui
           # - name: Windows / x86_64
           #   runs-on: windows-latest
           #   target: x86_64-pc-windows-msvc
@@ -89,11 +89,17 @@ jobs:
 
       - name: Build
         shell: bash
+        # --no-default-features drops kamu-cli's `dynamic-datafusion` default so
+        # the released binary statically links datafusion (no libdatafusion_dylib.so
+        # runtime dependency). The features listed here re-include the other
+        # defaults (ingest-evm, ingest-mqtt, query-extensions-json) plus the
+        # release-only ones (ingest-ftp, web-ui).
         run: |
           ${{ env.CARGO }} build \
             -p kamu-cli \
             --release \
             --target=${{ matrix.target }} \
+            --no-default-features \
             --features=${{ matrix.features }}
 
       - name: Rename binary

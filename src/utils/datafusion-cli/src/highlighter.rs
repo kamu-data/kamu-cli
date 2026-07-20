@@ -20,10 +20,10 @@
 use std::borrow::Cow::{self, Borrowed};
 use std::fmt::Display;
 
+use datafusion::config;
 use datafusion::sql::sqlparser::dialect::{Dialect, GenericDialect, dialect_from_str};
 use datafusion::sql::sqlparser::keywords::Keyword;
 use datafusion::sql::sqlparser::tokenizer::{Token, Tokenizer};
-use datafusion_common::config;
 use rustyline::highlight::{CmdKind, Highlighter};
 
 /// The syntax highlighter.

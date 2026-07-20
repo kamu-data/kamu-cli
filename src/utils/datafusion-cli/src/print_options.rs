@@ -21,8 +21,8 @@ use std::pin::Pin;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use arrow::datatypes::SchemaRef;
-use arrow::record_batch::RecordBatch;
+use datafusion::arrow::datatypes::SchemaRef;
+use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::common::DataFusionError;
 use datafusion::common::instant::Instant;
 use datafusion::config::FormatOptions;

@@ -19,11 +19,11 @@
 
 use std::str::FromStr;
 
-use arrow::csv::writer::WriterBuilder;
-use arrow::datatypes::SchemaRef;
-use arrow::json::{ArrayWriter, LineDelimitedWriter};
-use arrow::record_batch::RecordBatch;
-use arrow::util::pretty::pretty_format_batches_with_options;
+use datafusion::arrow::csv::writer::WriterBuilder;
+use datafusion::arrow::datatypes::SchemaRef;
+use datafusion::arrow::json::{ArrayWriter, LineDelimitedWriter};
+use datafusion::arrow::record_batch::RecordBatch;
+use datafusion::arrow::util::pretty::pretty_format_batches_with_options;
 use datafusion::config::FormatOptions;
 use datafusion::error::Result;
 
@@ -112,7 +112,7 @@ fn format_batches_with_maxrows<W: std::io::Write>(
     maxrows: MaxRows,
     format_options: &FormatOptions,
 ) -> Result<()> {
-    let options: arrow::util::display::FormatOptions = format_options.try_into()?;
+    let options: datafusion::arrow::util::display::FormatOptions = format_options.try_into()?;
 
     match maxrows {
         MaxRows::Limited(maxrows) => {
@@ -199,7 +199,7 @@ impl PrintFormat {
         match self {
             // Print column headers for Table format
             Self::Table if !schema.fields().is_empty() => {
-                let format_options: arrow::util::display::FormatOptions =
+                let format_options: datafusion::arrow::util::display::FormatOptions =
                     format_options.try_into()?;
 
                 let empty_batch = RecordBatch::new_empty(schema);

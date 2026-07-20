@@ -22,10 +22,10 @@ use std::sync::atomic::{AtomicU8, AtomicU64, Ordering};
 use std::time::Duration;
 use std::{cmp, fmt};
 
-use arrow::array::{ArrayRef, RecordBatch, StringArray};
-use arrow::util::pretty::pretty_format_batches;
 use async_trait::async_trait;
 use chrono::Utc;
+use datafusion::arrow::array::{ArrayRef, RecordBatch, StringArray};
+use datafusion::arrow::util::pretty::pretty_format_batches;
 use datafusion::common::HashMap;
 use datafusion::common::instant::Instant;
 use datafusion::error::DataFusionError;

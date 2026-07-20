@@ -22,9 +22,9 @@
 use std::borrow::Cow;
 use std::cell::Cell;
 
+use datafusion::config::Dialect;
 use datafusion::sql::parser::{DFParser, Statement};
 use datafusion::sql::sqlparser::dialect::dialect_from_str;
-use datafusion_common::config::Dialect;
 use rustyline::completion::{Completer, FilenameCompleter, Pair};
 use rustyline::error::ReadlineError;
 use rustyline::highlight::{CmdKind, Highlighter};
