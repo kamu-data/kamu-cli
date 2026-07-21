@@ -38,7 +38,6 @@ uninlined_format_args = "allow"
 
 
 [dependencies]
-arrow = { version = "58", default-features = false }
 async-trait = "0.1"
 aws-config = "1"
 aws-credential-types = "1"
@@ -56,13 +55,11 @@ datafusion = { version = "53", features = [
     "unicode_expressions",
     "compression",
 ] }
-datafusion-common = { version = "53", default-features = false }
 dirs = "6"
 futures = "0.3"
 log = "0.4"
 object_store = { version = "0.13", features = ["aws", "gcp", "http"] }
 parking_lot = { version = "0.12" }
-parquet = { version = "58", default-features = false }
 rustyline = "18"
 tokio = { version = "1", features = [
     "macros",

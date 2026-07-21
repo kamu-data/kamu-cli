@@ -384,13 +384,38 @@ debug = "line-tables-only"
 # Use this section to test or apply emergency overrides to dependencies
 # See: https://doc.rust-lang.org/cargo/reference/overriding-dependencies.html
 [patch.crates-io]
-# datafusion = { git = 'https://github.com/apache/datafusion.git', branch = 'main' }
-# datafusion-common = { git = 'https://github.com/apache/datafusion.git', tag = '42.0.0-rc1' }
-# datafusion-execution = { git = 'https://github.com/apache/datafusion.git', tag = '42.0.0-rc1' }
-# datafusion-expr = { git = 'https://github.com/apache/datafusion.git', tag = '42.0.0-rc1' }
-# datafusion-odata = { git = 'https://github.com/kamu-data/datafusion-odata.git', branch = '42.0.0-axum-0.6' }
-# datafusion-ethers = { git = "https://github.com/kamu-data/datafusion-ethers.git", tag = "42.0.0" }
-# object_store = { git = 'https://github.com/s373r/arrow-rs', branch = 'add-debug-logs', package = "object_store" }
 assert_cmd = { git = 'https://github.com/kamu-data/assert_cmd', branch = "deactivate-output-truncation" }
+# Use fork that lets us link datafusion as a dynamic library
+datafusion = { git = "https://github.com/kamu-data/datafusion", branch = "53.1.0-dylib" }
+datafusion-catalog = { git = "https://github.com/kamu-data/datafusion", branch = "53.1.0-dylib" }
+datafusion-catalog-listing = { git = "https://github.com/kamu-data/datafusion", branch = "53.1.0-dylib" }
+datafusion-common = { git = "https://github.com/kamu-data/datafusion", branch = "53.1.0-dylib" }
+datafusion-common-runtime = { git = "https://github.com/kamu-data/datafusion", branch = "53.1.0-dylib" }
+datafusion-datasource = { git = "https://github.com/kamu-data/datafusion", branch = "53.1.0-dylib" }
+datafusion-datasource-arrow = { git = "https://github.com/kamu-data/datafusion", branch = "53.1.0-dylib" }
+datafusion-datasource-csv = { git = "https://github.com/kamu-data/datafusion", branch = "53.1.0-dylib" }
+datafusion-datasource-json = { git = "https://github.com/kamu-data/datafusion", branch = "53.1.0-dylib" }
+datafusion-datasource-parquet = { git = "https://github.com/kamu-data/datafusion", branch = "53.1.0-dylib" }
+datafusion-doc = { git = "https://github.com/kamu-data/datafusion", branch = "53.1.0-dylib" }
+datafusion-execution = { git = "https://github.com/kamu-data/datafusion", branch = "53.1.0-dylib" }
+datafusion-expr = { git = "https://github.com/kamu-data/datafusion", branch = "53.1.0-dylib" }
+datafusion-expr-common = { git = "https://github.com/kamu-data/datafusion", branch = "53.1.0-dylib" }
+datafusion-functions = { git = "https://github.com/kamu-data/datafusion", branch = "53.1.0-dylib" }
+datafusion-functions-aggregate = { git = "https://github.com/kamu-data/datafusion", branch = "53.1.0-dylib" }
+datafusion-functions-aggregate-common = { git = "https://github.com/kamu-data/datafusion", branch = "53.1.0-dylib" }
+datafusion-functions-nested = { git = "https://github.com/kamu-data/datafusion", branch = "53.1.0-dylib" }
+datafusion-functions-table = { git = "https://github.com/kamu-data/datafusion", branch = "53.1.0-dylib" }
+datafusion-functions-window = { git = "https://github.com/kamu-data/datafusion", branch = "53.1.0-dylib" }
+datafusion-functions-window-common = { git = "https://github.com/kamu-data/datafusion", branch = "53.1.0-dylib" }
+datafusion-macros = { git = "https://github.com/kamu-data/datafusion", branch = "53.1.0-dylib" }
+datafusion-optimizer = { git = "https://github.com/kamu-data/datafusion", branch = "53.1.0-dylib" }
+datafusion-physical-expr = { git = "https://github.com/kamu-data/datafusion", branch = "53.1.0-dylib" }
+datafusion-physical-expr-adapter = { git = "https://github.com/kamu-data/datafusion", branch = "53.1.0-dylib" }
+datafusion-physical-expr-common = { git = "https://github.com/kamu-data/datafusion", branch = "53.1.0-dylib" }
+datafusion-physical-optimizer = { git = "https://github.com/kamu-data/datafusion", branch = "53.1.0-dylib" }
+datafusion-physical-plan = { git = "https://github.com/kamu-data/datafusion", branch = "53.1.0-dylib" }
+datafusion-pruning = { git = "https://github.com/kamu-data/datafusion", branch = "53.1.0-dylib" }
+datafusion-session = { git = "https://github.com/kamu-data/datafusion", branch = "53.1.0-dylib" }
+datafusion-sql = { git = "https://github.com/kamu-data/datafusion", branch = "53.1.0-dylib" }
 # dill = { path = "../dill-rs/dill" }
 # setty = { path = "../setty/setty" }

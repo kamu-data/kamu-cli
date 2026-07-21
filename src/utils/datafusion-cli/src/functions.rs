@@ -22,7 +22,8 @@ use std::fs::File;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use arrow::array::{
+use async_trait::async_trait;
+use datafusion::arrow::array::{
     DurationMillisecondArray,
     GenericListArray,
     Int64Array,
@@ -31,26 +32,25 @@ use arrow::array::{
     TimestampMillisecondArray,
     UInt64Array,
 };
-use arrow::buffer::{Buffer, OffsetBuffer, ScalarBuffer};
-use arrow::datatypes::{DataType, Field, Fields, Schema, SchemaRef, TimeUnit};
-use arrow::record_batch::RecordBatch;
-use arrow::util::pretty::pretty_format_batches;
-use async_trait::async_trait;
+use datafusion::arrow::buffer::{Buffer, OffsetBuffer, ScalarBuffer};
+use datafusion::arrow::datatypes::{DataType, Field, Fields, Schema, SchemaRef, TimeUnit};
+use datafusion::arrow::record_batch::RecordBatch;
+use datafusion::arrow::util::pretty::pretty_format_batches;
 use datafusion::catalog::{Session, TableFunctionImpl};
+use datafusion::common::instant::Instant;
 use datafusion::common::{Column, plan_err};
 use datafusion::datasource::TableProvider;
 use datafusion::datasource::memory::MemorySourceConfig;
 use datafusion::error::Result;
 use datafusion::execution::cache::cache_manager::CacheManager;
 use datafusion::logical_expr::Expr;
+use datafusion::parquet::basic::ConvertedType;
+use datafusion::parquet::data_type::{ByteArray, FixedLenByteArray};
+use datafusion::parquet::file::reader::FileReader;
+use datafusion::parquet::file::serialized_reader::SerializedFileReader;
+use datafusion::parquet::file::statistics::Statistics;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::scalar::ScalarValue;
-use datafusion_common::instant::Instant;
-use parquet::basic::ConvertedType;
-use parquet::data_type::{ByteArray, FixedLenByteArray};
-use parquet::file::reader::FileReader;
-use parquet::file::serialized_reader::SerializedFileReader;
-use parquet::file::statistics::Statistics;
 
 #[derive(Debug)]
 pub enum Function {

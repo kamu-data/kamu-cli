@@ -29,8 +29,15 @@ doctest = false
 
 
 [features]
-default = ["ingest-evm", "ingest-mqtt", "query-extensions-json"]
+default = [
+    "datafusion-dynamic",
+    "ingest-evm",
+    "ingest-mqtt",
+    "query-extensions-json",
+]
 
+# Links datafusion as a shared library to cut incremental link times during dev.
+datafusion-dynamic = ["datafusion/dynamic"]
 ingest-evm = ["kamu/ingest-evm"]
 ingest-ftp = ["kamu/ingest-ftp"]
 ingest-mqtt = ["kamu/ingest-mqtt", "dep:rumqttc"]
