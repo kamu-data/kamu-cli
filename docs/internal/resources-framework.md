@@ -428,7 +428,7 @@ and `ResourceStatus` ([`state/resource_status.rs`](/src/domain/resources/domain/
 ```rust
 pub struct ResourceHeaders {
     pub id: ResourceID,                      // generated — stable identity, assigned once
-    pub account: auth::AccountHandle,        // resolved id+name of the owning account
+    pub account: auth::AccountHandle,        // resolved owning account: resource id (`id`) + DID (`did`) + name
     pub name: ResourceName,                  // (authored)
     pub labels: ResourceLabels,              // (authored) BTreeMap<TypeRef, serde_json::Value>
     pub annotations: ResourceAnnotations,    // (authored) BTreeMap<TypeRef, serde_json::Value>
@@ -497,13 +497,20 @@ pub struct ResourceStatus {                  // ODF-generated; entirely server-o
 
 The behaviorally-significant consequences of adopting these shapes:
 
-- **`headers.account` is a mandatory `auth::AccountHandle` (id *and* name).** The `resources` table
-  stores only `account_id`, so repositories resolve the name on every read (Postgres/SQLite via
-  `JOIN accounts`; in-memory via a batched `AccountRepository` lookup — no N+1). The name is never
-  persisted, so an account rename shows up immediately on the next read
+- **`headers.account` is a mandatory `auth::AccountHandle`** carrying the RFC-18 shape — the account
+  *resource* id (`id: ResourceID`, an artificial UUID stored on `accounts.resource_id`), the account
+  DID (`did: AccountID`), and the account `name`. The `resources` table stores only `account_id` (the
+  DID), so repositories resolve **both the name and the account resource id** on every read
+  (Postgres/SQLite via `JOIN accounts`, selecting `accounts.resource_id`; in-memory via a batched
+  `AccountRepository` lookup — no N+1). Neither is persisted on the resource row, so an account rename
+  (or a future resource-id change) shows up immediately on the next read
   ([`test_account_rename_reflected_immediately_in_headers`](/src/infra/resources/repo-tests/src/resource_repository_test_suite.rs)).
   If the owning account can't be found (e.g. deletion racing async cleanup), repos substitute the
-  sentinel `deleted-account` (`DELETED_ACCOUNT_NAME_SENTINEL`) rather than failing the read.
+  sentinels `deleted-account` (`DELETED_ACCOUNT_NAME_SENTINEL`) and the nil resource id
+  (`deleted_account_resource_id_sentinel()`) rather than failing the read. Note `Account` is **not**
+  itself a resource yet; this `resource_id` is an artificial, stable id assigned per account (random
+  UUIDv4 on create) in preparation for `Account` eventually becoming a projection of an account
+  resource — no account-resource events/history exist today.
 - **Account is a precondition, not resolved, at the use-case boundary.**
   `ResourceHeadersInput.account` is an `Option<auth::AccountRef>` selector, but by the time headers
   reach `ApplyResourceUseCase::plan`/`apply` it must already be a resolved `AccountRef::Handle(_)`.

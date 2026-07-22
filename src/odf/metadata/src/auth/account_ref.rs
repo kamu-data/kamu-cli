@@ -26,13 +26,13 @@ type AccountRefProxy = crate::serde::yaml::StructOrString<crate::serde::yaml::au
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AccountRefByIdAndName {
-    pub id: AccountID,
+    pub did: AccountID,
     pub name: AccountName,
 }
 
 impl AccountRefByIdAndName {
-    pub fn new(id: AccountID, name: AccountName) -> Self {
-        Self { id, name }
+    pub fn new(did: AccountID, name: AccountName) -> Self {
+        Self { did, name }
     }
 }
 
@@ -45,11 +45,11 @@ pub enum AccountRef {
 }
 
 impl AccountRef {
-    pub fn id(&self) -> Option<&AccountID> {
+    pub fn did(&self) -> Option<&AccountID> {
         match self {
             AccountRef::Id(id) => Some(id),
             AccountRef::Name(_) => None,
-            AccountRef::IdAndName(hdl) => Some(&hdl.id),
+            AccountRef::IdAndName(hdl) => Some(&hdl.did),
         }
     }
 

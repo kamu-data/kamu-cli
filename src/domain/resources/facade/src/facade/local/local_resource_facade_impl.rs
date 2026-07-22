@@ -52,7 +52,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 
         let resource_counts = self
             .generic_resource_query_service
-            .summarize_resources(target_account.id)
+            .summarize_resources(target_account.did)
             .await?
             .into_iter()
             .map(|row| {
@@ -128,13 +128,13 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         let id = resolve_resource_id::<GetResourceError>(
             self.generic_resource_query_service.as_ref(),
             &schema,
-            &target_account.id,
+            &target_account.did,
             &selector.resource_ref,
         )
         .await?;
 
         let snapshot = self
-            .resolve_snapshot_for_schema::<GetResourceError>(&schema, &target_account.id, id)
+            .resolve_snapshot_for_schema::<GetResourceError>(&schema, &target_account.did, id)
             .await?;
 
         resource_handle_from_snapshot(snapshot).map_err(Into::into)
@@ -156,7 +156,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         let groups = group_batch_resource_refs(selector);
         let resolution_response = resolve_batch_ids(
             self.generic_resource_query_service.as_ref(),
-            &target_account.id,
+            &target_account.did,
             &schema,
             groups,
         )
@@ -164,7 +164,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 
         let (handles, problems) = self
             .resolve_id_handle_groups(
-                &target_account.id,
+                &target_account.did,
                 &schema,
                 resolution_response.id_entries,
                 resolution_response.problems,
@@ -255,7 +255,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 
         dispatcher
             .list(ResourceCrudDispatcherListRequest {
-                account_id: target_account.id,
+                account_id: target_account.did,
                 pagination: request.pagination,
             })
             .await
@@ -276,7 +276,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 
         let snapshots = self
             .generic_resource_query_service
-            .list_snapshots_by_schema(target_account.id, &schema, request.pagination)
+            .list_snapshots_by_schema(target_account.did, &schema, request.pagination)
             .await?;
 
         map_snapshots_to_handles(snapshots).map_err(Into::into)
@@ -306,7 +306,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         let rows = self
             .generic_resource_query_service
             .search_resource_handles(
-                &target_account.id,
+                &target_account.did,
                 &schemas,
                 request.exact_names.as_deref(),
                 request.name_pattern.as_deref(),
@@ -316,7 +316,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         let total_count = self
             .generic_resource_query_service
             .count_search_resource_handles(
-                &target_account.id,
+                &target_account.did,
                 &schemas,
                 request.exact_names.as_deref(),
                 request.name_pattern.as_deref(),
@@ -342,7 +342,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 
         let snapshots = self
             .generic_resource_query_service
-            .list_all_snapshots(target_account.id, request.pagination)
+            .list_all_snapshots(target_account.did, request.pagination)
             .await?;
 
         Ok(snapshots.into_iter().map(Into::into).collect())
@@ -359,7 +359,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 
         let snapshots = self
             .generic_resource_query_service
-            .list_all_snapshots(target_account.id, request.pagination)
+            .list_all_snapshots(target_account.did, request.pagination)
             .await?;
 
         map_snapshots_to_handles(snapshots).map_err(Into::into)
@@ -383,10 +383,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         Ok(match plan {
             ApplyManifestPlanningDecision::Planned(mut plan) => {
                 plan.warnings.splice(0..0, prepared.header_warnings);
-                plan.resource.headers.account = odf::AccountHandle {
-                    id: prepared.target_account.id,
-                    name: prepared.target_account.name,
-                };
+                plan.resource.headers.account = prepared.target_account;
 
                 ApplyManifestPlanningDecision::Planned(plan)
             }
@@ -414,10 +411,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         Ok(match result {
             ApplyManifestApplicationDecision::Applied(mut result) => {
                 result.warnings.splice(0..0, prepared.header_warnings);
-                result.resource.headers.account = odf::AccountHandle {
-                    id: prepared.target_account.id,
-                    name: prepared.target_account.name,
-                };
+                result.resource.headers.account = prepared.target_account;
 
                 ApplyManifestApplicationDecision::Applied(result)
             }
@@ -442,7 +436,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         let groups = group_batch_resource_refs(selector);
         let resolution_response = resolve_batch_ids(
             self.generic_resource_query_service.as_ref(),
-            &target_account.id,
+            &target_account.did,
             &schema,
             groups,
         )
@@ -461,7 +455,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 
         let rows_by_id = self
             .generic_resource_query_service
-            .find_resource_handles_by_ids(&target_account.id, &ids)
+            .find_resource_handles_by_ids(&target_account.did, &ids)
             .await?
             .into_iter()
             .map(|row| (row.id, row))
@@ -501,7 +495,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
                 get_resource_crud_dispatcher_for_trusted_schema(&self.catalog, schema.as_str())?;
             dispatcher
                 .delete(ResourceCrudDispatcherDeleteRequest {
-                    account_id: target_account.id.clone(),
+                    account_id: target_account.did.clone(),
                     ids: ids_to_delete,
                 })
                 .await?;
@@ -608,13 +602,13 @@ impl LocalResourceFacadeImpl {
         let id = resolve_resource_id::<E>(
             self.generic_resource_query_service.as_ref(),
             &schema,
-            &target_account.id,
+            &target_account.did,
             &selector.resource_ref,
         )
         .await?;
 
         let snapshot = self
-            .resolve_snapshot_for_schema::<E>(&schema, &target_account.id, id)
+            .resolve_snapshot_for_schema::<E>(&schema, &target_account.did, id)
             .await?;
 
         // The schema was resolved from a registered selector above, so a missing
@@ -626,17 +620,14 @@ impl LocalResourceFacadeImpl {
 
         let view = dispatcher
             .get(ResourceCrudDispatcherGetRequest {
-                account_id: target_account.id.clone(),
+                account_id: target_account.did.clone(),
                 id,
             })
             .await?;
 
         Ok(Resource {
             headers: kamu_resources::ResourceHeaders {
-                account: odf::AccountHandle {
-                    id: target_account.id,
-                    name: target_account.name,
-                },
+                account: target_account,
                 ..view.headers
             },
             ..view
@@ -665,7 +656,7 @@ impl LocalResourceFacadeImpl {
 
         let resolution_response = resolve_batch_ids(
             self.generic_resource_query_service.as_ref(),
-            &target_account.id,
+            &target_account.did,
             &schema,
             groups,
         )
@@ -682,7 +673,7 @@ impl LocalResourceFacadeImpl {
 
         let snapshots_by_id = self
             .generic_resource_query_service
-            .find_snapshots_by_ids(&target_account.id, &ids)
+            .find_snapshots_by_ids(&target_account.did, &ids)
             .await?
             .into_iter()
             .map(|snapshot| (snapshot.id, snapshot))
@@ -707,10 +698,7 @@ impl LocalResourceFacadeImpl {
                     let resource = Resource {
                         schema: snapshot.schema,
                         headers: kamu_resources::ResourceHeaders {
-                            account: odf::AccountHandle {
-                                id: target_account.id.clone(),
-                                name: target_account.name.clone(),
-                            },
+                            account: target_account.clone(),
                             ..snapshot.headers
                         },
                         spec: snapshot.spec,
@@ -822,7 +810,7 @@ impl LocalResourceFacadeImpl {
             return Ok(None);
         };
 
-        if snapshot.headers.account.id != *account_id {
+        if snapshot.headers.account.did != *account_id {
             return Ok(None);
         }
 
@@ -910,7 +898,7 @@ impl LocalResourceFacadeImpl {
 
         self.ensure_manifest_id_is_accessible(
             manifest.schema.typ(),
-            &target_account.id,
+            &target_account.did,
             manifest.headers.id,
         )
         .await?;

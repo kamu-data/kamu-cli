@@ -129,7 +129,7 @@ where
                 let account_id = headers
                     .account
                     .as_ref()
-                    .and_then(kamu_resources::ResourceAccountRef::id)
+                    .and_then(kamu_resources::ResourceAccountRef::did)
                     .expect("resource headers must carry a resolved account by apply time");
 
                 self.generic_resource_query_service

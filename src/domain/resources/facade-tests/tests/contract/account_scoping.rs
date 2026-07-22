@@ -75,7 +75,7 @@ fn variable_set_manifest_json_with_account(name: &str, account: &ResourceAccount
     if let Some(n) = account.name() {
         account_fields.push(format!(r#""name": "{n}""#));
     }
-    if let Some(id) = account.id() {
+    if let Some(id) = account.did() {
         account_fields.push(format!(r#""id": "{id}""#));
     }
     let account_fields = account_fields.join(", ");
@@ -106,7 +106,7 @@ fn account_by_id(id: odf::AccountID) -> ResourceAccountRef {
 
 fn account_by_name_and_id(name: &odf::AccountName, id: odf::AccountID) -> ResourceAccountRef {
     ResourceAccountRef::IdAndName(odf::metadata::auth::AccountRefByIdAndName {
-        id,
+        did: id,
         name: name.clone(),
     })
 }
@@ -162,7 +162,7 @@ pub async fn test_default_account_selector_resolves_current_account(
         .await
         .unwrap();
 
-    assert_eq!(view.headers.account.id, h.account_id(TestAccount::Alice));
+    assert_eq!(view.headers.account.did, h.account_id(TestAccount::Alice));
     assert_eq!(
         view.headers.account.name,
         h.account_name(TestAccount::Alice)
@@ -199,7 +199,7 @@ pub async fn test_account_by_name_resolves_correctly(h: &impl FacadeContractHarn
         .await
         .unwrap();
 
-    assert_eq!(view.headers.account.id, h.account_id(TestAccount::Alice));
+    assert_eq!(view.headers.account.did, h.account_id(TestAccount::Alice));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -231,7 +231,7 @@ pub async fn test_account_by_id_resolves_correctly(h: &impl FacadeContractHarnes
         .await
         .unwrap();
 
-    assert_eq!(view.headers.account.id, h.account_id(TestAccount::Alice));
+    assert_eq!(view.headers.account.did, h.account_id(TestAccount::Alice));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -259,7 +259,7 @@ pub async fn test_account_by_name_and_id_agree_resolves_correctly(h: &impl Facad
         .await
         .unwrap();
 
-    assert_eq!(view.headers.account.id, h.account_id(TestAccount::Alice));
+    assert_eq!(view.headers.account.did, h.account_id(TestAccount::Alice));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

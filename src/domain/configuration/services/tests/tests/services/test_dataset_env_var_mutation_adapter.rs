@@ -23,7 +23,7 @@ async fn test_lazy_creation_of_variable_resource_on_first_upsert() {
 
     let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
     let account_handle = harness.ensure_test_account("test-owner").await;
-    let account_id = account_handle.id.clone();
+    let account_id = account_handle.did.clone();
     harness.seed_dataset_entry(&dataset_id, &account_id).await;
 
     // No resources exist yet — first upsert creates them lazily
@@ -93,7 +93,7 @@ async fn test_lazy_creation_of_secret_resource_on_first_upsert() {
 
     let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
     let account_handle = harness.ensure_test_account("test-owner").await;
-    let account_id = account_handle.id.clone();
+    let account_id = account_handle.did.clone();
     harness.seed_dataset_entry(&dataset_id, &account_id).await;
 
     let result = harness
@@ -143,7 +143,7 @@ async fn test_delete_last_variable_removes_resource_and_binding() {
 
     let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
     let account_handle = harness.ensure_test_account("test-owner").await;
-    let account_id = account_handle.id.clone();
+    let account_id = account_handle.did.clone();
     harness.seed_dataset_entry(&dataset_id, &account_id).await;
 
     // Upsert two vars
@@ -221,7 +221,7 @@ async fn test_delete_last_secret_removes_resource_and_binding() {
 
     let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
     let account_handle = harness.ensure_test_account("test-owner").await;
-    let account_id = account_handle.id.clone();
+    let account_id = account_handle.did.clone();
     harness.seed_dataset_entry(&dataset_id, &account_id).await;
 
     // Upsert two secrets
@@ -305,7 +305,7 @@ async fn test_upsert_converts_variable_to_secret() {
 
     let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
     let account_handle = harness.ensure_test_account("test-owner").await;
-    let account_id = account_handle.id.clone();
+    let account_id = account_handle.did.clone();
     harness.seed_dataset_entry(&dataset_id, &account_id).await;
 
     // Start as a regular variable
@@ -367,7 +367,7 @@ async fn test_upsert_converts_secret_to_variable() {
 
     let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
     let account_handle = harness.ensure_test_account("test-owner").await;
-    let account_id = account_handle.id.clone();
+    let account_id = account_handle.did.clone();
     harness.seed_dataset_entry(&dataset_id, &account_id).await;
 
     // Start as a secret
@@ -429,7 +429,7 @@ async fn test_delete_nonexistent_key_returns_not_found() {
 
     let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
     let account_handle = harness.ensure_test_account("test-owner").await;
-    let account_id = account_handle.id.clone();
+    let account_id = account_handle.did.clone();
     harness.seed_dataset_entry(&dataset_id, &account_id).await;
 
     let err = harness

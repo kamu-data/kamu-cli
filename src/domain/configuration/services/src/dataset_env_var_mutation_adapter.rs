@@ -105,7 +105,13 @@ impl DatasetEnvVarMutationAdapter for DatasetEnvVarMutationAdapterImpl {
             })?;
 
         let account = odf::AccountHandle {
-            id: dataset_entry.owner_id,
+            // A `DatasetEntry` carries no account-resource id. Only `did`/`name`
+            // are read from this handle downstream, and the resulting
+            // `AccountRef` is re-resolved (with the real resource id) by the
+            // facade before any durable write, so a nil id here is a safe
+            // construction-time placeholder.
+            id: odf::ResourceID::new(uuid::Uuid::nil()),
+            did: dataset_entry.owner_id,
             name: dataset_entry.owner_name,
         };
 
@@ -198,7 +204,7 @@ impl DatasetEnvVarMutationAdapterImpl {
     ) -> Result<DatasetEnvVarUpsertResult, InternalError> {
         let resource_name = Self::legacy_variable_set_resource_name(dataset_id);
         let (existing_id, mut variables) = self
-            .load_existing_variable_spec(&account.id, &resource_name)
+            .load_existing_variable_spec(&account.did, &resource_name)
             .await?;
 
         let exists_as_variable = variables.contains_key(key);
@@ -275,7 +281,7 @@ impl DatasetEnvVarMutationAdapterImpl {
         let resource_name = Self::legacy_secret_set_resource_name(dataset_id);
 
         let (existing_id, mut secrets) = self
-            .load_existing_secret_spec_decrypted(&account.id, &resource_name)
+            .load_existing_secret_spec_decrypted(&account.did, &resource_name)
             .await?;
 
         let exists_as_secret = secrets.contains_key(key);
@@ -377,7 +383,7 @@ impl DatasetEnvVarMutationAdapterImpl {
         if spec.variables.entries.is_empty() {
             dispatcher
                 .delete(ResourceCrudDispatcherDeleteRequest {
-                    account_id: snapshot.headers.account.id.clone(),
+                    account_id: snapshot.headers.account.did.clone(),
                     ids: vec![resource_id],
                 })
                 .await
@@ -392,7 +398,7 @@ impl DatasetEnvVarMutationAdapterImpl {
                 id: Some(snapshot.headers.id),
                 account: Some(odf::metadata::auth::AccountRef::IdAndName(
                     odf::metadata::auth::AccountRefByIdAndName {
-                        id: snapshot.headers.account.id,
+                        did: snapshot.headers.account.did,
                         name: snapshot.headers.account.name,
                     },
                 )),
@@ -444,7 +450,7 @@ impl DatasetEnvVarMutationAdapterImpl {
         if decrypted.is_empty() {
             dispatcher
                 .delete(ResourceCrudDispatcherDeleteRequest {
-                    account_id: snapshot.headers.account.id.clone(),
+                    account_id: snapshot.headers.account.did.clone(),
                     ids: vec![resource_id],
                 })
                 .await
@@ -475,7 +481,7 @@ impl DatasetEnvVarMutationAdapterImpl {
                 id: Some(snapshot.headers.id),
                 account: Some(odf::metadata::auth::AccountRef::IdAndName(
                     odf::metadata::auth::AccountRefByIdAndName {
-                        id: snapshot.headers.account.id,
+                        did: snapshot.headers.account.did,
                         name: snapshot.headers.account.name,
                     },
                 )),
@@ -705,7 +711,7 @@ impl DatasetEnvVarMutationAdapterImpl {
             id: None,
             account: Some(odf::metadata::auth::AccountRef::IdAndName(
                 odf::metadata::auth::AccountRefByIdAndName {
-                    id: account.id,
+                    did: account.did,
                     name: account.name,
                 },
             )),

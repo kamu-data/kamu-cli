@@ -92,7 +92,8 @@ pub mod auth {
     #[serde(deny_unknown_fields)]
     #[serde(rename_all = "camelCase")]
     pub struct AccountHandle {
-        pub id: AccountID,
+        pub id: ResourceID,
+        pub did: AccountID,
         pub name: AccountName,
     }
 

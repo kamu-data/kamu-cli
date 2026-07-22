@@ -56,7 +56,7 @@ impl From<resource::ResourceHeaders> for resource::ResourceHeadersInput {
             id: Some(id),
             name,
             account: Some(auth::AccountRef::IdAndName(auth::AccountRefByIdAndName {
-                id: account.id,
+                did: account.did,
                 name: account.name,
             })),
             labels: Some(labels),

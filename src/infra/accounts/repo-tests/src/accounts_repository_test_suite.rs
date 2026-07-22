@@ -318,6 +318,7 @@ pub async fn test_duplicate_github_account_name(catalog: &Catalog) {
     assert_matches!(
         account_repo.save_account(&Account {
             id: odf::AccountID::new_generated_ed25519().1,
+            resource_id: Account::generate_resource_id(),
             ..make_test_account(
                 "wasya",
                 "wasya2@example.com", // different email
@@ -395,6 +396,7 @@ pub async fn test_search_accounts_by_name_pattern(catalog: &Catalog) {
     fn account(account_name: &str, display_name: &str, email: &str) -> Account {
         Account {
             id: account_id(&account_name),
+            resource_id: Account::generate_resource_id(),
             account_name: odf::AccountName::new_unchecked(account_name),
             email: Email::parse(email).unwrap(),
             display_name: display_name.to_string(),
@@ -517,6 +519,7 @@ pub async fn test_search_accounts_by_name_pattern_special_chars(catalog: &Catalo
     fn account(account_name: &str, display_name: &str, email: &str) -> Account {
         Account {
             id: account_id(&account_name),
+            resource_id: Account::generate_resource_id(),
             account_name: odf::AccountName::new_unchecked(account_name),
             email: Email::parse(email).unwrap(),
             display_name: display_name.to_string(),

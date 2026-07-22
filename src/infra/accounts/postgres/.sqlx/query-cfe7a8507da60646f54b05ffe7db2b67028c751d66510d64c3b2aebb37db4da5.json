@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO accounts (id, resource_id, account_name, email, display_name, account_type, avatar_url, registered_at, provider, provider_identity_key)\n                VALUES ($1, $2, $3, $4, $5, ($6::text)::account_type, $7, $8, $9, $10)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Uuid",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Text",
+        "Varchar",
+        "Timestamptz",
+        "Varchar",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "cfe7a8507da60646f54b05ffe7db2b67028c751d66510d64c3b2aebb37db4da5"
+}

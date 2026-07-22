@@ -26,18 +26,26 @@ type AccountHandleProxy = crate::serde::yaml::auth::AccountHandle;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(try_from = "AccountHandleProxy", into = "AccountHandleProxy")]
 pub struct AccountHandle {
-    pub id: AccountID,
+    /// ID of the account resource.
+    pub id: crate::resource::ResourceID,
+    /// DID of the account.
+    pub did: AccountID,
+    /// Name of the account.
     pub name: AccountName,
 }
 
 impl AccountHandle {
-    pub fn new(id: AccountID, name: AccountName) -> Self {
-        Self { id, name }
+    pub fn new(id: crate::resource::ResourceID, did: AccountID, name: AccountName) -> Self {
+        Self { id, did, name }
     }
 
     pub fn new_test(name: &str) -> AccountHandle {
         AccountHandle {
-            id: AccountID::new_seeded_ed25519(name.as_bytes()),
+            id: crate::resource::ResourceID::new(uuid::Uuid::new_v5(
+                &uuid::Uuid::NAMESPACE_URL,
+                name.as_bytes(),
+            )),
+            did: AccountID::new_seeded_ed25519(name.as_bytes()),
             name: AccountName::new_unchecked(name),
         }
     }

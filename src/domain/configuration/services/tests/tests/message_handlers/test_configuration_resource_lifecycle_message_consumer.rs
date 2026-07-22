@@ -55,7 +55,7 @@ async fn test_reconciliation_succeeded_for_variable_set_cleans_up_old_entries() 
             1,
             &[kamu_configuration::VariableSetEntry {
                 entry_id: Uuid::new_v4(),
-                account_id: harness.account_handle.id.clone(),
+                account_id: harness.account_handle.did.clone(),
                 key: "K".to_string(),
                 value: "v1".to_string(),
                 created_at: now,
@@ -73,7 +73,7 @@ async fn test_reconciliation_succeeded_for_variable_set_cleans_up_old_entries() 
             2,
             &[kamu_configuration::VariableSetEntry {
                 entry_id: Uuid::new_v4(),
-                account_id: harness.account_handle.id.clone(),
+                account_id: harness.account_handle.did.clone(),
                 key: "K".to_string(),
                 value: "v2".to_string(),
                 created_at: now,
@@ -122,7 +122,7 @@ async fn test_reconciliation_succeeded_for_secret_set_cleans_up_old_entries() {
             1,
             &[kamu_configuration::SecretSetEntry {
                 entry_id: Uuid::new_v4(),
-                account_id: harness.account_handle.id.clone(),
+                account_id: harness.account_handle.did.clone(),
                 key: "S".to_string(),
                 value: b"enc1".to_vec(),
                 secret_nonce: b"n1".to_vec(),
@@ -140,7 +140,7 @@ async fn test_reconciliation_succeeded_for_secret_set_cleans_up_old_entries() {
             2,
             &[kamu_configuration::SecretSetEntry {
                 entry_id: Uuid::new_v4(),
-                account_id: harness.account_handle.id.clone(),
+                account_id: harness.account_handle.did.clone(),
                 key: "S".to_string(),
                 value: b"enc2".to_vec(),
                 secret_nonce: b"n2".to_vec(),
@@ -202,7 +202,7 @@ async fn test_deleted_for_variable_set_removes_all_projection_entries() {
             1,
             &[kamu_configuration::VariableSetEntry {
                 entry_id: Uuid::new_v4(),
-                account_id: harness.account_handle.id.clone(),
+                account_id: harness.account_handle.did.clone(),
                 key: "K".to_string(),
                 value: "v".to_string(),
                 created_at: now,
@@ -249,7 +249,7 @@ async fn test_deleted_for_secret_set_removes_all_projection_entries() {
             1,
             &[kamu_configuration::SecretSetEntry {
                 entry_id: Uuid::new_v4(),
-                account_id: harness.account_handle.id.clone(),
+                account_id: harness.account_handle.did.clone(),
                 key: "S".to_string(),
                 value: b"enc".to_vec(),
                 secret_nonce: b"n".to_vec(),
@@ -296,7 +296,7 @@ async fn test_deleted_for_variable_set_with_multiple_ids_removes_all() {
                 1,
                 &[kamu_configuration::VariableSetEntry {
                     entry_id: Uuid::new_v4(),
-                    account_id: harness.account_handle.id.clone(),
+                    account_id: harness.account_handle.did.clone(),
                     key: "K".to_string(),
                     value: "v".to_string(),
                     created_at: now,
@@ -361,7 +361,7 @@ async fn test_deleted_for_variable_set_removes_only_targeted_id() {
                 1,
                 &[kamu_configuration::VariableSetEntry {
                     entry_id: Uuid::new_v4(),
-                    account_id: harness.account_handle.id.clone(),
+                    account_id: harness.account_handle.did.clone(),
                     key: "K".to_string(),
                     value: "v".to_string(),
                     created_at: now,
@@ -425,7 +425,7 @@ async fn test_deleted_for_secret_set_with_multiple_ids_removes_all() {
                 1,
                 &[kamu_configuration::SecretSetEntry {
                     entry_id: Uuid::new_v4(),
-                    account_id: harness.account_handle.id.clone(),
+                    account_id: harness.account_handle.did.clone(),
                     key: "S".to_string(),
                     value: b"enc".to_vec(),
                     secret_nonce: b"n".to_vec(),

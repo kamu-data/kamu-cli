@@ -32,7 +32,7 @@ async fn test_delete_single_resource_success() {
         .await;
     pretty_assertions::assert_eq!(snapshot.spec, serde_json::json!({ "value": "res-a" }));
 
-    harness.delete_resources(account_handle.id, vec![id]).await;
+    harness.delete_resources(account_handle.did, vec![id]).await;
 
     assert!(harness.get_snapshot_by_id(&id).await.is_none());
 }
@@ -59,7 +59,7 @@ async fn test_delete_multiple_resources_in_one_call() {
     pretty_assertions::assert_eq!(snapshot_c.spec, serde_json::json!({ "value": "res-c" }));
 
     harness
-        .delete_resources(account_handle.id, vec![id_a, id_b, id_c])
+        .delete_resources(account_handle.did, vec![id_a, id_b, id_c])
         .await;
 
     for id in [&id_a, &id_b, &id_c] {
@@ -81,7 +81,7 @@ async fn test_delete_nonexistent_id_is_idempotent() {
 
     // Non-existent IDs land in `outcome.not_found` and are silently skipped
     harness
-        .delete_resources(account_handle.id, vec![random_id])
+        .delete_resources(account_handle.did, vec![random_id])
         .await;
 }
 
@@ -100,7 +100,7 @@ async fn test_delete_resource_owned_by_other_account_fails() {
 
     let result = harness
         .delete_test_uc()
-        .execute(account_handle_b.id, vec![id])
+        .execute(account_handle_b.did, vec![id])
         .await;
 
     assert!(
@@ -129,7 +129,7 @@ async fn test_delete_emits_deleted_lifecycle_message() {
 
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
 
-    harness.delete_resources(account_handle.id, vec![id]).await;
+    harness.delete_resources(account_handle.did, vec![id]).await;
     // MockOutbox verifies .times() expectations on drop
 }
 
@@ -151,7 +151,7 @@ async fn test_delete_multiple_emits_single_message_with_all_resources() {
     let id_c = harness.apply_and_get_id(&account_handle, "res-c").await;
 
     harness
-        .delete_resources(account_handle.id, vec![id_a, id_b, id_c])
+        .delete_resources(account_handle.did, vec![id_a, id_b, id_c])
         .await;
     // MockOutbox verifies exactly one Deleted message with 3 resources on drop
 }
@@ -169,7 +169,7 @@ async fn test_delete_no_op_emits_no_message() {
     let account_handle = odf::AccountHandle::new_test("test-owner");
 
     harness
-        .delete_resources(account_handle.id, vec![make_id()])
+        .delete_resources(account_handle.did, vec![make_id()])
         .await;
 }
 
@@ -216,7 +216,7 @@ async fn test_deleted_message_carries_correct_snapshot_data() {
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
     *uid_cell.lock().unwrap() = Some(id);
 
-    harness.delete_resources(account_handle.id, vec![id]).await;
+    harness.delete_resources(account_handle.did, vec![id]).await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

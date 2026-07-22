@@ -55,10 +55,10 @@ impl From<&domain::ResourceAccountRef> for AccountRefInput {
             domain::ResourceAccountRef::Id(id) => Self::Id(id.clone()),
             domain::ResourceAccountRef::Name(name) => Self::Name(AccountName(name.to_string())),
             domain::ResourceAccountRef::IdAndName(odf::metadata::auth::AccountRefByIdAndName {
-                id,
+                did,
                 name,
             }) => Self::IdAndName(AccountRefByIdAndNameInput {
-                id: id.clone(),
+                id: did.clone(),
                 name: AccountName(name.to_string()),
             }),
         }

@@ -60,10 +60,11 @@ impl AccountRepository for PostgresAccountRepository {
 
         sqlx::query!(
             r#"
-            INSERT INTO accounts (id, account_name, email, display_name, account_type, avatar_url, registered_at, provider, provider_identity_key)
-                VALUES ($1, $2, $3, $4, ($5::text)::account_type, $6, $7, $8, $9)
+            INSERT INTO accounts (id, resource_id, account_name, email, display_name, account_type, avatar_url, registered_at, provider, provider_identity_key)
+                VALUES ($1, $2, $3, $4, $5, ($6::text)::account_type, $7, $8, $9, $10)
             "#,
             account_id_stack.as_str(),
+            *account.resource_id.as_ref(),
             account.account_name.as_str(),
             account.email.as_ref().to_ascii_lowercase(),
             account.display_name,
@@ -208,6 +209,7 @@ impl AccountRepository for PostgresAccountRepository {
             r#"
             SELECT
                 id as "id: _",
+                resource_id as "resource_id: _",
                 account_name,
                 email,
                 display_name,
@@ -253,6 +255,7 @@ impl AccountRepository for PostgresAccountRepository {
             r#"
             SELECT
                 id as "id: _",
+                resource_id as "resource_id: _",
                 account_name,
                 email,
                 display_name,
@@ -287,6 +290,7 @@ impl AccountRepository for PostgresAccountRepository {
             r#"
             SELECT
                 id as "id: _",
+                resource_id as "resource_id: _",
                 account_name,
                 email,
                 display_name,
@@ -408,6 +412,7 @@ impl AccountRepository for PostgresAccountRepository {
                 AccountRowModel,
                 r#"
                 SELECT id           AS "id: _",
+                       resource_id  AS "resource_id: _",
                        account_name,
                        email,
                        display_name,
@@ -490,6 +495,7 @@ impl AccountRepository for PostgresAccountRepository {
             AccountRowModel,
             r#"
             SELECT id           AS "id: _",
+                   resource_id  AS "resource_id: _",
                    account_name,
                    email,
                    display_name,
@@ -547,6 +553,7 @@ impl ExpensiveAccountRepository for PostgresAccountRepository {
                 AccountRowModel,
                 r#"
                 SELECT id           AS "id: _",
+                       resource_id  AS "resource_id: _",
                        account_name,
                        email,
                        display_name,

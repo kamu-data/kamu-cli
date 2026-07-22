@@ -24,12 +24,12 @@ async fn test_deleted_message_triggers_cascade_delete() {
     let account_handle = odf::AccountHandle::new_test("test-owner");
 
     let harness = AccountLifecycleConsumerHarness::new(
-        AccountLifecycleConsumerHarness::expect_execute_once(account_handle.id.clone()),
+        AccountLifecycleConsumerHarness::expect_execute_once(account_handle.did.clone()),
     );
 
     let message = AccountLifecycleMessage::deleted(
         Utc::now(),
-        account_handle.id,
+        account_handle.did,
         Email::parse("test@example.com").unwrap(),
         "Test User".to_string(),
     );
@@ -49,7 +49,7 @@ async fn test_created_message_is_no_op() {
 
     let message = AccountLifecycleMessage::created(
         Utc::now(),
-        account_handle.id,
+        account_handle.did,
         Email::parse("test@example.com").unwrap(),
         odf::AccountName::new_unchecked("testuser"),
         "Test User".to_string(),
@@ -69,7 +69,7 @@ async fn test_updated_message_is_no_op() {
 
     let message = AccountLifecycleMessage::updated(
         Utc::now(),
-        account_handle.id,
+        account_handle.did,
         Email::parse("old@example.com").unwrap(),
         Email::parse("new@example.com").unwrap(),
         odf::AccountName::new_unchecked("oldname"),

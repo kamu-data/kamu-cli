@@ -53,7 +53,7 @@ pub(crate) fn make_headers_input(
     ResourceHeadersInputExt::try_new(
         Some(odf::metadata::auth::AccountRef::IdAndName(
             odf::metadata::auth::AccountRefByIdAndName {
-                id: target_account.id.clone(),
+                did: target_account.did.clone(),
                 name: target_account.name.clone(),
             },
         )),
@@ -109,7 +109,7 @@ pub(crate) fn resource_to_manifest(view: Resource) -> Result<ResourceManifest, I
 
     let account = Some(kamu_resources::ResourceAccountRef::IdAndName(
         odf::metadata::auth::AccountRefByIdAndName {
-            id: headers.account.id,
+            did: headers.account.did,
             name: headers.account.name,
         },
     ));

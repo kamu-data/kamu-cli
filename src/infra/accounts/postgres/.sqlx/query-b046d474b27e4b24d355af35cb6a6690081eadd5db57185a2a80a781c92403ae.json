@@ -1,17 +1,17 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n                SELECT\n                    at.token_hash,\n                    a.id as \"id: _\",\n                    a.account_name,\n                    a.email,\n                    a.display_name,\n                    a.account_type as \"account_type: AccountType\",\n                    a.avatar_url,\n                    a.registered_at,\n                    a.provider,\n                    a.provider_identity_key\n                FROM access_tokens at\n                INNER JOIN accounts a ON a.id = account_id\n                WHERE at.id = $1 AND at.revoked_at IS null\n                ",
+  "query": "\n            SELECT id           AS \"id: _\",\n                   resource_id  AS \"resource_id: _\",\n                   account_name,\n                   email,\n                   display_name,\n                   account_type AS \"account_type: AccountType\",\n                   avatar_url,\n                   registered_at,\n                   provider,\n                   provider_identity_key\n            FROM accounts\n            WHERE lower(account_name) IN (SELECT lower(input_account_name)\n                                          FROM unnest($1::text[]) AS input_account_name)\n            ORDER BY account_name\n            ",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "token_hash",
-        "type_info": "Bytea"
+        "name": "id: _",
+        "type_info": "Varchar"
       },
       {
         "ordinal": 1,
-        "name": "id: _",
-        "type_info": "Varchar"
+        "name": "resource_id: _",
+        "type_info": "Uuid"
       },
       {
         "ordinal": 2,
@@ -66,7 +66,7 @@
     ],
     "parameters": {
       "Left": [
-        "Uuid"
+        "TextArray"
       ]
     },
     "nullable": [
@@ -82,5 +82,5 @@
       false
     ]
   },
-  "hash": "7f51103e69770d358383e4fa7bce84d38b07ac769374320e177e5d64aa36a359"
+  "hash": "b046d474b27e4b24d355af35cb6a6690081eadd5db57185a2a80a781c92403ae"
 }

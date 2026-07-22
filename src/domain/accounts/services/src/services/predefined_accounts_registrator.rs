@@ -128,6 +128,9 @@ impl PredefinedAccountsRegistrator {
     ) -> Result<(), InternalError> {
         let updated_account = Account {
             registered_at: account.registered_at,
+            // Preserve the stable account-resource id of the existing account;
+            // `AccountConfig::into` would otherwise mint a fresh random one.
+            resource_id: account.resource_id,
             ..account_config.into()
         };
 

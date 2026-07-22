@@ -41,6 +41,18 @@ pub fn deleted_account_name_sentinel() -> auth::AccountName {
     auth::AccountName::new_unchecked(DELETED_ACCOUNT_NAME_SENTINEL)
 }
 
+/// Placeholder account-resource id substituted alongside
+/// [`DELETED_ACCOUNT_NAME_SENTINEL`] when a resource's owning account can no
+/// longer be found (e.g. deletion racing async cleanup). The nil UUID.
+///
+/// The SQL backends embed the equivalent nil-UUID literal directly in their
+/// `COALESCE(a.resource_id, '00000000-0000-0000-0000-000000000000')` reads
+/// (`sqlx::query!` cannot splice a Rust const into its SQL, same caveat as the
+/// name sentinel), so keep the two in sync by hand if this ever changes.
+pub fn deleted_account_resource_id_sentinel() -> ResourceID {
+    ResourceID::new(uuid::Uuid::nil())
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub trait ResourceHeadersExt {
@@ -149,7 +161,13 @@ impl ResourceHeadersExt for ResourceHeaders {
 fn account_handle_from_input(input: &ResourceHeadersInput) -> auth::AccountHandle {
     match &input.account {
         Some(auth::AccountRef::IdAndName(account)) => auth::AccountHandle {
-            id: account.id.clone(),
+            // The account *resource* id is not carried by an `AccountRef`. This
+            // handle is a construction-time placeholder that the facade always
+            // overwrites with the freshly-resolved handle (incl. the real
+            // resource id) at the JOIN-on-read view boundary — see the doc
+            // comment above — so a nil id here is never persisted or observed.
+            id: odf::ResourceID::new(uuid::Uuid::nil()),
+            did: account.did.clone(),
             name: account.name.clone(),
         },
         other => panic!(

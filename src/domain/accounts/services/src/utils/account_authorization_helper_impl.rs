@@ -94,7 +94,7 @@ impl AccountAuthorizationHelper for AccountAuthorizationHelperImpl {
                 use kamu_auth_rebac::RebacServiceExt;
 
                 self.rebac_service
-                    .is_account_admin(&l.account_handle.id)
+                    .is_account_admin(&l.account_handle.did)
                     .await
                     .int_err()
             }
@@ -112,7 +112,7 @@ impl AccountAuthorizationHelper for AccountAuthorizationHelperImpl {
                 use kamu_auth_rebac::RebacServiceExt;
 
                 self.rebac_service
-                    .is_account_admin(&l.account_handle.id)
+                    .is_account_admin(&l.account_handle.did)
                     .await
                     .int_err()
             }

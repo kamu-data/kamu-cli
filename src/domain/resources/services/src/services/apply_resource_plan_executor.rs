@@ -155,7 +155,7 @@ where
             id: Some(headers.id),
             account: Some(odf::metadata::auth::AccountRef::IdAndName(
                 odf::metadata::auth::AccountRefByIdAndName {
-                    id: headers.account.id.clone(),
+                    did: headers.account.did.clone(),
                     name: headers.account.name.clone(),
                 },
             )),

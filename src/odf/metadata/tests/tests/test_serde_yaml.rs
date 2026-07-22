@@ -1326,7 +1326,8 @@ fn test_serde_resource_canonical() {
           id: 7149c2f9-41f2-4cbb-be8f-7d7747525f9a
           name: my-secret
           account:
-            id: did:odf:fed01816ef0a9abe93aba816ef0a9abe93aba90e6065747170300c0d3d30c2cd8d7a4
+            id: b0a3c1de-4f2a-4c9b-8e7d-1a2b3c4d5e6f
+            did: did:odf:fed01816ef0a9abe93aba816ef0a9abe93aba90e6065747170300c0d3d30c2cd8d7a4
             name: sergiimk
           labels:
             nested:
@@ -1377,7 +1378,8 @@ fn test_serde_resource_canonical() {
                 id: "7149c2f9-41f2-4cbb-be8f-7d7747525f9a".parse().unwrap(),
                 name: "my-secret".parse().unwrap(),
                 account: AccountHandle {
-                    id: AccountID::from_did_str("did:odf:fed01816ef0a9abe93aba816ef0a9abe93aba90e6065747170300c0d3d30c2cd8d7a4").unwrap(),
+                    id: "b0a3c1de-4f2a-4c9b-8e7d-1a2b3c4d5e6f".parse().unwrap(),
+                    did: AccountID::from_did_str("did:odf:fed01816ef0a9abe93aba816ef0a9abe93aba90e6065747170300c0d3d30c2cd8d7a4").unwrap(),
                     name: "sergiimk".parse().unwrap(),
                 },
                 labels: ResourceLabels {
@@ -1499,7 +1501,7 @@ fn test_serde_account_ref() {
     assert_matches!(
         serde_json::from_value::<AccountRef>(json!({ "id": id.to_string(), "name": "alice" }))
             .unwrap(),
-        AccountRef::IdAndName(handle) if handle.id == id && handle.name.as_str() == "alice"
+        AccountRef::IdAndName(handle) if handle.did == id && handle.name.as_str() == "alice"
     );
 
     let error = serde_json::from_value::<AccountRef>(json!({})).unwrap_err();
@@ -1511,7 +1513,7 @@ fn test_serde_account_ref() {
     );
 
     let both = AccountRef::IdAndName(AccountRefByIdAndName {
-        id: id.clone(),
+        did: id.clone(),
         name: "alice".parse().unwrap(),
     });
     let round_tripped: AccountRef =

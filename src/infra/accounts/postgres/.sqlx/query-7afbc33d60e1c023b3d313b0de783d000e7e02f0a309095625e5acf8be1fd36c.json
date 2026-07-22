@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n                SELECT id           AS \"id: _\",\n                       account_name,\n                       email,\n                       display_name,\n                       account_type AS \"account_type: AccountType\",\n                       avatar_url,\n                       registered_at,\n                       provider,\n                       provider_identity_key\n                FROM accounts\n                ORDER BY registered_at\n                LIMIT $1 OFFSET $2\n                ",
+  "query": "\n                SELECT id           AS \"id: _\",\n                       resource_id  AS \"resource_id: _\",\n                       account_name,\n                       email,\n                       display_name,\n                       account_type AS \"account_type: AccountType\",\n                       avatar_url,\n                       registered_at,\n                       provider,\n                       provider_identity_key\n                FROM accounts\n                ORDER BY registered_at\n                LIMIT $1 OFFSET $2\n                ",
   "describe": {
     "columns": [
       {
@@ -10,21 +10,26 @@
       },
       {
         "ordinal": 1,
+        "name": "resource_id: _",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
         "name": "account_name",
         "type_info": "Varchar"
       },
       {
-        "ordinal": 2,
+        "ordinal": 3,
         "name": "email",
         "type_info": "Varchar"
       },
       {
-        "ordinal": 3,
+        "ordinal": 4,
         "name": "display_name",
         "type_info": "Varchar"
       },
       {
-        "ordinal": 4,
+        "ordinal": 5,
         "name": "account_type: AccountType",
         "type_info": {
           "Custom": {
@@ -39,22 +44,22 @@
         }
       },
       {
-        "ordinal": 5,
+        "ordinal": 6,
         "name": "avatar_url",
         "type_info": "Varchar"
       },
       {
-        "ordinal": 6,
+        "ordinal": 7,
         "name": "registered_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 7,
+        "ordinal": 8,
         "name": "provider",
         "type_info": "Varchar"
       },
       {
-        "ordinal": 8,
+        "ordinal": 9,
         "name": "provider_identity_key",
         "type_info": "Varchar"
       }
@@ -71,11 +76,12 @@
       false,
       false,
       false,
+      false,
       true,
       false,
       false,
       false
     ]
   },
-  "hash": "b4aceb0d53d3b0f8a0abb51e1413555d38158d920551be1e1995f46e0840baf7"
+  "hash": "7afbc33d60e1c023b3d313b0de783d000e7e02f0a309095625e5acf8be1fd36c"
 }

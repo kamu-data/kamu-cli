@@ -76,7 +76,7 @@ macro_rules! declare_apply_resource_use_case {
                             .headers
                             .account
                             .as_ref()
-                            .and_then(kamu_resources::ResourceAccountRef::id)
+                            .and_then(kamu_resources::ResourceAccountRef::did)
                             .expect("resource headers account must be resolved by this point");
 
                         self.generic_resource_query_service

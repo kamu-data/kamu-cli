@@ -126,6 +126,7 @@ impl AccountBaseUseCaseHarness {
         {
             let mut b = CatalogBuilder::new_chained(catalog);
             b.add_value(CurrentAccountSubject::logged(
+                account.resource_id,
                 account.id.clone(),
                 account.account_name.clone(),
             ));
@@ -151,6 +152,7 @@ impl AccountBaseUseCaseHarness {
         {
             let mut b = dill::CatalogBuilder::new_chained(catalog);
             b.add_value(CurrentAccountSubject::logged(
+                account.resource_id,
                 account.id.clone(),
                 account.account_name.clone(),
             ));

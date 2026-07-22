@@ -13,6 +13,8 @@ use crate::formats::*;
 // ResourceID
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[cfg_attr(feature = "sqlx", derive(sqlx::Type))]
+#[cfg_attr(feature = "sqlx", sqlx(transparent))]
 #[derive(
     Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
 )]

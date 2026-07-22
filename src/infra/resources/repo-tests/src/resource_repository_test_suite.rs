@@ -126,7 +126,7 @@ pub async fn test_create_and_find_resource(catalog: &Catalog) {
     // find by name
     let found_id = repo
         .find_resource_id_by_name(
-            &account_handle.id,
+            &account_handle.did,
             &TEST_KIND,
             &"my-resource".parse().unwrap(),
         )
@@ -256,7 +256,7 @@ pub async fn test_find_resource_snapshots_by_ids(catalog: &Catalog) {
 
     let found = repo
         .find_resource_snapshots_by_ids(
-            &account_handle.id,
+            &account_handle.did,
             &[second.id, missing_id, first.id, other_account.id],
         )
         .await
@@ -317,7 +317,7 @@ pub async fn test_search_resource_handles(catalog: &Catalog) {
     // account ---
     let rows = repo
         .search_resource_handles(
-            &account_handle.id,
+            &account_handle.did,
             std::slice::from_ref(&TEST_KIND),
             None,
             Some("app-%"),
@@ -331,7 +331,7 @@ pub async fn test_search_resource_handles(catalog: &Catalog) {
     // --- name_pattern is case-insensitive ---
     let rows = repo
         .search_resource_handles(
-            &account_handle.id,
+            &account_handle.did,
             std::slice::from_ref(&TEST_KIND),
             None,
             Some("APP-%"),
@@ -345,7 +345,7 @@ pub async fn test_search_resource_handles(catalog: &Catalog) {
     // --- exact_names filter ---
     let rows = repo
         .search_resource_handles(
-            &account_handle.id,
+            &account_handle.did,
             std::slice::from_ref(&TEST_KIND),
             Some(&["app-alpha".parse().unwrap(), "db-alpha".parse().unwrap()]),
             None,
@@ -360,7 +360,7 @@ pub async fn test_search_resource_handles(catalog: &Catalog) {
     // --- exact_names filter is case-insensitive ---
     let rows = repo
         .search_resource_handles(
-            &account_handle.id,
+            &account_handle.did,
             std::slice::from_ref(&TEST_KIND),
             Some(&["App-Alpha".parse().unwrap(), "DB-ALPHA".parse().unwrap()]),
             None,
@@ -375,7 +375,7 @@ pub async fn test_search_resource_handles(catalog: &Catalog) {
     // --- multi-kind search ---
     let rows = repo
         .search_resource_handles(
-            &account_handle.id,
+            &account_handle.did,
             &[TEST_KIND.clone(), OTHER_KIND.clone()],
             None,
             Some("app-%"),
@@ -393,7 +393,7 @@ pub async fn test_search_resource_handles(catalog: &Catalog) {
     // --- no name_pattern and no exact_names returns all for the kind ---
     let rows = repo
         .search_resource_handles(
-            &account_handle.id,
+            &account_handle.did,
             std::slice::from_ref(&TEST_KIND),
             None,
             None,
@@ -406,7 +406,7 @@ pub async fn test_search_resource_handles(catalog: &Catalog) {
     // --- other account's resources are never returned ---
     let rows = repo
         .search_resource_handles(
-            &account_handle.id,
+            &account_handle.did,
             std::slice::from_ref(&TEST_KIND),
             None,
             Some("app-other-%"),
@@ -428,7 +428,7 @@ pub async fn test_count_search_resource_handles(catalog: &Catalog) {
 
     let count = repo
         .count_search_resource_handles(
-            &account_handle.id,
+            &account_handle.did,
             std::slice::from_ref(&TEST_KIND),
             None,
             Some("app-%"),
@@ -439,7 +439,7 @@ pub async fn test_count_search_resource_handles(catalog: &Catalog) {
 
     let count = repo
         .count_search_resource_handles(
-            &account_handle.id,
+            &account_handle.did,
             std::slice::from_ref(&TEST_KIND),
             Some(&["App-Alpha".parse().unwrap(), "DB-ALPHA".parse().unwrap()]),
             None,
@@ -450,7 +450,7 @@ pub async fn test_count_search_resource_handles(catalog: &Catalog) {
 
     let count = repo
         .count_search_resource_handles(
-            &account_handle.id,
+            &account_handle.did,
             &[TEST_KIND.clone(), OTHER_KIND.clone()],
             None,
             Some("app-%"),
@@ -461,7 +461,7 @@ pub async fn test_count_search_resource_handles(catalog: &Catalog) {
 
     let count = repo
         .count_search_resource_handles(
-            &account_handle.id,
+            &account_handle.did,
             std::slice::from_ref(&TEST_KIND),
             None,
             Some("app-other-%"),
@@ -472,7 +472,7 @@ pub async fn test_count_search_resource_handles(catalog: &Catalog) {
 
     let count = repo
         .count_search_resource_handles(
-            &account_handle.id,
+            &account_handle.did,
             std::slice::from_ref(&TEST_KIND),
             Some(&[]),
             None,
@@ -502,7 +502,7 @@ pub async fn test_resource_name_case_insensitive(catalog: &Catalog) {
     // --- find_resource_id_by_name is case-insensitive ---
     let found = repo
         .find_resource_id_by_name(
-            &account_handle.id,
+            &account_handle.did,
             &TEST_KIND,
             &"My-Resource".parse().unwrap(),
         )
@@ -512,7 +512,7 @@ pub async fn test_resource_name_case_insensitive(catalog: &Catalog) {
 
     let found = repo
         .find_resource_id_by_name(
-            &account_handle.id,
+            &account_handle.did,
             &TEST_KIND,
             &"MY-RESOURCE".parse().unwrap(),
         )
@@ -523,7 +523,7 @@ pub async fn test_resource_name_case_insensitive(catalog: &Catalog) {
     // --- find_resource_handles_by_names is case-insensitive ---
     let rows = repo
         .find_resource_handles_by_names(
-            &account_handle.id,
+            &account_handle.did,
             &TEST_KIND,
             &[
                 "My-Resource".parse().unwrap(),
@@ -539,7 +539,7 @@ pub async fn test_resource_name_case_insensitive(catalog: &Catalog) {
     // --- search_resource_handles exact_names is case-insensitive ---
     let rows = repo
         .search_resource_handles(
-            &account_handle.id,
+            &account_handle.did,
             std::slice::from_ref(&TEST_KIND),
             Some(&["MY-RESOURCE".parse().unwrap()]),
             None,
@@ -553,7 +553,7 @@ pub async fn test_resource_name_case_insensitive(catalog: &Catalog) {
     // --- name_pattern search is case-insensitive ---
     let rows = repo
         .search_resource_handles(
-            &account_handle.id,
+            &account_handle.did,
             std::slice::from_ref(&TEST_KIND),
             None,
             Some("MY-%"),
@@ -911,7 +911,7 @@ pub async fn test_list_resource_ids_with_pagination(catalog: &Catalog) {
 
     let first_page: Vec<_> = repo
         .list_resource_ids(
-            account_handle.id.clone(),
+            account_handle.did.clone(),
             &TEST_KIND,
             PaginationOpts::from_max_results(3),
         )
@@ -922,7 +922,7 @@ pub async fn test_list_resource_ids_with_pagination(catalog: &Catalog) {
 
     let second_page: Vec<_> = repo
         .list_resource_ids(
-            account_handle.id.clone(),
+            account_handle.did.clone(),
             &TEST_KIND,
             PaginationOpts::from_page(1, 3),
         )
@@ -960,7 +960,7 @@ pub async fn test_list_resource_snapshots_by_schema(catalog: &Catalog) {
 
     let kind_a: Vec<_> = repo
         .list_resource_snapshots_by_schema(
-            account_handle.id.clone(),
+            account_handle.did.clone(),
             &KIND_A,
             PaginationOpts::from_max_results(100),
         )
@@ -972,7 +972,7 @@ pub async fn test_list_resource_snapshots_by_schema(catalog: &Catalog) {
 
     let kind_b: Vec<_> = repo
         .list_resource_snapshots_by_schema(
-            account_handle.id.clone(),
+            account_handle.did.clone(),
             &KIND_B,
             PaginationOpts::from_max_results(100),
         )
@@ -984,7 +984,7 @@ pub async fn test_list_resource_snapshots_by_schema(catalog: &Catalog) {
 
     let kind_c: Vec<_> = repo
         .list_resource_snapshots_by_schema(
-            account_handle.id,
+            account_handle.did,
             &KIND_C,
             PaginationOpts::from_max_results(100),
         )
@@ -1019,7 +1019,7 @@ pub async fn test_list_all_resource_snapshots(catalog: &Catalog) {
     repo.create_resource(&other).await.unwrap();
 
     let all: Vec<_> = repo
-        .list_all_resource_snapshots(account_handle.id, PaginationOpts::from_max_results(100))
+        .list_all_resource_snapshots(account_handle.did, PaginationOpts::from_max_results(100))
         .try_collect()
         .await
         .unwrap();
@@ -1041,13 +1041,13 @@ pub async fn test_count_resources(catalog: &Catalog) {
     }
 
     let count = repo
-        .count_resources(account_handle.id.clone(), &TEST_KIND)
+        .count_resources(account_handle.did.clone(), &TEST_KIND)
         .await
         .unwrap();
     assert_eq!(3, count);
 
     let count_other = repo
-        .count_resources(account_handle.id, &OTHER_KIND)
+        .count_resources(account_handle.did, &OTHER_KIND)
         .await
         .unwrap();
     assert_eq!(0, count_other);
@@ -1105,7 +1105,7 @@ pub async fn test_summarize_resources(catalog: &Catalog) {
     other_account.status = Some(status_with_phase(ResourcePhase::Reconciling));
     repo.create_resource(&other_account).await.unwrap();
 
-    let summary = repo.summarize_resources(account_handle.id).await.unwrap();
+    let summary = repo.summarize_resources(account_handle.did).await.unwrap();
 
     assert_eq!(
         summary,
@@ -1180,7 +1180,7 @@ pub async fn test_find_deleted_resource_not_returned(catalog: &Catalog) {
 
     let by_name = repo
         .find_resource_id_by_name(
-            &account_handle.id,
+            &account_handle.did,
             &TEST_KIND,
             &"to-delete".parse().unwrap(),
         )
@@ -1189,14 +1189,14 @@ pub async fn test_find_deleted_resource_not_returned(catalog: &Catalog) {
     assert!(by_name.is_none());
 
     let count = repo
-        .count_resources(account_handle.id.clone(), &TEST_KIND)
+        .count_resources(account_handle.did.clone(), &TEST_KIND)
         .await
         .unwrap();
     assert_eq!(0, count);
 
     let ids: Vec<_> = repo
         .list_resource_ids(
-            account_handle.id,
+            account_handle.did,
             &TEST_KIND,
             PaginationOpts::from_max_results(100),
         )
@@ -1211,7 +1211,8 @@ pub async fn test_find_deleted_resource_not_returned(catalog: &Catalog) {
 fn make_test_account(handle: &odf::AccountHandle) -> Account {
     let name = handle.name.as_str();
     Account {
-        id: handle.id.clone(),
+        id: handle.did.clone(),
+        resource_id: handle.id,
         account_name: handle.name.clone(),
         email: email_utils::Email::parse(&format!("{name}@example.com")).unwrap(),
         display_name: name.to_string(),
@@ -1247,7 +1248,7 @@ pub async fn test_account_rename_reflected_immediately_in_headers(catalog: &Cata
         .await
         .unwrap()
         .unwrap();
-    assert_eq!(before_rename.headers.account.id, original_account.id);
+    assert_eq!(before_rename.headers.account.did, original_account.id);
     assert_eq!(before_rename.headers.account.name, original_handle.name);
 
     let new_name = odf::AccountName::new_unchecked("renamed");
@@ -1262,7 +1263,7 @@ pub async fn test_account_rename_reflected_immediately_in_headers(catalog: &Cata
         .await
         .unwrap()
         .unwrap();
-    assert_eq!(after_rename.headers.account.id, original_handle.id);
+    assert_eq!(after_rename.headers.account.did, original_handle.did);
     assert_eq!(
         after_rename.headers.account.name, new_name,
         "account rename must be reflected immediately on re-read, without any resource-side update"
@@ -1295,7 +1296,7 @@ pub async fn test_deleted_account_falls_back_to_sentinel_name(catalog: &Catalog)
         .unwrap()
         .unwrap();
 
-    assert_eq!(found.headers.account.id, account_handle.id);
+    assert_eq!(found.headers.account.did, account_handle.did);
     assert_eq!(
         found.headers.account.name,
         kamu_resources::deleted_account_name_sentinel(),

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT\n                id as \"id: _\",\n                account_name,\n                email,\n                display_name,\n                account_type as \"account_type: AccountType\",\n                avatar_url,\n                registered_at,\n                provider,\n                provider_identity_key\n            FROM accounts\n            WHERE id = ANY($1)\n            ORDER BY account_name\n            ",
+  "query": "\n            SELECT\n                id as \"id: _\",\n                resource_id as \"resource_id: _\",\n                account_name,\n                email,\n                display_name,\n                account_type as \"account_type: AccountType\",\n                avatar_url,\n                registered_at,\n                provider,\n                provider_identity_key\n            FROM accounts\n            WHERE lower(account_name) = lower($1)\n            ",
   "describe": {
     "columns": [
       {
@@ -10,21 +10,26 @@
       },
       {
         "ordinal": 1,
+        "name": "resource_id: _",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
         "name": "account_name",
         "type_info": "Varchar"
       },
       {
-        "ordinal": 2,
+        "ordinal": 3,
         "name": "email",
         "type_info": "Varchar"
       },
       {
-        "ordinal": 3,
+        "ordinal": 4,
         "name": "display_name",
         "type_info": "Varchar"
       },
       {
-        "ordinal": 4,
+        "ordinal": 5,
         "name": "account_type: AccountType",
         "type_info": {
           "Custom": {
@@ -39,32 +44,33 @@
         }
       },
       {
-        "ordinal": 5,
+        "ordinal": 6,
         "name": "avatar_url",
         "type_info": "Varchar"
       },
       {
-        "ordinal": 6,
+        "ordinal": 7,
         "name": "registered_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 7,
+        "ordinal": 8,
         "name": "provider",
         "type_info": "Varchar"
       },
       {
-        "ordinal": 8,
+        "ordinal": 9,
         "name": "provider_identity_key",
         "type_info": "Varchar"
       }
     ],
     "parameters": {
       "Left": [
-        "TextArray"
+        "Text"
       ]
     },
     "nullable": [
+      false,
       false,
       false,
       false,
@@ -76,5 +82,5 @@
       false
     ]
   },
-  "hash": "4e4accb99e123181af1402c3c423c48049384480631002c39b158f3dea7c09f8"
+  "hash": "6270be19f57a4b15c64b92e5ab72f4901652515b24b85de6c959f9f887428f3b"
 }

@@ -52,7 +52,11 @@ impl RemoteGraphqlFacadeHarness {
         for account in TestAccount::iter() {
             let account_name = local.account_name(account);
             let account_id = local.account_id(account);
-            let subject = CurrentAccountSubject::logged(account_id, account_name);
+            let subject = CurrentAccountSubject::logged(
+                kamu_accounts::Account::seed_resource_id_from_name(account_name.as_str()),
+                account_id,
+                account_name,
+            );
 
             let mut b = dill::CatalogBuilder::new_chained(local.base_catalog());
             b.add_value(subject);

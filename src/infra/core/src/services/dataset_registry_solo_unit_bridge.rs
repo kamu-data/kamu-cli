@@ -239,7 +239,7 @@ impl DatasetRegistry for DatasetRegistrySoloUnitBridge {
                             panic!("Logged subject only");
                         }
                         CurrentAccountSubject::Logged(l) => {
-                            if l.account_handle.id == owner_id {
+                            if l.account_handle.did == owner_id {
                                 Some(dataset_handle)
                             } else {
                                 None

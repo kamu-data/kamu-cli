@@ -60,10 +60,7 @@ impl ResourceAccountResolverImpl {
                     .await
                     .map_err(ResolveManifestAccountError::from)?;
 
-                Ok(odf::AccountHandle {
-                    id: account.id,
-                    name: account.account_name,
-                })
+                Ok((&account).into())
             }
             ResourceAccountRef::Name(name) => {
                 let account = self
@@ -72,18 +69,15 @@ impl ResourceAccountResolverImpl {
                     .await
                     .map_err(ResolveManifestAccountError::from)?;
 
-                Ok(odf::AccountHandle {
-                    id: account.id,
-                    name: account.account_name,
-                })
+                Ok((&account).into())
             }
             ResourceAccountRef::IdAndName(odf::metadata::auth::AccountRefByIdAndName {
-                id,
+                did,
                 name,
             }) => {
                 let account = self
                     .account_service
-                    .get_account_by_id(id)
+                    .get_account_by_id(did)
                     .await
                     .map_err(ResolveManifestAccountError::from)?;
 
@@ -95,10 +89,7 @@ impl ResourceAccountResolverImpl {
                     });
                 }
 
-                Ok(odf::AccountHandle {
-                    id: account.id,
-                    name: account.account_name,
-                })
+                Ok((&account).into())
             }
         }
     }
@@ -120,14 +111,14 @@ impl ResourceAccountResolverImpl {
     ) -> Result<(), ResolveManifestAccountError> {
         match self.current_account_subject.as_ref() {
             CurrentAccountSubject::Logged(current)
-                if current.account_handle.id == target_account.id =>
+                if current.account_handle.did == target_account.did =>
             {
                 Ok(())
             }
             CurrentAccountSubject::Logged(current) => {
                 let is_admin = self
                     .rebac_service
-                    .is_account_admin(&current.account_handle.id)
+                    .is_account_admin(&current.account_handle.did)
                     .await
                     .int_err()?;
                 if is_admin {

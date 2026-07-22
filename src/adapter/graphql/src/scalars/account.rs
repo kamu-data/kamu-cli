@@ -26,8 +26,8 @@ pub struct AccountRef(odf::metadata::auth::AccountRef);
 
 #[Object]
 impl AccountRef {
-    pub async fn id(&self) -> Option<AccountID<'_>> {
-        self.0.id().map(Into::into)
+    pub async fn did(&self) -> Option<AccountID<'_>> {
+        self.0.did().map(Into::into)
     }
 
     pub async fn name(&self) -> Option<AccountName<'_>> {
@@ -54,8 +54,12 @@ pub struct AccountHandle(odf::AccountHandle);
 
 #[Object]
 impl AccountHandle {
-    pub async fn id(&self) -> AccountID<'_> {
-        AccountID::from(&self.0.id)
+    pub async fn id(&self) -> ResourceID<'_> {
+        ResourceID::from(&self.0.id)
+    }
+
+    pub async fn did(&self) -> AccountID<'_> {
+        AccountID::from(&self.0.did)
     }
 
     pub async fn name(&self) -> AccountName<'_> {

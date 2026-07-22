@@ -12,10 +12,12 @@ use std::sync::Arc;
 use internal_error::InternalError;
 use kamu::domain::TenancyConfig;
 use kamu_accounts::{
+    Account,
     AccountService,
     CurrentAccountSubject,
     DEFAULT_ACCOUNT_ID,
     DEFAULT_ACCOUNT_NAME,
+    DEFAULT_ACCOUNT_RESOURCE_ID,
 };
 use thiserror::Error;
 
@@ -88,6 +90,7 @@ impl CurrentAccountIndication {
                 // NOTE: At this stage, we don't care whether the argument applies
                 //       in the case of multi-tenant workspace -- this will be checked later.
                 Ok(CurrentAccountSubject::logged(
+                    *DEFAULT_ACCOUNT_RESOURCE_ID,
                     DEFAULT_ACCOUNT_ID.clone(),
                     DEFAULT_ACCOUNT_NAME.clone(),
                 ))
@@ -97,6 +100,7 @@ impl CurrentAccountIndication {
                     WorkspaceStatus::NoWorkspace | WorkspaceStatus::AboutToBeCreated(_) => {
                         // NOTE: At this stage, real accounts do not exist yet.
                         let dummy_subject = CurrentAccountSubject::logged(
+                            Account::seed_resource_id_from_name(self.account_name.as_str()),
                             odf::AccountID::new_seeded_ed25519(self.account_name.as_bytes()),
                             self.account_name.clone(),
                         );
@@ -112,8 +116,7 @@ impl CurrentAccountIndication {
                             });
                         };
 
-                        let subject =
-                            CurrentAccountSubject::logged(account.id, account.account_name);
+                        let subject = CurrentAccountSubject::logged_from_account(&account);
 
                         Ok(subject)
                     }

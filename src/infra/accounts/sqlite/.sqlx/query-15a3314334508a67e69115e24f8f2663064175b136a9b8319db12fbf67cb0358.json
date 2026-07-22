@@ -1,15 +1,15 @@
 {
   "db_name": "SQLite",
-  "query": "\n                SELECT\n                    at.token_hash,\n                    a.id as \"id: _\",\n                    a.account_name,\n                    a.email,\n                    a.display_name,\n                    a.account_type as \"account_type: AccountType\",\n                    registered_at as \"registered_at: _\",\n                    a.avatar_url,\n                    a.provider,\n                    a.provider_identity_key\n                FROM access_tokens at\n                INNER JOIN accounts a ON at.account_id = a.id\n                WHERE at.id = $1 and at.revoked_at IS null\n                ",
+  "query": "\n            SELECT\n                id as \"id: _\",\n                resource_id as \"resource_id!: _\",\n                account_name,\n                email,\n                display_name,\n                account_type as \"account_type: AccountType\",\n                avatar_url,\n                registered_at as \"registered_at: _\",\n                provider,\n                provider_identity_key\n            FROM accounts\n            WHERE lower(account_name) = lower($1)\n            ",
   "describe": {
     "columns": [
       {
-        "name": "token_hash",
+        "name": "id: _",
         "ordinal": 0,
-        "type_info": "Blob"
+        "type_info": "Text"
       },
       {
-        "name": "id: _",
+        "name": "resource_id!: _",
         "ordinal": 1,
         "type_info": "Text"
       },
@@ -34,14 +34,14 @@
         "type_info": "Text"
       },
       {
-        "name": "registered_at: _",
+        "name": "avatar_url",
         "ordinal": 6,
-        "type_info": "Null"
+        "type_info": "Text"
       },
       {
-        "name": "avatar_url",
+        "name": "registered_at: _",
         "ordinal": 7,
-        "type_info": "Text"
+        "type_info": "Null"
       },
       {
         "name": "provider",
@@ -59,16 +59,16 @@
     },
     "nullable": [
       false,
-      false,
-      false,
+      true,
       false,
       false,
       false,
       false,
       true,
       false,
+      false,
       false
     ]
   },
-  "hash": "e4a5800ff20d537be317404a0021669d313254bbc081c44ddaa4a982e1a72bda"
+  "hash": "15a3314334508a67e69115e24f8f2663064175b136a9b8319db12fbf67cb0358"
 }

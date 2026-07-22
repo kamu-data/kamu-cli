@@ -240,7 +240,8 @@ pub(crate) struct ResourceHeaders {
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct AccountHandle {
-    pub id: odf::AccountID,
+    pub id: kamu_resources::ResourceID,
+    pub did: odf::AccountID,
     pub name: AccountName,
 }
 
@@ -248,6 +249,7 @@ impl From<AccountHandle> for odf::AccountHandle {
     fn from(value: AccountHandle) -> Self {
         Self {
             id: value.id,
+            did: value.did,
             name: odf::AccountName::new_unchecked(&value.name.0),
         }
     }

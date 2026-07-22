@@ -58,7 +58,7 @@ pub struct AccountRefByIdAndNameInput {
 impl From<AccountRefByIdAndNameInput> for odf::metadata::auth::AccountRefByIdAndName {
     fn from(value: AccountRefByIdAndNameInput) -> Self {
         Self {
-            id: value.id.into(),
+            did: value.id.into(),
             name: value.name.into(),
         }
     }

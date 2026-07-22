@@ -107,6 +107,7 @@ impl ClientSideHarness {
             }
             TenancyConfig::MultiTenant => {
                 b.add_value(CurrentAccountSubject::logged(
+                    kamu_accounts::Account::seed_resource_id_from_name(CLIENT_ACCOUNT_NAME),
                     odf::AccountID::new_seeded_ed25519(CLIENT_ACCOUNT_NAME.as_bytes()),
                     odf::AccountName::new_unchecked(CLIENT_ACCOUNT_NAME),
                 ));
