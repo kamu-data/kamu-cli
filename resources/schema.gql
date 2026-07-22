@@ -198,9 +198,23 @@ type AccountFlowsMut {
 	triggers: AccountFlowTriggersMut!
 }
 
+"""
+Link to an account.
+
+Schema: https://opendatafabric.org/schemas/auth/v1alpha1/AccountHandle
+"""
 type AccountHandle {
+	"""
+	ID of the account resource.
+	"""
 	id: ResourceID!
+	"""
+	DID of the account.
+	"""
 	did: AccountID!
+	"""
+	Name of the account.
+	"""
 	name: AccountName!
 }
 
@@ -287,15 +301,10 @@ type AccountQuotasUsageStorage {
 	limitTotalBytes: Int!
 }
 
-input AccountRefByDidAndNameInput {
-	did: AccountID!
-	name: AccountName!
-}
-
-input AccountRefInput @oneOf {
-	byDid: AccountID
-	byName: AccountName
-	byDidAndName: AccountRefByDidAndNameInput
+input AccountRefInput {
+	id: ResourceID
+	did: AccountID
+	name: AccountName
 }
 
 enum AccountType {
@@ -1932,6 +1941,8 @@ type DependencyDatasetResultNotAccessible implements DependencyDatasetResult {
 }
 
 scalar DeviceCode
+
+scalar Did
 
 """
 Wallet address in did:pkh format.
@@ -3952,15 +3963,18 @@ type ResourceBadAccountProblem {
 	code: ResourceBadAccountProblemCode!
 	accountId: AccountID
 	accountName: AccountName
+	expectedResourceId: ResourceID
+	expectedDid: AccountID
 	expectedName: AccountName
 	actualName: AccountName
 	message: String!
 }
 
 enum ResourceBadAccountProblemCode {
+	EMPTY_SELECTOR
 	ACCOUNT_NOT_FOUND_BY_ID
 	ACCOUNT_NOT_FOUND_BY_NAME
-	ID_NAME_MISMATCH
+	SELECTOR_MISMATCH
 }
 
 input ResourceBatchSelectorInput {
@@ -4019,8 +4033,8 @@ union ResourceGetOutcome = Resource | ResourceSelectorProblemResult
 
 type ResourceHandle {
 	id: ResourceID!
-	schema: TypeUri!
-	typeName: TypeName!
+	type: TypeUri!
+	did: Did
 	name: ResourceName!
 	account: AccountHandle!
 }

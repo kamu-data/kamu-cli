@@ -8283,6 +8283,8 @@ dependencies = [
  "event-sourcing",
  "hex",
  "internal-error",
+ "kamu-accounts",
+ "kamu-accounts-services",
  "kamu-configuration",
  "kamu-configuration-inmem",
  "kamu-configuration-services",

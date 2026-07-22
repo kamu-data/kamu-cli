@@ -1789,59 +1789,59 @@ pub struct PrepStepUnionTableOffset {}
     since = "2.0.0",
     note = "Use associated constants instead. This will no longer be generated in 2021."
 )]
-pub const ENUM_MIN_FLOW_TRIGGER: u8 = 0;
+pub const ENUM_MIN_FLOW_TRIGGER_INPUT: u8 = 0;
 #[deprecated(
     since = "2.0.0",
     note = "Use associated constants instead. This will no longer be generated in 2021."
 )]
-pub const ENUM_MAX_FLOW_TRIGGER: u8 = 4;
+pub const ENUM_MAX_FLOW_TRIGGER_INPUT: u8 = 4;
 #[deprecated(
     since = "2.0.0",
     note = "Use associated constants instead. This will no longer be generated in 2021."
 )]
 #[allow(non_camel_case_types)]
-pub const ENUM_VALUES_FLOW_TRIGGER: [FlowTrigger; 5] = [
-    FlowTrigger::NONE,
-    FlowTrigger::FlowTriggerSchedule,
-    FlowTrigger::FlowTriggerEvent,
-    FlowTrigger::FlowTriggerSource,
-    FlowTrigger::FlowTriggerDataset,
+pub const ENUM_VALUES_FLOW_TRIGGER_INPUT: [FlowTriggerInput; 5] = [
+    FlowTriggerInput::NONE,
+    FlowTriggerInput::FlowTriggerInputSchedule,
+    FlowTriggerInput::FlowTriggerInputEvent,
+    FlowTriggerInput::FlowTriggerInputSource,
+    FlowTriggerInput::FlowTriggerInputDataset,
 ];
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 #[repr(transparent)]
-pub struct FlowTrigger(pub u8);
+pub struct FlowTriggerInput(pub u8);
 #[allow(non_upper_case_globals)]
-impl FlowTrigger {
+impl FlowTriggerInput {
     pub const NONE: Self = Self(0);
-    pub const FlowTriggerSchedule: Self = Self(1);
-    pub const FlowTriggerEvent: Self = Self(2);
-    pub const FlowTriggerSource: Self = Self(3);
-    pub const FlowTriggerDataset: Self = Self(4);
+    pub const FlowTriggerInputSchedule: Self = Self(1);
+    pub const FlowTriggerInputEvent: Self = Self(2);
+    pub const FlowTriggerInputSource: Self = Self(3);
+    pub const FlowTriggerInputDataset: Self = Self(4);
 
     pub const ENUM_MIN: u8 = 0;
     pub const ENUM_MAX: u8 = 4;
     pub const ENUM_VALUES: &'static [Self] = &[
         Self::NONE,
-        Self::FlowTriggerSchedule,
-        Self::FlowTriggerEvent,
-        Self::FlowTriggerSource,
-        Self::FlowTriggerDataset,
+        Self::FlowTriggerInputSchedule,
+        Self::FlowTriggerInputEvent,
+        Self::FlowTriggerInputSource,
+        Self::FlowTriggerInputDataset,
     ];
     /// Returns the variant's name or "" if unknown.
     pub fn variant_name(self) -> Option<&'static str> {
         match self {
             Self::NONE => Some("NONE"),
-            Self::FlowTriggerSchedule => Some("FlowTriggerSchedule"),
-            Self::FlowTriggerEvent => Some("FlowTriggerEvent"),
-            Self::FlowTriggerSource => Some("FlowTriggerSource"),
-            Self::FlowTriggerDataset => Some("FlowTriggerDataset"),
+            Self::FlowTriggerInputSchedule => Some("FlowTriggerInputSchedule"),
+            Self::FlowTriggerInputEvent => Some("FlowTriggerInputEvent"),
+            Self::FlowTriggerInputSource => Some("FlowTriggerInputSource"),
+            Self::FlowTriggerInputDataset => Some("FlowTriggerInputDataset"),
             _ => None,
         }
     }
 }
-impl core::fmt::Debug for FlowTrigger {
+impl core::fmt::Debug for FlowTriggerInput {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         if let Some(name) = self.variant_name() {
             f.write_str(name)
@@ -1850,7 +1850,7 @@ impl core::fmt::Debug for FlowTrigger {
         }
     }
 }
-impl<'a> flatbuffers::Follow<'a> for FlowTrigger {
+impl<'a> flatbuffers::Follow<'a> for FlowTriggerInput {
     type Inner = Self;
     #[inline]
     unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
@@ -1859,8 +1859,8 @@ impl<'a> flatbuffers::Follow<'a> for FlowTrigger {
     }
 }
 
-impl flatbuffers::Push for FlowTrigger {
-    type Output = FlowTrigger;
+impl flatbuffers::Push for FlowTriggerInput {
+    type Output = FlowTriggerInput;
     #[inline]
     unsafe fn push(&self, dst: &mut [u8], _written_len: usize) {
         unsafe {
@@ -1869,7 +1869,7 @@ impl flatbuffers::Push for FlowTrigger {
     }
 }
 
-impl flatbuffers::EndianScalar for FlowTrigger {
+impl flatbuffers::EndianScalar for FlowTriggerInput {
     type Scalar = u8;
     #[inline]
     fn to_little_endian(self) -> u8 {
@@ -1883,7 +1883,7 @@ impl flatbuffers::EndianScalar for FlowTrigger {
     }
 }
 
-impl<'a> flatbuffers::Verifiable for FlowTrigger {
+impl<'a> flatbuffers::Verifiable for FlowTriggerInput {
     #[inline]
     fn run_verifier(
         v: &mut flatbuffers::Verifier,
@@ -1894,8 +1894,8 @@ impl<'a> flatbuffers::Verifiable for FlowTrigger {
     }
 }
 
-impl flatbuffers::SimpleToVerifyInSlice for FlowTrigger {}
-pub struct FlowTriggerUnionTableOffset {}
+impl flatbuffers::SimpleToVerifyInSlice for FlowTriggerInput {}
+pub struct FlowTriggerInputUnionTableOffset {}
 
 #[deprecated(
     since = "2.0.0",
@@ -2008,6 +2008,118 @@ impl<'a> flatbuffers::Verifiable for TaskSpecInput {
 
 impl flatbuffers::SimpleToVerifyInSlice for TaskSpecInput {}
 pub struct TaskSpecInputUnionTableOffset {}
+
+#[deprecated(
+    since = "2.0.0",
+    note = "Use associated constants instead. This will no longer be generated in 2021."
+)]
+pub const ENUM_MIN_FLOW_TRIGGER: u8 = 0;
+#[deprecated(
+    since = "2.0.0",
+    note = "Use associated constants instead. This will no longer be generated in 2021."
+)]
+pub const ENUM_MAX_FLOW_TRIGGER: u8 = 4;
+#[deprecated(
+    since = "2.0.0",
+    note = "Use associated constants instead. This will no longer be generated in 2021."
+)]
+#[allow(non_camel_case_types)]
+pub const ENUM_VALUES_FLOW_TRIGGER: [FlowTrigger; 5] = [
+    FlowTrigger::NONE,
+    FlowTrigger::FlowTriggerSchedule,
+    FlowTrigger::FlowTriggerEvent,
+    FlowTrigger::FlowTriggerSource,
+    FlowTrigger::FlowTriggerDataset,
+];
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[repr(transparent)]
+pub struct FlowTrigger(pub u8);
+#[allow(non_upper_case_globals)]
+impl FlowTrigger {
+    pub const NONE: Self = Self(0);
+    pub const FlowTriggerSchedule: Self = Self(1);
+    pub const FlowTriggerEvent: Self = Self(2);
+    pub const FlowTriggerSource: Self = Self(3);
+    pub const FlowTriggerDataset: Self = Self(4);
+
+    pub const ENUM_MIN: u8 = 0;
+    pub const ENUM_MAX: u8 = 4;
+    pub const ENUM_VALUES: &'static [Self] = &[
+        Self::NONE,
+        Self::FlowTriggerSchedule,
+        Self::FlowTriggerEvent,
+        Self::FlowTriggerSource,
+        Self::FlowTriggerDataset,
+    ];
+    /// Returns the variant's name or "" if unknown.
+    pub fn variant_name(self) -> Option<&'static str> {
+        match self {
+            Self::NONE => Some("NONE"),
+            Self::FlowTriggerSchedule => Some("FlowTriggerSchedule"),
+            Self::FlowTriggerEvent => Some("FlowTriggerEvent"),
+            Self::FlowTriggerSource => Some("FlowTriggerSource"),
+            Self::FlowTriggerDataset => Some("FlowTriggerDataset"),
+            _ => None,
+        }
+    }
+}
+impl core::fmt::Debug for FlowTrigger {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        if let Some(name) = self.variant_name() {
+            f.write_str(name)
+        } else {
+            f.write_fmt(format_args!("<UNKNOWN {:?}>", self.0))
+        }
+    }
+}
+impl<'a> flatbuffers::Follow<'a> for FlowTrigger {
+    type Inner = Self;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        let b = unsafe { flatbuffers::read_scalar_at::<u8>(buf, loc) };
+        Self(b)
+    }
+}
+
+impl flatbuffers::Push for FlowTrigger {
+    type Output = FlowTrigger;
+    #[inline]
+    unsafe fn push(&self, dst: &mut [u8], _written_len: usize) {
+        unsafe {
+            flatbuffers::emplace_scalar::<u8>(dst, self.0);
+        }
+    }
+}
+
+impl flatbuffers::EndianScalar for FlowTrigger {
+    type Scalar = u8;
+    #[inline]
+    fn to_little_endian(self) -> u8 {
+        self.0.to_le()
+    }
+    #[inline]
+    #[allow(clippy::wrong_self_convention)]
+    fn from_little_endian(v: u8) -> Self {
+        let b = u8::from_le(v);
+        Self(b)
+    }
+}
+
+impl<'a> flatbuffers::Verifiable for FlowTrigger {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        u8::run_verifier(v, pos)
+    }
+}
+
+impl flatbuffers::SimpleToVerifyInSlice for FlowTrigger {}
+pub struct FlowTriggerUnionTableOffset {}
 
 #[deprecated(
     since = "2.0.0",
@@ -3367,7 +3479,8 @@ impl<'a> flatbuffers::Follow<'a> for AccountRef<'a> {
 
 impl<'a> AccountRef<'a> {
     pub const VT_ID: flatbuffers::VOffsetT = 4;
-    pub const VT_NAME: flatbuffers::VOffsetT = 6;
+    pub const VT_DID: flatbuffers::VOffsetT = 6;
+    pub const VT_NAME: flatbuffers::VOffsetT = 8;
 
     #[inline]
     pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
@@ -3381,6 +3494,9 @@ impl<'a> AccountRef<'a> {
         let mut builder = AccountRefBuilder::new(_fbb);
         if let Some(x) = args.name {
             builder.add_name(x);
+        }
+        if let Some(x) = args.did {
+            builder.add_did(x);
         }
         if let Some(x) = args.id {
             builder.add_id(x);
@@ -3397,6 +3513,19 @@ impl<'a> AccountRef<'a> {
             self._tab
                 .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
                     AccountRef::VT_ID,
+                    None,
+                )
+        }
+    }
+    #[inline]
+    pub fn did(&self) -> Option<flatbuffers::Vector<'a, u8>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                    AccountRef::VT_DID,
                     None,
                 )
         }
@@ -3426,6 +3555,11 @@ impl flatbuffers::Verifiable for AccountRef<'_> {
                 Self::VT_ID,
                 false,
             )?
+            .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>(
+                "did",
+                Self::VT_DID,
+                false,
+            )?
             .visit_field::<flatbuffers::ForwardsUOffset<&str>>("name", Self::VT_NAME, false)?
             .finish();
         Ok(())
@@ -3433,6 +3567,7 @@ impl flatbuffers::Verifiable for AccountRef<'_> {
 }
 pub struct AccountRefArgs<'a> {
     pub id: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
+    pub did: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
     pub name: Option<flatbuffers::WIPOffset<&'a str>>,
 }
 impl<'a> Default for AccountRefArgs<'a> {
@@ -3440,6 +3575,7 @@ impl<'a> Default for AccountRefArgs<'a> {
     fn default() -> Self {
         AccountRefArgs {
             id: None,
+            did: None,
             name: None,
         }
     }
@@ -3454,6 +3590,11 @@ impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> AccountRefBuilder<'a, 'b, A> {
     pub fn add_id(&mut self, id: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>) {
         self.fbb_
             .push_slot_always::<flatbuffers::WIPOffset<_>>(AccountRef::VT_ID, id);
+    }
+    #[inline]
+    pub fn add_did(&mut self, did: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(AccountRef::VT_DID, did);
     }
     #[inline]
     pub fn add_name(&mut self, name: flatbuffers::WIPOffset<&'b str>) {
@@ -3481,6 +3622,7 @@ impl core::fmt::Debug for AccountRef<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let mut ds = f.debug_struct("AccountRef");
         ds.field("id", &self.id());
+        ds.field("did", &self.did());
         ds.field("name", &self.name());
         ds.finish()
     }
@@ -4659,7 +4801,8 @@ impl<'a> flatbuffers::Follow<'a> for AccountHandle<'a> {
 
 impl<'a> AccountHandle<'a> {
     pub const VT_ID: flatbuffers::VOffsetT = 4;
-    pub const VT_NAME: flatbuffers::VOffsetT = 6;
+    pub const VT_DID: flatbuffers::VOffsetT = 6;
+    pub const VT_NAME: flatbuffers::VOffsetT = 8;
 
     #[inline]
     pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
@@ -4673,6 +4816,9 @@ impl<'a> AccountHandle<'a> {
         let mut builder = AccountHandleBuilder::new(_fbb);
         if let Some(x) = args.name {
             builder.add_name(x);
+        }
+        if let Some(x) = args.did {
+            builder.add_did(x);
         }
         if let Some(x) = args.id {
             builder.add_id(x);
@@ -4689,6 +4835,19 @@ impl<'a> AccountHandle<'a> {
             self._tab
                 .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
                     AccountHandle::VT_ID,
+                    None,
+                )
+        }
+    }
+    #[inline]
+    pub fn did(&self) -> Option<flatbuffers::Vector<'a, u8>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                    AccountHandle::VT_DID,
                     None,
                 )
         }
@@ -4718,6 +4877,11 @@ impl flatbuffers::Verifiable for AccountHandle<'_> {
                 Self::VT_ID,
                 false,
             )?
+            .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>(
+                "did",
+                Self::VT_DID,
+                false,
+            )?
             .visit_field::<flatbuffers::ForwardsUOffset<&str>>("name", Self::VT_NAME, false)?
             .finish();
         Ok(())
@@ -4725,6 +4889,7 @@ impl flatbuffers::Verifiable for AccountHandle<'_> {
 }
 pub struct AccountHandleArgs<'a> {
     pub id: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
+    pub did: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
     pub name: Option<flatbuffers::WIPOffset<&'a str>>,
 }
 impl<'a> Default for AccountHandleArgs<'a> {
@@ -4732,6 +4897,7 @@ impl<'a> Default for AccountHandleArgs<'a> {
     fn default() -> Self {
         AccountHandleArgs {
             id: None,
+            did: None,
             name: None,
         }
     }
@@ -4746,6 +4912,11 @@ impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> AccountHandleBuilder<'a, 'b, A>
     pub fn add_id(&mut self, id: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>) {
         self.fbb_
             .push_slot_always::<flatbuffers::WIPOffset<_>>(AccountHandle::VT_ID, id);
+    }
+    #[inline]
+    pub fn add_did(&mut self, did: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(AccountHandle::VT_DID, did);
     }
     #[inline]
     pub fn add_name(&mut self, name: flatbuffers::WIPOffset<&'b str>) {
@@ -4773,6 +4944,7 @@ impl core::fmt::Debug for AccountHandle<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let mut ds = f.debug_struct("AccountHandle");
         ds.field("id", &self.id());
+        ds.field("did", &self.did());
         ds.field("name", &self.name());
         ds.finish()
     }
@@ -15919,16 +16091,16 @@ impl core::fmt::Debug for AttachmentsEmbedded<'_> {
         ds.finish()
     }
 }
-pub enum ResourceRefOffset {}
+pub enum ResourceHandleOffset {}
 #[derive(Copy, Clone, PartialEq)]
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-pub struct ResourceRef<'a> {
+pub struct ResourceHandle<'a> {
     pub _tab: flatbuffers::Table<'a>,
 }
 
-impl<'a> flatbuffers::Follow<'a> for ResourceRef<'a> {
-    type Inner = ResourceRef<'a>;
+impl<'a> flatbuffers::Follow<'a> for ResourceHandle<'a> {
+    type Inner = ResourceHandle<'a>;
     #[inline]
     unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
         Self {
@@ -15937,24 +16109,28 @@ impl<'a> flatbuffers::Follow<'a> for ResourceRef<'a> {
     }
 }
 
-impl<'a> ResourceRef<'a> {
+impl<'a> ResourceHandle<'a> {
     pub const VT_ACCOUNT: flatbuffers::VOffsetT = 4;
     pub const VT_TYPE_: flatbuffers::VOffsetT = 6;
     pub const VT_ID: flatbuffers::VOffsetT = 8;
-    pub const VT_NAME: flatbuffers::VOffsetT = 10;
+    pub const VT_DID: flatbuffers::VOffsetT = 10;
+    pub const VT_NAME: flatbuffers::VOffsetT = 12;
 
     #[inline]
     pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
-        ResourceRef { _tab: table }
+        ResourceHandle { _tab: table }
     }
     #[allow(unused_mut)]
     pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
         _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
-        args: &'args ResourceRefArgs<'args>,
-    ) -> flatbuffers::WIPOffset<ResourceRef<'bldr>> {
-        let mut builder = ResourceRefBuilder::new(_fbb);
+        args: &'args ResourceHandleArgs<'args>,
+    ) -> flatbuffers::WIPOffset<ResourceHandle<'bldr>> {
+        let mut builder = ResourceHandleBuilder::new(_fbb);
         if let Some(x) = args.name {
             builder.add_name(x);
+        }
+        if let Some(x) = args.did {
+            builder.add_did(x);
         }
         if let Some(x) = args.id {
             builder.add_id(x);
@@ -15969,13 +16145,16 @@ impl<'a> ResourceRef<'a> {
     }
 
     #[inline]
-    pub fn account(&self) -> Option<AccountRef<'a>> {
+    pub fn account(&self) -> Option<AccountHandle<'a>> {
         // Safety:
         // Created from valid Table for this object
         // which contains a valid value in this slot
         unsafe {
             self._tab
-                .get::<flatbuffers::ForwardsUOffset<AccountRef>>(ResourceRef::VT_ACCOUNT, None)
+                .get::<flatbuffers::ForwardsUOffset<AccountHandle>>(
+                    ResourceHandle::VT_ACCOUNT,
+                    None,
+                )
         }
     }
     #[inline]
@@ -15985,7 +16164,7 @@ impl<'a> ResourceRef<'a> {
         // which contains a valid value in this slot
         unsafe {
             self._tab
-                .get::<flatbuffers::ForwardsUOffset<&str>>(ResourceRef::VT_TYPE_, None)
+                .get::<flatbuffers::ForwardsUOffset<&str>>(ResourceHandle::VT_TYPE_, None)
         }
     }
     #[inline]
@@ -15996,7 +16175,20 @@ impl<'a> ResourceRef<'a> {
         unsafe {
             self._tab
                 .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
-                    ResourceRef::VT_ID,
+                    ResourceHandle::VT_ID,
+                    None,
+                )
+        }
+    }
+    #[inline]
+    pub fn did(&self) -> Option<flatbuffers::Vector<'a, u8>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                    ResourceHandle::VT_DID,
                     None,
                 )
         }
@@ -16008,12 +16200,12 @@ impl<'a> ResourceRef<'a> {
         // which contains a valid value in this slot
         unsafe {
             self._tab
-                .get::<flatbuffers::ForwardsUOffset<&str>>(ResourceRef::VT_NAME, None)
+                .get::<flatbuffers::ForwardsUOffset<&str>>(ResourceHandle::VT_NAME, None)
         }
     }
 }
 
-impl flatbuffers::Verifiable for ResourceRef<'_> {
+impl flatbuffers::Verifiable for ResourceHandle<'_> {
     #[inline]
     fn run_verifier(
         v: &mut flatbuffers::Verifier,
@@ -16021,7 +16213,7 @@ impl flatbuffers::Verifiable for ResourceRef<'_> {
     ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
         use self::flatbuffers::Verifiable;
         v.visit_table(pos)?
-            .visit_field::<flatbuffers::ForwardsUOffset<AccountRef>>(
+            .visit_field::<flatbuffers::ForwardsUOffset<AccountHandle>>(
                 "account",
                 Self::VT_ACCOUNT,
                 false,
@@ -16032,80 +16224,93 @@ impl flatbuffers::Verifiable for ResourceRef<'_> {
                 Self::VT_ID,
                 false,
             )?
+            .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>(
+                "did",
+                Self::VT_DID,
+                false,
+            )?
             .visit_field::<flatbuffers::ForwardsUOffset<&str>>("name", Self::VT_NAME, false)?
             .finish();
         Ok(())
     }
 }
-pub struct ResourceRefArgs<'a> {
-    pub account: Option<flatbuffers::WIPOffset<AccountRef<'a>>>,
+pub struct ResourceHandleArgs<'a> {
+    pub account: Option<flatbuffers::WIPOffset<AccountHandle<'a>>>,
     pub type_: Option<flatbuffers::WIPOffset<&'a str>>,
     pub id: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
+    pub did: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
     pub name: Option<flatbuffers::WIPOffset<&'a str>>,
 }
-impl<'a> Default for ResourceRefArgs<'a> {
+impl<'a> Default for ResourceHandleArgs<'a> {
     #[inline]
     fn default() -> Self {
-        ResourceRefArgs {
+        ResourceHandleArgs {
             account: None,
             type_: None,
             id: None,
+            did: None,
             name: None,
         }
     }
 }
 
-pub struct ResourceRefBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+pub struct ResourceHandleBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
     fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
     start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
 }
-impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> ResourceRefBuilder<'a, 'b, A> {
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> ResourceHandleBuilder<'a, 'b, A> {
     #[inline]
-    pub fn add_account(&mut self, account: flatbuffers::WIPOffset<AccountRef<'b>>) {
+    pub fn add_account(&mut self, account: flatbuffers::WIPOffset<AccountHandle<'b>>) {
         self.fbb_
-            .push_slot_always::<flatbuffers::WIPOffset<AccountRef>>(
-                ResourceRef::VT_ACCOUNT,
+            .push_slot_always::<flatbuffers::WIPOffset<AccountHandle>>(
+                ResourceHandle::VT_ACCOUNT,
                 account,
             );
     }
     #[inline]
     pub fn add_type_(&mut self, type_: flatbuffers::WIPOffset<&'b str>) {
         self.fbb_
-            .push_slot_always::<flatbuffers::WIPOffset<_>>(ResourceRef::VT_TYPE_, type_);
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(ResourceHandle::VT_TYPE_, type_);
     }
     #[inline]
     pub fn add_id(&mut self, id: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>) {
         self.fbb_
-            .push_slot_always::<flatbuffers::WIPOffset<_>>(ResourceRef::VT_ID, id);
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(ResourceHandle::VT_ID, id);
+    }
+    #[inline]
+    pub fn add_did(&mut self, did: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(ResourceHandle::VT_DID, did);
     }
     #[inline]
     pub fn add_name(&mut self, name: flatbuffers::WIPOffset<&'b str>) {
         self.fbb_
-            .push_slot_always::<flatbuffers::WIPOffset<_>>(ResourceRef::VT_NAME, name);
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(ResourceHandle::VT_NAME, name);
     }
     #[inline]
     pub fn new(
         _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
-    ) -> ResourceRefBuilder<'a, 'b, A> {
+    ) -> ResourceHandleBuilder<'a, 'b, A> {
         let start = _fbb.start_table();
-        ResourceRefBuilder {
+        ResourceHandleBuilder {
             fbb_: _fbb,
             start_: start,
         }
     }
     #[inline]
-    pub fn finish(self) -> flatbuffers::WIPOffset<ResourceRef<'a>> {
+    pub fn finish(self) -> flatbuffers::WIPOffset<ResourceHandle<'a>> {
         let o = self.fbb_.end_table(self.start_);
         flatbuffers::WIPOffset::new(o.value())
     }
 }
 
-impl core::fmt::Debug for ResourceRef<'_> {
+impl core::fmt::Debug for ResourceHandle<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        let mut ds = f.debug_struct("ResourceRef");
+        let mut ds = f.debug_struct("ResourceHandle");
         ds.field("account", &self.account());
         ds.field("type_", &self.type_());
         ds.field("id", &self.id());
+        ds.field("did", &self.did());
         ds.field("name", &self.name());
         ds.finish()
     }
@@ -16156,13 +16361,13 @@ impl<'a> Attribute<'a> {
     }
 
     #[inline]
-    pub fn object(&self) -> Option<ResourceRef<'a>> {
+    pub fn object(&self) -> Option<ResourceHandle<'a>> {
         // Safety:
         // Created from valid Table for this object
         // which contains a valid value in this slot
         unsafe {
             self._tab
-                .get::<flatbuffers::ForwardsUOffset<ResourceRef>>(Attribute::VT_OBJECT, None)
+                .get::<flatbuffers::ForwardsUOffset<ResourceHandle>>(Attribute::VT_OBJECT, None)
         }
     }
     #[inline]
@@ -16195,7 +16400,7 @@ impl flatbuffers::Verifiable for Attribute<'_> {
     ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
         use self::flatbuffers::Verifiable;
         v.visit_table(pos)?
-            .visit_field::<flatbuffers::ForwardsUOffset<ResourceRef>>(
+            .visit_field::<flatbuffers::ForwardsUOffset<ResourceHandle>>(
                 "object",
                 Self::VT_OBJECT,
                 false,
@@ -16207,7 +16412,7 @@ impl flatbuffers::Verifiable for Attribute<'_> {
     }
 }
 pub struct AttributeArgs<'a> {
-    pub object: Option<flatbuffers::WIPOffset<ResourceRef<'a>>>,
+    pub object: Option<flatbuffers::WIPOffset<ResourceHandle<'a>>>,
     pub name: Option<flatbuffers::WIPOffset<&'a str>>,
     pub value: Option<flatbuffers::WIPOffset<&'a str>>,
 }
@@ -16228,9 +16433,12 @@ pub struct AttributeBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
 }
 impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> AttributeBuilder<'a, 'b, A> {
     #[inline]
-    pub fn add_object(&mut self, object: flatbuffers::WIPOffset<ResourceRef<'b>>) {
+    pub fn add_object(&mut self, object: flatbuffers::WIPOffset<ResourceHandle<'b>>) {
         self.fbb_
-            .push_slot_always::<flatbuffers::WIPOffset<ResourceRef>>(Attribute::VT_OBJECT, object);
+            .push_slot_always::<flatbuffers::WIPOffset<ResourceHandle>>(
+                Attribute::VT_OBJECT,
+                object,
+            );
     }
     #[inline]
     pub fn add_name(&mut self, name: flatbuffers::WIPOffset<&'b str>) {
@@ -16263,6 +16471,751 @@ impl core::fmt::Debug for Attribute<'_> {
         ds.field("object", &self.object());
         ds.field("name", &self.name());
         ds.field("value", &self.value());
+        ds.finish()
+    }
+}
+pub enum ResourceRefOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+pub struct ResourceRef<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for ResourceRef<'a> {
+    type Inner = ResourceRef<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: unsafe { flatbuffers::Table::new(buf, loc) },
+        }
+    }
+}
+
+impl<'a> ResourceRef<'a> {
+    pub const VT_ACCOUNT: flatbuffers::VOffsetT = 4;
+    pub const VT_TYPE_: flatbuffers::VOffsetT = 6;
+    pub const VT_ID: flatbuffers::VOffsetT = 8;
+    pub const VT_DID: flatbuffers::VOffsetT = 10;
+    pub const VT_NAME: flatbuffers::VOffsetT = 12;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        ResourceRef { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
+        args: &'args ResourceRefArgs<'args>,
+    ) -> flatbuffers::WIPOffset<ResourceRef<'bldr>> {
+        let mut builder = ResourceRefBuilder::new(_fbb);
+        if let Some(x) = args.name {
+            builder.add_name(x);
+        }
+        if let Some(x) = args.did {
+            builder.add_did(x);
+        }
+        if let Some(x) = args.id {
+            builder.add_id(x);
+        }
+        if let Some(x) = args.type_ {
+            builder.add_type_(x);
+        }
+        if let Some(x) = args.account {
+            builder.add_account(x);
+        }
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn account(&self) -> Option<AccountRef<'a>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<AccountRef>>(ResourceRef::VT_ACCOUNT, None)
+        }
+    }
+    #[inline]
+    pub fn type_(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<&str>>(ResourceRef::VT_TYPE_, None)
+        }
+    }
+    #[inline]
+    pub fn id(&self) -> Option<flatbuffers::Vector<'a, u8>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                    ResourceRef::VT_ID,
+                    None,
+                )
+        }
+    }
+    #[inline]
+    pub fn did(&self) -> Option<flatbuffers::Vector<'a, u8>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                    ResourceRef::VT_DID,
+                    None,
+                )
+        }
+    }
+    #[inline]
+    pub fn name(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<&str>>(ResourceRef::VT_NAME, None)
+        }
+    }
+}
+
+impl flatbuffers::Verifiable for ResourceRef<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<flatbuffers::ForwardsUOffset<AccountRef>>(
+                "account",
+                Self::VT_ACCOUNT,
+                false,
+            )?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>("type_", Self::VT_TYPE_, false)?
+            .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>(
+                "id",
+                Self::VT_ID,
+                false,
+            )?
+            .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>(
+                "did",
+                Self::VT_DID,
+                false,
+            )?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>("name", Self::VT_NAME, false)?
+            .finish();
+        Ok(())
+    }
+}
+pub struct ResourceRefArgs<'a> {
+    pub account: Option<flatbuffers::WIPOffset<AccountRef<'a>>>,
+    pub type_: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub id: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
+    pub did: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
+    pub name: Option<flatbuffers::WIPOffset<&'a str>>,
+}
+impl<'a> Default for ResourceRefArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        ResourceRefArgs {
+            account: None,
+            type_: None,
+            id: None,
+            did: None,
+            name: None,
+        }
+    }
+}
+
+pub struct ResourceRefBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> ResourceRefBuilder<'a, 'b, A> {
+    #[inline]
+    pub fn add_account(&mut self, account: flatbuffers::WIPOffset<AccountRef<'b>>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<AccountRef>>(
+                ResourceRef::VT_ACCOUNT,
+                account,
+            );
+    }
+    #[inline]
+    pub fn add_type_(&mut self, type_: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(ResourceRef::VT_TYPE_, type_);
+    }
+    #[inline]
+    pub fn add_id(&mut self, id: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(ResourceRef::VT_ID, id);
+    }
+    #[inline]
+    pub fn add_did(&mut self, did: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(ResourceRef::VT_DID, did);
+    }
+    #[inline]
+    pub fn add_name(&mut self, name: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(ResourceRef::VT_NAME, name);
+    }
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    ) -> ResourceRefBuilder<'a, 'b, A> {
+        let start = _fbb.start_table();
+        ResourceRefBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<ResourceRef<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for ResourceRef<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("ResourceRef");
+        ds.field("account", &self.account());
+        ds.field("type_", &self.type_());
+        ds.field("id", &self.id());
+        ds.field("did", &self.did());
+        ds.field("name", &self.name());
+        ds.finish()
+    }
+}
+pub enum AttributeInputOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+pub struct AttributeInput<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for AttributeInput<'a> {
+    type Inner = AttributeInput<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: unsafe { flatbuffers::Table::new(buf, loc) },
+        }
+    }
+}
+
+impl<'a> AttributeInput<'a> {
+    pub const VT_OBJECT: flatbuffers::VOffsetT = 4;
+    pub const VT_NAME: flatbuffers::VOffsetT = 6;
+    pub const VT_VALUE: flatbuffers::VOffsetT = 8;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        AttributeInput { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
+        args: &'args AttributeInputArgs<'args>,
+    ) -> flatbuffers::WIPOffset<AttributeInput<'bldr>> {
+        let mut builder = AttributeInputBuilder::new(_fbb);
+        if let Some(x) = args.value {
+            builder.add_value(x);
+        }
+        if let Some(x) = args.name {
+            builder.add_name(x);
+        }
+        if let Some(x) = args.object {
+            builder.add_object(x);
+        }
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn object(&self) -> Option<ResourceRef<'a>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<ResourceRef>>(AttributeInput::VT_OBJECT, None)
+        }
+    }
+    #[inline]
+    pub fn name(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<&str>>(AttributeInput::VT_NAME, None)
+        }
+    }
+    #[inline]
+    pub fn value(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<&str>>(AttributeInput::VT_VALUE, None)
+        }
+    }
+}
+
+impl flatbuffers::Verifiable for AttributeInput<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<flatbuffers::ForwardsUOffset<ResourceRef>>(
+                "object",
+                Self::VT_OBJECT,
+                false,
+            )?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>("name", Self::VT_NAME, false)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>("value", Self::VT_VALUE, false)?
+            .finish();
+        Ok(())
+    }
+}
+pub struct AttributeInputArgs<'a> {
+    pub object: Option<flatbuffers::WIPOffset<ResourceRef<'a>>>,
+    pub name: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub value: Option<flatbuffers::WIPOffset<&'a str>>,
+}
+impl<'a> Default for AttributeInputArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        AttributeInputArgs {
+            object: None,
+            name: None,
+            value: None,
+        }
+    }
+}
+
+pub struct AttributeInputBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> AttributeInputBuilder<'a, 'b, A> {
+    #[inline]
+    pub fn add_object(&mut self, object: flatbuffers::WIPOffset<ResourceRef<'b>>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<ResourceRef>>(
+                AttributeInput::VT_OBJECT,
+                object,
+            );
+    }
+    #[inline]
+    pub fn add_name(&mut self, name: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(AttributeInput::VT_NAME, name);
+    }
+    #[inline]
+    pub fn add_value(&mut self, value: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(AttributeInput::VT_VALUE, value);
+    }
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    ) -> AttributeInputBuilder<'a, 'b, A> {
+        let start = _fbb.start_table();
+        AttributeInputBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<AttributeInput<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for AttributeInput<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("AttributeInput");
+        ds.field("object", &self.object());
+        ds.field("name", &self.name());
+        ds.field("value", &self.value());
+        ds.finish()
+    }
+}
+pub enum ValueHandleOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+pub struct ValueHandle<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for ValueHandle<'a> {
+    type Inner = ValueHandle<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: unsafe { flatbuffers::Table::new(buf, loc) },
+        }
+    }
+}
+
+impl<'a> ValueHandle<'a> {
+    pub const VT_ACCOUNT: flatbuffers::VOffsetT = 4;
+    pub const VT_TYPE_: flatbuffers::VOffsetT = 6;
+    pub const VT_ID: flatbuffers::VOffsetT = 8;
+    pub const VT_NAME: flatbuffers::VOffsetT = 10;
+    pub const VT_PATH: flatbuffers::VOffsetT = 12;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        ValueHandle { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
+        args: &'args ValueHandleArgs<'args>,
+    ) -> flatbuffers::WIPOffset<ValueHandle<'bldr>> {
+        let mut builder = ValueHandleBuilder::new(_fbb);
+        if let Some(x) = args.path {
+            builder.add_path(x);
+        }
+        if let Some(x) = args.name {
+            builder.add_name(x);
+        }
+        if let Some(x) = args.id {
+            builder.add_id(x);
+        }
+        if let Some(x) = args.type_ {
+            builder.add_type_(x);
+        }
+        if let Some(x) = args.account {
+            builder.add_account(x);
+        }
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn account(&self) -> Option<AccountHandle<'a>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<AccountHandle>>(ValueHandle::VT_ACCOUNT, None)
+        }
+    }
+    #[inline]
+    pub fn type_(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<&str>>(ValueHandle::VT_TYPE_, None)
+        }
+    }
+    #[inline]
+    pub fn id(&self) -> Option<flatbuffers::Vector<'a, u8>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, u8>>>(
+                    ValueHandle::VT_ID,
+                    None,
+                )
+        }
+    }
+    #[inline]
+    pub fn name(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<&str>>(ValueHandle::VT_NAME, None)
+        }
+    }
+    #[inline]
+    pub fn path(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<&str>>(ValueHandle::VT_PATH, None)
+        }
+    }
+}
+
+impl flatbuffers::Verifiable for ValueHandle<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<flatbuffers::ForwardsUOffset<AccountHandle>>(
+                "account",
+                Self::VT_ACCOUNT,
+                false,
+            )?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>("type_", Self::VT_TYPE_, false)?
+            .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, u8>>>(
+                "id",
+                Self::VT_ID,
+                false,
+            )?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>("name", Self::VT_NAME, false)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>("path", Self::VT_PATH, false)?
+            .finish();
+        Ok(())
+    }
+}
+pub struct ValueHandleArgs<'a> {
+    pub account: Option<flatbuffers::WIPOffset<AccountHandle<'a>>>,
+    pub type_: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub id: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, u8>>>,
+    pub name: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub path: Option<flatbuffers::WIPOffset<&'a str>>,
+}
+impl<'a> Default for ValueHandleArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        ValueHandleArgs {
+            account: None,
+            type_: None,
+            id: None,
+            name: None,
+            path: None,
+        }
+    }
+}
+
+pub struct ValueHandleBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> ValueHandleBuilder<'a, 'b, A> {
+    #[inline]
+    pub fn add_account(&mut self, account: flatbuffers::WIPOffset<AccountHandle<'b>>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<AccountHandle>>(
+                ValueHandle::VT_ACCOUNT,
+                account,
+            );
+    }
+    #[inline]
+    pub fn add_type_(&mut self, type_: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(ValueHandle::VT_TYPE_, type_);
+    }
+    #[inline]
+    pub fn add_id(&mut self, id: flatbuffers::WIPOffset<flatbuffers::Vector<'b, u8>>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(ValueHandle::VT_ID, id);
+    }
+    #[inline]
+    pub fn add_name(&mut self, name: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(ValueHandle::VT_NAME, name);
+    }
+    #[inline]
+    pub fn add_path(&mut self, path: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(ValueHandle::VT_PATH, path);
+    }
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    ) -> ValueHandleBuilder<'a, 'b, A> {
+        let start = _fbb.start_table();
+        ValueHandleBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<ValueHandle<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for ValueHandle<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("ValueHandle");
+        ds.field("account", &self.account());
+        ds.field("type_", &self.type_());
+        ds.field("id", &self.id());
+        ds.field("name", &self.name());
+        ds.field("path", &self.path());
+        ds.finish()
+    }
+}
+pub enum AwsCredentialsOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+pub struct AwsCredentials<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for AwsCredentials<'a> {
+    type Inner = AwsCredentials<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: unsafe { flatbuffers::Table::new(buf, loc) },
+        }
+    }
+}
+
+impl<'a> AwsCredentials<'a> {
+    pub const VT_ACCESS_KEY: flatbuffers::VOffsetT = 4;
+    pub const VT_SECRET_KEY: flatbuffers::VOffsetT = 6;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        AwsCredentials { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
+        args: &'args AwsCredentialsArgs<'args>,
+    ) -> flatbuffers::WIPOffset<AwsCredentials<'bldr>> {
+        let mut builder = AwsCredentialsBuilder::new(_fbb);
+        if let Some(x) = args.secret_key {
+            builder.add_secret_key(x);
+        }
+        if let Some(x) = args.access_key {
+            builder.add_access_key(x);
+        }
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn access_key(&self) -> Option<ValueHandle<'a>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab.get::<flatbuffers::ForwardsUOffset<ValueHandle>>(
+                AwsCredentials::VT_ACCESS_KEY,
+                None,
+            )
+        }
+    }
+    #[inline]
+    pub fn secret_key(&self) -> Option<ValueHandle<'a>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab.get::<flatbuffers::ForwardsUOffset<ValueHandle>>(
+                AwsCredentials::VT_SECRET_KEY,
+                None,
+            )
+        }
+    }
+}
+
+impl flatbuffers::Verifiable for AwsCredentials<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<flatbuffers::ForwardsUOffset<ValueHandle>>(
+                "access_key",
+                Self::VT_ACCESS_KEY,
+                false,
+            )?
+            .visit_field::<flatbuffers::ForwardsUOffset<ValueHandle>>(
+                "secret_key",
+                Self::VT_SECRET_KEY,
+                false,
+            )?
+            .finish();
+        Ok(())
+    }
+}
+pub struct AwsCredentialsArgs<'a> {
+    pub access_key: Option<flatbuffers::WIPOffset<ValueHandle<'a>>>,
+    pub secret_key: Option<flatbuffers::WIPOffset<ValueHandle<'a>>>,
+}
+impl<'a> Default for AwsCredentialsArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        AwsCredentialsArgs {
+            access_key: None,
+            secret_key: None,
+        }
+    }
+}
+
+pub struct AwsCredentialsBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> AwsCredentialsBuilder<'a, 'b, A> {
+    #[inline]
+    pub fn add_access_key(&mut self, access_key: flatbuffers::WIPOffset<ValueHandle<'b>>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<ValueHandle>>(
+                AwsCredentials::VT_ACCESS_KEY,
+                access_key,
+            );
+    }
+    #[inline]
+    pub fn add_secret_key(&mut self, secret_key: flatbuffers::WIPOffset<ValueHandle<'b>>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<ValueHandle>>(
+                AwsCredentials::VT_SECRET_KEY,
+                secret_key,
+            );
+    }
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    ) -> AwsCredentialsBuilder<'a, 'b, A> {
+        let start = _fbb.start_table();
+        AwsCredentialsBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<AwsCredentials<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for AwsCredentials<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("AwsCredentials");
+        ds.field("access_key", &self.access_key());
+        ds.field("secret_key", &self.secret_key());
         ds.finish()
     }
 }
@@ -16475,16 +17428,16 @@ impl core::fmt::Debug for ValueRef<'_> {
         ds.finish()
     }
 }
-pub enum AwsCredentialsOffset {}
+pub enum AwsCredentialsInputOffset {}
 #[derive(Copy, Clone, PartialEq)]
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-pub struct AwsCredentials<'a> {
+pub struct AwsCredentialsInput<'a> {
     pub _tab: flatbuffers::Table<'a>,
 }
 
-impl<'a> flatbuffers::Follow<'a> for AwsCredentials<'a> {
-    type Inner = AwsCredentials<'a>;
+impl<'a> flatbuffers::Follow<'a> for AwsCredentialsInput<'a> {
+    type Inner = AwsCredentialsInput<'a>;
     #[inline]
     unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
         Self {
@@ -16493,20 +17446,20 @@ impl<'a> flatbuffers::Follow<'a> for AwsCredentials<'a> {
     }
 }
 
-impl<'a> AwsCredentials<'a> {
+impl<'a> AwsCredentialsInput<'a> {
     pub const VT_ACCESS_KEY: flatbuffers::VOffsetT = 4;
     pub const VT_SECRET_KEY: flatbuffers::VOffsetT = 6;
 
     #[inline]
     pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
-        AwsCredentials { _tab: table }
+        AwsCredentialsInput { _tab: table }
     }
     #[allow(unused_mut)]
     pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
         _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
-        args: &'args AwsCredentialsArgs<'args>,
-    ) -> flatbuffers::WIPOffset<AwsCredentials<'bldr>> {
-        let mut builder = AwsCredentialsBuilder::new(_fbb);
+        args: &'args AwsCredentialsInputArgs<'args>,
+    ) -> flatbuffers::WIPOffset<AwsCredentialsInput<'bldr>> {
+        let mut builder = AwsCredentialsInputBuilder::new(_fbb);
         if let Some(x) = args.secret_key {
             builder.add_secret_key(x);
         }
@@ -16522,8 +17475,10 @@ impl<'a> AwsCredentials<'a> {
         // Created from valid Table for this object
         // which contains a valid value in this slot
         unsafe {
-            self._tab
-                .get::<flatbuffers::ForwardsUOffset<ValueRef>>(AwsCredentials::VT_ACCESS_KEY, None)
+            self._tab.get::<flatbuffers::ForwardsUOffset<ValueRef>>(
+                AwsCredentialsInput::VT_ACCESS_KEY,
+                None,
+            )
         }
     }
     #[inline]
@@ -16532,13 +17487,15 @@ impl<'a> AwsCredentials<'a> {
         // Created from valid Table for this object
         // which contains a valid value in this slot
         unsafe {
-            self._tab
-                .get::<flatbuffers::ForwardsUOffset<ValueRef>>(AwsCredentials::VT_SECRET_KEY, None)
+            self._tab.get::<flatbuffers::ForwardsUOffset<ValueRef>>(
+                AwsCredentialsInput::VT_SECRET_KEY,
+                None,
+            )
         }
     }
 }
 
-impl flatbuffers::Verifiable for AwsCredentials<'_> {
+impl flatbuffers::Verifiable for AwsCredentialsInput<'_> {
     #[inline]
     fn run_verifier(
         v: &mut flatbuffers::Verifier,
@@ -16560,30 +17517,30 @@ impl flatbuffers::Verifiable for AwsCredentials<'_> {
         Ok(())
     }
 }
-pub struct AwsCredentialsArgs<'a> {
+pub struct AwsCredentialsInputArgs<'a> {
     pub access_key: Option<flatbuffers::WIPOffset<ValueRef<'a>>>,
     pub secret_key: Option<flatbuffers::WIPOffset<ValueRef<'a>>>,
 }
-impl<'a> Default for AwsCredentialsArgs<'a> {
+impl<'a> Default for AwsCredentialsInputArgs<'a> {
     #[inline]
     fn default() -> Self {
-        AwsCredentialsArgs {
+        AwsCredentialsInputArgs {
             access_key: None,
             secret_key: None,
         }
     }
 }
 
-pub struct AwsCredentialsBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+pub struct AwsCredentialsInputBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
     fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
     start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
 }
-impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> AwsCredentialsBuilder<'a, 'b, A> {
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> AwsCredentialsInputBuilder<'a, 'b, A> {
     #[inline]
     pub fn add_access_key(&mut self, access_key: flatbuffers::WIPOffset<ValueRef<'b>>) {
         self.fbb_
             .push_slot_always::<flatbuffers::WIPOffset<ValueRef>>(
-                AwsCredentials::VT_ACCESS_KEY,
+                AwsCredentialsInput::VT_ACCESS_KEY,
                 access_key,
             );
     }
@@ -16591,30 +17548,30 @@ impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> AwsCredentialsBuilder<'a, 'b, A
     pub fn add_secret_key(&mut self, secret_key: flatbuffers::WIPOffset<ValueRef<'b>>) {
         self.fbb_
             .push_slot_always::<flatbuffers::WIPOffset<ValueRef>>(
-                AwsCredentials::VT_SECRET_KEY,
+                AwsCredentialsInput::VT_SECRET_KEY,
                 secret_key,
             );
     }
     #[inline]
     pub fn new(
         _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
-    ) -> AwsCredentialsBuilder<'a, 'b, A> {
+    ) -> AwsCredentialsInputBuilder<'a, 'b, A> {
         let start = _fbb.start_table();
-        AwsCredentialsBuilder {
+        AwsCredentialsInputBuilder {
             fbb_: _fbb,
             start_: start,
         }
     }
     #[inline]
-    pub fn finish(self) -> flatbuffers::WIPOffset<AwsCredentials<'a>> {
+    pub fn finish(self) -> flatbuffers::WIPOffset<AwsCredentialsInput<'a>> {
         let o = self.fbb_.end_table(self.start_);
         flatbuffers::WIPOffset::new(o.value())
     }
 }
 
-impl core::fmt::Debug for AwsCredentials<'_> {
+impl core::fmt::Debug for AwsCredentialsInput<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        let mut ds = f.debug_struct("AwsCredentials");
+        let mut ds = f.debug_struct("AwsCredentialsInput");
         ds.field("access_key", &self.access_key());
         ds.field("secret_key", &self.secret_key());
         ds.finish()
@@ -23880,16 +24837,13 @@ impl<'a> DatasetSpec<'a> {
         }
     }
     #[inline]
-    pub fn volume(&self) -> Option<PersistentVolumeRef<'a>> {
+    pub fn volume(&self) -> Option<ResourceHandle<'a>> {
         // Safety:
         // Created from valid Table for this object
         // which contains a valid value in this slot
         unsafe {
             self._tab
-                .get::<flatbuffers::ForwardsUOffset<PersistentVolumeRef>>(
-                    DatasetSpec::VT_VOLUME,
-                    None,
-                )
+                .get::<flatbuffers::ForwardsUOffset<ResourceHandle>>(DatasetSpec::VT_VOLUME, None)
         }
     }
 }
@@ -23911,7 +24865,7 @@ impl flatbuffers::Verifiable for DatasetSpec<'_> {
             .visit_field::<flatbuffers::ForwardsUOffset<
                 flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<MetadataEventWrapper>>,
             >>("metadata", Self::VT_METADATA, false)?
-            .visit_field::<flatbuffers::ForwardsUOffset<PersistentVolumeRef>>(
+            .visit_field::<flatbuffers::ForwardsUOffset<ResourceHandle>>(
                 "volume",
                 Self::VT_VOLUME,
                 false,
@@ -23928,7 +24882,7 @@ pub struct DatasetSpecArgs<'a> {
             flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<MetadataEventWrapper<'a>>>,
         >,
     >,
-    pub volume: Option<flatbuffers::WIPOffset<PersistentVolumeRef<'a>>>,
+    pub volume: Option<flatbuffers::WIPOffset<ResourceHandle<'a>>>,
 }
 impl<'a> Default for DatasetSpecArgs<'a> {
     #[inline]
@@ -23968,9 +24922,9 @@ impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> DatasetSpecBuilder<'a, 'b, A> {
             .push_slot_always::<flatbuffers::WIPOffset<_>>(DatasetSpec::VT_METADATA, metadata);
     }
     #[inline]
-    pub fn add_volume(&mut self, volume: flatbuffers::WIPOffset<PersistentVolumeRef<'b>>) {
+    pub fn add_volume(&mut self, volume: flatbuffers::WIPOffset<ResourceHandle<'b>>) {
         self.fbb_
-            .push_slot_always::<flatbuffers::WIPOffset<PersistentVolumeRef>>(
+            .push_slot_always::<flatbuffers::WIPOffset<ResourceHandle>>(
                 DatasetSpec::VT_VOLUME,
                 volume,
             );
@@ -24697,16 +25651,16 @@ impl core::fmt::Debug for ResourceSelector<'_> {
         ds.finish()
     }
 }
-pub enum FlowTriggerScheduleOffset {}
+pub enum FlowTriggerInputScheduleOffset {}
 #[derive(Copy, Clone, PartialEq)]
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-pub struct FlowTriggerSchedule<'a> {
+pub struct FlowTriggerInputSchedule<'a> {
     pub _tab: flatbuffers::Table<'a>,
 }
 
-impl<'a> flatbuffers::Follow<'a> for FlowTriggerSchedule<'a> {
-    type Inner = FlowTriggerSchedule<'a>;
+impl<'a> flatbuffers::Follow<'a> for FlowTriggerInputSchedule<'a> {
+    type Inner = FlowTriggerInputSchedule<'a>;
     #[inline]
     unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
         Self {
@@ -24715,19 +25669,19 @@ impl<'a> flatbuffers::Follow<'a> for FlowTriggerSchedule<'a> {
     }
 }
 
-impl<'a> FlowTriggerSchedule<'a> {
+impl<'a> FlowTriggerInputSchedule<'a> {
     pub const VT_CRON: flatbuffers::VOffsetT = 4;
 
     #[inline]
     pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
-        FlowTriggerSchedule { _tab: table }
+        FlowTriggerInputSchedule { _tab: table }
     }
     #[allow(unused_mut)]
     pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
         _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
-        args: &'args FlowTriggerScheduleArgs<'args>,
-    ) -> flatbuffers::WIPOffset<FlowTriggerSchedule<'bldr>> {
-        let mut builder = FlowTriggerScheduleBuilder::new(_fbb);
+        args: &'args FlowTriggerInputScheduleArgs<'args>,
+    ) -> flatbuffers::WIPOffset<FlowTriggerInputSchedule<'bldr>> {
+        let mut builder = FlowTriggerInputScheduleBuilder::new(_fbb);
         if let Some(x) = args.cron {
             builder.add_cron(x);
         }
@@ -24741,12 +25695,12 @@ impl<'a> FlowTriggerSchedule<'a> {
         // which contains a valid value in this slot
         unsafe {
             self._tab
-                .get::<flatbuffers::ForwardsUOffset<&str>>(FlowTriggerSchedule::VT_CRON, None)
+                .get::<flatbuffers::ForwardsUOffset<&str>>(FlowTriggerInputSchedule::VT_CRON, None)
         }
     }
 }
 
-impl flatbuffers::Verifiable for FlowTriggerSchedule<'_> {
+impl flatbuffers::Verifiable for FlowTriggerInputSchedule<'_> {
     #[inline]
     fn run_verifier(
         v: &mut flatbuffers::Verifier,
@@ -24759,60 +25713,60 @@ impl flatbuffers::Verifiable for FlowTriggerSchedule<'_> {
         Ok(())
     }
 }
-pub struct FlowTriggerScheduleArgs<'a> {
+pub struct FlowTriggerInputScheduleArgs<'a> {
     pub cron: Option<flatbuffers::WIPOffset<&'a str>>,
 }
-impl<'a> Default for FlowTriggerScheduleArgs<'a> {
+impl<'a> Default for FlowTriggerInputScheduleArgs<'a> {
     #[inline]
     fn default() -> Self {
-        FlowTriggerScheduleArgs { cron: None }
+        FlowTriggerInputScheduleArgs { cron: None }
     }
 }
 
-pub struct FlowTriggerScheduleBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+pub struct FlowTriggerInputScheduleBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
     fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
     start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
 }
-impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> FlowTriggerScheduleBuilder<'a, 'b, A> {
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> FlowTriggerInputScheduleBuilder<'a, 'b, A> {
     #[inline]
     pub fn add_cron(&mut self, cron: flatbuffers::WIPOffset<&'b str>) {
         self.fbb_
-            .push_slot_always::<flatbuffers::WIPOffset<_>>(FlowTriggerSchedule::VT_CRON, cron);
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(FlowTriggerInputSchedule::VT_CRON, cron);
     }
     #[inline]
     pub fn new(
         _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
-    ) -> FlowTriggerScheduleBuilder<'a, 'b, A> {
+    ) -> FlowTriggerInputScheduleBuilder<'a, 'b, A> {
         let start = _fbb.start_table();
-        FlowTriggerScheduleBuilder {
+        FlowTriggerInputScheduleBuilder {
             fbb_: _fbb,
             start_: start,
         }
     }
     #[inline]
-    pub fn finish(self) -> flatbuffers::WIPOffset<FlowTriggerSchedule<'a>> {
+    pub fn finish(self) -> flatbuffers::WIPOffset<FlowTriggerInputSchedule<'a>> {
         let o = self.fbb_.end_table(self.start_);
         flatbuffers::WIPOffset::new(o.value())
     }
 }
 
-impl core::fmt::Debug for FlowTriggerSchedule<'_> {
+impl core::fmt::Debug for FlowTriggerInputSchedule<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        let mut ds = f.debug_struct("FlowTriggerSchedule");
+        let mut ds = f.debug_struct("FlowTriggerInputSchedule");
         ds.field("cron", &self.cron());
         ds.finish()
     }
 }
-pub enum FlowTriggerEventOffset {}
+pub enum FlowTriggerInputEventOffset {}
 #[derive(Copy, Clone, PartialEq)]
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-pub struct FlowTriggerEvent<'a> {
+pub struct FlowTriggerInputEvent<'a> {
     pub _tab: flatbuffers::Table<'a>,
 }
 
-impl<'a> flatbuffers::Follow<'a> for FlowTriggerEvent<'a> {
-    type Inner = FlowTriggerEvent<'a>;
+impl<'a> flatbuffers::Follow<'a> for FlowTriggerInputEvent<'a> {
+    type Inner = FlowTriggerInputEvent<'a>;
     #[inline]
     unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
         Self {
@@ -24821,21 +25775,21 @@ impl<'a> flatbuffers::Follow<'a> for FlowTriggerEvent<'a> {
     }
 }
 
-impl<'a> FlowTriggerEvent<'a> {
+impl<'a> FlowTriggerInputEvent<'a> {
     pub const VT_EVENTS: flatbuffers::VOffsetT = 4;
     pub const VT_COOLDOWN: flatbuffers::VOffsetT = 6;
     pub const VT_COOLDOWN_MAX_BATCH: flatbuffers::VOffsetT = 8;
 
     #[inline]
     pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
-        FlowTriggerEvent { _tab: table }
+        FlowTriggerInputEvent { _tab: table }
     }
     #[allow(unused_mut)]
     pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
         _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
-        args: &'args FlowTriggerEventArgs<'args>,
-    ) -> flatbuffers::WIPOffset<FlowTriggerEvent<'bldr>> {
-        let mut builder = FlowTriggerEventBuilder::new(_fbb);
+        args: &'args FlowTriggerInputEventArgs<'args>,
+    ) -> flatbuffers::WIPOffset<FlowTriggerInputEvent<'bldr>> {
+        let mut builder = FlowTriggerInputEventBuilder::new(_fbb);
         if let Some(x) = args.cooldown_max_batch {
             builder.add_cooldown_max_batch(x);
         }
@@ -24854,8 +25808,10 @@ impl<'a> FlowTriggerEvent<'a> {
         // Created from valid Table for this object
         // which contains a valid value in this slot
         unsafe {
-            self._tab
-                .get::<flatbuffers::ForwardsUOffset<EventFilter>>(FlowTriggerEvent::VT_EVENTS, None)
+            self._tab.get::<flatbuffers::ForwardsUOffset<EventFilter>>(
+                FlowTriggerInputEvent::VT_EVENTS,
+                None,
+            )
         }
     }
     #[inline]
@@ -24865,7 +25821,7 @@ impl<'a> FlowTriggerEvent<'a> {
         // which contains a valid value in this slot
         unsafe {
             self._tab
-                .get::<Duration>(FlowTriggerEvent::VT_COOLDOWN, None)
+                .get::<Duration>(FlowTriggerInputEvent::VT_COOLDOWN, None)
         }
     }
     #[inline]
@@ -24875,12 +25831,12 @@ impl<'a> FlowTriggerEvent<'a> {
         // which contains a valid value in this slot
         unsafe {
             self._tab
-                .get::<u64>(FlowTriggerEvent::VT_COOLDOWN_MAX_BATCH, None)
+                .get::<u64>(FlowTriggerInputEvent::VT_COOLDOWN_MAX_BATCH, None)
         }
     }
 }
 
-impl flatbuffers::Verifiable for FlowTriggerEvent<'_> {
+impl flatbuffers::Verifiable for FlowTriggerInputEvent<'_> {
     #[inline]
     fn run_verifier(
         v: &mut flatbuffers::Verifier,
@@ -24899,15 +25855,15 @@ impl flatbuffers::Verifiable for FlowTriggerEvent<'_> {
         Ok(())
     }
 }
-pub struct FlowTriggerEventArgs<'a> {
+pub struct FlowTriggerInputEventArgs<'a> {
     pub events: Option<flatbuffers::WIPOffset<EventFilter<'a>>>,
     pub cooldown: Option<&'a Duration>,
     pub cooldown_max_batch: Option<u64>,
 }
-impl<'a> Default for FlowTriggerEventArgs<'a> {
+impl<'a> Default for FlowTriggerInputEventArgs<'a> {
     #[inline]
     fn default() -> Self {
-        FlowTriggerEventArgs {
+        FlowTriggerInputEventArgs {
             events: None,
             cooldown: None,
             cooldown_max_batch: None,
@@ -24915,65 +25871,67 @@ impl<'a> Default for FlowTriggerEventArgs<'a> {
     }
 }
 
-pub struct FlowTriggerEventBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+pub struct FlowTriggerInputEventBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
     fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
     start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
 }
-impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> FlowTriggerEventBuilder<'a, 'b, A> {
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> FlowTriggerInputEventBuilder<'a, 'b, A> {
     #[inline]
     pub fn add_events(&mut self, events: flatbuffers::WIPOffset<EventFilter<'b>>) {
         self.fbb_
             .push_slot_always::<flatbuffers::WIPOffset<EventFilter>>(
-                FlowTriggerEvent::VT_EVENTS,
+                FlowTriggerInputEvent::VT_EVENTS,
                 events,
             );
     }
     #[inline]
     pub fn add_cooldown(&mut self, cooldown: &Duration) {
         self.fbb_
-            .push_slot_always::<&Duration>(FlowTriggerEvent::VT_COOLDOWN, cooldown);
+            .push_slot_always::<&Duration>(FlowTriggerInputEvent::VT_COOLDOWN, cooldown);
     }
     #[inline]
     pub fn add_cooldown_max_batch(&mut self, cooldown_max_batch: u64) {
-        self.fbb_
-            .push_slot_always::<u64>(FlowTriggerEvent::VT_COOLDOWN_MAX_BATCH, cooldown_max_batch);
+        self.fbb_.push_slot_always::<u64>(
+            FlowTriggerInputEvent::VT_COOLDOWN_MAX_BATCH,
+            cooldown_max_batch,
+        );
     }
     #[inline]
     pub fn new(
         _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
-    ) -> FlowTriggerEventBuilder<'a, 'b, A> {
+    ) -> FlowTriggerInputEventBuilder<'a, 'b, A> {
         let start = _fbb.start_table();
-        FlowTriggerEventBuilder {
+        FlowTriggerInputEventBuilder {
             fbb_: _fbb,
             start_: start,
         }
     }
     #[inline]
-    pub fn finish(self) -> flatbuffers::WIPOffset<FlowTriggerEvent<'a>> {
+    pub fn finish(self) -> flatbuffers::WIPOffset<FlowTriggerInputEvent<'a>> {
         let o = self.fbb_.end_table(self.start_);
         flatbuffers::WIPOffset::new(o.value())
     }
 }
 
-impl core::fmt::Debug for FlowTriggerEvent<'_> {
+impl core::fmt::Debug for FlowTriggerInputEvent<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        let mut ds = f.debug_struct("FlowTriggerEvent");
+        let mut ds = f.debug_struct("FlowTriggerInputEvent");
         ds.field("events", &self.events());
         ds.field("cooldown", &self.cooldown());
         ds.field("cooldown_max_batch", &self.cooldown_max_batch());
         ds.finish()
     }
 }
-pub enum FlowTriggerSourceOffset {}
+pub enum FlowTriggerInputSourceOffset {}
 #[derive(Copy, Clone, PartialEq)]
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-pub struct FlowTriggerSource<'a> {
+pub struct FlowTriggerInputSource<'a> {
     pub _tab: flatbuffers::Table<'a>,
 }
 
-impl<'a> flatbuffers::Follow<'a> for FlowTriggerSource<'a> {
-    type Inner = FlowTriggerSource<'a>;
+impl<'a> flatbuffers::Follow<'a> for FlowTriggerInputSource<'a> {
+    type Inner = FlowTriggerInputSource<'a>;
     #[inline]
     unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
         Self {
@@ -24982,21 +25940,21 @@ impl<'a> flatbuffers::Follow<'a> for FlowTriggerSource<'a> {
     }
 }
 
-impl<'a> FlowTriggerSource<'a> {
+impl<'a> FlowTriggerInputSource<'a> {
     pub const VT_SOURCE: flatbuffers::VOffsetT = 4;
     pub const VT_MIN_RECORDS_TO_AWAIT: flatbuffers::VOffsetT = 6;
     pub const VT_MAX_AWAIT_INTERVAL: flatbuffers::VOffsetT = 8;
 
     #[inline]
     pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
-        FlowTriggerSource { _tab: table }
+        FlowTriggerInputSource { _tab: table }
     }
     #[allow(unused_mut)]
     pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
         _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
-        args: &'args FlowTriggerSourceArgs<'args>,
-    ) -> flatbuffers::WIPOffset<FlowTriggerSource<'bldr>> {
-        let mut builder = FlowTriggerSourceBuilder::new(_fbb);
+        args: &'args FlowTriggerInputSourceArgs<'args>,
+    ) -> flatbuffers::WIPOffset<FlowTriggerInputSource<'bldr>> {
+        let mut builder = FlowTriggerInputSourceBuilder::new(_fbb);
         if let Some(x) = args.min_records_to_await {
             builder.add_min_records_to_await(x);
         }
@@ -25016,7 +25974,7 @@ impl<'a> FlowTriggerSource<'a> {
         // which contains a valid value in this slot
         unsafe {
             self._tab.get::<flatbuffers::ForwardsUOffset<ResourceRef>>(
-                FlowTriggerSource::VT_SOURCE,
+                FlowTriggerInputSource::VT_SOURCE,
                 None,
             )
         }
@@ -25028,7 +25986,7 @@ impl<'a> FlowTriggerSource<'a> {
         // which contains a valid value in this slot
         unsafe {
             self._tab
-                .get::<u64>(FlowTriggerSource::VT_MIN_RECORDS_TO_AWAIT, None)
+                .get::<u64>(FlowTriggerInputSource::VT_MIN_RECORDS_TO_AWAIT, None)
         }
     }
     #[inline]
@@ -25038,12 +25996,12 @@ impl<'a> FlowTriggerSource<'a> {
         // which contains a valid value in this slot
         unsafe {
             self._tab
-                .get::<Duration>(FlowTriggerSource::VT_MAX_AWAIT_INTERVAL, None)
+                .get::<Duration>(FlowTriggerInputSource::VT_MAX_AWAIT_INTERVAL, None)
         }
     }
 }
 
-impl flatbuffers::Verifiable for FlowTriggerSource<'_> {
+impl flatbuffers::Verifiable for FlowTriggerInputSource<'_> {
     #[inline]
     fn run_verifier(
         v: &mut flatbuffers::Verifier,
@@ -25062,15 +26020,15 @@ impl flatbuffers::Verifiable for FlowTriggerSource<'_> {
         Ok(())
     }
 }
-pub struct FlowTriggerSourceArgs<'a> {
+pub struct FlowTriggerInputSourceArgs<'a> {
     pub source: Option<flatbuffers::WIPOffset<ResourceRef<'a>>>,
     pub min_records_to_await: Option<u64>,
     pub max_await_interval: Option<&'a Duration>,
 }
-impl<'a> Default for FlowTriggerSourceArgs<'a> {
+impl<'a> Default for FlowTriggerInputSourceArgs<'a> {
     #[inline]
     fn default() -> Self {
-        FlowTriggerSourceArgs {
+        FlowTriggerInputSourceArgs {
             source: None,
             min_records_to_await: None,
             max_await_interval: None,
@@ -25078,69 +26036,69 @@ impl<'a> Default for FlowTriggerSourceArgs<'a> {
     }
 }
 
-pub struct FlowTriggerSourceBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+pub struct FlowTriggerInputSourceBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
     fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
     start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
 }
-impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> FlowTriggerSourceBuilder<'a, 'b, A> {
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> FlowTriggerInputSourceBuilder<'a, 'b, A> {
     #[inline]
     pub fn add_source(&mut self, source: flatbuffers::WIPOffset<ResourceRef<'b>>) {
         self.fbb_
             .push_slot_always::<flatbuffers::WIPOffset<ResourceRef>>(
-                FlowTriggerSource::VT_SOURCE,
+                FlowTriggerInputSource::VT_SOURCE,
                 source,
             );
     }
     #[inline]
     pub fn add_min_records_to_await(&mut self, min_records_to_await: u64) {
         self.fbb_.push_slot_always::<u64>(
-            FlowTriggerSource::VT_MIN_RECORDS_TO_AWAIT,
+            FlowTriggerInputSource::VT_MIN_RECORDS_TO_AWAIT,
             min_records_to_await,
         );
     }
     #[inline]
     pub fn add_max_await_interval(&mut self, max_await_interval: &Duration) {
         self.fbb_.push_slot_always::<&Duration>(
-            FlowTriggerSource::VT_MAX_AWAIT_INTERVAL,
+            FlowTriggerInputSource::VT_MAX_AWAIT_INTERVAL,
             max_await_interval,
         );
     }
     #[inline]
     pub fn new(
         _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
-    ) -> FlowTriggerSourceBuilder<'a, 'b, A> {
+    ) -> FlowTriggerInputSourceBuilder<'a, 'b, A> {
         let start = _fbb.start_table();
-        FlowTriggerSourceBuilder {
+        FlowTriggerInputSourceBuilder {
             fbb_: _fbb,
             start_: start,
         }
     }
     #[inline]
-    pub fn finish(self) -> flatbuffers::WIPOffset<FlowTriggerSource<'a>> {
+    pub fn finish(self) -> flatbuffers::WIPOffset<FlowTriggerInputSource<'a>> {
         let o = self.fbb_.end_table(self.start_);
         flatbuffers::WIPOffset::new(o.value())
     }
 }
 
-impl core::fmt::Debug for FlowTriggerSource<'_> {
+impl core::fmt::Debug for FlowTriggerInputSource<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        let mut ds = f.debug_struct("FlowTriggerSource");
+        let mut ds = f.debug_struct("FlowTriggerInputSource");
         ds.field("source", &self.source());
         ds.field("min_records_to_await", &self.min_records_to_await());
         ds.field("max_await_interval", &self.max_await_interval());
         ds.finish()
     }
 }
-pub enum FlowTriggerDatasetOffset {}
+pub enum FlowTriggerInputDatasetOffset {}
 #[derive(Copy, Clone, PartialEq)]
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-pub struct FlowTriggerDataset<'a> {
+pub struct FlowTriggerInputDataset<'a> {
     pub _tab: flatbuffers::Table<'a>,
 }
 
-impl<'a> flatbuffers::Follow<'a> for FlowTriggerDataset<'a> {
-    type Inner = FlowTriggerDataset<'a>;
+impl<'a> flatbuffers::Follow<'a> for FlowTriggerInputDataset<'a> {
+    type Inner = FlowTriggerInputDataset<'a>;
     #[inline]
     unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
         Self {
@@ -25149,20 +26107,20 @@ impl<'a> flatbuffers::Follow<'a> for FlowTriggerDataset<'a> {
     }
 }
 
-impl<'a> FlowTriggerDataset<'a> {
+impl<'a> FlowTriggerInputDataset<'a> {
     pub const VT_DATASET: flatbuffers::VOffsetT = 4;
     pub const VT_EVENTS: flatbuffers::VOffsetT = 6;
 
     #[inline]
     pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
-        FlowTriggerDataset { _tab: table }
+        FlowTriggerInputDataset { _tab: table }
     }
     #[allow(unused_mut)]
     pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
         _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
-        args: &'args FlowTriggerDatasetArgs<'args>,
-    ) -> flatbuffers::WIPOffset<FlowTriggerDataset<'bldr>> {
-        let mut builder = FlowTriggerDatasetBuilder::new(_fbb);
+        args: &'args FlowTriggerInputDatasetArgs<'args>,
+    ) -> flatbuffers::WIPOffset<FlowTriggerInputDataset<'bldr>> {
+        let mut builder = FlowTriggerInputDatasetBuilder::new(_fbb);
         if let Some(x) = args.events {
             builder.add_events(x);
         }
@@ -25180,7 +26138,7 @@ impl<'a> FlowTriggerDataset<'a> {
         unsafe {
             self._tab
                 .get::<flatbuffers::ForwardsUOffset<DatasetSelector>>(
-                    FlowTriggerDataset::VT_DATASET,
+                    FlowTriggerInputDataset::VT_DATASET,
                     None,
                 )
         }
@@ -25193,12 +26151,12 @@ impl<'a> FlowTriggerDataset<'a> {
         unsafe {
             self._tab.get::<flatbuffers::ForwardsUOffset<
                 flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>,
-            >>(FlowTriggerDataset::VT_EVENTS, None)
+            >>(FlowTriggerInputDataset::VT_EVENTS, None)
         }
     }
 }
 
-impl flatbuffers::Verifiable for FlowTriggerDataset<'_> {
+impl flatbuffers::Verifiable for FlowTriggerInputDataset<'_> {
     #[inline]
     fn run_verifier(
         v: &mut flatbuffers::Verifier,
@@ -25218,32 +26176,32 @@ impl flatbuffers::Verifiable for FlowTriggerDataset<'_> {
         Ok(())
     }
 }
-pub struct FlowTriggerDatasetArgs<'a> {
+pub struct FlowTriggerInputDatasetArgs<'a> {
     pub dataset: Option<flatbuffers::WIPOffset<DatasetSelector<'a>>>,
     pub events: Option<
         flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>>,
     >,
 }
-impl<'a> Default for FlowTriggerDatasetArgs<'a> {
+impl<'a> Default for FlowTriggerInputDatasetArgs<'a> {
     #[inline]
     fn default() -> Self {
-        FlowTriggerDatasetArgs {
+        FlowTriggerInputDatasetArgs {
             dataset: None,
             events: None,
         }
     }
 }
 
-pub struct FlowTriggerDatasetBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+pub struct FlowTriggerInputDatasetBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
     fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
     start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
 }
-impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> FlowTriggerDatasetBuilder<'a, 'b, A> {
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> FlowTriggerInputDatasetBuilder<'a, 'b, A> {
     #[inline]
     pub fn add_dataset(&mut self, dataset: flatbuffers::WIPOffset<DatasetSelector<'b>>) {
         self.fbb_
             .push_slot_always::<flatbuffers::WIPOffset<DatasetSelector>>(
-                FlowTriggerDataset::VT_DATASET,
+                FlowTriggerInputDataset::VT_DATASET,
                 dataset,
             );
     }
@@ -25254,43 +26212,45 @@ impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> FlowTriggerDatasetBuilder<'a, '
             flatbuffers::Vector<'b, flatbuffers::ForwardsUOffset<&'b str>>,
         >,
     ) {
-        self.fbb_
-            .push_slot_always::<flatbuffers::WIPOffset<_>>(FlowTriggerDataset::VT_EVENTS, events);
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            FlowTriggerInputDataset::VT_EVENTS,
+            events,
+        );
     }
     #[inline]
     pub fn new(
         _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
-    ) -> FlowTriggerDatasetBuilder<'a, 'b, A> {
+    ) -> FlowTriggerInputDatasetBuilder<'a, 'b, A> {
         let start = _fbb.start_table();
-        FlowTriggerDatasetBuilder {
+        FlowTriggerInputDatasetBuilder {
             fbb_: _fbb,
             start_: start,
         }
     }
     #[inline]
-    pub fn finish(self) -> flatbuffers::WIPOffset<FlowTriggerDataset<'a>> {
+    pub fn finish(self) -> flatbuffers::WIPOffset<FlowTriggerInputDataset<'a>> {
         let o = self.fbb_.end_table(self.start_);
         flatbuffers::WIPOffset::new(o.value())
     }
 }
 
-impl core::fmt::Debug for FlowTriggerDataset<'_> {
+impl core::fmt::Debug for FlowTriggerInputDataset<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        let mut ds = f.debug_struct("FlowTriggerDataset");
+        let mut ds = f.debug_struct("FlowTriggerInputDataset");
         ds.field("dataset", &self.dataset());
         ds.field("events", &self.events());
         ds.finish()
     }
 }
-pub enum FlowTriggerWrapperOffset {}
+pub enum FlowTriggerInputWrapperOffset {}
 #[derive(Copy, Clone, PartialEq)]
 
-pub struct FlowTriggerWrapper<'a> {
+pub struct FlowTriggerInputWrapper<'a> {
     pub _tab: flatbuffers::Table<'a>,
 }
 
-impl<'a> flatbuffers::Follow<'a> for FlowTriggerWrapper<'a> {
-    type Inner = FlowTriggerWrapper<'a>;
+impl<'a> flatbuffers::Follow<'a> for FlowTriggerInputWrapper<'a> {
+    type Inner = FlowTriggerInputWrapper<'a>;
     #[inline]
     unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
         Self {
@@ -25299,20 +26259,20 @@ impl<'a> flatbuffers::Follow<'a> for FlowTriggerWrapper<'a> {
     }
 }
 
-impl<'a> FlowTriggerWrapper<'a> {
+impl<'a> FlowTriggerInputWrapper<'a> {
     pub const VT_VALUE_TYPE: flatbuffers::VOffsetT = 4;
     pub const VT_VALUE: flatbuffers::VOffsetT = 6;
 
     #[inline]
     pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
-        FlowTriggerWrapper { _tab: table }
+        FlowTriggerInputWrapper { _tab: table }
     }
     #[allow(unused_mut)]
     pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
         _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
-        args: &'args FlowTriggerWrapperArgs,
-    ) -> flatbuffers::WIPOffset<FlowTriggerWrapper<'bldr>> {
-        let mut builder = FlowTriggerWrapperBuilder::new(_fbb);
+        args: &'args FlowTriggerInputWrapperArgs,
+    ) -> flatbuffers::WIPOffset<FlowTriggerInputWrapper<'bldr>> {
+        let mut builder = FlowTriggerInputWrapperBuilder::new(_fbb);
         if let Some(x) = args.value {
             builder.add_value(x);
         }
@@ -25321,13 +26281,16 @@ impl<'a> FlowTriggerWrapper<'a> {
     }
 
     #[inline]
-    pub fn value_type(&self) -> FlowTrigger {
+    pub fn value_type(&self) -> FlowTriggerInput {
         // Safety:
         // Created from valid Table for this object
         // which contains a valid value in this slot
         unsafe {
             self._tab
-                .get::<FlowTrigger>(FlowTriggerWrapper::VT_VALUE_TYPE, Some(FlowTrigger::NONE))
+                .get::<FlowTriggerInput>(
+                    FlowTriggerInputWrapper::VT_VALUE_TYPE,
+                    Some(FlowTriggerInput::NONE),
+                )
                 .unwrap()
         }
     }
@@ -25339,20 +26302,20 @@ impl<'a> FlowTriggerWrapper<'a> {
         unsafe {
             self._tab
                 .get::<flatbuffers::ForwardsUOffset<flatbuffers::Table<'a>>>(
-                    FlowTriggerWrapper::VT_VALUE,
+                    FlowTriggerInputWrapper::VT_VALUE,
                     None,
                 )
         }
     }
     #[inline]
     #[allow(non_snake_case)]
-    pub fn value_as_flow_trigger_schedule(&self) -> Option<FlowTriggerSchedule<'a>> {
-        if self.value_type() == FlowTrigger::FlowTriggerSchedule {
+    pub fn value_as_flow_trigger_input_schedule(&self) -> Option<FlowTriggerInputSchedule<'a>> {
+        if self.value_type() == FlowTriggerInput::FlowTriggerInputSchedule {
             self.value().map(|t| {
                 // Safety:
                 // Created from a valid Table for this object
                 // Which contains a valid union in this slot
-                unsafe { FlowTriggerSchedule::init_from_table(t) }
+                unsafe { FlowTriggerInputSchedule::init_from_table(t) }
             })
         } else {
             None
@@ -25361,13 +26324,13 @@ impl<'a> FlowTriggerWrapper<'a> {
 
     #[inline]
     #[allow(non_snake_case)]
-    pub fn value_as_flow_trigger_event(&self) -> Option<FlowTriggerEvent<'a>> {
-        if self.value_type() == FlowTrigger::FlowTriggerEvent {
+    pub fn value_as_flow_trigger_input_event(&self) -> Option<FlowTriggerInputEvent<'a>> {
+        if self.value_type() == FlowTriggerInput::FlowTriggerInputEvent {
             self.value().map(|t| {
                 // Safety:
                 // Created from a valid Table for this object
                 // Which contains a valid union in this slot
-                unsafe { FlowTriggerEvent::init_from_table(t) }
+                unsafe { FlowTriggerInputEvent::init_from_table(t) }
             })
         } else {
             None
@@ -25376,13 +26339,13 @@ impl<'a> FlowTriggerWrapper<'a> {
 
     #[inline]
     #[allow(non_snake_case)]
-    pub fn value_as_flow_trigger_source(&self) -> Option<FlowTriggerSource<'a>> {
-        if self.value_type() == FlowTrigger::FlowTriggerSource {
+    pub fn value_as_flow_trigger_input_source(&self) -> Option<FlowTriggerInputSource<'a>> {
+        if self.value_type() == FlowTriggerInput::FlowTriggerInputSource {
             self.value().map(|t| {
                 // Safety:
                 // Created from a valid Table for this object
                 // Which contains a valid union in this slot
-                unsafe { FlowTriggerSource::init_from_table(t) }
+                unsafe { FlowTriggerInputSource::init_from_table(t) }
             })
         } else {
             None
@@ -25391,13 +26354,13 @@ impl<'a> FlowTriggerWrapper<'a> {
 
     #[inline]
     #[allow(non_snake_case)]
-    pub fn value_as_flow_trigger_dataset(&self) -> Option<FlowTriggerDataset<'a>> {
-        if self.value_type() == FlowTrigger::FlowTriggerDataset {
+    pub fn value_as_flow_trigger_input_dataset(&self) -> Option<FlowTriggerInputDataset<'a>> {
+        if self.value_type() == FlowTriggerInput::FlowTriggerInputDataset {
             self.value().map(|t| {
                 // Safety:
                 // Created from a valid Table for this object
                 // Which contains a valid union in this slot
-                unsafe { FlowTriggerDataset::init_from_table(t) }
+                unsafe { FlowTriggerInputDataset::init_from_table(t) }
             })
         } else {
             None
@@ -25405,7 +26368,7 @@ impl<'a> FlowTriggerWrapper<'a> {
     }
 }
 
-impl flatbuffers::Verifiable for FlowTriggerWrapper<'_> {
+impl flatbuffers::Verifiable for FlowTriggerInputWrapper<'_> {
     #[inline]
     fn run_verifier(
         v: &mut flatbuffers::Verifier,
@@ -25413,96 +26376,77 @@ impl flatbuffers::Verifiable for FlowTriggerWrapper<'_> {
     ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
         use self::flatbuffers::Verifiable;
         v.visit_table(pos)?
-            .visit_union::<FlowTrigger, _>(
-                "value_type",
-                Self::VT_VALUE_TYPE,
-                "value",
-                Self::VT_VALUE,
-                false,
-                |key, v, pos| match key {
-                    FlowTrigger::FlowTriggerSchedule => v
-                        .verify_union_variant::<flatbuffers::ForwardsUOffset<FlowTriggerSchedule>>(
-                            "FlowTrigger::FlowTriggerSchedule",
-                            pos,
-                        ),
-                    FlowTrigger::FlowTriggerEvent => v
-                        .verify_union_variant::<flatbuffers::ForwardsUOffset<FlowTriggerEvent>>(
-                            "FlowTrigger::FlowTriggerEvent",
-                            pos,
-                        ),
-                    FlowTrigger::FlowTriggerSource => v
-                        .verify_union_variant::<flatbuffers::ForwardsUOffset<FlowTriggerSource>>(
-                            "FlowTrigger::FlowTriggerSource",
-                            pos,
-                        ),
-                    FlowTrigger::FlowTriggerDataset => v
-                        .verify_union_variant::<flatbuffers::ForwardsUOffset<FlowTriggerDataset>>(
-                            "FlowTrigger::FlowTriggerDataset",
-                            pos,
-                        ),
-                    _ => Ok(()),
-                },
-            )?
-            .finish();
+     .visit_union::<FlowTriggerInput, _>("value_type", Self::VT_VALUE_TYPE, "value", Self::VT_VALUE, false, |key, v, pos| {
+        match key {
+          FlowTriggerInput::FlowTriggerInputSchedule => v.verify_union_variant::<flatbuffers::ForwardsUOffset<FlowTriggerInputSchedule>>("FlowTriggerInput::FlowTriggerInputSchedule", pos),
+          FlowTriggerInput::FlowTriggerInputEvent => v.verify_union_variant::<flatbuffers::ForwardsUOffset<FlowTriggerInputEvent>>("FlowTriggerInput::FlowTriggerInputEvent", pos),
+          FlowTriggerInput::FlowTriggerInputSource => v.verify_union_variant::<flatbuffers::ForwardsUOffset<FlowTriggerInputSource>>("FlowTriggerInput::FlowTriggerInputSource", pos),
+          FlowTriggerInput::FlowTriggerInputDataset => v.verify_union_variant::<flatbuffers::ForwardsUOffset<FlowTriggerInputDataset>>("FlowTriggerInput::FlowTriggerInputDataset", pos),
+          _ => Ok(()),
+        }
+     })?
+     .finish();
         Ok(())
     }
 }
-pub struct FlowTriggerWrapperArgs {
-    pub value_type: FlowTrigger,
+pub struct FlowTriggerInputWrapperArgs {
+    pub value_type: FlowTriggerInput,
     pub value: Option<flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>>,
 }
-impl<'a> Default for FlowTriggerWrapperArgs {
+impl<'a> Default for FlowTriggerInputWrapperArgs {
     #[inline]
     fn default() -> Self {
-        FlowTriggerWrapperArgs {
-            value_type: FlowTrigger::NONE,
+        FlowTriggerInputWrapperArgs {
+            value_type: FlowTriggerInput::NONE,
             value: None,
         }
     }
 }
 
-pub struct FlowTriggerWrapperBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+pub struct FlowTriggerInputWrapperBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
     fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
     start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
 }
-impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> FlowTriggerWrapperBuilder<'a, 'b, A> {
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> FlowTriggerInputWrapperBuilder<'a, 'b, A> {
     #[inline]
-    pub fn add_value_type(&mut self, value_type: FlowTrigger) {
-        self.fbb_.push_slot::<FlowTrigger>(
-            FlowTriggerWrapper::VT_VALUE_TYPE,
+    pub fn add_value_type(&mut self, value_type: FlowTriggerInput) {
+        self.fbb_.push_slot::<FlowTriggerInput>(
+            FlowTriggerInputWrapper::VT_VALUE_TYPE,
             value_type,
-            FlowTrigger::NONE,
+            FlowTriggerInput::NONE,
         );
     }
     #[inline]
     pub fn add_value(&mut self, value: flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>) {
-        self.fbb_
-            .push_slot_always::<flatbuffers::WIPOffset<_>>(FlowTriggerWrapper::VT_VALUE, value);
+        self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
+            FlowTriggerInputWrapper::VT_VALUE,
+            value,
+        );
     }
     #[inline]
     pub fn new(
         _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
-    ) -> FlowTriggerWrapperBuilder<'a, 'b, A> {
+    ) -> FlowTriggerInputWrapperBuilder<'a, 'b, A> {
         let start = _fbb.start_table();
-        FlowTriggerWrapperBuilder {
+        FlowTriggerInputWrapperBuilder {
             fbb_: _fbb,
             start_: start,
         }
     }
     #[inline]
-    pub fn finish(self) -> flatbuffers::WIPOffset<FlowTriggerWrapper<'a>> {
+    pub fn finish(self) -> flatbuffers::WIPOffset<FlowTriggerInputWrapper<'a>> {
         let o = self.fbb_.end_table(self.start_);
         flatbuffers::WIPOffset::new(o.value())
     }
 }
 
-impl core::fmt::Debug for FlowTriggerWrapper<'_> {
+impl core::fmt::Debug for FlowTriggerInputWrapper<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        let mut ds = f.debug_struct("FlowTriggerWrapper");
+        let mut ds = f.debug_struct("FlowTriggerInputWrapper");
         ds.field("value_type", &self.value_type());
         match self.value_type() {
-            FlowTrigger::FlowTriggerSchedule => {
-                if let Some(x) = self.value_as_flow_trigger_schedule() {
+            FlowTriggerInput::FlowTriggerInputSchedule => {
+                if let Some(x) = self.value_as_flow_trigger_input_schedule() {
                     ds.field("value", &x)
                 } else {
                     ds.field(
@@ -25511,8 +26455,8 @@ impl core::fmt::Debug for FlowTriggerWrapper<'_> {
                     )
                 }
             }
-            FlowTrigger::FlowTriggerEvent => {
-                if let Some(x) = self.value_as_flow_trigger_event() {
+            FlowTriggerInput::FlowTriggerInputEvent => {
+                if let Some(x) = self.value_as_flow_trigger_input_event() {
                     ds.field("value", &x)
                 } else {
                     ds.field(
@@ -25521,8 +26465,8 @@ impl core::fmt::Debug for FlowTriggerWrapper<'_> {
                     )
                 }
             }
-            FlowTrigger::FlowTriggerSource => {
-                if let Some(x) = self.value_as_flow_trigger_source() {
+            FlowTriggerInput::FlowTriggerInputSource => {
+                if let Some(x) = self.value_as_flow_trigger_input_source() {
                     ds.field("value", &x)
                 } else {
                     ds.field(
@@ -25531,8 +26475,8 @@ impl core::fmt::Debug for FlowTriggerWrapper<'_> {
                     )
                 }
             }
-            FlowTrigger::FlowTriggerDataset => {
-                if let Some(x) = self.value_as_flow_trigger_dataset() {
+            FlowTriggerInput::FlowTriggerInputDataset => {
+                if let Some(x) = self.value_as_flow_trigger_input_dataset() {
                     ds.field("value", &x)
                 } else {
                     ds.field(
@@ -26458,13 +27402,14 @@ impl<'a> FlowSpecInput<'a> {
     #[inline]
     pub fn triggers(
         &self,
-    ) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<FlowTriggerWrapper<'a>>>> {
+    ) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<FlowTriggerInputWrapper<'a>>>>
+    {
         // Safety:
         // Created from valid Table for this object
         // which contains a valid value in this slot
         unsafe {
             self._tab.get::<flatbuffers::ForwardsUOffset<
-                flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<FlowTriggerWrapper>>,
+                flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<FlowTriggerInputWrapper>>,
             >>(FlowSpecInput::VT_TRIGGERS, None)
         }
     }
@@ -26498,7 +27443,7 @@ impl flatbuffers::Verifiable for FlowSpecInput<'_> {
                 false,
             )?
             .visit_field::<flatbuffers::ForwardsUOffset<
-                flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<FlowTriggerWrapper>>,
+                flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<FlowTriggerInputWrapper>>,
             >>("triggers", Self::VT_TRIGGERS, false)?
             .visit_field::<flatbuffers::ForwardsUOffset<
                 flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<TaskSpecInputWrapper>>,
@@ -26511,7 +27456,7 @@ pub struct FlowSpecInputArgs<'a> {
     pub target: Option<flatbuffers::WIPOffset<ResourceSelector<'a>>>,
     pub triggers: Option<
         flatbuffers::WIPOffset<
-            flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<FlowTriggerWrapper<'a>>>,
+            flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<FlowTriggerInputWrapper<'a>>>,
         >,
     >,
     pub tasks: Option<
@@ -26548,7 +27493,7 @@ impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> FlowSpecInputBuilder<'a, 'b, A>
     pub fn add_triggers(
         &mut self,
         triggers: flatbuffers::WIPOffset<
-            flatbuffers::Vector<'b, flatbuffers::ForwardsUOffset<FlowTriggerWrapper<'b>>>,
+            flatbuffers::Vector<'b, flatbuffers::ForwardsUOffset<FlowTriggerInputWrapper<'b>>>,
         >,
     ) {
         self.fbb_
@@ -26587,6 +27532,859 @@ impl core::fmt::Debug for FlowSpecInput<'_> {
         ds.field("target", &self.target());
         ds.field("triggers", &self.triggers());
         ds.field("tasks", &self.tasks());
+        ds.finish()
+    }
+}
+pub enum FlowTriggerScheduleOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+pub struct FlowTriggerSchedule<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for FlowTriggerSchedule<'a> {
+    type Inner = FlowTriggerSchedule<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: unsafe { flatbuffers::Table::new(buf, loc) },
+        }
+    }
+}
+
+impl<'a> FlowTriggerSchedule<'a> {
+    pub const VT_CRON: flatbuffers::VOffsetT = 4;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        FlowTriggerSchedule { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
+        args: &'args FlowTriggerScheduleArgs<'args>,
+    ) -> flatbuffers::WIPOffset<FlowTriggerSchedule<'bldr>> {
+        let mut builder = FlowTriggerScheduleBuilder::new(_fbb);
+        if let Some(x) = args.cron {
+            builder.add_cron(x);
+        }
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn cron(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<&str>>(FlowTriggerSchedule::VT_CRON, None)
+        }
+    }
+}
+
+impl flatbuffers::Verifiable for FlowTriggerSchedule<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>("cron", Self::VT_CRON, false)?
+            .finish();
+        Ok(())
+    }
+}
+pub struct FlowTriggerScheduleArgs<'a> {
+    pub cron: Option<flatbuffers::WIPOffset<&'a str>>,
+}
+impl<'a> Default for FlowTriggerScheduleArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        FlowTriggerScheduleArgs { cron: None }
+    }
+}
+
+pub struct FlowTriggerScheduleBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> FlowTriggerScheduleBuilder<'a, 'b, A> {
+    #[inline]
+    pub fn add_cron(&mut self, cron: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(FlowTriggerSchedule::VT_CRON, cron);
+    }
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    ) -> FlowTriggerScheduleBuilder<'a, 'b, A> {
+        let start = _fbb.start_table();
+        FlowTriggerScheduleBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<FlowTriggerSchedule<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for FlowTriggerSchedule<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("FlowTriggerSchedule");
+        ds.field("cron", &self.cron());
+        ds.finish()
+    }
+}
+pub enum FlowTriggerEventOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+pub struct FlowTriggerEvent<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for FlowTriggerEvent<'a> {
+    type Inner = FlowTriggerEvent<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: unsafe { flatbuffers::Table::new(buf, loc) },
+        }
+    }
+}
+
+impl<'a> FlowTriggerEvent<'a> {
+    pub const VT_EVENTS: flatbuffers::VOffsetT = 4;
+    pub const VT_COOLDOWN: flatbuffers::VOffsetT = 6;
+    pub const VT_COOLDOWN_MAX_BATCH: flatbuffers::VOffsetT = 8;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        FlowTriggerEvent { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
+        args: &'args FlowTriggerEventArgs<'args>,
+    ) -> flatbuffers::WIPOffset<FlowTriggerEvent<'bldr>> {
+        let mut builder = FlowTriggerEventBuilder::new(_fbb);
+        if let Some(x) = args.cooldown_max_batch {
+            builder.add_cooldown_max_batch(x);
+        }
+        if let Some(x) = args.cooldown {
+            builder.add_cooldown(x);
+        }
+        if let Some(x) = args.events {
+            builder.add_events(x);
+        }
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn events(&self) -> Option<EventFilter<'a>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<EventFilter>>(FlowTriggerEvent::VT_EVENTS, None)
+        }
+    }
+    #[inline]
+    pub fn cooldown(&self) -> Option<&'a Duration> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<Duration>(FlowTriggerEvent::VT_COOLDOWN, None)
+        }
+    }
+    #[inline]
+    pub fn cooldown_max_batch(&self) -> Option<u64> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<u64>(FlowTriggerEvent::VT_COOLDOWN_MAX_BATCH, None)
+        }
+    }
+}
+
+impl flatbuffers::Verifiable for FlowTriggerEvent<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<flatbuffers::ForwardsUOffset<EventFilter>>(
+                "events",
+                Self::VT_EVENTS,
+                false,
+            )?
+            .visit_field::<Duration>("cooldown", Self::VT_COOLDOWN, false)?
+            .visit_field::<u64>("cooldown_max_batch", Self::VT_COOLDOWN_MAX_BATCH, false)?
+            .finish();
+        Ok(())
+    }
+}
+pub struct FlowTriggerEventArgs<'a> {
+    pub events: Option<flatbuffers::WIPOffset<EventFilter<'a>>>,
+    pub cooldown: Option<&'a Duration>,
+    pub cooldown_max_batch: Option<u64>,
+}
+impl<'a> Default for FlowTriggerEventArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        FlowTriggerEventArgs {
+            events: None,
+            cooldown: None,
+            cooldown_max_batch: None,
+        }
+    }
+}
+
+pub struct FlowTriggerEventBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> FlowTriggerEventBuilder<'a, 'b, A> {
+    #[inline]
+    pub fn add_events(&mut self, events: flatbuffers::WIPOffset<EventFilter<'b>>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<EventFilter>>(
+                FlowTriggerEvent::VT_EVENTS,
+                events,
+            );
+    }
+    #[inline]
+    pub fn add_cooldown(&mut self, cooldown: &Duration) {
+        self.fbb_
+            .push_slot_always::<&Duration>(FlowTriggerEvent::VT_COOLDOWN, cooldown);
+    }
+    #[inline]
+    pub fn add_cooldown_max_batch(&mut self, cooldown_max_batch: u64) {
+        self.fbb_
+            .push_slot_always::<u64>(FlowTriggerEvent::VT_COOLDOWN_MAX_BATCH, cooldown_max_batch);
+    }
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    ) -> FlowTriggerEventBuilder<'a, 'b, A> {
+        let start = _fbb.start_table();
+        FlowTriggerEventBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<FlowTriggerEvent<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for FlowTriggerEvent<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("FlowTriggerEvent");
+        ds.field("events", &self.events());
+        ds.field("cooldown", &self.cooldown());
+        ds.field("cooldown_max_batch", &self.cooldown_max_batch());
+        ds.finish()
+    }
+}
+pub enum FlowTriggerSourceOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+pub struct FlowTriggerSource<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for FlowTriggerSource<'a> {
+    type Inner = FlowTriggerSource<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: unsafe { flatbuffers::Table::new(buf, loc) },
+        }
+    }
+}
+
+impl<'a> FlowTriggerSource<'a> {
+    pub const VT_SOURCE: flatbuffers::VOffsetT = 4;
+    pub const VT_MIN_RECORDS_TO_AWAIT: flatbuffers::VOffsetT = 6;
+    pub const VT_MAX_AWAIT_INTERVAL: flatbuffers::VOffsetT = 8;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        FlowTriggerSource { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
+        args: &'args FlowTriggerSourceArgs<'args>,
+    ) -> flatbuffers::WIPOffset<FlowTriggerSource<'bldr>> {
+        let mut builder = FlowTriggerSourceBuilder::new(_fbb);
+        if let Some(x) = args.min_records_to_await {
+            builder.add_min_records_to_await(x);
+        }
+        if let Some(x) = args.max_await_interval {
+            builder.add_max_await_interval(x);
+        }
+        if let Some(x) = args.source {
+            builder.add_source(x);
+        }
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn source(&self) -> Option<ResourceHandle<'a>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<ResourceHandle>>(
+                    FlowTriggerSource::VT_SOURCE,
+                    None,
+                )
+        }
+    }
+    #[inline]
+    pub fn min_records_to_await(&self) -> Option<u64> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<u64>(FlowTriggerSource::VT_MIN_RECORDS_TO_AWAIT, None)
+        }
+    }
+    #[inline]
+    pub fn max_await_interval(&self) -> Option<&'a Duration> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<Duration>(FlowTriggerSource::VT_MAX_AWAIT_INTERVAL, None)
+        }
+    }
+}
+
+impl flatbuffers::Verifiable for FlowTriggerSource<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<flatbuffers::ForwardsUOffset<ResourceHandle>>(
+                "source",
+                Self::VT_SOURCE,
+                false,
+            )?
+            .visit_field::<u64>("min_records_to_await", Self::VT_MIN_RECORDS_TO_AWAIT, false)?
+            .visit_field::<Duration>("max_await_interval", Self::VT_MAX_AWAIT_INTERVAL, false)?
+            .finish();
+        Ok(())
+    }
+}
+pub struct FlowTriggerSourceArgs<'a> {
+    pub source: Option<flatbuffers::WIPOffset<ResourceHandle<'a>>>,
+    pub min_records_to_await: Option<u64>,
+    pub max_await_interval: Option<&'a Duration>,
+}
+impl<'a> Default for FlowTriggerSourceArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        FlowTriggerSourceArgs {
+            source: None,
+            min_records_to_await: None,
+            max_await_interval: None,
+        }
+    }
+}
+
+pub struct FlowTriggerSourceBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> FlowTriggerSourceBuilder<'a, 'b, A> {
+    #[inline]
+    pub fn add_source(&mut self, source: flatbuffers::WIPOffset<ResourceHandle<'b>>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<ResourceHandle>>(
+                FlowTriggerSource::VT_SOURCE,
+                source,
+            );
+    }
+    #[inline]
+    pub fn add_min_records_to_await(&mut self, min_records_to_await: u64) {
+        self.fbb_.push_slot_always::<u64>(
+            FlowTriggerSource::VT_MIN_RECORDS_TO_AWAIT,
+            min_records_to_await,
+        );
+    }
+    #[inline]
+    pub fn add_max_await_interval(&mut self, max_await_interval: &Duration) {
+        self.fbb_.push_slot_always::<&Duration>(
+            FlowTriggerSource::VT_MAX_AWAIT_INTERVAL,
+            max_await_interval,
+        );
+    }
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    ) -> FlowTriggerSourceBuilder<'a, 'b, A> {
+        let start = _fbb.start_table();
+        FlowTriggerSourceBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<FlowTriggerSource<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for FlowTriggerSource<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("FlowTriggerSource");
+        ds.field("source", &self.source());
+        ds.field("min_records_to_await", &self.min_records_to_await());
+        ds.field("max_await_interval", &self.max_await_interval());
+        ds.finish()
+    }
+}
+pub enum FlowTriggerDatasetOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+pub struct FlowTriggerDataset<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for FlowTriggerDataset<'a> {
+    type Inner = FlowTriggerDataset<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: unsafe { flatbuffers::Table::new(buf, loc) },
+        }
+    }
+}
+
+impl<'a> FlowTriggerDataset<'a> {
+    pub const VT_DATASET: flatbuffers::VOffsetT = 4;
+    pub const VT_EVENTS: flatbuffers::VOffsetT = 6;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        FlowTriggerDataset { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
+        args: &'args FlowTriggerDatasetArgs<'args>,
+    ) -> flatbuffers::WIPOffset<FlowTriggerDataset<'bldr>> {
+        let mut builder = FlowTriggerDatasetBuilder::new(_fbb);
+        if let Some(x) = args.events {
+            builder.add_events(x);
+        }
+        if let Some(x) = args.dataset {
+            builder.add_dataset(x);
+        }
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn dataset(&self) -> Option<DatasetSelector<'a>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<DatasetSelector>>(
+                    FlowTriggerDataset::VT_DATASET,
+                    None,
+                )
+        }
+    }
+    #[inline]
+    pub fn events(&self) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab.get::<flatbuffers::ForwardsUOffset<
+                flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>,
+            >>(FlowTriggerDataset::VT_EVENTS, None)
+        }
+    }
+}
+
+impl flatbuffers::Verifiable for FlowTriggerDataset<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<flatbuffers::ForwardsUOffset<DatasetSelector>>(
+                "dataset",
+                Self::VT_DATASET,
+                false,
+            )?
+            .visit_field::<flatbuffers::ForwardsUOffset<
+                flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<&'_ str>>,
+            >>("events", Self::VT_EVENTS, false)?
+            .finish();
+        Ok(())
+    }
+}
+pub struct FlowTriggerDatasetArgs<'a> {
+    pub dataset: Option<flatbuffers::WIPOffset<DatasetSelector<'a>>>,
+    pub events: Option<
+        flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<&'a str>>>,
+    >,
+}
+impl<'a> Default for FlowTriggerDatasetArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        FlowTriggerDatasetArgs {
+            dataset: None,
+            events: None,
+        }
+    }
+}
+
+pub struct FlowTriggerDatasetBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> FlowTriggerDatasetBuilder<'a, 'b, A> {
+    #[inline]
+    pub fn add_dataset(&mut self, dataset: flatbuffers::WIPOffset<DatasetSelector<'b>>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<DatasetSelector>>(
+                FlowTriggerDataset::VT_DATASET,
+                dataset,
+            );
+    }
+    #[inline]
+    pub fn add_events(
+        &mut self,
+        events: flatbuffers::WIPOffset<
+            flatbuffers::Vector<'b, flatbuffers::ForwardsUOffset<&'b str>>,
+        >,
+    ) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(FlowTriggerDataset::VT_EVENTS, events);
+    }
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    ) -> FlowTriggerDatasetBuilder<'a, 'b, A> {
+        let start = _fbb.start_table();
+        FlowTriggerDatasetBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<FlowTriggerDataset<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for FlowTriggerDataset<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("FlowTriggerDataset");
+        ds.field("dataset", &self.dataset());
+        ds.field("events", &self.events());
+        ds.finish()
+    }
+}
+pub enum FlowTriggerWrapperOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+pub struct FlowTriggerWrapper<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for FlowTriggerWrapper<'a> {
+    type Inner = FlowTriggerWrapper<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: unsafe { flatbuffers::Table::new(buf, loc) },
+        }
+    }
+}
+
+impl<'a> FlowTriggerWrapper<'a> {
+    pub const VT_VALUE_TYPE: flatbuffers::VOffsetT = 4;
+    pub const VT_VALUE: flatbuffers::VOffsetT = 6;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        FlowTriggerWrapper { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
+        args: &'args FlowTriggerWrapperArgs,
+    ) -> flatbuffers::WIPOffset<FlowTriggerWrapper<'bldr>> {
+        let mut builder = FlowTriggerWrapperBuilder::new(_fbb);
+        if let Some(x) = args.value {
+            builder.add_value(x);
+        }
+        builder.add_value_type(args.value_type);
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn value_type(&self) -> FlowTrigger {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<FlowTrigger>(FlowTriggerWrapper::VT_VALUE_TYPE, Some(FlowTrigger::NONE))
+                .unwrap()
+        }
+    }
+    #[inline]
+    pub fn value(&self) -> Option<flatbuffers::Table<'a>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<flatbuffers::Table<'a>>>(
+                    FlowTriggerWrapper::VT_VALUE,
+                    None,
+                )
+        }
+    }
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_as_flow_trigger_schedule(&self) -> Option<FlowTriggerSchedule<'a>> {
+        if self.value_type() == FlowTrigger::FlowTriggerSchedule {
+            self.value().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { FlowTriggerSchedule::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_as_flow_trigger_event(&self) -> Option<FlowTriggerEvent<'a>> {
+        if self.value_type() == FlowTrigger::FlowTriggerEvent {
+            self.value().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { FlowTriggerEvent::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_as_flow_trigger_source(&self) -> Option<FlowTriggerSource<'a>> {
+        if self.value_type() == FlowTrigger::FlowTriggerSource {
+            self.value().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { FlowTriggerSource::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    #[allow(non_snake_case)]
+    pub fn value_as_flow_trigger_dataset(&self) -> Option<FlowTriggerDataset<'a>> {
+        if self.value_type() == FlowTrigger::FlowTriggerDataset {
+            self.value().map(|t| {
+                // Safety:
+                // Created from a valid Table for this object
+                // Which contains a valid union in this slot
+                unsafe { FlowTriggerDataset::init_from_table(t) }
+            })
+        } else {
+            None
+        }
+    }
+}
+
+impl flatbuffers::Verifiable for FlowTriggerWrapper<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_union::<FlowTrigger, _>(
+                "value_type",
+                Self::VT_VALUE_TYPE,
+                "value",
+                Self::VT_VALUE,
+                false,
+                |key, v, pos| match key {
+                    FlowTrigger::FlowTriggerSchedule => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<FlowTriggerSchedule>>(
+                            "FlowTrigger::FlowTriggerSchedule",
+                            pos,
+                        ),
+                    FlowTrigger::FlowTriggerEvent => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<FlowTriggerEvent>>(
+                            "FlowTrigger::FlowTriggerEvent",
+                            pos,
+                        ),
+                    FlowTrigger::FlowTriggerSource => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<FlowTriggerSource>>(
+                            "FlowTrigger::FlowTriggerSource",
+                            pos,
+                        ),
+                    FlowTrigger::FlowTriggerDataset => v
+                        .verify_union_variant::<flatbuffers::ForwardsUOffset<FlowTriggerDataset>>(
+                            "FlowTrigger::FlowTriggerDataset",
+                            pos,
+                        ),
+                    _ => Ok(()),
+                },
+            )?
+            .finish();
+        Ok(())
+    }
+}
+pub struct FlowTriggerWrapperArgs {
+    pub value_type: FlowTrigger,
+    pub value: Option<flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>>,
+}
+impl<'a> Default for FlowTriggerWrapperArgs {
+    #[inline]
+    fn default() -> Self {
+        FlowTriggerWrapperArgs {
+            value_type: FlowTrigger::NONE,
+            value: None,
+        }
+    }
+}
+
+pub struct FlowTriggerWrapperBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> FlowTriggerWrapperBuilder<'a, 'b, A> {
+    #[inline]
+    pub fn add_value_type(&mut self, value_type: FlowTrigger) {
+        self.fbb_.push_slot::<FlowTrigger>(
+            FlowTriggerWrapper::VT_VALUE_TYPE,
+            value_type,
+            FlowTrigger::NONE,
+        );
+    }
+    #[inline]
+    pub fn add_value(&mut self, value: flatbuffers::WIPOffset<flatbuffers::UnionWIPOffset>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(FlowTriggerWrapper::VT_VALUE, value);
+    }
+    #[inline]
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    ) -> FlowTriggerWrapperBuilder<'a, 'b, A> {
+        let start = _fbb.start_table();
+        FlowTriggerWrapperBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<FlowTriggerWrapper<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for FlowTriggerWrapper<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("FlowTriggerWrapper");
+        ds.field("value_type", &self.value_type());
+        match self.value_type() {
+            FlowTrigger::FlowTriggerSchedule => {
+                if let Some(x) = self.value_as_flow_trigger_schedule() {
+                    ds.field("value", &x)
+                } else {
+                    ds.field(
+                        "value",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            FlowTrigger::FlowTriggerEvent => {
+                if let Some(x) = self.value_as_flow_trigger_event() {
+                    ds.field("value", &x)
+                } else {
+                    ds.field(
+                        "value",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            FlowTrigger::FlowTriggerSource => {
+                if let Some(x) = self.value_as_flow_trigger_source() {
+                    ds.field("value", &x)
+                } else {
+                    ds.field(
+                        "value",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            FlowTrigger::FlowTriggerDataset => {
+                if let Some(x) = self.value_as_flow_trigger_dataset() {
+                    ds.field("value", &x)
+                } else {
+                    ds.field(
+                        "value",
+                        &"InvalidFlatbuffer: Union discriminant does not match value.",
+                    )
+                }
+            }
+            _ => {
+                let x: Option<()> = None;
+                ds.field("value", &x)
+            }
+        };
         ds.finish()
     }
 }
@@ -26632,13 +28430,16 @@ impl<'a> TaskSpecIngest<'a> {
     }
 
     #[inline]
-    pub fn source(&self) -> Option<ResourceRef<'a>> {
+    pub fn source(&self) -> Option<ResourceHandle<'a>> {
         // Safety:
         // Created from valid Table for this object
         // which contains a valid value in this slot
         unsafe {
             self._tab
-                .get::<flatbuffers::ForwardsUOffset<ResourceRef>>(TaskSpecIngest::VT_SOURCE, None)
+                .get::<flatbuffers::ForwardsUOffset<ResourceHandle>>(
+                    TaskSpecIngest::VT_SOURCE,
+                    None,
+                )
         }
     }
     #[inline]
@@ -26661,7 +28462,7 @@ impl flatbuffers::Verifiable for TaskSpecIngest<'_> {
     ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
         use self::flatbuffers::Verifiable;
         v.visit_table(pos)?
-            .visit_field::<flatbuffers::ForwardsUOffset<ResourceRef>>(
+            .visit_field::<flatbuffers::ForwardsUOffset<ResourceHandle>>(
                 "source",
                 Self::VT_SOURCE,
                 false,
@@ -26676,7 +28477,7 @@ impl flatbuffers::Verifiable for TaskSpecIngest<'_> {
     }
 }
 pub struct TaskSpecIngestArgs<'a> {
-    pub source: Option<flatbuffers::WIPOffset<ResourceRef<'a>>>,
+    pub source: Option<flatbuffers::WIPOffset<ResourceHandle<'a>>>,
     pub params: Option<flatbuffers::WIPOffset<IngestParams<'a>>>,
 }
 impl<'a> Default for TaskSpecIngestArgs<'a> {
@@ -26695,9 +28496,9 @@ pub struct TaskSpecIngestBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
 }
 impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> TaskSpecIngestBuilder<'a, 'b, A> {
     #[inline]
-    pub fn add_source(&mut self, source: flatbuffers::WIPOffset<ResourceRef<'b>>) {
+    pub fn add_source(&mut self, source: flatbuffers::WIPOffset<ResourceHandle<'b>>) {
         self.fbb_
-            .push_slot_always::<flatbuffers::WIPOffset<ResourceRef>>(
+            .push_slot_always::<flatbuffers::WIPOffset<ResourceHandle>>(
                 TaskSpecIngest::VT_SOURCE,
                 source,
             );
@@ -26973,15 +28774,16 @@ impl<'a> TaskSpecWebhookCall<'a> {
     }
 
     #[inline]
-    pub fn target(&self) -> Option<ResourceRef<'a>> {
+    pub fn target(&self) -> Option<ResourceHandle<'a>> {
         // Safety:
         // Created from valid Table for this object
         // which contains a valid value in this slot
         unsafe {
-            self._tab.get::<flatbuffers::ForwardsUOffset<ResourceRef>>(
-                TaskSpecWebhookCall::VT_TARGET,
-                None,
-            )
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<ResourceHandle>>(
+                    TaskSpecWebhookCall::VT_TARGET,
+                    None,
+                )
         }
     }
     #[inline]
@@ -27004,7 +28806,7 @@ impl flatbuffers::Verifiable for TaskSpecWebhookCall<'_> {
     ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
         use self::flatbuffers::Verifiable;
         v.visit_table(pos)?
-            .visit_field::<flatbuffers::ForwardsUOffset<ResourceRef>>(
+            .visit_field::<flatbuffers::ForwardsUOffset<ResourceHandle>>(
                 "target",
                 Self::VT_TARGET,
                 false,
@@ -27015,7 +28817,7 @@ impl flatbuffers::Verifiable for TaskSpecWebhookCall<'_> {
     }
 }
 pub struct TaskSpecWebhookCallArgs<'a> {
-    pub target: Option<flatbuffers::WIPOffset<ResourceRef<'a>>>,
+    pub target: Option<flatbuffers::WIPOffset<ResourceHandle<'a>>>,
     pub payload: Option<flatbuffers::WIPOffset<&'a str>>,
 }
 impl<'a> Default for TaskSpecWebhookCallArgs<'a> {
@@ -27034,9 +28836,9 @@ pub struct TaskSpecWebhookCallBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a
 }
 impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> TaskSpecWebhookCallBuilder<'a, 'b, A> {
     #[inline]
-    pub fn add_target(&mut self, target: flatbuffers::WIPOffset<ResourceRef<'b>>) {
+    pub fn add_target(&mut self, target: flatbuffers::WIPOffset<ResourceHandle<'b>>) {
         self.fbb_
-            .push_slot_always::<flatbuffers::WIPOffset<ResourceRef>>(
+            .push_slot_always::<flatbuffers::WIPOffset<ResourceHandle>>(
                 TaskSpecWebhookCall::VT_TARGET,
                 target,
             );
@@ -30153,13 +31955,13 @@ impl<'a> PersistentVolumeSpecInputS3<'a> {
         }
     }
     #[inline]
-    pub fn credentials(&self) -> Option<AwsCredentials<'a>> {
+    pub fn credentials(&self) -> Option<AwsCredentialsInput<'a>> {
         // Safety:
         // Created from valid Table for this object
         // which contains a valid value in this slot
         unsafe {
             self._tab
-                .get::<flatbuffers::ForwardsUOffset<AwsCredentials>>(
+                .get::<flatbuffers::ForwardsUOffset<AwsCredentialsInput>>(
                     PersistentVolumeSpecInputS3::VT_CREDENTIALS,
                     None,
                 )
@@ -30188,7 +31990,7 @@ impl flatbuffers::Verifiable for PersistentVolumeSpecInputS3<'_> {
                 Self::VT_CAPACITY,
                 false,
             )?
-            .visit_field::<flatbuffers::ForwardsUOffset<AwsCredentials>>(
+            .visit_field::<flatbuffers::ForwardsUOffset<AwsCredentialsInput>>(
                 "credentials",
                 Self::VT_CREDENTIALS,
                 false,
@@ -30203,7 +32005,7 @@ pub struct PersistentVolumeSpecInputS3Args<'a> {
     pub bucket: Option<flatbuffers::WIPOffset<&'a str>>,
     pub prefix: Option<flatbuffers::WIPOffset<&'a str>>,
     pub capacity: Option<flatbuffers::WIPOffset<VolumeCapacity<'a>>>,
-    pub credentials: Option<flatbuffers::WIPOffset<AwsCredentials<'a>>>,
+    pub credentials: Option<flatbuffers::WIPOffset<AwsCredentialsInput<'a>>>,
 }
 impl<'a> Default for PersistentVolumeSpecInputS3Args<'a> {
     #[inline]
@@ -30261,9 +32063,12 @@ impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> PersistentVolumeSpecInputS3Buil
             );
     }
     #[inline]
-    pub fn add_credentials(&mut self, credentials: flatbuffers::WIPOffset<AwsCredentials<'b>>) {
+    pub fn add_credentials(
+        &mut self,
+        credentials: flatbuffers::WIPOffset<AwsCredentialsInput<'b>>,
+    ) {
         self.fbb_
-            .push_slot_always::<flatbuffers::WIPOffset<AwsCredentials>>(
+            .push_slot_always::<flatbuffers::WIPOffset<AwsCredentialsInput>>(
                 PersistentVolumeSpecInputS3::VT_CREDENTIALS,
                 credentials,
             );
@@ -32153,13 +33958,13 @@ impl<'a> Relation<'a> {
     }
 
     #[inline]
-    pub fn subject(&self) -> Option<ResourceRef<'a>> {
+    pub fn subject(&self) -> Option<ResourceHandle<'a>> {
         // Safety:
         // Created from valid Table for this object
         // which contains a valid value in this slot
         unsafe {
             self._tab
-                .get::<flatbuffers::ForwardsUOffset<ResourceRef>>(Relation::VT_SUBJECT, None)
+                .get::<flatbuffers::ForwardsUOffset<ResourceHandle>>(Relation::VT_SUBJECT, None)
         }
     }
     #[inline]
@@ -32183,18 +33988,211 @@ impl<'a> Relation<'a> {
         }
     }
     #[inline]
+    pub fn object(&self) -> Option<ResourceHandle<'a>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<ResourceHandle>>(Relation::VT_OBJECT, None)
+        }
+    }
+}
+
+impl flatbuffers::Verifiable for Relation<'_> {
+    #[inline]
+    fn run_verifier(
+        v: &mut flatbuffers::Verifier,
+        pos: usize,
+    ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+        use self::flatbuffers::Verifiable;
+        v.visit_table(pos)?
+            .visit_field::<flatbuffers::ForwardsUOffset<ResourceHandle>>(
+                "subject",
+                Self::VT_SUBJECT,
+                false,
+            )?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>(
+                "relation",
+                Self::VT_RELATION,
+                false,
+            )?
+            .visit_field::<flatbuffers::ForwardsUOffset<&str>>("value", Self::VT_VALUE, false)?
+            .visit_field::<flatbuffers::ForwardsUOffset<ResourceHandle>>(
+                "object",
+                Self::VT_OBJECT,
+                false,
+            )?
+            .finish();
+        Ok(())
+    }
+}
+pub struct RelationArgs<'a> {
+    pub subject: Option<flatbuffers::WIPOffset<ResourceHandle<'a>>>,
+    pub relation: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub value: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub object: Option<flatbuffers::WIPOffset<ResourceHandle<'a>>>,
+}
+impl<'a> Default for RelationArgs<'a> {
+    #[inline]
+    fn default() -> Self {
+        RelationArgs {
+            subject: None,
+            relation: None,
+            value: None,
+            object: None,
+        }
+    }
+}
+
+pub struct RelationBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+    fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> RelationBuilder<'a, 'b, A> {
+    #[inline]
+    pub fn add_subject(&mut self, subject: flatbuffers::WIPOffset<ResourceHandle<'b>>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<ResourceHandle>>(
+                Relation::VT_SUBJECT,
+                subject,
+            );
+    }
+    #[inline]
+    pub fn add_relation(&mut self, relation: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(Relation::VT_RELATION, relation);
+    }
+    #[inline]
+    pub fn add_value(&mut self, value: flatbuffers::WIPOffset<&'b str>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(Relation::VT_VALUE, value);
+    }
+    #[inline]
+    pub fn add_object(&mut self, object: flatbuffers::WIPOffset<ResourceHandle<'b>>) {
+        self.fbb_
+            .push_slot_always::<flatbuffers::WIPOffset<ResourceHandle>>(
+                Relation::VT_OBJECT,
+                object,
+            );
+    }
+    #[inline]
+    pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>) -> RelationBuilder<'a, 'b, A> {
+        let start = _fbb.start_table();
+        RelationBuilder {
+            fbb_: _fbb,
+            start_: start,
+        }
+    }
+    #[inline]
+    pub fn finish(self) -> flatbuffers::WIPOffset<Relation<'a>> {
+        let o = self.fbb_.end_table(self.start_);
+        flatbuffers::WIPOffset::new(o.value())
+    }
+}
+
+impl core::fmt::Debug for Relation<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut ds = f.debug_struct("Relation");
+        ds.field("subject", &self.subject());
+        ds.field("relation", &self.relation());
+        ds.field("value", &self.value());
+        ds.field("object", &self.object());
+        ds.finish()
+    }
+}
+pub enum RelationInputOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+pub struct RelationInput<'a> {
+    pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for RelationInput<'a> {
+    type Inner = RelationInput<'a>;
+    #[inline]
+    unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+        Self {
+            _tab: unsafe { flatbuffers::Table::new(buf, loc) },
+        }
+    }
+}
+
+impl<'a> RelationInput<'a> {
+    pub const VT_SUBJECT: flatbuffers::VOffsetT = 4;
+    pub const VT_RELATION: flatbuffers::VOffsetT = 6;
+    pub const VT_VALUE: flatbuffers::VOffsetT = 8;
+    pub const VT_OBJECT: flatbuffers::VOffsetT = 10;
+
+    #[inline]
+    pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+        RelationInput { _tab: table }
+    }
+    #[allow(unused_mut)]
+    pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+        _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
+        args: &'args RelationInputArgs<'args>,
+    ) -> flatbuffers::WIPOffset<RelationInput<'bldr>> {
+        let mut builder = RelationInputBuilder::new(_fbb);
+        if let Some(x) = args.object {
+            builder.add_object(x);
+        }
+        if let Some(x) = args.value {
+            builder.add_value(x);
+        }
+        if let Some(x) = args.relation {
+            builder.add_relation(x);
+        }
+        if let Some(x) = args.subject {
+            builder.add_subject(x);
+        }
+        builder.finish()
+    }
+
+    #[inline]
+    pub fn subject(&self) -> Option<ResourceRef<'a>> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<ResourceRef>>(RelationInput::VT_SUBJECT, None)
+        }
+    }
+    #[inline]
+    pub fn relation(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<&str>>(RelationInput::VT_RELATION, None)
+        }
+    }
+    #[inline]
+    pub fn value(&self) -> Option<&'a str> {
+        // Safety:
+        // Created from valid Table for this object
+        // which contains a valid value in this slot
+        unsafe {
+            self._tab
+                .get::<flatbuffers::ForwardsUOffset<&str>>(RelationInput::VT_VALUE, None)
+        }
+    }
+    #[inline]
     pub fn object(&self) -> Option<ResourceRef<'a>> {
         // Safety:
         // Created from valid Table for this object
         // which contains a valid value in this slot
         unsafe {
             self._tab
-                .get::<flatbuffers::ForwardsUOffset<ResourceRef>>(Relation::VT_OBJECT, None)
+                .get::<flatbuffers::ForwardsUOffset<ResourceRef>>(RelationInput::VT_OBJECT, None)
         }
     }
 }
 
-impl flatbuffers::Verifiable for Relation<'_> {
+impl flatbuffers::Verifiable for RelationInput<'_> {
     #[inline]
     fn run_verifier(
         v: &mut flatbuffers::Verifier,
@@ -32222,16 +34220,16 @@ impl flatbuffers::Verifiable for Relation<'_> {
         Ok(())
     }
 }
-pub struct RelationArgs<'a> {
+pub struct RelationInputArgs<'a> {
     pub subject: Option<flatbuffers::WIPOffset<ResourceRef<'a>>>,
     pub relation: Option<flatbuffers::WIPOffset<&'a str>>,
     pub value: Option<flatbuffers::WIPOffset<&'a str>>,
     pub object: Option<flatbuffers::WIPOffset<ResourceRef<'a>>>,
 }
-impl<'a> Default for RelationArgs<'a> {
+impl<'a> Default for RelationInputArgs<'a> {
     #[inline]
     fn default() -> Self {
-        RelationArgs {
+        RelationInputArgs {
             subject: None,
             relation: None,
             value: None,
@@ -32240,49 +34238,57 @@ impl<'a> Default for RelationArgs<'a> {
     }
 }
 
-pub struct RelationBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+pub struct RelationInputBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
     fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
     start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
 }
-impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> RelationBuilder<'a, 'b, A> {
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> RelationInputBuilder<'a, 'b, A> {
     #[inline]
     pub fn add_subject(&mut self, subject: flatbuffers::WIPOffset<ResourceRef<'b>>) {
         self.fbb_
-            .push_slot_always::<flatbuffers::WIPOffset<ResourceRef>>(Relation::VT_SUBJECT, subject);
+            .push_slot_always::<flatbuffers::WIPOffset<ResourceRef>>(
+                RelationInput::VT_SUBJECT,
+                subject,
+            );
     }
     #[inline]
     pub fn add_relation(&mut self, relation: flatbuffers::WIPOffset<&'b str>) {
         self.fbb_
-            .push_slot_always::<flatbuffers::WIPOffset<_>>(Relation::VT_RELATION, relation);
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(RelationInput::VT_RELATION, relation);
     }
     #[inline]
     pub fn add_value(&mut self, value: flatbuffers::WIPOffset<&'b str>) {
         self.fbb_
-            .push_slot_always::<flatbuffers::WIPOffset<_>>(Relation::VT_VALUE, value);
+            .push_slot_always::<flatbuffers::WIPOffset<_>>(RelationInput::VT_VALUE, value);
     }
     #[inline]
     pub fn add_object(&mut self, object: flatbuffers::WIPOffset<ResourceRef<'b>>) {
         self.fbb_
-            .push_slot_always::<flatbuffers::WIPOffset<ResourceRef>>(Relation::VT_OBJECT, object);
+            .push_slot_always::<flatbuffers::WIPOffset<ResourceRef>>(
+                RelationInput::VT_OBJECT,
+                object,
+            );
     }
     #[inline]
-    pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>) -> RelationBuilder<'a, 'b, A> {
+    pub fn new(
+        _fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+    ) -> RelationInputBuilder<'a, 'b, A> {
         let start = _fbb.start_table();
-        RelationBuilder {
+        RelationInputBuilder {
             fbb_: _fbb,
             start_: start,
         }
     }
     #[inline]
-    pub fn finish(self) -> flatbuffers::WIPOffset<Relation<'a>> {
+    pub fn finish(self) -> flatbuffers::WIPOffset<RelationInput<'a>> {
         let o = self.fbb_.end_table(self.start_);
         flatbuffers::WIPOffset::new(o.value())
     }
 }
 
-impl core::fmt::Debug for Relation<'_> {
+impl core::fmt::Debug for RelationInput<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        let mut ds = f.debug_struct("Relation");
+        let mut ds = f.debug_struct("RelationInput");
         ds.field("subject", &self.subject());
         ds.field("relation", &self.relation());
         ds.field("value", &self.value());
@@ -32334,26 +34340,26 @@ impl<'a> RelationsSpecInput<'a> {
     #[inline]
     pub fn relations(
         &self,
-    ) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<Relation<'a>>>> {
+    ) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<RelationInput<'a>>>> {
         // Safety:
         // Created from valid Table for this object
         // which contains a valid value in this slot
         unsafe {
             self._tab.get::<flatbuffers::ForwardsUOffset<
-                flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<Relation>>,
+                flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<RelationInput>>,
             >>(RelationsSpecInput::VT_RELATIONS, None)
         }
     }
     #[inline]
     pub fn attributes(
         &self,
-    ) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<Attribute<'a>>>> {
+    ) -> Option<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<AttributeInput<'a>>>> {
         // Safety:
         // Created from valid Table for this object
         // which contains a valid value in this slot
         unsafe {
             self._tab.get::<flatbuffers::ForwardsUOffset<
-                flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<Attribute>>,
+                flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<AttributeInput>>,
             >>(RelationsSpecInput::VT_ATTRIBUTES, None)
         }
     }
@@ -32368,10 +34374,10 @@ impl flatbuffers::Verifiable for RelationsSpecInput<'_> {
         use self::flatbuffers::Verifiable;
         v.visit_table(pos)?
             .visit_field::<flatbuffers::ForwardsUOffset<
-                flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<Relation>>,
+                flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<RelationInput>>,
             >>("relations", Self::VT_RELATIONS, false)?
             .visit_field::<flatbuffers::ForwardsUOffset<
-                flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<Attribute>>,
+                flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<AttributeInput>>,
             >>("attributes", Self::VT_ATTRIBUTES, false)?
             .finish();
         Ok(())
@@ -32379,11 +34385,13 @@ impl flatbuffers::Verifiable for RelationsSpecInput<'_> {
 }
 pub struct RelationsSpecInputArgs<'a> {
     pub relations: Option<
-        flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<Relation<'a>>>>,
+        flatbuffers::WIPOffset<
+            flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<RelationInput<'a>>>,
+        >,
     >,
     pub attributes: Option<
         flatbuffers::WIPOffset<
-            flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<Attribute<'a>>>,
+            flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<AttributeInput<'a>>>,
         >,
     >,
 }
@@ -32406,7 +34414,7 @@ impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> RelationsSpecInputBuilder<'a, '
     pub fn add_relations(
         &mut self,
         relations: flatbuffers::WIPOffset<
-            flatbuffers::Vector<'b, flatbuffers::ForwardsUOffset<Relation<'b>>>,
+            flatbuffers::Vector<'b, flatbuffers::ForwardsUOffset<RelationInput<'b>>>,
         >,
     ) {
         self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(
@@ -32418,7 +34426,7 @@ impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> RelationsSpecInputBuilder<'a, '
     pub fn add_attributes(
         &mut self,
         attributes: flatbuffers::WIPOffset<
-            flatbuffers::Vector<'b, flatbuffers::ForwardsUOffset<Attribute<'b>>>,
+            flatbuffers::Vector<'b, flatbuffers::ForwardsUOffset<AttributeInput<'b>>>,
         >,
     ) {
         self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(

@@ -147,7 +147,7 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
         .expect("list_handles with canonical selector must succeed");
     for i in &handles {
         assert_eq!(
-            i.schema,
+            i.r#type,
             *VariableSetResource::schema(),
             "list_handles schema must be canonical"
         );

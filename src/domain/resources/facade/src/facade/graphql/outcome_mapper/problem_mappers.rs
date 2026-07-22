@@ -57,6 +57,7 @@ pub(crate) fn bad_account_problem_error(
     use cynic_api::fragments::ResourceBadAccountProblemCode as C;
 
     Ok(match problem.code {
+        C::EmptySelector => crate::ResolveManifestAccountError::EmptySelector,
         C::AccountNotFoundById => crate::ResolveManifestAccountError::AccountNotFoundById(
             kamu_accounts::AccountNotFoundByIdError {
                 account_id: problem.account_id.ok_or_else(|| {
@@ -69,12 +70,16 @@ pub(crate) fn bad_account_problem_error(
                 account_name: account_name_from_problem(problem.account_name, "account_name")?,
             },
         ),
-        C::IdNameMismatch => crate::ResolveManifestAccountError::IdNameMismatch {
-            account_id: problem.account_id.ok_or_else(|| {
+        C::SelectorMismatch => crate::ResolveManifestAccountError::SelectorMismatch {
+            did: problem.account_id.ok_or_else(|| {
                 InternalError::new("Malformed remote bad account problem: missing account_id")
             })?,
-            expected_name: account_name_from_problem(problem.expected_name, "expected_name")?,
             actual_name: account_name_from_problem(problem.actual_name, "actual_name")?,
+            expected_resource_id: problem.expected_resource_id,
+            expected_did: problem.expected_did,
+            expected_name: problem
+                .expected_name
+                .map(|name| odf::AccountName::new_unchecked(&name.0)),
         },
     })
 }

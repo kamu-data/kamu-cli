@@ -54,7 +54,7 @@ time-source = { workspace = true }
 kamu = { workspace = true, features = ["query-extensions-nested-functions"] }
 
 kamu-adapter-auth-oso-rebac = { workspace = true }
-kamu-adapter-auth-web3 = { workspace = true, features = ["did-pkh"] }
+kamu-adapter-auth-web3 = { workspace = true }
 kamu-adapter-flight-sql = { workspace = true }
 kamu-adapter-flow-dataset = { workspace = true }
 kamu-adapter-flow-webhook = { workspace = true }
@@ -68,12 +68,7 @@ kamu-adapter-http = { workspace = true, features = [
 kamu-adapter-oauth = { workspace = true }
 kamu-adapter-odata = { workspace = true }
 kamu-datafusion-cli = { workspace = true }
-odf = { workspace = true, features = [
-    "datafusion",
-    "http",
-    "lfs",
-    "s3",
-] }
+odf = { workspace = true, features = ["datafusion", "http", "lfs", "s3"] }
 random-strings = { workspace = true }
 
 kamu-flow-system = { workspace = true }

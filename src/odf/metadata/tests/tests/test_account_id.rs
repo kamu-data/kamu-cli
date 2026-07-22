@@ -58,7 +58,6 @@ fn test_display() {
             .unwrap()
         ),
     );
-    #[cfg(feature = "did-pkh")]
     pretty_assertions::assert_eq!(
         r#"did:pkh:eip155:1:0xb9c5714089478a327f09197987f16f9e5d936e8a"#,
         format!(
@@ -67,7 +66,6 @@ fn test_display() {
                 .unwrap()
         ),
     );
-    #[cfg(feature = "did-pkh")]
     pretty_assertions::assert_eq!(
         r#"did:pkh:solana:4sGjMW1sUnHzSxGspuhpqLDx6wiyjNtZ:CKg5d12Jhpej1JqtmxLJgaFqqeYjxgPqToJ4LBdvG9Ev"#,
         format!(
@@ -84,7 +82,6 @@ fn test_display() {
 
 #[test]
 fn test_did_string() {
-    #[cfg(feature = "did-pkh")]
     pretty_assertions::assert_eq!(
         "did:pkh:eip155:1:0xb9c5714089478a327f09197987f16f9e5d936e8a",
         AccountID::from_did_str("did:pkh:eip155:1:0xb9c5714089478a327f09197987f16f9e5d936e8a")
@@ -94,7 +91,6 @@ fn test_did_string() {
             .as_did_str()
             .to_string(),
     );
-    #[cfg(feature = "did-pkh")]
     pretty_assertions::assert_eq!(
         r#"did:pkh:solana:4sGjMW1sUnHzSxGspuhpqLDx6wiyjNtZ:CKg5d12Jhpej1JqtmxLJgaFqqeYjxgPqToJ4LBdvG9Ev"#,
         AccountID::from_did_str(r#"did:pkh:solana:4sGjMW1sUnHzSxGspuhpqLDx6wiyjNtZ:CKg5d12Jhpej1JqtmxLJgaFqqeYjxgPqToJ4LBdvG9Ev"#)
@@ -169,7 +165,6 @@ fn test_stack_string() {
         pretty_assertions::assert_eq!(77, stack_account_did_odf.len());
     }
 
-    #[cfg(feature = "did-pkh")]
     {
         let account_did_pkh =
             AccountID::from_did_str("did:pkh:eip155:1:0xb9c5714089478a327f09197987f16f9e5d936e8a")
@@ -183,7 +178,6 @@ fn test_stack_string() {
         pretty_assertions::assert_eq!(59, stack_account_did_pkh.len());
     }
 
-    #[cfg(feature = "did-pkh")]
     {
         let account_did_pkh =
             AccountID::from_did_str(

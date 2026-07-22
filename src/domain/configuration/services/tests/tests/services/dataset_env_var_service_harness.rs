@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use chrono::Utc;
 use dill::CatalogBuilder;
+use kamu_accounts_services::AccountServiceImpl;
 pub use kamu_configuration_services::testing::BaseConfigurationServiceHarness;
 use kamu_datasets::{
     DatasetEnvVarMutationAdapter,
@@ -37,6 +38,7 @@ impl DatasetEnvVarServiceHarness {
 
         let mut b = CatalogBuilder::new_chained(base.catalog());
         b.add::<InMemoryDatasetEntryRepository>();
+        b.add::<AccountServiceImpl>();
 
         let catalog = b.build();
 

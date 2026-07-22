@@ -20,6 +20,7 @@ use kamu_resources_facade::{
     ListResourceHandlesRequest,
     ListResourcesError,
     ListResourcesRequest,
+    ResolveManifestAccountError,
     ResourceBatchSelector,
     ResourceManifestFormat,
     ResourceRef,
@@ -72,11 +73,11 @@ async fn create_with_account_selector(
 
 fn variable_set_manifest_json_with_account(name: &str, account: &ResourceAccountRef) -> String {
     let mut account_fields = Vec::new();
-    if let Some(n) = account.name() {
+    if let Some(n) = &account.name {
         account_fields.push(format!(r#""name": "{n}""#));
     }
-    if let Some(id) = account.did() {
-        account_fields.push(format!(r#""id": "{id}""#));
+    if let Some(did) = &account.did {
+        account_fields.push(format!(r#""did": "{did}""#));
     }
     let account_fields = account_fields.join(", ");
     indoc::formatdoc!(
@@ -97,28 +98,45 @@ fn variable_set_manifest_json_with_account(name: &str, account: &ResourceAccount
 }
 
 fn account_by_name(name: &odf::AccountName) -> ResourceAccountRef {
-    ResourceAccountRef::Name(name.clone())
+    ResourceAccountRef {
+        id: None,
+        did: None,
+        name: Some(name.clone()),
+    }
 }
 
 fn account_by_id(id: odf::AccountID) -> ResourceAccountRef {
-    ResourceAccountRef::Did(id)
+    ResourceAccountRef {
+        id: None,
+        did: Some(id),
+        name: None,
+    }
 }
 
 fn account_by_name_and_id(name: &odf::AccountName, id: odf::AccountID) -> ResourceAccountRef {
-    ResourceAccountRef::DidAndName(odf::metadata::auth::AccountRefByDidAndName {
-        did: id,
-        name: name.clone(),
-    })
+    ResourceAccountRef {
+        id: None,
+        did: Some(id),
+        name: Some(name.clone()),
+    }
 }
 
 fn unknown_account_by_name() -> ResourceAccountRef {
-    ResourceAccountRef::Name(odf::AccountName::new_unchecked(
-        "unknown-resource-contract-account",
-    ))
+    ResourceAccountRef {
+        id: None,
+        did: None,
+        name: Some(odf::AccountName::new_unchecked(
+            "unknown-resource-contract-account",
+        )),
+    }
 }
 
 fn unknown_account_by_id() -> ResourceAccountRef {
-    ResourceAccountRef::Did(odf::AccountID::new_generated_ed25519().1)
+    ResourceAccountRef {
+        id: None,
+        did: Some(odf::AccountID::new_generated_ed25519().1),
+        name: None,
+    }
 }
 
 fn selector_by_name(name: &str, account: Option<ResourceAccountRef>) -> ResourceSelector {
@@ -517,9 +535,10 @@ contract_test!(
 
 /// An explicit `"account": {}` in the manifest — distinct from omitting the
 /// `account` key entirely (which defaults to the caller's own account, see
-/// RF-120). `ResourceAccountRef` cannot represent this state once resolved
-/// (it's an `Id | Name | Both` enum with no empty variant), so this must be
-/// rejected at manifest deserialization time.
+/// RF-120). `ResourceAccountRef` is a struct with all-optional fields, so
+/// `{}` parses fine (all `None`); it is instead rejected by account
+/// resolution (`ResourceAccountResolverImpl`), which requires at least one of
+/// `id`, `did`, or `name` to be present.
 pub async fn test_empty_account_selector_is_rejected(h: &impl FacadeContractHarness) {
     let manifest = indoc::formatdoc!(
         r#"
@@ -547,8 +566,10 @@ pub async fn test_empty_account_selector_is_rejected(h: &impl FacadeContractHarn
 
     assert_matches!(
         result,
-        Err(ApplyManifestError::ParseManifest(_)),
-        "an empty account selector `{{}}` must be rejected while parsing the manifest, got: \
+        Err(ApplyManifestError::BadAccount(
+            ResolveManifestAccountError::EmptySelector
+        )),
+        "an empty account selector `{{}}` must be rejected during account resolution, got: \
          {result:?}"
     );
 }

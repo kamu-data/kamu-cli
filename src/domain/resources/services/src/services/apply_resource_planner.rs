@@ -123,13 +123,13 @@ where
         match id {
             Some(id) => Ok(Some(id)),
             None => {
-                // Account resolution (id + name lookup) already happened upstream, as
-                // part of the apply process (see `ResourceAccountResolver`); `headers.account`
-                // is always a resolved `Some(AccountRef::IdAndName(_))` by this point.
+                // Account resolution (id + did + name lookup) already happened upstream,
+                // as part of the apply process (see `ResourceAccountResolver`);
+                // `headers.account` is always fully resolved by this point.
                 let account_id = headers
                     .account
                     .as_ref()
-                    .and_then(kamu_resources::ResourceAccountRef::did)
+                    .and_then(|a| a.did.as_ref())
                     .expect("resource headers must carry a resolved account by apply time");
 
                 self.generic_resource_query_service

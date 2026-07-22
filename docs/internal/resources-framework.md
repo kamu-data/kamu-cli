@@ -1,7 +1,6 @@
 # Resources Framework — Architecture
 
-> **Status:** prototype, under active development on branch
-> `feature/1609-managed-resources-prototype-stage1`.
+> **Status:** prototype, under active development.
 > This document describes the framework *as it stands today*. Type names, paths, and field lists
 > below are drawn from source — when they drift, treat the source as canonical and update this page.
 
@@ -122,7 +121,7 @@ long-term goal. This page documents what exists now.
 | --- | --- |
 | **Resource** | A single managed object instance of a given type, identified by a `ResourceID`. |
 | **Schema** | The canonical resource-type identity URL, e.g. `.../config/v1alpha1/VariableSet`. Carried as a `TypeUri` (opaque identity); `ResourceSchemaId` is a parsed lens over it. Its last path segment is a `TypeName` (e.g. `VariableSet`). |
-| **Type name** | Human-facing resource type label derived from the schema's last path segment (`TypeName`, e.g. `VariableSet`). `ResourceHandle`, `ResourceTypeCountSummary`, and `ResourceNameNotFoundError` carry this value as `type_name`; it is derived via `ResourceSchemaId`/`resource_type_name()`. |
+| **Type name** | Human-facing resource type label derived from the schema's last path segment (`TypeName`, e.g. `VariableSet`). `ResourceTypeCountSummary` and `ResourceNameNotFoundError` carry this value as `type_name`; `ResourceHandle` does not store it and instead derives it on demand via `ResourceSchemaId`/`resource_type_name()`. |
 | **Selector name / alias** | A resource *type's* CLI/API lookup name used only to resolve raw selector input before dispatch: canonical (`variablesets`, `secretsets`) or a short alias (`vs`, `ss`). Both are `ResourceSelectorName` values and live in selector-resolution structures (`ResourceTypeDescriptor`, `ResourcePresentationDefinition`, `ResourceDispatcherMeta`, CLI selector services). They are not ODF `TypeName`s and are not persisted identity. |
 | **Resource type selector** | Raw user/API input identifying a *type* before resolution (`ResourceTypeSelectorRaw`; matches a selector name or alias). Distinct from **Selector**, which identifies an *instance*. |
 | **Descriptor** | Schema (`TypeUri`) + selector name/aliases identifying a type for routing/presentation; domain type `ResourceTypeDescriptor`, carried in `dill` as `ResourceDispatcherMeta`. |
@@ -371,7 +370,7 @@ pub struct ResourceManifest {
 pub struct ResourceManifestHeaders {
     pub id: Option<ResourceID>,              // optional — NOT assignable; an exact pointer to an
                                              // existing resource for updates (e.g. when renaming)
-    pub account: Option<ResourceAccountRef>, // optional — by name, id, or both; defaults to caller
+    pub account: Option<ResourceAccountRef>, // optional — id/did/name selector; defaults to caller
     pub name: ResourceName,                  // required
     pub labels: Vec<(TypeRef, serde_json::Value)>,
     pub annotations: Vec<(TypeRef, serde_json::Value)>,
@@ -411,10 +410,10 @@ A user may write **only**: `$schema`, `headers.{id?, account?, name, labels, ann
 > downstream carries the plain `TypeUri`. Both serialize byte-identically, so there's no wire/storage
 > difference.
 
-> **`ResourceAccountRef`** is ODF's generated `auth::AccountRef` enum
-> (`Id(AccountID) | Name(AccountName) | Both { id, name }`), shared by the manifest `account` field
-> and every facade selector's `account`. The enum has no empty variant, so `headers.account: {}` is
-> rejected at deserialization time ("AccountRef must specify id or name or both").
+> **`ResourceAccountRef`** is ODF's generated `auth::AccountRef` struct — `{ id: Option<ResourceID>,
+> did: Option<AccountID>, name: Option<AccountName> }`, all fields optional — shared by the manifest
+> `account` field and every facade selector's `account`. See [§7](#7-account-resolution--authorization)
+> for how a selector resolves to an account and how an empty one (`{}`) is rejected.
 
 The `id` is **not** something the user assigns — a new resource's UID is always allocated by the
 server. It may only be *supplied* on a manifest to point at an already-existing resource for an
@@ -447,8 +446,8 @@ pub struct ResourceStatus {                  // ODF-generated; entirely server-o
 ```
 
 > **Codegen-alias convention.** `ResourceHeaders`, `ResourceHeadersInput`, `ResourcePhase`,
-> `ResourceConditions`, `ResourceLabels`, `ResourceAnnotations` (and `ResourceID`/`TypeUri`/
-> `ResourceAccountRef` seen earlier) are all `pub type` aliases adopting ODF's generated types
+> `ResourceConditions`, `ResourceLabels`, `ResourceAnnotations`, `ResourceHandle` (and `ResourceID`/
+> `TypeUri`/`ResourceAccountRef` seen earlier) are all `pub type` aliases adopting ODF's generated types
 > verbatim rather than hand-rolled structs. The generated DTOs have no direct `Serialize`/`Deserialize`
 > — serde goes through ODF's YAML "shadow proxy", so fields of these types carry a
 > `#[serde_as(as = "odf::metadata::serde::yaml::resource::…")]` annotation instead of deriving serde
@@ -462,11 +461,15 @@ pub struct ResourceStatus {                  // ODF-generated; entirely server-o
 > matching generated `SimpleObject`. Both live in `values/`, not `views/` — `views/` is reserved for
 > query-shaped results (`ResourceSummaryView`, list/apply-manifest outcomes), whereas `Resource` is the
 > canonical per-instance DTO. Its identity/lookup counterpart, domain `ResourceHandle`
-> ([`values/resource_handle.rs`](/src/domain/resources/domain/src/values/resource_handle.rs) — `schema` +
-> `typeName` + `account` + `id` + `name`), has no ODF codegen equivalent and stays hand-rolled, but is
-> named and placed the same way. The GraphQL-facing type is also `ResourceHandle` (was
-> `ResourceIdentity`). Its `typeName` is derived from `schema` via `resource_type_name()`;
-> handles do not carry CLI selector names.
+> ([`values/resource_handle.rs`](/src/domain/resources/domain/src/values/resource_handle.rs)), is also a
+> `pub type` alias — of `odf::metadata::resource::ResourceHandle` (RFC-18 shape: `account:
+> auth::AccountHandle`, `r#type: TypeUri`, `id: ResourceID`, `did: Option<Did>`, `name: ResourceName`).
+> `did` is always `None` today — populating it needs DID-aware resource types, which don't exist yet
+> (see [`handle_support.rs`](/src/domain/resources/facade/src/facade/local/helpers/handle_support.rs)).
+> A short display name is derived on demand from `r#type` via `resource_type_name()` (see
+> [`resource_schema_id.rs`](/src/domain/resources/domain/src/values/resource_schema_id.rs)) rather
+> than carried on the handle. The GraphQL-facing type is also `ResourceHandle`; it mirrors the same
+> fields, exposing `r#type` under the wire name `type`. Handles do not carry CLI selector names.
 >
 > Per-kind `Spec`/`SpecInput` types follow the same convention where the RFC shape and the domain's
 > existing behavior (validation, linting) are compatible. `kamu_configuration::VariableSetSpec` /
@@ -490,10 +493,9 @@ pub struct ResourceStatus {                  // ODF-generated; entirely server-o
 > `decrypt_plaintext_bytes` helpers attach via the `SecretExt` extension trait instead.
 > `content_encoding` returns the parsed `kamu_configuration::ContentEncoding` (`Jwe`/`Aes256Gcm`)
 > rather than a raw string, so encoding-specific code matches on the enum and must be revisited when
-> a new encoding is added. One user-visible consequence of the codegen adoption: a plaintext secret
-> written with the scalar shorthand (`API_TOKEN: hunter2`) no longer round-trips as a scalar —
-> `get ss --revealed` renders it as `{ value: hunter2 }`, matching `VariableSet`'s existing behavior
-> (there is no retained "was this shorthand" flag once parsed).
+> a new encoding is added. A plaintext secret written with the scalar shorthand (`API_TOKEN: hunter2`)
+> does not round-trip as a scalar — `get ss --revealed` renders it as `{ value: hunter2 }`, matching
+> `VariableSet`'s behavior (there is no retained "was this shorthand" flag once parsed).
 
 The behaviorally-significant consequences of adopting these shapes:
 
@@ -507,17 +509,20 @@ The behaviorally-significant consequences of adopting these shapes:
   ([`test_account_rename_reflected_immediately_in_headers`](/src/infra/resources/repo-tests/src/resource_repository_test_suite.rs)).
   If the owning account can't be found (e.g. deletion racing async cleanup), repos substitute the
   sentinels `deleted-account` (`DELETED_ACCOUNT_NAME_SENTINEL`) and the nil resource id
-  (`deleted_account_resource_id_sentinel()`) rather than failing the read. Note `Account` is **not**
-  itself a resource yet; this `resource_id` is an artificial, stable id assigned per account (random
-  UUIDv4 on create) in preparation for `Account` eventually becoming a projection of an account
-  resource — no account-resource events/history exist today.
+  (`deleted_account_resource_id_sentinel()`) rather than failing the read. `Account` is **not** itself
+  a resource yet; `resource_id` is an artificial, stable id assigned per account
+  (`kamu_accounts::Account::resource_id`) in preparation for `Account` eventually becoming a
+  projection of an account resource — no account-resource events/history exist today.
 - **Account is a precondition, not resolved, at the use-case boundary.**
-  `ResourceHeadersInput.account` is an `Option<auth::AccountRef>` selector, but by the time headers
-  reach `ApplyResourceUseCase::plan`/`apply` it must already be a resolved `AccountRef::Handle(_)`.
-  Resolution is the caller's job — via the facade's `ResourceAccountResolver` (which also
-  authorizes), or by threading a handle already in hand (e.g. `DatasetEnvVarMutationAdapterImpl`
-  from `DatasetEntry.owner_*`). The use case enforces this defensively because the downstream
-  event-sourced projector is pure/sync and cannot resolve accounts.
+  `ResourceHeadersInput.account` is an `Option<auth::AccountRef>` selector — `{id, did, name}`, all
+  optional — but by the time headers reach `ApplyResourceUseCase::plan`/`apply` it must already be a
+  fully-resolved `AccountRef` (all three fields `Some`); `ResourceHeaders::from_input` panics
+  otherwise. Resolution is the caller's job — via the facade's `ResourceAccountResolver` (which also
+  authorizes), or by resolving the account directly when only a DID/name is in hand (e.g.
+  `DatasetEnvVarMutationAdapterImpl` looks up the resource id via `AccountService` from
+  `DatasetEntry.owner_id`/`owner_name` before building headers). The use case enforces this
+  defensively because the downstream event-sourced projector is pure/sync and cannot resolve
+  accounts.
 - **Built-in conditions** are Kamu extensions keyed by stable URIs under
   `https://kamu.dev/schemas/resource/v1alpha1/conditions/{Accepted,Ready,Reconciling}`; each value
   carries `status`, `reason`, optional `message`, and `lastTransitionTime`. `conditions` is optional
@@ -620,8 +625,7 @@ backfill, never rewriting the event log in place).
 **Schema/version upgrades.** The schema URL is part of resource identity, including its version
 segment. Supporting a new schema version therefore requires an explicit compatibility/migration
 story for that resource type: update manifests, projections, dispatcher registration, and any
-existing rows/events that should move to the new schema. Do not assume the pre-`$schema` version
-conversion rules still apply.
+existing rows/events that should move to the new schema.
 
 ---
 
@@ -635,11 +639,12 @@ Resolution + permission checks live in `ResourceAccountResolverImpl`
   the calling subject's own account**. To target *another* account, the resolver requires the caller
   to be an **admin** (`rebac_service.is_account_admin`); otherwise it returns
   `AccessError::Unauthorized`. An **anonymous** subject cannot resolve any account (rejected).
-- **Account selector forms.** `account` (`ResourceAccountRef`) may be given by name, by id, or both
-  (agreement checked when both are given — mismatch → error). Resolution maps the selector to a
-  concrete `(AccountID, AccountName)`. An empty selector (`{}`) is rejected while the manifest is
-  being deserialized — the enum has no empty variant, so this is a parse-time failure, not a
-  resolution-time one; the resolver itself never sees an empty selector.
+- **Account selector forms.** `account` (`ResourceAccountRef`) carries `id`/`did`/`name`, all
+  optional. The account is looked up by `did` if given, else by `name`; any other selector field(s)
+  present are then checked for agreement against the resolved account (a mismatch on `id`, `did`, or
+  `name` → `SelectorMismatch`). An empty selector (`{}`) parses successfully (the struct derives
+  `Default`) but is rejected by the resolver itself with `EmptySelector`, since at least one of
+  `id`/`did`/`name` is required to resolve an account.
 - **Remote calls.** For a remote context the CLI authenticates with an access token; the server then
   resolves the *authenticated principal* into the current account subject exactly as above — the
   client never asserts its own account id, the server derives it.
@@ -1065,9 +1070,9 @@ stateDiagram-v2
 **Notes on current behavior (stage-1):**
 
 - **`Failed` is the only unhealthy phase.** `ResourcePhase` (`Pending`/`Reconciling`/`Ready`/`Failed`)
-  is adopted directly from ODF RFC-018's codegen (see [§5a](#5a-resource-anatomy--input-vs-auto-generated));
-  a never-produced `Degraded` variant was dropped. `Failed` is set by `mark_failed` when the
-  reconciler errors, alongside a `Ready=false` condition carrying the reason/message.
+  is adopted directly from ODF RFC-018's codegen (see [§5a](#5a-resource-anatomy--input-vs-auto-generated)).
+  `Failed` is set by `mark_failed` when the reconciler errors, alongside a `Ready=false` condition
+  carrying the reason/message.
 - **`Failed` is status, not terminal and not auto-retried.** There is no background reconcile
   worker or scheduler yet. Recovery is driven by the **user re-applying** the manifest: a changed
   spec bumps `generation`, which moves the resource back to `Pending` (clearing conditions) and makes

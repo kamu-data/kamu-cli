@@ -11,7 +11,7 @@ use chrono::{DateTime, Utc};
 use database_common::PaginationOpts;
 
 use crate::prelude::*;
-use crate::scalars::{AccountID, AccountName, ResourcePhase, TypeName, UInt64};
+use crate::scalars::{AccountID, AccountName, Did, ResourcePhase, TypeName, UInt64};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Type aliases for cleaner From implementations
@@ -49,41 +49,19 @@ impl ResourceTypeSelectorInput {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(InputObject, Debug, Clone)]
-pub struct AccountRefByDidAndNameInput {
-    pub did: AccountID<'static>,
-    pub name: AccountName<'static>,
-}
-
-impl From<AccountRefByDidAndNameInput> for odf::metadata::auth::AccountRefByDidAndName {
-    fn from(value: AccountRefByDidAndNameInput) -> Self {
-        Self {
-            did: value.did.into(),
-            name: value.name.into(),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(OneofObject, Debug, Clone)]
-pub enum AccountRefInput {
-    #[graphql(name = "byDid")]
-    Did(AccountID<'static>),
-    #[graphql(name = "byName")]
-    Name(AccountName<'static>),
-    #[graphql(name = "byDidAndName")]
-    DidAndName(AccountRefByDidAndNameInput),
+#[derive(InputObject, Debug, Clone, Default)]
+pub struct AccountRefInput {
+    pub id: Option<ResourceID<'static>>,
+    pub did: Option<AccountID<'static>>,
+    pub name: Option<AccountName<'static>>,
 }
 
 impl AccountRefInput {
     pub fn into_manifest_account(self) -> kamu_resources::ResourceAccountRef {
-        match self {
-            Self::Did(did) => kamu_resources::ResourceAccountRef::Did(did.into()),
-            Self::Name(name) => kamu_resources::ResourceAccountRef::Name(name.into()),
-            Self::DidAndName(account) => {
-                kamu_resources::ResourceAccountRef::DidAndName(account.into())
-            }
+        kamu_resources::ResourceAccountRef {
+            id: self.id.map(Into::into),
+            did: self.did.map(Into::into),
+            name: self.name.map(Into::into),
         }
     }
 }
@@ -270,6 +248,8 @@ pub struct ResourceBadAccountProblem {
     pub code: ResourceBadAccountProblemCode,
     pub account_id: Option<AccountID<'static>>,
     pub account_name: Option<AccountName<'static>>,
+    pub expected_resource_id: Option<ResourceID<'static>>,
+    pub expected_did: Option<AccountID<'static>>,
     pub expected_name: Option<AccountName<'static>>,
     pub actual_name: Option<AccountName<'static>>,
     pub message: String,
@@ -281,10 +261,22 @@ impl From<kamu_resources_facade::ResolveManifestAccountError> for ResourceBadAcc
 
         let message = value.to_string();
         match value {
+            E::EmptySelector => Self {
+                code: ResourceBadAccountProblemCode::EmptySelector,
+                account_id: None,
+                account_name: None,
+                expected_resource_id: None,
+                expected_did: None,
+                expected_name: None,
+                actual_name: None,
+                message,
+            },
             E::AccountNotFoundById(error) => Self {
                 code: ResourceBadAccountProblemCode::AccountNotFoundById,
                 account_id: Some(error.account_id.into()),
                 account_name: None,
+                expected_resource_id: None,
+                expected_did: None,
                 expected_name: None,
                 actual_name: None,
                 message,
@@ -293,19 +285,25 @@ impl From<kamu_resources_facade::ResolveManifestAccountError> for ResourceBadAcc
                 code: ResourceBadAccountProblemCode::AccountNotFoundByName,
                 account_id: None,
                 account_name: Some(error.account_name.into()),
+                expected_resource_id: None,
+                expected_did: None,
                 expected_name: None,
                 actual_name: None,
                 message,
             },
-            E::IdNameMismatch {
-                account_id,
-                expected_name,
+            E::SelectorMismatch {
+                did,
                 actual_name,
+                expected_resource_id,
+                expected_did,
+                expected_name,
             } => Self {
-                code: ResourceBadAccountProblemCode::IdNameMismatch,
-                account_id: Some(account_id.into()),
+                code: ResourceBadAccountProblemCode::SelectorMismatch,
+                account_id: Some(did.into()),
                 account_name: None,
-                expected_name: Some(expected_name.into()),
+                expected_resource_id: expected_resource_id.map(Into::into),
+                expected_did: expected_did.map(Into::into),
+                expected_name: expected_name.map(Into::into),
                 actual_name: Some(actual_name.into()),
                 message,
             },
@@ -320,9 +318,10 @@ impl From<kamu_resources_facade::ResolveManifestAccountError> for ResourceBadAcc
 
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ResourceBadAccountProblemCode {
+    EmptySelector,
     AccountNotFoundById,
     AccountNotFoundByName,
-    IdNameMismatch,
+    SelectorMismatch,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -563,8 +562,11 @@ pub struct BatchResourceManifestSuccess {
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceHandle {
     pub id: ResourceID<'static>,
-    pub schema: TypeUri<'static>,
-    pub type_name: TypeName<'static>,
+    #[graphql(name = "type")]
+    pub r#type: TypeUri<'static>,
+    // Always `None` until we support DID-aware resource types (see
+    // handle_support.rs).
+    pub did: Option<Did<'static>>,
     pub name: ResourceName<'static>,
     pub account: AccountHandle,
 }
@@ -573,8 +575,8 @@ impl From<kamu_resources::ResourceHandle> for ResourceHandle {
     fn from(value: kamu_resources::ResourceHandle) -> Self {
         Self {
             id: value.id.into(),
-            schema: value.schema.into(),
-            type_name: value.type_name.into(),
+            r#type: value.r#type.into(),
+            did: value.did.map(Into::into),
             name: value.name.into(),
             account: value.account.into(),
         }

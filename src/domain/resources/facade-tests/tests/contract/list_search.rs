@@ -125,9 +125,13 @@ pub async fn test_list_handles_for_account(h: &impl FacadeContractHarness) {
     assert!(!names.contains(&"idlist-bob-1"));
 
     for i in &handles {
-        assert_eq!(i.schema.as_str(), VARIABLE_SET_SCHEMA_STR);
-        assert_eq!(i.schema.as_str(), VARIABLE_SET_SCHEMA_STR);
-        assert!(!i.type_name.as_str().is_empty());
+        assert_eq!(i.r#type.as_str(), VARIABLE_SET_SCHEMA_STR);
+        assert!(
+            !kamu_resources::resource_type_name(&i.r#type)
+                .unwrap()
+                .as_str()
+                .is_empty()
+        );
     }
 }
 
@@ -473,7 +477,7 @@ pub async fn test_search_multi_type(h: &impl FacadeContractHarness) {
 
     // Both schemas must be represented in the result
     let schemas: std::collections::HashSet<_> =
-        response.items.iter().map(|i| i.schema.as_str()).collect();
+        response.items.iter().map(|i| i.r#type.as_str()).collect();
     assert!(
         schemas.contains(VARIABLE_SET_SCHEMA_STR),
         "result must include VariableSet schema"

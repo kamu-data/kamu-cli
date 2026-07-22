@@ -219,7 +219,7 @@ impl ResourceSelectionResolutionService for ResourceSelectionResolutionServiceIm
 
 impl ResourceSelectionResolutionServiceImpl {
     fn target_key_from_handle(handle: &ResourceHandle) -> ResourceTargetKey {
-        (handle.schema.clone(), handle.id)
+        (handle.r#type.clone(), handle.id)
     }
 
     fn target_key(target: &ResourceTarget) -> ResourceTargetKey {
@@ -356,7 +356,7 @@ impl ResourceSelectionResolutionServiceImpl {
         )
         .await?;
 
-        // Handles intentionally carry a display TypeName, not a CLI selector.
+        // Handles intentionally carry a schema TypeUri, not a CLI selector.
         // Reconstruct command-routing selectors from the descriptor set that
         // was already loaded for this expansion.
         let canonical_selectors_by_schema =
@@ -368,7 +368,7 @@ impl ResourceSelectionResolutionServiceImpl {
             .map(|handle| {
                 let canonical_selector = Self::canonical_selector_for_schema(
                     &canonical_selectors_by_schema,
-                    &handle.schema,
+                    &handle.r#type,
                 )?;
                 Ok(Self::target_from_handle(
                     handle,
@@ -489,7 +489,7 @@ impl ResourceSelectionResolutionServiceImpl {
             .map(|handle| {
                 let canonical_selector = Self::canonical_selector_for_schema(
                     &canonical_selectors_by_schema,
-                    &handle.schema,
+                    &handle.r#type,
                 )?;
                 Ok(Self::target_from_handle(
                     handle,
@@ -722,7 +722,7 @@ impl ResourceSelectionResolutionServiceImpl {
             .map(|handle| {
                 let canonical_selector = Self::canonical_selector_for_schema(
                     &canonical_selectors_by_schema,
-                    &handle.schema,
+                    &handle.r#type,
                 )?;
                 Ok(Self::target_from_handle(
                     handle,
@@ -925,7 +925,7 @@ impl ResourceSelectionResolutionServiceImpl {
     ) -> ResourceTarget {
         ResourceTarget {
             canonical_selector,
-            schema: handle.schema,
+            schema: handle.r#type,
             id: handle.id,
             name: handle.name,
             selector_input,

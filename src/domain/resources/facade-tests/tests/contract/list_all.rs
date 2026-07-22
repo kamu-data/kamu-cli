@@ -37,7 +37,7 @@ fn handle_keys(mut items: Vec<kamu_resources::ResourceHandle>) -> Vec<(String, S
     normalize_handles(&mut items);
     items
         .into_iter()
-        .map(|item| (item.schema.to_string(), item.name.to_string()))
+        .map(|item| (item.r#type.to_string(), item.name.to_string()))
         .collect()
 }
 

@@ -127,7 +127,12 @@ pub async fn test_get_handle_by_name(h: &impl FacadeContractHarness) {
         "ident-name-test",
         &id,
     );
-    assert!(!handle.type_name.as_str().is_empty());
+    assert!(
+        !kamu_resources::resource_type_name(&handle.r#type)
+            .unwrap()
+            .as_str()
+            .is_empty()
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -150,8 +155,7 @@ pub async fn test_get_handle_by_uid(h: &impl FacadeContractHarness) {
         "id must match when fetched by name vs id"
     );
     assert_eq!(handle_by_name.name, handle_by_uid.name);
-    assert_eq!(handle_by_name.schema, handle_by_uid.schema);
-    assert_eq!(handle_by_name.schema, handle_by_uid.schema);
+    assert_eq!(handle_by_name.r#type, handle_by_uid.r#type);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

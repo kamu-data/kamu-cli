@@ -88,7 +88,7 @@ impl ResourceHeadersExt for ResourceHeaders {
     }
 
     fn from_input(now: DateTime<Utc>, id: ResourceID, input: ResourceHeadersInput) -> Self {
-        let account = account_handle_from_input(&input);
+        let account = account_handle_from_input(input.account.as_ref());
 
         Self {
             id,
@@ -119,14 +119,14 @@ impl ResourceHeadersExt for ResourceHeaders {
             .as_ref()
             .map_or(&empty_map, |a| &a.entries);
 
-        self.account == account_handle_from_input(input)
+        self.account == account_handle_from_input(input.account.as_ref())
             && self.name == input.name
             && self.labels.entries == *input_labels
             && self.annotations.entries == *input_annotations
     }
 
     fn apply_update(&mut self, now: DateTime<Utc>, input: ResourceHeadersInput) {
-        self.account = account_handle_from_input(&input);
+        self.account = account_handle_from_input(input.account.as_ref());
         self.name = input.name;
         self.labels = input
             .labels
@@ -146,33 +146,26 @@ impl ResourceHeadersExt for ResourceHeaders {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Account resolution (id + name lookup) happens upstream, as part of the
-/// apply process (see `ResourceAccountResolver`), before a
+/// Account resolution (id + did + name lookup) happens upstream, as part of
+/// the apply process (see `ResourceAccountResolver`), before a
 /// [`ResourceHeadersInput`] is ever constructed — every production caller
-/// populates `account` with an already-resolved
-/// [`auth::AccountRef::IdAndName`]. The facade also overwrites the resulting
-/// header's `account` with the freshly-resolved handle at the view boundary on
-/// every read, so the name carried here is never persisted or relied upon (see
-/// plan `.spec/022.resource-headers.plan.md` — avoiding name denormalization is
-/// the point of that JOIN-on-read design). This function only exists to
-/// satisfy the aliased struct's mandatory `account` field during
-/// construction and panics if handed an unresolved reference, which would
-/// indicate a caller bypassed account resolution.
-fn account_handle_from_input(input: &ResourceHeadersInput) -> auth::AccountHandle {
-    match &input.account {
-        Some(auth::AccountRef::DidAndName(account)) => auth::AccountHandle {
-            // The account *resource* id is not carried by an `AccountRef`. This
-            // handle is a construction-time placeholder that the facade always
-            // overwrites with the freshly-resolved handle (incl. the real
-            // resource id) at the JOIN-on-read view boundary — see the doc
-            // comment above — so a nil id here is never persisted or observed.
-            id: odf::ResourceID::new(uuid::Uuid::nil()),
-            did: account.did.clone(),
-            name: account.name.clone(),
+/// populates `account` with a fully-resolved [`auth::AccountRef`]. Panics if
+/// handed a partially-resolved reference, which would indicate a caller
+/// bypassed account resolution.
+fn account_handle_from_input(input: Option<&auth::AccountRef>) -> auth::AccountHandle {
+    match input {
+        Some(auth::AccountRef {
+            id: Some(id),
+            did: Some(did),
+            name: Some(name),
+        }) => auth::AccountHandle {
+            id: *id,
+            did: did.clone(),
+            name: name.clone(),
         },
         other => panic!(
-            "ResourceHeadersInput.account must be a resolved AccountRef::IdAndName by the time \
-             headers are constructed, got: {other:?}"
+            "ResourceHeadersInput.account must be a fully resolved AccountRef (id, did, and name \
+             all present) by the time headers are constructed, got: {other:?}"
         ),
     }
 }

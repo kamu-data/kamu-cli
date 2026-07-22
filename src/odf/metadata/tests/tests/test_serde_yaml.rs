@@ -1252,25 +1252,39 @@ fn test_serde_resource_input_refs() {
                 annotations: None,
             },
             spec: RelationsSpecInput {
-                relations: Some(vec![Relation {
-                    subject: ResourceRef::Name {
+                relations: Some(vec![RelationInput {
+                    subject: ResourceRef {
                         account: None,
-                        typ: TypeRef::Name("Account".parse().unwrap()),
-                        name: "alice".parse().unwrap(),
+                        r#type: TypeRef::Name("Account".parse().unwrap()),
+                        id: None,
+                        did: None,
+                        name: Some("alice".parse().unwrap()),
                     },
                     relation: "role".to_string(),
                     value: Some(json!("maintainer")),
-                    object: ResourceRef::Name {
-                        account: Some(AccountRef::Name("bob".parse().unwrap())),
-                        typ: TypeRef::Name("Dataset".parse().unwrap()),
-                        name: "bobs-dataset".parse().unwrap(),
+                    object: ResourceRef {
+                        account: Some(AccountRef {
+                            id: None,
+                            did: None,
+                            name: Some("bob".parse().unwrap()),
+                        }),
+                        r#type: TypeRef::Name("Dataset".parse().unwrap()),
+                        id: None,
+                        did: None,
+                        name: Some("bobs-dataset".parse().unwrap()),
                     },
                 }]),
-                attributes: Some(vec![Attribute {
-                    object: ResourceRef::Name {
-                        account: Some(AccountRef::Name("bob".parse().unwrap())),
-                        typ: TypeRef::Name("Dataset".parse().unwrap()),
-                        name: "bobs-dataset".parse().unwrap(),
+                attributes: Some(vec![AttributeInput {
+                    object: ResourceRef {
+                        account: Some(AccountRef {
+                            id: None,
+                            did: None,
+                            name: Some("bob".parse().unwrap()),
+                        }),
+                        r#type: TypeRef::Name("Dataset".parse().unwrap()),
+                        id: None,
+                        did: None,
+                        name: Some("bobs-dataset".parse().unwrap()),
                     },
                     name: "allowPublicRead".to_string(),
                     value: json!(true),
@@ -1326,7 +1340,7 @@ fn test_serde_resource_canonical() {
           id: 7149c2f9-41f2-4cbb-be8f-7d7747525f9a
           name: my-secret
           account:
-            id: b0a3c1de-4f2a-4c9b-8e7d-1a2b3c4d5e6f
+            id: c27331ce-ce88-4ff9-8c5a-4ce8107cc03f
             did: did:odf:fed01816ef0a9abe93aba816ef0a9abe93aba90e6065747170300c0d3d30c2cd8d7a4
             name: sergiimk
           labels:
@@ -1378,7 +1392,7 @@ fn test_serde_resource_canonical() {
                 id: "7149c2f9-41f2-4cbb-be8f-7d7747525f9a".parse().unwrap(),
                 name: "my-secret".parse().unwrap(),
                 account: AccountHandle {
-                    id: "b0a3c1de-4f2a-4c9b-8e7d-1a2b3c4d5e6f".parse().unwrap(),
+                    id: "c27331ce-ce88-4ff9-8c5a-4ce8107cc03f".parse().unwrap(),
                     did: AccountID::from_did_str("did:odf:fed01816ef0a9abe93aba816ef0a9abe93aba90e6065747170300c0d3d30c2cd8d7a4").unwrap(),
                     name: "sergiimk".parse().unwrap(),
                 },
@@ -1461,7 +1475,8 @@ fn test_serde_resource_canonical() {
               id: 7149c2f9-41f2-4cbb-be8f-7d7747525f9a
               name: my-secret
               account:
-                id: did:odf:fed01816ef0a9abe93aba816ef0a9abe93aba90e6065747170300c0d3d30c2cd8d7a4
+                id: c27331ce-ce88-4ff9-8c5a-4ce8107cc03f
+                did: did:odf:fed01816ef0a9abe93aba816ef0a9abe93aba90e6065747170300c0d3d30c2cd8d7a4
                 name: sergiimk
               labels:
                 nested:
@@ -1486,38 +1501,72 @@ fn test_serde_resource_canonical() {
 
 #[test]
 fn test_serde_account_ref() {
-    let id = AccountID::new_generated_ed25519().1;
+    let resource_id = ResourceID::new(uuid::Uuid::new_v4());
+    let did = AccountID::new_generated_ed25519().1;
 
-    assert_matches!(
-        serde_json::from_value::<AccountRef>(json!({ "id": id.to_string() })).unwrap(),
-        AccountRef::Did(actual) if actual == id
-    );
-
-    assert_matches!(
-        serde_json::from_value::<AccountRef>(json!({ "name": "alice" })).unwrap(),
-        AccountRef::Name(name) if name.as_str() == "alice"
-    );
-
-    assert_matches!(
-        serde_json::from_value::<AccountRef>(json!({ "id": id.to_string(), "name": "alice" }))
+    assert_eq!(
+        serde_json::from_value::<serde::auth::AccountRef>(json!({ "did": did.to_string() }))
+            .unwrap()
+            .into_dto()
             .unwrap(),
-        AccountRef::DidAndName(handle) if handle.did == id && handle.name.as_str() == "alice"
+        AccountRef {
+            id: None,
+            did: Some(did.clone()),
+            name: None,
+        }
     );
 
-    let error = serde_json::from_value::<AccountRef>(json!({})).unwrap_err();
-    assert!(
-        error
-            .to_string()
-            .contains("must specify id or name or both"),
-        "unexpected error message: {error}"
+    assert_eq!(
+        serde_json::from_value::<serde::auth::AccountRef>(json!({ "name": "alice" }))
+            .unwrap()
+            .into_dto()
+            .unwrap(),
+        AccountRef {
+            id: None,
+            did: None,
+            name: Some("alice".parse().unwrap()),
+        }
     );
 
-    let both = AccountRef::DidAndName(AccountRefByDidAndName {
-        did: id.clone(),
-        name: "alice".parse().unwrap(),
-    });
+    assert_eq!(
+        serde_json::from_value::<serde::auth::AccountRef>(
+            json!({ "id": resource_id.to_string(), "did": did.to_string(), "name": "alice" })
+        )
+        .unwrap()
+        .into_dto()
+        .unwrap(),
+        AccountRef {
+            id: Some(resource_id),
+            did: Some(did.clone()),
+            name: Some("alice".parse().unwrap()),
+        }
+    );
+
+    // All fields are optional: an empty object is valid and resolves to an
+    // unspecified reference (resolution failure, if any, happens downstream).
+    assert_eq!(
+        serde_json::from_value::<serde::auth::AccountRef>(json!({}))
+            .unwrap()
+            .into_dto()
+            .unwrap(),
+        AccountRef {
+            id: None,
+            did: None,
+            name: None,
+        }
+    );
+
+    let both = AccountRef {
+        id: Some(resource_id),
+        did: Some(did),
+        name: Some("alice".parse().unwrap()),
+    };
     let round_tripped: AccountRef =
-        serde_json::from_value(serde_json::to_value(&both).unwrap()).unwrap();
+        serde_json::to_value(serde::auth::AccountRef::from(both.clone()))
+            .and_then(serde_json::from_value::<serde::auth::AccountRef>)
+            .unwrap()
+            .into_dto()
+            .unwrap();
     assert_eq!(round_tripped, both);
 }
 

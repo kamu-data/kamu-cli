@@ -137,7 +137,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .resolve_snapshot_for_schema::<GetResourceError>(&schema, &target_account.did, id)
             .await?;
 
-        resource_handle_from_snapshot(snapshot).map_err(Into::into)
+        Ok(resource_handle_from_snapshot(snapshot))
     }
 
     async fn get_handles(
@@ -279,7 +279,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .list_snapshots_by_schema(target_account.did, &schema, request.pagination)
             .await?;
 
-        map_snapshots_to_handles(snapshots).map_err(Into::into)
+        Ok(map_snapshots_to_handles(snapshots))
     }
 
     async fn search_handles(
@@ -326,7 +326,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         let items = rows
             .into_iter()
             .map(resource_handle_from_row)
-            .collect::<Result<Vec<_>, InternalError>>()?;
+            .collect::<Vec<_>>();
 
         Ok(SearchResourceHandlesResponse { items, total_count })
     }
@@ -362,7 +362,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .list_all_snapshots(target_account.did, request.pagination)
             .await?;
 
-        map_snapshots_to_handles(snapshots).map_err(Into::into)
+        Ok(map_snapshots_to_handles(snapshots))
     }
 
     async fn plan_apply_manifest(
@@ -748,8 +748,6 @@ impl LocalResourceFacadeImpl {
             .map(|row| (row.id, row))
             .collect::<HashMap<_, _>>();
 
-        let type_name = resource_type_name(schema)?;
-
         let mut handles = Vec::new();
         for (request_index, _, id) in id_entries {
             let row_result = rows_by_id
@@ -760,7 +758,7 @@ impl LocalResourceFacadeImpl {
                 validate_handle_row(row, schema, ensure_schema_matches::<ResourceLookupProblem>)
             }) {
                 Ok(row) => {
-                    let handle = resource_handle_from_row_with_type_name(row, type_name.clone());
+                    let handle = resource_handle_from_row(row);
                     handles.push(IndexedResource {
                         request_index,
                         item: handle,

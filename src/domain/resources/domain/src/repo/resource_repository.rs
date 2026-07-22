@@ -221,11 +221,11 @@ pub struct ResourceHandleRow {
 
 impl ResourceHandleRow {
     pub fn account_handle(&self) -> odf::AccountHandle {
-        odf::AccountHandle::new(
-            ResourceID::new(self.account_resource_id),
-            self.account_id.clone(),
-            odf::AccountName::new_unchecked(&self.account_name),
-        )
+        odf::AccountHandle {
+            id: ResourceID::new(self.account_resource_id),
+            did: self.account_id.clone(),
+            name: odf::AccountName::new_unchecked(&self.account_name),
+        }
     }
 }
 
