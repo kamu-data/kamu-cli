@@ -50,15 +50,15 @@ impl ResourceTypeSelectorInput {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(InputObject, Debug, Clone)]
-pub struct AccountRefByIdAndNameInput {
-    pub id: AccountID<'static>,
+pub struct AccountRefByDidAndNameInput {
+    pub did: AccountID<'static>,
     pub name: AccountName<'static>,
 }
 
-impl From<AccountRefByIdAndNameInput> for odf::metadata::auth::AccountRefByIdAndName {
-    fn from(value: AccountRefByIdAndNameInput) -> Self {
+impl From<AccountRefByDidAndNameInput> for odf::metadata::auth::AccountRefByDidAndName {
+    fn from(value: AccountRefByDidAndNameInput) -> Self {
         Self {
-            did: value.id.into(),
+            did: value.did.into(),
             name: value.name.into(),
         }
     }
@@ -68,21 +68,21 @@ impl From<AccountRefByIdAndNameInput> for odf::metadata::auth::AccountRefByIdAnd
 
 #[derive(OneofObject, Debug, Clone)]
 pub enum AccountRefInput {
-    #[graphql(name = "byId")]
-    Id(AccountID<'static>),
+    #[graphql(name = "byDid")]
+    Did(AccountID<'static>),
     #[graphql(name = "byName")]
     Name(AccountName<'static>),
-    #[graphql(name = "byIdAndName")]
-    IdAndName(AccountRefByIdAndNameInput),
+    #[graphql(name = "byDidAndName")]
+    DidAndName(AccountRefByDidAndNameInput),
 }
 
 impl AccountRefInput {
     pub fn into_manifest_account(self) -> kamu_resources::ResourceAccountRef {
         match self {
-            Self::Id(id) => kamu_resources::ResourceAccountRef::Id(id.into()),
+            Self::Did(did) => kamu_resources::ResourceAccountRef::Did(did.into()),
             Self::Name(name) => kamu_resources::ResourceAccountRef::Name(name.into()),
-            Self::IdAndName(account) => {
-                kamu_resources::ResourceAccountRef::IdAndName(account.into())
+            Self::DidAndName(account) => {
+                kamu_resources::ResourceAccountRef::DidAndName(account.into())
             }
         }
     }

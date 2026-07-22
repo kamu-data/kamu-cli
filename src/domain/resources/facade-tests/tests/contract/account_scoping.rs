@@ -101,11 +101,11 @@ fn account_by_name(name: &odf::AccountName) -> ResourceAccountRef {
 }
 
 fn account_by_id(id: odf::AccountID) -> ResourceAccountRef {
-    ResourceAccountRef::Id(id)
+    ResourceAccountRef::Did(id)
 }
 
 fn account_by_name_and_id(name: &odf::AccountName, id: odf::AccountID) -> ResourceAccountRef {
-    ResourceAccountRef::IdAndName(odf::metadata::auth::AccountRefByIdAndName {
+    ResourceAccountRef::DidAndName(odf::metadata::auth::AccountRefByDidAndName {
         did: id,
         name: name.clone(),
     })
@@ -118,7 +118,7 @@ fn unknown_account_by_name() -> ResourceAccountRef {
 }
 
 fn unknown_account_by_id() -> ResourceAccountRef {
-    ResourceAccountRef::Id(odf::AccountID::new_generated_ed25519().1)
+    ResourceAccountRef::Did(odf::AccountID::new_generated_ed25519().1)
 }
 
 fn selector_by_name(name: &str, account: Option<ResourceAccountRef>) -> ResourceSelector {

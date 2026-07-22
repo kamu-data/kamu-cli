@@ -160,7 +160,7 @@ impl ResourceHeadersExt for ResourceHeaders {
 /// indicate a caller bypassed account resolution.
 fn account_handle_from_input(input: &ResourceHeadersInput) -> auth::AccountHandle {
     match &input.account {
-        Some(auth::AccountRef::IdAndName(account)) => auth::AccountHandle {
+        Some(auth::AccountRef::DidAndName(account)) => auth::AccountHandle {
             // The account *resource* id is not carried by an `AccountRef`. This
             // handle is a construction-time placeholder that the facade always
             // overwrites with the freshly-resolved handle (incl. the real

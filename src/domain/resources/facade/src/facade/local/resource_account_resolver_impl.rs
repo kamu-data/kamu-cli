@@ -53,10 +53,10 @@ impl ResourceAccountResolverImpl {
         };
 
         match selector {
-            ResourceAccountRef::Id(id) => {
+            ResourceAccountRef::Did(did) => {
                 let account = self
                     .account_service
-                    .get_account_by_id(id)
+                    .get_account_by_id(did)
                     .await
                     .map_err(ResolveManifestAccountError::from)?;
 
@@ -71,7 +71,7 @@ impl ResourceAccountResolverImpl {
 
                 Ok((&account).into())
             }
-            ResourceAccountRef::IdAndName(odf::metadata::auth::AccountRefByIdAndName {
+            ResourceAccountRef::DidAndName(odf::metadata::auth::AccountRefByDidAndName {
                 did,
                 name,
             }) => {

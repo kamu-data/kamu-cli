@@ -52,7 +52,7 @@ impl std::str::FromStr for proxies::config::Variable {
 impl From<dtos::auth::AccountRef> for proxies::auth::AccountRef {
     fn from(v: dtos::auth::AccountRef) -> Self {
         match v {
-            dtos::auth::AccountRef::Id(id) => Self {
+            dtos::auth::AccountRef::Did(id) => Self {
                 id: Some(id),
                 name: None,
             },
@@ -60,7 +60,7 @@ impl From<dtos::auth::AccountRef> for proxies::auth::AccountRef {
                 id: None,
                 name: Some(name),
             },
-            dtos::auth::AccountRef::IdAndName(hdl) => Self {
+            dtos::auth::AccountRef::DidAndName(hdl) => Self {
                 id: Some(hdl.did),
                 name: Some(hdl.name),
             },
@@ -81,7 +81,7 @@ impl TryFrom<proxies::auth::AccountRef> for dtos::auth::AccountRef {
             proxies::auth::AccountRef {
                 id: Some(id),
                 name: None,
-            } => Ok(Self::Id(id)),
+            } => Ok(Self::Did(id)),
             proxies::auth::AccountRef {
                 id: None,
                 name: Some(name),
@@ -89,7 +89,7 @@ impl TryFrom<proxies::auth::AccountRef> for dtos::auth::AccountRef {
             proxies::auth::AccountRef {
                 id: Some(id),
                 name: Some(name),
-            } => Ok(Self::IdAndName(crate::auth::AccountRefByIdAndName::new(
+            } => Ok(Self::DidAndName(crate::auth::AccountRefByDidAndName::new(
                 id, name,
             ))),
         }

@@ -25,12 +25,12 @@ type AccountRefProxy = crate::serde::yaml::StructOrString<crate::serde::yaml::au
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AccountRefByIdAndName {
+pub struct AccountRefByDidAndName {
     pub did: AccountID,
     pub name: AccountName,
 }
 
-impl AccountRefByIdAndName {
+impl AccountRefByDidAndName {
     pub fn new(did: AccountID, name: AccountName) -> Self {
         Self { did, name }
     }
@@ -39,25 +39,25 @@ impl AccountRefByIdAndName {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(try_from = "AccountRefProxy", into = "AccountRefProxy")]
 pub enum AccountRef {
-    Id(AccountID),
+    Did(AccountID),
     Name(AccountName),
-    IdAndName(AccountRefByIdAndName),
+    DidAndName(AccountRefByDidAndName),
 }
 
 impl AccountRef {
     pub fn did(&self) -> Option<&AccountID> {
         match self {
-            AccountRef::Id(id) => Some(id),
+            AccountRef::Did(did) => Some(did),
             AccountRef::Name(_) => None,
-            AccountRef::IdAndName(hdl) => Some(&hdl.did),
+            AccountRef::DidAndName(both) => Some(&both.did),
         }
     }
 
     pub fn name(&self) -> Option<&AccountName> {
         match self {
             AccountRef::Name(name) => Some(name),
-            AccountRef::Id(_) => None,
-            AccountRef::IdAndName(hdl) => Some(&hdl.name),
+            AccountRef::Did(_) => None,
+            AccountRef::DidAndName(both) => Some(&both.name),
         }
     }
 }
@@ -66,7 +66,7 @@ impl AccountRef {
 
 impl From<AccountID> for AccountRef {
     fn from(value: AccountID) -> Self {
-        Self::Id(value)
+        Self::Did(value)
     }
 }
 

@@ -32,33 +32,32 @@ impl ResourceTypeSelectorInput {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::InputObject, Debug, Clone)]
-#[cynic(graphql_type = "AccountRefByIdAndNameInput")]
-pub(crate) struct AccountRefByIdAndNameInput {
-    pub id: odf::AccountID,
+#[cynic(graphql_type = "AccountRefByDidAndNameInput")]
+pub(crate) struct AccountRefByDidAndNameInput {
+    pub did: odf::AccountID,
     pub name: AccountName,
 }
 
 #[derive(cynic::InputObject, Debug, Clone)]
 #[cynic(graphql_type = "AccountRefInput")]
 pub(crate) enum AccountRefInput {
-    #[cynic(rename = "byId")]
-    Id(odf::AccountID),
+    #[cynic(rename = "byDid")]
+    Did(odf::AccountID),
     #[cynic(rename = "byName")]
     Name(AccountName),
-    #[cynic(rename = "byIdAndName")]
-    IdAndName(AccountRefByIdAndNameInput),
+    #[cynic(rename = "byDidAndName")]
+    DidAndName(AccountRefByDidAndNameInput),
 }
 
 impl From<&domain::ResourceAccountRef> for AccountRefInput {
     fn from(value: &domain::ResourceAccountRef) -> Self {
         match value {
-            domain::ResourceAccountRef::Id(id) => Self::Id(id.clone()),
+            domain::ResourceAccountRef::Did(did) => Self::Did(did.clone()),
             domain::ResourceAccountRef::Name(name) => Self::Name(AccountName(name.to_string())),
-            domain::ResourceAccountRef::IdAndName(odf::metadata::auth::AccountRefByIdAndName {
-                did,
-                name,
-            }) => Self::IdAndName(AccountRefByIdAndNameInput {
-                id: did.clone(),
+            domain::ResourceAccountRef::DidAndName(
+                odf::metadata::auth::AccountRefByDidAndName { did, name },
+            ) => Self::DidAndName(AccountRefByDidAndNameInput {
+                did: did.clone(),
                 name: AccountName(name.to_string()),
             }),
         }

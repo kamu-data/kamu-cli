@@ -55,7 +55,7 @@ impl From<resource::ResourceHeaders> for resource::ResourceHeadersInput {
         Self {
             id: Some(id),
             name,
-            account: Some(auth::AccountRef::IdAndName(auth::AccountRefByIdAndName {
+            account: Some(auth::AccountRef::DidAndName(auth::AccountRefByDidAndName {
                 did: account.did,
                 name: account.name,
             })),

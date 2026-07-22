@@ -189,7 +189,7 @@ mod tests {
     use super::*;
 
     fn account() -> auth::AccountRef {
-        auth::AccountRef::Id(odf::AccountID::new_seeded_ed25519(b"test-account"))
+        auth::AccountRef::Did(odf::AccountID::new_seeded_ed25519(b"test-account"))
     }
 
     fn entry(key: &str, value: serde_json::Value) -> (TypeRef, serde_json::Value) {

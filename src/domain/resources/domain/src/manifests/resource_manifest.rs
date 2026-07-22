@@ -165,11 +165,11 @@ mod tests {
         );
 
         let headers: ResourceManifestHeaders = serde_json::from_str(&json).unwrap();
-        assert_matches!(&headers.account, Some(ResourceAccountRef::Id(actual)) if *actual == id);
+        assert_matches!(&headers.account, Some(ResourceAccountRef::Did(actual)) if *actual == id);
 
         let round_tripped: ResourceManifestHeaders =
             serde_json::from_str(&serde_json::to_string(&headers).unwrap()).unwrap();
-        assert_matches!(round_tripped.account, Some(ResourceAccountRef::Id(actual)) if actual == id);
+        assert_matches!(round_tripped.account, Some(ResourceAccountRef::Did(actual)) if actual == id);
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

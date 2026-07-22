@@ -287,15 +287,15 @@ type AccountQuotasUsageStorage {
 	limitTotalBytes: Int!
 }
 
-input AccountRefByIdAndNameInput {
-	id: AccountID!
+input AccountRefByDidAndNameInput {
+	did: AccountID!
 	name: AccountName!
 }
 
 input AccountRefInput @oneOf {
-	byId: AccountID
+	byDid: AccountID
 	byName: AccountName
-	byIdAndName: AccountRefByIdAndNameInput
+	byDidAndName: AccountRefByDidAndNameInput
 }
 
 enum AccountType {

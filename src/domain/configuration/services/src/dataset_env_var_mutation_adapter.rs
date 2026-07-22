@@ -399,8 +399,8 @@ impl DatasetEnvVarMutationAdapterImpl {
         } else {
             let headers = ResourceHeadersInput {
                 id: Some(snapshot.headers.id),
-                account: Some(odf::metadata::auth::AccountRef::IdAndName(
-                    odf::metadata::auth::AccountRefByIdAndName {
+                account: Some(odf::metadata::auth::AccountRef::DidAndName(
+                    odf::metadata::auth::AccountRefByDidAndName {
                         did: snapshot.headers.account.did,
                         name: snapshot.headers.account.name,
                     },
@@ -482,8 +482,8 @@ impl DatasetEnvVarMutationAdapterImpl {
             });
             let headers = ResourceHeadersInput {
                 id: Some(snapshot.headers.id),
-                account: Some(odf::metadata::auth::AccountRef::IdAndName(
-                    odf::metadata::auth::AccountRefByIdAndName {
+                account: Some(odf::metadata::auth::AccountRef::DidAndName(
+                    odf::metadata::auth::AccountRefByDidAndName {
                         did: snapshot.headers.account.did,
                         name: snapshot.headers.account.name,
                     },
@@ -713,8 +713,8 @@ impl DatasetEnvVarMutationAdapterImpl {
     ) -> ResourceHeadersInput {
         ResourceHeadersInput {
             id: None,
-            account: Some(odf::metadata::auth::AccountRef::IdAndName(
-                odf::metadata::auth::AccountRefByIdAndName {
+            account: Some(odf::metadata::auth::AccountRef::DidAndName(
+                odf::metadata::auth::AccountRefByDidAndName {
                     did: account_did,
                     name: account_name,
                 },

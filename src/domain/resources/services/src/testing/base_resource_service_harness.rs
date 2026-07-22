@@ -181,8 +181,8 @@ impl BaseResourceServiceHarness {
     pub fn make_headers_input(account: odf::AccountHandle, name: &str) -> ResourceHeadersInput {
         ResourceHeadersInput {
             id: None,
-            account: Some(odf::metadata::auth::AccountRef::IdAndName(
-                odf::metadata::auth::AccountRefByIdAndName {
+            account: Some(odf::metadata::auth::AccountRef::DidAndName(
+                odf::metadata::auth::AccountRefByDidAndName {
                     did: account.did,
                     name: account.name,
                 },
