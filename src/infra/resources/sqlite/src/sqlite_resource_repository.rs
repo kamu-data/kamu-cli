@@ -64,7 +64,7 @@ impl ResourceRepository for SqliteResourceRepository {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
-        let account_id_stack = resource_snapshot.headers.account.id.as_stack_string();
+        let account_id_stack = resource_snapshot.headers.account.did.as_stack_string();
         let account_id_str = account_id_stack.as_str();
         let resource_snapshot_schema = resource_snapshot.schema.as_str();
         let name_str = resource_snapshot.headers.name.as_str();
@@ -117,7 +117,7 @@ impl ResourceRepository for SqliteResourceRepository {
         .map_err(|e: sqlx::Error| match e {
             sqlx::Error::Database(e) if e.is_unique_violation() => {
                 CreateResourceError::Duplicate(ResourceDuplicateError {
-                    account_id: resource_snapshot.headers.account.id.clone(),
+                    account_id: resource_snapshot.headers.account.did.clone(),
                     schema: resource_snapshot.schema.clone(),
                     name: resource_snapshot.headers.name.clone(),
                 })
@@ -136,7 +136,7 @@ impl ResourceRepository for SqliteResourceRepository {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
-        let account_id_stack = resource_snapshot.headers.account.id.as_stack_string();
+        let account_id_stack = resource_snapshot.headers.account.did.as_stack_string();
         let account_id_str = account_id_stack.as_str();
         let resource_snapshot_schema = resource_snapshot.schema.as_str();
         let name_str = resource_snapshot.headers.name.as_str();
@@ -192,7 +192,7 @@ impl ResourceRepository for SqliteResourceRepository {
         .map_err(|e: sqlx::Error| match e {
             sqlx::Error::Database(e) if e.is_unique_violation() => {
                 UpdateResourceError::Duplicate(ResourceDuplicateError {
-                    account_id: resource_snapshot.headers.account.id.clone(),
+                    account_id: resource_snapshot.headers.account.did.clone(),
                     schema: resource_snapshot.schema.clone(),
                     name: resource_snapshot.headers.name.clone(),
                 })
@@ -266,6 +266,7 @@ impl ResourceRepository for SqliteResourceRepository {
                 r.resource_schema as schema,
                 r.resource_name as name,
                 r.account_id as account_id,
+                COALESCE(a.resource_id, X'00000000000000000000000000000000') as account_resource_id,
                 COALESCE(a.account_name, $2) as account_name
             FROM resources r
             LEFT JOIN accounts a ON a.id = r.account_id
@@ -313,6 +314,7 @@ impl ResourceRepository for SqliteResourceRepository {
                 r.resource_schema as schema,
                 r.resource_name as name,
                 r.account_id as account_id,
+                COALESCE(a.resource_id, X'00000000000000000000000000000000') as account_resource_id,
                 COALESCE(a.account_name, $3) as account_name
             FROM resources r
             LEFT JOIN accounts a ON a.id = r.account_id
@@ -364,6 +366,7 @@ impl ResourceRepository for SqliteResourceRepository {
                 r.resource_schema as schema,
                 r.resource_name as name,
                 r.account_id as account_id,
+                COALESCE(a.resource_id, X'00000000000000000000000000000000') as account_resource_id,
                 COALESCE(a.account_name, "#,
         );
         query_builder.push_bind(kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL);
@@ -484,6 +487,7 @@ impl ResourceRepository for SqliteResourceRepository {
             SELECT
                 r.resource_id as "id: uuid::Uuid",
                 r.account_id as "account_id: odf::AccountID",
+                COALESCE(a.resource_id, X'00000000000000000000000000000000') as "account_resource_id!: uuid::Uuid",
                 COALESCE(a.account_name, $3) as "account_name!: String",
                 r.resource_schema,
                 r.resource_name,
@@ -516,7 +520,8 @@ impl ResourceRepository for SqliteResourceRepository {
             headers: ResourceHeaders {
                 id: ResourceID::new(row.id),
                 account: odf::AccountHandle {
-                    id: row.account_id,
+                    id: ResourceID::new(row.account_resource_id),
+                    did: row.account_id,
                     name: odf::AccountName::new_unchecked(&row.account_name),
                 },
                 name: kamu_resources::ResourceName::new_unchecked(&row.resource_name),
@@ -557,6 +562,7 @@ impl ResourceRepository for SqliteResourceRepository {
             SELECT
                 r.resource_id as id,
                 r.account_id,
+                COALESCE(a.resource_id, X'00000000000000000000000000000000') as account_resource_id,
                 COALESCE(a.account_name, '{deleted_account_sentinel}') as account_name,
                 r.resource_schema,
                 r.resource_name,
@@ -609,6 +615,7 @@ impl ResourceRepository for SqliteResourceRepository {
             SELECT
                 r.resource_id as "id: uuid::Uuid",
                 r.account_id as "account_id: odf::AccountID",
+                COALESCE(a.resource_id, X'00000000000000000000000000000000') as "account_resource_id!: uuid::Uuid",
                 COALESCE(a.account_name, $2) as "account_name!: String",
                 r.resource_schema,
                 r.resource_name,
@@ -639,7 +646,8 @@ impl ResourceRepository for SqliteResourceRepository {
             headers: ResourceHeaders {
                 id: ResourceID::new(row.id),
                 account: odf::AccountHandle {
-                    id: row.account_id,
+                    id: ResourceID::new(row.account_resource_id),
+                    did: row.account_id,
                     name: odf::AccountName::new_unchecked(&row.account_name),
                 },
                 name: kamu_resources::ResourceName::new_unchecked(&row.resource_name),
@@ -682,6 +690,7 @@ impl ResourceRepository for SqliteResourceRepository {
             SELECT
                 r.resource_id as id,
                 r.account_id,
+                COALESCE(a.resource_id, X'00000000000000000000000000000000') as account_resource_id,
                 COALESCE(a.account_name, '{deleted_account_sentinel}') as account_name,
                 r.resource_schema,
                 r.resource_name,
@@ -778,6 +787,7 @@ impl ResourceRepository for SqliteResourceRepository {
                 SELECT
                     r.resource_id as "id: uuid::Uuid",
                     r.account_id as "account_id: odf::AccountID",
+                    COALESCE(a.resource_id, X'00000000000000000000000000000000') as "account_resource_id!: uuid::Uuid",
                     COALESCE(a.account_name, 'deleted-account') as "account_name!: String",
                     r.resource_schema,
                     r.resource_name,
@@ -813,7 +823,8 @@ impl ResourceRepository for SqliteResourceRepository {
                     headers: ResourceHeaders {
                         id: ResourceID::new(row.id),
                         account: odf::AccountHandle {
-                            id: row.account_id,
+                            id: ResourceID::new(row.account_resource_id),
+                            did: row.account_id,
                             name: odf::AccountName::new_unchecked(&row.account_name),
                         },
                         name: kamu_resources::ResourceName::new_unchecked(&row.resource_name),
@@ -854,6 +865,7 @@ impl ResourceRepository for SqliteResourceRepository {
                 SELECT
                     r.resource_id as "id: uuid::Uuid",
                     r.account_id as "account_id: odf::AccountID",
+                    COALESCE(a.resource_id, X'00000000000000000000000000000000') as "account_resource_id!: uuid::Uuid",
                     COALESCE(a.account_name, 'deleted-account') as "account_name!: String",
                     r.resource_schema,
                     r.resource_name,
@@ -887,7 +899,8 @@ impl ResourceRepository for SqliteResourceRepository {
                     headers: ResourceHeaders {
                         id: ResourceID::new(row.id),
                         account: odf::AccountHandle {
-                            id: row.account_id,
+                            id: ResourceID::new(row.account_resource_id),
+                            did: row.account_id,
                             name: odf::AccountName::new_unchecked(&row.account_name),
                         },
                         name: kamu_resources::ResourceName::new_unchecked(&row.resource_name),

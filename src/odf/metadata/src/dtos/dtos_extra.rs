@@ -36,6 +36,21 @@ where
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ResourcePhase
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl Display for resource::ResourcePhase {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Pending => "Pending",
+            Self::Reconciling => "Reconciling",
+            Self::Ready => "Ready",
+            Self::Failed => "Failed",
+        })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // ResourceHeaders
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -55,12 +70,269 @@ impl From<resource::ResourceHeaders> for resource::ResourceHeadersInput {
         Self {
             id: Some(id),
             name,
-            account: Some(auth::AccountRef::IdAndName(auth::AccountRefByIdAndName {
-                id: account.id,
-                name: account.name,
-            })),
+            account: Some(auth::AccountRef {
+                id: Some(account.id),
+                did: Some(account.did),
+                name: Some(account.name),
+            }),
             labels: Some(labels),
             annotations: Some(annotations),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ResourceRef
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl std::str::FromStr for resource::ResourceRef {
+    type Err = ::multiformats::ParseError<Self>;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let Some((typ, account, name)) = Grammar::match_resource_ref(s) else {
+            return Err(::multiformats::ParseError::<Self>::new(s));
+        };
+
+        Ok(Self {
+            account: account.map(|s| AccountName::new_unchecked(s).into()),
+            r#type: resource::TypeName::new_unchecked(typ).into(),
+            id: None,
+            did: None,
+            name: Some(resource::ResourceName::new_unchecked(name)),
+        })
+    }
+}
+
+impl_parse_error!(resource::ResourceRef);
+impl_try_from_str!(resource::ResourceRef);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ResourceHandle
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl From<resource::ResourceHandle> for resource::ResourceRef {
+    fn from(value: resource::ResourceHandle) -> Self {
+        let resource::ResourceHandle {
+            account,
+            r#type,
+            id,
+            did,
+            name,
+        } = value;
+        Self {
+            account: Some(account.into()),
+            r#type: r#type.into(),
+            id: Some(id),
+            did,
+            name: Some(name),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// AccountRef
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl std::str::FromStr for auth::AccountRef {
+    type Err = ::multiformats::ParseError<Self>;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let Some((name, "")) = Grammar::match_account_name(s) else {
+            return Err(::multiformats::ParseError::<Self>::new(s));
+        };
+
+        Ok(Self {
+            id: None,
+            did: None,
+            name: Some(auth::AccountName::new_unchecked(name)),
+        })
+    }
+}
+
+impl_parse_error!(auth::AccountRef);
+impl_try_from_str!(auth::AccountRef);
+
+impl From<auth::AccountID> for auth::AccountRef {
+    fn from(value: AccountID) -> Self {
+        Self {
+            id: None,
+            did: Some(value),
+            name: None,
+        }
+    }
+}
+
+impl From<auth::AccountName> for auth::AccountRef {
+    fn from(value: AccountName) -> Self {
+        Self {
+            id: None,
+            did: None,
+            name: Some(value),
+        }
+    }
+}
+
+impl From<auth::AccountHandle> for auth::AccountRef {
+    fn from(value: auth::AccountHandle) -> Self {
+        let auth::AccountHandle { id, did, name } = value;
+        Self {
+            id: Some(id),
+            did: Some(did),
+            name: Some(name),
+        }
+    }
+}
+
+impl From<auth::AccountRef> for resource::ResourceRef {
+    fn from(value: auth::AccountRef) -> Self {
+        let auth::AccountRef { id, did, name } = value;
+        Self {
+            account: None,
+            r#type: auth::Account::schema().clone().into(),
+            id,
+            did: did.map(Into::into),
+            name: name.map(Into::into),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// AccountHandle
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl From<auth::AccountHandle> for resource::ResourceRef {
+    fn from(value: auth::AccountHandle) -> Self {
+        auth::AccountRef::from(value).into()
+    }
+}
+
+impl auth::AccountHandle {
+    pub fn new_test(account_name_str: &str) -> Self {
+        Self {
+            id: crate::resource::ResourceID::new(uuid::Uuid::new_v5(
+                &uuid::Uuid::NAMESPACE_URL,
+                account_name_str.as_bytes(),
+            )),
+            did: AccountID::new_seeded_ed25519(account_name_str.as_bytes()),
+            name: AccountName::new_unchecked(account_name_str),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Secret
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl std::str::FromStr for config::Secret {
+    type Err = ::multiformats::ParseError<Self>;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self {
+            value: s.into(),
+            content_encoding: None,
+        })
+    }
+}
+
+impl_parse_error!(config::Secret);
+impl_try_from_str!(config::Secret);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Variable
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl std::str::FromStr for config::Variable {
+    type Err = ::multiformats::ParseError<Self>;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self { value: s.into() })
+    }
+}
+
+impl_parse_error!(config::Variable);
+impl_try_from_str!(config::Variable);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ValueRef
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl std::str::FromStr for config::ValueRef {
+    type Err = ::multiformats::ParseError<Self>;
+
+    fn from_str(_s: &str) -> Result<Self, Self::Err> {
+        todo!()
+    }
+}
+
+impl_parse_error!(config::ValueRef);
+impl_try_from_str!(config::ValueRef);
+
+impl From<config::ValueRef> for resource::ResourceRef {
+    fn from(value: config::ValueRef) -> Self {
+        let config::ValueRef {
+            account,
+            r#type,
+            id,
+            name,
+            path: _,
+        } = value;
+        Self {
+            account,
+            r#type,
+            id,
+            did: None,
+            name,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ValueHandle
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl From<config::ValueHandle> for resource::ResourceRef {
+    fn from(value: config::ValueHandle) -> Self {
+        let config::ValueHandle {
+            account,
+            r#type,
+            id,
+            name,
+            path: _,
+        } = value;
+        Self {
+            account: Some(account.into()),
+            r#type: r#type.into(),
+            id: Some(id),
+            did: None,
+            name: Some(name),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// PersistentVolumeRef
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl std::str::FromStr for storage::PersistentVolumeRef {
+    type Err = ::multiformats::ParseError<Self>;
+
+    fn from_str(_s: &str) -> Result<Self, Self::Err> {
+        todo!()
+    }
+}
+
+impl_parse_error!(storage::PersistentVolumeRef);
+impl_try_from_str!(storage::PersistentVolumeRef);
+
+impl From<storage::PersistentVolumeRef> for resource::ResourceRef {
+    fn from(value: storage::PersistentVolumeRef) -> Self {
+        let storage::PersistentVolumeRef { account, id, name } = value;
+        Self {
+            account,
+            r#type: storage::PersistentVolume::schema().clone().into(),
+            id,
+            did: None,
+            name,
         }
     }
 }

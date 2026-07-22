@@ -36,15 +36,26 @@ impl CurrentAccountSubject {
         Self::Anonymous(reason)
     }
 
+    pub fn logged_from_account(account: &crate::Account) -> Self {
+        Self::Logged(LoggedAccount {
+            account_handle: account.into(),
+        })
+    }
+
     #[cfg(any(feature = "testing", test))]
     pub fn anonymous_no_authentication_provided() -> Self {
         Self::Anonymous(AnonymousAccountReason::NoAuthenticationProvided)
     }
 
-    pub fn logged(account_id: odf::AccountID, account_name: odf::AccountName) -> Self {
+    pub fn logged(
+        resource_id: odf::ResourceID,
+        account_id: odf::AccountID,
+        account_name: odf::AccountName,
+    ) -> Self {
         Self::Logged(LoggedAccount {
             account_handle: odf::AccountHandle {
-                id: account_id,
+                id: resource_id,
+                did: account_id,
                 name: account_name,
             },
         })
@@ -52,12 +63,17 @@ impl CurrentAccountSubject {
 
     #[cfg(any(feature = "testing", test))]
     pub fn new_test() -> Self {
-        Self::logged(DEFAULT_ACCOUNT_ID.clone(), DEFAULT_ACCOUNT_NAME.clone())
+        Self::logged(
+            *crate::DEFAULT_ACCOUNT_RESOURCE_ID,
+            DEFAULT_ACCOUNT_ID.clone(),
+            DEFAULT_ACCOUNT_NAME.clone(),
+        )
     }
 
     #[cfg(any(feature = "testing", test))]
     pub fn new_test_with(account_name: &impl AsRef<str>) -> Self {
         Self::logged(
+            crate::Account::seed_resource_id_from_name(account_name.as_ref()),
             odf::metadata::testing::account_id(account_name),
             odf::AccountName::new_unchecked(account_name),
         )
@@ -68,7 +84,7 @@ impl CurrentAccountSubject {
             CurrentAccountSubject::Anonymous(_) => {
                 panic!("Anonymous account misused");
             }
-            CurrentAccountSubject::Logged(l) => &l.account_handle.id,
+            CurrentAccountSubject::Logged(l) => &l.account_handle.did,
         }
     }
 
@@ -76,7 +92,7 @@ impl CurrentAccountSubject {
         match self {
             CurrentAccountSubject::Anonymous(_) => None,
             CurrentAccountSubject::Logged(logged_account) => {
-                Some(&logged_account.account_handle.id)
+                Some(&logged_account.account_handle.did)
             }
         }
     }

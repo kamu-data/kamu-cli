@@ -171,6 +171,7 @@ async fn new_account(account_repo: &Arc<dyn AccountRepository>) -> Account {
 
     let account = Account {
         id: account_id,
+        resource_id: Account::generate_resource_id(),
         account_name: odf::AccountName::new_unchecked(account_name),
         email: Email::parse("configuration-binding-user@example.com").unwrap(),
         display_name: String::new(),
@@ -215,10 +216,7 @@ async fn create_resource(
             headers: ResourceHeaders::simple(
                 Utc::now(),
                 resource_id,
-                odf::AccountHandle {
-                    id: account.id.clone(),
-                    name: account.account_name.clone(),
-                },
+                account.into(),
                 &resource_id.to_string(),
             ),
             spec: serde_json::to_value(VariableSetSpec::new(

@@ -20,12 +20,12 @@ use std::path::PathBuf;
 use bitflags::bitflags;
 use chrono::{DateTime, Utc};
 use enum_variants::*;
-use multiformats::*;
 use serde::{Deserialize, Serialize};
 use setty::types::{ByteSize, DurationString};
 
 use crate::auth::*;
 use crate::dataset::*;
+use crate::formats::*;
 use crate::resource::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -61,7 +61,33 @@ pub mod auth {
     static ACCOUNT_SCHEMA: std::sync::LazyLock<TypeUri> =
         std::sync::LazyLock::new(|| TypeUri::new_unchecked(ACCOUNT_SCHEMA_STR));
 
-    pub use crate::auth::{AccountHandle, AccountRef};
+    /// Link to an account.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/AccountHandle
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct AccountHandle {
+        /// ID of the account resource.
+        pub id: ResourceID,
+        /// DID of the account.
+        pub did: AccountID,
+        /// Name of the account.
+        pub name: AccountName,
+    }
+    impl IntoResourceRef for AccountHandle {}
+
+    /// Reference to an account.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/AccountRef
+    #[derive(Clone, Debug, Eq, PartialEq, Default)]
+    pub struct AccountRef {
+        /// UUID of the account resource.
+        pub id: Option<ResourceID>,
+        /// DID of the account.
+        pub did: Option<AccountID>,
+        /// Name of the account.
+        pub name: Option<AccountName>,
+    }
+    impl IntoResourceRef for AccountRef {}
 
     /// Predefined account specification.
     ///
@@ -173,6 +199,23 @@ pub mod auth {
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct Attribute {
         /// The resource this attribute is attached to.
+        pub object: resource::ResourceHandle,
+        /// Name of the attribute.
+        ///
+        /// Examples:
+        /// - "allowPublicRead"
+        pub name: String,
+        /// Value of the attribute.
+        pub value: serde_json::Value,
+    }
+
+    /// A named attribute attached to a resource, used by auth policies for
+    /// access control decisions.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/AttributeInput
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct AttributeInput {
+        /// The resource this attribute is attached to.
         pub object: resource::ResourceRef,
         /// Name of the attribute e.g. `allowPublicRead`.
         pub name: String,
@@ -186,6 +229,23 @@ pub mod auth {
     /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/Relation
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct Relation {
+        /// The resource that holds the relation.
+        pub subject: resource::ResourceHandle,
+        /// Name of the relation e.g. `role`, `member`, `owner`.
+        pub relation: String,
+        /// Optional value associated with the relation e.g. `maintainer` for a
+        /// `role` relation.
+        pub value: Option<serde_json::Value>,
+        /// The resource that is the target of the relation.
+        pub object: resource::ResourceHandle,
+    }
+
+    /// A directed relationship between two resources, optionally carrying a
+    /// typed value.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/RelationInput
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct RelationInput {
         /// The resource that holds the relation.
         pub subject: resource::ResourceRef,
         /// Name of the relation e.g. `role`, `member`, `owner`.
@@ -242,9 +302,9 @@ pub mod auth {
     #[derive(Clone, Debug, Eq, PartialEq, Default)]
     pub struct RelationsSpecInput {
         /// Relations between resources.
-        pub relations: Option<Vec<auth::Relation>>,
+        pub relations: Option<Vec<auth::RelationInput>>,
         /// Resource attributes.
-        pub attributes: Option<Vec<auth::Attribute>>,
+        pub attributes: Option<Vec<auth::AttributeInput>>,
     }
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -323,7 +383,55 @@ pub mod config {
         pub entries: std::collections::BTreeMap<String, config::Secret>,
     }
 
-    pub use crate::config::ValueRef;
+    /// Reference to a value within a `VariableSet` or a `SecretSet`.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/config/v1alpha1/ValueHandle
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct ValueHandle {
+        /// Account that owns the target resource.
+        pub account: auth::AccountHandle,
+        /// Type URI of the target resource.
+        pub r#type: TypeUri,
+        /// ID of the resource within a node.
+        pub id: ResourceID,
+        /// Name of a resource.
+        pub name: ResourceName,
+        /// JSON path to a value within a `VariableSet` or a `SecretSet`.
+        ///
+        /// Examples:
+        /// - "port"
+        /// - "postgres.schemaName"
+        pub path: Option<String>,
+    }
+    impl IntoResourceRef for ValueHandle {}
+
+    /// Reference to a value within a `VariableSet` or a `SecretSet`.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/config/v1alpha1/ValueRef
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct ValueRef {
+        /// Reference to an account that owns the `VariableSet` or the
+        /// `SecretSet`.
+        pub account: Option<auth::AccountRef>,
+        /// Short type name or full type URI of the target resource.
+        ///
+        /// Examples:
+        /// - "SecretSet"
+        /// - "VariableSet"
+        /// - "https://opendatafabric.org/config/v1/SecretSet"
+        pub r#type: TypeRef,
+        /// ID of a resource.
+        pub id: Option<ResourceID>,
+        /// Name of a resource.
+        pub name: Option<ResourceName>,
+        /// JSON path to a value within a `VariableSet` or a `SecretSet`.
+        ///
+        /// Examples:
+        /// - "port"
+        /// - "postgres.schemaName"
+        pub path: Option<String>,
+    }
+    impl IntoResourceRef for ValueRef {}
 
     /// Container for key-value variables. Every key must be a string. Values
     /// shoud reference fields in `SecretSet`s and `VariableSet`s.
@@ -941,7 +1049,7 @@ pub mod dataset {
         pub metadata: Vec<dataset::MetadataEvent>,
         /// Reference to a storage volume where dataset data will be stored. If
         /// omitted, the node's default storage is used.
-        pub volume: storage::PersistentVolumeRef,
+        pub volume: resource::ResourceHandle,
     }
 
     /// Represents a desired state of the dataset metadata.
@@ -1712,7 +1820,7 @@ pub mod flow {
         /// Defines resources for which this flow will be instantiated.
         pub target: resource::ResourceSelector,
         /// Conditions that cause this flow to execute.
-        pub triggers: Vec<flow::FlowTrigger>,
+        pub triggers: Vec<flow::FlowTriggerInput>,
         /// List of tasks to run consecutively.
         pub tasks: Vec<flow::TaskSpecInput>,
     }
@@ -1764,6 +1872,78 @@ pub mod flow {
         pub cooldown_max_batch: Option<u64>,
     }
 
+    /// Condition that causes a flow to be executed.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowTriggerInput
+    #[derive(Clone, PartialEq, Eq, Debug)]
+    pub enum FlowTriggerInput {
+        Schedule(flow::FlowTriggerInputSchedule),
+        Event(flow::FlowTriggerInputEvent),
+        Source(flow::FlowTriggerInputSource),
+        Dataset(flow::FlowTriggerInputDataset),
+    }
+
+    impl_enum_with_variants!(FlowTriggerInput);
+    impl_enum_variant!(FlowTriggerInput::Schedule(flow::FlowTriggerInputSchedule));
+    impl_enum_variant!(FlowTriggerInput::Event(flow::FlowTriggerInputEvent));
+    impl_enum_variant!(FlowTriggerInput::Source(flow::FlowTriggerInputSource));
+    impl_enum_variant!(FlowTriggerInput::Dataset(flow::FlowTriggerInputDataset));
+
+    /// Triggers the flow when matching datasets are updated.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowTriggerInput#/$defs/Dataset
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct FlowTriggerInputDataset {
+        /// Selector that identifies which datasets can trigger this flow.
+        pub dataset: dataset::DatasetSelector,
+        /// Set of event bus event IDs that this trigger will react to
+        pub events: Option<Vec<String>>,
+    }
+
+    /// Triggers the flow when an event bus event matching one of the filters is
+    /// observed.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowTriggerInput#/$defs/Event
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct FlowTriggerInputEvent {
+        /// Filters the event by type and fields.
+        pub events: event::EventFilter,
+        /// The trigger will fire upon first observed event. If another event
+        /// arrives withing the `cooldown` interval the firing will be postponed
+        /// until `cooldown` interval ends. I.e. trigger is guaranteed to fire,
+        /// but may batch multiple events together into one flow run.
+        pub cooldown: Option<DurationString>,
+        /// If an event is observed a `cooldownMaxBatch` number of times during
+        /// the `cooldown` interval it will fire the trigger without waiting for
+        /// cooldown to finish.
+        pub cooldown_max_batch: Option<u64>,
+    }
+
+    /// Triggers the flow on a cron schedule.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowTriggerInput#/$defs/Schedule
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct FlowTriggerInputSchedule {
+        /// Cron5 expression defining the schedule e.g. `@daily` or `*/30 * * *
+        /// *`.
+        pub cron: String,
+    }
+
+    /// Triggers the flow when a source receives new data, with optional
+    /// batching controls.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowTriggerInput#/$defs/Source
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct FlowTriggerInputSource {
+        /// Reference to the source resource that drives this trigger.
+        pub source: resource::ResourceRef,
+        /// Minimum number of new records to accumulate before triggering.
+        pub min_records_to_await: Option<u64>,
+        /// Maximum time to wait for `minRecordsToAwait` before triggering
+        /// anyway e.g. `1h`.
+        pub max_await_interval: Option<DurationString>,
+    }
+
     /// Triggers the flow on a cron schedule.
     ///
     /// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowTrigger#/$defs/Schedule
@@ -1781,7 +1961,7 @@ pub mod flow {
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct FlowTriggerSource {
         /// Reference to the source resource that drives this trigger.
-        pub source: resource::ResourceRef,
+        pub source: resource::ResourceHandle,
         /// Minimum number of new records to accumulate before triggering.
         pub min_records_to_await: Option<u64>,
         /// Maximum time to wait for `minRecordsToAwait` before triggering
@@ -1852,7 +2032,7 @@ pub mod flow {
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct TaskSpecIngest {
         /// Reference to the source resource that defines how to fetch data.
-        pub source: resource::ResourceRef,
+        pub source: resource::ResourceHandle,
         /// Optional parameters to control ingestion behavior.
         pub params: Option<source::IngestParams>,
     }
@@ -1919,7 +2099,7 @@ pub mod flow {
     #[derive(Clone, Debug, Eq, PartialEq)]
     pub struct TaskSpecWebhookCall {
         /// Reference to the `WebhookTarget`.
-        pub target: resource::ResourceRef,
+        pub target: resource::ResourceHandle,
         /// The payload to send. May include templating.
         pub payload: Option<String>,
     }
@@ -2178,6 +2358,24 @@ pub mod resource {
         pub entries: std::collections::BTreeMap<TypeRef, serde_json::Value>,
     }
 
+    /// Lint to another resolved resource.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceHandle
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct ResourceHandle {
+        /// Account that owns the target resource.
+        pub account: auth::AccountHandle,
+        /// Type URI of the target resource.
+        pub r#type: TypeUri,
+        /// ID of the resource within a node.
+        pub id: ResourceID,
+        /// DID of the resource, if applicable.
+        pub did: Option<Did>,
+        /// Name of a resource.
+        pub name: ResourceName,
+    }
+    impl IntoResourceRef for ResourceHandle {}
+
     /// Container for identity and ownership information of a resource.
     ///
     /// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceHeaders
@@ -2268,7 +2466,29 @@ pub mod resource {
         Failed,
     }
 
-    pub use crate::resource::{ResourceRef, ResourceSelector};
+    /// Reference to another resource.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceRef
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub struct ResourceRef {
+        /// Reference to an account that owns the target resource.
+        pub account: Option<auth::AccountRef>,
+        /// Short type name or full type URI of the target resource.
+        ///
+        /// Examples:
+        /// - "SecretSet"
+        /// - "https://opendatafabric.org/config/v1/SecretSet"
+        pub r#type: TypeRef,
+        /// ID of the resource within a node.
+        pub id: Option<ResourceID>,
+        /// DID of the resource.
+        pub did: Option<Did>,
+        /// Name of a resource.
+        pub name: Option<ResourceName>,
+    }
+    impl IntoResourceRef for ResourceRef {}
+
+    pub use crate::resource::ResourceSelector;
 
     /// Resource lifecycle and reconciliation information.
     ///
@@ -3364,6 +3584,17 @@ pub mod storage {
     #[derive(Clone, Debug, Eq, PartialEq, Default)]
     pub struct AwsCredentials {
         /// Reference to a secret containing the AWS access key ID.
+        pub access_key: Option<config::ValueHandle>,
+        /// Reference to a secret containing the AWS secret access key.
+        pub secret_key: Option<config::ValueHandle>,
+    }
+
+    /// Access credentials for AWS or an AWS-compatible service.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/storage/v1alpha1/AwsCredentialsInput
+    #[derive(Clone, Debug, Eq, PartialEq, Default)]
+    pub struct AwsCredentialsInput {
+        /// Reference to a secret containing the AWS access key ID.
         pub access_key: Option<config::ValueRef>,
         /// Reference to a secret containing the AWS secret access key.
         pub secret_key: Option<config::ValueRef>,
@@ -3396,7 +3627,19 @@ pub mod storage {
     static PERSISTENT_VOLUME_SCHEMA: std::sync::LazyLock<TypeUri> =
         std::sync::LazyLock::new(|| TypeUri::new_unchecked(PERSISTENT_VOLUME_SCHEMA_STR));
 
-    pub use crate::storage::PersistentVolumeRef;
+    /// Reference to a `PersistentVolume`.
+    ///
+    /// Schema: https://opendatafabric.org/schemas/storage/v1alpha1/PersistentVolumeRef
+    #[derive(Clone, Debug, Eq, PartialEq, Default)]
+    pub struct PersistentVolumeRef {
+        /// Reference to an account that owns the `PersistentVolume`.
+        pub account: Option<auth::AccountRef>,
+        /// ID of the resource.
+        pub id: Option<ResourceID>,
+        /// Name of the resource.
+        pub name: Option<ResourceName>,
+    }
+    impl IntoResourceRef for PersistentVolumeRef {}
 
     /// Defines a storage volume where data can be stored and its access
     /// credentials.
@@ -3440,7 +3683,7 @@ pub mod storage {
         /// Storage capacity allocation.
         pub capacity: Option<storage::VolumeCapacity>,
         /// Access credentials for the bucket.
-        pub credentials: Option<storage::AwsCredentials>,
+        pub credentials: Option<storage::AwsCredentialsInput>,
     }
 
     /// An Amazon S3 or S3-compatible object storage bucket.

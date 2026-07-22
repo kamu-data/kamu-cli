@@ -32,35 +32,22 @@ impl ResourceTypeSelectorInput {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::InputObject, Debug, Clone)]
-#[cynic(graphql_type = "AccountRefByIdAndNameInput")]
-pub(crate) struct AccountRefByIdAndNameInput {
-    pub id: odf::AccountID,
-    pub name: AccountName,
-}
-
-#[derive(cynic::InputObject, Debug, Clone)]
 #[cynic(graphql_type = "AccountRefInput")]
-pub(crate) enum AccountRefInput {
-    #[cynic(rename = "byId")]
-    Id(odf::AccountID),
-    #[cynic(rename = "byName")]
-    Name(AccountName),
-    #[cynic(rename = "byIdAndName")]
-    IdAndName(AccountRefByIdAndNameInput),
+pub(crate) struct AccountRefInput {
+    pub id: Option<kamu_resources::ResourceID>,
+    pub did: Option<odf::AccountID>,
+    pub name: Option<AccountName>,
 }
 
 impl From<&domain::ResourceAccountRef> for AccountRefInput {
     fn from(value: &domain::ResourceAccountRef) -> Self {
-        match value {
-            domain::ResourceAccountRef::Id(id) => Self::Id(id.clone()),
-            domain::ResourceAccountRef::Name(name) => Self::Name(AccountName(name.to_string())),
-            domain::ResourceAccountRef::IdAndName(odf::metadata::auth::AccountRefByIdAndName {
-                id,
-                name,
-            }) => Self::IdAndName(AccountRefByIdAndNameInput {
-                id: id.clone(),
-                name: AccountName(name.to_string()),
-            }),
+        Self {
+            id: value.id,
+            did: value.did.clone(),
+            name: value
+                .name
+                .as_ref()
+                .map(|name| AccountName(name.to_string())),
         }
     }
 }

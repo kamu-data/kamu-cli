@@ -21,6 +21,7 @@ pub use odf_dataset::{
     MetadataChain,
 };
 pub use odf_metadata::auth::AccountHandle;
+pub use odf_metadata::resource::ResourceID;
 pub use odf_metadata::{
     AccessError,
     AccountID,

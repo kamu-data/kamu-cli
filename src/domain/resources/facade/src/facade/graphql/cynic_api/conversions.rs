@@ -82,8 +82,8 @@ impl From<fragments::ResourceStatus> for domain::ResourceStatus {
 impl From<fragments::ResourceHandle> for domain::ResourceHandle {
     fn from(value: fragments::ResourceHandle) -> Self {
         Self {
-            schema: value.schema,
-            type_name: value.type_name,
+            r#type: value.r#type,
+            did: value.did,
             account: value.account.into(),
             id: value.id,
             name: value.name,

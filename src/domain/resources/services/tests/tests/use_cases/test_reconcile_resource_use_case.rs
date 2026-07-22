@@ -353,7 +353,7 @@ async fn test_reconcile_after_delete_returns_ok_but_snapshot_is_gone() {
     let account_handle = odf::AccountHandle::new_test("test-owner");
     let id = harness.apply_and_get_id(&account_handle, "res-a").await;
 
-    harness.delete_resources(account_handle.id, vec![id]).await;
+    harness.delete_resources(account_handle.did, vec![id]).await;
 
     assert!(
         harness.get_snapshot_by_id(&id).await.is_none(),

@@ -230,6 +230,7 @@ impl LocalFacadeHarness {
     fn catalog_for_account(&self, account: TestAccount) -> dill::Catalog {
         let account_id = self.account_id(account);
         let subject = CurrentAccountSubject::logged(
+            kamu_accounts::Account::seed_resource_id_from_name(account.name()),
             account_id,
             odf::AccountName::new_unchecked(account.name()),
         );

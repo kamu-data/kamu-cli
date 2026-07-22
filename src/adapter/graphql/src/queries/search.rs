@@ -394,7 +394,7 @@ impl Search {
 
         let is_admin = match current_account_subject.as_ref() {
             CurrentAccountSubject::Logged(a) => rebac_service
-                .is_account_admin(&a.account_handle.id)
+                .is_account_admin(&a.account_handle.did)
                 .await
                 .int_err()?,
             _ => false,

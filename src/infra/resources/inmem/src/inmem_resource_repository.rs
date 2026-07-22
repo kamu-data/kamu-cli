@@ -34,6 +34,7 @@ use kamu_resources::{
     TypeUri,
     UpdateResourceError,
     deleted_account_name_sentinel,
+    deleted_account_resource_id_sentinel,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -67,18 +68,21 @@ impl InMemoryResourceRepository {
         }
     }
 
-    /// Re-resolves the owning account's current name, live on every read —
-    /// mirroring the postgres/sqlite backends' `LEFT JOIN accounts`. The
-    /// stored snapshot only carries `account.id` as the durable identity;
-    /// `account.name` is always refreshed here so account renames are
-    /// reflected immediately and deletions never surface a stale name.
-    /// `account_id` has no FK-cascade tie to the `accounts` table (different
-    /// bounded context, async outbox-driven cleanup), so a missing account
-    /// falls back to a sentinel name instead of failing the read.
+    /// Re-resolves the owning account's current resource id + name, live on
+    /// every read — mirroring the postgres/sqlite backends' `LEFT JOIN
+    /// accounts`. The stored snapshot only carries `account.did` as the durable
+    /// identity; `account.id` (the account-resource id) and `account.name` are
+    /// always refreshed here so account renames are reflected immediately and
+    /// deletions never surface stale values. The account DID has no FK-cascade
+    /// tie to the `accounts` table (different bounded context, async
+    /// outbox-driven cleanup), so a missing account falls back to sentinels
+    /// instead of failing the read.
     async fn resolve_snapshot(&self, mut snapshot: ResourceSnapshot) -> ResourceSnapshot {
-        snapshot.headers.account.name = self
-            .resolve_account_name(&snapshot.headers.account.id)
+        let (resource_id, name) = self
+            .resolve_account_identity(&snapshot.headers.account.did)
             .await;
+        snapshot.headers.account.id = resource_id;
+        snapshot.headers.account.name = name;
         snapshot
     }
 
@@ -86,8 +90,8 @@ impl InMemoryResourceRepository {
     /// account name with a single `get_accounts_by_ids` call instead of one
     /// lookup per snapshot, mirroring the SQL backends' set-based `LEFT JOIN`
     /// (no N+1 across a multi-row read). An id missing from the batch result
-    /// (deleted account) falls back to the sentinel per-snapshot, same as
-    /// [`Self::resolve_account_name`]. A hard `Internal` error from the
+    /// (deleted account) falls back to the sentinels per-snapshot, same as
+    /// [`Self::resolve_account_identity`]. A hard `Internal` error from the
     /// lookup itself (no I/O in the inmem backend, so effectively
     /// unreachable in practice) is treated the same way rather than failing
     /// the whole read, to keep this method infallible like its single-item
@@ -95,17 +99,17 @@ impl InMemoryResourceRepository {
     async fn resolve_snapshots(&self, snapshots: Vec<ResourceSnapshot>) -> Vec<ResourceSnapshot> {
         let account_ids: Vec<&odf::AccountID> = snapshots
             .iter()
-            .map(|snapshot| &snapshot.headers.account.id)
+            .map(|snapshot| &snapshot.headers.account.did)
             .collect();
 
-        let names_by_id: HashMap<odf::AccountID, odf::AccountName> = self
+        let identity_by_did: HashMap<odf::AccountID, (odf::ResourceID, odf::AccountName)> = self
             .account_repository
             .get_accounts_by_ids(&account_ids)
             .await
             .map(|accounts| {
                 accounts
                     .into_iter()
-                    .map(|account| (account.id, account.account_name))
+                    .map(|account| (account.id, (account.resource_id, account.account_name)))
                     .collect()
             })
             .unwrap_or_default();
@@ -113,21 +117,40 @@ impl InMemoryResourceRepository {
         snapshots
             .into_iter()
             .map(|mut snapshot| {
-                snapshot.headers.account.name = names_by_id
-                    .get(&snapshot.headers.account.id)
+                let (resource_id, name) = identity_by_did
+                    .get(&snapshot.headers.account.did)
                     .cloned()
-                    .unwrap_or_else(deleted_account_name_sentinel);
+                    .unwrap_or_else(|| {
+                        (
+                            deleted_account_resource_id_sentinel(),
+                            deleted_account_name_sentinel(),
+                        )
+                    });
+                snapshot.headers.account.id = resource_id;
+                snapshot.headers.account.name = name;
                 snapshot
             })
             .collect()
     }
 
-    async fn resolve_account_name(&self, account_id: &odf::AccountID) -> odf::AccountName {
+    /// Re-resolves the owning account's current resource id + name from the
+    /// account repository, mirroring the SQL backends' `LEFT JOIN accounts`. A
+    /// missing account (deleted, racing async cleanup) falls back to the
+    /// sentinels rather than failing the read.
+    async fn resolve_account_identity(
+        &self,
+        account_did: &odf::AccountID,
+    ) -> (odf::ResourceID, odf::AccountName) {
         self.account_repository
-            .get_account_by_id(account_id)
+            .get_account_by_id(account_did)
             .await
-            .map(|account| account.account_name)
-            .unwrap_or_else(|_| deleted_account_name_sentinel())
+            .map(|account| (account.resource_id, account.account_name))
+            .unwrap_or_else(|_| {
+                (
+                    deleted_account_resource_id_sentinel(),
+                    deleted_account_name_sentinel(),
+                )
+            })
     }
 }
 
@@ -146,7 +169,7 @@ impl ResourceRepository for InMemoryResourceRepository {
         let mut guard = self.state.lock().unwrap();
 
         let lookup_key = ResourceLookupKey {
-            account_id: resource_snapshot.headers.account.id.clone(),
+            account_id: resource_snapshot.headers.account.did.clone(),
             schema: resource_snapshot.schema.clone(),
             name: resource_snapshot.headers.name.clone(),
         };
@@ -155,7 +178,7 @@ impl ResourceRepository for InMemoryResourceRepository {
             || guard.ids_by_lookup_key.contains_key(&lookup_key)
         {
             return Err(CreateResourceError::Duplicate(ResourceDuplicateError {
-                account_id: resource_snapshot.headers.account.id.clone(),
+                account_id: resource_snapshot.headers.account.did.clone(),
                 schema: resource_snapshot.schema.clone(),
                 name: resource_snapshot.headers.name.clone(),
             }));
@@ -205,12 +228,12 @@ impl ResourceRepository for InMemoryResourceRepository {
             }
 
             let previous_lookup_key = ResourceLookupKey {
-                account_id: previous_snapshot.headers.account.id,
+                account_id: previous_snapshot.headers.account.did,
                 schema: previous_snapshot.schema,
                 name: previous_snapshot.headers.name,
             };
             let next_lookup_key = ResourceLookupKey {
-                account_id: resource_snapshot.headers.account.id.clone(),
+                account_id: resource_snapshot.headers.account.did.clone(),
                 schema: resource_snapshot.schema.clone(),
                 name: resource_snapshot.headers.name.clone(),
             };
@@ -219,7 +242,7 @@ impl ResourceRepository for InMemoryResourceRepository {
                 && *existing_resource_id != resource_snapshot.id
             {
                 return Err(UpdateResourceError::Duplicate(ResourceDuplicateError {
-                    account_id: resource_snapshot.headers.account.id.clone(),
+                    account_id: resource_snapshot.headers.account.did.clone(),
                     schema: resource_snapshot.schema.clone(),
                     name: resource_snapshot.headers.name.clone(),
                 }));
@@ -276,13 +299,14 @@ impl ResourceRepository for InMemoryResourceRepository {
             .iter()
             .filter_map(|id| guard.snapshots_by_id.get(id))
             .filter(|snapshot| {
-                snapshot.headers.account.id == *account_id && snapshot.headers.deleted_at.is_none()
+                snapshot.headers.account.did == *account_id && snapshot.headers.deleted_at.is_none()
             })
             .map(|snapshot| ResourceHandleRow {
                 id: *snapshot.id.as_ref(),
                 schema: snapshot.schema.to_string(),
                 name: snapshot.headers.name.to_string(),
-                account_id: snapshot.headers.account.id.clone(),
+                account_id: snapshot.headers.account.did.clone(),
+                account_resource_id: *snapshot.headers.account.id.as_ref(),
                 account_name: snapshot.headers.account.name.to_string(),
             })
             .collect())
@@ -313,7 +337,8 @@ impl ResourceRepository for InMemoryResourceRepository {
                 id: *snapshot.id.as_ref(),
                 schema: snapshot.schema.to_string(),
                 name: snapshot.headers.name.to_string(),
-                account_id: snapshot.headers.account.id.clone(),
+                account_id: snapshot.headers.account.did.clone(),
+                account_resource_id: *snapshot.headers.account.id.as_ref(),
                 account_name: snapshot.headers.account.name.to_string(),
             })
             .collect())
@@ -354,7 +379,8 @@ impl ResourceRepository for InMemoryResourceRepository {
                 id: *snapshot.id.as_ref(),
                 schema: snapshot.schema.to_string(),
                 name: snapshot.headers.name.to_string(),
-                account_id: snapshot.headers.account.id.clone(),
+                account_id: snapshot.headers.account.did.clone(),
+                account_resource_id: *snapshot.headers.account.id.as_ref(),
                 account_name: snapshot.headers.account.name.to_string(),
             })
             .collect())
@@ -443,7 +469,7 @@ impl ResourceRepository for InMemoryResourceRepository {
             ids.iter()
                 .filter_map(|id| guard.snapshots_by_id.get(id))
                 .filter(|snapshot| {
-                    snapshot.headers.account.id == *account_id
+                    snapshot.headers.account.did == *account_id
                         && snapshot.headers.deleted_at.is_none()
                 })
                 .cloned()
@@ -465,7 +491,7 @@ impl ResourceRepository for InMemoryResourceRepository {
                 .snapshots_by_id
                 .values()
                 .filter(|snapshot| {
-                    snapshot.headers.account.id == account_id
+                    snapshot.headers.account.did == account_id
                         && snapshot.schema == *schema
                         && snapshot.headers.deleted_at.is_none()
                 })
@@ -505,7 +531,7 @@ impl ResourceRepository for InMemoryResourceRepository {
                     .snapshots_by_id
                     .values()
                     .filter(|snapshot| {
-                        snapshot.headers.account.id == account_id
+                        snapshot.headers.account.did == account_id
                             && snapshot.schema == schema
                             && snapshot.headers.deleted_at.is_none()
                     })
@@ -545,7 +571,7 @@ impl ResourceRepository for InMemoryResourceRepository {
                     .snapshots_by_id
                     .values()
                     .filter(|snapshot| {
-                        snapshot.headers.account.id == account_id
+                        snapshot.headers.account.did == account_id
                             && snapshot.headers.deleted_at.is_none()
                     })
                     .cloned()
@@ -583,7 +609,7 @@ impl ResourceRepository for InMemoryResourceRepository {
             .snapshots_by_id
             .values()
             .filter(|snapshot| {
-                snapshot.headers.account.id == account_id
+                snapshot.headers.account.did == account_id
                     && snapshot.schema == *schema
                     && snapshot.headers.deleted_at.is_none()
             })
@@ -599,7 +625,7 @@ impl ResourceRepository for InMemoryResourceRepository {
         let mut rows_by_key = HashMap::<TypeUri, ResourceSummaryRow>::new();
 
         for snapshot in guard.snapshots_by_id.values().filter(|snapshot| {
-            snapshot.headers.account.id == account_id && snapshot.headers.deleted_at.is_none()
+            snapshot.headers.account.did == account_id && snapshot.headers.deleted_at.is_none()
         }) {
             let row = rows_by_key
                 .entry(snapshot.schema.clone())
@@ -682,7 +708,7 @@ fn filter_search_snapshots<'a>(
     guard
         .snapshots_by_id
         .values()
-        .filter(|snapshot| snapshot.headers.account.id == *account_id)
+        .filter(|snapshot| snapshot.headers.account.did == *account_id)
         .filter(|snapshot| schemas.contains(&snapshot.schema))
         .filter(|snapshot| snapshot.headers.deleted_at.is_none())
         .filter(|snapshot| exact_names.is_none_or(|names| names.contains(&snapshot.headers.name)))

@@ -28,6 +28,9 @@ pub enum ResolveManifestAccountError {
     #[error("Anonymous subject cannot resolve a target account")]
     AnonymousSubject,
 
+    #[error("Account selector must specify at least one of `id`, `did`, or `name`")]
+    EmptySelector,
+
     #[error(transparent)]
     AccountNotFoundById(kamu_accounts::AccountNotFoundByIdError),
 
@@ -35,13 +38,16 @@ pub enum ResolveManifestAccountError {
     AccountNotFoundByName(kamu_accounts::AccountNotFoundByNameError),
 
     #[error(
-        "Account selector mismatch: id '{account_id}' belongs to '{actual_name}', not \
-         '{expected_name}'"
+        "Account selector mismatch: resolved account '{did}' ({actual_name}) does not match the \
+         provided selector (expected resource id: {expected_resource_id:?}, expected did: \
+         {expected_did:?}, expected name: {expected_name:?})"
     )]
-    IdNameMismatch {
-        account_id: odf::AccountID,
-        expected_name: odf::AccountName,
+    SelectorMismatch {
+        did: odf::AccountID,
         actual_name: odf::AccountName,
+        expected_resource_id: Option<odf::ResourceID>,
+        expected_did: Option<odf::AccountID>,
+        expected_name: Option<odf::AccountName>,
     },
 
     #[error(transparent)]

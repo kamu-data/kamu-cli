@@ -59,7 +59,7 @@ impl CreateDatasetUseCaseHelper {
                         None,
                         raw_alias.dataset_name.clone(),
                     )),
-                    subject.account_handle.id.clone(),
+                    subject.account_handle.did.clone(),
                 ))
             }
             TenancyConfig::MultiTenant => {
@@ -80,7 +80,7 @@ impl CreateDatasetUseCaseHelper {
                             Some(subject.account_handle.name.clone()),
                             raw_alias.dataset_name.clone(),
                         )),
-                        subject.account_handle.id.clone(),
+                        subject.account_handle.did.clone(),
                     ))
                 }
             }

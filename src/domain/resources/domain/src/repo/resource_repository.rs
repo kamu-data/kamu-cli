@@ -215,15 +215,17 @@ pub struct ResourceHandleRow {
     pub schema: String,
     pub name: String,
     pub account_id: odf::AccountID,
+    pub account_resource_id: uuid::Uuid,
     pub account_name: String,
 }
 
 impl ResourceHandleRow {
     pub fn account_handle(&self) -> odf::AccountHandle {
-        odf::AccountHandle::new(
-            self.account_id.clone(),
-            odf::AccountName::new_unchecked(&self.account_name),
-        )
+        odf::AccountHandle {
+            id: ResourceID::new(self.account_resource_id),
+            did: self.account_id.clone(),
+            name: odf::AccountName::new_unchecked(&self.account_name),
+        }
     }
 }
 
@@ -234,6 +236,7 @@ impl ResourceHandleRow {
 pub struct ResourceSnapshotRow {
     pub id: uuid::Uuid,
     pub account_id: odf::AccountID,
+    pub account_resource_id: uuid::Uuid,
     pub account_name: String,
     pub resource_schema: String,
     pub resource_name: String,
@@ -258,7 +261,8 @@ impl ResourceSnapshotRow {
             headers: crate::ResourceHeaders {
                 id,
                 account: odf::AccountHandle {
-                    id: self.account_id,
+                    id: ResourceID::new(self.account_resource_id),
+                    did: self.account_id,
                     name: odf::AccountName::new_unchecked(&self.account_name),
                 },
                 name: ResourceName::new_unchecked(&self.resource_name),

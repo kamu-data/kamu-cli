@@ -24,8 +24,10 @@ struct Timestamp {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table AccountRef {
-  // DID of the account.
+  // UUID of the account resource.
   id: [ubyte];
+  // DID of the account.
+  did: [ubyte];
   // Name of the account.
   name: string;
 }
@@ -142,8 +144,10 @@ table AccountSpecInput {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 table AccountHandle {
-  // DID of the account.
+  // ID of the account resource.
   id: [ubyte];
+  // DID of the account.
+  did: [ubyte];
   // Name of the account.
   name: string;
 }
@@ -1023,6 +1027,45 @@ table AttachmentsEmbedded {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ResourceHandle
+// Lint to another resolved resource.
+//
+// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceHandle
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table ResourceHandle {
+  // Account that owns the target resource.
+  account: AccountHandle;
+  // Type URI of the target resource.
+  type: string;
+  // ID of the resource within a node.
+  id: [ubyte];
+  // DID of the resource, if applicable.
+  did: [ubyte];
+  // Name of a resource.
+  name: string;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Attribute
+// A named attribute attached to a resource, used by auth policies for access control decisions.
+//
+// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/Attribute
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table Attribute {
+  // The resource this attribute is attached to.
+  object: ResourceHandle;
+  // Name of the attribute.
+  //
+  // Examples:
+  // - "allowPublicRead"
+  name: string;
+  // Value of the attribute.
+  value: string (json);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // ResourceRef
 // Reference to another resource.
 //
@@ -1038,26 +1081,66 @@ table ResourceRef {
   // - "SecretSet"
   // - "https://opendatafabric.org/config/v1/SecretSet"
   type: string;
-  // ID of a resource.
+  // ID of the resource within a node.
   id: [ubyte];
+  // DID of the resource.
+  did: [ubyte];
   // Name of a resource.
   name: string;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Attribute
+// AttributeInput
 // A named attribute attached to a resource, used by auth policies for access control decisions.
 //
-// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/Attribute
+// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/AttributeInput
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-table Attribute {
+table AttributeInput {
   // The resource this attribute is attached to.
   object: ResourceRef;
   // Name of the attribute e.g. `allowPublicRead`.
   name: string;
   // Value of the attribute.
   value: string (json);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ValueHandle
+// Reference to a value within a `VariableSet` or a `SecretSet`.
+//
+// Schema: https://opendatafabric.org/schemas/config/v1alpha1/ValueHandle
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table ValueHandle {
+  // Account that owns the target resource.
+  account: AccountHandle;
+  // Type URI of the target resource.
+  type: string;
+  // ID of the resource within a node.
+  id: [ubyte];
+  // Name of a resource.
+  name: string;
+  // JSON path to a value within a `VariableSet` or a `SecretSet`.
+  //
+  // Examples:
+  // - "port"
+  // - "postgres.schemaName"
+  path: string;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// AwsCredentials
+// Access credentials for AWS or an AWS-compatible service.
+//
+// Schema: https://opendatafabric.org/schemas/storage/v1alpha1/AwsCredentials
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table AwsCredentials {
+  // Reference to a secret containing the AWS access key ID.
+  access_key: ValueHandle;
+  // Reference to a secret containing the AWS secret access key.
+  secret_key: ValueHandle;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1090,13 +1173,13 @@ table ValueRef {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// AwsCredentials
+// AwsCredentialsInput
 // Access credentials for AWS or an AWS-compatible service.
 //
-// Schema: https://opendatafabric.org/schemas/storage/v1alpha1/AwsCredentials
+// Schema: https://opendatafabric.org/schemas/storage/v1alpha1/AwsCredentialsInput
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-table AwsCredentials {
+table AwsCredentialsInput {
   // Reference to a secret containing the AWS access key ID.
   access_key: ValueRef;
   // Reference to a secret containing the AWS secret access key.
@@ -1769,7 +1852,7 @@ table DatasetSpec {
   // An array of metadata events that will be used to populate the chain. Here you can define polling and push sources, set licenses, add attachments etc.
   metadata: [MetadataEventWrapper];
   // Reference to a storage volume where dataset data will be stored. If omitted, the node's default storage is used.
-  volume: PersistentVolumeRef;
+  volume: ResourceHandle;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1841,39 +1924,39 @@ table ResourceSelector {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// FlowTrigger
+// FlowTriggerInput
 // Condition that causes a flow to be executed.
 //
-// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowTrigger
+// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowTriggerInput
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-union FlowTrigger {
-  FlowTriggerSchedule,
-  FlowTriggerEvent,
-  FlowTriggerSource,
-  FlowTriggerDataset,
+union FlowTriggerInput {
+  FlowTriggerInputSchedule,
+  FlowTriggerInputEvent,
+  FlowTriggerInputSource,
+  FlowTriggerInputDataset,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// FlowTriggerSchedule
+// FlowTriggerInputSchedule
 // Triggers the flow on a cron schedule.
 //
-// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowTrigger#/$defs/Schedule
+// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowTriggerInput#/$defs/Schedule
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-table FlowTriggerSchedule {
+table FlowTriggerInputSchedule {
   // Cron5 expression defining the schedule e.g. `@daily` or `*/30 * * * *`.
   cron: string;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// FlowTriggerEvent
+// FlowTriggerInputEvent
 // Triggers the flow when an event bus event matching one of the filters is observed.
 //
-// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowTrigger#/$defs/Event
+// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowTriggerInput#/$defs/Event
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-table FlowTriggerEvent {
+table FlowTriggerInputEvent {
   // Filters the event by type and fields.
   events: EventFilter;
   // The trigger will fire upon first observed event. If another event arrives withing the `cooldown` interval the firing will be postponed until `cooldown` interval ends. I.e. trigger is guaranteed to fire, but may batch multiple events together into one flow run.
@@ -1883,13 +1966,13 @@ table FlowTriggerEvent {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// FlowTriggerSource
+// FlowTriggerInputSource
 // Triggers the flow when a source receives new data, with optional batching controls.
 //
-// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowTrigger#/$defs/Source
+// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowTriggerInput#/$defs/Source
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-table FlowTriggerSource {
+table FlowTriggerInputSource {
   // Reference to the source resource that drives this trigger.
   source: ResourceRef;
   // Minimum number of new records to accumulate before triggering.
@@ -1899,21 +1982,21 @@ table FlowTriggerSource {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// FlowTriggerDataset
+// FlowTriggerInputDataset
 // Triggers the flow when matching datasets are updated.
 //
-// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowTrigger#/$defs/Dataset
+// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowTriggerInput#/$defs/Dataset
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-table FlowTriggerDataset {
+table FlowTriggerInputDataset {
   // Selector that identifies which datasets can trigger this flow.
   dataset: DatasetSelector;
   // Set of event bus event IDs that this trigger will react to
   events: [string];
 }
 
-table FlowTriggerWrapper {
-  value: FlowTrigger;
+table FlowTriggerInputWrapper {
+  value: FlowTriggerInput;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2007,9 +2090,85 @@ table FlowSpecInput {
   // Defines resources for which this flow will be instantiated.
   target: ResourceSelector;
   // Conditions that cause this flow to execute.
-  triggers: [FlowTriggerWrapper];
+  triggers: [FlowTriggerInputWrapper];
   // List of tasks to run consecutively.
   tasks: [TaskSpecInputWrapper];
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// FlowTrigger
+// Condition that causes a flow to be executed.
+//
+// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowTrigger
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+union FlowTrigger {
+  FlowTriggerSchedule,
+  FlowTriggerEvent,
+  FlowTriggerSource,
+  FlowTriggerDataset,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// FlowTriggerSchedule
+// Triggers the flow on a cron schedule.
+//
+// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowTrigger#/$defs/Schedule
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table FlowTriggerSchedule {
+  // Cron5 expression defining the schedule e.g. `@daily` or `*/30 * * * *`.
+  cron: string;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// FlowTriggerEvent
+// Triggers the flow when an event bus event matching one of the filters is observed.
+//
+// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowTrigger#/$defs/Event
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table FlowTriggerEvent {
+  // Filters the event by type and fields.
+  events: EventFilter;
+  // The trigger will fire upon first observed event. If another event arrives withing the `cooldown` interval the firing will be postponed until `cooldown` interval ends. I.e. trigger is guaranteed to fire, but may batch multiple events together into one flow run.
+  cooldown: Duration;
+  // If an event is observed a `cooldownMaxBatch` number of times during the `cooldown` interval it will fire the trigger without waiting for cooldown to finish.
+  cooldown_max_batch: uint64 = null;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// FlowTriggerSource
+// Triggers the flow when a source receives new data, with optional batching controls.
+//
+// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowTrigger#/$defs/Source
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table FlowTriggerSource {
+  // Reference to the source resource that drives this trigger.
+  source: ResourceHandle;
+  // Minimum number of new records to accumulate before triggering.
+  min_records_to_await: uint64 = null;
+  // Maximum time to wait for `minRecordsToAwait` before triggering anyway e.g. `1h`.
+  max_await_interval: Duration;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// FlowTriggerDataset
+// Triggers the flow when matching datasets are updated.
+//
+// Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowTrigger#/$defs/Dataset
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table FlowTriggerDataset {
+  // Selector that identifies which datasets can trigger this flow.
+  dataset: DatasetSelector;
+  // Set of event bus event IDs that this trigger will react to
+  events: [string];
+}
+
+table FlowTriggerWrapper {
+  value: FlowTrigger;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2035,7 +2194,7 @@ union TaskSpec {
 
 table TaskSpecIngest {
   // Reference to the source resource that defines how to fetch data.
-  source: ResourceRef;
+  source: ResourceHandle;
   // Optional parameters to control ingestion behavior.
   params: IngestParams;
 }
@@ -2071,7 +2230,7 @@ table TaskSpecGarbageCollection {
 
 table TaskSpecWebhookCall {
   // Reference to the `WebhookTarget`.
-  target: ResourceRef;
+  target: ResourceHandle;
   // The payload to send. May include templating.
   payload: string;
 }
@@ -2336,7 +2495,7 @@ table PersistentVolumeSpecInputS3 {
   // Storage capacity allocation.
   capacity: VolumeCapacity;
   // Access credentials for the bucket.
-  credentials: AwsCredentials;
+  credentials: AwsCredentialsInput;
 }
 
 union PersistentVolumeSpec {
@@ -2493,6 +2652,24 @@ table RawQueryResponseRoot {
 
 table Relation {
   // The resource that holds the relation.
+  subject: ResourceHandle;
+  // Name of the relation e.g. `role`, `member`, `owner`.
+  relation: string;
+  // Optional value associated with the relation e.g. `maintainer` for a `role` relation.
+  value: string (json);
+  // The resource that is the target of the relation.
+  object: ResourceHandle;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// RelationInput
+// A directed relationship between two resources, optionally carrying a typed value.
+//
+// Schema: https://opendatafabric.org/schemas/auth/v1alpha1/RelationInput
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+table RelationInput {
+  // The resource that holds the relation.
   subject: ResourceRef;
   // Name of the relation e.g. `role`, `member`, `owner`.
   relation: string;
@@ -2511,9 +2688,9 @@ table Relation {
 
 table RelationsSpecInput {
   // Relations between resources.
-  relations: [Relation];
+  relations: [RelationInput];
   // Resource attributes.
-  attributes: [Attribute];
+  attributes: [AttributeInput];
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

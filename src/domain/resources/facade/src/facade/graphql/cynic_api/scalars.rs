@@ -25,6 +25,7 @@ cynic::impl_scalar!(
     schema::ResourceTypeSelectorRaw
 );
 cynic::impl_scalar!(domain::TypeUri, schema::TypeUri);
+cynic::impl_scalar!(odf::metadata::formats::Did, schema::Did);
 cynic::impl_scalar!(serde_json::Value, schema::JSON);
 cynic::impl_scalar!(Uint64, schema::Uint64);
 cynic::impl_scalar!(ResourceLabels, schema::ResourceLabels);

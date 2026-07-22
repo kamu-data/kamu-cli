@@ -41,6 +41,18 @@ pub fn deleted_account_name_sentinel() -> auth::AccountName {
     auth::AccountName::new_unchecked(DELETED_ACCOUNT_NAME_SENTINEL)
 }
 
+/// Placeholder account-resource id substituted alongside
+/// [`DELETED_ACCOUNT_NAME_SENTINEL`] when a resource's owning account can no
+/// longer be found (e.g. deletion racing async cleanup). The nil UUID.
+///
+/// The SQL backends embed the equivalent nil-UUID literal directly in their
+/// `COALESCE(a.resource_id, '00000000-0000-0000-0000-000000000000')` reads
+/// (`sqlx::query!` cannot splice a Rust const into its SQL, same caveat as the
+/// name sentinel), so keep the two in sync by hand if this ever changes.
+pub fn deleted_account_resource_id_sentinel() -> ResourceID {
+    ResourceID::new(uuid::Uuid::nil())
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub trait ResourceHeadersExt {
@@ -76,7 +88,7 @@ impl ResourceHeadersExt for ResourceHeaders {
     }
 
     fn from_input(now: DateTime<Utc>, id: ResourceID, input: ResourceHeadersInput) -> Self {
-        let account = account_handle_from_input(&input);
+        let account = account_handle_from_input(input.account.as_ref());
 
         Self {
             id,
@@ -107,14 +119,14 @@ impl ResourceHeadersExt for ResourceHeaders {
             .as_ref()
             .map_or(&empty_map, |a| &a.entries);
 
-        self.account == account_handle_from_input(input)
+        self.account == account_handle_from_input(input.account.as_ref())
             && self.name == input.name
             && self.labels.entries == *input_labels
             && self.annotations.entries == *input_annotations
     }
 
     fn apply_update(&mut self, now: DateTime<Utc>, input: ResourceHeadersInput) {
-        self.account = account_handle_from_input(&input);
+        self.account = account_handle_from_input(input.account.as_ref());
         self.name = input.name;
         self.labels = input
             .labels
@@ -134,27 +146,26 @@ impl ResourceHeadersExt for ResourceHeaders {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Account resolution (id + name lookup) happens upstream, as part of the
-/// apply process (see `ResourceAccountResolver`), before a
+/// Account resolution (id + did + name lookup) happens upstream, as part of
+/// the apply process (see `ResourceAccountResolver`), before a
 /// [`ResourceHeadersInput`] is ever constructed — every production caller
-/// populates `account` with an already-resolved
-/// [`auth::AccountRef::IdAndName`]. The facade also overwrites the resulting
-/// header's `account` with the freshly-resolved handle at the view boundary on
-/// every read, so the name carried here is never persisted or relied upon (see
-/// plan `.spec/022.resource-headers.plan.md` — avoiding name denormalization is
-/// the point of that JOIN-on-read design). This function only exists to
-/// satisfy the aliased struct's mandatory `account` field during
-/// construction and panics if handed an unresolved reference, which would
-/// indicate a caller bypassed account resolution.
-fn account_handle_from_input(input: &ResourceHeadersInput) -> auth::AccountHandle {
-    match &input.account {
-        Some(auth::AccountRef::IdAndName(account)) => auth::AccountHandle {
-            id: account.id.clone(),
-            name: account.name.clone(),
+/// populates `account` with a fully-resolved [`auth::AccountRef`]. Panics if
+/// handed a partially-resolved reference, which would indicate a caller
+/// bypassed account resolution.
+fn account_handle_from_input(input: Option<&auth::AccountRef>) -> auth::AccountHandle {
+    match input {
+        Some(auth::AccountRef {
+            id: Some(id),
+            did: Some(did),
+            name: Some(name),
+        }) => auth::AccountHandle {
+            id: *id,
+            did: did.clone(),
+            name: name.clone(),
         },
         other => panic!(
-            "ResourceHeadersInput.account must be a resolved AccountRef::IdAndName by the time \
-             headers are constructed, got: {other:?}"
+            "ResourceHeadersInput.account must be a fully resolved AccountRef (id, did, and name \
+             all present) by the time headers are constructed, got: {other:?}"
         ),
     }
 }

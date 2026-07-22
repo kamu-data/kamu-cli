@@ -274,6 +274,7 @@ impl AuthenticationService for AuthenticationServiceImpl {
                 // Create a new account
                 let new_account = Account {
                     id: provider_response.account_id,
+                    resource_id: Account::generate_resource_id(),
                     account_name: provider_response.account_name.clone(),
                     email: provider_response.email,
                     display_name: provider_response.display_name,

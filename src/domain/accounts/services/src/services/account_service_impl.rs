@@ -183,6 +183,7 @@ impl AccountService for AccountServiceImpl {
         let identity = DidPkhAccountIdentity::from_did_pkh(did_pkh)?;
         let new_account = Account {
             id: did_pkh.clone().into(),
+            resource_id: Account::generate_resource_id(),
             account_name: identity.account_name,
             email: identity.email,
             display_name: identity.display_name,

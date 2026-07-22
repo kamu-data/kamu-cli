@@ -27,7 +27,7 @@ impl Accounts {
 
         match subject.as_ref() {
             CurrentAccountSubject::Logged(account) => Ok(Account::new(
-                account.account_handle.id.clone().into(),
+                account.account_handle.did.clone().into(),
                 account.account_handle.name.clone().into(),
             )),
             CurrentAccountSubject::Anonymous(_) => {

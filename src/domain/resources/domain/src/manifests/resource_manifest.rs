@@ -28,11 +28,13 @@ pub struct ResourceManifest {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[serde_with::serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ResourceManifestHeaders {
     pub id: Option<ResourceID>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde_as(as = "Option<odf::metadata::serde::yaml::auth::AccountRef>")]
     pub account: Option<ResourceAccountRef>,
     pub name: String,
     #[serde(
@@ -159,17 +161,23 @@ mod tests {
     // is wired through `ResourceManifestHeaders`.
     #[test]
     fn deserializes_and_round_trips_account_field() {
-        let id = odf::AccountID::new_generated_ed25519().1;
+        let did = odf::AccountID::new_generated_ed25519().1;
         let json = format!(
-            r#"{{"id": null, "account": {{"id": "{id}"}}, "name": "n", "labels": {{}}, "annotations": {{}}}}"#
+            r#"{{"id": null, "account": {{"did": "{did}"}}, "name": "n", "labels": {{}}, "annotations": {{}}}}"#
         );
 
         let headers: ResourceManifestHeaders = serde_json::from_str(&json).unwrap();
-        assert_matches!(&headers.account, Some(ResourceAccountRef::Id(actual)) if *actual == id);
+        assert_matches!(
+            &headers.account,
+            Some(ResourceAccountRef { did: Some(actual), .. }) if *actual == did
+        );
 
         let round_tripped: ResourceManifestHeaders =
             serde_json::from_str(&serde_json::to_string(&headers).unwrap()).unwrap();
-        assert_matches!(round_tripped.account, Some(ResourceAccountRef::Id(actual)) if actual == id);
+        assert_matches!(
+            round_tripped.account,
+            Some(ResourceAccountRef { did: Some(actual), .. }) if actual == did
+        );
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

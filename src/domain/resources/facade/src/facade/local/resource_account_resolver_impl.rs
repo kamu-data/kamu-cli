@@ -52,55 +52,41 @@ impl ResourceAccountResolverImpl {
             return self.resolve_current_subject_account();
         };
 
-        match selector {
-            ResourceAccountRef::Id(id) => {
-                let account = self
-                    .account_service
-                    .get_account_by_id(id)
-                    .await
-                    .map_err(ResolveManifestAccountError::from)?;
+        let account = match (&selector.did, &selector.name) {
+            (Some(did), _) => self
+                .account_service
+                .get_account_by_id(did)
+                .await
+                .map_err(ResolveManifestAccountError::from)?,
+            (None, Some(name)) => self
+                .account_service
+                .get_account_by_name(name)
+                .await
+                .map_err(ResolveManifestAccountError::from)?,
+            (None, None) => return Err(ResolveManifestAccountError::EmptySelector),
+        };
 
-                Ok(odf::AccountHandle {
-                    id: account.id,
-                    name: account.account_name,
-                })
-            }
-            ResourceAccountRef::Name(name) => {
-                let account = self
-                    .account_service
-                    .get_account_by_name(name)
-                    .await
-                    .map_err(ResolveManifestAccountError::from)?;
+        let resource_id_matches = selector
+            .id
+            .as_ref()
+            .is_none_or(|id| *id == account.resource_id);
+        let did_matches = selector.did.as_ref().is_none_or(|did| *did == account.id);
+        let name_matches = selector
+            .name
+            .as_ref()
+            .is_none_or(|name| *name == account.account_name);
 
-                Ok(odf::AccountHandle {
-                    id: account.id,
-                    name: account.account_name,
-                })
-            }
-            ResourceAccountRef::IdAndName(odf::metadata::auth::AccountRefByIdAndName {
-                id,
-                name,
-            }) => {
-                let account = self
-                    .account_service
-                    .get_account_by_id(id)
-                    .await
-                    .map_err(ResolveManifestAccountError::from)?;
-
-                if account.account_name != *name {
-                    return Err(ResolveManifestAccountError::IdNameMismatch {
-                        account_id: account.id,
-                        expected_name: name.clone(),
-                        actual_name: account.account_name,
-                    });
-                }
-
-                Ok(odf::AccountHandle {
-                    id: account.id,
-                    name: account.account_name,
-                })
-            }
+        if !resource_id_matches || !did_matches || !name_matches {
+            return Err(ResolveManifestAccountError::SelectorMismatch {
+                did: account.id,
+                actual_name: account.account_name,
+                expected_resource_id: selector.id,
+                expected_did: selector.did.clone(),
+                expected_name: selector.name.clone(),
+            });
         }
+
+        Ok((&account).into())
     }
 
     fn resolve_current_subject_account(
@@ -120,14 +106,14 @@ impl ResourceAccountResolverImpl {
     ) -> Result<(), ResolveManifestAccountError> {
         match self.current_account_subject.as_ref() {
             CurrentAccountSubject::Logged(current)
-                if current.account_handle.id == target_account.id =>
+                if current.account_handle.did == target_account.did =>
             {
                 Ok(())
             }
             CurrentAccountSubject::Logged(current) => {
                 let is_admin = self
                     .rebac_service
-                    .is_account_admin(&current.account_handle.id)
+                    .is_account_admin(&current.account_handle.did)
                     .await
                     .int_err()?;
                 if is_admin {

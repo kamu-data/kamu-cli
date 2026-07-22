@@ -114,15 +114,18 @@ pub(crate) struct ResourceBadAccountProblem {
     pub code: ResourceBadAccountProblemCode,
     pub account_id: Option<odf::AccountID>,
     pub account_name: Option<AccountName>,
+    pub expected_resource_id: Option<kamu_resources::ResourceID>,
+    pub expected_did: Option<odf::AccountID>,
     pub expected_name: Option<AccountName>,
     pub actual_name: Option<AccountName>,
 }
 
 #[derive(cynic::Enum, Debug, Clone, Copy)]
 pub(crate) enum ResourceBadAccountProblemCode {
+    EmptySelector,
     AccountNotFoundById,
     AccountNotFoundByName,
-    IdNameMismatch,
+    SelectorMismatch,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -240,7 +243,8 @@ pub(crate) struct ResourceHeaders {
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct AccountHandle {
-    pub id: odf::AccountID,
+    pub id: kamu_resources::ResourceID,
+    pub did: odf::AccountID,
     pub name: AccountName,
 }
 
@@ -248,6 +252,7 @@ impl From<AccountHandle> for odf::AccountHandle {
     fn from(value: AccountHandle) -> Self {
         Self {
             id: value.id,
+            did: value.did,
             name: odf::AccountName::new_unchecked(&value.name.0),
         }
     }
@@ -258,8 +263,9 @@ impl From<AccountHandle> for odf::AccountHandle {
 #[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct ResourceHandle {
     pub id: kamu_resources::ResourceID,
-    pub schema: kamu_resources::TypeUri,
-    pub type_name: kamu_resources::TypeName,
+    #[cynic(rename = "type")]
+    pub r#type: kamu_resources::TypeUri,
+    pub did: Option<odf::metadata::formats::Did>,
     pub name: kamu_resources::ResourceName,
     pub account: AccountHandle,
 }

@@ -58,7 +58,7 @@ impl ResourceRepository for PostgresResourceRepository {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
-        let account_id_stack = resource_snapshot.headers.account.id.as_stack_string();
+        let account_id_stack = resource_snapshot.headers.account.did.as_stack_string();
         let account_id_str = account_id_stack.as_str();
         let labels = kamu_resources::resource_labels_to_json(&resource_snapshot.headers.labels);
         let annotations =
@@ -109,7 +109,7 @@ impl ResourceRepository for PostgresResourceRepository {
         .map_err(|e: sqlx::Error| match e {
             sqlx::Error::Database(e) if e.is_unique_violation() => {
                 CreateResourceError::Duplicate(ResourceDuplicateError {
-                    account_id: resource_snapshot.headers.account.id.clone(),
+                    account_id: resource_snapshot.headers.account.did.clone(),
                     schema: resource_snapshot.schema.clone(),
                     name: resource_snapshot.headers.name.clone(),
                 })
@@ -173,7 +173,7 @@ impl ResourceRepository for PostgresResourceRepository {
                     resource_snapshot
                         .headers
                         .account
-                        .id
+                        .did
                         .as_stack_string()
                         .to_string(),
                 )
@@ -244,7 +244,7 @@ impl ResourceRepository for PostgresResourceRepository {
                 sqlx::Error::Database(e) if e.is_unique_violation() => {
                     let resource_snapshot = &resource_updates[0].snapshot;
                     UpdateResourceError::Duplicate(ResourceDuplicateError {
-                        account_id: resource_snapshot.headers.account.id.clone(),
+                        account_id: resource_snapshot.headers.account.did.clone(),
                         schema: resource_snapshot.schema.clone(),
                         name: resource_snapshot.headers.name.clone(),
                     })
@@ -313,6 +313,10 @@ impl ResourceRepository for PostgresResourceRepository {
                 r.resource_schema as schema,
                 r.resource_name as name,
                 r.account_id as "account_id: odf::AccountID",
+                -- LEFT JOIN: a.resource_id is NULL only when the owning account
+                -- row is gone (deletion racing async cleanup), same case the
+                -- account_name sentinel covers. Substitute the nil resource id.
+                COALESCE(a.resource_id, '00000000-0000-0000-0000-000000000000'::uuid) as "account_resource_id!: uuid::Uuid",
                 COALESCE(a.account_name, $3) as "account_name!"
             FROM resources r
             LEFT JOIN accounts a ON a.id = r.account_id
@@ -354,6 +358,10 @@ impl ResourceRepository for PostgresResourceRepository {
                 r.resource_schema as schema,
                 r.resource_name as name,
                 r.account_id as "account_id: odf::AccountID",
+                -- LEFT JOIN: a.resource_id is NULL only when the owning account
+                -- row is gone (deletion racing async cleanup), same case the
+                -- account_name sentinel covers. Substitute the nil resource id.
+                COALESCE(a.resource_id, '00000000-0000-0000-0000-000000000000'::uuid) as "account_resource_id!: uuid::Uuid",
                 COALESCE(a.account_name, $4) as "account_name!"
             FROM resources r
             LEFT JOIN accounts a ON a.id = r.account_id
@@ -411,6 +419,10 @@ impl ResourceRepository for PostgresResourceRepository {
                 r.resource_schema as schema,
                 r.resource_name as name,
                 r.account_id as "account_id: odf::AccountID",
+                -- LEFT JOIN: a.resource_id is NULL only when the owning account
+                -- row is gone (deletion racing async cleanup), same case the
+                -- account_name sentinel covers. Substitute the nil resource id.
+                COALESCE(a.resource_id, '00000000-0000-0000-0000-000000000000'::uuid) as "account_resource_id!: uuid::Uuid",
                 COALESCE(a.account_name, $7) as "account_name!"
             FROM resources r
             LEFT JOIN accounts a ON a.id = r.account_id
@@ -496,6 +508,10 @@ impl ResourceRepository for PostgresResourceRepository {
             SELECT
                 r.resource_id as "id: uuid::Uuid",
                 r.account_id as "account_id: odf::AccountID",
+                -- LEFT JOIN: a.resource_id is NULL only when the owning account
+                -- row is gone (deletion racing async cleanup), same case the
+                -- account_name sentinel covers. Substitute the nil resource id.
+                COALESCE(a.resource_id, '00000000-0000-0000-0000-000000000000'::uuid) as "account_resource_id!: uuid::Uuid",
                 COALESCE(a.account_name, $3) as "account_name!",
                 r.resource_schema,
                 r.resource_name,
@@ -528,7 +544,8 @@ impl ResourceRepository for PostgresResourceRepository {
             headers: ResourceHeaders {
                 id: ResourceID::new(row.id),
                 account: odf::AccountHandle {
-                    id: row.account_id,
+                    id: ResourceID::new(row.account_resource_id),
+                    did: row.account_id,
                     name: odf::AccountName::new_unchecked(&row.account_name),
                 },
                 name: kamu_resources::ResourceName::new_unchecked(&row.resource_name),
@@ -566,6 +583,7 @@ impl ResourceRepository for PostgresResourceRepository {
             SELECT
                 r.resource_id as id,
                 r.account_id,
+                COALESCE(a.resource_id, '00000000-0000-0000-0000-000000000000'::uuid) as account_resource_id,
                 COALESCE(a.account_name, $3) as account_name,
                 r.resource_schema,
                 r.resource_name,
@@ -617,6 +635,10 @@ impl ResourceRepository for PostgresResourceRepository {
             SELECT
                 r.resource_id as "id: uuid::Uuid",
                 r.account_id as "account_id: odf::AccountID",
+                -- LEFT JOIN: a.resource_id is NULL only when the owning account
+                -- row is gone (deletion racing async cleanup), same case the
+                -- account_name sentinel covers. Substitute the nil resource id.
+                COALESCE(a.resource_id, '00000000-0000-0000-0000-000000000000'::uuid) as "account_resource_id!: uuid::Uuid",
                 COALESCE(a.account_name, $2) as "account_name!",
                 r.resource_schema,
                 r.resource_name,
@@ -647,7 +669,8 @@ impl ResourceRepository for PostgresResourceRepository {
             headers: ResourceHeaders {
                 id: ResourceID::new(row.id),
                 account: odf::AccountHandle {
-                    id: row.account_id,
+                    id: ResourceID::new(row.account_resource_id),
+                    did: row.account_id,
                     name: odf::AccountName::new_unchecked(&row.account_name),
                 },
                 name: kamu_resources::ResourceName::new_unchecked(&row.resource_name),
@@ -686,6 +709,10 @@ impl ResourceRepository for PostgresResourceRepository {
             SELECT
                 r.resource_id as "id: uuid::Uuid",
                 r.account_id as "account_id: odf::AccountID",
+                -- LEFT JOIN: a.resource_id is NULL only when the owning account
+                -- row is gone (deletion racing async cleanup), same case the
+                -- account_name sentinel covers. Substitute the nil resource id.
+                COALESCE(a.resource_id, '00000000-0000-0000-0000-000000000000'::uuid) as "account_resource_id!: uuid::Uuid",
                 COALESCE(a.account_name, $3) as "account_name!",
                 r.resource_schema,
                 r.resource_name,
@@ -720,7 +747,8 @@ impl ResourceRepository for PostgresResourceRepository {
                 headers: ResourceHeaders {
                     id: ResourceID::new(row.id),
                     account: odf::AccountHandle {
-                        id: row.account_id,
+                        id: ResourceID::new(row.account_resource_id),
+                        did: row.account_id,
                         name: odf::AccountName::new_unchecked(&row.account_name),
                     },
                     name: kamu_resources::ResourceName::new_unchecked(&row.resource_name),
@@ -802,6 +830,10 @@ impl ResourceRepository for PostgresResourceRepository {
                 SELECT
                     r.resource_id as "id: uuid::Uuid",
                     r.account_id as "account_id: odf::AccountID",
+                -- LEFT JOIN: a.resource_id is NULL only when the owning account
+                -- row is gone (deletion racing async cleanup), same case the
+                -- account_name sentinel covers. Substitute the nil resource id.
+                COALESCE(a.resource_id, '00000000-0000-0000-0000-000000000000'::uuid) as "account_resource_id!: uuid::Uuid",
                     COALESCE(a.account_name, $5) as "account_name!",
                     r.resource_schema,
                     r.resource_name,
@@ -838,7 +870,8 @@ impl ResourceRepository for PostgresResourceRepository {
                     headers: ResourceHeaders {
                         id: ResourceID::new(row.id),
                         account: odf::AccountHandle {
-                            id: row.account_id,
+                            id: ResourceID::new(row.account_resource_id),
+                            did: row.account_id,
                             name: odf::AccountName::new_unchecked(&row.account_name),
                         },
                         name: kamu_resources::ResourceName::new_unchecked(&row.resource_name),
@@ -878,6 +911,10 @@ impl ResourceRepository for PostgresResourceRepository {
                 SELECT
                     r.resource_id as "id: uuid::Uuid",
                     r.account_id as "account_id: odf::AccountID",
+                -- LEFT JOIN: a.resource_id is NULL only when the owning account
+                -- row is gone (deletion racing async cleanup), same case the
+                -- account_name sentinel covers. Substitute the nil resource id.
+                COALESCE(a.resource_id, '00000000-0000-0000-0000-000000000000'::uuid) as "account_resource_id!: uuid::Uuid",
                     COALESCE(a.account_name, $4) as "account_name!",
                     r.resource_schema,
                     r.resource_name,
@@ -912,7 +949,8 @@ impl ResourceRepository for PostgresResourceRepository {
                     headers: ResourceHeaders {
                         id: ResourceID::new(row.id),
                         account: odf::AccountHandle {
-                            id: row.account_id,
+                            id: ResourceID::new(row.account_resource_id),
+                            did: row.account_id,
                             name: odf::AccountName::new_unchecked(&row.account_name),
                         },
                         name: kamu_resources::ResourceName::new_unchecked(&row.resource_name),

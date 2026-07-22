@@ -153,7 +153,7 @@ impl AccountConfig {
         let password = Self::generate_password(&subject.account_handle.name);
 
         Self {
-            id: Some(subject.account_handle.id),
+            id: Some(subject.account_handle.did),
             account_name: subject.account_handle.name,
             password,
             email,

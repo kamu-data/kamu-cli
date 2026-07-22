@@ -78,10 +78,7 @@ impl<Svc> AuthenticationMiddleware<Svc> {
             // TODO: PERF: Getting the full account info here is expensive while all we need
             // is the caller identity
             match account_res {
-                Ok(account) => Ok(CurrentAccountSubject::logged(
-                    account.id,
-                    account.account_name,
-                )),
+                Ok(account) => Ok(CurrentAccountSubject::logged_from_account(&account)),
                 Err(GetAccountInfoError::AccessToken(e)) => match e {
                     AccessTokenError::Expired => Ok(CurrentAccountSubject::anonymous(
                         AnonymousAccountReason::AuthenticationExpired,

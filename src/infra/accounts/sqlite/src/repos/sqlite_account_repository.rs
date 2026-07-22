@@ -64,6 +64,7 @@ impl AccountRepository for SqliteAccountRepository {
         let connection_mut = tr.connection_mut().await?;
 
         let account_id = account.id.to_string();
+        let resource_id = account.resource_id.as_ref();
         let account_name = account.account_name.as_str();
         let email = account.email.as_ref().to_ascii_lowercase();
         let provider = account.provider.clone();
@@ -71,10 +72,11 @@ impl AccountRepository for SqliteAccountRepository {
 
         sqlx::query!(
             r#"
-            INSERT INTO accounts (id, account_name, email, display_name, account_type, avatar_url, registered_at, provider, provider_identity_key)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            INSERT INTO accounts (id, resource_id, account_name, email, display_name, account_type, avatar_url, registered_at, provider, provider_identity_key)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             "#,
             account_id,
+            resource_id,
             account_name,
             email,
             account.display_name,
@@ -224,6 +226,7 @@ impl AccountRepository for SqliteAccountRepository {
             r#"
             SELECT
                 id as "id: _",
+                resource_id as "resource_id!: _",
                 account_name,
                 email,
                 display_name,
@@ -265,6 +268,7 @@ impl AccountRepository for SqliteAccountRepository {
         let mut query_builder = sqlx::QueryBuilder::<_>::new(
             r#"
             SELECT id,
+                   resource_id,
                    account_name,
                    email,
                    display_name,
@@ -308,6 +312,7 @@ impl AccountRepository for SqliteAccountRepository {
             r#"
             SELECT
                 id as "id: _",
+                resource_id as "resource_id!: _",
                 account_name,
                 email,
                 display_name,
@@ -433,6 +438,7 @@ impl AccountRepository for SqliteAccountRepository {
             r#"
             )
             SELECT id,
+                   resource_id,
                    account_name,
                    email,
                    display_name,
@@ -476,6 +482,7 @@ impl AccountRepository for SqliteAccountRepository {
             let query_str = format!(
                 r#"
                 SELECT id,
+                       resource_id,
                        account_name,
                        email,
                        display_name,
@@ -585,6 +592,7 @@ impl ExpensiveAccountRepository for SqliteAccountRepository {
                 AccountRowModel,
                 r#"
                 SELECT id            AS "id: _",
+                       resource_id   AS "resource_id!: _",
                        account_name,
                        email,
                        display_name,

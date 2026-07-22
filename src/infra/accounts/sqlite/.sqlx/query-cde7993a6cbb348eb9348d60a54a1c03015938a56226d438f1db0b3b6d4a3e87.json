@@ -1,0 +1,74 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT\n                id as \"id: _\",\n                resource_id as \"resource_id!: _\",\n                account_name,\n                email,\n                display_name,\n                account_type as \"account_type: AccountType\",\n                avatar_url,\n                registered_at as \"registered_at: _\",\n                provider,\n                provider_identity_key\n            FROM accounts\n            WHERE id = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: _",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "resource_id!: _",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "account_name",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "email",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "display_name",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "account_type: AccountType",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "avatar_url",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "registered_at: _",
+        "ordinal": 7,
+        "type_info": "Null"
+      },
+      {
+        "name": "provider",
+        "ordinal": 8,
+        "type_info": "Text"
+      },
+      {
+        "name": "provider_identity_key",
+        "ordinal": 9,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "cde7993a6cbb348eb9348d60a54a1c03015938a56226d438f1db0b3b6d4a3e87"
+}

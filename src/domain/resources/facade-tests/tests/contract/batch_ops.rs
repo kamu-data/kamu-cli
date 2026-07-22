@@ -242,9 +242,13 @@ pub async fn test_get_many_empty_refs_validates_bad_account(h: &impl FacadeContr
     let result = facade
         .get_many(
             ResourceBatchSelector {
-                account: Some(ResourceAccountRef::Name(odf::AccountName::new_unchecked(
-                    "unknown-resource-contract-account",
-                ))),
+                account: Some(ResourceAccountRef {
+                    id: None,
+                    did: None,
+                    name: Some(odf::AccountName::new_unchecked(
+                        "unknown-resource-contract-account",
+                    )),
+                }),
                 resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
                 resource_refs: vec![],
             },
@@ -270,9 +274,13 @@ contract_test!(
 pub async fn test_batch_empty_refs_validation_is_consistent(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
     let bad_type = "NoSuchResourceTypeXYZ";
-    let bad_account = Some(ResourceAccountRef::Name(odf::AccountName::new_unchecked(
-        "unknown-resource-contract-account",
-    )));
+    let bad_account = Some(ResourceAccountRef {
+        id: None,
+        did: None,
+        name: Some(odf::AccountName::new_unchecked(
+            "unknown-resource-contract-account",
+        )),
+    });
 
     // get_handles: unsupported type
     let gi_type = facade

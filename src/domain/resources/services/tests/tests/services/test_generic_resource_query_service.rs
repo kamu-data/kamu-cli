@@ -56,13 +56,13 @@ async fn test_find_owned_snapshot_success() {
         .await;
 
     let result = harness
-        .find_owned_snapshot(&account_handle.id, TestResource::schema(), id)
+        .find_owned_snapshot(&account_handle.did, TestResource::schema(), id)
         .await;
 
     let snapshot = result.unwrap().unwrap();
     assert_eq!(snapshot.id, id);
     assert_eq!(snapshot.schema, *TestResource::schema());
-    assert_eq!(snapshot.headers.account.id, account_handle.id);
+    assert_eq!(snapshot.headers.account.did, account_handle.did);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -74,7 +74,7 @@ async fn test_find_owned_snapshot_not_found() {
     let account_handle = odf::AccountHandle::new_test("test-owner");
 
     let result = harness
-        .find_owned_snapshot(&account_handle.id, TestResource::schema(), id)
+        .find_owned_snapshot(&account_handle.did, TestResource::schema(), id)
         .await;
 
     assert!(result.unwrap().is_none());
@@ -95,7 +95,7 @@ async fn test_find_owned_snapshot_access_denied() {
         .await;
 
     let result = harness
-        .find_owned_snapshot(&account_handle_b.id, TestResource::schema(), id)
+        .find_owned_snapshot(&account_handle_b.did, TestResource::schema(), id)
         .await;
 
     assert!(
@@ -121,7 +121,7 @@ async fn test_find_owned_snapshot_schema_mismatch_by_query() {
         .await;
 
     let result = harness
-        .find_owned_snapshot(&account_handle.id, &OTHER_SCHEMA, id)
+        .find_owned_snapshot(&account_handle.did, &OTHER_SCHEMA, id)
         .await;
 
     // The repository filters by schema in find_resource_snapshot, so a wrong
@@ -146,7 +146,7 @@ async fn test_find_owned_snapshot_schema_mismatch_by_type() {
         .await;
 
     let result = harness
-        .find_owned_snapshot(&account_handle.id, &NEWER_SCHEMA, id)
+        .find_owned_snapshot(&account_handle.did, &NEWER_SCHEMA, id)
         .await;
 
     assert!(result.unwrap().is_none());
@@ -173,7 +173,7 @@ async fn test_find_owned_snapshots_all_found() {
 
     let outcome = harness
         .find_owned_snapshots(
-            &account_handle.id,
+            &account_handle.did,
             TestResource::schema(),
             &[uid_1, uid_2, uid_3],
         )
@@ -197,7 +197,7 @@ async fn test_find_owned_snapshots_not_found() {
     let uid_2 = harness.allocate_id().await;
 
     let outcome = harness
-        .find_owned_snapshots(&account_handle.id, TestResource::schema(), &[uid_1, uid_2])
+        .find_owned_snapshots(&account_handle.did, TestResource::schema(), &[uid_1, uid_2])
         .await;
 
     assert!(outcome.found.is_empty());
@@ -220,7 +220,7 @@ async fn test_find_owned_snapshots_access_denied() {
         .await;
 
     let outcome = harness
-        .find_owned_snapshots(&account_handle_b.id, TestResource::schema(), &[id])
+        .find_owned_snapshots(&account_handle_b.did, TestResource::schema(), &[id])
         .await;
 
     assert!(outcome.found.is_empty());
@@ -240,7 +240,7 @@ async fn test_find_owned_snapshots_schema_mismatch_by_type() {
         .await;
 
     let outcome = harness
-        .find_owned_snapshots(&account_handle.id, TestResource::schema(), &[id])
+        .find_owned_snapshots(&account_handle.did, TestResource::schema(), &[id])
         .await;
 
     assert!(outcome.found.is_empty());
@@ -262,7 +262,7 @@ async fn test_find_owned_snapshots_schema_mismatch_by_version() {
         .await;
 
     let outcome = harness
-        .find_owned_snapshots(&account_handle.id, TestResource::schema(), &[id])
+        .find_owned_snapshots(&account_handle.did, TestResource::schema(), &[id])
         .await;
 
     assert!(outcome.found.is_empty());
@@ -318,7 +318,7 @@ async fn test_find_owned_snapshots_mixed_outcomes() {
 
     let outcome = harness
         .find_owned_snapshots(
-            &account_handle_a.id,
+            &account_handle_a.did,
             TestResource::schema(),
             &[
                 uid_found,

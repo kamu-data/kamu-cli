@@ -6812,8 +6812,16 @@ async fn test_list_all_flow_initiators() {
     let foo = AccountConfig::test_config_from_name(odf::AccountName::new_unchecked("foo"));
     let bar = AccountConfig::test_config_from_name(odf::AccountName::new_unchecked("bar"));
 
-    let subject_foo = CurrentAccountSubject::logged(foo.get_id(), foo.account_name.clone());
-    let subject_bar = CurrentAccountSubject::logged(bar.get_id(), bar.account_name.clone());
+    let subject_foo = CurrentAccountSubject::logged(
+        kamu_accounts::Account::seed_resource_id_from_name(foo.account_name.as_str()),
+        foo.get_id(),
+        foo.account_name.clone(),
+    );
+    let subject_bar = CurrentAccountSubject::logged(
+        kamu_accounts::Account::seed_resource_id_from_name(bar.account_name.as_str()),
+        bar.get_id(),
+        bar.account_name.clone(),
+    );
 
     let harness = FlowHarness::new();
 
@@ -6953,8 +6961,16 @@ async fn test_list_all_datasets_with_flow() {
     let foo = AccountConfig::test_config_from_name(odf::AccountName::new_unchecked("foo"));
     let bar = AccountConfig::test_config_from_name(odf::AccountName::new_unchecked("bar"));
 
-    let subject_foo = CurrentAccountSubject::logged(foo.get_id(), foo.account_name.clone());
-    let subject_bar = CurrentAccountSubject::logged(bar.get_id(), bar.account_name.clone());
+    let subject_foo = CurrentAccountSubject::logged(
+        kamu_accounts::Account::seed_resource_id_from_name(foo.account_name.as_str()),
+        foo.get_id(),
+        foo.account_name.clone(),
+    );
+    let subject_bar = CurrentAccountSubject::logged(
+        kamu_accounts::Account::seed_resource_id_from_name(bar.account_name.as_str()),
+        bar.get_id(),
+        bar.account_name.clone(),
+    );
 
     let harness = FlowHarness::new();
 

@@ -12,8 +12,8 @@ pub use ed25519_dalek::SigningKey;
 pub use multiformats::stack_string::{AsStackString, ToStackString};
 pub use multiformats::{self, DidKey, Multicodec, Multihash, ParseError, PrivateKey, Signature};
 
+mod did;
 mod did_odf;
-#[cfg(feature = "did-pkh")]
 mod did_pkh;
 mod grammar;
 mod macros;
@@ -21,8 +21,8 @@ mod macros;
 #[cfg(feature = "sqlx")]
 mod sqlx;
 
+pub use did::*;
 pub use did_odf::*;
-#[cfg(feature = "did-pkh")]
 pub use did_pkh::*;
 pub use grammar::*;
 pub(crate) use macros::*;

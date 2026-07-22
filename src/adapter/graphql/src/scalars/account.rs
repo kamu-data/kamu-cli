@@ -20,62 +20,6 @@ simple_string_scalar!(Email, email_utils::Email, parse);
 simple_string_scalar!(AccountPassword, kamu_accounts::Password, try_new);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone)]
-pub struct AccountRef(odf::metadata::auth::AccountRef);
-
-#[Object]
-impl AccountRef {
-    pub async fn id(&self) -> Option<AccountID<'_>> {
-        self.0.id().map(Into::into)
-    }
-
-    pub async fn name(&self) -> Option<AccountName<'_>> {
-        self.0.name().map(Into::into)
-    }
-}
-
-impl From<odf::metadata::auth::AccountRef> for AccountRef {
-    fn from(value: odf::metadata::auth::AccountRef) -> Self {
-        Self(value)
-    }
-}
-
-impl From<AccountRef> for odf::metadata::auth::AccountRef {
-    fn from(value: AccountRef) -> Self {
-        value.0
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone)]
-pub struct AccountHandle(odf::AccountHandle);
-
-#[Object]
-impl AccountHandle {
-    pub async fn id(&self) -> AccountID<'_> {
-        AccountID::from(&self.0.id)
-    }
-
-    pub async fn name(&self) -> AccountName<'_> {
-        AccountName::from(&self.0.name)
-    }
-}
-
-impl From<odf::AccountHandle> for AccountHandle {
-    fn from(value: odf::AccountHandle) -> Self {
-        Self(value)
-    }
-}
-
-impl From<AccountHandle> for odf::AccountHandle {
-    fn from(value: AccountHandle) -> Self {
-        value.0
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // AccountDisplayName
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -141,7 +141,7 @@ impl BaseResourceServiceHarness {
         let account_repository = self.catalog.get_one::<dyn AccountRepository>().unwrap();
 
         if account_repository
-            .get_account_by_id(&account.id)
+            .get_account_by_id(&account.did)
             .await
             .is_ok()
         {
@@ -151,7 +151,8 @@ impl BaseResourceServiceHarness {
         let name = account.name.as_str();
         account_repository
             .save_account(&Account {
-                id: account.id.clone(),
+                id: account.did.clone(),
+                resource_id: account.id,
                 account_name: account.name.clone(),
                 email: email_utils::Email::parse(&format!("{name}@example.com")).unwrap(),
                 display_name: name.to_string(),
@@ -180,12 +181,11 @@ impl BaseResourceServiceHarness {
     pub fn make_headers_input(account: odf::AccountHandle, name: &str) -> ResourceHeadersInput {
         ResourceHeadersInput {
             id: None,
-            account: Some(odf::metadata::auth::AccountRef::IdAndName(
-                odf::metadata::auth::AccountRefByIdAndName {
-                    id: account.id,
-                    name: account.name,
-                },
-            )),
+            account: Some(odf::metadata::auth::AccountRef {
+                id: Some(account.id),
+                did: Some(account.did),
+                name: Some(account.name),
+            }),
             name: kamu_resources::ResourceName::new_unchecked(name),
             labels: Some(kamu_resources::ResourceLabels {
                 entries: BTreeMap::new(),

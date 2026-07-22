@@ -33,6 +33,7 @@ pub(crate) async fn new_account_with_name(
 
     let account = Account {
         id,
+        resource_id: Account::generate_resource_id(),
         account_name: odf::AccountName::new_unchecked(account_name),
         email: Email::parse(format!("{account_name}@example.com").as_str()).unwrap(),
         display_name: String::new(),

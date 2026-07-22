@@ -83,7 +83,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
             .run_flow_manually(
                 Utc::now(),
                 &flow_binding,
-                logged_account.account_handle.id,
+                logged_account.account_handle.did,
                 maybe_forced_configuration_rule,
             )
             .await
@@ -129,7 +129,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
             .run_flow_manually(
                 Utc::now(),
                 &flow_binding,
-                logged_account.account_handle.id,
+                logged_account.account_handle.did,
                 None,
             )
             .await
@@ -195,7 +195,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
             .run_flow_manually(
                 Utc::now(),
                 &flow_binding,
-                logged_account.account_handle.id,
+                logged_account.account_handle.did,
                 maybe_forced_configuration_rule,
             )
             .await
@@ -280,7 +280,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
             .run_flow_manually(
                 Utc::now(),
                 &flow_binding,
-                logged_account.account_handle.id,
+                logged_account.account_handle.did,
                 maybe_forced_flow_config_rule,
             )
             .await
@@ -323,7 +323,7 @@ impl<'a> DatasetFlowRunsMut<'a> {
             .run_flow_manually(
                 Utc::now(),
                 &flow_binding,
-                logged_account.account_handle.id,
+                logged_account.account_handle.did,
                 None,
             )
             .await

@@ -7,19 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use serde::{Deserialize, Serialize};
-
-use crate::{ResourceID, ResourceName, TypeName, TypeUri};
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ResourceHandle {
-    pub schema: TypeUri,
-    pub type_name: TypeName,
-    pub account: odf::AccountHandle,
-    pub id: ResourceID,
-    pub name: ResourceName,
-}
+pub type ResourceHandle = odf::metadata::resource::ResourceHandle;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

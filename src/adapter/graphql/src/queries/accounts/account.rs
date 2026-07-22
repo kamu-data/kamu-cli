@@ -115,7 +115,7 @@ impl Account {
                     DEFAULT_ACCOUNT_NAME.clone().into(),
                 ),
                 CurrentAccountSubject::Logged(l) => Self::new(
-                    l.account_handle.id.clone().into(),
+                    l.account_handle.did.clone().into(),
                     l.account_handle.name.clone().into(),
                 ),
             }))

@@ -7,73 +7,44 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use internal_error::InternalError;
 use kamu_resources::{
     ResourceHandle,
     ResourceHandleRow,
     ResourceID,
     ResourceName,
     ResourceSnapshot,
-    TypeName,
     TypeUri,
-    resource_type_name,
 };
 
 use crate::ResourceLookupProblem;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Builds a handle from a stored snapshot by deriving the display `type_name`
-/// from the stored schema. A parse failure is internal/corrupt data, because
-/// snapshots should only contain valid resource schema URIs.
-pub(crate) fn resource_handle_from_snapshot(
-    snapshot: ResourceSnapshot,
-) -> Result<ResourceHandle, InternalError> {
-    let type_name = resource_type_name(&snapshot.schema)?;
-
-    Ok(ResourceHandle {
-        schema: snapshot.schema,
-        type_name,
+/// Builds a handle from a stored snapshot.
+pub(crate) fn resource_handle_from_snapshot(snapshot: ResourceSnapshot) -> ResourceHandle {
+    ResourceHandle {
+        r#type: snapshot.schema,
+        // TODO: temporary until we support DID-aware resource types; once we do,
+        // this must be populated instead of always `None`.
+        did: None,
         account: snapshot.headers.account,
         id: snapshot.id,
         name: snapshot.headers.name,
-    })
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Builds a handle from a storage row by deriving the display `type_name` from
-/// the row schema. See [`resource_handle_from_snapshot`].
-pub(crate) fn resource_handle_from_row(
-    row: ResourceHandleRow,
-) -> Result<ResourceHandle, InternalError> {
+/// Builds a handle from a storage row.
+pub(crate) fn resource_handle_from_row(row: ResourceHandleRow) -> ResourceHandle {
     let account = row.account_handle();
     let schema = TypeUri::new_unchecked(row.schema);
-    let type_name = resource_type_name(&schema)?;
-
-    Ok(ResourceHandle {
-        schema,
-        type_name,
-        account,
-        id: ResourceID::new(row.id),
-        name: ResourceName::new_unchecked(&row.name),
-    })
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Builds a handle from a row whose schema has already been validated against
-/// a known request schema, allowing the caller to resolve `type_name` once for
-/// the whole batch.
-pub(crate) fn resource_handle_from_row_with_type_name(
-    row: ResourceHandleRow,
-    type_name: TypeName,
-) -> ResourceHandle {
-    let account = row.account_handle();
 
     ResourceHandle {
-        schema: TypeUri::new_unchecked(row.schema),
-        type_name,
+        r#type: schema,
+        // TODO: temporary until we support DID-aware resource types; once we do,
+        // this must be populated instead of always `None`.
+        did: None,
         account,
         id: ResourceID::new(row.id),
         name: ResourceName::new_unchecked(&row.name),
@@ -97,12 +68,8 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Maps stored snapshots to handles. Each handle derives its display
-/// `type_name` from its own schema, so this supports both single-schema and
-/// cross-schema listings.
-pub(crate) fn map_snapshots_to_handles(
-    snapshots: Vec<ResourceSnapshot>,
-) -> Result<Vec<ResourceHandle>, InternalError> {
+/// Maps stored snapshots to handles.
+pub(crate) fn map_snapshots_to_handles(snapshots: Vec<ResourceSnapshot>) -> Vec<ResourceHandle> {
     snapshots
         .into_iter()
         .map(resource_handle_from_snapshot)

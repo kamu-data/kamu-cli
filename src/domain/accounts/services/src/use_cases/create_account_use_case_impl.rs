@@ -190,6 +190,7 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
 
         let account = Account {
             id: account_id,
+            resource_id: Account::generate_resource_id(),
             account_name: account_name.clone(),
             email,
             display_name: account_name.to_string(),

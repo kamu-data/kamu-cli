@@ -13,6 +13,7 @@ use std::sync::Arc;
 use chrono::Utc;
 use crypto_utils::{AesGcmEncryptor, Encryptor};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use kamu_accounts::AccountService;
 use kamu_configuration::{
     DatasetSecretSetBindingRepository,
     DatasetVariableSetBindingRepository,
@@ -77,6 +78,7 @@ impl From<GetDispatcherError> for InternalError {
 pub struct DatasetEnvVarMutationAdapterImpl {
     catalog: dill::Catalog,
     dataset_entry_repository: Arc<dyn DatasetEntryRepository>,
+    account_service: Arc<dyn AccountService>,
     generic_resource_query_service: Arc<dyn GenericResourceQueryService>,
     variable_set_projection_repo: Arc<dyn VariableSetProjectionRepository>,
     secret_set_projection_repo: Arc<dyn SecretSetProjectionRepository>,
@@ -104,19 +106,26 @@ impl DatasetEnvVarMutationAdapter for DatasetEnvVarMutationAdapterImpl {
                 GetDatasetEntryError::Internal(e) => e,
             })?;
 
-        let account = odf::AccountHandle {
-            id: dataset_entry.owner_id,
-            name: dataset_entry.owner_name,
-        };
-
         match value {
             DatasetEnvVarValue::Regular(plaintext) => {
-                self.upsert_variable(dataset_id, key, plaintext, &account)
-                    .await
+                self.upsert_variable(
+                    dataset_id,
+                    key,
+                    plaintext,
+                    &dataset_entry.owner_id,
+                    &dataset_entry.owner_name,
+                )
+                .await
             }
             DatasetEnvVarValue::Secret(secret) => {
-                self.upsert_secret(dataset_id, key, secret.expose_secret(), &account)
-                    .await
+                self.upsert_secret(
+                    dataset_id,
+                    key,
+                    secret.expose_secret(),
+                    &dataset_entry.owner_id,
+                    &dataset_entry.owner_name,
+                )
+                .await
             }
         }
     }
@@ -194,11 +203,12 @@ impl DatasetEnvVarMutationAdapterImpl {
         dataset_id: &odf::DatasetID,
         key: &str,
         plaintext: &str,
-        account: &odf::AccountHandle,
+        account_did: &odf::AccountID,
+        account_name: &odf::AccountName,
     ) -> Result<DatasetEnvVarUpsertResult, InternalError> {
         let resource_name = Self::legacy_variable_set_resource_name(dataset_id);
         let (existing_id, mut variables) = self
-            .load_existing_variable_spec(&account.id, &resource_name)
+            .load_existing_variable_spec(account_did, &resource_name)
             .await?;
 
         let exists_as_variable = variables.contains_key(key);
@@ -226,7 +236,9 @@ impl DatasetEnvVarMutationAdapterImpl {
             },
         ))
         .int_err()?;
-        let headers = self.make_headers(account.clone(), resource_name);
+        let headers = self
+            .make_headers(account_did.clone(), account_name.clone(), resource_name)
+            .await?;
 
         let dispatcher = self.get_dispatcher::<InternalError>(VariableSetResource::SCHEMA_STR)?;
 
@@ -270,12 +282,13 @@ impl DatasetEnvVarMutationAdapterImpl {
         dataset_id: &odf::DatasetID,
         key: &str,
         plaintext: &str,
-        account: &odf::AccountHandle,
+        account_did: &odf::AccountID,
+        account_name: &odf::AccountName,
     ) -> Result<DatasetEnvVarUpsertResult, InternalError> {
         let resource_name = Self::legacy_secret_set_resource_name(dataset_id);
 
         let (existing_id, mut secrets) = self
-            .load_existing_secret_spec_decrypted(&account.id, &resource_name)
+            .load_existing_secret_spec_decrypted(account_did, &resource_name)
             .await?;
 
         let exists_as_secret = secrets.contains_key(key);
@@ -302,7 +315,9 @@ impl DatasetEnvVarMutationAdapterImpl {
             },
         ))
         .int_err()?;
-        let headers = self.make_headers(account.clone(), resource_name);
+        let headers = self
+            .make_headers(account_did.clone(), account_name.clone(), resource_name)
+            .await?;
 
         let dispatcher = self.get_dispatcher::<InternalError>(SecretSetResource::SCHEMA_STR)?;
 
@@ -377,7 +392,7 @@ impl DatasetEnvVarMutationAdapterImpl {
         if spec.variables.entries.is_empty() {
             dispatcher
                 .delete(ResourceCrudDispatcherDeleteRequest {
-                    account_id: snapshot.headers.account.id.clone(),
+                    account_id: snapshot.headers.account.did.clone(),
                     ids: vec![resource_id],
                 })
                 .await
@@ -390,12 +405,11 @@ impl DatasetEnvVarMutationAdapterImpl {
         } else {
             let headers = ResourceHeadersInput {
                 id: Some(snapshot.headers.id),
-                account: Some(odf::metadata::auth::AccountRef::IdAndName(
-                    odf::metadata::auth::AccountRefByIdAndName {
-                        id: snapshot.headers.account.id,
-                        name: snapshot.headers.account.name,
-                    },
-                )),
+                account: Some(odf::metadata::auth::AccountRef {
+                    id: Some(snapshot.headers.account.id),
+                    did: Some(snapshot.headers.account.did),
+                    name: Some(snapshot.headers.account.name),
+                }),
                 name: snapshot.headers.name,
                 labels: Some(snapshot.headers.labels),
                 annotations: Some(snapshot.headers.annotations),
@@ -444,7 +458,7 @@ impl DatasetEnvVarMutationAdapterImpl {
         if decrypted.is_empty() {
             dispatcher
                 .delete(ResourceCrudDispatcherDeleteRequest {
-                    account_id: snapshot.headers.account.id.clone(),
+                    account_id: snapshot.headers.account.did.clone(),
                     ids: vec![resource_id],
                 })
                 .await
@@ -473,12 +487,11 @@ impl DatasetEnvVarMutationAdapterImpl {
             });
             let headers = ResourceHeadersInput {
                 id: Some(snapshot.headers.id),
-                account: Some(odf::metadata::auth::AccountRef::IdAndName(
-                    odf::metadata::auth::AccountRefByIdAndName {
-                        id: snapshot.headers.account.id,
-                        name: snapshot.headers.account.name,
-                    },
-                )),
+                account: Some(odf::metadata::auth::AccountRef {
+                    id: Some(snapshot.headers.account.id),
+                    did: Some(snapshot.headers.account.did),
+                    name: Some(snapshot.headers.account.name),
+                }),
                 name: snapshot.headers.name,
                 labels: Some(snapshot.headers.labels),
                 annotations: Some(snapshot.headers.annotations),
@@ -696,19 +709,25 @@ impl DatasetEnvVarMutationAdapterImpl {
         Ok(decrypted)
     }
 
-    fn make_headers(
+    async fn make_headers(
         &self,
-        account: odf::AccountHandle,
+        account_did: odf::AccountID,
+        account_name: odf::AccountName,
         resource_name: ResourceName,
-    ) -> ResourceHeadersInput {
-        ResourceHeadersInput {
+    ) -> Result<ResourceHeadersInput, InternalError> {
+        let account = self.account_service.get_account_by_id(&account_did).await;
+        let account_resource_id = match account {
+            Ok(account) => account.resource_id,
+            Err(e) => return Err(e.int_err()),
+        };
+
+        Ok(ResourceHeadersInput {
             id: None,
-            account: Some(odf::metadata::auth::AccountRef::IdAndName(
-                odf::metadata::auth::AccountRefByIdAndName {
-                    id: account.id,
-                    name: account.name,
-                },
-            )),
+            account: Some(odf::metadata::auth::AccountRef {
+                id: Some(account_resource_id),
+                did: Some(account_did),
+                name: Some(account_name),
+            }),
             name: resource_name,
             labels: Some(kamu_resources::ResourceLabels {
                 entries: BTreeMap::new(),
@@ -716,7 +735,7 @@ impl DatasetEnvVarMutationAdapterImpl {
             annotations: Some(kamu_resources::ResourceAnnotations {
                 entries: BTreeMap::new(),
             }),
-        }
+        })
     }
 }
 

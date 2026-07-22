@@ -49,7 +49,7 @@ async fn test_get_state_by_id_success() {
 
     let state = harness
         .typed_query_svc()
-        .get_state_by_id(account_handle.id, &id)
+        .get_state_by_id(account_handle.did, &id)
         .await
         .unwrap();
 
@@ -66,7 +66,7 @@ async fn test_get_state_by_id_not_found() {
 
     let result = harness
         .typed_query_svc()
-        .get_state_by_id(account_handle.id, &id)
+        .get_state_by_id(account_handle.did, &id)
         .await;
 
     assert!(
@@ -86,7 +86,7 @@ async fn test_get_state_by_id_wrong_account() {
 
     let result = harness
         .typed_query_svc()
-        .get_state_by_id(account_handle_b.id, &id)
+        .get_state_by_id(account_handle_b.did, &id)
         .await;
 
     // Wrong account: implementation returns NotFound to avoid information leakage
@@ -110,7 +110,7 @@ async fn test_get_state_by_id_type_mismatch() {
 
     let result = harness
         .typed_query_svc()
-        .get_state_by_id(account_handle.id, &id)
+        .get_state_by_id(account_handle.did, &id)
         .await;
 
     // get_state_by_id uses get_snapshot_by_query which filters by schema, so a
@@ -142,7 +142,7 @@ async fn test_list_states_filters_by_account() {
     let states_a = harness
         .typed_query_svc()
         .list_states(
-            account_handle_a.id,
+            account_handle_a.did,
             PaginationOpts::from_max_results(usize::MAX),
         )
         .await
@@ -153,7 +153,7 @@ async fn test_list_states_filters_by_account() {
     let states_b = harness
         .typed_query_svc()
         .list_states(
-            account_handle_b.id,
+            account_handle_b.did,
             PaginationOpts::from_max_results(usize::MAX),
         )
         .await

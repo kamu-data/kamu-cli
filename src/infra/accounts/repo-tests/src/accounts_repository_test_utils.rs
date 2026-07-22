@@ -24,6 +24,7 @@ pub(crate) fn make_test_account(
 ) -> Account {
     Account {
         id: odf::AccountID::new_seeded_ed25519(name.as_bytes()),
+        resource_id: Account::seed_resource_id_from_name(name),
         account_name: odf::AccountName::new_unchecked(name),
         email: Email::parse(email).unwrap(),
         display_name: String::from(name),

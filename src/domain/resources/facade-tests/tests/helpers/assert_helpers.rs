@@ -48,7 +48,7 @@ pub fn assert_handle_fields(
     expected_name: &str,
     expected_uid: &ResourceID,
 ) {
-    assert_eq!(handle.schema, *expected_schema, "handle schema mismatch");
+    assert_eq!(handle.r#type, *expected_schema, "handle schema mismatch");
     assert_eq!(handle.name, expected_name, "handle name mismatch");
     assert_eq!(handle.id, *expected_uid, "handle id mismatch");
 }
@@ -143,7 +143,7 @@ pub fn normalize_summary_views(views: &mut [ResourceSummaryView]) {
 
 /// Normalizes a slice of `ResourceHandle` by sorting by `(schema, name)`.
 pub fn normalize_handles(views: &mut [ResourceHandle]) {
-    views.sort_by(|a, b| (&a.schema, &a.name).cmp(&(&b.schema, &b.name)));
+    views.sort_by(|a, b| (&a.r#type, &a.name).cmp(&(&b.r#type, &b.name)));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
