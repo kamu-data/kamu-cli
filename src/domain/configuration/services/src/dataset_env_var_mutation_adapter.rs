@@ -104,25 +104,26 @@ impl DatasetEnvVarMutationAdapter for DatasetEnvVarMutationAdapterImpl {
                 GetDatasetEntryError::Internal(e) => e,
             })?;
 
-        let account = odf::AccountHandle {
-            // A `DatasetEntry` carries no account-resource id. Only `did`/`name`
-            // are read from this handle downstream, and the resulting
-            // `AccountRef` is re-resolved (with the real resource id) by the
-            // facade before any durable write, so a nil id here is a safe
-            // construction-time placeholder.
-            id: odf::ResourceID::new(uuid::Uuid::nil()),
-            did: dataset_entry.owner_id,
-            name: dataset_entry.owner_name,
-        };
-
         match value {
             DatasetEnvVarValue::Regular(plaintext) => {
-                self.upsert_variable(dataset_id, key, plaintext, &account)
-                    .await
+                self.upsert_variable(
+                    dataset_id,
+                    key,
+                    plaintext,
+                    &dataset_entry.owner_id,
+                    &dataset_entry.owner_name,
+                )
+                .await
             }
             DatasetEnvVarValue::Secret(secret) => {
-                self.upsert_secret(dataset_id, key, secret.expose_secret(), &account)
-                    .await
+                self.upsert_secret(
+                    dataset_id,
+                    key,
+                    secret.expose_secret(),
+                    &dataset_entry.owner_id,
+                    &dataset_entry.owner_name,
+                )
+                .await
             }
         }
     }
@@ -200,11 +201,12 @@ impl DatasetEnvVarMutationAdapterImpl {
         dataset_id: &odf::DatasetID,
         key: &str,
         plaintext: &str,
-        account: &odf::AccountHandle,
+        account_did: &odf::AccountID,
+        account_name: &odf::AccountName,
     ) -> Result<DatasetEnvVarUpsertResult, InternalError> {
         let resource_name = Self::legacy_variable_set_resource_name(dataset_id);
         let (existing_id, mut variables) = self
-            .load_existing_variable_spec(&account.did, &resource_name)
+            .load_existing_variable_spec(account_did, &resource_name)
             .await?;
 
         let exists_as_variable = variables.contains_key(key);
@@ -232,7 +234,7 @@ impl DatasetEnvVarMutationAdapterImpl {
             },
         ))
         .int_err()?;
-        let headers = self.make_headers(account.clone(), resource_name);
+        let headers = self.make_headers(account_did.clone(), account_name.clone(), resource_name);
 
         let dispatcher = self.get_dispatcher::<InternalError>(VariableSetResource::SCHEMA_STR)?;
 
@@ -276,12 +278,13 @@ impl DatasetEnvVarMutationAdapterImpl {
         dataset_id: &odf::DatasetID,
         key: &str,
         plaintext: &str,
-        account: &odf::AccountHandle,
+        account_did: &odf::AccountID,
+        account_name: &odf::AccountName,
     ) -> Result<DatasetEnvVarUpsertResult, InternalError> {
         let resource_name = Self::legacy_secret_set_resource_name(dataset_id);
 
         let (existing_id, mut secrets) = self
-            .load_existing_secret_spec_decrypted(&account.did, &resource_name)
+            .load_existing_secret_spec_decrypted(account_did, &resource_name)
             .await?;
 
         let exists_as_secret = secrets.contains_key(key);
@@ -308,7 +311,7 @@ impl DatasetEnvVarMutationAdapterImpl {
             },
         ))
         .int_err()?;
-        let headers = self.make_headers(account.clone(), resource_name);
+        let headers = self.make_headers(account_did.clone(), account_name.clone(), resource_name);
 
         let dispatcher = self.get_dispatcher::<InternalError>(SecretSetResource::SCHEMA_STR)?;
 
@@ -704,15 +707,16 @@ impl DatasetEnvVarMutationAdapterImpl {
 
     fn make_headers(
         &self,
-        account: odf::AccountHandle,
+        account_did: odf::AccountID,
+        account_name: odf::AccountName,
         resource_name: ResourceName,
     ) -> ResourceHeadersInput {
         ResourceHeadersInput {
             id: None,
             account: Some(odf::metadata::auth::AccountRef::IdAndName(
                 odf::metadata::auth::AccountRefByIdAndName {
-                    did: account.did,
-                    name: account.name,
+                    did: account_did,
+                    name: account_name,
                 },
             )),
             name: resource_name,
