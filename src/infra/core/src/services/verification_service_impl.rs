@@ -235,7 +235,7 @@ impl VerificationServiceImpl {
                 .append(
                     block,
                     odf::dataset::AppendOpts {
-                        precomputed_hash: Some(&block_hash),
+                        expected_hash: Some(&block_hash),
                         ..odf::dataset::AppendOpts::default()
                     },
                 )
@@ -245,6 +245,12 @@ impl VerificationServiceImpl {
                 Err(odf::dataset::AppendError::RefNotFound(e)) => {
                     Err(VerificationError::RefNotFound(e))
                 }
+                Err(odf::dataset::AppendError::InvalidBlock(e)) => Err(
+                    VerificationError::BlockMalformed(odf::storage::BlockMalformedError {
+                        hash: block_hash,
+                        source: e.into(),
+                    }),
+                ),
                 Err(e) => Err(VerificationError::Internal(e.int_err())),
             }?;
         }
