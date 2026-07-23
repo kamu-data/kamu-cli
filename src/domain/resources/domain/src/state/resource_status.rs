@@ -67,7 +67,7 @@ impl ResourceStatusExt for ResourceStatus {
     }
 
     fn ready_condition_status(&self) -> Option<ResourceConditionStatus> {
-        ready_condition(self).map(|condition| condition.status)
+        ready_condition(self).map(|condition| condition.value)
     }
 
     fn mark_reconciling(&mut self, now: DateTime<Utc>) {

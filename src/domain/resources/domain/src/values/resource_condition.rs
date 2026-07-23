@@ -26,7 +26,7 @@ pub const RESOURCE_CONDITION_RECONCILING_SCHEMA_URI: &str =
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct ResourceConditionValue {
-    pub status: ResourceConditionStatus,
+    pub value: ResourceConditionStatus,
     pub reason: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
@@ -42,7 +42,7 @@ impl ResourceConditionValue {
             if let Ok(existing) =
                 serde_json::from_value::<ResourceConditionValue>(existing_value.clone())
             {
-                let status_changed = existing.status != new_condition.status;
+                let status_changed = existing.value != new_condition.value;
                 ResourceConditionValue {
                     last_transition_time: if status_changed {
                         new_condition.last_transition_time
@@ -65,7 +65,7 @@ impl ResourceConditionValue {
         (
             accepted_condition_type_ref(),
             Self {
-                status: ResourceConditionStatus::True,
+                value: ResourceConditionStatus::True,
                 reason: "ValidationPassed".to_string(),
                 message: None,
                 last_transition_time: now,
@@ -81,7 +81,7 @@ impl ResourceConditionValue {
         (
             accepted_condition_type_ref(),
             Self {
-                status: ResourceConditionStatus::False,
+                value: ResourceConditionStatus::False,
                 reason: reason.into(),
                 message: Some(message.into()),
                 last_transition_time: now,
@@ -93,7 +93,7 @@ impl ResourceConditionValue {
         (
             ready_condition_type_ref(),
             Self {
-                status: ResourceConditionStatus::True,
+                value: ResourceConditionStatus::True,
                 reason: "Reconciled".to_string(),
                 message: None,
                 last_transition_time: now,
@@ -109,7 +109,7 @@ impl ResourceConditionValue {
         (
             ready_condition_type_ref(),
             Self {
-                status: ResourceConditionStatus::False,
+                value: ResourceConditionStatus::False,
                 reason: reason.into(),
                 message: Some(message.into()),
                 last_transition_time: now,
@@ -121,7 +121,7 @@ impl ResourceConditionValue {
         (
             reconciling_condition_type_ref(),
             Self {
-                status: ResourceConditionStatus::True,
+                value: ResourceConditionStatus::True,
                 reason: "Processing".to_string(),
                 message: None,
                 last_transition_time: now,
@@ -133,7 +133,7 @@ impl ResourceConditionValue {
         (
             reconciling_condition_type_ref(),
             Self {
-                status: ResourceConditionStatus::False,
+                value: ResourceConditionStatus::False,
                 reason: "Idle".to_string(),
                 message: None,
                 last_transition_time: now,

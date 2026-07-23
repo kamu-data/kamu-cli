@@ -130,7 +130,7 @@ long-term goal. This page documents what exists now.
 | **Status** | Server-owned observed state (`ResourceStatus`: `phase`, optional `observedGeneration`/`reconciledAt`/`conditions`). `conditions` is a `TypeRef → JSON` map. `generation` lives in **headers**, not status. On a `Resource` (domain/GraphQL), `status` is always present — a resource with no reconciliation yet gets a synthesized `Pending` status with no conditions. The `Option` lives only in the persisted `ResourceSnapshot` row (`None` before the first write completes). |
 | **Snapshot** | The persisted materialized form of a resource (`ResourceSnapshot`). |
 | **Phase** | Lifecycle stage: `Pending`, `Reconciling`, `Ready`, `Failed` (ODF RFC-018 `ResourcePhase`; see [§13 state machine](#lifecycle-state-machine)). |
-| **Condition** | A status signal keyed by a condition schema URI. Built-ins: `Accepted`, `Ready`, `Reconciling`; each value has `status`, `reason`, optional `message`, `lastTransitionTime`. |
+| **Condition** | A status signal keyed by a condition schema URI. Built-ins: `Accepted`, `Ready`, `Reconciling`; each value has `value`, `reason`, optional `message`, `lastTransitionTime`. |
 | **generation / observedGeneration** | `generation` bumps on each spec/headers change; `observedGeneration` records the last one reconciliation processed. Absent or lower → reconcile. |
 | **Reconciliation** | Driving actual state toward the spec (e.g. `SecretSet` materializes its encrypted read-side projection). |
 | **Selector** | Identifies one (`ResourceSelector`) or many (`ResourceBatchSelector`) resource *instances*, by name or UID, optionally account-scoped. |
@@ -525,9 +525,10 @@ The behaviorally-significant consequences of adopting these shapes:
   accounts.
 - **Built-in conditions** are Kamu extensions keyed by stable URIs under
   `https://kamu.dev/schemas/resource/v1alpha1/conditions/{Accepted,Ready,Reconciling}`; each value
-  carries `status`, `reason`, optional `message`, and `lastTransitionTime`. `conditions` is optional
-  (absent → `None`, not empty map): new resources have none, and a spec update clears them. The
-  informational schema docs under `src/domain/resources/schemas/…/conditions/` are not yet validated
+  carries `value` (the `True`/`False`/`Unknown` signal, matching the ODF `ResourceCondition`
+  meta-schema's required `value` property), `reason`, optional `message`, and `lastTransitionTime`.
+  `conditions` is optional (absent → `None`, not empty map): new resources have none, and a spec
+  update clears them. The schema docs under `src/domain/resources/schemas/…/conditions/` are not yet validated
   or registered.
 - **Manifest labels/annotations reject duplicate keys.** The ODF proxy deserializes into a `BTreeMap`
   that silently drops duplicates (last-write-wins), so `ResourceManifestHeaders.{labels,annotations}`

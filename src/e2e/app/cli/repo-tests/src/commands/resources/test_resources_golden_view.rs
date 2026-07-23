@@ -157,15 +157,15 @@ fn successful_conditions() -> serde_json::Value {
     serde_json::json!({
         "https://kamu.dev/schemas/resource/v1alpha1/conditions/Accepted": {
             "reason": "ValidationPassed",
-            "status": "True"
+            "value": "True"
         },
         "https://kamu.dev/schemas/resource/v1alpha1/conditions/Ready": {
             "reason": "Reconciled",
-            "status": "True"
+            "value": "True"
         },
         "https://kamu.dev/schemas/resource/v1alpha1/conditions/Reconciling": {
             "reason": "Idle",
-            "status": "False"
+            "value": "False"
         }
     })
 }

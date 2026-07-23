@@ -285,7 +285,7 @@ impl BaseResourceServiceHarness {
     }
 
     /// Assert that a condition of `type_` is present in `status` and has the
-    /// expected `status` value.  Optionally assert `reason` and whether a
+    /// expected `value`.  Optionally assert `reason` and whether a
     /// non-None `message` is present.
     #[track_caller]
     pub fn assert_condition(
@@ -305,8 +305,8 @@ impl BaseResourceServiceHarness {
             .unwrap_or_else(|e| panic!("{condition_name} condition must be decodable: {e}"));
 
         assert_eq!(
-            cond.status, expected_status,
-            "{condition_name} condition status mismatch"
+            cond.value, expected_status,
+            "{condition_name} condition value mismatch"
         );
 
         if let Some(reason) = expected_reason {
