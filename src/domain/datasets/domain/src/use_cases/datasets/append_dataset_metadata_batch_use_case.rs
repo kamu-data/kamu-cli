@@ -40,7 +40,7 @@ pub struct AppendDatasetMetadataBatchUseCaseOptions {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
-#[error("{append_error}")]
+#[error("Failed to append block {block_sequence_number} ({block_hash}): {append_error}")]
 pub struct AppendDatasetMetadataBatchUseCaseBlockAppendError {
     pub append_error: odf::dataset::AppendError,
     pub block_sequence_number: u64,
