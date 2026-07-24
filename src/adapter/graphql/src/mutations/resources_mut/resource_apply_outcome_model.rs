@@ -50,6 +50,7 @@ pub enum ResourceHeaderValidationProblemCode {
     DuplicateLabelKey,
     TooManyAnnotations,
     DuplicateAnnotationKey,
+    ResourceExtensionSchema,
 }
 
 impl From<kamu_resources::ResourceHeadersValidationError> for ResourceInvalidHeaderProblem {
@@ -71,6 +72,9 @@ impl From<kamu_resources_facade::ResourceInvalidHeadersError> for ResourceInvali
             C::TooManyAnnotations => ResourceHeaderValidationProblemCode::TooManyAnnotations,
             C::DuplicateAnnotationKey => {
                 ResourceHeaderValidationProblemCode::DuplicateAnnotationKey
+            }
+            C::ResourceExtensionSchema => {
+                ResourceHeaderValidationProblemCode::ResourceExtensionSchema
             }
         };
         Self {

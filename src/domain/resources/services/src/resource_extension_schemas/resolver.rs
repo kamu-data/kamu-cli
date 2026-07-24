@@ -10,14 +10,16 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use kamu_resources::{ResourceExtensionKind, ResourceSchemaId, ResourceWarning, TypeRef, TypeUri};
+use kamu_resources::{
+    ResourceExtensionKind,
+    ResourceSchemaId,
+    ResourceWarning,
+    TypeRef,
+    TypeUri,
+    resource_free_form_extension_warning,
+};
 
 use crate::{ResourceExtensionResolutionError, ResourceExtensionSchemaRegistry};
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub const WARNING_CODE_FREEFORM_LABELS: &str = "resource_freeform_labels";
-pub const WARNING_CODE_FREEFORM_ANNOTATIONS: &str = "resource_freeform_annotations";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -127,35 +129,10 @@ impl ResourceExtensionSchemaResolver {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn make_free_form_warnings(
-    kind: ResourceExtensionKind,
-    mut keys: Vec<String>,
-) -> Vec<ResourceWarning> {
-    if keys.is_empty() {
-        return Vec::new();
-    }
-
-    keys.sort();
-
-    let (code, category_name, path) = match kind {
-        ResourceExtensionKind::Label => (WARNING_CODE_FREEFORM_LABELS, "labels", "headers.labels"),
-        ResourceExtensionKind::Annotation => (
-            WARNING_CODE_FREEFORM_ANNOTATIONS,
-            "annotations",
-            "headers.annotations",
-        ),
-        ResourceExtensionKind::Condition => return Vec::new(),
-    };
-
-    vec![ResourceWarning {
-        code: code.to_string(),
-        path: Some(path.to_string()),
-        message: format!(
-            "resource headers contain free-form {category_name} not backed by a registered \
-             schema: {}",
-            keys.join(", ")
-        ),
-    }]
+fn make_free_form_warnings(kind: ResourceExtensionKind, keys: Vec<String>) -> Vec<ResourceWarning> {
+    resource_free_form_extension_warning(kind, keys)
+        .into_iter()
+        .collect()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

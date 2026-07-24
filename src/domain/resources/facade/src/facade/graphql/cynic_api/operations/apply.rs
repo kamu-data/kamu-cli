@@ -200,6 +200,7 @@ pub(crate) enum ResourceHeaderValidationProblemCode {
     DuplicateLabelKey,
     TooManyAnnotations,
     DuplicateAnnotationKey,
+    ResourceExtensionSchema,
 }
 
 impl From<ResourceHeaderValidationProblemCode> for crate::ResourceHeadersValidationProblemCode {
@@ -214,6 +215,7 @@ impl From<ResourceHeaderValidationProblemCode> for crate::ResourceHeadersValidat
             C::DuplicateLabelKey => Self::DuplicateLabelKey,
             C::TooManyAnnotations => Self::TooManyAnnotations,
             C::DuplicateAnnotationKey => Self::DuplicateAnnotationKey,
+            C::ResourceExtensionSchema => Self::ResourceExtensionSchema,
         }
     }
 }

@@ -23,6 +23,7 @@ use kamu_resources::{
     UnsupportedResourceDescriptorError,
     UnsupportedResourceSelectorError,
 };
+use kamu_resources_services::ResourceExtensionResolutionError;
 use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -37,6 +38,7 @@ pub enum ResourceHeadersValidationProblemCode {
     DuplicateLabelKey,
     TooManyAnnotations,
     DuplicateAnnotationKey,
+    ResourceExtensionSchema,
 }
 
 #[derive(Debug, Error)]
@@ -62,6 +64,15 @@ impl From<ResourceHeadersValidationError> for ResourceInvalidHeadersError {
         };
         Self {
             code,
+            message: err.to_string(),
+        }
+    }
+}
+
+impl From<ResourceExtensionResolutionError> for ResourceInvalidHeadersError {
+    fn from(err: ResourceExtensionResolutionError) -> Self {
+        Self {
+            code: ResourceHeadersValidationProblemCode::ResourceExtensionSchema,
             message: err.to_string(),
         }
     }
@@ -329,6 +340,12 @@ pub enum ApplyManifestError {
 
 impl From<ResourceHeadersValidationError> for ApplyManifestError {
     fn from(err: ResourceHeadersValidationError) -> Self {
+        Self::InvalidHeaders(err.into())
+    }
+}
+
+impl From<ResourceExtensionResolutionError> for ApplyManifestError {
+    fn from(err: ResourceExtensionResolutionError) -> Self {
         Self::InvalidHeaders(err.into())
     }
 }

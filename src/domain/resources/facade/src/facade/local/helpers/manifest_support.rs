@@ -16,13 +16,11 @@ use kamu_resources::{
     ResourceWarning,
     description_annotation_short_name_type_ref,
     description_annotation_type_ref,
+    resource_label_not_indexed_warning,
+    resource_missing_description_warning,
 };
 
 use crate::{ApplyManifestError, ParseResourceManifestError, ResourceManifestFormat};
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-const WARNING_CODE_MISSING_DESCRIPTION: &str = "missing_description";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -47,8 +45,10 @@ pub(crate) fn parse_manifest(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn make_headers_input(
-    manifest: &ResourceManifest,
+    name: &str,
     target_account: &odf::AccountHandle,
+    labels: Vec<(kamu_resources::TypeRef, serde_json::Value)>,
+    annotations: Vec<(kamu_resources::TypeRef, serde_json::Value)>,
 ) -> Result<ResourceHeadersInput, ApplyManifestError> {
     ResourceHeadersInputExt::try_new(
         Some(odf::metadata::auth::AccountRef {
@@ -56,9 +56,9 @@ pub(crate) fn make_headers_input(
             did: Some(target_account.did.clone()),
             name: Some(target_account.name.clone()),
         }),
-        manifest.headers.name.as_str(),
-        manifest.headers.labels.clone(),
-        manifest.headers.annotations.clone(),
+        name,
+        labels,
+        annotations,
     )
     .map_err(Into::into)
 }
@@ -66,13 +66,11 @@ pub(crate) fn make_headers_input(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn collect_manifest_header_warnings(
-    manifest: &ResourceManifest,
+    annotations: &[(kamu_resources::TypeRef, serde_json::Value)],
 ) -> Vec<ResourceWarning> {
     let mut warnings = Vec::new();
 
-    let description = manifest
-        .headers
-        .annotations
+    let description = annotations
         .iter()
         .find(|(key, _)| {
             *key == description_annotation_type_ref()
@@ -81,14 +79,22 @@ pub(crate) fn collect_manifest_header_warnings(
         .and_then(|(_, value)| value.as_str());
 
     if description.is_none_or(|description| description.trim().is_empty()) {
-        warnings.push(ResourceWarning {
-            code: WARNING_CODE_MISSING_DESCRIPTION.to_string(),
-            path: Some("headers.annotations.description".to_string()),
-            message: "Resource has no description".to_string(),
-        });
+        warnings.push(resource_missing_description_warning());
     }
 
     warnings
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub(crate) fn collect_non_indexable_label_warnings(
+    labels: &[(kamu_resources::TypeRef, serde_json::Value)],
+) -> Vec<ResourceWarning> {
+    labels
+        .iter()
+        .filter(|(_, value)| !value.is_string())
+        .map(|(key, _)| resource_label_not_indexed_warning(key))
+        .collect()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

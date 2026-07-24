@@ -15,13 +15,10 @@ use kamu_resources::{
     TypeName,
     TypeRef,
     TypeUri,
+    WARNING_CODE_RESOURCE_FREEFORM_ANNOTATIONS,
+    WARNING_CODE_RESOURCE_FREEFORM_LABELS,
 };
-use kamu_resources_services::{
-    ResourceExtensionResolutionError,
-    ResourceExtensionSchemaResolver,
-    WARNING_CODE_FREEFORM_ANNOTATIONS,
-    WARNING_CODE_FREEFORM_LABELS,
-};
+use kamu_resources_services::{ResourceExtensionResolutionError, ResourceExtensionSchemaResolver};
 use pretty_assertions::assert_eq;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -64,7 +61,10 @@ fn test_unknown_short_name_is_preserved_as_free_form_with_warning() {
         ]
     );
     assert_eq!(resolved.warnings.len(), 1);
-    assert_eq!(resolved.warnings[0].code, WARNING_CODE_FREEFORM_LABELS);
+    assert_eq!(
+        resolved.warnings[0].code,
+        WARNING_CODE_RESOURCE_FREEFORM_LABELS
+    );
     assert_eq!(resolved.warnings[0].path.as_deref(), Some("headers.labels"));
     assert_eq!(
         resolved.warnings[0].message,
@@ -90,7 +90,10 @@ fn test_unknown_annotation_short_name_uses_annotation_free_form_warning() {
         )]
     );
     assert_eq!(resolved.warnings.len(), 1);
-    assert_eq!(resolved.warnings[0].code, WARNING_CODE_FREEFORM_ANNOTATIONS);
+    assert_eq!(
+        resolved.warnings[0].code,
+        WARNING_CODE_RESOURCE_FREEFORM_ANNOTATIONS
+    );
     assert_eq!(
         resolved.warnings[0].path.as_deref(),
         Some("headers.annotations")

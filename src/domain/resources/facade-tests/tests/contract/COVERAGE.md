@@ -21,6 +21,11 @@ Each RF scenario from the original plan is listed with its status.
 | RF-024  | apply_manifest.rs   | Deferred | Apply rejects immutable field change                                  | Requires a resource type with an immutable field                      |
 | RF-025  | apply_manifest.rs   | Active   | Apply rejects invalid spec                                            | Combined with RF-016 in one test                                       |
 | RF-026  | apply_manifest.rs   | Active   | Apply preserves duplicate header-key validation                     |                                                                        |
+| RF-026A | apply_manifest.rs   | Active   | Apply rejects invalid label/annotation header keys at parse time       | Extension beyond original plan                                         |
+| RF-026B | apply_manifest.rs   | Active   | Apply round-trips populated labels and annotations                     | Extension beyond original plan                                         |
+| RF-026C | apply_manifest.rs   | Active   | Plan/apply report extension header warnings                           | Covers free-form labels/annotations and non-indexable label values     |
+| RF-026D | apply_manifest.rs   | Active   | Extension header canonicalization precedes diffing                    | Short-name after URI reapply reports `Untouched`                       |
+| RF-026E | apply_manifest.rs   | Active   | Plan/apply reject invalid registered extension values as headers       | Surfaces as `InvalidHeaders` locally and remotely                      |
 | RF-030  | get_handle.rs     | Active   | Get by name returns full resource view                                |                                                                        |
 | RF-031  | get_handle.rs     | Active   | Get by UID returns same full resource view                            |                                                                        |
 | RF-032  | get_handle.rs     | Active   | Get handle by name returns lightweight handle                     |                                                                        |
