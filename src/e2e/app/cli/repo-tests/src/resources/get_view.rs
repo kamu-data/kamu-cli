@@ -73,16 +73,17 @@ impl ResourceView {
     }
 
     /// The `description` well-known annotation
-    /// (`headers.annotations.description`), if present. Description is not a
-    /// dedicated header field — it is the first well-known entry in
-    /// `annotations` — so this reads it out of that map directly rather than
-    /// via a JSON pointer (the schema URI form of the key contains `/`
-    /// characters, which would need RFC 6901 escaping in a pointer string).
+    /// (`headers.annotations.<Description schema URI>`), if present.
+    /// Description is not a dedicated header field — it is the first
+    /// well-known entry in `annotations` — so this reads it out of that map
+    /// directly rather than via a JSON pointer (the schema URI form of the
+    /// key contains `/` characters, which would need RFC 6901 escaping in a
+    /// pointer string).
     pub fn description(&self) -> Option<&str> {
         self.0
             .get("headers")
             .and_then(|h| h.get("annotations"))
-            .and_then(|a| a.get("description"))
+            .and_then(|a| a.get(super::fixtures::DESCRIPTION_ANNOTATION_SCHEMA))
             .and_then(Value::as_str)
     }
 

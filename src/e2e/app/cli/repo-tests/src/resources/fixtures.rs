@@ -33,6 +33,8 @@ pub const SECRET_SET_SCHEMA: &str = odf::metadata::config::SecretSet::schema_str
 /// full canonical `$schema` URIs.
 pub const VARIABLE_SET_SHORT_NAME: &str = "VariableSet";
 pub const SECRET_SET_SHORT_NAME: &str = "SecretSet";
+pub const DESCRIPTION_ANNOTATION_SCHEMA: &str =
+    "https://kamu.dev/schemas/resource/v1alpha1/annotations/Description";
 
 /// Kamu config enabling secrets encryption. `SecretSet` apply encrypts values
 /// via the configured key, so any scenario that applies a `SecretSet` must run
@@ -81,9 +83,9 @@ pub fn variable_set_manifest_yaml(name: &str, value: &str) -> String {
 
 /// Same as [`variable_set_manifest_yaml`] but carries a populated
 /// `headers.labels`/`headers.annotations` block — a short `TypeName` label
-/// key, a full `TypeUri` label key with a nested-object value, and two
-/// annotations (the well-known `description` plus an `owner`) — to pin the
-/// ODF `TypeRef`-keyed canonical shape end-to-end.
+/// key, a free-form short label key with a nested-object value, and two
+/// annotations (the well-known `description` plus an `owner`) — to pin the ODF
+/// `TypeRef`-keyed canonical shape end-to-end.
 pub fn variable_set_manifest_yaml_with_labels(name: &str, value: &str) -> String {
     indoc::formatdoc!(
         r#"
@@ -92,7 +94,7 @@ pub fn variable_set_manifest_yaml_with_labels(name: &str, value: &str) -> String
           name: {name}
           labels:
             env: prod
-            https://opendatafabric.org/schemas/labels/v1/Team:
+            team:
               name: data-platform
           annotations:
             description: {DEFAULT_DESCRIPTION}

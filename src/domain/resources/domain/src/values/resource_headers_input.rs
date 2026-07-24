@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 
 use odf::metadata::auth;
 
-use crate::{ResourceValidateHeaders, TypeRef, get_description};
+use crate::{ResourceValidateHeaders, TypeRef};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -100,7 +100,6 @@ enum ResourceHeaderField {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub const MAX_NAME_LEN: usize = 128;
-pub const MAX_DESCRIPTION_LEN: usize = 4096;
 pub const MAX_LABELS: usize = 64;
 pub const MAX_ANNOTATIONS: usize = 128;
 
@@ -116,16 +115,6 @@ impl ResourceValidateHeaders for ResourceHeadersInput {
             return Err(ResourceHeadersValidationError::NameTooLong {
                 actual: self.name.len(),
                 max: MAX_NAME_LEN,
-            });
-        }
-
-        if let Some(annotations) = &self.annotations
-            && let Some(description) = get_description(&annotations.entries)
-            && description.len() > MAX_DESCRIPTION_LEN
-        {
-            return Err(ResourceHeadersValidationError::DescriptionTooLong {
-                actual: description.len(),
-                max: MAX_DESCRIPTION_LEN,
             });
         }
 
@@ -163,9 +152,6 @@ pub enum ResourceHeadersValidationError {
 
     #[error("invalid resource name '{name}'")]
     InvalidName { name: String },
-
-    #[error("description is too long: got {actual}, max is {max}")]
-    DescriptionTooLong { actual: usize, max: usize },
 
     #[error("too many labels: got {actual}, max is {max}")]
     TooManyLabels { actual: usize, max: usize },

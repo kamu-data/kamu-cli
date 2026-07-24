@@ -26,6 +26,7 @@ Each RF scenario from the original plan is listed with its status.
 | RF-026C | apply_manifest.rs   | Active   | Plan/apply report extension header warnings                           | Covers free-form labels/annotations and non-indexable label values     |
 | RF-026D | apply_manifest.rs   | Active   | Extension header canonicalization precedes diffing                    | Short-name after URI reapply reports `Untouched`                       |
 | RF-026E | apply_manifest.rs   | Active   | Plan/apply reject invalid registered extension values as headers       | Surfaces as `InvalidHeaders` locally and remotely                      |
+| RF-026F | apply_manifest.rs   | Active   | Plan/apply reject over-long description via annotation schema          | Uses `ResourceExtensionSchema`, not legacy `DescriptionTooLong`        |
 | RF-030  | get_handle.rs     | Active   | Get by name returns full resource view                                |                                                                        |
 | RF-031  | get_handle.rs     | Active   | Get by UID returns same full resource view                            |                                                                        |
 | RF-032  | get_handle.rs     | Active   | Get handle by name returns lightweight handle                     |                                                                        |

@@ -14,7 +14,6 @@ use kamu_resources::{
     ResourceHeadersInputExt,
     ResourceManifest,
     ResourceWarning,
-    description_annotation_short_name_type_ref,
     description_annotation_type_ref,
     resource_label_not_indexed_warning,
     resource_missing_description_warning,
@@ -72,10 +71,7 @@ pub(crate) fn collect_manifest_header_warnings(
 
     let description = annotations
         .iter()
-        .find(|(key, _)| {
-            *key == description_annotation_type_ref()
-                || *key == description_annotation_short_name_type_ref()
-        })
+        .find(|(key, _)| *key == description_annotation_type_ref())
         .and_then(|(_, value)| value.as_str());
 
     if description.is_none_or(|description| description.trim().is_empty()) {

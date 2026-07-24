@@ -137,7 +137,7 @@ long-term goal. This page documents what exists now.
 | **SpecViewMode** | How sensitive spec fields render. Two modes: `Encrypted` (default — stored ciphertext as-is) and `Revealed` (decrypted). No "redacted" mode today. |
 | **Dispatcher** | Per-type adapter (`ResourceCrudDispatcher`, …) registered in `dill`, looked up by schema or selector metadata. |
 | **Facade** | The single API seam (`ResourceFacade`); local or remote-GraphQL impl. |
-| **TypeRef** | A label/annotation *key*: a short `TypeName` (e.g. `env`) or a full schema URI, per ODF RFC-018 (`odf::metadata::resource::TypeRef` = `Uri \| Name`). `Ord`, so a `BTreeMap` key; serializes as a plain string. |
+| **TypeRef** | A label/annotation *key*: a short `TypeName` (e.g. registered `environment`, or free-form `env`) or a full schema URI, per ODF RFC-018 (`odf::metadata::resource::TypeRef` = `Uri \| Name`). `Ord`, so a `BTreeMap` key; serializes as a plain string. |
 | **Labels / Annotations** | `headers.{labels,annotations}`: `BTreeMap<TypeRef, serde_json::Value>` (arbitrary JSON keyed by `TypeRef`, not flat `String → String`). Manifest input starts as ordered `Vec<(TypeRef, Value)>` so duplicate keys can be rejected before map construction; registered extension keys are canonicalized to schema URI and typed-value validated during facade apply preparation. Per RFC-018, labels are meant to be indexed/queryable and annotations not — **indexing not yet implemented**. |
 
 ---
@@ -390,6 +390,8 @@ A user may write **only**: `$schema`, `headers.{id?, account?, name, labels, ann
 > extension-schema dispatcher validates the value and the facade apply preparation canonicalizes
 > authored short names (for example `description`) to the stable schema URI
 > (`https://kamu.dev/schemas/resource/v1alpha1/annotations/Description`) before diffing and storage.
+> Runtime description lookup and the missing-description warning therefore read the canonical URI
+> key only; the short name is an input spelling, not stored identity.
 > A manifest author writes it as, e.g.:
 > ```yaml
 > headers:

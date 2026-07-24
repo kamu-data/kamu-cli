@@ -25,6 +25,7 @@ use kamu_resources_facade::{
     ApplyManifestError,
     ApplyManifestRequest,
     GetResourceError,
+    ResourceHeadersValidationProblemCode,
     ResourceManifestFormat,
     ResourceRef,
     ResourceSelector,
@@ -68,6 +69,18 @@ fn assert_warning_codes(warnings: &[ResourceWarning], expected_codes: &[&str]) {
             "expected warning code '{expected_code}', got: {codes:?}"
         );
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn assert_invalid_headers_code(
+    result: Result<impl std::fmt::Debug, ApplyManifestError>,
+    expected_code: ResourceHeadersValidationProblemCode,
+) {
+    assert_matches!(
+        result,
+        Err(ApplyManifestError::InvalidHeaders(err)) if err.code == expected_code
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -715,9 +728,8 @@ pub async fn test_apply_rejects_invalid_header_key(h: &impl FacadeContractHarnes
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// RF-026 (extension): a successful apply carrying both a short `TypeName`
-// label key and a full `TypeUri` label key, plus a nested-object annotation
-// value, round-trips into the stored resource unchanged.
+// RF-026 (extension): a successful apply carrying free-form label keys and a
+// free-form annotation preserves them under their authored short names.
 contract_test!(
     apply_round_trips_populated_labels_annotations,
     super::test_apply_round_trips_populated_labels_annotations
@@ -733,7 +745,7 @@ pub async fn test_apply_round_trips_populated_labels_annotations(h: &impl Facade
           name: labeled-vars
           labels:
             env: prod
-            https://opendatafabric.org/schemas/labels/v1/Team:
+            team:
               name: data-platform
               oncall:
                 - alice
@@ -763,11 +775,7 @@ pub async fn test_apply_round_trips_populated_labels_annotations(h: &impl Facade
         Some(&serde_json::json!("prod"))
     );
     assert_eq!(
-        view.headers.labels.entries.get(
-            &"https://opendatafabric.org/schemas/labels/v1/Team"
-                .parse()
-                .unwrap()
-        ),
+        view.headers.labels.entries.get(&"team".parse().unwrap()),
         Some(&serde_json::json!({ "name": "data-platform", "oncall": ["alice", "bob"] }))
     );
     assert_eq!(
@@ -949,7 +957,10 @@ pub async fn test_apply_rejects_invalid_registered_header_extension_value(
             manifest: manifest.clone(),
         })
         .await;
-    assert_matches!(plan_result, Err(ApplyManifestError::InvalidHeaders(_)));
+    assert_invalid_headers_code(
+        plan_result,
+        ResourceHeadersValidationProblemCode::ResourceExtensionSchema,
+    );
 
     let apply_result = facade
         .apply_manifest(ApplyManifestRequest {
@@ -957,7 +968,57 @@ pub async fn test_apply_rejects_invalid_registered_header_extension_value(
             manifest,
         })
         .await;
-    assert_matches!(apply_result, Err(ApplyManifestError::InvalidHeaders(_)));
+    assert_invalid_headers_code(
+        apply_result,
+        ResourceHeadersValidationProblemCode::ResourceExtensionSchema,
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+contract_test!(
+    apply_rejects_overlong_description_via_annotation_schema,
+    super::test_apply_rejects_overlong_description_via_annotation_schema
+);
+
+pub async fn test_apply_rejects_overlong_description_via_annotation_schema(
+    h: &impl FacadeContractHarness,
+) {
+    let facade = h.facade_for(TestAccount::Alice);
+
+    let manifest = serde_json::json!({
+        "$schema": VARIABLE_SET_SCHEMA_STR,
+        "headers": {
+            "name": "overlong-description-vars",
+            "annotations": {
+                "description": "x".repeat(4097)
+            }
+        },
+        "spec": {"variables": {"KEY": {"value": "value"}}}
+    })
+    .to_string();
+
+    let plan_result = facade
+        .plan_apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: manifest.clone(),
+        })
+        .await;
+    assert_invalid_headers_code(
+        plan_result,
+        ResourceHeadersValidationProblemCode::ResourceExtensionSchema,
+    );
+
+    let apply_result = facade
+        .apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest,
+        })
+        .await;
+    assert_invalid_headers_code(
+        apply_result,
+        ResourceHeadersValidationProblemCode::ResourceExtensionSchema,
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
