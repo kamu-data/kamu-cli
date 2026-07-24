@@ -10,7 +10,9 @@
 #[macro_use]
 mod declare_resource_extension_schema_dispatcher;
 mod built_in_dispatchers;
+mod resolver;
 mod resource_extension_schema_registry;
 
 pub use built_in_dispatchers::*;
+pub use resolver::*;
 pub use resource_extension_schema_registry::*;

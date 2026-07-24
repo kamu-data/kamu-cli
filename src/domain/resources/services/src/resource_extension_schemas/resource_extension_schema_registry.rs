@@ -87,6 +87,24 @@ pub enum ResourceExtensionResolutionError {
         uri: TypeUri,
         resource_schema: TypeUri,
     },
+
+    #[error("{kind:?} extension '{authored_key}' value is invalid: {reason}")]
+    InvalidValue {
+        kind: ResourceExtensionKind,
+        authored_key: TypeRef,
+        canonical_uri: TypeUri,
+        reason: String,
+    },
+
+    #[error(
+        "{kind:?} extension keys {authored_keys:?} resolve to duplicate canonical key \
+         '{canonical_key}'"
+    )]
+    DuplicateAfterCanonicalization {
+        kind: ResourceExtensionKind,
+        canonical_key: TypeRef,
+        authored_keys: Vec<TypeRef>,
+    },
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

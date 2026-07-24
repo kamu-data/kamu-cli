@@ -14,4 +14,5 @@ mod event_stores;
 mod message_handlers;
 mod services;
 mod test_resource_extension_schema_registry;
+mod test_resource_extension_schema_resolver;
 mod use_cases;
