@@ -136,6 +136,7 @@ interface "ResourceAccountResolver" <<i>>
 interface "ResourceAggregateLoader" <<i>>
 interface "ResourceContextStore" <<i>>
 interface "ResourceCrudDispatcher" <<i>>
+interface "ResourceExtensionSchemaDispatcher" <<i>>
 interface "ResourceFacade" <<i>>
 interface "ResourceFacadeFactory" <<i>>
 interface "ResourceLifecycleEventDispatcher" <<i>>
@@ -189,6 +190,7 @@ interface "Web3AuthEip4361NonceRepository" <<i>>
 interface "Web3AuthEip4361NonceService" <<i>>
 interface "WebhookDeliveryRepository" <<i>>
 interface "WebhookSubscriptionEventStore" <<i>>
+class "AcceptedConditionDispatcher"
 class "AccessTokenRegistryService"
 class "AccessTokenServiceImpl"
 class "AccountAuthorizationHelperImpl"
@@ -257,6 +259,7 @@ class "DeleteDatasetUseCaseImpl"
 class "DependencyGraphImmediateListener"
 class "DependencyGraphIndexer"
 class "DependencyGraphServiceImpl" <<singleton>>
+class "DescriptionAnnotationDispatcher"
 class "DidGeneratorDefault"
 class "DidSecretEncryptionConfig" <<singleton>>
 class "DidSecretService"
@@ -295,6 +298,7 @@ class "JupyterConfig" <<singleton>>
 class "JwtAuthenticationConfig" <<singleton>>
 class "KamuAuthOso"
 class "KamuFlightSqlService"
+class "LabelEnvironmentDispatcher"
 class "ListAllResourcesUseCaseImpl"
 class "LocalResourceFacadeImpl"
 class "LoginPasswordAuthProvider"
@@ -344,10 +348,12 @@ class "PushRequestPlannerImpl"
 class "QueryDatasetDataUseCaseImpl"
 class "QueryServiceImpl"
 class "QuotaDefaultsConfig" <<singleton>>
+class "ReadyConditionDispatcher"
 class "RebacDatasetLifecycleMessageConsumer"
 class "RebacDatasetRegistryFacadeImpl"
 class "RebacIndexer"
 class "RebacServiceImpl"
+class "ReconcilingConditionDispatcher"
 class "Registry" <<singleton>>
 class "RemoteAliasResolverImpl"
 class "RemoteAliasesRegistryImpl"
@@ -1146,6 +1152,11 @@ class "WsSmartTransferProtocolClient"
 "AccountLifecycleMessageConsumer"  --> "DeleteAccountResourcesUseCase"
 "MessageConsumer" <|-- "ResourceLifecycleMessageConsumer"
 "MessageConsumerT" <|-- "ResourceLifecycleMessageConsumer"
+"ResourceExtensionSchemaDispatcher" <|-- "DescriptionAnnotationDispatcher"
+"ResourceExtensionSchemaDispatcher" <|-- "AcceptedConditionDispatcher"
+"ResourceExtensionSchemaDispatcher" <|-- "ReadyConditionDispatcher"
+"ResourceExtensionSchemaDispatcher" <|-- "ReconcilingConditionDispatcher"
+"ResourceExtensionSchemaDispatcher" <|-- "LabelEnvironmentDispatcher"
 "GenericResourceQueryService" <|-- "GenericResourceQueryServiceImpl"
 "GenericResourceQueryServiceImpl"  --> "ResourceRepository"
 "DeleteAccountResourcesUseCase" <|-- "DeleteAccountResourcesUsecaseImpl"

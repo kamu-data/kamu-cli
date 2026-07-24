@@ -9,13 +9,13 @@
 
 use std::collections::BTreeMap;
 
-use crate::{TypeName, TypeRef, TypeUri};
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub const RESOURCE_ANNOTATION_DESCRIPTION_SCHEMA_URI: &str =
-    "https://kamu.dev/schemas/resource/v1alpha1/annotations/Description";
-pub const RESOURCE_ANNOTATION_DESCRIPTION_SHORT_NAME: &str = "description";
+use crate::{
+    RESOURCE_ANNOTATION_DESCRIPTION_SCHEMA_URI,
+    RESOURCE_ANNOTATION_DESCRIPTION_SHORT_NAME,
+    TypeName,
+    TypeRef,
+    TypeUri,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

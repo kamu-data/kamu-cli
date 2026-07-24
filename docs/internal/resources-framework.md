@@ -138,7 +138,7 @@ long-term goal. This page documents what exists now.
 | **Dispatcher** | Per-type adapter (`ResourceCrudDispatcher`, …) registered in `dill`, looked up by schema or selector metadata. |
 | **Facade** | The single API seam (`ResourceFacade`); local or remote-GraphQL impl. |
 | **TypeRef** | A label/annotation *key*: a short `TypeName` (e.g. `env`) or a full schema URI, per ODF RFC-018 (`odf::metadata::resource::TypeRef` = `Uri \| Name`). `Ord`, so a `BTreeMap` key; serializes as a plain string. |
-| **Labels / Annotations** | `headers.{labels,annotations}`: `BTreeMap<TypeRef, serde_json::Value>` (arbitrary JSON keyed by `TypeRef`, not flat `String → String`). Per RFC-018, labels are meant to be indexed/queryable and annotations not — **indexing not yet implemented**. |
+| **Labels / Annotations** | `headers.{labels,annotations}`: `BTreeMap<TypeRef, serde_json::Value>` (arbitrary JSON keyed by `TypeRef`, not flat `String → String`). Built-in extension schemas are registered in DI for typed value validation and future discovery/canonicalization. Per RFC-018, labels are meant to be indexed/queryable and annotations not — **indexing not yet implemented**. |
 
 ---
 
@@ -385,16 +385,17 @@ A user may write **only**: `$schema`, `headers.{id?, account?, name, labels, ann
 > well-known entry in `headers.annotations`, establishing the pattern future well-known annotations
 > (e.g. an icon or docs link) will follow. A well-known annotation is declared as a schema-URI
 > constant plus a `..._type_ref()` helper (see
-> [`values/resource_annotation.rs`](/src/domain/resources/domain/src/values/resource_annotation.rs),
-> mirroring the `RESOURCE_CONDITION_*_SCHEMA_URI` convention used for conditions), with an
-> informational JSON Schema doc under `schemas/resource/v1alpha1/annotations/` (not yet validated or
-> registered, same caveat as condition schemas). **Lookup is temporarily dual-keyed**: code that reads
-> the description (the missing-description lint, the CLI render path, view derivation) checks both the
-> canonical schema URI (`https://kamu.dev/schemas/resource/v1alpha1/annotations/Description`) and the
-> short alias (`description`) as equivalent, because there is no short-name-to-URI normalization
-> mechanism yet. This is a deliberate short-term compromise, not the long-term shape — new well-known
-> annotations should not copy the dual-key lookup once normalization exists. A manifest author writes
-> it as, e.g.:
+> [`values/resource_annotation.rs`](/src/domain/resources/domain/src/values/resource_annotation.rs)).
+> The schema URI, embedded JSON Schema doc, and typed validator live in
+> [`validation/schemas/annotations/description.rs`](/src/domain/resources/domain/src/validation/schemas/annotations/description.rs),
+> mirroring the category-specific schema files used for labels and conditions. A DI-registered
+> extension-schema dispatcher performs typed DTO value validation. **Lookup is temporarily
+> dual-keyed**: code that reads the description (the
+> missing-description lint, the CLI render path, view derivation) checks both the canonical schema URI
+> (`https://kamu.dev/schemas/resource/v1alpha1/annotations/Description`) and the short alias
+> (`description`) as equivalent, because manifest canonicalization is not wired in yet. This is a
+> deliberate short-term compromise, not the long-term shape — new well-known annotations should not
+> copy the dual-key lookup once normalization exists. A manifest author writes it as, e.g.:
 > ```yaml
 > headers:
 >   name: my-resource
@@ -528,8 +529,10 @@ The behaviorally-significant consequences of adopting these shapes:
   carries `value` (the `True`/`False`/`Unknown` signal, matching the ODF `ResourceCondition`
   meta-schema's required `value` property), `reason`, optional `message`, and `lastTransitionTime`.
   `conditions` is optional (absent → `None`, not empty map): new resources have none, and a spec
-  update clears them. The schema docs under `src/domain/resources/schemas/…/conditions/` are not yet validated
-  or registered.
+  update clears them. The schema docs under `src/domain/resources/schemas/…/conditions/` are embedded
+  from the corresponding `validation/schemas/conditions/*` files into DI-registered extension
+  dispatchers; value validation is strict serde over `ResourceConditionValue` (unknown fields are
+  rejected).
 - **Manifest labels/annotations reject duplicate keys.** The ODF proxy deserializes into a `BTreeMap`
   that silently drops duplicates (last-write-wins), so `ResourceManifestHeaders.{labels,annotations}`
   stay `Vec<(TypeRef, serde_json::Value)>` with a custom visitor that errors on a repeated key. An
@@ -760,6 +763,17 @@ a miss means corrupt storage/registration, i.e. `InternalError`) is the point of
 single place where this crate's `dill` catalog components (base query services, the cross-type use
 cases, and the outbox message consumers) are registered. Per-type use cases and dispatchers are
 registered separately by the type's own crate (see [§14](#14-concrete-resource-types-kamu-configuration)).
+
+**Extension-schema registry.** Built-in label/annotation/condition schemas register
+`ResourceExtensionSchemaDispatcher` trait objects through the same dill metadata pattern as CRUD
+dispatchers. During catalog assembly,
+`kamu_resources_services::build_catalog_with_resource_extension_schema_registry` builds a preview
+catalog, constructs `ResourceExtensionSchemaRegistry` from every registered dispatcher, attaches the
+immutable registry value, and returns the final catalog. The registry parses const-friendly metadata
+into runtime records, checks duplicate schema IDs and short-name conflicts, and precomputes lookup
+indexes by URI plus short-name precedence tiers (exact resource type → versioned context → context →
+any resource). Today this powers typed value validation and registry tests; manifest
+canonicalization, durable-state guarding, label indexing, and filtering are later phases.
 
 ---
 
@@ -1281,6 +1295,10 @@ Otherwise the behavior is already guaranteed for both implementations by the con
   `UnsupportedResourceDescriptorError::NotFound`; two matching registrations yield `Duplicate`.
   Selector-based lookup (`variablesets`, `vs`, etc.) is a separate metadata path and yields
   selector-specific not-found/duplicate errors.
+- **Extension-schema dispatch is also by schema URI.** Built-in extension dispatchers are registered
+  for `description`, `environment`, and the three status conditions. Registry construction is an
+  explicit catalog-assembly step and fails on duplicate extension schema IDs, invalid `https://`
+  metadata, or same-tier short-name conflicts.
 - **Manifests are strict** — `#[serde(deny_unknown_fields)]` means a manifest cannot carry
   `status`, timestamps, or `generation`. Those are server-owned
   ([§5a](#5a-resource-anatomy--input-vs-auto-generated)).

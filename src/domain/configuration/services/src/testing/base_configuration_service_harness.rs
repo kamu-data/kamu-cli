@@ -9,7 +9,6 @@
 
 use std::sync::Arc;
 
-use dill::CatalogBuilder;
 use kamu_configuration::{
     DatasetConfigurationSetBinding,
     DatasetSecretSetBindingRepository,
@@ -43,19 +42,16 @@ pub struct BaseConfigurationServiceHarness {
 
 impl BaseConfigurationServiceHarness {
     pub fn new() -> Self {
-        let base = BaseResourceServiceHarness::new();
+        let base = BaseResourceServiceHarness::new_with_additional_dependencies(|b| {
+            b.add_value(SecretsEncryptionConfig::sample())
+                .add::<InMemoryVariableSetProjectionRepository>()
+                .add::<InMemorySecretSetProjectionRepository>()
+                .add::<InMemoryDatasetVariableSetBindingRepository>()
+                .add::<InMemoryDatasetSecretSetBindingRepository>();
 
-        let mut b = CatalogBuilder::new_chained(base.catalog());
-
-        b.add_value(SecretsEncryptionConfig::sample())
-            .add::<InMemoryVariableSetProjectionRepository>()
-            .add::<InMemorySecretSetProjectionRepository>()
-            .add::<InMemoryDatasetVariableSetBindingRepository>()
-            .add::<InMemoryDatasetSecretSetBindingRepository>();
-
-        crate::register_dependencies(&mut b);
-
-        let catalog = b.build();
+            crate::register_dependencies(b);
+        });
+        let catalog = base.catalog().clone();
 
         Self { base, catalog }
     }

@@ -66,6 +66,22 @@ impl BaseResourceServiceHarness {
     }
 
     pub fn new_with_opts(opts: BaseResourceServiceHarnessOpts) -> Self {
+        Self::new_with_opts_and_additional_dependencies(opts, |_| {})
+    }
+
+    pub fn new_with_additional_dependencies(
+        register_additional_dependencies: impl FnOnce(&mut CatalogBuilder),
+    ) -> Self {
+        Self::new_with_opts_and_additional_dependencies(
+            BaseResourceServiceHarnessOpts::default(),
+            register_additional_dependencies,
+        )
+    }
+
+    pub fn new_with_opts_and_additional_dependencies(
+        opts: BaseResourceServiceHarnessOpts,
+        register_additional_dependencies: impl FnOnce(&mut CatalogBuilder),
+    ) -> Self {
         let mut b = CatalogBuilder::new();
 
         b.add_value(SystemTimeSourceStub::new_set(Utc::now()))
@@ -85,13 +101,14 @@ impl BaseResourceServiceHarness {
         NoOpDatabasePlugin::init_database_components(&mut b);
 
         crate::register_dependencies(&mut b);
+        register_additional_dependencies(&mut b);
 
         register_message_dispatcher::<ResourceLifecycleMessage>(
             &mut b,
             MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
         );
 
-        let catalog = b.build();
+        let catalog = crate::build_catalog_with_resource_extension_schema_registry(b).unwrap();
 
         let generic_query_svc = catalog.get_one().unwrap();
         let resource_repo = catalog.get_one().unwrap();
