@@ -785,8 +785,17 @@ any resource). `ResourceExtensionSchemaResolver` sits on top of the registry: ex
 strict (unknown / wrong-kind / inapplicable URIs reject), while unresolved short names are preserved
 as free-form extension keys with warnings. For registered labels and annotations the resolver also
 validates the JSON value through the schema dispatcher and rewrites the key to the canonical schema
-URI before headers are converted into maps. Durable-state guarding, label indexing, and filtering are
-later phases.
+URI before headers are converted into maps. `ResourcePersistenceServiceHelper` delegates to
+`ResourceDurableStateValidator` before create/save repository/event-store writes: registered
+label/annotation URIs and all condition URIs must resolve, apply to the resource schema, and
+validate through their dispatcher; registered short aliases are rejected as noncanonical durable
+state; unknown short label/annotation names remain free-form. The validator reports
+`ResourceDurableStateValidationError`, composed from existing domain errors such as
+`ParseResourceSchemaError`, `ResourceExtensionResolutionError`, and `ResourceExtensionValueError`.
+Persistence carries it as `ResourcePersistenceError::InvalidDurableState`; public use-case
+boundaries translate that into an internal error because user-authored paths should have been
+rejected earlier. Delete is not blocked by this guard, so cleanup can still remove a resource that
+already contains corrupt extension state. Label indexing and filtering are later phases.
 
 ---
 

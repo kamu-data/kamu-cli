@@ -9,7 +9,17 @@
 
 use event_sourcing::{LoadError, Projection};
 
-use crate::{ResourceID, ResourceName, ResourceSnapshot, TypeName, TypeUri};
+use crate::{
+    ParseResourceSchemaError,
+    ResourceExtensionKind,
+    ResourceExtensionValueError,
+    ResourceID,
+    ResourceName,
+    ResourceSnapshot,
+    TypeName,
+    TypeRef,
+    TypeUri,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -76,6 +86,74 @@ impl ResourceTypeMismatchError {
     ) -> Self {
         Self::new(id, expected.clone(), actual.schema.clone())
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
+pub enum ResourceDurableStateValidationError {
+    #[error(transparent)]
+    InvalidResourceSchema(#[from] ParseResourceSchemaError),
+
+    #[error("{kind:?} extension '{key}' must be stored under its canonical URI")]
+    NonCanonicalExtensionKey {
+        kind: ResourceExtensionKind,
+        key: TypeRef,
+    },
+
+    #[error(transparent)]
+    ExtensionResolution(#[from] ResourceExtensionResolutionError),
+
+    #[error("{kind:?} extension '{key}' value is invalid: {error}")]
+    InvalidExtensionValue {
+        kind: ResourceExtensionKind,
+        key: TypeRef,
+        error: ResourceExtensionValueError,
+    },
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, thiserror::Error, Clone, PartialEq, Eq)]
+pub enum ResourceExtensionResolutionError {
+    #[error("unknown {kind:?} extension URI '{uri}'")]
+    UnknownUri {
+        kind: ResourceExtensionKind,
+        uri: TypeUri,
+    },
+
+    #[error(
+        "extension URI '{uri}' is registered as {actual_kind:?}, but was used as {expected_kind:?}"
+    )]
+    KindMismatch {
+        uri: TypeUri,
+        expected_kind: ResourceExtensionKind,
+        actual_kind: ResourceExtensionKind,
+    },
+
+    #[error("extension URI '{uri}' is not applicable to resource schema '{resource_schema}'")]
+    Inapplicable {
+        uri: TypeUri,
+        resource_schema: TypeUri,
+    },
+
+    #[error("{kind:?} extension '{authored_key}' value is invalid: {reason}")]
+    InvalidValue {
+        kind: ResourceExtensionKind,
+        authored_key: TypeRef,
+        canonical_uri: TypeUri,
+        reason: String,
+    },
+
+    #[error(
+        "{kind:?} extension keys {authored_keys:?} resolve to duplicate canonical key \
+         '{canonical_key}'"
+    )]
+    DuplicateAfterCanonicalization {
+        kind: ResourceExtensionKind,
+        canonical_key: TypeRef,
+        authored_keys: Vec<TypeRef>,
+    },
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

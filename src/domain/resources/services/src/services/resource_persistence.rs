@@ -19,9 +19,11 @@ use crate::domain::{
     ResourcePersistenceError,
     ResourceRepository,
     ResourceSchemaProvider,
+    ResourceSnapshot,
     ResourceSnapshotUpdate,
     UpdateResourceError,
 };
+use crate::{ResourceDurableStateValidator, ResourceExtensionSchemaRegistry};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -31,6 +33,7 @@ where
 {
     resource_repository: &'a dyn ResourceRepository,
     event_store: &'a R::Store,
+    extension_schema_registry: &'a ResourceExtensionSchemaRegistry,
 }
 
 impl<'a, R> ResourcePersistenceServiceHelper<'a, R>
@@ -39,15 +42,21 @@ where
     R::LifecycleError: InvariantViolationOf<<R as DeclarativeResource>::ResourceState>,
     R::Spec: serde::Serialize,
 {
-    pub fn new(resource_repository: &'a dyn ResourceRepository, event_store: &'a R::Store) -> Self {
+    pub fn new(
+        resource_repository: &'a dyn ResourceRepository,
+        event_store: &'a R::Store,
+        extension_schema_registry: &'a ResourceExtensionSchemaRegistry,
+    ) -> Self {
         Self {
             resource_repository,
             event_store,
+            extension_schema_registry,
         }
     }
 
     pub async fn create(&self, resource: &mut R) -> Result<(), ResourcePersistenceError> {
         let snapshot = resource.make_resource_snapshot()?;
+        self.validate_snapshot(&snapshot)?;
 
         match self.resource_repository.create_resource(&snapshot).await {
             Ok(()) => {}
@@ -74,6 +83,8 @@ where
 
     pub async fn save(&self, resource: &mut R) -> Result<(), ResourcePersistenceError> {
         let expected_last_event_id = resource.aggregate().last_stored_event_id();
+        let snapshot = resource.make_resource_snapshot()?;
+        self.validate_snapshot(&snapshot)?;
 
         match resource.aggregate_mut().save(self.event_store).await {
             Ok(()) => {}
@@ -86,6 +97,15 @@ where
         }
 
         self.sync_snapshot(resource, expected_last_event_id).await
+    }
+
+    fn validate_snapshot(
+        &self,
+        snapshot: &ResourceSnapshot,
+    ) -> Result<(), ResourcePersistenceError> {
+        ResourceDurableStateValidator::new(self.extension_schema_registry)
+            .validate_snapshot(snapshot)
+            .map_err(ResourcePersistenceError::InvalidDurableState)
     }
 }
 
@@ -206,6 +226,7 @@ macro_rules! declare_resource_persistence_service {
         pub struct $service {
             resource_repository: std::sync::Arc<dyn kamu_resources::ResourceRepository>,
             event_store: std::sync::Arc<dyn $store>,
+            extension_schema_registry: std::sync::Arc<$crate::ResourceExtensionSchemaRegistry>,
         }
 
         #[async_trait::async_trait]
@@ -217,6 +238,7 @@ macro_rules! declare_resource_persistence_service {
                 let helper = $crate::ResourcePersistenceServiceHelper::<$resource>::new(
                     self.resource_repository.as_ref(),
                     self.event_store.as_ref(),
+                    self.extension_schema_registry.as_ref(),
                 );
 
                 helper.create(resource).await
@@ -229,6 +251,7 @@ macro_rules! declare_resource_persistence_service {
                 let helper = $crate::ResourcePersistenceServiceHelper::<$resource>::new(
                     self.resource_repository.as_ref(),
                     self.event_store.as_ref(),
+                    self.extension_schema_registry.as_ref(),
                 );
 
                 helper.save(resource).await
@@ -242,6 +265,7 @@ macro_rules! declare_resource_persistence_service {
                 let helper = $crate::ResourcePersistenceServiceHelper::<$resource>::new(
                     self.resource_repository.as_ref(),
                     self.event_store.as_ref(),
+                    self.extension_schema_registry.as_ref(),
                 );
 
                 helper.delete(resource, now).await
@@ -255,6 +279,7 @@ macro_rules! declare_resource_persistence_service {
                 let helper = $crate::ResourcePersistenceServiceHelper::<$resource>::new(
                     self.resource_repository.as_ref(),
                     self.event_store.as_ref(),
+                    self.extension_schema_registry.as_ref(),
                 );
 
                 helper.delete_many(resources, now).await

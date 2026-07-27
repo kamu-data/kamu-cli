@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 use kamu_resources::{
     ResourceExtensionKind,
+    ResourceExtensionResolutionError,
     ResourceSchemaId,
     ResourceWarning,
     TypeRef,
@@ -19,7 +20,7 @@ use kamu_resources::{
     resource_free_form_extension_warning,
 };
 
-use crate::{ResourceExtensionResolutionError, ResourceExtensionSchemaRegistry};
+use crate::ResourceExtensionSchemaRegistry;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

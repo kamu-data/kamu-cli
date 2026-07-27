@@ -242,6 +242,7 @@ where
                 Self::ConcurrentModification(err)
             }
             ResourcePersistenceError::Duplicate(err) => Self::Internal(err.int_err()),
+            ResourcePersistenceError::InvalidDurableState(err) => Self::Internal(err.int_err()),
             ResourcePersistenceError::Internal(err) => Self::Internal(err),
         }
     }

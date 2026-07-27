@@ -69,7 +69,7 @@ pub enum ResourceExtensionScopeMeta {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, Clone, PartialEq, Eq)]
 #[error("{message}")]
 pub struct ResourceExtensionValueError {
     message: String,

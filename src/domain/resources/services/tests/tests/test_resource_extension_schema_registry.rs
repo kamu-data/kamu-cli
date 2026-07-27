@@ -14,6 +14,7 @@ use kamu_resources::{
     RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI,
     ResourceExtensionApplicationMeta,
     ResourceExtensionKind,
+    ResourceExtensionResolutionError,
     ResourceExtensionScopeMeta,
     ResourceExtensionValueError,
     ResourceSchemaId,
@@ -22,7 +23,7 @@ use kamu_resources::{
     TypeRef,
     TypeUri,
 };
-use kamu_resources_services::{ResourceExtensionResolutionError, ResourceExtensionSchemaRegistry};
+use kamu_resources_services::ResourceExtensionSchemaRegistry;
 use pretty_assertions::assert_eq;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

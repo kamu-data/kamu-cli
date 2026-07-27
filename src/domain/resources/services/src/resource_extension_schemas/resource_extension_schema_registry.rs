@@ -15,6 +15,7 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu_resources::{
     ResourceExtensionApplicationMeta,
     ResourceExtensionKind,
+    ResourceExtensionResolutionError,
     ResourceExtensionSchemaDispatcher,
     ResourceExtensionSchemaMeta,
     ResourceExtensionScope,
@@ -61,50 +62,6 @@ pub struct ResourceExtensionApplication {
     pub scope: ResourceExtensionScope,
     pub preferred_name: Option<TypeName>,
     pub aliases: Vec<TypeName>,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, thiserror::Error, PartialEq, Eq)]
-pub enum ResourceExtensionResolutionError {
-    #[error("unknown {kind:?} extension URI '{uri}'")]
-    UnknownUri {
-        kind: ResourceExtensionKind,
-        uri: TypeUri,
-    },
-
-    #[error(
-        "extension URI '{uri}' is registered as {actual_kind:?}, but was used as {expected_kind:?}"
-    )]
-    KindMismatch {
-        uri: TypeUri,
-        expected_kind: ResourceExtensionKind,
-        actual_kind: ResourceExtensionKind,
-    },
-
-    #[error("extension URI '{uri}' is not applicable to resource schema '{resource_schema}'")]
-    Inapplicable {
-        uri: TypeUri,
-        resource_schema: TypeUri,
-    },
-
-    #[error("{kind:?} extension '{authored_key}' value is invalid: {reason}")]
-    InvalidValue {
-        kind: ResourceExtensionKind,
-        authored_key: TypeRef,
-        canonical_uri: TypeUri,
-        reason: String,
-    },
-
-    #[error(
-        "{kind:?} extension keys {authored_keys:?} resolve to duplicate canonical key \
-         '{canonical_key}'"
-    )]
-    DuplicateAfterCanonicalization {
-        kind: ResourceExtensionKind,
-        canonical_key: TypeRef,
-        authored_keys: Vec<TypeRef>,
-    },
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -11,6 +11,7 @@ use kamu_resources::{
     RESOURCE_ANNOTATION_DESCRIPTION_SCHEMA_URI,
     RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI,
     ResourceExtensionKind,
+    ResourceExtensionResolutionError,
     ResourceSchemaId,
     TypeName,
     TypeRef,
@@ -18,7 +19,7 @@ use kamu_resources::{
     WARNING_CODE_RESOURCE_FREEFORM_ANNOTATIONS,
     WARNING_CODE_RESOURCE_FREEFORM_LABELS,
 };
-use kamu_resources_services::{ResourceExtensionResolutionError, ResourceExtensionSchemaResolver};
+use kamu_resources_services::ResourceExtensionSchemaResolver;
 use pretty_assertions::assert_eq;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

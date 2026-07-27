@@ -14,6 +14,7 @@ use kamu_resources::{
     ApplyResourceCrudDispatcherError,
     DeleteResourcesCrudDispatcherError,
     GetResourceCrudDispatcherError,
+    ResourceExtensionResolutionError,
     ResourceHeadersValidationError,
     ResourceID,
     ResourceIDNotFoundError,
@@ -23,7 +24,6 @@ use kamu_resources::{
     UnsupportedResourceDescriptorError,
     UnsupportedResourceSelectorError,
 };
-use kamu_resources_services::ResourceExtensionResolutionError;
 use thiserror::Error;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
