@@ -10,7 +10,7 @@
 use std::assert_matches;
 
 use odf::DatasetID;
-use odf_dataset::SetRefOpts;
+use odf_dataset::{SetRefOpts, StoreDatasetOpts};
 use odf_metadata::testing::MetadataFactory;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -36,7 +36,7 @@ pub async fn test_store_dataset<
     );
 
     let store_result = storage_unit
-        .store_dataset(seed_block.clone())
+        .store_dataset(seed_block.clone(), StoreDatasetOpts::default())
         .await
         .unwrap();
 
@@ -66,7 +66,9 @@ pub async fn test_store_dataset<
         .unwrap();
 
     // Now test ID collision
-    let store_result = storage_unit.store_dataset(seed_block).await;
+    let store_result = storage_unit
+        .store_dataset(seed_block, StoreDatasetOpts::default())
+        .await;
 
     assert_matches!(
         store_result.err(),
@@ -89,7 +91,7 @@ pub async fn test_delete_dataset<
     )
     .build_typed();
     let store_result = storage_unit
-        .store_dataset(seed_block.clone())
+        .store_dataset(seed_block.clone(), StoreDatasetOpts::default())
         .await
         .unwrap();
     set_initial_head(&store_result).await;
@@ -141,11 +143,11 @@ pub async fn test_iterate_datasets<
     .build_typed();
 
     let store_result_1 = storage_unit
-        .store_dataset(seed_block_1.clone())
+        .store_dataset(seed_block_1.clone(), StoreDatasetOpts::default())
         .await
         .unwrap();
     let store_result_2 = storage_unit
-        .store_dataset(seed_block_2.clone())
+        .store_dataset(seed_block_2.clone(), StoreDatasetOpts::default())
         .await
         .unwrap();
     set_initial_head(&store_result_1).await;

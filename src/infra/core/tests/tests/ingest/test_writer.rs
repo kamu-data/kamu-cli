@@ -2349,6 +2349,7 @@ impl Harness {
                 )
                 .system_time(system_time)
                 .build_typed(),
+                odf::dataset::StoreDatasetOpts::default(),
             )
             .await
             .unwrap();

@@ -89,6 +89,7 @@ async fn test_indexes_datasets_correctly(tenancy_config: TenancyConfig) {
                         .build(),
                 )
                 .build_typed(),
+                odf::dataset::StoreDatasetOpts::default(),
             )
             .await
             .unwrap();

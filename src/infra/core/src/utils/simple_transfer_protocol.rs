@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 
 use database_common_macros::{transactional_method1, transactional_method2};
 use futures::{Future, StreamExt, TryStreamExt, stream};
-use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_core::utils::metadata_chain_comparator::*;
 use kamu_core::*;
 use kamu_datasets::{
@@ -148,7 +148,7 @@ impl SimpleTransferProtocol {
             }
         }
 
-        let mut blocks_desc_ordered = match chains_comparison {
+        let blocks_desc_ordered = match chains_comparison {
             CompareChainsResult::Equal => unreachable!(),
             CompareChainsResult::LhsAhead {
                 lhs_ahead_blocks: src_ahead_blocks,
@@ -156,14 +156,23 @@ impl SimpleTransferProtocol {
             CompareChainsResult::LhsBehind { .. } | CompareChainsResult::Divergence { .. } => {
                 // Load all source blocks from head to tail
                 assert!(force);
-                use odf::dataset::MetadataChainExt;
                 src_chain
-                    .iter_blocks()
+                    .iter_blocks_bytes_interval((&odf::BlockRef::Head).into(), None, false)
                     .try_collect()
                     .await
                     .map_err(Self::map_block_iteration_error)?
             }
         };
+
+        // Decode blocks, as we need to access events to scan for data chunks etc.
+        let mut blocks_desc_ordered = blocks_desc_ordered
+            .into_iter()
+            .map(|(hash, _, bytes)| bytes.decode().map(|block| (hash, block, bytes)))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| CorruptedSourceError {
+                message: "Unable to decode metadata block".into(),
+                source: Some(e.into()),
+            })?;
 
         let old_head = dst_head.clone();
         let num_blocks = blocks_desc_ordered.len();
@@ -175,7 +184,7 @@ impl SimpleTransferProtocol {
             use odf::metadata::AsTypedBlock;
 
             // Safety: there are blocks
-            let (first_hash, first_block) = blocks_desc_ordered.pop().unwrap();
+            let (first_hash, first_block, first_block_bytes) = blocks_desc_ordered.pop().unwrap();
             let seed_block = first_block
                 .into_typed()
                 .ok_or_else(|| CorruptedSourceError {
@@ -189,6 +198,8 @@ impl SimpleTransferProtocol {
                 .create_dataset_transactional(
                     alias,
                     seed_block,
+                    first_block_bytes,
+                    &first_hash,
                     transfer_options.visibility_for_created_dataset,
                 )
                 .await?;
@@ -277,20 +288,46 @@ impl SimpleTransferProtocol {
         &self,
         dataset_alias: &odf::DatasetAlias,
         seed_block: odf::MetadataBlockTyped<odf::metadata::Seed>,
+        seed_block_bytes: odf::MetadataBlockBytes,
+        expected_hash: &odf::Multihash,
         dataset_visibility: odf::DatasetVisibility,
-    ) -> Result<CreateDatasetResult, InternalError> {
-        let result = create_dataset_use_case
+    ) -> Result<CreateDatasetResult, SyncError> {
+        let res = create_dataset_use_case
             .execute(
                 dataset_alias,
                 seed_block,
-                CreateDatasetUseCaseOptions { dataset_visibility },
+                CreateDatasetUseCaseOptions {
+                    dataset_visibility,
+                    seed_block_bytes: Some(seed_block_bytes),
+                },
             )
-            .await
-            .int_err()?;
+            .await?;
 
-        result.dataset.detach_from_transaction();
+        if res.head != *expected_hash {
+            // Return the same kind of error as AppendDatasetMetadataBatchUseCase would on
+            // hash mismatch
+            return Err(
+                kamu_datasets::AppendDatasetMetadataBatchUseCaseError::BlockAppendError(
+                    kamu_datasets::AppendDatasetMetadataBatchUseCaseBlockAppendError {
+                        append_error: odf::dataset::AppendError::InvalidBlock(
+                            odf::dataset::AppendValidationError::HashMismatch(
+                                odf::storage::HashMismatchError {
+                                    expected: expected_hash.clone(),
+                                    actual: res.head,
+                                },
+                            ),
+                        ),
+                        block_sequence_number: 0,
+                        block_hash: expected_hash.clone(),
+                    },
+                )
+                .into(),
+            );
+        }
 
-        Ok(result)
+        res.dataset.detach_from_transaction();
+
+        Ok(res)
     }
 
     #[transactional_method2(append_dataset_metadata_batch_use_case: Arc<dyn AppendDatasetMetadataBatchUseCase>, dataset_registry: Arc<dyn DatasetRegistry>)]
@@ -298,7 +335,7 @@ impl SimpleTransferProtocol {
         &self,
         dst: &dyn odf::Dataset,
         dst_alias: Option<&odf::DatasetAlias>,
-        new_blocks: Box<dyn Iterator<Item = odf::dataset::HashedMetadataBlock> + Send>,
+        new_blocks: Box<dyn Iterator<Item = odf::dataset::HashedMetadataBlockBytesDecoded> + Send>,
         options: AppendDatasetMetadataBatchUseCaseOptions,
     ) -> Result<Option<odf::Multihash>, AppendDatasetMetadataBatchUseCaseError> {
         if let Some(alias) = dst_alias {
@@ -462,7 +499,7 @@ impl SimpleTransferProtocol {
 
     async fn synchronize_blocks<'a>(
         &'a self,
-        blocks_desc_ordered: Vec<odf::dataset::HashedMetadataBlock>,
+        blocks_desc_ordered: Vec<odf::dataset::HashedMetadataBlockBytesDecoded>,
         src: &'a dyn odf::Dataset,
         dst: &'a dyn odf::Dataset,
         dst_alias: Option<&odf::DatasetAlias>,
@@ -479,7 +516,7 @@ impl SimpleTransferProtocol {
         use odf::metadata::IntoDataStreamBlock;
         for block in blocks_desc_ordered
             .iter()
-            .filter_map(|(_, b)| b.as_data_stream_block())
+            .filter_map(|(_, b, _)| b.as_data_stream_block())
         {
             if let Some(data_slice) = block.event.new_data {
                 stats.src_estimated.data_slices_read += 1;
@@ -509,7 +546,7 @@ impl SimpleTransferProtocol {
         // Download data and checkpoints
         let arc_stats = Arc::new(Mutex::new(stats));
         let mut block_download_tasks = vec![];
-        blocks_desc_ordered.iter().rev().for_each(|(_, b)| {
+        blocks_desc_ordered.iter().rev().for_each(|(_, b, _)| {
             if let Some(block_stream) = b.as_data_stream_block() {
                 if let Some(data_slice) = block_stream.event.new_data {
                     // Each function return unique future

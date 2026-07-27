@@ -10435,6 +10435,7 @@ dependencies = [
  "sha3 0.10.9",
  "sqlx",
  "ssi-caips",
+ "strum 0.28.0",
  "thiserror 2.0.18",
  "tonic",
  "tonic-prost",

@@ -11,6 +11,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use futures::{Future, Stream, TryStreamExt, future};
+use odf_metadata::dataset::MetadataBlockBytes;
 use odf_metadata::*;
 use pin_project::pin_project;
 
@@ -45,6 +46,14 @@ impl<'a> From<&'a Multihash> for MetadataChainIterBoundary<'a> {
 
 pub type HashedMetadataBlock = (Multihash, MetadataBlock);
 pub type HashedMetadataBlockRef<'a> = (&'a Multihash, &'a MetadataBlock);
+
+pub type HashedMetadataBlockBytes = (Multihash, MetadataBlockBytes);
+pub type HashedMetadataBlockBytesWithHeader = (Multihash, MetadataBlockHeader, MetadataBlockBytes);
+pub type HashedMetadataBlockBytesDecoded = (Multihash, MetadataBlock, MetadataBlockBytes);
+
+pub type MetadataBytesStreamItem = Result<HashedMetadataBlockBytesWithHeader, IterBlocksError>;
+pub type DynMetadataBytesStream<'a> =
+    Pin<Box<dyn Stream<Item = MetadataBytesStreamItem> + Send + 'a>>;
 
 type MetadataStreamItem = Result<HashedMetadataBlock, IterBlocksError>;
 type FilteredDataStreamBlocksStreamItem =

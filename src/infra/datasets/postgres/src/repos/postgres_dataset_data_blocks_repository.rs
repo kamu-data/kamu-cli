@@ -11,6 +11,7 @@ use database_common::TransactionRefT;
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_datasets::*;
+use odf::MetadataEventType;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -94,7 +95,7 @@ impl DatasetDataBlockRepository for PostgresDatasetDataBlockRepository {
             sequence_number: u64::try_from(r.sequence_number).unwrap(),
             block_hash: odf::Multihash::new(odf::metadata::Multicodec::Sha3_256, &r.block_hash_bin)
                 .unwrap(),
-            block_payload: bytes::Bytes::from(r.block_payload),
+            block_payload: odf::MetadataBlockBytes::new(bytes::Bytes::from(r.block_payload)),
         }))
     }
 
@@ -162,7 +163,7 @@ impl DatasetDataBlockRepository for PostgresDatasetDataBlockRepository {
                     &r.block_hash_bin,
                 )
                 .unwrap(),
-                block_payload: bytes::Bytes::from(r.block_payload),
+                block_payload: odf::MetadataBlockBytes::new(bytes::Bytes::from(r.block_payload)),
             })
             .collect())
     }
@@ -203,7 +204,7 @@ impl DatasetDataBlockRepository for PostgresDatasetDataBlockRepository {
                     &r.block_hash_bin,
                 )
                 .unwrap(),
-                block_payload: bytes::Bytes::from(r.block_payload),
+                block_payload: odf::MetadataBlockBytes::new(bytes::Bytes::from(r.block_payload)),
             })
             .collect())
     }

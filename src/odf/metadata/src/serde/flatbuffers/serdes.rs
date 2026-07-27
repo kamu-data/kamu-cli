@@ -14,6 +14,7 @@ use multiformats::Multicodec;
 
 pub use super::convertors_generated::*;
 use super::proxies_generated as fbgen;
+use crate::dataset::MetadataBlockHeader;
 use crate::dtos::dataset::MetadataBlock;
 use crate::dtos::engine::*;
 use crate::serde::*;
@@ -74,10 +75,8 @@ impl MetadataBlockSerializer for FlatbuffersMetadataBlockSerializer {
 
 pub struct FlatbuffersMetadataBlockDeserializer;
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl MetadataBlockDeserializer for FlatbuffersMetadataBlockDeserializer {
-    fn read_manifest(&self, data: &[u8]) -> Result<MetadataBlock, Error> {
+impl FlatbuffersMetadataBlockDeserializer {
+    fn get_block_proxy<'a>(&self, data: &'a [u8]) -> Result<fbgen::MetadataBlock<'a>, Error> {
         let manifest_proxy = flatbuffers::root::<fbgen::Manifest>(data).map_err(Error::serde)?;
 
         // TODO: Better error handling
@@ -93,6 +92,27 @@ impl MetadataBlockDeserializer for FlatbuffersMetadataBlockDeserializer {
             flatbuffers::root::<fbgen::MetadataBlock>(manifest_proxy.content().unwrap().bytes())
                 .map_err(Error::serde)?;
 
+        Ok(block_proxy)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl MetadataBlockDeserializer for FlatbuffersMetadataBlockDeserializer {
+    fn read_header(&self, data: &[u8]) -> Result<MetadataBlockHeader, Error> {
+        let block_proxy = self.get_block_proxy(data)?;
+        Ok(MetadataBlockHeader {
+            system_time: super::fb_to_datetime(block_proxy.system_time().unwrap()),
+            prev_block_hash: block_proxy
+                .prev_block_hash()
+                .map(|v| crate::Multihash::from_bytes(v.bytes()).unwrap()),
+            sequence_number: block_proxy.sequence_number(),
+            event_type: block_proxy.event_type().into(),
+        })
+    }
+
+    fn read_manifest(&self, data: &[u8]) -> Result<MetadataBlock, Error> {
+        let block_proxy = self.get_block_proxy(data)?;
         let block = MetadataBlock::deserialize(block_proxy);
         Ok(block)
     }

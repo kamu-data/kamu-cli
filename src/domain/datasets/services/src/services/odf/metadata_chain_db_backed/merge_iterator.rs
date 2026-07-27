@@ -70,7 +70,8 @@ impl<'a> CachedBlocksMergeIterator<'a> {
     /// Get the next block with automatic data page loading
     pub(crate) async fn next(
         &mut self,
-    ) -> Result<Option<(odf::Multihash, odf::MetadataBlock)>, InternalError> {
+    ) -> Result<Option<(odf::Multihash, odf::MetadataBlock, odf::MetadataBlockBytes)>, InternalError>
+    {
         // Peek sequence numbers from both iterators
         let key_seq = self.key_blocks_iter.current_sequence_number();
         let data_seq = self.data_blocks_current_sequence_number();
@@ -169,7 +170,9 @@ impl<'a> CachedBlocksMergeIterator<'a> {
     }
 
     /// Advance data blocks iterator and return current block
-    fn next_data_block(&mut self) -> Option<(odf::Multihash, odf::MetadataBlock)> {
+    fn next_data_block(
+        &mut self,
+    ) -> Option<(odf::Multihash, odf::MetadataBlock, odf::MetadataBlockBytes)> {
         if let Some(ref page) = self.data_blocks_page
             && let Some(idx) = self.data_blocks_current_index
         {

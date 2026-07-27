@@ -113,7 +113,7 @@ impl DatasetKeyBlockRepository for InMemoryDatasetKeyBlockRepository {
         &self,
         dataset_ids: &[odf::DatasetID],
         block_ref: &odf::BlockRef,
-        event_type: MetadataEventType,
+        event_type: odf::MetadataEventType,
     ) -> Result<Vec<(odf::DatasetID, DatasetBlock)>, InternalError> {
         let guard = self.state.lock().unwrap();
         let mut result = Vec::new();

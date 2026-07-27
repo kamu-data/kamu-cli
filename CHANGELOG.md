@@ -14,6 +14,13 @@ Recommendation: for ease of reading, use the following format:
 -->
 
 ## [Unreleased]
+### Fixed
+- Fixed a long-standing upstream issue in `MetadataBlock` flatbuffers encoding where `Timestamp` struct was encoded unaligned. This means that if you re-serialize existing blocks - they will have a different binary layout and different hashes than the old ones. Compatibility notes:
+  - Reading old blocks still works fine
+  - New blocks will be written with correct alignment
+  - `MetadataBlock` manifest version is incremented to `3` to differentiate blocks with fixed layout
+  - Simple and Smart Transfer Protocols were updated to transfer and commit binary block data unaltered (without relying on re-serialization to produce identical binary layout) - this ensures that synced blocks hash to the same value as at the origin even with slight serialization logic differences
+- Verification logic error handling was improved to handle hash mismatches
 ### Changed
 - Major reorganization of `odf::metadata` sub-crate for IaC changes (see [RFC-018](https://github.com/open-data-fabric/open-data-fabric/blob/master/rfcs/018-iac-resource-framework.md))
 - Added codegen types and formats for many prototype IaC resources

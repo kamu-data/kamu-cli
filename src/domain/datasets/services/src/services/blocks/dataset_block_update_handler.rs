@@ -234,7 +234,7 @@ pub(crate) async fn collect_dataset_blocks_in_range(
     let mut blocks_stream = target
         .as_metadata_chain()
         .as_uncached_chain()
-        .iter_blocks_interval(head.into(), tail.map(Into::into), false);
+        .iter_blocks_bytes_interval(head.into(), tail.map(Into::into), false);
 
     loop {
         // Try reading next stream element
@@ -254,12 +254,17 @@ pub(crate) async fn collect_dataset_blocks_in_range(
         };
 
         // Check if we've reached the end of stream
-        let Some((block_hash, block)) = try_next_result else {
+        let Some((block_hash, block_header, block_bytes)) = try_next_result else {
             break;
         };
 
-        let event_flags = odf::metadata::MetadataEventTypeFlags::from(&block.event);
-        let block_entity = crate::make_dataset_block(block_hash, &block);
+        let event_flags: odf::metadata::MetadataEventTypeFlags = block_header.event_type.into();
+        let block_entity = DatasetBlock {
+            event_kind: block_header.event_type,
+            sequence_number: block_header.sequence_number,
+            block_hash,
+            block_payload: block_bytes,
+        };
 
         if event_flags.has_data_flags() {
             // This is a data block (AddData, ExecuteTransform)

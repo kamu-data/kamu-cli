@@ -40,8 +40,12 @@ pub use odf_metadata::{
     DatasetRefRemote,
     DatasetSnapshot,
     MetadataBlock,
+    MetadataBlockBytes,
+    MetadataBlockHeader,
     MetadataBlockTyped,
     MetadataEvent,
+    MetadataEventType,
+    MetadataEventTypeFlags,
     Multihash,
     RepoName,
 };

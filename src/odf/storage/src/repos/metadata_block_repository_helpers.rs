@@ -18,11 +18,14 @@ use crate::{BlockMalformedError, BlockVersionError, GetBlockError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn serialize_metadata_block(block: &MetadataBlock) -> Result<Vec<u8>, Error> {
+pub fn serialize_metadata_block(block: &MetadataBlock) -> Result<MetadataBlockBytes, Error> {
     let buffer = FlatbuffersMetadataBlockSerializer.write_manifest(block)?;
 
-    // Convert Buffer<u8> to Vec<u8> efficiently without copying
-    Ok(buffer.collapse_vec())
+    // TODO: PERF: Lots of copying here - we should return Bytes from
+    // `write_manifest` to begin with
+    Ok(MetadataBlockBytes::new(bytes::Bytes::from(
+        buffer.collapse_vec(),
+    )))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

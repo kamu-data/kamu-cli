@@ -518,6 +518,7 @@ impl WsSmartTransferProtocolClient {
         &self,
         dataset_alias: &odf::DatasetAlias,
         seed_block: odf::MetadataBlockTyped<odf::metadata::Seed>,
+        seed_block_bytes: odf::MetadataBlockBytes,
         expected_head: &odf::Multihash,
         dataset_visibility: odf::DatasetVisibility,
     ) -> Result<CreateDatasetResult, SyncError> {
@@ -525,7 +526,10 @@ impl WsSmartTransferProtocolClient {
             .execute(
                 dataset_alias,
                 seed_block,
-                CreateDatasetUseCaseOptions { dataset_visibility },
+                CreateDatasetUseCaseOptions {
+                    dataset_visibility,
+                    seed_block_bytes: Some(seed_block_bytes),
+                },
             )
             .await?;
 
@@ -560,7 +564,7 @@ impl WsSmartTransferProtocolClient {
     async fn append_metadata_transactional(
         &self,
         dataset_handle: &odf::DatasetHandle,
-        new_blocks: std::collections::VecDeque<(odf::Multihash, odf::MetadataBlock)>,
+        new_blocks: std::collections::VecDeque<odf::dataset::HashedMetadataBlockBytesDecoded>,
         force_update_if_diverged: bool,
     ) -> Result<Option<odf::Multihash>, SyncError> {
         let transactional_target = dataset_registry.get_dataset_by_handle(dataset_handle).await;
@@ -691,7 +695,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                 }
                 ((**dst).clone(), dst.get_handle().clone())
             } else {
-                let (first_hash, first_block) = new_blocks.pop_front().unwrap();
+                let (first_hash, first_block, first_block_bytes) = new_blocks.pop_front().unwrap();
                 let seed_block = first_block
                     .into_typed()
                     .ok_or_else(|| CorruptedSourceError {
@@ -705,6 +709,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                     .create_dataset_transactional(
                         alias,
                         seed_block,
+                        first_block_bytes,
                         &first_hash,
                         transfer_options.visibility_for_created_dataset,
                     )

@@ -15,6 +15,31 @@ use super::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MetadataBlockHeader {
+    /// System time when this block was written.
+    pub system_time: DateTime<Utc>,
+    /// Hash sum of the preceding block.
+    pub prev_block_hash: Option<Multihash>,
+    /// Block sequence number starting from tail to head.
+    pub sequence_number: u64,
+    /// Type of the event
+    pub event_type: MetadataEventType,
+}
+
+impl From<&MetadataBlock> for MetadataBlockHeader {
+    fn from(b: &MetadataBlock) -> Self {
+        Self {
+            system_time: b.system_time,
+            prev_block_hash: b.prev_block_hash.clone(),
+            sequence_number: b.sequence_number,
+            event_type: MetadataEventType::from_metadata_event(&b.event),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Same as [`MetadataBlock`] struct but holds a specific variant of the
 /// [`MetadataEvent`]
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -104,6 +129,7 @@ impl AsTypedBlock for MetadataBlock {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: Remove in favor of `MetadataChain::accept` API
 pub struct MetadataEventDataStream {
     pub prev_checkpoint: Option<Multihash>,
     pub prev_offset: Option<u64>,
@@ -260,6 +286,51 @@ impl IntoDataStreamBlock for MetadataBlock {
                 prev_block_hash: self.prev_block_hash.as_ref(),
                 event,
             })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MetadataBlockBytes(pub bytes::Bytes);
+
+impl MetadataBlockBytes {
+    pub fn new(bytes: bytes::Bytes) -> Self {
+        Self(bytes)
+    }
+
+    pub fn new_from_slice(data: &[u8]) -> Self {
+        Self(bytes::Bytes::copy_from_slice(data))
+    }
+
+    pub fn decode_header(&self) -> Result<MetadataBlockHeader, crate::serde::Error> {
+        use crate::serde::MetadataBlockDeserializer as _;
+        let des = crate::serde::flatbuffers::FlatbuffersMetadataBlockDeserializer;
+        des.read_header(&self.0)
+    }
+
+    pub fn decode(&self) -> Result<MetadataBlock, crate::serde::Error> {
+        use crate::serde::MetadataBlockDeserializer as _;
+        let des = crate::serde::flatbuffers::FlatbuffersMetadataBlockDeserializer;
+        des.read_manifest(&self.0)
+    }
+
+    pub fn as_slice(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl std::ops::Deref for MetadataBlockBytes {
+    type Target = bytes::Bytes;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl From<MetadataBlockBytes> for bytes::Bytes {
+    fn from(value: MetadataBlockBytes) -> Self {
+        value.0
     }
 }
 

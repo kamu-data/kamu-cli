@@ -196,13 +196,17 @@ impl BaseRepoHarness {
         target.as_metadata_chain().iter_blocks().count().await
     }
 
-    pub fn hash_from_block(block: &odf::MetadataBlock) -> odf::Multihash {
-        let block_data = odf::storage::serialize_metadata_block(block).unwrap();
+    pub fn serialize_block(
+        block: &odf::MetadataBlock,
+    ) -> (odf::Multihash, odf::MetadataBlockBytes) {
+        let bytes = odf::storage::serialize_metadata_block(block).unwrap();
 
-        odf::Multihash::from_digest::<sha3::Sha3_256>(
+        let hash = odf::Multihash::from_digest::<sha3::Sha3_256>(
             odf::metadata::Multicodec::Sha3_256,
-            &block_data,
-        )
+            &bytes,
+        );
+
+        (hash, bytes)
     }
 }
 

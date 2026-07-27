@@ -9,6 +9,7 @@
 
 use ::serde::Deserialize;
 
+use crate::dataset::{MetadataBlockHeader, MetadataEventType};
 use crate::dtos;
 use crate::serde::yaml::derivations_generated as serde;
 use crate::serde::*;
@@ -42,6 +43,17 @@ impl MetadataBlockSerializer for YamlMetadataBlockSerializer {
 pub struct YamlMetadataBlockDeserializer;
 
 impl MetadataBlockDeserializer for YamlMetadataBlockDeserializer {
+    fn read_header(&self, data: &[u8]) -> Result<MetadataBlockHeader, Error> {
+        // TODO: PERF: Skip event deserialization
+        let block = self.read_manifest(data)?;
+        Ok(MetadataBlockHeader {
+            system_time: block.system_time,
+            prev_block_hash: block.prev_block_hash,
+            sequence_number: block.sequence_number,
+            event_type: MetadataEventType::from_metadata_event(&block.event),
+        })
+    }
+
     fn read_manifest(&self, data: &[u8]) -> Result<dtos::dataset::MetadataBlock, Error> {
         // Read short manifest first, with kind and version only
         let manifest_no_content: serde::legacy::Manifest<::serde::de::IgnoredAny> =

@@ -231,12 +231,21 @@ impl VerificationServiceImpl {
 
         for (block_hash, block) in blocks.into_iter().rev() {
             use odf::MetadataChain;
+
+            // TODO: PERF: Avoid extra read by iterating over raw block bytes
+            let block_data = resolved_dataset
+                .as_metadata_chain()
+                .get_block_bytes(&block_hash)
+                .await
+                .int_err()?;
+
             match in_memory_chain
                 .append(
                     block,
                     odf::dataset::AppendOpts {
                         expected_hash: Some(&block_hash),
-                        ..odf::dataset::AppendOpts::default()
+                        block_data: Some(&block_data),
+                        ..Default::default()
                     },
                 )
                 .await

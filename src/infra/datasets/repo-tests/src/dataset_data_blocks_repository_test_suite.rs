@@ -91,9 +91,9 @@ pub async fn test_save_data_blocks_batch(catalog: &Catalog) {
 
     assert_eq!(root_all.len(), 2);
     assert_eq!(root_all[0].sequence_number, 1);
-    assert_eq!(root_all[0].event_kind, MetadataEventType::AddData);
+    assert_eq!(root_all[0].event_kind, odf::MetadataEventType::AddData);
     assert_eq!(root_all[1].sequence_number, 2);
-    assert_eq!(root_all[1].event_kind, MetadataEventType::AddData);
+    assert_eq!(root_all[1].event_kind, odf::MetadataEventType::AddData);
 
     // Test with Derivative dataset (ExecuteTransform blocks only)
     let derivative_dataset_id = odf::DatasetID::new_seeded_ed25519(b"ds-batch-derivative");
@@ -130,12 +130,12 @@ pub async fn test_save_data_blocks_batch(catalog: &Catalog) {
     assert_eq!(derivative_all[0].sequence_number, 1);
     assert_eq!(
         derivative_all[0].event_kind,
-        MetadataEventType::ExecuteTransform
+        odf::MetadataEventType::ExecuteTransform
     );
     assert_eq!(derivative_all[1].sequence_number, 2);
     assert_eq!(
         derivative_all[1].event_kind,
-        MetadataEventType::ExecuteTransform
+        odf::MetadataEventType::ExecuteTransform
     );
 }
 
@@ -290,8 +290,8 @@ pub async fn test_get_page_of_data_blocks(catalog: &Catalog) {
     // Should return blocks in ascending order of sequence numbers (4, 5)
     assert_eq!(page[0].sequence_number, 4);
     assert_eq!(page[1].sequence_number, 5);
-    assert_eq!(page[0].event_kind, MetadataEventType::AddData);
-    assert_eq!(page[1].event_kind, MetadataEventType::AddData);
+    assert_eq!(page[0].event_kind, odf::MetadataEventType::AddData);
+    assert_eq!(page[1].event_kind, odf::MetadataEventType::AddData);
 
     // Test pagination - get next 2 blocks
     let page = repo
@@ -302,8 +302,8 @@ pub async fn test_get_page_of_data_blocks(catalog: &Catalog) {
     assert_eq!(page.len(), 2);
     assert_eq!(page[0].sequence_number, 2);
     assert_eq!(page[1].sequence_number, 3);
-    assert_eq!(page[0].event_kind, MetadataEventType::AddData);
-    assert_eq!(page[1].event_kind, MetadataEventType::AddData);
+    assert_eq!(page[0].event_kind, odf::MetadataEventType::AddData);
+    assert_eq!(page[1].event_kind, odf::MetadataEventType::AddData);
 
     // Test pagination - get remaining block
     let page = repo
@@ -313,7 +313,7 @@ pub async fn test_get_page_of_data_blocks(catalog: &Catalog) {
 
     assert_eq!(page.len(), 1);
     assert_eq!(page[0].sequence_number, 1);
-    assert_eq!(page[0].event_kind, MetadataEventType::AddData);
+    assert_eq!(page[0].event_kind, odf::MetadataEventType::AddData);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

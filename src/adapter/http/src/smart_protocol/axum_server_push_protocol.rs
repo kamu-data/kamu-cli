@@ -196,7 +196,8 @@ impl AxumServerPushProtocolInstance {
                     .expect("Dataset ref is not an alias");
 
                 use odf::metadata::AsTypedBlock as _;
-                let (_, first_block) = new_blocks.pop_front().unwrap();
+                let (first_block_hash, first_block, first_block_bytes) =
+                    new_blocks.pop_front().unwrap();
                 let seed_block = first_block
                     .into_typed()
                     .ok_or_else(|| {
@@ -215,26 +216,25 @@ impl AxumServerPushProtocolInstance {
 
                 let create_options = CreateDatasetUseCaseOptions {
                     dataset_visibility: visibility_for_created_dataset,
+                    seed_block_bytes: Some(first_block_bytes),
                 };
-                let created_dataset_handle_result =
-                    DatabaseTransactionRunner::new(self.catalog.clone())
-                        .transactional_with(
-                            |create_dataset_use_case: Arc<dyn CreateDatasetUseCase>| async move {
-                                create_dataset_use_case
-                                    .execute(dataset_alias, seed_block, create_options)
-                                    .await
-                                    .map(|create_dataset_result| {
-                                        create_dataset_result.dataset_handle
-                                    })
-                            },
-                        )
-                        .instrument(tracing::debug_span!(
-                            "AxumServerPushProtocolInstance::create_dataset",
-                        ))
-                        .await;
-                match created_dataset_handle_result {
-                    Ok(created_dataset_handle) => {
-                        self.maybe_dataset_handle = Some(created_dataset_handle);
+                let create_result = DatabaseTransactionRunner::new(self.catalog.clone())
+                    .transactional_with(
+                        |create_dataset_use_case: Arc<dyn CreateDatasetUseCase>| async move {
+                            create_dataset_use_case
+                                .execute(dataset_alias, seed_block, create_options)
+                                .await
+                                .inspect(|res| res.dataset.detach_from_transaction())
+                        },
+                    )
+                    .instrument(tracing::debug_span!(
+                        "AxumServerPushProtocolInstance::create_dataset",
+                    ))
+                    .await;
+                match create_result {
+                    Ok(res) => {
+                        assert_eq!(res.head, first_block_hash);
+                        self.maybe_dataset_handle = Some(res.dataset_handle);
                     }
                     Err(CreateDatasetError::RefCollision(err)) => {
                         return Err(PushServerError::RefCollision(
@@ -336,7 +336,7 @@ impl AxumServerPushProtocolInstance {
     async fn try_handle_push_metadata_request(
         &mut self,
         push_request: DatasetPushRequest,
-    ) -> Result<VecDeque<odf::dataset::HashedMetadataBlock>, PushServerError> {
+    ) -> Result<VecDeque<odf::dataset::HashedMetadataBlockBytesDecoded>, PushServerError> {
         let push_metadata_request =
             match axum_read_payload::<DatasetPushMetadataRequest>(&mut self.socket).await {
                 Ok(push_metadata_request) => Ok(push_metadata_request),
@@ -483,7 +483,7 @@ impl AxumServerPushProtocolInstance {
 
     async fn try_handle_push_complete(
         &mut self,
-        new_blocks: VecDeque<odf::dataset::HashedMetadataBlock>,
+        new_blocks: VecDeque<odf::dataset::HashedMetadataBlockBytesDecoded>,
         force_update_if_diverged: bool,
         old_head_maybe: Option<Multihash>,
     ) -> Result<(), PushServerError> {

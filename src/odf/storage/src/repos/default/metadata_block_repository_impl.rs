@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use async_trait::async_trait;
-use bytes::Bytes;
 use internal_error::ResultIntoInternal;
 use odf_metadata::*;
 
@@ -48,8 +47,15 @@ where
         deserialize_metadata_block(hash, &block_data)
     }
 
-    async fn get_block_bytes(&self, hash: &Multihash) -> Result<Bytes, GetBlockDataError> {
-        self.obj_repo.get_bytes(hash).await.map_err(Into::into)
+    async fn get_block_bytes(
+        &self,
+        hash: &Multihash,
+    ) -> Result<MetadataBlockBytes, GetBlockDataError> {
+        self.obj_repo
+            .get_bytes(hash)
+            .await
+            .map(MetadataBlockBytes::new)
+            .map_err(Into::into)
     }
 
     async fn get_block_size(&self, hash: &Multihash) -> Result<u64, GetBlockDataError> {

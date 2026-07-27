@@ -87,13 +87,13 @@ where
     }
 
     fn try_select_prev_block_satisfying_hints(
-        blocks: &[(odf::Multihash, odf::MetadataBlock)],
+        blocks: &[(odf::Multihash, odf::MetadataBlock, odf::MetadataBlockBytes)],
         hint_flags: odf::metadata::MetadataEventTypeFlags,
-    ) -> Option<(odf::Multihash, odf::MetadataBlock)> {
+    ) -> Option<(odf::Multihash, odf::MetadataBlock, odf::MetadataBlockBytes)> {
         blocks
             .iter()
             .rev()
-            .find(|(_, block)| {
+            .find(|(_, block, _)| {
                 odf::metadata::MetadataEventTypeFlags::from(&block.event).intersects(hint_flags)
             })
             .cloned()
@@ -146,18 +146,8 @@ where
             let key_blocks = key_block_records
                 .into_iter()
                 .map(|key_block| {
-                    odf::storage::deserialize_metadata_block(
-                        &key_block.block_hash,
-                        &key_block.block_payload,
-                    )
-                    .map(|metadata_block| {
-                        (
-                            key_block.block_hash,
-                            key_block.block_payload,
-                            metadata_block,
-                        )
-                    })
-                    .int_err()
+                    let decoded_block = key_block.block_payload.decode().int_err()?;
+                    Ok((key_block.block_hash, decoded_block, key_block.block_payload))
                 })
                 .collect::<Result<Vec<_>, InternalError>>()?;
 
@@ -414,6 +404,107 @@ where
 
         Ok(BlockLookupResult::NotFound)
     }
+
+    async fn iter_blocks_cached<'a>(
+        &'a self,
+        head_boundary: odf::dataset::MetadataChainIterBoundary<'a>,
+        tail_boundary: Option<odf::dataset::MetadataChainIterBoundary<'a>>,
+        ignore_missing_tail: bool,
+    ) -> Result<
+        Option<
+            impl futures::Stream<
+                Item = Result<
+                    (odf::Multihash, odf::MetadataBlock, odf::MetadataBlockBytes),
+                    odf::IterBlocksError,
+                >,
+            > + 'a,
+        >,
+        odf::IterBlocksError,
+    > {
+        use odf::MetadataChain;
+
+        // Force loading key blocks unless it was already done
+        let Some(cached_key_blocks) = self.ensure_key_blocks_are_preloaded().await? else {
+            return Ok(None);
+        };
+
+        // Try getting data block repository
+        let data_block_repository = {
+            let read_guard = self.state.read().unwrap();
+            read_guard.maybe_dataset_data_block_repo.clone()
+        };
+
+        // We should have both key blocks and data blocks cache available for optimized
+        // iteration
+        let Some(data_block_repository) = data_block_repository else {
+            return Ok(None);
+        };
+
+        Ok(Some(async_stream::try_stream! {
+                // We need to load starting block to know the sequence number
+                let (head_hash, head_block) = match head_boundary {
+                    odf::dataset::MetadataChainIterBoundary::Hash(h) => {
+                        let block = self.get_block(h).await?;
+                        (h.clone(), block)
+                    },
+                    odf::dataset::MetadataChainIterBoundary::Ref(r) => {
+                        let h = self.resolve_ref(r).await?;
+                        let block = self.get_block(&h).await?;
+                        (h, block)
+                    },
+                };
+
+                // We need tail hash boundary
+                let maybe_tail_hash = match tail_boundary {
+                    None => None,
+                    Some(odf::dataset::MetadataChainIterBoundary::Hash(h)) => Some(h.clone()),
+                    Some(odf::dataset::MetadataChainIterBoundary::Ref(r)) => Some(self.resolve_ref(r).await?),
+                };
+
+                // Ensure the first page containing the head sequence number is preloaded and cached
+                // This allows multiple concurrent iterators to reuse the same cached first page
+                let cached_data_blocks_page = self
+                    .ensure_data_blocks_are_preloaded(head_block.sequence_number..head_block.sequence_number)
+                    .await?
+                    .expect("Data block repository is available, so data blocks should be loaded");
+
+                // Create and initialize the merge iterator for efficient traversal
+                // Always use the existing cached data blocks since we just ensured they're loaded
+                let mut merge_iterator = CachedBlocksMergeIterator::prepare(
+                    data_block_repository.as_ref(),
+                    &self.dataset_id,
+                    self.config.data_blocks_page_size,
+                    cached_key_blocks.as_ref(),
+                    cached_data_blocks_page,
+                    head_block.sequence_number,
+                );
+
+                // Iterate backwards from head to tail using the optimized merge iterator
+                loop {
+                    // Get the next block with the highest sequence number
+                    let Some((block_hash, block, block_bytes)) = merge_iterator.next().await? else {
+                        // No more blocks
+                        break;
+                    };
+
+                    // Check if we reached the tail
+                    if Some(&block_hash) == maybe_tail_hash.as_ref() {
+                        return;
+                    }
+
+                    // Yield the block
+                    yield (block_hash, block, block_bytes);
+                }
+
+                // Check if tail was expected but not found
+                if !ignore_missing_tail && let Some(tail_hash) = maybe_tail_hash {
+                    Err(odf::IterBlocksError::InvalidInterval(odf::dataset::InvalidIntervalError {
+                        head: head_hash,
+                        tail: tail_hash,
+                    }))?;
+                }
+        }))
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -466,7 +557,7 @@ where
     async fn get_block_bytes(
         &self,
         hash: &odf::Multihash,
-    ) -> Result<bytes::Bytes, odf::storage::GetBlockDataError> {
+    ) -> Result<odf::MetadataBlockBytes, odf::storage::GetBlockDataError> {
         self.get_from_cache_or_fallback(
             hash,
             CachedBlocksRange::try_get_original_block_payload,
@@ -513,89 +604,45 @@ where
         tail_boundary: Option<odf::dataset::MetadataChainIterBoundary<'a>>,
         ignore_missing_tail: bool,
     ) -> odf::dataset::DynMetadataStream<'a> {
+        use futures::TryStreamExt;
+
         Box::pin(async_stream::try_stream! {
-            // Force loading key blocks unless it was already done
-            let maybe_cached_key_blocks = self.ensure_key_blocks_are_preloaded().await?;
+            if let Some(stream) = self.iter_blocks_cached(head_boundary, tail_boundary, ignore_missing_tail).await? {
+                futures::pin_mut!(stream);
 
-            // Try getting data block repository
-            let maybe_data_block_repository = if maybe_cached_key_blocks.is_some() {
-                let read_guard = self.state.read().unwrap();
-                read_guard.maybe_dataset_data_block_repo.clone()
-            } else {
-                None
-            };
-
-            // We should have both key blocks and data blocks cache available for optimized iteration
-            if let Some(cached_key_blocks) = maybe_cached_key_blocks && let Some(data_block_repository) = maybe_data_block_repository {
-                // We need to load starting block to know the sequence number
-                let (head_hash, head_block) = match head_boundary {
-                    odf::dataset::MetadataChainIterBoundary::Hash(h) => {
-                        let block = self.get_block(h).await?;
-                        (h.clone(), block)
-                    },
-                    odf::dataset::MetadataChainIterBoundary::Ref(r) => {
-                        let h = self.resolve_ref(r).await?;
-                        let block = self.get_block(&h).await?;
-                        (h, block)
-                    },
-                };
-
-                // We need tail hash boundary
-                let maybe_tail_hash = match tail_boundary {
-                    None => None,
-                    Some(odf::dataset::MetadataChainIterBoundary::Hash(h)) => Some(h.clone()),
-                    Some(odf::dataset::MetadataChainIterBoundary::Ref(r)) => Some(self.resolve_ref(r).await?),
-                };
-
-                // Ensure the first page containing the head sequence number is preloaded and cached
-                // This allows multiple concurrent iterators to reuse the same cached first page
-                let cached_data_blocks_page = self
-                    .ensure_data_blocks_are_preloaded(head_block.sequence_number..head_block.sequence_number)
-                    .await?
-                    .expect("Data block repository is available, so data blocks should be loaded");
-
-                // Create and initialize the merge iterator for efficient traversal
-                // Always use the existing cached data blocks since we just ensured they're loaded
-                let mut merge_iterator = CachedBlocksMergeIterator::prepare(
-                    data_block_repository.as_ref(),
-                    &self.dataset_id,
-                    self.config.data_blocks_page_size,
-                    cached_key_blocks.as_ref(),
-                    cached_data_blocks_page,
-                    head_block.sequence_number,
-                );
-
-                // Iterate backwards from head to tail using the optimized merge iterator
-                loop {
-                    // Get the next block with the highest sequence number
-                    let Some((block_hash, block)) = merge_iterator.next().await? else {
-                        // No more blocks
-                        break;
-                    };
-
-                    // Check if we reached the tail
-                    if Some(&block_hash) == maybe_tail_hash.as_ref() {
-                        return;
-                    }
-
-                    // Yield the block
+                while let Some((block_hash, block, _)) = stream.try_next().await? {
                     yield (block_hash, block);
                 }
-
-                // Check if tail was expected but not found
-                if !ignore_missing_tail && let Some(tail_hash) = maybe_tail_hash {
-                    Err(odf::IterBlocksError::InvalidInterval(odf::dataset::InvalidIntervalError {
-                        head: head_hash,
-                        tail: tail_hash,
-                    }))?;
-                }
-
             } else {
                 // Data blocks cache is not available, simply forward the stream
-                use futures::TryStreamExt;
                 let mut stream = self.metadata_chain.iter_blocks_interval(head_boundary, tail_boundary, ignore_missing_tail);
-                while let Some((block_hash, block)) = stream.try_next().await? {
-                    yield (block_hash, block);
+                while let Some(item) = stream.try_next().await? {
+                    yield item;
+                }
+            }
+        })
+    }
+
+    fn iter_blocks_bytes_interval<'a>(
+        &'a self,
+        head_boundary: odf::dataset::MetadataChainIterBoundary<'a>,
+        tail_boundary: Option<odf::dataset::MetadataChainIterBoundary<'a>>,
+        ignore_missing_tail: bool,
+    ) -> odf::dataset::DynMetadataBytesStream<'a> {
+        use futures::TryStreamExt;
+
+        Box::pin(async_stream::try_stream! {
+            if let Some(stream) = self.iter_blocks_cached(head_boundary, tail_boundary, ignore_missing_tail).await? {
+                futures::pin_mut!(stream);
+
+                while let Some((block_hash, block, block_bytes)) = stream.try_next().await? {
+                    yield (block_hash, odf::MetadataBlockHeader::from(&block), block_bytes);
+                }
+            } else {
+                // Data blocks cache is not available, simply forward the stream
+                let mut stream = self.metadata_chain.iter_blocks_bytes_interval(head_boundary, tail_boundary, ignore_missing_tail);
+                while let Some(item) = stream.try_next().await? {
+                    yield item;
                 }
             }
         })
@@ -689,22 +736,19 @@ where
             // Decide which block to return, if any
             match (key_block_result, data_block_result) {
                 (
-                    BlockLookupResult::Found(key_block_hint),
-                    BlockLookupResult::Found(data_block_hint),
+                    BlockLookupResult::Found((key_block_hash, key_block, _)),
+                    BlockLookupResult::Found((data_block_hash, data_block, _)),
                 ) => {
                     // Both key and data blocks present, pick the by the higher sequence number
-                    if key_block_hint.1.sequence_number > data_block_hint.1.sequence_number {
-                        return Ok(Some(key_block_hint));
+                    if key_block.sequence_number > data_block.sequence_number {
+                        return Ok(Some((key_block_hash, key_block)));
                     }
-                    return Ok(Some(data_block_hint));
+                    return Ok(Some((data_block_hash, data_block)));
                 }
-                (BlockLookupResult::Found(key_block_hint), _) => {
-                    // Only key block is available
-                    return Ok(Some(key_block_hint));
-                }
-                (_, BlockLookupResult::Found(data_block_hint)) => {
-                    // Only data block is available
-                    return Ok(Some(data_block_hint));
+                (BlockLookupResult::Found((hash, block, _)), _)
+                | (_, BlockLookupResult::Found((hash, block, _))) => {
+                    // Only key or data block is available
+                    return Ok(Some((hash, block)));
                 }
                 (BlockLookupResult::Stop, BlockLookupResult::Stop) => {
                     // Both algorithms decided to stop searching with confidence
