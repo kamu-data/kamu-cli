@@ -13,7 +13,6 @@ use url::Url;
 
 use crate::facade::graphql::{cynic_api, outcome_mapper};
 use crate::{
-    ApplyManifestBatchItemResult,
     ApplyManifestBatchRequest,
     ApplyManifestBatchResponse,
     ApplyManifestError,
@@ -365,29 +364,20 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
         request: ApplyManifestBatchRequest,
     ) -> Result<ApplyManifestBatchResponse<domain::ApplyManifestPlanningDecision>, BatchResourceError>
     {
-        // TODO(#1609 phase 4): issue a single batch GraphQL mutation instead of looping
-        // over the single-item operation, so the server can enforce
-        // single-transaction atomicity.
-        let mut items = Vec::with_capacity(request.items.len());
+        use cynic_api::operations::apply_batch as Operation;
 
-        for (request_index, item) in request.items.into_iter().enumerate() {
-            let outcome = self.plan_apply_manifest(item).await;
-            let stop = matches!(
-                outcome,
-                Ok(domain::ApplyManifestPlanningDecision::Rejected(_))
-            ) || outcome.is_err();
+        let variables = Operation::ApplyManifestsVariables::new(request, true);
 
-            items.push(ApplyManifestBatchItemResult {
-                request_index,
-                outcome,
-            });
-
-            if stop {
-                break;
-            }
+        match self
+            .graphql_client
+            .execute_operation(Operation::build_operation(variables))
+            .await
+        {
+            Ok(response) => outcome_mapper::map_batch_apply_manifests_planning_outcome(
+                response.resources.apply_manifests,
+            ),
+            Err(error) => outcome_mapper::map_batch_apply_manifests_planning_rollback(error),
         }
-
-        Ok(ApplyManifestBatchResponse { items })
     }
 
     async fn apply_manifests(
@@ -397,29 +387,20 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
         ApplyManifestBatchResponse<domain::ApplyManifestApplicationDecision>,
         BatchResourceError,
     > {
-        // TODO(#1609 phase 4): issue a single batch GraphQL mutation instead of looping
-        // over the single-item operation, so the server can enforce
-        // single-transaction atomicity.
-        let mut items = Vec::with_capacity(request.items.len());
+        use cynic_api::operations::apply_batch as Operation;
 
-        for (request_index, item) in request.items.into_iter().enumerate() {
-            let outcome = self.apply_manifest(item).await;
-            let stop = matches!(
-                outcome,
-                Ok(domain::ApplyManifestApplicationDecision::Rejected(_))
-            ) || outcome.is_err();
+        let variables = Operation::ApplyManifestsVariables::new(request, false);
 
-            items.push(ApplyManifestBatchItemResult {
-                request_index,
-                outcome,
-            });
-
-            if stop {
-                break;
-            }
+        match self
+            .graphql_client
+            .execute_operation(Operation::build_operation(variables))
+            .await
+        {
+            Ok(response) => outcome_mapper::map_batch_apply_manifests_application_outcome(
+                response.resources.apply_manifests,
+            ),
+            Err(error) => outcome_mapper::map_batch_apply_manifests_application_rollback(error),
         }
-
-        Ok(ApplyManifestBatchResponse { items })
     }
 
     async fn delete(

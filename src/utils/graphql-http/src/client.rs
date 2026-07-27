@@ -158,6 +158,7 @@ impl GraphqlHttpClient {
         if let Some(errors) = response.errors
             && !errors.is_empty()
         {
+            let extensions = errors.first().and_then(|error| error.extensions.clone());
             let message = errors
                 .into_iter()
                 .map(|error| error.message)
@@ -172,6 +173,7 @@ impl GraphqlHttpClient {
             return Err(GraphqlHttpRequestError::graphql(
                 self.endpoint_url.clone(),
                 message,
+                extensions,
             ));
         }
 
@@ -213,6 +215,9 @@ struct GraphqlResponse {
 #[derive(Debug, Deserialize)]
 struct GraphqlError {
     message: String,
+
+    #[serde(default)]
+    extensions: Option<serde_json::Map<String, JsonValue>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

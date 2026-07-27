@@ -347,6 +347,10 @@ impl ApplyCommand {
             .into_iter()
             .map(|item| (item.request_index, item.outcome))
             .collect::<std::collections::HashMap<_, _>>();
+        let rolled_back_successes = response
+            .rolled_back_successes
+            .into_iter()
+            .collect::<std::collections::HashSet<_>>();
 
         for (request_index, manifest) in manifests.iter().enumerate() {
             let source = manifest.source.to_string();
@@ -354,9 +358,14 @@ impl ApplyCommand {
 
             match results_by_index.remove(&request_index) {
                 None => {
-                    // Never attempted: the batch stopped before reaching this item.
-                    summary.record_not_attempted();
-                    printer.print_not_attempted(item_progress, &source);
+                    if rolled_back_successes.contains(&request_index) {
+                        summary.record_rolled_back();
+                        printer.print_rolled_back(item_progress, &source, None, self.dry_run)?;
+                    } else {
+                        // Never attempted: the batch stopped before reaching this item.
+                        summary.record_not_attempted();
+                        printer.print_not_attempted(item_progress, &source);
+                    }
                 }
                 Some(Ok(ExecuteResourceManifestOutcome::Accepted(result))) => {
                     if committed {
@@ -364,7 +373,12 @@ impl ApplyCommand {
                         printer.print_accepted(item_progress, &source, &result, self.dry_run)?;
                     } else {
                         summary.record_rolled_back();
-                        printer.print_rolled_back(item_progress, &source, &result, self.dry_run)?;
+                        printer.print_rolled_back(
+                            item_progress,
+                            &source,
+                            Some(&result.resource),
+                            self.dry_run,
+                        )?;
                     }
                 }
                 Some(Ok(ExecuteResourceManifestOutcome::Rejected(rejection))) => {
@@ -600,6 +614,7 @@ where
                 outcome: item.outcome.map(ExecuteResourceManifestOutcome::from),
             })
             .collect(),
+        rolled_back_successes: response.rolled_back_successes,
     }
 }
 
@@ -736,12 +751,15 @@ impl<'a> ApplyPrinter<'a> {
 
     /// Prints an item that individually succeeded but was not persisted
     /// because the enclosing single-transaction batch rolled back due to a
-    /// later item's rejection/failure.
+    /// later item's rejection/failure. `resource` is only available when the
+    /// facade could report the item's real post-apply state (the local
+    /// path); the remote GraphQL path rolls back server-side and cannot hand
+    /// back a resource that was never committed, so it prints without one.
     fn print_rolled_back(
         &self,
         item_progress: ApplyItemProgress<'_>,
         source: &str,
-        result: &ExecutedResourceManifestResult,
+        resource: Option<&Resource>,
         dry_run: bool,
     ) -> Result<(), CLIError> {
         let label = if dry_run {
@@ -761,8 +779,10 @@ impl<'a> ApplyPrinter<'a> {
         );
         self.increment_completed(progress);
 
-        if self.should_print_verbose_resource() {
-            self.print_verbose_resource(progress, &result.resource)?;
+        if let Some(resource) = resource
+            && self.should_print_verbose_resource()
+        {
+            self.print_verbose_resource(progress, resource)?;
         }
 
         Ok(())

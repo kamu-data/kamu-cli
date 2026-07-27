@@ -9,6 +9,7 @@
 
 use kamu_resources as domain;
 
+use crate::facade::graphql::cynic_api::fragments::ResourceManifestFormat;
 use crate::facade::graphql::cynic_api::scalars::AccountName;
 use crate::facade::graphql::cynic_api::schema;
 use crate::{ResourceBatchSelector, ResourceRef, ResourceSelector, SearchResourceHandlesRequest};
@@ -125,6 +126,15 @@ impl TryFrom<&ResourceBatchSelector> for ResourceBatchSelectorInput {
             account: value.account.as_ref().map(Into::into),
         })
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::InputObject, Debug, Clone)]
+#[cynic(graphql_type = "ApplyManifestInput")]
+pub(crate) struct ApplyManifestInput {
+    pub manifest: String,
+    pub format: ResourceManifestFormat,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -505,6 +505,11 @@ type AdminSearchMut {
 	resetSearchIndices(entityNames: [SearchEntityName!]): String!
 }
 
+input ApplyManifestInput {
+	manifest: String!
+	format: ResourceManifestFormat!
+}
+
 type ApplyRolesMatrixResult {
 	message: String!
 }
@@ -3919,6 +3924,15 @@ enum ResourceApplyChangeKind {
 	SPEC
 }
 
+type ResourceApplyManifestItemResult {
+	requestIndex: Int!
+	outcome: ResourceApplyOutcome!
+}
+
+type ResourceApplyManifestsResult {
+	items: [ResourceApplyManifestItemResult!]!
+}
+
 enum ResourceApplyOperation {
 	CREATED
 	UPDATED
@@ -4397,6 +4411,7 @@ type Resources {
 
 type ResourcesMut {
 	applyManifest(manifest: String!, format: ResourceManifestFormat!, dryRun: Boolean): ResourceApplyOutcome!
+	applyManifests(manifests: [ApplyManifestInput!]!, dryRun: Boolean): ResourceApplyManifestsResult!
 	delete(selector: ResourceSelectorInput!): ResourceDeleteOutcome!
 	deleteMany(selector: ResourceBatchSelectorInput!): ResourceDeleteManyOutcome!
 }

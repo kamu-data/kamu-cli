@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 pub(crate) mod apply;
+pub(crate) mod apply_batch;
 pub(crate) mod delete;
 pub(crate) mod get_resource;
 pub(crate) mod get_resources;

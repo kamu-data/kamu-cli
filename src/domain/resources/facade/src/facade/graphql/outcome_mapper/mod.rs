@@ -7,9 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+mod apply_batch_helpers;
 mod batch_helpers;
 mod operation_outcomes;
 mod problem_mappers;
 
+pub(crate) use apply_batch_helpers::*;
 pub(crate) use operation_outcomes::*;
 pub(crate) use problem_mappers::{bad_account_problem_error, unsupported_descriptor_problem_error};

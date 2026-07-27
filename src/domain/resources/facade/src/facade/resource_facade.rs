@@ -209,6 +209,17 @@ pub struct ApplyManifestBatchRequest {
 #[derive(Debug)]
 pub struct ApplyManifestBatchResponse<D> {
     pub items: Vec<ApplyManifestBatchItemResult<D>>,
+    /// Positional indexes of items that individually succeeded but whose
+    /// accepted details could not be returned because the enclosing
+    /// single-transaction batch rolled back.
+    ///
+    /// This is transport metadata, not a per-item error. Local facades can
+    /// keep this empty because they report every attempted item's real
+    /// pre-rollback outcome in `items`; remote transports such as GraphQL use
+    /// this to make rolled-back successes explicit when rollback is forced
+    /// through a transport-level error and the normal `data` payload is not
+    /// available.
+    pub rolled_back_successes: Vec<usize>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

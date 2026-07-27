@@ -98,14 +98,9 @@ pub async fn test_resources_apply_batch(ctx: ResourceCtx) {
     // `variables`) is rejected. Without --continue-on-error the whole batch is
     // one transaction: the rejection rolls back everything, including valid-a
     // (listed before it, which individually would have succeeded). valid-b
-    // (listed after) is never attempted at all.
-    //
-    // NOTE: this assumes true atomicity, which the remote facade does not yet
-    // provide (Phase 4 — real batch GraphQL mutation + transport-error
-    // rollback — is not implemented; the remote facade still loops over the
-    // single-item mutation, so valid-a stays committed there today). The two
-    // remote-context failures this causes are expected and tracked against
-    // Phase 4, not treated as a regression here.
+    // (listed after) is never attempted at all. This holds identically for
+    // both local (DB transaction) and remote (GraphQL batch mutation +
+    // transport-error-forced rollback) contexts.
     {
         let a_name = "stop-valid-a";
         let invalid_name = "stop-invalid";

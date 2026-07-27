@@ -444,7 +444,10 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             }
         }
 
-        Ok(ApplyManifestBatchResponse { items })
+        Ok(ApplyManifestBatchResponse {
+            items,
+            rolled_back_successes: Vec::new(),
+        })
     }
 
     async fn apply_manifests(
@@ -469,7 +472,10 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             }
         }
 
-        Ok(ApplyManifestBatchResponse { items })
+        Ok(ApplyManifestBatchResponse {
+            items,
+            rolled_back_successes: Vec::new(),
+        })
     }
 
     async fn delete_many(
