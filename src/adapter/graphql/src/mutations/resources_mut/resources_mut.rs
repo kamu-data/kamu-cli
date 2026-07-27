@@ -451,11 +451,19 @@ fn build_apply_manifest_summary<D>(
     summary
 }
 
-/// Forces a transport-level GraphQL error so the enclosing
-/// `#[transactional_handler]` rolls back the whole batch. Rollback is
-/// batch-transaction metadata, not a per-item error, so it is carried
-/// entirely via `extensions` (as `ApplyManifestBatchSummary`) rather than
-/// folded into any per-item outcome. The rich per-item `Resource`
+/// Forces a transport-level GraphQL error so the whole request's database
+/// transaction rolls back. The transaction itself is opened by the
+/// `#[transactional_handler]`-annotated `graphql_handler` in
+/// `app/cli/src/explore/graphql_handler.rs`, which wraps the *entire*
+/// `schema.execute()` call and rolls back on any error in the response — not
+/// something local to this resolver. Because that transaction is
+/// request-scoped rather than field-scoped, a client that bundles
+/// `applyManifests` with an unrelated top-level mutation in the same GraphQL
+/// request would roll back that mutation too if this batch fails.
+///
+/// Rollback is batch-transaction metadata, not a per-item error, so it is
+/// carried entirely via `extensions` (as `ApplyManifestBatchSummary`) rather
+/// than folded into any per-item outcome. The rich per-item `Resource`
 /// GraphQL/domain types have no `serde::Serialize` (much of that graph is
 /// auto-generated), so the rollback payload intentionally carries only a
 /// lightweight summary per item, rather than the full resource.

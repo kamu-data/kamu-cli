@@ -142,6 +142,12 @@ applied through the remote GraphQL API.
 
 Use `--dry-run` to preview the accepted changes without applying them.
 
+By default, a multi-manifest batch is applied atomically: if any manifest is
+rejected or fails, the entire batch is rolled back, including manifests
+earlier in the batch that would otherwise have succeeded. Use
+`--continue-on-error` to instead apply each manifest independently, so that
+earlier successes are kept even if a later manifest fails.
+
 **Examples:**
 
 Apply a single manifest:
@@ -192,7 +198,9 @@ pub struct Apply {
     #[arg(long)]
     pub stdin: bool,
 
-    /// Continue processing after per-manifest failures
+    /// Apply each manifest independently instead of the batch as a single
+    /// all-or-nothing transaction, so earlier successes survive a later
+    /// manifest's rejection or failure
     #[arg(long)]
     pub continue_on_error: bool,
 }

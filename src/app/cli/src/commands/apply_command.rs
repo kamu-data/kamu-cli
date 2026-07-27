@@ -755,6 +755,11 @@ impl<'a> ApplyPrinter<'a> {
     /// facade could report the item's real post-apply state (the local
     /// path); the remote GraphQL path rolls back server-side and cannot hand
     /// back a resource that was never committed, so it prints without one.
+    ///
+    /// Under `--dry-run` nothing is ever committed to begin with, so there is
+    /// no transaction to roll back; the wording instead reflects that this
+    /// item's plan was cut short because a later manifest in the same batch
+    /// stopped planning.
     fn print_rolled_back(
         &self,
         item_progress: ApplyItemProgress<'_>,
@@ -762,16 +767,22 @@ impl<'a> ApplyPrinter<'a> {
         resource: Option<&Resource>,
         dry_run: bool,
     ) -> Result<(), CLIError> {
-        let label = if dry_run {
-            "Not committed (dry-run, batch rolled back)"
+        let (label, detail) = if dry_run {
+            (
+                "Not planned (batch stopped)",
+                "would have been planned, but a later manifest in the batch stopped planning",
+            )
         } else {
-            "Not committed (batch rolled back)"
+            (
+                "Not committed (batch rolled back)",
+                "would have been applied, but not committed (batch rolled back)",
+            )
         };
 
         let progress = self.finish_item(
             item_progress,
             format!(
-                "{}: {} -> would have been applied, but not committed (batch rolled back)",
+                "{}: {} -> {detail}",
                 console::style(label).yellow().bold(),
                 source
             ),
