@@ -125,7 +125,7 @@ Create or update resources from manifest files
 
 * `-r`, `--recursive` — Recursively scan directories for manifests
 * `--stdin` — Read manifest from standard input
-* `--continue-on-error` — Continue processing after per-manifest failures
+* `--continue-on-error` — Apply each manifest independently instead of the batch as a single all-or-nothing transaction, so earlier successes survive a later manifest's rejection or failure
 
 Applies one or more resource manifests to the active resource context.
 
@@ -134,6 +134,12 @@ workspace. If the active context points to a remote server, manifests are
 applied through the remote GraphQL API.
 
 Use `--dry-run` to preview the accepted changes without applying them.
+
+By default, a multi-manifest batch is applied atomically: if any manifest is
+rejected or fails, the entire batch is rolled back, including manifests
+earlier in the batch that would otherwise have succeeded. Use
+`--continue-on-error` to instead apply each manifest independently, so that
+earlier successes are kept even if a later manifest fails.
 
 **Examples:**
 
