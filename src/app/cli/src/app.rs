@@ -182,7 +182,10 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
                 is_e2e_testing,
             )?;
 
-            let base_catalog = base_catalog_builder.build();
+            let base_catalog =
+                kamu_resources_services::build_catalog_with_resource_extension_schema_registry(
+                    base_catalog_builder,
+                )?;
 
             // Database requires extra actions:
             if let Some(db_config) = &database_config {

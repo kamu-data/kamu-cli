@@ -13,6 +13,7 @@ use std::sync::Arc;
 use internal_error::InternalError;
 use kamu_resources::*;
 use kamu_resources_services::{
+    ResourceExtensionSchemaResolver,
     get_resource_crud_dispatcher,
     get_resource_crud_dispatcher_by_raw_selector,
     get_resource_crud_dispatcher_for_trusted_schema,
@@ -29,6 +30,7 @@ pub struct LocalResourceFacadeImpl {
     catalog: dill::Catalog,
     resource_account_resolver: Arc<dyn ResourceAccountResolver>,
     generic_resource_query_service: Arc<dyn GenericResourceQueryService>,
+    resource_extension_schema_resolver: Arc<ResourceExtensionSchemaResolver>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -891,8 +893,34 @@ impl LocalResourceFacadeImpl {
             manifest.schema.as_str(),
         )?;
 
-        let headers = make_headers_input(&manifest, &target_account)?;
-        let header_warnings = collect_manifest_header_warnings(&manifest);
+        let canonical_labels = self
+            .resource_extension_schema_resolver
+            .canonicalize_entries(
+                ResourceExtensionKind::Label,
+                manifest.headers.labels.clone(),
+                &manifest.schema,
+            )?;
+        let canonical_annotations = self
+            .resource_extension_schema_resolver
+            .canonicalize_entries(
+                ResourceExtensionKind::Annotation,
+                manifest.headers.annotations.clone(),
+                &manifest.schema,
+            )?;
+
+        let mut header_warnings = collect_manifest_header_warnings(&canonical_annotations.entries);
+        header_warnings.extend(collect_non_indexable_label_warnings(
+            &canonical_labels.entries,
+        ));
+        header_warnings.extend(canonical_labels.warnings);
+        header_warnings.extend(canonical_annotations.warnings);
+
+        let headers = make_headers_input(
+            manifest.headers.name.as_str(),
+            &target_account,
+            canonical_labels.entries,
+            canonical_annotations.entries,
+        )?;
 
         self.ensure_manifest_id_is_accessible(
             manifest.schema.typ(),

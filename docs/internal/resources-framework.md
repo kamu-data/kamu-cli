@@ -137,8 +137,8 @@ long-term goal. This page documents what exists now.
 | **SpecViewMode** | How sensitive spec fields render. Two modes: `Encrypted` (default — stored ciphertext as-is) and `Revealed` (decrypted). No "redacted" mode today. |
 | **Dispatcher** | Per-type adapter (`ResourceCrudDispatcher`, …) registered in `dill`, looked up by schema or selector metadata. |
 | **Facade** | The single API seam (`ResourceFacade`); local or remote-GraphQL impl. |
-| **TypeRef** | A label/annotation *key*: a short `TypeName` (e.g. `env`) or a full schema URI, per ODF RFC-018 (`odf::metadata::resource::TypeRef` = `Uri \| Name`). `Ord`, so a `BTreeMap` key; serializes as a plain string. |
-| **Labels / Annotations** | `headers.{labels,annotations}`: `BTreeMap<TypeRef, serde_json::Value>` (arbitrary JSON keyed by `TypeRef`, not flat `String → String`). Per RFC-018, labels are meant to be indexed/queryable and annotations not — **indexing not yet implemented**. |
+| **TypeRef** | A label/annotation *key*: a short `TypeName` (e.g. registered `environment`, or free-form `env`) or a full schema URI, per ODF RFC-018 (`odf::metadata::resource::TypeRef` = `Uri \| Name`). `Ord`, so a `BTreeMap` key; serializes as a plain string. |
+| **Labels / Annotations** | `headers.{labels,annotations}`: `BTreeMap<TypeRef, serde_json::Value>` (arbitrary JSON keyed by `TypeRef`, not flat `String → String`). Manifest input starts as ordered `Vec<(TypeRef, Value)>` so duplicate keys can be rejected before map construction; registered extension keys are canonicalized to schema URI and typed-value validated during facade apply preparation. Per RFC-018, labels are meant to be indexed/queryable and annotations not — **indexing not yet implemented**. |
 
 ---
 
@@ -383,18 +383,16 @@ A user may write **only**: `$schema`, `headers.{id?, account?, name, labels, ann
 
 > **Well-known annotations.** `description` is not a dedicated header field — it is the *first*
 > well-known entry in `headers.annotations`, establishing the pattern future well-known annotations
-> (e.g. an icon or docs link) will follow. A well-known annotation is declared as a schema-URI
-> constant plus a `..._type_ref()` helper (see
-> [`values/resource_annotation.rs`](/src/domain/resources/domain/src/values/resource_annotation.rs),
-> mirroring the `RESOURCE_CONDITION_*_SCHEMA_URI` convention used for conditions), with an
-> informational JSON Schema doc under `schemas/resource/v1alpha1/annotations/` (not yet validated or
-> registered, same caveat as condition schemas). **Lookup is temporarily dual-keyed**: code that reads
-> the description (the missing-description lint, the CLI render path, view derivation) checks both the
-> canonical schema URI (`https://kamu.dev/schemas/resource/v1alpha1/annotations/Description`) and the
-> short alias (`description`) as equivalent, because there is no short-name-to-URI normalization
-> mechanism yet. This is a deliberate short-term compromise, not the long-term shape — new well-known
-> annotations should not copy the dual-key lookup once normalization exists. A manifest author writes
-> it as, e.g.:
+> (e.g. an icon or docs link) will follow. A well-known annotation is declared as a schema URI,
+> embedded JSON Schema doc, and typed validator in
+> [`validation/schemas/annotations/description.rs`](/src/domain/resources/domain/src/validation/schemas/annotations/description.rs),
+> mirroring the category-specific schema files used for labels and conditions. A DI-registered
+> extension-schema dispatcher validates the value and the facade apply preparation canonicalizes
+> authored short names (for example `description`) to the stable schema URI
+> (`https://kamu.dev/schemas/resource/v1alpha1/annotations/Description`) before diffing and storage.
+> Runtime description lookup and the missing-description warning therefore read the canonical URI
+> key only; the short name is an input spelling, not stored identity.
+> A manifest author writes it as, e.g.:
 > ```yaml
 > headers:
 >   name: my-resource
@@ -528,14 +526,28 @@ The behaviorally-significant consequences of adopting these shapes:
   carries `value` (the `True`/`False`/`Unknown` signal, matching the ODF `ResourceCondition`
   meta-schema's required `value` property), `reason`, optional `message`, and `lastTransitionTime`.
   `conditions` is optional (absent → `None`, not empty map): new resources have none, and a spec
-  update clears them. The schema docs under `src/domain/resources/schemas/…/conditions/` are not yet validated
-  or registered.
+  update clears them. The schema docs under `src/domain/resources/schemas/…/conditions/` are embedded
+  from the corresponding `validation/schemas/conditions/*` files into DI-registered extension
+  dispatchers; value validation is strict serde over `ResourceConditionValue` (unknown fields are
+  rejected).
 - **Manifest labels/annotations reject duplicate keys.** The ODF proxy deserializes into a `BTreeMap`
   that silently drops duplicates (last-write-wins), so `ResourceManifestHeaders.{labels,annotations}`
   stay `Vec<(TypeRef, serde_json::Value)>` with a custom visitor that errors on a repeated key. An
   invalid key fails at manifest *parse* time (`ParseManifest`), not headers validation — so the
   `InvalidLabelKey`/`InvalidAnnotationKey` and per-value-size problem codes were removed as
   unreachable; only entry *counts* (`MAX_LABELS`/`MAX_ANNOTATIONS`) are enforced.
+- **Registered label/annotation keys are canonicalized before diffing.** Facade apply preparation
+  resolves `headers.labels` and `headers.annotations` with `ResourceExtensionSchemaResolver` before
+  constructing `ResourceHeadersInput`. Short names and aliases that resolve to a registered extension
+  are rewritten to the canonical schema URI, so re-applying `description` after a stored URI form (or
+  vice versa) is `Untouched` rather than a headers update. Duplicate keys that only become duplicates
+  after canonicalization are rejected as `InvalidHeaders`. Unknown short names remain free-form and
+  are preserved, with a warning; unknown full URIs are strict and are rejected.
+- **Resource warning codes live with `ResourceWarning`.** Core resource-header warnings are defined in
+  [`values/resource_warning.rs`](/src/domain/resources/domain/src/values/resource_warning.rs): missing
+  description, non-indexable labels, and free-form label/annotation warnings. Configuration-specific
+  spec warnings stay on their spec input types (`VariableSetSpecInput`, `SecretSetSpecInput`) because
+  those are configuration-domain lints.
 
 Also generated: `id` (allocated if the manifest omitted it). Reconciliation time is represented
 inside the status object as `status.reconciledAt`; there is no separate top-level timestamp.
@@ -761,6 +773,30 @@ single place where this crate's `dill` catalog components (base query services, 
 cases, and the outbox message consumers) are registered. Per-type use cases and dispatchers are
 registered separately by the type's own crate (see [§14](#14-concrete-resource-types-kamu-configuration)).
 
+**Extension-schema registry.** Built-in label/annotation/condition schemas register
+`ResourceExtensionSchemaDispatcher` trait objects through the same dill metadata pattern as CRUD
+dispatchers. During catalog assembly,
+`kamu_resources_services::build_catalog_with_resource_extension_schema_registry` builds a preview
+catalog, constructs `ResourceExtensionSchemaRegistry` from every registered dispatcher, attaches the
+immutable registry value, and returns the final catalog. The registry parses const-friendly metadata
+into runtime records, checks duplicate schema IDs and short-name conflicts, and precomputes lookup
+indexes by URI plus short-name precedence tiers (exact resource type → versioned context → context →
+any resource). `ResourceExtensionSchemaResolver` sits on top of the registry: exact URI keys are
+strict (unknown / wrong-kind / inapplicable URIs reject), while unresolved short names are preserved
+as free-form extension keys with warnings. For registered labels and annotations the resolver also
+validates the JSON value through the schema dispatcher and rewrites the key to the canonical schema
+URI before headers are converted into maps. `ResourcePersistenceServiceHelper` delegates to
+`ResourceDurableStateValidator` before create/save repository/event-store writes: registered
+label/annotation URIs and all condition URIs must resolve, apply to the resource schema, and
+validate through their dispatcher; registered short aliases are rejected as noncanonical durable
+state; unknown short label/annotation names remain free-form. The validator reports
+`ResourceDurableStateValidationError`, composed from existing domain errors such as
+`ParseResourceSchemaError`, `ResourceExtensionResolutionError`, and `ResourceExtensionValueError`.
+Persistence carries it as `ResourcePersistenceError::InvalidDurableState`; public use-case
+boundaries translate that into an internal error because user-authored paths should have been
+rejected earlier. Delete is not blocked by this guard, so cleanup can still remove a resource that
+already contains corrupt extension state. Label indexing and filtering are later phases.
+
 ---
 
 ## 10. Facade (`kamu-resources-facade`)
@@ -817,7 +853,11 @@ Batch operations return `BatchResourceResponse<T, E>` with positional `successes
 - **`LocalResourceFacadeImpl`** — resolves account → resolves selector name/alias to a
   schema and UID/snapshot → looks up the per-type dispatcher via `get_resource_crud_dispatcher` →
   calls it. Holds the `dill::Catalog`,
-  a `ResourceAccountResolver`, and `GenericResourceQueryService`.
+  a `ResourceAccountResolver`, `GenericResourceQueryService`, and
+  `ResourceExtensionSchemaResolver`. For `plan_apply_manifest` / `apply_manifest`, the shared
+  preparation step parses the manifest, resolves the account, resolves the CRUD dispatcher,
+  canonicalizes and validates labels/annotations, collects header warnings, then builds
+  `ResourceHeadersInput`; this is why plan/apply accept, reject, and warn identically.
 - **`RemoteGraphqlResourceFacadeImpl`** — a `cynic`-based GraphQL client that issues the queries /
   mutations of a remote server (whose resolvers use a *local* facade there). Operations live under
   `facade/graphql/cynic_api/operations/`; responses are mapped back to domain views/errors in
@@ -856,7 +896,8 @@ typed `Problem` variants *and* transport-level GraphQL errors. The apply outcome
 - `Rejection` → category (`ImmutableFieldChanged`, `BusinessValidationFailed`,
   `ReferencedObjectMissing`, `LifecycleRuleConflict`) + message.
 - `ParseManifest`, `UnsupportedDescriptor`, `BadAccount`, `InvalidHeaders`, `InvalidSpec` →
-  structured validation/parse problems.
+  structured validation/parse problems. Extension-schema resolution failures are reported as
+  `InvalidHeaders` with `ResourceHeaderValidationProblemCode::ResourceExtensionSchema`.
 
 These map directly from the domain views in
 [`views/apply_manifest_views.rs`](/src/domain/resources/domain/src/views/apply_manifest_views.rs)
@@ -947,15 +988,18 @@ sequenceDiagram
     participant D as ManifestDiscovery+Execution
     participant F as ResourceFacade (Local)
     participant R as Dispatcher registry
+    participant X as Extension schema resolver
     participant UC as ApplyResourceUseCase<R>
     participant ST as Event store + repo
     participant OB as Outbox
 
     U->>D: apply -f manifest.yaml [--dry-run]
     D->>F: apply_manifest(ApplyManifestRequest) (or plan_apply_manifest)
-    F->>F: resolve account, parse manifest ($schema, spec)
+    F->>F: resolve account, parse manifest ($schema, headers, spec)
     F->>R: get_resource_crud_dispatcher(schema)
     R-->>F: ResourceCrudDispatcher<R>
+    F->>X: canonicalize + validate labels/annotations
+    X-->>F: canonical headers + warnings (or InvalidHeaders)
     F->>UC: plan(params)  %% validate + diff (create/update/untouched)
     alt dry-run
         UC-->>F: ApplyResourcePlanningDecision (Planned | Rejected)
@@ -1261,8 +1305,8 @@ Otherwise the behavior is already guaranteed for both implementations by the con
 | Layer | Crate | Directory | Key files |
 | --- | --- | --- | --- |
 | Domain model | `kamu-resources` | `src/domain/resources/domain/src` | `core/`, `state/`, `values/`, `manifests/`, `repo/`, `dispatchers/`, `messages/`, `use_cases/`, `views/` |
-| Domain schemas | `kamu-resources` | `src/domain/resources/schemas` | Informational JSON schemas for framework-owned resource extensions, currently built-in status conditions. |
-| Services | `kamu-resources-services` | `src/domain/resources/services/src` | `use_cases/{apply,reconcile,delete}.rs`, `crud_dispatchers/resource_crud_dispatcher_registry.rs`, `message_handlers/`, `event_stores/`, `dependencies.rs` |
+| Domain schemas | `kamu-resources` | `src/domain/resources/schemas` | Informational JSON schemas for framework-owned resource extensions: built-in labels, annotations, and status conditions. |
+| Services | `kamu-resources-services` | `src/domain/resources/services/src` | `use_cases/{apply,reconcile,delete}.rs`, `crud_dispatchers/resource_crud_dispatcher_registry.rs`, `resource_extension_schemas/`, `message_handlers/`, `event_stores/`, `dependencies.rs` |
 | Facade | `kamu-resources-facade` | `src/domain/resources/facade/src/facade` | `resource_facade.rs`, `local/`, `graphql/` |
 | GraphQL | (adapter) | `src/adapter/graphql/src` | `queries/resources/`, `mutations/resources_mut/` |
 | CLI commands | (app/cli) | `src/app/cli/src/commands` | `apply_command.rs`, `list_resources_command.rs`, `get_resource_command.rs`, `delete_resources_command.rs`, `context_*_command.rs` |
@@ -1281,6 +1325,12 @@ Otherwise the behavior is already guaranteed for both implementations by the con
   `UnsupportedResourceDescriptorError::NotFound`; two matching registrations yield `Duplicate`.
   Selector-based lookup (`variablesets`, `vs`, etc.) is a separate metadata path and yields
   selector-specific not-found/duplicate errors.
+- **Extension-schema dispatch is also by schema URI.** Built-in extension dispatchers are registered
+  for `description`, `environment`, and the three status conditions. Registry construction is an
+  explicit catalog-assembly step and fails on duplicate extension schema IDs, invalid `https://`
+  metadata, or same-tier short-name conflicts. Full URI keys are exact and strict; short names are
+  human-authored aliases resolved through case-insensitive `TypeName` precedence tiers. Unknown short
+  names stay free-form with warnings, while unknown full URIs reject.
 - **Manifests are strict** — `#[serde(deny_unknown_fields)]` means a manifest cannot carry
   `status`, timestamps, or `generation`. Those are server-owned
   ([§5a](#5a-resource-anatomy--input-vs-auto-generated)).

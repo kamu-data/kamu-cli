@@ -33,6 +33,13 @@ pub const SECRET_SET_SCHEMA: &str = odf::metadata::config::SecretSet::schema_str
 /// full canonical `$schema` URIs.
 pub const VARIABLE_SET_SHORT_NAME: &str = "VariableSet";
 pub const SECRET_SET_SHORT_NAME: &str = "SecretSet";
+pub const DESCRIPTION_ANNOTATION_SCHEMA: &str =
+    "https://kamu.dev/schemas/resource/v1alpha1/annotations/Description";
+/// Canonical schema URI for the built-in `environment` label (see
+/// `kamu_resources::RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI`, duplicated here so
+/// this crate does not need a `kamu-resources` dependency).
+pub const ENVIRONMENT_LABEL_SCHEMA: &str =
+    "https://kamu.dev/schemas/resource/v1alpha1/labels/Environment";
 
 /// Kamu config enabling secrets encryption. `SecretSet` apply encrypts values
 /// via the configured key, so any scenario that applies a `SecretSet` must run
@@ -81,9 +88,9 @@ pub fn variable_set_manifest_yaml(name: &str, value: &str) -> String {
 
 /// Same as [`variable_set_manifest_yaml`] but carries a populated
 /// `headers.labels`/`headers.annotations` block — a short `TypeName` label
-/// key, a full `TypeUri` label key with a nested-object value, and two
-/// annotations (the well-known `description` plus an `owner`) — to pin the
-/// ODF `TypeRef`-keyed canonical shape end-to-end.
+/// key, a free-form short label key with a nested-object value, and two
+/// annotations (the well-known `description` plus an `owner`) — to pin the ODF
+/// `TypeRef`-keyed canonical shape end-to-end.
 pub fn variable_set_manifest_yaml_with_labels(name: &str, value: &str) -> String {
     indoc::formatdoc!(
         r#"
@@ -92,7 +99,7 @@ pub fn variable_set_manifest_yaml_with_labels(name: &str, value: &str) -> String
           name: {name}
           labels:
             env: prod
-            https://opendatafabric.org/schemas/labels/v1/Team:
+            team:
               name: data-platform
           annotations:
             description: {DEFAULT_DESCRIPTION}
@@ -246,6 +253,110 @@ pub fn variable_set_manifest_business_invalid(name: &str) -> String {
           name: {name}
         spec:
           variables: {{}}
+        "#
+    )
+}
+
+/// A `VariableSet` manifest authoring the built-in `environment` label under
+/// the given key (short name `environment` or the canonical
+/// [`ENVIRONMENT_LABEL_SCHEMA`] URI — callers pass whichever key the scenario
+/// is exercising) with the given value.
+pub fn variable_set_manifest_with_environment_label(
+    name: &str,
+    value: &str,
+    label_key: &str,
+) -> String {
+    indoc::formatdoc!(
+        r#"
+        $schema: {VARIABLE_SET_SCHEMA}
+        headers:
+          name: {name}
+          labels:
+            {label_key}: {value}
+          annotations:
+            description: {DEFAULT_DESCRIPTION}
+        spec:
+          variables:
+            MESSAGE: value
+        "#
+    )
+}
+
+/// A `VariableSet` manifest carrying a label under an unregistered
+/// `https://…` URI key — exercises the "unknown URI is rejected" rule
+/// (registered URIs are a closed set).
+pub fn variable_set_manifest_with_unknown_label_uri(name: &str) -> String {
+    indoc::formatdoc!(
+        r#"
+        $schema: {VARIABLE_SET_SCHEMA}
+        headers:
+          name: {name}
+          labels:
+            https://kamu.dev/schemas/resource/v1alpha1/labels/NotRegistered: value
+        spec:
+          variables:
+            MESSAGE: value
+        "#
+    )
+}
+
+/// A `VariableSet` manifest whose `description` annotation is over the
+/// built-in 4096-character limit — exercises the schema-driven rejection path
+/// end-to-end via the CLI.
+pub fn variable_set_manifest_with_overlong_description(name: &str) -> String {
+    let description = "x".repeat(4097);
+    indoc::formatdoc!(
+        r#"
+        $schema: {VARIABLE_SET_SCHEMA}
+        headers:
+          name: {name}
+          annotations:
+            description: {description}
+        spec:
+          variables:
+            MESSAGE: value
+        "#
+    )
+}
+
+/// A `VariableSet` manifest carrying an unregistered **short-name** label —
+/// exercises the free-form-short-name-accepted-with-warning path (stored
+/// opaquely, `resource_freeform_labels` warning emitted).
+pub fn variable_set_manifest_with_freeform_label(name: &str) -> String {
+    indoc::formatdoc!(
+        r#"
+        $schema: {VARIABLE_SET_SCHEMA}
+        headers:
+          name: {name}
+          labels:
+            team: data-platform
+          annotations:
+            description: {DEFAULT_DESCRIPTION}
+        spec:
+          variables:
+            MESSAGE: value
+        "#
+    )
+}
+
+/// A `VariableSet` manifest carrying a **structured** (non-string) label
+/// value — exercises the `resource_label_not_indexed` warning path; the
+/// structured value itself must be preserved as-is by `get`.
+pub fn variable_set_manifest_with_structured_label(name: &str) -> String {
+    indoc::formatdoc!(
+        r#"
+        $schema: {VARIABLE_SET_SCHEMA}
+        headers:
+          name: {name}
+          labels:
+            coordinates:
+              lat: 1
+              lon: 2
+          annotations:
+            description: {DEFAULT_DESCRIPTION}
+        spec:
+          variables:
+            MESSAGE: value
         "#
     )
 }

@@ -117,6 +117,12 @@ where
             Err(ResourcePersistenceError::ConcurrentModification(err)) => {
                 Err(DeleteResourcesError::ConcurrentModification(err))
             }
+            Err(ResourcePersistenceError::InvalidDurableState(err)) => {
+                Err(DeleteResourcesError::Internal(
+                    err.int_err()
+                        .with_context("Failed to persist deleted resources"),
+                ))
+            }
             Err(ResourcePersistenceError::Internal(err)) => Err(DeleteResourcesError::Internal(
                 err.with_context("Failed to persist deleted resources"),
             )),

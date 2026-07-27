@@ -10,5 +10,6 @@
 mod test_apply_resource_plan_executor;
 mod test_apply_resource_planner;
 mod test_generic_resource_query_service;
+mod test_resource_durable_state_validator;
 mod test_resource_persistence_service;
 mod test_typed_resource_query_service;

@@ -66,7 +66,7 @@ impl BaseGQLResourceHarness {
             MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
         );
 
-        b.build()
+        kamu_resources_services::build_catalog_with_resource_extension_schema_registry(b).unwrap()
     }
 
     pub fn new_with_config(tenancy_config: TenancyConfig, outbox_provider: OutboxProvider) -> Self {

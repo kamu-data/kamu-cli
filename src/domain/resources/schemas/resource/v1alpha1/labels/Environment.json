@@ -1,0 +1,6 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kamu.dev/schemas/resource/v1alpha1/labels/Environment",
+  "title": "Environment Resource Label",
+  "type": "string"
+}

@@ -10,21 +10,19 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::{TypeRef, TypeUri};
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub const RESOURCE_CONDITION_ACCEPTED_SCHEMA_URI: &str =
-    "https://kamu.dev/schemas/resource/v1alpha1/conditions/Accepted";
-pub const RESOURCE_CONDITION_READY_SCHEMA_URI: &str =
-    "https://kamu.dev/schemas/resource/v1alpha1/conditions/Ready";
-pub const RESOURCE_CONDITION_RECONCILING_SCHEMA_URI: &str =
-    "https://kamu.dev/schemas/resource/v1alpha1/conditions/Reconciling";
+use crate::{
+    RESOURCE_CONDITION_ACCEPTED_SCHEMA_URI,
+    RESOURCE_CONDITION_READY_SCHEMA_URI,
+    RESOURCE_CONDITION_RECONCILING_SCHEMA_URI,
+    TypeRef,
+    TypeUri,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
 pub struct ResourceConditionValue {
     pub value: ResourceConditionStatus,
     pub reason: String,

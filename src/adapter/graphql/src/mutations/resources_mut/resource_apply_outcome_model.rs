@@ -45,11 +45,11 @@ pub enum ResourceHeaderValidationProblemCode {
     EmptyName,
     NameTooLong,
     InvalidName,
-    DescriptionTooLong,
     TooManyLabels,
     DuplicateLabelKey,
     TooManyAnnotations,
     DuplicateAnnotationKey,
+    ResourceExtensionSchema,
 }
 
 impl From<kamu_resources::ResourceHeadersValidationError> for ResourceInvalidHeaderProblem {
@@ -65,12 +65,14 @@ impl From<kamu_resources_facade::ResourceInvalidHeadersError> for ResourceInvali
             C::EmptyName => ResourceHeaderValidationProblemCode::EmptyName,
             C::NameTooLong => ResourceHeaderValidationProblemCode::NameTooLong,
             C::InvalidName => ResourceHeaderValidationProblemCode::InvalidName,
-            C::DescriptionTooLong => ResourceHeaderValidationProblemCode::DescriptionTooLong,
             C::TooManyLabels => ResourceHeaderValidationProblemCode::TooManyLabels,
             C::DuplicateLabelKey => ResourceHeaderValidationProblemCode::DuplicateLabelKey,
             C::TooManyAnnotations => ResourceHeaderValidationProblemCode::TooManyAnnotations,
             C::DuplicateAnnotationKey => {
                 ResourceHeaderValidationProblemCode::DuplicateAnnotationKey
+            }
+            C::ResourceExtensionSchema => {
+                ResourceHeaderValidationProblemCode::ResourceExtensionSchema
             }
         };
         Self {

@@ -7,12 +7,13 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches;
 use std::sync::Arc;
 
 use chrono::Utc;
 use dill::CatalogBuilder;
 use kamu_resources::{
-    DeclarativeResourceState,
+    DeclarativeResource,
     ReconcilableResource,
     ResourceAggregateLoader,
     ResourceID,
@@ -73,10 +74,7 @@ async fn test_create_duplicate_id_returns_error() {
     let (_, mut agg2) = make_fresh_aggregate(harness.account_handle.clone(), "res-a");
     let result = harness.persistence_svc().create(&mut agg2).await;
 
-    assert!(
-        matches!(result, Err(ResourcePersistenceError::Duplicate(_))),
-        "expected Duplicate error, got {result:?}"
-    );
+    assert_matches!(result, Err(ResourcePersistenceError::Duplicate(_)));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -211,16 +209,12 @@ async fn test_concurrent_modification_detected() {
         .unwrap();
     let result = harness.persistence_svc().save(&mut agg_2).await;
 
-    assert!(
-        matches!(
-            result,
-            Err(ResourcePersistenceError::ConcurrentModification(_))
-        ),
-        "expected ConcurrentModification error, got {result:?}"
+    assert_matches!(
+        result,
+        Err(ResourcePersistenceError::ConcurrentModification(_))
     );
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

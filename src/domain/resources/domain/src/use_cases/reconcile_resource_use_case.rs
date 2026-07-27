@@ -55,6 +55,7 @@ where
             ResourcePersistenceError::ConcurrentModification(err) => {
                 Self::ConcurrentModification(err)
             }
+            ResourcePersistenceError::InvalidDurableState(err) => Self::Internal(err.int_err()),
             ResourcePersistenceError::Internal(err) => Self::Internal(err),
         }
     }

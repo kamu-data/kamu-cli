@@ -11,11 +11,13 @@ mod apply_resource_plan_executor;
 mod apply_resource_planner;
 mod generic_resource_query;
 mod resource_aggregate_loader;
+mod resource_durable_state_validator;
 mod resource_persistence;
 mod typed_resource_query;
 
 pub use apply_resource_plan_executor::*;
 pub use apply_resource_planner::*;
 pub use generic_resource_query::*;
+pub use resource_durable_state_validator::*;
 pub use resource_persistence::*;
 pub use typed_resource_query::*;

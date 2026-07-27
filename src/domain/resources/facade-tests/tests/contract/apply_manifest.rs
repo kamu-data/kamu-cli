@@ -10,14 +10,22 @@
 use kamu_configuration::VariableSetResource;
 use kamu_resources::{
     ApplyManifestApplicationDecision,
+    ApplyManifestChangeKind,
     ApplyManifestPlanningDecision,
     ApplyResourceOutcome,
+    RESOURCE_ANNOTATION_DESCRIPTION_SCHEMA_URI,
+    RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI,
     ResourceSchemaProvider,
+    ResourceWarning,
+    WARNING_CODE_RESOURCE_FREEFORM_ANNOTATIONS,
+    WARNING_CODE_RESOURCE_FREEFORM_LABELS,
+    WARNING_CODE_RESOURCE_LABEL_NOT_INDEXED,
 };
 use kamu_resources_facade::{
     ApplyManifestError,
     ApplyManifestRequest,
     GetResourceError,
+    ResourceHeadersValidationProblemCode,
     ResourceManifestFormat,
     ResourceRef,
     ResourceSelector,
@@ -45,6 +53,34 @@ fn make_selector(resource_type: &str, _schema: &str, name: &str) -> ResourceSele
         resource_type: resource_type.parse().unwrap(),
         resource_ref: ResourceRef::ByName(name.parse().unwrap()),
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn assert_warning_codes(warnings: &[ResourceWarning], expected_codes: &[&str]) {
+    let codes = warnings
+        .iter()
+        .map(|warning| warning.code.as_str())
+        .collect::<Vec<_>>();
+
+    for expected_code in expected_codes {
+        assert!(
+            codes.contains(expected_code),
+            "expected warning code '{expected_code}', got: {codes:?}"
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn assert_invalid_headers_code(
+    result: Result<impl std::fmt::Debug, ApplyManifestError>,
+    expected_code: ResourceHeadersValidationProblemCode,
+) {
+    assert_matches!(
+        result,
+        Err(ApplyManifestError::InvalidHeaders(err)) if err.code == expected_code
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -692,9 +728,8 @@ pub async fn test_apply_rejects_invalid_header_key(h: &impl FacadeContractHarnes
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// RF-026 (extension): a successful apply carrying both a short `TypeName`
-// label key and a full `TypeUri` label key, plus a nested-object annotation
-// value, round-trips into the stored resource unchanged.
+// RF-026 (extension): a successful apply carrying free-form label keys and a
+// free-form annotation preserves them under their authored short names.
 contract_test!(
     apply_round_trips_populated_labels_annotations,
     super::test_apply_round_trips_populated_labels_annotations
@@ -710,7 +745,7 @@ pub async fn test_apply_round_trips_populated_labels_annotations(h: &impl Facade
           name: labeled-vars
           labels:
             env: prod
-            https://opendatafabric.org/schemas/labels/v1/Team:
+            team:
               name: data-platform
               oncall:
                 - alice
@@ -740,11 +775,7 @@ pub async fn test_apply_round_trips_populated_labels_annotations(h: &impl Facade
         Some(&serde_json::json!("prod"))
     );
     assert_eq!(
-        view.headers.labels.entries.get(
-            &"https://opendatafabric.org/schemas/labels/v1/Team"
-                .parse()
-                .unwrap()
-        ),
+        view.headers.labels.entries.get(&"team".parse().unwrap()),
         Some(&serde_json::json!({ "name": "data-platform", "oncall": ["alice", "bob"] }))
     );
     assert_eq!(
@@ -753,6 +784,240 @@ pub async fn test_apply_round_trips_populated_labels_annotations(h: &impl Facade
             .entries
             .get(&"owner".parse().unwrap()),
         Some(&serde_json::json!("https://github.com/open-data-fabric"))
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+contract_test!(
+    apply_header_extension_warnings_are_reported,
+    super::test_apply_header_extension_warnings_are_reported
+);
+
+pub async fn test_apply_header_extension_warnings_are_reported(h: &impl FacadeContractHarness) {
+    let facade = h.facade_for(TestAccount::Alice);
+
+    let manifest = indoc::formatdoc!(
+        r#"
+        $schema: {VARIABLE_SET_SCHEMA_STR}
+        headers:
+          name: extension-warning-vars
+          labels:
+            arbitrary:
+              nested: true
+          annotations:
+            description: Has a description
+            note: check later
+        spec:
+          variables:
+            KEY:
+              value: value
+        "#
+    );
+
+    let plan_decision = facade
+        .plan_apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Yaml,
+            manifest: manifest.clone(),
+        })
+        .await
+        .unwrap();
+
+    let ApplyManifestPlanningDecision::Planned(plan) = &plan_decision else {
+        panic!("expected Planned decision, got Rejected");
+    };
+    assert_warning_codes(
+        &plan.warnings,
+        &[
+            WARNING_CODE_RESOURCE_LABEL_NOT_INDEXED,
+            WARNING_CODE_RESOURCE_FREEFORM_LABELS,
+            WARNING_CODE_RESOURCE_FREEFORM_ANNOTATIONS,
+        ],
+    );
+
+    let apply_decision = facade
+        .apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Yaml,
+            manifest,
+        })
+        .await
+        .unwrap();
+
+    let ApplyManifestApplicationDecision::Applied(result) = &apply_decision else {
+        panic!("expected Applied decision, got Rejected");
+    };
+    assert_warning_codes(
+        &result.warnings,
+        &[
+            WARNING_CODE_RESOURCE_LABEL_NOT_INDEXED,
+            WARNING_CODE_RESOURCE_FREEFORM_LABELS,
+            WARNING_CODE_RESOURCE_FREEFORM_ANNOTATIONS,
+        ],
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+contract_test!(
+    apply_header_extension_canonicalization_precedes_diffing,
+    super::test_apply_header_extension_canonicalization_precedes_diffing
+);
+
+pub async fn test_apply_header_extension_canonicalization_precedes_diffing(
+    h: &impl FacadeContractHarness,
+) {
+    let facade = h.facade_for(TestAccount::Alice);
+
+    let create_manifest = serde_json::json!({
+        "$schema": VARIABLE_SET_SCHEMA_STR,
+        "headers": {
+            "name": "canonical-label-vars",
+            "labels": {
+                RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI: "prod"
+            },
+            "annotations": {
+                RESOURCE_ANNOTATION_DESCRIPTION_SCHEMA_URI: "Has a description"
+            }
+        },
+        "spec": {"variables": {"KEY": {"value": "value"}}}
+    })
+    .to_string();
+
+    facade
+        .apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: create_manifest,
+        })
+        .await
+        .unwrap();
+
+    let reapply_manifest = serde_json::json!({
+        "$schema": VARIABLE_SET_SCHEMA_STR,
+        "headers": {
+            "name": "canonical-label-vars",
+            "labels": {
+                "environment": "prod"
+            },
+            "annotations": {
+                "description": "Has a description"
+            }
+        },
+        "spec": {"variables": {"KEY": {"value": "value"}}}
+    })
+    .to_string();
+
+    let decision = facade
+        .plan_apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: reapply_manifest,
+        })
+        .await
+        .unwrap();
+
+    let ApplyManifestPlanningDecision::Planned(plan) = &decision else {
+        panic!("expected Planned decision, got Rejected");
+    };
+    assert_eq!(plan.outcome, ApplyResourceOutcome::Untouched);
+    assert!(
+        !plan
+            .changes
+            .iter()
+            .any(|change| matches!(change.kind, ApplyManifestChangeKind::Headers)),
+        "spelling-only label/annotation key changes must not produce header changes"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+contract_test!(
+    apply_rejects_invalid_registered_header_extension_value,
+    super::test_apply_rejects_invalid_registered_header_extension_value
+);
+
+pub async fn test_apply_rejects_invalid_registered_header_extension_value(
+    h: &impl FacadeContractHarness,
+) {
+    let facade = h.facade_for(TestAccount::Alice);
+
+    let manifest = serde_json::json!({
+        "$schema": VARIABLE_SET_SCHEMA_STR,
+        "headers": {
+            "name": "invalid-extension-vars",
+            "labels": {
+                "environment": {"not": "a string"}
+            }
+        },
+        "spec": {"variables": {"KEY": {"value": "value"}}}
+    })
+    .to_string();
+
+    let plan_result = facade
+        .plan_apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: manifest.clone(),
+        })
+        .await;
+    assert_invalid_headers_code(
+        plan_result,
+        ResourceHeadersValidationProblemCode::ResourceExtensionSchema,
+    );
+
+    let apply_result = facade
+        .apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest,
+        })
+        .await;
+    assert_invalid_headers_code(
+        apply_result,
+        ResourceHeadersValidationProblemCode::ResourceExtensionSchema,
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+contract_test!(
+    apply_rejects_overlong_description_via_annotation_schema,
+    super::test_apply_rejects_overlong_description_via_annotation_schema
+);
+
+pub async fn test_apply_rejects_overlong_description_via_annotation_schema(
+    h: &impl FacadeContractHarness,
+) {
+    let facade = h.facade_for(TestAccount::Alice);
+
+    let manifest = serde_json::json!({
+        "$schema": VARIABLE_SET_SCHEMA_STR,
+        "headers": {
+            "name": "overlong-description-vars",
+            "annotations": {
+                "description": "x".repeat(4097)
+            }
+        },
+        "spec": {"variables": {"KEY": {"value": "value"}}}
+    })
+    .to_string();
+
+    let plan_result = facade
+        .plan_apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: manifest.clone(),
+        })
+        .await;
+    assert_invalid_headers_code(
+        plan_result,
+        ResourceHeadersValidationProblemCode::ResourceExtensionSchema,
+    );
+
+    let apply_result = facade
+        .apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest,
+        })
+        .await;
+    assert_invalid_headers_code(
+        apply_result,
+        ResourceHeadersValidationProblemCode::ResourceExtensionSchema,
     );
 }
 

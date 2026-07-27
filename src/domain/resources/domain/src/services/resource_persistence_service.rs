@@ -11,7 +11,11 @@ use chrono::{DateTime, Utc};
 use event_sourcing::ConcurrentModificationError;
 use internal_error::InternalError;
 
-use crate::{ReconcilableEventSourcedResource, ResourceDuplicateError};
+use crate::{
+    ReconcilableEventSourcedResource,
+    ResourceDuplicateError,
+    ResourceDurableStateValidationError,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -43,6 +47,9 @@ pub enum ResourcePersistenceError {
 
     #[error(transparent)]
     ConcurrentModification(ConcurrentModificationError),
+
+    #[error(transparent)]
+    InvalidDurableState(ResourceDurableStateValidationError),
 
     #[error(transparent)]
     Internal(#[from] InternalError),

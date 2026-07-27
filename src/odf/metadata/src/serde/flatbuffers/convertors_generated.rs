@@ -7495,7 +7495,7 @@ impl Into<odf::sink::WebhookTargetStatusValue> for fb::WebhookTargetStatusValue 
 // Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn datetime_to_fb(dt: &DateTime<Utc>) -> fb::Timestamp {
+pub(crate) fn datetime_to_fb(dt: &DateTime<Utc>) -> fb::Timestamp {
     fb::Timestamp::new(
         dt.year(),
         dt.ordinal() as u16,
@@ -7504,7 +7504,7 @@ fn datetime_to_fb(dt: &DateTime<Utc>) -> fb::Timestamp {
     )
 }
 
-fn fb_to_datetime(dt: &fb::Timestamp) -> DateTime<Utc> {
+pub(crate) fn fb_to_datetime(dt: &fb::Timestamp) -> DateTime<Utc> {
     let naive_date_time = NaiveDate::from_yo_opt(dt.year(), dt.ordinal() as u32)
         .unwrap()
         .and_time(
@@ -7517,10 +7517,10 @@ fn fb_to_datetime(dt: &fb::Timestamp) -> DateTime<Utc> {
     Utc.from_local_datetime(&naive_date_time).unwrap()
 }
 
-fn duration_to_fb(v: &DurationString) -> fb::Duration {
+pub(crate) fn duration_to_fb(v: &DurationString) -> fb::Duration {
     fb::Duration::new(v.as_nanos() as u64)
 }
 
-fn fb_to_duration(v: &fb::Duration) -> DurationString {
+pub(crate) fn fb_to_duration(v: &fb::Duration) -> DurationString {
     DurationString::new(std::time::Duration::from_nanos(v.nanoseconds()))
 }
