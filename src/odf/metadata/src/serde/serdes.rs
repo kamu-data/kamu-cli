@@ -13,7 +13,6 @@ use std::fmt::Display;
 use chrono::{DateTime, Utc};
 use thiserror::Error;
 
-use super::Buffer;
 use crate::data::OperationType;
 use crate::dataset::{MetadataBlock, MetadataBlockHeader};
 use crate::engine::{RawQueryRequest, RawQueryResponse, TransformRequest, TransformResponse};
@@ -68,7 +67,7 @@ pub const METADATA_BLOCK_SUPPORTED_VERSION_RANGE: (MetadataBlockVersion, Metadat
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub trait MetadataBlockSerializer {
-    fn write_manifest(&self, block: &MetadataBlock) -> Result<Buffer<u8>, Error>;
+    fn write_manifest(&self, block: &MetadataBlock) -> Result<bytes::Bytes, Error>;
 }
 
 pub trait MetadataBlockDeserializer {
@@ -94,7 +93,7 @@ pub trait MetadataBlockDeserializer {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub trait DatasetSnapshotSerializer {
-    fn write_manifest(&self, snapshot: &DatasetSnapshot) -> Result<Buffer<u8>, Error>;
+    fn write_manifest(&self, snapshot: &DatasetSnapshot) -> Result<bytes::Bytes, Error>;
 }
 
 pub trait DatasetSnapshotDeserializer {
@@ -106,11 +105,11 @@ pub trait DatasetSnapshotDeserializer {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub trait EngineProtocolSerializer {
-    fn write_raw_query_request(&self, inst: &RawQueryRequest) -> Result<Buffer<u8>, Error>;
-    fn write_raw_query_response(&self, inst: &RawQueryResponse) -> Result<Buffer<u8>, Error>;
+    fn write_raw_query_request(&self, inst: &RawQueryRequest) -> Result<bytes::Bytes, Error>;
+    fn write_raw_query_response(&self, inst: &RawQueryResponse) -> Result<bytes::Bytes, Error>;
 
-    fn write_transform_request(&self, inst: &TransformRequest) -> Result<Buffer<u8>, Error>;
-    fn write_transform_response(&self, inst: &TransformResponse) -> Result<Buffer<u8>, Error>;
+    fn write_transform_request(&self, inst: &TransformRequest) -> Result<bytes::Bytes, Error>;
+    fn write_transform_response(&self, inst: &TransformResponse) -> Result<bytes::Bytes, Error>;
 }
 
 pub trait EngineProtocolDeserializer {

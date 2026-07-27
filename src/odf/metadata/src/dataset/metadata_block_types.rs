@@ -291,6 +291,7 @@ impl IntoDataStreamBlock for MetadataBlock {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Represents canonical flatbuffer-encoded metadata block wrapped in a manifest
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MetadataBlockBytes(pub bytes::Bytes);
 

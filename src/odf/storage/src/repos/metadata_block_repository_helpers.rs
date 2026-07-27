@@ -11,7 +11,7 @@ use odf_metadata::serde::flatbuffers::{
     FlatbuffersMetadataBlockDeserializer,
     FlatbuffersMetadataBlockSerializer,
 };
-use odf_metadata::serde::{Error, MetadataBlockDeserializer, MetadataBlockSerializer};
+use odf_metadata::serde::{Error, MetadataBlockDeserializer};
 use odf_metadata::*;
 
 use crate::{BlockMalformedError, BlockVersionError, GetBlockError};
@@ -19,13 +19,7 @@ use crate::{BlockMalformedError, BlockVersionError, GetBlockError};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn serialize_metadata_block(block: &MetadataBlock) -> Result<MetadataBlockBytes, Error> {
-    let buffer = FlatbuffersMetadataBlockSerializer.write_manifest(block)?;
-
-    // TODO: PERF: Lots of copying here - we should return Bytes from
-    // `write_manifest` to begin with
-    Ok(MetadataBlockBytes::new(bytes::Bytes::from(
-        buffer.collapse_vec(),
-    )))
+    FlatbuffersMetadataBlockSerializer.write_manifest_canonical(block)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
