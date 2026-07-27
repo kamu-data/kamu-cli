@@ -13,6 +13,8 @@ use url::Url;
 
 use crate::facade::graphql::{cynic_api, outcome_mapper};
 use crate::{
+    ApplyManifestBatchRequest,
+    ApplyManifestBatchResponse,
     ApplyManifestError,
     ApplyManifestRequest,
     BatchResourceError,
@@ -355,6 +357,50 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
             .resources
             .apply_manifest
             .try_into_application_decision()
+    }
+
+    async fn plan_apply_manifests(
+        &self,
+        request: ApplyManifestBatchRequest,
+    ) -> Result<ApplyManifestBatchResponse<domain::ApplyManifestPlanningDecision>, BatchResourceError>
+    {
+        use cynic_api::operations::apply_batch as Operation;
+
+        let variables = Operation::ApplyManifestsVariables::new(request, true);
+
+        match self
+            .graphql_client
+            .execute_operation(Operation::build_operation(variables))
+            .await
+        {
+            Ok(response) => outcome_mapper::map_batch_apply_manifests_planning_outcome(
+                response.resources.apply_manifests,
+            ),
+            Err(error) => outcome_mapper::map_batch_apply_manifests_planning_rollback(error),
+        }
+    }
+
+    async fn apply_manifests(
+        &self,
+        request: ApplyManifestBatchRequest,
+    ) -> Result<
+        ApplyManifestBatchResponse<domain::ApplyManifestApplicationDecision>,
+        BatchResourceError,
+    > {
+        use cynic_api::operations::apply_batch as Operation;
+
+        let variables = Operation::ApplyManifestsVariables::new(request, false);
+
+        match self
+            .graphql_client
+            .execute_operation(Operation::build_operation(variables))
+            .await
+        {
+            Ok(response) => outcome_mapper::map_batch_apply_manifests_application_outcome(
+                response.resources.apply_manifests,
+            ),
+            Err(error) => outcome_mapper::map_batch_apply_manifests_application_rollback(error),
+        }
     }
 
     async fn delete(

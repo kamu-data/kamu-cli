@@ -26,7 +26,11 @@ pub enum GraphqlHttpRequestError {
     },
 
     #[error("Remote GraphQL request to '{endpoint_url}' failed: {message}")]
-    Graphql { endpoint_url: Url, message: String },
+    Graphql {
+        endpoint_url: Url,
+        message: String,
+        extensions: Option<serde_json::Map<String, serde_json::Value>>,
+    },
 
     #[error(transparent)]
     Internal(#[from] InternalError),
@@ -51,10 +55,15 @@ impl GraphqlHttpRequestError {
         }
     }
 
-    pub fn graphql(endpoint_url: Url, message: String) -> Self {
+    pub fn graphql(
+        endpoint_url: Url,
+        message: String,
+        extensions: Option<serde_json::Map<String, serde_json::Value>>,
+    ) -> Self {
         Self::Graphql {
             endpoint_url,
             message,
+            extensions,
         }
     }
 }

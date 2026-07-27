@@ -124,6 +124,16 @@ pub trait ResourceFacade: Send + Sync {
         request: ApplyManifestRequest,
     ) -> Result<ApplyManifestApplicationDecision, ApplyManifestError>;
 
+    async fn plan_apply_manifests(
+        &self,
+        request: ApplyManifestBatchRequest,
+    ) -> Result<ApplyManifestBatchResponse<ApplyManifestPlanningDecision>, BatchResourceError>;
+
+    async fn apply_manifests(
+        &self,
+        request: ApplyManifestBatchRequest,
+    ) -> Result<ApplyManifestBatchResponse<ApplyManifestApplicationDecision>, BatchResourceError>;
+
     async fn delete(&self, selector: ResourceSelector) -> Result<ResourceID, DeleteResourceError>;
 
     async fn delete_many(
@@ -185,6 +195,39 @@ pub struct BatchResourceProblem<E> {
 pub struct ApplyManifestRequest {
     pub format: ResourceManifestFormat,
     pub manifest: String,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone)]
+pub struct ApplyManifestBatchRequest {
+    pub items: Vec<ApplyManifestRequest>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub struct ApplyManifestBatchResponse<D> {
+    pub items: Vec<ApplyManifestBatchItemResult<D>>,
+    /// Positional indexes of items that individually succeeded but whose
+    /// accepted details could not be returned because the enclosing
+    /// single-transaction batch rolled back.
+    ///
+    /// This is transport metadata, not a per-item error. Local facades can
+    /// keep this empty because they report every attempted item's real
+    /// pre-rollback outcome in `items`; remote transports such as GraphQL use
+    /// this to make rolled-back successes explicit when rollback is forced
+    /// through a transport-level error and the normal `data` payload is not
+    /// available.
+    pub rolled_back_successes: Vec<usize>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub struct ApplyManifestBatchItemResult<D> {
+    pub request_index: usize,
+    pub outcome: Result<D, ApplyManifestError>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

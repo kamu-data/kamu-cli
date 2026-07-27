@@ -7,18 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources::{
-    ApplyManifestApplicationDecision,
-    ApplyManifestPlanningDecision,
-    ApplyManifestResult,
-};
 use kamu_resources_facade::{ApplyManifestRequest, ResourceFacade};
 
 use crate::resources::{
     DiscoveredResourceManifest,
     ExecuteResourceManifestError,
     ExecuteResourceManifestOutcome,
-    ExecutedResourceManifestResult,
     ResourceManifestExecutionService,
 };
 
@@ -49,37 +43,11 @@ impl ResourceManifestExecutionService for ResourceManifestExecutionServiceImpl {
 
         if dry_run {
             let decision = resource_facade.plan_apply_manifest(request).await?;
-            return Ok(match decision {
-                ApplyManifestPlanningDecision::Planned(plan) => {
-                    ExecuteResourceManifestOutcome::Accepted(ExecutedResourceManifestResult {
-                        outcome: plan.outcome,
-                        resource: plan.resource,
-                        warnings: plan.warnings,
-                        changes: plan.changes,
-                    })
-                }
-                ApplyManifestPlanningDecision::Rejected(rejection) => {
-                    ExecuteResourceManifestOutcome::Rejected(rejection)
-                }
-            });
+            return Ok(decision.into());
         }
 
         let decision = resource_facade.apply_manifest(request).await?;
-        Ok(match decision {
-            ApplyManifestApplicationDecision::Applied(ApplyManifestResult {
-                resource,
-                outcome,
-                warnings,
-            }) => ExecuteResourceManifestOutcome::Accepted(ExecutedResourceManifestResult {
-                outcome,
-                resource,
-                warnings,
-                changes: Vec::new(),
-            }),
-            ApplyManifestApplicationDecision::Rejected(rejection) => {
-                ExecuteResourceManifestOutcome::Rejected(rejection)
-            }
-        })
+        Ok(decision.into())
     }
 }
 

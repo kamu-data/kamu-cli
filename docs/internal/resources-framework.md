@@ -829,6 +829,10 @@ pub trait ResourceFacade: Send + Sync {
 
     async fn plan_apply_manifest(&self, request: ApplyManifestRequest) -> Result<ApplyManifestPlanningDecision, ...>;
     async fn apply_manifest(&self, request: ApplyManifestRequest) -> Result<ApplyManifestApplicationDecision, ...>;
+    async fn plan_apply_manifests(&self, request: ApplyManifestBatchRequest)
+        -> Result<ApplyManifestBatchResponse<ApplyManifestPlanningDecision>, BatchResourceError>;
+    async fn apply_manifests(&self, request: ApplyManifestBatchRequest)
+        -> Result<ApplyManifestBatchResponse<ApplyManifestApplicationDecision>, BatchResourceError>;
     async fn delete(&self, selector: ResourceSelector) -> Result<ResourceID, ...>;
     async fn delete_many(&self, selector: ResourceBatchSelector) -> ...;
 }
@@ -847,6 +851,21 @@ pub enum   SpecViewMode { Encrypted /* default */, Revealed }
 
 Batch operations return `BatchResourceResponse<T, E>` with positional `successes` / `problems`
 (each tagged by `request_index`) — so a partial batch reports per-item outcomes.
+
+`plan_apply_manifests` / `apply_manifests` are the exception: they return
+`ApplyManifestBatchResponse<D>` and are all-or-nothing, not partial-batch. The
+whole batch is one transaction — the first item that is individually
+rejected or fails stops processing and rolls back everything, including
+earlier items in the same call that would otherwise have succeeded.
+`ApplyManifestBatchResponse::items` reports only the items actually
+processed before the stop (positionally tagged by `request_index`, `Ok(D)`
+or `Err(ApplyManifestError)`); `rolled_back_successes` separately lists the
+indexes of items that individually succeeded but were rolled back, which the
+local facade always leaves empty (it can report each item's true
+pre-rollback outcome in `items` instead) but the remote GraphQL facade
+populates when the rollback is forced through a transport-level error and
+the normal per-item `data` is unavailable (see `GqlError::gql_extended` /
+`extensions.batch` in `ResourcesMut::apply_manifests`).
 
 **Implementations:**
 
@@ -915,7 +934,7 @@ implementation files carry `_resource(s)_` names:
 
 | Subcommand | Implementation file | Purpose |
 | --- | --- | --- |
-| `kamu apply` | `apply_command.rs` | Discover manifests (files/dir/stdin) and apply/plan them; `--dry-run`, `--recursive`, `--stdin`, `--continue-on-error`. |
+| `kamu apply` | `apply_command.rs` | Discover manifests (files/dir/stdin) and apply/plan them as a single all-or-nothing batch by default; `--dry-run`, `--recursive`, `--stdin`, `--continue-on-error`. |
 | `kamu list` | `list_resources_command.rs` | List resources by type or all; renders Table/CSV/JSON/Parquet. |
 | `kamu get` | `get_resource_command.rs` | Get resource(s) by selector(s); names or full manifest; `--spec`, `--revealed`. |
 | `kamu delete` | `delete_resources_command.rs` | Delete by selector(s); `--force`, `--ignore-not-found`, `--dry-run`. |
@@ -952,7 +971,7 @@ themselves are agnostic. Selector grammar is specified below, after the semantic
 | Output modes | summary + changes (`--dry-run`)/warnings; verbose | `-o name` \| `-o json` \| `-o yaml`; `--spec` for apply-compatible spec | Table/CSV/JSON/Parquet (via `OutputConfig`), `-w` for wider detail | summary / dry-run preview |
 | Default secret visibility | n/a | **`Encrypted`** (ciphertext); `--revealed` to decrypt | secrets not expanded in list columns | n/a |
 | Relevant flags | `--dry-run`, `--recursive`, `--stdin`, `--continue-on-error` | `--ignore-not-found`, `--spec`, `--revealed`, `--max-results`/`--unbounded` | `--max-results`/`--unbounded`, `-w`, `-o` | `--force`, `--ignore-not-found`, `--dry-run` |
-| Flag semantics | `--continue-on-error`: keep going past a failing manifest; `--dry-run`: plan only, no writes | `--ignore-not-found`: skip missing selectors instead of erroring | — | `--force`: skip confirmation prompt; `--ignore-not-found`: exit OK if absent; `--dry-run`: preview resolved deletions |
+| Flag semantics | default: whole batch is one transaction, a rejection/failure rolls back every manifest including earlier successes; `--continue-on-error`: apply each manifest independently so earlier successes survive a later failure; `--dry-run`: plan only, no writes | `--ignore-not-found`: skip missing selectors instead of erroring | — | `--force`: skip confirmation prompt; `--ignore-not-found`: exit OK if absent; `--dry-run`: preview resolved deletions |
 | Local vs remote | identical behavior; chosen by context (`--context` to override) | identical | identical | identical |
 
 > The `get` vs `list` boundary is intentional: `get` is for *named/selected* resources (bounded),

@@ -104,3 +104,12 @@ Each RF scenario from the original plan is listed with its status.
 | RF-153  | cross_impl.rs       | Active   | Local and remote render equivalent manifests                          | True cross-facade test                                                 |
 | RF-154  | cross_impl.rs       | Active   | Local and remote produce equivalent batch responses                   | Verified via `contract_test!` macro, not side-by-side comparison       |
 | RF-155  | cross_impl.rs       | Active   | Local and remote produce equivalent apply decisions                   | Verified via `contract_test!` macro, not side-by-side comparison       |
+| RF-160  | apply_manifest_batch.rs | Active | Batch apply all successes preserve order and persist                  |                                                                        |
+| RF-161  | apply_manifest_batch.rs | Active | Batch apply stops on business rejection and reports rollback metadata | Physical rollback is covered by CLI E2E against real storage           |
+| RF-162  | apply_manifest_batch.rs | Active | Batch apply stops on hard failure with typed error reconstruction     | Uses ParseManifest as the hard failure                                 |
+| RF-163  | apply_manifest_batch.rs | Active | Batch rollback reconstructs IDNotFound as typed error                 | Covers remote `extensions.batch` decode taxonomy                       |
+| RF-164  | apply_manifest_batch.rs | Active | Batch rollback reconstructs TypeMismatch as typed error               | Covers remote `extensions.batch` decode taxonomy                       |
+| RF-165  | apply_manifest_batch.rs | Active | Batch dry-run stops on business rejection and persists nothing        |                                                                        |
+| RF-166  | apply_manifest_batch.rs | Active | Batch dry-run same-name create/update plans both as create            | Pins no same-batch write visibility during planning                    |
+| RF-167  | apply_manifest_batch.rs | Active | Live batch same-name create/update reads own writes                   |                                                                        |
+| RF-168  | apply_manifest_batch.rs | Active | Raw GraphQL batch rejection returns rollback extensions               | Verifies `extensions.batch` envelope                                   |
