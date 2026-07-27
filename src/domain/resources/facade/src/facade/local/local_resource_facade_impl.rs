@@ -423,6 +423,55 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         })
     }
 
+    async fn plan_apply_manifests(
+        &self,
+        request: ApplyManifestBatchRequest,
+    ) -> Result<ApplyManifestBatchResponse<ApplyManifestPlanningDecision>, BatchResourceError> {
+        let mut items = Vec::with_capacity(request.items.len());
+
+        for (request_index, item) in request.items.into_iter().enumerate() {
+            let outcome = self.plan_apply_manifest(item).await;
+            let stop = matches!(outcome, Ok(ApplyManifestPlanningDecision::Rejected(_)))
+                || outcome.is_err();
+
+            items.push(ApplyManifestBatchItemResult {
+                request_index,
+                outcome,
+            });
+
+            if stop {
+                break;
+            }
+        }
+
+        Ok(ApplyManifestBatchResponse { items })
+    }
+
+    async fn apply_manifests(
+        &self,
+        request: ApplyManifestBatchRequest,
+    ) -> Result<ApplyManifestBatchResponse<ApplyManifestApplicationDecision>, BatchResourceError>
+    {
+        let mut items = Vec::with_capacity(request.items.len());
+
+        for (request_index, item) in request.items.into_iter().enumerate() {
+            let outcome = self.apply_manifest(item).await;
+            let stop = matches!(outcome, Ok(ApplyManifestApplicationDecision::Rejected(_)))
+                || outcome.is_err();
+
+            items.push(ApplyManifestBatchItemResult {
+                request_index,
+                outcome,
+            });
+
+            if stop {
+                break;
+            }
+        }
+
+        Ok(ApplyManifestBatchResponse { items })
+    }
+
     async fn delete_many(
         &self,
         selector: ResourceBatchSelector,

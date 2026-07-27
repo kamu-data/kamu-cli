@@ -124,6 +124,16 @@ pub trait ResourceFacade: Send + Sync {
         request: ApplyManifestRequest,
     ) -> Result<ApplyManifestApplicationDecision, ApplyManifestError>;
 
+    async fn plan_apply_manifests(
+        &self,
+        request: ApplyManifestBatchRequest,
+    ) -> Result<ApplyManifestBatchResponse<ApplyManifestPlanningDecision>, BatchResourceError>;
+
+    async fn apply_manifests(
+        &self,
+        request: ApplyManifestBatchRequest,
+    ) -> Result<ApplyManifestBatchResponse<ApplyManifestApplicationDecision>, BatchResourceError>;
+
     async fn delete(&self, selector: ResourceSelector) -> Result<ResourceID, DeleteResourceError>;
 
     async fn delete_many(
@@ -185,6 +195,28 @@ pub struct BatchResourceProblem<E> {
 pub struct ApplyManifestRequest {
     pub format: ResourceManifestFormat,
     pub manifest: String,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone)]
+pub struct ApplyManifestBatchRequest {
+    pub items: Vec<ApplyManifestRequest>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub struct ApplyManifestBatchResponse<D> {
+    pub items: Vec<ApplyManifestBatchItemResult<D>>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug)]
+pub struct ApplyManifestBatchItemResult<D> {
+    pub request_index: usize,
+    pub outcome: Result<D, ApplyManifestError>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

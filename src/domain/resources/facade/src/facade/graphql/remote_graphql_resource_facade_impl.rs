@@ -13,6 +13,9 @@ use url::Url;
 
 use crate::facade::graphql::{cynic_api, outcome_mapper};
 use crate::{
+    ApplyManifestBatchItemResult,
+    ApplyManifestBatchRequest,
+    ApplyManifestBatchResponse,
     ApplyManifestError,
     ApplyManifestRequest,
     BatchResourceError,
@@ -355,6 +358,68 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
             .resources
             .apply_manifest
             .try_into_application_decision()
+    }
+
+    async fn plan_apply_manifests(
+        &self,
+        request: ApplyManifestBatchRequest,
+    ) -> Result<ApplyManifestBatchResponse<domain::ApplyManifestPlanningDecision>, BatchResourceError>
+    {
+        // TODO(#1609 phase 4): issue a single batch GraphQL mutation instead of looping
+        // over the single-item operation, so the server can enforce
+        // single-transaction atomicity.
+        let mut items = Vec::with_capacity(request.items.len());
+
+        for (request_index, item) in request.items.into_iter().enumerate() {
+            let outcome = self.plan_apply_manifest(item).await;
+            let stop = matches!(
+                outcome,
+                Ok(domain::ApplyManifestPlanningDecision::Rejected(_))
+            ) || outcome.is_err();
+
+            items.push(ApplyManifestBatchItemResult {
+                request_index,
+                outcome,
+            });
+
+            if stop {
+                break;
+            }
+        }
+
+        Ok(ApplyManifestBatchResponse { items })
+    }
+
+    async fn apply_manifests(
+        &self,
+        request: ApplyManifestBatchRequest,
+    ) -> Result<
+        ApplyManifestBatchResponse<domain::ApplyManifestApplicationDecision>,
+        BatchResourceError,
+    > {
+        // TODO(#1609 phase 4): issue a single batch GraphQL mutation instead of looping
+        // over the single-item operation, so the server can enforce
+        // single-transaction atomicity.
+        let mut items = Vec::with_capacity(request.items.len());
+
+        for (request_index, item) in request.items.into_iter().enumerate() {
+            let outcome = self.apply_manifest(item).await;
+            let stop = matches!(
+                outcome,
+                Ok(domain::ApplyManifestApplicationDecision::Rejected(_))
+            ) || outcome.is_err();
+
+            items.push(ApplyManifestBatchItemResult {
+                request_index,
+                outcome,
+            });
+
+            if stop {
+                break;
+            }
+        }
+
+        Ok(ApplyManifestBatchResponse { items })
     }
 
     async fn delete(
