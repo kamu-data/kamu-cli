@@ -69,7 +69,7 @@ impl MetadataChainComparator {
             lhs_chain.expecting_to_read_blocks(lhs_sequence_number + 1);
             return Ok(CompareChainsResult::LhsAhead {
                 lhs_ahead_blocks: lhs_chain
-                    .iter_blocks_interval(lhs_head.into(), None, false)
+                    .iter_blocks_bytes_interval(lhs_head.into(), None, false)
                     .try_collect()
                     .await?,
             });
@@ -169,8 +169,8 @@ impl MetadataChainComparator {
         ahead_chain.expecting_to_read_blocks(ahead_size);
 
         use odf::MetadataChain;
-        let ahead_blocks: Vec<odf::dataset::HashedMetadataBlock> = ahead_chain
-            .iter_blocks_interval(ahead_head.into(), None, false)
+        let ahead_blocks: Vec<odf::dataset::HashedMetadataBlockBytesWithHeader> = ahead_chain
+            .iter_blocks_bytes_interval(ahead_head.into(), None, false)
             .take(usize::try_from(ahead_size).unwrap())
             .try_collect()
             .await?;
@@ -281,10 +281,10 @@ impl MetadataChainComparator {
 pub enum CompareChainsResult {
     Equal,
     LhsAhead {
-        lhs_ahead_blocks: Vec<odf::dataset::HashedMetadataBlock>,
+        lhs_ahead_blocks: Vec<odf::dataset::HashedMetadataBlockBytesWithHeader>,
     },
     LhsBehind {
-        rhs_ahead_blocks: Vec<odf::dataset::HashedMetadataBlock>,
+        rhs_ahead_blocks: Vec<odf::dataset::HashedMetadataBlockBytesWithHeader>,
     },
     Divergence {
         uncommon_blocks_in_lhs: u64,
@@ -297,7 +297,7 @@ pub enum CompareChainsResult {
 #[derive(Debug)]
 enum CommonAncestorCheck {
     Success {
-        ahead_blocks: Vec<odf::dataset::HashedMetadataBlock>,
+        ahead_blocks: Vec<odf::dataset::HashedMetadataBlockBytesWithHeader>,
     },
     Failure {
         common_ancestor_sequence_number: Option<u64>,
@@ -425,7 +425,7 @@ impl odf::MetadataChain for MetadataChainWithStats<'_> {
     async fn get_block_bytes(
         &self,
         hash: &odf::Multihash,
-    ) -> Result<bytes::Bytes, odf::storage::GetBlockDataError> {
+    ) -> Result<odf::MetadataBlockBytes, odf::storage::GetBlockDataError> {
         (self.on_read)(1);
         self.chain.get_block_bytes(hash).await
     }
@@ -450,16 +450,8 @@ impl odf::MetadataChain for MetadataChainWithStats<'_> {
             .await
     }
 
-    /// Iterates the chain in reverse order starting with specified block and
-    /// following the previous block links. The interval returned is `[head,
-    /// tail)` - tail is exclusive. If `tail` argument is provided but not
-    /// encountered the iteration will continue until first block followed by an
-    /// error. If `ignore_missing_tail` argument is provided, the exception
-    /// is not generated if tail is not detected while traversing from head
-    ///
-    /// PERF: iterates over blocks sequentially: O(N). If you initially
-    /// know the type of blocks, it's better to consider using accept_*()
-    /// API.
+    // TODO: Delegating iteration to an inner chain likely bypasses stats counting
+    // We should likely implment stats on the storage level, not chain level
     fn iter_blocks_interval<'a>(
         &'a self,
         head_boundary: odf::dataset::MetadataChainIterBoundary<'a>,
@@ -468,6 +460,16 @@ impl odf::MetadataChain for MetadataChainWithStats<'_> {
     ) -> odf::dataset::DynMetadataStream<'a> {
         self.chain
             .iter_blocks_interval(head_boundary, tail_boundary, ignore_missing_tail)
+    }
+
+    fn iter_blocks_bytes_interval<'a>(
+        &'a self,
+        head_boundary: odf::dataset::MetadataChainIterBoundary<'a>,
+        tail_boundary: Option<odf::dataset::MetadataChainIterBoundary<'a>>,
+        ignore_missing_tail: bool,
+    ) -> odf::dataset::DynMetadataBytesStream<'a> {
+        self.chain
+            .iter_blocks_bytes_interval(head_boundary, tail_boundary, ignore_missing_tail)
     }
 
     async fn set_ref<'b>(

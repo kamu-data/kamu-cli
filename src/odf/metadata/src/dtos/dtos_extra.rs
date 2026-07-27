@@ -734,6 +734,26 @@ impl dataset::MetadataEventTypeFlags {
     }
 }
 
+impl From<crate::dataset::MetadataEventType> for dataset::MetadataEventTypeFlags {
+    fn from(value: crate::dataset::MetadataEventType) -> Self {
+        match value {
+            MetadataEventType::AddData => Self::ADD_DATA,
+            MetadataEventType::ExecuteTransform => Self::EXECUTE_TRANSFORM,
+            MetadataEventType::Seed => Self::SEED,
+            MetadataEventType::SetPollingSource => Self::SET_POLLING_SOURCE,
+            MetadataEventType::SetVocab => Self::SET_VOCAB,
+            MetadataEventType::SetAttachments => Self::SET_ATTACHMENTS,
+            MetadataEventType::SetInfo => Self::SET_INFO,
+            MetadataEventType::SetLicense => Self::SET_LICENSE,
+            MetadataEventType::SetDataSchema => Self::SET_DATA_SCHEMA,
+            MetadataEventType::SetTransform => Self::SET_TRANSFORM,
+            MetadataEventType::AddPushSource => Self::ADD_PUSH_SOURCE,
+            MetadataEventType::DisablePushSource => Self::DISABLE_PUSH_SOURCE,
+            MetadataEventType::DisablePollingSource => Self::DISABLE_POLLING_SOURCE,
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // SecretSetSpec
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

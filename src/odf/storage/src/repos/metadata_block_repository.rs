@@ -8,8 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use async_trait::async_trait;
-use bytes::Bytes;
 use internal_error::{BoxedError, InternalError};
+use odf_metadata::dataset::MetadataBlockBytes;
 use odf_metadata::*;
 use thiserror::Error;
 
@@ -31,7 +31,10 @@ pub trait MetadataBlockRepository: Send + Sync {
 
     async fn get_block(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError>;
 
-    async fn get_block_bytes(&self, hash: &Multihash) -> Result<Bytes, GetBlockDataError>;
+    async fn get_block_bytes(
+        &self,
+        hash: &Multihash,
+    ) -> Result<MetadataBlockBytes, GetBlockDataError>;
 
     async fn get_block_size(&self, hash: &Multihash) -> Result<u64, GetBlockDataError>;
 

@@ -440,7 +440,7 @@ impl FlowDescriptionBuilder {
             .match_datasets_having_key_blocks(
                 dataset_ids,
                 &odf::BlockRef::Head,
-                kamu_datasets::MetadataEventType::SetPollingSource,
+                odf::MetadataEventType::SetPollingSource,
             )
             .await?;
 
@@ -480,7 +480,7 @@ impl FlowDescriptionBuilder {
             .match_datasets_having_key_blocks(
                 dataset_ids,
                 &odf::BlockRef::Head,
-                kamu_datasets::MetadataEventType::SetTransform,
+                odf::MetadataEventType::SetTransform,
             )
             .await?;
 

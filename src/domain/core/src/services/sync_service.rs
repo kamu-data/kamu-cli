@@ -254,6 +254,8 @@ pub enum SyncError {
     OverwriteSeedBlock(#[from] OverwriteSeedBlockError),
     #[error(transparent)]
     Corrupted(#[from] CorruptedSourceError),
+    #[error(transparent)]
+    BadMetadata(#[from] kamu_datasets::AppendDatasetMetadataBatchUseCaseError),
     #[error("Dataset was updated concurrently")]
     UpdatedConcurrently(#[source] BoxedError),
     #[error(transparent)]

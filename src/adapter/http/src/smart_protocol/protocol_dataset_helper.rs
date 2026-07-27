@@ -11,7 +11,6 @@ use std::collections::VecDeque;
 use std::io::Read;
 use std::str::FromStr;
 
-use bytes::Bytes;
 use flate2::Compression;
 use futures::TryStreamExt;
 use headers::Header as _;
@@ -155,7 +154,7 @@ pub async fn prepare_dataset_metadata_batch(
     for (hash, _) in blocks_for_transfer.iter().rev() {
         num_blocks += 1;
 
-        let block_bytes: Bytes = metadata_chain.get_block_bytes(hash).await.int_err()?;
+        let block_bytes = metadata_chain.get_block_bytes(hash).await.int_err()?;
 
         let block_data: &[u8] = &block_bytes;
 
@@ -185,7 +184,7 @@ pub async fn prepare_dataset_metadata_batch(
 
 pub fn decode_metadata_batch(
     blocks_batch: &MetadataBlocksBatch,
-) -> Result<VecDeque<odf::dataset::HashedMetadataBlock>, odf::GetBlockError> {
+) -> Result<VecDeque<odf::dataset::HashedMetadataBlockBytesDecoded>, odf::GetBlockError> {
     let blocks_data = unpack_dataset_metadata_batch(blocks_batch);
 
     blocks_data
@@ -196,7 +195,8 @@ pub fn decode_metadata_batch(
             //       This is currently necessary because we need to be able to deserialize
             //       blocks BEFORE an instance of MetadataChain exists.
             //       Consider injecting a configurable block deserializer.
-            odf::storage::deserialize_metadata_block(&hash, &bytes).map(|block| (hash, block))
+            odf::storage::deserialize_metadata_block(&hash, &bytes)
+                .map(|block| (hash, block, bytes))
         })
         .collect::<Result<VecDeque<_>, _>>()
 }
@@ -205,7 +205,7 @@ pub fn decode_metadata_batch(
 
 fn unpack_dataset_metadata_batch(
     blocks_batch: &MetadataBlocksBatch,
-) -> Vec<(odf::Multihash, Vec<u8>)> {
+) -> Vec<(odf::Multihash, odf::MetadataBlockBytes)> {
     assert!(
         blocks_batch.media_type.eq(MEDIA_TAR_GZ),
         "Unsupported media type {}",
@@ -220,7 +220,7 @@ fn unpack_dataset_metadata_batch(
 
     let decoder = flate2::read::GzDecoder::new(blocks_batch.payload.as_slice());
     let mut archive = tar::Archive::new(decoder);
-    let blocks_data: Vec<(odf::Multihash, Vec<u8>)> = archive
+    let blocks_data: Vec<(odf::Multihash, odf::MetadataBlockBytes)> = archive
         .entries()
         .unwrap()
         .filter_map(Result::ok)
@@ -232,7 +232,7 @@ fn unpack_dataset_metadata_batch(
             let path = entry.path().unwrap();
             let hash = odf::Multihash::from_multibase(path.to_str().unwrap()).unwrap();
 
-            (hash, buf)
+            (hash, odf::MetadataBlockBytes::new(buf.into()))
         })
         .collect();
 
@@ -297,11 +297,11 @@ pub async fn collect_object_references_from_interval(
 
 pub async fn collect_object_references_from_metadata(
     dataset: &dyn odf::Dataset,
-    blocks: &VecDeque<odf::dataset::HashedMetadataBlock>,
+    blocks: &VecDeque<odf::dataset::HashedMetadataBlockBytesDecoded>,
     missing_files_only: bool,
 ) -> Vec<ObjectFileReference> {
     let mut res_references: Vec<ObjectFileReference> = Vec::new();
-    for (_, block) in blocks {
+    for (_, block, _) in blocks {
         collect_object_references_from_block(
             dataset,
             block,
@@ -733,10 +733,10 @@ pub async fn dataset_export_object_file(
 /// Check if the seed block has the same `dataset_id` and `kind` as the existing
 /// dataset.
 pub(crate) fn ensure_seed_not_in_conflict(
-    first_incoming_block_maybe: Option<&(odf::Multihash, odf::MetadataBlock)>,
+    first_incoming_block_maybe: Option<&odf::dataset::HashedMetadataBlockBytesDecoded>,
     existing_dataset_handle: &odf::DatasetHandle,
 ) -> bool {
-    if let Some((_, first_incoming_block)) = first_incoming_block_maybe
+    if let Some((_, first_incoming_block, _)) = first_incoming_block_maybe
         && let odf::MetadataEvent::Seed(seed_event) = &first_incoming_block.event
         && (seed_event.dataset_id != existing_dataset_handle.id
             || seed_event.dataset_kind != existing_dataset_handle.kind)

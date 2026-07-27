@@ -11,18 +11,15 @@ use odf_metadata::serde::flatbuffers::{
     FlatbuffersMetadataBlockDeserializer,
     FlatbuffersMetadataBlockSerializer,
 };
-use odf_metadata::serde::{Error, MetadataBlockDeserializer, MetadataBlockSerializer};
+use odf_metadata::serde::{Error, MetadataBlockDeserializer};
 use odf_metadata::*;
 
 use crate::{BlockMalformedError, BlockVersionError, GetBlockError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn serialize_metadata_block(block: &MetadataBlock) -> Result<Vec<u8>, Error> {
-    let buffer = FlatbuffersMetadataBlockSerializer.write_manifest(block)?;
-
-    // Convert Buffer<u8> to Vec<u8> efficiently without copying
-    Ok(buffer.collapse_vec())
+pub fn serialize_metadata_block(block: &MetadataBlock) -> Result<MetadataBlockBytes, Error> {
+    FlatbuffersMetadataBlockSerializer.write_manifest_canonical(block)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

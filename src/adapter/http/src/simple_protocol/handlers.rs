@@ -108,7 +108,7 @@ pub async fn dataset_blocks_handler(
     axum::extract::Extension(catalog): axum::extract::Extension<dill::Catalog>,
     axum::extract::Extension(hdl): axum::extract::Extension<odf::DatasetHandle>,
     axum::extract::Path(hash_param): axum::extract::Path<BlockHashFromPath>,
-) -> Result<Vec<u8>, ApiError> {
+) -> Result<bytes::Bytes, ApiError> {
     let dataset_registry = catalog.get_one::<dyn DatasetRegistry>().unwrap();
     let target_dataset = dataset_registry.get_dataset_by_handle(&hdl).await;
 
@@ -126,7 +126,7 @@ pub async fn dataset_blocks_handler(
         .int_err()
         .api_err()?;
 
-    Ok(block_bytes)
+    Ok(block_bytes.into())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

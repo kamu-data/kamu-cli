@@ -25,11 +25,13 @@ pub struct AppendDatasetMetadataBatchUseCaseImpl {}
 impl AppendDatasetMetadataBatchUseCaseImpl {
     fn append_block_options<'a>(
         block_hash: &'a odf::Multihash,
+        block_data: &'a [u8],
         options: &AppendDatasetMetadataBatchUseCaseOptions,
     ) -> odf::dataset::AppendOpts<'a> {
         let mut opts = odf::dataset::AppendOpts {
             update_ref: None,
             expected_hash: Some(block_hash),
+            block_data: Some(block_data),
             ..Default::default()
         };
         if let Some(trust_source_hashes) = options.trust_source_hashes {
@@ -81,7 +83,9 @@ impl AppendDatasetMetadataBatchUseCase for AppendDatasetMetadataBatchUseCaseImpl
     async fn execute(
         &self,
         dataset: &dyn odf::Dataset,
-        new_blocks_into_it: Box<dyn Iterator<Item = odf::dataset::HashedMetadataBlock> + Send>,
+        new_blocks_into_it: Box<
+            dyn Iterator<Item = odf::dataset::HashedMetadataBlockBytesDecoded> + Send,
+        >,
         options: AppendDatasetMetadataBatchUseCaseOptions,
     ) -> Result<Option<odf::Multihash>, AppendDatasetMetadataBatchUseCaseError> {
         let mut new_blocks_it = new_blocks_into_it.into_iter().peekable();
@@ -97,12 +101,15 @@ impl AppendDatasetMetadataBatchUseCase for AppendDatasetMetadataBatchUseCaseImpl
 
         let metadata_chain = dataset.as_metadata_chain();
 
-        while let Some((hash, block)) = new_blocks_it.next() {
+        while let Some((hash, block, block_bytes)) = new_blocks_it.next() {
             tracing::debug!(sequence_number = %block.sequence_number, hash = %hash, "Appending block");
 
             let block_sequence_number = block.sequence_number;
             if let Err(append_error) = metadata_chain
-                .append(block, Self::append_block_options(&hash, &options))
+                .append(
+                    block,
+                    Self::append_block_options(&hash, &block_bytes, &options),
+                )
                 .await
             {
                 return Err(AppendDatasetMetadataBatchUseCaseBlockAppendError {

@@ -13,10 +13,7 @@ use std::collections::HashMap;
 
 pub struct CachedBlocksRange {
     /// Cached blocks with hashes in chronological order
-    blocks: Vec<(odf::Multihash, odf::MetadataBlock)>,
-
-    /// Original block payloads, in the same order as in `blocks`
-    original_block_payloads: Vec<bytes::Bytes>,
+    blocks: Vec<(odf::Multihash, odf::MetadataBlock, odf::MetadataBlockBytes)>,
 
     /// The same info in lookup-friendly form:
     ///  index in `blocks` by block hash
@@ -24,24 +21,17 @@ pub struct CachedBlocksRange {
 }
 
 impl CachedBlocksRange {
-    pub(crate) fn new(block_rows: Vec<(odf::Multihash, bytes::Bytes, odf::MetadataBlock)>) -> Self {
-        let mut blocks = Vec::with_capacity(block_rows.len());
-        let mut original_block_payloads = Vec::with_capacity(block_rows.len());
-
-        for (hash, payload, block) in block_rows {
-            blocks.push((hash, block));
-            original_block_payloads.push(payload);
-        }
-
+    pub(crate) fn new(
+        blocks: Vec<(odf::Multihash, odf::MetadataBlock, odf::MetadataBlockBytes)>,
+    ) -> Self {
         let blocks_lookup = blocks
             .iter()
             .enumerate()
-            .map(|(idx, (hash, _))| (hash.clone(), idx))
+            .map(|(idx, (hash, _, _))| (hash.clone(), idx))
             .collect();
 
         Self {
             blocks,
-            original_block_payloads,
             blocks_lookup,
         }
     }
@@ -63,22 +53,22 @@ impl CachedBlocksRange {
     pub(crate) fn try_get_block_size(&self, hash: &odf::Multihash) -> Option<u64> {
         self.blocks_lookup
             .get(hash)
-            .map(|&idx| self.original_block_payloads[idx].len() as u64)
+            .map(|&idx| self.blocks[idx].2.len() as u64)
     }
 
     pub(crate) fn try_get_original_block_payload(
         &self,
         hash: &odf::Multihash,
-    ) -> Option<bytes::Bytes> {
+    ) -> Option<odf::MetadataBlockBytes> {
         self.blocks_lookup
             .get(hash)
-            .map(|&idx| self.original_block_payloads[idx].clone())
+            .map(|&idx| self.blocks[idx].2.clone())
     }
 
     pub(crate) fn get_block_by_index(
         &self,
         index: usize,
-    ) -> Option<&(odf::Multihash, odf::MetadataBlock)> {
+    ) -> Option<&(odf::Multihash, odf::MetadataBlock, odf::MetadataBlockBytes)> {
         self.blocks.get(index)
     }
 
@@ -108,7 +98,7 @@ impl CachedBlocksRange {
     pub(crate) fn get_cached_blocks_for_range(
         &self,
         range: std::ops::Range<u64>,
-    ) -> Option<&[(odf::Multihash, odf::MetadataBlock)]> {
+    ) -> Option<&[(odf::Multihash, odf::MetadataBlock, odf::MetadataBlockBytes)]> {
         // No blocks yet?
         if self.blocks.is_empty() {
             return None;
@@ -123,12 +113,12 @@ impl CachedBlocksRange {
         // Find the first block that is greater than or equal to the min boundary
         let start_index = self
             .blocks
-            .binary_search_by_key(&range.start, |(_, block)| block.sequence_number)
+            .binary_search_by_key(&range.start, |(_, block, _)| block.sequence_number)
             .unwrap_or_else(|x| x);
 
         // Use the start_index to reduce the search space for the max boundary
         let end_index = self.blocks[start_index..]
-            .binary_search_by_key(&range.end, |(_, block)| block.sequence_number)
+            .binary_search_by_key(&range.end, |(_, block, _)| block.sequence_number)
             .map(|x| x + start_index)
             .unwrap_or_else(|x| x + start_index);
 
@@ -148,7 +138,7 @@ impl CachedBlocksRange {
 
         match self
             .blocks
-            .binary_search_by_key(&sequence_number, |(_, block)| block.sequence_number)
+            .binary_search_by_key(&sequence_number, |(_, block, _)| block.sequence_number)
         {
             Ok(idx) => Some(idx), // Exact match
             Err(idx) => {
@@ -178,7 +168,7 @@ impl CachedBlocksRange {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) enum BlockLookupResult {
-    Found((odf::Multihash, odf::MetadataBlock)),
+    Found((odf::Multihash, odf::MetadataBlock, odf::MetadataBlockBytes)),
     NotFound,
     Stop,
 }
@@ -186,23 +176,27 @@ pub(crate) enum BlockLookupResult {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct CachedBlocksReverseIterator<'a> {
-    blocks: &'a [(odf::Multihash, odf::MetadataBlock)],
+    blocks: &'a [(odf::Multihash, odf::MetadataBlock, odf::MetadataBlockBytes)],
     current_index: Option<usize>,
 }
 
 impl CachedBlocksReverseIterator<'_> {
     /// Peek at the current block without advancing the iterator
-    pub(crate) fn peek(&self) -> Option<&(odf::Multihash, odf::MetadataBlock)> {
+    pub(crate) fn peek(
+        &self,
+    ) -> Option<&(odf::Multihash, odf::MetadataBlock, odf::MetadataBlockBytes)> {
         self.current_index.map(|idx| &self.blocks[idx])
     }
 
     /// Get the current block's sequence number without advancing the iterator
     pub(crate) fn current_sequence_number(&self) -> Option<u64> {
-        self.peek().map(|(_, block)| block.sequence_number)
+        self.peek().map(|(_, block, _)| block.sequence_number)
     }
 
     /// Advance to the next block (lower sequence number)
-    pub(crate) fn next(&mut self) -> Option<&(odf::Multihash, odf::MetadataBlock)> {
+    pub(crate) fn next(
+        &mut self,
+    ) -> Option<&(odf::Multihash, odf::MetadataBlock, odf::MetadataBlockBytes)> {
         match self.current_index {
             Some(idx) => {
                 let current_block = &self.blocks[idx];

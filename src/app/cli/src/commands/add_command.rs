@@ -148,7 +148,7 @@ impl AddCommand {
             let alias = snapshot.name.clone();
             let res = self
                 .create_dataset_from_snapshot
-                .execute(snapshot, create_options)
+                .execute(snapshot, create_options.clone())
                 .await;
 
             ret.push((alias, res));
@@ -289,6 +289,7 @@ impl Command for AddCommand {
 
         let create_options = CreateDatasetUseCaseOptions {
             dataset_visibility: self.dataset_visibility,
+            seed_block_bytes: None,
         };
         let mut add_results = self
             .create_datasets_from_snapshots(snapshots, create_options)

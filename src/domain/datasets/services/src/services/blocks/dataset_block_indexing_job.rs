@@ -17,7 +17,6 @@ use kamu_datasets::{
     DatasetDataBlockRepository,
     DatasetKeyBlockRepository,
     DatasetRegistry,
-    MetadataEventType,
     ResolvedDataset,
 };
 
@@ -122,13 +121,21 @@ pub(crate) async fn index_dataset_blocks_entirely(
     let mut blocks_stream = target
         .as_metadata_chain()
         .as_uncached_chain()
-        .iter_blocks_interval((&head).into(), None, true);
+        .iter_blocks_bytes_interval((&head).into(), None, true);
 
-    while let Some((block_hash, block)) = blocks_stream.try_next().await.int_err()? {
-        let event_flags = odf::metadata::MetadataEventTypeFlags::from(&block.event);
-        let block_entity = make_dataset_block(block_hash, &block);
+    while let Some((block_hash, block_header, block_bytes)) =
+        blocks_stream.try_next().await.int_err()?
+    {
+        let event_type_flags: odf::MetadataEventTypeFlags = block_header.event_type.into();
 
-        if event_flags.has_data_flags() {
+        let block_entity = DatasetBlock {
+            event_kind: block_header.event_type,
+            sequence_number: block_header.sequence_number,
+            block_hash,
+            block_payload: block_bytes,
+        };
+
+        if event_type_flags.has_data_flags() {
             // This is a data block (AddData, ExecuteTransform)
             data_chunk.push(block_entity);
             total_data_blocks += 1;
@@ -222,22 +229,6 @@ pub(crate) async fn index_dataset_blocks_entirely(
     );
 
     Ok(())
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) fn make_dataset_block(
-    block_hash: odf::Multihash,
-    block: &odf::MetadataBlock,
-) -> DatasetBlock {
-    let block_data = odf::storage::serialize_metadata_block(block).unwrap();
-
-    DatasetBlock {
-        event_kind: MetadataEventType::from_metadata_event(&block.event),
-        sequence_number: block.sequence_number,
-        block_hash,
-        block_payload: bytes::Bytes::from(block_data),
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

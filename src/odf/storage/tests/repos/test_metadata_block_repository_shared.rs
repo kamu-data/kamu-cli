@@ -9,7 +9,6 @@
 
 use std::assert_matches;
 
-use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use odf_metadata::*;
 use opendatafabric_storage::*;
@@ -40,7 +39,7 @@ pub async fn test_insert_block(repo: &dyn MetadataBlockRepository) {
 // Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn create_block() -> (MetadataBlock, Bytes, Multihash, u64) {
+pub fn create_block() -> (MetadataBlock, MetadataBlockBytes, Multihash, u64) {
     let block = MetadataBlock {
         system_time: Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap(),
         prev_block_hash: None,
@@ -52,10 +51,15 @@ pub fn create_block() -> (MetadataBlock, Bytes, Multihash, u64) {
     };
     let block_data = serialize_metadata_block(&block).unwrap();
     let hash = Multihash::from_multibase(
-        "f16205603b882241c71351baf996d6dba7e3ddbd571457e93c1cd282bdc61f9fed5f2",
+        "f1620e4773ca5765b41781e721cb891182e43a2df35665cd82b378e54b9ea25f4f50f",
     )
     .unwrap();
-    let block_size = 112;
+    let block_size = 120;
 
-    (block, Bytes::copy_from_slice(&block_data), hash, block_size)
+    (
+        block,
+        MetadataBlockBytes::new_from_slice(&block_data),
+        hash,
+        block_size,
+    )
 }

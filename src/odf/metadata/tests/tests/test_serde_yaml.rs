@@ -301,7 +301,7 @@ fn serde_set_data_schema() {
     let expected_data = indoc!(
         r#"
         kind: MetadataBlock
-        version: 2
+        version: 3
         content:
           systemTime: 2020-01-01T12:00:00Z
           prevBlockHash: f16209eb949bd8ff0bb1d827f11809aebc6bd0d5955c7f368469a913c70d196620272
@@ -388,7 +388,7 @@ fn serde_set_data_schema_legacy() {
     let expected_data = indoc!(
         r#"
         kind: MetadataBlock
-        version: 2
+        version: 3
         content:
           systemTime: 2020-01-01T12:00:00Z
           prevBlockHash: f16209eb949bd8ff0bb1d827f11809aebc6bd0d5955c7f368469a913c70d196620272
@@ -737,7 +737,7 @@ fn serde_metadata_block() {
     let expected = indoc!(
         "
         kind: MetadataBlock
-        version: 2
+        version: 3
         content:
           systemTime: 2020-01-01T12:00:00Z
           prevBlockHash: f16209eb949bd8ff0bb1d827f11809aebc6bd0d5955c7f368469a913c70d196620272

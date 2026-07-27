@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use bytes::Bytes;
 use odf_metadata::*;
 use odf_storage_lfs::ObjectRepositoryLocalFSSha3;
 use opendatafabric_storage::*;
@@ -82,7 +81,7 @@ mockall::mock! {
 
         async fn get_block(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError>;
 
-        async fn get_block_bytes(&self, hash: &Multihash) -> Result<Bytes, GetBlockDataError>;
+        async fn get_block_bytes(&self, hash: &Multihash) -> Result<MetadataBlockBytes, GetBlockDataError>;
 
         async fn get_block_size(&self, hash: &Multihash) -> Result<u64, GetBlockDataError>;
 

@@ -11,6 +11,7 @@ use database_common::TransactionRefT;
 use dill::{component, interface};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_datasets::*;
+use odf::MetadataEventType;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -111,7 +112,7 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
                     &r.block_hash_bin,
                 )
                 .unwrap(),
-                block_payload: bytes::Bytes::from(r.block_payload),
+                block_payload: odf::MetadataBlockBytes::new(bytes::Bytes::from(r.block_payload)),
             })
             .collect())
     }
@@ -163,7 +164,9 @@ impl DatasetKeyBlockRepository for PostgresDatasetKeyBlockRepository {
                             &r.block_hash_bin,
                         )
                         .unwrap(),
-                        block_payload: bytes::Bytes::from(r.block_payload),
+                        block_payload: odf::MetadataBlockBytes::new(bytes::Bytes::from(
+                            r.block_payload,
+                        )),
                     },
                 )
             })

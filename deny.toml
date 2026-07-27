@@ -135,6 +135,7 @@ ignore = [
     "RUSTSEC-2026-0194",
     "RUSTSEC-2026-0195",
     # Unmaintained (smallstr)
+    # Waiting for upstream crates to migrate to other implementation
     # https://rustsec.org/advisories/RUSTSEC-2026-0215
     "RUSTSEC-2026-0215",
 ]

@@ -49,6 +49,7 @@ setty = { version = "1", default-features = false, features = [
     "types-bytesize",
     "types-duration-string",
 ] }
+strum = { version = "0.28", default-features = false, features = ["derive"] }
 
 like = { version = "0.3", default-features = false }
 sha3 = "0.10"

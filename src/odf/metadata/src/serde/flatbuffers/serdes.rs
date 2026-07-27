@@ -14,6 +14,8 @@ use multiformats::Multicodec;
 
 pub use super::convertors_generated::*;
 use super::proxies_generated as fbgen;
+use crate::MetadataBlockBytes;
+use crate::dataset::MetadataBlockHeader;
 use crate::dtos::dataset::MetadataBlock;
 use crate::dtos::engine::*;
 use crate::serde::*;
@@ -29,20 +31,21 @@ pub struct FlatbuffersMetadataBlockSerializer;
 impl FlatbuffersMetadataBlockSerializer {
     const METADATA_BLOCK_SIZE_ESTIMATE: usize = 10 * 1024;
 
-    fn serialize_metadata_block(&self, block: &MetadataBlock) -> Buffer<u8> {
+    fn serialize_metadata_block(&self, block: &MetadataBlock) -> bytes::Bytes {
         let mut fb =
             flatbuffers::FlatBufferBuilder::with_capacity(Self::METADATA_BLOCK_SIZE_ESTIMATE);
         let offset = block.serialize(&mut fb);
         fb.finish(offset, None);
         let (buf, head) = fb.collapse();
-        Buffer::new(head, buf.len(), buf)
+
+        let buf = bytes::Bytes::from(buf);
+        buf.slice(head..buf.len())
     }
-}
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl MetadataBlockSerializer for FlatbuffersMetadataBlockSerializer {
-    fn write_manifest(&self, block: &MetadataBlock) -> Result<Buffer<u8>, Error> {
+    pub fn write_manifest_canonical(
+        &self,
+        block: &MetadataBlock,
+    ) -> Result<MetadataBlockBytes, Error> {
         // TODO: PERF: Serializing nested flatbuffers turned out to be a pain
         // It's hard to make the inner object length-prefixed in order to then treat it
         // as a [ubyte] array so for now we allocate twice and copy inner object
@@ -64,7 +67,16 @@ impl MetadataBlockSerializer for FlatbuffersMetadataBlockSerializer {
         fb.finish(offset, None);
         let (buf, head) = fb.collapse();
 
-        Ok(Buffer::new(head, buf.len(), buf))
+        let buf = bytes::Bytes::from(buf);
+        Ok(MetadataBlockBytes::new(buf.slice(head..buf.len())))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl MetadataBlockSerializer for FlatbuffersMetadataBlockSerializer {
+    fn write_manifest(&self, block: &MetadataBlock) -> Result<bytes::Bytes, Error> {
+        self.write_manifest_canonical(block).map(Into::into)
     }
 }
 
@@ -74,10 +86,8 @@ impl MetadataBlockSerializer for FlatbuffersMetadataBlockSerializer {
 
 pub struct FlatbuffersMetadataBlockDeserializer;
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl MetadataBlockDeserializer for FlatbuffersMetadataBlockDeserializer {
-    fn read_manifest(&self, data: &[u8]) -> Result<MetadataBlock, Error> {
+impl FlatbuffersMetadataBlockDeserializer {
+    fn get_block_proxy<'a>(&self, data: &'a [u8]) -> Result<fbgen::MetadataBlock<'a>, Error> {
         let manifest_proxy = flatbuffers::root::<fbgen::Manifest>(data).map_err(Error::serde)?;
 
         // TODO: Better error handling
@@ -93,6 +103,27 @@ impl MetadataBlockDeserializer for FlatbuffersMetadataBlockDeserializer {
             flatbuffers::root::<fbgen::MetadataBlock>(manifest_proxy.content().unwrap().bytes())
                 .map_err(Error::serde)?;
 
+        Ok(block_proxy)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl MetadataBlockDeserializer for FlatbuffersMetadataBlockDeserializer {
+    fn read_header(&self, data: &[u8]) -> Result<MetadataBlockHeader, Error> {
+        let block_proxy = self.get_block_proxy(data)?;
+        Ok(MetadataBlockHeader {
+            system_time: super::fb_to_datetime(block_proxy.system_time().unwrap()),
+            prev_block_hash: block_proxy
+                .prev_block_hash()
+                .map(|v| crate::Multihash::from_bytes(v.bytes()).unwrap()),
+            sequence_number: block_proxy.sequence_number(),
+            event_type: block_proxy.event_type().into(),
+        })
+    }
+
+    fn read_manifest(&self, data: &[u8]) -> Result<MetadataBlock, Error> {
+        let block_proxy = self.get_block_proxy(data)?;
         let block = MetadataBlock::deserialize(block_proxy);
         Ok(block)
     }
@@ -105,15 +136,16 @@ impl MetadataBlockDeserializer for FlatbuffersMetadataBlockDeserializer {
 pub struct FlatbuffersEngineProtocol;
 
 impl EngineProtocolSerializer for FlatbuffersEngineProtocol {
-    fn write_raw_query_request(&self, inst: &RawQueryRequest) -> Result<Buffer<u8>, Error> {
+    fn write_raw_query_request(&self, inst: &RawQueryRequest) -> Result<bytes::Bytes, Error> {
         let mut fb = flatbuffers::FlatBufferBuilder::new();
         let offset = inst.serialize(&mut fb);
         fb.finish(offset, None);
         let (buf, head) = fb.collapse();
-        Ok(Buffer::new(head, buf.len(), buf))
+        let buf = bytes::Bytes::from(buf);
+        Ok(buf.slice(head..buf.len()))
     }
 
-    fn write_raw_query_response(&self, inst: &RawQueryResponse) -> Result<Buffer<u8>, Error> {
+    fn write_raw_query_response(&self, inst: &RawQueryResponse) -> Result<bytes::Bytes, Error> {
         let mut fb = flatbuffers::FlatBufferBuilder::new();
         let offset = {
             let (typ, offset) = inst.serialize(&mut fb);
@@ -124,18 +156,20 @@ impl EngineProtocolSerializer for FlatbuffersEngineProtocol {
         };
         fb.finish(offset, None);
         let (buf, head) = fb.collapse();
-        Ok(Buffer::new(head, buf.len(), buf))
+        let buf = bytes::Bytes::from(buf);
+        Ok(buf.slice(head..buf.len()))
     }
 
-    fn write_transform_request(&self, inst: &TransformRequest) -> Result<Buffer<u8>, Error> {
+    fn write_transform_request(&self, inst: &TransformRequest) -> Result<bytes::Bytes, Error> {
         let mut fb = flatbuffers::FlatBufferBuilder::new();
         let offset = inst.serialize(&mut fb);
         fb.finish(offset, None);
         let (buf, head) = fb.collapse();
-        Ok(Buffer::new(head, buf.len(), buf))
+        let buf = bytes::Bytes::from(buf);
+        Ok(buf.slice(head..buf.len()))
     }
 
-    fn write_transform_response(&self, inst: &TransformResponse) -> Result<Buffer<u8>, Error> {
+    fn write_transform_response(&self, inst: &TransformResponse) -> Result<bytes::Bytes, Error> {
         let mut fb = flatbuffers::FlatBufferBuilder::new();
         let offset = {
             let (typ, offset) = inst.serialize(&mut fb);
@@ -146,7 +180,8 @@ impl EngineProtocolSerializer for FlatbuffersEngineProtocol {
         };
         fb.finish(offset, None);
         let (buf, head) = fb.collapse();
-        Ok(Buffer::new(head, buf.len(), buf))
+        let buf = bytes::Bytes::from(buf);
+        Ok(buf.slice(head..buf.len()))
     }
 }
 

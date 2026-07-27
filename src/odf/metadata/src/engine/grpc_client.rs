@@ -39,7 +39,7 @@ impl EngineGrpcClient {
             .int_err()?;
 
         let request_grpc = tonic::Request::new(RawQueryRequestGRPC {
-            flatbuffer: fb.collapse_vec(),
+            flatbuffer: fb.into(),
         });
 
         let mut stream = self
@@ -85,7 +85,7 @@ impl EngineGrpcClient {
             .int_err()?;
 
         let request_grpc = tonic::Request::new(TransformRequestGRPC {
-            flatbuffer: fb.collapse_vec(),
+            flatbuffer: fb.into(),
         });
 
         let mut stream = self

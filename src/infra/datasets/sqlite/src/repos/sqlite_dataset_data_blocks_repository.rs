@@ -37,14 +37,14 @@ struct DatasetDataBlockRow {
 impl DatasetDataBlockRow {
     fn into_domain(self) -> DatasetBlock {
         DatasetBlock {
-            event_kind: MetadataEventType::from_str(&self.event_type).unwrap(),
+            event_kind: odf::MetadataEventType::from_str(&self.event_type).unwrap(),
             sequence_number: u64::try_from(self.sequence_number).unwrap(),
             block_hash: odf::Multihash::new(
                 odf::metadata::Multicodec::Sha3_256,
                 &self.block_hash_bin,
             )
             .unwrap(),
-            block_payload: bytes::Bytes::from(self.block_payload),
+            block_payload: odf::MetadataBlockBytes::new(bytes::Bytes::from(self.block_payload)),
         }
     }
 }

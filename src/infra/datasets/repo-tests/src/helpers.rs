@@ -20,7 +20,7 @@ use kamu_accounts::{
     DEFAULT_ACCOUNT_ID,
     DEFAULT_ACCOUNT_NAME,
 };
-use kamu_datasets::{DatasetBlock, DatasetEntry, DatasetEntryRepository, MetadataEventType};
+use kamu_datasets::{DatasetBlock, DatasetEntry, DatasetEntryRepository};
 use odf::metadata::testing::MetadataFactory;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -139,7 +139,7 @@ pub(crate) fn make_add_data_block(sequence_number: u64) -> DatasetBlock {
 
     let block = MetadataFactory::metadata_block(event).build();
 
-    make_block(sequence_number, &block, MetadataEventType::AddData)
+    make_block(sequence_number, &block, odf::MetadataEventType::AddData)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -157,7 +157,11 @@ pub(crate) fn make_execute_transform_block(sequence_number: u64) -> DatasetBlock
 
     let block = MetadataFactory::metadata_block(event).build();
 
-    make_block(sequence_number, &block, MetadataEventType::ExecuteTransform)
+    make_block(
+        sequence_number,
+        &block,
+        odf::MetadataEventType::ExecuteTransform,
+    )
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -167,7 +171,7 @@ pub(crate) fn make_seed_block(kind: odf::DatasetKind) -> DatasetBlock {
 
     let block = MetadataFactory::metadata_block(event).build();
 
-    make_block(0, &block, MetadataEventType::Seed)
+    make_block(0, &block, odf::MetadataEventType::Seed)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -180,7 +184,7 @@ pub(crate) fn make_info_block(sequence_number: u64) -> DatasetBlock {
 
     let block = MetadataFactory::metadata_block(event).build();
 
-    make_block(sequence_number, &block, MetadataEventType::SetInfo)
+    make_block(sequence_number, &block, odf::MetadataEventType::SetInfo)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -193,7 +197,7 @@ pub(crate) fn make_license_block(sequence_number: u64) -> DatasetBlock {
 
     let block = MetadataFactory::metadata_block(event).build();
 
-    make_block(sequence_number, &block, MetadataEventType::SetLicense)
+    make_block(sequence_number, &block, odf::MetadataEventType::SetLicense)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -201,12 +205,14 @@ pub(crate) fn make_license_block(sequence_number: u64) -> DatasetBlock {
 fn make_block(
     sequence_number: u64,
     block: &odf::MetadataBlock,
-    kind: MetadataEventType,
+    kind: odf::MetadataEventType,
 ) -> DatasetBlock {
     let block_hash =
         odf::Multihash::from_digest_sha3_256(format!("block-{sequence_number}").as_bytes());
 
-    let block_payload = bytes::Bytes::from(odf::storage::serialize_metadata_block(block).unwrap());
+    let block_payload = odf::MetadataBlockBytes::new(bytes::Bytes::from(
+        odf::storage::serialize_metadata_block(block).unwrap(),
+    ));
 
     DatasetBlock {
         event_kind: kind,

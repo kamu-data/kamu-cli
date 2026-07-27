@@ -36,7 +36,10 @@ pub trait MetadataChain: Send + Sync {
     async fn get_block_size(&self, hash: &Multihash) -> Result<u64, GetBlockDataError>;
 
     /// Returns the specified block as raw bytes
-    async fn get_block_bytes(&self, hash: &Multihash) -> Result<bytes::Bytes, GetBlockDataError>;
+    async fn get_block_bytes(
+        &self,
+        hash: &Multihash,
+    ) -> Result<MetadataBlockBytes, GetBlockDataError>;
 
     /// Returns the specified block
     async fn get_block(&self, hash: &Multihash) -> Result<MetadataBlock, GetBlockError>;
@@ -69,6 +72,15 @@ pub trait MetadataChain: Send + Sync {
         tail_boundary: Option<MetadataChainIterBoundary<'a>>,
         ignore_missing_tail: bool,
     ) -> DynMetadataStream<'a>;
+
+    /// Similar to `iter_blocks_interval` but returns raw bytes instead of fully
+    /// decoding the blocks
+    fn iter_blocks_bytes_interval<'a>(
+        &'a self,
+        head_boundary: MetadataChainIterBoundary<'a>,
+        tail_boundary: Option<MetadataChainIterBoundary<'a>>,
+        ignore_missing_tail: bool,
+    ) -> DynMetadataBytesStream<'a>;
 
     /// Appends the block to the chain
     async fn append<'a>(
@@ -740,6 +752,14 @@ pub struct AppendOpts<'a> {
 
     /// Append will result in error if computed hash does not match this one.
     pub expected_hash: Option<&'a Multihash>,
+
+    /// Append will use the provided block DTO for validation but will store the
+    /// provided bytes. This avoids extra overhead of serializing the block.
+    /// Note that the block hash will also be computed over provided bytes.
+    ///
+    /// Warning: You have to be certain that bytes actually correspond to the
+    /// DTO.
+    pub block_data: Option<&'a [u8]>,
 }
 
 impl Default for AppendOpts<'_> {
@@ -751,6 +771,7 @@ impl Default for AppendOpts<'_> {
             check_ref_is: None,
             precomputed_hash: None,
             expected_hash: None,
+            block_data: None,
         }
     }
 }
@@ -803,6 +824,16 @@ impl From<GetBlockError> for IterBlocksError {
             GetBlockError::BlockMalformed(e) => Self::BlockMalformed(e),
             GetBlockError::Access(e) => Self::Access(e),
             GetBlockError::Internal(e) => Self::Internal(e),
+        }
+    }
+}
+
+impl From<GetBlockDataError> for IterBlocksError {
+    fn from(v: GetBlockDataError) -> Self {
+        match v {
+            GetBlockDataError::NotFound(e) => Self::BlockNotFound(e),
+            GetBlockDataError::Access(e) => Self::Access(e),
+            GetBlockDataError::Internal(e) => Self::Internal(e),
         }
     }
 }

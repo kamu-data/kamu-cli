@@ -300,10 +300,6 @@ impl KamuTable {
 
 #[async_trait::async_trait]
 impl TableProvider for KamuTable {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-
     fn schema(&self) -> SchemaRef {
         // SAFETY: We rely on `KamuScheme` to pre-initialize schemas in async context
         // before handing down references to `KamuTable`
