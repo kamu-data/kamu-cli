@@ -87,6 +87,30 @@ impl ResourceView {
             .and_then(Value::as_str)
     }
 
+    /// A label value (`headers.labels.<key>`), by exact key (short name or
+    /// canonical schema URI — callers pass whichever key they expect the
+    /// value to be stored under). `None` if the key is absent.
+    pub fn label(&self, key: &str) -> Option<&Value> {
+        self.0
+            .get("headers")
+            .and_then(|h| h.get("labels"))
+            .and_then(|l| l.get(key))
+    }
+
+    /// A label's string value (`headers.labels.<key>`), if present and
+    /// string-valued.
+    pub fn label_str(&self, key: &str) -> Option<&str> {
+        self.label(key).and_then(Value::as_str)
+    }
+
+    /// An annotation value (`headers.annotations.<key>`), by exact key.
+    pub fn annotation(&self, key: &str) -> Option<&Value> {
+        self.0
+            .get("headers")
+            .and_then(|h| h.get("annotations"))
+            .and_then(|a| a.get(key))
+    }
+
     /// Stable resource ID. The exact nesting is intentionally not part of the
     /// test contract, so this searches the rendered document recursively.
     pub fn id(&self) -> String {
