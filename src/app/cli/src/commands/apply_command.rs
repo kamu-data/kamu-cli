@@ -12,7 +12,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
-use database_common_macros::transactional_method2;
+use database_common_macros::{transactional_method1, transactional_method2};
 use internal_error::{BoxedError, ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_resources::{
     ApplyManifestChange,
@@ -22,7 +22,13 @@ use kamu_resources::{
     ResourceWarning,
     resource_type_name,
 };
-use kamu_resources_facade::ResourceManifestFormat as FacadeResourceManifestFormat;
+use kamu_resources_facade::{
+    ApplyManifestBatchItemResult,
+    ApplyManifestBatchRequest,
+    ApplyManifestBatchResponse,
+    ApplyManifestRequest,
+    ResourceManifestFormat as FacadeResourceManifestFormat,
+};
 use thiserror::Error;
 
 use super::{BatchError, CLIError, Command, common};
@@ -175,6 +181,26 @@ impl ApplyCommand {
         summary: &mut ApplySummary,
         errors: &mut Vec<(BoxedError, String)>,
     ) -> Result<(), CLIError> {
+        if self.continue_on_error {
+            self.apply_manifests_per_item(printer, manifests, maybe_progress, summary, errors)
+                .await
+        } else {
+            self.apply_manifests_as_one_batch(printer, manifests, maybe_progress, summary, errors)
+                .await
+        }
+    }
+
+    /// Existing per-item transactional loop: each manifest is independently
+    /// transacted (see `apply_single_manifest`), so earlier successes survive
+    /// a later rejection/failure and the loop keeps going past failures.
+    async fn apply_manifests_per_item(
+        &self,
+        printer: &ApplyPrinter<'_>,
+        manifests: Vec<DiscoveredResourceManifest>,
+        maybe_progress: Option<&ApplyMultiProgress>,
+        summary: &mut ApplySummary,
+        errors: &mut Vec<(BoxedError, String)>,
+    ) -> Result<(), CLIError> {
         for manifest in manifests {
             let source = manifest.source.to_string();
             let item_progress = printer.start_item(maybe_progress, &source);
@@ -224,6 +250,146 @@ impl ApplyCommand {
                     if !self.continue_on_error {
                         break;
                     }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Opens exactly one transaction for the whole batch: the first
+    /// rejection/failure rolls back everything, including earlier items in
+    /// the same invocation that would otherwise have succeeded.
+    #[transactional_method1(resource_facade_factory: Arc<dyn ResourceFacadeFactory>)]
+    async fn apply_manifest_batch(
+        &self,
+        manifests: &[DiscoveredResourceManifest],
+    ) -> Result<ApplyManifestBatchResponse<ExecuteResourceManifestOutcome>, ExecuteBatchError> {
+        let resource_facade = resource_facade_factory
+            .get_resource_facade(self.explicit_context_name.as_deref())
+            .map_err(|e| ExecuteBatchError::Internal(e.int_err()))?;
+
+        let mut items = Vec::with_capacity(manifests.len());
+        for manifest in manifests {
+            let content = manifest
+                .source
+                .read_content()
+                .map_err(ExecuteBatchError::ReadManifest)?;
+            items.push(ApplyManifestRequest {
+                format: manifest.format,
+                manifest: content,
+            });
+        }
+
+        let request = ApplyManifestBatchRequest { items };
+
+        let response = if self.dry_run {
+            let response = resource_facade
+                .plan_apply_manifests(request)
+                .await
+                .map_err(ExecuteBatchError::Batch)?;
+            map_batch_response(response)
+        } else {
+            let response = resource_facade
+                .apply_manifests(request)
+                .await
+                .map_err(ExecuteBatchError::Batch)?;
+            map_batch_response(response)
+        };
+
+        let fully_succeeded = response.items.len() == manifests.len()
+            && response.items.iter().all(|item| {
+                matches!(
+                    item.outcome,
+                    Ok(ExecuteResourceManifestOutcome::Accepted(_))
+                )
+            });
+
+        if fully_succeeded {
+            Ok(response)
+        } else {
+            Err(ExecuteBatchError::Rejected(response))
+        }
+    }
+
+    /// New atomic path: a single call to the batch facade method wraps the
+    /// *entire* batch in one transaction.
+    async fn apply_manifests_as_one_batch(
+        &self,
+        printer: &ApplyPrinter<'_>,
+        manifests: Vec<DiscoveredResourceManifest>,
+        maybe_progress: Option<&ApplyMultiProgress>,
+        summary: &mut ApplySummary,
+        errors: &mut Vec<(BoxedError, String)>,
+    ) -> Result<(), CLIError> {
+        let (response, committed) = match self.apply_manifest_batch(&manifests).await {
+            Ok(response) => (response, true),
+            Err(ExecuteBatchError::Rejected(response)) => (response, false),
+            Err(ExecuteBatchError::ReadManifest(err)) => {
+                summary.record_failed();
+                errors.push((Box::new(err), "Failed to read manifest".to_string()));
+                return Ok(());
+            }
+            Err(ExecuteBatchError::Batch(err)) => {
+                summary.record_failed();
+                errors.push((Box::new(err), "Batch apply failed".to_string()));
+                return Ok(());
+            }
+            Err(ExecuteBatchError::Internal(err)) => {
+                summary.record_failed();
+                errors.push((Box::new(err), "Batch apply failed".to_string()));
+                return Ok(());
+            }
+        };
+
+        let mut results_by_index = response
+            .items
+            .into_iter()
+            .map(|item| (item.request_index, item.outcome))
+            .collect::<std::collections::HashMap<_, _>>();
+
+        for (request_index, manifest) in manifests.iter().enumerate() {
+            let source = manifest.source.to_string();
+            let item_progress = printer.start_item(maybe_progress, &source);
+
+            match results_by_index.remove(&request_index) {
+                None => {
+                    // Never attempted: the batch stopped before reaching this item.
+                    summary.record_not_attempted();
+                    printer.print_not_attempted(item_progress, &source);
+                }
+                Some(Ok(ExecuteResourceManifestOutcome::Accepted(result))) => {
+                    if committed {
+                        summary.record_accepted(&result);
+                        printer.print_accepted(item_progress, &source, &result, self.dry_run)?;
+                    } else {
+                        summary.record_rolled_back();
+                        printer.print_rolled_back(item_progress, &source, &result, self.dry_run)?;
+                    }
+                }
+                Some(Ok(ExecuteResourceManifestOutcome::Rejected(rejection))) => {
+                    summary.record_rejected();
+                    printer.print_rejected(item_progress, &source, rejection.message.clone());
+
+                    errors.push((
+                        Box::<dyn std::error::Error + Send + Sync>::from(ApplyRejectedError::from(
+                            rejection,
+                        )),
+                        format!("Manifest {source} was rejected"),
+                    ));
+                }
+                Some(Err(err)) => {
+                    summary.record_failed();
+                    printer.print_failed(item_progress, &source, err.to_string());
+
+                    errors.push((
+                        Box::new(err),
+                        format!(
+                            "Failed to {} manifest {}",
+                            if self.dry_run { "plan" } else { "apply" },
+                            source
+                        ),
+                    ));
                 }
             }
         }
@@ -323,6 +489,8 @@ struct ApplySummary {
     rejected: usize,
     failed: usize,
     warnings: usize,
+    rolled_back: usize,
+    not_attempted: usize,
 }
 
 impl ApplySummary {
@@ -345,6 +513,21 @@ impl ApplySummary {
     fn record_failed(&mut self) {
         self.total_items += 1;
         self.failed += 1;
+    }
+
+    /// An item that individually succeeded but was thrown away because the
+    /// enclosing single-transaction batch rolled back — never counted into
+    /// `created`/`updated`, since nothing was actually persisted.
+    fn record_rolled_back(&mut self) {
+        self.total_items += 1;
+        self.rolled_back += 1;
+    }
+
+    /// An item the batch never reached because it stopped at an earlier
+    /// rejection/failure.
+    fn record_not_attempted(&mut self) {
+        self.total_items += 1;
+        self.not_attempted += 1;
     }
 }
 
@@ -380,6 +563,43 @@ enum ExecuteSingleManifestError {
 impl From<InternalError> for ExecuteSingleManifestError {
     fn from(value: InternalError) -> Self {
         Self::Internal(value)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// `Rejected` carries the partial batch response out of a rolled-back
+/// transaction for reporting; `ReadManifest`/`Batch`/`Internal` are genuine
+/// failures that abort the whole call before any item-level response exists.
+enum ExecuteBatchError {
+    Rejected(ApplyManifestBatchResponse<ExecuteResourceManifestOutcome>),
+    ReadManifest(std::io::Error),
+    Batch(kamu_resources_facade::BatchResourceError),
+    Internal(InternalError),
+}
+
+// Required by `transactional_method1`.
+impl From<InternalError> for ExecuteBatchError {
+    fn from(value: InternalError) -> Self {
+        Self::Internal(value)
+    }
+}
+
+fn map_batch_response<D>(
+    response: ApplyManifestBatchResponse<D>,
+) -> ApplyManifestBatchResponse<ExecuteResourceManifestOutcome>
+where
+    ExecuteResourceManifestOutcome: From<D>,
+{
+    ApplyManifestBatchResponse {
+        items: response
+            .items
+            .into_iter()
+            .map(|item| ApplyManifestBatchItemResult {
+                request_index: item.request_index,
+                outcome: item.outcome.map(ExecuteResourceManifestOutcome::from),
+            })
+            .collect(),
     }
 }
 
@@ -427,21 +647,29 @@ impl<'a> ApplyPrinter<'a> {
     }
 
     fn print_summary(&self, progress: Option<&ApplyMultiProgress>, summary: &ApplySummary) {
-        self.print_line(
-            progress,
-            format!(
-                "{} {} item(s): {} created, {} updated, {} unchanged, {} rejected, {} failed, {} \
-                 warning(s)",
-                console::style("Summary").bold(),
-                summary.total_items,
-                summary.created,
-                summary.updated,
-                summary.unchanged,
-                summary.rejected,
-                summary.failed,
-                summary.warnings
-            ),
+        let mut line = format!(
+            "{} {} item(s): {} created, {} updated, {} unchanged, {} rejected, {} failed, {} \
+             warning(s)",
+            console::style("Summary").bold(),
+            summary.total_items,
+            summary.created,
+            summary.updated,
+            summary.unchanged,
+            summary.rejected,
+            summary.failed,
+            summary.warnings
         );
+
+        if summary.rolled_back > 0 || summary.not_attempted > 0 {
+            use std::fmt::Write as _;
+            let _ = write!(
+                line,
+                ", {} rolled back, {} not attempted",
+                summary.rolled_back, summary.not_attempted
+            );
+        }
+
+        self.print_line(progress, line);
     }
 
     fn batch_failure_summary(&self, error_count: usize) -> String {
@@ -504,6 +732,55 @@ impl<'a> ApplyPrinter<'a> {
         );
         self.increment_completed(progress);
         self.print_error_detail(progress, source, message);
+    }
+
+    /// Prints an item that individually succeeded but was not persisted
+    /// because the enclosing single-transaction batch rolled back due to a
+    /// later item's rejection/failure.
+    fn print_rolled_back(
+        &self,
+        item_progress: ApplyItemProgress<'_>,
+        source: &str,
+        result: &ExecutedResourceManifestResult,
+        dry_run: bool,
+    ) -> Result<(), CLIError> {
+        let label = if dry_run {
+            "Not committed (dry-run, batch rolled back)"
+        } else {
+            "Not committed (batch rolled back)"
+        };
+
+        let progress = self.finish_item(
+            item_progress,
+            format!(
+                "{}: {} -> would have been applied, but not committed (batch rolled back)",
+                console::style(label).yellow().bold(),
+                source
+            ),
+            true,
+        );
+        self.increment_completed(progress);
+
+        if self.should_print_verbose_resource() {
+            self.print_verbose_resource(progress, &result.resource)?;
+        }
+
+        Ok(())
+    }
+
+    /// Prints an item the batch never reached because it stopped at an
+    /// earlier rejection/failure.
+    fn print_not_attempted(&self, item_progress: ApplyItemProgress<'_>, source: &str) {
+        let progress = self.finish_item(
+            item_progress,
+            format!(
+                "{}: {}",
+                console::style("Not attempted (batch rolled back)").dim(),
+                source
+            ),
+            true,
+        );
+        self.increment_completed(progress);
     }
 
     fn finish_progress(

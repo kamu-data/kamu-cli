@@ -92,11 +92,20 @@ pub async fn test_resources_apply_batch(ctx: ResourceCtx) {
         );
     }
 
-    // ── 3. Stop-on-error (default) ────────────────────────────────────────────
+    // ── 3. Single-transaction, all-or-nothing batch (default) ─────────────────
     //
     // Order: [valid-a, invalid, valid-b]. The invalid manifest (empty
-    // `variables`) is rejected; without --continue-on-error the batch aborts on
-    // it, so valid-b (listed after) is never applied. valid-a (before) is.
+    // `variables`) is rejected. Without --continue-on-error the whole batch is
+    // one transaction: the rejection rolls back everything, including valid-a
+    // (listed before it, which individually would have succeeded). valid-b
+    // (listed after) is never attempted at all.
+    //
+    // NOTE: this assumes true atomicity, which the remote facade does not yet
+    // provide (Phase 4 — real batch GraphQL mutation + transport-error
+    // rollback — is not implemented; the remote facade still loops over the
+    // single-item mutation, so valid-a stays committed there today). The two
+    // remote-context failures this causes are expected and tracked against
+    // Phase 4, not treated as a regression here.
     {
         let a_name = "stop-valid-a";
         let invalid_name = "stop-invalid";
@@ -117,18 +126,21 @@ pub async fn test_resources_apply_batch(ctx: ResourceCtx) {
         ctx.assert_resource_absent("vs", a_name).await;
         ctx.assert_resource_absent("vs", b_name).await;
 
-        // total_items counts only the items processed before the abort: a
-        // (created) + invalid (rejected). valid-b is never reached.
+        // total_items counts every manifest reported on: a (rolled back) +
+        // invalid (rejected) + b (not attempted). Nothing is created because
+        // the whole batch rolled back.
         ctx.assert_failure(
             ["apply", "stop/a.yaml", "stop/invalid.yaml", "stop/b.yaml"],
             Some(&[
-                r#"Summary 2 item\(s\): 1 created, 0 updated, 0 unchanged, 1 rejected, 0 failed"#,
+                r#"Summary 3 item\(s\): 0 created, 0 updated, 0 unchanged, 1 rejected, 0 failed, 0 warning\(s\), 1 rolled back, 1 not attempted"#,
                 r#"Failed to apply 1 item\(s\)"#,
             ]),
         )
         .await;
 
-        ctx.assert_resource_present("vs", a_name).await;
+        // Nothing from the batch was persisted, including valid-a which
+        // individually would have succeeded — that's the point of atomicity.
+        ctx.assert_resource_absent("vs", a_name).await;
         ctx.assert_resource_absent("vs", b_name).await;
         ctx.assert_resource_absent("vs", invalid_name).await;
     }

@@ -8,8 +8,11 @@
 // by the Apache License, Version 2.0.
 
 use kamu_resources::{
+    ApplyManifestApplicationDecision,
     ApplyManifestChange,
+    ApplyManifestPlanningDecision,
     ApplyManifestRejection,
+    ApplyManifestResult,
     ApplyResourceOutcome,
     Resource,
     ResourceWarning,
@@ -28,6 +31,42 @@ pub trait ResourceManifestExecutionService: Send + Sync {
         manifest: &DiscoveredResourceManifest,
         dry_run: bool,
     ) -> Result<ExecuteResourceManifestOutcome, ExecuteResourceManifestError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl From<ApplyManifestPlanningDecision> for ExecuteResourceManifestOutcome {
+    fn from(decision: ApplyManifestPlanningDecision) -> Self {
+        match decision {
+            ApplyManifestPlanningDecision::Planned(plan) => {
+                Self::Accepted(ExecutedResourceManifestResult {
+                    outcome: plan.outcome,
+                    resource: plan.resource,
+                    warnings: plan.warnings,
+                    changes: plan.changes,
+                })
+            }
+            ApplyManifestPlanningDecision::Rejected(rejection) => Self::Rejected(rejection),
+        }
+    }
+}
+
+impl From<ApplyManifestApplicationDecision> for ExecuteResourceManifestOutcome {
+    fn from(decision: ApplyManifestApplicationDecision) -> Self {
+        match decision {
+            ApplyManifestApplicationDecision::Applied(ApplyManifestResult {
+                resource,
+                outcome,
+                warnings,
+            }) => Self::Accepted(ExecutedResourceManifestResult {
+                outcome,
+                resource,
+                warnings,
+                changes: Vec::new(),
+            }),
+            ApplyManifestApplicationDecision::Rejected(rejection) => Self::Rejected(rejection),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
