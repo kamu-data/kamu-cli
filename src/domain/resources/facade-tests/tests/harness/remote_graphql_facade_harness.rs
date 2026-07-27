@@ -93,6 +93,34 @@ impl RemoteGraphqlFacadeHarness {
     pub fn base_catalog(&self) -> &dill::Catalog {
         self.local.base_catalog()
     }
+
+    pub async fn execute_raw_graphql(
+        &self,
+        account: TestAccount,
+        request: async_graphql::Request,
+    ) -> async_graphql::Response {
+        let account_name = self.local.account_name(account);
+        let account_id = self.local.account_id(account);
+        let subject = CurrentAccountSubject::logged(
+            kamu_accounts::Account::seed_resource_id_from_name(account_name.as_str()),
+            account_id,
+            account_name,
+        );
+
+        let mut b = dill::CatalogBuilder::new_chained(self.local.base_catalog());
+        b.add_value(subject);
+        kamu_resources_facade::register_dependencies(&mut b);
+        let catalog = b.build();
+
+        kamu_adapter_graphql::schema_quiet()
+            .execute(
+                request
+                    .data(account_entity_data_loader(&catalog))
+                    .data(dataset_handle_data_loader(&catalog))
+                    .data(catalog),
+            )
+            .await
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -140,7 +140,46 @@ pub async fn test_resources_apply_batch(ctx: ResourceCtx) {
         ctx.assert_resource_absent("vs", invalid_name).await;
     }
 
-    // ── 4. --continue-on-error
+    // ── 4. Hard failure also rolls back the whole batch ───────────────────────
+    //
+    // This is distinct from the business rejection case above: the middle
+    // manifest is malformed JSON, so it is counted as `failed`, not rejected.
+    // The same atomicity contract still applies.
+    {
+        let a_name = "hard-fail-valid-a";
+        let b_name = "hard-fail-valid-b";
+        ctx.write_manifest(
+            "hard-fail/a.yaml",
+            &fixtures::variable_set_manifest_yaml(a_name, "a"),
+        );
+        ctx.write_manifest("hard-fail/invalid.json", "not valid json {{{");
+        ctx.write_manifest(
+            "hard-fail/b.yaml",
+            &fixtures::variable_set_manifest_yaml(b_name, "b"),
+        );
+
+        ctx.assert_resource_absent("vs", a_name).await;
+        ctx.assert_resource_absent("vs", b_name).await;
+
+        ctx.assert_failure(
+            [
+                "apply",
+                "hard-fail/a.yaml",
+                "hard-fail/invalid.json",
+                "hard-fail/b.yaml",
+            ],
+            Some(&[
+                r#"Summary 3 item\(s\): 0 created, 0 updated, 0 unchanged, 0 rejected, 1 failed, 0 warning\(s\), 1 rolled back, 1 not attempted"#,
+                r#"Failed to apply 1 item\(s\)"#,
+            ]),
+        )
+        .await;
+
+        ctx.assert_resource_absent("vs", a_name).await;
+        ctx.assert_resource_absent("vs", b_name).await;
+    }
+
+    // ── 5. --continue-on-error
     // ────────────────────────────────────────────────
     //
     // Same trio, but now the batch processes all three: valid-a and valid-b are
