@@ -117,6 +117,7 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
     async fn store_dataset(
         &self,
         seed_block: MetadataBlockTyped<Seed>,
+        opts: StoreDatasetOpts,
     ) -> Result<StoreDatasetResult, StoreDatasetError> {
         // Check if a dataset with the same ID can be resolved successfully
         use DatasetStorageUnit;
@@ -181,6 +182,10 @@ impl DatasetStorageUnitWriter for DatasetStorageUnitLocalFs {
                     // as atomically as possible
                     check_ref_is: Some(None),
                     update_ref: None,
+                    block_data: opts
+                        .seed_block_bytes
+                        .as_ref()
+                        .map(MetadataBlockBytes::as_slice),
                     ..AppendOpts::default()
                 },
             )

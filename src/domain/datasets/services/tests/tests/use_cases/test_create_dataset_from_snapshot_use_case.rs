@@ -37,7 +37,7 @@ async fn test_create_root_dataset_from_snapshot() {
         MockDidGenerator::predefined_dataset_ids(vec![predefined_foo_id.clone()]);
     let harness = CreateFromSnapshotUseCaseHarness::new(Some(mock_did_generator)).await;
 
-    let hash_seed_block = BaseRepoHarness::hash_from_block(&odf::MetadataBlock {
+    let (seed_block_hash, _) = BaseRepoHarness::serialize_block(&odf::MetadataBlock {
         system_time: harness.system_time_source().now(),
         prev_block_hash: None,
         sequence_number: 0,
@@ -98,7 +98,7 @@ async fn test_create_root_dataset_from_snapshot() {
         .replace("<foo_id>", predefined_foo_id.to_string().as_str())
         .replace("<foo_head>", foo_created.head.to_string().as_str())
         .replace("<foo_id>", predefined_foo_id.to_string().as_str())
-        .replace("<foo_key_tail>", hash_seed_block.to_string().as_str())
+        .replace("<foo_key_tail>", seed_block_hash.to_string().as_str())
         .replace("<foo_key_head>", foo_created.head.to_string().as_str()),
         harness.collected_outbox_messages(),
     );
@@ -119,7 +119,7 @@ async fn test_create_derived_dataset_from_snapshot() {
     ]);
     let harness = CreateFromSnapshotUseCaseHarness::new(Some(mock_did_generator)).await;
 
-    let foo_hash_seed_block = BaseRepoHarness::hash_from_block(&odf::MetadataBlock {
+    let (foo_hash_seed_block, _) = BaseRepoHarness::serialize_block(&odf::MetadataBlock {
         system_time: harness.system_time_source().now(),
         prev_block_hash: None,
         sequence_number: 0,
@@ -135,7 +135,7 @@ async fn test_create_derived_dataset_from_snapshot() {
         .push_event(MetadataFactory::set_polling_source().build())
         .build();
 
-    let bar_hash_seed_block = BaseRepoHarness::hash_from_block(&odf::MetadataBlock {
+    let (bar_hash_seed_block, _) = BaseRepoHarness::serialize_block(&odf::MetadataBlock {
         system_time: harness.system_time_source().now(),
         prev_block_hash: None,
         sequence_number: 0,
@@ -155,11 +155,11 @@ async fn test_create_derived_dataset_from_snapshot() {
         )
         .build();
 
-    let options = Default::default();
+    let options = kamu_datasets::CreateDatasetUseCaseOptions::default();
 
     let foo_created = harness
         .use_case
-        .execute(snapshot_root, options)
+        .execute(snapshot_root, options.clone())
         .await
         .unwrap();
     let bar_created = harness

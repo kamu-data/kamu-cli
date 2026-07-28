@@ -198,7 +198,7 @@ impl ResetTestHarness {
 
         let stored = self
             .dataset_storage_unit_writer()
-            .store_dataset(seed_block)
+            .store_dataset(seed_block, odf::dataset::StoreDatasetOpts::default())
             .await
             .unwrap();
 

@@ -17,7 +17,9 @@ pub trait AppendDatasetMetadataBatchUseCase: Send + Sync {
     async fn execute(
         &self,
         dataset: &dyn odf::Dataset,
-        new_blocks_into_it: Box<dyn Iterator<Item = odf::dataset::HashedMetadataBlock> + Send>,
+        new_blocks_into_it: Box<
+            dyn Iterator<Item = odf::dataset::HashedMetadataBlockBytesDecoded> + Send,
+        >,
         options: AppendDatasetMetadataBatchUseCaseOptions,
     ) -> Result<Option<odf::Multihash>, AppendDatasetMetadataBatchUseCaseError>;
 }
@@ -40,7 +42,7 @@ pub struct AppendDatasetMetadataBatchUseCaseOptions {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
-#[error("{append_error}")]
+#[error("Failed to append block {block_sequence_number} ({block_hash}): {append_error}")]
 pub struct AppendDatasetMetadataBatchUseCaseBlockAppendError {
     pub append_error: odf::dataset::AppendError,
     pub block_sequence_number: u64,

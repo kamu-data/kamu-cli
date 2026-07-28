@@ -152,6 +152,7 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
                 snapshot,
                 CreateDatasetUseCaseOptions {
                     dataset_visibility: odf::DatasetVisibility::Private,
+                    seed_block_bytes: None,
                 },
             )
             .await
@@ -165,6 +166,7 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
                 snapshot,
                 CreateDatasetUseCaseOptions {
                     dataset_visibility: odf::DatasetVisibility::Private,
+                    seed_block_bytes: None,
                 },
             )
             .await

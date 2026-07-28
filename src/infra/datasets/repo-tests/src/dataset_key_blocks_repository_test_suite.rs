@@ -93,11 +93,11 @@ pub async fn test_save_blocks_batch(catalog: &Catalog) {
 
     assert_eq!(all.len(), 3);
     assert_eq!(all[0].sequence_number, 0);
-    assert_eq!(all[0].event_kind, MetadataEventType::Seed);
+    assert_eq!(all[0].event_kind, odf::MetadataEventType::Seed);
     assert_eq!(all[1].sequence_number, 1);
-    assert_eq!(all[1].event_kind, MetadataEventType::SetInfo);
+    assert_eq!(all[1].event_kind, odf::MetadataEventType::SetInfo);
     assert_eq!(all[2].sequence_number, 2);
-    assert_eq!(all[2].event_kind, MetadataEventType::SetLicense);
+    assert_eq!(all[2].event_kind, odf::MetadataEventType::SetLicense);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -221,7 +221,7 @@ pub async fn test_match_datasets_having_blocks(catalog: &Catalog) {
         .match_datasets_having_key_blocks(
             &dataset_ids,
             &odf::BlockRef::Head,
-            kamu_datasets::MetadataEventType::SetLicense,
+            odf::MetadataEventType::SetLicense,
         )
         .await
         .unwrap();
@@ -242,7 +242,7 @@ pub async fn test_match_datasets_having_blocks(catalog: &Catalog) {
         .match_datasets_having_key_blocks(
             &dataset_ids,
             &odf::BlockRef::Head,
-            kamu_datasets::MetadataEventType::SetInfo,
+            odf::MetadataEventType::SetInfo,
         )
         .await
         .unwrap();

@@ -488,7 +488,7 @@ async fn test_data_query_handler_success() {
                     "limit": 100,
                     "datasets": [{
                         "alias": "kamu-server/population",
-                        "blockHash": "f1620354e9a2c081393afc7b94846fd1e62f6e25f32e238dc0474a9a5bd4074b8c740",
+                        "blockHash": "f1620efdd11877825ad5f30fce4fb64a130e3d6273ea8fc81d72507c59081cc1d430e",
                         "id": "did:odf:fed01df230b49615d175307d580c33d6fda61fc7b9aec91df0f5c1a5ebe3b8cbfee02",
                     }],
                 },
@@ -503,14 +503,14 @@ async fn test_data_query_handler_success() {
                 },
                 "subQueries": [],
                 "commitment": {
-                    "inputHash": "f1620d2b55fb8df2d106a4e9ffd44bac530adfa725954ddbe202510dc8b3c3fbde520",
+                    "inputHash": "f16207ec84999fec29898a304aab4c4990bff33e455a409c0c2958894ecb87717dc6a",
                     "outputHash": "f16208d66e08ce876ba35ce00ea56f02faf83dbc086f877c443e3d493427ccad133f1",
                     "subQueriesHash": "f1620ca4510738395af1429224dd785675309c344b2b549632e20275c69b15ed1d210",
                 },
                 "proof": {
                     "type": "Ed25519Signature2020",
                     "verificationMethod": "did:key:z6Mko2nqhQ9wYSTS5Giab2j1aHzGnxHimqwmFeEVY8aNsVnN",
-                    "proofValue": "uOE_tMf5GeMLYS4fAEWzvmR8pyYE7Qv2YG_Wm8IqrfrwjsqCf55YEg02y1dnSJ3mN6Ifn4DtVJ9cyVCVQ738hBQ",
+                    "proofValue": "uu5cFSKBj004FnB-e4dRajWz5q6loJDMMH-2_WwilhJarqBnwm0urFzZKVTk5OYzUMz75sukMjb5u8A--aR5tDg",
                 }
             }),
             response
@@ -648,7 +648,7 @@ async fn test_data_verify_handler() {
                     "limit": 100,
                     "datasets": [{
                         "alias": "kamu-server/population",
-                        "blockHash": "f1620354e9a2c081393afc7b94846fd1e62f6e25f32e238dc0474a9a5bd4074b8c740",
+                        "blockHash": "f1620efdd11877825ad5f30fce4fb64a130e3d6273ea8fc81d72507c59081cc1d430e",
                         "id": "did:odf:fed01df230b49615d175307d580c33d6fda61fc7b9aec91df0f5c1a5ebe3b8cbfee02",
                     }],
                 },
@@ -661,14 +661,14 @@ async fn test_data_verify_handler() {
                 },
                 "subQueries": [],
                 "commitment": {
-                    "inputHash": "f16208ce1893977a7449d3b830e02531a7ca00feca3f2723e97a272f0c56e2547b4dc",
+                    "inputHash": "f1620ef74430b1ad8916e80c148f7a9e8815ca702610a2655971b2f9852f00d5caa31",
                     "outputHash": "f1620ff7f5beaf16900218a3ac4aae82cdccf764816986c7c739c716cf7dc03112a2c",
                     "subQueriesHash": "f1620ca4510738395af1429224dd785675309c344b2b549632e20275c69b15ed1d210",
                 },
                 "proof": {
                     "type": "Ed25519Signature2020",
                     "verificationMethod": "did:key:z6Mko2nqhQ9wYSTS5Giab2j1aHzGnxHimqwmFeEVY8aNsVnN",
-                    "proofValue": "uCIwOoFXgg9wIy07MWWMHjhfSp6bOrRRqzH7LJuKxTQBC6BTH1Gov-1aeXJy1turWwuHt4EfV77d7YfN8nGRUAA",
+                    "proofValue": "u43jJXaMAJCmMzZ0SL2HBQloggw5PQzOnG7gCPTZAoJKCtAx-mrhSmqtWna676x3gm09_b0V7_Qb8zcca8nuABg",
                 }
             }),
             response

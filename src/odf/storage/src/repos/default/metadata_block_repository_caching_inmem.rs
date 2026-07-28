@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use async_trait::async_trait;
-use bytes::Bytes;
 use dashmap::DashMap;
 use internal_error::ResultIntoInternal;
 use odf_metadata::*;
@@ -18,7 +17,7 @@ use crate::*;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct CachedValue {
-    block_data: Bytes,
+    block_data: MetadataBlockBytes,
     deserialized_block: Option<MetadataBlock>,
 }
 
@@ -95,7 +94,10 @@ where
         }
     }
 
-    async fn get_block_bytes(&self, hash: &Multihash) -> Result<Bytes, GetBlockDataError> {
+    async fn get_block_bytes(
+        &self,
+        hash: &Multihash,
+    ) -> Result<MetadataBlockBytes, GetBlockDataError> {
         if let Some(cached_value) = self.cache.get(hash) {
             return Ok(cached_value.block_data.clone());
         }
@@ -148,7 +150,7 @@ where
 
         if let Ok(result) = &insert_result {
             let cache_value = CachedValue {
-                block_data: Bytes::copy_from_slice(block_data),
+                block_data: MetadataBlockBytes::new_from_slice(block_data),
                 deserialized_block: None,
             };
 

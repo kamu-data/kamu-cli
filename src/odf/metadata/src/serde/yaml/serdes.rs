@@ -9,6 +9,7 @@
 
 use ::serde::Deserialize;
 
+use crate::dataset::{MetadataBlockHeader, MetadataEventType};
 use crate::dtos;
 use crate::serde::yaml::derivations_generated as serde;
 use crate::serde::*;
@@ -20,7 +21,7 @@ use crate::serde::*;
 pub struct YamlMetadataBlockSerializer;
 
 impl MetadataBlockSerializer for YamlMetadataBlockSerializer {
-    fn write_manifest(&self, block: &dtos::dataset::MetadataBlock) -> Result<Buffer<u8>, Error> {
+    fn write_manifest(&self, block: &dtos::dataset::MetadataBlock) -> Result<bytes::Bytes, Error> {
         let manifest = serde::legacy::Manifest {
             version: METADATA_BLOCK_CURRENT_VERSION as i32,
             kind: "MetadataBlock".to_owned(),
@@ -31,7 +32,7 @@ impl MetadataBlockSerializer for YamlMetadataBlockSerializer {
             .map_err(Error::serde)?
             .into_bytes();
 
-        Ok(Buffer::new(0, buf.len(), buf))
+        Ok(bytes::Bytes::from(buf))
     }
 }
 
@@ -42,6 +43,17 @@ impl MetadataBlockSerializer for YamlMetadataBlockSerializer {
 pub struct YamlMetadataBlockDeserializer;
 
 impl MetadataBlockDeserializer for YamlMetadataBlockDeserializer {
+    fn read_header(&self, data: &[u8]) -> Result<MetadataBlockHeader, Error> {
+        // TODO: PERF: Skip event deserialization
+        let block = self.read_manifest(data)?;
+        Ok(MetadataBlockHeader {
+            system_time: block.system_time,
+            prev_block_hash: block.prev_block_hash,
+            sequence_number: block.sequence_number,
+            event_type: MetadataEventType::from_metadata_event(&block.event),
+        })
+    }
+
     fn read_manifest(&self, data: &[u8]) -> Result<dtos::dataset::MetadataBlock, Error> {
         // Read short manifest first, with kind and version only
         let manifest_no_content: serde::legacy::Manifest<::serde::de::IgnoredAny> =
@@ -85,9 +97,9 @@ impl YamlMetadataEventSerializer {
     pub fn write_manifest(
         &self,
         event: &dtos::dataset::MetadataEvent,
-    ) -> Result<Buffer<u8>, Error> {
+    ) -> Result<bytes::Bytes, Error> {
         let buf = self.write_manifest_str(event)?.into_bytes();
-        Ok(Buffer::new(0, buf.len(), buf))
+        Ok(bytes::Bytes::from(buf))
     }
 }
 
@@ -135,9 +147,9 @@ impl DatasetSnapshotSerializer for YamlDatasetSnapshotSerializer {
     fn write_manifest(
         &self,
         snapshot: &dtos::legacy::DatasetSnapshot,
-    ) -> Result<Buffer<u8>, Error> {
+    ) -> Result<bytes::Bytes, Error> {
         let buf = self.write_manifest_str(snapshot)?.into_bytes();
-        Ok(Buffer::new(0, buf.len(), buf))
+        Ok(bytes::Bytes::from(buf))
     }
 }
 
@@ -192,45 +204,45 @@ impl EngineProtocolSerializer for YamlEngineProtocol {
     fn write_raw_query_request(
         &self,
         inst: &dtos::engine::RawQueryRequest,
-    ) -> Result<Buffer<u8>, Error> {
+    ) -> Result<bytes::Bytes, Error> {
         let buf = serde_yaml::to_string(&serde::engine::RawQueryRequest::from(inst.clone()))
             .map_err(Error::serde)?
             .into_bytes();
 
-        Ok(Buffer::new(0, buf.len(), buf))
+        Ok(bytes::Bytes::from(buf))
     }
 
     fn write_raw_query_response(
         &self,
         inst: &dtos::engine::RawQueryResponse,
-    ) -> Result<Buffer<u8>, Error> {
+    ) -> Result<bytes::Bytes, Error> {
         let buf = serde_yaml::to_string(&serde::engine::RawQueryResponse::from(inst.clone()))
             .map_err(Error::serde)?
             .into_bytes();
 
-        Ok(Buffer::new(0, buf.len(), buf))
+        Ok(bytes::Bytes::from(buf))
     }
 
     fn write_transform_request(
         &self,
         inst: &dtos::engine::TransformRequest,
-    ) -> Result<Buffer<u8>, Error> {
+    ) -> Result<bytes::Bytes, Error> {
         let buf = serde_yaml::to_string(&serde::engine::TransformRequest::from(inst.clone()))
             .map_err(Error::serde)?
             .into_bytes();
 
-        Ok(Buffer::new(0, buf.len(), buf))
+        Ok(bytes::Bytes::from(buf))
     }
 
     fn write_transform_response(
         &self,
         inst: &dtos::engine::TransformResponse,
-    ) -> Result<Buffer<u8>, Error> {
+    ) -> Result<bytes::Bytes, Error> {
         let buf = serde_yaml::to_string(&serde::engine::TransformResponse::from(inst.clone()))
             .map_err(Error::serde)?
             .into_bytes();
 
-        Ok(Buffer::new(0, buf.len(), buf))
+        Ok(bytes::Bytes::from(buf))
     }
 }
 

@@ -20,7 +20,6 @@ use std::path::PathBuf;
 
 use ::serde::{Deserialize, Deserializer, Serialize, Serializer};
 use chrono::{DateTime, Utc};
-use multiformats::*;
 use setty::types::{ByteSize, DurationString};
 
 use super::formats::*;
@@ -28,6 +27,7 @@ use crate::auth::{AccountID, AccountName};
 use crate::dataset::{DatasetAlias, DatasetID, DatasetRef};
 use crate::dtos;
 use crate::errors::ValidationError;
+use crate::formats::*;
 use crate::resource::{ResourceID, ResourceName, TypeRef, TypeUri};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -92,7 +92,8 @@ pub mod auth {
     #[serde(deny_unknown_fields)]
     #[serde(rename_all = "camelCase")]
     pub struct AccountHandle {
-        pub id: AccountID,
+        pub id: ResourceID,
+        pub did: AccountID,
         pub name: AccountName,
     }
 
@@ -100,6 +101,27 @@ pub mod auth {
         type Dto = dtos::auth::AccountHandle;
         fn into_dto(self) -> Result<Self::Dto, ValidationError> {
             self.try_into()
+        }
+    }
+
+    impl From<dtos::auth::AccountHandle> for AccountHandle {
+        fn from(v: dtos::auth::AccountHandle) -> Self {
+            Self {
+                id: v.id,
+                did: v.did,
+                name: v.name,
+            }
+        }
+    }
+
+    impl TryFrom<AccountHandle> for dtos::auth::AccountHandle {
+        type Error = ValidationError;
+        fn try_from(v: AccountHandle) -> Result<Self, ValidationError> {
+            Ok(Self {
+                id: v.id,
+                did: v.did,
+                name: v.name,
+            })
         }
     }
 
@@ -112,7 +134,10 @@ pub mod auth {
     pub struct AccountRef {
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub id: Option<AccountID>,
+        pub id: Option<ResourceID>,
+        #[serde(default)]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub did: Option<AccountID>,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
         pub name: Option<AccountName>,
@@ -125,6 +150,15 @@ pub mod auth {
         }
     }
 
+    impl std::str::FromStr for AccountRef {
+        type Err = String;
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            let v = dtos::auth::AccountRef::try_from(s).map_err(|e| e.to_string())?;
+            Ok(v.into())
+        }
+    }
+
     impl From<dtos::auth::AccountRef> for StructOrString<AccountRef> {
         fn from(v: dtos::auth::AccountRef) -> Self {
             Self(v.into())
@@ -134,6 +168,27 @@ pub mod auth {
         type Error = ValidationError;
         fn try_from(v: StructOrString<AccountRef>) -> Result<Self, ValidationError> {
             v.0.try_into()
+        }
+    }
+
+    impl From<dtos::auth::AccountRef> for AccountRef {
+        fn from(v: dtos::auth::AccountRef) -> Self {
+            Self {
+                id: v.id,
+                did: v.did,
+                name: v.name,
+            }
+        }
+    }
+
+    impl TryFrom<AccountRef> for dtos::auth::AccountRef {
+        type Error = ValidationError;
+        fn try_from(v: AccountRef) -> Result<Self, ValidationError> {
+            Ok(Self {
+                id: v.id,
+                did: v.did,
+                name: v.name,
+            })
         }
     }
 
@@ -312,7 +367,7 @@ pub mod auth {
     #[serde(deny_unknown_fields)]
     #[serde(rename_all = "camelCase")]
     pub struct Attribute {
-        pub object: StructOrString<resource::ResourceRef>,
+        pub object: resource::ResourceHandle,
         pub name: String,
         pub value: serde_json::Value,
     }
@@ -338,7 +393,7 @@ pub mod auth {
         type Error = ValidationError;
         fn try_from(v: Attribute) -> Result<Self, ValidationError> {
             Ok(Self {
-                object: dtos::resource::ResourceRef::try_from(v.object)?,
+                object: dtos::resource::ResourceHandle::try_from(v.object)?,
                 name: v.name,
                 value: v.value,
             })
@@ -347,17 +402,57 @@ pub mod auth {
 
     implement_serde_as!(dtos::auth::Attribute, Attribute);
 
+    // Schema: https://opendatafabric.org/schemas/auth/v1alpha1/AttributeInput
+    #[derive(Debug, Serialize, Deserialize)]
+    #[serde(deny_unknown_fields)]
+    #[serde(rename_all = "camelCase")]
+    pub struct AttributeInput {
+        pub object: StructOrString<resource::ResourceRef>,
+        pub name: String,
+        pub value: serde_json::Value,
+    }
+
+    impl IntoDto for AttributeInput {
+        type Dto = dtos::auth::AttributeInput;
+        fn into_dto(self) -> Result<Self::Dto, ValidationError> {
+            self.try_into()
+        }
+    }
+
+    impl From<dtos::auth::AttributeInput> for AttributeInput {
+        fn from(v: dtos::auth::AttributeInput) -> Self {
+            Self {
+                object: v.object.into(),
+                name: v.name,
+                value: v.value,
+            }
+        }
+    }
+
+    impl TryFrom<AttributeInput> for dtos::auth::AttributeInput {
+        type Error = ValidationError;
+        fn try_from(v: AttributeInput) -> Result<Self, ValidationError> {
+            Ok(Self {
+                object: dtos::resource::ResourceRef::try_from(v.object)?,
+                name: v.name,
+                value: v.value,
+            })
+        }
+    }
+
+    implement_serde_as!(dtos::auth::AttributeInput, AttributeInput);
+
     // Schema: https://opendatafabric.org/schemas/auth/v1alpha1/Relation
     #[derive(Debug, Serialize, Deserialize)]
     #[serde(deny_unknown_fields)]
     #[serde(rename_all = "camelCase")]
     pub struct Relation {
-        pub subject: StructOrString<resource::ResourceRef>,
+        pub subject: resource::ResourceHandle,
         pub relation: String,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
         pub value: Option<serde_json::Value>,
-        pub object: StructOrString<resource::ResourceRef>,
+        pub object: resource::ResourceHandle,
     }
 
     impl IntoDto for Relation {
@@ -382,6 +477,51 @@ pub mod auth {
         type Error = ValidationError;
         fn try_from(v: Relation) -> Result<Self, ValidationError> {
             Ok(Self {
+                subject: dtos::resource::ResourceHandle::try_from(v.subject)?,
+                relation: v.relation,
+                value: v.value,
+                object: dtos::resource::ResourceHandle::try_from(v.object)?,
+            })
+        }
+    }
+
+    implement_serde_as!(dtos::auth::Relation, Relation);
+
+    // Schema: https://opendatafabric.org/schemas/auth/v1alpha1/RelationInput
+    #[derive(Debug, Serialize, Deserialize)]
+    #[serde(deny_unknown_fields)]
+    #[serde(rename_all = "camelCase")]
+    pub struct RelationInput {
+        pub subject: StructOrString<resource::ResourceRef>,
+        pub relation: String,
+        #[serde(default)]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub value: Option<serde_json::Value>,
+        pub object: StructOrString<resource::ResourceRef>,
+    }
+
+    impl IntoDto for RelationInput {
+        type Dto = dtos::auth::RelationInput;
+        fn into_dto(self) -> Result<Self::Dto, ValidationError> {
+            self.try_into()
+        }
+    }
+
+    impl From<dtos::auth::RelationInput> for RelationInput {
+        fn from(v: dtos::auth::RelationInput) -> Self {
+            Self {
+                subject: v.subject.into(),
+                relation: v.relation,
+                value: v.value,
+                object: v.object.into(),
+            }
+        }
+    }
+
+    impl TryFrom<RelationInput> for dtos::auth::RelationInput {
+        type Error = ValidationError;
+        fn try_from(v: RelationInput) -> Result<Self, ValidationError> {
+            Ok(Self {
                 subject: dtos::resource::ResourceRef::try_from(v.subject)?,
                 relation: v.relation,
                 value: v.value,
@@ -390,7 +530,7 @@ pub mod auth {
         }
     }
 
-    implement_serde_as!(dtos::auth::Relation, Relation);
+    implement_serde_as!(dtos::auth::RelationInput, RelationInput);
 
     // Schema: https://opendatafabric.org/schemas/auth/v1alpha1/RelationsSpec
     #[derive(Debug, Serialize, Deserialize)]
@@ -444,10 +584,10 @@ pub mod auth {
     pub struct RelationsSpecInput {
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub relations: Option<Vec<auth::Relation>>,
+        pub relations: Option<Vec<auth::RelationInput>>,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub attributes: Option<Vec<auth::Attribute>>,
+        pub attributes: Option<Vec<auth::AttributeInput>>,
     }
 
     impl IntoDto for RelationsSpecInput {
@@ -476,7 +616,7 @@ pub mod auth {
                     .relations
                     .map(|v| {
                         v.into_iter()
-                            .map(|i| dtos::auth::Relation::try_from(i))
+                            .map(|i| dtos::auth::RelationInput::try_from(i))
                             .collect::<Result<_, _>>()
                     })
                     .transpose()?,
@@ -484,7 +624,7 @@ pub mod auth {
                     .attributes
                     .map(|v| {
                         v.into_iter()
-                            .map(|i| dtos::auth::Attribute::try_from(i))
+                            .map(|i| dtos::auth::AttributeInput::try_from(i))
                             .collect::<Result<_, _>>()
                     })
                     .transpose()?,
@@ -518,6 +658,15 @@ pub mod config {
         type Dto = dtos::config::Secret;
         fn into_dto(self) -> Result<Self::Dto, ValidationError> {
             self.try_into()
+        }
+    }
+
+    impl std::str::FromStr for Secret {
+        type Err = String;
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            let v = dtos::config::Secret::try_from(s).map_err(|e| e.to_string())?;
+            Ok(v.into())
         }
     }
 
@@ -659,6 +808,54 @@ pub mod config {
 
     implement_serde_as!(dtos::config::Secrets, Secrets);
 
+    // Schema: https://opendatafabric.org/schemas/config/v1alpha1/ValueHandle
+    #[derive(Debug, Serialize, Deserialize)]
+    #[serde(deny_unknown_fields)]
+    #[serde(rename_all = "camelCase")]
+    pub struct ValueHandle {
+        pub account: auth::AccountHandle,
+        pub r#type: TypeUri,
+        pub id: ResourceID,
+        pub name: ResourceName,
+        #[serde(default)]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub path: Option<String>,
+    }
+
+    impl IntoDto for ValueHandle {
+        type Dto = dtos::config::ValueHandle;
+        fn into_dto(self) -> Result<Self::Dto, ValidationError> {
+            self.try_into()
+        }
+    }
+
+    impl From<dtos::config::ValueHandle> for ValueHandle {
+        fn from(v: dtos::config::ValueHandle) -> Self {
+            Self {
+                account: v.account.into(),
+                r#type: v.r#type,
+                id: v.id,
+                name: v.name,
+                path: v.path,
+            }
+        }
+    }
+
+    impl TryFrom<ValueHandle> for dtos::config::ValueHandle {
+        type Error = ValidationError;
+        fn try_from(v: ValueHandle) -> Result<Self, ValidationError> {
+            Ok(Self {
+                account: dtos::auth::AccountHandle::try_from(v.account)?,
+                r#type: v.r#type,
+                id: v.id,
+                name: v.name,
+                path: v.path,
+            })
+        }
+    }
+
+    implement_serde_as!(dtos::config::ValueHandle, ValueHandle);
+
     // Schema: https://opendatafabric.org/schemas/config/v1alpha1/ValueRef
     #[derive(Debug, Serialize, Deserialize)]
     #[serde(deny_unknown_fields)]
@@ -686,6 +883,15 @@ pub mod config {
         }
     }
 
+    impl std::str::FromStr for ValueRef {
+        type Err = String;
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            let v = dtos::config::ValueRef::try_from(s).map_err(|e| e.to_string())?;
+            Ok(v.into())
+        }
+    }
+
     impl From<dtos::config::ValueRef> for StructOrString<ValueRef> {
         fn from(v: dtos::config::ValueRef) -> Self {
             Self(v.into())
@@ -695,6 +901,34 @@ pub mod config {
         type Error = ValidationError;
         fn try_from(v: StructOrString<ValueRef>) -> Result<Self, ValidationError> {
             v.0.try_into()
+        }
+    }
+
+    impl From<dtos::config::ValueRef> for ValueRef {
+        fn from(v: dtos::config::ValueRef) -> Self {
+            Self {
+                account: v.account.map(|v| v.into()),
+                r#type: v.r#type,
+                id: v.id,
+                name: v.name,
+                path: v.path,
+            }
+        }
+    }
+
+    impl TryFrom<ValueRef> for dtos::config::ValueRef {
+        type Error = ValidationError;
+        fn try_from(v: ValueRef) -> Result<Self, ValidationError> {
+            Ok(Self {
+                account: v
+                    .account
+                    .map(|v| dtos::auth::AccountRef::try_from(v))
+                    .transpose()?,
+                r#type: v.r#type,
+                id: v.id,
+                name: v.name,
+                path: v.path,
+            })
         }
     }
 
@@ -749,6 +983,15 @@ pub mod config {
         type Dto = dtos::config::Variable;
         fn into_dto(self) -> Result<Self::Dto, ValidationError> {
             self.try_into()
+        }
+    }
+
+    impl std::str::FromStr for Variable {
+        type Err = String;
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            let v = dtos::config::Variable::try_from(s).map_err(|e| e.to_string())?;
+            Ok(v.into())
         }
     }
 
@@ -2399,6 +2642,15 @@ pub mod dataset {
         }
     }
 
+    impl std::str::FromStr for DatasetSelector {
+        type Err = String;
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            let v = dtos::dataset::DatasetSelector::try_from(s).map_err(|e| e.to_string())?;
+            Ok(v.into())
+        }
+    }
+
     impl From<dtos::dataset::DatasetSelector> for StructOrString<DatasetSelector> {
         fn from(v: dtos::dataset::DatasetSelector) -> Self {
             Self(v.into())
@@ -2421,7 +2673,7 @@ pub mod dataset {
         pub did: DatasetID,
         pub kind: dataset::DatasetKind,
         pub metadata: Vec<dataset::MetadataEvent>,
-        pub volume: StructOrString<storage::PersistentVolumeRef>,
+        pub volume: resource::ResourceHandle,
     }
 
     impl IntoDto for DatasetSpec {
@@ -2453,7 +2705,7 @@ pub mod dataset {
                     .into_iter()
                     .map(|i| dtos::dataset::MetadataEvent::try_from(i))
                     .collect::<Result<_, _>>()?,
-                volume: dtos::storage::PersistentVolumeRef::try_from(v.volume)?,
+                volume: dtos::resource::ResourceHandle::try_from(v.volume)?,
             })
         }
     }
@@ -4174,7 +4426,7 @@ pub mod flow {
     #[serde(rename_all = "camelCase")]
     pub struct FlowSpecInput {
         pub target: StructOrString<resource::ResourceSelector>,
-        pub triggers: Vec<flow::FlowTrigger>,
+        pub triggers: Vec<flow::FlowTriggerInput>,
         pub tasks: Vec<flow::TaskSpecInput>,
     }
 
@@ -4203,7 +4455,7 @@ pub mod flow {
                 triggers: v
                     .triggers
                     .into_iter()
-                    .map(|i| dtos::flow::FlowTrigger::try_from(i))
+                    .map(|i| dtos::flow::FlowTriggerInput::try_from(i))
                     .collect::<Result<_, _>>()?,
                 tasks: v
                     .tasks
@@ -4346,6 +4598,213 @@ pub mod flow {
 
     implement_serde_as!(dtos::flow::FlowTriggerEvent, FlowTriggerEvent);
 
+    // Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowTriggerInput
+    #[derive(Debug, Serialize, Deserialize)]
+    #[serde(deny_unknown_fields)]
+    #[serde(tag = "kind")]
+    pub enum FlowTriggerInput {
+        #[serde(alias = "schedule")]
+        Schedule(flow::FlowTriggerInputSchedule),
+        #[serde(alias = "event")]
+        Event(flow::FlowTriggerInputEvent),
+        #[serde(alias = "source")]
+        Source(flow::FlowTriggerInputSource),
+        #[serde(alias = "dataset")]
+        Dataset(flow::FlowTriggerInputDataset),
+    }
+
+    impl IntoDto for FlowTriggerInput {
+        type Dto = dtos::flow::FlowTriggerInput;
+        fn into_dto(self) -> Result<Self::Dto, ValidationError> {
+            self.try_into()
+        }
+    }
+
+    impl From<dtos::flow::FlowTriggerInput> for FlowTriggerInput {
+        fn from(v: dtos::flow::FlowTriggerInput) -> Self {
+            match v {
+                dtos::flow::FlowTriggerInput::Schedule(v) => Self::Schedule(v.into()),
+                dtos::flow::FlowTriggerInput::Event(v) => Self::Event(v.into()),
+                dtos::flow::FlowTriggerInput::Source(v) => Self::Source(v.into()),
+                dtos::flow::FlowTriggerInput::Dataset(v) => Self::Dataset(v.into()),
+            }
+        }
+    }
+
+    impl TryFrom<FlowTriggerInput> for dtos::flow::FlowTriggerInput {
+        type Error = ValidationError;
+        fn try_from(v: FlowTriggerInput) -> Result<Self, Self::Error> {
+            match v {
+                FlowTriggerInput::Schedule(v) => Ok(Self::Schedule(v.try_into()?)),
+                FlowTriggerInput::Event(v) => Ok(Self::Event(v.try_into()?)),
+                FlowTriggerInput::Source(v) => Ok(Self::Source(v.try_into()?)),
+                FlowTriggerInput::Dataset(v) => Ok(Self::Dataset(v.try_into()?)),
+            }
+        }
+    }
+
+    implement_serde_as!(dtos::flow::FlowTriggerInput, FlowTriggerInput);
+
+    // Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowTriggerInput#/$defs/Dataset
+    #[derive(Debug, Serialize, Deserialize)]
+    #[serde(deny_unknown_fields)]
+    #[serde(rename_all = "camelCase")]
+    pub struct FlowTriggerInputDataset {
+        pub dataset: StructOrString<dataset::DatasetSelector>,
+        #[serde(default)]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub events: Option<Vec<String>>,
+    }
+
+    impl IntoDto for FlowTriggerInputDataset {
+        type Dto = dtos::flow::FlowTriggerInputDataset;
+        fn into_dto(self) -> Result<Self::Dto, ValidationError> {
+            self.try_into()
+        }
+    }
+
+    impl From<dtos::flow::FlowTriggerInputDataset> for FlowTriggerInputDataset {
+        fn from(v: dtos::flow::FlowTriggerInputDataset) -> Self {
+            Self {
+                dataset: v.dataset.into(),
+                events: v.events,
+            }
+        }
+    }
+
+    impl TryFrom<FlowTriggerInputDataset> for dtos::flow::FlowTriggerInputDataset {
+        type Error = ValidationError;
+        fn try_from(v: FlowTriggerInputDataset) -> Result<Self, ValidationError> {
+            Ok(Self {
+                dataset: dtos::dataset::DatasetSelector::try_from(v.dataset)?,
+                events: v.events,
+            })
+        }
+    }
+
+    implement_serde_as!(dtos::flow::FlowTriggerInputDataset, FlowTriggerInputDataset);
+
+    // Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowTriggerInput#/$defs/Event
+    #[derive(Debug, Serialize, Deserialize)]
+    #[serde(deny_unknown_fields)]
+    #[serde(rename_all = "camelCase")]
+    pub struct FlowTriggerInputEvent {
+        pub events: event::EventFilter,
+        #[serde(default)]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub cooldown: Option<DurationString>,
+        #[serde(default)]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub cooldown_max_batch: Option<u64>,
+    }
+
+    impl IntoDto for FlowTriggerInputEvent {
+        type Dto = dtos::flow::FlowTriggerInputEvent;
+        fn into_dto(self) -> Result<Self::Dto, ValidationError> {
+            self.try_into()
+        }
+    }
+
+    impl From<dtos::flow::FlowTriggerInputEvent> for FlowTriggerInputEvent {
+        fn from(v: dtos::flow::FlowTriggerInputEvent) -> Self {
+            Self {
+                events: v.events.into(),
+                cooldown: v.cooldown,
+                cooldown_max_batch: v.cooldown_max_batch,
+            }
+        }
+    }
+
+    impl TryFrom<FlowTriggerInputEvent> for dtos::flow::FlowTriggerInputEvent {
+        type Error = ValidationError;
+        fn try_from(v: FlowTriggerInputEvent) -> Result<Self, ValidationError> {
+            Ok(Self {
+                events: dtos::event::EventFilter::try_from(v.events)?,
+                cooldown: v.cooldown,
+                cooldown_max_batch: v.cooldown_max_batch,
+            })
+        }
+    }
+
+    implement_serde_as!(dtos::flow::FlowTriggerInputEvent, FlowTriggerInputEvent);
+
+    // Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowTriggerInput#/$defs/Schedule
+    #[derive(Debug, Serialize, Deserialize)]
+    #[serde(deny_unknown_fields)]
+    #[serde(rename_all = "camelCase")]
+    pub struct FlowTriggerInputSchedule {
+        pub cron: String,
+    }
+
+    impl IntoDto for FlowTriggerInputSchedule {
+        type Dto = dtos::flow::FlowTriggerInputSchedule;
+        fn into_dto(self) -> Result<Self::Dto, ValidationError> {
+            self.try_into()
+        }
+    }
+
+    impl From<dtos::flow::FlowTriggerInputSchedule> for FlowTriggerInputSchedule {
+        fn from(v: dtos::flow::FlowTriggerInputSchedule) -> Self {
+            Self { cron: v.cron }
+        }
+    }
+
+    impl TryFrom<FlowTriggerInputSchedule> for dtos::flow::FlowTriggerInputSchedule {
+        type Error = ValidationError;
+        fn try_from(v: FlowTriggerInputSchedule) -> Result<Self, ValidationError> {
+            Ok(Self { cron: v.cron })
+        }
+    }
+
+    implement_serde_as!(
+        dtos::flow::FlowTriggerInputSchedule,
+        FlowTriggerInputSchedule
+    );
+
+    // Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowTriggerInput#/$defs/Source
+    #[derive(Debug, Serialize, Deserialize)]
+    #[serde(deny_unknown_fields)]
+    #[serde(rename_all = "camelCase")]
+    pub struct FlowTriggerInputSource {
+        pub source: StructOrString<resource::ResourceRef>,
+        #[serde(default)]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub min_records_to_await: Option<u64>,
+        #[serde(default)]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub max_await_interval: Option<DurationString>,
+    }
+
+    impl IntoDto for FlowTriggerInputSource {
+        type Dto = dtos::flow::FlowTriggerInputSource;
+        fn into_dto(self) -> Result<Self::Dto, ValidationError> {
+            self.try_into()
+        }
+    }
+
+    impl From<dtos::flow::FlowTriggerInputSource> for FlowTriggerInputSource {
+        fn from(v: dtos::flow::FlowTriggerInputSource) -> Self {
+            Self {
+                source: v.source.into(),
+                min_records_to_await: v.min_records_to_await,
+                max_await_interval: v.max_await_interval,
+            }
+        }
+    }
+
+    impl TryFrom<FlowTriggerInputSource> for dtos::flow::FlowTriggerInputSource {
+        type Error = ValidationError;
+        fn try_from(v: FlowTriggerInputSource) -> Result<Self, ValidationError> {
+            Ok(Self {
+                source: dtos::resource::ResourceRef::try_from(v.source)?,
+                min_records_to_await: v.min_records_to_await,
+                max_await_interval: v.max_await_interval,
+            })
+        }
+    }
+
+    implement_serde_as!(dtos::flow::FlowTriggerInputSource, FlowTriggerInputSource);
+
     // Schema: https://opendatafabric.org/schemas/flow/v1alpha1/FlowTrigger#/$defs/Schedule
     #[derive(Debug, Serialize, Deserialize)]
     #[serde(deny_unknown_fields)]
@@ -4381,7 +4840,7 @@ pub mod flow {
     #[serde(deny_unknown_fields)]
     #[serde(rename_all = "camelCase")]
     pub struct FlowTriggerSource {
-        pub source: StructOrString<resource::ResourceRef>,
+        pub source: resource::ResourceHandle,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
         pub min_records_to_await: Option<u64>,
@@ -4411,7 +4870,7 @@ pub mod flow {
         type Error = ValidationError;
         fn try_from(v: FlowTriggerSource) -> Result<Self, ValidationError> {
             Ok(Self {
-                source: dtos::resource::ResourceRef::try_from(v.source)?,
+                source: dtos::resource::ResourceHandle::try_from(v.source)?,
                 min_records_to_await: v.min_records_to_await,
                 max_await_interval: v.max_await_interval,
             })
@@ -4542,7 +5001,7 @@ pub mod flow {
     #[serde(deny_unknown_fields)]
     #[serde(rename_all = "camelCase")]
     pub struct TaskSpecIngest {
-        pub source: StructOrString<resource::ResourceRef>,
+        pub source: resource::ResourceHandle,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
         pub params: Option<source::IngestParams>,
@@ -4568,7 +5027,7 @@ pub mod flow {
         type Error = ValidationError;
         fn try_from(v: TaskSpecIngest) -> Result<Self, ValidationError> {
             Ok(Self {
-                source: dtos::resource::ResourceRef::try_from(v.source)?,
+                source: dtos::resource::ResourceHandle::try_from(v.source)?,
                 params: v
                     .params
                     .map(|v| dtos::source::IngestParams::try_from(v))
@@ -4787,7 +5246,7 @@ pub mod flow {
     #[serde(deny_unknown_fields)]
     #[serde(rename_all = "camelCase")]
     pub struct TaskSpecWebhookCall {
-        pub target: StructOrString<resource::ResourceRef>,
+        pub target: resource::ResourceHandle,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
         pub payload: Option<String>,
@@ -4813,7 +5272,7 @@ pub mod flow {
         type Error = ValidationError;
         fn try_from(v: TaskSpecWebhookCall) -> Result<Self, ValidationError> {
             Ok(Self {
-                target: dtos::resource::ResourceRef::try_from(v.target)?,
+                target: dtos::resource::ResourceHandle::try_from(v.target)?,
                 payload: v.payload,
             })
         }
@@ -5580,6 +6039,54 @@ pub mod resource {
 
     implement_serde_as!(dtos::resource::ResourceConditions, ResourceConditions);
 
+    // Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceHandle
+    #[derive(Debug, Serialize, Deserialize)]
+    #[serde(deny_unknown_fields)]
+    #[serde(rename_all = "camelCase")]
+    pub struct ResourceHandle {
+        pub account: auth::AccountHandle,
+        pub r#type: TypeUri,
+        pub id: ResourceID,
+        #[serde(default)]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub did: Option<Did>,
+        pub name: ResourceName,
+    }
+
+    impl IntoDto for ResourceHandle {
+        type Dto = dtos::resource::ResourceHandle;
+        fn into_dto(self) -> Result<Self::Dto, ValidationError> {
+            self.try_into()
+        }
+    }
+
+    impl From<dtos::resource::ResourceHandle> for ResourceHandle {
+        fn from(v: dtos::resource::ResourceHandle) -> Self {
+            Self {
+                account: v.account.into(),
+                r#type: v.r#type,
+                id: v.id,
+                did: v.did,
+                name: v.name,
+            }
+        }
+    }
+
+    impl TryFrom<ResourceHandle> for dtos::resource::ResourceHandle {
+        type Error = ValidationError;
+        fn try_from(v: ResourceHandle) -> Result<Self, ValidationError> {
+            Ok(Self {
+                account: dtos::auth::AccountHandle::try_from(v.account)?,
+                r#type: v.r#type,
+                id: v.id,
+                did: v.did,
+                name: v.name,
+            })
+        }
+    }
+
+    implement_serde_as!(dtos::resource::ResourceHandle, ResourceHandle);
+
     // Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceHeaders
     #[derive(Debug, Serialize, Deserialize)]
     #[serde(deny_unknown_fields)]
@@ -5848,6 +6355,9 @@ pub mod resource {
         pub id: Option<ResourceID>,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
+        pub did: Option<Did>,
+        #[serde(default)]
+        #[serde(skip_serializing_if = "Option::is_none")]
         pub name: Option<ResourceName>,
     }
 
@@ -5855,6 +6365,15 @@ pub mod resource {
         type Dto = dtos::resource::ResourceRef;
         fn into_dto(self) -> Result<Self::Dto, ValidationError> {
             self.try_into()
+        }
+    }
+
+    impl std::str::FromStr for ResourceRef {
+        type Err = String;
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            let v = dtos::resource::ResourceRef::try_from(s).map_err(|e| e.to_string())?;
+            Ok(v.into())
         }
     }
 
@@ -5867,6 +6386,34 @@ pub mod resource {
         type Error = ValidationError;
         fn try_from(v: StructOrString<ResourceRef>) -> Result<Self, ValidationError> {
             v.0.try_into()
+        }
+    }
+
+    impl From<dtos::resource::ResourceRef> for ResourceRef {
+        fn from(v: dtos::resource::ResourceRef) -> Self {
+            Self {
+                account: v.account.map(|v| v.into()),
+                r#type: v.r#type,
+                id: v.id,
+                did: v.did,
+                name: v.name,
+            }
+        }
+    }
+
+    impl TryFrom<ResourceRef> for dtos::resource::ResourceRef {
+        type Error = ValidationError;
+        fn try_from(v: ResourceRef) -> Result<Self, ValidationError> {
+            Ok(Self {
+                account: v
+                    .account
+                    .map(|v| dtos::auth::AccountRef::try_from(v))
+                    .transpose()?,
+                r#type: v.r#type,
+                id: v.id,
+                did: v.did,
+                name: v.name,
+            })
         }
     }
 
@@ -5896,6 +6443,15 @@ pub mod resource {
         type Dto = dtos::resource::ResourceSelector;
         fn into_dto(self) -> Result<Self::Dto, ValidationError> {
             self.try_into()
+        }
+    }
+
+    impl std::str::FromStr for ResourceSelector {
+        type Err = String;
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            let v = dtos::resource::ResourceSelector::try_from(s).map_err(|e| e.to_string())?;
+            Ok(v.into())
         }
     }
 
@@ -8109,10 +8665,10 @@ pub mod storage {
     pub struct AwsCredentials {
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub access_key: Option<StructOrString<config::ValueRef>>,
+        pub access_key: Option<config::ValueHandle>,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub secret_key: Option<StructOrString<config::ValueRef>>,
+        pub secret_key: Option<config::ValueHandle>,
     }
 
     impl IntoDto for AwsCredentials {
@@ -8137,6 +8693,53 @@ pub mod storage {
             Ok(Self {
                 access_key: v
                     .access_key
+                    .map(|v| dtos::config::ValueHandle::try_from(v))
+                    .transpose()?,
+                secret_key: v
+                    .secret_key
+                    .map(|v| dtos::config::ValueHandle::try_from(v))
+                    .transpose()?,
+            })
+        }
+    }
+
+    implement_serde_as!(dtos::storage::AwsCredentials, AwsCredentials);
+
+    // Schema: https://opendatafabric.org/schemas/storage/v1alpha1/AwsCredentialsInput
+    #[derive(Debug, Serialize, Deserialize)]
+    #[serde(deny_unknown_fields)]
+    #[serde(rename_all = "camelCase")]
+    pub struct AwsCredentialsInput {
+        #[serde(default)]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub access_key: Option<StructOrString<config::ValueRef>>,
+        #[serde(default)]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub secret_key: Option<StructOrString<config::ValueRef>>,
+    }
+
+    impl IntoDto for AwsCredentialsInput {
+        type Dto = dtos::storage::AwsCredentialsInput;
+        fn into_dto(self) -> Result<Self::Dto, ValidationError> {
+            self.try_into()
+        }
+    }
+
+    impl From<dtos::storage::AwsCredentialsInput> for AwsCredentialsInput {
+        fn from(v: dtos::storage::AwsCredentialsInput) -> Self {
+            Self {
+                access_key: v.access_key.map(|v| v.into()),
+                secret_key: v.secret_key.map(|v| v.into()),
+            }
+        }
+    }
+
+    impl TryFrom<AwsCredentialsInput> for dtos::storage::AwsCredentialsInput {
+        type Error = ValidationError;
+        fn try_from(v: AwsCredentialsInput) -> Result<Self, ValidationError> {
+            Ok(Self {
+                access_key: v
+                    .access_key
                     .map(|v| dtos::config::ValueRef::try_from(v))
                     .transpose()?,
                 secret_key: v
@@ -8147,7 +8750,7 @@ pub mod storage {
         }
     }
 
-    implement_serde_as!(dtos::storage::AwsCredentials, AwsCredentials);
+    implement_serde_as!(dtos::storage::AwsCredentialsInput, AwsCredentialsInput);
 
     // Schema: https://opendatafabric.org/schemas/storage/v1alpha1/PersistentVolumeRef
     #[derive(Debug, Serialize, Deserialize)]
@@ -8172,6 +8775,15 @@ pub mod storage {
         }
     }
 
+    impl std::str::FromStr for PersistentVolumeRef {
+        type Err = String;
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            let v = dtos::storage::PersistentVolumeRef::try_from(s).map_err(|e| e.to_string())?;
+            Ok(v.into())
+        }
+    }
+
     impl From<dtos::storage::PersistentVolumeRef> for StructOrString<PersistentVolumeRef> {
         fn from(v: dtos::storage::PersistentVolumeRef) -> Self {
             Self(v.into())
@@ -8181,6 +8793,30 @@ pub mod storage {
         type Error = ValidationError;
         fn try_from(v: StructOrString<PersistentVolumeRef>) -> Result<Self, ValidationError> {
             v.0.try_into()
+        }
+    }
+
+    impl From<dtos::storage::PersistentVolumeRef> for PersistentVolumeRef {
+        fn from(v: dtos::storage::PersistentVolumeRef) -> Self {
+            Self {
+                account: v.account.map(|v| v.into()),
+                id: v.id,
+                name: v.name,
+            }
+        }
+    }
+
+    impl TryFrom<PersistentVolumeRef> for dtos::storage::PersistentVolumeRef {
+        type Error = ValidationError;
+        fn try_from(v: PersistentVolumeRef) -> Result<Self, ValidationError> {
+            Ok(Self {
+                account: v
+                    .account
+                    .map(|v| dtos::auth::AccountRef::try_from(v))
+                    .transpose()?,
+                id: v.id,
+                name: v.name,
+            })
         }
     }
 
@@ -8279,7 +8915,7 @@ pub mod storage {
         pub capacity: Option<storage::VolumeCapacity>,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub credentials: Option<storage::AwsCredentials>,
+        pub credentials: Option<storage::AwsCredentialsInput>,
     }
 
     impl IntoDto for PersistentVolumeSpecInputS3 {
@@ -8316,7 +8952,7 @@ pub mod storage {
                     .transpose()?,
                 credentials: v
                     .credentials
-                    .map(|v| dtos::storage::AwsCredentials::try_from(v))
+                    .map(|v| dtos::storage::AwsCredentialsInput::try_from(v))
                     .transpose()?,
             })
         }

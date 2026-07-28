@@ -443,6 +443,7 @@ impl InitOnStartup for PredefinedDatasetsRegistrator {
                     .build_typed(),
                     CreateDatasetUseCaseOptions {
                         dataset_visibility: odf::DatasetVisibility::Public,
+                        seed_block_bytes: None,
                     },
                 )
                 .await

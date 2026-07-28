@@ -49,19 +49,29 @@ async fn test_append_dataset_metadata_batch() {
         sequence_number: 2,
         event: odf::MetadataEvent::SetInfo(MetadataFactory::set_info().description("test").build()),
     };
-    let hash_set_info_block = BaseRepoHarness::hash_from_block(&set_info_block);
+    let (set_info_block_hash, set_info_block_bytes) =
+        BaseRepoHarness::serialize_block(&set_info_block);
 
     let set_license_block = odf::MetadataBlock {
         system_time: harness.system_time_source().now(),
-        prev_block_hash: Some(hash_set_info_block.clone()),
+        prev_block_hash: Some(set_info_block_hash.clone()),
         sequence_number: 3,
         event: odf::MetadataEvent::SetLicense(MetadataFactory::set_license().build()),
     };
-    let hash_set_license_block = BaseRepoHarness::hash_from_block(&set_license_block);
+    let (set_license_block_hash, set_license_block_bytes) =
+        BaseRepoHarness::serialize_block(&set_license_block);
 
     let new_blocks = VecDeque::from([
-        (hash_set_info_block.clone(), set_info_block),
-        (hash_set_license_block.clone(), set_license_block),
+        (
+            set_info_block_hash.clone(),
+            set_info_block,
+            set_info_block_bytes,
+        ),
+        (
+            set_license_block_hash.clone(),
+            set_license_block,
+            set_license_block_bytes,
+        ),
     ]);
 
     let res = harness
@@ -95,12 +105,12 @@ async fn test_append_dataset_metadata_batch() {
         )
         .replace("<foo_id>", predefined_foo_id.to_string().as_str())
         .replace("<old_head>", foo_old_head.to_string().as_str())
-        .replace("<new_head>", hash_set_license_block.to_string().as_str())
+        .replace("<new_head>", set_license_block_hash.to_string().as_str())
         .replace("<foo_id>", predefined_foo_id.to_string().as_str())
-        .replace("<foo_key_tail>", hash_set_info_block.to_string().as_str())
+        .replace("<foo_key_tail>", set_info_block_hash.to_string().as_str())
         .replace(
             "<foo_key_head>",
-            hash_set_license_block.to_string().as_str()
+            set_license_block_hash.to_string().as_str()
         ),
         harness.collected_outbox_messages(),
     );
@@ -155,9 +165,14 @@ async fn test_append_dataset_metadata_batch_with_same_dependencies() {
                 .build(),
         ),
     };
-    let hash_set_transform_block = BaseRepoHarness::hash_from_block(&set_transform_block);
+    let (set_transform_block_hash, set_transform_block_bytes) =
+        BaseRepoHarness::serialize_block(&set_transform_block);
 
-    let new_blocks = VecDeque::from([(hash_set_transform_block.clone(), set_transform_block)]);
+    let new_blocks = VecDeque::from([(
+        set_transform_block_hash.clone(),
+        set_transform_block,
+        set_transform_block_bytes,
+    )]);
 
     let res = harness
         .use_case
@@ -190,16 +205,16 @@ async fn test_append_dataset_metadata_batch_with_same_dependencies() {
             "#
         )
         .replace("<old_head>", baz_old_head.to_string().as_str())
-        .replace("<new_head>", hash_set_transform_block.to_string().as_str())
+        .replace("<new_head>", set_transform_block_hash.to_string().as_str())
         .replace("<baz_id>", baz.dataset_handle.id.to_string().as_str())
         .replace("<baz_id>", baz.dataset_handle.id.to_string().as_str())
         .replace(
             "<foo_key_tail>",
-            hash_set_transform_block.to_string().as_str()
+            set_transform_block_hash.to_string().as_str()
         )
         .replace(
             "<foo_key_head>",
-            hash_set_transform_block.to_string().as_str()
+            set_transform_block_hash.to_string().as_str()
         ),
         harness.collected_outbox_messages(),
     );
@@ -251,9 +266,14 @@ async fn test_append_dataset_metadata_batch_with_new_dependencies() {
                 .build(),
         ),
     };
-    let hash_set_transform_block = BaseRepoHarness::hash_from_block(&set_transform_block);
+    let (set_transform_block_hash, set_transform_block_bytes) =
+        BaseRepoHarness::serialize_block(&set_transform_block);
 
-    let new_blocks = VecDeque::from([(hash_set_transform_block.clone(), set_transform_block)]);
+    let new_blocks = VecDeque::from([(
+        set_transform_block_hash.clone(),
+        set_transform_block,
+        set_transform_block_bytes,
+    )]);
 
     let res = harness
         .use_case
@@ -291,13 +311,13 @@ async fn test_append_dataset_metadata_batch_with_new_dependencies() {
             "#
         )
         .replace("<old_head>", bar_old_head.to_string().as_str())
-        .replace("<new_head>", hash_set_transform_block.to_string().as_str())
+        .replace("<new_head>", set_transform_block_hash.to_string().as_str())
         .replace("<foo_id>", foo.dataset_handle.id.to_string().as_str())
         .replace("<bar_id>", bar.dataset_handle.id.to_string().as_str())
         .replace("<baz_id>", baz.dataset_handle.id.to_string().as_str())
         .replace("<bar_id>", bar.dataset_handle.id.to_string().as_str())
-        .replace("<key_tail>", hash_set_transform_block.to_string().as_str())
-        .replace("<key_head>", hash_set_transform_block.to_string().as_str()),
+        .replace("<key_tail>", set_transform_block_hash.to_string().as_str())
+        .replace("<key_head>", set_transform_block_hash.to_string().as_str()),
         harness.collected_outbox_messages(),
     );
 }

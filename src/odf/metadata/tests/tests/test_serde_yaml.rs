@@ -301,7 +301,7 @@ fn serde_set_data_schema() {
     let expected_data = indoc!(
         r#"
         kind: MetadataBlock
-        version: 2
+        version: 3
         content:
           systemTime: 2020-01-01T12:00:00Z
           prevBlockHash: f16209eb949bd8ff0bb1d827f11809aebc6bd0d5955c7f368469a913c70d196620272
@@ -388,7 +388,7 @@ fn serde_set_data_schema_legacy() {
     let expected_data = indoc!(
         r#"
         kind: MetadataBlock
-        version: 2
+        version: 3
         content:
           systemTime: 2020-01-01T12:00:00Z
           prevBlockHash: f16209eb949bd8ff0bb1d827f11809aebc6bd0d5955c7f368469a913c70d196620272
@@ -737,7 +737,7 @@ fn serde_metadata_block() {
     let expected = indoc!(
         "
         kind: MetadataBlock
-        version: 2
+        version: 3
         content:
           systemTime: 2020-01-01T12:00:00Z
           prevBlockHash: f16209eb949bd8ff0bb1d827f11809aebc6bd0d5955c7f368469a913c70d196620272
@@ -1252,25 +1252,39 @@ fn test_serde_resource_input_refs() {
                 annotations: None,
             },
             spec: RelationsSpecInput {
-                relations: Some(vec![Relation {
-                    subject: ResourceRef::Name {
+                relations: Some(vec![RelationInput {
+                    subject: ResourceRef {
                         account: None,
-                        typ: TypeRef::Name("Account".parse().unwrap()),
-                        name: "alice".parse().unwrap(),
+                        r#type: TypeRef::Name("Account".parse().unwrap()),
+                        id: None,
+                        did: None,
+                        name: Some("alice".parse().unwrap()),
                     },
                     relation: "role".to_string(),
                     value: Some(json!("maintainer")),
-                    object: ResourceRef::Name {
-                        account: Some(AccountRef::Name("bob".parse().unwrap())),
-                        typ: TypeRef::Name("Dataset".parse().unwrap()),
-                        name: "bobs-dataset".parse().unwrap(),
+                    object: ResourceRef {
+                        account: Some(AccountRef {
+                            id: None,
+                            did: None,
+                            name: Some("bob".parse().unwrap()),
+                        }),
+                        r#type: TypeRef::Name("Dataset".parse().unwrap()),
+                        id: None,
+                        did: None,
+                        name: Some("bobs-dataset".parse().unwrap()),
                     },
                 }]),
-                attributes: Some(vec![Attribute {
-                    object: ResourceRef::Name {
-                        account: Some(AccountRef::Name("bob".parse().unwrap())),
-                        typ: TypeRef::Name("Dataset".parse().unwrap()),
-                        name: "bobs-dataset".parse().unwrap(),
+                attributes: Some(vec![AttributeInput {
+                    object: ResourceRef {
+                        account: Some(AccountRef {
+                            id: None,
+                            did: None,
+                            name: Some("bob".parse().unwrap()),
+                        }),
+                        r#type: TypeRef::Name("Dataset".parse().unwrap()),
+                        id: None,
+                        did: None,
+                        name: Some("bobs-dataset".parse().unwrap()),
                     },
                     name: "allowPublicRead".to_string(),
                     value: json!(true),
@@ -1326,7 +1340,8 @@ fn test_serde_resource_canonical() {
           id: aa-12345
           name: my-secret
           account:
-            id: did:odf:fed01816ef0a9abe93aba816ef0a9abe93aba90e6065747170300c0d3d30c2cd8d7a4
+            id: c27331ce-ce88-4ff9-8c5a-4ce8107cc03f
+            did: did:odf:fed01816ef0a9abe93aba816ef0a9abe93aba90e6065747170300c0d3d30c2cd8d7a4
             name: sergiimk
           labels:
             nested:
@@ -1377,7 +1392,8 @@ fn test_serde_resource_canonical() {
                 id: "aa-12345".parse().unwrap(),
                 name: "my-secret".parse().unwrap(),
                 account: AccountHandle {
-                    id: AccountID::from_did_str("did:odf:fed01816ef0a9abe93aba816ef0a9abe93aba90e6065747170300c0d3d30c2cd8d7a4").unwrap(),
+                    id: "c27331ce-ce88-4ff9-8c5a-4ce8107cc03f".parse().unwrap(),
+                    did: AccountID::from_did_str("did:odf:fed01816ef0a9abe93aba816ef0a9abe93aba90e6065747170300c0d3d30c2cd8d7a4").unwrap(),
                     name: "sergiimk".parse().unwrap(),
                 },
                 labels: ResourceLabels {
@@ -1459,7 +1475,8 @@ fn test_serde_resource_canonical() {
               id: aa-12345
               name: my-secret
               account:
-                id: did:odf:fed01816ef0a9abe93aba816ef0a9abe93aba90e6065747170300c0d3d30c2cd8d7a4
+                id: c27331ce-ce88-4ff9-8c5a-4ce8107cc03f
+                did: did:odf:fed01816ef0a9abe93aba816ef0a9abe93aba90e6065747170300c0d3d30c2cd8d7a4
                 name: sergiimk
               labels:
                 nested:

@@ -13,9 +13,8 @@ use std::fmt::Display;
 use chrono::{DateTime, Utc};
 use thiserror::Error;
 
-use super::Buffer;
 use crate::data::OperationType;
-use crate::dataset::MetadataBlock;
+use crate::dataset::{MetadataBlock, MetadataBlockHeader};
 use crate::engine::{RawQueryRequest, RawQueryResponse, TransformRequest, TransformResponse};
 use crate::errors::ValidationError;
 use crate::legacy::DatasetSnapshot;
@@ -28,6 +27,9 @@ use crate::legacy::DatasetSnapshot;
 pub enum MetadataBlockVersion {
     Initial = 1,
     SequenceNumbers = 2,
+    /// Block with fixed struct alignments
+    /// See: <https://github.com/kamu-data/kamu-cli/issues/1084>
+    StructAlignment = 3,
 }
 
 #[derive(Error, Debug)]
@@ -43,6 +45,7 @@ impl TryFrom<i32> for MetadataBlockVersion {
         match value {
             1 => Ok(MetadataBlockVersion::Initial),
             2 => Ok(MetadataBlockVersion::SequenceNumbers),
+            3 => Ok(MetadataBlockVersion::StructAlignment),
             _ => Err(MetadataBlockVersionError::UnsupportedVersion(value)),
         }
     }
@@ -52,7 +55,7 @@ pub const METADATA_BLOCK_MINIMUM_SUPPORTED_VERSION: MetadataBlockVersion =
     MetadataBlockVersion::SequenceNumbers;
 
 pub const METADATA_BLOCK_CURRENT_VERSION: MetadataBlockVersion =
-    MetadataBlockVersion::SequenceNumbers;
+    MetadataBlockVersion::StructAlignment;
 
 pub const METADATA_BLOCK_SUPPORTED_VERSION_RANGE: (MetadataBlockVersion, MetadataBlockVersion) = (
     METADATA_BLOCK_MINIMUM_SUPPORTED_VERSION,
@@ -64,10 +67,12 @@ pub const METADATA_BLOCK_SUPPORTED_VERSION_RANGE: (MetadataBlockVersion, Metadat
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub trait MetadataBlockSerializer {
-    fn write_manifest(&self, block: &MetadataBlock) -> Result<Buffer<u8>, Error>;
+    fn write_manifest(&self, block: &MetadataBlock) -> Result<bytes::Bytes, Error>;
 }
 
 pub trait MetadataBlockDeserializer {
+    fn read_header(&self, data: &[u8]) -> Result<MetadataBlockHeader, Error>;
+
     fn read_manifest(&self, data: &[u8]) -> Result<MetadataBlock, Error>;
 
     fn check_version_compatibility(version: MetadataBlockVersion) -> Result<(), Error> {
@@ -78,7 +83,7 @@ pub trait MetadataBlockDeserializer {
                     supported_version_range: METADATA_BLOCK_SUPPORTED_VERSION_RANGE,
                 }))
             }
-            MetadataBlockVersion::SequenceNumbers => Ok(()),
+            MetadataBlockVersion::SequenceNumbers | MetadataBlockVersion::StructAlignment => Ok(()),
         }
     }
 }
@@ -88,7 +93,7 @@ pub trait MetadataBlockDeserializer {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub trait DatasetSnapshotSerializer {
-    fn write_manifest(&self, snapshot: &DatasetSnapshot) -> Result<Buffer<u8>, Error>;
+    fn write_manifest(&self, snapshot: &DatasetSnapshot) -> Result<bytes::Bytes, Error>;
 }
 
 pub trait DatasetSnapshotDeserializer {
@@ -100,11 +105,11 @@ pub trait DatasetSnapshotDeserializer {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub trait EngineProtocolSerializer {
-    fn write_raw_query_request(&self, inst: &RawQueryRequest) -> Result<Buffer<u8>, Error>;
-    fn write_raw_query_response(&self, inst: &RawQueryResponse) -> Result<Buffer<u8>, Error>;
+    fn write_raw_query_request(&self, inst: &RawQueryRequest) -> Result<bytes::Bytes, Error>;
+    fn write_raw_query_response(&self, inst: &RawQueryResponse) -> Result<bytes::Bytes, Error>;
 
-    fn write_transform_request(&self, inst: &TransformRequest) -> Result<Buffer<u8>, Error>;
-    fn write_transform_response(&self, inst: &TransformResponse) -> Result<Buffer<u8>, Error>;
+    fn write_transform_request(&self, inst: &TransformRequest) -> Result<bytes::Bytes, Error>;
+    fn write_transform_response(&self, inst: &TransformResponse) -> Result<bytes::Bytes, Error>;
 }
 
 pub trait EngineProtocolDeserializer {

@@ -43,7 +43,7 @@ bytes = { version = "1", default-features = false }
 chrono = { version = "0.4" }
 indoc = { version = "2", default-features = false }
 nonempty = { version = "0.12", default-features = false }
-nutype = { version = "0.6", default-features = false, features = [
+nutype = { version = "0.7", default-features = false, features = [
     "regex",
     "serde",
 ] }

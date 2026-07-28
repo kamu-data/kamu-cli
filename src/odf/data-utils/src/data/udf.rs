@@ -51,10 +51,6 @@ impl AssertNotNull {
 }
 
 impl ScalarUDFImpl for AssertNotNull {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-
     fn name(&self) -> &'static str {
         "assert_not_null"
     }
@@ -131,10 +127,6 @@ impl AssertListElementsNotNull {
 }
 
 impl ScalarUDFImpl for AssertListElementsNotNull {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-
     fn name(&self) -> &'static str {
         "assert_list_elements_not_null"
     }

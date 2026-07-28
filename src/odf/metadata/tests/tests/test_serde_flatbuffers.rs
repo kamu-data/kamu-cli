@@ -110,7 +110,7 @@ fn test_flatbuffers_maps() {
 #[test]
 fn test_flatbuffers_any_json_property() {
     // String
-    let expected = auth::Attribute {
+    let expected = auth::AttributeInput {
         object: "X:x".parse().unwrap(),
         name: "my-attr".to_string(),
         value: json!("some-attr"),
@@ -121,11 +121,12 @@ fn test_flatbuffers_any_json_property() {
     fb.finish(offset, None);
     let data = fb.finished_data();
 
-    let actual = auth::Attribute::deserialize(::flatbuffers::root::<fb::Attribute>(data).unwrap());
+    let actual =
+        auth::AttributeInput::deserialize(::flatbuffers::root::<fb::AttributeInput>(data).unwrap());
     pretty_assertions::assert_eq!(expected, actual);
 
     // Int
-    let expected = auth::Attribute {
+    let expected = auth::AttributeInput {
         object: "X:x".parse().unwrap(),
         name: "my-attr".to_string(),
         value: json!(123),
@@ -136,11 +137,12 @@ fn test_flatbuffers_any_json_property() {
     fb.finish(offset, None);
     let data = fb.finished_data();
 
-    let actual = auth::Attribute::deserialize(::flatbuffers::root::<fb::Attribute>(data).unwrap());
+    let actual =
+        auth::AttributeInput::deserialize(::flatbuffers::root::<fb::AttributeInput>(data).unwrap());
     pretty_assertions::assert_eq!(expected, actual);
 
     // Nested
-    let expected = auth::Attribute {
+    let expected = auth::AttributeInput {
         object: "X:x".parse().unwrap(),
         name: "my-attr".to_string(),
         value: json!({"a": "x", "b": "y"}),
@@ -151,7 +153,8 @@ fn test_flatbuffers_any_json_property() {
     fb.finish(offset, None);
     let data = fb.finished_data();
 
-    let actual = auth::Attribute::deserialize(::flatbuffers::root::<fb::Attribute>(data).unwrap());
+    let actual =
+        auth::AttributeInput::deserialize(::flatbuffers::root::<fb::AttributeInput>(data).unwrap());
     pretty_assertions::assert_eq!(expected, actual);
 }
 
@@ -169,7 +172,7 @@ fn get_test_events() -> [(MetadataEvent, &'static str); 10] {
                 new_source_state: None,
                 extra: None,
             }),
-            "73e2977b8beae4aef53670067c1173b9d68e69721908d080b84286ab366d1e14",
+            "a93874702479f83ddff1e7a660ca78085def333c86501b0d895fa3aec79c7189",
         ),
         (
             MetadataEvent::AddData(AddData {
@@ -181,7 +184,7 @@ fn get_test_events() -> [(MetadataEvent, &'static str); 10] {
                 new_source_state: None,
                 extra: None,
             }),
-            "32516689d582e02e77778af75a71b6d131a640d0bebed99b99d96b385cee915f",
+            "86aeb7dee0502b4886761de5e45b5111c0bc9e0fbfee02e3685487109305ef56",
         ),
         (
             MetadataEvent::AddData(AddData {
@@ -193,7 +196,7 @@ fn get_test_events() -> [(MetadataEvent, &'static str); 10] {
                 new_source_state: None,
                 extra: None,
             }),
-            "1ad91cabca81e1f1771f28070980bfdcf409e5f8a877b3976b611401d2998189",
+            "d1b412dab2a6af53f3e1b183834557bbf1c4689e2fc9b92fc0d04741ef607ecc",
         ),
         (
             MetadataEvent::AddData(AddData {
@@ -210,7 +213,7 @@ fn get_test_events() -> [(MetadataEvent, &'static str); 10] {
                 new_source_state: None,
                 extra: None,
             }),
-            "ec1d3f6aa39bb256fcae16d79a95705f614e26d9a86d393b6f9e6b19a60d0df6",
+            "1fcf10cb843746c4c44e6c288e216995701aa073426fc4bebe14f1680f8ec6d1",
         ),
         (
             MetadataEvent::SetPollingSource(SetPollingSource {
@@ -241,7 +244,7 @@ fn get_test_events() -> [(MetadataEvent, &'static str); 10] {
                     primary_key: vec!["a".to_owned()],
                 }),
             }),
-            "18cc1680b3d36f63358b59d469d76dcbf71ddac3ea66a693ce4158cfc5dfb28d",
+            "eb61498b7362d334131a8486a5ce4cc2638d7c1aa3e4da82a19cf834a77df718",
         ),
         (
             MetadataEvent::SetPollingSource(SetPollingSource {
@@ -275,7 +278,7 @@ fn get_test_events() -> [(MetadataEvent, &'static str); 10] {
                     primary_key: vec!["a".to_owned()],
                 }),
             }),
-            "39cfd70254179a7cdea4263f951b8acbdc2b8a20dc0c1c4c572ab6da2dd9b28a",
+            "f96c90e9e9700819ba05d87f66b200a18a08404706ac62cde6d68bc350e73861",
         ),
         (
             MetadataEvent::AddData(AddData {
@@ -296,7 +299,7 @@ fn get_test_events() -> [(MetadataEvent, &'static str); 10] {
                 }),
                 extra: None,
             }),
-            "db5044313bbd596fb54bef9387ad61a18206d1e93e833db4d1159d20cd3cac58",
+            "9326dc5daab04877a9f006ff6b1636a8fa9dcec9615b54f741a1a90091eaf694",
         ),
         (
             MetadataEvent::AddData(AddData {
@@ -320,7 +323,7 @@ fn get_test_events() -> [(MetadataEvent, &'static str); 10] {
                     size_naive: 100,
                 })),
             }),
-            "00b4cf8b3b22ff71931696f13cc5c06f80eb3360b6d7dccdd3a3b4fb1b5d943c",
+            "54f64c642cca6f67416ebe2b29e5d9414ece91f819efe97cd437fbe542c61bbb",
         ),
         (
             MetadataEvent::SetTransform(SetTransform {
@@ -342,7 +345,7 @@ fn get_test_events() -> [(MetadataEvent, &'static str); 10] {
                     temporal_tables: None,
                 }),
             }),
-            "dc2ab3737792021b6794d3969315bb521701780c91548104f149906d98c8da70",
+            "bb6aa1f9689b794c75affa709ae2477b209411d9ad092c2318ecd9ea94121bcc",
         ),
         (
             MetadataEvent::ExecuteTransform(ExecuteTransform {
@@ -373,7 +376,7 @@ fn get_test_events() -> [(MetadataEvent, &'static str); 10] {
                 new_checkpoint: None,
                 new_watermark: Some(Utc.with_ymd_and_hms(2020, 1, 1, 12, 0, 0).unwrap()),
             }),
-            "a955281dca303056a88e39291d17e045d88ecdafca3ef9e75b09b83169633b52",
+            "21cab7396525e614beeafe21c05a38bf597a39a191cc14147b9c5ec32210cf82",
         ),
     ]
 }
@@ -456,7 +459,7 @@ fn serde_set_data_schema() {
     assert_eq!(expected_block, actual_block);
 
     let hash_actual = format!("{:x}", sha3::Sha3_256::digest(&buffer));
-    let hash_expected = "33d0a65cfb9853f14830fc84e443767d9acfedd24d13c3c22bdc82f3be1b507f";
+    let hash_expected = "80865248519d55fa04598e24ba42884728efe70956e640dca4df5ec8043c69ca";
 
     assert_eq!(hash_actual, hash_expected);
 
@@ -497,7 +500,7 @@ fn serde_set_data_schema_legacy() {
     assert_eq!(expected_block, actual_block);
 
     let hash_actual = format!("{:x}", sha3::Sha3_256::digest(&buffer));
-    let hash_expected = "44d64d764fb207713407b9a761566409404c907f765993105608299cd6f5bebf";
+    let hash_expected = "a7e79d088ca7bac689f12d71ae64b93e7bab62a7db2fec83ea89e9bf90dd89ed";
 
     assert_eq!(hash_actual, hash_expected);
 

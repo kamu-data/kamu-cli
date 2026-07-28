@@ -275,8 +275,8 @@ impl DatasetBaseUseCaseHarness {
                 event,
                 system_time: self.system_time_source.now(),
             };
-            let hash = BaseRepoHarness::hash_from_block(&block);
-            new_hashed_blocks.push_back((hash.clone(), block));
+            let (hash, bytes) = BaseRepoHarness::serialize_block(&block);
+            new_hashed_blocks.push_back((hash.clone(), block, bytes));
 
             prev_block_hash = hash;
         }

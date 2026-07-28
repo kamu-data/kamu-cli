@@ -22,9 +22,7 @@ doctest = false
 
 
 [features]
-default = ["did-pkh"]
-
-did-pkh = ["odf/did-pkh"]
+default = []
 
 
 [dependencies]
@@ -54,6 +52,9 @@ kamu-auth-web3-services = { workspace = true, default-features = false }
 
 chrono = { version = "0.4", default-features = false }
 indoc = { version = "2" }
-pretty_assertions = { version = "1", default-features = false, features = ["std", "unstable"] }
+pretty_assertions = { version = "1", default-features = false, features = [
+    "std",
+    "unstable",
+] }
 test-log = { version = "0.2", features = ["trace"] }
 tokio = { version = "1", default-features = false, features = [] }

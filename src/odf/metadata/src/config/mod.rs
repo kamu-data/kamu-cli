@@ -9,7 +9,3 @@
 
 // Combine this module's types with generated DTOs
 pub use crate::dtos::config::*;
-
-mod value_ref;
-
-pub use value_ref::*;

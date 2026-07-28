@@ -31,7 +31,6 @@ dataset = [
     "arrow",
 ]
 datafusion = ["arrow", "odf-data-utils?/datafusion"]
-did-pkh = ["odf-metadata/did-pkh"]
 engine-rpc = ["odf-metadata/engine-rpc"]
 http = ["dep:odf-storage-http", "odf-dataset-impl?/http"]
 lfs = ["dep:odf-storage-lfs", "odf-dataset/lfs", "odf-dataset-impl?/lfs"]

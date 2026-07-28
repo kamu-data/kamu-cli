@@ -518,16 +518,42 @@ impl WsSmartTransferProtocolClient {
         &self,
         dataset_alias: &odf::DatasetAlias,
         seed_block: odf::MetadataBlockTyped<odf::metadata::Seed>,
+        seed_block_bytes: odf::MetadataBlockBytes,
+        expected_head: &odf::Multihash,
         dataset_visibility: odf::DatasetVisibility,
-    ) -> Result<CreateDatasetResult, InternalError> {
+    ) -> Result<CreateDatasetResult, SyncError> {
         let res = create_dataset_use_case
             .execute(
                 dataset_alias,
                 seed_block,
-                CreateDatasetUseCaseOptions { dataset_visibility },
+                CreateDatasetUseCaseOptions {
+                    dataset_visibility,
+                    seed_block_bytes: Some(seed_block_bytes),
+                },
             )
-            .await
-            .int_err()?;
+            .await?;
+
+        if res.head != *expected_head {
+            // Return the same kind of error as AppendDatasetMetadataBatchUseCase would on
+            // hash mismatch
+            return Err(
+                kamu_datasets::AppendDatasetMetadataBatchUseCaseError::BlockAppendError(
+                    kamu_datasets::AppendDatasetMetadataBatchUseCaseBlockAppendError {
+                        append_error: odf::dataset::AppendError::InvalidBlock(
+                            odf::dataset::AppendValidationError::HashMismatch(
+                                odf::storage::HashMismatchError {
+                                    expected: expected_head.clone(),
+                                    actual: res.head,
+                                },
+                            ),
+                        ),
+                        block_sequence_number: 0,
+                        block_hash: expected_head.clone(),
+                    },
+                )
+                .into(),
+            );
+        }
 
         res.dataset.detach_from_transaction();
 
@@ -538,12 +564,12 @@ impl WsSmartTransferProtocolClient {
     async fn append_metadata_transactional(
         &self,
         dataset_handle: &odf::DatasetHandle,
-        new_blocks: std::collections::VecDeque<(odf::Multihash, odf::MetadataBlock)>,
+        new_blocks: std::collections::VecDeque<odf::dataset::HashedMetadataBlockBytesDecoded>,
         force_update_if_diverged: bool,
-    ) -> Result<Option<odf::Multihash>, InternalError> {
+    ) -> Result<Option<odf::Multihash>, SyncError> {
         let transactional_target = dataset_registry.get_dataset_by_handle(dataset_handle).await;
 
-        append_dataset_metadata_batch_use_case
+        let head = append_dataset_metadata_batch_use_case
             .execute(
                 transactional_target.as_ref(),
                 Box::new(new_blocks.into_iter()),
@@ -554,8 +580,9 @@ impl WsSmartTransferProtocolClient {
                     ..Default::default()
                 },
             )
-            .await
-            .int_err()
+            .await?;
+
+        Ok(head)
     }
 }
 
@@ -668,7 +695,7 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                 }
                 ((**dst).clone(), dst.get_handle().clone())
             } else {
-                let (first_hash, first_block) = new_blocks.pop_front().unwrap();
+                let (first_hash, first_block, first_block_bytes) = new_blocks.pop_front().unwrap();
                 let seed_block = first_block
                     .into_typed()
                     .ok_or_else(|| CorruptedSourceError {
@@ -682,6 +709,8 @@ impl SmartTransferProtocolClient for WsSmartTransferProtocolClient {
                     .create_dataset_transactional(
                         alias,
                         seed_block,
+                        first_block_bytes,
+                        &first_hash,
                         transfer_options.visibility_for_created_dataset,
                     )
                     .await?;

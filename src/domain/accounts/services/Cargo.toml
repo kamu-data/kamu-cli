@@ -39,7 +39,7 @@ kamu-auth-rebac = { workspace = true }
 kamu-search = { workspace = true }
 messaging-outbox = { workspace = true }
 event-sourcing = { workspace = true }
-odf = { workspace = true, default-features = false, features = ["did-pkh"] }
+odf = { workspace = true }
 random-strings = { workspace = true }
 time-source = { workspace = true }
 

@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use internal_error::InternalError;
-use odf_metadata::{DatasetID, DatasetKind, MetadataBlockTyped, Multihash, Seed};
+use odf_metadata::*;
 use odf_storage::BlockNotFoundError;
 use thiserror::Error;
 
@@ -24,6 +24,7 @@ pub trait DatasetStorageUnitWriter: Sync + Send {
     async fn store_dataset(
         &self,
         seed_block: MetadataBlockTyped<Seed>,
+        opts: StoreDatasetOpts,
     ) -> Result<StoreDatasetResult, StoreDatasetError>;
 
     async fn write_dataset_reference(
@@ -34,6 +35,15 @@ pub trait DatasetStorageUnitWriter: Sync + Send {
     ) -> Result<(), WriteDatasetReferenceError>;
 
     async fn delete_dataset(&self, dataset_id: &DatasetID) -> Result<(), DeleteStoredDatasetError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Default)]
+pub struct StoreDatasetOpts {
+    /// Allows passing a pre-serialized seed block data. You must be absolutely
+    /// sure that these bytes correspond to the decoded block.
+    pub seed_block_bytes: Option<MetadataBlockBytes>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

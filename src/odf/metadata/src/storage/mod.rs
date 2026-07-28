@@ -10,8 +10,6 @@
 // Combine this module's types with generated DTOs
 pub use crate::dtos::storage::*;
 
-mod persistent_volume_ref;
 mod repo_name;
 
-pub use persistent_volume_ref::*;
 pub use repo_name::*;

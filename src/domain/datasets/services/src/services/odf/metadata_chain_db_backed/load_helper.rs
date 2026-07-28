@@ -16,7 +16,7 @@ pub(crate) async fn load_data_blocks_from_repository(
     dataset_id: &odf::DatasetID,
     page_size: usize,
     sequence_number: u64,
-) -> Result<Vec<(odf::Multihash, bytes::Bytes, odf::MetadataBlock)>, InternalError> {
+) -> Result<Vec<(odf::Multihash, odf::MetadataBlock, odf::MetadataBlockBytes)>, InternalError> {
     // Load data block records from repository
     let data_block_records = data_block_repository
         .get_page_of_data_blocks(dataset_id, &odf::BlockRef::Head, page_size, sequence_number)
@@ -27,18 +27,12 @@ pub(crate) async fn load_data_blocks_from_repository(
     let data_blocks = data_block_records
         .into_iter()
         .map(|data_block| {
-            odf::storage::deserialize_metadata_block(
-                &data_block.block_hash,
-                &data_block.block_payload,
-            )
-            .map(|metadata_block| {
-                (
-                    data_block.block_hash,
-                    data_block.block_payload,
-                    metadata_block,
-                )
-            })
-            .int_err()
+            let decoded_block = data_block.block_payload.decode().int_err()?;
+            Ok((
+                data_block.block_hash,
+                decoded_block,
+                data_block.block_payload,
+            ))
         })
         .collect::<Result<Vec<_>, InternalError>>()?;
 
@@ -46,8 +40,8 @@ pub(crate) async fn load_data_blocks_from_repository(
         %dataset_id,
         page_size,
         sequence_number,
-        min_bound = ?data_blocks.first().map(|(_, _, b)| b.sequence_number),
-        max_bound = ?data_blocks.last().map(|(_, _, b)| b.sequence_number),
+        min_bound = ?data_blocks.first().map(|(_, b, _)| b.sequence_number),
+        max_bound = ?data_blocks.last().map(|(_, b, _)| b.sequence_number),
         "Loaded data blocks page",
     );
 

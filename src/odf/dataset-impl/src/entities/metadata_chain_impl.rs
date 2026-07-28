@@ -47,6 +47,49 @@ where
             meta_ref_repo,
         }
     }
+
+    fn iter_blocks_interval_impl<'a, F, T>(
+        &'a self,
+        head_boundary: MetadataChainIterBoundary<'a>,
+        tail_boundary: Option<MetadataChainIterBoundary<'a>>,
+        ignore_missing_tail: bool,
+        decode: F,
+    ) -> impl futures::Stream<Item = Result<T, IterBlocksError>> + 'a
+    where
+        T: 'static,
+        F: 'static,
+        F: Fn(Multihash, MetadataBlockBytes) -> Result<(T, Option<Multihash>), GetBlockError>,
+    {
+        async_stream::try_stream! {
+            let head_hash = match head_boundary {
+                MetadataChainIterBoundary::Hash(h) => h.clone(),
+                MetadataChainIterBoundary::Ref(r) => self.resolve_ref(r).await?,
+            };
+
+            let tail_hash = match tail_boundary {
+                None => None,
+                Some(MetadataChainIterBoundary::Hash(h)) => Some(h.clone()),
+                Some(MetadataChainIterBoundary::Ref(r)) => Some(self.resolve_ref(r).await?),
+            };
+
+            let mut current = Some(head_hash.clone());
+
+            while current.is_some() && current != tail_hash {
+                let block_data = self.get_block_bytes(current.as_ref().unwrap()).await?;
+                let (ret, prev_block_hash) = decode(current.take().unwrap(), block_data)?;
+
+                yield ret;
+                current = prev_block_hash;
+            }
+
+            if !ignore_missing_tail && current.is_none() && let Some(tail_hash) = tail_hash {
+                Err(IterBlocksError::InvalidInterval(InvalidIntervalError {
+                    head: head_hash,
+                    tail: tail_hash,
+                }))?;
+            }
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -65,7 +108,10 @@ where
         self.meta_block_repo.get_block_size(hash).await
     }
 
-    async fn get_block_bytes(&self, hash: &Multihash) -> Result<bytes::Bytes, GetBlockDataError> {
+    async fn get_block_bytes(
+        &self,
+        hash: &Multihash,
+    ) -> Result<MetadataBlockBytes, GetBlockDataError> {
         self.meta_block_repo.get_block_bytes(hash).await
     }
 
@@ -106,34 +152,46 @@ where
         tail_boundary: Option<MetadataChainIterBoundary<'a>>,
         ignore_missing_tail: bool,
     ) -> DynMetadataStream<'a> {
-        Box::pin(async_stream::try_stream! {
-            let head_hash = match head_boundary {
-                MetadataChainIterBoundary::Hash(h) => h.clone(),
-                MetadataChainIterBoundary::Ref(r) => self.resolve_ref(r).await?,
-            };
+        Box::pin(self.iter_blocks_interval_impl(
+            head_boundary,
+            tail_boundary,
+            ignore_missing_tail,
+            |hash, bytes| {
+                let block = bytes.decode().map_err(|e| {
+                    GetBlockError::BlockMalformed(BlockMalformedError {
+                        hash: hash.clone(),
+                        source: e.into(),
+                    })
+                })?;
 
-            let tail_hash = match tail_boundary {
-                None => None,
-                Some(MetadataChainIterBoundary::Hash(h)) => Some(h.clone()),
-                Some(MetadataChainIterBoundary::Ref(r)) => Some(self.resolve_ref(r).await?),
-            };
+                let prev_block_hash = block.prev_block_hash.clone();
+                Ok(((hash, block), prev_block_hash))
+            },
+        ))
+    }
 
-            let mut current = Some(head_hash.clone());
+    fn iter_blocks_bytes_interval<'a>(
+        &'a self,
+        head_boundary: MetadataChainIterBoundary<'a>,
+        tail_boundary: Option<MetadataChainIterBoundary<'a>>,
+        ignore_missing_tail: bool,
+    ) -> DynMetadataBytesStream<'a> {
+        Box::pin(self.iter_blocks_interval_impl(
+            head_boundary,
+            tail_boundary,
+            ignore_missing_tail,
+            |hash, bytes| {
+                let header = bytes.decode_header().map_err(|e| {
+                    GetBlockError::BlockMalformed(BlockMalformedError {
+                        hash: hash.clone(),
+                        source: e.into(),
+                    })
+                })?;
 
-            while current.is_some() && current != tail_hash {
-                let block = self.get_block(current.as_ref().unwrap()).await?;
-                let next = block.prev_block_hash.clone();
-                yield (current.take().unwrap(), block);
-                current = next;
-            }
-
-            if !ignore_missing_tail && current.is_none() && let Some(tail_hash) = tail_hash {
-                Err(IterBlocksError::InvalidInterval(InvalidIntervalError {
-                    head: head_hash,
-                    tail: tail_hash,
-                }))?;
-            }
-        })
+                let prev_block_hash = header.prev_block_hash.clone();
+                Ok(((hash, header, bytes), prev_block_hash))
+            },
+        ))
     }
 
     async fn append<'a>(
@@ -187,22 +245,34 @@ where
             None
         };
 
-        let res = self
-            .meta_block_repo
-            .insert_block(
-                &block,
-                InsertOpts {
-                    precomputed_hash: opts.precomputed_hash,
-                    expected_hash: opts.expected_hash,
-                    ..Default::default()
-                },
-            )
-            .await
-            .map_err(|e| match e {
-                InsertBlockError::HashMismatch(e) => AppendValidationError::HashMismatch(e).into(),
-                InsertBlockError::Access(e) => AppendError::Access(e),
-                InsertBlockError::Internal(e) => AppendError::Internal(e),
-            })?;
+        let res = if let Some(block_data) = opts.block_data {
+            self.meta_block_repo
+                .insert_block_data(
+                    block_data,
+                    InsertOpts {
+                        precomputed_hash: opts.precomputed_hash,
+                        expected_hash: opts.expected_hash,
+                        ..Default::default()
+                    },
+                )
+                .await
+        } else {
+            self.meta_block_repo
+                .insert_block(
+                    &block,
+                    InsertOpts {
+                        precomputed_hash: opts.precomputed_hash,
+                        expected_hash: opts.expected_hash,
+                        ..Default::default()
+                    },
+                )
+                .await
+        }
+        .map_err(|e| match e {
+            InsertBlockError::HashMismatch(e) => AppendValidationError::HashMismatch(e).into(),
+            InsertBlockError::Access(e) => AppendError::Access(e),
+            InsertBlockError::Internal(e) => AppendError::Internal(e),
+        })?;
 
         tracing::debug!(?block, "Successfully appended block");
 

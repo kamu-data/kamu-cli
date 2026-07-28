@@ -38,14 +38,14 @@ struct DatasetKeyBlockRow {
 impl DatasetKeyBlockRow {
     fn into_domain(self) -> DatasetBlock {
         DatasetBlock {
-            event_kind: MetadataEventType::from_str(&self.event_type).unwrap(),
+            event_kind: odf::MetadataEventType::from_str(&self.event_type).unwrap(),
             sequence_number: u64::try_from(self.sequence_number).unwrap(),
             block_hash: odf::Multihash::new(
                 odf::metadata::Multicodec::Sha3_256,
                 &self.block_hash_bin,
             )
             .unwrap(),
-            block_payload: bytes::Bytes::from(self.block_payload),
+            block_payload: odf::MetadataBlockBytes::new(bytes::Bytes::from(self.block_payload)),
         }
     }
 }
@@ -155,7 +155,7 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
         &self,
         dataset_ids: &[odf::DatasetID],
         block_ref: &odf::BlockRef,
-        event_type: MetadataEventType,
+        event_type: odf::MetadataEventType,
     ) -> Result<Vec<(odf::DatasetID, DatasetBlock)>, InternalError> {
         let mut tr = self.transaction.lock().await;
         let conn = tr.connection_mut().await?;
@@ -217,14 +217,16 @@ impl DatasetKeyBlockRepository for SqliteDatasetKeyBlockRepository {
             .map(|r| {
                 let dataset_id = odf::DatasetID::from_did_str(&r.dataset_id).unwrap();
                 let key_block = DatasetBlock {
-                    event_kind: MetadataEventType::from_str(&r.event_type).unwrap(),
+                    event_kind: odf::MetadataEventType::from_str(&r.event_type).unwrap(),
                     sequence_number: u64::try_from(r.sequence_number).unwrap(),
                     block_hash: odf::Multihash::new(
                         odf::metadata::Multicodec::Sha3_256,
                         &r.block_hash_bin,
                     )
                     .unwrap(),
-                    block_payload: bytes::Bytes::from(r.block_payload),
+                    block_payload: odf::MetadataBlockBytes::new(bytes::Bytes::from(
+                        r.block_payload,
+                    )),
                 };
                 (dataset_id, key_block)
             })

@@ -77,7 +77,13 @@ impl CreateDatasetUseCase for CreateDatasetUseCaseImpl {
         // Make storage level dataset (no HEAD yet)
         let store_result = self
             .create_helper
-            .store_dataset(canonical_alias.as_ref(), seed_block)
+            .store_dataset(
+                canonical_alias.as_ref(),
+                seed_block,
+                odf::dataset::StoreDatasetOpts {
+                    seed_block_bytes: options.seed_block_bytes,
+                },
+            )
             .await?;
 
         // Set initial dataset HEAD
