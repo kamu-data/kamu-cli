@@ -20,6 +20,10 @@ pub struct AdminSearchMut;
 enum SearchEntityName {
     Datasets,
     Accounts,
+    MoleculeActivities,
+    MoleculeAnnouncements,
+    MoleculeDataRoomEntries,
+    MoleculeProjects,
 }
 
 impl SearchEntityName {
@@ -27,6 +31,18 @@ impl SearchEntityName {
         match self {
             Self::Datasets => kamu_datasets::dataset_search_schema::SCHEMA_NAME,
             Self::Accounts => kamu_accounts::account_search_schema::SCHEMA_NAME,
+            Self::MoleculeActivities => {
+                kamu_molecule_domain::molecule_activity_search_schema::SCHEMA_NAME
+            }
+            Self::MoleculeAnnouncements => {
+                kamu_molecule_domain::molecule_announcement_search_schema::SCHEMA_NAME
+            }
+            Self::MoleculeDataRoomEntries => {
+                kamu_molecule_domain::molecule_data_room_entry_search_schema::SCHEMA_NAME
+            }
+            Self::MoleculeProjects => {
+                kamu_molecule_domain::molecule_project_search_schema::SCHEMA_NAME
+            }
         }
     }
 }

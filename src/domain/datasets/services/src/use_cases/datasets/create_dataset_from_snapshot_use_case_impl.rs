@@ -110,7 +110,8 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
         // Resolve a target account and full alias of the dataset
         let (canonical_alias, target_account_id) = self
             .create_helper
-            .resolve_alias_target(&snapshot.name, subject)?;
+            .resolve_alias_target(&snapshot.name, subject)
+            .await?;
 
         let dataset_did = self.did_generator.generate_dataset_id();
         // Make a seed block

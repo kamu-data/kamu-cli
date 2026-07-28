@@ -72,20 +72,18 @@ fn test_has_access_by_name_matrix() {
     for (subject_account_name, target_account_name, expected) in [
         // molecule
         (MOLECULE, MOLECULE, true),
-        // TODO: Uncomment after sku/molecule merging
-        // (MOLECULE, MOLECULE_PROJECT, true),
-        // (MOLECULE, MOLECULE_DEV, false),
-        // (MOLECULE, MOLECULE_DEV_PROJECT, false),
-        // (MOLECULE, "molecule.devops", true),
-        // (MOLECULE, "molecule.dev.probe8503325863", false),
+        (MOLECULE, MOLECULE_PROJECT, true),
+        (MOLECULE, MOLECULE_DEV, false),
+        (MOLECULE, MOLECULE_DEV_PROJECT, false),
+        (MOLECULE, "molecule.devops", true),
+        (MOLECULE, "molecule.dev.probe8503325863", false),
         // molecule.dev
         (MOLECULE_DEV, MOLECULE_DEV, true),
-        // TODO: Uncomment after sku/molecule merging
-        // (MOLECULE_DEV, MOLECULE_DEV_PROJECT, true),
-        // (MOLECULE_DEV, MOLECULE, false),
-        // (MOLECULE_DEV, MOLECULE_PROJECT, false),
-        // (MOLECULE_DEV, "molecule.devops", false),
-        // (MOLECULE_DEV, "molecule.dev.probe8503325863", true),
+        (MOLECULE_DEV, MOLECULE_DEV_PROJECT, true),
+        (MOLECULE_DEV, MOLECULE, false),
+        (MOLECULE_DEV, MOLECULE_PROJECT, false),
+        (MOLECULE_DEV, "molecule.devops", false),
+        (MOLECULE_DEV, "molecule.dev.probe8503325863", true),
     ] {
         let actual = SignEip712UseCaseImpl::has_access_by_account_name(
             subject_account_name,
@@ -184,6 +182,11 @@ async fn test_execute_matrix() {
                 //     expected_ok_response_for_molecule_project_account_id(),
                 // ),
                 (
+                    "1) Test 8",
+                    to_odf_did(&molecule_project_account_id()),
+                    expected_ok_response_for_molecule_project_account_id(),
+                ),
+                (
                     "1) Test 9",
                     to_odf_did(&molecule_dev_account_id()),
                     expected_ok_response_for_molecule_dev_account_id(),
@@ -194,6 +197,11 @@ async fn test_execute_matrix() {
                 //     to_odf_did(&molecule_dev_project_account_id()),
                 //     expected_ok_response_for_molecule_dev_project_account_id(),
                 // ),
+                (
+                    "1) Test 10",
+                    to_odf_did(&molecule_dev_project_account_id()),
+                    expected_ok_response_for_molecule_dev_project_account_id(),
+                ),
                 (
                     "1) Test 11",
                     to_odf_did(&user_account_id()),
@@ -261,6 +269,11 @@ async fn test_execute_matrix() {
                 //     expected_ok_response_for_molecule_project_account_id(),
                 // ),
                 (
+                    "2) Test 8",
+                    to_odf_did(&molecule_project_account_id()),
+                    expected_ok_response_for_molecule_project_account_id(),
+                ),
+                (
                     "2) Test 9",
                     to_odf_did(&molecule_dev_account_id()),
                     expected_not_found(to_odf_did(&molecule_dev_account_id())),
@@ -271,6 +284,11 @@ async fn test_execute_matrix() {
                 //     to_odf_did(&molecule_dev_project_account_id()),
                 //     expected_not_found(to_odf_did(&molecule_dev_project_account_id())),
                 // ),
+                (
+                    "2) Test 10",
+                    to_odf_did(&molecule_dev_project_account_id()),
+                    expected_not_found(to_odf_did(&molecule_dev_project_account_id())),
+                ),
                 (
                     "2) Test 11",
                     to_odf_did(&user_account_id()),
@@ -338,6 +356,11 @@ async fn test_execute_matrix() {
                 //     expected_not_found(to_odf_did(&molecule_project_account_id())),
                 // ),
                 (
+                    "3) Test 8",
+                    to_odf_did(&molecule_project_account_id()),
+                    expected_not_found(to_odf_did(&molecule_project_account_id())),
+                ),
+                (
                     "3) Test 9",
                     to_odf_did(&molecule_dev_account_id()),
                     expected_ok_response_for_molecule_dev_account_id(),
@@ -348,6 +371,11 @@ async fn test_execute_matrix() {
                 //     to_odf_did(&molecule_dev_project_account_id()),
                 //     expected_ok_response_for_molecule_dev_project_account_id(),
                 // ),
+                (
+                    "3) Test 10",
+                    to_odf_did(&molecule_dev_project_account_id()),
+                    expected_ok_response_for_molecule_dev_project_account_id(),
+                ),
                 (
                     "3) Test 11",
                     to_odf_did(&user_account_id()),
@@ -415,6 +443,11 @@ async fn test_execute_matrix() {
                 //     expected_not_found(to_odf_did(&molecule_project_account_id())),
                 // ),
                 (
+                    "4) Test 8",
+                    to_odf_did(&molecule_project_account_id()),
+                    expected_not_found(to_odf_did(&molecule_project_account_id())),
+                ),
+                (
                     "4) Test 9",
                     to_odf_did(&molecule_dev_account_id()),
                     expected_not_found(to_odf_did(&molecule_dev_account_id())),
@@ -425,6 +458,11 @@ async fn test_execute_matrix() {
                 //     to_odf_did(&molecule_dev_project_account_id()),
                 //     expected_not_found(to_odf_did(&molecule_dev_project_account_id())),
                 // ),
+                (
+                    "4) Test 10",
+                    to_odf_did(&molecule_dev_project_account_id()),
+                    expected_not_found(to_odf_did(&molecule_dev_project_account_id())),
+                ),
                 (
                     "4) Test 11",
                     to_odf_did(&user_account_id()),
@@ -492,6 +530,11 @@ async fn test_execute_matrix() {
                 //     expected_not_found(to_odf_did(&molecule_project_account_id())),
                 // ),
                 (
+                    "5) Test 8",
+                    to_odf_did(&molecule_project_account_id()),
+                    expected_not_found(to_odf_did(&molecule_project_account_id())),
+                ),
+                (
                     "5) Test 9",
                     to_odf_did(&molecule_dev_account_id()),
                     expected_not_found(to_odf_did(&molecule_dev_account_id())),
@@ -502,6 +545,11 @@ async fn test_execute_matrix() {
                 //     to_odf_did(&molecule_dev_project_account_id()),
                 //     expected_not_found(to_odf_did(&molecule_dev_project_account_id())),
                 // ),
+                (
+                    "5) Test 10",
+                    to_odf_did(&molecule_dev_project_account_id()),
+                    expected_not_found(to_odf_did(&molecule_dev_project_account_id())),
+                ),
                 (
                     "5) Test 11",
                     to_odf_did(&user_account_id()),
@@ -835,11 +883,9 @@ fn mock_dataset_action_authorizer() -> MockDatasetActionAuthorizer {
         // NOTE: At the time of the request, we don't know what the DID is, so we can check it
         //       for the account as well
         .expect_check_read_dataset(&to_dataset_id(&molecule_account_id()), 1, false)
-        // TODO: Uncomment after sku/molecule merging
-        // .expect_check_read_dataset(&to_dataset_id(&molecule_project_account_id()), 1, false)
+        .expect_check_read_dataset(&to_dataset_id(&molecule_project_account_id()), 1, false)
         .expect_check_read_dataset(&to_dataset_id(&molecule_dev_account_id()), 1, false)
-        // TODO: Uncomment after sku/molecule merging
-        // .expect_check_read_dataset(&to_dataset_id(&molecule_dev_project_account_id()), 1, false)
+        .expect_check_read_dataset(&to_dataset_id(&molecule_dev_project_account_id()), 1, false)
         .expect_check_read_dataset(&to_dataset_id(&user_account_id()), 1, false)
         .expect_check_read_dataset(&to_dataset_id(&not_found_account_id()), 1, false)
 }
@@ -864,7 +910,6 @@ fn expected_ok_response_for_molecule_account_id() -> Result<serde_json::Value, S
     }))
 }
 
-#[expect(unused)]
 #[expect(clippy::unnecessary_wraps)]
 fn expected_ok_response_for_molecule_project_account_id() -> Result<serde_json::Value, String> {
     Ok(json!({
@@ -893,7 +938,6 @@ fn expected_ok_response_for_molecule_dev_account_id() -> Result<serde_json::Valu
     }))
 }
 
-#[expect(unused)]
 #[expect(clippy::unnecessary_wraps)]
 fn expected_ok_response_for_molecule_dev_project_account_id() -> Result<serde_json::Value, String> {
     Ok(json!({
