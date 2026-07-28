@@ -222,9 +222,13 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
         schema: &TypeUri,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceSnapshot>, InternalError> {
-        let mut resource_snapshots_stream = self
-            .resource_repository
-            .list_resource_snapshots_by_schema(account_id, schema, pagination);
+        let mut resource_snapshots_stream =
+            self.resource_repository.list_resource_snapshots_by_schema(
+                account_id,
+                schema,
+                pagination,
+                &kamu_resources::ResolvedResourceLabelFilter::default(),
+            );
 
         use tokio_stream::StreamExt;
 

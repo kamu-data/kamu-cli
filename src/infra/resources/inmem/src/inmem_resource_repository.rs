@@ -18,6 +18,7 @@ use internal_error::InternalError;
 use kamu_accounts::AccountRepository;
 use kamu_resources::{
     CreateResourceError,
+    ResolvedResourceLabelFilter,
     ResourceDuplicateError,
     ResourceHandleRow,
     ResourceID,
@@ -521,6 +522,7 @@ impl ResourceRepository for InMemoryResourceRepository {
         account_id: odf::AccountID,
         schema: &TypeUri,
         pagination: PaginationOpts,
+        _label_filter: &ResolvedResourceLabelFilter,
     ) -> ResourceSnapshotStream<'_> {
         let schema = schema.clone();
 

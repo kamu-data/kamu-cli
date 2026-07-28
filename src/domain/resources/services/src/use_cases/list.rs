@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use database_common::PaginationOpts;
+use kamu_resources::ResolvedResourceLabelFilter;
 
 use crate::domain::{ReconcilableEventSourcedResource, TypedResourceQueryService};
 
@@ -34,9 +35,10 @@ where
         &self,
         account_id: odf::AccountID,
         pagination: PaginationOpts,
+        label_filter: ResolvedResourceLabelFilter,
     ) -> Result<Vec<R::ResourceState>, internal_error::InternalError> {
         self.typed_resource_query_service
-            .list_states(account_id, pagination)
+            .list_states(account_id, pagination, label_filter)
             .await
     }
 }
@@ -62,6 +64,7 @@ macro_rules! declare_list_resources_by_type_use_case {
                 &self,
                 account_id: odf::AccountID,
                 pagination: database_common::PaginationOpts,
+                label_filter: kamu_resources::ResolvedResourceLabelFilter,
             ) -> Result<
                 Vec<<$resource as kamu_resources::DeclarativeResource>::ResourceState>,
                 internal_error::InternalError,
@@ -70,7 +73,7 @@ macro_rules! declare_list_resources_by_type_use_case {
                     self.typed_resource_query_service.as_ref(),
                 );
 
-                helper.execute(account_id, pagination).await
+                helper.execute(account_id, pagination, label_filter).await
             }
         }
     };

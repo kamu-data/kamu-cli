@@ -288,9 +288,10 @@ impl From<ListResourcesError> for CLIError {
         use ListResourcesError as E;
 
         match e {
-            e @ (E::UnsupportedSelector(_) | E::BadAccount(_) | E::InvalidSearchQuery(_)) => {
-                Self::failure(e)
-            }
+            e @ (E::UnsupportedSelector(_)
+            | E::BadAccount(_)
+            | E::InvalidSearchQuery(_)
+            | E::InvalidLabelFilter(_)) => Self::failure(e),
             E::RemoteRequest(err) => Self::from(err),
             E::Internal(err) => Self::critical(err),
         }

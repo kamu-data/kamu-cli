@@ -8,10 +8,12 @@
 // by the Apache License, Version 2.0.
 
 use database_common::PaginationOpts;
+use kamu_resources::RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI;
 use kamu_resources_facade::{
     ListResourceHandlesRequest,
     ListResourcesError,
     ListResourcesRequest,
+    ResourceLabelFilterProblemCode,
     SearchResourceHandlesRequest,
 };
 use pretty_assertions::{assert_eq, assert_matches};
@@ -24,6 +26,8 @@ use crate::helpers::{
     VARIABLE_SET_CANONICAL_SELECTOR,
     VARIABLE_SET_SCHEMA_STR,
     apply_manifest_and_get_id,
+    create_variable_set_with_labels,
+    label_filter,
     normalize_handles,
     normalize_summary_views,
     secret_set_manifest_json,
@@ -63,6 +67,7 @@ pub async fn test_list_summaries_for_account(h: &impl FacadeContractHarness) {
             raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             account: None, // default = alice
             pagination: PaginationOpts::from_max_results(1000),
+            label_filter: None,
         })
         .await
         .unwrap();
@@ -154,6 +159,7 @@ pub async fn test_list_supports_pagination_limit(h: &impl FacadeContractHarness)
             raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             account: None,
             pagination: PaginationOpts::from_page(0, 2),
+            label_filter: None,
         })
         .await
         .unwrap();
@@ -185,6 +191,7 @@ pub async fn test_list_supports_pagination_offset(h: &impl FacadeContractHarness
             raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             account: None,
             pagination: PaginationOpts::from_page(0, 2),
+            label_filter: None,
         })
         .await
         .unwrap();
@@ -193,6 +200,7 @@ pub async fn test_list_supports_pagination_offset(h: &impl FacadeContractHarness
             raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             account: None,
             pagination: PaginationOpts::from_page(1, 2),
+            label_filter: None,
         })
         .await
         .unwrap();
@@ -227,6 +235,7 @@ pub async fn test_list_handles_pagination_mirrors_list(h: &impl FacadeContractHa
             raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             account: None,
             pagination: PaginationOpts::from_page(1, 2),
+            label_filter: None,
         })
         .await
         .unwrap();
@@ -265,6 +274,7 @@ pub async fn test_list_empty_account_returns_empty(h: &impl FacadeContractHarnes
             raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
+            label_filter: None,
         })
         .await
         .unwrap();
@@ -298,6 +308,7 @@ pub async fn test_list_unsupported_kind_returns_error(h: &impl FacadeContractHar
             raw_type_selector: unsupported_selector.parse().unwrap(),
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
+            label_filter: None,
         })
         .await;
     let handles = facade
@@ -582,6 +593,214 @@ pub async fn test_search_account_scoping(h: &impl FacadeContractHarness) {
     assert_eq!(
         sorted_handle_names(bob_response.items),
         vec!["search-scope-bob", "search-scope-shared"]
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// The cases below exercise Phase-7 filter *resolution* at the local facade
+// boundary only: repository-level matching lands in Phase 9, and the remote
+// (GraphQL) transport for `label_filter` lands in Phase 10 — until then the
+// remote client silently drops the filter, so these are local-only.
+
+// RF-097
+#[test_log::test(tokio::test)]
+async fn list_filter_by_canonical_label_uri_is_accepted() {
+    let h = crate::harness::LocalFacadeHarness::new().await;
+    create_variable_set_with_labels(
+        &h,
+        TestAccount::Alice,
+        "list-filter-prod",
+        &[(RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI, "prod".into())],
+    )
+    .await;
+
+    let facade = h.facade_for(TestAccount::Alice);
+
+    let result = facade
+        .list(ListResourcesRequest {
+            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            account: None,
+            pagination: PaginationOpts::from_max_results(1000),
+            label_filter: Some(label_filter(&[(
+                RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI,
+                "prod",
+            )])),
+        })
+        .await;
+
+    assert_matches!(result, Ok(_));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-098
+#[test_log::test(tokio::test)]
+async fn list_filter_by_short_label_name_is_accepted() {
+    let h = crate::harness::LocalFacadeHarness::new().await;
+    create_variable_set_with_labels(
+        &h,
+        TestAccount::Alice,
+        "list-filter-short-prod",
+        &[(RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI, "prod".into())],
+    )
+    .await;
+
+    let facade = h.facade_for(TestAccount::Alice);
+
+    // Short name resolves to the same canonical URI as the fully-qualified key,
+    // so it must be accepted just like the URI form.
+    let result = facade
+        .list(ListResourcesRequest {
+            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            account: None,
+            pagination: PaginationOpts::from_max_results(1000),
+            label_filter: Some(label_filter(&[("environment", "prod")])),
+        })
+        .await;
+
+    assert_matches!(result, Ok(_));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-099
+#[test_log::test(tokio::test)]
+async fn list_filter_by_free_form_label_is_accepted() {
+    let h = crate::harness::LocalFacadeHarness::new().await;
+    create_variable_set_with_labels(
+        &h,
+        TestAccount::Alice,
+        "list-filter-freeform-a",
+        &[("team", "data".into())],
+    )
+    .await;
+
+    let facade = h.facade_for(TestAccount::Alice);
+
+    // `team` has no registered schema, so it stays free-form and queryable.
+    let result = facade
+        .list(ListResourcesRequest {
+            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            account: None,
+            pagination: PaginationOpts::from_max_results(1000),
+            label_filter: Some(label_filter(&[("team", "data")])),
+        })
+        .await;
+
+    assert_matches!(result, Ok(_));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-099A
+#[test_log::test(tokio::test)]
+async fn list_filter_invalid_key_is_rejected() {
+    let h = crate::harness::LocalFacadeHarness::new().await;
+    let facade = h.facade_for(TestAccount::Alice);
+
+    // `=` is not a valid TypeName/TypeUri character, so this key fails
+    // `TypeRef::from_str` before any resolver lookup happens.
+    let result = facade
+        .list(ListResourcesRequest {
+            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            account: None,
+            pagination: PaginationOpts::from_max_results(1000),
+            label_filter: Some(label_filter(&[("not a valid key=", "x")])),
+        })
+        .await;
+
+    let Err(ListResourcesError::InvalidLabelFilter(err)) = result else {
+        panic!("expected InvalidLabelFilter, got {result:?}");
+    };
+    assert_eq!(err.code, ResourceLabelFilterProblemCode::InvalidKey);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-099B
+#[test_log::test(tokio::test)]
+async fn list_filter_unknown_uri_is_rejected() {
+    let h = crate::harness::LocalFacadeHarness::new().await;
+    let facade = h.facade_for(TestAccount::Alice);
+
+    let result = facade
+        .list(ListResourcesRequest {
+            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            account: None,
+            pagination: PaginationOpts::from_max_results(1000),
+            label_filter: Some(label_filter(&[(
+                "https://kamu.dev/schemas/resource/v1alpha1/labels/DoesNotExist",
+                "x",
+            )])),
+        })
+        .await;
+
+    let Err(ListResourcesError::InvalidLabelFilter(err)) = result else {
+        panic!("expected InvalidLabelFilter, got {result:?}");
+    };
+    assert_eq!(
+        err.code,
+        ResourceLabelFilterProblemCode::ResourceExtensionSchema
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-099C
+#[test_log::test(tokio::test)]
+async fn list_filter_non_string_value_is_rejected() {
+    let h = crate::harness::LocalFacadeHarness::new().await;
+    let facade = h.facade_for(TestAccount::Alice);
+
+    let result = facade
+        .list(ListResourcesRequest {
+            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            account: None,
+            pagination: PaginationOpts::from_max_results(1000),
+            label_filter: Some(kamu_resources::ResourceLabelFilterInput {
+                entries: std::collections::BTreeMap::from([(
+                    "environment".to_string(),
+                    serde_json::json!({"not": "a string"}),
+                )]),
+            }),
+        })
+        .await;
+
+    let Err(ListResourcesError::InvalidLabelFilter(err)) = result else {
+        panic!("expected InvalidLabelFilter, got {result:?}");
+    };
+    assert_eq!(err.code, ResourceLabelFilterProblemCode::NonStringValue);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-099D
+#[test_log::test(tokio::test)]
+async fn list_filter_duplicate_after_canonicalization_is_rejected() {
+    let h = crate::harness::LocalFacadeHarness::new().await;
+    let facade = h.facade_for(TestAccount::Alice);
+
+    // Short name `environment` and its canonical URI both resolve to the same
+    // canonical key, so authoring both in one filter is a duplicate.
+    let result = facade
+        .list(ListResourcesRequest {
+            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            account: None,
+            pagination: PaginationOpts::from_max_results(1000),
+            label_filter: Some(label_filter(&[
+                ("environment", "prod"),
+                (RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI, "prod"),
+            ])),
+        })
+        .await;
+
+    let Err(ListResourcesError::InvalidLabelFilter(err)) = result else {
+        panic!("expected InvalidLabelFilter, got {result:?}");
+    };
+    assert_eq!(
+        err.code,
+        ResourceLabelFilterProblemCode::DuplicateAfterCanonicalization
     );
 }
 

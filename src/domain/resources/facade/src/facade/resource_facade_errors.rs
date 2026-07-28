@@ -20,6 +20,7 @@ use kamu_resources::{
     ResourceIDNotFoundError,
     ResourceInvalidSpecError,
     ResourceNameNotFoundError,
+    TypeRef,
     TypeUri,
     UnsupportedResourceDescriptorError,
     UnsupportedResourceSelectorError,
@@ -71,6 +72,54 @@ impl From<ResourceExtensionResolutionError> for ResourceInvalidHeadersError {
     fn from(err: ResourceExtensionResolutionError) -> Self {
         Self {
             code: ResourceHeadersValidationProblemCode::ResourceExtensionSchema,
+            message: err.to_string(),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum ResourceLabelFilterProblemCode {
+    InvalidKey,
+    ResourceExtensionSchema,
+    NonStringValue,
+    DuplicateAfterCanonicalization,
+}
+
+#[derive(Debug, Error)]
+#[error("{message}")]
+pub struct ResourceInvalidLabelFilterError {
+    pub code: ResourceLabelFilterProblemCode,
+    pub message: String,
+}
+
+impl ResourceInvalidLabelFilterError {
+    pub fn invalid_key(key: &str, reason: impl std::fmt::Display) -> Self {
+        Self {
+            code: ResourceLabelFilterProblemCode::InvalidKey,
+            message: format!("invalid label filter key '{key}': {reason}"),
+        }
+    }
+
+    pub fn non_string_value(key: &TypeRef) -> Self {
+        Self {
+            code: ResourceLabelFilterProblemCode::NonStringValue,
+            message: format!("non-string label filter values are not supported yet (key '{key}')"),
+        }
+    }
+}
+
+impl From<ResourceExtensionResolutionError> for ResourceInvalidLabelFilterError {
+    fn from(err: ResourceExtensionResolutionError) -> Self {
+        let code = match &err {
+            ResourceExtensionResolutionError::DuplicateAfterCanonicalization { .. } => {
+                ResourceLabelFilterProblemCode::DuplicateAfterCanonicalization
+            }
+            _ => ResourceLabelFilterProblemCode::ResourceExtensionSchema,
+        };
+        Self {
+            code,
             message: err.to_string(),
         }
     }
@@ -206,6 +255,9 @@ pub enum ListResourcesError {
 
     #[error(transparent)]
     InvalidSearchQuery(#[from] InvalidResourceSearchQueryError),
+
+    #[error(transparent)]
+    InvalidLabelFilter(#[from] ResourceInvalidLabelFilterError),
 
     #[error(transparent)]
     RemoteRequest(#[from] GraphqlHttpRequestError),

@@ -231,6 +231,7 @@ impl Resources {
                 raw_type_selector: resource_type.into_resource_type_selector(),
                 account: account.map(AccountRefInput::into_manifest_account),
                 pagination: PaginationOpts::from_page(page, per_page),
+                label_filter: None,
             })
             .await
         {
@@ -618,6 +619,7 @@ fn map_list_resources_error(error: kamu_resources_facade::ListResourcesError) ->
         E::UnsupportedSelector(_) => GqlError::gql("Unsupported resource type selector"),
         E::BadAccount(error) => map_resolve_manifest_account_error(error),
         E::InvalidSearchQuery(error) => GqlError::gql(error.to_string()),
+        E::InvalidLabelFilter(error) => GqlError::gql(error.to_string()),
         E::RemoteRequest(error) => error.int_err().into(),
         E::Internal(error) => error.into(),
     }

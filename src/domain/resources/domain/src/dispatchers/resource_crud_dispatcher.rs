@@ -19,6 +19,7 @@ use crate::{
     ApplyResourceUseCaseError,
     DeleteResourcesError,
     GetResourceByIdError,
+    ResolvedResourceLabelFilter,
     Resource,
     ResourceHeadersInput,
     ResourceID,
@@ -33,6 +34,8 @@ use crate::{
 
 #[async_trait::async_trait]
 pub trait ResourceCrudDispatcher: Send + Sync {
+    fn schema(&self) -> &'static TypeUri;
+
     async fn plan_apply(
         &self,
         request: ResourceCrudDispatcherApplyRequest,
@@ -82,6 +85,7 @@ pub struct ResourceCrudDispatcherGetRequest {
 pub struct ResourceCrudDispatcherListRequest {
     pub account_id: odf::AccountID,
     pub pagination: PaginationOpts,
+    pub label_filter: ResolvedResourceLabelFilter,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

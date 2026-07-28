@@ -10,7 +10,7 @@
 use database_common::PaginationOpts;
 use internal_error::InternalError;
 
-use crate::DeclarativeResource;
+use crate::{DeclarativeResource, ResolvedResourceLabelFilter};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -20,6 +20,7 @@ pub trait ListResourcesByTypeUseCase<R: DeclarativeResource>: Send + Sync {
         &self,
         account_id: odf::AccountID,
         pagination: PaginationOpts,
+        label_filter: ResolvedResourceLabelFilter,
     ) -> Result<Vec<R::ResourceState>, InternalError>;
 }
 

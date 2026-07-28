@@ -73,6 +73,13 @@ Each RF scenario from the original plan is listed with its status.
 | RF-094  | list_search.rs      | Active   | Search with neither exact names nor pattern is rejected               |                                                                        |
 | RF-095  | list_search.rs      | Active   | Search pagination and total_count                                     |                                                                        |
 | RF-096  | list_search.rs      | Active   | Search account scoping                                                |                                                                        |
+| RF-097  | list_search.rs      | Active   | List filter by canonical label URI is accepted                        | Local-only: repo matching is Phase 9, remote transport is Phase 10   |
+| RF-098  | list_search.rs      | Active   | List filter by short label name is accepted                           | Local-only, same reason as RF-097                                     |
+| RF-099  | list_search.rs      | Active   | List filter by free-form label is accepted                            | Local-only, same reason as RF-097                                     |
+| RF-099A | list_search.rs      | Active   | List filter invalid key is rejected                                   | Local-only, same reason as RF-097                                     |
+| RF-099B | list_search.rs      | Active   | List filter unknown URI is rejected                                   | Local-only, same reason as RF-097                                     |
+| RF-099C | list_search.rs      | Active   | List filter non-string value is rejected                              | Local-only, same reason as RF-097                                     |
+| RF-099D | list_search.rs      | Active   | List filter duplicate-after-canonicalization is rejected              | Local-only, same reason as RF-097                                     |
 | RF-100  | list_all.rs         | Active   | list_all returns summaries across supported types                     |                                                                        |
 | RF-101  | list_all.rs         | Active   | list_all_handles returns handles across supported types         |                                                                        |
 | RF-102  | list_all.rs         | Active   | list_all pagination                                                   |                                                                        |

@@ -17,6 +17,7 @@ use futures::TryStreamExt;
 use kamu_accounts::{Account, AccountRepository, AccountType};
 use kamu_resources::{
     CreateResourceError,
+    ResolvedResourceLabelFilter,
     ResourceHeaders,
     ResourceHeadersExt,
     ResourceID,
@@ -958,11 +959,14 @@ pub async fn test_list_resource_snapshots_by_schema(catalog: &Catalog) {
         repo.create_resource(&snapshot).await.unwrap();
     }
 
+    let no_filter = ResolvedResourceLabelFilter::default();
+
     let kind_a: Vec<_> = repo
         .list_resource_snapshots_by_schema(
             account_handle.did.clone(),
             &KIND_A,
             PaginationOpts::from_max_results(100),
+            &no_filter,
         )
         .try_collect()
         .await
@@ -975,6 +979,7 @@ pub async fn test_list_resource_snapshots_by_schema(catalog: &Catalog) {
             account_handle.did.clone(),
             &KIND_B,
             PaginationOpts::from_max_results(100),
+            &no_filter,
         )
         .try_collect()
         .await
@@ -987,6 +992,7 @@ pub async fn test_list_resource_snapshots_by_schema(catalog: &Catalog) {
             account_handle.did,
             &KIND_C,
             PaginationOpts::from_max_results(100),
+            &no_filter,
         )
         .try_collect()
         .await

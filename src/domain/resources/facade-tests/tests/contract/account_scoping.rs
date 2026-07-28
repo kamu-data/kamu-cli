@@ -325,6 +325,7 @@ pub async fn test_account_name_id_mismatch_is_rejected(h: &impl FacadeContractHa
             raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
+            label_filter: None,
         })
         .await
         .unwrap();
@@ -347,6 +348,7 @@ pub async fn test_unknown_account_is_rejected(h: &impl FacadeContractHarness) {
             raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             account: Some(unknown_account_by_name()),
             pagination: PaginationOpts::from_max_results(1000),
+            label_filter: None,
         })
         .await;
     let by_id = facade

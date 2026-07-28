@@ -280,6 +280,7 @@ impl ListResourcesCommand {
                     raw_type_selector: selector_name.into(),
                     account: None,
                     pagination: PaginationOpts::from_max_results(max_results.get()),
+                    label_filter: None,
                 })
                 .await
                 .map_err(Into::into)
@@ -290,6 +291,7 @@ impl ListResourcesCommand {
                         raw_type_selector: selector_name.into(),
                         account: None,
                         pagination,
+                        label_filter: None,
                     })
                     .await
                     .map_err(Into::into)

@@ -48,6 +48,10 @@ macro_rules! declare_resource_crud_dispatcher {
             <$resource as kamu_resources::ReconcilableResource>::LifecycleError:
                 std::error::Error + Send + Sync + 'static,
         {
+            fn schema(&self) -> &'static kamu_resources::TypeUri {
+                <$resource as kamu_resources::ResourceSchemaProvider>::schema()
+            }
+
             async fn plan_apply(
                 &self,
                 request: $crate::ResourceCrudDispatcherApplyRequest,
@@ -119,7 +123,7 @@ macro_rules! declare_resource_crud_dispatcher {
             ) -> Result<Vec<kamu_resources::ResourceSummaryView>, internal_error::InternalError> {
                 let states = self
                     .list_resources_by_type_use_case
-                    .execute(request.account_id, request.pagination)
+                    .execute(request.account_id, request.pagination, request.label_filter)
                     .await?;
 
                 Ok(states

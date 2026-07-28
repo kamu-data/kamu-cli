@@ -10,7 +10,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use internal_error::InternalError;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_resources::*;
 use kamu_resources_services::{
     ResourceExtensionSchemaResolver,
@@ -255,10 +255,19 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             &request.raw_type_selector,
         )?;
 
+        let resource_schema = ResourceSchemaId::try_from(dispatcher.schema()).int_err()?;
+
+        let label_filter = resolve_label_filter(
+            &self.resource_extension_schema_resolver,
+            request.label_filter,
+            &resource_schema,
+        )?;
+
         dispatcher
             .list(ResourceCrudDispatcherListRequest {
                 account_id: target_account.did,
                 pagination: request.pagination,
+                label_filter,
             })
             .await
             .map_err(Into::into)

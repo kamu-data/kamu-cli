@@ -15,6 +15,7 @@ use domain::{
     ResourceAccountRef,
     ResourceHandle,
     ResourceID,
+    ResourceLabelFilterInput,
     ResourceName,
     ResourceSummaryView,
     ResourceTypeDescriptor,
@@ -254,6 +255,7 @@ pub struct ListResourcesRequest {
     pub raw_type_selector: ResourceTypeSelectorRaw,
     pub account: Option<ResourceAccountRef>,
     pub pagination: PaginationOpts,
+    pub label_filter: Option<ResourceLabelFilterInput>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

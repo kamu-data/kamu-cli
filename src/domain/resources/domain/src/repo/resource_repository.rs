@@ -14,6 +14,7 @@ use internal_error::InternalError;
 use thiserror::Error;
 
 use crate::{
+    ResolvedResourceLabelFilter,
     ResourceID,
     ResourceIDStream,
     ResourceName,
@@ -127,6 +128,7 @@ pub trait ResourceRepository: Send + Sync {
         account_id: odf::AccountID,
         schema: &TypeUri,
         pagination: PaginationOpts,
+        label_filter: &ResolvedResourceLabelFilter,
     ) -> ResourceSnapshotStream<'_>;
 
     fn list_all_resource_snapshots(

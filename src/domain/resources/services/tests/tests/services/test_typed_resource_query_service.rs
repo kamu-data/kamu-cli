@@ -15,6 +15,7 @@ use dill::CatalogBuilder;
 use kamu_resources::{
     ApplyResourceUseCase,
     DeclarativeResourceState,
+    ResolvedResourceLabelFilter,
     ResourceHeaders,
     ResourceHeadersExt,
     ResourceID,
@@ -144,6 +145,7 @@ async fn test_list_states_filters_by_account() {
         .list_states(
             account_handle_a.did,
             PaginationOpts::from_max_results(usize::MAX),
+            ResolvedResourceLabelFilter::default(),
         )
         .await
         .unwrap();
@@ -155,6 +157,7 @@ async fn test_list_states_filters_by_account() {
         .list_states(
             account_handle_b.did,
             PaginationOpts::from_max_results(usize::MAX),
+            ResolvedResourceLabelFilter::default(),
         )
         .await
         .unwrap();
