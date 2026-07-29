@@ -36,3 +36,45 @@ impl ResolvedResourceLabelFilter {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A parsed (not yet resolved) label filter expression, mirroring the shape
+/// the ODF `LabelFilter` JSON Schema anticipates: plain keys are equality
+/// leaves, implicitly `ANDed` at the top level; `$not`/`$or` are reserved
+/// combinator keys for future boolean expressions.
+///
+/// Only [`ResourceLabelFilterExpr::Eq`] is evaluated today —
+/// [`ResourceLabelFilterExpr::Not`]/[`ResourceLabelFilterExpr::Or`] parse
+/// successfully (so their shape is recognized rather than misclassified as an
+/// invalid key or an unsupported value) but the resolver rejects them as
+/// not-yet-supported before any resolution is attempted.
+///
+/// Parsed from raw entries by
+/// [`ResourceLabelFilterExprParser`](crate::ResourceLabelFilterExprParser).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ResourceLabelFilterExpr {
+    Eq {
+        key: String,
+        value: serde_json::Value,
+    },
+    /// Negates the conjunction of the nested entries — `{"$not": {"a": "x",
+    /// "b": "y"}}` negates `a=x AND b=y`, and the nested object may itself
+    /// contain `$not`/`$or`, same as any other filter object.
+    Not(Vec<ResourceLabelFilterExpr>),
+    Or(Vec<ResourceLabelFilterExpr>),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
+pub enum ResourceLabelFilterExprParseError {
+    #[error("'$not' must be an object, got: {0}")]
+    NotExpectsObject(String),
+
+    #[error("'$or' must be an array of objects, got: {0}")]
+    OrExpectsArrayOfObjects(String),
+
+    #[error("unknown filter operator key '{0}'")]
+    UnknownOperator(String),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -887,17 +887,19 @@ the normal per-item `data` is unavailable (see `GqlError::gql_extended` /
 on demand by the CLI for remote contexts — see [§12](#12-cli).)
 
 **Label filtering on `list`.** `ListResourcesRequest` carries an optional
-`label_filter: Option<odf::metadata::resource::LabelFilter>` (raw `String`-keyed
-entries). It is supported **only** on the single-type `list` path — `list_handles`,
-`search_handles`, `list_all`, and `list_all_handles` have no filter field, since
-filtering a multi-schema query is not representable without per-type alias
-resolution. `LocalResourceFacadeImpl::list` resolves the schema for the selector,
-then resolves the filter through the same `ResourceExtensionSchemaResolver` used by
-manifest apply (`ResourceExtensionKind::Label`), producing a domain-level
-`ResolvedResourceLabelFilter { entries: Vec<{ key: TypeRef, value: String }> }` —
-every key canonical (URI or free-form), every value a plain string. Resolution
-happens strictly before dispatch: a raw filter key that fails `TypeRef::from_str`,
-resolves to a non-label schema, resolves to an inapplicable/unknown URI, carries a
+`label_filter: Option<ResourceLabelFilterInput>` (`ResourceLabelFilterInput` is a
+`kamu_resources` type alias to `odf::metadata::resource::LabelFilter`, raw
+`String`-keyed entries). It is supported **only** on the single-type `list` path —
+`list_handles`, `search_handles`, `list_all`, and `list_all_handles` have no filter
+field, since filtering a multi-schema query is not representable without per-type
+alias resolution. `LocalResourceFacadeImpl::list` resolves the schema via
+`dispatcher.schema()`, then resolves the filter through the same
+`ResourceExtensionSchemaResolver` used by manifest apply
+(`ResourceExtensionKind::Label`), producing a domain-level
+`ResolvedResourceLabelFilter { entries: Vec<(TypeRef, String)> }` — every key
+canonical (URI or free-form), every value a plain string. Resolution happens
+strictly before dispatch: a raw filter key that fails `TypeRef::from_str`, resolves
+to a non-label schema, resolves to an inapplicable/unknown URI, carries a
 non-string value, or collides with another key after canonicalization is rejected
 as `ResourceInvalidLabelFilterError` (`ListResourcesError::InvalidLabelFilter`)
 before any repository access. The resolved filter is threaded unchanged through
@@ -909,6 +911,18 @@ parameter but do not yet apply it (actual `resource_labels`-backed matching is a
 later phase); the GraphQL/remote transport for `label_filter` and the CLI
 `--selector` flag are likewise still unwired, so `list` currently ignores the
 filter end-to-end except for the local-facade resolution/rejection behavior above.
+
+The raw entries are first parsed by `parse_label_filter_entries` (domain,
+`values/resource_label_filter.rs`) into a `ResourceLabelFilterExpr` tree —
+`Eq { key, value }` leaves, plus reserved `$not`/`$or` combinator keys mirroring
+the shape the upstream ODF `LabelFilter` JSON Schema's own examples show
+(`{"$not": {...}}`, `{"$or": [...]}`). Only `Eq` is resolved today; a `$not`/`$or`
+node (well-formed or malformed) is rejected immediately with
+`ResourceLabelFilterProblemCode::UnsupportedExpression` — a purpose-built "not
+supported yet" code, rather than being misclassified as an invalid key or a
+non-string value. This is representational only: no repository, GraphQL, or CLI
+surface evaluates `$not`/`$or` — they exist so the wire shape is recognized ahead
+of a possible future boolean-expression phase.
 
 ---
 

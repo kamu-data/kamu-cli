@@ -10,6 +10,8 @@
 use kamu_resources::{
     ResolvedResourceLabelFilter,
     ResourceExtensionKind,
+    ResourceLabelFilterExpr,
+    ResourceLabelFilterExprParser,
     ResourceLabelFilterInput,
     ResourceSchemaId,
     TypeRef,
@@ -29,24 +31,25 @@ pub(crate) fn resolve_label_filter(
         return Ok(ResolvedResourceLabelFilter::default());
     };
 
-    let mut entries = Vec::with_capacity(label_filter.entries.len());
-    for (key, value) in label_filter.entries {
-        let type_ref: TypeRef = key
-            .parse()
-            .map_err(|err| ResourceInvalidLabelFilterError::invalid_key(&key, err))?;
+    let parsed = ResourceLabelFilterExprParser::parse(label_filter.entries)?;
 
-        let Some(value) = value.as_str() else {
-            return Err(ResourceInvalidLabelFilterError::non_string_value(&type_ref));
-        };
-
-        let resolution = resolver.resolve_key(
-            ResourceExtensionKind::Label,
-            &type_ref,
-            &serde_json::Value::String(value.to_owned()),
-            resource_schema,
-        )?;
-
-        entries.push((resolution.canonical_key, value.to_owned()));
+    let mut entries = Vec::with_capacity(parsed.len());
+    for expr in parsed {
+        match expr {
+            ResourceLabelFilterExpr::Eq { key, value } => {
+                entries.push(resolve_eq_entry(resolver, &key, &value, resource_schema)?);
+            }
+            ResourceLabelFilterExpr::Not(_) => {
+                return Err(ResourceInvalidLabelFilterError::unsupported_expression(
+                    "'$not' is not supported yet",
+                ));
+            }
+            ResourceLabelFilterExpr::Or(_) => {
+                return Err(ResourceInvalidLabelFilterError::unsupported_expression(
+                    "'$or' is not supported yet",
+                ));
+            }
+        }
     }
 
     entries.sort_by(|a, b| a.0.cmp(&b.0));
@@ -63,6 +66,32 @@ pub(crate) fn resolve_label_filter(
     }
 
     Ok(ResolvedResourceLabelFilter { entries })
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn resolve_eq_entry(
+    resolver: &ResourceExtensionSchemaResolver,
+    key: &str,
+    value: &serde_json::Value,
+    resource_schema: &ResourceSchemaId,
+) -> Result<(TypeRef, String), ResourceInvalidLabelFilterError> {
+    let type_ref: TypeRef = key
+        .parse()
+        .map_err(|err| ResourceInvalidLabelFilterError::invalid_key(key, err))?;
+
+    let Some(value) = value.as_str() else {
+        return Err(ResourceInvalidLabelFilterError::non_string_value(&type_ref));
+    };
+
+    let resolution = resolver.resolve_key(
+        ResourceExtensionKind::Label,
+        &type_ref,
+        &serde_json::Value::String(value.to_owned()),
+        resource_schema,
+    )?;
+
+    Ok((resolution.canonical_key, value.to_owned()))
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -805,3 +805,103 @@ async fn list_filter_duplicate_after_canonicalization_is_rejected() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-099E
+#[test_log::test(tokio::test)]
+async fn list_filter_not_operator_is_rejected() {
+    let h = crate::harness::LocalFacadeHarness::new().await;
+    let facade = h.facade_for(TestAccount::Alice);
+
+    // `$not` is recognized as a reserved combinator key (per the ODF
+    // `LabelFilter` schema's examples) but boolean-expression evaluation is
+    // not implemented yet, so it must be rejected with a purpose-built code —
+    // not misclassified as an invalid key or a non-string value.
+    let result = facade
+        .list(ListResourcesRequest {
+            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            account: None,
+            pagination: PaginationOpts::from_max_results(1000),
+            label_filter: Some(kamu_resources::ResourceLabelFilterInput {
+                entries: std::collections::BTreeMap::from([(
+                    "$not".to_string(),
+                    serde_json::json!({"environment": "prod"}),
+                )]),
+            }),
+        })
+        .await;
+
+    let Err(ListResourcesError::InvalidLabelFilter(err)) = result else {
+        panic!("expected InvalidLabelFilter, got {result:?}");
+    };
+    assert_eq!(
+        err.code,
+        ResourceLabelFilterProblemCode::UnsupportedExpression
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-099F
+#[test_log::test(tokio::test)]
+async fn list_filter_or_operator_is_rejected() {
+    let h = crate::harness::LocalFacadeHarness::new().await;
+    let facade = h.facade_for(TestAccount::Alice);
+
+    let result = facade
+        .list(ListResourcesRequest {
+            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            account: None,
+            pagination: PaginationOpts::from_max_results(1000),
+            label_filter: Some(kamu_resources::ResourceLabelFilterInput {
+                entries: std::collections::BTreeMap::from([(
+                    "$or".to_string(),
+                    serde_json::json!([{"environment": "prod"}, {"environment": "staging"}]),
+                )]),
+            }),
+        })
+        .await;
+
+    let Err(ListResourcesError::InvalidLabelFilter(err)) = result else {
+        panic!("expected InvalidLabelFilter, got {result:?}");
+    };
+    assert_eq!(
+        err.code,
+        ResourceLabelFilterProblemCode::UnsupportedExpression
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-099G
+#[test_log::test(tokio::test)]
+async fn list_filter_malformed_not_operator_is_rejected() {
+    let h = crate::harness::LocalFacadeHarness::new().await;
+    let facade = h.facade_for(TestAccount::Alice);
+
+    // A malformed `$not` (wrong value shape) is a parse failure, not a
+    // resolver failure, but it shares the same "not supported yet" code as a
+    // well-formed `$not` — both mean "this filter syntax isn't usable yet."
+    let result = facade
+        .list(ListResourcesRequest {
+            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            account: None,
+            pagination: PaginationOpts::from_max_results(1000),
+            label_filter: Some(kamu_resources::ResourceLabelFilterInput {
+                entries: std::collections::BTreeMap::from([(
+                    "$not".to_string(),
+                    serde_json::json!("not-an-object"),
+                )]),
+            }),
+        })
+        .await;
+
+    let Err(ListResourcesError::InvalidLabelFilter(err)) = result else {
+        panic!("expected InvalidLabelFilter, got {result:?}");
+    };
+    assert_eq!(
+        err.code,
+        ResourceLabelFilterProblemCode::UnsupportedExpression
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

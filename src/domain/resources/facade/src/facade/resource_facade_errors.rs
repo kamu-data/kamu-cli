@@ -19,6 +19,7 @@ use kamu_resources::{
     ResourceID,
     ResourceIDNotFoundError,
     ResourceInvalidSpecError,
+    ResourceLabelFilterExprParseError,
     ResourceNameNotFoundError,
     TypeRef,
     TypeUri,
@@ -85,6 +86,7 @@ pub enum ResourceLabelFilterProblemCode {
     ResourceExtensionSchema,
     NonStringValue,
     DuplicateAfterCanonicalization,
+    UnsupportedExpression,
 }
 
 #[derive(Debug, Error)]
@@ -108,6 +110,13 @@ impl ResourceInvalidLabelFilterError {
             message: format!("non-string label filter values are not supported yet (key '{key}')"),
         }
     }
+
+    pub fn unsupported_expression(reason: impl std::fmt::Display) -> Self {
+        Self {
+            code: ResourceLabelFilterProblemCode::UnsupportedExpression,
+            message: format!("label filter expression is not supported yet: {reason}"),
+        }
+    }
 }
 
 impl From<ResourceExtensionResolutionError> for ResourceInvalidLabelFilterError {
@@ -122,6 +131,12 @@ impl From<ResourceExtensionResolutionError> for ResourceInvalidLabelFilterError 
             code,
             message: err.to_string(),
         }
+    }
+}
+
+impl From<ResourceLabelFilterExprParseError> for ResourceInvalidLabelFilterError {
+    fn from(err: ResourceLabelFilterExprParseError) -> Self {
+        Self::unsupported_expression(err)
     }
 }
 

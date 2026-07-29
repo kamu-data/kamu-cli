@@ -80,6 +80,9 @@ Each RF scenario from the original plan is listed with its status.
 | RF-099B | list_search.rs      | Active   | List filter unknown URI is rejected                                   | Local-only, same reason as RF-097                                     |
 | RF-099C | list_search.rs      | Active   | List filter non-string value is rejected                              | Local-only, same reason as RF-097                                     |
 | RF-099D | list_search.rs      | Active   | List filter duplicate-after-canonicalization is rejected              | Local-only, same reason as RF-097                                     |
+| RF-099E | list_search.rs      | Active   | List filter `$not` operator is rejected                               | Recognized (ODF `LabelFilter` schema shape) but not evaluated yet     |
+| RF-099F | list_search.rs      | Active   | List filter `$or` operator is rejected                                | Recognized but not evaluated yet, same reason as RF-099E              |
+| RF-099G | list_search.rs      | Active   | List filter malformed `$not` operator is rejected                     | Parse failure shares the same code as a well-formed but unevaluated `$not` |
 | RF-100  | list_all.rs         | Active   | list_all returns summaries across supported types                     |                                                                        |
 | RF-101  | list_all.rs         | Active   | list_all_handles returns handles across supported types         |                                                                        |
 | RF-102  | list_all.rs         | Active   | list_all pagination                                                   |                                                                        |
