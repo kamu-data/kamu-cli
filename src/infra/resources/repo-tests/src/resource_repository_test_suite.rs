@@ -46,7 +46,7 @@ static KIND_C: LazyLock<TypeUri> = LazyLock::new(|| TypeUri::new_unchecked("Kind
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn make_test_snapshot(
+pub(crate) fn make_test_snapshot(
     account: &odf::AccountHandle,
     schema: &TypeUri,
     name: &str,

@@ -10,8 +10,10 @@
 // Re-exports
 pub use kamu_resources as domain;
 
+mod sqlite_resource_label_projection_repository;
 mod sqlite_resource_raw_event_store;
 mod sqlite_resource_repository;
 
+pub use sqlite_resource_label_projection_repository::*;
 pub use sqlite_resource_raw_event_store::*;
 pub use sqlite_resource_repository::*;

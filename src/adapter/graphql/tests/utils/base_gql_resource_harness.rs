@@ -27,7 +27,11 @@ use kamu_resources::{
     ResourceSnapshot,
     TypeUri,
 };
-use kamu_resources_inmem::{InMemoryRawResourceEventStore, InMemoryResourceRepository};
+use kamu_resources_inmem::{
+    InMemoryRawResourceEventStore,
+    InMemoryResourceLabelProjectionRepository,
+    InMemoryResourceRepository,
+};
 use messaging_outbox::{OutboxProvider, register_message_dispatcher};
 
 use crate::utils::BaseGQLDatasetHarness;
@@ -52,6 +56,7 @@ impl BaseGQLResourceHarness {
         let mut b = dill::CatalogBuilder::new_chained(base_catalog);
 
         b.add::<InMemoryResourceRepository>()
+            .add::<InMemoryResourceLabelProjectionRepository>()
             .add::<InMemoryRawResourceEventStore>()
             .add::<InMemoryDatasetVariableSetBindingRepository>()
             .add::<InMemoryDatasetSecretSetBindingRepository>()

@@ -912,8 +912,9 @@ later phase); the GraphQL/remote transport for `label_filter` and the CLI
 `--selector` flag are likewise still unwired, so `list` currently ignores the
 filter end-to-end except for the local-facade resolution/rejection behavior above.
 
-The raw entries are first parsed by `parse_label_filter_entries` (domain,
-`values/resource_label_filter.rs`) into a `ResourceLabelFilterExpr` tree —
+The raw entries are first parsed by `ResourceLabelFilterExprParser::parse`
+(domain, `values/resource_label_filter_parser.rs`, separate from the model types
+in `values/resource_label_filter.rs`) into a `ResourceLabelFilterExpr` tree —
 `Eq { key, value }` leaves, plus reserved `$not`/`$or` combinator keys mirroring
 the shape the upstream ODF `LabelFilter` JSON Schema's own examples show
 (`{"$not": {...}}`, `{"$or": [...]}`). Only `Eq` is resolved today; a `$not`/`$or`
@@ -923,6 +924,47 @@ supported yet" code, rather than being misclassified as an invalid key or a
 non-string value. This is representational only: no repository, GraphQL, or CLI
 surface evaluates `$not`/`$or` — they exist so the wire shape is recognized ahead
 of a possible future boolean-expression phase.
+
+**`resource_labels_projection` index.** A normalized Postgres/SQLite table
+(`resource_id, label_key, label_value`, `PK(resource_id, label_key)`, `FK →
+resources ON DELETE CASCADE`, covering index on `(label_key, label_value,
+resource_id)`) mirroring the top-level **string-valued** entries of
+`resources.labels` — non-string values (numbers, objects, arrays, booleans, null)
+are not indexed. The `_projection` suffix signals it carries no independent
+state of its own — every row is derived from `resources.labels`.
+
+It is maintained by a dedicated sibling trait, `ResourceLabelProjectionRepository`
+(`domain/src/repo/resource_label_projection_repository.rs`:
+`replace_entries(resource_id, &[(String,String)])` /
+`find_entries(resource_id)`), **not** inline inside `ResourceRepository`'s
+`create_resource`/`update_resource(s)`. It is invoked from
+`ResourcePersistenceServiceHelper::sync_snapshots` — the single choke point behind
+`create`/`save`/`delete(_many)` — immediately after
+`resource_repository.update_resources(...)` succeeds, with both repositories
+resolved from the same transactional DI scope so the snapshot write and the
+projection write commit or roll back together. This keeps `ResourceRepository`
+scoped to `resources`/`resource_events` and gives the projection's read side room
+to grow into real filtered queries (Phase 9) without touching `ResourceRepository`'s
+surface. Implemented per backend (`Postgres…`/`Sqlite…`/`InMemoryResourceLabelProjectionRepository`,
+registered alongside `ResourceRepository` at every composition root and test
+harness); Postgres's `replace_entries` insert uses a compile-time checked static
+query via `UNNEST($2::text[], $3::text[])` over paired key/value arrays rather than
+a dynamic `QueryBuilder`. Resources are only ever soft-deleted in practice, so
+`ON DELETE CASCADE` exists for maintenance safety but has no dedicated test (same
+as other cascade FKs in this codebase).
+
+**Rebuilding projections — known gap.** If `resource_labels_projection` ever drifts
+from `resources.labels` (manual DB surgery, a bug, a skipped migration step), there
+is **no rebuild tooling** — no admin command, no maintenance job, nothing. In
+principle a rebuild only needs a single-table scan (`SELECT resource_id, labels
+FROM resources` → re-derive string entries → `replace_entries`), since
+`resources.labels` is already the trusted materialized value; no `resource_events`
+replay is required for *this* projection. This gap isn't unique to this table: no
+projection anywhere in the resources framework has rebuild tooling today, including
+`resources` itself relative to `resource_events` (which *would* need event replay,
+a materially bigger problem). Building either is out of scope for this feature —
+flagged here as a pre-existing operational gap for a future theme, not something
+introduced by label filtering.
 
 ---
 

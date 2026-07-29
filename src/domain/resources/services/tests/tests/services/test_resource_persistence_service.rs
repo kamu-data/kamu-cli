@@ -17,6 +17,7 @@ use kamu_resources::{
     ReconcilableResource,
     ResourceAggregateLoader,
     ResourceID,
+    ResourceLabelProjectionRepository,
     ResourcePersistenceError,
     ResourcePersistenceService,
     ResourceRawEventQuery,
@@ -58,6 +59,81 @@ async fn test_create_resource_persists_snapshot_and_events() {
         "snapshot must record last event id"
     );
     assert_eq!(snapshot.last_event_id, loaded.last_stored_event_id());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_create_resource_populates_label_projection() {
+    let harness = ResourcePersistenceServiceHarness::new();
+
+    let headers = kamu_resources::ResourceHeadersInputExt::try_new(
+        Some(odf::metadata::auth::AccountRef {
+            id: Some(harness.account_handle.id),
+            did: Some(harness.account_handle.did.clone()),
+            name: Some(harness.account_handle.name.clone()),
+        }),
+        "res-a",
+        vec![
+            ("env".parse().unwrap(), serde_json::json!("prod")),
+            // Structured values are not indexed.
+            (
+                "coordinates".parse().unwrap(),
+                serde_json::json!({"lat": 1}),
+            ),
+        ],
+        vec![],
+    )
+    .unwrap();
+
+    let id = kamu_resources::ResourceID::new(uuid::Uuid::new_v4());
+    let mut agg = crate::tests::utils::TestResource::try_create(
+        Utc::now(),
+        id,
+        headers,
+        TestResourceSpec {
+            value: "res-a".to_string(),
+        },
+    )
+    .unwrap();
+
+    harness.persistence_svc().create(&mut agg).await.unwrap();
+
+    assert_eq!(
+        harness.label_projection_entries(&id).await,
+        vec![("env".to_string(), "prod".to_string())]
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_save_resource_resyncs_label_projection() {
+    let harness = ResourcePersistenceServiceHarness::new();
+    let (id, mut agg) = make_fresh_aggregate(harness.account_handle.clone(), "res-a");
+    harness.persistence_svc().create(&mut agg).await.unwrap();
+
+    assert_eq!(harness.label_projection_entries(&id).await, vec![]);
+
+    let mut loaded = harness.aggregate_loader().load(&id).await.unwrap();
+    let new_headers = kamu_resources::ResourceHeadersInputExt::try_new(
+        Some(odf::metadata::auth::AccountRef {
+            id: Some(harness.account_handle.id),
+            did: Some(harness.account_handle.did.clone()),
+            name: Some(harness.account_handle.name.clone()),
+        }),
+        "res-a",
+        vec![("env".parse().unwrap(), serde_json::json!("staging"))],
+        vec![],
+    )
+    .unwrap();
+    loaded.try_update_headers(Utc::now(), new_headers).unwrap();
+    harness.persistence_svc().save(&mut loaded).await.unwrap();
+
+    assert_eq!(
+        harness.label_projection_entries(&id).await,
+        vec![("env".to_string(), "staging".to_string())]
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -268,6 +344,15 @@ impl ResourcePersistenceServiceHarness {
             .await
             .unwrap()
             .is_none()
+    }
+
+    async fn label_projection_entries(&self, id: &ResourceID) -> Vec<(String, String)> {
+        self.catalog
+            .get_one::<dyn ResourceLabelProjectionRepository>()
+            .unwrap()
+            .find_entries(id)
+            .await
+            .unwrap()
     }
 }
 

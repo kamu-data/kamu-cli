@@ -54,4 +54,16 @@ pub fn resource_annotations_to_json(annotations: &ResourceAnnotations) -> serde_
     serde_json::to_value(proxy).unwrap()
 }
 
+/// Extracts the top-level string-valued entries of `labels`, keyed by their
+/// canonical string form. Used to maintain the `resource_labels_projection`
+/// index — non-string values (numbers, objects, arrays, booleans, null) are
+/// not indexed and are silently excluded.
+pub fn string_label_entries(labels: &ResourceLabels) -> Vec<(String, String)> {
+    labels
+        .entries
+        .iter()
+        .filter_map(|(key, value)| Some((key.as_str().to_owned(), value.as_str()?.to_owned())))
+        .collect()
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

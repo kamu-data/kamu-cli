@@ -29,7 +29,11 @@ use kamu_resources::{
     ResourceStatus,
     TypeUri,
 };
-use kamu_resources_inmem::{InMemoryRawResourceEventStore, InMemoryResourceRepository};
+use kamu_resources_inmem::{
+    InMemoryRawResourceEventStore,
+    InMemoryResourceLabelProjectionRepository,
+    InMemoryResourceRepository,
+};
 use messaging_outbox::{MockOutbox, Outbox, OutboxProvider, register_message_dispatcher};
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
 
@@ -95,6 +99,7 @@ impl BaseResourceServiceHarness {
         }
 
         b.add::<InMemoryResourceRepository>()
+            .add::<InMemoryResourceLabelProjectionRepository>()
             .add::<InMemoryRawResourceEventStore>()
             .add::<InMemoryAccountRepository>();
 

@@ -139,6 +139,7 @@ interface "ResourceCrudDispatcher" <<i>>
 interface "ResourceExtensionSchemaDispatcher" <<i>>
 interface "ResourceFacade" <<i>>
 interface "ResourceFacadeFactory" <<i>>
+interface "ResourceLabelProjectionRepository" <<i>>
 interface "ResourceLifecycleEventDispatcher" <<i>>
 interface "ResourceLoader" <<i>>
 interface "ResourceManifestDiscoveryService" <<i>>
@@ -439,6 +440,7 @@ class "SqliteOAuthDeviceCodeRepository"
 class "SqliteOutboxMessageBridge" <<agnostic>>
 class "SqlitePlugin"
 class "SqliteRebacRepository"
+class "SqliteResourceLabelProjectionRepository"
 class "SqliteResourceRawEventStore"
 class "SqliteResourceRepository"
 class "SqliteSecretSetProjectionRepository"
@@ -909,6 +911,7 @@ class "WsSmartTransferProtocolClient"
 "SecretSetResourceLifecycleDispatcher"  --> "ReconcileResourceUseCase"
 "ResourcePersistenceService" <|-- "SecretSetResourcePersistenceServiceImpl"
 "SecretSetResourcePersistenceServiceImpl"  --> "SecretSetEventStore"
+"SecretSetResourcePersistenceServiceImpl"  --> "ResourceLabelProjectionRepository"
 "SecretSetResourcePersistenceServiceImpl"  --> "ResourceRepository"
 "SecretSetResourcePersistenceServiceImpl"  --> "ResourceExtensionSchemaRegistry"
 "TypedResourceQueryService" <|-- "SecretSetTypedResourceQueryServiceImpl"
@@ -942,6 +945,7 @@ class "WsSmartTransferProtocolClient"
 "VariableSetResourceLifecycleDispatcher"  --> "ReconcileResourceUseCase"
 "ResourcePersistenceService" <|-- "VariableSetResourcePersistenceServiceImpl"
 "VariableSetResourcePersistenceServiceImpl"  --> "VariableSetEventStore"
+"VariableSetResourcePersistenceServiceImpl"  --> "ResourceLabelProjectionRepository"
 "VariableSetResourcePersistenceServiceImpl"  --> "ResourceRepository"
 "VariableSetResourcePersistenceServiceImpl"  --> "ResourceExtensionSchemaRegistry"
 "TypedResourceQueryService" <|-- "VariableSetTypedResourceQueryServiceImpl"
@@ -1169,6 +1173,8 @@ class "WsSmartTransferProtocolClient"
 "DeleteAccountResourcesUsecaseImpl"  --> "GenericResourceQueryService"
 "ListAllResourcesUseCase" <|-- "ListAllResourcesUseCaseImpl"
 "ListAllResourcesUseCaseImpl"  --> "GenericResourceQueryService"
+"ResourceLabelProjectionRepository" <|-- "SqliteResourceLabelProjectionRepository"
+"SqliteResourceLabelProjectionRepository"  --> "TransactionRefT"
 "ResourceRawEventStore" <|-- "SqliteResourceRawEventStore"
 "SqliteResourceRawEventStore"  --> "TransactionRefT"
 "ResourceRepository" <|-- "SqliteResourceRepository"
@@ -1228,6 +1234,7 @@ class "WsSmartTransferProtocolClient"
 "ResourceLifecycleEventDispatcher" <|-- "StorageResourceLifecycleDispatcher"
 "StorageResourceLifecycleDispatcher"  --> "ReconcileResourceUseCase"
 "ResourcePersistenceService" <|-- "StorageResourcePersistenceServiceImpl"
+"StorageResourcePersistenceServiceImpl"  --> "ResourceLabelProjectionRepository"
 "StorageResourcePersistenceServiceImpl"  --> "ResourceRepository"
 "StorageResourcePersistenceServiceImpl"  --> "StorageEventStore"
 "StorageResourcePersistenceServiceImpl"  --> "ResourceExtensionSchemaRegistry"
