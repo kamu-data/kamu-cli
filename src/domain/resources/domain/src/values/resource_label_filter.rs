@@ -24,14 +24,37 @@ pub type ResourceLabelFilterInput = odf::metadata::resource::LabelFilter;
 /// names kept as free-form) and every value is a plain string equality
 /// predicate. Repositories consume this directly and never resolve aliases
 /// or validate schemas themselves.
+///
+/// Mirrors the parsed [`ResourceLabelFilterExpr`] tree rather than flattening
+/// it, so that boolean operators can grow into real evaluation without
+/// re-shaping every layer between the facade and the repositories. Only the
+/// conjunctive fragment ([`Self::True`]/[`Self::Eq`]/[`Self::And`]) is
+/// evaluated today — see
+/// [`flatten_conjunction`](crate::flatten_conjunction), the single place where
+/// that capability boundary is enforced.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ResolvedResourceLabelFilter {
-    pub entries: Vec<(TypeRef, String)>,
+pub enum ResolvedResourceLabelFilter {
+    /// Matches everything — the resolved form of "no filter at all".
+    #[default]
+    True,
+    Eq {
+        key: TypeRef,
+        value: String,
+    },
+    And(Vec<ResolvedResourceLabelFilter>),
+    Not(Box<ResolvedResourceLabelFilter>),
+    Or(Vec<ResolvedResourceLabelFilter>),
 }
 
 impl ResolvedResourceLabelFilter {
+    /// Whether this filter constrains nothing, and can therefore be skipped
+    /// entirely when building a repository query.
     pub fn is_empty(&self) -> bool {
-        self.entries.is_empty()
+        match self {
+            Self::True => true,
+            Self::And(children) | Self::Or(children) if children.is_empty() => true,
+            _ => false,
+        }
     }
 }
 
@@ -52,14 +75,21 @@ impl ResolvedResourceLabelFilter {
 /// [`ResourceLabelFilterExprParser`](crate::ResourceLabelFilterExprParser).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ResourceLabelFilterExpr {
+    /// Matches everything — an empty filter object, at any nesting level.
+    True,
     Eq {
         key: String,
         value: serde_json::Value,
     },
+    /// The implicit conjunction of a filter object's entries.
+    And(Vec<ResourceLabelFilterExpr>),
     /// Negates the conjunction of the nested entries — `{"$not": {"a": "x",
     /// "b": "y"}}` negates `a=x AND b=y`, and the nested object may itself
     /// contain `$not`/`$or`, same as any other filter object.
-    Not(Vec<ResourceLabelFilterExpr>),
+    Not(Box<ResourceLabelFilterExpr>),
+    /// Disjunction over the `$or` array's elements. Each element is a filter
+    /// object in its own right, so it becomes one branch — grouping between
+    /// branches is significant and must not be flattened away.
     Or(Vec<ResourceLabelFilterExpr>),
 }
 

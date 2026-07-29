@@ -22,14 +22,23 @@ pub struct ResourceLabelFilterExprParser;
 
 impl ResourceLabelFilterExprParser {
     /// Entries stay an implicit AND at every level (top-level and nested
-    /// under `$not`), same as the ODF `LabelFilter` schema's object shape.
+    /// under `$not`/`$or`), same as the ODF `LabelFilter` schema's object
+    /// shape. An empty object yields [`ResourceLabelFilterExpr::True`], and a
+    /// single entry is returned unwrapped rather than in a one-element
+    /// [`ResourceLabelFilterExpr::And`].
     pub fn parse(
         entries: BTreeMap<String, serde_json::Value>,
-    ) -> Result<Vec<ResourceLabelFilterExpr>, ResourceLabelFilterExprParseError> {
-        entries
+    ) -> Result<ResourceLabelFilterExpr, ResourceLabelFilterExprParseError> {
+        let mut parsed = entries
             .into_iter()
             .map(Self::parse_entry)
-            .collect::<Result<Vec<_>, _>>()
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(match parsed.len() {
+            0 => ResourceLabelFilterExpr::True,
+            1 => parsed.pop().unwrap(),
+            _ => ResourceLabelFilterExpr::And(parsed),
+        })
     }
 
     fn parse_entry(
@@ -51,7 +60,7 @@ impl ResourceLabelFilterExprParser {
         let nested = Self::parse_filter_object(value)
             .map_err(|v| ResourceLabelFilterExprParseError::NotExpectsObject(v.to_string()))?;
 
-        Ok(ResourceLabelFilterExpr::Not(nested))
+        Ok(ResourceLabelFilterExpr::Not(Box::new(nested)))
     }
 
     fn parse_or(
@@ -63,6 +72,9 @@ impl ResourceLabelFilterExprParser {
             ));
         };
 
+        // Each array element is one disjunction branch. Branches are kept as
+        // separate nodes — flattening their entries into a single list would
+        // silently turn `[{a, b}, {c}]` into `a OR b OR c`.
         let branches = items
             .iter()
             .map(|item| {
@@ -70,21 +82,17 @@ impl ResourceLabelFilterExprParser {
                     ResourceLabelFilterExprParseError::OrExpectsArrayOfObjects(v.to_string())
                 })
             })
-            .collect::<Result<Vec<_>, _>>()?
-            .into_iter()
-            .flatten()
-            .collect();
+            .collect::<Result<Vec<_>, _>>()?;
 
         Ok(ResourceLabelFilterExpr::Or(branches))
     }
 
     /// Parses a nested filter object (the value under `$not`, or one element
-    /// of the `$or` array) back into entries. Returns the original value on
-    /// error so callers can report it with their own operator-specific
-    /// message.
+    /// of the `$or` array). Returns the original value on error so callers can
+    /// report it with their own operator-specific message.
     fn parse_filter_object(
         value: &serde_json::Value,
-    ) -> Result<Vec<ResourceLabelFilterExpr>, serde_json::Value> {
+    ) -> Result<ResourceLabelFilterExpr, serde_json::Value> {
         let serde_json::Value::Object(object) = value else {
             return Err(value.clone());
         };
@@ -108,18 +116,47 @@ mod tests {
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+    fn eq(key: &str, value: &str) -> ResourceLabelFilterExpr {
+        ResourceLabelFilterExpr::Eq {
+            key: key.to_string(),
+            value: serde_json::json!(value),
+        }
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    #[test]
+    fn parses_empty_object_as_true() {
+        let parsed = ResourceLabelFilterExprParser::parse(BTreeMap::new()).unwrap();
+
+        assert_eq!(parsed, ResourceLabelFilterExpr::True);
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
     #[test]
     fn parses_plain_equality() {
         let entries = BTreeMap::from([("environment".to_string(), serde_json::json!("prod"))]);
 
         let parsed = ResourceLabelFilterExprParser::parse(entries).unwrap();
 
+        assert_eq!(parsed, eq("environment", "prod"));
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    #[test]
+    fn parses_multiple_top_level_entries_as_conjunction() {
+        let entries = BTreeMap::from([
+            ("a".to_string(), serde_json::json!("x")),
+            ("b".to_string(), serde_json::json!("y")),
+        ]);
+
+        let parsed = ResourceLabelFilterExprParser::parse(entries).unwrap();
+
         assert_eq!(
             parsed,
-            vec![ResourceLabelFilterExpr::Eq {
-                key: "environment".to_string(),
-                value: serde_json::json!("prod"),
-            }]
+            ResourceLabelFilterExpr::And(vec![eq("a", "x"), eq("b", "y")])
         );
     }
 
@@ -136,12 +173,7 @@ mod tests {
 
         assert_eq!(
             parsed,
-            vec![ResourceLabelFilterExpr::Not(vec![
-                ResourceLabelFilterExpr::Eq {
-                    key: "environment".to_string(),
-                    value: serde_json::json!("prod"),
-                }
-            ])]
+            ResourceLabelFilterExpr::Not(Box::new(eq("environment", "prod")))
         );
     }
 
@@ -154,18 +186,13 @@ mod tests {
 
         let parsed = ResourceLabelFilterExprParser::parse(entries).unwrap();
 
+        // `NOT (a=x AND b=y)`, not `(NOT a=x) AND (NOT b=y)`.
         assert_eq!(
             parsed,
-            vec![ResourceLabelFilterExpr::Not(vec![
-                ResourceLabelFilterExpr::Eq {
-                    key: "a".to_string(),
-                    value: serde_json::json!("x"),
-                },
-                ResourceLabelFilterExpr::Eq {
-                    key: "b".to_string(),
-                    value: serde_json::json!("y"),
-                },
-            ])]
+            ResourceLabelFilterExpr::Not(Box::new(ResourceLabelFilterExpr::And(vec![
+                eq("a", "x"),
+                eq("b", "y"),
+            ])))
         );
     }
 
@@ -182,12 +209,10 @@ mod tests {
 
         assert_eq!(
             parsed,
-            vec![ResourceLabelFilterExpr::Not(vec![
-                ResourceLabelFilterExpr::Not(vec![ResourceLabelFilterExpr::Eq {
-                    key: "environment".to_string(),
-                    value: serde_json::json!("prod"),
-                }])
-            ])]
+            ResourceLabelFilterExpr::Not(Box::new(ResourceLabelFilterExpr::Not(Box::new(eq(
+                "environment",
+                "prod"
+            )))))
         );
     }
 
@@ -204,16 +229,63 @@ mod tests {
 
         assert_eq!(
             parsed,
-            vec![ResourceLabelFilterExpr::Or(vec![
-                ResourceLabelFilterExpr::Eq {
-                    key: "name".to_string(),
-                    value: serde_json::json!("foo"),
-                },
-                ResourceLabelFilterExpr::Eq {
-                    key: "name".to_string(),
-                    value: serde_json::json!("bar"),
-                },
-            ])]
+            ResourceLabelFilterExpr::Or(vec![eq("name", "foo"), eq("name", "bar")])
+        );
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    #[test]
+    fn parses_or_branches_preserving_grouping() {
+        let entries = BTreeMap::from([(
+            "$or".to_string(),
+            serde_json::json!([{"a": "x", "b": "y"}, {"c": "z"}]),
+        )]);
+
+        let parsed = ResourceLabelFilterExprParser::parse(entries).unwrap();
+
+        // `(a=x AND b=y) OR c=z` — the first branch must stay one node rather
+        // than being flattened into `a=x OR b=y OR c=z`.
+        assert_eq!(
+            parsed,
+            ResourceLabelFilterExpr::Or(vec![
+                ResourceLabelFilterExpr::And(vec![eq("a", "x"), eq("b", "y")]),
+                eq("c", "z"),
+            ])
+        );
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    #[test]
+    fn parses_nested_not_inside_or_branch() {
+        let entries = BTreeMap::from([(
+            "$or".to_string(),
+            serde_json::json!([{"$not": {"a": "x"}}, {"b": "y"}]),
+        )]);
+
+        let parsed = ResourceLabelFilterExprParser::parse(entries).unwrap();
+
+        assert_eq!(
+            parsed,
+            ResourceLabelFilterExpr::Or(vec![
+                ResourceLabelFilterExpr::Not(Box::new(eq("a", "x"))),
+                eq("b", "y"),
+            ])
+        );
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    #[test]
+    fn rejects_or_given_a_non_array() {
+        let entries = BTreeMap::from([("$or".to_string(), serde_json::json!({"a": "x"}))]);
+
+        assert_matches!(
+            ResourceLabelFilterExprParser::parse(entries),
+            Err(ResourceLabelFilterExprParseError::OrExpectsArrayOfObjects(
+                _
+            ))
         );
     }
 
