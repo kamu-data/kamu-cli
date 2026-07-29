@@ -21,6 +21,7 @@ use kamu_resources::{
     ResourceHeaders,
     ResourceHeadersExt,
     ResourceID,
+    ResourceLabelProjectionRepository,
     ResourcePhase,
     ResourcePhaseCounts,
     ResourceRawEventQuery,
@@ -28,6 +29,7 @@ use kamu_resources::{
     ResourceSnapshot,
     ResourceSnapshotUpdate,
     ResourceSummaryRow,
+    TypeRef,
     TypeUri,
     UpdateResourceError,
     description_annotation_type_ref,
@@ -322,6 +324,7 @@ pub async fn test_search_resource_handles(catalog: &Catalog) {
             std::slice::from_ref(&TEST_KIND),
             None,
             Some("app-%"),
+            &ResolvedResourceLabelFilter::default(),
             PaginationOpts::from_max_results(10),
         )
         .await
@@ -336,6 +339,7 @@ pub async fn test_search_resource_handles(catalog: &Catalog) {
             std::slice::from_ref(&TEST_KIND),
             None,
             Some("APP-%"),
+            &ResolvedResourceLabelFilter::default(),
             PaginationOpts::from_max_results(10),
         )
         .await
@@ -350,6 +354,7 @@ pub async fn test_search_resource_handles(catalog: &Catalog) {
             std::slice::from_ref(&TEST_KIND),
             Some(&["app-alpha".parse().unwrap(), "db-alpha".parse().unwrap()]),
             None,
+            &ResolvedResourceLabelFilter::default(),
             PaginationOpts::from_max_results(10),
         )
         .await
@@ -365,6 +370,7 @@ pub async fn test_search_resource_handles(catalog: &Catalog) {
             std::slice::from_ref(&TEST_KIND),
             Some(&["App-Alpha".parse().unwrap(), "DB-ALPHA".parse().unwrap()]),
             None,
+            &ResolvedResourceLabelFilter::default(),
             PaginationOpts::from_max_results(10),
         )
         .await
@@ -380,6 +386,7 @@ pub async fn test_search_resource_handles(catalog: &Catalog) {
             &[TEST_KIND.clone(), OTHER_KIND.clone()],
             None,
             Some("app-%"),
+            &ResolvedResourceLabelFilter::default(),
             PaginationOpts::from_max_results(10),
         )
         .await
@@ -398,6 +405,7 @@ pub async fn test_search_resource_handles(catalog: &Catalog) {
             std::slice::from_ref(&TEST_KIND),
             None,
             None,
+            &ResolvedResourceLabelFilter::default(),
             PaginationOpts::from_max_results(10),
         )
         .await
@@ -411,6 +419,7 @@ pub async fn test_search_resource_handles(catalog: &Catalog) {
             std::slice::from_ref(&TEST_KIND),
             None,
             Some("app-other-%"),
+            &ResolvedResourceLabelFilter::default(),
             PaginationOpts::from_max_results(10),
         )
         .await
@@ -433,6 +442,7 @@ pub async fn test_count_search_resource_handles(catalog: &Catalog) {
             std::slice::from_ref(&TEST_KIND),
             None,
             Some("app-%"),
+            &ResolvedResourceLabelFilter::default(),
         )
         .await
         .unwrap();
@@ -444,6 +454,7 @@ pub async fn test_count_search_resource_handles(catalog: &Catalog) {
             std::slice::from_ref(&TEST_KIND),
             Some(&["App-Alpha".parse().unwrap(), "DB-ALPHA".parse().unwrap()]),
             None,
+            &ResolvedResourceLabelFilter::default(),
         )
         .await
         .unwrap();
@@ -455,6 +466,7 @@ pub async fn test_count_search_resource_handles(catalog: &Catalog) {
             &[TEST_KIND.clone(), OTHER_KIND.clone()],
             None,
             Some("app-%"),
+            &ResolvedResourceLabelFilter::default(),
         )
         .await
         .unwrap();
@@ -466,6 +478,7 @@ pub async fn test_count_search_resource_handles(catalog: &Catalog) {
             std::slice::from_ref(&TEST_KIND),
             None,
             Some("app-other-%"),
+            &ResolvedResourceLabelFilter::default(),
         )
         .await
         .unwrap();
@@ -477,6 +490,7 @@ pub async fn test_count_search_resource_handles(catalog: &Catalog) {
             std::slice::from_ref(&TEST_KIND),
             Some(&[]),
             None,
+            &ResolvedResourceLabelFilter::default(),
         )
         .await
         .unwrap();
@@ -544,6 +558,7 @@ pub async fn test_resource_name_case_insensitive(catalog: &Catalog) {
             std::slice::from_ref(&TEST_KIND),
             Some(&["MY-RESOURCE".parse().unwrap()]),
             None,
+            &ResolvedResourceLabelFilter::default(),
             PaginationOpts::from_max_results(10),
         )
         .await
@@ -558,12 +573,211 @@ pub async fn test_resource_name_case_insensitive(catalog: &Catalog) {
             std::slice::from_ref(&TEST_KIND),
             None,
             Some("MY-%"),
+            &ResolvedResourceLabelFilter::default(),
             PaginationOpts::from_max_results(10),
         )
         .await
         .unwrap();
     let names = rows.into_iter().map(|r| r.name).collect::<Vec<_>>();
     assert_eq!(names, vec!["my-resource"]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Seeds three resources carrying string labels, keeping the
+/// `resource_labels_projection` index in step with `resources.labels` the way
+/// the persistence service does in production — the SQL backends filter via
+/// that index, so a snapshot alone would not be matchable.
+async fn seed_label_filtered_resources(
+    repo: &dyn ResourceRepository,
+    projection_repo: &dyn ResourceLabelProjectionRepository,
+    account_handle: &odf::AccountHandle,
+) {
+    for (name, labels) in [
+        ("prod-data", vec![("environment", "prod"), ("team", "data")]),
+        (
+            "prod-infra",
+            vec![("environment", "prod"), ("team", "infra")],
+        ),
+        (
+            "staging-data",
+            vec![("environment", "staging"), ("team", "data")],
+        ),
+    ] {
+        let mut snapshot = make_test_snapshot(account_handle, &TEST_KIND, name);
+        snapshot.id = repo.new_resource_id().await.unwrap();
+        snapshot.headers.labels.entries = labels
+            .iter()
+            .map(|(k, v)| ((*k).parse().unwrap(), serde_json::json!(v)))
+            .collect();
+
+        repo.create_resource(&snapshot).await.unwrap();
+
+        let entries = labels
+            .iter()
+            .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
+            .collect::<Vec<_>>();
+        projection_repo
+            .replace_entries(&snapshot.id, &entries)
+            .await
+            .unwrap();
+    }
+}
+
+fn label_filter_of(pairs: &[(&str, &str)]) -> ResolvedResourceLabelFilter {
+    let entries = pairs
+        .iter()
+        .map(|(key, value)| ResolvedResourceLabelFilter::Eq {
+            key: TypeRef::Name((*key).parse().unwrap()),
+            value: (*value).to_string(),
+        })
+        .collect::<Vec<_>>();
+
+    ResolvedResourceLabelFilter::And(entries)
+}
+
+async fn filtered_list_names(
+    repo: &dyn ResourceRepository,
+    account_handle: &odf::AccountHandle,
+    label_filter: &ResolvedResourceLabelFilter,
+) -> Vec<String> {
+    let snapshots = repo
+        .list_resource_snapshots_by_schema(
+            account_handle.did.clone(),
+            &TEST_KIND,
+            PaginationOpts::from_max_results(10),
+            label_filter,
+        )
+        .try_collect::<Vec<_>>()
+        .await
+        .unwrap();
+
+    let mut names = snapshots
+        .into_iter()
+        .map(|s| s.headers.name.to_string())
+        .collect::<Vec<_>>();
+    names.sort();
+    names
+}
+
+pub async fn test_list_resource_snapshots_label_filtering(catalog: &Catalog) {
+    let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+    let projection_repo = catalog
+        .get_one::<dyn ResourceLabelProjectionRepository>()
+        .unwrap();
+
+    let account_handle = odf::AccountHandle::new_test("test-account");
+    seed_label_filtered_resources(repo.as_ref(), projection_repo.as_ref(), &account_handle).await;
+
+    // --- empty filter behaves exactly like no filter ---
+    let names = filtered_list_names(
+        repo.as_ref(),
+        &account_handle,
+        &ResolvedResourceLabelFilter::default(),
+    )
+    .await;
+    assert_eq!(names, vec!["prod-data", "prod-infra", "staging-data"]);
+
+    // --- single equality ---
+    let names = filtered_list_names(
+        repo.as_ref(),
+        &account_handle,
+        &label_filter_of(&[("environment", "prod")]),
+    )
+    .await;
+    assert_eq!(names, vec!["prod-data", "prod-infra"]);
+
+    // --- two independent labels are ANDed ---
+    let names = filtered_list_names(
+        repo.as_ref(),
+        &account_handle,
+        &label_filter_of(&[("environment", "prod"), ("team", "data")]),
+    )
+    .await;
+    assert_eq!(names, vec!["prod-data"]);
+
+    // --- wrong value matches nothing ---
+    let names = filtered_list_names(
+        repo.as_ref(),
+        &account_handle,
+        &label_filter_of(&[("environment", "nope")]),
+    )
+    .await;
+    assert!(names.is_empty(), "expected no matches, got {names:?}");
+
+    // --- unknown key matches nothing ---
+    let names = filtered_list_names(
+        repo.as_ref(),
+        &account_handle,
+        &label_filter_of(&[("no-such-label", "x")]),
+    )
+    .await;
+    assert!(names.is_empty(), "expected no matches, got {names:?}");
+
+    // --- matching is case-sensitive, unlike resource-name lookups ---
+    let names = filtered_list_names(
+        repo.as_ref(),
+        &account_handle,
+        &label_filter_of(&[("environment", "PROD")]),
+    )
+    .await;
+    assert!(names.is_empty(), "expected no matches, got {names:?}");
+}
+
+pub async fn test_search_resource_handles_label_filtering(catalog: &Catalog) {
+    let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+    let projection_repo = catalog
+        .get_one::<dyn ResourceLabelProjectionRepository>()
+        .unwrap();
+
+    let account_handle = odf::AccountHandle::new_test("test-account");
+    seed_label_filtered_resources(repo.as_ref(), projection_repo.as_ref(), &account_handle).await;
+
+    let filter = label_filter_of(&[("environment", "prod")]);
+
+    // --- filter narrows the identifier expansion that get/delete rely on ---
+    let rows = repo
+        .search_resource_handles(
+            &account_handle.did,
+            std::slice::from_ref(&TEST_KIND),
+            None,
+            Some("%"),
+            &filter,
+            PaginationOpts::from_max_results(10),
+        )
+        .await
+        .unwrap();
+    let mut names = rows.into_iter().map(|row| row.name).collect::<Vec<_>>();
+    names.sort();
+    assert_eq!(names, vec!["prod-data", "prod-infra"]);
+
+    // --- count agrees with the filtered page ---
+    let count = repo
+        .count_search_resource_handles(
+            &account_handle.did,
+            std::slice::from_ref(&TEST_KIND),
+            None,
+            Some("%"),
+            &filter,
+        )
+        .await
+        .unwrap();
+    assert_eq!(count, 2);
+
+    // --- filter composes with the name pattern ---
+    let rows = repo
+        .search_resource_handles(
+            &account_handle.did,
+            std::slice::from_ref(&TEST_KIND),
+            None,
+            Some("%-infra"),
+            &filter,
+            PaginationOpts::from_max_results(10),
+        )
+        .await
+        .unwrap();
+    let names = rows.into_iter().map(|row| row.name).collect::<Vec<_>>();
+    assert_eq!(names, vec!["prod-infra"]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

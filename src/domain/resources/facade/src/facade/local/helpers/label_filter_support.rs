@@ -71,6 +71,85 @@ fn ensure_executable(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Resolves the authored filter expression — the whole `LabelFilter` object,
+/// however many entries and nested operators it carries — against several
+/// candidate schemas at once, for the multi-type selectors that `get`/`delete`
+/// expand (`kamu get '%/%' -l env=prod,team=data`).
+///
+/// Returns the schemas that can still match, paired with the one resolved
+/// expression tree to apply to all of them.
+///
+/// Two behaviours are deliberate:
+///
+/// - A schema whose extension registry rejects the key is **dropped** rather
+///   than failing the whole query: a label that is inapplicable to a type just
+///   means no resource of that type can match. If every schema rejects it, the
+///   error is surfaced, since that indicates a genuinely bad filter.
+/// - The resolved filters are asserted to be **identical** across schemas. No
+///   label schema resolves differently per resource type today — built-in
+///   labels apply to every type and unregistered keys stay free-form — so the
+///   divergent case is unreachable. Supporting it would mean OR-ing per-schema
+///   predicates in every backend, which is left unimplemented rather than
+///   written blind and never exercised.
+pub(crate) fn resolve_label_filter_for_schemas(
+    resolver: &ResourceExtensionSchemaResolver,
+    label_filter: Option<ResourceLabelFilterInput>,
+    resource_schemas: &[ResourceSchemaId],
+) -> Result<(Vec<ResourceSchemaId>, ResolvedResourceLabelFilter), ResourceInvalidLabelFilterError> {
+    let Some(label_filter) = label_filter else {
+        return Ok((resource_schemas.to_vec(), ResolvedResourceLabelFilter::True));
+    };
+
+    // Parsing is schema-independent, so it happens once up front; only
+    // resolution — canonicalizing keys against a schema's extension registry —
+    // varies per schema. All authored entries become a single tree here: two
+    // labels parse to one `And([Eq, Eq])` root, not two separate filters.
+    let parsed_expr = ResourceLabelFilterExprParser::parse(label_filter.entries)?;
+
+    let mut applicable_schemas = Vec::with_capacity(resource_schemas.len());
+    let mut resolved_expr: Option<ResolvedResourceLabelFilter> = None;
+    let mut last_error = None;
+
+    for resource_schema in resource_schemas {
+        match resolve_expr(resolver, &parsed_expr, resource_schema) {
+            Ok(schema_expr) => {
+                // An unsupported operator is a property of the expression, not
+                // of any one schema, so it fails outright instead of merely
+                // excluding this schema from the candidate set.
+                ensure_executable(&schema_expr)?;
+
+                if let Some(previous_expr) = &resolved_expr {
+                    assert_eq!(
+                        previous_expr, &schema_expr,
+                        "label filter expression resolved differently for schema \
+                         '{resource_schema}' than for a preceding one; per-schema filtering is \
+                         not implemented, as no label schema is type-dependent today"
+                    );
+                } else {
+                    resolved_expr = Some(schema_expr);
+                }
+
+                applicable_schemas.push(resource_schema.clone());
+            }
+            Err(err) => last_error = Some(err),
+        }
+    }
+
+    match (resolved_expr, last_error) {
+        (Some(resolved_expr), _) => Ok((applicable_schemas, resolved_expr)),
+        // Every candidate schema rejected the filter, so the filter itself is
+        // at fault.
+        (None, Some(err)) => Err(err),
+        // No candidate schemas at all. There is nothing the filter could be
+        // wrong about, so this is not an error: callers pass the empty schema
+        // list down, and the repositories already return an empty result for
+        // it. The filter value is irrelevant when no schema can match.
+        (None, None) => Ok((Vec::new(), ResolvedResourceLabelFilter::True)),
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 fn resolve_expr(
     resolver: &ResourceExtensionSchemaResolver,
     expr: &ResourceLabelFilterExpr,
@@ -171,6 +250,268 @@ fn resolve_eq_entry(
     )?;
 
     Ok((resolution.canonical_key, value.to_owned()))
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+
+    use kamu_resources::RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI;
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    fn resolver() -> std::sync::Arc<ResourceExtensionSchemaResolver> {
+        let mut builder = dill::CatalogBuilder::new();
+        kamu_resources_services::register_dependencies(&mut builder);
+        let catalog =
+            kamu_resources_services::build_catalog_with_resource_extension_schema_registry(builder)
+                .unwrap();
+
+        catalog.get_one().unwrap()
+    }
+
+    fn schema(name: &str) -> ResourceSchemaId {
+        ResourceSchemaId::parse(&format!(
+            "https://example.com/schemas/config/v1alpha1/{name}"
+        ))
+        .unwrap()
+    }
+
+    fn filter_of(pairs: &[(&str, &str)]) -> ResourceLabelFilterInput {
+        ResourceLabelFilterInput {
+            entries: pairs
+                .iter()
+                .map(|(k, v)| ((*k).to_string(), serde_json::json!(v)))
+                .collect::<BTreeMap<_, _>>(),
+        }
+    }
+
+    fn uri_key(uri: &str) -> TypeRef {
+        TypeRef::Uri(kamu_resources::TypeUri::new_unchecked(uri))
+    }
+
+    fn name_key(name: &str) -> TypeRef {
+        TypeRef::Name(name.parse().unwrap())
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    #[test]
+    fn no_filter_keeps_every_schema_and_resolves_to_true() {
+        let schemas = vec![schema("Widget"), schema("Gadget")];
+
+        let (applicable, resolved) =
+            resolve_label_filter_for_schemas(&resolver(), None, &schemas).unwrap();
+
+        assert_eq!(applicable, schemas);
+        assert_eq!(resolved, ResolvedResourceLabelFilter::True);
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    #[test]
+    fn empty_schema_list_with_a_filter_yields_no_candidates() {
+        // A selector matching no resource type is not a filter error: the
+        // repositories already return an empty result for an empty schema
+        // list, so resolution must not fail (nor panic) here.
+        let (applicable, resolved) = resolve_label_filter_for_schemas(
+            &resolver(),
+            Some(filter_of(&[("environment", "prod")])),
+            &[],
+        )
+        .unwrap();
+
+        assert!(applicable.is_empty());
+        assert_eq!(resolved, ResolvedResourceLabelFilter::True);
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    #[test]
+    fn empty_schema_list_without_a_filter_yields_no_candidates() {
+        let (applicable, resolved) =
+            resolve_label_filter_for_schemas(&resolver(), None, &[]).unwrap();
+
+        assert!(applicable.is_empty());
+        assert_eq!(resolved, ResolvedResourceLabelFilter::True);
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    #[test]
+    fn single_label_resolves_to_a_bare_equality() {
+        let schemas = vec![schema("Widget")];
+
+        let (applicable, resolved) = resolve_label_filter_for_schemas(
+            &resolver(),
+            Some(filter_of(&[("environment", "prod")])),
+            &schemas,
+        )
+        .unwrap();
+
+        assert_eq!(applicable, schemas);
+        assert_eq!(
+            resolved,
+            ResolvedResourceLabelFilter::Eq {
+                key: uri_key(RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI),
+                value: "prod".to_string(),
+            }
+        );
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    #[test]
+    fn two_independent_labels_resolve_into_one_conjunction() {
+        let schemas = vec![schema("Widget")];
+
+        let (_, resolved) = resolve_label_filter_for_schemas(
+            &resolver(),
+            Some(filter_of(&[("environment", "prod"), ("team", "data")])),
+            &schemas,
+        )
+        .unwrap();
+
+        // Both labels live in a single resolved tree: `environment`
+        // canonicalizes to its schema URI, `team` stays free-form.
+        assert_eq!(
+            resolved,
+            ResolvedResourceLabelFilter::And(vec![
+                ResolvedResourceLabelFilter::Eq {
+                    key: uri_key(RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI),
+                    value: "prod".to_string(),
+                },
+                ResolvedResourceLabelFilter::Eq {
+                    key: name_key("team"),
+                    value: "data".to_string(),
+                },
+            ])
+        );
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    #[test]
+    fn built_in_label_resolves_identically_across_schemas() {
+        // `environment` is registered as `AnyResource`, so every candidate
+        // type yields the same tree and the uniform path is taken.
+        let schemas = vec![schema("Widget"), schema("Gadget"), schema("Doohickey")];
+
+        let (applicable, resolved) = resolve_label_filter_for_schemas(
+            &resolver(),
+            Some(filter_of(&[("environment", "prod")])),
+            &schemas,
+        )
+        .unwrap();
+
+        assert_eq!(applicable, schemas);
+        assert_eq!(
+            resolved,
+            ResolvedResourceLabelFilter::Eq {
+                key: uri_key(RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI),
+                value: "prod".to_string(),
+            }
+        );
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    #[test]
+    fn free_form_label_stays_uncanonicalized_across_schemas() {
+        let schemas = vec![schema("Widget"), schema("Gadget")];
+
+        let (applicable, resolved) = resolve_label_filter_for_schemas(
+            &resolver(),
+            Some(filter_of(&[("team", "data")])),
+            &schemas,
+        )
+        .unwrap();
+
+        assert_eq!(applicable, schemas);
+        assert_eq!(
+            resolved,
+            ResolvedResourceLabelFilter::Eq {
+                key: name_key("team"),
+                value: "data".to_string(),
+            }
+        );
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    #[test]
+    fn unknown_uri_key_is_rejected_for_every_schema() {
+        let schemas = vec![schema("Widget"), schema("Gadget")];
+
+        // No schema can resolve an unregistered URI, so the filter itself is
+        // at fault and the error surfaces rather than emptying the candidates.
+        let err = resolve_label_filter_for_schemas(
+            &resolver(),
+            Some(filter_of(&[(
+                "https://example.com/schemas/labels/v1alpha1/NotRegistered",
+                "x",
+            )])),
+            &schemas,
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            err.code,
+            ResourceLabelFilterProblemCode::ResourceExtensionSchema
+        );
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    #[test]
+    fn unsupported_operator_fails_outright() {
+        let schemas = vec![schema("Widget"), schema("Gadget")];
+
+        let label_filter = ResourceLabelFilterInput {
+            entries: BTreeMap::from([(
+                "$or".to_string(),
+                serde_json::json!([{"environment": "prod"}, {"environment": "staging"}]),
+            )]),
+        };
+
+        let err = resolve_label_filter_for_schemas(&resolver(), Some(label_filter), &schemas)
+            .unwrap_err();
+
+        // Not merely an inapplicable-per-schema outcome: `$or` is a property
+        // of the expression, so it must not be reported as "no schema matched".
+        assert_eq!(
+            err.code,
+            ResourceLabelFilterProblemCode::UnsupportedExpression
+        );
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    #[test]
+    fn duplicate_key_after_canonicalization_is_rejected() {
+        let schemas = vec![schema("Widget")];
+
+        // Short name and canonical URI collapse to the same key.
+        let err = resolve_label_filter_for_schemas(
+            &resolver(),
+            Some(filter_of(&[
+                ("environment", "prod"),
+                (RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI, "staging"),
+            ])),
+            &schemas,
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            err.code,
+            ResourceLabelFilterProblemCode::DuplicateAfterCanonicalization
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

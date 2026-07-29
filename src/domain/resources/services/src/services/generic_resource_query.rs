@@ -17,6 +17,7 @@ use crate::domain::{
     FindOwnedResourceError,
     FindOwnedSnapshotsOutcome,
     GenericResourceQueryService,
+    ResolvedResourceLabelFilter,
     ResourceHandleRow,
     ResourceID,
     ResourceName,
@@ -83,10 +84,18 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
         schemas: &[TypeUri],
         exact_names: Option<&[ResourceName]>,
         name_pattern: Option<&str>,
+        label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceHandleRow>, InternalError> {
         self.resource_repository
-            .search_resource_handles(account_id, schemas, exact_names, name_pattern, pagination)
+            .search_resource_handles(
+                account_id,
+                schemas,
+                exact_names,
+                name_pattern,
+                label_filter,
+                pagination,
+            )
             .await
     }
 
@@ -96,9 +105,16 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
         schemas: &[TypeUri],
         exact_names: Option<&[ResourceName]>,
         name_pattern: Option<&str>,
+        label_filter: &ResolvedResourceLabelFilter,
     ) -> Result<usize, InternalError> {
         self.resource_repository
-            .count_search_resource_handles(account_id, schemas, exact_names, name_pattern)
+            .count_search_resource_handles(
+                account_id,
+                schemas,
+                exact_names,
+                name_pattern,
+                label_filter,
+            )
             .await
     }
 

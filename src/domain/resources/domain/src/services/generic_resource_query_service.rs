@@ -11,6 +11,7 @@ use database_common::PaginationOpts;
 use internal_error::InternalError;
 
 use crate::{
+    ResolvedResourceLabelFilter,
     ResourceHandleRow,
     ResourceID,
     ResourceName,
@@ -52,6 +53,7 @@ pub trait GenericResourceQueryService: Send + Sync {
         schemas: &[TypeUri],
         exact_names: Option<&[ResourceName]>,
         name_pattern: Option<&str>,
+        label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceHandleRow>, InternalError>;
 
@@ -61,6 +63,7 @@ pub trait GenericResourceQueryService: Send + Sync {
         schemas: &[TypeUri],
         exact_names: Option<&[ResourceName]>,
         name_pattern: Option<&str>,
+        label_filter: &ResolvedResourceLabelFilter,
     ) -> Result<usize, InternalError>;
 
     async fn find_owned_snapshot(

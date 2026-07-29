@@ -22,6 +22,7 @@ use kamu_resources::{
     ResourceHeaders,
     ResourceID,
     ResourceIDStream,
+    ResourceLabelFilterPredicate,
     ResourceName,
     ResourcePhaseCounts,
     ResourceRawEventQuery,
@@ -392,11 +393,14 @@ impl ResourceRepository for PostgresResourceRepository {
         schemas: &[TypeUri],
         exact_names: Option<&[ResourceName]>,
         name_pattern: Option<&str>,
+        label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceHandleRow>, InternalError> {
         if schemas.is_empty() || exact_names.is_some_and(<[ResourceName]>::is_empty) {
             return Ok(Vec::new());
         }
+
+        let (label_keys, label_values) = split_label_filter_pairs(label_filter)?;
 
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
@@ -432,6 +436,20 @@ impl ResourceRepository for PostgresResourceRepository {
               AND ($3::text[] IS NULL OR LOWER(r.resource_name) = ANY($3))
               AND ($4::text IS NULL OR r.resource_name ILIKE $4 ESCAPE '\')
               AND r.deleted_at IS NULL
+              -- Every authored (key, value) pair must be present. Phrased as
+              -- "no pair is missing" so a variable-length filter still fits in
+              -- one static query; empty arrays make it vacuously true.
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM UNNEST($8::text[], $9::text[]) AS f(k, v)
+                  WHERE NOT EXISTS (
+                      SELECT 1
+                      FROM resource_labels_projection rl
+                      WHERE rl.resource_id = r.resource_id
+                        AND rl.label_key = f.k
+                        AND rl.label_value = f.v
+                  )
+              )
             ORDER BY r.updated_at DESC, r.resource_id DESC
             LIMIT $5 OFFSET $6
             "#,
@@ -442,6 +460,8 @@ impl ResourceRepository for PostgresResourceRepository {
             limit,
             offset,
             kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL,
+            &label_keys,
+            &label_values,
         )
         .fetch_all(connection_mut)
         .await
@@ -456,10 +476,13 @@ impl ResourceRepository for PostgresResourceRepository {
         schemas: &[TypeUri],
         exact_names: Option<&[ResourceName]>,
         name_pattern: Option<&str>,
+        label_filter: &ResolvedResourceLabelFilter,
     ) -> Result<usize, InternalError> {
         if schemas.is_empty() || exact_names.is_some_and(<[ResourceName]>::is_empty) {
             return Ok(0);
         }
+
+        let (label_keys, label_values) = split_label_filter_pairs(label_filter)?;
 
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
@@ -476,17 +499,32 @@ impl ResourceRepository for PostgresResourceRepository {
         let row = sqlx::query!(
             r#"
             SELECT COUNT(*) AS count
-            FROM resources
-            WHERE account_id = $1
-              AND resource_schema = ANY($2)
-              AND ($3::text[] IS NULL OR LOWER(resource_name) = ANY($3))
-              AND ($4::text IS NULL OR resource_name ILIKE $4 ESCAPE '\')
-              AND deleted_at IS NULL
+            FROM resources r
+            WHERE r.account_id = $1
+              AND r.resource_schema = ANY($2)
+              AND ($3::text[] IS NULL OR LOWER(r.resource_name) = ANY($3))
+              AND ($4::text IS NULL OR r.resource_name ILIKE $4 ESCAPE '\')
+              AND r.deleted_at IS NULL
+              -- Same predicate as `search_resource_handles`, so a filtered
+              -- count always agrees with its filtered page.
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM UNNEST($5::text[], $6::text[]) AS f(k, v)
+                  WHERE NOT EXISTS (
+                      SELECT 1
+                      FROM resource_labels_projection rl
+                      WHERE rl.resource_id = r.resource_id
+                        AND rl.label_key = f.k
+                        AND rl.label_value = f.v
+                  )
+              )
             "#,
             account_id_stack.as_str(),
             schema_strs as _,
             exact_names.as_deref() as _,
             name_pattern.as_deref(),
+            &label_keys,
+            &label_values,
         )
         .fetch_one(connection_mut)
         .await
@@ -815,11 +853,14 @@ impl ResourceRepository for PostgresResourceRepository {
         account_id: odf::AccountID,
         schema: &TypeUri,
         pagination: PaginationOpts,
-        _label_filter: &ResolvedResourceLabelFilter,
+        label_filter: &ResolvedResourceLabelFilter,
     ) -> ResourceSnapshotStream<'_> {
         let resource_schema = schema.as_str().to_owned();
+        let label_filter = label_filter.clone();
 
         Box::pin(async_stream::stream! {
+            let (label_keys, label_values) = split_label_filter_pairs(&label_filter)?;
+
             let mut tr = self.transaction.lock().await;
             let connection_mut = tr.connection_mut().await?;
 
@@ -853,6 +894,18 @@ impl ResourceRepository for PostgresResourceRepository {
                 WHERE r.account_id = $1
                   AND r.resource_schema = $2
                   AND r.deleted_at IS NULL
+                  -- Same predicate as `search_resource_handles`.
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM UNNEST($6::text[], $7::text[]) AS f(k, v)
+                      WHERE NOT EXISTS (
+                          SELECT 1
+                          FROM resource_labels_projection rl
+                          WHERE rl.resource_id = r.resource_id
+                            AND rl.label_key = f.k
+                            AND rl.label_value = f.v
+                      )
+                  )
                 ORDER BY r.updated_at DESC, r.resource_id DESC
                 LIMIT $3 OFFSET $4
                 "#,
@@ -861,6 +914,8 @@ impl ResourceRepository for PostgresResourceRepository {
                 limit,
                 offset,
                 kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL,
+                &label_keys,
+                &label_values,
             )
             .fetch(connection_mut)
             .map_err(ErrorIntoInternal::int_err);
@@ -1048,6 +1103,26 @@ impl ResourceRepository for PostgresResourceRepository {
             })
             .collect())
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Splits a resolved label filter into the parallel `(keys, values)` arrays
+/// bound by the `UNNEST`-based predicates above.
+///
+/// Keeping the pairs as two `TEXT[]` binds is what lets a variable-length
+/// filter live inside a *static* `sqlx::query!`, which is required for
+/// compile-time checking against the offline cache. Postgres has `UNNEST`;
+/// the `SQLite` backend pushes one `EXISTS` per pair instead.
+fn split_label_filter_pairs(
+    label_filter: &ResolvedResourceLabelFilter,
+) -> Result<(Vec<String>, Vec<String>), InternalError> {
+    let pairs = ResourceLabelFilterPredicate::flatten_conjunction(label_filter).int_err()?;
+
+    Ok(pairs
+        .into_iter()
+        .map(|(key, value)| (key.to_string(), value.to_owned()))
+        .unzip())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

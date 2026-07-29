@@ -134,6 +134,7 @@ impl SearchResourceHandlesInput {
                 .map(|names| names.into_iter().map(Into::into).collect()),
             name_pattern: self.name_pattern,
             account: self.account.map(AccountRefInput::into_manifest_account),
+            label_filter: None,
             pagination,
         }
     }

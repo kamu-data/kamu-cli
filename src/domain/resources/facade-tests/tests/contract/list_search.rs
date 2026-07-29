@@ -355,6 +355,7 @@ pub async fn test_search_by_exact_names(h: &impl FacadeContractHarness) {
             ]),
             name_pattern: None,
             account: None,
+            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -388,6 +389,7 @@ pub async fn test_search_exact_names_ignores_missing(h: &impl FacadeContractHarn
             ]),
             name_pattern: None,
             account: None,
+            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -417,6 +419,7 @@ pub async fn test_search_by_name_pattern(h: &impl FacadeContractHarness) {
             exact_names: None,
             name_pattern: Some("search-pattern-%".to_string()),
             account: None,
+            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -466,6 +469,7 @@ pub async fn test_search_multi_type(h: &impl FacadeContractHarness) {
             exact_names: None,
             name_pattern: Some("multi-type-%".to_string()),
             account: None,
+            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -516,6 +520,7 @@ pub async fn test_search_empty_criteria_returns_error(h: &impl FacadeContractHar
             exact_names: None,
             name_pattern: None,
             account: None,
+            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await;
@@ -543,6 +548,7 @@ pub async fn test_search_pagination_and_total_count(h: &impl FacadeContractHarne
             exact_names: None,
             name_pattern: Some("search-page-%".to_string()),
             account: None,
+            label_filter: None,
             pagination: PaginationOpts::from_page(1, 2),
         })
         .await
@@ -570,6 +576,7 @@ pub async fn test_search_account_scoping(h: &impl FacadeContractHarness) {
             exact_names: None,
             name_pattern: Some("search-scope-%".to_string()),
             account: None,
+            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -581,6 +588,7 @@ pub async fn test_search_account_scoping(h: &impl FacadeContractHarness) {
             exact_names: None,
             name_pattern: Some("search-scope-%".to_string()),
             account: None,
+            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await

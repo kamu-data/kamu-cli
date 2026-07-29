@@ -458,6 +458,7 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
             exact_names: None,
             name_pattern: Some("acct-%".to_string()),
             account: None,
+            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -468,6 +469,7 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
             exact_names: None,
             name_pattern: Some("acct-%".to_string()),
             account: None,
+            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await

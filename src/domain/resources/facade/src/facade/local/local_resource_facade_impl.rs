@@ -314,6 +314,26 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
+        let resource_schema_ids = schemas
+            .iter()
+            .map(|schema| ResourceSchemaId::try_from(schema).int_err())
+            .collect::<Result<Vec<_>, _>>()?;
+
+        // Resolution can narrow the candidate types: a schema that rejects the
+        // label is dropped rather than failing the whole query.
+        let (applicable_schema_ids, label_filter) = resolve_label_filter_for_schemas(
+            &self.resource_extension_schema_resolver,
+            request.label_filter,
+            &resource_schema_ids,
+        )?;
+
+        let schemas = schemas
+            .into_iter()
+            .zip(&resource_schema_ids)
+            .filter(|(_, schema_id)| applicable_schema_ids.contains(schema_id))
+            .map(|(schema, _)| schema)
+            .collect::<Vec<_>>();
+
         let rows = self
             .generic_resource_query_service
             .search_resource_handles(
@@ -321,6 +341,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
                 &schemas,
                 request.exact_names.as_deref(),
                 request.name_pattern.as_deref(),
+                &label_filter,
                 request.pagination,
             )
             .await?;
@@ -331,6 +352,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
                 &schemas,
                 request.exact_names.as_deref(),
                 request.name_pattern.as_deref(),
+                &label_filter,
             )
             .await?;
 

@@ -275,6 +275,9 @@ pub struct SearchResourceHandlesRequest {
     pub exact_names: Option<Vec<ResourceName>>,
     pub name_pattern: Option<String>,
     pub account: Option<ResourceAccountRef>,
+    /// What gives `get`/`delete` label filtering: both expand a selector into
+    /// identifiers through this request before operating by id.
+    pub label_filter: Option<ResourceLabelFilterInput>,
     pub pagination: PaginationOpts,
 }
 

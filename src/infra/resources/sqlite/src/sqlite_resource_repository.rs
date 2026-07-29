@@ -23,12 +23,14 @@ use futures::TryStreamExt;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_resources::{
     CreateResourceError,
+    DELETED_ACCOUNT_NAME_SENTINEL,
     ResolvedResourceLabelFilter,
     ResourceDuplicateError,
     ResourceHandleRow,
     ResourceHeaders,
     ResourceID,
     ResourceIDStream,
+    ResourceLabelFilterPredicate,
     ResourceName,
     ResourcePhaseCounts,
     ResourceRawEventQuery,
@@ -37,6 +39,7 @@ use kamu_resources::{
     ResourceSnapshotRow,
     ResourceSnapshotStream,
     ResourceSummaryRow,
+    TypeRef,
     TypeUri,
     UpdateResourceError,
 };
@@ -346,11 +349,15 @@ impl ResourceRepository for SqliteResourceRepository {
         schemas: &[TypeUri],
         exact_names: Option<&[ResourceName]>,
         name_pattern: Option<&str>,
+        label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceHandleRow>, InternalError> {
         if schemas.is_empty() || exact_names.is_some_and(<[ResourceName]>::is_empty) {
             return Ok(Vec::new());
         }
+
+        let label_pairs =
+            ResourceLabelFilterPredicate::flatten_conjunction(label_filter).int_err()?;
 
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
@@ -403,6 +410,8 @@ impl ResourceRepository for SqliteResourceRepository {
             query_builder.push(r#" ESCAPE '\' COLLATE NOCASE"#);
         }
 
+        push_label_filter_predicates(&mut query_builder, &label_pairs);
+
         query_builder
             .push(" ORDER BY r.updated_at DESC, r.resource_id DESC LIMIT ")
             .push_bind(limit)
@@ -422,10 +431,14 @@ impl ResourceRepository for SqliteResourceRepository {
         schemas: &[TypeUri],
         exact_names: Option<&[ResourceName]>,
         name_pattern: Option<&str>,
+        label_filter: &ResolvedResourceLabelFilter,
     ) -> Result<usize, InternalError> {
         if schemas.is_empty() || exact_names.is_some_and(<[ResourceName]>::is_empty) {
             return Ok(0);
         }
+
+        let label_pairs =
+            ResourceLabelFilterPredicate::flatten_conjunction(label_filter).int_err()?;
 
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
@@ -433,15 +446,17 @@ impl ResourceRepository for SqliteResourceRepository {
         let account_id_stack = account_id.as_stack_string();
         let account_id_str = account_id_stack.as_str();
 
+        // Aliased `r` so the label-filter predicates, which correlate on
+        // `r.resource_id`, can be shared with `search_resource_handles`.
         let mut query_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
             r#"
             SELECT COUNT(*) as count
-            FROM resources
-            WHERE account_id = "#,
+            FROM resources r
+            WHERE r.account_id = "#,
         );
         query_builder
             .push_bind(account_id_str)
-            .push(" AND deleted_at IS NULL AND resource_schema IN (");
+            .push(" AND r.deleted_at IS NULL AND r.resource_schema IN (");
         {
             let mut separated = query_builder.separated(", ");
             for schema in schemas {
@@ -451,7 +466,7 @@ impl ResourceRepository for SqliteResourceRepository {
         query_builder.push(")");
 
         if let Some(exact_names) = exact_names {
-            query_builder.push(" AND resource_name COLLATE NOCASE IN (");
+            query_builder.push(" AND r.resource_name COLLATE NOCASE IN (");
             let mut separated = query_builder.separated(", ");
             for name in exact_names {
                 separated.push_bind(name.to_string());
@@ -460,10 +475,12 @@ impl ResourceRepository for SqliteResourceRepository {
         }
 
         if let Some(name_pattern) = name_pattern {
-            query_builder.push(" AND resource_name LIKE ");
+            query_builder.push(" AND r.resource_name LIKE ");
             query_builder.push_bind(sql_like_escape_pattern(name_pattern));
             query_builder.push(r#" ESCAPE '\' COLLATE NOCASE"#);
         }
+
+        push_label_filter_predicates(&mut query_builder, &label_pairs);
 
         let row = query_builder
             .build_query_scalar::<i64>()
@@ -771,11 +788,15 @@ impl ResourceRepository for SqliteResourceRepository {
         account_id: odf::AccountID,
         schema: &TypeUri,
         pagination: PaginationOpts,
-        _label_filter: &ResolvedResourceLabelFilter,
+        label_filter: &ResolvedResourceLabelFilter,
     ) -> ResourceSnapshotStream<'_> {
         let resource_schema = schema.as_str().to_owned();
+        let label_filter = label_filter.clone();
 
         Box::pin(async_stream::stream! {
+            let label_pairs =
+                ResourceLabelFilterPredicate::flatten_conjunction(&label_filter).int_err()?;
+
             let mut tr = self.transaction.lock().await;
             let connection_mut = tr.connection_mut().await?;
 
@@ -784,66 +805,54 @@ impl ResourceRepository for SqliteResourceRepository {
             let limit = i64::try_from(pagination.limit).int_err()?;
             let offset = i64::try_from(pagination.offset).int_err()?;
 
-            let mut query_stream = sqlx::query!(
+            // Built dynamically rather than via `sqlx::query!` because the
+            // label filter contributes a variable number of predicates.
+            let mut query_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
                 r#"
                 SELECT
-                    r.resource_id as "id: uuid::Uuid",
-                    r.account_id as "account_id: odf::AccountID",
-                    COALESCE(a.resource_id, X'00000000000000000000000000000000') as "account_resource_id!: uuid::Uuid",
-                    COALESCE(a.account_name, 'deleted-account') as "account_name!: String",
+                    r.resource_id as id,
+                    r.account_id,
+                    COALESCE(a.resource_id, X'00000000000000000000000000000000') as account_resource_id,
+                    COALESCE(a.account_name, "#,
+            );
+            query_builder.push_bind(DELETED_ACCOUNT_NAME_SENTINEL);
+            query_builder.push(
+                r#") as account_name,
                     r.resource_schema,
                     r.resource_name,
-                    r.labels as "labels: serde_json::Value",
-                    r.annotations as "annotations: serde_json::Value",
-                    r.spec as "spec: serde_json::Value",
-                    r.status as "status: serde_json::Value",
+                    r.labels,
+                    r.annotations,
+                    r.spec,
+                    r.status,
                     r.generation,
-                    r.created_at as "created_at: DateTime<Utc>",
-                    r.updated_at as "updated_at: DateTime<Utc>",
-                    r.deleted_at as "deleted_at: DateTime<Utc>",
+                    r.created_at,
+                    r.updated_at,
+                    r.deleted_at,
                     r.last_event_id
                 FROM resources r
                 LEFT JOIN accounts a ON a.id = r.account_id
-                WHERE r.account_id = $1
-                  AND r.resource_schema = $2
-                  AND r.deleted_at IS NULL
-                ORDER BY r.updated_at DESC, r.resource_id DESC
-                LIMIT $3 OFFSET $4
-                "#,
-                account_id_str,
-                resource_schema,
-                limit,
-                offset,
-            )
-            .fetch(connection_mut)
-            .map_err(ErrorIntoInternal::int_err);
+                WHERE r.account_id = "#,
+            );
+            query_builder.push_bind(account_id_str);
+            query_builder.push(" AND r.resource_schema = ");
+            query_builder.push_bind(resource_schema);
+            query_builder.push(" AND r.deleted_at IS NULL");
+
+            push_label_filter_predicates(&mut query_builder, &label_pairs);
+
+            query_builder
+                .push(" ORDER BY r.updated_at DESC, r.resource_id DESC LIMIT ")
+                .push_bind(limit)
+                .push(" OFFSET ")
+                .push_bind(offset);
+
+            let mut query_stream = query_builder
+                .build_query_as::<ResourceSnapshotRow>()
+                .fetch(connection_mut)
+                .map_err(ErrorIntoInternal::int_err);
 
             while let Some(row) = query_stream.try_next().await? {
-                yield Ok(ResourceSnapshot {
-                    id: ResourceID::new(row.id),
-                    schema: TypeUri::new_unchecked(row.resource_schema),
-                    headers: ResourceHeaders {
-                        id: ResourceID::new(row.id),
-                        account: odf::AccountHandle {
-                            id: ResourceID::new(row.account_resource_id),
-                            did: row.account_id,
-                            name: odf::AccountName::new_unchecked(&row.account_name),
-                        },
-                        name: kamu_resources::ResourceName::new_unchecked(&row.resource_name),
-                        labels: kamu_resources::resource_labels_from_json(row.labels),
-                        annotations: kamu_resources::resource_annotations_from_json(row.annotations),
-                        generation: u64::try_from(row.generation).unwrap(),
-                        created_at: row.created_at,
-                        updated_at: row.updated_at,
-                        deleted_at: row.deleted_at,
-                    },
-                    spec: row.spec,
-                    status: row
-                        .status
-                        .as_ref()
-                        .and_then(ResourceSnapshot::basic_status_from_json),
-                    last_event_id: row.last_event_id.map(EventID::new),
-                });
+                yield Ok(row.into_snapshot());
             }
         })
     }
@@ -1010,6 +1019,29 @@ impl ResourceRepository for SqliteResourceRepository {
                 },
             })
             .collect())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Appends one correlated `EXISTS` over `resource_labels_projection` per
+/// `(key, value)` pair, requiring the row aliased `r` to carry all of them.
+///
+/// `SQLite` has no `UNNEST`, so pairs are pushed as individual predicates
+/// rather than bound as arrays the way the Postgres backend does.
+fn push_label_filter_predicates(
+    query_builder: &mut sqlx::QueryBuilder<'_, sqlx::Sqlite>,
+    label_pairs: &[(&TypeRef, &str)],
+) {
+    for (key, value) in label_pairs {
+        query_builder.push(
+            " AND EXISTS (SELECT 1 FROM resource_labels_projection rl WHERE rl.resource_id = \
+             r.resource_id AND rl.label_key = ",
+        );
+        query_builder.push_bind(key.to_string());
+        query_builder.push(" AND rl.label_value = ");
+        query_builder.push_bind((*value).to_string());
+        query_builder.push(")");
     }
 }
 

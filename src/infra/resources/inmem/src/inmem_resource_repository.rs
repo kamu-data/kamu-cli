@@ -14,7 +14,7 @@ use database_common::PaginationOpts;
 use dill::*;
 use event_sourcing::EventID;
 use futures::StreamExt;
-use internal_error::InternalError;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::AccountRepository;
 use kamu_resources::{
     CreateResourceError,
@@ -23,6 +23,7 @@ use kamu_resources::{
     ResourceHandleRow,
     ResourceID,
     ResourceIDStream,
+    ResourceLabelFilterPredicate,
     ResourceName,
     ResourcePhase,
     ResourcePhaseCounts,
@@ -32,10 +33,12 @@ use kamu_resources::{
     ResourceSnapshotStream,
     ResourceSnapshotUpdate,
     ResourceSummaryRow,
+    TypeRef,
     TypeUri,
     UpdateResourceError,
     deleted_account_name_sentinel,
     deleted_account_resource_id_sentinel,
+    string_label_entries,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -351,18 +354,29 @@ impl ResourceRepository for InMemoryResourceRepository {
         schemas: &[TypeUri],
         exact_names: Option<&[ResourceName]>,
         name_pattern: Option<&str>,
+        label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceHandleRow>, InternalError> {
         if schemas.is_empty() || exact_names.is_some_and(<[ResourceName]>::is_empty) {
             return Ok(Vec::new());
         }
 
+        let label_pairs =
+            ResourceLabelFilterPredicate::flatten_conjunction(label_filter).int_err()?;
+
         let mut snapshots = {
             let guard = self.state.lock().unwrap();
-            filter_search_snapshots(&guard, account_id, schemas, exact_names, name_pattern)
-                .into_iter()
-                .cloned()
-                .collect::<Vec<_>>()
+            filter_search_snapshots(
+                &guard,
+                account_id,
+                schemas,
+                exact_names,
+                name_pattern,
+                &label_pairs,
+            )
+            .into_iter()
+            .cloned()
+            .collect::<Vec<_>>()
         };
 
         snapshots.sort_by(|lhs, rhs| {
@@ -393,14 +407,26 @@ impl ResourceRepository for InMemoryResourceRepository {
         schemas: &[TypeUri],
         exact_names: Option<&[ResourceName]>,
         name_pattern: Option<&str>,
+        label_filter: &ResolvedResourceLabelFilter,
     ) -> Result<usize, InternalError> {
-        let guard = self.state.lock().unwrap();
-
         if schemas.is_empty() || exact_names.is_some_and(<[ResourceName]>::is_empty) {
             return Ok(0);
         }
 
-        Ok(filter_search_snapshots(&guard, account_id, schemas, exact_names, name_pattern).len())
+        let label_pairs =
+            ResourceLabelFilterPredicate::flatten_conjunction(label_filter).int_err()?;
+
+        let guard = self.state.lock().unwrap();
+
+        Ok(filter_search_snapshots(
+            &guard,
+            account_id,
+            schemas,
+            exact_names,
+            name_pattern,
+            &label_pairs,
+        )
+        .len())
     }
 
     async fn find_resource_snapshot(
@@ -522,11 +548,15 @@ impl ResourceRepository for InMemoryResourceRepository {
         account_id: odf::AccountID,
         schema: &TypeUri,
         pagination: PaginationOpts,
-        _label_filter: &ResolvedResourceLabelFilter,
+        label_filter: &ResolvedResourceLabelFilter,
     ) -> ResourceSnapshotStream<'_> {
         let schema = schema.clone();
+        let label_filter = label_filter.clone();
 
         let stream = futures::stream::once(async move {
+            let label_pairs =
+                ResourceLabelFilterPredicate::flatten_conjunction(&label_filter).int_err()?;
+
             let mut snapshots_page: Vec<_> = {
                 let guard = self.state.lock().unwrap();
                 guard
@@ -537,6 +567,7 @@ impl ResourceRepository for InMemoryResourceRepository {
                             && snapshot.schema == schema
                             && snapshot.headers.deleted_at.is_none()
                     })
+                    .filter(|snapshot| snapshot_matches_label_pairs(snapshot, &label_pairs))
                     .cloned()
                     .collect()
             };
@@ -554,9 +585,14 @@ impl ResourceRepository for InMemoryResourceRepository {
                 .take(pagination.limit)
                 .collect();
 
-            self.resolve_snapshots(snapshots_page).await
+            Ok(self.resolve_snapshots(snapshots_page).await)
         })
-        .flat_map(|snapshots| futures::stream::iter(snapshots.into_iter().map(Ok)));
+        .flat_map(|snapshots: Result<Vec<_>, InternalError>| match snapshots {
+            Ok(snapshots) => {
+                futures::stream::iter(snapshots.into_iter().map(Ok).collect::<Vec<_>>())
+            }
+            Err(err) => futures::stream::iter(vec![Err(err)]),
+        });
 
         Box::pin(stream)
     }
@@ -706,6 +742,7 @@ fn filter_search_snapshots<'a>(
     schemas: &[TypeUri],
     exact_names: Option<&[ResourceName]>,
     name_pattern: Option<&str>,
+    label_pairs: &[(&TypeRef, &str)],
 ) -> Vec<&'a ResourceSnapshot> {
     guard
         .snapshots_by_id
@@ -719,7 +756,36 @@ fn filter_search_snapshots<'a>(
                 resource_name_matches_pattern(&snapshot.headers.name, pattern)
             })
         })
+        .filter(|snapshot| snapshot_matches_label_pairs(snapshot, label_pairs))
         .collect()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Mirrors the SQL backends' correlated-`EXISTS` semantics: every `(key,
+/// value)` pair must be present among the snapshot's *string-valued* labels,
+/// compared case-sensitively.
+///
+/// Reads the labels straight off the snapshot rather than consulting
+/// `ResourceLabelProjectionRepository`, which lives in a separate DI singleton.
+/// [`string_label_entries`] is the very same projection function that
+/// maintains that index, so the two cannot disagree.
+fn snapshot_matches_label_pairs(
+    snapshot: &ResourceSnapshot,
+    label_pairs: &[(&TypeRef, &str)],
+) -> bool {
+    if label_pairs.is_empty() {
+        return true;
+    }
+
+    let entries = string_label_entries(&snapshot.headers.labels);
+
+    label_pairs.iter().all(|(key, value)| {
+        let key = key.to_string();
+        entries
+            .iter()
+            .any(|(entry_key, entry_value)| *entry_key == key && entry_value == value)
+    })
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

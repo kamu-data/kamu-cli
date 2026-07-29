@@ -31,6 +31,14 @@ pub struct UnsupportedLabelFilterOperatorError {
 /// Translates a [`ResolvedResourceLabelFilter`] into the predicate shape the
 /// repository backends can execute, and owns the definition of which boolean
 /// operators are supported.
+///
+/// Every backend compares the resulting pairs **case-sensitively**, unlike the
+/// `resource_name` lookups that sit beside them in the same repositories.
+/// Labels are data rather than user-typed identifiers: values are arbitrary
+/// (`version=RC1` and `version=rc1` are meaningfully different), and
+/// canonicalized keys are schema URIs whose path segment is case-sensitive.
+/// This matches Kubernetes label selectors, and the
+/// `resource_labels_projection` columns carry no case-insensitive collation.
 pub struct ResourceLabelFilterPredicate;
 
 impl ResourceLabelFilterPredicate {

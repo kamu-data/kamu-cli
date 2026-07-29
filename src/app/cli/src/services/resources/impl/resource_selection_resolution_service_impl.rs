@@ -473,6 +473,7 @@ impl ResourceSelectionResolutionServiceImpl {
                             exact_names: None,
                             name_pattern: None,
                             account: None,
+                            label_filter: None,
                             pagination,
                         })
                         .await
@@ -523,6 +524,7 @@ impl ResourceSelectionResolutionServiceImpl {
                             exact_names: None,
                             name_pattern: Some(request_name_pattern),
                             account: None,
+                            label_filter: None,
                             pagination,
                         })
                         .await
@@ -688,6 +690,7 @@ impl ResourceSelectionResolutionServiceImpl {
                             exact_names: None,
                             name_pattern: Some(request_name_pattern),
                             account: None,
+                            label_filter: None,
                             pagination,
                         })
                         .await

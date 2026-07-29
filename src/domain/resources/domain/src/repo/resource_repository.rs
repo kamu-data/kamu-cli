@@ -77,12 +77,15 @@ pub trait ResourceRepository: Send + Sync {
         names: &[ResourceName],
     ) -> Result<Vec<ResourceHandleRow>, InternalError>;
 
+    /// `label_filter` applies uniformly to every schema in `schemas` — the
+    /// facade guarantees it resolves identically for all of them.
     async fn search_resource_handles(
         &self,
         account_id: &odf::AccountID,
         schemas: &[TypeUri],
         exact_names: Option<&[ResourceName]>,
         name_pattern: Option<&str>,
+        label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceHandleRow>, InternalError>;
 
@@ -92,6 +95,7 @@ pub trait ResourceRepository: Send + Sync {
         schemas: &[TypeUri],
         exact_names: Option<&[ResourceName]>,
         name_pattern: Option<&str>,
+        label_filter: &ResolvedResourceLabelFilter,
     ) -> Result<usize, InternalError>;
 
     async fn find_resource_snapshot(
