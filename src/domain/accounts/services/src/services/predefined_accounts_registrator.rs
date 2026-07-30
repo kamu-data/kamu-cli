@@ -123,8 +123,15 @@ impl PredefinedAccountsRegistrator {
         account_config: &AccountConfig,
     ) -> Result<(), InternalError> {
         let updated_account = Account {
-            registered_at: account.registered_at,
-            ..account_config.into()
+            id: account_config.get_id(),
+            account_name: account_config.account_name.clone(),
+            email: account_config.email.clone(),
+            display_name: account_config.get_display_name(),
+            account_type: account_config.account_type,
+            avatar_url: account_config.avatar_url.clone(),
+            registered_at: original_account.registered_at,
+            provider: account_config.provider.clone(),
+            provider_identity_key: account_config.account_name.to_string(),
         };
 
         if AccountProvider::is_password(&account_config.provider) {
