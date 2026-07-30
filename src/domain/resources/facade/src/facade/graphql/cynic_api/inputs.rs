@@ -114,6 +114,7 @@ pub(crate) struct ResourceBatchSelectorInput {
     pub resource_type: ResourceTypeSelectorInput,
     pub refs: Vec<ResourceRefInput>,
     pub account: Option<AccountRefInput>,
+    pub label_filter: Option<ResourceLabelFilterInput>,
 }
 
 impl TryFrom<&ResourceBatchSelector> for ResourceBatchSelectorInput {
@@ -124,7 +125,38 @@ impl TryFrom<&ResourceBatchSelector> for ResourceBatchSelectorInput {
             resource_type: ResourceTypeSelectorInput::from_resource_type(&value.resource_type),
             refs: value.resource_refs.iter().map(Into::into).collect(),
             account: value.account.as_ref().map(Into::into),
+            label_filter: value.label_filter.as_ref().map(Into::into),
         })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::InputObject, Debug, Clone)]
+#[cynic(graphql_type = "ResourceLabelFilterEntryInput")]
+pub(crate) struct ResourceLabelFilterEntryInput {
+    pub key: String,
+    pub value: serde_json::Value,
+}
+
+#[derive(cynic::InputObject, Debug, Clone)]
+#[cynic(graphql_type = "ResourceLabelFilterInput")]
+pub(crate) struct ResourceLabelFilterInput {
+    pub entries: Vec<ResourceLabelFilterEntryInput>,
+}
+
+impl From<&domain::ResourceLabelFilterInput> for ResourceLabelFilterInput {
+    fn from(value: &domain::ResourceLabelFilterInput) -> Self {
+        Self {
+            entries: value
+                .entries
+                .iter()
+                .map(|(key, value)| ResourceLabelFilterEntryInput {
+                    key: key.clone(),
+                    value: value.clone(),
+                })
+                .collect(),
+        }
     }
 }
 
@@ -146,6 +178,7 @@ pub(crate) struct SearchResourceHandlesInput {
     pub names: Option<Vec<domain::ResourceName>>,
     pub name_pattern: Option<String>,
     pub account: Option<AccountRefInput>,
+    pub label_filter: Option<ResourceLabelFilterInput>,
 }
 
 impl TryFrom<&SearchResourceHandlesRequest> for SearchResourceHandlesInput {
@@ -161,6 +194,7 @@ impl TryFrom<&SearchResourceHandlesRequest> for SearchResourceHandlesInput {
             names: value.exact_names.clone(),
             name_pattern: value.name_pattern.clone(),
             account: value.account.as_ref().map(Into::into),
+            label_filter: value.label_filter.as_ref().map(Into::into),
         })
     }
 }

@@ -14,6 +14,7 @@ use crate::facade::graphql::cynic_api::fragments::{
     BatchResourceProblem,
     ResourceBadAccountProblem,
     ResourceHandle,
+    ResourceInvalidLabelFilterProblem,
     ResourceSelectorProblemResult,
     ResourceUnsupportedSelectorProblem,
 };
@@ -78,6 +79,7 @@ pub(crate) enum BatchResourceHandlesOutcome {
     BatchResourceHandlesResult(BatchResourceHandlesResult),
     ResourceUnsupportedSelectorProblem(ResourceUnsupportedSelectorProblem),
     ResourceBadAccountProblem(ResourceBadAccountProblem),
+    ResourceInvalidLabelFilterProblem(ResourceInvalidLabelFilterProblem),
     #[cynic(fallback)]
     Unknown,
 }

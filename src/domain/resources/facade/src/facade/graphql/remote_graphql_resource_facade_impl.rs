@@ -225,6 +225,7 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
         let variables = cynic_api::variables::ListByResourceTypeVariables::new(
             &request.raw_type_selector,
             request.account.as_ref(),
+            request.label_filter.as_ref(),
             request.pagination,
         )
         .map_err(ListResourcesError::Internal)?;
@@ -246,6 +247,7 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
         let variables = cynic_api::variables::ListByResourceTypeVariables::new(
             &request.raw_type_selector,
             request.account.as_ref(),
+            request.label_filter.as_ref(),
             request.pagination,
         )
         .map_err(ListResourcesError::Internal)?;
@@ -289,6 +291,7 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
 
         let variables = cynic_api::variables::ListAllVariables::new(
             request.account.as_ref(),
+            request.label_filter.as_ref(),
             request.pagination,
         )
         .map_err(ListAllResourcesError::Internal)?;
@@ -309,6 +312,7 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
 
         let variables = cynic_api::variables::ListAllVariables::new(
             request.account.as_ref(),
+            request.label_filter.as_ref(),
             request.pagination,
         )
         .map_err(ListAllResourcesError::Internal)?;

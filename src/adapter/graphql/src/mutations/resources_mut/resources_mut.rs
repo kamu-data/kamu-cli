@@ -14,11 +14,13 @@ use crate::queries::{
     BatchResourceProblem,
     ResourceBadAccountProblem,
     ResourceBatchSelectorInput,
+    ResourceInvalidLabelFilterProblem,
     ResourceManifestFormat,
     ResourceSelectorInput,
     ResourceSelectorProblem,
     ResourceSelectorProblemResult,
     ResourceUnsupportedSelectorProblem,
+    into_facade_filter,
     map_bad_account_problem,
     map_resolve_manifest_account_error,
     map_unsupported_descriptor_problem,
@@ -190,13 +192,13 @@ impl ResourcesMut {
             resource_type,
             resource_refs,
             account,
+            label_filter,
         } = selector;
         let resource_type_selector = resource_type.into_resource_type_selector();
 
         match resource_facade
             .delete_many(kamu_resources_facade::ResourceBatchSelector {
-                // Label filtering is not exposed over GraphQL yet.
-                label_filter: None,
+                label_filter: into_facade_filter(label_filter)?,
                 account: account.map(AccountRefInput::into_manifest_account),
                 resource_type: resource_type_selector,
                 resource_refs: resource_refs.into_iter().map(Into::into).collect(),
@@ -210,6 +212,9 @@ impl ResourcesMut {
             Err(kamu_resources_facade::BatchResourceError::BadAccount(e)) => Ok(
                 ResourceDeleteManyOutcome::BadAccount(map_bad_account_problem(e)?),
             ),
+            Err(kamu_resources_facade::BatchResourceError::InvalidLabelFilter(e)) => {
+                Ok(ResourceDeleteManyOutcome::InvalidLabelFilter(e.into()))
+            }
             Err(e) => Err(map_batch_delete_resource_error(e)),
         }
     }
@@ -513,6 +518,7 @@ pub enum ResourceDeleteManyOutcome {
     Success(ResourceDeleteManyResult),
     UnsupportedSelector(ResourceUnsupportedSelectorProblem),
     BadAccount(ResourceBadAccountProblem),
+    InvalidLabelFilter(ResourceInvalidLabelFilterProblem),
 }
 
 #[derive(SimpleObject, Debug, Clone)]

@@ -32,6 +32,7 @@ use crate::helpers::{
     normalize_summary_views,
     secret_set_manifest_json,
     sorted_handle_names,
+    sorted_summary_names,
     variable_set_manifest_json,
 };
 
@@ -610,26 +611,31 @@ pub async fn test_search_account_scoping(h: &impl FacadeContractHarness) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// The cases below exercise Phase-7 filter *resolution* at the local facade
-// boundary only: repository-level matching lands in Phase 9, and the remote
-// (GraphQL) transport for `label_filter` lands in Phase 10 — until then the
-// remote client silently drops the filter, so these are local-only.
-
 // RF-097
-#[test_log::test(tokio::test)]
-async fn list_filter_by_canonical_label_uri_is_accepted() {
-    let h = crate::harness::LocalFacadeHarness::new().await;
+contract_test!(
+    list_filter_by_canonical_label_uri,
+    super::test_list_filter_by_canonical_label_uri
+);
+
+pub async fn test_list_filter_by_canonical_label_uri(h: &impl FacadeContractHarness) {
     create_variable_set_with_labels(
-        &h,
+        h,
         TestAccount::Alice,
         "list-filter-prod",
         &[(RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI, "prod".into())],
     )
     .await;
+    create_variable_set_with_labels(
+        h,
+        TestAccount::Alice,
+        "list-filter-staging",
+        &[(RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI, "staging".into())],
+    )
+    .await;
 
     let facade = h.facade_for(TestAccount::Alice);
 
-    let result = facade
+    let items = facade
         .list(ListResourcesRequest {
             raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             account: None,
@@ -639,19 +645,27 @@ async fn list_filter_by_canonical_label_uri_is_accepted() {
                 "prod",
             )])),
         })
-        .await;
+        .await
+        .unwrap();
 
-    assert_matches!(result, Ok(_));
+    assert_eq!(
+        sorted_summary_names(items),
+        vec!["list-filter-prod"],
+        "only the matching value must survive the filter"
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // RF-098
-#[test_log::test(tokio::test)]
-async fn list_filter_by_short_label_name_is_accepted() {
-    let h = crate::harness::LocalFacadeHarness::new().await;
+contract_test!(
+    list_filter_by_short_label_name,
+    super::test_list_filter_by_short_label_name
+);
+
+pub async fn test_list_filter_by_short_label_name(h: &impl FacadeContractHarness) {
     create_variable_set_with_labels(
-        &h,
+        h,
         TestAccount::Alice,
         "list-filter-short-prod",
         &[(RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI, "prod".into())],
@@ -661,54 +675,69 @@ async fn list_filter_by_short_label_name_is_accepted() {
     let facade = h.facade_for(TestAccount::Alice);
 
     // Short name resolves to the same canonical URI as the fully-qualified key,
-    // so it must be accepted just like the URI form.
-    let result = facade
+    // so it must select the same resource.
+    let items = facade
         .list(ListResourcesRequest {
             raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
             label_filter: Some(label_filter(&[("environment", "prod")])),
         })
-        .await;
+        .await
+        .unwrap();
 
-    assert_matches!(result, Ok(_));
+    assert_eq!(sorted_summary_names(items), vec!["list-filter-short-prod"]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // RF-099
-#[test_log::test(tokio::test)]
-async fn list_filter_by_free_form_label_is_accepted() {
-    let h = crate::harness::LocalFacadeHarness::new().await;
+contract_test!(
+    list_filter_by_free_form_label,
+    super::test_list_filter_by_free_form_label
+);
+
+pub async fn test_list_filter_by_free_form_label(h: &impl FacadeContractHarness) {
     create_variable_set_with_labels(
-        &h,
+        h,
         TestAccount::Alice,
         "list-filter-freeform-a",
         &[("team", "data".into())],
+    )
+    .await;
+    create_variable_set_with_labels(
+        h,
+        TestAccount::Alice,
+        "list-filter-freeform-b",
+        &[("team", "platform".into())],
     )
     .await;
 
     let facade = h.facade_for(TestAccount::Alice);
 
     // `team` has no registered schema, so it stays free-form and queryable.
-    let result = facade
+    let items = facade
         .list(ListResourcesRequest {
             raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
             label_filter: Some(label_filter(&[("team", "data")])),
         })
-        .await;
+        .await
+        .unwrap();
 
-    assert_matches!(result, Ok(_));
+    assert_eq!(sorted_summary_names(items), vec!["list-filter-freeform-a"]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // RF-099A
-#[test_log::test(tokio::test)]
-async fn list_filter_invalid_key_is_rejected() {
-    let h = crate::harness::LocalFacadeHarness::new().await;
+contract_test!(
+    list_filter_invalid_key_is_rejected,
+    super::test_list_filter_invalid_key_is_rejected
+);
+
+pub async fn test_list_filter_invalid_key_is_rejected(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
     // `=` is not a valid TypeName/TypeUri character, so this key fails
@@ -731,9 +760,12 @@ async fn list_filter_invalid_key_is_rejected() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // RF-099B
-#[test_log::test(tokio::test)]
-async fn list_filter_unknown_uri_is_rejected() {
-    let h = crate::harness::LocalFacadeHarness::new().await;
+contract_test!(
+    list_filter_unknown_uri_is_rejected,
+    super::test_list_filter_unknown_uri_is_rejected
+);
+
+pub async fn test_list_filter_unknown_uri_is_rejected(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
     let result = facade
@@ -760,9 +792,12 @@ async fn list_filter_unknown_uri_is_rejected() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // RF-099C
-#[test_log::test(tokio::test)]
-async fn list_filter_non_string_value_is_rejected() {
-    let h = crate::harness::LocalFacadeHarness::new().await;
+contract_test!(
+    list_filter_non_string_value_is_rejected,
+    super::test_list_filter_non_string_value_is_rejected
+);
+
+pub async fn test_list_filter_non_string_value_is_rejected(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
     let result = facade
@@ -788,9 +823,14 @@ async fn list_filter_non_string_value_is_rejected() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // RF-099D
-#[test_log::test(tokio::test)]
-async fn list_filter_duplicate_after_canonicalization_is_rejected() {
-    let h = crate::harness::LocalFacadeHarness::new().await;
+contract_test!(
+    list_filter_duplicate_after_canonicalization_is_rejected,
+    super::test_list_filter_duplicate_after_canonicalization_is_rejected
+);
+
+pub async fn test_list_filter_duplicate_after_canonicalization_is_rejected(
+    h: &impl FacadeContractHarness,
+) {
     let facade = h.facade_for(TestAccount::Alice);
 
     // Short name `environment` and its canonical URI both resolve to the same
@@ -819,9 +859,12 @@ async fn list_filter_duplicate_after_canonicalization_is_rejected() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // RF-099E
-#[test_log::test(tokio::test)]
-async fn list_filter_not_operator_is_rejected() {
-    let h = crate::harness::LocalFacadeHarness::new().await;
+contract_test!(
+    list_filter_not_operator_is_rejected,
+    super::test_list_filter_not_operator_is_rejected
+);
+
+pub async fn test_list_filter_not_operator_is_rejected(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
     // `$not` is recognized as a reserved combinator key (per the ODF
@@ -854,9 +897,12 @@ async fn list_filter_not_operator_is_rejected() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // RF-099F
-#[test_log::test(tokio::test)]
-async fn list_filter_or_operator_is_rejected() {
-    let h = crate::harness::LocalFacadeHarness::new().await;
+contract_test!(
+    list_filter_or_operator_is_rejected,
+    super::test_list_filter_or_operator_is_rejected
+);
+
+pub async fn test_list_filter_or_operator_is_rejected(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
     let result = facade
@@ -885,9 +931,12 @@ async fn list_filter_or_operator_is_rejected() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // RF-099G
-#[test_log::test(tokio::test)]
-async fn list_filter_malformed_not_operator_is_rejected() {
-    let h = crate::harness::LocalFacadeHarness::new().await;
+contract_test!(
+    list_filter_malformed_not_operator_is_rejected,
+    super::test_list_filter_malformed_not_operator_is_rejected
+);
+
+pub async fn test_list_filter_malformed_not_operator_is_rejected(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
     // A malformed `$not` (wrong value shape) is a parse failure, not a
@@ -914,6 +963,53 @@ async fn list_filter_malformed_not_operator_is_rejected() {
         err.code,
         ResourceLabelFilterProblemCode::UnsupportedExpression
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-099H
+contract_test!(
+    search_handles_filter_narrows_candidates,
+    super::test_search_handles_filter_narrows_candidates
+);
+
+pub async fn test_search_handles_filter_narrows_candidates(h: &impl FacadeContractHarness) {
+    create_variable_set_with_labels(
+        h,
+        TestAccount::Alice,
+        "search-filter-prod",
+        &[(RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI, "prod".into())],
+    )
+    .await;
+    create_variable_set_with_labels(
+        h,
+        TestAccount::Alice,
+        "search-filter-staging",
+        &[(RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI, "staging".into())],
+    )
+    .await;
+
+    let facade = h.facade_for(TestAccount::Alice);
+
+    // The filter travels on the identifier-expansion path that `get`/`delete`
+    // also use, so it must narrow the handle set, not just the summary list.
+    let response = facade
+        .search_handles(SearchResourceHandlesRequest {
+            raw_type_selectors: vec![VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()],
+            exact_names: None,
+            name_pattern: Some("search-filter-%".to_string()),
+            account: None,
+            label_filter: Some(label_filter(&[("environment", "prod")])),
+            pagination: PaginationOpts::from_max_results(1000),
+        })
+        .await
+        .unwrap();
+
+    assert_eq!(
+        sorted_handle_names(response.items),
+        vec!["search-filter-prod"]
+    );
+    assert_eq!(response.total_count, 1);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

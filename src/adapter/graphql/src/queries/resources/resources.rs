@@ -22,7 +22,9 @@ use crate::queries::{
     ResourceConnection,
     ResourceHandle,
     ResourceHandleConnection,
+    ResourceInvalidLabelFilterProblem,
     ResourceInvalidSearchQueryProblem,
+    ResourceLabelFilterInput,
     ResourceManifestFormat,
     ResourceRenderManifestResult,
     ResourceSelectorInput,
@@ -34,6 +36,7 @@ use crate::queries::{
     ResourceUnsupportedSelectorProblem,
     ResourcesSummary,
     SearchResourceHandlesInput,
+    into_facade_filter,
     map_unsupported_selector_problem,
 };
 
@@ -146,7 +149,7 @@ impl Resources {
         let spec_view_mode = Self::spec_view_mode_from_revealed(revealed);
 
         match resource_facade
-            .get_many(selector.into(), spec_view_mode)
+            .get_many(selector.try_into()?, spec_view_mode)
             .await
         {
             Ok(response) => Ok(BatchResourcesOutcome::Success(response.into())),
@@ -156,6 +159,9 @@ impl Resources {
             Err(kamu_resources_facade::BatchResourceError::BadAccount(e)) => Ok(
                 BatchResourcesOutcome::BadAccount(map_bad_account_problem(e)?),
             ),
+            Err(kamu_resources_facade::BatchResourceError::InvalidLabelFilter(e)) => {
+                Ok(BatchResourcesOutcome::InvalidLabelFilter(e.into()))
+            }
             Err(e) => Err(map_batch_resource_error(e)),
         }
     }
@@ -197,7 +203,7 @@ impl Resources {
     ) -> Result<BatchResourceHandlesOutcome> {
         let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
 
-        match resource_facade.get_handles(selector.into()).await {
+        match resource_facade.get_handles(selector.try_into()?).await {
             Ok(response) => Ok(BatchResourceHandlesOutcome::Success(response.into())),
             Err(kamu_resources_facade::BatchResourceError::UnsupportedSelector(e)) => {
                 Ok(BatchResourceHandlesOutcome::UnsupportedSelector(
@@ -207,6 +213,9 @@ impl Resources {
             Err(kamu_resources_facade::BatchResourceError::BadAccount(e)) => Ok(
                 BatchResourceHandlesOutcome::BadAccount(map_bad_account_problem(e)?),
             ),
+            Err(kamu_resources_facade::BatchResourceError::InvalidLabelFilter(e)) => {
+                Ok(BatchResourceHandlesOutcome::InvalidLabelFilter(e.into()))
+            }
             Err(e) => Err(map_batch_resource_error(e)),
         }
     }
@@ -219,6 +228,7 @@ impl Resources {
         ctx: &Context<'_>,
         resource_type: ResourceTypeSelectorInput,
         account: Option<AccountRefInput>,
+        label_filter: Option<ResourceLabelFilterInput>,
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<ResourceListOutcome> {
@@ -231,7 +241,7 @@ impl Resources {
                 raw_type_selector: resource_type.into_resource_type_selector(),
                 account: account.map(AccountRefInput::into_manifest_account),
                 pagination: PaginationOpts::from_page(page, per_page),
-                label_filter: None,
+                label_filter: into_facade_filter(label_filter)?,
             })
             .await
         {
@@ -251,6 +261,9 @@ impl Resources {
             Err(kamu_resources_facade::ListResourcesError::BadAccount(error)) => Ok(
                 ResourceListOutcome::BadAccount(map_bad_account_problem(error)?),
             ),
+            Err(kamu_resources_facade::ListResourcesError::InvalidLabelFilter(error)) => {
+                Ok(ResourceListOutcome::InvalidLabelFilter(error.into()))
+            }
             Err(error) => Err(map_list_resources_error(error)),
         }
     }
@@ -263,6 +276,7 @@ impl Resources {
         ctx: &Context<'_>,
         resource_type: ResourceTypeSelectorInput,
         account: Option<AccountRefInput>,
+        label_filter: Option<ResourceLabelFilterInput>,
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<ResourceHandleListOutcome> {
@@ -274,8 +288,7 @@ impl Resources {
             .list_handles(kamu_resources_facade::ListResourceHandlesRequest {
                 raw_type_selector: resource_type.into_resource_type_selector(),
                 account: account.map(AccountRefInput::into_manifest_account),
-                // Label filtering is not exposed over GraphQL yet.
-                label_filter: None,
+                label_filter: into_facade_filter(label_filter)?,
                 pagination: PaginationOpts::from_page(page, per_page),
             })
             .await
@@ -298,6 +311,9 @@ impl Resources {
             Err(kamu_resources_facade::ListResourcesError::InvalidSearchQuery(error)) => {
                 Ok(ResourceHandleListOutcome::InvalidSearchQuery(error.into()))
             }
+            Err(kamu_resources_facade::ListResourcesError::InvalidLabelFilter(error)) => {
+                Ok(ResourceHandleListOutcome::InvalidLabelFilter(error.into()))
+            }
             Err(error) => Err(map_list_resources_error(error)),
         }
     }
@@ -317,7 +333,7 @@ impl Resources {
         let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
 
         match resource_facade
-            .search_handles(query.into_facade_request(PaginationOpts::from_page(page, per_page)))
+            .search_handles(query.into_facade_request(PaginationOpts::from_page(page, per_page))?)
             .await
         {
             Ok(response) => {
@@ -342,6 +358,9 @@ impl Resources {
             Err(kamu_resources_facade::ListResourcesError::InvalidSearchQuery(error)) => {
                 Ok(ResourceHandleListOutcome::InvalidSearchQuery(error.into()))
             }
+            Err(kamu_resources_facade::ListResourcesError::InvalidLabelFilter(error)) => {
+                Ok(ResourceHandleListOutcome::InvalidLabelFilter(error.into()))
+            }
             Err(error) => Err(map_list_resources_error(error)),
         }
     }
@@ -353,6 +372,7 @@ impl Resources {
         &self,
         ctx: &Context<'_>,
         account: Option<AccountRefInput>,
+        label_filter: Option<ResourceLabelFilterInput>,
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<ResourceListAllOutcome> {
@@ -362,8 +382,7 @@ impl Resources {
 
         match resource_facade
             .list_all(kamu_resources_facade::ListAllResourcesRequest {
-                // Label filtering is not exposed over GraphQL yet.
-                label_filter: None,
+                label_filter: into_facade_filter(label_filter)?,
                 account: account.map(AccountRefInput::into_manifest_account),
                 pagination: PaginationOpts::from_page(page, per_page),
             })
@@ -382,6 +401,9 @@ impl Resources {
             Err(kamu_resources_facade::ListAllResourcesError::BadAccount(error)) => Ok(
                 ResourceListAllOutcome::BadAccount(map_bad_account_problem(error)?),
             ),
+            Err(kamu_resources_facade::ListAllResourcesError::InvalidLabelFilter(error)) => {
+                Ok(ResourceListAllOutcome::InvalidLabelFilter(error.into()))
+            }
             Err(error) => Err(map_list_all_resources_error(error)),
         }
     }
@@ -393,6 +415,7 @@ impl Resources {
         &self,
         ctx: &Context<'_>,
         account: Option<AccountRefInput>,
+        label_filter: Option<ResourceLabelFilterInput>,
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<ResourceHandleListAllOutcome> {
@@ -402,8 +425,7 @@ impl Resources {
 
         match resource_facade
             .list_all_handles(kamu_resources_facade::ListAllResourceHandlesRequest {
-                // Label filtering is not exposed over GraphQL yet.
-                label_filter: None,
+                label_filter: into_facade_filter(label_filter)?,
                 account: account.map(AccountRefInput::into_manifest_account),
                 pagination: PaginationOpts::from_page(page, per_page),
             })
@@ -418,6 +440,9 @@ impl Resources {
             }
             Err(kamu_resources_facade::ListAllResourcesError::BadAccount(error)) => Ok(
                 ResourceHandleListAllOutcome::BadAccount(map_bad_account_problem(error)?),
+            ),
+            Err(kamu_resources_facade::ListAllResourcesError::InvalidLabelFilter(error)) => Ok(
+                ResourceHandleListAllOutcome::InvalidLabelFilter(error.into()),
             ),
             Err(error) => Err(map_list_all_resources_error(error)),
         }
@@ -477,7 +502,7 @@ impl Resources {
         let spec_view_mode = Self::spec_view_mode_from_revealed(revealed);
 
         match resource_facade
-            .render_manifests(selector.into(), format.into(), spec_view_mode)
+            .render_manifests(selector.try_into()?, format.into(), spec_view_mode)
             .await
         {
             Ok(response) => Ok(BatchResourceManifestsOutcome::Success(response.into())),
@@ -489,6 +514,9 @@ impl Resources {
             Err(kamu_resources_facade::BatchResourceError::BadAccount(e)) => Ok(
                 BatchResourceManifestsOutcome::BadAccount(map_bad_account_problem(e)?),
             ),
+            Err(kamu_resources_facade::BatchResourceError::InvalidLabelFilter(e)) => {
+                Ok(BatchResourceManifestsOutcome::InvalidLabelFilter(e.into()))
+            }
             Err(e) => Err(map_batch_resource_error(e)),
         }
     }
@@ -535,6 +563,7 @@ pub enum ResourceListOutcome {
     Success(ResourceConnection),
     UnsupportedSelector(ResourceUnsupportedSelectorProblem),
     BadAccount(ResourceBadAccountProblem),
+    InvalidLabelFilter(ResourceInvalidLabelFilterProblem),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -545,6 +574,7 @@ pub enum ResourceHandleListOutcome {
     UnsupportedSelector(ResourceUnsupportedSelectorProblem),
     BadAccount(ResourceBadAccountProblem),
     InvalidSearchQuery(ResourceInvalidSearchQueryProblem),
+    InvalidLabelFilter(ResourceInvalidLabelFilterProblem),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -553,6 +583,7 @@ pub enum ResourceHandleListOutcome {
 pub enum ResourceListAllOutcome {
     Success(ResourceConnection),
     BadAccount(ResourceBadAccountProblem),
+    InvalidLabelFilter(ResourceInvalidLabelFilterProblem),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -561,6 +592,7 @@ pub enum ResourceListAllOutcome {
 pub enum ResourceHandleListAllOutcome {
     Success(ResourceHandleConnection),
     BadAccount(ResourceBadAccountProblem),
+    InvalidLabelFilter(ResourceInvalidLabelFilterProblem),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

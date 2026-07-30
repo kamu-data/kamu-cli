@@ -115,6 +115,14 @@ pub fn sorted_handle_names(mut items: Vec<kamu_resources::ResourceHandle>) -> Ve
         .collect()
 }
 
+pub fn sorted_summary_names(mut items: Vec<kamu_resources::ResourceSummaryView>) -> Vec<String> {
+    crate::helpers::normalize_summary_views(&mut items);
+    items
+        .into_iter()
+        .map(|item| item.name.to_string())
+        .collect()
+}
+
 pub fn total_schema_count(summary: kamu_resources::ResourcesSummary, schema: &TypeUri) -> u64 {
     summary
         .resource_counts
