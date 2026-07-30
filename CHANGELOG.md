@@ -13,6 +13,10 @@ Recommendation: for ease of reading, use the following format:
 ### Fixed
 -->
 
+# [Unreleased]
+### Fixed
+- Restored decimal type support in DDL schema (#1670)
+
 ## [0.265.0] - 2026-07-27
 ### Fixed
 - Fixed a long-standing upstream issue in `MetadataBlock` flatbuffers encoding where `Timestamp` struct was encoded unaligned. This means that if you re-serialize existing blocks - they will have a different binary layout and different hashes than the old ones. Compatibility notes:
