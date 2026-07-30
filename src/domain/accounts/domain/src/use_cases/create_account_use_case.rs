@@ -13,7 +13,7 @@ use email_utils::Email;
 use internal_error::InternalError;
 use odf::metadata::DidPkh;
 
-use crate::{Account, CreateAccountError, Password};
+use crate::{Account, AccountConfig, CreateAccountError, Password};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -21,8 +21,7 @@ use crate::{Account, CreateAccountError, Password};
 pub trait CreateAccountUseCase: Send + Sync {
     async fn execute(
         &self,
-        account: &Account,
-        password: &Password,
+        account_config: &AccountConfig,
         quiet: bool,
     ) -> Result<Account, CreateAccountError>;
 

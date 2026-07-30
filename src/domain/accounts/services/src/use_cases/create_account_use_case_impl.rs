@@ -12,9 +12,10 @@ use std::sync::Arc;
 
 use database_common::BatchLookup;
 use email_utils::Email;
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::{
     Account,
+    AccountConfig,
     AccountLifecycleMessage,
     AccountProvider,
     AccountService,
@@ -92,18 +93,28 @@ impl CreateAccountUseCaseImpl {
         Password::try_new(random_password).int_err()
     }
 
-    async fn save_account(
+    async fn save_password_account(
         &self,
         account: &Account,
         password: &Password,
+        account_key: odf::metadata::SigningKey,
     ) -> Result<(), CreateAccountError> {
-        self.account_service.save_account(account).await?;
+        if !AccountProvider::is_password(&account.provider) {
+            return Err(NonPasswordProviderError {
+                provider: account.provider.clone(),
+                account_name: account.account_name.clone(),
+            }
+            .int_err()
+            .into());
+        };
 
-        if account.provider == <&'static str>::from(AccountProvider::Password) {
-            self.account_service
-                .save_account_password(account, password)
-                .await?;
-        }
+        self.account_service.save_account(account).await?;
+        self.account_service
+            .save_account_password(account, password)
+            .await?;
+
+        self.maybe_save_private_key(&account.id, account_key)
+            .await?;
 
         Ok(())
     }
@@ -155,17 +166,33 @@ impl CreateAccountUseCaseImpl {
 impl CreateAccountUseCase for CreateAccountUseCaseImpl {
     async fn execute(
         &self,
-        account: &Account,
-        password: &Password,
+        account_config: &AccountConfig,
         quiet: bool,
     ) -> Result<Account, CreateAccountError> {
-        self.save_account(account, password).await?;
+        let (account_key, account_id) = odf::AccountID::new_generated_ed25519();
+
+        let account = Account {
+            id: account_id,
+            account_name: account_config.account_name.clone(),
+            email: account_config.email.clone(),
+            display_name: account_config.get_display_name(),
+            account_type: account_config.account_type,
+            avatar_url: account_config.avatar_url.clone(),
+            registered_at: account_config
+                .registered_at
+                .unwrap_or_else(|| self.time_source.now()),
+            provider: account_config.provider.clone(),
+            provider_identity_key: account_config.account_name.to_string(),
+        };
+
+        self.save_password_account(&account, &account_config.password, account_key)
+            .await?;
 
         if !quiet {
-            self.notify_account_created(account).await?;
+            self.notify_account_created(&account).await?;
         }
 
-        Ok(account.clone())
+        Ok(account)
     }
 
     async fn execute_derived(
@@ -200,8 +227,7 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
             provider_identity_key: String::from(account_name.as_str()),
         };
 
-        self.save_account(&account, &password).await?;
-        self.maybe_save_private_key(&account.id, account_key)
+        self.save_password_account(&account, &password, account_key)
             .await?;
 
         self.notify_account_created(&account).await?;
@@ -258,6 +284,15 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
 
         Ok(created_accounts)
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(thiserror::Error, Debug)]
+#[error("Non-password provider '{provider}' for password account '{account_name}'")]
+struct NonPasswordProviderError {
+    pub provider: String,
+    pub account_name: odf::AccountName,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
