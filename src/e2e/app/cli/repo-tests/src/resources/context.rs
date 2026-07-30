@@ -450,10 +450,30 @@ impl ResourceCtx {
 
     /// Run `list <type> -o json` and return the sorted resource names.
     pub async fn list_names(&self, type_selector: &str) -> Vec<String> {
-        let label = format!("list {type_selector} -o json");
-        let doc = self
-            .stdout_json(["list", type_selector, "-o", "json"])
-            .await;
+        self.list_names_with_labels(type_selector, &[]).await
+    }
+
+    /// Run `list <type> [-l <sel>]… -o json` and return the sorted resource
+    /// names.
+    ///
+    /// Each entry in `label_selectors` becomes its own `-l` flag, so scenarios
+    /// can exercise both the repeated-flag form and the comma-separated form a
+    /// single entry allows.
+    pub async fn list_names_with_labels(
+        &self,
+        type_selector: &str,
+        label_selectors: &[&str],
+    ) -> Vec<String> {
+        let mut args = vec!["list".to_string(), type_selector.to_string()];
+        for selector in label_selectors {
+            args.push("-l".to_string());
+            args.push((*selector).to_string());
+        }
+        args.push("-o".to_string());
+        args.push("json".to_string());
+
+        let label = args.join(" ");
+        let doc = self.stdout_json(args).await;
 
         let mut names: Vec<String> = doc
             .as_array()

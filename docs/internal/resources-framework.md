@@ -138,7 +138,7 @@ long-term goal. This page documents what exists now.
 | **Dispatcher** | Per-type adapter (`ResourceCrudDispatcher`, …) registered in `dill`, looked up by schema or selector metadata. |
 | **Facade** | The single API seam (`ResourceFacade`); local or remote-GraphQL impl. |
 | **TypeRef** | A label/annotation *key*: a short `TypeName` (e.g. registered `environment`, or free-form `env`) or a full schema URI, per ODF RFC-018 (`odf::metadata::resource::TypeRef` = `Uri \| Name`). `Ord`, so a `BTreeMap` key; serializes as a plain string. |
-| **Labels / Annotations** | `headers.{labels,annotations}`: `BTreeMap<TypeRef, serde_json::Value>` (arbitrary JSON keyed by `TypeRef`, not flat `String → String`). Manifest input starts as ordered `Vec<(TypeRef, Value)>` so duplicate keys can be rejected before map construction; registered extension keys are canonicalized to schema URI and typed-value validated during facade apply preparation. Per RFC-018, labels are meant to be indexed/queryable and annotations not — **indexing not yet implemented**. |
+| **Labels / Annotations** | `headers.{labels,annotations}`: `BTreeMap<TypeRef, serde_json::Value>` (arbitrary JSON keyed by `TypeRef`, not flat `String → String`). Manifest input starts as ordered `Vec<(TypeRef, Value)>` so duplicate keys can be rejected before map construction; registered extension keys are canonicalized to schema URI and typed-value validated during facade apply preparation. Per RFC-018, labels are meant to be indexed/queryable and annotations not: **string-valued** labels are indexed via `resource_labels_projection` and selectable with `--label`/`-l`; non-string values are stored but not indexed, so they can never be matched by an equality filter. Annotations are never indexed. |
 
 ---
 
@@ -601,8 +601,9 @@ Resources are **event-sourced with a materialized snapshot per resource**. Stora
   `deleted_at` (nullable), `last_event_id`. **Uniqueness:**
   `UNIQUE (account_id, resource_schema, resource_name)`.
   A partial index on `(account_id, resource_schema, status->>'phase') WHERE deleted_at IS NULL`
-  backs the summary projection. `labels`/`annotations` are untyped JSONB with **no index** — label
-  indexing for selector queries is deferred, not yet implemented. There is no dedicated
+  backs the summary projection. `labels`/`annotations` are untyped JSONB with **no index of their
+  own**; label selector queries are served by the separate `resource_labels_projection` table
+  (below), never by scanning this JSONB. There is no dedicated
   `description` column: `description` lives inside `annotations` as the first well-known
   annotation entry, so adding future well-known annotations needs no schema change.
 - **`resource_events`** — append-only log: `event_id` (BIGINT from a sequence, PK), `resource_id`
@@ -795,7 +796,9 @@ state; unknown short label/annotation names remain free-form. The validator repo
 Persistence carries it as `ResourcePersistenceError::InvalidDurableState`; public use-case
 boundaries translate that into an internal error because user-authored paths should have been
 rejected earlier. Delete is not blocked by this guard, so cleanup can still remove a resource that
-already contains corrupt extension state. Label indexing and filtering are later phases.
+already contains corrupt extension state. Label indexing and filtering are implemented — see
+[§10](#10-facade-kamu-resources-facade) for the resolved-filter tree and the AND-only evaluation
+boundary.
 
 ---
 
@@ -886,44 +889,68 @@ the normal per-item `data` is unavailable (see `GqlError::gql_extended` /
 `ResourceAccountResolverImpl` and `LocalResourceFacadeImpl`. (The remote impl is constructed
 on demand by the CLI for remote contexts — see [§12](#12-cli).)
 
-**Label filtering on `list`.** `ListResourcesRequest` carries an optional
-`label_filter: Option<ResourceLabelFilterInput>` (`ResourceLabelFilterInput` is a
-`kamu_resources` type alias to `odf::metadata::resource::LabelFilter`, raw
-`String`-keyed entries). It is supported **only** on the single-type `list` path —
-`list_handles`, `search_handles`, `list_all`, and `list_all_handles` have no filter
-field, since filtering a multi-schema query is not representable without per-type
-alias resolution. `LocalResourceFacadeImpl::list` resolves the schema via
-`dispatcher.schema()`, then resolves the filter through the same
-`ResourceExtensionSchemaResolver` used by manifest apply
-(`ResourceExtensionKind::Label`), producing a domain-level
-`ResolvedResourceLabelFilter { entries: Vec<(TypeRef, String)> }` — every key
-canonical (URI or free-form), every value a plain string. Resolution happens
-strictly before dispatch: a raw filter key that fails `TypeRef::from_str`, resolves
-to a non-label schema, resolves to an inapplicable/unknown URI, carries a
-non-string value, or collides with another key after canonicalization is rejected
-as `ResourceInvalidLabelFilterError` (`ListResourcesError::InvalidLabelFilter`)
-before any repository access. The resolved filter is threaded unchanged through
-`ResourceCrudDispatcherListRequest` → `ListResourcesByTypeUseCase` →
-`TypedResourceQueryService::list_states` → `ResourceRepository::list_resource_snapshots_by_schema`
-— repositories receive only the resolved predicate and never resolve aliases or
-touch the extension-schema registry. As of this writing the repositories accept the
-parameter but do not yet apply it (actual `resource_labels`-backed matching is a
-later phase); the GraphQL/remote transport for `label_filter` and the CLI
-`--selector` flag are likewise still unwired, so `list` currently ignores the
-filter end-to-end except for the local-facade resolution/rejection behavior above.
+**Label filtering on `list`, `get` and `delete`.** `ListResourcesRequest`,
+`ListResourceHandlesRequest`, and `SearchResourceHandlesRequest` each carry an
+optional `label_filter: Option<ResourceLabelFilterInput>` (`ResourceLabelFilterInput`
+is a `kamu_resources` type alias to `odf::metadata::resource::LabelFilter`, raw
+`String`-keyed entries), as does `ResourceBatchSelector`.
 
-The raw entries are first parsed by `ResourceLabelFilterExprParser::parse`
-(domain, `values/resource_label_filter_parser.rs`, separate from the model types
-in `values/resource_label_filter.rs`) into a `ResourceLabelFilterExpr` tree —
-`Eq { key, value }` leaves, plus reserved `$not`/`$or` combinator keys mirroring
-the shape the upstream ODF `LabelFilter` JSON Schema's own examples show
-(`{"$not": {...}}`, `{"$or": [...]}`). Only `Eq` is resolved today; a `$not`/`$or`
-node (well-formed or malformed) is rejected immediately with
-`ResourceLabelFilterProblemCode::UnsupportedExpression` — a purpose-built "not
-supported yet" code, rather than being misclassified as an invalid key or a
-non-string value. This is representational only: no repository, GraphQL, or CLI
-surface evaluates `$not`/`$or` — they exist so the wire shape is recognized ahead
-of a possible future boolean-expression phase.
+Filtering covers `get` and `delete` as well as `list` because the CLI resolves
+those in **two phases**: it first expands type/name patterns into identifiers via
+`search_handles`/`list_handles`, then operates on the resulting `ResourceRef::ById`
+set. A label filter is a *narrowing of the candidate identifier set* — structurally
+the same job as a name pattern — so it belongs to that phase-1 expansion. The
+phase-2 batch calls (`get_many`, `delete_many`, `render_manifests`) therefore pass
+`label_filter: None` **by design**: their ids were already narrowed. That is an
+ordering precondition held by convention, not by the type system — see the
+`FilteredResourceIds` note in [§17](#17-extension-points--gotchas).
+
+Resolution happens in the local facade, strictly before dispatch, through the same
+`ResourceExtensionSchemaResolver` used by manifest apply (`ResourceExtensionKind::Label`).
+A raw filter key that fails `TypeRef::from_str`, resolves to a non-label schema,
+resolves to an inapplicable/unknown URI, carries a non-string value, or collides
+with another key after canonicalization is rejected as
+`ResourceInvalidLabelFilterError` before any repository access. Repositories
+receive only the resolved predicate and never resolve aliases or touch the
+extension-schema registry.
+
+**Multi-type queries resolve the filter per schema and collapse.** `search_handles`
+may span several schemas. The filter is resolved once per candidate schema and the
+resolved trees compared: today they are always equal — the built-in `environment`
+label applies to every resource type and unregistered short names resolve to
+free-form identity — so the uniform single-predicate path is taken. The divergent
+case is *reserved, not implemented*: it is guarded by an assertion and a comment
+rather than by OR-across-types SQL that no test could exercise. A schema whose
+`applications` list excludes the filtered label is dropped from the candidate set
+(no resource of that type can match); only if **every** schema fails to resolve is
+the resolution error surfaced.
+
+**Resolved shape is a tree; evaluation is AND-only.** The raw entries are parsed by
+`ResourceLabelFilterExprParser::parse` (domain,
+`values/resource_label_filter_parser.rs`, separate from the model types in
+`values/resource_label_filter.rs`) into a `ResourceLabelFilterExpr` tree, and
+resolution produces the mirrored `ResolvedResourceLabelFilter`:
+
+```rust
+pub enum ResolvedResourceLabelFilter {
+    True,                                    // resolved form of "no filter"
+    Eq { key: TypeRef, value: String },
+    And(Vec<ResolvedResourceLabelFilter>),
+    Not(Box<ResolvedResourceLabelFilter>),
+    Or(Vec<ResolvedResourceLabelFilter>),
+}
+```
+
+The tree shape is deliberate: `$not`/`$or` are fully *representable and resolvable*,
+so adding support for them later is a backend-local change that touches no
+signature. The **capability boundary lives in the repository layer**, not the
+resolver: every backend calls the single shared helper `flatten_conjunction`, which
+walks `True`/`Eq`/`And` into a flat key/value pair list and returns
+`UnsupportedOperator` for `Not`/`Or`. That is mapped to
+`ResourceLabelFilterProblemCode::UnsupportedExpression` at the facade edge, so
+"what is supported" is defined in exactly one place. The duplicate-after-canonicalization
+check applies **per conjunction level** — two `Or` branches may legitimately test
+the same key.
 
 **`resource_labels_projection` index.** A normalized Postgres/SQLite table
 (`resource_id, label_key, label_value`, `PK(resource_id, label_key)`, `FK →
@@ -1003,6 +1030,25 @@ These map directly from the domain views in
 (`ApplyManifestPlan` / `ApplyManifestResult` / `ApplyManifestRejection` /
 `ApplyManifestChange` / `ApplyManifestChangeKind`).
 
+**Label-filter transport.** `ResourceLabelFilterInput { entries: [ResourceLabelFilterEntryInput!]! }`
+carries the filter, where each entry is `{ key: String!, value: JSON! }`. It is accepted by
+`list_by_resource_type`, `list_handles_by_resource_type`, `search_handles`, and (via
+`ResourceBatchSelectorInput`) the batch `resources`/`render_manifests` queries and the
+`delete_many` mutation.
+
+Entries are a **list, not a map**, so a key repeated by the caller reaches the server intact and is
+reported as a duplicate rather than one spelling silently winning — a map would collapse it in the
+transport before the server could see it. Note this catches only *literal* repeats; equivalent
+spellings of one key (short name vs canonical URI) collide later, during resolution.
+
+Filter failures surface as a `ResourceInvalidLabelFilterError` union variant carrying a stable
+`ResourceLabelFilterProblemCode` (`InvalidKey`, `ResourceExtensionSchema`, `NonStringValue`,
+`DuplicateAfterCanonicalization`, `UnsupportedExpression`). The typed code — rather than a message
+string — is what lets the remote facade **rebuild the same error the local facade raises**, which
+is what makes the `contract_test!` local/remote pairs assert identical behavior on both transports.
+The remote (cynic) client does mechanical mapping only: no alias resolution, validation, or
+canonicalization happens client-side.
+
 ---
 
 ## 12. CLI
@@ -1033,6 +1079,7 @@ implementations under `impl/`):
 | `ResourceManifestExecutionService` | Reads a discovered manifest and calls `plan_apply_manifest` / `apply_manifest`. |
 | `ResourceTypeLookupService` | Resolves a resource type by selector name/alias/raw string; caches `list_supported_resource_types` per context. |
 | `ResourceSelectionSyntaxService` | Parses the `get`/`delete` selector grammar. |
+| `ResourceLabelSelectorParser` | Parses `--label`/`-l` arguments into the wire-level `ResourceLabelFilterInput` (scanner + parser pair). Passes keys/values through verbatim — alias resolution and schema validation belong to the facade. |
 | `ResourceSelectionResolutionService` | Expands parsed selectors into concrete targets via facade queries. |
 | `ResourceSelectorResolutionService` | Resolves a single selector string to a `ResourceRef`. |
 | `ResourceSummaryService` | Produces the dashboard summary (context info + per-type counts). |
@@ -1050,7 +1097,8 @@ themselves are agnostic. Selector grammar is specified below, after the semantic
 | May return / act on multiple | yes (per manifest) | **yes, but bounded** — selector-driven, capped by `max_results`, `--unbounded` to lift | yes (bounded by `--max-results`/`--unbounded`) | yes |
 | Output modes | summary + changes (`--dry-run`)/warnings; verbose | `-o name` \| `-o json` \| `-o yaml`; `--spec` for apply-compatible spec | Table/CSV/JSON/Parquet (via `OutputConfig`), `-w` for wider detail | summary / dry-run preview |
 | Default secret visibility | n/a | **`Encrypted`** (ciphertext); `--revealed` to decrypt | secrets not expanded in list columns | n/a |
-| Relevant flags | `--dry-run`, `--recursive`, `--stdin`, `--continue-on-error` | `--ignore-not-found`, `--spec`, `--revealed`, `--max-results`/`--unbounded` | `--max-results`/`--unbounded`, `-w`, `-o` | `--force`, `--ignore-not-found`, `--dry-run` |
+| Relevant flags | `--dry-run`, `--recursive`, `--stdin`, `--continue-on-error` | `--ignore-not-found`, `--spec`, `--revealed`, `--max-results`/`--unbounded`, `--label`/`-l` | `--max-results`/`--unbounded`, `-w`, `-o`, `--label`/`-l` | `--force`, `--ignore-not-found`, `--dry-run`, `--label`/`-l` |
+| Label filtering | n/a | `-l` narrows the selector expansion | `-l` narrows the listing (incl. `list all`) | `-l` narrows what `--all`/patterns resolve to |
 | Flag semantics | default: whole batch is one transaction, a rejection/failure rolls back every manifest including earlier successes; `--continue-on-error`: apply each manifest independently so earlier successes survive a later failure; `--dry-run`: plan only, no writes | `--ignore-not-found`: skip missing selectors instead of erroring | — | `--force`: skip confirmation prompt; `--ignore-not-found`: exit OK if absent; `--dry-run`: preview resolved deletions |
 | Local vs remote | identical behavior; chosen by context (`--context` to override) | identical | identical | identical |
 
@@ -1074,6 +1122,32 @@ themselves are agnostic. Selector grammar is specified below, after the semantic
 
 (`kamu get all` *is* accepted, bounded by `--max-results`/`--unbounded`; prefer `kamu list all` for
 unbounded enumeration — a guidance boundary, not a parser rejection.)
+
+**Label selector grammar (`--label`/`-l`)** — parsed by `ResourceLabelSelectorParser`
+([`resource_label_selector_parser.rs`](/src/app/cli/src/services/resources/impl/resource_label_selector_parser.rs)),
+with escape handling split into a companion scanner:
+
+```ebnf
+selector    = [ conjunction ] , eof ;
+conjunction = predicate , { separator , predicate } ;
+predicate   = word , equals , word ;
+```
+
+Flat `key=value` equality only, ANDed. Repeated flags accumulate, so `-l a=1 -l b=2` and
+`-l a=1,b=2` are equivalent. `=` and `,` are reserved delimiters **everywhere, including inside
+values** — a second `=` in a predicate is a syntax error, not part of the value; write `\=`,
+`\,`, or `\\` for literals. An empty key is rejected; an empty value is allowed. A duplicate
+authored key across all flags is an error.
+
+Only the conjunctive fragment is expressible **on purpose**: `$not`/`$or` are representable in the
+resolved tree but rejected at evaluation, and the reserved sigils are rejected by the grammar *now*
+so that adding them later is a grammar extension rather than a breaking reinterpretation of input
+that parses today. Likewise `!=`/`in`/`notin` produce an explicit unsupported-syntax error rather
+than being silently misparsed.
+
+`-l` applies to resources only. `list datasets -l …` and `delete datasets -l …` (including the
+mixed dataset+resource form) are rejected — datasets carry no labels, and filtering only the
+resource half of a mixed delete would still delete every named dataset unfiltered.
 
 ---
 
@@ -1448,4 +1522,17 @@ Otherwise the behavior is already guaranteed for both implementations by the con
 - **Local ≡ remote is a contract-test invariant for covered behavior** — the `contract_test!` suite
   enforces parity only for the cases it exercises (not untested paths); when changing facade
   behavior, extend that suite so both implementations stay in lockstep.
+- **Phase-1 expansion is where label filters apply — phase-2 `None` is load-bearing.** `get` and
+  `delete` first expand selectors into identifiers (filtered), then act on those ids by
+  `ResourceRef::ById`. The phase-2 batch calls — `get_many`, `delete_many`, `render_manifests` —
+  therefore pass `label_filter: None` deliberately. **This is an ordering precondition enforced by
+  convention, not by types.** A future caller that reaches those batch methods with ids that did
+  *not* come from a filtered expansion would silently return resources the filter should have
+  excluded, with no error and no failing test. If you add such a caller, filter during expansion —
+  do not add a second filter to the batch call. (A `FilteredResourceIds` newtype making this
+  compiler-checked is planned but not yet implemented.)
+- **The label-filter capability boundary is `flatten_conjunction`, in one place.** The resolved
+  filter is a full boolean tree, but evaluation is AND-only. Every backend routes through that one
+  domain helper, which rejects `Not`/`Or`. Widening support means changing it and the backends —
+  never a signature, and never the resolver.
 - **Test convention:** use `assert_matches!` directly (never `assert!(matches!(...))`).

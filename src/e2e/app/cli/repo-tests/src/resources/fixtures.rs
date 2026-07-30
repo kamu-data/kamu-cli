@@ -282,6 +282,36 @@ pub fn variable_set_manifest_with_environment_label(
     )
 }
 
+/// A `VariableSet` manifest carrying the built-in `environment` label **and** a
+/// free-form `team` label — the two-predicate fixture for AND-ed label
+/// filtering, where one predicate is schema-registered (canonicalized to
+/// [`ENVIRONMENT_LABEL_SCHEMA`]) and the other stays free-form.
+///
+/// Mixing the two kinds in one resource is deliberate: it proves the AND is
+/// evaluated over the *stored* keys, after canonicalization has rewritten only
+/// the registered one.
+pub fn variable_set_manifest_with_environment_and_team_labels(
+    name: &str,
+    environment: &str,
+    team: &str,
+) -> String {
+    indoc::formatdoc!(
+        r#"
+        $schema: {VARIABLE_SET_SCHEMA}
+        headers:
+          name: {name}
+          labels:
+            environment: {environment}
+            team: {team}
+          annotations:
+            description: {DEFAULT_DESCRIPTION}
+        spec:
+          variables:
+            MESSAGE: value
+        "#
+    )
+}
+
 /// A `VariableSet` manifest carrying a label under an unregistered
 /// `https://…` URI key — exercises the "unknown URI is rejected" rule
 /// (registered URIs are a closed set).
