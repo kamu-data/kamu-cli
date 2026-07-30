@@ -155,6 +155,13 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         let schema =
             self.resolve_schema_for_selector::<BatchResourceError>(&selector.resource_type)?;
 
+        let resource_schema = ResourceSchemaId::try_from(&schema).int_err()?;
+        let label_filter = resolve_label_filter(
+            &self.resource_extension_schema_resolver,
+            selector.label_filter.clone(),
+            &resource_schema,
+        )?;
+
         let groups = group_batch_resource_refs(selector);
         let resolution_response = resolve_batch_ids(
             self.generic_resource_query_service.as_ref(),
@@ -170,6 +177,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
                 &schema,
                 resolution_response.id_entries,
                 resolution_response.problems,
+                &label_filter,
             )
             .await?;
 
@@ -285,9 +293,22 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         let schema =
             self.resolve_schema_for_selector::<ListResourcesError>(&request.raw_type_selector)?;
 
+        let resource_schema = ResourceSchemaId::try_from(&schema).int_err()?;
+
+        let label_filter = resolve_label_filter(
+            &self.resource_extension_schema_resolver,
+            request.label_filter,
+            &resource_schema,
+        )?;
+
         let snapshots = self
             .generic_resource_query_service
-            .list_snapshots_by_schema(target_account.did, &schema, request.pagination)
+            .list_snapshots_by_schema(
+                target_account.did,
+                &schema,
+                &label_filter,
+                request.pagination,
+            )
             .await?;
 
         Ok(map_snapshots_to_handles(snapshots))
@@ -373,9 +394,11 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .resolve_target_account(request.account.as_ref())
             .await?;
 
+        let label_filter = self.resolve_label_filter_for_all_schemas(request.label_filter)?;
+
         let snapshots = self
             .generic_resource_query_service
-            .list_all_snapshots(target_account.did, request.pagination)
+            .list_all_snapshots(target_account.did, &label_filter, request.pagination)
             .await?;
 
         Ok(snapshots.into_iter().map(Into::into).collect())
@@ -390,9 +413,11 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .resolve_target_account(request.account.as_ref())
             .await?;
 
+        let label_filter = self.resolve_label_filter_for_all_schemas(request.label_filter)?;
+
         let snapshots = self
             .generic_resource_query_service
-            .list_all_snapshots(target_account.did, request.pagination)
+            .list_all_snapshots(target_account.did, &label_filter, request.pagination)
             .await?;
 
         Ok(map_snapshots_to_handles(snapshots))
@@ -521,6 +546,13 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         let schema =
             self.resolve_schema_for_selector::<BatchResourceError>(&selector.resource_type)?;
 
+        let resource_schema = ResourceSchemaId::try_from(&schema).int_err()?;
+        let label_filter = resolve_label_filter(
+            &self.resource_extension_schema_resolver,
+            selector.label_filter.clone(),
+            &resource_schema,
+        )?;
+
         let groups = group_batch_resource_refs(selector);
         let resolution_response = resolve_batch_ids(
             self.generic_resource_query_service.as_ref(),
@@ -543,7 +575,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 
         let rows_by_id = self
             .generic_resource_query_service
-            .find_resource_handles_by_ids(&target_account.did, &ids)
+            .find_resource_handles_by_ids(&target_account.did, &ids, &label_filter)
             .await?
             .into_iter()
             .map(|row| (row.id, row))
@@ -604,6 +636,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
                 account: selector.account,
                 resource_type: selector.resource_type,
                 resource_refs: vec![selector.resource_ref],
+                label_filter: None,
             })
             .await?;
 
@@ -620,6 +653,32 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl LocalResourceFacadeImpl {
+    /// Resolves an authored filter for the `all` scope.
+    ///
+    /// `all` spans every registered schema, so the filter is resolved against
+    /// all of them at once — the same uniformity guarantee `search_handles`
+    /// relies on. Schemas that reject the filter are simply not returned,
+    /// which is harmless here: the repository applies one predicate across all
+    /// schemas, and a resource whose schema rejected the key cannot carry it.
+    fn resolve_label_filter_for_all_schemas(
+        &self,
+        label_filter: Option<ResourceLabelFilterInput>,
+    ) -> Result<ResolvedResourceLabelFilter, ResourceInvalidLabelFilterError> {
+        let resource_schema_ids = self
+            .list_resource_type_descriptors()
+            .iter()
+            .map(|descriptor| ResourceSchemaId::try_from(&descriptor.schema))
+            .collect::<Result<Vec<_>, _>>()
+            .expect("registered descriptors always carry canonical schema URIs");
+
+        let (_, resolved) = resolve_label_filter_for_schemas(
+            &self.resource_extension_schema_resolver,
+            label_filter,
+            &resource_schema_ids,
+        )?;
+
+        Ok(resolved)
+    }
     fn list_resource_type_descriptors(&self) -> Vec<ResourceTypeDescriptor> {
         let mut seen = HashSet::new();
         let mut descriptors = Vec::new();
@@ -740,6 +799,8 @@ impl LocalResourceFacadeImpl {
         let schema =
             self.resolve_schema_for_selector::<BatchResourceError>(&selector.resource_type)?;
 
+        // Batch selectors name their targets explicitly, so callers narrow by
+        // labels through `get_handles` before reaching this point.
         let groups = group_batch_resource_refs(selector);
 
         let resolution_response = resolve_batch_ids(
@@ -819,6 +880,7 @@ impl LocalResourceFacadeImpl {
         schema: &TypeUri,
         id_entries: BatchIdEntries,
         mut problems: Vec<BatchResourceProblem<ResourceLookupProblem>>,
+        label_filter: &ResolvedResourceLabelFilter,
     ) -> Result<
         (
             Vec<IndexedResource<ResourceHandle>>,
@@ -830,18 +892,31 @@ impl LocalResourceFacadeImpl {
 
         let rows_by_id = self
             .generic_resource_query_service
-            .find_resource_handles_by_ids(account_id, &ids)
+            .find_resource_handles_by_ids(account_id, &ids, label_filter)
             .await?
             .into_iter()
             .map(|row| (row.id, row))
             .collect::<HashMap<_, _>>();
 
         let mut handles = Vec::new();
-        for (request_index, _, id) in id_entries {
-            let row_result = rows_by_id
-                .get(id.as_ref())
-                .cloned()
-                .ok_or_else(|| id_not_found(id));
+        for (request_index, resource_ref, id) in id_entries {
+            // A row can be absent because the id does not exist or because the
+            // label filter excluded it. Either way, report the miss in the
+            // terms the caller selected by, so a filtered-out `vs/my-vars`
+            // still names `my-vars` rather than its resolved id.
+            let not_found = || match &resource_ref {
+                ResourceRef::ByName(name) => resource_type_name(schema)
+                    .map(|type_name| {
+                        ResourceLookupProblem::NameNotFound(ResourceNameNotFoundError {
+                            type_name,
+                            name: name.clone(),
+                        })
+                    })
+                    .unwrap_or_else(|_| id_not_found(id)),
+                ResourceRef::ById(_) => id_not_found(id),
+            };
+
+            let row_result = rows_by_id.get(id.as_ref()).cloned().ok_or_else(not_found);
             match row_result.and_then(|row| {
                 validate_handle_row(row, schema, ensure_schema_matches::<ResourceLookupProblem>)
             }) {

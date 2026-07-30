@@ -97,7 +97,11 @@ pub async fn test_no_resources_initially(catalog: &Catalog) {
     assert!(ids.is_empty());
 
     let snapshots: Vec<_> = repo
-        .list_all_resource_snapshots(account_id, PaginationOpts::from_max_results(100))
+        .list_all_resource_snapshots(
+            account_id,
+            &ResolvedResourceLabelFilter::True,
+            PaginationOpts::from_max_results(100),
+        )
         .try_collect()
         .await
         .unwrap();
@@ -535,9 +539,9 @@ pub async fn test_resource_name_case_insensitive(catalog: &Catalog) {
         .unwrap();
     assert_eq!(found, Some(id));
 
-    // --- find_resource_handles_by_names is case-insensitive ---
+    // --- resolve_resource_ids_by_names is case-insensitive ---
     let rows = repo
-        .find_resource_handles_by_names(
+        .resolve_resource_ids_by_names(
             &account_handle.did,
             &TEST_KIND,
             &[
@@ -547,7 +551,10 @@ pub async fn test_resource_name_case_insensitive(catalog: &Catalog) {
         )
         .await
         .unwrap();
-    let mut names = rows.into_iter().map(|r| r.name).collect::<Vec<_>>();
+    let mut names = rows
+        .into_iter()
+        .map(|(name, _)| name.to_string())
+        .collect::<Vec<_>>();
     names.sort();
     assert_eq!(names, vec!["my-resource", "other-resource"]);
 
@@ -1239,7 +1246,11 @@ pub async fn test_list_all_resource_snapshots(catalog: &Catalog) {
     repo.create_resource(&other).await.unwrap();
 
     let all: Vec<_> = repo
-        .list_all_resource_snapshots(account_handle.did, PaginationOpts::from_max_results(100))
+        .list_all_resource_snapshots(
+            account_handle.did,
+            &ResolvedResourceLabelFilter::True,
+            PaginationOpts::from_max_results(100),
+        )
         .try_collect()
         .await
         .unwrap();

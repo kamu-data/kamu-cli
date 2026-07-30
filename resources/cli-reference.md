@@ -677,6 +677,7 @@ Delete datasets or resources
 * `-f`, `--force` — Do not ask for confirmation
 * `--ignore-not-found` — Exit successfully when a selected resource does not exist
 * `--dry-run` — Preview the resolved resource deletions without deleting anything
+* `-l`, `--label <LABEL_SELECTOR>` — Narrow the selection to resources carrying all of the given labels, as `key=value` pairs (repeatable, or comma-separated)
 
 This command deletes datasets using the legacy dataset path by default, or
 resources when a resource target is specified explicitly.
@@ -743,6 +744,10 @@ Preview deletion:
 
     kamu delete dataset/my.dataset vs/my-vars --dry-run
 
+Narrow a deletion to resources carrying a label:
+
+    kamu delete variablesets --all -l environment=stale --dry-run
+
 
 
 
@@ -801,6 +806,7 @@ Returns manifest representation of a resource
 
   Default value: `100`
 * `--unbounded` — Disable the limit for expanding selectors
+* `-l`, `--label <LABEL_SELECTOR>` — Narrow the selection to resources carrying all of the given labels, as `key=value` pairs (repeatable, or comma-separated)
 
 Returns the current state of one or more resources as YAML or JSON.
 
@@ -857,6 +863,10 @@ Read a resource from a remote context:
 Ignore missing resources:
 
     kamu get secretsets missing-a missing-b --ignore-not-found
+
+Narrow matched resources to those carrying a label:
+
+    kamu get 'variablesets/%' -l environment=production
 
 
 
@@ -1058,6 +1068,7 @@ List datasets or resources
 * `-w`, `--wide` — Show more details (repeat for more)
 * `--max-results <N>` — Maximum number of results to list
 * `--unbounded` — Disable the result limit
+* `-l`, `--label <LABEL_SELECTOR>` — Narrow the listing to resources carrying all of the given labels, as `key=value` pairs (repeatable, or comma-separated)
 
 **Examples:**
 
@@ -1084,6 +1095,14 @@ To list storages from a specific context:
 To see more details:
 
     kamu list -w
+
+To list only resources carrying a label:
+
+    kamu list variablesets -l environment=production
+
+To require several labels at once:
+
+    kamu list variablesets -l environment=production,tier=backend
 
 To get a machine-readable list of all resources:
 

@@ -61,20 +61,21 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
         &self,
         account_id: &odf::AccountID,
         ids: &[ResourceID],
+        label_filter: &ResolvedResourceLabelFilter,
     ) -> Result<Vec<ResourceHandleRow>, InternalError> {
         self.resource_repository
-            .find_resource_handles_by_ids(account_id, ids)
+            .find_resource_handles_by_ids(account_id, ids, label_filter)
             .await
     }
 
-    async fn find_resource_handles_by_names(
+    async fn resolve_resource_ids_by_names(
         &self,
         account_id: &odf::AccountID,
         schema: &TypeUri,
         names: &[ResourceName],
-    ) -> Result<Vec<ResourceHandleRow>, InternalError> {
+    ) -> Result<Vec<(ResourceName, ResourceID)>, InternalError> {
         self.resource_repository
-            .find_resource_handles_by_names(account_id, schema, names)
+            .resolve_resource_ids_by_names(account_id, schema, names)
             .await
     }
 
@@ -236,15 +237,12 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
         &self,
         account_id: odf::AccountID,
         schema: &TypeUri,
+        label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceSnapshot>, InternalError> {
-        let mut resource_snapshots_stream =
-            self.resource_repository.list_resource_snapshots_by_schema(
-                account_id,
-                schema,
-                pagination,
-                &kamu_resources::ResolvedResourceLabelFilter::default(),
-            );
+        let mut resource_snapshots_stream = self
+            .resource_repository
+            .list_resource_snapshots_by_schema(account_id, schema, pagination, label_filter);
 
         use tokio_stream::StreamExt;
 
@@ -259,11 +257,14 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
     async fn list_all_snapshots(
         &self,
         account_id: odf::AccountID,
+        label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceSnapshot>, InternalError> {
-        let mut resource_snapshots_stream = self
-            .resource_repository
-            .list_all_resource_snapshots(account_id, pagination);
+        let mut resource_snapshots_stream = self.resource_repository.list_all_resource_snapshots(
+            account_id,
+            label_filter,
+            pagination,
+        );
 
         use tokio_stream::StreamExt;
 

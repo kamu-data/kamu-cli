@@ -296,10 +296,13 @@ impl ResourceRepository for PostgresResourceRepository {
         &self,
         account_id: &odf::AccountID,
         ids: &[ResourceID],
+        label_filter: &ResolvedResourceLabelFilter,
     ) -> Result<Vec<ResourceHandleRow>, InternalError> {
         if ids.is_empty() {
             return Ok(Vec::new());
         }
+
+        let (label_keys, label_values) = split_label_filter_pairs(label_filter)?;
 
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
@@ -325,10 +328,24 @@ impl ResourceRepository for PostgresResourceRepository {
             WHERE r.account_id = $1
               AND r.resource_id = ANY($2)
               AND r.deleted_at IS NULL
+              -- Same "no pair is missing" predicate as the listing paths.
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM UNNEST($4::text[], $5::text[]) AS f(k, v)
+                  WHERE NOT EXISTS (
+                      SELECT 1
+                      FROM resource_labels_projection rl
+                      WHERE rl.resource_id = r.resource_id
+                        AND rl.label_key = f.k
+                        AND rl.label_value = f.v
+                  )
+              )
             "#,
             account_id_stack.as_str(),
             &ids,
             kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL,
+            &label_keys,
+            &label_values,
         )
         .fetch_all(connection_mut)
         .await
@@ -337,12 +354,12 @@ impl ResourceRepository for PostgresResourceRepository {
         Ok(rows)
     }
 
-    async fn find_resource_handles_by_names(
+    async fn resolve_resource_ids_by_names(
         &self,
         account_id: &odf::AccountID,
         schema: &TypeUri,
         names: &[ResourceName],
-    ) -> Result<Vec<ResourceHandleRow>, InternalError> {
+    ) -> Result<Vec<(ResourceName, ResourceID)>, InternalError> {
         if names.is_empty() {
             return Ok(Vec::new());
         }
@@ -352,21 +369,12 @@ impl ResourceRepository for PostgresResourceRepository {
 
         let account_id_stack = account_id.as_stack_string();
 
-        let rows = sqlx::query_as!(
-            ResourceHandleRow,
+        let rows = sqlx::query!(
             r#"
             SELECT
                 r.resource_id as "id: uuid::Uuid",
-                r.resource_schema as schema,
-                r.resource_name as name,
-                r.account_id as "account_id: odf::AccountID",
-                -- LEFT JOIN: a.resource_id is NULL only when the owning account
-                -- row is gone (deletion racing async cleanup), same case the
-                -- account_name sentinel covers. Substitute the nil resource id.
-                COALESCE(a.resource_id, '00000000-0000-0000-0000-000000000000'::uuid) as "account_resource_id!: uuid::Uuid",
-                COALESCE(a.account_name, $4) as "account_name!"
+                r.resource_name as name
             FROM resources r
-            LEFT JOIN accounts a ON a.id = r.account_id
             WHERE r.account_id = $1
               AND r.resource_schema = $2
               AND LOWER(r.resource_name) = ANY($3)
@@ -378,13 +386,20 @@ impl ResourceRepository for PostgresResourceRepository {
                 .iter()
                 .map(|n| n.to_ascii_lowercase())
                 .collect::<Vec<_>>() as _,
-            kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL,
         )
         .fetch_all(connection_mut)
         .await
         .int_err()?;
 
-        Ok(rows)
+        Ok(rows
+            .into_iter()
+            .map(|row| {
+                (
+                    ResourceName::new_unchecked(&row.name),
+                    ResourceID::new(row.id),
+                )
+            })
+            .collect())
     }
 
     async fn search_resource_handles(
@@ -953,9 +968,14 @@ impl ResourceRepository for PostgresResourceRepository {
     fn list_all_resource_snapshots(
         &self,
         account_id: odf::AccountID,
+        label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
     ) -> ResourceSnapshotStream<'_> {
+        let label_filter_pairs = split_label_filter_pairs(label_filter);
+
         Box::pin(async_stream::stream! {
+            let (label_keys, label_values) = label_filter_pairs?;
+
             let mut tr = self.transaction.lock().await;
             let connection_mut = tr.connection_mut().await?;
 
@@ -988,6 +1008,19 @@ impl ResourceRepository for PostgresResourceRepository {
                 LEFT JOIN accounts a ON a.id = r.account_id
                 WHERE r.account_id = $1
                   AND r.deleted_at IS NULL
+                  -- Same "no pair is missing" predicate as the per-schema
+                  -- listing, so `list all` filters identically to `list <type>`.
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM UNNEST($5::text[], $6::text[]) AS f(k, v)
+                      WHERE NOT EXISTS (
+                          SELECT 1
+                          FROM resource_labels_projection rl
+                          WHERE rl.resource_id = r.resource_id
+                            AND rl.label_key = f.k
+                            AND rl.label_value = f.v
+                      )
+                  )
                 ORDER BY r.updated_at DESC, r.resource_id DESC
                 LIMIT $2 OFFSET $3
                 "#,
@@ -995,6 +1028,8 @@ impl ResourceRepository for PostgresResourceRepository {
                 limit,
                 offset,
                 kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL,
+                &label_keys,
+                &label_values,
             )
             .fetch(connection_mut)
             .map_err(ErrorIntoInternal::int_err);

@@ -9,7 +9,12 @@
 
 use database_common::PaginationOpts;
 
-use crate::domain::{GenericResourceQueryService, ListAllResourcesUseCase, ResourceSnapshot};
+use crate::domain::{
+    GenericResourceQueryService,
+    ListAllResourcesUseCase,
+    ResolvedResourceLabelFilter,
+    ResourceSnapshot,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -26,10 +31,11 @@ impl ListAllResourcesUseCase for ListAllResourcesUseCaseImpl {
     async fn execute(
         &self,
         account_id: odf::AccountID,
+        label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceSnapshot>, internal_error::InternalError> {
         self.generic_resource_query_service
-            .list_all_snapshots(account_id, pagination)
+            .list_all_snapshots(account_id, label_filter, pagination)
             .await
     }
 }

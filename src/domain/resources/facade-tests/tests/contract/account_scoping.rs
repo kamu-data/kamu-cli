@@ -153,6 +153,7 @@ fn batch_selector_by_name(
 ) -> ResourceBatchSelector {
     ResourceBatchSelector {
         account,
+        label_filter: None,
         resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
         resource_refs: vec![ResourceRef::ByName(name.parse().unwrap())],
     }
@@ -354,6 +355,7 @@ pub async fn test_unknown_account_is_rejected(h: &impl FacadeContractHarness) {
     let by_id = facade
         .list_all(ListAllResourcesRequest {
             account: Some(unknown_account_by_id()),
+            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await;
@@ -431,6 +433,7 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
         .list_handles(ListResourceHandlesRequest {
             raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             account: None,
+            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -439,6 +442,7 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
         .list_handles(ListResourceHandlesRequest {
             raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             account: None,
+            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -486,6 +490,7 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
     let alice_all = alice
         .list_all_handles(ListAllResourceHandlesRequest {
             account: None,
+            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -493,6 +498,7 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
     let bob_all = bob
         .list_all(ListAllResourcesRequest {
             account: None,
+            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await

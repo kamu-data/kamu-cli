@@ -104,6 +104,8 @@ impl From<ResourceBatchSelectorInput> for kamu_resources_facade::ResourceBatchSe
             account: value.account.map(AccountRefInput::into_manifest_account),
             resource_type: value.resource_type.into_resource_type_selector(),
             resource_refs: value.resource_refs.into_iter().map(Into::into).collect(),
+            // Label filtering is not exposed over GraphQL yet.
+            label_filter: None,
         }
     }
 }

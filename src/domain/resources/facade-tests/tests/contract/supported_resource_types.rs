@@ -142,6 +142,7 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
         .list_handles(ListResourceHandlesRequest {
             raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             account: None,
+            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -301,6 +302,7 @@ pub async fn test_unsupported_schema_rejected_consistently(h: &impl FacadeContra
         .list_handles(ListResourceHandlesRequest {
             raw_type_selector: bad_type.parse().unwrap(),
             account: None,
+            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await;

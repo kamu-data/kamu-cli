@@ -249,10 +249,14 @@ impl ResourceRepository for SqliteResourceRepository {
         &self,
         account_id: &odf::AccountID,
         ids: &[ResourceID],
+        label_filter: &ResolvedResourceLabelFilter,
     ) -> Result<Vec<ResourceHandleRow>, InternalError> {
         if ids.is_empty() {
             return Ok(Vec::new());
         }
+
+        let label_pairs =
+            ResourceLabelFilterPredicate::flatten_conjunction(label_filter).int_err()?;
 
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
@@ -262,6 +266,22 @@ impl ResourceRepository for SqliteResourceRepository {
 
         let uids_placeholders =
             sqlite_generate_placeholders_list(ids.len(), NonZeroUsize::new(3).unwrap());
+
+        // Each filter pair contributes two more placeholders after the ids.
+        let mut label_predicates = String::new();
+        let mut next_placeholder = 3 + ids.len();
+        for _ in &label_pairs {
+            use std::fmt::Write;
+            write!(
+                label_predicates,
+                " AND EXISTS (SELECT 1 FROM resource_labels_projection rl WHERE rl.resource_id = \
+                 r.resource_id AND rl.label_key = ${} AND rl.label_value = ${})",
+                next_placeholder,
+                next_placeholder + 1,
+            )
+            .expect("writing to a String cannot fail");
+            next_placeholder += 2;
+        }
 
         let query_str = format!(
             r#"
@@ -276,7 +296,7 @@ impl ResourceRepository for SqliteResourceRepository {
             LEFT JOIN accounts a ON a.id = r.account_id
             WHERE r.account_id = $1
               AND r.resource_id IN ({uids_placeholders})
-              AND r.deleted_at IS NULL
+              AND r.deleted_at IS NULL{label_predicates}
             "#,
         );
 
@@ -286,18 +306,21 @@ impl ResourceRepository for SqliteResourceRepository {
         for id in ids {
             query = query.bind(*id.as_ref());
         }
+        for (key, value) in &label_pairs {
+            query = query.bind(key.to_string()).bind((*value).to_string());
+        }
 
         let rows = query.fetch_all(connection_mut).await.int_err()?;
 
         Ok(rows)
     }
 
-    async fn find_resource_handles_by_names(
+    async fn resolve_resource_ids_by_names(
         &self,
         account_id: &odf::AccountID,
         schema: &TypeUri,
         names: &[ResourceName],
-    ) -> Result<Vec<ResourceHandleRow>, InternalError> {
+    ) -> Result<Vec<(ResourceName, ResourceID)>, InternalError> {
         if names.is_empty() {
             return Ok(Vec::new());
         }
@@ -309,19 +332,14 @@ impl ResourceRepository for SqliteResourceRepository {
         let account_id_str = account_id_stack.as_str();
 
         let names_placeholders =
-            sqlite_generate_placeholders_list(names.len(), NonZeroUsize::new(4).unwrap());
+            sqlite_generate_placeholders_list(names.len(), NonZeroUsize::new(3).unwrap());
 
         let query_str = format!(
             r#"
             SELECT
                 r.resource_id as id,
-                r.resource_schema as schema,
-                r.resource_name as name,
-                r.account_id as account_id,
-                COALESCE(a.resource_id, X'00000000000000000000000000000000') as account_resource_id,
-                COALESCE(a.account_name, $3) as account_name
+                r.resource_name as name
             FROM resources r
-            LEFT JOIN accounts a ON a.id = r.account_id
             WHERE r.account_id = $1
               AND r.resource_schema = $2
               AND r.resource_name COLLATE NOCASE IN ({names_placeholders})
@@ -329,10 +347,9 @@ impl ResourceRepository for SqliteResourceRepository {
             "#,
         );
 
-        let mut query = sqlx::query_as::<_, ResourceHandleRow>(&query_str)
+        let mut query = sqlx::query_as::<_, (uuid::Uuid, String)>(&query_str)
             .bind(account_id_str)
-            .bind(schema.as_str())
-            .bind(kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL);
+            .bind(schema.as_str());
 
         for name in names {
             query = query.bind(name.to_string());
@@ -340,7 +357,10 @@ impl ResourceRepository for SqliteResourceRepository {
 
         let rows = query.fetch_all(connection_mut).await.int_err()?;
 
-        Ok(rows)
+        Ok(rows
+            .into_iter()
+            .map(|(id, name)| (ResourceName::new_unchecked(&name), ResourceID::new(id)))
+            .collect())
     }
 
     async fn search_resource_handles(
@@ -860,9 +880,15 @@ impl ResourceRepository for SqliteResourceRepository {
     fn list_all_resource_snapshots(
         &self,
         account_id: odf::AccountID,
+        label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
     ) -> ResourceSnapshotStream<'_> {
+        let label_filter = label_filter.clone();
+
         Box::pin(async_stream::stream! {
+            let label_pairs =
+                ResourceLabelFilterPredicate::flatten_conjunction(&label_filter).int_err()?;
+
             let mut tr = self.transaction.lock().await;
             let connection_mut = tr.connection_mut().await?;
 
@@ -871,64 +897,52 @@ impl ResourceRepository for SqliteResourceRepository {
             let limit = i64::try_from(pagination.limit).int_err()?;
             let offset = i64::try_from(pagination.offset).int_err()?;
 
-            let mut query_stream = sqlx::query!(
+            // Built dynamically rather than via `sqlx::query!` because the
+            // label filter contributes a variable number of predicates.
+            let mut query_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
                 r#"
                 SELECT
-                    r.resource_id as "id: uuid::Uuid",
-                    r.account_id as "account_id: odf::AccountID",
-                    COALESCE(a.resource_id, X'00000000000000000000000000000000') as "account_resource_id!: uuid::Uuid",
-                    COALESCE(a.account_name, 'deleted-account') as "account_name!: String",
+                    r.resource_id as id,
+                    r.account_id,
+                    COALESCE(a.resource_id, X'00000000000000000000000000000000') as account_resource_id,
+                    COALESCE(a.account_name, "#,
+            );
+            query_builder.push_bind(DELETED_ACCOUNT_NAME_SENTINEL);
+            query_builder.push(
+                r#") as account_name,
                     r.resource_schema,
                     r.resource_name,
-                    r.labels as "labels: serde_json::Value",
-                    r.annotations as "annotations: serde_json::Value",
-                    r.spec as "spec: serde_json::Value",
-                    r.status as "status: serde_json::Value",
+                    r.labels,
+                    r.annotations,
+                    r.spec,
+                    r.status,
                     r.generation,
-                    r.created_at as "created_at: DateTime<Utc>",
-                    r.updated_at as "updated_at: DateTime<Utc>",
-                    r.deleted_at as "deleted_at: DateTime<Utc>",
+                    r.created_at,
+                    r.updated_at,
+                    r.deleted_at,
                     r.last_event_id
                 FROM resources r
                 LEFT JOIN accounts a ON a.id = r.account_id
-                WHERE r.account_id = $1
-                  AND r.deleted_at IS NULL
-                ORDER BY r.updated_at DESC, r.resource_id DESC
-                LIMIT $2 OFFSET $3
-                "#,
-                account_id_str,
-                limit,
-                offset,
-            )
+                WHERE r.account_id = "#,
+            );
+            query_builder.push_bind(account_id_str);
+            query_builder.push(" AND r.deleted_at IS NULL");
+
+            push_label_filter_predicates(&mut query_builder, &label_pairs);
+
+            query_builder
+                .push(" ORDER BY r.updated_at DESC, r.resource_id DESC LIMIT ")
+                .push_bind(limit)
+                .push(" OFFSET ")
+                .push_bind(offset);
+
+            let mut query_stream = query_builder
+                .build_query_as::<ResourceSnapshotRow>()
             .fetch(connection_mut)
             .map_err(ErrorIntoInternal::int_err);
 
             while let Some(row) = query_stream.try_next().await? {
-                yield Ok(ResourceSnapshot {
-                    id: ResourceID::new(row.id),
-                    schema: TypeUri::new_unchecked(row.resource_schema),
-                    headers: ResourceHeaders {
-                        id: ResourceID::new(row.id),
-                        account: odf::AccountHandle {
-                            id: ResourceID::new(row.account_resource_id),
-                            did: row.account_id,
-                            name: odf::AccountName::new_unchecked(&row.account_name),
-                        },
-                        name: kamu_resources::ResourceName::new_unchecked(&row.resource_name),
-                        labels: kamu_resources::resource_labels_from_json(row.labels),
-                        annotations: kamu_resources::resource_annotations_from_json(row.annotations),
-                        generation: u64::try_from(row.generation).unwrap(),
-                        created_at: row.created_at,
-                        updated_at: row.updated_at,
-                        deleted_at: row.deleted_at,
-                    },
-                    spec: row.spec,
-                    status: row
-                        .status
-                        .as_ref()
-                        .and_then(ResourceSnapshot::basic_status_from_json),
-                    last_event_id: row.last_event_id.map(EventID::new),
-                });
+                yield Ok(row.into_snapshot());
             }
         })
     }

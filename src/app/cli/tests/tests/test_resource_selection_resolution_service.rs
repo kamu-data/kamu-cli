@@ -97,9 +97,10 @@ async fn resolves_exact_type_name_patterns_via_search() {
                 shadowed_selectors: Vec::new(),
             },
             &harness.facade,
-            ResourceSelectionResolutionOptions {
+            &ResourceSelectionResolutionOptions {
                 ignore_not_found: false,
                 max_expanded_results: Some(10),
+                label_filter: None,
             },
         )
         .await
@@ -136,9 +137,10 @@ async fn ignores_unmatched_name_patterns_when_requested() {
                 shadowed_selectors: Vec::new(),
             },
             &harness.facade,
-            ResourceSelectionResolutionOptions {
+            &ResourceSelectionResolutionOptions {
                 ignore_not_found: true,
                 max_expanded_results: Some(10),
+                label_filter: None,
             },
         )
         .await
@@ -171,9 +173,10 @@ async fn errors_on_unmatched_name_patterns_by_default() {
                 shadowed_selectors: Vec::new(),
             },
             &harness.facade,
-            ResourceSelectionResolutionOptions {
+            &ResourceSelectionResolutionOptions {
                 ignore_not_found: false,
                 max_expanded_results: Some(10),
+                label_filter: None,
             },
         )
         .await
@@ -237,9 +240,10 @@ async fn resolves_type_patterns_with_exact_names_in_supported_type_order() {
                 shadowed_selectors: Vec::new(),
             },
             &harness.facade,
-            ResourceSelectionResolutionOptions {
+            &ResourceSelectionResolutionOptions {
                 ignore_not_found: false,
                 max_expanded_results: Some(10),
+                label_filter: None,
             },
         )
         .await
@@ -307,9 +311,10 @@ async fn resolves_type_pattern_all_via_search_across_matched_types() {
                 shadowed_selectors: Vec::new(),
             },
             &harness.facade,
-            ResourceSelectionResolutionOptions {
+            &ResourceSelectionResolutionOptions {
                 ignore_not_found: false,
                 max_expanded_results: Some(10),
+                label_filter: None,
             },
         )
         .await
@@ -376,9 +381,10 @@ async fn resolves_type_pattern_name_patterns_via_single_search_across_matched_ty
                 shadowed_selectors: Vec::new(),
             },
             &harness.facade,
-            ResourceSelectionResolutionOptions {
+            &ResourceSelectionResolutionOptions {
                 ignore_not_found: false,
                 max_expanded_results: Some(10),
+                label_filter: None,
             },
         )
         .await
@@ -446,9 +452,10 @@ async fn type_pattern_exact_id_tries_every_matched_type() {
                 shadowed_selectors: Vec::new(),
             },
             &harness.facade,
-            ResourceSelectionResolutionOptions {
+            &ResourceSelectionResolutionOptions {
                 ignore_not_found: false,
                 max_expanded_results: Some(10),
+                label_filter: None,
             },
         )
         .await
@@ -485,9 +492,10 @@ async fn ignores_unmatched_type_pattern_exact_selectors_when_requested() {
                 shadowed_selectors: Vec::new(),
             },
             &harness.facade,
-            ResourceSelectionResolutionOptions {
+            &ResourceSelectionResolutionOptions {
                 ignore_not_found: true,
                 max_expanded_results: Some(10),
+                label_filter: None,
             },
         )
         .await
@@ -523,9 +531,10 @@ async fn errors_on_unmatched_type_pattern_exact_selectors_by_default() {
                 shadowed_selectors: Vec::new(),
             },
             &harness.facade,
-            ResourceSelectionResolutionOptions {
+            &ResourceSelectionResolutionOptions {
                 ignore_not_found: false,
                 max_expanded_results: Some(10),
+                label_filter: None,
             },
         )
         .await
@@ -557,9 +566,10 @@ async fn ignores_unmatched_type_pattern_name_patterns_when_requested() {
                 shadowed_selectors: Vec::new(),
             },
             &harness.facade,
-            ResourceSelectionResolutionOptions {
+            &ResourceSelectionResolutionOptions {
                 ignore_not_found: true,
                 max_expanded_results: Some(10),
+                label_filter: None,
             },
         )
         .await
@@ -593,9 +603,10 @@ async fn errors_on_unmatched_type_pattern_name_patterns_by_default() {
                 shadowed_selectors: Vec::new(),
             },
             &harness.facade,
-            ResourceSelectionResolutionOptions {
+            &ResourceSelectionResolutionOptions {
                 ignore_not_found: false,
                 max_expanded_results: Some(10),
+                label_filter: None,
             },
         )
         .await
@@ -648,9 +659,10 @@ async fn deduplicates_overlapping_name_patterns_before_counting_max_results() {
                 shadowed_selectors: Vec::new(),
             },
             &harness.facade,
-            ResourceSelectionResolutionOptions {
+            &ResourceSelectionResolutionOptions {
                 ignore_not_found: false,
                 max_expanded_results: Some(1),
+                label_filter: None,
             },
         )
         .await
@@ -711,9 +723,10 @@ async fn deduplicates_repeated_type_pattern_exact_name_matches() {
                 shadowed_selectors: Vec::new(),
             },
             &harness.facade,
-            ResourceSelectionResolutionOptions {
+            &ResourceSelectionResolutionOptions {
                 ignore_not_found: false,
                 max_expanded_results: Some(1),
+                label_filter: None,
             },
         )
         .await
@@ -783,9 +796,10 @@ async fn deduplicates_type_pattern_all_before_counting_max_results() {
                 shadowed_selectors: Vec::new(),
             },
             &harness.facade,
-            ResourceSelectionResolutionOptions {
+            &ResourceSelectionResolutionOptions {
                 ignore_not_found: false,
                 max_expanded_results: Some(1),
+                label_filter: None,
             },
         )
         .await
@@ -841,9 +855,10 @@ async fn deduplicates_type_pattern_name_patterns_before_counting_max_results() {
                 shadowed_selectors: Vec::new(),
             },
             &harness.facade,
-            ResourceSelectionResolutionOptions {
+            &ResourceSelectionResolutionOptions {
                 ignore_not_found: false,
                 max_expanded_results: Some(1),
+                label_filter: None,
             },
         )
         .await
@@ -908,9 +923,10 @@ async fn errors_when_unique_targets_exceed_max_results_after_deduplication() {
                 shadowed_selectors: Vec::new(),
             },
             &harness.facade,
-            ResourceSelectionResolutionOptions {
+            &ResourceSelectionResolutionOptions {
                 ignore_not_found: false,
                 max_expanded_results: Some(1),
+                label_filter: None,
             },
         )
         .await
@@ -924,6 +940,211 @@ async fn errors_when_unique_targets_exceed_max_results_after_deduplication() {
 
     let requests = search_requests.lock().unwrap();
     assert_eq!(requests.len(), 1);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn passes_the_label_filter_to_pattern_expansion() {
+    let mut harness = ResourceSelectionResolutionHarness::new();
+    let search_requests = Arc::new(Mutex::new(Vec::new()));
+    harness.expect_search_handles(
+        1,
+        vec![ResourceHandle {
+            r#type: variableset_type_uri().clone(),
+            did: None,
+            id: ResourceID::new(uuid::Uuid::new_v4()),
+            name: "app-alpha".parse().unwrap(),
+            account: DEFAULT_ACCOUNT_HANDLE.clone(),
+        }],
+        Arc::clone(&search_requests),
+    );
+
+    let result = harness
+        .service
+        .resolve(
+            ResourceSelectionSyntax {
+                items: vec![ResourceSelectionItem::NamePattern {
+                    type_descriptor: harness.variableset_type_descriptor(),
+                    selector_input: NAME_APP_PATTERN.to_string(),
+                    name_pattern: NAME_APP_PATTERN.to_string(),
+                }],
+                shadowed_selectors: Vec::new(),
+            },
+            &harness.facade,
+            &ResourceSelectionResolutionOptions {
+                ignore_not_found: false,
+                max_expanded_results: Some(10),
+                label_filter: Some(environment_label_filter()),
+            },
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(result.targets.len(), 1);
+
+    // The filter must reach the backend, not be applied after expansion:
+    // `--max-results` counts matched resources only.
+    let requests = search_requests.lock().unwrap();
+    assert_eq!(requests.len(), 1);
+    assert_eq!(
+        requests[0].label_filter.as_ref(),
+        Some(&environment_label_filter())
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn passes_the_label_filter_to_the_all_selector() {
+    let mut harness = ResourceSelectionResolutionHarness::new();
+    harness.expect_list_supported_resource_types(vec![harness.variableset_type_descriptor()]);
+
+    let list_all_requests = Arc::new(Mutex::new(Vec::new()));
+    harness.expect_list_all_handles(
+        vec![ResourceHandle {
+            r#type: variableset_type_uri().clone(),
+            did: None,
+            id: ResourceID::new(uuid::Uuid::new_v4()),
+            name: "app-alpha".parse().unwrap(),
+            account: DEFAULT_ACCOUNT_HANDLE.clone(),
+        }],
+        Arc::clone(&list_all_requests),
+    );
+
+    let result = harness
+        .service
+        .resolve(
+            ResourceSelectionSyntax {
+                items: vec![ResourceSelectionItem::All],
+                shadowed_selectors: Vec::new(),
+            },
+            &harness.facade,
+            &ResourceSelectionResolutionOptions {
+                ignore_not_found: false,
+                max_expanded_results: Some(10),
+                label_filter: Some(environment_label_filter()),
+            },
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(result.targets.len(), 1);
+
+    // `all` spans every schema, and the facade resolves the filter against all
+    // of them, so the filter must reach the backend rather than be rejected.
+    let requests = list_all_requests.lock().unwrap();
+    assert_eq!(requests.len(), 1);
+    assert_eq!(
+        requests[0].label_filter.as_ref(),
+        Some(&environment_label_filter())
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn narrows_exact_selectors_by_the_label_filter() {
+    let matching_id = ResourceID::new(uuid::Uuid::new_v4());
+
+    let matching = ResourceHandle {
+        r#type: variableset_type_uri().clone(),
+        did: None,
+        id: matching_id,
+        name: "vars-a".parse().unwrap(),
+        account: DEFAULT_ACCOUNT_HANDLE.clone(),
+    };
+
+    // The facade applies the filter inside the batch lookup, so `vars-b` comes
+    // back as a not-found problem rather than being dropped afterwards.
+    let mut harness = ResourceSelectionResolutionHarness::new();
+    let batch_selectors = Arc::new(Mutex::new(Vec::new()));
+    harness.expect_get_handles(1, vec![matching], Arc::clone(&batch_selectors));
+
+    // No follow-up search: filtering exact selectors must stay one round trip.
+    harness.expect_search_handles(0, Vec::new(), Arc::new(Mutex::new(Vec::new())));
+
+    let result = harness
+        .service
+        .resolve(
+            ResourceSelectionSyntax {
+                items: vec![
+                    harness.exact_selection_item("vars-a"),
+                    harness.exact_selection_item("vars-b"),
+                ],
+                shadowed_selectors: Vec::new(),
+            },
+            &harness.facade,
+            &ResourceSelectionResolutionOptions {
+                // Filtered-out resources surface as "not found", so this keeps
+                // the assertion on the target set rather than on the error.
+                ignore_not_found: true,
+                max_expanded_results: Some(10),
+                label_filter: Some(environment_label_filter()),
+            },
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(result.targets.len(), 1);
+    assert_eq!(result.targets[0].id, matching_id);
+    assert_eq!(result.ignored_selectors.len(), 1);
+
+    let selectors = batch_selectors.lock().unwrap();
+    assert_eq!(selectors.len(), 1);
+    assert_eq!(
+        selectors[0].label_filter.as_ref(),
+        Some(&environment_label_filter())
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn leaves_exact_selectors_untouched_without_a_label_filter() {
+    let handle = ResourceHandle {
+        r#type: variableset_type_uri().clone(),
+        did: None,
+        id: ResourceID::new(uuid::Uuid::new_v4()),
+        name: "vars-a".parse().unwrap(),
+        account: DEFAULT_ACCOUNT_HANDLE.clone(),
+    };
+
+    let mut harness = ResourceSelectionResolutionHarness::new();
+    harness.expect_get_handles(1, vec![handle], Arc::new(Mutex::new(Vec::new())));
+
+    // Still exactly one round trip, with no filter attached.
+    harness.expect_search_handles(0, Vec::new(), Arc::new(Mutex::new(Vec::new())));
+
+    let result = harness
+        .service
+        .resolve(
+            ResourceSelectionSyntax {
+                items: vec![harness.exact_selection_item("vars-a")],
+                shadowed_selectors: Vec::new(),
+            },
+            &harness.facade,
+            &ResourceSelectionResolutionOptions {
+                ignore_not_found: false,
+                max_expanded_results: Some(10),
+                label_filter: None,
+            },
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(result.targets.len(), 1);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn environment_label_filter() -> kamu_resources::ResourceLabelFilterInput {
+    kamu_resources::ResourceLabelFilterInput {
+        entries: std::collections::BTreeMap::from([(
+            "environment".to_string(),
+            serde_json::Value::String("production".to_string()),
+        )]),
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1000,6 +1221,76 @@ impl ResourceSelectionResolutionHarness {
                     )
                     .into()),
                 }
+            });
+    }
+
+    /// Answers a batch exact lookup with `handles`, matched by name against
+    /// the requested refs so request order is preserved.
+    fn expect_get_handles(
+        &mut self,
+        times: usize,
+        handles: Vec<ResourceHandle>,
+        batch_selectors: Arc<Mutex<Vec<kamu_resources_facade::ResourceBatchSelector>>>,
+    ) {
+        self.facade
+            .expect_get_handles()
+            .times(times)
+            .returning(move |selector| {
+                batch_selectors.lock().unwrap().push(selector.clone());
+
+                let mut successes = Vec::new();
+                let mut problems = Vec::new();
+
+                for (request_index, resource_ref) in selector.resource_refs.iter().enumerate() {
+                    let ResourceRef::ByName(name) = resource_ref else {
+                        panic!("this harness resolves exact selectors by name only");
+                    };
+
+                    match handles.iter().find(|handle| handle.name == *name) {
+                        Some(handle) => {
+                            successes.push(kamu_resources_facade::BatchResourceSuccess {
+                                request_index,
+                                item: handle.clone(),
+                            });
+                        }
+                        None => problems.push(kamu_resources_facade::BatchResourceProblem {
+                            request_index,
+                            error: ResourceLookupProblem::NameNotFound(ResourceNameNotFoundError {
+                                type_name: kamu_resources::TypeName::new_unchecked(
+                                    selector.resource_type.as_str(),
+                                ),
+                                name: name.clone(),
+                            }),
+                        }),
+                    }
+                }
+
+                Ok(kamu_resources_facade::BatchResourceResponse {
+                    successes,
+                    problems,
+                })
+            });
+    }
+
+    fn exact_selection_item(&self, name: &str) -> ResourceSelectionItem {
+        ResourceSelectionItem::Exact(resources::ResourceExactSelector {
+            type_descriptor: self.variableset_type_descriptor(),
+            selector_input: format!("{VARIABLESETS_SHORT_NAME}/{name}"),
+            resource_ref: ResourceRef::ByName(name.parse().unwrap()),
+        })
+    }
+
+    fn expect_list_all_handles(
+        &mut self,
+        handles: Vec<ResourceHandle>,
+        requests: Arc<Mutex<Vec<kamu_resources_facade::ListAllResourceHandlesRequest>>>,
+    ) {
+        self.facade
+            .expect_list_all_handles()
+            .times(1)
+            .returning(move |request| {
+                requests.lock().unwrap().push(request);
+                Ok(handles.clone())
             });
     }
 

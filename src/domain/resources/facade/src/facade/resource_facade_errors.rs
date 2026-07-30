@@ -215,6 +215,9 @@ pub enum BatchResourceError {
     BadAccount(#[from] ResolveManifestAccountError),
 
     #[error(transparent)]
+    InvalidLabelFilter(#[from] ResourceInvalidLabelFilterError),
+
+    #[error(transparent)]
     RemoteRequest(#[from] GraphqlHttpRequestError),
 
     #[error(transparent)]
@@ -295,6 +298,9 @@ pub enum ListAllResourcesError {
     BadAccount(#[from] ResolveManifestAccountError),
 
     #[error(transparent)]
+    InvalidLabelFilter(#[from] ResourceInvalidLabelFilterError),
+
+    #[error(transparent)]
     RemoteRequest(#[from] GraphqlHttpRequestError),
 
     #[error(transparent)]
@@ -351,6 +357,9 @@ impl From<BatchResourceError> for DeleteResourceError {
         match err {
             BatchResourceError::UnsupportedSelector(err) => Self::UnsupportedSelector(err),
             BatchResourceError::BadAccount(err) => Self::BadAccount(err),
+            // `delete` resolves a single pre-selected ref, so it never carries
+            // a label filter for this to surface from.
+            BatchResourceError::InvalidLabelFilter(err) => Self::Internal(err.int_err()),
             BatchResourceError::RemoteRequest(err) => Self::RemoteRequest(err),
             BatchResourceError::Internal(err) => Self::Internal(err),
         }

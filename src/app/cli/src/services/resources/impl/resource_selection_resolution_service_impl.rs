@@ -53,7 +53,7 @@ impl ResourceSelectionResolutionService for ResourceSelectionResolutionServiceIm
         &self,
         selection: ResourceSelectionSyntax,
         resource_facade: &dyn ResourceFacade,
-        options: ResourceSelectionResolutionOptions,
+        options: &ResourceSelectionResolutionOptions,
     ) -> Result<ResourceSelectionResolution, CLIError> {
         let mut targets = Vec::with_capacity(selection.items.len());
         let mut ignored_selectors = Vec::new();
@@ -68,7 +68,12 @@ impl ResourceSelectionResolutionService for ResourceSelectionResolutionServiceIm
         // replaying results in the original selector order below. At this point
         // shadowed selectors are already absent from `selection.items`, because the
         // syntax layer moved them into `shadowed_selectors` instead.
-        let exact_results = Self::fetch_exact_identities(&selection, resource_facade).await?;
+        let exact_results = Self::fetch_exact_identities(
+            &selection,
+            resource_facade,
+            options.label_filter.as_ref(),
+        )
+        .await?;
         let mut exact_results = exact_results.into_iter();
 
         for item in selection.items {
@@ -267,6 +272,7 @@ impl ResourceSelectionResolutionServiceImpl {
     async fn fetch_exact_identities(
         selection: &ResourceSelectionSyntax,
         resource_facade: &dyn ResourceFacade,
+        label_filter: Option<&kamu_resources::ResourceLabelFilterInput>,
     ) -> Result<Vec<Result<ResourceHandle, GetResourceError>>, CLIError> {
         let exact_selectors = selection
             .items
@@ -291,7 +297,7 @@ impl ResourceSelectionResolutionServiceImpl {
         let mut exact_results = (0..exact_request_count)
             .map(|_| None)
             .collect::<Vec<Option<Result<ResourceHandle, GetResourceError>>>>();
-        let mut groups = BTreeMap::new();
+        let mut groups: BTreeMap<kamu_resources::ResourceTypeSelectorRaw, Vec<_>> = BTreeMap::new();
 
         for (exact_index, (_, resource_type, resource_ref)) in
             exact_selectors.into_iter().enumerate()
@@ -311,6 +317,10 @@ impl ResourceSelectionResolutionServiceImpl {
                         .iter()
                         .map(|(_, resource_ref)| resource_ref.clone())
                         .collect(),
+                    // Applied by this same lookup, so no follow-up query: a ref
+                    // that resolves but lacks the labels comes back as a
+                    // not-found problem.
+                    label_filter: label_filter.cloned(),
                 })
                 .await?;
 
@@ -338,20 +348,24 @@ impl ResourceSelectionResolutionServiceImpl {
         supported_resource_types: &[ResourceTypeDescriptor],
         seen_target_keys: &HashSet<ResourceTargetKey>,
         expanded_results: usize,
-        options: ResourceSelectionResolutionOptions,
+        options: &ResourceSelectionResolutionOptions,
     ) -> Result<Vec<ResourceTarget>, CLIError> {
         let collected = Self::collect_unique_bounded_identities(
             Self::remaining_expanded_results(expanded_results, options),
             options.max_expanded_results,
             seen_target_keys,
-            |pagination| async move {
-                resource_facade
-                    .list_all_handles(ListAllResourceHandlesRequest {
-                        account: None,
-                        pagination,
-                    })
-                    .await
-                    .map_err(Into::into)
+            |pagination| {
+                let request_label_filter = options.label_filter.clone();
+                async move {
+                    resource_facade
+                        .list_all_handles(ListAllResourceHandlesRequest {
+                            account: None,
+                            label_filter: request_label_filter,
+                            pagination,
+                        })
+                        .await
+                        .map_err(Into::into)
+                }
             },
         )
         .await?;
@@ -403,21 +417,25 @@ impl ResourceSelectionResolutionServiceImpl {
         seen_target_keys: &HashSet<ResourceTargetKey>,
         selector_input: String,
         expanded_results: usize,
-        options: ResourceSelectionResolutionOptions,
+        options: &ResourceSelectionResolutionOptions,
     ) -> Result<Vec<ResourceTarget>, CLIError> {
         let collected = Self::collect_unique_bounded_identities(
             Self::remaining_expanded_results(expanded_results, options),
             options.max_expanded_results,
             seen_target_keys,
-            |pagination| async move {
-                resource_facade
-                    .list_handles(ListResourceHandlesRequest {
-                        raw_type_selector: (&type_descriptor.canonical_selector).into(),
-                        account: None,
-                        pagination,
-                    })
-                    .await
-                    .map_err(Into::into)
+            |pagination| {
+                let request_label_filter = options.label_filter.clone();
+                async move {
+                    resource_facade
+                        .list_handles(ListResourceHandlesRequest {
+                            raw_type_selector: (&type_descriptor.canonical_selector).into(),
+                            account: None,
+                            label_filter: request_label_filter,
+                            pagination,
+                        })
+                        .await
+                        .map_err(Into::into)
+                }
             },
         )
         .await?;
@@ -442,7 +460,7 @@ impl ResourceSelectionResolutionServiceImpl {
         type_pattern: String,
         selector_input: String,
         expanded_results: usize,
-        options: ResourceSelectionResolutionOptions,
+        options: &ResourceSelectionResolutionOptions,
     ) -> Result<Vec<ResourceTarget>, CLIError> {
         let matched_types = Self::matched_type_descriptors(supported_resource_types, &type_pattern);
 
@@ -466,6 +484,7 @@ impl ResourceSelectionResolutionServiceImpl {
             seen_target_keys,
             |pagination| {
                 let raw_type_selectors = matched_resource_type_selectors.clone();
+                let request_label_filter = options.label_filter.clone();
                 async move {
                     resource_facade
                         .search_handles(SearchResourceHandlesRequest {
@@ -473,7 +492,7 @@ impl ResourceSelectionResolutionServiceImpl {
                             exact_names: None,
                             name_pattern: None,
                             account: None,
-                            label_filter: None,
+                            label_filter: request_label_filter,
                             pagination,
                         })
                         .await
@@ -509,7 +528,7 @@ impl ResourceSelectionResolutionServiceImpl {
         name_pattern: String,
         expanded_results: usize,
         ignored_selectors: &mut Vec<ResourceIgnoredSelector>,
-        options: ResourceSelectionResolutionOptions,
+        options: &ResourceSelectionResolutionOptions,
     ) -> Result<Vec<ResourceTarget>, CLIError> {
         let collected = Self::collect_unique_bounded_identities(
             Self::remaining_expanded_results(expanded_results, options),
@@ -517,6 +536,7 @@ impl ResourceSelectionResolutionServiceImpl {
             seen_target_keys,
             |pagination| {
                 let request_name_pattern = name_pattern.clone();
+                let request_label_filter = options.label_filter.clone();
                 async move {
                     resource_facade
                         .search_handles(SearchResourceHandlesRequest {
@@ -524,7 +544,7 @@ impl ResourceSelectionResolutionServiceImpl {
                             exact_names: None,
                             name_pattern: Some(request_name_pattern),
                             account: None,
-                            label_filter: None,
+                            label_filter: request_label_filter,
                             pagination,
                         })
                         .await
@@ -572,7 +592,7 @@ impl ResourceSelectionResolutionServiceImpl {
         resource_ref: kamu_resources_facade::ResourceRef,
         expanded_results: usize,
         ignored_selectors: &mut Vec<ResourceIgnoredSelector>,
-        options: ResourceSelectionResolutionOptions,
+        options: &ResourceSelectionResolutionOptions,
     ) -> Result<Vec<ResourceTarget>, CLIError> {
         let matched_types = Self::matched_type_descriptors(supported_resource_types, &type_pattern);
 
@@ -658,7 +678,7 @@ impl ResourceSelectionResolutionServiceImpl {
         name_pattern: String,
         expanded_results: usize,
         ignored_selectors: &mut Vec<ResourceIgnoredSelector>,
-        options: ResourceSelectionResolutionOptions,
+        options: &ResourceSelectionResolutionOptions,
     ) -> Result<Vec<ResourceTarget>, CLIError> {
         let matched_types = Self::matched_type_descriptors(supported_resource_types, &type_pattern);
 
@@ -683,6 +703,7 @@ impl ResourceSelectionResolutionServiceImpl {
             |pagination| {
                 let request_resource_types = matched_resource_type_selectors.clone();
                 let request_name_pattern = name_pattern.clone();
+                let request_label_filter = options.label_filter.clone();
                 async move {
                     resource_facade
                         .search_handles(SearchResourceHandlesRequest {
@@ -690,7 +711,7 @@ impl ResourceSelectionResolutionServiceImpl {
                             exact_names: None,
                             name_pattern: Some(request_name_pattern),
                             account: None,
-                            label_filter: None,
+                            label_filter: request_label_filter,
                             pagination,
                         })
                         .await
@@ -742,7 +763,7 @@ impl ResourceSelectionResolutionServiceImpl {
         seen_target_keys: &mut HashSet<ResourceTargetKey>,
         targets: &mut Vec<ResourceTarget>,
         ignored_selectors: &mut Vec<ResourceIgnoredSelector>,
-        options: ResourceSelectionResolutionOptions,
+        options: &ResourceSelectionResolutionOptions,
     ) -> Result<(), CLIError> {
         match exact_results
             .next()
@@ -831,7 +852,7 @@ impl ResourceSelectionResolutionServiceImpl {
 
     fn remaining_expanded_results(
         expanded_results: usize,
-        options: ResourceSelectionResolutionOptions,
+        options: &ResourceSelectionResolutionOptions,
     ) -> Option<usize> {
         options
             .max_expanded_results

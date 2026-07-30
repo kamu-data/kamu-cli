@@ -117,6 +117,7 @@ pub async fn test_list_handles_for_account(h: &impl FacadeContractHarness) {
         .list_handles(ListResourceHandlesRequest {
             raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             account: None,
+            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -243,6 +244,7 @@ pub async fn test_list_handles_pagination_mirrors_list(h: &impl FacadeContractHa
         .list_handles(ListResourceHandlesRequest {
             raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             account: None,
+            label_filter: None,
             pagination: PaginationOpts::from_page(1, 2),
         })
         .await
@@ -282,6 +284,7 @@ pub async fn test_list_empty_account_returns_empty(h: &impl FacadeContractHarnes
         .list_handles(ListResourceHandlesRequest {
             raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             account: None,
+            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -315,6 +318,7 @@ pub async fn test_list_unsupported_kind_returns_error(h: &impl FacadeContractHar
         .list_handles(ListResourceHandlesRequest {
             raw_type_selector: unsupported_selector.parse().unwrap(),
             account: None,
+            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await;

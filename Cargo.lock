@@ -8043,6 +8043,7 @@ dependencies = [
  "vergen-gitcl",
  "webbrowser",
  "whoami",
+ "winnow 1.0.3",
 ]
 
 [[package]]

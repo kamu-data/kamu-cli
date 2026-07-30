@@ -303,7 +303,7 @@ impl From<ListAllResourcesError> for CLIError {
         use ListAllResourcesError as E;
 
         match e {
-            e @ E::BadAccount(_) => Self::failure(e),
+            e @ (E::BadAccount(_) | E::InvalidLabelFilter(_)) => Self::failure(e),
             E::RemoteRequest(err) => Self::from(err),
             E::Internal(err) => Self::critical(err),
         }
@@ -315,7 +315,9 @@ impl From<BatchResourceError> for CLIError {
         use BatchResourceError as E;
 
         match e {
-            e @ (E::UnsupportedSelector(_) | E::BadAccount(_)) => Self::failure(e),
+            e @ (E::UnsupportedSelector(_) | E::BadAccount(_) | E::InvalidLabelFilter(_)) => {
+                Self::failure(e)
+            }
             E::RemoteRequest(err) => Self::from(err),
             E::Internal(err) => Self::critical(err),
         }

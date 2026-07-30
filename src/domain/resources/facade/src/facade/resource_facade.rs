@@ -159,6 +159,10 @@ pub struct ResourceBatchSelector {
     pub account: Option<ResourceAccountRef>,
     pub resource_type: ResourceTypeSelectorRaw,
     pub resource_refs: Vec<ResourceRef>,
+    /// Narrows the batch in the same lookup rather than a follow-up query.
+    /// A ref that resolves but does not carry the labels is reported as
+    /// not-found, so `-l` behaves uniformly across selector forms.
+    pub label_filter: Option<ResourceLabelFilterInput>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -264,6 +268,7 @@ pub struct ListResourcesRequest {
 pub struct ListResourceHandlesRequest {
     pub raw_type_selector: ResourceTypeSelectorRaw,
     pub account: Option<ResourceAccountRef>,
+    pub label_filter: Option<ResourceLabelFilterInput>,
     pub pagination: PaginationOpts,
 }
 
@@ -275,8 +280,6 @@ pub struct SearchResourceHandlesRequest {
     pub exact_names: Option<Vec<ResourceName>>,
     pub name_pattern: Option<String>,
     pub account: Option<ResourceAccountRef>,
-    /// What gives `get`/`delete` label filtering: both expand a selector into
-    /// identifiers through this request before operating by id.
     pub label_filter: Option<ResourceLabelFilterInput>,
     pub pagination: PaginationOpts,
 }
@@ -294,6 +297,9 @@ pub struct SearchResourceHandlesResponse {
 #[derive(Debug, Clone)]
 pub struct ListAllResourcesRequest {
     pub account: Option<ResourceAccountRef>,
+    /// Resolved against every registered schema, so `list all -l ...` filters
+    /// exactly like a per-type listing.
+    pub label_filter: Option<ResourceLabelFilterInput>,
     pub pagination: PaginationOpts,
 }
 
@@ -302,6 +308,8 @@ pub struct ListAllResourcesRequest {
 #[derive(Debug, Clone)]
 pub struct ListAllResourceHandlesRequest {
     pub account: Option<ResourceAccountRef>,
+    /// See [`ListAllResourcesRequest::label_filter`].
+    pub label_filter: Option<ResourceLabelFilterInput>,
     pub pagination: PaginationOpts,
 }
 

@@ -195,6 +195,8 @@ impl ResourcesMut {
 
         match resource_facade
             .delete_many(kamu_resources_facade::ResourceBatchSelector {
+                // Label filtering is not exposed over GraphQL yet.
+                label_filter: None,
                 account: account.map(AccountRefInput::into_manifest_account),
                 resource_type: resource_type_selector,
                 resource_refs: resource_refs.into_iter().map(Into::into).collect(),
@@ -586,6 +588,7 @@ fn map_batch_delete_resource_error(error: kamu_resources_facade::BatchResourceEr
     match error {
         E::UnsupportedSelector(_) => GqlError::gql("Unsupported resource type selector"),
         E::BadAccount(error) => map_resolve_manifest_account_error(error),
+        E::InvalidLabelFilter(error) => GqlError::gql(error.to_string()),
         E::RemoteRequest(error) => error.int_err().into(),
         E::Internal(error) => error.into(),
     }
@@ -599,6 +602,7 @@ fn map_batch_apply_resource_error(error: kamu_resources_facade::BatchResourceErr
     match error {
         E::UnsupportedSelector(_) => GqlError::gql("Unsupported resource type selector"),
         E::BadAccount(error) => map_resolve_manifest_account_error(error),
+        E::InvalidLabelFilter(error) => GqlError::gql(error.to_string()),
         E::RemoteRequest(error) => error.int_err().into(),
         E::Internal(error) => error.into(),
     }

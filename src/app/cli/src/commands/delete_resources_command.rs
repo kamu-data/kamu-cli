@@ -42,6 +42,7 @@ pub struct DeleteResourcesCommand {
 
     resolved_context: ResolvedResourceContext,
     syntax: ResourceSelectionSyntax,
+    label_filter: Option<kamu_resources::ResourceLabelFilterInput>,
     force: bool,
     ignore_not_found: bool,
     dry_run: bool,
@@ -58,6 +59,7 @@ impl DeleteResourcesCommand {
         output_config: Arc<OutputConfig>,
         resolved_context: ResolvedResourceContext,
         syntax: ResourceSelectionSyntax,
+        label_filter: Option<kamu_resources::ResourceLabelFilterInput>,
         force: bool,
         ignore_not_found: bool,
         dry_run: bool,
@@ -70,6 +72,7 @@ impl DeleteResourcesCommand {
             output_config,
             resolved_context,
             syntax,
+            label_filter,
             force,
             ignore_not_found,
             dry_run,
@@ -84,9 +87,10 @@ impl DeleteResourcesCommand {
             .resolve(
                 self.syntax.clone(),
                 self.resource_facade.as_ref(),
-                ResourceSelectionResolutionOptions {
+                &ResourceSelectionResolutionOptions {
                     ignore_not_found: self.ignore_not_found,
                     max_expanded_results: None,
+                    label_filter: self.label_filter.clone(),
                 },
             )
             .await?;
@@ -222,6 +226,8 @@ impl DeleteResourcesCommand {
                 .resource_facade
                 .delete_many(ResourceBatchSelector {
                     account: None,
+                    // Ids come from the already-filtered expansion phase.
+                    label_filter: None,
                     resource_type: entries
                         .first()
                         .map(|(_, target)| {

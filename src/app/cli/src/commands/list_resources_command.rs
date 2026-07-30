@@ -53,6 +53,7 @@ pub struct ListResourcesCommand {
     output_config: Arc<OutputConfig>,
     detail_level: u8,
     max_results: Option<NonZeroUsize>,
+    label_filter: Option<kamu_resources::ResourceLabelFilterInput>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -67,6 +68,7 @@ impl ListResourcesCommand {
         output_config: Arc<OutputConfig>,
         detail_level: u8,
         max_results: Option<NonZeroUsize>,
+        label_filter: Option<kamu_resources::ResourceLabelFilterInput>,
     ) -> Self {
         Self {
             resource_facade,
@@ -77,6 +79,7 @@ impl ListResourcesCommand {
             output_config,
             detail_level,
             max_results,
+            label_filter,
         }
     }
 
@@ -280,7 +283,7 @@ impl ListResourcesCommand {
                     raw_type_selector: selector_name.into(),
                     account: None,
                     pagination: PaginationOpts::from_max_results(max_results.get()),
-                    label_filter: None,
+                    label_filter: self.label_filter.clone(),
                 })
                 .await
                 .map_err(Into::into)
@@ -291,7 +294,7 @@ impl ListResourcesCommand {
                         raw_type_selector: selector_name.into(),
                         account: None,
                         pagination,
-                        label_filter: None,
+                        label_filter: self.label_filter.clone(),
                     })
                     .await
                     .map_err(Into::into)
@@ -305,6 +308,7 @@ impl ListResourcesCommand {
             self.resource_facade
                 .list_all(kamu_resources_facade::ListAllResourcesRequest {
                     account: None,
+                    label_filter: self.label_filter.clone(),
                     pagination: PaginationOpts::from_max_results(max_results.get()),
                 })
                 .await
@@ -314,6 +318,7 @@ impl ListResourcesCommand {
                 self.resource_facade
                     .list_all(kamu_resources_facade::ListAllResourcesRequest {
                         account: None,
+                        label_filter: self.label_filter.clone(),
                         pagination,
                     })
                     .await

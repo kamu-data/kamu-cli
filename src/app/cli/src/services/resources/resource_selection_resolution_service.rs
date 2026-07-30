@@ -9,6 +9,7 @@
 
 use kamu_resources::{
     ResourceID,
+    ResourceLabelFilterInput,
     ResourceName,
     ResourceSelectorName,
     ResourceTypeDescriptor,
@@ -27,16 +28,21 @@ pub trait ResourceSelectionResolutionService: Send + Sync {
         &self,
         selection: ResourceSelectionSyntax,
         resource_facade: &dyn ResourceFacade,
-        options: ResourceSelectionResolutionOptions,
+        options: &ResourceSelectionResolutionOptions,
     ) -> Result<ResourceSelectionResolution, CLIError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ResourceSelectionResolutionOptions {
     pub ignore_not_found: bool,
     pub max_expanded_results: Option<usize>,
+
+    /// Narrows every expansion to resources carrying these labels. Applied
+    /// during identifier expansion rather than after it, so `--max-results`
+    /// counts only resources that actually match.
+    pub label_filter: Option<ResourceLabelFilterInput>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

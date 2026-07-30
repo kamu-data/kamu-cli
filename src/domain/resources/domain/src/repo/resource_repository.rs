@@ -27,6 +27,18 @@ use crate::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Storage for resources and the queries over them.
+///
+/// # Label filtering
+///
+/// A method takes a `label_filter` if and only if it queries an *unknown*
+/// result set. Methods resolving *known* identities — by id, or by name —
+/// do not, and neither do aggregates.
+///
+/// Callers that both resolve identities and filter must resolve first and
+/// filter second, via [`Self::find_resource_handles_by_ids`]. Filtering during
+/// resolution would collapse "this name does not exist" into "this name does
+/// not match", which are distinct outcomes to report.
 #[async_trait::async_trait]
 pub trait ResourceRepository: Send + Sync {
     async fn new_resource_id(&self) -> Result<ResourceID, InternalError>;
@@ -64,21 +76,26 @@ pub trait ResourceRepository: Send + Sync {
         name: &ResourceName,
     ) -> Result<Option<ResourceID>, InternalError>;
 
+    /// Ids excluded by `label_filter` are absent from the result, exactly like
+    /// ids that do not exist.
     async fn find_resource_handles_by_ids(
         &self,
         account_id: &odf::AccountID,
         ids: &[ResourceID],
+        label_filter: &ResolvedResourceLabelFilter,
     ) -> Result<Vec<ResourceHandleRow>, InternalError>;
 
-    async fn find_resource_handles_by_names(
+    /// Matches names case-insensitively. Names that do not exist are absent
+    /// from the result.
+    async fn resolve_resource_ids_by_names(
         &self,
         account_id: &odf::AccountID,
         schema: &TypeUri,
         names: &[ResourceName],
-    ) -> Result<Vec<ResourceHandleRow>, InternalError>;
+    ) -> Result<Vec<(ResourceName, ResourceID)>, InternalError>;
 
-    /// `label_filter` applies uniformly to every schema in `schemas` — the
-    /// facade guarantees it resolves identically for all of them.
+    /// `label_filter` must be one that resolves identically for every schema
+    /// in `schemas`.
     async fn search_resource_handles(
         &self,
         account_id: &odf::AccountID,
@@ -135,9 +152,12 @@ pub trait ResourceRepository: Send + Sync {
         label_filter: &ResolvedResourceLabelFilter,
     ) -> ResourceSnapshotStream<'_>;
 
+    /// Spans every schema the account owns, so `label_filter` must be one that
+    /// resolves identically for all of them.
     fn list_all_resource_snapshots(
         &self,
         account_id: odf::AccountID,
+        label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
     ) -> ResourceSnapshotStream<'_>;
 

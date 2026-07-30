@@ -29,6 +29,7 @@ use super::{CLIError, Command, common};
 use crate::cli::GetOutputFormat;
 use crate::resources::{
     ResourceFacadeFactory,
+    ResourceLabelSelectorParser,
     ResourceSelectionResolutionOptions,
     ResourceSelectionResolutionService,
     ResourceSelectionSyntaxService,
@@ -67,6 +68,9 @@ pub struct GetResourceCommand {
 
     #[dill::component(explicit)]
     unbounded: bool,
+
+    #[dill::component(explicit)]
+    label_selectors: Vec<String>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -74,15 +78,16 @@ pub struct GetResourceCommand {
 impl GetResourceCommand {
     const MATERIALIZATION_BATCH_SIZE: usize = 100;
 
-    fn resolution_options(&self) -> ResourceSelectionResolutionOptions {
-        ResourceSelectionResolutionOptions {
+    fn resolution_options(&self) -> Result<ResourceSelectionResolutionOptions, CLIError> {
+        Ok(ResourceSelectionResolutionOptions {
             ignore_not_found: self.ignore_not_found,
             max_expanded_results: if self.unbounded {
                 None
             } else {
                 Some(self.max_results.get())
             },
-        }
+            label_filter: ResourceLabelSelectorParser::parse(&self.label_selectors)?,
+        })
     }
 
     fn spec_view_mode(&self) -> kamu_resources_facade::SpecViewMode {
@@ -219,6 +224,8 @@ impl GetResourceCommand {
                     .render_manifests(
                         ResourceBatchSelector {
                             account: None,
+                            // Ids come from the already-filtered expansion phase.
+                            label_filter: None,
                             resource_type: chunk
                                 .first()
                                 .map(|(_, target)| {
@@ -263,6 +270,8 @@ impl GetResourceCommand {
                     .get_many(
                         ResourceBatchSelector {
                             account: None,
+                            // Ids come from the already-filtered expansion phase.
+                            label_filter: None,
                             resource_type: kamu_resources::ResourceTypeSelectorRaw::new_unchecked(
                                 chunk
                                     .first()
@@ -415,7 +424,11 @@ impl Command for GetResourceCommand {
 
         let resolved_targets = self
             .resource_selection_resolution_service
-            .resolve(syntax, resource_facade.as_ref(), self.resolution_options())
+            .resolve(
+                syntax,
+                resource_facade.as_ref(),
+                &self.resolution_options()?,
+            )
             .await?;
 
         match self.run_mode() {

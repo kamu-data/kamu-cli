@@ -274,6 +274,8 @@ impl Resources {
             .list_handles(kamu_resources_facade::ListResourceHandlesRequest {
                 raw_type_selector: resource_type.into_resource_type_selector(),
                 account: account.map(AccountRefInput::into_manifest_account),
+                // Label filtering is not exposed over GraphQL yet.
+                label_filter: None,
                 pagination: PaginationOpts::from_page(page, per_page),
             })
             .await
@@ -360,6 +362,8 @@ impl Resources {
 
         match resource_facade
             .list_all(kamu_resources_facade::ListAllResourcesRequest {
+                // Label filtering is not exposed over GraphQL yet.
+                label_filter: None,
                 account: account.map(AccountRefInput::into_manifest_account),
                 pagination: PaginationOpts::from_page(page, per_page),
             })
@@ -398,6 +402,8 @@ impl Resources {
 
         match resource_facade
             .list_all_handles(kamu_resources_facade::ListAllResourceHandlesRequest {
+                // Label filtering is not exposed over GraphQL yet.
+                label_filter: None,
                 account: account.map(AccountRefInput::into_manifest_account),
                 pagination: PaginationOpts::from_page(page, per_page),
             })
@@ -605,6 +611,7 @@ fn map_batch_resource_error(error: kamu_resources_facade::BatchResourceError) ->
     match error {
         E::UnsupportedSelector(_) => GqlError::gql("Unsupported resource type selector"),
         E::BadAccount(error) => map_resolve_manifest_account_error(error),
+        E::InvalidLabelFilter(error) => GqlError::gql(error.to_string()),
         E::RemoteRequest(error) => error.int_err().into(),
         E::Internal(error) => error.into(),
     }
@@ -632,6 +639,7 @@ fn map_list_all_resources_error(error: kamu_resources_facade::ListAllResourcesEr
 
     match error {
         E::BadAccount(error) => map_resolve_manifest_account_error(error),
+        E::InvalidLabelFilter(error) => GqlError::gql(error.to_string()),
         E::RemoteRequest(error) => error.int_err().into(),
         E::Internal(error) => error.into(),
     }

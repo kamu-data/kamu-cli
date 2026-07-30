@@ -296,7 +296,11 @@ impl ResourceRepository for InMemoryResourceRepository {
         &self,
         account_id: &odf::AccountID,
         ids: &[ResourceID],
+        label_filter: &ResolvedResourceLabelFilter,
     ) -> Result<Vec<ResourceHandleRow>, InternalError> {
+        let label_pairs =
+            ResourceLabelFilterPredicate::flatten_conjunction(label_filter).int_err()?;
+
         let guard = self.state.lock().unwrap();
 
         Ok(ids
@@ -305,6 +309,7 @@ impl ResourceRepository for InMemoryResourceRepository {
             .filter(|snapshot| {
                 snapshot.headers.account.did == *account_id && snapshot.headers.deleted_at.is_none()
             })
+            .filter(|snapshot| snapshot_matches_label_pairs(snapshot, &label_pairs))
             .map(|snapshot| ResourceHandleRow {
                 id: *snapshot.id.as_ref(),
                 schema: snapshot.schema.to_string(),
@@ -316,12 +321,12 @@ impl ResourceRepository for InMemoryResourceRepository {
             .collect())
     }
 
-    async fn find_resource_handles_by_names(
+    async fn resolve_resource_ids_by_names(
         &self,
         account_id: &odf::AccountID,
         schema: &TypeUri,
         names: &[ResourceName],
-    ) -> Result<Vec<ResourceHandleRow>, InternalError> {
+    ) -> Result<Vec<(ResourceName, ResourceID)>, InternalError> {
         let guard = self.state.lock().unwrap();
 
         Ok(names
@@ -337,14 +342,7 @@ impl ResourceRepository for InMemoryResourceRepository {
                     .and_then(|id| guard.snapshots_by_id.get(id))
             })
             .filter(|snapshot| snapshot.headers.deleted_at.is_none())
-            .map(|snapshot| ResourceHandleRow {
-                id: *snapshot.id.as_ref(),
-                schema: snapshot.schema.to_string(),
-                name: snapshot.headers.name.to_string(),
-                account_id: snapshot.headers.account.did.clone(),
-                account_resource_id: *snapshot.headers.account.id.as_ref(),
-                account_name: snapshot.headers.account.name.to_string(),
-            })
+            .map(|snapshot| (snapshot.headers.name.clone(), snapshot.id))
             .collect())
     }
 
@@ -600,9 +598,15 @@ impl ResourceRepository for InMemoryResourceRepository {
     fn list_all_resource_snapshots(
         &self,
         account_id: odf::AccountID,
+        label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
     ) -> ResourceSnapshotStream<'_> {
+        let label_filter = label_filter.clone();
+
         let stream = futures::stream::once(async move {
+            let label_pairs =
+                ResourceLabelFilterPredicate::flatten_conjunction(&label_filter).int_err()?;
+
             let mut snapshots_page: Vec<_> = {
                 let guard = self.state.lock().unwrap();
                 guard
@@ -612,6 +616,7 @@ impl ResourceRepository for InMemoryResourceRepository {
                         snapshot.headers.account.did == account_id
                             && snapshot.headers.deleted_at.is_none()
                     })
+                    .filter(|snapshot| snapshot_matches_label_pairs(snapshot, &label_pairs))
                     .cloned()
                     .collect()
             };
@@ -629,9 +634,14 @@ impl ResourceRepository for InMemoryResourceRepository {
                 .take(pagination.limit)
                 .collect();
 
-            self.resolve_snapshots(snapshots_page).await
+            Ok(self.resolve_snapshots(snapshots_page).await)
         })
-        .flat_map(|snapshots| futures::stream::iter(snapshots.into_iter().map(Ok)));
+        .flat_map(|snapshots: Result<Vec<_>, InternalError>| match snapshots {
+            Ok(snapshots) => {
+                futures::stream::iter(snapshots.into_iter().map(Ok).collect::<Vec<_>>())
+            }
+            Err(err) => futures::stream::iter(vec![Err(err)]),
+        });
 
         Box::pin(stream)
     }
