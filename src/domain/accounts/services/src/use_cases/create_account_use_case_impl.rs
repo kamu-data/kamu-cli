@@ -171,7 +171,7 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
     ) -> Result<Account, CreateAccountError> {
         let (account_key, account_id) = odf::AccountID::new_generated_ed25519();
 
-        let account = Account {
+        let new_account = Account {
             id: account_id,
             account_name: account_config.account_name.clone(),
             email: account_config.email.clone(),
@@ -185,14 +185,14 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
             provider_identity_key: account_config.account_name.to_string(),
         };
 
-        self.save_password_account(&account, &account_config.password, account_key)
+        self.save_password_account(&new_account, &account_config.password, account_key)
             .await?;
 
         if !quiet {
-            self.notify_account_created(&account).await?;
+            self.notify_account_created(&new_account).await?;
         }
 
-        Ok(account)
+        Ok(new_account)
     }
 
     async fn execute_derived(
@@ -215,7 +215,7 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
 
         let (account_key, account_id) = odf::AccountID::new_generated_ed25519();
 
-        let account = Account {
+        let new_account = Account {
             id: account_id,
             account_name: account_name.clone(),
             email,
@@ -224,15 +224,15 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
             avatar_url: options.avatar_url,
             registered_at: self.time_source.now(),
             provider: AccountProvider::Password.to_string(),
-            provider_identity_key: String::from(account_name.as_str()),
+            provider_identity_key: account_name.to_string(),
         };
 
-        self.save_password_account(&account, &password, account_key)
+        self.save_password_account(&new_account, &password, account_key)
             .await?;
 
-        self.notify_account_created(&account).await?;
+        self.notify_account_created(&new_account).await?;
 
-        Ok(account)
+        Ok(new_account)
     }
 
     async fn execute_multi_wallet_accounts(

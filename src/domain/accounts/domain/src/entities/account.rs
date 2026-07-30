@@ -49,6 +49,12 @@ pub enum AccountProvider {
     Web3Wallet,
 }
 
+impl AccountProvider {
+    pub fn is_password(provider: &str) -> bool {
+        provider == <&'static str>::from(AccountProvider::Password)
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -62,6 +68,18 @@ pub struct Account {
     pub registered_at: DateTime<Utc>,
     pub provider: String,
     pub provider_identity_key: String,
+}
+
+#[derive(Debug)]
+pub struct PasswordAccount {
+    pub account: Account,
+    pub password: Password,
+}
+
+impl PasswordAccount {
+    pub fn try_new(account: Account, password: Password) -> Option<Self> {
+        AccountProvider::is_password(&account.provider).then_some(Self { account, password })
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

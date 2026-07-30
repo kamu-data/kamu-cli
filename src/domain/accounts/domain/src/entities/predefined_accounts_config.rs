@@ -125,8 +125,7 @@ pub struct AccountConfig {
 }
 
 impl AccountConfig {
-    // TODO: Do not use the method outside of tests
-    // #[cfg(any(feature = "testing", test))]
+    #[cfg(any(feature = "testing", test))]
     pub fn test_config_from_name(account_name: odf::AccountName) -> Self {
         let email = Email::parse(&format!("{account_name}@example.com")).unwrap();
         let password = Self::generate_password(&account_name);

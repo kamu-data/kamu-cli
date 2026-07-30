@@ -12,6 +12,7 @@ use std::sync::Arc;
 use dill::{Catalog, CatalogBuilder};
 use kamu_accounts::{
     Account,
+    AccountConfig,
     AccountService,
     CreateAccountUseCase,
     CurrentAccountSubject,
@@ -96,14 +97,15 @@ impl AccountBaseUseCaseHarness {
     }
 
     pub async fn create_account(&self, catalog: &Catalog, account_name: &str) -> Account {
-        let account = Account {
-            registered_at: self.system_time_source.now(),
-            ..Account::test(Self::account_id_from_name(account_name), account_name)
+        let account_config = AccountConfig {
+            registered_at: Some(self.system_time_source.now()),
+            password: TEST_PASSWORD.clone(),
+            ..AccountConfig::test_config_from_name(odf::AccountName::new_unchecked(account_name))
         };
 
         let create_account_uc = catalog.get_one::<dyn CreateAccountUseCase>().unwrap();
         create_account_uc
-            .execute(&account, &TEST_PASSWORD, false /* quiet */)
+            .execute(&account_config, false /* quiet */)
             .await
             .unwrap()
     }

@@ -11,7 +11,6 @@ use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use std::sync::Arc;
 
-use dill::*;
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::*;
 use kamu_accounts::*;
@@ -21,7 +20,6 @@ use kamu_auth_rebac::{
     RebacService,
     boolean_property_value,
 };
-use odf::AccountID;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -36,9 +34,9 @@ pub struct PredefinedAccountsRegistrator {
     create_account_use_case: Arc<dyn CreateAccountUseCase>,
 }
 
-#[component(pub)]
-#[interface(dyn InitOnStartup)]
-#[meta(InitOnStartupMeta {
+#[dill::component(pub)]
+#[dill::interface(dyn InitOnStartup)]
+#[dill::meta(InitOnStartupMeta {
     job_name: JOB_KAMU_ACCOUNTS_PREDEFINED_ACCOUNTS_REGISTRATOR,
     depends_on: &[],
     requires_transaction: true,
@@ -67,7 +65,7 @@ impl PredefinedAccountsRegistrator {
 
         match self.account_service.get_account_by_id(&account_id).await {
             Ok(account) => {
-                self.compare_and_update_account(account, account_config)
+                self.compare_and_maybe_update_account(account, account_config)
                     .await?;
             }
             Err(GetAccountByIdError::NotFound(_)) => {
@@ -84,7 +82,7 @@ impl PredefinedAccountsRegistrator {
 
     async fn set_rebac_properties(
         &self,
-        account_id: &AccountID,
+        account_id: &odf::AccountID,
         account_config: &AccountConfig,
     ) -> Result<(), InternalError> {
         // TODO: Revisit if batch property setting will be implemented
@@ -111,19 +109,17 @@ impl PredefinedAccountsRegistrator {
         &self,
         account_config: &AccountConfig,
     ) -> Result<(), InternalError> {
-        let account: Account = account_config.into();
-
         self.create_account_use_case
-            .execute(&account, &account_config.password, true /* quiet */)
+            .execute(account_config, true /* quiet */)
             .await
             .int_err()?;
 
         Ok(())
     }
 
-    async fn compare_and_update_account(
+    async fn compare_and_maybe_update_account(
         &self,
-        account: Account,
+        original_account: Account,
         account_config: &AccountConfig,
     ) -> Result<(), InternalError> {
         let updated_account = Account {
@@ -131,7 +127,7 @@ impl PredefinedAccountsRegistrator {
             ..account_config.into()
         };
 
-        if account_config.provider == <&'static str>::from(AccountProvider::Password) {
+        if AccountProvider::is_password(&account_config.provider) {
             use VerifyPasswordError as E;
 
             let has_password_changed = match self
@@ -152,13 +148,14 @@ impl PredefinedAccountsRegistrator {
             }
         }
 
-        if account != updated_account {
+        if original_account != updated_account {
             tracing::info!(
-                "Updating modified predefined account: old: {account:?}, new: {updated_account:?}",
+                "Updating modified predefined account: old: {original_account:?}, new: \
+                 {updated_account:?}",
             );
 
             self.update_account_use_case
-                .execute_internal(&updated_account, &account)
+                .execute_internal(&updated_account, &original_account)
                 .await
                 .int_err()?;
         }
@@ -189,8 +186,9 @@ impl InitOnStartup for PredefinedAccountsRegistrator {
                 }
                 Entry::Occupied(_) => {
                     tracing::warn!(
-                        "Duplicate account configuration found for account ID: {}. Skipping.",
-                        account_id
+                        "Duplicate account configuration found for account ID: {account_id} ({}). \
+                         Skipping.",
+                        account_config.account_name
                     );
                 }
             }
