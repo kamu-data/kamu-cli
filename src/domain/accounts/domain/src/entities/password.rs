@@ -32,21 +32,10 @@ impl std::fmt::Display for Password {
 
 #[derive(thiserror::Error, Debug, Clone)]
 pub enum PasswordValidationError {
+    #[error("Minimum password length is {MIN_PASSWORD_LENGTH}")]
     TooShort,
+    #[error("Password contains non-ASCII characters")]
     NonAscii,
-}
-
-impl std::fmt::Display for PasswordValidationError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            PasswordValidationError::TooShort => {
-                write!(f, "Minimum password length is {MIN_PASSWORD_LENGTH}")
-            }
-            PasswordValidationError::NonAscii => {
-                write!(f, "Password contains non-ASCII characters")
-            }
-        }
-    }
 }
 
 fn validate_password(password: &str) -> Result<(), PasswordValidationError> {
