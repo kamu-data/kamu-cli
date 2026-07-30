@@ -15,7 +15,7 @@ use chrono::{DateTime, Utc};
 use email_utils::Email;
 use serde::{Deserialize, Serialize};
 
-use crate::{AccountConfig, Password};
+use crate::Password;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -62,24 +62,6 @@ pub struct Account {
     pub registered_at: DateTime<Utc>,
     pub provider: String,
     pub provider_identity_key: String,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl From<&AccountConfig> for Account {
-    fn from(account_config: &AccountConfig) -> Self {
-        Account {
-            id: account_config.get_id(),
-            account_name: account_config.account_name.clone(),
-            email: account_config.email.clone(),
-            display_name: account_config.get_display_name(),
-            account_type: account_config.account_type,
-            avatar_url: account_config.avatar_url.clone(),
-            registered_at: account_config.registered_at.unwrap_or_else(Utc::now),
-            provider: account_config.provider.clone(),
-            provider_identity_key: account_config.account_name.to_string(),
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
