@@ -281,6 +281,103 @@ pub async fn test_resources_label_filter_delete(ctx: ResourceCtx) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// KNOWN DEFECT (not yet fixed): a wildcard *type* pattern combined with an
+// *exact* name/id (`%/prod-vars`) resolves via `TypePatternExactName`, which
+// calls `ResourceFacade::get_handle` — a scalar lookup whose `ResourceSelector`
+// has no `label_filter` field at all. `-l` is silently dropped on this one
+// selector shape, unlike the `Exact` item (`vs/prod-vars`), which correctly
+// filters through the batched `get_handles`/`ResourceBatchSelector` path (see
+// `test_resources_label_filter_get`'s "exact selector" case above). This test
+// is expected to fail until that path is rewired to carry the filter.
+pub async fn test_resources_label_filter_type_pattern_exact_name_ignores_filter(ctx: ResourceCtx) {
+    seed_labeled_variable_sets(&ctx).await;
+
+    // `prod-vars` carries `environment=production`, not `staging`, so a
+    // correctly filtered lookup must exclude it — exactly like the `Exact`
+    // selector case does for the same resource/filter combination.
+    let excluded = ctx
+        .stdout([
+            "get",
+            "%/prod-vars",
+            "-l",
+            "environment=staging",
+            "-o",
+            "json",
+            "--ignore-not-found",
+        ])
+        .await;
+    assert!(
+        excluded.trim().is_empty(),
+        "a type-pattern + exact-name selector must still be subject to the label filter, \
+         got:\n{excluded}"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Seeds a `VariableSet` and a `SecretSet` sharing the `environment` label, so
+/// a type-pattern selector spanning both schemas (`%sets`) has a genuine
+/// multi-type candidate set to narrow. Requires
+/// [`fixtures::SECRETS_ENCRYPTION_KAMU_CONFIG`].
+///
+/// | name         | type        | environment |
+/// |--------------|-------------|-------------|
+/// | `prod-vars`  | VariableSet | production  |
+/// | `prod-creds` | SecretSet   | production  |
+/// | `stage-creds`| SecretSet   | staging     |
+async fn seed_labeled_cross_type_resources(ctx: &ResourceCtx) {
+    let prod_vars = fixtures::variable_set_manifest_with_environment_label(
+        "prod-vars",
+        "production",
+        "environment",
+    );
+    ctx.assert_success_with_stdin(["apply", "--stdin"], &prod_vars, None)
+        .await;
+
+    let prod_creds = fixtures::secret_set_manifest_with_environment_label(
+        "prod-creds",
+        "production",
+        "environment",
+    );
+    ctx.assert_success_with_stdin(["apply", "--stdin"], &prod_creds, None)
+        .await;
+
+    let stage_creds = fixtures::secret_set_manifest_with_environment_label(
+        "stage-creds",
+        "staging",
+        "environment",
+    );
+    ctx.assert_success_with_stdin(["apply", "--stdin"], &stage_creds, None)
+        .await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Coverage gap closed: `TypePatternNamePattern`
+// (`<type-pattern>/<name-pattern>`, both segments wildcarded) is resolved via
+// `search_handles` as well — same backend call as `TypePatternAll`, different
+// selector shape. Must run with
+// `Options::with_kamu_config(fixtures::SECRETS_ENCRYPTION_KAMU_CONFIG)`.
+pub async fn test_resources_label_filter_type_pattern_name_pattern(ctx: ResourceCtx) {
+    seed_labeled_cross_type_resources(&ctx).await;
+
+    // `%sets/%-creds` matches only the two SecretSets by name pattern; the
+    // filter must still narrow that set to the production one.
+    let idents = ctx
+        .get_idents(["get", "%sets/%-creds", "-l", "environment=production"])
+        .await;
+    assert_eq!(
+        idents,
+        [(
+            fixtures::SECRET_SET_SCHEMA.to_string(),
+            "prod-creds".to_string()
+        )],
+        "`%sets/%-creds -l environment=production` should exclude the staging SecretSet"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_resources_label_filter_structured_not_selectable(ctx: ResourceCtx) {
     // A structured (non-string) label value is stored but deliberately not
     // indexed, so it can never be selected by an equality filter. The resource

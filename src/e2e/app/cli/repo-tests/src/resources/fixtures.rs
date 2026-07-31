@@ -230,6 +230,36 @@ pub fn secret_set_manifest_pre_encrypted_yaml(name: &str) -> String {
     )
 }
 
+/// A `SecretSet` manifest authoring the built-in `environment` label under the
+/// given key (short name `environment` or the canonical
+/// [`ENVIRONMENT_LABEL_SCHEMA`] URI), mirroring
+/// [`variable_set_manifest_with_environment_label`] for the other resource
+/// type — used to build a multi-type candidate set (`SecretSet` +
+/// `VariableSet`) for label-filter scenarios that need a type-pattern
+/// selector (e.g. `%sets`) to actually span more than one schema. Requires
+/// [`SECRETS_ENCRYPTION_KAMU_CONFIG`].
+pub fn secret_set_manifest_with_environment_label(
+    name: &str,
+    value: &str,
+    label_key: &str,
+) -> String {
+    indoc::formatdoc!(
+        r#"
+        $schema: {SECRET_SET_SCHEMA}
+        headers:
+          name: {name}
+          labels:
+            {label_key}: {value}
+          annotations:
+            description: {DEFAULT_DESCRIPTION}
+        spec:
+          secrets:
+            API_TOKEN:
+              value: token-{name}
+        "#
+    )
+}
+
 /// The same `SecretSet` manifest as [`secret_set_manifest_yaml`] but in JSON.
 pub fn secret_set_manifest_json(name: &str, token: &str, password: &str) -> String {
     serde_json::json!({
