@@ -25,15 +25,4 @@ kamu_cli_resource_e2e_test!(
     )
 );
 
-// Known-defect scenario (see doc comment on the fixture): kept separate so its
-// failure doesn't obscure the nine passing cases above.
-kamu_cli_resource_e2e_test!(
-    storage = sqlite,
-    fixture =
-        kamu_cli_e2e_repo_tests::commands::test_resources_get_selectors_type_pattern_all_defect,
-    options = Options::default().with_kamu_config(
-        kamu_cli_e2e_repo_tests::resources::fixtures::SECRETS_ENCRYPTION_KAMU_CONFIG
-    )
-);
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

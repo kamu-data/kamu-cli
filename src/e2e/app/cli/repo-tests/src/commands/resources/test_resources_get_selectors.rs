@@ -31,12 +31,7 @@ use crate::resources::{ResourceCtx, fixtures};
 //   - Three equivalent selector forms for one resource
 //   - Multi-name same-type, mixed ref-form
 //   - Name pattern, type pattern, type+name pattern, `%sets`
-//   - `--max-results` truncation and `--unbounded`
-//
-// `test_resources_get_selectors_type_pattern_all_defect` below is a separate,
-// deliberately failing scenario for a known defect in one selector shape — kept
-// out of the main function so its failure doesn't hide whether the other nine
-// cases still pass.
+//   - `--max-results` truncation, `--unbounded`, and `%sets all`
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Identity constants — kept terse so assertions read as "which resources came
@@ -163,40 +158,20 @@ pub async fn test_resources_get_selectors(ctx: ResourceCtx) {
             vs("db-creds"),
         ]
     );
-}
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// KNOWN DEFECT (not yet fixed): type pattern + `all` name selector.
-//
-// `%sets all` (equivalently `%sets/%`) resolves to `TypePatternAll`, which is
-// *always* resolved via `search_handles` with both `exact_names` and
-// `name_pattern` left `None` (`process_type_pattern_all_item` in
-// `resource_selection_resolution_service_impl.rs`). The local facade's
-// `search_handles` unconditionally rejects that combination with
-// `InvalidResourceSearchQueryError` ("Resource handle search requires exact
-// names or a name pattern"), so this selector shape fails for every
-// multi-type-pattern-plus-`all` selection — nothing to do with labels or any
-// other flag. The mock-facade unit test for this path
-// (`resolves_type_pattern_all_via_search_across_matched_types`) never catches
-// it because the mock does not enforce the same validation the real facade
-// does. `%sets db-creds` (case 7 in `test_resources_get_selectors` above, an
-// exact name) is the sibling shape that *does* work — this is the one where
-// the name segment is the broad `all`/`%` selector instead.
-//
-// Asserts the *desired* behavior (a real match set), so this test fails until
-// `TypePatternAll` is rewired to pass a query the search backend accepts —
-// deliberately, so the defect stays visible in CI rather than being pinned as
-// a passing "error message stays the same" check.
-pub async fn test_resources_get_selectors_type_pattern_all_defect(ctx: ResourceCtx) {
-    ctx.apply_variable_set("app-vars", "hello").await;
-    ctx.apply_secret_set("app-secrets", "tok1", "pw1").await;
+    // ── 10. Type pattern + `all` name selector: `get %sets all` ───────────────
+    //
+    // Equivalent to `%sets/%`: every VariableSet and SecretSet.
 
     let idents = ctx.get_idents(["get", "%sets", "all"]).await;
     assert_eq!(
         idents,
-        [ss("app-secrets"), vs("app-vars")],
-        "`%sets all` should resolve to every VariableSet and SecretSet, matching `%sets/%`"
+        [
+            ss("app-secrets"),
+            ss("db-creds"),
+            vs("app-vars"),
+            vs("db-creds"),
+        ]
     );
 }
 

@@ -378,6 +378,35 @@ pub async fn test_resources_label_filter_type_pattern_name_pattern(ctx: Resource
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// Coverage gap closed: `TypePatternAll` (`<type-pattern> all`, e.g. `%sets
+// all`) is resolved via `search_handles` with `name_pattern: Some("%")` — not
+// testable with a label filter until that selector shape worked at all.
+pub async fn test_resources_label_filter_type_pattern_all(ctx: ResourceCtx) {
+    seed_labeled_cross_type_resources(&ctx).await;
+
+    // `%sets all` spans every VariableSet and SecretSet; the filter must still
+    // narrow that set to the production ones.
+    let idents = ctx
+        .get_idents(["get", "%sets", "all", "-l", "environment=production"])
+        .await;
+    assert_eq!(
+        idents,
+        [
+            (
+                fixtures::SECRET_SET_SCHEMA.to_string(),
+                "prod-creds".to_string()
+            ),
+            (
+                fixtures::VARIABLE_SET_SCHEMA.to_string(),
+                "prod-vars".to_string()
+            ),
+        ],
+        "`%sets all -l environment=production` should exclude the staging SecretSet"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_resources_label_filter_structured_not_selectable(ctx: ResourceCtx) {
     // A structured (non-string) label value is stored but deliberately not
     // indexed, so it can never be selected by an equality filter. The resource

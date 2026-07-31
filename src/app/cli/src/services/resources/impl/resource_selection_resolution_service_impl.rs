@@ -490,7 +490,9 @@ impl ResourceSelectionResolutionServiceImpl {
                         .search_handles(SearchResourceHandlesRequest {
                             raw_type_selectors,
                             exact_names: None,
-                            name_pattern: None,
+                            // `search_handles` requires a name query; `%` matches
+                            // every name, so it means "no narrowing" here.
+                            name_pattern: Some("%".to_string()),
                             account: None,
                             label_filter: request_label_filter,
                             pagination,

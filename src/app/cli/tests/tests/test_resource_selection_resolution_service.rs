@@ -334,7 +334,8 @@ async fn resolves_type_pattern_all_via_search_across_matched_types() {
         vec![SECRETSETS_NAME, STORAGES_NAME]
     );
     assert_eq!(requests[0].exact_names, None);
-    assert_eq!(requests[0].name_pattern, None);
+    // `search_handles` rejects requests with no exact_names and no name_pattern.
+    assert_eq!(requests[0].name_pattern.as_deref(), Some("%"));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1304,6 +1305,12 @@ impl ResourceSelectionResolutionHarness {
             .expect_search_handles()
             .times(times)
             .returning(move |request| {
+                // Mirrors the real facade: it rejects requests with neither field set.
+                assert!(
+                    request.exact_names.is_some() || request.name_pattern.is_some(),
+                    "search_handles request carries neither exact_names nor name_pattern, which \
+                     the real facade rejects: {request:?}"
+                );
                 search_requests.lock().unwrap().push(request);
                 Ok(SearchResourceHandlesResponse {
                     total_count: search_results.len(),
