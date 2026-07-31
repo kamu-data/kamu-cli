@@ -10,7 +10,8 @@
 use kamu_cli_e2e_common::prelude::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// SecretSet lifecycle + reveal safety (emits _local + _remote)
+// SecretSet lifecycle + reveal safety + already-encrypted apply
+// (emits _local + _remote)
 //
 // Applying a SecretSet requires secrets encryption to be enabled, hence the
 // `with_kamu_config`.
@@ -19,18 +20,6 @@ use kamu_cli_e2e_common::prelude::*;
 kamu_cli_resource_e2e_test!(
     storage = sqlite,
     fixture = kamu_cli_e2e_repo_tests::commands::test_resources_secretset_lifecycle,
-    options = Options::default().with_kamu_config(
-        kamu_cli_e2e_repo_tests::resources::fixtures::SECRETS_ENCRYPTION_KAMU_CONFIG
-    )
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Apply a manifest with an already-encrypted secret (emits _local + _remote)
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-kamu_cli_resource_e2e_test!(
-    storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_resources_secretset_apply_pre_encrypted,
     options = Options::default().with_kamu_config(
         kamu_cli_e2e_repo_tests::resources::fixtures::SECRETS_ENCRYPTION_KAMU_CONFIG
     )

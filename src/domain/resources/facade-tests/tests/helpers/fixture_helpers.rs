@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use kamu_configuration::{SecretSetResource, VariableSetResource};
-use kamu_resources::{ApplyResourceOutcome, ResourceID, TypeUri};
+use kamu_resources::{ApplyResourceOutcome, ResourceID, ResourceLabelFilterInput, TypeUri};
 use kamu_resources_facade::{ApplyManifestRequest, ResourceManifestFormat};
 
 use crate::harness::{FacadeContractHarness, TestAccount};
@@ -25,9 +25,6 @@ pub const SECRET_SET_SCHEMA_STR: &str = SecretSetResource::SCHEMA_STR;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Builds a `VariableSet` manifest JSON string.
-///
-/// Each variable is emitted as `{"value": "<v>"}` — the structured form of
-/// the RFC-derived `Variable` shape.
 pub fn variable_set_manifest_json(
     name: &str,
     account: Option<&str>,
@@ -83,11 +80,7 @@ pub fn variable_set_manifest_yaml(
         ),
         None => String::new(),
     };
-    // Each variable entry must appear at 4-space indent under `variables:`.
-    // The outer formatdoc! strips the 8-space common indent from the template
-    // body, but {variables_section} is a string interpolation — its content is
-    // NOT re-indented by formatdoc!.  We therefore pre-indent each line by the
-    // exact 4 spaces we want in the final YAML output.
+    // Interpolated YAML blocks are not re-indented by `formatdoc!`.
     let variables_section: String = vars
         .iter()
         .map(|(k, v)| format!("    {k}:\n      value: {v}"))
@@ -115,12 +108,63 @@ pub fn sorted_handle_names(mut items: Vec<kamu_resources::ResourceHandle>) -> Ve
         .collect()
 }
 
+pub fn sorted_summary_names(mut items: Vec<kamu_resources::ResourceSummaryView>) -> Vec<String> {
+    crate::helpers::normalize_summary_views(&mut items);
+    items
+        .into_iter()
+        .map(|item| item.name.to_string())
+        .collect()
+}
+
 pub fn total_schema_count(summary: kamu_resources::ResourcesSummary, schema: &TypeUri) -> u64 {
     summary
         .resource_counts
         .into_iter()
         .find(|count| count.schema == *schema)
         .map_or(0, |count| count.total_count)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Applies a labeled `VariableSet` manifest and returns its id.
+pub async fn create_variable_set_with_labels(
+    h: &impl FacadeContractHarness,
+    account: TestAccount,
+    name: &str,
+    labels: &[(&str, serde_json::Value)],
+) -> ResourceID {
+    let labels_json: serde_json::Map<_, _> = labels
+        .iter()
+        .map(|(k, v)| ((*k).to_string(), v.clone()))
+        .collect();
+    let manifest = serde_json::json!({
+        "$schema": VARIABLE_SET_SCHEMA_STR,
+        "headers": {
+            "name": name,
+            "labels": labels_json,
+        },
+        "spec": {"variables": {"K": {"value": "v"}}}
+    })
+    .to_string();
+
+    apply_manifest_and_get_id(h, account, manifest).await
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Builds a `ResourceLabelFilterInput` from string-valued entries.
+pub fn label_filter(entries: &[(&str, &str)]) -> ResourceLabelFilterInput {
+    ResourceLabelFilterInput {
+        entries: entries
+            .iter()
+            .map(|(k, v)| {
+                (
+                    (*k).to_string(),
+                    serde_json::Value::String((*v).to_string()),
+                )
+            })
+            .collect(),
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

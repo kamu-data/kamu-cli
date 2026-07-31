@@ -20,6 +20,7 @@ use crate::output::OutputConfig;
 use crate::resource_context::{ResourceContextReporter, ResourceContextResolver};
 use crate::resources::{
     ResourceFacadeFactory,
+    ResourceLabelSelectorParser,
     ResourceSelectionResolutionService,
     ResourceSelectionSyntax,
     ResourceSelectionSyntaxService,
@@ -75,6 +76,9 @@ pub struct DeleteCommand {
 
     #[dill::component(explicit)]
     dry_run: bool,
+
+    #[dill::component(explicit)]
+    label_selectors: Vec<String>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -156,6 +160,10 @@ impl DeleteCommand {
         self.resolve_delete_resources_command_from_syntax(syntax.clone())
     }
 
+    fn label_selector_unsupported_for_datasets_error() -> CLIError {
+        CLIError::usage_error("Label selectors are not supported when deleting datasets")
+    }
+
     fn resolve_delete_resources_command_from_syntax(
         &self,
         syntax: ResourceSelectionSyntax,
@@ -176,6 +184,7 @@ impl DeleteCommand {
             self.output_config.clone(),
             resolved_context,
             syntax,
+            ResourceLabelSelectorParser::parse(&self.label_selectors)?,
             self.force,
             self.ignore_not_found,
             self.dry_run,
@@ -217,6 +226,10 @@ impl Command for DeleteCommand {
                     ));
                 }
 
+                if !self.label_selectors.is_empty() {
+                    return Err(Self::label_selector_unsupported_for_datasets_error());
+                }
+
                 self.make_delete_datasets_command(&request)?
                     .validate_args()
                     .await
@@ -238,6 +251,12 @@ impl Command for DeleteCommand {
                     return Err(CLIError::usage_error(
                         "--context is supported only for pure resource deletion",
                     ));
+                }
+
+                // Applying the filter to only the resource half would still
+                // delete every named dataset unfiltered.
+                if !self.label_selectors.is_empty() {
+                    return Err(Self::label_selector_unsupported_for_datasets_error());
                 }
 
                 self.make_delete_datasets_command(&request)?

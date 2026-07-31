@@ -8,4 +8,5 @@
 // by the Apache License, Version 2.0.
 
 mod test_inmem_raw_resource_event_store;
+mod test_inmem_resource_label_projection_repository;
 mod test_inmem_resource_repository;

@@ -14,6 +14,7 @@ use internal_error::InternalError;
 use thiserror::Error;
 
 use crate::{
+    ResolvedResourceLabelFilter,
     ResourceID,
     ResourceIDStream,
     ResourceName,
@@ -26,6 +27,8 @@ use crate::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Storage for resources and the queries over them.
+/// Label filters apply only to unknown result sets, not direct identity reads.
 #[async_trait::async_trait]
 pub trait ResourceRepository: Send + Sync {
     async fn new_resource_id(&self) -> Result<ResourceID, InternalError>;
@@ -69,19 +72,23 @@ pub trait ResourceRepository: Send + Sync {
         ids: &[ResourceID],
     ) -> Result<Vec<ResourceHandleRow>, InternalError>;
 
-    async fn find_resource_handles_by_names(
+    /// Matches names case-insensitively. Names that do not exist are absent
+    /// from the result.
+    async fn resolve_resource_ids_by_names(
         &self,
         account_id: &odf::AccountID,
         schema: &TypeUri,
         names: &[ResourceName],
-    ) -> Result<Vec<ResourceHandleRow>, InternalError>;
+    ) -> Result<Vec<(ResourceName, ResourceID)>, InternalError>;
 
+    /// `label_filter` must be one that resolves identically for every schema
+    /// in `schemas`.
     async fn search_resource_handles(
         &self,
         account_id: &odf::AccountID,
         schemas: &[TypeUri],
-        exact_names: Option<&[ResourceName]>,
-        name_pattern: Option<&str>,
+        query: &ResourceSearchQuery,
+        label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceHandleRow>, InternalError>;
 
@@ -89,8 +96,8 @@ pub trait ResourceRepository: Send + Sync {
         &self,
         account_id: &odf::AccountID,
         schemas: &[TypeUri],
-        exact_names: Option<&[ResourceName]>,
-        name_pattern: Option<&str>,
+        query: &ResourceSearchQuery,
+        label_filter: &ResolvedResourceLabelFilter,
     ) -> Result<usize, InternalError>;
 
     async fn find_resource_snapshot(
@@ -127,11 +134,15 @@ pub trait ResourceRepository: Send + Sync {
         account_id: odf::AccountID,
         schema: &TypeUri,
         pagination: PaginationOpts,
+        label_filter: &ResolvedResourceLabelFilter,
     ) -> ResourceSnapshotStream<'_>;
 
+    /// Spans every schema the account owns, so `label_filter` must be one that
+    /// resolves identically for all of them.
     fn list_all_resource_snapshots(
         &self,
         account_id: odf::AccountID,
+        label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
     ) -> ResourceSnapshotStream<'_>;
 
@@ -145,6 +156,27 @@ pub trait ResourceRepository: Send + Sync {
         &self,
         account_id: odf::AccountID,
     ) -> Result<Vec<ResourceSummaryRow>, InternalError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Exactly one way to narrow a `search_resource_handles` call.
+#[derive(Debug, Clone)]
+pub enum ResourceSearchQuery {
+    ExactNames(Vec<ResourceName>),
+    ExactIds(Vec<ResourceID>),
+    NamePattern(String),
+}
+
+impl ResourceSearchQuery {
+    /// An empty `ExactNames`/`ExactIds` list can never match anything.
+    pub fn is_vacuous(&self) -> bool {
+        match self {
+            Self::ExactNames(names) => names.is_empty(),
+            Self::ExactIds(ids) => ids.is_empty(),
+            Self::NamePattern(_) => false,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

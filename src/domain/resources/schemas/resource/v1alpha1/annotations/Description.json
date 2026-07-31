@@ -3,5 +3,6 @@
   "$id": "https://kamu.dev/schemas/resource/v1alpha1/annotations/Description",
   "title": "Description Resource Annotation",
   "type": "string",
+  "minLength": 1,
   "maxLength": 4096
 }

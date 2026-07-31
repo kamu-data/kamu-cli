@@ -19,7 +19,9 @@ use kamu_resources::{
     ResourceID,
     ResourceIDNotFoundError,
     ResourceInvalidSpecError,
+    ResourceLabelFilterExprParseError,
     ResourceNameNotFoundError,
+    TypeRef,
     TypeUri,
     UnsupportedResourceDescriptorError,
     UnsupportedResourceSelectorError,
@@ -73,6 +75,68 @@ impl From<ResourceExtensionResolutionError> for ResourceInvalidHeadersError {
             code: ResourceHeadersValidationProblemCode::ResourceExtensionSchema,
             message: err.to_string(),
         }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum ResourceLabelFilterProblemCode {
+    InvalidKey,
+    ResourceExtensionSchema,
+    NonStringValue,
+    DuplicateAfterCanonicalization,
+    UnsupportedExpression,
+}
+
+#[derive(Debug, Error)]
+#[error("{message}")]
+pub struct ResourceInvalidLabelFilterError {
+    pub code: ResourceLabelFilterProblemCode,
+    pub message: String,
+}
+
+impl ResourceInvalidLabelFilterError {
+    pub fn invalid_key(key: &str, reason: impl std::fmt::Display) -> Self {
+        Self {
+            code: ResourceLabelFilterProblemCode::InvalidKey,
+            message: format!("invalid label filter key '{key}': {reason}"),
+        }
+    }
+
+    pub fn non_string_value(key: &TypeRef) -> Self {
+        Self {
+            code: ResourceLabelFilterProblemCode::NonStringValue,
+            message: format!("non-string label filter values are not supported yet (key '{key}')"),
+        }
+    }
+
+    pub fn unsupported_expression(reason: impl std::fmt::Display) -> Self {
+        Self {
+            code: ResourceLabelFilterProblemCode::UnsupportedExpression,
+            message: format!("label filter expression is not supported yet: {reason}"),
+        }
+    }
+}
+
+impl From<ResourceExtensionResolutionError> for ResourceInvalidLabelFilterError {
+    fn from(err: ResourceExtensionResolutionError) -> Self {
+        let code = match &err {
+            ResourceExtensionResolutionError::DuplicateAfterCanonicalization { .. } => {
+                ResourceLabelFilterProblemCode::DuplicateAfterCanonicalization
+            }
+            _ => ResourceLabelFilterProblemCode::ResourceExtensionSchema,
+        };
+        Self {
+            code,
+            message: err.to_string(),
+        }
+    }
+}
+
+impl From<ResourceLabelFilterExprParseError> for ResourceInvalidLabelFilterError {
+    fn from(err: ResourceLabelFilterExprParseError) -> Self {
+        Self::unsupported_expression(err)
     }
 }
 
@@ -151,6 +215,9 @@ pub enum BatchResourceError {
     BadAccount(#[from] ResolveManifestAccountError),
 
     #[error(transparent)]
+    InvalidLabelFilter(#[from] ResourceInvalidLabelFilterError),
+
+    #[error(transparent)]
     RemoteRequest(#[from] GraphqlHttpRequestError),
 
     #[error(transparent)]
@@ -205,7 +272,7 @@ pub enum ListResourcesError {
     BadAccount(#[from] ResolveManifestAccountError),
 
     #[error(transparent)]
-    InvalidSearchQuery(#[from] InvalidResourceSearchQueryError),
+    InvalidLabelFilter(#[from] ResourceInvalidLabelFilterError),
 
     #[error(transparent)]
     RemoteRequest(#[from] GraphqlHttpRequestError),
@@ -217,15 +284,12 @@ pub enum ListResourcesError {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Error)]
-#[error("Resource handle search requires exact names or a name pattern")]
-pub struct InvalidResourceSearchQueryError;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Error)]
 pub enum ListAllResourcesError {
     #[error(transparent)]
     BadAccount(#[from] ResolveManifestAccountError),
+
+    #[error(transparent)]
+    InvalidLabelFilter(#[from] ResourceInvalidLabelFilterError),
 
     #[error(transparent)]
     RemoteRequest(#[from] GraphqlHttpRequestError),
@@ -284,6 +348,9 @@ impl From<BatchResourceError> for DeleteResourceError {
         match err {
             BatchResourceError::UnsupportedSelector(err) => Self::UnsupportedSelector(err),
             BatchResourceError::BadAccount(err) => Self::BadAccount(err),
+            // `delete` resolves a single pre-selected ref, so it never carries
+            // a label filter for this to surface from.
+            BatchResourceError::InvalidLabelFilter(err) => Self::Internal(err.int_err()),
             BatchResourceError::RemoteRequest(err) => Self::RemoteRequest(err),
             BatchResourceError::Internal(err) => Self::Internal(err),
         }

@@ -30,6 +30,9 @@ pub enum DescriptionValidationError {
     #[error("description must be a string")]
     NotAString,
 
+    #[error("description must not be empty")]
+    Empty,
+
     #[error("description is too long: got {actual}, max is {max}")]
     TooLong { actual: usize, max: usize },
 }
@@ -41,6 +44,13 @@ impl ResourceValidateSchemaValue for Description {
         let description = value
             .as_str()
             .ok_or(DescriptionValidationError::NotAString)?;
+
+        // An empty annotation carries no information; omitting the key says
+        // the same thing without a stored value.
+        if description.is_empty() {
+            return Err(DescriptionValidationError::Empty);
+        }
+
         let actual = description.chars().count();
 
         if actual > MAX_DESCRIPTION_LEN {
@@ -58,6 +68,8 @@ impl ResourceValidateSchemaValue for Description {
 
 #[cfg(test)]
 mod tests {
+    use std::assert_matches;
+
     use super::*;
 
     #[test]
@@ -67,10 +79,24 @@ mod tests {
 
         assert_eq!(document["$id"], RESOURCE_ANNOTATION_DESCRIPTION_SCHEMA_URI);
         assert_eq!(document["type"], "string");
+        assert_eq!(document["minLength"], serde_json::json!(1));
         assert_eq!(
             document["maxLength"],
             serde_json::json!(MAX_DESCRIPTION_LEN)
         );
+    }
+
+    #[test]
+    fn test_rejects_an_empty_description() {
+        assert_matches!(
+            Description::validate(&serde_json::json!("")),
+            Err(DescriptionValidationError::Empty)
+        );
+    }
+
+    #[test]
+    fn test_accepts_a_non_empty_description() {
+        assert_matches!(Description::validate(&serde_json::json!("hello")), Ok(()));
     }
 }
 

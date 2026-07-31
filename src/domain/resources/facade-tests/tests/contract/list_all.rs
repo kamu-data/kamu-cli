@@ -73,6 +73,7 @@ pub async fn list_all_summaries_across_supported_resource_types(h: &impl FacadeC
         .facade_for(TestAccount::Alice)
         .list_all(ListAllResourcesRequest {
             account: None,
+            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -125,6 +126,7 @@ pub async fn test_list_all_handles_across_supported_resource_types(h: &impl Faca
         .facade_for(TestAccount::Alice)
         .list_all_handles(ListAllResourceHandlesRequest {
             account: None,
+            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -177,6 +179,7 @@ pub async fn test_list_all_supports_pagination(h: &impl FacadeContractHarness) {
     let first_page = facade
         .list_all(ListAllResourcesRequest {
             account: None,
+            label_filter: None,
             pagination: PaginationOpts::from_page(0, 2),
         })
         .await
@@ -184,6 +187,7 @@ pub async fn test_list_all_supports_pagination(h: &impl FacadeContractHarness) {
     let second_page = facade
         .list_all(ListAllResourcesRequest {
             account: None,
+            label_filter: None,
             pagination: PaginationOpts::from_page(1, 2),
         })
         .await
@@ -191,6 +195,7 @@ pub async fn test_list_all_supports_pagination(h: &impl FacadeContractHarness) {
     let handle_second_page = facade
         .list_all_handles(ListAllResourceHandlesRequest {
             account: None,
+            label_filter: None,
             pagination: PaginationOpts::from_page(1, 2),
         })
         .await
@@ -230,6 +235,7 @@ pub async fn test_list_all_empty_account_returns_empty(h: &impl FacadeContractHa
     let summaries = facade
         .list_all(ListAllResourcesRequest {
             account: None,
+            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -237,6 +243,7 @@ pub async fn test_list_all_empty_account_returns_empty(h: &impl FacadeContractHa
     let handles = facade
         .list_all_handles(ListAllResourceHandlesRequest {
             account: None,
+            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await

@@ -22,7 +22,10 @@ use crate::resources::{ResourceCtx, fixtures};
 // contexts.
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_resources_extension_schema_canonicalization(ctx: ResourceCtx) {
+// Canonicalization, rejections, and warnings are independent checks over
+// disjoint resource names with no shared mutable state, so they run as one
+// fixture instead of three separate e2e instantiations.
+pub async fn test_resources_extension_schema_behavior(ctx: ResourceCtx) {
     let name = "env-label-vars";
 
     // ── 1. Canonicalization on write: author by short name ───────────────────
@@ -76,11 +79,8 @@ pub async fn test_resources_extension_schema_canonicalization(ctx: ResourceCtx) 
         ]),
     )
     .await;
-}
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub async fn test_resources_extension_schema_rejections(ctx: ResourceCtx) {
+    // ── Rejections ────────────────────────────────────────────────────────────
     // ── Unknown URI label key is rejected ─────────────────────────────────────
     let unknown_uri_manifest =
         fixtures::variable_set_manifest_with_unknown_label_uri("unknown-uri-vars");
@@ -111,11 +111,8 @@ pub async fn test_resources_extension_schema_rejections(ctx: ResourceCtx) {
     )
     .await;
     ctx.assert_resource_absent("vs", "overlong-desc-vars").await;
-}
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub async fn test_resources_extension_schema_warnings(ctx: ResourceCtx) {
+    // ── Warnings ──────────────────────────────────────────────────────────────
     // ── Free-form short-name label: accepted, stored opaquely, with warning ──
     let name = "freeform-label-vars";
     let freeform_manifest = fixtures::variable_set_manifest_with_freeform_label(name);

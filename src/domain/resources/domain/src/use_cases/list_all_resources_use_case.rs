@@ -10,7 +10,7 @@
 use database_common::PaginationOpts;
 use internal_error::InternalError;
 
-use crate::ResourceSnapshot;
+use crate::{ResolvedResourceLabelFilter, ResourceSnapshot};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -19,6 +19,7 @@ pub trait ListAllResourcesUseCase: Send + Sync {
     async fn execute(
         &self,
         account_id: odf::AccountID,
+        label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceSnapshot>, InternalError>;
 }

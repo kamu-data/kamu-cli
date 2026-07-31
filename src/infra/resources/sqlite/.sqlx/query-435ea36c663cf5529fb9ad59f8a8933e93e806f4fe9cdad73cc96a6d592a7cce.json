@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT label_key, label_value\n            FROM resource_labels_projection\n            WHERE resource_id = $1\n            ORDER BY label_key\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "label_key",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "label_value",
+        "ordinal": 1,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "435ea36c663cf5529fb9ad59f8a8933e93e806f4fe9cdad73cc96a6d592a7cce"
+}

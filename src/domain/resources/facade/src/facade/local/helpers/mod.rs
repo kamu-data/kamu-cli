@@ -9,10 +9,12 @@
 
 mod batch_id_resolver;
 mod handle_support;
+mod label_filter_support;
 mod manifest_support;
 mod validation_helpers;
 
 pub(crate) use batch_id_resolver::*;
 pub(crate) use handle_support::*;
+pub(crate) use label_filter_support::*;
 pub(crate) use manifest_support::*;
 pub(crate) use validation_helpers::*;

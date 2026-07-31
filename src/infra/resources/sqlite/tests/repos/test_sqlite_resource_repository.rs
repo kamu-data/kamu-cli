@@ -12,7 +12,7 @@ use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
 use kamu_accounts_sqlite::SqliteAccountRepository;
 use kamu_resources_repo_tests::resource_repository_test_suite as resource_repo_suite;
-use kamu_resources_sqlite::SqliteResourceRepository;
+use kamu_resources_sqlite::{SqliteResourceLabelProjectionRepository, SqliteResourceRepository};
 use sqlx::SqlitePool;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -52,6 +52,14 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
+    fixture = resource_repo_suite::test_find_resource_handles_by_ids,
+    harness = SqliteResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
     fixture = resource_repo_suite::test_find_resource_snapshots_by_schema_and_ids,
     harness = SqliteResourceRepositoryHarness
 );
@@ -68,7 +76,47 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
+    fixture = resource_repo_suite::test_search_resource_handles_exact_ids,
+    harness = SqliteResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = resource_repo_suite::test_search_resource_handles_pattern_special_characters,
+    harness = SqliteResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
     fixture = resource_repo_suite::test_count_search_resource_handles,
+    harness = SqliteResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = resource_repo_suite::test_count_search_resource_handles_exact_ids,
+    harness = SqliteResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = resource_repo_suite::test_list_resource_snapshots_label_filtering,
+    harness = SqliteResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = resource_repo_suite::test_search_resource_handles_label_filtering,
     harness = SqliteResourceRepositoryHarness
 );
 
@@ -204,6 +252,7 @@ impl SqliteResourceRepositoryHarness {
         catalog_builder.add_value(sqlite_pool);
         catalog_builder.add::<SqliteTransactionManager>();
         catalog_builder.add::<SqliteResourceRepository>();
+        catalog_builder.add::<SqliteResourceLabelProjectionRepository>();
         catalog_builder.add::<SqliteAccountRepository>();
         Self {
             catalog: catalog_builder.build(),

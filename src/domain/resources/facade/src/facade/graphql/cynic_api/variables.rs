@@ -10,7 +10,11 @@
 use database_common::PaginationOpts;
 use internal_error::InternalError;
 
-use crate::facade::graphql::cynic_api::inputs::{AccountRefInput, ResourceTypeSelectorInput};
+use crate::facade::graphql::cynic_api::inputs::{
+    AccountRefInput,
+    ResourceLabelFilterInput,
+    ResourceTypeSelectorInput,
+};
 use crate::facade::graphql::cynic_api::schema;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -19,6 +23,7 @@ use crate::facade::graphql::cynic_api::schema;
 pub(crate) struct ListByResourceTypeVariables {
     pub resource_type: ResourceTypeSelectorInput,
     pub account: Option<AccountRefInput>,
+    pub label_filter: Option<ResourceLabelFilterInput>,
     pub page: i32,
     pub per_page: i32,
 }
@@ -27,12 +32,14 @@ impl ListByResourceTypeVariables {
     pub(crate) fn new(
         resource_type: &kamu_resources::ResourceTypeSelectorRaw,
         account: Option<&kamu_resources::ResourceAccountRef>,
+        label_filter: Option<&kamu_resources::ResourceLabelFilterInput>,
         pagination: PaginationOpts,
     ) -> Result<Self, InternalError> {
         let (page, per_page) = pagination.as_page_params(Self::DEFAULT_PAGE_SIZE)?;
         Ok(Self {
             resource_type: ResourceTypeSelectorInput::from_resource_type(resource_type),
             account: account.map(Into::into),
+            label_filter: label_filter.map(Into::into),
             page,
             per_page,
         })
@@ -46,6 +53,7 @@ impl ListByResourceTypeVariables {
 #[derive(cynic::QueryVariables, Debug, Clone)]
 pub(crate) struct ListAllVariables {
     pub account: Option<AccountRefInput>,
+    pub label_filter: Option<ResourceLabelFilterInput>,
     pub page: i32,
     pub per_page: i32,
 }
@@ -53,11 +61,13 @@ pub(crate) struct ListAllVariables {
 impl ListAllVariables {
     pub(crate) fn new(
         account: Option<&kamu_resources::ResourceAccountRef>,
+        label_filter: Option<&kamu_resources::ResourceLabelFilterInput>,
         pagination: PaginationOpts,
     ) -> Result<Self, InternalError> {
         let (page, per_page) = pagination.as_page_params(Self::DEFAULT_PAGE_SIZE)?;
         Ok(Self {
             account: account.map(Into::into),
+            label_filter: label_filter.map(Into::into),
             page,
             per_page,
         })

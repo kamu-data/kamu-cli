@@ -10,7 +10,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use internal_error::InternalError;
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_resources::*;
 use kamu_resources_services::{
     ResourceExtensionSchemaResolver,
@@ -255,10 +255,19 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             &request.raw_type_selector,
         )?;
 
+        let resource_schema = ResourceSchemaId::try_from(dispatcher.schema()).int_err()?;
+
+        let label_filter = resolve_label_filter(
+            &self.resource_extension_schema_resolver,
+            request.label_filter,
+            &resource_schema,
+        )?;
+
         dispatcher
             .list(ResourceCrudDispatcherListRequest {
                 account_id: target_account.did,
                 pagination: request.pagination,
+                label_filter,
             })
             .await
             .map_err(Into::into)
@@ -276,9 +285,22 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         let schema =
             self.resolve_schema_for_selector::<ListResourcesError>(&request.raw_type_selector)?;
 
+        let resource_schema = ResourceSchemaId::try_from(&schema).int_err()?;
+
+        let label_filter = resolve_label_filter(
+            &self.resource_extension_schema_resolver,
+            request.label_filter,
+            &resource_schema,
+        )?;
+
         let snapshots = self
             .generic_resource_query_service
-            .list_snapshots_by_schema(target_account.did, &schema, request.pagination)
+            .list_snapshots_by_schema(
+                target_account.did,
+                &schema,
+                &label_filter,
+                request.pagination,
+            )
             .await?;
 
         Ok(map_snapshots_to_handles(snapshots))
@@ -288,8 +310,12 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         &self,
         request: SearchResourceHandlesRequest,
     ) -> Result<SearchResourceHandlesResponse, ListResourcesError> {
-        if request.exact_names.is_none() && request.name_pattern.is_none() {
-            return Err(InvalidResourceSearchQueryError.into());
+        // Empty exact-name/id queries are vacuous.
+        if request.query.is_vacuous() {
+            return Ok(SearchResourceHandlesResponse {
+                items: Vec::new(),
+                total_count: 0,
+            });
         }
 
         let target_account = self
@@ -305,13 +331,32 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
+        let resource_schema_ids = schemas
+            .iter()
+            .map(|schema| ResourceSchemaId::try_from(schema).int_err())
+            .collect::<Result<Vec<_>, _>>()?;
+
+        // Resolution can drop schemas that cannot carry the requested labels.
+        let (applicable_schema_ids, label_filter) = resolve_label_filter_for_schemas(
+            &self.resource_extension_schema_resolver,
+            request.label_filter,
+            &resource_schema_ids,
+        )?;
+
+        let schemas = schemas
+            .into_iter()
+            .zip(&resource_schema_ids)
+            .filter(|(_, schema_id)| applicable_schema_ids.contains(schema_id))
+            .map(|(schema, _)| schema)
+            .collect::<Vec<_>>();
+
         let rows = self
             .generic_resource_query_service
             .search_resource_handles(
                 &target_account.did,
                 &schemas,
-                request.exact_names.as_deref(),
-                request.name_pattern.as_deref(),
+                &request.query,
+                &label_filter,
                 request.pagination,
             )
             .await?;
@@ -320,8 +365,8 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .count_search_resource_handles(
                 &target_account.did,
                 &schemas,
-                request.exact_names.as_deref(),
-                request.name_pattern.as_deref(),
+                &request.query,
+                &label_filter,
             )
             .await?;
 
@@ -342,9 +387,11 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .resolve_target_account(request.account.as_ref())
             .await?;
 
+        let label_filter = self.resolve_label_filter_for_all_schemas(request.label_filter)?;
+
         let snapshots = self
             .generic_resource_query_service
-            .list_all_snapshots(target_account.did, request.pagination)
+            .list_all_snapshots(target_account.did, &label_filter, request.pagination)
             .await?;
 
         Ok(snapshots.into_iter().map(Into::into).collect())
@@ -359,9 +406,11 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .resolve_target_account(request.account.as_ref())
             .await?;
 
+        let label_filter = self.resolve_label_filter_for_all_schemas(request.label_filter)?;
+
         let snapshots = self
             .generic_resource_query_service
-            .list_all_snapshots(target_account.did, request.pagination)
+            .list_all_snapshots(target_account.did, &label_filter, request.pagination)
             .await?;
 
         Ok(map_snapshots_to_handles(snapshots))
@@ -545,9 +594,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         }
 
         if !ids_to_delete.is_empty() {
-            // `schema` was resolved from a registered selector above, so a
-            // missing dispatcher is a data-integrity catastrophe, not a user
-            // error.
+            // Registered selector schemas must have a dispatcher.
             let dispatcher =
                 get_resource_crud_dispatcher_for_trusted_schema(&self.catalog, schema.as_str())?;
             dispatcher
@@ -589,6 +636,26 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl LocalResourceFacadeImpl {
+    /// Resolves an authored filter for the `all` scope.
+    fn resolve_label_filter_for_all_schemas(
+        &self,
+        label_filter: Option<ResourceLabelFilterInput>,
+    ) -> Result<ResolvedResourceLabelFilter, ResourceInvalidLabelFilterError> {
+        let resource_schema_ids = self
+            .list_resource_type_descriptors()
+            .iter()
+            .map(|descriptor| ResourceSchemaId::try_from(&descriptor.schema))
+            .collect::<Result<Vec<_>, _>>()
+            .expect("registered descriptors always carry canonical schema URIs");
+
+        let (_, resolved) = resolve_label_filter_for_schemas(
+            &self.resource_extension_schema_resolver,
+            label_filter,
+            &resource_schema_ids,
+        )?;
+
+        Ok(resolved)
+    }
     fn list_resource_type_descriptors(&self) -> Vec<ResourceTypeDescriptor> {
         let mut seen = HashSet::new();
         let mut descriptors = Vec::new();
@@ -668,8 +735,7 @@ impl LocalResourceFacadeImpl {
             .resolve_snapshot_for_schema::<E>(&schema, &target_account.did, id)
             .await?;
 
-        // The schema was resolved from a registered selector above, so a missing
-        // dispatcher here is a data-integrity catastrophe, not a user error.
+        // Registered selector schemas must have a dispatcher.
         let dispatcher = get_resource_crud_dispatcher_for_trusted_schema(
             &self.catalog,
             snapshot.schema.as_str(),
@@ -709,6 +775,7 @@ impl LocalResourceFacadeImpl {
         let schema =
             self.resolve_schema_for_selector::<BatchResourceError>(&selector.resource_type)?;
 
+        // Batch selectors name their targets explicitly.
         let groups = group_batch_resource_refs(selector);
 
         let resolution_response = resolve_batch_ids(
@@ -806,11 +873,21 @@ impl LocalResourceFacadeImpl {
             .collect::<HashMap<_, _>>();
 
         let mut handles = Vec::new();
-        for (request_index, _, id) in id_entries {
-            let row_result = rows_by_id
-                .get(id.as_ref())
-                .cloned()
-                .ok_or_else(|| id_not_found(id));
+        for (request_index, resource_ref, id) in id_entries {
+            // Report misses in the terms the caller selected by.
+            let not_found = || match &resource_ref {
+                ResourceRef::ByName(name) => resource_type_name(schema)
+                    .map(|type_name| {
+                        ResourceLookupProblem::NameNotFound(ResourceNameNotFoundError {
+                            type_name,
+                            name: name.clone(),
+                        })
+                    })
+                    .unwrap_or_else(|_| id_not_found(id)),
+                ResourceRef::ById(_) => id_not_found(id),
+            };
+
+            let row_result = rows_by_id.get(id.as_ref()).cloned().ok_or_else(not_found);
             match row_result.and_then(|row| {
                 validate_handle_row(row, schema, ensure_schema_matches::<ResourceLookupProblem>)
             }) {
@@ -916,8 +993,7 @@ impl LocalResourceFacadeImpl {
     where
         E: From<InternalError>,
     {
-        // Dispatcher is resolved once from the first item; all items in a batch share
-        // the same schema, so this avoids redundant catalog lookups.
+        // All batch items share one schema, so one dispatcher lookup is enough.
         let maybe_dispatcher = resources
             .first()
             .and_then(|r| self.try_resolve_spec_view_dispatcher(&r.item.schema, spec_view_mode));

@@ -10,7 +10,7 @@
 use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
 use kamu_accounts_inmem::InMemoryAccountRepository;
-use kamu_resources_inmem::InMemoryResourceRepository;
+use kamu_resources_inmem::{InMemoryResourceLabelProjectionRepository, InMemoryResourceRepository};
 use kamu_resources_repo_tests::resource_repository_test_suite as resource_repo_suite;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -50,6 +50,14 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem,
+    fixture = resource_repo_suite::test_find_resource_handles_by_ids,
+    harness = InMemoryResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
     fixture = resource_repo_suite::test_find_resource_snapshots_by_schema_and_ids,
     harness = InMemoryResourceRepositoryHarness
 );
@@ -66,7 +74,47 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem,
+    fixture = resource_repo_suite::test_search_resource_handles_exact_ids,
+    harness = InMemoryResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = resource_repo_suite::test_search_resource_handles_pattern_special_characters,
+    harness = InMemoryResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
     fixture = resource_repo_suite::test_count_search_resource_handles,
+    harness = InMemoryResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = resource_repo_suite::test_count_search_resource_handles_exact_ids,
+    harness = InMemoryResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = resource_repo_suite::test_list_resource_snapshots_label_filtering,
+    harness = InMemoryResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = resource_repo_suite::test_search_resource_handles_label_filtering,
     harness = InMemoryResourceRepositoryHarness
 );
 
@@ -200,6 +248,7 @@ impl InMemoryResourceRepositoryHarness {
     pub fn new() -> Self {
         let mut catalog_builder = CatalogBuilder::new();
         catalog_builder.add::<InMemoryResourceRepository>();
+        catalog_builder.add::<InMemoryResourceLabelProjectionRepository>();
         catalog_builder.add::<InMemoryAccountRepository>();
         Self {
             catalog: catalog_builder.build(),

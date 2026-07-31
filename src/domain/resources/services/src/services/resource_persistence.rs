@@ -16,12 +16,14 @@ use crate::domain::{
     DeclarativeResource,
     InvariantViolationOf,
     ReconcilableEventSourcedResource,
+    ResourceLabelProjectionRepository,
     ResourcePersistenceError,
     ResourceRepository,
     ResourceSchemaProvider,
     ResourceSnapshot,
     ResourceSnapshotUpdate,
     UpdateResourceError,
+    string_label_entries,
 };
 use crate::{ResourceDurableStateValidator, ResourceExtensionSchemaRegistry};
 
@@ -32,6 +34,7 @@ where
     R: ReconcilableEventSourcedResource + ResourceSchemaProvider,
 {
     resource_repository: &'a dyn ResourceRepository,
+    label_projection_repository: &'a dyn ResourceLabelProjectionRepository,
     event_store: &'a R::Store,
     extension_schema_registry: &'a ResourceExtensionSchemaRegistry,
 }
@@ -44,11 +47,13 @@ where
 {
     pub fn new(
         resource_repository: &'a dyn ResourceRepository,
+        label_projection_repository: &'a dyn ResourceLabelProjectionRepository,
         event_store: &'a R::Store,
         extension_schema_registry: &'a ResourceExtensionSchemaRegistry,
     ) -> Self {
         Self {
             resource_repository,
+            label_projection_repository,
             event_store,
             extension_schema_registry,
         }
@@ -198,17 +203,31 @@ where
             .collect::<Result<Vec<_>, ResourcePersistenceError>>()?;
 
         match self.resource_repository.update_resources(&updates).await {
-            Ok(()) => Ok(()),
+            Ok(()) => {}
             Err(UpdateResourceError::ConcurrentModification(err)) => {
-                Err(ResourcePersistenceError::ConcurrentModification(err))
+                return Err(ResourcePersistenceError::ConcurrentModification(err));
             }
-            Err(UpdateResourceError::Duplicate(err)) => Err(ResourcePersistenceError::Internal(
-                format!("{err}")
-                    .int_err()
-                    .with_context("Unexpected duplicate resource state while syncing resources"),
-            )),
-            Err(err) => Err(ResourcePersistenceError::Internal(err.int_err())),
+            Err(UpdateResourceError::Duplicate(err)) => {
+                return Err(ResourcePersistenceError::Internal(
+                    format!("{err}").int_err().with_context(
+                        "Unexpected duplicate resource state while syncing resources",
+                    ),
+                ));
+            }
+            Err(err) => return Err(ResourcePersistenceError::Internal(err.int_err())),
         }
+
+        for update in &updates {
+            self.label_projection_repository
+                .replace_entries(
+                    &update.snapshot.id,
+                    &string_label_entries(&update.snapshot.headers.labels),
+                )
+                .await
+                .map_err(ResourcePersistenceError::Internal)?;
+        }
+
+        Ok(())
     }
 }
 
@@ -225,6 +244,8 @@ macro_rules! declare_resource_persistence_service {
         #[dill::interface(dyn kamu_resources::ResourcePersistenceService<$resource>)]
         pub struct $service {
             resource_repository: std::sync::Arc<dyn kamu_resources::ResourceRepository>,
+            label_projection_repository:
+                std::sync::Arc<dyn kamu_resources::ResourceLabelProjectionRepository>,
             event_store: std::sync::Arc<dyn $store>,
             extension_schema_registry: std::sync::Arc<$crate::ResourceExtensionSchemaRegistry>,
         }
@@ -237,6 +258,7 @@ macro_rules! declare_resource_persistence_service {
             ) -> Result<(), kamu_resources::ResourcePersistenceError> {
                 let helper = $crate::ResourcePersistenceServiceHelper::<$resource>::new(
                     self.resource_repository.as_ref(),
+                    self.label_projection_repository.as_ref(),
                     self.event_store.as_ref(),
                     self.extension_schema_registry.as_ref(),
                 );
@@ -250,6 +272,7 @@ macro_rules! declare_resource_persistence_service {
             ) -> Result<(), kamu_resources::ResourcePersistenceError> {
                 let helper = $crate::ResourcePersistenceServiceHelper::<$resource>::new(
                     self.resource_repository.as_ref(),
+                    self.label_projection_repository.as_ref(),
                     self.event_store.as_ref(),
                     self.extension_schema_registry.as_ref(),
                 );
@@ -264,6 +287,7 @@ macro_rules! declare_resource_persistence_service {
             ) -> Result<(), kamu_resources::ResourcePersistenceError> {
                 let helper = $crate::ResourcePersistenceServiceHelper::<$resource>::new(
                     self.resource_repository.as_ref(),
+                    self.label_projection_repository.as_ref(),
                     self.event_store.as_ref(),
                     self.extension_schema_registry.as_ref(),
                 );
@@ -278,6 +302,7 @@ macro_rules! declare_resource_persistence_service {
             ) -> Result<(), kamu_resources::ResourcePersistenceError> {
                 let helper = $crate::ResourcePersistenceServiceHelper::<$resource>::new(
                     self.resource_repository.as_ref(),
+                    self.label_projection_repository.as_ref(),
                     self.event_store.as_ref(),
                     self.extension_schema_registry.as_ref(),
                 );

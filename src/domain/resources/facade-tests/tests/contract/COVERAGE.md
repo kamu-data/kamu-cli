@@ -68,11 +68,24 @@ Each RF scenario from the original plan is listed with its status.
 | RF-086  | list_search.rs      | Active   | List unsupported type returns unsupported descriptor error            |                                                                        |
 | RF-090  | list_search.rs      | Active   | Search by exact names                                                 |                                                                        |
 | RF-091  | list_search.rs      | Active   | Search by exact names with missing names                              |                                                                        |
+| RF-091A | list_search.rs      | Active   | Search by exact ids                                                   | Extension beyond original plan                                         |
+| RF-091B | list_search.rs      | Active   | Search by exact ids with missing ids                                  | Extension beyond original plan                                         |
+| RF-091C | list_search.rs      | Active   | Search by exact ids is account-scoped                                 | Extension beyond original plan                                         |
 | RF-092  | list_search.rs      | Active   | Search by name pattern                                                |                                                                        |
 | RF-093  | list_search.rs      | Active   | Search by multiple types                                              |                                                                        |
-| RF-094  | list_search.rs      | Active   | Search with neither exact names nor pattern is rejected               |                                                                        |
+| RF-094  | list_search.rs      | Active   | Search with an empty exact-names/ids list is vacuous, not rejected    | `ResourceSearchQuery` makes "no query mode" unrepresentable            |
 | RF-095  | list_search.rs      | Active   | Search pagination and total_count                                     |                                                                        |
 | RF-096  | list_search.rs      | Active   | Search account scoping                                                |                                                                        |
+| RF-097  | list_search.rs      | Active   | List filter by canonical label URI is accepted                        | Local-only: repo matching is Phase 9, remote transport is Phase 10   |
+| RF-098  | list_search.rs      | Active   | List filter by short label name is accepted                           | Local-only, same reason as RF-097                                     |
+| RF-099  | list_search.rs      | Active   | List filter by free-form label is accepted                            | Local-only, same reason as RF-097                                     |
+| RF-099A | list_search.rs      | Active   | List filter invalid key is rejected                                   | Local-only, same reason as RF-097                                     |
+| RF-099B | list_search.rs      | Active   | List filter unknown URI is rejected                                   | Local-only, same reason as RF-097                                     |
+| RF-099C | list_search.rs      | Active   | List filter non-string value is rejected                              | Local-only, same reason as RF-097                                     |
+| RF-099D | list_search.rs      | Active   | List filter duplicate-after-canonicalization is rejected              | Local-only, same reason as RF-097                                     |
+| RF-099E | list_search.rs      | Active   | List filter `$not` operator is rejected                               | Recognized (ODF `LabelFilter` schema shape) but not evaluated yet     |
+| RF-099F | list_search.rs      | Active   | List filter `$or` operator is rejected                                | Recognized but not evaluated yet, same reason as RF-099E              |
+| RF-099G | list_search.rs      | Active   | List filter malformed `$not` operator is rejected                     | Parse failure shares the same code as a well-formed but unevaluated `$not` |
 | RF-100  | list_all.rs         | Active   | list_all returns summaries across supported types                     |                                                                        |
 | RF-101  | list_all.rs         | Active   | list_all_handles returns handles across supported types         |                                                                        |
 | RF-102  | list_all.rs         | Active   | list_all pagination                                                   |                                                                        |

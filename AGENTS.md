@@ -38,6 +38,7 @@ cargo nextest run -E 'test(test_name_here)'
 - Prefer inline formatting like `format!("value={value}")`.
 - Prefer checked numeric conversions like `usize::try_from(x).unwrap()` when narrowing types.
 - Respect exact long separator comment style where surrounding files use it.
+- Keep comments short — one or two lines. State the non-obvious fact (a constraint, invariant, or reason), not a walkthrough of the code or the history of how it got there. Never cite plan/spec/issue identifiers (e.g. "plan 7 item 3") in code comments — plans are not part of the codebase and the reference rots.
 - Keep macros declarative. Put algorithmic logic into ordinary helper functions or services.
 - When logic becomes conceptually distinct, split it into its own module early.
 - Organize model files top-down: highest-level result/union type first, then referenced structs/enums, with impl blocks immediately after the type.

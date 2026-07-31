@@ -49,6 +49,49 @@ impl ResourceTypeSelectorInput {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// One authored `key = value` label predicate.
+#[derive(InputObject, Debug, Clone)]
+pub struct ResourceLabelFilterEntryInput {
+    pub key: String,
+    pub value: serde_json::Value,
+}
+
+/// Selects resources by label predicates.
+/// A list preserves duplicate keys for validation.
+#[derive(InputObject, Debug, Clone)]
+pub struct ResourceLabelFilterInput {
+    pub entries: Vec<ResourceLabelFilterEntryInput>,
+}
+
+impl ResourceLabelFilterInput {
+    /// Rejects duplicate keys before entries collapse into a map.
+    pub fn into_facade_filter(self) -> Result<kamu_resources::ResourceLabelFilterInput, GqlError> {
+        let mut entries = std::collections::BTreeMap::new();
+
+        for entry in self.entries {
+            if entries.contains_key(&entry.key) {
+                return Err(GqlError::gql(format!(
+                    "label filter key '{}' is specified more than once",
+                    entry.key
+                )));
+            }
+            entries.insert(entry.key, entry.value);
+        }
+
+        Ok(kamu_resources::ResourceLabelFilterInput { entries })
+    }
+}
+
+pub(crate) fn into_facade_filter(
+    label_filter: Option<ResourceLabelFilterInput>,
+) -> Result<Option<kamu_resources::ResourceLabelFilterInput>, GqlError> {
+    label_filter
+        .map(ResourceLabelFilterInput::into_facade_filter)
+        .transpose()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(InputObject, Debug, Clone, Default)]
 pub struct AccountRefInput {
     pub id: Option<ResourceID<'static>>,
@@ -98,12 +141,38 @@ impl From<ResourceSelectorInput> for kamu_resources_facade::ResourceSelector {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<ResourceBatchSelectorInput> for kamu_resources_facade::ResourceBatchSelector {
-    fn from(value: ResourceBatchSelectorInput) -> Self {
-        Self {
+impl TryFrom<ResourceBatchSelectorInput> for kamu_resources_facade::ResourceBatchSelector {
+    type Error = GqlError;
+
+    fn try_from(value: ResourceBatchSelectorInput) -> Result<Self, GqlError> {
+        Ok(Self {
             account: value.account.map(AccountRefInput::into_manifest_account),
             resource_type: value.resource_type.into_resource_type_selector(),
             resource_refs: value.resource_refs.into_iter().map(Into::into).collect(),
+        })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Exactly one way to narrow a search.
+#[derive(OneofObject, Debug, Clone)]
+pub enum ResourceSearchQueryInput {
+    ExactNames(Vec<ResourceName<'static>>),
+    ExactIds(Vec<ResourceID<'static>>),
+    NamePattern(String),
+}
+
+impl From<ResourceSearchQueryInput> for kamu_resources::ResourceSearchQuery {
+    fn from(value: ResourceSearchQueryInput) -> Self {
+        match value {
+            ResourceSearchQueryInput::ExactNames(names) => {
+                Self::ExactNames(names.into_iter().map(Into::into).collect())
+            }
+            ResourceSearchQueryInput::ExactIds(ids) => {
+                Self::ExactIds(ids.into_iter().map(Into::into).collect())
+            }
+            ResourceSearchQueryInput::NamePattern(pattern) => Self::NamePattern(pattern),
         }
     }
 }
@@ -113,29 +182,27 @@ impl From<ResourceBatchSelectorInput> for kamu_resources_facade::ResourceBatchSe
 #[derive(InputObject, Debug, Clone)]
 pub struct SearchResourceHandlesInput {
     pub resource_types: Vec<ResourceTypeSelectorInput>,
-    pub names: Option<Vec<ResourceName<'static>>>,
-    pub name_pattern: Option<String>,
+    pub query: ResourceSearchQueryInput,
     pub account: Option<AccountRefInput>,
+    pub label_filter: Option<ResourceLabelFilterInput>,
 }
 
 impl SearchResourceHandlesInput {
     pub fn into_facade_request(
         self,
         pagination: PaginationOpts,
-    ) -> kamu_resources_facade::SearchResourceHandlesRequest {
-        kamu_resources_facade::SearchResourceHandlesRequest {
+    ) -> Result<kamu_resources_facade::SearchResourceHandlesRequest, GqlError> {
+        Ok(kamu_resources_facade::SearchResourceHandlesRequest {
             raw_type_selectors: self
                 .resource_types
                 .into_iter()
                 .map(ResourceTypeSelectorInput::into_resource_type_selector)
                 .collect(),
-            exact_names: self
-                .names
-                .map(|names| names.into_iter().map(Into::into).collect()),
-            name_pattern: self.name_pattern,
+            query: self.query.into(),
             account: self.account.map(AccountRefInput::into_manifest_account),
+            label_filter: into_facade_filter(self.label_filter)?,
             pagination,
-        }
+        })
     }
 }
 
@@ -440,17 +507,41 @@ impl TryFrom<kamu_resources::UnsupportedResourceSelectorError> for ResourceSelec
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// The `labelFilter` argument could not be resolved into a matchable filter.
 #[derive(SimpleObject, Debug, Clone)]
-pub struct ResourceInvalidSearchQueryProblem {
+pub struct ResourceInvalidLabelFilterProblem {
+    pub code: ResourceLabelFilterProblemCode,
     pub message: String,
 }
 
-impl From<kamu_resources_facade::InvalidResourceSearchQueryError>
-    for ResourceInvalidSearchQueryProblem
+#[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ResourceLabelFilterProblemCode {
+    InvalidKey,
+    ResourceExtensionSchema,
+    NonStringValue,
+    DuplicateAfterCanonicalization,
+    UnsupportedExpression,
+}
+
+impl From<kamu_resources_facade::ResourceInvalidLabelFilterError>
+    for ResourceInvalidLabelFilterProblem
 {
-    fn from(value: kamu_resources_facade::InvalidResourceSearchQueryError) -> Self {
+    fn from(value: kamu_resources_facade::ResourceInvalidLabelFilterError) -> Self {
+        use kamu_resources_facade::ResourceLabelFilterProblemCode as C;
+
+        let code = match value.code {
+            C::InvalidKey => ResourceLabelFilterProblemCode::InvalidKey,
+            C::ResourceExtensionSchema => ResourceLabelFilterProblemCode::ResourceExtensionSchema,
+            C::NonStringValue => ResourceLabelFilterProblemCode::NonStringValue,
+            C::DuplicateAfterCanonicalization => {
+                ResourceLabelFilterProblemCode::DuplicateAfterCanonicalization
+            }
+            C::UnsupportedExpression => ResourceLabelFilterProblemCode::UnsupportedExpression,
+        };
+
         Self {
-            message: value.to_string(),
+            code,
+            message: value.message,
         }
     }
 }

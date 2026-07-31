@@ -126,6 +126,7 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
             raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
+            label_filter: None,
         })
         .await
         .expect("list with canonical selector must succeed");
@@ -141,6 +142,7 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
         .list_handles(ListResourceHandlesRequest {
             raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             account: None,
+            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -173,6 +175,7 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
             raw_type_selector: "vs".parse().unwrap(),
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
+            label_filter: None,
         })
         .await
         .expect("short name 'vs' must resolve for list");
@@ -189,6 +192,7 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
             raw_type_selector: "VariableSet".parse().unwrap(),
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
+            label_filter: None,
         })
         .await;
     match schema_type_name_result {
@@ -281,6 +285,7 @@ pub async fn test_unsupported_schema_rejected_consistently(h: &impl FacadeContra
             raw_type_selector: bad_type.parse().unwrap(),
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
+            label_filter: None,
         })
         .await;
     match list_result {
@@ -297,6 +302,7 @@ pub async fn test_unsupported_schema_rejected_consistently(h: &impl FacadeContra
         .list_handles(ListResourceHandlesRequest {
             raw_type_selector: bad_type.parse().unwrap(),
             account: None,
+            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await;

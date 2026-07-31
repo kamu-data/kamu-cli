@@ -16,15 +16,18 @@ use futures::TryStreamExt;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_resources::{
     CreateResourceError,
+    ResolvedResourceLabelFilter,
     ResourceDuplicateError,
     ResourceHandleRow,
     ResourceHeaders,
     ResourceID,
     ResourceIDStream,
+    ResourceLabelFilterPredicate,
     ResourceName,
     ResourcePhaseCounts,
     ResourceRawEventQuery,
     ResourceRepository,
+    ResourceSearchQuery,
     ResourceSnapshot,
     ResourceSnapshotRow,
     ResourceSnapshotStream,
@@ -335,12 +338,12 @@ impl ResourceRepository for PostgresResourceRepository {
         Ok(rows)
     }
 
-    async fn find_resource_handles_by_names(
+    async fn resolve_resource_ids_by_names(
         &self,
         account_id: &odf::AccountID,
         schema: &TypeUri,
         names: &[ResourceName],
-    ) -> Result<Vec<ResourceHandleRow>, InternalError> {
+    ) -> Result<Vec<(ResourceName, ResourceID)>, InternalError> {
         if names.is_empty() {
             return Ok(Vec::new());
         }
@@ -350,21 +353,12 @@ impl ResourceRepository for PostgresResourceRepository {
 
         let account_id_stack = account_id.as_stack_string();
 
-        let rows = sqlx::query_as!(
-            ResourceHandleRow,
+        let rows = sqlx::query!(
             r#"
             SELECT
                 r.resource_id as "id: uuid::Uuid",
-                r.resource_schema as schema,
-                r.resource_name as name,
-                r.account_id as "account_id: odf::AccountID",
-                -- LEFT JOIN: a.resource_id is NULL only when the owning account
-                -- row is gone (deletion racing async cleanup), same case the
-                -- account_name sentinel covers. Substitute the nil resource id.
-                COALESCE(a.resource_id, '00000000-0000-0000-0000-000000000000'::uuid) as "account_resource_id!: uuid::Uuid",
-                COALESCE(a.account_name, $4) as "account_name!"
+                r.resource_name as name
             FROM resources r
-            LEFT JOIN accounts a ON a.id = r.account_id
             WHERE r.account_id = $1
               AND r.resource_schema = $2
               AND LOWER(r.resource_name) = ANY($3)
@@ -376,26 +370,35 @@ impl ResourceRepository for PostgresResourceRepository {
                 .iter()
                 .map(|n| n.to_ascii_lowercase())
                 .collect::<Vec<_>>() as _,
-            kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL,
         )
         .fetch_all(connection_mut)
         .await
         .int_err()?;
 
-        Ok(rows)
+        Ok(rows
+            .into_iter()
+            .map(|row| {
+                (
+                    ResourceName::new_unchecked(&row.name),
+                    ResourceID::new(row.id),
+                )
+            })
+            .collect())
     }
 
     async fn search_resource_handles(
         &self,
         account_id: &odf::AccountID,
         schemas: &[TypeUri],
-        exact_names: Option<&[ResourceName]>,
-        name_pattern: Option<&str>,
+        query: &ResourceSearchQuery,
+        label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceHandleRow>, InternalError> {
-        if schemas.is_empty() || exact_names.is_some_and(<[ResourceName]>::is_empty) {
+        if schemas.is_empty() || query.is_vacuous() {
             return Ok(Vec::new());
         }
+
+        let (label_keys, label_values) = split_label_filter_pairs(label_filter)?;
 
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
@@ -404,47 +407,149 @@ impl ResourceRepository for PostgresResourceRepository {
         let schema_strs = schemas.iter().map(TypeUri::as_str).collect::<Vec<_>>();
         let limit = i64::try_from(pagination.limit).int_err()?;
         let offset = i64::try_from(pagination.offset).int_err()?;
-        let exact_names = exact_names.map(|ns| {
-            ns.iter()
-                .map(|n| n.to_ascii_lowercase())
-                .collect::<Vec<_>>()
-        });
-        let name_pattern = name_pattern.map(sql_like_escape_pattern);
 
-        let rows = sqlx::query_as!(
-            ResourceHandleRow,
-            r#"
-            SELECT
-                r.resource_id as "id: uuid::Uuid",
-                r.resource_schema as schema,
-                r.resource_name as name,
-                r.account_id as "account_id: odf::AccountID",
-                -- LEFT JOIN: a.resource_id is NULL only when the owning account
-                -- row is gone (deletion racing async cleanup), same case the
-                -- account_name sentinel covers. Substitute the nil resource id.
-                COALESCE(a.resource_id, '00000000-0000-0000-0000-000000000000'::uuid) as "account_resource_id!: uuid::Uuid",
-                COALESCE(a.account_name, $7) as "account_name!"
-            FROM resources r
-            LEFT JOIN accounts a ON a.id = r.account_id
-            WHERE r.account_id = $1
-              AND r.resource_schema = ANY($2)
-              AND ($3::text[] IS NULL OR LOWER(r.resource_name) = ANY($3))
-              AND ($4::text IS NULL OR r.resource_name ILIKE $4 ESCAPE '\')
-              AND r.deleted_at IS NULL
-            ORDER BY r.updated_at DESC, r.resource_id DESC
-            LIMIT $5 OFFSET $6
-            "#,
-            account_id_stack.as_str(),
-            schema_strs as _,
-            exact_names.as_deref() as _,
-            name_pattern.as_deref(),
-            limit,
-            offset,
-            kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL,
-        )
-        .fetch_all(connection_mut)
-        .await
-        .int_err()?;
+        let rows = match query {
+            ResourceSearchQuery::ExactNames(names) => {
+                let names = names
+                    .iter()
+                    .map(|n| n.to_ascii_lowercase())
+                    .collect::<Vec<_>>();
+                sqlx::query_as!(
+                    ResourceHandleRow,
+                    r#"
+                    SELECT
+                        r.resource_id as "id: uuid::Uuid",
+                        r.resource_schema as schema,
+                        r.resource_name as name,
+                        r.account_id as "account_id: odf::AccountID",
+                        -- Account row may be missing during async cleanup.
+                        COALESCE(a.resource_id, '00000000-0000-0000-0000-000000000000'::uuid) as "account_resource_id!: uuid::Uuid",
+                        COALESCE(a.account_name, $6) as "account_name!"
+                    FROM resources r
+                    LEFT JOIN accounts a ON a.id = r.account_id
+                    WHERE r.account_id = $1
+                      AND r.resource_schema = ANY($2)
+                      AND LOWER(r.resource_name) = ANY($3)
+                      AND r.deleted_at IS NULL
+                      -- Every requested label pair must be present.
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM UNNEST($7::text[], $8::text[]) AS f(k, v)
+                          WHERE NOT EXISTS (
+                              SELECT 1
+                              FROM resource_labels_projection rl
+                              WHERE rl.resource_id = r.resource_id
+                                AND rl.label_key = f.k
+                                AND rl.label_value = f.v
+                          )
+                      )
+                    ORDER BY r.updated_at DESC, r.resource_id DESC
+                    LIMIT $4 OFFSET $5
+                    "#,
+                    account_id_stack.as_str(),
+                    schema_strs as _,
+                    &names,
+                    limit,
+                    offset,
+                    kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL,
+                    &label_keys,
+                    &label_values,
+                )
+                .fetch_all(connection_mut)
+                .await
+                .int_err()?
+            }
+            ResourceSearchQuery::ExactIds(ids) => {
+                let ids = ids.iter().map(|id| *id.as_ref()).collect::<Vec<_>>();
+                sqlx::query_as!(
+                    ResourceHandleRow,
+                    r#"
+                    SELECT
+                        r.resource_id as "id: uuid::Uuid",
+                        r.resource_schema as schema,
+                        r.resource_name as name,
+                        r.account_id as "account_id: odf::AccountID",
+                        COALESCE(a.resource_id, '00000000-0000-0000-0000-000000000000'::uuid) as "account_resource_id!: uuid::Uuid",
+                        COALESCE(a.account_name, $6) as "account_name!"
+                    FROM resources r
+                    LEFT JOIN accounts a ON a.id = r.account_id
+                    WHERE r.account_id = $1
+                      AND r.resource_schema = ANY($2)
+                      AND r.resource_id = ANY($3::uuid[])
+                      AND r.deleted_at IS NULL
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM UNNEST($7::text[], $8::text[]) AS f(k, v)
+                          WHERE NOT EXISTS (
+                              SELECT 1
+                              FROM resource_labels_projection rl
+                              WHERE rl.resource_id = r.resource_id
+                                AND rl.label_key = f.k
+                                AND rl.label_value = f.v
+                          )
+                      )
+                    ORDER BY r.updated_at DESC, r.resource_id DESC
+                    LIMIT $4 OFFSET $5
+                    "#,
+                    account_id_stack.as_str(),
+                    schema_strs as _,
+                    &ids,
+                    limit,
+                    offset,
+                    kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL,
+                    &label_keys,
+                    &label_values,
+                )
+                .fetch_all(connection_mut)
+                .await
+                .int_err()?
+            }
+            ResourceSearchQuery::NamePattern(pattern) => {
+                let pattern = sql_like_escape_pattern(pattern);
+                sqlx::query_as!(
+                    ResourceHandleRow,
+                    r#"
+                    SELECT
+                        r.resource_id as "id: uuid::Uuid",
+                        r.resource_schema as schema,
+                        r.resource_name as name,
+                        r.account_id as "account_id: odf::AccountID",
+                        COALESCE(a.resource_id, '00000000-0000-0000-0000-000000000000'::uuid) as "account_resource_id!: uuid::Uuid",
+                        COALESCE(a.account_name, $6) as "account_name!"
+                    FROM resources r
+                    LEFT JOIN accounts a ON a.id = r.account_id
+                    WHERE r.account_id = $1
+                      AND r.resource_schema = ANY($2)
+                      AND r.resource_name ILIKE $3 ESCAPE '\'
+                      AND r.deleted_at IS NULL
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM UNNEST($7::text[], $8::text[]) AS f(k, v)
+                          WHERE NOT EXISTS (
+                              SELECT 1
+                              FROM resource_labels_projection rl
+                              WHERE rl.resource_id = r.resource_id
+                                AND rl.label_key = f.k
+                                AND rl.label_value = f.v
+                          )
+                      )
+                    ORDER BY r.updated_at DESC, r.resource_id DESC
+                    LIMIT $4 OFFSET $5
+                    "#,
+                    account_id_stack.as_str(),
+                    schema_strs as _,
+                    pattern.as_str(),
+                    limit,
+                    offset,
+                    kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL,
+                    &label_keys,
+                    &label_values,
+                )
+                .fetch_all(connection_mut)
+                .await
+                .int_err()?
+            }
+        };
 
         Ok(rows)
     }
@@ -453,45 +558,127 @@ impl ResourceRepository for PostgresResourceRepository {
         &self,
         account_id: &odf::AccountID,
         schemas: &[TypeUri],
-        exact_names: Option<&[ResourceName]>,
-        name_pattern: Option<&str>,
+        query: &ResourceSearchQuery,
+        label_filter: &ResolvedResourceLabelFilter,
     ) -> Result<usize, InternalError> {
-        if schemas.is_empty() || exact_names.is_some_and(<[ResourceName]>::is_empty) {
+        if schemas.is_empty() || query.is_vacuous() {
             return Ok(0);
         }
+
+        let (label_keys, label_values) = split_label_filter_pairs(label_filter)?;
 
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
         let account_id_stack = account_id.as_stack_string();
         let schema_strs = schemas.iter().map(TypeUri::as_str).collect::<Vec<_>>();
-        let exact_names = exact_names.map(|ns| {
-            ns.iter()
-                .map(|n| n.to_ascii_lowercase())
-                .collect::<Vec<_>>()
-        });
-        let name_pattern = name_pattern.map(sql_like_escape_pattern);
 
-        let row = sqlx::query!(
-            r#"
-            SELECT COUNT(*) AS count
-            FROM resources
-            WHERE account_id = $1
-              AND resource_schema = ANY($2)
-              AND ($3::text[] IS NULL OR LOWER(resource_name) = ANY($3))
-              AND ($4::text IS NULL OR resource_name ILIKE $4 ESCAPE '\')
-              AND deleted_at IS NULL
-            "#,
-            account_id_stack.as_str(),
-            schema_strs as _,
-            exact_names.as_deref() as _,
-            name_pattern.as_deref(),
-        )
-        .fetch_one(connection_mut)
-        .await
-        .int_err()?;
+        let count = match query {
+            ResourceSearchQuery::ExactNames(names) => {
+                let names = names
+                    .iter()
+                    .map(|n| n.to_ascii_lowercase())
+                    .collect::<Vec<_>>();
+                sqlx::query!(
+                    r#"
+                    SELECT COUNT(*) AS count
+                    FROM resources r
+                    WHERE r.account_id = $1
+                      AND r.resource_schema = ANY($2)
+                      AND LOWER(r.resource_name) = ANY($3)
+                      AND r.deleted_at IS NULL
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM UNNEST($4::text[], $5::text[]) AS f(k, v)
+                          WHERE NOT EXISTS (
+                              SELECT 1
+                              FROM resource_labels_projection rl
+                              WHERE rl.resource_id = r.resource_id
+                                AND rl.label_key = f.k
+                                AND rl.label_value = f.v
+                          )
+                      )
+                    "#,
+                    account_id_stack.as_str(),
+                    schema_strs as _,
+                    &names,
+                    &label_keys,
+                    &label_values,
+                )
+                .fetch_one(connection_mut)
+                .await
+                .int_err()?
+                .count
+            }
+            ResourceSearchQuery::ExactIds(ids) => {
+                let ids = ids.iter().map(|id| *id.as_ref()).collect::<Vec<_>>();
+                sqlx::query!(
+                    r#"
+                    SELECT COUNT(*) AS count
+                    FROM resources r
+                    WHERE r.account_id = $1
+                      AND r.resource_schema = ANY($2)
+                      AND r.resource_id = ANY($3::uuid[])
+                      AND r.deleted_at IS NULL
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM UNNEST($4::text[], $5::text[]) AS f(k, v)
+                          WHERE NOT EXISTS (
+                              SELECT 1
+                              FROM resource_labels_projection rl
+                              WHERE rl.resource_id = r.resource_id
+                                AND rl.label_key = f.k
+                                AND rl.label_value = f.v
+                          )
+                      )
+                    "#,
+                    account_id_stack.as_str(),
+                    schema_strs as _,
+                    &ids,
+                    &label_keys,
+                    &label_values,
+                )
+                .fetch_one(connection_mut)
+                .await
+                .int_err()?
+                .count
+            }
+            ResourceSearchQuery::NamePattern(pattern) => {
+                let pattern = sql_like_escape_pattern(pattern);
+                sqlx::query!(
+                    r#"
+                    SELECT COUNT(*) AS count
+                    FROM resources r
+                    WHERE r.account_id = $1
+                      AND r.resource_schema = ANY($2)
+                      AND r.resource_name ILIKE $3 ESCAPE '\'
+                      AND r.deleted_at IS NULL
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM UNNEST($4::text[], $5::text[]) AS f(k, v)
+                          WHERE NOT EXISTS (
+                              SELECT 1
+                              FROM resource_labels_projection rl
+                              WHERE rl.resource_id = r.resource_id
+                                AND rl.label_key = f.k
+                                AND rl.label_value = f.v
+                          )
+                      )
+                    "#,
+                    account_id_stack.as_str(),
+                    schema_strs as _,
+                    pattern.as_str(),
+                    &label_keys,
+                    &label_values,
+                )
+                .fetch_one(connection_mut)
+                .await
+                .int_err()?
+                .count
+            }
+        };
 
-        Ok(usize::try_from(row.count.unwrap_or(0)).int_err()?)
+        Ok(usize::try_from(count.unwrap_or(0)).int_err()?)
     }
 
     async fn find_resource_snapshot(
@@ -508,9 +695,7 @@ impl ResourceRepository for PostgresResourceRepository {
             SELECT
                 r.resource_id as "id: uuid::Uuid",
                 r.account_id as "account_id: odf::AccountID",
-                -- LEFT JOIN: a.resource_id is NULL only when the owning account
-                -- row is gone (deletion racing async cleanup), same case the
-                -- account_name sentinel covers. Substitute the nil resource id.
+                -- Account row may be missing during async cleanup.
                 COALESCE(a.resource_id, '00000000-0000-0000-0000-000000000000'::uuid) as "account_resource_id!: uuid::Uuid",
                 COALESCE(a.account_name, $3) as "account_name!",
                 r.resource_schema,
@@ -814,10 +999,14 @@ impl ResourceRepository for PostgresResourceRepository {
         account_id: odf::AccountID,
         schema: &TypeUri,
         pagination: PaginationOpts,
+        label_filter: &ResolvedResourceLabelFilter,
     ) -> ResourceSnapshotStream<'_> {
         let resource_schema = schema.as_str().to_owned();
+        let label_filter = label_filter.clone();
 
         Box::pin(async_stream::stream! {
+            let (label_keys, label_values) = split_label_filter_pairs(&label_filter)?;
+
             let mut tr = self.transaction.lock().await;
             let connection_mut = tr.connection_mut().await?;
 
@@ -851,6 +1040,17 @@ impl ResourceRepository for PostgresResourceRepository {
                 WHERE r.account_id = $1
                   AND r.resource_schema = $2
                   AND r.deleted_at IS NULL
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM UNNEST($6::text[], $7::text[]) AS f(k, v)
+                      WHERE NOT EXISTS (
+                          SELECT 1
+                          FROM resource_labels_projection rl
+                          WHERE rl.resource_id = r.resource_id
+                            AND rl.label_key = f.k
+                            AND rl.label_value = f.v
+                      )
+                  )
                 ORDER BY r.updated_at DESC, r.resource_id DESC
                 LIMIT $3 OFFSET $4
                 "#,
@@ -859,6 +1059,8 @@ impl ResourceRepository for PostgresResourceRepository {
                 limit,
                 offset,
                 kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL,
+                &label_keys,
+                &label_values,
             )
             .fetch(connection_mut)
             .map_err(ErrorIntoInternal::int_err);
@@ -896,9 +1098,14 @@ impl ResourceRepository for PostgresResourceRepository {
     fn list_all_resource_snapshots(
         &self,
         account_id: odf::AccountID,
+        label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
     ) -> ResourceSnapshotStream<'_> {
+        let label_filter_pairs = split_label_filter_pairs(label_filter);
+
         Box::pin(async_stream::stream! {
+            let (label_keys, label_values) = label_filter_pairs?;
+
             let mut tr = self.transaction.lock().await;
             let connection_mut = tr.connection_mut().await?;
 
@@ -911,9 +1118,7 @@ impl ResourceRepository for PostgresResourceRepository {
                 SELECT
                     r.resource_id as "id: uuid::Uuid",
                     r.account_id as "account_id: odf::AccountID",
-                -- LEFT JOIN: a.resource_id is NULL only when the owning account
-                -- row is gone (deletion racing async cleanup), same case the
-                -- account_name sentinel covers. Substitute the nil resource id.
+                -- Account row may be missing during async cleanup.
                 COALESCE(a.resource_id, '00000000-0000-0000-0000-000000000000'::uuid) as "account_resource_id!: uuid::Uuid",
                     COALESCE(a.account_name, $4) as "account_name!",
                     r.resource_schema,
@@ -931,6 +1136,17 @@ impl ResourceRepository for PostgresResourceRepository {
                 LEFT JOIN accounts a ON a.id = r.account_id
                 WHERE r.account_id = $1
                   AND r.deleted_at IS NULL
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM UNNEST($5::text[], $6::text[]) AS f(k, v)
+                      WHERE NOT EXISTS (
+                          SELECT 1
+                          FROM resource_labels_projection rl
+                          WHERE rl.resource_id = r.resource_id
+                            AND rl.label_key = f.k
+                            AND rl.label_value = f.v
+                      )
+                  )
                 ORDER BY r.updated_at DESC, r.resource_id DESC
                 LIMIT $2 OFFSET $3
                 "#,
@@ -938,6 +1154,8 @@ impl ResourceRepository for PostgresResourceRepository {
                 limit,
                 offset,
                 kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL,
+                &label_keys,
+                &label_values,
             )
             .fetch(connection_mut)
             .map_err(ErrorIntoInternal::int_err);
@@ -1046,6 +1264,20 @@ impl ResourceRepository for PostgresResourceRepository {
             })
             .collect())
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Splits a resolved label filter into `UNNEST`-bound key/value arrays.
+fn split_label_filter_pairs(
+    label_filter: &ResolvedResourceLabelFilter,
+) -> Result<(Vec<String>, Vec<String>), InternalError> {
+    let pairs = ResourceLabelFilterPredicate::flatten_conjunction(label_filter).int_err()?;
+
+    Ok(pairs
+        .into_iter()
+        .map(|(key, value)| (key.to_string(), value.to_owned()))
+        .unzip())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

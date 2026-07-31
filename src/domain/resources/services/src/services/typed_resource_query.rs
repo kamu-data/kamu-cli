@@ -13,6 +13,7 @@ use tokio_stream::StreamExt;
 
 use crate::domain::{
     DeclarativeResource,
+    ResolvedResourceLabelFilter,
     ResourceID,
     ResourceIDNotFoundError,
     ResourceRawEventQuery,
@@ -106,10 +107,11 @@ where
         &self,
         account_id: odf::AccountID,
         pagination: PaginationOpts,
+        label_filter: ResolvedResourceLabelFilter,
     ) -> Result<Vec<R::ResourceState>, InternalError> {
         let mut resource_snapshots_stream = self
             .resource_repository
-            .list_resource_snapshots_by_schema(account_id, R::schema(), pagination);
+            .list_resource_snapshots_by_schema(account_id, R::schema(), pagination, &label_filter);
 
         let mut resource_states = Vec::new();
         while let Some(resource_snapshot) = resource_snapshots_stream.next().await {
@@ -181,6 +183,7 @@ macro_rules! declare_typed_resource_query_service {
                 &self,
                 account_id: odf::AccountID,
                 pagination: database_common::PaginationOpts,
+                label_filter: kamu_resources::ResolvedResourceLabelFilter,
             ) -> Result<
                 Vec<<$resource as kamu_resources::DeclarativeResource>::ResourceState>,
                 internal_error::InternalError,
@@ -189,7 +192,9 @@ macro_rules! declare_typed_resource_query_service {
                     self.resource_repository.as_ref(),
                 );
 
-                helper.list_states(account_id, pagination).await
+                helper
+                    .list_states(account_id, pagination, label_filter)
+                    .await
             }
         }
     };

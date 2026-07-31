@@ -31,7 +31,7 @@ use crate::resources::{ResourceCtx, fixtures};
 //   - Three equivalent selector forms for one resource
 //   - Multi-name same-type, mixed ref-form
 //   - Name pattern, type pattern, type+name pattern, `%sets`
-//   - `--max-results` truncation and `--unbounded`
+//   - `--max-results` truncation, `--unbounded`, and `%sets all`
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Identity constants — kept terse so assertions read as "which resources came
@@ -149,6 +149,21 @@ pub async fn test_resources_get_selectors(ctx: ResourceCtx) {
     // `get all --unbounded` returns all four seeded resources and only those.
 
     let idents = ctx.get_idents(["get", "all", "--unbounded"]).await;
+    assert_eq!(
+        idents,
+        [
+            ss("app-secrets"),
+            ss("db-creds"),
+            vs("app-vars"),
+            vs("db-creds"),
+        ]
+    );
+
+    // ── 10. Type pattern + `all` name selector: `get %sets all` ───────────────
+    //
+    // Equivalent to `%sets/%`: every VariableSet and SecretSet.
+
+    let idents = ctx.get_idents(["get", "%sets", "all"]).await;
     assert_eq!(
         idents,
         [

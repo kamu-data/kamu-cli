@@ -861,6 +861,10 @@ Force dataset interpretation when a dataset account collides with a resource pre
 Preview deletion:
 
     kamu delete dataset/my.dataset vs/my-vars --dry-run
+
+Narrow a deletion to resources carrying a label:
+
+    kamu delete variablesets --all -l environment=stale --dry-run
 "#)]
 pub struct Delete {
     /// Target to delete: `datasets`, `all`, or a resource selector
@@ -893,6 +897,11 @@ pub struct Delete {
     /// Preview the resolved resource deletions without deleting anything
     #[arg(long)]
     pub dry_run: bool,
+
+    /// Narrow the selection to resources carrying all of the given labels,
+    /// as `key=value` pairs (repeatable, or comma-separated)
+    #[arg(long = "label", short = 'l', value_name = "LABEL_SELECTOR")]
+    pub label_selectors: Vec<String>,
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -989,6 +998,10 @@ Read a resource from a remote context:
 Ignore missing resources:
 
     kamu get secretsets missing-a missing-b --ignore-not-found
+
+Narrow matched resources to those carrying a label:
+
+    kamu get 'variablesets/%' -l environment=production
 "#)]
 pub struct Get {
     /// Resource selector(s): `type name...` or `type/name...`
@@ -1028,6 +1041,11 @@ pub struct Get {
     /// Disable the limit for expanding selectors
     #[arg(long)]
     pub unbounded: bool,
+
+    /// Narrow the selection to resources carrying all of the given labels,
+    /// as `key=value` pairs (repeatable, or comma-separated)
+    #[arg(long = "label", short = 'l', value_name = "LABEL_SELECTOR")]
+    pub label_selectors: Vec<String>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1247,6 +1265,14 @@ To see more details:
 
     kamu list -w
 
+To list only resources carrying a label:
+
+    kamu list variablesets -l environment=production
+
+To require several labels at once:
+
+    kamu list variablesets -l environment=production,tier=backend
+
 To get a machine-readable list of all resources:
 
     kamu list all -o csv
@@ -1286,6 +1312,11 @@ pub struct List {
     /// List accessible datasets of all accounts
     #[arg(long, hide = true)]
     pub all_accounts: bool,
+
+    /// Narrow the listing to resources carrying all of the given labels,
+    /// as `key=value` pairs (repeatable, or comma-separated)
+    #[arg(long = "label", short = 'l', value_name = "LABEL_SELECTOR")]
+    pub label_selectors: Vec<String>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

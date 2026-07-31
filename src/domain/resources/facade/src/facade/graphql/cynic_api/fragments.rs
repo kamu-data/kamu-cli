@@ -180,8 +180,41 @@ pub(crate) struct ResourceSelectorProblemResult {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
-pub(crate) struct ResourceInvalidSearchQueryProblem {
+pub(crate) struct ResourceInvalidLabelFilterProblem {
+    pub code: ResourceLabelFilterProblemCode,
     pub message: String,
+}
+
+/// Mirrors the server enum so the remote facade can rebuild the same typed
+/// error the local one raises, rather than degrading it to a message.
+#[derive(cynic::Enum, Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ResourceLabelFilterProblemCode {
+    InvalidKey,
+    ResourceExtensionSchema,
+    NonStringValue,
+    DuplicateAfterCanonicalization,
+    UnsupportedExpression,
+}
+
+impl From<ResourceInvalidLabelFilterProblem> for crate::ResourceInvalidLabelFilterError {
+    fn from(value: ResourceInvalidLabelFilterProblem) -> Self {
+        use crate::ResourceLabelFilterProblemCode as C;
+
+        let code = match value.code {
+            ResourceLabelFilterProblemCode::InvalidKey => C::InvalidKey,
+            ResourceLabelFilterProblemCode::ResourceExtensionSchema => C::ResourceExtensionSchema,
+            ResourceLabelFilterProblemCode::NonStringValue => C::NonStringValue,
+            ResourceLabelFilterProblemCode::DuplicateAfterCanonicalization => {
+                C::DuplicateAfterCanonicalization
+            }
+            ResourceLabelFilterProblemCode::UnsupportedExpression => C::UnsupportedExpression,
+        };
+
+        Self {
+            code,
+            message: value.message,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

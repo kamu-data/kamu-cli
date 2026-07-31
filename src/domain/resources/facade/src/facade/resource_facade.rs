@@ -15,7 +15,9 @@ use domain::{
     ResourceAccountRef,
     ResourceHandle,
     ResourceID,
+    ResourceLabelFilterInput,
     ResourceName,
+    ResourceSearchQuery,
     ResourceSummaryView,
     ResourceTypeDescriptor,
     ResourceTypeSelectorRaw,
@@ -209,16 +211,8 @@ pub struct ApplyManifestBatchRequest {
 #[derive(Debug)]
 pub struct ApplyManifestBatchResponse<D> {
     pub items: Vec<ApplyManifestBatchItemResult<D>>,
-    /// Positional indexes of items that individually succeeded but whose
-    /// accepted details could not be returned because the enclosing
-    /// single-transaction batch rolled back.
-    ///
-    /// This is transport metadata, not a per-item error. Local facades can
-    /// keep this empty because they report every attempted item's real
-    /// pre-rollback outcome in `items`; remote transports such as GraphQL use
-    /// this to make rolled-back successes explicit when rollback is forced
-    /// through a transport-level error and the normal `data` payload is not
-    /// available.
+    /// Positional indexes of successes hidden by a batch rollback.
+    /// This is transport metadata, not a per-item error.
     pub rolled_back_successes: Vec<usize>,
 }
 
@@ -254,6 +248,7 @@ pub struct ListResourcesRequest {
     pub raw_type_selector: ResourceTypeSelectorRaw,
     pub account: Option<ResourceAccountRef>,
     pub pagination: PaginationOpts,
+    pub label_filter: Option<ResourceLabelFilterInput>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -262,6 +257,7 @@ pub struct ListResourcesRequest {
 pub struct ListResourceHandlesRequest {
     pub raw_type_selector: ResourceTypeSelectorRaw,
     pub account: Option<ResourceAccountRef>,
+    pub label_filter: Option<ResourceLabelFilterInput>,
     pub pagination: PaginationOpts,
 }
 
@@ -270,9 +266,9 @@ pub struct ListResourceHandlesRequest {
 #[derive(Debug, Clone)]
 pub struct SearchResourceHandlesRequest {
     pub raw_type_selectors: Vec<ResourceTypeSelectorRaw>,
-    pub exact_names: Option<Vec<ResourceName>>,
-    pub name_pattern: Option<String>,
+    pub query: ResourceSearchQuery,
     pub account: Option<ResourceAccountRef>,
+    pub label_filter: Option<ResourceLabelFilterInput>,
     pub pagination: PaginationOpts,
 }
 
@@ -289,6 +285,8 @@ pub struct SearchResourceHandlesResponse {
 #[derive(Debug, Clone)]
 pub struct ListAllResourcesRequest {
     pub account: Option<ResourceAccountRef>,
+    /// Resolved against every registered schema.
+    pub label_filter: Option<ResourceLabelFilterInput>,
     pub pagination: PaginationOpts,
 }
 
@@ -297,6 +295,8 @@ pub struct ListAllResourcesRequest {
 #[derive(Debug, Clone)]
 pub struct ListAllResourceHandlesRequest {
     pub account: Option<ResourceAccountRef>,
+    /// See [`ListAllResourcesRequest::label_filter`].
+    pub label_filter: Option<ResourceLabelFilterInput>,
     pub pagination: PaginationOpts,
 }
 

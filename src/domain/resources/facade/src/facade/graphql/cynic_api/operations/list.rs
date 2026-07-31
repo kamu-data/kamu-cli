@@ -13,7 +13,7 @@ use crate::facade::graphql::cynic_api::fragments::{
     ResourceBadAccountProblem,
     ResourceConnection,
     ResourceHandleConnection,
-    ResourceInvalidSearchQueryProblem,
+    ResourceInvalidLabelFilterProblem,
     ResourceUnsupportedSelectorProblem,
 };
 use crate::facade::graphql::cynic_api::schema;
@@ -35,7 +35,7 @@ pub(crate) struct ListByResourceTypeQuery {
 #[derive(cynic::QueryFragment, Debug, Clone)]
 #[cynic(graphql_type = "Resources", variables = "ListByResourceTypeVariables")]
 pub(crate) struct ListByResourceTypeResources {
-    #[arguments(resourceType: $resource_type, account: $account, page: $page, perPage: $per_page)]
+    #[arguments(resourceType: $resource_type, account: $account, labelFilter: $label_filter, page: $page, perPage: $per_page)]
     pub list_by_resource_type: ResourceListOutcome,
 }
 
@@ -50,7 +50,7 @@ pub(crate) struct ListAllQuery {
 #[derive(cynic::QueryFragment, Debug, Clone)]
 #[cynic(graphql_type = "Resources", variables = "ListAllVariables")]
 pub(crate) struct ListAllResources {
-    #[arguments(account: $account, page: $page, perPage: $per_page)]
+    #[arguments(account: $account, labelFilter: $label_filter, page: $page, perPage: $per_page)]
     pub list_all: ResourceListAllOutcome,
 }
 
@@ -65,7 +65,7 @@ pub(crate) struct ListHandlesByResourceTypeQuery {
 #[derive(cynic::QueryFragment, Debug, Clone)]
 #[cynic(graphql_type = "Resources", variables = "ListByResourceTypeVariables")]
 pub(crate) struct ListHandlesByResourceTypeResources {
-    #[arguments(resourceType: $resource_type, account: $account, page: $page, perPage: $per_page)]
+    #[arguments(resourceType: $resource_type, account: $account, labelFilter: $label_filter, page: $page, perPage: $per_page)]
     pub list_handles_by_resource_type: ResourceHandleListOutcome,
 }
 
@@ -80,7 +80,7 @@ pub(crate) struct ListAllHandlesQuery {
 #[derive(cynic::QueryFragment, Debug, Clone)]
 #[cynic(graphql_type = "Resources", variables = "ListAllVariables")]
 pub(crate) struct ListAllHandlesResources {
-    #[arguments(account: $account, page: $page, perPage: $per_page)]
+    #[arguments(account: $account, labelFilter: $label_filter, page: $page, perPage: $per_page)]
     pub list_all_handles: ResourceHandleListAllOutcome,
 }
 
@@ -91,6 +91,7 @@ pub(crate) enum ResourceListOutcome {
     ResourceConnection(ResourceConnection),
     ResourceUnsupportedSelectorProblem(ResourceUnsupportedSelectorProblem),
     ResourceBadAccountProblem(ResourceBadAccountProblem),
+    ResourceInvalidLabelFilterProblem(ResourceInvalidLabelFilterProblem),
     #[cynic(fallback)]
     Unknown,
 }
@@ -101,6 +102,7 @@ pub(crate) enum ResourceListOutcome {
 pub(crate) enum ResourceListAllOutcome {
     ResourceConnection(ResourceConnection),
     ResourceBadAccountProblem(ResourceBadAccountProblem),
+    ResourceInvalidLabelFilterProblem(ResourceInvalidLabelFilterProblem),
     #[cynic(fallback)]
     Unknown,
 }
@@ -112,7 +114,7 @@ pub(crate) enum ResourceHandleListOutcome {
     ResourceHandleConnection(ResourceHandleConnection),
     ResourceUnsupportedSelectorProblem(ResourceUnsupportedSelectorProblem),
     ResourceBadAccountProblem(ResourceBadAccountProblem),
-    ResourceInvalidSearchQueryProblem(ResourceInvalidSearchQueryProblem),
+    ResourceInvalidLabelFilterProblem(ResourceInvalidLabelFilterProblem),
     #[cynic(fallback)]
     Unknown,
 }
@@ -123,6 +125,7 @@ pub(crate) enum ResourceHandleListOutcome {
 pub(crate) enum ResourceHandleListAllOutcome {
     ResourceHandleConnection(ResourceHandleConnection),
     ResourceBadAccountProblem(ResourceBadAccountProblem),
+    ResourceInvalidLabelFilterProblem(ResourceInvalidLabelFilterProblem),
     #[cynic(fallback)]
     Unknown,
 }

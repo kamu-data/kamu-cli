@@ -148,6 +148,7 @@ pub fn get_command(
                 c.force,
                 c.ignore_not_found,
                 c.dry_run,
+                c.label_selectors,
             )
             .cast(),
         ),
@@ -173,6 +174,7 @@ pub fn get_command(
                 c.ignore_not_found,
                 c.max_results,
                 c.unbounded,
+                c.label_selectors,
             )
             .cast(),
         ),
@@ -233,6 +235,7 @@ pub fn get_command(
                 c.wide,
                 c.max_results,
                 c.unbounded,
+                c.label_selectors,
             )
             .cast(),
         ),

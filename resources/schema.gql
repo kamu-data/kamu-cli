@@ -4073,9 +4073,9 @@ type ResourceHandleEdge {
 	node: ResourceHandle!
 }
 
-union ResourceHandleListAllOutcome = ResourceHandleConnection | ResourceBadAccountProblem
+union ResourceHandleListAllOutcome = ResourceHandleConnection | ResourceBadAccountProblem | ResourceInvalidLabelFilterProblem
 
-union ResourceHandleListOutcome = ResourceHandleConnection | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem | ResourceInvalidSearchQueryProblem
+union ResourceHandleListOutcome = ResourceHandleConnection | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem | ResourceInvalidLabelFilterProblem
 
 enum ResourceHeaderValidationProblemCode {
 	EMPTY_NAME
@@ -4155,7 +4155,11 @@ type ResourceInvalidHeaderProblem {
 	message: String!
 }
 
-type ResourceInvalidSearchQueryProblem {
+"""
+The `labelFilter` argument could not be resolved into a matchable filter.
+"""
+type ResourceInvalidLabelFilterProblem {
+	code: ResourceLabelFilterProblemCode!
 	message: String!
 }
 
@@ -4167,9 +4171,33 @@ type ResourceInvalidSpecProblem {
 	message: String!
 }
 
+"""
+One authored `key = value` label predicate.
+"""
+input ResourceLabelFilterEntryInput {
+	key: String!
+	value: JSON!
+}
+
+"""
+Selects resources by label predicates.
+A list preserves duplicate keys for validation.
+"""
+input ResourceLabelFilterInput {
+	entries: [ResourceLabelFilterEntryInput!]!
+}
+
+enum ResourceLabelFilterProblemCode {
+	INVALID_KEY
+	RESOURCE_EXTENSION_SCHEMA
+	NON_STRING_VALUE
+	DUPLICATE_AFTER_CANONICALIZATION
+	UNSUPPORTED_EXPRESSION
+}
+
 scalar ResourceLabels
 
-union ResourceListAllOutcome = ResourceConnection | ResourceBadAccountProblem
+union ResourceListAllOutcome = ResourceConnection | ResourceBadAccountProblem | ResourceInvalidLabelFilterProblem
 
 enum ResourceListColumnDataType {
 	STRING
@@ -4196,7 +4224,7 @@ enum ResourceListColumnVisibility {
 	WIDE_ONLY
 }
 
-union ResourceListOutcome = ResourceConnection | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem
+union ResourceListOutcome = ResourceConnection | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem | ResourceInvalidLabelFilterProblem
 
 union ResourceLookupProblem = ResourceIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceSchemaMismatchProblem
 
@@ -4249,6 +4277,15 @@ type ResourceSchemaMismatchProblem {
 	expectedSchema: TypeUri!
 	actualSchema: TypeUri!
 	message: String!
+}
+
+"""
+Exactly one way to narrow a search.
+"""
+input ResourceSearchQueryInput @oneOf {
+	exactNames: [ResourceName!]
+	exactIds: [ResourceID!]
+	namePattern: String
 }
 
 input ResourceSelectorInput {
@@ -4382,11 +4419,11 @@ type Resources {
 	"""
 	Returns resources of the specified resource type
 	"""
-	listByResourceType(resourceType: ResourceTypeSelectorInput!, account: AccountRefInput, page: Int, perPage: Int): ResourceListOutcome!
+	listByResourceType(resourceType: ResourceTypeSelectorInput!, account: AccountRefInput, labelFilter: ResourceLabelFilterInput, page: Int, perPage: Int): ResourceListOutcome!
 	"""
 	Returns resource handles of the specified resource type
 	"""
-	listHandlesByResourceType(resourceType: ResourceTypeSelectorInput!, account: AccountRefInput, page: Int, perPage: Int): ResourceHandleListOutcome!
+	listHandlesByResourceType(resourceType: ResourceTypeSelectorInput!, account: AccountRefInput, labelFilter: ResourceLabelFilterInput, page: Int, perPage: Int): ResourceHandleListOutcome!
 	"""
 	Searches resource handles across the specified exact resource types
 	"""
@@ -4394,11 +4431,11 @@ type Resources {
 	"""
 	Returns resources across all resource types
 	"""
-	listAll(account: AccountRefInput, page: Int, perPage: Int): ResourceListAllOutcome!
+	listAll(account: AccountRefInput, labelFilter: ResourceLabelFilterInput, page: Int, perPage: Int): ResourceListAllOutcome!
 	"""
 	Returns resource handles across all resource types
 	"""
-	listAllHandles(account: AccountRefInput, page: Int, perPage: Int): ResourceHandleListAllOutcome!
+	listAllHandles(account: AccountRefInput, labelFilter: ResourceLabelFilterInput, page: Int, perPage: Int): ResourceHandleListAllOutcome!
 	"""
 	Renders a canonical manifest representation from a stored resource
 	"""
@@ -4498,9 +4535,9 @@ enum SearchEntityName {
 
 input SearchResourceHandlesInput {
 	resourceTypes: [ResourceTypeSelectorInput!]!
-	names: [ResourceName!]
-	namePattern: String
+	query: ResourceSearchQueryInput!
 	account: AccountRefInput
+	labelFilter: ResourceLabelFilterInput
 }
 
 union SearchResult = Dataset

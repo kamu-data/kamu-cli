@@ -49,7 +49,11 @@ use kamu_configuration_inmem::{
 use kamu_datasets::SecretsEncryptionConfig;
 use kamu_resources::{MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE, ResourceLifecycleMessage};
 use kamu_resources_facade::ResourceFacade;
-use kamu_resources_inmem::{InMemoryRawResourceEventStore, InMemoryResourceRepository};
+use kamu_resources_inmem::{
+    InMemoryRawResourceEventStore,
+    InMemoryResourceLabelProjectionRepository,
+    InMemoryResourceRepository,
+};
 use messaging_outbox::{OutboxAgent, OutboxProvider, register_message_dispatcher};
 use strum::IntoEnumIterator;
 use time_source::SystemTimeSourceProvider;
@@ -180,6 +184,7 @@ impl LocalFacadeHarness {
 
         // Resources
         b.add::<InMemoryResourceRepository>()
+            .add::<InMemoryResourceLabelProjectionRepository>()
             .add::<InMemoryRawResourceEventStore>();
 
         // Configuration

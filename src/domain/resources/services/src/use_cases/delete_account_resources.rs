@@ -42,7 +42,12 @@ impl DeleteAccountResourcesUsecaseImpl {
     ) -> Result<Vec<ResourceSnapshot>, InternalError> {
         collect_all_pages(PAGE_SIZE, |pagination| async move {
             self.generic_resource_query_service
-                .list_all_snapshots(account_id.clone(), pagination)
+                // Account teardown sweeps every resource, never a subset.
+                .list_all_snapshots(
+                    account_id.clone(),
+                    &kamu_resources::ResolvedResourceLabelFilter::True,
+                    pagination,
+                )
                 .await
         })
         .await

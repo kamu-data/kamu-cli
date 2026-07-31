@@ -19,6 +19,7 @@ use crate::output::OutputConfig;
 use crate::resource_context::{ResourceContextReporter, ResourceContextResolver};
 use crate::resources::{
     ResourceFacadeFactory,
+    ResourceLabelSelectorParser,
     ResourceTypeLookupErrorOptions,
     ResourceTypeLookupService,
 };
@@ -66,6 +67,9 @@ pub struct ListCommand {
 
     #[dill::component(explicit)]
     unbounded: bool,
+
+    #[dill::component(explicit)]
+    label_selectors: Vec<String>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -136,6 +140,7 @@ impl ListCommand {
             } else {
                 self.max_results
             },
+            ResourceLabelSelectorParser::parse(&self.label_selectors)?,
         ))
     }
 }
@@ -150,6 +155,12 @@ impl Command for ListCommand {
                 if self.explicit_context_name.is_some() {
                     return Err(CLIError::usage_error(
                         "--context is supported only when listing resources",
+                    ));
+                }
+
+                if !self.label_selectors.is_empty() {
+                    return Err(CLIError::usage_error(
+                        "Label selectors are not supported when listing datasets",
                     ));
                 }
 

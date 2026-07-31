@@ -74,6 +74,9 @@ pub(crate) fn map_list_outcome(
         O::ResourceBadAccountProblem(problem) => Err(ListResourcesError::BadAccount(
             bad_account_problem_error(problem).map_err(ListResourcesError::Internal)?,
         )),
+        O::ResourceInvalidLabelFilterProblem(problem) => {
+            Err(ListResourcesError::InvalidLabelFilter(problem.into()))
+        }
         O::Unknown => Err(ListResourcesError::Internal(InternalError::new(
             "Remote list returned an unrecognized ResourceListOutcome variant",
         ))),
@@ -97,6 +100,9 @@ pub(crate) fn map_list_all_outcome(
         O::ResourceBadAccountProblem(problem) => Err(ListAllResourcesError::BadAccount(
             bad_account_problem_error(problem).map_err(ListAllResourcesError::Internal)?,
         )),
+        O::ResourceInvalidLabelFilterProblem(problem) => {
+            Err(ListAllResourcesError::InvalidLabelFilter(problem.into()))
+        }
         O::Unknown => Err(ListAllResourcesError::Internal(InternalError::new(
             "Remote list_all returned an unrecognized ResourceListAllOutcome variant",
         ))),
@@ -120,9 +126,8 @@ pub(crate) fn map_list_handles_outcome(
         O::ResourceBadAccountProblem(problem) => Err(ListResourcesError::BadAccount(
             bad_account_problem_error(problem).map_err(ListResourcesError::Internal)?,
         )),
-        O::ResourceInvalidSearchQueryProblem(problem) => {
-            drop(problem.message);
-            Err(crate::InvalidResourceSearchQueryError.into())
+        O::ResourceInvalidLabelFilterProblem(problem) => {
+            Err(ListResourcesError::InvalidLabelFilter(problem.into()))
         }
         O::Unknown => Err(ListResourcesError::Internal(InternalError::new(
             "Remote list_handles returned an unrecognized ResourceHandleListOutcome variant",
@@ -144,6 +149,9 @@ pub(crate) fn map_list_all_handles_outcome(
         O::ResourceBadAccountProblem(problem) => Err(ListAllResourcesError::BadAccount(
             bad_account_problem_error(problem).map_err(ListAllResourcesError::Internal)?,
         )),
+        O::ResourceInvalidLabelFilterProblem(problem) => {
+            Err(ListAllResourcesError::InvalidLabelFilter(problem.into()))
+        }
         O::Unknown => Err(ListAllResourcesError::Internal(InternalError::new(
             "Remote list_all_handles returned an unrecognized ResourceHandleListAllOutcome variant",
         ))),
@@ -177,9 +185,8 @@ pub(crate) fn map_search_handles_outcome(
         O::ResourceBadAccountProblem(problem) => Err(ListResourcesError::BadAccount(
             bad_account_problem_error(problem).map_err(ListResourcesError::Internal)?,
         )),
-        O::ResourceInvalidSearchQueryProblem(problem) => {
-            drop(problem.message);
-            Err(crate::InvalidResourceSearchQueryError.into())
+        O::ResourceInvalidLabelFilterProblem(problem) => {
+            Err(ListResourcesError::InvalidLabelFilter(problem.into()))
         }
         O::Unknown => Err(ListResourcesError::Internal(InternalError::new(
             "Remote search returned an unrecognized ResourceHandleListOutcome variant",

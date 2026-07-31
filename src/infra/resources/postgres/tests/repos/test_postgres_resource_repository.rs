@@ -11,7 +11,10 @@ use database_common::PostgresTransactionManager;
 use database_common_macros::database_transactional_test;
 use dill::{Catalog, CatalogBuilder};
 use kamu_accounts_postgres::PostgresAccountRepository;
-use kamu_resources_postgres::PostgresResourceRepository;
+use kamu_resources_postgres::{
+    PostgresResourceLabelProjectionRepository,
+    PostgresResourceRepository,
+};
 use kamu_resources_repo_tests::resource_repository_test_suite as resource_repo_suite;
 use sqlx::PgPool;
 
@@ -52,6 +55,14 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = postgres,
+    fixture = resource_repo_suite::test_find_resource_handles_by_ids,
+    harness = PostgresResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
     fixture = resource_repo_suite::test_find_resource_snapshots_by_schema_and_ids,
     harness = PostgresResourceRepositoryHarness
 );
@@ -68,7 +79,47 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = postgres,
+    fixture = resource_repo_suite::test_search_resource_handles_exact_ids,
+    harness = PostgresResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
+    fixture = resource_repo_suite::test_search_resource_handles_pattern_special_characters,
+    harness = PostgresResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
     fixture = resource_repo_suite::test_count_search_resource_handles,
+    harness = PostgresResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
+    fixture = resource_repo_suite::test_count_search_resource_handles_exact_ids,
+    harness = PostgresResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
+    fixture = resource_repo_suite::test_list_resource_snapshots_label_filtering,
+    harness = PostgresResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
+    fixture = resource_repo_suite::test_search_resource_handles_label_filtering,
     harness = PostgresResourceRepositoryHarness
 );
 
@@ -204,6 +255,7 @@ impl PostgresResourceRepositoryHarness {
         catalog_builder.add_value(pg_pool);
         catalog_builder.add::<PostgresTransactionManager>();
         catalog_builder.add::<PostgresResourceRepository>();
+        catalog_builder.add::<PostgresResourceLabelProjectionRepository>();
         catalog_builder.add::<PostgresAccountRepository>();
         Self {
             catalog: catalog_builder.build(),
