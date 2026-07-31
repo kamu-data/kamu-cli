@@ -25,9 +25,6 @@ pub const SECRET_SET_SCHEMA_STR: &str = SecretSetResource::SCHEMA_STR;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Builds a `VariableSet` manifest JSON string.
-///
-/// Each variable is emitted as `{"value": "<v>"}` — the structured form of
-/// the RFC-derived `Variable` shape.
 pub fn variable_set_manifest_json(
     name: &str,
     account: Option<&str>,
@@ -83,11 +80,7 @@ pub fn variable_set_manifest_yaml(
         ),
         None => String::new(),
     };
-    // Each variable entry must appear at 4-space indent under `variables:`.
-    // The outer formatdoc! strips the 8-space common indent from the template
-    // body, but {variables_section} is a string interpolation — its content is
-    // NOT re-indented by formatdoc!.  We therefore pre-indent each line by the
-    // exact 4 spaces we want in the final YAML output.
+    // Interpolated YAML blocks are not re-indented by `formatdoc!`.
     let variables_section: String = vars
         .iter()
         .map(|(k, v)| format!("    {k}:\n      value: {v}"))
@@ -133,9 +126,7 @@ pub fn total_schema_count(summary: kamu_resources::ResourcesSummary, schema: &Ty
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Applies a `VariableSet` manifest authoring the given labels and returns its
-/// id. `label_values` are embedded as raw JSON, so structured (non-string)
-/// values can be exercised too.
+/// Applies a labeled `VariableSet` manifest and returns its id.
 pub async fn create_variable_set_with_labels(
     h: &impl FacadeContractHarness,
     account: TestAccount,

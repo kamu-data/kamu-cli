@@ -310,8 +310,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         &self,
         request: SearchResourceHandlesRequest,
     ) -> Result<SearchResourceHandlesResponse, ListResourcesError> {
-        // An empty `ExactNames`/`ExactIds` query can never match anything;
-        // short-circuit here rather than round-tripping to the repository.
+        // Empty exact-name/id queries are vacuous.
         if request.query.is_vacuous() {
             return Ok(SearchResourceHandlesResponse {
                 items: Vec::new(),
@@ -337,8 +336,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .map(|schema| ResourceSchemaId::try_from(schema).int_err())
             .collect::<Result<Vec<_>, _>>()?;
 
-        // Resolution can narrow the candidate types: a schema that rejects the
-        // label is dropped rather than failing the whole query.
+        // Resolution can drop schemas that cannot carry the requested labels.
         let (applicable_schema_ids, label_filter) = resolve_label_filter_for_schemas(
             &self.resource_extension_schema_resolver,
             request.label_filter,
@@ -596,9 +594,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         }
 
         if !ids_to_delete.is_empty() {
-            // `schema` was resolved from a registered selector above, so a
-            // missing dispatcher is a data-integrity catastrophe, not a user
-            // error.
+            // Registered selector schemas must have a dispatcher.
             let dispatcher =
                 get_resource_crud_dispatcher_for_trusted_schema(&self.catalog, schema.as_str())?;
             dispatcher
@@ -641,12 +637,6 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 
 impl LocalResourceFacadeImpl {
     /// Resolves an authored filter for the `all` scope.
-    ///
-    /// `all` spans every registered schema, so the filter is resolved against
-    /// all of them at once — the same uniformity guarantee `search_handles`
-    /// relies on. Schemas that reject the filter are simply not returned,
-    /// which is harmless here: the repository applies one predicate across all
-    /// schemas, and a resource whose schema rejected the key cannot carry it.
     fn resolve_label_filter_for_all_schemas(
         &self,
         label_filter: Option<ResourceLabelFilterInput>,
@@ -745,8 +735,7 @@ impl LocalResourceFacadeImpl {
             .resolve_snapshot_for_schema::<E>(&schema, &target_account.did, id)
             .await?;
 
-        // The schema was resolved from a registered selector above, so a missing
-        // dispatcher here is a data-integrity catastrophe, not a user error.
+        // Registered selector schemas must have a dispatcher.
         let dispatcher = get_resource_crud_dispatcher_for_trusted_schema(
             &self.catalog,
             snapshot.schema.as_str(),
@@ -786,8 +775,7 @@ impl LocalResourceFacadeImpl {
         let schema =
             self.resolve_schema_for_selector::<BatchResourceError>(&selector.resource_type)?;
 
-        // Batch selectors name their targets explicitly, so callers narrow by
-        // labels through `get_handles` before reaching this point.
+        // Batch selectors name their targets explicitly.
         let groups = group_batch_resource_refs(selector);
 
         let resolution_response = resolve_batch_ids(
@@ -886,9 +874,7 @@ impl LocalResourceFacadeImpl {
 
         let mut handles = Vec::new();
         for (request_index, resource_ref, id) in id_entries {
-            // A row can be absent because the id does not exist. Report the
-            // miss in the terms the caller selected by, so `vs/my-vars`
-            // still names `my-vars` rather than its resolved id.
+            // Report misses in the terms the caller selected by.
             let not_found = || match &resource_ref {
                 ResourceRef::ByName(name) => resource_type_name(schema)
                     .map(|type_name| {
@@ -1007,8 +993,7 @@ impl LocalResourceFacadeImpl {
     where
         E: From<InternalError>,
     {
-        // Dispatcher is resolved once from the first item; all items in a batch share
-        // the same schema, so this avoids redundant catalog lookups.
+        // All batch items share one schema, so one dispatcher lookup is enough.
         let maybe_dispatcher = resources
             .first()
             .and_then(|r| self.try_resolve_spec_view_dispatcher(&r.item.schema, spec_view_mode));

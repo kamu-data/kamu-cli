@@ -24,13 +24,6 @@ use crate::{ResourceInvalidLabelFilterError, ResourceLabelFilterProblemCode};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Resolves an authored label filter into its canonical form.
-///
-/// The whole expression tree is resolved, including `$not`/`$or` branches —
-/// resolution is about canonicalizing keys and validating values, which is
-/// meaningful regardless of the operator wrapping a leaf. Whether an operator
-/// can actually be *executed* is decided further down, by
-/// [`ResourceLabelFilterPredicate::flatten_conjunction`] at the repository
-/// boundary, so that growing support is a backend-local change.
 pub(crate) fn resolve_label_filter(
     resolver: &ResourceExtensionSchemaResolver,
     label_filter: Option<ResourceLabelFilterInput>,
@@ -52,15 +45,6 @@ pub(crate) fn resolve_label_filter(
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Rejects a resolved filter that no repository backend can evaluate yet.
-///
-/// The check is delegated to
-/// [`ResourceLabelFilterPredicate::flatten_conjunction`] so that the set of
-/// supported operators is defined in exactly one place. It runs here, at the
-/// facade edge, purely so the caller gets a typed
-/// [`ResourceLabelFilterProblemCode::UnsupportedExpression`] instead of an
-/// opaque `InternalError` from deep inside a repository. Once the backends can
-/// evaluate an operator, `flatten_conjunction` stops rejecting it and this
-/// check lets it through unchanged.
 fn ensure_executable(
     resolved: &ResolvedResourceLabelFilter,
 ) -> Result<(), ResourceInvalidLabelFilterError> {
@@ -71,26 +55,8 @@ fn ensure_executable(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Resolves the authored filter expression — the whole `LabelFilter` object,
-/// however many entries and nested operators it carries — against several
-/// candidate schemas at once, for the multi-type selectors that `get`/`delete`
-/// expand (`kamu get '%/%' -l env=prod,team=data`).
-///
-/// Returns the schemas that can still match, paired with the one resolved
-/// expression tree to apply to all of them.
-///
-/// Two behaviours are deliberate:
-///
-/// - A schema whose extension registry rejects the key is **dropped** rather
-///   than failing the whole query: a label that is inapplicable to a type just
-///   means no resource of that type can match. If every schema rejects it, the
-///   error is surfaced, since that indicates a genuinely bad filter.
-/// - The resolved filters are asserted to be **identical** across schemas. No
-///   label schema resolves differently per resource type today — built-in
-///   labels apply to every type and unregistered keys stay free-form — so the
-///   divergent case is unreachable. Supporting it would mean OR-ing per-schema
-///   predicates in every backend, which is left unimplemented rather than
-///   written blind and never exercised.
+/// Resolves one label filter against multiple candidate schemas.
+/// Schemas that reject a label key cannot match and are dropped.
 pub(crate) fn resolve_label_filter_for_schemas(
     resolver: &ResourceExtensionSchemaResolver,
     label_filter: Option<ResourceLabelFilterInput>,
@@ -100,10 +66,7 @@ pub(crate) fn resolve_label_filter_for_schemas(
         return Ok((resource_schemas.to_vec(), ResolvedResourceLabelFilter::True));
     };
 
-    // Parsing is schema-independent, so it happens once up front; only
-    // resolution — canonicalizing keys against a schema's extension registry —
-    // varies per schema. All authored entries become a single tree here: two
-    // labels parse to one `And([Eq, Eq])` root, not two separate filters.
+    // Parsing is schema-independent; only key resolution varies per schema.
     let parsed_expr = ResourceLabelFilterExprParser::parse(label_filter.entries)?;
 
     let mut applicable_schemas = Vec::with_capacity(resource_schemas.len());
@@ -113,9 +76,7 @@ pub(crate) fn resolve_label_filter_for_schemas(
     for resource_schema in resource_schemas {
         match resolve_expr(resolver, &parsed_expr, resource_schema) {
             Ok(schema_expr) => {
-                // An unsupported operator is a property of the expression, not
-                // of any one schema, so it fails outright instead of merely
-                // excluding this schema from the candidate set.
+                // Unsupported operators are expression errors, not schema misses.
                 ensure_executable(&schema_expr)?;
 
                 if let Some(previous_expr) = &resolved_expr {
@@ -137,13 +98,9 @@ pub(crate) fn resolve_label_filter_for_schemas(
 
     match (resolved_expr, last_error) {
         (Some(resolved_expr), _) => Ok((applicable_schemas, resolved_expr)),
-        // Every candidate schema rejected the filter, so the filter itself is
-        // at fault.
+        // Every candidate schema rejected the filter, so the filter itself is at fault.
         (None, Some(err)) => Err(err),
-        // No candidate schemas at all. There is nothing the filter could be
-        // wrong about, so this is not an error: callers pass the empty schema
-        // list down, and the repositories already return an empty result for
-        // it. The filter value is irrelevant when no schema can match.
+        // No candidate schemas means no match, not a bad filter.
         (None, None) => Ok((Vec::new(), ResolvedResourceLabelFilter::True)),
     }
 }
@@ -316,9 +273,6 @@ mod tests {
 
     #[test]
     fn empty_schema_list_with_a_filter_yields_no_candidates() {
-        // A selector matching no resource type is not a filter error: the
-        // repositories already return an empty result for an empty schema
-        // list, so resolution must not fail (nor panic) here.
         let (applicable, resolved) = resolve_label_filter_for_schemas(
             &resolver(),
             Some(filter_of(&[("environment", "prod")])),
@@ -377,8 +331,6 @@ mod tests {
         )
         .unwrap();
 
-        // Both labels live in a single resolved tree: `environment`
-        // canonicalizes to its schema URI, `team` stays free-form.
         assert_eq!(
             resolved,
             ResolvedResourceLabelFilter::And(vec![
@@ -398,8 +350,6 @@ mod tests {
 
     #[test]
     fn built_in_label_resolves_identically_across_schemas() {
-        // `environment` is registered as `AnyResource`, so every candidate
-        // type yields the same tree and the uniform path is taken.
         let schemas = vec![schema("Widget"), schema("Gadget"), schema("Doohickey")];
 
         let (applicable, resolved) = resolve_label_filter_for_schemas(
@@ -448,8 +398,6 @@ mod tests {
     fn unknown_uri_key_is_rejected_for_every_schema() {
         let schemas = vec![schema("Widget"), schema("Gadget")];
 
-        // No schema can resolve an unregistered URI, so the filter itself is
-        // at fault and the error surfaces rather than emptying the candidates.
         let err = resolve_label_filter_for_schemas(
             &resolver(),
             Some(filter_of(&[(
@@ -482,8 +430,6 @@ mod tests {
         let err = resolve_label_filter_for_schemas(&resolver(), Some(label_filter), &schemas)
             .unwrap_err();
 
-        // Not merely an inapplicable-per-schema outcome: `$or` is a property
-        // of the expression, so it must not be reported as "no schema matched".
         assert_eq!(
             err.code,
             ResourceLabelFilterProblemCode::UnsupportedExpression

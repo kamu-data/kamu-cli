@@ -61,11 +61,7 @@ impl ResourceSelectionResolutionService for ResourceSelectionResolutionServiceIm
         let supported_resource_types =
             Self::supported_resource_types_for_patterns(&selection, resource_facade).await?;
 
-        // Exact selectors are prefetched in batches before the main loop so we can
-        // collapse many single-item lookups into grouped backend calls while still
-        // replaying results in the original selector order below. At this point
-        // shadowed selectors are already absent from `selection.items`, because the
-        // syntax layer moved them into `shadowed_selectors` instead.
+        // Prefetch exact selectors in batches, then replay them in input order.
         let exact_results = Self::fetch_exact_identities(
             &selection,
             resource_facade,
@@ -312,8 +308,7 @@ impl ResourceSelectionResolutionServiceImpl {
         }
 
         for (resource_type, (schema, entries)) in groups {
-            // `search_handles` carries one query mode at a time, so a group
-            // mixing `ById`/`ByName` refs needs one call per ref kind.
+            // `search_handles` carries one query mode at a time.
             let mut by_id = Vec::new();
             let mut by_name = Vec::new();
             for (exact_index, resource_ref) in &entries {
@@ -378,8 +373,7 @@ impl ResourceSelectionResolutionServiceImpl {
                     .map(|handle| (handle.name.to_ascii_lowercase(), handle))
                     .collect::<HashMap<_, _>>();
 
-                // `schema` came from a registered type descriptor, so a
-                // parse failure here is a data-integrity catastrophe.
+                // Registered descriptor schemas must parse back into TypeUri.
                 let type_name =
                     kamu_resources::resource_type_name(&schema).map_err(CLIError::critical)?;
 
@@ -430,9 +424,7 @@ impl ResourceSelectionResolutionServiceImpl {
         )
         .await?;
 
-        // Handles intentionally carry a schema TypeUri, not a CLI selector.
-        // Reconstruct command-routing selectors from the descriptor set that
-        // was already loaded for this expansion.
+        // Reconstruct command-routing selectors from the loaded descriptors.
         let canonical_selectors_by_schema =
             Self::canonical_selectors_by_schema(supported_resource_types);
 
@@ -453,10 +445,7 @@ impl ResourceSelectionResolutionServiceImpl {
             .collect()
     }
 
-    /// Resolves the canonical selector for a handle's schema against an
-    /// already-fetched descriptor set. A miss is an internal inconsistency:
-    /// the backend returned a handle outside the selector scope requested by
-    /// the CLI expansion.
+    /// Resolves the canonical selector for a handle's schema.
     fn canonical_selector_for_schema<'a>(
         canonical_selectors_by_schema: &'a CanonicalSelectorsBySchema<'a>,
         schema: &kamu_resources::TypeUri,
@@ -549,8 +538,7 @@ impl ResourceSelectionResolutionServiceImpl {
                     resource_facade
                         .search_handles(SearchResourceHandlesRequest {
                             raw_type_selectors,
-                            // `%` matches every name, so it means "no narrowing"
-                            // here.
+                            // `%` matches every name.
                             query: kamu_resources::ResourceSearchQuery::NamePattern(
                                 "%".to_string(),
                             ),

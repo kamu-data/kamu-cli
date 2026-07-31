@@ -422,9 +422,7 @@ impl ResourceRepository for PostgresResourceRepository {
                         r.resource_schema as schema,
                         r.resource_name as name,
                         r.account_id as "account_id: odf::AccountID",
-                        -- LEFT JOIN: a.resource_id is NULL only when the owning account
-                        -- row is gone (deletion racing async cleanup), same case the
-                        -- account_name sentinel covers. Substitute the nil resource id.
+                        -- Account row may be missing during async cleanup.
                         COALESCE(a.resource_id, '00000000-0000-0000-0000-000000000000'::uuid) as "account_resource_id!: uuid::Uuid",
                         COALESCE(a.account_name, $6) as "account_name!"
                     FROM resources r
@@ -433,9 +431,7 @@ impl ResourceRepository for PostgresResourceRepository {
                       AND r.resource_schema = ANY($2)
                       AND LOWER(r.resource_name) = ANY($3)
                       AND r.deleted_at IS NULL
-                      -- Every authored (key, value) pair must be present. Phrased as
-                      -- "no pair is missing" so a variable-length filter still fits in
-                      -- one static query; empty arrays make it vacuously true.
+                      -- Every requested label pair must be present.
                       AND NOT EXISTS (
                           SELECT 1
                           FROM UNNEST($7::text[], $8::text[]) AS f(k, v)
@@ -591,8 +587,6 @@ impl ResourceRepository for PostgresResourceRepository {
                       AND r.resource_schema = ANY($2)
                       AND LOWER(r.resource_name) = ANY($3)
                       AND r.deleted_at IS NULL
-                      -- Same predicate as `search_resource_handles`, so a filtered
-                      -- count always agrees with its filtered page.
                       AND NOT EXISTS (
                           SELECT 1
                           FROM UNNEST($4::text[], $5::text[]) AS f(k, v)
@@ -701,9 +695,7 @@ impl ResourceRepository for PostgresResourceRepository {
             SELECT
                 r.resource_id as "id: uuid::Uuid",
                 r.account_id as "account_id: odf::AccountID",
-                -- LEFT JOIN: a.resource_id is NULL only when the owning account
-                -- row is gone (deletion racing async cleanup), same case the
-                -- account_name sentinel covers. Substitute the nil resource id.
+                -- Account row may be missing during async cleanup.
                 COALESCE(a.resource_id, '00000000-0000-0000-0000-000000000000'::uuid) as "account_resource_id!: uuid::Uuid",
                 COALESCE(a.account_name, $3) as "account_name!",
                 r.resource_schema,
@@ -1048,7 +1040,6 @@ impl ResourceRepository for PostgresResourceRepository {
                 WHERE r.account_id = $1
                   AND r.resource_schema = $2
                   AND r.deleted_at IS NULL
-                  -- Same predicate as `search_resource_handles`.
                   AND NOT EXISTS (
                       SELECT 1
                       FROM UNNEST($6::text[], $7::text[]) AS f(k, v)
@@ -1127,9 +1118,7 @@ impl ResourceRepository for PostgresResourceRepository {
                 SELECT
                     r.resource_id as "id: uuid::Uuid",
                     r.account_id as "account_id: odf::AccountID",
-                -- LEFT JOIN: a.resource_id is NULL only when the owning account
-                -- row is gone (deletion racing async cleanup), same case the
-                -- account_name sentinel covers. Substitute the nil resource id.
+                -- Account row may be missing during async cleanup.
                 COALESCE(a.resource_id, '00000000-0000-0000-0000-000000000000'::uuid) as "account_resource_id!: uuid::Uuid",
                     COALESCE(a.account_name, $4) as "account_name!",
                     r.resource_schema,
@@ -1147,8 +1136,6 @@ impl ResourceRepository for PostgresResourceRepository {
                 LEFT JOIN accounts a ON a.id = r.account_id
                 WHERE r.account_id = $1
                   AND r.deleted_at IS NULL
-                  -- Same "no pair is missing" predicate as the per-schema
-                  -- listing, so `list all` filters identically to `list <type>`.
                   AND NOT EXISTS (
                       SELECT 1
                       FROM UNNEST($5::text[], $6::text[]) AS f(k, v)
@@ -1281,13 +1268,7 @@ impl ResourceRepository for PostgresResourceRepository {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Splits a resolved label filter into the parallel `(keys, values)` arrays
-/// bound by the `UNNEST`-based predicates above.
-///
-/// Keeping the pairs as two `TEXT[]` binds is what lets a variable-length
-/// filter live inside a *static* `sqlx::query!`, which is required for
-/// compile-time checking against the offline cache. Postgres has `UNNEST`;
-/// the `SQLite` backend pushes one `EXISTS` per pair instead.
+/// Splits a resolved label filter into `UNNEST`-bound key/value arrays.
 fn split_label_filter_pairs(
     label_filter: &ResolvedResourceLabelFilter,
 ) -> Result<(Vec<String>, Vec<String>), InternalError> {

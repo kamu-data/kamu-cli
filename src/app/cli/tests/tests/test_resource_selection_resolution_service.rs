@@ -964,8 +964,6 @@ async fn passes_the_label_filter_to_pattern_expansion() {
 
     assert_eq!(result.targets.len(), 1);
 
-    // The filter must reach the backend, not be applied after expansion:
-    // `--max-results` counts matched resources only.
     let requests = search_requests.lock().unwrap();
     assert_eq!(requests.len(), 1);
     assert_eq!(
@@ -1012,8 +1010,6 @@ async fn passes_the_label_filter_to_the_all_selector() {
 
     assert_eq!(result.targets.len(), 1);
 
-    // `all` spans every schema, and the facade resolves the filter against all
-    // of them, so the filter must reach the backend rather than be rejected.
     let requests = list_all_requests.lock().unwrap();
     assert_eq!(requests.len(), 1);
     assert_eq!(
@@ -1036,8 +1032,6 @@ async fn narrows_exact_selectors_by_the_label_filter() {
         account: DEFAULT_ACCOUNT_HANDLE.clone(),
     };
 
-    // The facade applies the filter inside the search lookup, so `vars-b` comes
-    // back as a not-found problem rather than being dropped afterwards.
     let mut harness = ResourceSelectionResolutionHarness::new();
     let search_requests = Arc::new(Mutex::new(Vec::new()));
     harness.expect_search_handles(1, vec![matching], Arc::clone(&search_requests));
@@ -1054,8 +1048,6 @@ async fn narrows_exact_selectors_by_the_label_filter() {
             },
             &harness.facade,
             &ResourceSelectionResolutionOptions {
-                // Filtered-out resources surface as "not found", so this keeps
-                // the assertion on the target set rather than on the error.
                 ignore_not_found: true,
                 max_expanded_results: Some(10),
                 label_filter: Some(environment_label_filter()),
@@ -1068,7 +1060,6 @@ async fn narrows_exact_selectors_by_the_label_filter() {
     assert_eq!(result.targets[0].id, matching_id);
     assert_eq!(result.ignored_selectors.len(), 1);
 
-    // No follow-up search: filtering exact selectors must stay one round trip.
     let requests = search_requests.lock().unwrap();
     assert_eq!(requests.len(), 1);
     assert_eq!(
@@ -1090,7 +1081,6 @@ async fn leaves_exact_selectors_untouched_without_a_label_filter() {
     };
 
     let mut harness = ResourceSelectionResolutionHarness::new();
-    // Still exactly one round trip, with no filter attached.
     harness.expect_search_handles(1, vec![handle], Arc::new(Mutex::new(Vec::new())));
 
     let result = harness

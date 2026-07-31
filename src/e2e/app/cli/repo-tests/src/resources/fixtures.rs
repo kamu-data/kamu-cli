@@ -7,45 +7,23 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-// Manifest fixtures for resource CLI e2e tests.
-//
-// The manifest envelope (`$schema`/`headers.name`/`spec`) mirrors
-// `kamu_resources::ResourceManifest`. The specs mirror
-// `kamu_configuration::{VariableSetSpec, SecretSetSpec}`:
-//   - VariableSet spec: `{ variables: { NAME: "value" } }` (scalar) or `{
-//     variables: { NAME: { value: "value" } } }` (structured).
-//   - SecretSet spec:   `{ secrets:   { NAME: { value: "value" } } }`.
-//
-// Variable/secret names must match `^[A-Za-z_][A-Za-z0-9_]*$`; uppercase is
-// preferred (lowercase only triggers a lint warning). An empty `variables`
-// map deserializes fine but fails business validation — used for the invalid
-// fixture below.
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Canonical schemas (sourced from the ODF codegen — the single source of truth)
+// Canonical schemas
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub const VARIABLE_SET_SCHEMA: &str = odf::metadata::config::VariableSet::schema_str();
 pub const SECRET_SET_SCHEMA: &str = odf::metadata::config::SecretSet::schema_str();
 
-/// Short CRD-style type name (the `Type` column in `list`/`summary` output),
-/// as opposed to [`VARIABLE_SET_SCHEMA`]/[`SECRET_SET_SCHEMA`] which are the
-/// full canonical `$schema` URIs.
+/// Short CRD-style type name used in `list`/`summary` output.
 pub const VARIABLE_SET_SHORT_NAME: &str = "VariableSet";
 pub const SECRET_SET_SHORT_NAME: &str = "SecretSet";
 pub const DESCRIPTION_ANNOTATION_SCHEMA: &str =
     "https://kamu.dev/schemas/resource/v1alpha1/annotations/Description";
-/// Canonical schema URI for the built-in `environment` label (see
-/// `kamu_resources::RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI`, duplicated here so
-/// this crate does not need a `kamu-resources` dependency).
+/// Canonical schema URI for the built-in `environment` label.
 pub const ENVIRONMENT_LABEL_SCHEMA: &str =
     "https://kamu.dev/schemas/resource/v1alpha1/labels/Environment";
 
-/// Kamu config enabling secrets encryption. `SecretSet` apply encrypts values
-/// via the configured key, so any scenario that applies a `SecretSet` must run
-/// with this config (passed to the harness via `Options::with_kamu_config`).
-/// Without it, the CLI panics in the secret-set sanitizer. The key is the
-/// 32-char sample from `kamu_datasets::SAMPLE_SECRETS_ENCRYPTION_KEY`.
+/// Kamu config required by scenarios that apply `SecretSet` manifests.
 pub const SECRETS_ENCRYPTION_KAMU_CONFIG: &str = indoc::indoc!(
     r#"
     kind: CLIConfig
@@ -57,20 +35,14 @@ pub const SECRETS_ENCRYPTION_KAMU_CONFIG: &str = indoc::indoc!(
     "#
 );
 
-/// Default `description` annotation baked into the well-formed builders. A
-/// manifest without a description applies successfully but emits a
-/// `missing_description` lint warning; the canonical fixtures include one so
-/// the common lifecycle scenarios stay warning-free. The warning path itself is
-/// covered explicitly by [`variable_set_manifest_no_description`].
+/// Default `description` annotation for warning-free fixtures.
 pub const DEFAULT_DESCRIPTION: &str = "e2e test fixture resource";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Builders
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// A well-formed `VariableSet` manifest in YAML with a single `MESSAGE`
-/// variable and a `description` annotation (so it applies without lint
-/// warnings).
+/// A well-formed `VariableSet` manifest in YAML.
 pub fn variable_set_manifest_yaml(name: &str, value: &str) -> String {
     indoc::formatdoc!(
         r#"
@@ -86,11 +58,7 @@ pub fn variable_set_manifest_yaml(name: &str, value: &str) -> String {
     )
 }
 
-/// Same as [`variable_set_manifest_yaml`] but carries a populated
-/// `headers.labels`/`headers.annotations` block — a short `TypeName` label
-/// key, a free-form short label key with a nested-object value, and two
-/// annotations (the well-known `description` plus an `owner`) — to pin the ODF
-/// `TypeRef`-keyed canonical shape end-to-end.
+/// Same as [`variable_set_manifest_yaml`] with labels and annotations.
 pub fn variable_set_manifest_yaml_with_labels(name: &str, value: &str) -> String {
     indoc::formatdoc!(
         r#"
@@ -122,12 +90,7 @@ pub fn variable_set_manifest_json(name: &str, value: &str) -> String {
     .to_string()
 }
 
-/// A well-formed `VariableSet` manifest in YAML that targets a specific account
-/// by name via the `headers.account.name` field — the GitOps-style path where
-/// a manifest names the account it belongs to (mirrors `ResourceAccountRef
-/// { name, id }`, here using the by-name form). Used by the multi-tenant
-/// scenarios to prove the CLI honors the manifest's account selector, including
-/// the mismatch/unknown rejection paths.
+/// A `VariableSet` manifest targeting a specific account by name.
 pub fn variable_set_manifest_yaml_for_account(
     name: &str,
     value: &str,
@@ -149,9 +112,7 @@ pub fn variable_set_manifest_yaml_for_account(
     )
 }
 
-/// A `VariableSet` manifest **without** a `description` annotation. Applies
-/// successfully but emits the `missing_description` lint warning — used to
-/// cover the warning surface explicitly.
+/// A `VariableSet` manifest without a `description` annotation.
 pub fn variable_set_manifest_no_description(name: &str, value: &str) -> String {
     indoc::formatdoc!(
         r#"
@@ -165,8 +126,7 @@ pub fn variable_set_manifest_no_description(name: &str, value: &str) -> String {
     )
 }
 
-/// A well-formed `SecretSet` manifest in YAML with two secret entries and a
-/// `description` (so it applies without lint warnings).
+/// A well-formed `SecretSet` manifest in YAML.
 pub fn secret_set_manifest_yaml(name: &str, token: &str, password: &str) -> String {
     indoc::formatdoc!(
         r#"
@@ -185,33 +145,16 @@ pub fn secret_set_manifest_yaml(name: &str, token: &str, password: &str) -> Stri
     )
 }
 
-/// Plaintext that [`PRE_ENCRYPTED_API_TOKEN_JWE`] decrypts back to. A scenario
-/// that applies the pre-encrypted manifest can reveal it and assert this value.
+/// Plaintext that [`PRE_ENCRYPTED_API_TOKEN_JWE`] decrypts back to.
 pub const PRE_ENCRYPTED_API_TOKEN_PLAINTEXT: &str = "super-secret-token";
 
-/// A compact JWE token (`contentEncoding: "jwe"`) for
-/// [`PRE_ENCRYPTED_API_TOKEN_PLAINTEXT`], as a GitOps-committed manifest would
-/// carry an already-encrypted secret.
-///
-/// The token is tied to the encryption key in
-/// [`SECRETS_ENCRYPTION_KAMU_CONFIG`] (`QfnEDcnUtGSW2pwVXaFPvZOwxyFm2BOC`, i.e.
-/// `kamu_datasets::SAMPLE_SECRETS_ENCRYPTION_KEY`). It MUST be applied with
-/// that same config, otherwise `--revealed` would fail to decrypt.
-///
-/// How the token was produced (reproduce if the sample key ever changes): build
-/// a `crypto_utils::SecretCryptor` from the sample key and call
-/// `encrypt_to_jwe(b"super-secret-token")`. The JWE IV is random per call, so
-/// re-running yields a different token that still decrypts to the same
-/// plaintext — any such token is valid.
+/// A compact JWE token for [`PRE_ENCRYPTED_API_TOKEN_PLAINTEXT`].
+/// Must be applied with [`SECRETS_ENCRYPTION_KAMU_CONFIG`].
 pub const PRE_ENCRYPTED_API_TOKEN_JWE: &str = "eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..\
                                                xqDKWewaviCEWvPB.-hVKByad54NGfdcYuA0lyGPm.\
                                                vy4bkibgH2ZgDXVsFxDUmw";
 
-/// A `SecretSet` manifest whose single secret is supplied **pre-encrypted** (as
-/// a JWE token, see [`PRE_ENCRYPTED_API_TOKEN_JWE`]). Applying it exercises the
-/// already-encrypted apply path — the sanitizer must accept the encrypted value
-/// as-is rather than re-encrypting it. Must be applied with
-/// [`SECRETS_ENCRYPTION_KAMU_CONFIG`].
+/// A `SecretSet` manifest whose single secret is supplied pre-encrypted.
 pub fn secret_set_manifest_pre_encrypted_yaml(name: &str) -> String {
     indoc::formatdoc!(
         r#"
@@ -230,14 +173,7 @@ pub fn secret_set_manifest_pre_encrypted_yaml(name: &str) -> String {
     )
 }
 
-/// A `SecretSet` manifest authoring the built-in `environment` label under the
-/// given key (short name `environment` or the canonical
-/// [`ENVIRONMENT_LABEL_SCHEMA`] URI), mirroring
-/// [`variable_set_manifest_with_environment_label`] for the other resource
-/// type — used to build a multi-type candidate set (`SecretSet` +
-/// `VariableSet`) for label-filter scenarios that need a type-pattern
-/// selector (e.g. `%sets`) to actually span more than one schema. Requires
-/// [`SECRETS_ENCRYPTION_KAMU_CONFIG`].
+/// A `SecretSet` manifest carrying the built-in `environment` label.
 pub fn secret_set_manifest_with_environment_label(
     name: &str,
     value: &str,
@@ -273,8 +209,7 @@ pub fn secret_set_manifest_json(name: &str, token: &str, password: &str) -> Stri
     .to_string()
 }
 
-/// A syntactically valid `VariableSet` manifest that fails business validation
-/// (empty `variables` map). Useful for batch / error scenarios.
+/// A syntactically valid `VariableSet` manifest that fails business validation.
 pub fn variable_set_manifest_business_invalid(name: &str) -> String {
     indoc::formatdoc!(
         r#"
@@ -287,10 +222,7 @@ pub fn variable_set_manifest_business_invalid(name: &str) -> String {
     )
 }
 
-/// A `VariableSet` manifest authoring the built-in `environment` label under
-/// the given key (short name `environment` or the canonical
-/// [`ENVIRONMENT_LABEL_SCHEMA`] URI — callers pass whichever key the scenario
-/// is exercising) with the given value.
+/// A `VariableSet` manifest carrying the built-in `environment` label.
 pub fn variable_set_manifest_with_environment_label(
     name: &str,
     value: &str,
@@ -312,14 +244,7 @@ pub fn variable_set_manifest_with_environment_label(
     )
 }
 
-/// A `VariableSet` manifest carrying the built-in `environment` label **and** a
-/// free-form `team` label — the two-predicate fixture for AND-ed label
-/// filtering, where one predicate is schema-registered (canonicalized to
-/// [`ENVIRONMENT_LABEL_SCHEMA`]) and the other stays free-form.
-///
-/// Mixing the two kinds in one resource is deliberate: it proves the AND is
-/// evaluated over the *stored* keys, after canonicalization has rewritten only
-/// the registered one.
+/// A `VariableSet` manifest carrying `environment` and free-form `team` labels.
 pub fn variable_set_manifest_with_environment_and_team_labels(
     name: &str,
     environment: &str,
@@ -342,9 +267,7 @@ pub fn variable_set_manifest_with_environment_and_team_labels(
     )
 }
 
-/// A `VariableSet` manifest carrying a label under an unregistered
-/// `https://…` URI key — exercises the "unknown URI is rejected" rule
-/// (registered URIs are a closed set).
+/// A `VariableSet` manifest carrying an unregistered URI label key.
 pub fn variable_set_manifest_with_unknown_label_uri(name: &str) -> String {
     indoc::formatdoc!(
         r#"
@@ -360,9 +283,7 @@ pub fn variable_set_manifest_with_unknown_label_uri(name: &str) -> String {
     )
 }
 
-/// A `VariableSet` manifest whose `description` annotation is over the
-/// built-in 4096-character limit — exercises the schema-driven rejection path
-/// end-to-end via the CLI.
+/// A `VariableSet` manifest with an overlong `description` annotation.
 pub fn variable_set_manifest_with_overlong_description(name: &str) -> String {
     let description = "x".repeat(4097);
     indoc::formatdoc!(
@@ -379,9 +300,7 @@ pub fn variable_set_manifest_with_overlong_description(name: &str) -> String {
     )
 }
 
-/// A `VariableSet` manifest carrying an unregistered **short-name** label —
-/// exercises the free-form-short-name-accepted-with-warning path (stored
-/// opaquely, `resource_freeform_labels` warning emitted).
+/// A `VariableSet` manifest carrying an unregistered short-name label.
 pub fn variable_set_manifest_with_freeform_label(name: &str) -> String {
     indoc::formatdoc!(
         r#"
@@ -399,9 +318,7 @@ pub fn variable_set_manifest_with_freeform_label(name: &str) -> String {
     )
 }
 
-/// A `VariableSet` manifest carrying a **structured** (non-string) label
-/// value — exercises the `resource_label_not_indexed` warning path; the
-/// structured value itself must be preserved as-is by `get`.
+/// A `VariableSet` manifest carrying a structured label value.
 pub fn variable_set_manifest_with_structured_label(name: &str) -> String {
     indoc::formatdoc!(
         r#"

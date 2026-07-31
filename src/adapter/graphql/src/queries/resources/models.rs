@@ -49,31 +49,22 @@ impl ResourceTypeSelectorInput {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// One `key = value` equality predicate.
-///
-/// `key` accepts either a registered label's short name or its canonical schema
-/// URI; the server canonicalizes before matching. `value` is `JSON` because the
-/// underlying label values are JSON, though only strings are matchable today.
+/// One authored `key = value` label predicate.
 #[derive(InputObject, Debug, Clone)]
 pub struct ResourceLabelFilterEntryInput {
     pub key: String,
     pub value: serde_json::Value,
 }
 
-/// Selects resources by their labels. A resource matches only if it satisfies
-/// every entry.
-///
-/// Carried as a list rather than a map so that a key repeated by the caller
-/// reaches the server intact and is reported, instead of one silently winning.
+/// Selects resources by label predicates.
+/// A list preserves duplicate keys for validation.
 #[derive(InputObject, Debug, Clone)]
 pub struct ResourceLabelFilterInput {
     pub entries: Vec<ResourceLabelFilterEntryInput>,
 }
 
 impl ResourceLabelFilterInput {
-    /// Rejects a duplicate key before the entries collapse into the domain's
-    /// map. Canonicalization happens later, so this catches only literal
-    /// repeats; equivalent spellings of one key are caught during resolution.
+    /// Rejects duplicate keys before entries collapse into a map.
     pub fn into_facade_filter(self) -> Result<kamu_resources::ResourceLabelFilterInput, GqlError> {
         let mut entries = std::collections::BTreeMap::new();
 
@@ -91,8 +82,6 @@ impl ResourceLabelFilterInput {
     }
 }
 
-/// Applies [`ResourceLabelFilterInput::into_facade_filter`] to an optional
-/// argument, which is how every filterable field receives it.
 pub(crate) fn into_facade_filter(
     label_filter: Option<ResourceLabelFilterInput>,
 ) -> Result<Option<kamu_resources::ResourceLabelFilterInput>, GqlError> {
@@ -166,9 +155,7 @@ impl TryFrom<ResourceBatchSelectorInput> for kamu_resources_facade::ResourceBatc
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Exactly one way to narrow a search — mirrors
-/// [`kamu_resources::ResourceSearchQuery`]; `@oneOf` rejects invalid
-/// combinations before the resolver runs.
+/// Exactly one way to narrow a search.
 #[derive(OneofObject, Debug, Clone)]
 pub enum ResourceSearchQueryInput {
     ExactNames(Vec<ResourceName<'static>>),

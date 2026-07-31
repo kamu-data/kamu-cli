@@ -211,16 +211,8 @@ pub struct ApplyManifestBatchRequest {
 #[derive(Debug)]
 pub struct ApplyManifestBatchResponse<D> {
     pub items: Vec<ApplyManifestBatchItemResult<D>>,
-    /// Positional indexes of items that individually succeeded but whose
-    /// accepted details could not be returned because the enclosing
-    /// single-transaction batch rolled back.
-    ///
-    /// This is transport metadata, not a per-item error. Local facades can
-    /// keep this empty because they report every attempted item's real
-    /// pre-rollback outcome in `items`; remote transports such as GraphQL use
-    /// this to make rolled-back successes explicit when rollback is forced
-    /// through a transport-level error and the normal `data` payload is not
-    /// available.
+    /// Positional indexes of successes hidden by a batch rollback.
+    /// This is transport metadata, not a per-item error.
     pub rolled_back_successes: Vec<usize>,
 }
 
@@ -293,8 +285,7 @@ pub struct SearchResourceHandlesResponse {
 #[derive(Debug, Clone)]
 pub struct ListAllResourcesRequest {
     pub account: Option<ResourceAccountRef>,
-    /// Resolved against every registered schema, so `list all -l ...` filters
-    /// exactly like a per-type listing.
+    /// Resolved against every registered schema.
     pub label_filter: Option<ResourceLabelFilterInput>,
     pub pagination: PaginationOpts,
 }

@@ -778,8 +778,6 @@ pub async fn test_list_filter_by_short_label_name(h: &impl FacadeContractHarness
 
     let facade = h.facade_for(TestAccount::Alice);
 
-    // Short name resolves to the same canonical URI as the fully-qualified key,
-    // so it must select the same resource.
     let items = facade
         .list(ListResourcesRequest {
             raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
@@ -819,7 +817,6 @@ pub async fn test_list_filter_by_free_form_label(h: &impl FacadeContractHarness)
 
     let facade = h.facade_for(TestAccount::Alice);
 
-    // `team` has no registered schema, so it stays free-form and queryable.
     let items = facade
         .list(ListResourcesRequest {
             raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
@@ -844,8 +841,6 @@ contract_test!(
 pub async fn test_list_filter_invalid_key_is_rejected(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
-    // `=` is not a valid TypeName/TypeUri character, so this key fails
-    // `TypeRef::from_str` before any resolver lookup happens.
     let result = facade
         .list(ListResourcesRequest {
             raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
@@ -937,8 +932,6 @@ pub async fn test_list_filter_duplicate_after_canonicalization_is_rejected(
 ) {
     let facade = h.facade_for(TestAccount::Alice);
 
-    // Short name `environment` and its canonical URI both resolve to the same
-    // canonical key, so authoring both in one filter is a duplicate.
     let result = facade
         .list(ListResourcesRequest {
             raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
@@ -971,10 +964,6 @@ contract_test!(
 pub async fn test_list_filter_not_operator_is_rejected(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
-    // `$not` is recognized as a reserved combinator key (per the ODF
-    // `LabelFilter` schema's examples) but boolean-expression evaluation is
-    // not implemented yet, so it must be rejected with a purpose-built code —
-    // not misclassified as an invalid key or a non-string value.
     let result = facade
         .list(ListResourcesRequest {
             raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
@@ -1043,9 +1032,6 @@ contract_test!(
 pub async fn test_list_filter_malformed_not_operator_is_rejected(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
-    // A malformed `$not` (wrong value shape) is a parse failure, not a
-    // resolver failure, but it shares the same "not supported yet" code as a
-    // well-formed `$not` — both mean "this filter syntax isn't usable yet."
     let result = facade
         .list(ListResourcesRequest {
             raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
@@ -1095,8 +1081,6 @@ pub async fn test_search_handles_filter_narrows_candidates(h: &impl FacadeContra
 
     let facade = h.facade_for(TestAccount::Alice);
 
-    // The filter travels on the identifier-expansion path that `get`/`delete`
-    // also use, so it must narrow the handle set, not just the summary list.
     let response = facade
         .search_handles(SearchResourceHandlesRequest {
             raw_type_selectors: vec![VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()],

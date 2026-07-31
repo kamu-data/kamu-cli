@@ -122,7 +122,6 @@ pub async fn test_create_and_find_resource(catalog: &Catalog) {
 
     repo.create_resource(&snapshot).await.unwrap();
 
-    // find by id
     let found = repo.find_resource_snapshot_by_id(&id).await.unwrap();
     assert!(found.is_some());
     let found = found.unwrap();
@@ -131,7 +130,6 @@ pub async fn test_create_and_find_resource(catalog: &Catalog) {
     assert_eq!(found.headers.name, "my-resource");
     assert_eq!(found.last_event_id, None);
 
-    // find by name
     let found_id = repo
         .find_resource_id_by_name(
             &account_handle.did,
@@ -142,7 +140,6 @@ pub async fn test_create_and_find_resource(catalog: &Catalog) {
         .unwrap();
     assert_eq!(found_id, Some(id));
 
-    // find via raw event query
     let found = repo
         .find_resource_snapshot(&ResourceRawEventQuery {
             schema: TEST_KIND.clone(),
@@ -153,7 +150,6 @@ pub async fn test_create_and_find_resource(catalog: &Catalog) {
     assert!(found.is_some());
     assert_eq!(found.unwrap().id, id);
 
-    // wrong kind returns nothing
     let not_found = repo
         .find_resource_snapshot(&ResourceRawEventQuery {
             schema: OTHER_KIND.clone(),
@@ -203,7 +199,6 @@ pub async fn test_create_find_update_resource_with_populated_labels_annotations(
     assert_eq!(found.headers.labels, snapshot.headers.labels);
     assert_eq!(found.headers.annotations, snapshot.headers.annotations);
 
-    // update: change a value, add a key, remove a key
     let mut updated_headers = found.headers.clone();
     updated_headers
         .labels
@@ -285,7 +280,6 @@ pub async fn test_find_resource_handles_by_ids(catalog: &Catalog) {
     let account_handle = odf::AccountHandle::new_test("test-account");
     let other_account_handle = odf::AccountHandle::new_test("other-account");
 
-    // --- empty id list returns nothing, no query issued ---
     let found = repo
         .find_resource_handles_by_ids(&account_handle.did, &[])
         .await
@@ -318,7 +312,6 @@ pub async fn test_find_resource_handles_by_ids(catalog: &Catalog) {
     };
     repo.update_resource(&deleted, None).await.unwrap();
 
-    // --- single id ---
     let found = repo
         .find_resource_handles_by_ids(&account_handle.did, &[first.id])
         .await
@@ -326,9 +319,6 @@ pub async fn test_find_resource_handles_by_ids(catalog: &Catalog) {
     let found_ids = found.into_iter().map(|row| row.id).collect::<Vec<_>>();
     assert_eq!(found_ids, vec![*first.id.as_ref()]);
 
-    // --- multiple ids across schemas, a missing id, another account's id,
-    // and a deleted resource's id — only the two live own-account ids come
-    // back ---
     let found = repo
         .find_resource_handles_by_ids(
             &account_handle.did,
@@ -393,8 +383,6 @@ pub async fn test_search_resource_handles(catalog: &Catalog) {
 
     seed_search_resource_handles(repo.as_ref(), &account_handle).await;
 
-    // --- name_pattern: prefix wildcard matches only TestKind items for this
-    // account ---
     let rows = repo
         .search_resource_handles(
             &account_handle.did,
@@ -408,7 +396,6 @@ pub async fn test_search_resource_handles(catalog: &Catalog) {
     let names = rows.into_iter().map(|row| row.name).collect::<Vec<_>>();
     assert_eq!(names, vec!["app-beta", "app-alpha"]);
 
-    // --- name_pattern is case-insensitive ---
     let rows = repo
         .search_resource_handles(
             &account_handle.did,
@@ -422,7 +409,6 @@ pub async fn test_search_resource_handles(catalog: &Catalog) {
     let names = rows.into_iter().map(|row| row.name).collect::<Vec<_>>();
     assert_eq!(names, vec!["app-beta", "app-alpha"]);
 
-    // --- exact_names filter ---
     let rows = repo
         .search_resource_handles(
             &account_handle.did,
@@ -440,7 +426,6 @@ pub async fn test_search_resource_handles(catalog: &Catalog) {
     names.sort();
     assert_eq!(names, vec!["app-alpha", "db-alpha"]);
 
-    // --- exact_names filter is case-insensitive ---
     let rows = repo
         .search_resource_handles(
             &account_handle.did,
@@ -458,7 +443,6 @@ pub async fn test_search_resource_handles(catalog: &Catalog) {
     names.sort();
     assert_eq!(names, vec!["app-alpha", "db-alpha"]);
 
-    // --- multi-kind search ---
     let rows = repo
         .search_resource_handles(
             &account_handle.did,
@@ -476,7 +460,6 @@ pub async fn test_search_resource_handles(catalog: &Catalog) {
         vec!["app-alpha", "app-beta", "app-delta", "app-gamma"]
     );
 
-    // --- `%` pattern returns all for the kind ---
     let rows = repo
         .search_resource_handles(
             &account_handle.did,
@@ -489,7 +472,6 @@ pub async fn test_search_resource_handles(catalog: &Catalog) {
         .unwrap();
     assert_eq!(rows.len(), 3);
 
-    // --- other account's resources are never returned ---
     let rows = repo
         .search_resource_handles(
             &account_handle.did,
@@ -502,7 +484,6 @@ pub async fn test_search_resource_handles(catalog: &Catalog) {
         .unwrap();
     assert!(rows.is_empty());
 
-    // --- empty name_pattern matches nothing (distinct from a vacuous query) ---
     let rows = repo
         .search_resource_handles(
             &account_handle.did,
@@ -524,7 +505,6 @@ pub async fn test_search_resource_handles_exact_ids(catalog: &Catalog) {
     let account_handle = odf::AccountHandle::new_test("test-account");
     let ids = seed_search_resource_handles(repo.as_ref(), &account_handle).await;
 
-    // --- single id ---
     let rows = repo
         .search_resource_handles(
             &account_handle.did,
@@ -538,7 +518,6 @@ pub async fn test_search_resource_handles_exact_ids(catalog: &Catalog) {
     let names = rows.into_iter().map(|row| row.name).collect::<Vec<_>>();
     assert_eq!(names, vec!["app-alpha"]);
 
-    // --- multiple ids ---
     let rows = repo
         .search_resource_handles(
             &account_handle.did,
@@ -553,7 +532,6 @@ pub async fn test_search_resource_handles_exact_ids(catalog: &Catalog) {
     names.sort();
     assert_eq!(names, vec!["app-alpha", "db-alpha"]);
 
-    // --- non-existent id mixed with an existing one ---
     let missing_id = repo.new_resource_id().await.unwrap();
     let rows = repo
         .search_resource_handles(
@@ -568,7 +546,6 @@ pub async fn test_search_resource_handles_exact_ids(catalog: &Catalog) {
     let names = rows.into_iter().map(|row| row.name).collect::<Vec<_>>();
     assert_eq!(names, vec!["app-alpha"]);
 
-    // --- id restricted to a different schema is not matched ---
     let rows = repo
         .search_resource_handles(
             &account_handle.did,
@@ -581,7 +558,6 @@ pub async fn test_search_resource_handles_exact_ids(catalog: &Catalog) {
         .unwrap();
     assert!(rows.is_empty());
 
-    // --- other account's resource id is never returned, even if listed ---
     let rows = repo
         .search_resource_handles(
             &account_handle.did,
@@ -594,7 +570,6 @@ pub async fn test_search_resource_handles_exact_ids(catalog: &Catalog) {
         .unwrap();
     assert!(rows.is_empty());
 
-    // --- multi-kind search across ids from different kinds ---
     let rows = repo
         .search_resource_handles(
             &account_handle.did,
@@ -609,7 +584,6 @@ pub async fn test_search_resource_handles_exact_ids(catalog: &Catalog) {
     names.sort();
     assert_eq!(names, vec!["app-alpha", "app-gamma"]);
 
-    // --- vacuous (empty) id list matches nothing ---
     let rows = repo
         .search_resource_handles(
             &account_handle.did,
@@ -668,10 +642,7 @@ pub async fn test_count_search_resource_handles_exact_ids(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Pins escaping behaviour for literal `_` inside a `NamePattern`: the
-/// pattern is user-authored SQL LIKE syntax, so `%` remains a live wildcard,
-/// but a literal `_` in a stored name must not be matched by an unescaped
-/// `_` standing in for "any single character".
+/// Pins escaping behavior for literal `_` inside a `NamePattern`.
 pub async fn test_search_resource_handles_pattern_special_characters(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
 
@@ -686,8 +657,6 @@ pub async fn test_search_resource_handles_pattern_special_characters(catalog: &C
         repo.create_resource(&snapshot).await.unwrap();
     }
 
-    // --- a literal `_` in the pattern matches only the name with that exact
-    // character, not the name with a hyphen in the same position ---
     let rows = repo
         .search_resource_handles(
             &account_handle.did,
@@ -701,7 +670,6 @@ pub async fn test_search_resource_handles_pattern_special_characters(catalog: &C
     let names = rows.into_iter().map(|row| row.name).collect::<Vec<_>>();
     assert_eq!(names, vec!["a_b"]);
 
-    // --- `%` in a caller-supplied pattern still behaves as a live wildcard ---
     let rows = repo
         .search_resource_handles(
             &account_handle.did,
@@ -801,7 +769,6 @@ pub async fn test_resource_name_case_insensitive(catalog: &Catalog) {
     beta.id = repo.new_resource_id().await.unwrap();
     repo.create_resource(&beta).await.unwrap();
 
-    // --- find_resource_id_by_name is case-insensitive ---
     let found = repo
         .find_resource_id_by_name(
             &account_handle.did,
@@ -822,7 +789,6 @@ pub async fn test_resource_name_case_insensitive(catalog: &Catalog) {
         .unwrap();
     assert_eq!(found, Some(id));
 
-    // --- resolve_resource_ids_by_names is case-insensitive ---
     let rows = repo
         .resolve_resource_ids_by_names(
             &account_handle.did,
@@ -841,7 +807,6 @@ pub async fn test_resource_name_case_insensitive(catalog: &Catalog) {
     names.sort();
     assert_eq!(names, vec!["my-resource", "other-resource"]);
 
-    // --- search_resource_handles exact_names is case-insensitive ---
     let rows = repo
         .search_resource_handles(
             &account_handle.did,
@@ -855,7 +820,6 @@ pub async fn test_resource_name_case_insensitive(catalog: &Catalog) {
     let names = rows.into_iter().map(|r| r.name).collect::<Vec<_>>();
     assert_eq!(names, vec!["my-resource"]);
 
-    // --- name_pattern search is case-insensitive ---
     let rows = repo
         .search_resource_handles(
             &account_handle.did,
@@ -872,10 +836,7 @@ pub async fn test_resource_name_case_insensitive(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Seeds three resources carrying string labels, keeping the
-/// `resource_labels_projection` index in step with `resources.labels` the way
-/// the persistence service does in production — the SQL backends filter via
-/// that index, so a snapshot alone would not be matchable.
+/// Seeds resources and their label projection rows.
 async fn seed_label_filtered_resources(
     repo: &dyn ResourceRepository,
     projection_repo: &dyn ResourceLabelProjectionRepository,
@@ -957,7 +918,6 @@ pub async fn test_list_resource_snapshots_label_filtering(catalog: &Catalog) {
     let account_handle = odf::AccountHandle::new_test("test-account");
     seed_label_filtered_resources(repo.as_ref(), projection_repo.as_ref(), &account_handle).await;
 
-    // --- empty filter behaves exactly like no filter ---
     let names = filtered_list_names(
         repo.as_ref(),
         &account_handle,
@@ -966,7 +926,6 @@ pub async fn test_list_resource_snapshots_label_filtering(catalog: &Catalog) {
     .await;
     assert_eq!(names, vec!["prod-data", "prod-infra", "staging-data"]);
 
-    // --- single equality ---
     let names = filtered_list_names(
         repo.as_ref(),
         &account_handle,
@@ -975,7 +934,6 @@ pub async fn test_list_resource_snapshots_label_filtering(catalog: &Catalog) {
     .await;
     assert_eq!(names, vec!["prod-data", "prod-infra"]);
 
-    // --- two independent labels are ANDed ---
     let names = filtered_list_names(
         repo.as_ref(),
         &account_handle,
@@ -984,7 +942,6 @@ pub async fn test_list_resource_snapshots_label_filtering(catalog: &Catalog) {
     .await;
     assert_eq!(names, vec!["prod-data"]);
 
-    // --- wrong value matches nothing ---
     let names = filtered_list_names(
         repo.as_ref(),
         &account_handle,
@@ -993,7 +950,6 @@ pub async fn test_list_resource_snapshots_label_filtering(catalog: &Catalog) {
     .await;
     assert!(names.is_empty(), "expected no matches, got {names:?}");
 
-    // --- unknown key matches nothing ---
     let names = filtered_list_names(
         repo.as_ref(),
         &account_handle,
@@ -1002,7 +958,6 @@ pub async fn test_list_resource_snapshots_label_filtering(catalog: &Catalog) {
     .await;
     assert!(names.is_empty(), "expected no matches, got {names:?}");
 
-    // --- matching is case-sensitive, unlike resource-name lookups ---
     let names = filtered_list_names(
         repo.as_ref(),
         &account_handle,
@@ -1023,7 +978,6 @@ pub async fn test_search_resource_handles_label_filtering(catalog: &Catalog) {
 
     let filter = label_filter_of(&[("environment", "prod")]);
 
-    // --- filter narrows the identifier expansion that get/delete rely on ---
     let rows = repo
         .search_resource_handles(
             &account_handle.did,
@@ -1038,7 +992,6 @@ pub async fn test_search_resource_handles_label_filtering(catalog: &Catalog) {
     names.sort();
     assert_eq!(names, vec!["prod-data", "prod-infra"]);
 
-    // --- count agrees with the filtered page ---
     let count = repo
         .count_search_resource_handles(
             &account_handle.did,
@@ -1050,7 +1003,6 @@ pub async fn test_search_resource_handles_label_filtering(catalog: &Catalog) {
         .unwrap();
     assert_eq!(count, 2);
 
-    // --- filter composes with the name pattern ---
     let rows = repo
         .search_resource_handles(
             &account_handle.did,

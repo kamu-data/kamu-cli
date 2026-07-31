@@ -28,17 +28,7 @@ use crate::{
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Storage for resources and the queries over them.
-///
-/// # Label filtering
-///
-/// A method takes a `label_filter` if and only if it queries an *unknown*
-/// result set. Methods resolving *known* identities — by id, or by name —
-/// do not, and neither do aggregates.
-///
-/// Callers that both resolve identities and filter must resolve first and
-/// filter second, via [`Self::find_resource_handles_by_ids`]. Filtering during
-/// resolution would collapse "this name does not exist" into "this name does
-/// not match", which are distinct outcomes to report.
+/// Label filters apply only to unknown result sets, not direct identity reads.
 #[async_trait::async_trait]
 pub trait ResourceRepository: Send + Sync {
     async fn new_resource_id(&self) -> Result<ResourceID, InternalError>;
@@ -170,9 +160,7 @@ pub trait ResourceRepository: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Exactly one way to narrow a `search_resource_handles` call by identity or
-/// name — mutually exclusive by construction, unlike two independently
-/// optional fields.
+/// Exactly one way to narrow a `search_resource_handles` call.
 #[derive(Debug, Clone)]
 pub enum ResourceSearchQuery {
     ExactNames(Vec<ResourceName>),

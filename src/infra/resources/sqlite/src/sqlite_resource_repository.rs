@@ -428,8 +428,6 @@ impl ResourceRepository for SqliteResourceRepository {
         let account_id_stack = account_id.as_stack_string();
         let account_id_str = account_id_stack.as_str();
 
-        // Aliased `r` so the label-filter predicates, which correlate on
-        // `r.resource_id`, can be shared with `search_resource_handles`.
         let mut query_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
             r#"
             SELECT COUNT(*) as count
@@ -773,8 +771,6 @@ impl ResourceRepository for SqliteResourceRepository {
             let limit = i64::try_from(pagination.limit).int_err()?;
             let offset = i64::try_from(pagination.offset).int_err()?;
 
-            // Built dynamically rather than via `sqlx::query!` because the
-            // label filter contributes a variable number of predicates.
             let mut query_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
                 r#"
                 SELECT
@@ -845,8 +841,6 @@ impl ResourceRepository for SqliteResourceRepository {
             let limit = i64::try_from(pagination.limit).int_err()?;
             let offset = i64::try_from(pagination.offset).int_err()?;
 
-            // Built dynamically rather than via `sqlx::query!` because the
-            // label filter contributes a variable number of predicates.
             let mut query_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
                 r#"
                 SELECT
@@ -1018,11 +1012,7 @@ fn push_search_query_predicate(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Appends one correlated `EXISTS` over `resource_labels_projection` per
-/// `(key, value)` pair, requiring the row aliased `r` to carry all of them.
-///
-/// `SQLite` has no `UNNEST`, so pairs are pushed as individual predicates
-/// rather than bound as arrays the way the Postgres backend does.
+/// Appends one label-projection predicate per `(key, value)` pair.
 fn push_label_filter_predicates(
     query_builder: &mut sqlx::QueryBuilder<'_, sqlx::Sqlite>,
     label_pairs: &[(&TypeRef, &str)],

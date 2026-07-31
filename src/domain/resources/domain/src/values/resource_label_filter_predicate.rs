@@ -11,15 +11,7 @@ use crate::{ResolvedResourceLabelFilter, TypeRef};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Raised when a resolved label filter uses a boolean operator that no
-/// repository backend can evaluate yet.
-///
-/// This is the **only** definition of the supported-operator boundary: the
-/// filter model, the facade, and every repository implementation are all able
-/// to carry `$not`/`$or`, and it is
-/// [`ResourceLabelFilterPredicate::flatten_conjunction`] alone that decides
-/// they cannot yet be executed. Growing support therefore means teaching the
-/// backends a richer predicate builder, not re-shaping any type in between.
+/// Raised when a resolved label filter uses an unsupported boolean operator.
 #[derive(Debug, Clone, Copy, thiserror::Error, PartialEq, Eq)]
 #[error("label filter operator '{operator}' is not supported yet")]
 pub struct UnsupportedLabelFilterOperatorError {
@@ -28,30 +20,13 @@ pub struct UnsupportedLabelFilterOperatorError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Translates a [`ResolvedResourceLabelFilter`] into the predicate shape the
-/// repository backends can execute, and owns the definition of which boolean
-/// operators are supported.
-///
-/// Every backend compares the resulting pairs **case-sensitively**, unlike the
-/// `resource_name` lookups that sit beside them in the same repositories.
-/// Labels are data rather than user-typed identifiers: values are arbitrary
-/// (`version=RC1` and `version=rc1` are meaningfully different), and
-/// canonicalized keys are schema URIs whose path segment is case-sensitive.
-/// This matches Kubernetes label selectors, and the
-/// `resource_labels_projection` columns carry no case-insensitive collation.
+/// Translates resolved label filters into repository predicates.
+/// Label keys and values are compared case-sensitively.
 pub struct ResourceLabelFilterPredicate;
 
 impl ResourceLabelFilterPredicate {
-    /// Flattens a resolved filter into the plain `(key, value)` conjunction
-    /// that repositories translate into correlated `EXISTS` predicates over
-    /// `resource_labels_projection`.
-    ///
-    /// Nested [`ResolvedResourceLabelFilter::And`] nodes are flattened, since a
-    /// conjunction of conjunctions is still a conjunction.
-    /// [`ResolvedResourceLabelFilter::Not`]/[`ResolvedResourceLabelFilter::Or`]
-    /// yield [`UnsupportedLabelFilterOperatorError`] — callers surface this as
-    /// an unsupported-expression problem rather than silently dropping the
-    /// predicate, which would over-match.
+    /// Flattens a resolved filter into the supported `(key, value)`
+    /// conjunction.
     pub fn flatten_conjunction(
         filter: &ResolvedResourceLabelFilter,
     ) -> Result<Vec<(&TypeRef, &str)>, UnsupportedLabelFilterOperatorError> {

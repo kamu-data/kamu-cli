@@ -11,30 +11,16 @@ use crate::TypeRef;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// An authored, not-yet-resolved label filter: raw string keys paired with
-/// arbitrary JSON values, exactly as they arrive from a caller (CLI, GraphQL).
-/// Resolved into a [`ResolvedResourceLabelFilter`] by the facade before it
-/// reaches the repository layer.
+/// An authored label filter, resolved by the facade before repository use.
 pub type ResourceLabelFilterInput = odf::metadata::resource::LabelFilter;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// A single-type label filter that has already been resolved: every key is
-/// canonical (short names replaced with their schema URI, unresolved short
-/// names kept as free-form) and every value is a plain string equality
-/// predicate. Repositories consume this directly and never resolve aliases
-/// or validate schemas themselves.
-///
-/// Mirrors the parsed [`ResourceLabelFilterExpr`] tree rather than flattening
-/// it, so that boolean operators can grow into real evaluation without
-/// re-shaping every layer between the facade and the repositories. Only the
-/// conjunctive fragment ([`Self::True`]/[`Self::Eq`]/[`Self::And`]) is
-/// evaluated today — see
-/// [`flatten_conjunction`](crate::flatten_conjunction), the single place where
-/// that capability boundary is enforced.
+/// A label filter whose keys and string values have already been resolved.
+/// Repositories consume this directly and do not validate schemas.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub enum ResolvedResourceLabelFilter {
-    /// Matches everything — the resolved form of "no filter at all".
+    /// Matches everything.
     #[default]
     True,
     Eq {
@@ -47,8 +33,7 @@ pub enum ResolvedResourceLabelFilter {
 }
 
 impl ResolvedResourceLabelFilter {
-    /// Whether this filter constrains nothing, and can therefore be skipped
-    /// entirely when building a repository query.
+    /// Whether this filter can be skipped when building a repository query.
     pub fn is_empty(&self) -> bool {
         match self {
             Self::True => true,
@@ -60,22 +45,11 @@ impl ResolvedResourceLabelFilter {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// A parsed (not yet resolved) label filter expression, mirroring the shape
-/// the ODF `LabelFilter` JSON Schema anticipates: plain keys are equality
-/// leaves, implicitly `ANDed` at the top level; `$not`/`$or` are reserved
-/// combinator keys for future boolean expressions.
-///
-/// Only [`ResourceLabelFilterExpr::Eq`] is evaluated today —
-/// [`ResourceLabelFilterExpr::Not`]/[`ResourceLabelFilterExpr::Or`] parse
-/// successfully (so their shape is recognized rather than misclassified as an
-/// invalid key or an unsupported value) but the resolver rejects them as
-/// not-yet-supported before any resolution is attempted.
-///
-/// Parsed from raw entries by
-/// [`ResourceLabelFilterExprParser`](crate::ResourceLabelFilterExprParser).
+/// A parsed, not-yet-resolved label filter expression.
+/// Plain keys are equality leaves; `$not`/`$or` are recognized operators.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ResourceLabelFilterExpr {
-    /// Matches everything — an empty filter object, at any nesting level.
+    /// Matches everything.
     True,
     Eq {
         key: String,
@@ -83,13 +57,9 @@ pub enum ResourceLabelFilterExpr {
     },
     /// The implicit conjunction of a filter object's entries.
     And(Vec<ResourceLabelFilterExpr>),
-    /// Negates the conjunction of the nested entries — `{"$not": {"a": "x",
-    /// "b": "y"}}` negates `a=x AND b=y`, and the nested object may itself
-    /// contain `$not`/`$or`, same as any other filter object.
+    /// Negates the nested filter object.
     Not(Box<ResourceLabelFilterExpr>),
-    /// Disjunction over the `$or` array's elements. Each element is a filter
-    /// object in its own right, so it becomes one branch — grouping between
-    /// branches is significant and must not be flattened away.
+    /// Disjunction over the `$or` array's filter objects.
     Or(Vec<ResourceLabelFilterExpr>),
 }
 

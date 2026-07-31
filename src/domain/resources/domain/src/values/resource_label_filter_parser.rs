@@ -13,19 +13,12 @@ use crate::{ResourceLabelFilterExpr, ResourceLabelFilterExprParseError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Parses the raw entries of a
-/// [`ResourceLabelFilterInput`](crate::ResourceLabelFilterInput) into the
-/// [`ResourceLabelFilterExpr`] tree shape, without resolving or validating
-/// any key/value (that happens one layer up, only for
-/// [`ResourceLabelFilterExpr::Eq`] leaves).
+/// Parses raw label filter entries without resolving keys or values.
 pub struct ResourceLabelFilterExprParser;
 
 impl ResourceLabelFilterExprParser {
-    /// Entries stay an implicit AND at every level (top-level and nested
-    /// under `$not`/`$or`), same as the ODF `LabelFilter` schema's object
-    /// shape. An empty object yields [`ResourceLabelFilterExpr::True`], and a
-    /// single entry is returned unwrapped rather than in a one-element
-    /// [`ResourceLabelFilterExpr::And`].
+    /// Entries stay an implicit AND at every object level.
+    /// Empty objects yield [`ResourceLabelFilterExpr::True`].
     pub fn parse(
         entries: BTreeMap<String, serde_json::Value>,
     ) -> Result<ResourceLabelFilterExpr, ResourceLabelFilterExprParseError> {
@@ -72,9 +65,7 @@ impl ResourceLabelFilterExprParser {
             ));
         };
 
-        // Each array element is one disjunction branch. Branches are kept as
-        // separate nodes — flattening their entries into a single list would
-        // silently turn `[{a, b}, {c}]` into `a OR b OR c`.
+        // Each array element is one disjunction branch.
         let branches = items
             .iter()
             .map(|item| {
@@ -87,9 +78,7 @@ impl ResourceLabelFilterExprParser {
         Ok(ResourceLabelFilterExpr::Or(branches))
     }
 
-    /// Parses a nested filter object (the value under `$not`, or one element
-    /// of the `$or` array). Returns the original value on error so callers can
-    /// report it with their own operator-specific message.
+    /// Returns the original value on error for operator-specific reporting.
     fn parse_filter_object(
         value: &serde_json::Value,
     ) -> Result<ResourceLabelFilterExpr, serde_json::Value> {

@@ -25,11 +25,7 @@ struct Predicate {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Parses `--label`/`-l` arguments into the wire-level
-/// [`ResourceLabelFilterInput`] consumed by the facade.
-///
-/// The scanner has already resolved escapes and dropped whitespace, so the
-/// grammar mentions neither:
+/// Parses `--label`/`-l` arguments into facade filter input.
 ///
 /// ```ebnf
 /// selector    = [ conjunction ] , eof ;
@@ -37,25 +33,11 @@ struct Predicate {
 /// predicate   = word , equals , word ;
 /// ```
 ///
-/// `=` and `,` are reserved delimiters everywhere, including inside values: a
-/// second `=` in a predicate is a syntax error, not part of the value. Use
-/// `\=` to mean a literal one. Only the conjunctive fragment is expressible on
-/// purpose — the resolved filter is a full boolean tree (`Eq`/`And`/`Not`/`Or`)
-/// but evaluation is AND-only, enforced once by `flatten_conjunction` in the
-/// domain crate. The reserved sigils are rejected *now* so adding `$not`/`$or`
-/// later is a grammar extension rather than a breaking reinterpretation of
-/// input that parses today.
-///
-/// Keys and values are passed through verbatim once unescaped — alias
-/// resolution and schema validation belong to the facade, never here.
+/// Escapes and inter-token whitespace are handled by the scanner. Keys and
+/// values stay unresolved until facade validation.
 pub struct ResourceLabelSelectorParser;
 
 impl ResourceLabelSelectorParser {
-    /// Parses every `--label` occurrence into a single conjunctive filter.
-    ///
-    /// Repeated flags accumulate, so `-l a=1 -l b=2` is equivalent to
-    /// `-l a=1,b=2`. Returns `None` when no selector was given at all, which
-    /// the facade distinguishes from an empty filter.
     pub fn parse(label_selectors: &[String]) -> Result<Option<ResourceLabelFilterInput>, CLIError> {
         if label_selectors.is_empty() {
             return Ok(None);
@@ -92,10 +74,7 @@ impl ResourceLabelSelectorParser {
         Self::parse_tokens(&tokens, input)
     }
 
-    /// `selector = [ conjunction ] , eof`
-    ///
-    /// An argument that scans to no tokens at all yields no predicates rather
-    /// than an error, so `-l ''` is a no-op instead of a parse failure.
+    /// Blank selectors are no-ops.
     fn parse_tokens(tokens: &[Spanned], input: &str) -> Result<Vec<Predicate>, CLIError> {
         if tokens.is_empty() {
             return Ok(Vec::new());
@@ -133,10 +112,7 @@ impl ResourceLabelSelectorParser {
 
     /// `predicate = word , equals , word`
     ///
-    /// Both sides are mandatory: label values have a minimum length of one, so
-    /// `environment=` could never match anything.
-    ///
-    /// Returns the predicate together with the tokens following it.
+    /// Both sides are mandatory.
     fn parse_predicate<'t>(
         tokens: &'t [Spanned],
         input: &str,
@@ -172,9 +148,7 @@ impl ResourceLabelSelectorParser {
         };
 
         let Token::Word(value) = &value_token.token else {
-            // Reported ahead of the caller's generic "expected `,`" because
-            // naming the escape is what the user actually needs. `=` is a
-            // delimiter everywhere, so `token=a=b` does not mean `a=b`.
+            // Name the escape before the caller reports a generic separator error.
             let message = if value_token.token == Token::Equals {
                 r"unexpected `=` in a label value — escape it as `\=`"
             } else {
@@ -184,8 +158,7 @@ impl ResourceLabelSelectorParser {
             return Err(Self::error_at(input, value_token.start, message));
         };
 
-        // `=` is a delimiter everywhere, so a further one after a complete
-        // value is equally a syntax error rather than value text.
+        // A further `=` is a syntax error, not value text.
         if let Some(equals) = rest.first().filter(|t| t.token == Token::Equals) {
             return Err(Self::error_at(
                 input,
@@ -203,8 +176,7 @@ impl ResourceLabelSelectorParser {
         ))
     }
 
-    /// Renders a failure as a caret-annotated usage error, so the offending
-    /// column is shown rather than described.
+    /// Renders a failure as a caret-annotated usage error.
     fn error_at(input: &str, offset: usize, message: &str) -> CLIError {
         let caret = " ".repeat(input[..offset.min(input.len())].chars().count());
 

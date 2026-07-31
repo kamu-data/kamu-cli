@@ -13,13 +13,8 @@ use crate::ResourceID;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Maintains the `resource_labels_projection` index: a rebuildable projection
-/// of every resource's top-level string-valued labels, keyed by canonical
-/// label key. Owned separately from [`crate::ResourceRepository`] because it
-/// is maintained by the persistence controller
-/// (`ResourcePersistenceServiceHelper`) alongside — not inside — the snapshot
-/// write, sharing the same transactional DI scope so both writes commit or roll
-/// back together.
+/// Maintains the rebuildable `resource_labels_projection` index.
+/// Entries are updated in the same transactional scope as resource snapshots.
 #[async_trait::async_trait]
 pub trait ResourceLabelProjectionRepository: Send + Sync {
     /// Replaces all projected label entries for `resource_id` with `entries`.
@@ -32,8 +27,6 @@ pub trait ResourceLabelProjectionRepository: Send + Sync {
     ) -> Result<(), InternalError>;
 
     /// Returns the projected label entries for `resource_id`, sorted by key.
-    /// Primarily used for tests and future filtered-query support; not on the
-    /// `list` read path yet (Phase 9).
     async fn find_entries(
         &self,
         resource_id: &ResourceID,

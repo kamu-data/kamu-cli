@@ -4172,11 +4172,7 @@ type ResourceInvalidSpecProblem {
 }
 
 """
-One `key = value` equality predicate.
-
-`key` accepts either a registered label's short name or its canonical schema
-URI; the server canonicalizes before matching. `value` is `JSON` because the
-underlying label values are JSON, though only strings are matchable today.
+One authored `key = value` label predicate.
 """
 input ResourceLabelFilterEntryInput {
 	key: String!
@@ -4184,11 +4180,8 @@ input ResourceLabelFilterEntryInput {
 }
 
 """
-Selects resources by their labels. A resource matches only if it satisfies
-every entry.
-
-Carried as a list rather than a map so that a key repeated by the caller
-reaches the server intact and is reported, instead of one silently winning.
+Selects resources by label predicates.
+A list preserves duplicate keys for validation.
 """
 input ResourceLabelFilterInput {
 	entries: [ResourceLabelFilterEntryInput!]!
@@ -4287,9 +4280,7 @@ type ResourceSchemaMismatchProblem {
 }
 
 """
-Exactly one way to narrow a search — mirrors
-[`kamu_resources::ResourceSearchQuery`]; `@oneOf` rejects invalid
-combinations before the resolver runs.
+Exactly one way to narrow a search.
 """
 input ResourceSearchQueryInput @oneOf {
 	exactNames: [ResourceName!]
