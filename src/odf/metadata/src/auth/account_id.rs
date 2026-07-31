@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use ed25519_dalek::SigningKey;
 use multiformats::stack_string::AsStackString;
 use multiformats::*;
 
@@ -52,6 +51,10 @@ impl AccountID {
     /// cryptographically secure generation
     pub fn new_seeded_ed25519(seed: &[u8]) -> Self {
         Self::Odf(DidOdf::new_seeded_ed25519(seed))
+    }
+
+    pub fn from_signing_key(key: &PrivateKey) -> Self {
+        Self::from(key.verifying_key())
     }
 
     pub fn as_did_odf(&self) -> Option<&DidOdf> {
