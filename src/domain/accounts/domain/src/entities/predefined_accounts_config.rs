@@ -7,6 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::borrow::Cow;
+
 use chrono::{DateTime, Utc};
 use email_utils::Email;
 
@@ -15,11 +17,11 @@ use crate::{
     AccountDisplayName,
     AccountProvider,
     AccountType,
-    // DEFAULT_ACCOUNT_ID,
     DEFAULT_ACCOUNT_NAME,
     DEFAULT_ACCOUNT_PASSWORD,
     DEFAULT_PASSWORD_STR,
     Password,
+    ProviderIdentityKey,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -46,8 +48,8 @@ impl PredefinedAccountsConfig {
     pub fn single_tenant() -> Self {
         Self {
             predefined: vec![AccountConfig {
-                // id: Some(DEFAULT_ACCOUNT_ID.clone()),
                 id: None,
+                private_key: None,
                 account_name: DEFAULT_ACCOUNT_NAME.clone(),
                 password: DEFAULT_ACCOUNT_PASSWORD.clone(),
                 account_type: AccountType::User,
@@ -87,12 +89,21 @@ pub enum AccountPropertyName {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// The declarative account configuration used to register an account if one
+/// does not already exist.
+///
+/// To update an existing account, either `id` or `private_key` must be
+/// specified.
 #[setty::derive(setty::Config, Clone)]
 pub struct AccountConfig {
-    /// Auto-derived from `account_name` if omitted
-    // TODO: Extend AccountConfig to carry optional private key
+    /// May be omitted in favor of `private_key`.
     #[config(combine(replace))]
     pub id: Option<odf::AccountID>,
+
+    /// Optional ed25519 private key. When set, `id` is derived from it
+    /// (and must match `id` if both are present).
+    #[config(combine(replace))]
+    pub private_key: Option<odf::metadata::PrivateKey>,
 
     #[config(combine(replace))]
     pub account_name: odf::AccountName,
@@ -136,6 +147,7 @@ impl AccountConfig {
 
         Self {
             id: None,
+            private_key: None,
             account_name,
             password,
             email,
@@ -159,6 +171,7 @@ impl AccountConfig {
 
         Self {
             id: Some(subject.account_id),
+            private_key: None,
             account_name: subject.account_name,
             password,
             email,
@@ -192,12 +205,39 @@ impl AccountConfig {
         self
     }
 
-    pub fn get_id(&self) -> odf::AccountID {
-        if let Some(id) = &self.id {
-            id.clone()
-        } else {
-            odf::AccountID::new_seeded_ed25519(self.account_name.as_bytes())
-        }
+    /// Resolves account ID from `id` and/or `private_key`.
+    /// Returns `None` when neither is set.
+    pub fn resolve_account_id(
+        &self,
+    ) -> Result<Option<Cow<'_, odf::AccountID>>, DerivedAccountIdMismatchError> {
+        let id = match (&self.id, &self.private_key) {
+            (Some(configured_id), Some(private_key)) => {
+                let derived_id = odf::AccountID::from_signing_key(private_key);
+
+                if *configured_id != derived_id {
+                    return Err(DerivedAccountIdMismatchError {
+                        configured_id: configured_id.clone(),
+                        derived_id,
+                        account_name: self.account_name.clone(),
+                    });
+                }
+
+                Some(Cow::Owned(derived_id))
+            }
+            (Some(id), None) => Some(Cow::Borrowed(id)),
+            (None, Some(private_key)) => {
+                let id = odf::AccountID::from_signing_key(private_key);
+
+                Some(Cow::Owned(id))
+            }
+            (None, None) => None,
+        };
+
+        Ok(id)
+    }
+
+    pub fn provider_identity_key(&self) -> ProviderIdentityKey {
+        self.account_name.to_string()
     }
 
     // TODO (refactoring): update?
@@ -219,6 +259,18 @@ impl AccountConfig {
     pub fn generate_password(account_name: &odf::AccountName) -> Password {
         Password::try_new(format!("{DEFAULT_PASSWORD_STR}:{account_name}")).unwrap()
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(thiserror::Error, Debug)]
+#[error(
+    "Account '{account_name}': ID mismatch — configured '{configured_id}', derived '{derived_id}'"
+)]
+pub struct DerivedAccountIdMismatchError {
+    account_name: odf::AccountName,
+    configured_id: odf::AccountID,
+    derived_id: odf::AccountID,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

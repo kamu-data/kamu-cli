@@ -21,6 +21,8 @@ use crate::Password;
 
 // TODO: have some length restrictions (0 < .. < limit)
 pub type AccountDisplayName = String;
+// TODO: have some length restrictions (0 < .. < limit)
+pub type ProviderIdentityKey = String;
 
 pub const DEFAULT_ACCOUNT_NAME_STR: &str = "kamu";
 pub const DEFAULT_PASSWORD_STR: &str = "kamu.dev";
@@ -67,7 +69,7 @@ pub struct Account {
     pub avatar_url: Option<String>,
     pub registered_at: DateTime<Utc>,
     pub provider: String,
-    pub provider_identity_key: String,
+    pub provider_identity_key: ProviderIdentityKey,
 }
 
 #[derive(Debug)]
