@@ -193,42 +193,13 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
         account_config: &AccountConfig,
         quiet: bool,
     ) -> Result<Account, CreateAccountError> {
-        /*
-        impl From<&AccountConfig> for Account {
-            fn from(account_config: &AccountConfig) -> Self {
-            Account {
-                id: account_config.get_id(),
-                account_name: account_config.account_name.clone(),
-                email: account_config.email.clone(),
-                display_name: account_config.get_display_name(),
-                account_type: account_config.account_type,
-                avatar_url: account_config.avatar_url.clone(),
-                registered_at: account_config.registered_at.unwrap_or_else(Utc::now),
-                provider: account_config.provider.clone(),
-                provider_identity_key: account_config.account_name.to_string(),
-            }
-            }
-        }
-        */
-
-        let (account_key, new_account_id) = odf::AccountID::new_generated_ed25519();
+        let (maybe_account_key, account_id) =
+            Self::resolve_account_key_and_id(account_config).int_err()?;
 
         println!("!!!4: {account_config:?}");
 
         let new_account = Account {
-            // TODO temp test
-            // id: account_id,
-            // fed016b61ed2ab1b63a006b61ed2ab1b63a00b016d65607000000e0821aafbf163e6f
-            // fed016b61ed2ab1b63a006b61ed2ab1b63a00b016d65607000000e0821aafbf163e6f
-            //
-            // id: account_config.get_id(),
-            id: {
-                if let Some(account_id_from_config) = &account_config.id {
-                    account_id_from_config.clone()
-                } else {
-                    new_account_id
-                }
-            },
+            id: account_id,
             account_name: account_config.account_name.clone(),
             email: account_config.email.clone(),
             display_name: account_config.get_display_name(),
@@ -238,11 +209,11 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
                 .registered_at
                 .unwrap_or_else(|| self.time_source.now()),
             provider: account_config.provider.clone(),
-            provider_identity_key: account_config.account_name.to_string(),
+            provider_identity_key: account_config.provider_identity_key(),
         };
 
         // todo сохраняем, если это новый аккаунт id -- обновить это место
-        self.save_password_account(&new_account, &account_config.password, Some(account_key))
+        self.save_password_account(&new_account, &account_config.password, maybe_account_key)
             .await?;
 
         if !quiet {
