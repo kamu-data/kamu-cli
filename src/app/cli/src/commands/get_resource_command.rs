@@ -224,8 +224,6 @@ impl GetResourceCommand {
                     .render_manifests(
                         ResourceBatchSelector {
                             account: None,
-                            // Ids come from the already-filtered expansion phase.
-                            label_filter: None,
                             resource_type: chunk
                                 .first()
                                 .map(|(_, target)| {
@@ -270,8 +268,6 @@ impl GetResourceCommand {
                     .get_many(
                         ResourceBatchSelector {
                             account: None,
-                            // Ids come from the already-filtered expansion phase.
-                            label_filter: None,
                             resource_type: kamu_resources::ResourceTypeSelectorRaw::new_unchecked(
                                 chunk
                                     .first()

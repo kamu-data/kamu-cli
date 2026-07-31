@@ -35,6 +35,7 @@ use kamu_resources::{
     ResourcePhaseCounts,
     ResourceRawEventQuery,
     ResourceRepository,
+    ResourceSearchQuery,
     ResourceSnapshot,
     ResourceSnapshotRow,
     ResourceSnapshotStream,
@@ -249,14 +250,10 @@ impl ResourceRepository for SqliteResourceRepository {
         &self,
         account_id: &odf::AccountID,
         ids: &[ResourceID],
-        label_filter: &ResolvedResourceLabelFilter,
     ) -> Result<Vec<ResourceHandleRow>, InternalError> {
         if ids.is_empty() {
             return Ok(Vec::new());
         }
-
-        let label_pairs =
-            ResourceLabelFilterPredicate::flatten_conjunction(label_filter).int_err()?;
 
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
@@ -266,22 +263,6 @@ impl ResourceRepository for SqliteResourceRepository {
 
         let uids_placeholders =
             sqlite_generate_placeholders_list(ids.len(), NonZeroUsize::new(3).unwrap());
-
-        // Each filter pair contributes two more placeholders after the ids.
-        let mut label_predicates = String::new();
-        let mut next_placeholder = 3 + ids.len();
-        for _ in &label_pairs {
-            use std::fmt::Write;
-            write!(
-                label_predicates,
-                " AND EXISTS (SELECT 1 FROM resource_labels_projection rl WHERE rl.resource_id = \
-                 r.resource_id AND rl.label_key = ${} AND rl.label_value = ${})",
-                next_placeholder,
-                next_placeholder + 1,
-            )
-            .expect("writing to a String cannot fail");
-            next_placeholder += 2;
-        }
 
         let query_str = format!(
             r#"
@@ -296,7 +277,7 @@ impl ResourceRepository for SqliteResourceRepository {
             LEFT JOIN accounts a ON a.id = r.account_id
             WHERE r.account_id = $1
               AND r.resource_id IN ({uids_placeholders})
-              AND r.deleted_at IS NULL{label_predicates}
+              AND r.deleted_at IS NULL
             "#,
         );
 
@@ -305,9 +286,6 @@ impl ResourceRepository for SqliteResourceRepository {
             .bind(kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL);
         for id in ids {
             query = query.bind(*id.as_ref());
-        }
-        for (key, value) in &label_pairs {
-            query = query.bind(key.to_string()).bind((*value).to_string());
         }
 
         let rows = query.fetch_all(connection_mut).await.int_err()?;
@@ -367,12 +345,11 @@ impl ResourceRepository for SqliteResourceRepository {
         &self,
         account_id: &odf::AccountID,
         schemas: &[TypeUri],
-        exact_names: Option<&[ResourceName]>,
-        name_pattern: Option<&str>,
+        query: &ResourceSearchQuery,
         label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceHandleRow>, InternalError> {
-        if schemas.is_empty() || exact_names.is_some_and(<[ResourceName]>::is_empty) {
+        if schemas.is_empty() || query.is_vacuous() {
             return Ok(Vec::new());
         }
 
@@ -415,21 +392,7 @@ impl ResourceRepository for SqliteResourceRepository {
         }
         query_builder.push(")");
 
-        if let Some(exact_names) = exact_names {
-            query_builder.push(" AND r.resource_name COLLATE NOCASE IN (");
-            let mut separated = query_builder.separated(", ");
-            for name in exact_names {
-                separated.push_bind(name.to_string());
-            }
-            query_builder.push(")");
-        }
-
-        if let Some(name_pattern) = name_pattern {
-            query_builder.push(" AND r.resource_name LIKE ");
-            query_builder.push_bind(sql_like_escape_pattern(name_pattern));
-            query_builder.push(r#" ESCAPE '\' COLLATE NOCASE"#);
-        }
-
+        push_search_query_predicate(&mut query_builder, query);
         push_label_filter_predicates(&mut query_builder, &label_pairs);
 
         query_builder
@@ -449,11 +412,10 @@ impl ResourceRepository for SqliteResourceRepository {
         &self,
         account_id: &odf::AccountID,
         schemas: &[TypeUri],
-        exact_names: Option<&[ResourceName]>,
-        name_pattern: Option<&str>,
+        query: &ResourceSearchQuery,
         label_filter: &ResolvedResourceLabelFilter,
     ) -> Result<usize, InternalError> {
-        if schemas.is_empty() || exact_names.is_some_and(<[ResourceName]>::is_empty) {
+        if schemas.is_empty() || query.is_vacuous() {
             return Ok(0);
         }
 
@@ -485,21 +447,7 @@ impl ResourceRepository for SqliteResourceRepository {
         }
         query_builder.push(")");
 
-        if let Some(exact_names) = exact_names {
-            query_builder.push(" AND r.resource_name COLLATE NOCASE IN (");
-            let mut separated = query_builder.separated(", ");
-            for name in exact_names {
-                separated.push_bind(name.to_string());
-            }
-            query_builder.push(")");
-        }
-
-        if let Some(name_pattern) = name_pattern {
-            query_builder.push(" AND r.resource_name LIKE ");
-            query_builder.push_bind(sql_like_escape_pattern(name_pattern));
-            query_builder.push(r#" ESCAPE '\' COLLATE NOCASE"#);
-        }
-
+        push_search_query_predicate(&mut query_builder, query);
         push_label_filter_predicates(&mut query_builder, &label_pairs);
 
         let row = query_builder
@@ -1033,6 +981,38 @@ impl ResourceRepository for SqliteResourceRepository {
                 },
             })
             .collect())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Appends the predicate matching `query`'s one active mode.
+fn push_search_query_predicate(
+    query_builder: &mut sqlx::QueryBuilder<'_, sqlx::Sqlite>,
+    query: &ResourceSearchQuery,
+) {
+    match query {
+        ResourceSearchQuery::ExactNames(names) => {
+            query_builder.push(" AND r.resource_name COLLATE NOCASE IN (");
+            let mut separated = query_builder.separated(", ");
+            for name in names {
+                separated.push_bind(name.to_string());
+            }
+            query_builder.push(")");
+        }
+        ResourceSearchQuery::ExactIds(ids) => {
+            query_builder.push(" AND r.resource_id IN (");
+            let mut separated = query_builder.separated(", ");
+            for id in ids {
+                separated.push_bind(*id.as_ref());
+            }
+            query_builder.push(")");
+        }
+        ResourceSearchQuery::NamePattern(pattern) => {
+            query_builder.push(" AND r.resource_name LIKE ");
+            query_builder.push_bind(sql_like_escape_pattern(pattern));
+            query_builder.push(r#" ESCAPE '\' COLLATE NOCASE"#);
+        }
     }
 }
 

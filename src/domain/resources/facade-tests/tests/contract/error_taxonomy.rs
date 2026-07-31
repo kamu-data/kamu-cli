@@ -70,7 +70,6 @@ fn by_id(id: &kamu_resources::ResourceID) -> ResourceSelector {
 fn batch_by_name(name: &str) -> ResourceBatchSelector {
     ResourceBatchSelector {
         account: None,
-        label_filter: None,
         resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
         resource_refs: vec![ResourceRef::ByName(name.parse().unwrap())],
     }
@@ -79,7 +78,6 @@ fn batch_by_name(name: &str) -> ResourceBatchSelector {
 fn batch_by_id(id: kamu_resources::ResourceID) -> ResourceBatchSelector {
     ResourceBatchSelector {
         account: None,
-        label_filter: None,
         resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
         resource_refs: vec![ResourceRef::ById(id)],
     }
@@ -375,7 +373,6 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
         .get_many(
             ResourceBatchSelector {
                 account: Some(unknown_account.clone()),
-                label_filter: None,
                 resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
                 resource_refs: vec![ResourceRef::ByName("bad-acct-get-many".parse().unwrap())],
             },
@@ -424,7 +421,6 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
     let result = facade
         .delete_many(ResourceBatchSelector {
             account: Some(unknown_account.clone()),
-            label_filter: None,
             resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             resource_refs: vec![ResourceRef::ByName("bad-acct-delete-many".parse().unwrap())],
         })

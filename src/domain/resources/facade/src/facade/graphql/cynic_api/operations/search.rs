@@ -15,7 +15,6 @@ use crate::facade::graphql::cynic_api::fragments::{
     ResourceBadAccountProblem,
     ResourceHandleConnection,
     ResourceInvalidLabelFilterProblem,
-    ResourceInvalidSearchQueryProblem,
     ResourceUnsupportedSelectorProblem,
 };
 use crate::facade::graphql::cynic_api::inputs::SearchResourceHandlesInput;
@@ -43,7 +42,6 @@ pub(crate) enum ResourceHandleListOutcome {
     ResourceHandleConnection(ResourceHandleConnection),
     ResourceUnsupportedSelectorProblem(ResourceUnsupportedSelectorProblem),
     ResourceBadAccountProblem(ResourceBadAccountProblem),
-    ResourceInvalidSearchQueryProblem(ResourceInvalidSearchQueryProblem),
     ResourceInvalidLabelFilterProblem(ResourceInvalidLabelFilterProblem),
     #[cynic(fallback)]
     Unknown,

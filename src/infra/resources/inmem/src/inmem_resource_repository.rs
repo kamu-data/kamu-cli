@@ -29,6 +29,7 @@ use kamu_resources::{
     ResourcePhaseCounts,
     ResourceRawEventQuery,
     ResourceRepository,
+    ResourceSearchQuery,
     ResourceSnapshot,
     ResourceSnapshotStream,
     ResourceSnapshotUpdate,
@@ -296,11 +297,7 @@ impl ResourceRepository for InMemoryResourceRepository {
         &self,
         account_id: &odf::AccountID,
         ids: &[ResourceID],
-        label_filter: &ResolvedResourceLabelFilter,
     ) -> Result<Vec<ResourceHandleRow>, InternalError> {
-        let label_pairs =
-            ResourceLabelFilterPredicate::flatten_conjunction(label_filter).int_err()?;
-
         let guard = self.state.lock().unwrap();
 
         Ok(ids
@@ -309,7 +306,6 @@ impl ResourceRepository for InMemoryResourceRepository {
             .filter(|snapshot| {
                 snapshot.headers.account.did == *account_id && snapshot.headers.deleted_at.is_none()
             })
-            .filter(|snapshot| snapshot_matches_label_pairs(snapshot, &label_pairs))
             .map(|snapshot| ResourceHandleRow {
                 id: *snapshot.id.as_ref(),
                 schema: snapshot.schema.to_string(),
@@ -350,12 +346,11 @@ impl ResourceRepository for InMemoryResourceRepository {
         &self,
         account_id: &odf::AccountID,
         schemas: &[TypeUri],
-        exact_names: Option<&[ResourceName]>,
-        name_pattern: Option<&str>,
+        query: &ResourceSearchQuery,
         label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceHandleRow>, InternalError> {
-        if schemas.is_empty() || exact_names.is_some_and(<[ResourceName]>::is_empty) {
+        if schemas.is_empty() || query.is_vacuous() {
             return Ok(Vec::new());
         }
 
@@ -364,17 +359,10 @@ impl ResourceRepository for InMemoryResourceRepository {
 
         let mut snapshots = {
             let guard = self.state.lock().unwrap();
-            filter_search_snapshots(
-                &guard,
-                account_id,
-                schemas,
-                exact_names,
-                name_pattern,
-                &label_pairs,
-            )
-            .into_iter()
-            .cloned()
-            .collect::<Vec<_>>()
+            filter_search_snapshots(&guard, account_id, schemas, query, &label_pairs)
+                .into_iter()
+                .cloned()
+                .collect::<Vec<_>>()
         };
 
         snapshots.sort_by(|lhs, rhs| {
@@ -403,11 +391,10 @@ impl ResourceRepository for InMemoryResourceRepository {
         &self,
         account_id: &odf::AccountID,
         schemas: &[TypeUri],
-        exact_names: Option<&[ResourceName]>,
-        name_pattern: Option<&str>,
+        query: &ResourceSearchQuery,
         label_filter: &ResolvedResourceLabelFilter,
     ) -> Result<usize, InternalError> {
-        if schemas.is_empty() || exact_names.is_some_and(<[ResourceName]>::is_empty) {
+        if schemas.is_empty() || query.is_vacuous() {
             return Ok(0);
         }
 
@@ -416,15 +403,7 @@ impl ResourceRepository for InMemoryResourceRepository {
 
         let guard = self.state.lock().unwrap();
 
-        Ok(filter_search_snapshots(
-            &guard,
-            account_id,
-            schemas,
-            exact_names,
-            name_pattern,
-            &label_pairs,
-        )
-        .len())
+        Ok(filter_search_snapshots(&guard, account_id, schemas, query, &label_pairs).len())
     }
 
     async fn find_resource_snapshot(
@@ -750,8 +729,7 @@ fn filter_search_snapshots<'a>(
     guard: &'a State,
     account_id: &odf::AccountID,
     schemas: &[TypeUri],
-    exact_names: Option<&[ResourceName]>,
-    name_pattern: Option<&str>,
+    query: &ResourceSearchQuery,
     label_pairs: &[(&TypeRef, &str)],
 ) -> Vec<&'a ResourceSnapshot> {
     guard
@@ -760,11 +738,12 @@ fn filter_search_snapshots<'a>(
         .filter(|snapshot| snapshot.headers.account.did == *account_id)
         .filter(|snapshot| schemas.contains(&snapshot.schema))
         .filter(|snapshot| snapshot.headers.deleted_at.is_none())
-        .filter(|snapshot| exact_names.is_none_or(|names| names.contains(&snapshot.headers.name)))
-        .filter(|snapshot| {
-            name_pattern.is_none_or(|pattern| {
+        .filter(|snapshot| match query {
+            ResourceSearchQuery::ExactNames(names) => names.contains(&snapshot.headers.name),
+            ResourceSearchQuery::ExactIds(ids) => ids.contains(&snapshot.id),
+            ResourceSearchQuery::NamePattern(pattern) => {
                 resource_name_matches_pattern(&snapshot.headers.name, pattern)
-            })
+            }
         })
         .filter(|snapshot| snapshot_matches_label_pairs(snapshot, label_pairs))
         .collect()

@@ -26,6 +26,7 @@ use kamu_resources::{
     ResourcePhaseCounts,
     ResourceRawEventQuery,
     ResourceRepository,
+    ResourceSearchQuery,
     ResourceSnapshot,
     ResourceSnapshotUpdate,
     ResourceSummaryRow,
@@ -278,6 +279,78 @@ pub async fn test_find_resource_snapshots_by_ids(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_find_resource_handles_by_ids(catalog: &Catalog) {
+    let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+
+    let account_handle = odf::AccountHandle::new_test("test-account");
+    let other_account_handle = odf::AccountHandle::new_test("other-account");
+
+    // --- empty id list returns nothing, no query issued ---
+    let found = repo
+        .find_resource_handles_by_ids(&account_handle.did, &[])
+        .await
+        .unwrap();
+    assert!(found.is_empty());
+
+    let mut first = make_test_snapshot(&account_handle, &TEST_KIND, "first");
+    first.id = repo.new_resource_id().await.unwrap();
+    // Different schema on purpose: unlike `search_resource_handles`, this
+    // method has no schema filter, so a match here must still come back.
+    let mut second = make_test_snapshot(&account_handle, &OTHER_KIND, "second");
+    second.id = repo.new_resource_id().await.unwrap();
+    let mut other_account = make_test_snapshot(&other_account_handle, &TEST_KIND, "other-account");
+    other_account.id = repo.new_resource_id().await.unwrap();
+    let mut to_delete = make_test_snapshot(&account_handle, &TEST_KIND, "to-delete");
+    to_delete.id = repo.new_resource_id().await.unwrap();
+    let missing_id = repo.new_resource_id().await.unwrap();
+
+    repo.create_resource(&first).await.unwrap();
+    repo.create_resource(&second).await.unwrap();
+    repo.create_resource(&other_account).await.unwrap();
+    repo.create_resource(&to_delete).await.unwrap();
+
+    let deleted = ResourceSnapshot {
+        headers: ResourceHeaders {
+            deleted_at: Some(Utc::now()),
+            ..to_delete.headers.clone()
+        },
+        ..to_delete.clone()
+    };
+    repo.update_resource(&deleted, None).await.unwrap();
+
+    // --- single id ---
+    let found = repo
+        .find_resource_handles_by_ids(&account_handle.did, &[first.id])
+        .await
+        .unwrap();
+    let found_ids = found.into_iter().map(|row| row.id).collect::<Vec<_>>();
+    assert_eq!(found_ids, vec![*first.id.as_ref()]);
+
+    // --- multiple ids across schemas, a missing id, another account's id,
+    // and a deleted resource's id — only the two live own-account ids come
+    // back ---
+    let found = repo
+        .find_resource_handles_by_ids(
+            &account_handle.did,
+            &[
+                first.id,
+                second.id,
+                missing_id,
+                other_account.id,
+                to_delete.id,
+            ],
+        )
+        .await
+        .unwrap();
+    let mut found_ids = found.into_iter().map(|row| row.id).collect::<Vec<_>>();
+    found_ids.sort();
+    let mut expected_ids = vec![*first.id.as_ref(), *second.id.as_ref()];
+    expected_ids.sort();
+    assert_eq!(found_ids, expected_ids);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_find_resource_snapshots_by_schema_and_ids(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
 
@@ -326,8 +399,7 @@ pub async fn test_search_resource_handles(catalog: &Catalog) {
         .search_resource_handles(
             &account_handle.did,
             std::slice::from_ref(&TEST_KIND),
-            None,
-            Some("app-%"),
+            &ResourceSearchQuery::NamePattern("app-%".to_string()),
             &ResolvedResourceLabelFilter::default(),
             PaginationOpts::from_max_results(10),
         )
@@ -341,8 +413,7 @@ pub async fn test_search_resource_handles(catalog: &Catalog) {
         .search_resource_handles(
             &account_handle.did,
             std::slice::from_ref(&TEST_KIND),
-            None,
-            Some("APP-%"),
+            &ResourceSearchQuery::NamePattern("APP-%".to_string()),
             &ResolvedResourceLabelFilter::default(),
             PaginationOpts::from_max_results(10),
         )
@@ -356,8 +427,10 @@ pub async fn test_search_resource_handles(catalog: &Catalog) {
         .search_resource_handles(
             &account_handle.did,
             std::slice::from_ref(&TEST_KIND),
-            Some(&["app-alpha".parse().unwrap(), "db-alpha".parse().unwrap()]),
-            None,
+            &ResourceSearchQuery::ExactNames(vec![
+                "app-alpha".parse().unwrap(),
+                "db-alpha".parse().unwrap(),
+            ]),
             &ResolvedResourceLabelFilter::default(),
             PaginationOpts::from_max_results(10),
         )
@@ -372,8 +445,10 @@ pub async fn test_search_resource_handles(catalog: &Catalog) {
         .search_resource_handles(
             &account_handle.did,
             std::slice::from_ref(&TEST_KIND),
-            Some(&["App-Alpha".parse().unwrap(), "DB-ALPHA".parse().unwrap()]),
-            None,
+            &ResourceSearchQuery::ExactNames(vec![
+                "App-Alpha".parse().unwrap(),
+                "DB-ALPHA".parse().unwrap(),
+            ]),
             &ResolvedResourceLabelFilter::default(),
             PaginationOpts::from_max_results(10),
         )
@@ -388,8 +463,7 @@ pub async fn test_search_resource_handles(catalog: &Catalog) {
         .search_resource_handles(
             &account_handle.did,
             &[TEST_KIND.clone(), OTHER_KIND.clone()],
-            None,
-            Some("app-%"),
+            &ResourceSearchQuery::NamePattern("app-%".to_string()),
             &ResolvedResourceLabelFilter::default(),
             PaginationOpts::from_max_results(10),
         )
@@ -402,13 +476,12 @@ pub async fn test_search_resource_handles(catalog: &Catalog) {
         vec!["app-alpha", "app-beta", "app-delta", "app-gamma"]
     );
 
-    // --- no name_pattern and no exact_names returns all for the kind ---
+    // --- `%` pattern returns all for the kind ---
     let rows = repo
         .search_resource_handles(
             &account_handle.did,
             std::slice::from_ref(&TEST_KIND),
-            None,
-            None,
+            &ResourceSearchQuery::NamePattern("%".to_string()),
             &ResolvedResourceLabelFilter::default(),
             PaginationOpts::from_max_results(10),
         )
@@ -421,14 +494,226 @@ pub async fn test_search_resource_handles(catalog: &Catalog) {
         .search_resource_handles(
             &account_handle.did,
             std::slice::from_ref(&TEST_KIND),
-            None,
-            Some("app-other-%"),
+            &ResourceSearchQuery::NamePattern("app-other-%".to_string()),
             &ResolvedResourceLabelFilter::default(),
             PaginationOpts::from_max_results(10),
         )
         .await
         .unwrap();
     assert!(rows.is_empty());
+
+    // --- empty name_pattern matches nothing (distinct from a vacuous query) ---
+    let rows = repo
+        .search_resource_handles(
+            &account_handle.did,
+            std::slice::from_ref(&TEST_KIND),
+            &ResourceSearchQuery::NamePattern(String::new()),
+            &ResolvedResourceLabelFilter::default(),
+            PaginationOpts::from_max_results(10),
+        )
+        .await
+        .unwrap();
+    assert!(rows.is_empty());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_search_resource_handles_exact_ids(catalog: &Catalog) {
+    let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+
+    let account_handle = odf::AccountHandle::new_test("test-account");
+    let ids = seed_search_resource_handles(repo.as_ref(), &account_handle).await;
+
+    // --- single id ---
+    let rows = repo
+        .search_resource_handles(
+            &account_handle.did,
+            std::slice::from_ref(&TEST_KIND),
+            &ResourceSearchQuery::ExactIds(vec![ids.app_alpha]),
+            &ResolvedResourceLabelFilter::default(),
+            PaginationOpts::from_max_results(10),
+        )
+        .await
+        .unwrap();
+    let names = rows.into_iter().map(|row| row.name).collect::<Vec<_>>();
+    assert_eq!(names, vec!["app-alpha"]);
+
+    // --- multiple ids ---
+    let rows = repo
+        .search_resource_handles(
+            &account_handle.did,
+            std::slice::from_ref(&TEST_KIND),
+            &ResourceSearchQuery::ExactIds(vec![ids.app_alpha, ids.db_alpha]),
+            &ResolvedResourceLabelFilter::default(),
+            PaginationOpts::from_max_results(10),
+        )
+        .await
+        .unwrap();
+    let mut names = rows.into_iter().map(|row| row.name).collect::<Vec<_>>();
+    names.sort();
+    assert_eq!(names, vec!["app-alpha", "db-alpha"]);
+
+    // --- non-existent id mixed with an existing one ---
+    let missing_id = repo.new_resource_id().await.unwrap();
+    let rows = repo
+        .search_resource_handles(
+            &account_handle.did,
+            std::slice::from_ref(&TEST_KIND),
+            &ResourceSearchQuery::ExactIds(vec![ids.app_alpha, missing_id]),
+            &ResolvedResourceLabelFilter::default(),
+            PaginationOpts::from_max_results(10),
+        )
+        .await
+        .unwrap();
+    let names = rows.into_iter().map(|row| row.name).collect::<Vec<_>>();
+    assert_eq!(names, vec!["app-alpha"]);
+
+    // --- id restricted to a different schema is not matched ---
+    let rows = repo
+        .search_resource_handles(
+            &account_handle.did,
+            std::slice::from_ref(&OTHER_KIND),
+            &ResourceSearchQuery::ExactIds(vec![ids.app_alpha]),
+            &ResolvedResourceLabelFilter::default(),
+            PaginationOpts::from_max_results(10),
+        )
+        .await
+        .unwrap();
+    assert!(rows.is_empty());
+
+    // --- other account's resource id is never returned, even if listed ---
+    let rows = repo
+        .search_resource_handles(
+            &account_handle.did,
+            std::slice::from_ref(&TEST_KIND),
+            &ResourceSearchQuery::ExactIds(vec![ids.other_account]),
+            &ResolvedResourceLabelFilter::default(),
+            PaginationOpts::from_max_results(10),
+        )
+        .await
+        .unwrap();
+    assert!(rows.is_empty());
+
+    // --- multi-kind search across ids from different kinds ---
+    let rows = repo
+        .search_resource_handles(
+            &account_handle.did,
+            &[TEST_KIND.clone(), OTHER_KIND.clone()],
+            &ResourceSearchQuery::ExactIds(vec![ids.app_alpha, ids.app_gamma]),
+            &ResolvedResourceLabelFilter::default(),
+            PaginationOpts::from_max_results(10),
+        )
+        .await
+        .unwrap();
+    let mut names = rows.into_iter().map(|row| row.name).collect::<Vec<_>>();
+    names.sort();
+    assert_eq!(names, vec!["app-alpha", "app-gamma"]);
+
+    // --- vacuous (empty) id list matches nothing ---
+    let rows = repo
+        .search_resource_handles(
+            &account_handle.did,
+            std::slice::from_ref(&TEST_KIND),
+            &ResourceSearchQuery::ExactIds(vec![]),
+            &ResolvedResourceLabelFilter::default(),
+            PaginationOpts::from_max_results(10),
+        )
+        .await
+        .unwrap();
+    assert!(rows.is_empty());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_count_search_resource_handles_exact_ids(catalog: &Catalog) {
+    let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+
+    let account_handle = odf::AccountHandle::new_test("test-account");
+    let ids = seed_search_resource_handles(repo.as_ref(), &account_handle).await;
+
+    let count = repo
+        .count_search_resource_handles(
+            &account_handle.did,
+            std::slice::from_ref(&TEST_KIND),
+            &ResourceSearchQuery::ExactIds(vec![ids.app_alpha, ids.db_alpha]),
+            &ResolvedResourceLabelFilter::default(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(count, 2);
+
+    let missing_id = repo.new_resource_id().await.unwrap();
+    let count = repo
+        .count_search_resource_handles(
+            &account_handle.did,
+            std::slice::from_ref(&TEST_KIND),
+            &ResourceSearchQuery::ExactIds(vec![ids.app_alpha, missing_id]),
+            &ResolvedResourceLabelFilter::default(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(count, 1);
+
+    let count = repo
+        .count_search_resource_handles(
+            &account_handle.did,
+            std::slice::from_ref(&TEST_KIND),
+            &ResourceSearchQuery::ExactIds(vec![]),
+            &ResolvedResourceLabelFilter::default(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(count, 0);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Pins escaping behaviour for literal `_` inside a `NamePattern`: the
+/// pattern is user-authored SQL LIKE syntax, so `%` remains a live wildcard,
+/// but a literal `_` in a stored name must not be matched by an unescaped
+/// `_` standing in for "any single character".
+pub async fn test_search_resource_handles_pattern_special_characters(catalog: &Catalog) {
+    let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+
+    let account_handle = odf::AccountHandle::new_test("test-account");
+
+    // "a-b" and "a_b" differ only in whether the middle character is a
+    // literal underscore or a hyphen — an unescaped `_` in a LIKE pattern
+    // would match both.
+    for name in ["a-b", "a_b", "a-b-plain"] {
+        let mut snapshot = make_test_snapshot(&account_handle, &TEST_KIND, name);
+        snapshot.id = repo.new_resource_id().await.unwrap();
+        repo.create_resource(&snapshot).await.unwrap();
+    }
+
+    // --- a literal `_` in the pattern matches only the name with that exact
+    // character, not the name with a hyphen in the same position ---
+    let rows = repo
+        .search_resource_handles(
+            &account_handle.did,
+            std::slice::from_ref(&TEST_KIND),
+            &ResourceSearchQuery::NamePattern("a_b".to_string()),
+            &ResolvedResourceLabelFilter::default(),
+            PaginationOpts::from_max_results(10),
+        )
+        .await
+        .unwrap();
+    let names = rows.into_iter().map(|row| row.name).collect::<Vec<_>>();
+    assert_eq!(names, vec!["a_b"]);
+
+    // --- `%` in a caller-supplied pattern still behaves as a live wildcard ---
+    let rows = repo
+        .search_resource_handles(
+            &account_handle.did,
+            std::slice::from_ref(&TEST_KIND),
+            &ResourceSearchQuery::NamePattern("a-b-%".to_string()),
+            &ResolvedResourceLabelFilter::default(),
+            PaginationOpts::from_max_results(10),
+        )
+        .await
+        .unwrap();
+    let names = rows.into_iter().map(|row| row.name).collect::<Vec<_>>();
+    assert_eq!(names, vec!["a-b-plain"]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -444,8 +729,7 @@ pub async fn test_count_search_resource_handles(catalog: &Catalog) {
         .count_search_resource_handles(
             &account_handle.did,
             std::slice::from_ref(&TEST_KIND),
-            None,
-            Some("app-%"),
+            &ResourceSearchQuery::NamePattern("app-%".to_string()),
             &ResolvedResourceLabelFilter::default(),
         )
         .await
@@ -456,8 +740,10 @@ pub async fn test_count_search_resource_handles(catalog: &Catalog) {
         .count_search_resource_handles(
             &account_handle.did,
             std::slice::from_ref(&TEST_KIND),
-            Some(&["App-Alpha".parse().unwrap(), "DB-ALPHA".parse().unwrap()]),
-            None,
+            &ResourceSearchQuery::ExactNames(vec![
+                "App-Alpha".parse().unwrap(),
+                "DB-ALPHA".parse().unwrap(),
+            ]),
             &ResolvedResourceLabelFilter::default(),
         )
         .await
@@ -468,8 +754,7 @@ pub async fn test_count_search_resource_handles(catalog: &Catalog) {
         .count_search_resource_handles(
             &account_handle.did,
             &[TEST_KIND.clone(), OTHER_KIND.clone()],
-            None,
-            Some("app-%"),
+            &ResourceSearchQuery::NamePattern("app-%".to_string()),
             &ResolvedResourceLabelFilter::default(),
         )
         .await
@@ -480,8 +765,7 @@ pub async fn test_count_search_resource_handles(catalog: &Catalog) {
         .count_search_resource_handles(
             &account_handle.did,
             std::slice::from_ref(&TEST_KIND),
-            None,
-            Some("app-other-%"),
+            &ResourceSearchQuery::NamePattern("app-other-%".to_string()),
             &ResolvedResourceLabelFilter::default(),
         )
         .await
@@ -492,8 +776,7 @@ pub async fn test_count_search_resource_handles(catalog: &Catalog) {
         .count_search_resource_handles(
             &account_handle.did,
             std::slice::from_ref(&TEST_KIND),
-            Some(&[]),
-            None,
+            &ResourceSearchQuery::ExactNames(vec![]),
             &ResolvedResourceLabelFilter::default(),
         )
         .await
@@ -563,8 +846,7 @@ pub async fn test_resource_name_case_insensitive(catalog: &Catalog) {
         .search_resource_handles(
             &account_handle.did,
             std::slice::from_ref(&TEST_KIND),
-            Some(&["MY-RESOURCE".parse().unwrap()]),
-            None,
+            &ResourceSearchQuery::ExactNames(vec!["MY-RESOURCE".parse().unwrap()]),
             &ResolvedResourceLabelFilter::default(),
             PaginationOpts::from_max_results(10),
         )
@@ -578,8 +860,7 @@ pub async fn test_resource_name_case_insensitive(catalog: &Catalog) {
         .search_resource_handles(
             &account_handle.did,
             std::slice::from_ref(&TEST_KIND),
-            None,
-            Some("MY-%"),
+            &ResourceSearchQuery::NamePattern("MY-%".to_string()),
             &ResolvedResourceLabelFilter::default(),
             PaginationOpts::from_max_results(10),
         )
@@ -747,8 +1028,7 @@ pub async fn test_search_resource_handles_label_filtering(catalog: &Catalog) {
         .search_resource_handles(
             &account_handle.did,
             std::slice::from_ref(&TEST_KIND),
-            None,
-            Some("%"),
+            &ResourceSearchQuery::NamePattern("%".to_string()),
             &filter,
             PaginationOpts::from_max_results(10),
         )
@@ -763,8 +1043,7 @@ pub async fn test_search_resource_handles_label_filtering(catalog: &Catalog) {
         .count_search_resource_handles(
             &account_handle.did,
             std::slice::from_ref(&TEST_KIND),
-            None,
-            Some("%"),
+            &ResourceSearchQuery::NamePattern("%".to_string()),
             &filter,
         )
         .await
@@ -776,8 +1055,7 @@ pub async fn test_search_resource_handles_label_filtering(catalog: &Catalog) {
         .search_resource_handles(
             &account_handle.did,
             std::slice::from_ref(&TEST_KIND),
-            None,
-            Some("%-infra"),
+            &ResourceSearchQuery::NamePattern("%-infra".to_string()),
             &filter,
             PaginationOpts::from_max_results(10),
         )
@@ -789,12 +1067,20 @@ pub async fn test_search_resource_handles_label_filtering(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+struct SeededSearchHandleIds {
+    app_alpha: ResourceID,
+    db_alpha: ResourceID,
+    app_gamma: ResourceID,
+    other_account: ResourceID,
+}
+
 async fn seed_search_resource_handles(
     repo: &dyn ResourceRepository,
     account_handle: &odf::AccountHandle,
-) {
+) -> SeededSearchHandleIds {
     let other_account_handle = odf::AccountHandle::new_test("other-account");
 
+    let mut ids = std::collections::HashMap::new();
     for (kind, name, account) in [
         (&*TEST_KIND, "app-alpha", account_handle.clone()),
         (&*TEST_KIND, "app-beta", account_handle.clone()),
@@ -805,7 +1091,15 @@ async fn seed_search_resource_handles(
     ] {
         let mut snapshot = make_test_snapshot(&account, kind, name);
         snapshot.id = repo.new_resource_id().await.unwrap();
+        ids.insert(name, snapshot.id);
         repo.create_resource(&snapshot).await.unwrap();
+    }
+
+    SeededSearchHandleIds {
+        app_alpha: ids["app-alpha"],
+        db_alpha: ids["db-alpha"],
+        app_gamma: ids["app-gamma"],
+        other_account: ids["app-other-account"],
     }
 }
 

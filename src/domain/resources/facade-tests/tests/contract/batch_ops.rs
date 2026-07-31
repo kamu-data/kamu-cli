@@ -62,7 +62,6 @@ pub async fn test_get_many_all_successes(h: &impl FacadeContractHarness) {
 
     let selector = ResourceBatchSelector {
         account: None,
-        label_filter: None,
         resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
         resource_refs: vec![
             ResourceRef::ByName("batch-a".parse().unwrap()),
@@ -111,7 +110,6 @@ pub async fn test_get_many_mixed_successes_problems(h: &impl FacadeContractHarne
         .get_many(
             ResourceBatchSelector {
                 account: None,
-                label_filter: None,
                 resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
                 resource_refs: vec![
                     ResourceRef::ByName("mixed-a".parse().unwrap()), // idx 0 — exists
@@ -159,7 +157,6 @@ pub async fn test_get_many_duplicate_refs(h: &impl FacadeContractHarness) {
         .get_many(
             ResourceBatchSelector {
                 account: None,
-                label_filter: None,
                 resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
                 resource_refs: vec![
                     ResourceRef::ByName("dup-ref".parse().unwrap()), // idx 0
@@ -190,7 +187,6 @@ pub async fn test_get_many_empty_refs(h: &impl FacadeContractHarness) {
         .get_many(
             ResourceBatchSelector {
                 account: None,
-                label_filter: None,
                 resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
                 resource_refs: vec![],
             },
@@ -218,7 +214,6 @@ pub async fn test_get_many_empty_refs_validates_unsupported_kind(h: &impl Facade
         .get_many(
             ResourceBatchSelector {
                 account: None,
-                label_filter: None,
                 resource_type: "NoSuchResourceKindXYZ".parse().unwrap(),
                 resource_refs: vec![],
             },
@@ -247,7 +242,6 @@ pub async fn test_get_many_empty_refs_validates_bad_account(h: &impl FacadeContr
     let result = facade
         .get_many(
             ResourceBatchSelector {
-                label_filter: None,
                 account: Some(ResourceAccountRef {
                     id: None,
                     did: None,
@@ -292,7 +286,6 @@ pub async fn test_batch_empty_refs_validation_is_consistent(h: &impl FacadeContr
     let gi_type = facade
         .get_handles(ResourceBatchSelector {
             account: None,
-            label_filter: None,
             resource_type: bad_type.parse().unwrap(),
             resource_refs: vec![],
         })
@@ -307,7 +300,6 @@ pub async fn test_batch_empty_refs_validation_is_consistent(h: &impl FacadeContr
     let gi_acct = facade
         .get_handles(ResourceBatchSelector {
             account: bad_account.clone(),
-            label_filter: None,
             resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             resource_refs: vec![],
         })
@@ -323,7 +315,6 @@ pub async fn test_batch_empty_refs_validation_is_consistent(h: &impl FacadeContr
         .render_manifests(
             ResourceBatchSelector {
                 account: None,
-                label_filter: None,
                 resource_type: bad_type.parse().unwrap(),
                 resource_refs: vec![],
             },
@@ -342,7 +333,6 @@ pub async fn test_batch_empty_refs_validation_is_consistent(h: &impl FacadeContr
         .render_manifests(
             ResourceBatchSelector {
                 account: bad_account.clone(),
-                label_filter: None,
                 resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
                 resource_refs: vec![],
             },
@@ -360,7 +350,6 @@ pub async fn test_batch_empty_refs_validation_is_consistent(h: &impl FacadeContr
     let dm_type = facade
         .delete_many(ResourceBatchSelector {
             account: None,
-            label_filter: None,
             resource_type: bad_type.parse().unwrap(),
             resource_refs: vec![],
         })
@@ -375,7 +364,6 @@ pub async fn test_batch_empty_refs_validation_is_consistent(h: &impl FacadeContr
     let dm_acct = facade
         .delete_many(ResourceBatchSelector {
             account: bad_account.clone(),
-            label_filter: None,
             resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             resource_refs: vec![],
         })
@@ -400,7 +388,6 @@ pub async fn test_get_many_wrong_schema(h: &impl FacadeContractHarness) {
         .get_many(
             ResourceBatchSelector {
                 account: None,
-                label_filter: None,
                 resource_type: SECRET_SET_CANONICAL_SELECTOR.parse().unwrap(),
                 resource_refs: vec![
                     ResourceRef::ById(id), // idx 0 — exists but wrong schema
@@ -438,7 +425,6 @@ pub async fn test_get_handles_mirrors_get_many(h: &impl FacadeContractHarness) {
     let response = facade
         .get_handles(ResourceBatchSelector {
             account: None,
-            label_filter: None,
             resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             resource_refs: vec![
                 ResourceRef::ByName("idents-a".parse().unwrap()), // idx 0 — exists
@@ -486,7 +472,6 @@ pub async fn test_render_manifests_all_successes(h: &impl FacadeContractHarness)
             .render_manifests(
                 ResourceBatchSelector {
                     account: None,
-                    label_filter: None,
                     resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
                     resource_refs: vec![
                         ResourceRef::ById(id_a), // idx 0
@@ -545,7 +530,6 @@ pub async fn test_render_manifests_mixed_successes_problems(h: &impl FacadeContr
         .render_manifests(
             ResourceBatchSelector {
                 account: None,
-                label_filter: None,
                 resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
                 resource_refs: vec![
                     ResourceRef::ById(uid_existing), // idx 0 — exists
@@ -592,7 +576,6 @@ pub async fn test_delete_many_all_successes(h: &impl FacadeContractHarness) {
     let response = facade
         .delete_many(ResourceBatchSelector {
             account: None,
-            label_filter: None,
             resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             resource_refs: vec![
                 ResourceRef::ByName("del-many-a".parse().unwrap()), // idx 0
@@ -654,7 +637,6 @@ pub async fn test_delete_many_mixed_successes_problems(h: &impl FacadeContractHa
     let response = facade
         .delete_many(ResourceBatchSelector {
             account: None,
-            label_filter: None,
             resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             resource_refs: vec![
                 ResourceRef::ByName("del-mix-exists".parse().unwrap()), // idx 0 — exists
@@ -710,7 +692,6 @@ pub async fn test_delete_many_duplicate_refs_is_deterministic(h: &impl FacadeCon
     let response = facade
         .delete_many(ResourceBatchSelector {
             account: None,
-            label_filter: None,
             resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             resource_refs: vec![
                 ResourceRef::ByName("del-dup-ref".parse().unwrap()), // idx 0
@@ -770,7 +751,6 @@ pub async fn test_batch_apis_reject_unsupported_type(h: &impl FacadeContractHarn
 
     let selector = ResourceBatchSelector {
         account: None,
-        label_filter: None,
         resource_type: bad_type.parse().unwrap(),
         resource_refs: vec![ResourceRef::ById(id)],
     };

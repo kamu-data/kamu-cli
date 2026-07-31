@@ -76,13 +76,10 @@ pub trait ResourceRepository: Send + Sync {
         name: &ResourceName,
     ) -> Result<Option<ResourceID>, InternalError>;
 
-    /// Ids excluded by `label_filter` are absent from the result, exactly like
-    /// ids that do not exist.
     async fn find_resource_handles_by_ids(
         &self,
         account_id: &odf::AccountID,
         ids: &[ResourceID],
-        label_filter: &ResolvedResourceLabelFilter,
     ) -> Result<Vec<ResourceHandleRow>, InternalError>;
 
     /// Matches names case-insensitively. Names that do not exist are absent
@@ -100,8 +97,7 @@ pub trait ResourceRepository: Send + Sync {
         &self,
         account_id: &odf::AccountID,
         schemas: &[TypeUri],
-        exact_names: Option<&[ResourceName]>,
-        name_pattern: Option<&str>,
+        query: &ResourceSearchQuery,
         label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceHandleRow>, InternalError>;
@@ -110,8 +106,7 @@ pub trait ResourceRepository: Send + Sync {
         &self,
         account_id: &odf::AccountID,
         schemas: &[TypeUri],
-        exact_names: Option<&[ResourceName]>,
-        name_pattern: Option<&str>,
+        query: &ResourceSearchQuery,
         label_filter: &ResolvedResourceLabelFilter,
     ) -> Result<usize, InternalError>;
 
@@ -171,6 +166,29 @@ pub trait ResourceRepository: Send + Sync {
         &self,
         account_id: odf::AccountID,
     ) -> Result<Vec<ResourceSummaryRow>, InternalError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Exactly one way to narrow a `search_resource_handles` call by identity or
+/// name — mutually exclusive by construction, unlike two independently
+/// optional fields.
+#[derive(Debug, Clone)]
+pub enum ResourceSearchQuery {
+    ExactNames(Vec<ResourceName>),
+    ExactIds(Vec<ResourceID>),
+    NamePattern(String),
+}
+
+impl ResourceSearchQuery {
+    /// An empty `ExactNames`/`ExactIds` list can never match anything.
+    pub fn is_vacuous(&self) -> bool {
+        match self {
+            Self::ExactNames(names) => names.is_empty(),
+            Self::ExactIds(ids) => ids.is_empty(),
+            Self::NamePattern(_) => false,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

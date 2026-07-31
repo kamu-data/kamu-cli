@@ -180,13 +180,6 @@ pub(crate) struct ResourceSelectorProblemResult {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
-pub(crate) struct ResourceInvalidSearchQueryProblem {
-    pub message: String,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct ResourceInvalidLabelFilterProblem {
     pub code: ResourceLabelFilterProblemCode,
     pub message: String,

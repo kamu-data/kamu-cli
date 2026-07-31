@@ -126,10 +126,6 @@ pub(crate) fn map_list_handles_outcome(
         O::ResourceBadAccountProblem(problem) => Err(ListResourcesError::BadAccount(
             bad_account_problem_error(problem).map_err(ListResourcesError::Internal)?,
         )),
-        O::ResourceInvalidSearchQueryProblem(problem) => {
-            drop(problem.message);
-            Err(crate::InvalidResourceSearchQueryError.into())
-        }
         O::ResourceInvalidLabelFilterProblem(problem) => {
             Err(ListResourcesError::InvalidLabelFilter(problem.into()))
         }
@@ -189,10 +185,6 @@ pub(crate) fn map_search_handles_outcome(
         O::ResourceBadAccountProblem(problem) => Err(ListResourcesError::BadAccount(
             bad_account_problem_error(problem).map_err(ListResourcesError::Internal)?,
         )),
-        O::ResourceInvalidSearchQueryProblem(problem) => {
-            drop(problem.message);
-            Err(crate::InvalidResourceSearchQueryError.into())
-        }
         O::ResourceInvalidLabelFilterProblem(problem) => {
             Err(ListResourcesError::InvalidLabelFilter(problem.into()))
         }
@@ -306,9 +298,6 @@ pub(crate) fn map_batch_get_resources_outcome(
         O::ResourceBadAccountProblem(problem) => Err(BatchResourceError::BadAccount(
             bad_account_problem_error(problem).map_err(BatchResourceError::Internal)?,
         )),
-        O::ResourceInvalidLabelFilterProblem(problem) => {
-            Err(BatchResourceError::InvalidLabelFilter(problem.into()))
-        }
         O::Unknown => Err(BatchResourceError::Internal(InternalError::new(
             "Remote get_many returned an unrecognized BatchResourcesOutcome variant",
         ))),
@@ -350,9 +339,6 @@ pub(crate) fn map_batch_get_handles_outcome(
         O::ResourceBadAccountProblem(problem) => Err(BatchResourceError::BadAccount(
             bad_account_problem_error(problem).map_err(BatchResourceError::Internal)?,
         )),
-        O::ResourceInvalidLabelFilterProblem(problem) => {
-            Err(BatchResourceError::InvalidLabelFilter(problem.into()))
-        }
         O::Unknown => Err(BatchResourceError::Internal(InternalError::new(
             "Remote get_handles returned an unrecognized BatchResourceHandlesOutcome variant",
         ))),
@@ -396,9 +382,6 @@ pub(crate) fn map_batch_render_manifests_outcome(
         O::ResourceBadAccountProblem(problem) => Err(BatchResourceError::BadAccount(
             bad_account_problem_error(problem).map_err(BatchResourceError::Internal)?,
         )),
-        O::ResourceInvalidLabelFilterProblem(problem) => {
-            Err(BatchResourceError::InvalidLabelFilter(problem.into()))
-        }
         O::Unknown => Err(BatchResourceError::Internal(InternalError::new(
             "Remote render_manifests returned an unrecognized BatchResourceManifestsOutcome \
              variant",
@@ -440,9 +423,6 @@ pub(crate) fn map_batch_delete_many_outcome(
         O::ResourceBadAccountProblem(problem) => Err(BatchResourceError::BadAccount(
             bad_account_problem_error(problem).map_err(BatchResourceError::Internal)?,
         )),
-        O::ResourceInvalidLabelFilterProblem(problem) => {
-            Err(BatchResourceError::InvalidLabelFilter(problem.into()))
-        }
         O::Unknown => Err(BatchResourceError::Internal(InternalError::new(
             "Remote delete_many returned an unrecognized ResourceDeleteManyOutcome variant",
         ))),

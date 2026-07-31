@@ -24,6 +24,7 @@ use crate::domain::{
     ResourceNotOwnedByAccountError,
     ResourceRawEventQuery,
     ResourceRepository,
+    ResourceSearchQuery,
     ResourceSnapshot,
     ResourceSummaryRow,
     ResourceTypeMismatchError,
@@ -61,10 +62,9 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
         &self,
         account_id: &odf::AccountID,
         ids: &[ResourceID],
-        label_filter: &ResolvedResourceLabelFilter,
     ) -> Result<Vec<ResourceHandleRow>, InternalError> {
         self.resource_repository
-            .find_resource_handles_by_ids(account_id, ids, label_filter)
+            .find_resource_handles_by_ids(account_id, ids)
             .await
     }
 
@@ -83,20 +83,12 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
         &self,
         account_id: &odf::AccountID,
         schemas: &[TypeUri],
-        exact_names: Option<&[ResourceName]>,
-        name_pattern: Option<&str>,
+        query: &ResourceSearchQuery,
         label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceHandleRow>, InternalError> {
         self.resource_repository
-            .search_resource_handles(
-                account_id,
-                schemas,
-                exact_names,
-                name_pattern,
-                label_filter,
-                pagination,
-            )
+            .search_resource_handles(account_id, schemas, query, label_filter, pagination)
             .await
     }
 
@@ -104,18 +96,11 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
         &self,
         account_id: &odf::AccountID,
         schemas: &[TypeUri],
-        exact_names: Option<&[ResourceName]>,
-        name_pattern: Option<&str>,
+        query: &ResourceSearchQuery,
         label_filter: &ResolvedResourceLabelFilter,
     ) -> Result<usize, InternalError> {
         self.resource_repository
-            .count_search_resource_handles(
-                account_id,
-                schemas,
-                exact_names,
-                name_pattern,
-                label_filter,
-            )
+            .count_search_resource_handles(account_id, schemas, query, label_filter)
             .await
     }
 

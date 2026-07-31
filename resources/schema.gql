@@ -603,7 +603,7 @@ type BatchResourceHandleSuccess {
 	handle: ResourceHandle!
 }
 
-union BatchResourceHandlesOutcome = BatchResourceHandlesResult | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem | ResourceInvalidLabelFilterProblem
+union BatchResourceHandlesOutcome = BatchResourceHandlesResult | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem
 
 type BatchResourceHandlesResult {
 	handles: [BatchResourceHandleSuccess!]!
@@ -615,7 +615,7 @@ type BatchResourceManifestSuccess {
 	manifest: ResourceRenderManifestResult!
 }
 
-union BatchResourceManifestsOutcome = BatchResourceManifestsResult | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem | ResourceInvalidLabelFilterProblem
+union BatchResourceManifestsOutcome = BatchResourceManifestsResult | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem
 
 type BatchResourceManifestsResult {
 	manifests: [BatchResourceManifestSuccess!]!
@@ -632,7 +632,7 @@ type BatchResourceSuccess {
 	resource: Resource!
 }
 
-union BatchResourcesOutcome = BatchResourcesResult | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem | ResourceInvalidLabelFilterProblem
+union BatchResourcesOutcome = BatchResourcesResult | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem
 
 type BatchResourcesResult {
 	resources: [BatchResourceSuccess!]!
@@ -3995,7 +3995,6 @@ input ResourceBatchSelectorInput {
 	resourceType: ResourceTypeSelectorInput!
 	refs: [ResourceRefInput!]!
 	account: AccountRefInput
-	labelFilter: ResourceLabelFilterInput
 }
 
 input ResourceByNameSelectorInput {
@@ -4020,7 +4019,7 @@ type ResourceConnection {
 	edges: [ResourceEdge!]!
 }
 
-union ResourceDeleteManyOutcome = ResourceDeleteManyResult | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem | ResourceInvalidLabelFilterProblem
+union ResourceDeleteManyOutcome = ResourceDeleteManyResult | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem
 
 type ResourceDeleteManyResult {
 	resources: [ResourceDeleteManySuccess!]!
@@ -4076,7 +4075,7 @@ type ResourceHandleEdge {
 
 union ResourceHandleListAllOutcome = ResourceHandleConnection | ResourceBadAccountProblem | ResourceInvalidLabelFilterProblem
 
-union ResourceHandleListOutcome = ResourceHandleConnection | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem | ResourceInvalidSearchQueryProblem | ResourceInvalidLabelFilterProblem
+union ResourceHandleListOutcome = ResourceHandleConnection | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem | ResourceInvalidLabelFilterProblem
 
 enum ResourceHeaderValidationProblemCode {
 	EMPTY_NAME
@@ -4161,10 +4160,6 @@ The `labelFilter` argument could not be resolved into a matchable filter.
 """
 type ResourceInvalidLabelFilterProblem {
 	code: ResourceLabelFilterProblemCode!
-	message: String!
-}
-
-type ResourceInvalidSearchQueryProblem {
 	message: String!
 }
 
@@ -4289,6 +4284,17 @@ type ResourceSchemaMismatchProblem {
 	expectedSchema: TypeUri!
 	actualSchema: TypeUri!
 	message: String!
+}
+
+"""
+Exactly one way to narrow a search — mirrors
+[`kamu_resources::ResourceSearchQuery`]; `@oneOf` rejects invalid
+combinations before the resolver runs.
+"""
+input ResourceSearchQueryInput @oneOf {
+	exactNames: [ResourceName!]
+	exactIds: [ResourceID!]
+	namePattern: String
 }
 
 input ResourceSelectorInput {
@@ -4538,8 +4544,7 @@ enum SearchEntityName {
 
 input SearchResourceHandlesInput {
 	resourceTypes: [ResourceTypeSelectorInput!]!
-	names: [ResourceName!]
-	namePattern: String
+	query: ResourceSearchQueryInput!
 	account: AccountRefInput
 	labelFilter: ResourceLabelFilterInput
 }

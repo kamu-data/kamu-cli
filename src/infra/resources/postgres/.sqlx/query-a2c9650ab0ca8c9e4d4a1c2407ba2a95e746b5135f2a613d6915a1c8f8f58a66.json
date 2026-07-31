@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    SELECT COUNT(*) AS count\n                    FROM resources r\n                    WHERE r.account_id = $1\n                      AND r.resource_schema = ANY($2)\n                      AND LOWER(r.resource_name) = ANY($3)\n                      AND r.deleted_at IS NULL\n                      -- Same predicate as `search_resource_handles`, so a filtered\n                      -- count always agrees with its filtered page.\n                      AND NOT EXISTS (\n                          SELECT 1\n                          FROM UNNEST($4::text[], $5::text[]) AS f(k, v)\n                          WHERE NOT EXISTS (\n                              SELECT 1\n                              FROM resource_labels_projection rl\n                              WHERE rl.resource_id = r.resource_id\n                                AND rl.label_key = f.k\n                                AND rl.label_value = f.v\n                          )\n                      )\n                    ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "TextArray",
+        "TextArray",
+        "TextArray",
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "a2c9650ab0ca8c9e4d4a1c2407ba2a95e746b5135f2a613d6915a1c8f8f58a66"
+}

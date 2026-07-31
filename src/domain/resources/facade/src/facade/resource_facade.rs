@@ -17,6 +17,7 @@ use domain::{
     ResourceID,
     ResourceLabelFilterInput,
     ResourceName,
+    ResourceSearchQuery,
     ResourceSummaryView,
     ResourceTypeDescriptor,
     ResourceTypeSelectorRaw,
@@ -159,10 +160,6 @@ pub struct ResourceBatchSelector {
     pub account: Option<ResourceAccountRef>,
     pub resource_type: ResourceTypeSelectorRaw,
     pub resource_refs: Vec<ResourceRef>,
-    /// Narrows the batch in the same lookup rather than a follow-up query.
-    /// A ref that resolves but does not carry the labels is reported as
-    /// not-found, so `-l` behaves uniformly across selector forms.
-    pub label_filter: Option<ResourceLabelFilterInput>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -277,8 +274,7 @@ pub struct ListResourceHandlesRequest {
 #[derive(Debug, Clone)]
 pub struct SearchResourceHandlesRequest {
     pub raw_type_selectors: Vec<ResourceTypeSelectorRaw>,
-    pub exact_names: Option<Vec<ResourceName>>,
-    pub name_pattern: Option<String>,
+    pub query: ResourceSearchQuery,
     pub account: Option<ResourceAccountRef>,
     pub label_filter: Option<ResourceLabelFilterInput>,
     pub pagination: PaginationOpts,

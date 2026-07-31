@@ -114,7 +114,6 @@ pub(crate) struct ResourceBatchSelectorInput {
     pub resource_type: ResourceTypeSelectorInput,
     pub refs: Vec<ResourceRefInput>,
     pub account: Option<AccountRefInput>,
-    pub label_filter: Option<ResourceLabelFilterInput>,
 }
 
 impl TryFrom<&ResourceBatchSelector> for ResourceBatchSelectorInput {
@@ -125,7 +124,6 @@ impl TryFrom<&ResourceBatchSelector> for ResourceBatchSelectorInput {
             resource_type: ResourceTypeSelectorInput::from_resource_type(&value.resource_type),
             refs: value.resource_refs.iter().map(Into::into).collect(),
             account: value.account.as_ref().map(Into::into),
-            label_filter: value.label_filter.as_ref().map(Into::into),
         })
     }
 }
@@ -172,11 +170,42 @@ pub(crate) struct ApplyManifestInput {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::InputObject, Debug, Clone)]
+#[cynic(graphql_type = "ResourceSearchQueryInput")]
+pub(crate) struct ResourceSearchQueryInput {
+    pub exact_names: Option<Vec<domain::ResourceName>>,
+    pub exact_ids: Option<Vec<domain::ResourceID>>,
+    pub name_pattern: Option<String>,
+}
+
+impl From<&domain::ResourceSearchQuery> for ResourceSearchQueryInput {
+    fn from(value: &domain::ResourceSearchQuery) -> Self {
+        match value {
+            domain::ResourceSearchQuery::ExactNames(names) => Self {
+                exact_names: Some(names.clone()),
+                exact_ids: None,
+                name_pattern: None,
+            },
+            domain::ResourceSearchQuery::ExactIds(ids) => Self {
+                exact_names: None,
+                exact_ids: Some(ids.clone()),
+                name_pattern: None,
+            },
+            domain::ResourceSearchQuery::NamePattern(pattern) => Self {
+                exact_names: None,
+                exact_ids: None,
+                name_pattern: Some(pattern.clone()),
+            },
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::InputObject, Debug, Clone)]
 #[cynic(graphql_type = "SearchResourceHandlesInput")]
 pub(crate) struct SearchResourceHandlesInput {
     pub resource_types: Vec<ResourceTypeSelectorInput>,
-    pub names: Option<Vec<domain::ResourceName>>,
-    pub name_pattern: Option<String>,
+    pub query: ResourceSearchQueryInput,
     pub account: Option<AccountRefInput>,
     pub label_filter: Option<ResourceLabelFilterInput>,
 }
@@ -191,8 +220,7 @@ impl TryFrom<&SearchResourceHandlesRequest> for SearchResourceHandlesInput {
                 .iter()
                 .map(ResourceTypeSelectorInput::from_resource_type)
                 .collect(),
-            names: value.exact_names.clone(),
-            name_pattern: value.name_pattern.clone(),
+            query: (&value.query).into(),
             account: value.account.as_ref().map(Into::into),
             label_filter: value.label_filter.as_ref().map(Into::into),
         })

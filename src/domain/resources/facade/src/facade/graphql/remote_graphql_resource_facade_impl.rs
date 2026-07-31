@@ -268,10 +268,6 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
     ) -> Result<SearchResourceHandlesResponse, ListResourcesError> {
         use cynic_api::operations::search as SearchOperation;
 
-        if request.exact_names.is_none() && request.name_pattern.is_none() {
-            return Err(crate::InvalidResourceSearchQueryError.into());
-        }
-
         let variables = SearchOperation::SearchHandlesVariables::new(&request)
             .map_err(ListResourcesError::Internal)?;
 

@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use database_common::PaginationOpts;
-use kamu_resources::RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI;
+use kamu_resources::{RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI, ResourceID, ResourceSearchQuery};
 use kamu_resources_facade::{
     ListResourceHandlesRequest,
     ListResourcesError,
@@ -354,11 +354,10 @@ pub async fn test_search_by_exact_names(h: &impl FacadeContractHarness) {
     let response = facade
         .search_handles(SearchResourceHandlesRequest {
             raw_type_selectors: vec![VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()],
-            exact_names: Some(vec![
+            query: ResourceSearchQuery::ExactNames(vec![
                 "search-exact-alpha".parse().unwrap(),
                 "search-exact-beta".parse().unwrap(),
             ]),
-            name_pattern: None,
             account: None,
             label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
@@ -388,11 +387,10 @@ pub async fn test_search_exact_names_ignores_missing(h: &impl FacadeContractHarn
     let response = facade
         .search_handles(SearchResourceHandlesRequest {
             raw_type_selectors: vec![VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()],
-            exact_names: Some(vec![
+            query: ResourceSearchQuery::ExactNames(vec![
                 "search-missing-present".parse().unwrap(),
                 "search-missing-absent".parse().unwrap(),
             ]),
-            name_pattern: None,
             account: None,
             label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
@@ -409,6 +407,114 @@ pub async fn test_search_exact_names_ignores_missing(h: &impl FacadeContractHarn
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// RF-091A
+contract_test!(search_by_exact_ids, super::test_search_by_exact_ids);
+
+pub async fn test_search_by_exact_ids(h: &impl FacadeContractHarness) {
+    let alpha_id = apply_manifest_and_get_id(
+        h,
+        TestAccount::Alice,
+        variable_set_manifest_json("search-id-alpha", None, &[("K", "v")]),
+    )
+    .await;
+    let beta_id = apply_manifest_and_get_id(
+        h,
+        TestAccount::Alice,
+        variable_set_manifest_json("search-id-beta", None, &[("K", "v")]),
+    )
+    .await;
+
+    let facade = h.facade_for(TestAccount::Alice);
+    let response = facade
+        .search_handles(SearchResourceHandlesRequest {
+            raw_type_selectors: vec![VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()],
+            query: ResourceSearchQuery::ExactIds(vec![alpha_id, beta_id]),
+            account: None,
+            label_filter: None,
+            pagination: PaginationOpts::from_max_results(1000),
+        })
+        .await
+        .unwrap();
+
+    assert_eq!(response.total_count, 2);
+    assert_eq!(
+        sorted_handle_names(response.items),
+        vec!["search-id-alpha", "search-id-beta"]
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-091B
+contract_test!(
+    search_exact_ids_ignores_missing,
+    super::test_search_exact_ids_ignores_missing
+);
+
+pub async fn test_search_exact_ids_ignores_missing(h: &impl FacadeContractHarness) {
+    let present_id = apply_manifest_and_get_id(
+        h,
+        TestAccount::Alice,
+        variable_set_manifest_json("search-id-missing-present", None, &[("K", "v")]),
+    )
+    .await;
+    let missing_id = ResourceID::new(uuid::Uuid::new_v4());
+
+    let facade = h.facade_for(TestAccount::Alice);
+    let response = facade
+        .search_handles(SearchResourceHandlesRequest {
+            raw_type_selectors: vec![VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()],
+            query: ResourceSearchQuery::ExactIds(vec![present_id, missing_id]),
+            account: None,
+            label_filter: None,
+            pagination: PaginationOpts::from_max_results(1000),
+        })
+        .await
+        .unwrap();
+
+    assert_eq!(response.total_count, 1);
+    assert_eq!(
+        sorted_handle_names(response.items),
+        vec!["search-id-missing-present"]
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-091C
+contract_test!(
+    search_exact_ids_account_scoping,
+    super::test_search_exact_ids_account_scoping
+);
+
+pub async fn test_search_exact_ids_account_scoping(h: &impl FacadeContractHarness) {
+    let bob_id = apply_manifest_and_get_id(
+        h,
+        TestAccount::Bob,
+        variable_set_manifest_json("search-id-bobs", None, &[("K", "v")]),
+    )
+    .await;
+
+    // Alice searches by an id that genuinely exists, but is owned by Bob —
+    // it must not leak across the account boundary.
+    let facade = h.facade_for(TestAccount::Alice);
+    let response = facade
+        .search_handles(SearchResourceHandlesRequest {
+            raw_type_selectors: vec![VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()],
+            query: ResourceSearchQuery::ExactIds(vec![bob_id]),
+            account: None,
+            label_filter: None,
+            pagination: PaginationOpts::from_max_results(1000),
+        })
+        .await
+        .unwrap();
+
+    assert_eq!(response.items, Vec::new());
+    assert_eq!(response.total_count, 0);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // RF-092
 contract_test!(search_by_name_pattern, super::test_search_by_name_pattern);
 
@@ -421,8 +527,7 @@ pub async fn test_search_by_name_pattern(h: &impl FacadeContractHarness) {
     let response = facade
         .search_handles(SearchResourceHandlesRequest {
             raw_type_selectors: vec![VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()],
-            exact_names: None,
-            name_pattern: Some("search-pattern-%".to_string()),
+            query: ResourceSearchQuery::NamePattern("search-pattern-%".to_string()),
             account: None,
             label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
@@ -471,8 +576,7 @@ pub async fn test_search_multi_type(h: &impl FacadeContractHarness) {
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
                 SECRET_SET_CANONICAL_SELECTOR.parse().unwrap(),
             ],
-            exact_names: None,
-            name_pattern: Some("multi-type-%".to_string()),
+            query: ResourceSearchQuery::NamePattern("multi-type-%".to_string()),
             account: None,
             label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
@@ -512,25 +616,28 @@ pub async fn test_search_multi_type(h: &impl FacadeContractHarness) {
 
 // RF-094
 contract_test!(
-    search_empty_criteria_returns_error,
-    super::test_search_empty_criteria_returns_error
+    search_empty_exact_names_returns_no_matches,
+    super::test_search_empty_exact_names_returns_no_matches
 );
 
-pub async fn test_search_empty_criteria_returns_error(h: &impl FacadeContractHarness) {
+// An empty `ExactNames`/`ExactIds` list is valid but vacuous — it matches
+// nothing rather than erroring.
+pub async fn test_search_empty_exact_names_returns_no_matches(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
-    let result = facade
+    let response = facade
         .search_handles(SearchResourceHandlesRequest {
             raw_type_selectors: vec![VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()],
-            exact_names: None,
-            name_pattern: None,
+            query: ResourceSearchQuery::ExactNames(vec![]),
             account: None,
             label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
-        .await;
+        .await
+        .unwrap();
 
-    assert_matches!(result, Err(ListResourcesError::InvalidSearchQuery(_)));
+    assert_eq!(response.items, Vec::new());
+    assert_eq!(response.total_count, 0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -550,8 +657,7 @@ pub async fn test_search_pagination_and_total_count(h: &impl FacadeContractHarne
     let response = facade
         .search_handles(SearchResourceHandlesRequest {
             raw_type_selectors: vec![VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()],
-            exact_names: None,
-            name_pattern: Some("search-page-%".to_string()),
+            query: ResourceSearchQuery::NamePattern("search-page-%".to_string()),
             account: None,
             label_filter: None,
             pagination: PaginationOpts::from_page(1, 2),
@@ -578,8 +684,7 @@ pub async fn test_search_account_scoping(h: &impl FacadeContractHarness) {
         .facade_for(TestAccount::Alice)
         .search_handles(SearchResourceHandlesRequest {
             raw_type_selectors: vec![VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()],
-            exact_names: None,
-            name_pattern: Some("search-scope-%".to_string()),
+            query: ResourceSearchQuery::NamePattern("search-scope-%".to_string()),
             account: None,
             label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
@@ -590,8 +695,7 @@ pub async fn test_search_account_scoping(h: &impl FacadeContractHarness) {
         .facade_for(TestAccount::Bob)
         .search_handles(SearchResourceHandlesRequest {
             raw_type_selectors: vec![VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()],
-            exact_names: None,
-            name_pattern: Some("search-scope-%".to_string()),
+            query: ResourceSearchQuery::NamePattern("search-scope-%".to_string()),
             account: None,
             label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
@@ -996,8 +1100,7 @@ pub async fn test_search_handles_filter_narrows_candidates(h: &impl FacadeContra
     let response = facade
         .search_handles(SearchResourceHandlesRequest {
             raw_type_selectors: vec![VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()],
-            exact_names: None,
-            name_pattern: Some("search-filter-%".to_string()),
+            query: ResourceSearchQuery::NamePattern("search-filter-%".to_string()),
             account: None,
             label_filter: Some(label_filter(&[("environment", "prod")])),
             pagination: PaginationOpts::from_max_results(1000),

@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashMap;
+use std::assert_matches;
 use std::sync::{Arc, LazyLock, Mutex};
 
 use dill::CatalogBuilder;
@@ -19,18 +19,10 @@ use kamu_cli::services::resources::{
     ResourceSelectionResolutionService,
     ResourceSelectionSyntax,
 };
-use kamu_resources::{
-    ResourceHandle,
-    ResourceID,
-    ResourceNameNotFoundError,
-    ResourceTypeDescriptor,
-    TypeUri,
-};
+use kamu_resources::{ResourceHandle, ResourceID, ResourceTypeDescriptor, TypeUri};
 use kamu_resources_facade::{
     MockResourceFacade,
-    ResourceLookupProblem,
     ResourceRef,
-    ResourceSelector,
     SearchResourceHandlesRequest,
     SearchResourceHandlesResponse,
 };
@@ -115,7 +107,10 @@ async fn resolves_exact_type_name_patterns_via_search() {
         raw_selector_strings(&requests[0].raw_type_selectors),
         vec![VARIABLESETS_NAME]
     );
-    assert_eq!(requests[0].name_pattern.as_deref(), Some(NAME_APP_PATTERN));
+    assert_matches!(
+        &requests[0].query,
+        kamu_resources::ResourceSearchQuery::NamePattern(p) if p == NAME_APP_PATTERN
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -198,32 +193,26 @@ async fn resolves_type_patterns_with_exact_names_in_supported_type_order() {
         harness.storage_type_descriptor(),
     ]);
 
-    let get_handle_requests = Arc::new(Mutex::new(Vec::new()));
-    harness.expect_get_handle(
-        2,
-        HashMap::from([
-            (
-                SECRETSETS_NAME.to_string(),
-                Some(ResourceHandle {
-                    r#type: secretset_type_uri().clone(),
-                    did: None,
-                    id: ResourceID::new(uuid::Uuid::new_v4()),
-                    name: RESOURCE_DB_CREDS.parse().unwrap(),
-                    account: DEFAULT_ACCOUNT_HANDLE.clone(),
-                }),
-            ),
-            (
-                STORAGES_NAME.to_string(),
-                Some(ResourceHandle {
-                    r#type: STORAGE_TYPE_URI.clone(),
-                    did: None,
-                    id: ResourceID::new(uuid::Uuid::new_v4()),
-                    name: RESOURCE_DB_CREDS.parse().unwrap(),
-                    account: DEFAULT_ACCOUNT_HANDLE.clone(),
-                }),
-            ),
-        ]),
-        Arc::clone(&get_handle_requests),
+    let search_requests = Arc::new(Mutex::new(Vec::new()));
+    harness.expect_search_handles(
+        1,
+        vec![
+            ResourceHandle {
+                r#type: secretset_type_uri().clone(),
+                did: None,
+                id: ResourceID::new(uuid::Uuid::new_v4()),
+                name: RESOURCE_DB_CREDS.parse().unwrap(),
+                account: DEFAULT_ACCOUNT_HANDLE.clone(),
+            },
+            ResourceHandle {
+                r#type: STORAGE_TYPE_URI.clone(),
+                did: None,
+                id: ResourceID::new(uuid::Uuid::new_v4()),
+                name: RESOURCE_DB_CREDS.parse().unwrap(),
+                account: DEFAULT_ACCOUNT_HANDLE.clone(),
+            },
+        ],
+        Arc::clone(&search_requests),
     );
 
     let result = harness
@@ -262,10 +251,17 @@ async fn resolves_type_patterns_with_exact_names_in_supported_type_order() {
             .all(|target| target.selector_input == format!("{TYPE_PATTERN_S}/{RESOURCE_DB_CREDS}"))
     );
 
-    let requests = get_handle_requests.lock().unwrap();
-    assert_eq!(requests.len(), 2);
-    assert_eq!(requests[0].resource_type.as_str(), SECRETSETS_NAME);
-    assert_eq!(requests[1].resource_type.as_str(), STORAGES_NAME);
+    let requests = search_requests.lock().unwrap();
+    assert_eq!(requests.len(), 1);
+    assert_eq!(
+        raw_selector_strings(&requests[0].raw_type_selectors),
+        vec![SECRETSETS_NAME, STORAGES_NAME]
+    );
+    assert_matches!(
+        &requests[0].query,
+        kamu_resources::ResourceSearchQuery::ExactNames(names)
+            if names == &vec![RESOURCE_DB_CREDS.parse::<kamu_resources::ResourceName>().unwrap()]
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -333,9 +329,10 @@ async fn resolves_type_pattern_all_via_search_across_matched_types() {
         raw_selector_strings(&requests[0].raw_type_selectors),
         vec![SECRETSETS_NAME, STORAGES_NAME]
     );
-    assert_eq!(requests[0].exact_names, None);
-    // `search_handles` rejects requests with no exact_names and no name_pattern.
-    assert_eq!(requests[0].name_pattern.as_deref(), Some("%"));
+    assert_matches!(
+        &requests[0].query,
+        kamu_resources::ResourceSearchQuery::NamePattern(p) if p == "%"
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -410,8 +407,10 @@ async fn resolves_type_pattern_name_patterns_via_single_search_across_matched_ty
         raw_selector_strings(&requests[0].raw_type_selectors),
         vec![SECRETSETS_NAME, STORAGES_NAME]
     );
-    assert_eq!(requests[0].exact_names, None);
-    assert_eq!(requests[0].name_pattern.as_deref(), Some("db-%"));
+    assert_matches!(
+        &requests[0].query,
+        kamu_resources::ResourceSearchQuery::NamePattern(p) if p == "db-%"
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -425,20 +424,17 @@ async fn type_pattern_exact_id_tries_every_matched_type() {
         harness.storage_type_descriptor(),
     ]);
 
-    let get_handle_requests = Arc::new(Mutex::new(Vec::new()));
-    harness.expect_get_handle(
-        2,
-        HashMap::from([(
-            STORAGES_NAME.to_string(),
-            Some(ResourceHandle {
-                r#type: STORAGE_TYPE_URI.clone(),
-                did: None,
-                id,
-                name: RESOURCE_DB_CREDS.parse().unwrap(),
-                account: DEFAULT_ACCOUNT_HANDLE.clone(),
-            }),
-        )]),
-        Arc::clone(&get_handle_requests),
+    let search_requests = Arc::new(Mutex::new(Vec::new()));
+    harness.expect_search_handles(
+        1,
+        vec![ResourceHandle {
+            r#type: STORAGE_TYPE_URI.clone(),
+            did: None,
+            id,
+            name: RESOURCE_DB_CREDS.parse().unwrap(),
+            account: DEFAULT_ACCOUNT_HANDLE.clone(),
+        }],
+        Arc::clone(&search_requests),
     );
 
     let result = harness
@@ -465,10 +461,16 @@ async fn type_pattern_exact_id_tries_every_matched_type() {
     assert_eq!(result.targets.len(), 1);
     assert_eq!(result.targets[0].canonical_selector.as_str(), STORAGES_NAME);
 
-    let requests = get_handle_requests.lock().unwrap();
-    assert_eq!(requests.len(), 2);
-    assert_eq!(requests[0].resource_type.as_str(), SECRETSETS_NAME);
-    assert_eq!(requests[1].resource_type.as_str(), STORAGES_NAME);
+    let requests = search_requests.lock().unwrap();
+    assert_eq!(requests.len(), 1);
+    assert_eq!(
+        raw_selector_strings(&requests[0].raw_type_selectors),
+        vec![SECRETSETS_NAME, STORAGES_NAME]
+    );
+    assert_matches!(
+        &requests[0].query,
+        kamu_resources::ResourceSearchQuery::ExactIds(ids) if ids == &vec![id]
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -477,7 +479,7 @@ async fn type_pattern_exact_id_tries_every_matched_type() {
 async fn ignores_unmatched_type_pattern_exact_selectors_when_requested() {
     let mut harness = ResourceSelectionResolutionHarness::new();
     harness.expect_list_supported_resource_types(vec![harness.secretset_type_descriptor()]);
-    harness.expect_get_handle(1, HashMap::new(), Arc::new(Mutex::new(Vec::new())));
+    harness.expect_search_handles(1, Vec::new(), Arc::new(Mutex::new(Vec::new())));
 
     let result = harness
         .service
@@ -516,7 +518,7 @@ async fn ignores_unmatched_type_pattern_exact_selectors_when_requested() {
 async fn errors_on_unmatched_type_pattern_exact_selectors_by_default() {
     let mut harness = ResourceSelectionResolutionHarness::new();
     harness.expect_list_supported_resource_types(vec![harness.secretset_type_descriptor()]);
-    harness.expect_get_handle(1, HashMap::new(), Arc::new(Mutex::new(Vec::new())));
+    harness.expect_search_handles(1, Vec::new(), Arc::new(Mutex::new(Vec::new())));
 
     let error = harness
         .service
@@ -685,20 +687,17 @@ async fn deduplicates_repeated_type_pattern_exact_name_matches() {
     let shared_id = ResourceID::new(uuid::Uuid::new_v4());
     harness.expect_list_supported_resource_types(vec![harness.secretset_type_descriptor()]);
 
-    let get_handle_requests = Arc::new(Mutex::new(Vec::new()));
-    harness.expect_get_handle(
+    let search_requests = Arc::new(Mutex::new(Vec::new()));
+    harness.expect_search_handles(
         2,
-        HashMap::from([(
-            SECRETSETS_NAME.to_string(),
-            Some(ResourceHandle {
-                r#type: secretset_type_uri().clone(),
-                did: None,
-                id: shared_id,
-                name: RESOURCE_DB_CREDS.parse().unwrap(),
-                account: DEFAULT_ACCOUNT_HANDLE.clone(),
-            }),
-        )]),
-        Arc::clone(&get_handle_requests),
+        vec![ResourceHandle {
+            r#type: secretset_type_uri().clone(),
+            did: None,
+            id: shared_id,
+            name: RESOURCE_DB_CREDS.parse().unwrap(),
+            account: DEFAULT_ACCOUNT_HANDLE.clone(),
+        }],
+        Arc::clone(&search_requests),
     );
 
     let result = harness
@@ -736,7 +735,7 @@ async fn deduplicates_repeated_type_pattern_exact_name_matches() {
     assert_eq!(result.targets.len(), 1);
     assert_eq!(result.targets[0].id, shared_id);
 
-    let requests = get_handle_requests.lock().unwrap();
+    let requests = search_requests.lock().unwrap();
     assert_eq!(requests.len(), 2);
 }
 
@@ -750,7 +749,7 @@ async fn deduplicates_type_pattern_all_before_counting_max_results() {
 
     let search_requests = Arc::new(Mutex::new(Vec::new()));
     harness.expect_search_handles(
-        1,
+        2,
         vec![ResourceHandle {
             r#type: secretset_type_uri().clone(),
             did: None,
@@ -759,22 +758,6 @@ async fn deduplicates_type_pattern_all_before_counting_max_results() {
             account: DEFAULT_ACCOUNT_HANDLE.clone(),
         }],
         Arc::clone(&search_requests),
-    );
-
-    let get_handle_requests = Arc::new(Mutex::new(Vec::new()));
-    harness.expect_get_handle(
-        1,
-        HashMap::from([(
-            SECRETSETS_NAME.to_string(),
-            Some(ResourceHandle {
-                r#type: secretset_type_uri().clone(),
-                did: None,
-                id: shared_id,
-                name: RESOURCE_DB_CREDS.parse().unwrap(),
-                account: DEFAULT_ACCOUNT_HANDLE.clone(),
-            }),
-        )]),
-        Arc::clone(&get_handle_requests),
     );
 
     let result = harness
@@ -810,10 +793,7 @@ async fn deduplicates_type_pattern_all_before_counting_max_results() {
     assert_eq!(result.targets[0].id, shared_id);
 
     let search_requests = search_requests.lock().unwrap();
-    assert_eq!(search_requests.len(), 1);
-
-    let get_handle_requests = get_handle_requests.lock().unwrap();
-    assert_eq!(get_handle_requests.len(), 1);
+    assert_eq!(search_requests.len(), 2);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1056,14 +1036,11 @@ async fn narrows_exact_selectors_by_the_label_filter() {
         account: DEFAULT_ACCOUNT_HANDLE.clone(),
     };
 
-    // The facade applies the filter inside the batch lookup, so `vars-b` comes
+    // The facade applies the filter inside the search lookup, so `vars-b` comes
     // back as a not-found problem rather than being dropped afterwards.
     let mut harness = ResourceSelectionResolutionHarness::new();
-    let batch_selectors = Arc::new(Mutex::new(Vec::new()));
-    harness.expect_get_handles(1, vec![matching], Arc::clone(&batch_selectors));
-
-    // No follow-up search: filtering exact selectors must stay one round trip.
-    harness.expect_search_handles(0, Vec::new(), Arc::new(Mutex::new(Vec::new())));
+    let search_requests = Arc::new(Mutex::new(Vec::new()));
+    harness.expect_search_handles(1, vec![matching], Arc::clone(&search_requests));
 
     let result = harness
         .service
@@ -1091,10 +1068,11 @@ async fn narrows_exact_selectors_by_the_label_filter() {
     assert_eq!(result.targets[0].id, matching_id);
     assert_eq!(result.ignored_selectors.len(), 1);
 
-    let selectors = batch_selectors.lock().unwrap();
-    assert_eq!(selectors.len(), 1);
+    // No follow-up search: filtering exact selectors must stay one round trip.
+    let requests = search_requests.lock().unwrap();
+    assert_eq!(requests.len(), 1);
     assert_eq!(
-        selectors[0].label_filter.as_ref(),
+        requests[0].label_filter.as_ref(),
         Some(&environment_label_filter())
     );
 }
@@ -1112,10 +1090,8 @@ async fn leaves_exact_selectors_untouched_without_a_label_filter() {
     };
 
     let mut harness = ResourceSelectionResolutionHarness::new();
-    harness.expect_get_handles(1, vec![handle], Arc::new(Mutex::new(Vec::new())));
-
     // Still exactly one round trip, with no filter attached.
-    harness.expect_search_handles(0, Vec::new(), Arc::new(Mutex::new(Vec::new())));
+    harness.expect_search_handles(1, vec![handle], Arc::new(Mutex::new(Vec::new())));
 
     let result = harness
         .service
@@ -1187,92 +1163,6 @@ impl ResourceSelectionResolutionHarness {
             .returning(move || Ok(supported_resource_types.clone()));
     }
 
-    fn expect_get_handle(
-        &mut self,
-        times: usize,
-        get_handle_results: HashMap<String, Option<ResourceHandle>>,
-        get_handle_requests: Arc<Mutex<Vec<ResourceSelector>>>,
-    ) {
-        self.facade
-            .expect_get_handle()
-            .times(times)
-            .returning(move |selector| {
-                get_handle_requests.lock().unwrap().push(selector.clone());
-
-                if let Some(handle) = get_handle_results
-                    .get(selector.resource_type.as_str())
-                    .cloned()
-                    .flatten()
-                {
-                    return Ok(handle);
-                }
-
-                // The resolution service always calls `get_handle` with the
-                // already-resolved canonical selector name, never a raw alias.
-                let type_name =
-                    kamu_resources::TypeName::new_unchecked(selector.resource_type.as_str());
-
-                match selector.resource_ref {
-                    ResourceRef::ById(id) => Err(ResourceLookupProblem::IDNotFound(
-                        kamu_resources::ResourceIDNotFoundError(id),
-                    )
-                    .into()),
-                    ResourceRef::ByName(name) => Err(ResourceLookupProblem::NameNotFound(
-                        ResourceNameNotFoundError { type_name, name },
-                    )
-                    .into()),
-                }
-            });
-    }
-
-    /// Answers a batch exact lookup with `handles`, matched by name against
-    /// the requested refs so request order is preserved.
-    fn expect_get_handles(
-        &mut self,
-        times: usize,
-        handles: Vec<ResourceHandle>,
-        batch_selectors: Arc<Mutex<Vec<kamu_resources_facade::ResourceBatchSelector>>>,
-    ) {
-        self.facade
-            .expect_get_handles()
-            .times(times)
-            .returning(move |selector| {
-                batch_selectors.lock().unwrap().push(selector.clone());
-
-                let mut successes = Vec::new();
-                let mut problems = Vec::new();
-
-                for (request_index, resource_ref) in selector.resource_refs.iter().enumerate() {
-                    let ResourceRef::ByName(name) = resource_ref else {
-                        panic!("this harness resolves exact selectors by name only");
-                    };
-
-                    match handles.iter().find(|handle| handle.name == *name) {
-                        Some(handle) => {
-                            successes.push(kamu_resources_facade::BatchResourceSuccess {
-                                request_index,
-                                item: handle.clone(),
-                            });
-                        }
-                        None => problems.push(kamu_resources_facade::BatchResourceProblem {
-                            request_index,
-                            error: ResourceLookupProblem::NameNotFound(ResourceNameNotFoundError {
-                                type_name: kamu_resources::TypeName::new_unchecked(
-                                    selector.resource_type.as_str(),
-                                ),
-                                name: name.clone(),
-                            }),
-                        }),
-                    }
-                }
-
-                Ok(kamu_resources_facade::BatchResourceResponse {
-                    successes,
-                    problems,
-                })
-            });
-    }
-
     fn exact_selection_item(&self, name: &str) -> ResourceSelectionItem {
         ResourceSelectionItem::Exact(resources::ResourceExactSelector {
             type_descriptor: self.variableset_type_descriptor(),
@@ -1305,12 +1195,6 @@ impl ResourceSelectionResolutionHarness {
             .expect_search_handles()
             .times(times)
             .returning(move |request| {
-                // Mirrors the real facade: it rejects requests with neither field set.
-                assert!(
-                    request.exact_names.is_some() || request.name_pattern.is_some(),
-                    "search_handles request carries neither exact_names nor name_pattern, which \
-                     the real facade rejects: {request:?}"
-                );
                 search_requests.lock().unwrap().push(request);
                 Ok(SearchResourceHandlesResponse {
                     total_count: search_results.len(),

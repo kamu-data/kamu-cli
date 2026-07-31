@@ -13,7 +13,6 @@ use internal_error::InternalError;
 use crate::facade::graphql::cynic_api::fragments::{
     BatchResourceProblem,
     ResourceBadAccountProblem,
-    ResourceInvalidLabelFilterProblem,
     ResourceManifestFormat,
     ResourceRenderManifestResult,
     ResourceSelectorProblemResult,
@@ -82,7 +81,6 @@ pub(crate) enum BatchResourceManifestsOutcome {
     BatchResourceManifestsResult(BatchResourceManifestsResult),
     ResourceUnsupportedSelectorProblem(ResourceUnsupportedSelectorProblem),
     ResourceBadAccountProblem(ResourceBadAccountProblem),
-    ResourceInvalidLabelFilterProblem(ResourceInvalidLabelFilterProblem),
     #[cynic(fallback)]
     Unknown,
 }

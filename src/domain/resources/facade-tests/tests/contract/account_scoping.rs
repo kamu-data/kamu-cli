@@ -9,7 +9,7 @@
 
 use database_common::PaginationOpts;
 use kamu_configuration::VariableSetResource;
-use kamu_resources::{ResourceAccountRef, ResourceID, ResourceSchemaProvider};
+use kamu_resources::{ResourceAccountRef, ResourceID, ResourceSchemaProvider, ResourceSearchQuery};
 use kamu_resources_facade::{
     ApplyManifestError,
     ApplyManifestRequest,
@@ -153,7 +153,6 @@ fn batch_selector_by_name(
 ) -> ResourceBatchSelector {
     ResourceBatchSelector {
         account,
-        label_filter: None,
         resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
         resource_refs: vec![ResourceRef::ByName(name.parse().unwrap())],
     }
@@ -459,8 +458,7 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
     let alice_search = alice
         .search_handles(SearchResourceHandlesRequest {
             raw_type_selectors: vec![VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()],
-            exact_names: None,
-            name_pattern: Some("acct-%".to_string()),
+            query: ResourceSearchQuery::NamePattern("acct-%".to_string()),
             account: None,
             label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
@@ -470,8 +468,7 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
     let bob_search = bob
         .search_handles(SearchResourceHandlesRequest {
             raw_type_selectors: vec![VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()],
-            exact_names: None,
-            name_pattern: Some("acct-%".to_string()),
+            query: ResourceSearchQuery::NamePattern("acct-%".to_string()),
             account: None,
             label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),

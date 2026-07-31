@@ -68,9 +68,12 @@ Each RF scenario from the original plan is listed with its status.
 | RF-086  | list_search.rs      | Active   | List unsupported type returns unsupported descriptor error            |                                                                        |
 | RF-090  | list_search.rs      | Active   | Search by exact names                                                 |                                                                        |
 | RF-091  | list_search.rs      | Active   | Search by exact names with missing names                              |                                                                        |
+| RF-091A | list_search.rs      | Active   | Search by exact ids                                                   | Extension beyond original plan                                         |
+| RF-091B | list_search.rs      | Active   | Search by exact ids with missing ids                                  | Extension beyond original plan                                         |
+| RF-091C | list_search.rs      | Active   | Search by exact ids is account-scoped                                 | Extension beyond original plan                                         |
 | RF-092  | list_search.rs      | Active   | Search by name pattern                                                |                                                                        |
 | RF-093  | list_search.rs      | Active   | Search by multiple types                                              |                                                                        |
-| RF-094  | list_search.rs      | Active   | Search with neither exact names nor pattern is rejected               |                                                                        |
+| RF-094  | list_search.rs      | Active   | Search with an empty exact-names/ids list is vacuous, not rejected    | `ResourceSearchQuery` makes "no query mode" unrepresentable            |
 | RF-095  | list_search.rs      | Active   | Search pagination and total_count                                     |                                                                        |
 | RF-096  | list_search.rs      | Active   | Search account scoping                                                |                                                                        |
 | RF-097  | list_search.rs      | Active   | List filter by canonical label URI is accepted                        | Local-only: repo matching is Phase 9, remote transport is Phase 10   |

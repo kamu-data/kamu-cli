@@ -23,7 +23,6 @@ use crate::queries::{
     ResourceHandle,
     ResourceHandleConnection,
     ResourceInvalidLabelFilterProblem,
-    ResourceInvalidSearchQueryProblem,
     ResourceLabelFilterInput,
     ResourceManifestFormat,
     ResourceRenderManifestResult,
@@ -159,9 +158,6 @@ impl Resources {
             Err(kamu_resources_facade::BatchResourceError::BadAccount(e)) => Ok(
                 BatchResourcesOutcome::BadAccount(map_bad_account_problem(e)?),
             ),
-            Err(kamu_resources_facade::BatchResourceError::InvalidLabelFilter(e)) => {
-                Ok(BatchResourcesOutcome::InvalidLabelFilter(e.into()))
-            }
             Err(e) => Err(map_batch_resource_error(e)),
         }
     }
@@ -213,9 +209,6 @@ impl Resources {
             Err(kamu_resources_facade::BatchResourceError::BadAccount(e)) => Ok(
                 BatchResourceHandlesOutcome::BadAccount(map_bad_account_problem(e)?),
             ),
-            Err(kamu_resources_facade::BatchResourceError::InvalidLabelFilter(e)) => {
-                Ok(BatchResourceHandlesOutcome::InvalidLabelFilter(e.into()))
-            }
             Err(e) => Err(map_batch_resource_error(e)),
         }
     }
@@ -308,9 +301,6 @@ impl Resources {
             Err(kamu_resources_facade::ListResourcesError::BadAccount(error)) => Ok(
                 ResourceHandleListOutcome::BadAccount(map_bad_account_problem(error)?),
             ),
-            Err(kamu_resources_facade::ListResourcesError::InvalidSearchQuery(error)) => {
-                Ok(ResourceHandleListOutcome::InvalidSearchQuery(error.into()))
-            }
             Err(kamu_resources_facade::ListResourcesError::InvalidLabelFilter(error)) => {
                 Ok(ResourceHandleListOutcome::InvalidLabelFilter(error.into()))
             }
@@ -355,9 +345,6 @@ impl Resources {
             Err(kamu_resources_facade::ListResourcesError::BadAccount(error)) => Ok(
                 ResourceHandleListOutcome::BadAccount(map_bad_account_problem(error)?),
             ),
-            Err(kamu_resources_facade::ListResourcesError::InvalidSearchQuery(error)) => {
-                Ok(ResourceHandleListOutcome::InvalidSearchQuery(error.into()))
-            }
             Err(kamu_resources_facade::ListResourcesError::InvalidLabelFilter(error)) => {
                 Ok(ResourceHandleListOutcome::InvalidLabelFilter(error.into()))
             }
@@ -514,9 +501,6 @@ impl Resources {
             Err(kamu_resources_facade::BatchResourceError::BadAccount(e)) => Ok(
                 BatchResourceManifestsOutcome::BadAccount(map_bad_account_problem(e)?),
             ),
-            Err(kamu_resources_facade::BatchResourceError::InvalidLabelFilter(e)) => {
-                Ok(BatchResourceManifestsOutcome::InvalidLabelFilter(e.into()))
-            }
             Err(e) => Err(map_batch_resource_error(e)),
         }
     }
@@ -573,7 +557,6 @@ pub enum ResourceHandleListOutcome {
     Success(ResourceHandleConnection),
     UnsupportedSelector(ResourceUnsupportedSelectorProblem),
     BadAccount(ResourceBadAccountProblem),
-    InvalidSearchQuery(ResourceInvalidSearchQueryProblem),
     InvalidLabelFilter(ResourceInvalidLabelFilterProblem),
 }
 
@@ -657,7 +640,6 @@ fn map_list_resources_error(error: kamu_resources_facade::ListResourcesError) ->
     match error {
         E::UnsupportedSelector(_) => GqlError::gql("Unsupported resource type selector"),
         E::BadAccount(error) => map_resolve_manifest_account_error(error),
-        E::InvalidSearchQuery(error) => GqlError::gql(error.to_string()),
         E::InvalidLabelFilter(error) => GqlError::gql(error.to_string()),
         E::RemoteRequest(error) => error.int_err().into(),
         E::Internal(error) => error.into(),

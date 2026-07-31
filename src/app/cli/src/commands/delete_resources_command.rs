@@ -226,8 +226,6 @@ impl DeleteResourcesCommand {
                 .resource_facade
                 .delete_many(ResourceBatchSelector {
                     account: None,
-                    // Ids come from the already-filtered expansion phase.
-                    label_filter: None,
                     resource_type: entries
                         .first()
                         .map(|(_, target)| {

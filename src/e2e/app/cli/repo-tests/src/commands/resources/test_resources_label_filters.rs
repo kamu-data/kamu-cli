@@ -281,20 +281,16 @@ pub async fn test_resources_label_filter_delete(ctx: ResourceCtx) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// KNOWN DEFECT (not yet fixed): a wildcard *type* pattern combined with an
-// *exact* name/id (`%/prod-vars`) resolves via `TypePatternExactName`, which
-// calls `ResourceFacade::get_handle` — a scalar lookup whose `ResourceSelector`
-// has no `label_filter` field at all. `-l` is silently dropped on this one
-// selector shape, unlike the `Exact` item (`vs/prod-vars`), which correctly
-// filters through the batched `get_handles`/`ResourceBatchSelector` path (see
-// `test_resources_label_filter_get`'s "exact selector" case above). This test
-// is expected to fail until that path is rewired to carry the filter.
-pub async fn test_resources_label_filter_type_pattern_exact_name_ignores_filter(ctx: ResourceCtx) {
+// A wildcard *type* pattern combined with an *exact* name/id (`%/prod-vars`)
+// resolves via `TypePatternExactName`, which now routes through
+// `search_handles` (like `TypePatternAll`/`TypePatternNamePattern`) instead of
+// the unfiltered scalar `get_handle` path, so `-l` is respected here too.
+pub async fn test_resources_label_filter_type_pattern_exact_name(ctx: ResourceCtx) {
     seed_labeled_variable_sets(&ctx).await;
 
+    // ── Non-matching filter excludes a `ByName` ref ──────────────────────────
     // `prod-vars` carries `environment=production`, not `staging`, so a
-    // correctly filtered lookup must exclude it — exactly like the `Exact`
-    // selector case does for the same resource/filter combination.
+    // correctly filtered lookup must exclude it.
     let excluded = ctx
         .stdout([
             "get",
@@ -311,6 +307,39 @@ pub async fn test_resources_label_filter_type_pattern_exact_name_ignores_filter(
         "a type-pattern + exact-name selector must still be subject to the label filter, \
          got:\n{excluded}"
     );
+
+    // ── Matching filter still returns the resource ───────────────────────────
+    let view = ctx
+        .get_one(["get", "%/prod-vars", "-l", "environment=production"])
+        .await;
+    assert_eq!(view.name(), "prod-vars");
+
+    // ── Same coverage for a `ById` ref ────────────────────────────────────────
+    // The type-pattern segment resolves any UUIDv4-shaped selector to `ById`
+    // before the exact match, so that ref kind needs its own assertion.
+    let id = ctx.resource_id("vs", "prod-vars").await;
+
+    let excluded_by_id = ctx
+        .stdout([
+            "get",
+            &format!("%/{id}"),
+            "-l",
+            "environment=staging",
+            "-o",
+            "json",
+            "--ignore-not-found",
+        ])
+        .await;
+    assert!(
+        excluded_by_id.trim().is_empty(),
+        "a type-pattern + exact-id selector must still be subject to the label filter, \
+         got:\n{excluded_by_id}"
+    );
+
+    let view_by_id = ctx
+        .get_one(["get", &format!("%/{id}"), "-l", "environment=production"])
+        .await;
+    assert_eq!(view_by_id.name(), "prod-vars");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

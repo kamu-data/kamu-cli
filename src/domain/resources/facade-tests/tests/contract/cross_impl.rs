@@ -270,7 +270,6 @@ pub async fn test_batch_equivalence(h: &impl FacadeContractHarness) {
 
     let batch_selector = ResourceBatchSelector {
         account: None,
-        label_filter: None,
         resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
         resource_refs: vec![
             ResourceRef::ByName("cross-batch-a".parse().unwrap()), // idx 0 — exists

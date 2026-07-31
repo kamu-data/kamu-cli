@@ -146,7 +146,6 @@ pub async fn test_spec_view_mode_applies_to_batch_get(h: &impl FacadeContractHar
 
     let batch_selector = ResourceBatchSelector {
         account: None,
-        label_filter: None,
         resource_type: SECRET_SET_CANONICAL_SELECTOR.parse().unwrap(),
         resource_refs: vec![ResourceRef::ById(id_a), ResourceRef::ById(id_b)],
     };

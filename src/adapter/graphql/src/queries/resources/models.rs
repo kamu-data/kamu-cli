@@ -138,7 +138,6 @@ pub struct ResourceBatchSelectorInput {
     #[graphql(name = "refs")]
     pub resource_refs: Vec<ResourceRefInput>,
     pub account: Option<AccountRefInput>,
-    pub label_filter: Option<ResourceLabelFilterInput>,
 }
 
 impl From<ResourceSelectorInput> for kamu_resources_facade::ResourceSelector {
@@ -161,8 +160,33 @@ impl TryFrom<ResourceBatchSelectorInput> for kamu_resources_facade::ResourceBatc
             account: value.account.map(AccountRefInput::into_manifest_account),
             resource_type: value.resource_type.into_resource_type_selector(),
             resource_refs: value.resource_refs.into_iter().map(Into::into).collect(),
-            label_filter: into_facade_filter(value.label_filter)?,
         })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Exactly one way to narrow a search — mirrors
+/// [`kamu_resources::ResourceSearchQuery`]; `@oneOf` rejects invalid
+/// combinations before the resolver runs.
+#[derive(OneofObject, Debug, Clone)]
+pub enum ResourceSearchQueryInput {
+    ExactNames(Vec<ResourceName<'static>>),
+    ExactIds(Vec<ResourceID<'static>>),
+    NamePattern(String),
+}
+
+impl From<ResourceSearchQueryInput> for kamu_resources::ResourceSearchQuery {
+    fn from(value: ResourceSearchQueryInput) -> Self {
+        match value {
+            ResourceSearchQueryInput::ExactNames(names) => {
+                Self::ExactNames(names.into_iter().map(Into::into).collect())
+            }
+            ResourceSearchQueryInput::ExactIds(ids) => {
+                Self::ExactIds(ids.into_iter().map(Into::into).collect())
+            }
+            ResourceSearchQueryInput::NamePattern(pattern) => Self::NamePattern(pattern),
+        }
     }
 }
 
@@ -171,8 +195,7 @@ impl TryFrom<ResourceBatchSelectorInput> for kamu_resources_facade::ResourceBatc
 #[derive(InputObject, Debug, Clone)]
 pub struct SearchResourceHandlesInput {
     pub resource_types: Vec<ResourceTypeSelectorInput>,
-    pub names: Option<Vec<ResourceName<'static>>>,
-    pub name_pattern: Option<String>,
+    pub query: ResourceSearchQueryInput,
     pub account: Option<AccountRefInput>,
     pub label_filter: Option<ResourceLabelFilterInput>,
 }
@@ -188,10 +211,7 @@ impl SearchResourceHandlesInput {
                 .into_iter()
                 .map(ResourceTypeSelectorInput::into_resource_type_selector)
                 .collect(),
-            exact_names: self
-                .names
-                .map(|names| names.into_iter().map(Into::into).collect()),
-            name_pattern: self.name_pattern,
+            query: self.query.into(),
             account: self.account.map(AccountRefInput::into_manifest_account),
             label_filter: into_facade_filter(self.label_filter)?,
             pagination,
@@ -500,23 +520,6 @@ impl TryFrom<kamu_resources::UnsupportedResourceSelectorError> for ResourceSelec
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(SimpleObject, Debug, Clone)]
-pub struct ResourceInvalidSearchQueryProblem {
-    pub message: String,
-}
-
-impl From<kamu_resources_facade::InvalidResourceSearchQueryError>
-    for ResourceInvalidSearchQueryProblem
-{
-    fn from(value: kamu_resources_facade::InvalidResourceSearchQueryError) -> Self {
-        Self {
-            message: value.to_string(),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 /// The `labelFilter` argument could not be resolved into a matchable filter.
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceInvalidLabelFilterProblem {
@@ -584,7 +587,6 @@ pub enum BatchResourcesOutcome {
     Success(BatchResourcesResult),
     UnsupportedSelector(ResourceUnsupportedSelectorProblem),
     BadAccount(ResourceBadAccountProblem),
-    InvalidLabelFilter(ResourceInvalidLabelFilterProblem),
 }
 
 #[derive(SimpleObject, Debug, Clone)]
@@ -624,7 +626,6 @@ pub enum BatchResourceManifestsOutcome {
     Success(BatchResourceManifestsResult),
     UnsupportedSelector(ResourceUnsupportedSelectorProblem),
     BadAccount(ResourceBadAccountProblem),
-    InvalidLabelFilter(ResourceInvalidLabelFilterProblem),
 }
 
 #[derive(SimpleObject, Debug, Clone)]
@@ -693,7 +694,6 @@ pub enum BatchResourceHandlesOutcome {
     Success(BatchResourceHandlesResult),
     UnsupportedSelector(ResourceUnsupportedSelectorProblem),
     BadAccount(ResourceBadAccountProblem),
-    InvalidLabelFilter(ResourceInvalidLabelFilterProblem),
 }
 
 #[derive(SimpleObject, Debug, Clone)]

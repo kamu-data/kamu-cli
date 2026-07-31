@@ -155,13 +155,6 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         let schema =
             self.resolve_schema_for_selector::<BatchResourceError>(&selector.resource_type)?;
 
-        let resource_schema = ResourceSchemaId::try_from(&schema).int_err()?;
-        let label_filter = resolve_label_filter(
-            &self.resource_extension_schema_resolver,
-            selector.label_filter.clone(),
-            &resource_schema,
-        )?;
-
         let groups = group_batch_resource_refs(selector);
         let resolution_response = resolve_batch_ids(
             self.generic_resource_query_service.as_ref(),
@@ -177,7 +170,6 @@ impl ResourceFacade for LocalResourceFacadeImpl {
                 &schema,
                 resolution_response.id_entries,
                 resolution_response.problems,
-                &label_filter,
             )
             .await?;
 
@@ -318,8 +310,13 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         &self,
         request: SearchResourceHandlesRequest,
     ) -> Result<SearchResourceHandlesResponse, ListResourcesError> {
-        if request.exact_names.is_none() && request.name_pattern.is_none() {
-            return Err(InvalidResourceSearchQueryError.into());
+        // An empty `ExactNames`/`ExactIds` query can never match anything;
+        // short-circuit here rather than round-tripping to the repository.
+        if request.query.is_vacuous() {
+            return Ok(SearchResourceHandlesResponse {
+                items: Vec::new(),
+                total_count: 0,
+            });
         }
 
         let target_account = self
@@ -360,8 +357,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .search_resource_handles(
                 &target_account.did,
                 &schemas,
-                request.exact_names.as_deref(),
-                request.name_pattern.as_deref(),
+                &request.query,
                 &label_filter,
                 request.pagination,
             )
@@ -371,8 +367,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .count_search_resource_handles(
                 &target_account.did,
                 &schemas,
-                request.exact_names.as_deref(),
-                request.name_pattern.as_deref(),
+                &request.query,
                 &label_filter,
             )
             .await?;
@@ -546,13 +541,6 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         let schema =
             self.resolve_schema_for_selector::<BatchResourceError>(&selector.resource_type)?;
 
-        let resource_schema = ResourceSchemaId::try_from(&schema).int_err()?;
-        let label_filter = resolve_label_filter(
-            &self.resource_extension_schema_resolver,
-            selector.label_filter.clone(),
-            &resource_schema,
-        )?;
-
         let groups = group_batch_resource_refs(selector);
         let resolution_response = resolve_batch_ids(
             self.generic_resource_query_service.as_ref(),
@@ -575,7 +563,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 
         let rows_by_id = self
             .generic_resource_query_service
-            .find_resource_handles_by_ids(&target_account.did, &ids, &label_filter)
+            .find_resource_handles_by_ids(&target_account.did, &ids)
             .await?
             .into_iter()
             .map(|row| (row.id, row))
@@ -636,7 +624,6 @@ impl ResourceFacade for LocalResourceFacadeImpl {
                 account: selector.account,
                 resource_type: selector.resource_type,
                 resource_refs: vec![selector.resource_ref],
-                label_filter: None,
             })
             .await?;
 
@@ -880,7 +867,6 @@ impl LocalResourceFacadeImpl {
         schema: &TypeUri,
         id_entries: BatchIdEntries,
         mut problems: Vec<BatchResourceProblem<ResourceLookupProblem>>,
-        label_filter: &ResolvedResourceLabelFilter,
     ) -> Result<
         (
             Vec<IndexedResource<ResourceHandle>>,
@@ -892,7 +878,7 @@ impl LocalResourceFacadeImpl {
 
         let rows_by_id = self
             .generic_resource_query_service
-            .find_resource_handles_by_ids(account_id, &ids, label_filter)
+            .find_resource_handles_by_ids(account_id, &ids)
             .await?
             .into_iter()
             .map(|row| (row.id, row))
@@ -900,9 +886,8 @@ impl LocalResourceFacadeImpl {
 
         let mut handles = Vec::new();
         for (request_index, resource_ref, id) in id_entries {
-            // A row can be absent because the id does not exist or because the
-            // label filter excluded it. Either way, report the miss in the
-            // terms the caller selected by, so a filtered-out `vs/my-vars`
+            // A row can be absent because the id does not exist. Report the
+            // miss in the terms the caller selected by, so `vs/my-vars`
             // still names `my-vars` rather than its resolved id.
             let not_found = || match &resource_ref {
                 ResourceRef::ByName(name) => resource_type_name(schema)

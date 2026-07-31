@@ -826,7 +826,7 @@ pub trait ResourceFacade: Send + Sync {
 
     async fn list(&self, request: ListResourcesRequest) -> Result<Vec<ResourceSummaryView>, ...>;
     async fn list_handles(&self, request: ListResourceHandlesRequest) -> ...;
-    async fn search_handles(&self, request: SearchResourceHandlesRequest) -> ...;
+    async fn search_handles(&self, request: SearchResourceHandlesRequest) -> ...; // request.query: ResourceSearchQuery
     async fn list_all(&self, request: ListAllResourcesRequest) -> ...;
     async fn list_all_handles(&self, request: ListAllResourceHandlesRequest) -> ...;
 
@@ -893,17 +893,26 @@ on demand by the CLI for remote contexts — see [§12](#12-cli).)
 `ListResourceHandlesRequest`, and `SearchResourceHandlesRequest` each carry an
 optional `label_filter: Option<ResourceLabelFilterInput>` (`ResourceLabelFilterInput`
 is a `kamu_resources` type alias to `odf::metadata::resource::LabelFilter`, raw
-`String`-keyed entries), as does `ResourceBatchSelector`.
+`String`-keyed entries). `ResourceBatchSelector` does **not** — it never did
+anything but forward the field to `get_handles`/`delete_many`, and the last
+producer of a non-`None` value (`Exact` selector resolution) has since moved to
+`search_handles`, so the field was removed rather than left permanently unused.
 
 Filtering covers `get` and `delete` as well as `list` because the CLI resolves
 those in **two phases**: it first expands type/name patterns into identifiers via
 `search_handles`/`list_handles`, then operates on the resulting `ResourceRef::ById`
 set. A label filter is a *narrowing of the candidate identifier set* — structurally
 the same job as a name pattern — so it belongs to that phase-1 expansion. The
-phase-2 batch calls (`get_many`, `delete_many`, `render_manifests`) therefore pass
-`label_filter: None` **by design**: their ids were already narrowed. That is an
-ordering precondition held by convention, not by the type system — see the
-`FilteredResourceIds` note in [§17](#17-extension-points--gotchas).
+phase-2 batch calls (`get_many`, `delete_many`, `render_manifests`) structurally
+**cannot** carry a filter — `ResourceBatchSelector` has no such field — so the old
+"pass `label_filter: None` by convention" precondition is now enforced by the type
+system instead of by discipline.
+
+`search_handles`'s `query: ResourceSearchQuery` field (`ExactNames(Vec<ResourceName>)`
+/ `ExactIds(Vec<ResourceID>)` / `NamePattern(String)`) replaces what used to be two
+independently-optional fields (`exact_names`, `name_pattern`) that were never
+legitimately combined — every caller set exactly one. The enum makes "exactly one
+selection mode" a type-level invariant instead of a runtime convention.
 
 Resolution happens in the local facade, strictly before dispatch, through the same
 `ResourceExtensionSchemaResolver` used by manifest apply (`ResourceExtensionKind::Label`).
@@ -1032,9 +1041,17 @@ These map directly from the domain views in
 
 **Label-filter transport.** `ResourceLabelFilterInput { entries: [ResourceLabelFilterEntryInput!]! }`
 carries the filter, where each entry is `{ key: String!, value: JSON! }`. It is accepted by
-`list_by_resource_type`, `list_handles_by_resource_type`, `search_handles`, and (via
-`ResourceBatchSelectorInput`) the batch `resources`/`render_manifests` queries and the
-`delete_many` mutation.
+`list_by_resource_type`, `list_handles_by_resource_type`, and `search_handles`.
+`ResourceBatchSelectorInput` — used by the batch `resources`/`render_manifests` queries and the
+`delete_many` mutation — does not carry a `labelFilter` field at all.
+
+**`search_handles`'s query is a `oneOf` input.** `SearchResourceHandlesInput.query:
+ResourceSearchQueryInput!` replaces the old independently-optional `names`/`namePattern`
+fields. `ResourceSearchQueryInput` is declared `@oneOf` with three single-field
+variants (`exactNames: [ResourceName!]`, `exactIds: [ResourceID!]`, `namePattern: String`) —
+exactly one may be set, enforced by the GraphQL layer itself before the resolver runs. On the
+Rust side this is `#[derive(async_graphql::OneofObject)]`; the `cynic` client side has matching
+`oneOf`-input codegen.
 
 Entries are a **list, not a map**, so a key repeated by the caller reaches the server intact and is
 reported as a duplicate rather than one spelling silently winning — a map would collapse it in the
@@ -1522,15 +1539,13 @@ Otherwise the behavior is already guaranteed for both implementations by the con
 - **Local ≡ remote is a contract-test invariant for covered behavior** — the `contract_test!` suite
   enforces parity only for the cases it exercises (not untested paths); when changing facade
   behavior, extend that suite so both implementations stay in lockstep.
-- **Phase-1 expansion is where label filters apply — phase-2 `None` is load-bearing.** `get` and
+- **Phase-1 expansion is where label filters apply — phase-2 has no filter to misuse.** `get` and
   `delete` first expand selectors into identifiers (filtered), then act on those ids by
   `ResourceRef::ById`. The phase-2 batch calls — `get_many`, `delete_many`, `render_manifests` —
-  therefore pass `label_filter: None` deliberately. **This is an ordering precondition enforced by
-  convention, not by types.** A future caller that reaches those batch methods with ids that did
-  *not* come from a filtered expansion would silently return resources the filter should have
-  excluded, with no error and no failing test. If you add such a caller, filter during expansion —
-  do not add a second filter to the batch call. (A `FilteredResourceIds` newtype making this
-  compiler-checked is planned but not yet implemented.)
+  take a `ResourceBatchSelector`, which has no `label_filter` field at all, so a future caller
+  cannot reach those methods with an unfiltered id set and a forgotten filter: there is nothing to
+  forget. If a new batch selector shape ever needs filtering, filter during expansion (phase 1)
+  rather than adding a filter field to the batch call.
 - **The label-filter capability boundary is `flatten_conjunction`, in one place.** The resolved
   filter is a full boolean tree, but evaluation is AND-only. Every backend routes through that one
   domain helper, which rejects `Not`/`Or`. Widening support means changing it and the backends —

@@ -15,6 +15,7 @@ use crate::{
     ResourceHandleRow,
     ResourceID,
     ResourceName,
+    ResourceSearchQuery,
     ResourceSnapshot,
     ResourceSummaryRow,
     ResourceTypeMismatchError,
@@ -43,7 +44,6 @@ pub trait GenericResourceQueryService: Send + Sync {
         &self,
         account_id: &odf::AccountID,
         ids: &[ResourceID],
-        label_filter: &ResolvedResourceLabelFilter,
     ) -> Result<Vec<ResourceHandleRow>, InternalError>;
 
     /// Matches names case-insensitively. Names that do not exist are absent
@@ -59,8 +59,7 @@ pub trait GenericResourceQueryService: Send + Sync {
         &self,
         account_id: &odf::AccountID,
         schemas: &[TypeUri],
-        exact_names: Option<&[ResourceName]>,
-        name_pattern: Option<&str>,
+        query: &ResourceSearchQuery,
         label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceHandleRow>, InternalError>;
@@ -69,8 +68,7 @@ pub trait GenericResourceQueryService: Send + Sync {
         &self,
         account_id: &odf::AccountID,
         schemas: &[TypeUri],
-        exact_names: Option<&[ResourceName]>,
-        name_pattern: Option<&str>,
+        query: &ResourceSearchQuery,
         label_filter: &ResolvedResourceLabelFilter,
     ) -> Result<usize, InternalError>;
 

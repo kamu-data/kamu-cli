@@ -62,11 +62,7 @@ impl<'a> DatasetConfiguration<'a> {
 
         let ids: Vec<_> = bindings.iter().map(|b| b.resource_id).collect();
         let identities = generic_resource_query_svc
-            .find_resource_handles_by_ids(
-                current_account_id,
-                &ids,
-                &kamu_resources::ResolvedResourceLabelFilter::True,
-            )
+            .find_resource_handles_by_ids(current_account_id, &ids)
             .await
             .int_err()?;
 
@@ -118,11 +114,7 @@ impl<'a> DatasetConfiguration<'a> {
 
         let ids: Vec<_> = bindings.iter().map(|b| b.resource_id).collect();
         let identities = generic_resource_query_svc
-            .find_resource_handles_by_ids(
-                current_account_id,
-                &ids,
-                &kamu_resources::ResolvedResourceLabelFilter::True,
-            )
+            .find_resource_handles_by_ids(current_account_id, &ids)
             .await
             .int_err()?;
 

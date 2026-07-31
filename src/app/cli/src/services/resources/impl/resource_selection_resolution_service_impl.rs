@@ -17,10 +17,8 @@ use kamu_resources_facade::{
     GetResourceError,
     ListAllResourceHandlesRequest,
     ListResourceHandlesRequest,
-    ResourceBatchSelector,
     ResourceFacade,
     ResourceLookupProblem,
-    ResourceSelector,
     SearchResourceHandlesRequest,
 };
 
@@ -282,6 +280,7 @@ impl ResourceSelectionResolutionServiceImpl {
                 ResourceSelectionItem::Exact(selector) => Some((
                     index,
                     selector.type_descriptor.canonical_selector.clone().into(),
+                    selector.type_descriptor.schema.clone(),
                     selector.resource_ref.clone(),
                 )),
                 ResourceSelectionItem::All
@@ -297,50 +296,111 @@ impl ResourceSelectionResolutionServiceImpl {
         let mut exact_results = (0..exact_request_count)
             .map(|_| None)
             .collect::<Vec<Option<Result<ResourceHandle, GetResourceError>>>>();
-        let mut groups: BTreeMap<kamu_resources::ResourceTypeSelectorRaw, Vec<_>> = BTreeMap::new();
+        let mut groups: BTreeMap<
+            kamu_resources::ResourceTypeSelectorRaw,
+            (kamu_resources::TypeUri, Vec<_>),
+        > = BTreeMap::new();
 
-        for (exact_index, (_, resource_type, resource_ref)) in
+        for (exact_index, (_, resource_type, schema, resource_ref)) in
             exact_selectors.into_iter().enumerate()
         {
             groups
                 .entry(resource_type)
-                .or_insert_with(Vec::new)
+                .or_insert_with(|| (schema, Vec::new()))
+                .1
                 .push((exact_index, resource_ref));
         }
 
-        for (resource_type, entries) in groups {
-            let exact_batch_result = resource_facade
-                .get_handles(ResourceBatchSelector {
-                    account: None,
-                    resource_type,
-                    resource_refs: entries
-                        .iter()
-                        .map(|(_, resource_ref)| resource_ref.clone())
-                        .collect(),
-                    // Applied by this same lookup, so no follow-up query: a ref
-                    // that resolves but lacks the labels comes back as a
-                    // not-found problem.
-                    label_filter: label_filter.cloned(),
-                })
-                .await?;
-
-            for problem in exact_batch_result.problems {
-                let (exact_index, _) = entries[problem.request_index];
-                exact_results[exact_index] =
-                    Some(Err(Self::lookup_problem_to_get_error(problem.error)));
+        for (resource_type, (schema, entries)) in groups {
+            // `search_handles` carries one query mode at a time, so a group
+            // mixing `ById`/`ByName` refs needs one call per ref kind.
+            let mut by_id = Vec::new();
+            let mut by_name = Vec::new();
+            for (exact_index, resource_ref) in &entries {
+                match resource_ref {
+                    kamu_resources_facade::ResourceRef::ById(id) => by_id.push((*exact_index, *id)),
+                    kamu_resources_facade::ResourceRef::ByName(name) => {
+                        by_name.push((*exact_index, name.clone()));
+                    }
+                }
             }
 
-            for success in exact_batch_result.successes {
-                let (exact_index, _) = entries[success.request_index];
-                exact_results[exact_index] = Some(Ok(success.item));
+            if !by_id.is_empty() {
+                let ids = by_id.iter().map(|(_, id)| *id).collect::<Vec<_>>();
+                let found = resource_facade
+                    .search_handles(SearchResourceHandlesRequest {
+                        raw_type_selectors: vec![resource_type.clone()],
+                        query: kamu_resources::ResourceSearchQuery::ExactIds(ids),
+                        account: None,
+                        label_filter: label_filter.cloned(),
+                        pagination: PaginationOpts {
+                            limit: by_id.len(),
+                            offset: 0,
+                        },
+                    })
+                    .await?
+                    .items
+                    .into_iter()
+                    .map(|handle| (handle.id, handle))
+                    .collect::<HashMap<_, _>>();
+
+                for (exact_index, id) in by_id {
+                    exact_results[exact_index] = Some(match found.get(&id) {
+                        Some(handle) => Ok(handle.clone()),
+                        None => Err(GetResourceError::LookupProblem(
+                            kamu_resources_facade::ResourceLookupProblem::IDNotFound(
+                                kamu_resources::ResourceIDNotFoundError(id),
+                            ),
+                        )),
+                    });
+                }
+            }
+
+            if !by_name.is_empty() {
+                let names = by_name
+                    .iter()
+                    .map(|(_, name)| name.clone())
+                    .collect::<Vec<_>>();
+                let found = resource_facade
+                    .search_handles(SearchResourceHandlesRequest {
+                        raw_type_selectors: vec![resource_type.clone()],
+                        query: kamu_resources::ResourceSearchQuery::ExactNames(names),
+                        account: None,
+                        label_filter: label_filter.cloned(),
+                        pagination: PaginationOpts {
+                            limit: by_name.len(),
+                            offset: 0,
+                        },
+                    })
+                    .await?
+                    .items
+                    .into_iter()
+                    .map(|handle| (handle.name.to_ascii_lowercase(), handle))
+                    .collect::<HashMap<_, _>>();
+
+                // `schema` came from a registered type descriptor, so a
+                // parse failure here is a data-integrity catastrophe.
+                let type_name =
+                    kamu_resources::resource_type_name(&schema).map_err(CLIError::critical)?;
+
+                for (exact_index, name) in by_name {
+                    exact_results[exact_index] =
+                        Some(match found.get(&name.to_ascii_lowercase()) {
+                            Some(handle) => Ok(handle.clone()),
+                            None => Err(GetResourceError::LookupProblem(
+                                kamu_resources_facade::ResourceLookupProblem::NameNotFound(
+                                    kamu_resources::ResourceNameNotFoundError {
+                                        type_name: type_name.clone(),
+                                        name,
+                                    },
+                                ),
+                            )),
+                        });
+                }
             }
         }
 
         Ok(exact_results.into_iter().flatten().collect())
-    }
-
-    fn lookup_problem_to_get_error(error: ResourceLookupProblem) -> GetResourceError {
-        GetResourceError::LookupProblem(error)
     }
 
     async fn process_all_item(
@@ -489,10 +549,11 @@ impl ResourceSelectionResolutionServiceImpl {
                     resource_facade
                         .search_handles(SearchResourceHandlesRequest {
                             raw_type_selectors,
-                            exact_names: None,
-                            // `search_handles` requires a name query; `%` matches
-                            // every name, so it means "no narrowing" here.
-                            name_pattern: Some("%".to_string()),
+                            // `%` matches every name, so it means "no narrowing"
+                            // here.
+                            query: kamu_resources::ResourceSearchQuery::NamePattern(
+                                "%".to_string(),
+                            ),
                             account: None,
                             label_filter: request_label_filter,
                             pagination,
@@ -543,8 +604,9 @@ impl ResourceSelectionResolutionServiceImpl {
                     resource_facade
                         .search_handles(SearchResourceHandlesRequest {
                             raw_type_selectors: vec![(&type_descriptor.canonical_selector).into()],
-                            exact_names: None,
-                            name_pattern: Some(request_name_pattern),
+                            query: kamu_resources::ResourceSearchQuery::NamePattern(
+                                request_name_pattern,
+                            ),
                             account: None,
                             label_filter: request_label_filter,
                             pagination,
@@ -605,52 +667,48 @@ impl ResourceSelectionResolutionServiceImpl {
             ));
         }
 
-        let mut targets = Vec::new();
-        let mut local_seen_target_keys = HashSet::new();
-        let remaining_limit = Self::remaining_expanded_results(expanded_results, options);
-        let mut had_any_match = false;
+        let matched_resource_type_selectors = matched_types
+            .iter()
+            .map(|descriptor| (&descriptor.canonical_selector).into())
+            .collect::<Vec<_>>();
 
-        for type_descriptor in &matched_types {
-            match resource_facade
-                .get_handle(ResourceSelector {
-                    account: None,
-                    resource_type: (&type_descriptor.canonical_selector).into(),
-                    resource_ref: resource_ref.clone(),
-                })
-                .await
-            {
-                Ok(handle) => {
-                    had_any_match = true;
-                    let target_key = Self::target_key_from_handle(&handle);
+        let canonical_selectors_by_schema = Self::canonical_selectors_by_schema(&matched_types);
 
-                    if seen_target_keys.contains(&target_key)
-                        || !local_seen_target_keys.insert(target_key)
-                    {
-                        continue;
-                    }
-
-                    targets.push(Self::target_from_handle(
-                        handle,
-                        type_descriptor.canonical_selector.clone(),
-                        selector_input.clone(),
-                    ));
-
-                    if let Some(limit) = remaining_limit
-                        && targets.len() > limit
-                    {
-                        return Err(Self::max_expanded_results_exceeded_error(
-                            options.max_expanded_results.unwrap_or(limit),
-                        ));
-                    }
-                }
-                Err(GetResourceError::LookupProblem(
-                    ResourceLookupProblem::NameNotFound(_) | ResourceLookupProblem::IDNotFound(_),
-                )) => {}
-                Err(error) => return Err(error.into()),
+        let query = match &resource_ref {
+            kamu_resources_facade::ResourceRef::ById(id) => {
+                kamu_resources::ResourceSearchQuery::ExactIds(vec![*id])
             }
-        }
+            kamu_resources_facade::ResourceRef::ByName(name) => {
+                kamu_resources::ResourceSearchQuery::ExactNames(vec![name.clone()])
+            }
+        };
 
-        if targets.is_empty() && !had_any_match {
+        let collected = Self::collect_unique_bounded_identities(
+            Self::remaining_expanded_results(expanded_results, options),
+            options.max_expanded_results,
+            seen_target_keys,
+            |pagination| {
+                let raw_type_selectors = matched_resource_type_selectors.clone();
+                let request_query = query.clone();
+                let request_label_filter = options.label_filter.clone();
+                async move {
+                    resource_facade
+                        .search_handles(SearchResourceHandlesRequest {
+                            raw_type_selectors,
+                            query: request_query,
+                            account: None,
+                            label_filter: request_label_filter,
+                            pagination,
+                        })
+                        .await
+                        .map(|response| response.items)
+                        .map_err(Into::into)
+                }
+            },
+        )
+        .await?;
+
+        if collected.identities.is_empty() && !collected.had_any_match {
             if options.ignore_not_found {
                 ignored_selectors.push(ResourceIgnoredSelector {
                     type_descriptor: matched_types
@@ -668,7 +726,21 @@ impl ResourceSelectionResolutionServiceImpl {
             ));
         }
 
-        Ok(targets)
+        collected
+            .identities
+            .into_iter()
+            .map(|handle| {
+                let canonical_selector = Self::canonical_selector_for_schema(
+                    &canonical_selectors_by_schema,
+                    &handle.r#type,
+                )?;
+                Ok(Self::target_from_handle(
+                    handle,
+                    canonical_selector.clone(),
+                    selector_input.clone(),
+                ))
+            })
+            .collect()
     }
 
     async fn process_type_pattern_name_pattern_item(
@@ -710,8 +782,9 @@ impl ResourceSelectionResolutionServiceImpl {
                     resource_facade
                         .search_handles(SearchResourceHandlesRequest {
                             raw_type_selectors: request_resource_types,
-                            exact_names: None,
-                            name_pattern: Some(request_name_pattern),
+                            query: kamu_resources::ResourceSearchQuery::NamePattern(
+                                request_name_pattern,
+                            ),
                             account: None,
                             label_filter: request_label_filter,
                             pagination,
