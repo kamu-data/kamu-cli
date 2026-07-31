@@ -20,7 +20,6 @@ mod test_resources_get_selectors;
 mod test_resources_golden_view;
 mod test_resources_id_lookup;
 mod test_resources_label_filters;
-mod test_resources_manifest_account;
 mod test_resources_multitenant_isolation;
 mod test_resources_output_formats;
 mod test_resources_secretset;

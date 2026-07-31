@@ -139,23 +139,23 @@ pub async fn test_resources_secretset_lifecycle(ctx: ResourceCtx) {
         Some(&[r#"Resource 'app-secrets' of type 'SecretSet' was not found"#]),
     )
     .await;
+
+    // ── 11. Apply a manifest whose secret is ALREADY encrypted ───────────────
+    //
+    // Exercises the already-encrypted apply path — the GitOps case where a
+    // committed manifest carries `{ value: <jwe>, contentEncoding: jwe }`
+    // instead of a plaintext value. The sanitizer must accept the encrypted
+    // value as-is (not re-encrypt it), and `--revealed` must decrypt it back
+    // to the original plaintext. Shares this fixture's `with_kamu_config`
+    // wiring rather than needing its own. The JWE token is tied to the
+    // configured sample encryption key; see
+    // `fixtures::PRE_ENCRYPTED_API_TOKEN_JWE` for how it was produced.
+    test_resources_secretset_apply_pre_encrypted(&ctx).await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Scenario: apply a manifest whose secret is ALREADY encrypted (QA scenario 3)
-//
-// Exercises the already-encrypted apply path — the GitOps case where a
-// committed manifest carries `{ value: <jwe>, contentEncoding: jwe }` instead
-// of a plaintext value. The sanitizer must accept the encrypted value as-is
-// (not re-encrypt it), and `--revealed` must decrypt it back to the original
-// plaintext.
-//
-// The JWE token is tied to the configured sample encryption key; see
-// `fixtures::PRE_ENCRYPTED_API_TOKEN_JWE` for how it was produced. Wire with
-// `Options::with_kamu_config(fixtures::SECRETS_ENCRYPTION_KAMU_CONFIG)`.
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_resources_secretset_apply_pre_encrypted(ctx: ResourceCtx) {
+async fn test_resources_secretset_apply_pre_encrypted(ctx: &ResourceCtx) {
     let resource_name = "gitops-secrets";
 
     ctx.assert_resource_absent("ss", resource_name).await;

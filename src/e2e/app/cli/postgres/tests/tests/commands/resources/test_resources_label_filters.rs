@@ -16,17 +16,7 @@ use kamu_cli_e2e_common::prelude::*;
 
 kamu_cli_resource_e2e_test!(
     storage = postgres,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_resources_label_filter_list
-);
-
-kamu_cli_resource_e2e_test!(
-    storage = postgres,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_resources_label_filter_list_all
-);
-
-kamu_cli_resource_e2e_test!(
-    storage = postgres,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_resources_label_filter_get
+    fixture = kamu_cli_e2e_repo_tests::commands::test_resources_label_filter_read_paths
 );
 
 kamu_cli_resource_e2e_test!(
@@ -40,29 +30,13 @@ kamu_cli_resource_e2e_test!(
         kamu_cli_e2e_repo_tests::commands::test_resources_label_filter_type_pattern_exact_name
 );
 
-// Apply `SecretSet`s, hence `with_kamu_config`.
+// Applies `SecretSet`s, hence `with_kamu_config`.
 kamu_cli_resource_e2e_test!(
     storage = postgres,
-    fixture =
-        kamu_cli_e2e_repo_tests::commands::test_resources_label_filter_type_pattern_name_pattern,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_resources_label_filter_type_pattern_multitype,
     options = Options::default().with_kamu_config(
         kamu_cli_e2e_repo_tests::resources::fixtures::SECRETS_ENCRYPTION_KAMU_CONFIG
     )
-);
-
-// Applies a `SecretSet`, hence `with_kamu_config`.
-kamu_cli_resource_e2e_test!(
-    storage = postgres,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_resources_label_filter_type_pattern_all,
-    options = Options::default().with_kamu_config(
-        kamu_cli_e2e_repo_tests::resources::fixtures::SECRETS_ENCRYPTION_KAMU_CONFIG
-    )
-);
-
-kamu_cli_resource_e2e_test!(
-    storage = postgres,
-    fixture =
-        kamu_cli_e2e_repo_tests::commands::test_resources_label_filter_structured_not_selectable
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -126,17 +126,18 @@ pub async fn test_resources_variableset_lifecycle(ctx: ResourceCtx) {
     // ── 12. get --ignore-not-found succeeds (empty) ───────────────────────────
     ctx.assert_success(["get", "vs", resource_name, "--ignore-not-found"], None)
         .await;
+
+    // ── 13. Apply surfaces lint warnings but still succeeds ──────────────────
+    //
+    // A manifest without a `description` annotation applies successfully
+    // (resource is created, `0 failed`) yet emits the non-fatal
+    // `missing_description` lint warning and reports a non-zero warning count.
+    test_resources_variableset_apply_warning(&ctx).await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Scenario: apply surfaces lint warnings but still succeeds (QA scenario 2)
-//
-// A manifest without a `description` annotation applies successfully
-// (resource is created, `0 failed`) yet emits the non-fatal
-// `missing_description` lint warning and reports a non-zero warning count.
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_resources_variableset_apply_warning(ctx: ResourceCtx) {
+async fn test_resources_variableset_apply_warning(ctx: &ResourceCtx) {
     let resource_name = "warn-vars";
 
     ctx.assert_resource_absent("vs", resource_name).await;

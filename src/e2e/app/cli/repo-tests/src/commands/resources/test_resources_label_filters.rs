@@ -61,10 +61,15 @@ async fn seed_labeled_variable_sets(ctx: &ResourceCtx) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_resources_label_filter_list(ctx: ResourceCtx) {
+// Covers `list`, `list all`, and `get` filtering together on one seeded set:
+// they are all read-only probes over the same VariableSet fixtures, so
+// running them as three separate e2e instantiations bought nothing but fixed
+// per-test overhead. `delete` stays in its own fixture below since it mutates
+// state that these read assertions depend on.
+pub async fn test_resources_label_filter_read_paths(ctx: ResourceCtx) {
     seed_labeled_variable_sets(&ctx).await;
 
-    // ── Unfiltered baseline ──────────────────────────────────────────────────
+    // ── list: unfiltered baseline ────────────────────────────────────────────
     // Pins the full candidate set, so every narrowing below is a real
     // subtraction rather than a query that happened to return little.
     assert_eq!(
@@ -73,7 +78,7 @@ pub async fn test_resources_label_filter_list(ctx: ResourceCtx) {
         "unfiltered list should return every seeded VariableSet"
     );
 
-    // ── Short-name key narrows ───────────────────────────────────────────────
+    // ── list: short-name key narrows ─────────────────────────────────────────
     assert_eq!(
         ctx.list_names_with_labels("vs", &["environment=production"])
             .await,
@@ -81,7 +86,7 @@ pub async fn test_resources_label_filter_list(ctx: ResourceCtx) {
         "`-l environment=production` should exclude the staging resource"
     );
 
-    // ── Canonical URI key is equivalent ──────────────────────────────────────
+    // ── list: canonical URI key is equivalent ────────────────────────────────
     // The label is stored under its canonical URI, so filtering by the short
     // name only works if the filter is canonicalized too. Asserting the two
     // forms agree is what proves resolution happens on the filter path.
@@ -92,7 +97,7 @@ pub async fn test_resources_label_filter_list(ctx: ResourceCtx) {
         "canonical URI key must select identically to the short name"
     );
 
-    // ── Two predicates are ANDed ─────────────────────────────────────────────
+    // ── list: two predicates are ANDed ───────────────────────────────────────
     // `team` is free-form and `environment` is schema-registered, so this also
     // covers AND-ing across the canonicalized/opaque boundary.
     assert_eq!(
@@ -110,7 +115,7 @@ pub async fn test_resources_label_filter_list(ctx: ResourceCtx) {
         "comma-separated selectors in one flag should AND identically"
     );
 
-    // ── Non-matching value excludes everything ───────────────────────────────
+    // ── list: non-matching value excludes everything ─────────────────────────
     assert_eq!(
         ctx.list_names_with_labels("vs", &["environment=nonexistent"])
             .await,
@@ -118,7 +123,7 @@ pub async fn test_resources_label_filter_list(ctx: ResourceCtx) {
         "a value no resource carries should return an empty list, not an error"
     );
 
-    // ── An unknown key excludes everything ───────────────────────────────────
+    // ── list: an unknown key excludes everything ─────────────────────────────
     // Free-form keys are unconstrained, so an unregistered key is a valid
     // filter that simply matches nothing — not a rejection.
     assert_eq!(
@@ -126,16 +131,11 @@ pub async fn test_resources_label_filter_list(ctx: ResourceCtx) {
         Vec::<String>::new(),
         "an unregistered free-form key should match nothing without erroring"
     );
-}
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub async fn test_resources_label_filter_list_all(ctx: ResourceCtx) {
-    seed_labeled_variable_sets(&ctx).await;
-
-    // `list all` spans every resource type, so the filter must be applied to
-    // the multi-type expansion path (where the filter is resolved once per
-    // schema and collapsed), not just the single-type one.
+    // ── list all: spans every resource type ──────────────────────────────────
+    // The filter must be applied to the multi-type expansion path (where it
+    // is resolved once per schema and collapsed), not just the single-type
+    // one.
     assert_eq!(
         ctx.list_names_with_labels("all", &["environment=production"])
             .await,
@@ -143,22 +143,15 @@ pub async fn test_resources_label_filter_list_all(ctx: ResourceCtx) {
         "`list all -l` should narrow across the multi-type path"
     );
 
-    // Datasets are not resources and carry no labels, so filtering them is
-    // rejected rather than silently ignored.
+    // ── list all: datasets carry no labels, so filtering them is rejected ────
+    // rather than silently ignored.
     ctx.assert_failure(
         ["list", "datasets", "-l", "environment=production"],
         Some(&[r#"Label selectors are not supported when listing datasets"#]),
     )
     .await;
-}
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub async fn test_resources_label_filter_get(ctx: ResourceCtx) {
-    seed_labeled_variable_sets(&ctx).await;
-
-    // `get` filters during its phase-1 expansion of the name pattern into
-    // identifiers, so a pattern plus a filter must intersect the two.
+    // ── get: filters during phase-1 name-pattern expansion into identifiers ──
     let idents = ctx
         .get_idents(["get", "vs/%", "-l", "environment=production"])
         .await;
@@ -284,7 +277,9 @@ pub async fn test_resources_label_filter_delete(ctx: ResourceCtx) {
 // A wildcard *type* pattern combined with an *exact* name/id (`%/prod-vars`)
 // resolves via `TypePatternExactName`, which now routes through
 // `search_handles` (like `TypePatternAll`/`TypePatternNamePattern`) instead of
-// the unfiltered scalar `get_handle` path, so `-l` is respected here too.
+// the unfiltered scalar `get_handle` path, so `-l` is respected here too. Also
+// covers the structured-label-not-selectable case, which needs no `SecretSet`
+// either and so shares this fixture's plain (no `with_kamu_config`) wiring.
 pub async fn test_resources_label_filter_type_pattern_exact_name(ctx: ResourceCtx) {
     seed_labeled_variable_sets(&ctx).await;
 
@@ -340,6 +335,40 @@ pub async fn test_resources_label_filter_type_pattern_exact_name(ctx: ResourceCt
         .get_one(["get", &format!("%/{id}"), "-l", "environment=production"])
         .await;
     assert_eq!(view_by_id.name(), "prod-vars");
+
+    // ── Structured (non-string) label values are stored but not selectable ──
+    // A structured value is deliberately not indexed, so it can never be
+    // matched by an equality filter — but the resource must remain fully
+    // reachable *without* the filter, proving this is an indexing boundary,
+    // not data loss. Uses its own resource name, so it doesn't interact with
+    // `seed_labeled_variable_sets` above.
+    let structured_name = "structured-label-vars";
+    let structured_manifest =
+        fixtures::variable_set_manifest_with_structured_label(structured_name);
+    ctx.assert_success_with_stdin(["apply", "--stdin"], &structured_manifest, None)
+        .await;
+
+    assert!(
+        ctx.list_names("vs")
+            .await
+            .contains(&structured_name.to_string()),
+        "the structured-label resource must be listed when no filter is applied"
+    );
+
+    // The value is a JSON object; the CLI grammar can only express string
+    // equality, so no selector spelling can match it.
+    assert_eq!(
+        ctx.list_names_with_labels("vs", &["coordinates=1"]).await,
+        Vec::<String>::new(),
+        "a structured label value must not be selectable by equality"
+    );
+
+    let structured_view = ctx.get_one(["get", "vs", structured_name]).await;
+    assert_eq!(
+        structured_view.label("coordinates").cloned(),
+        Some(serde_json::json!({ "lat": 1, "lon": 2 })),
+        "the structured value must still be readable via `get`"
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -382,16 +411,17 @@ async fn seed_labeled_cross_type_resources(ctx: &ResourceCtx) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Coverage gap closed: `TypePatternNamePattern`
-// (`<type-pattern>/<name-pattern>`, both segments wildcarded) is resolved via
-// `search_handles` as well — same backend call as `TypePatternAll`, different
-// selector shape. Must run with
+// Covers `TypePatternNamePattern` and `TypePatternAll`, both resolved via
+// `search_handles` (same backend call, different selector shape) and both
+// requiring a `SecretSet` in the mix, hence sharing one fixture and one
+// `with_kamu_config` wiring instead of two. Must run with
 // `Options::with_kamu_config(fixtures::SECRETS_ENCRYPTION_KAMU_CONFIG)`.
-pub async fn test_resources_label_filter_type_pattern_name_pattern(ctx: ResourceCtx) {
+pub async fn test_resources_label_filter_type_pattern_multitype(ctx: ResourceCtx) {
     seed_labeled_cross_type_resources(&ctx).await;
 
-    // `%sets/%-creds` matches only the two SecretSets by name pattern; the
-    // filter must still narrow that set to the production one.
+    // ── TypePatternNamePattern: `%sets/%-creds` ──────────────────────────────
+    // Matches only the two SecretSets by name pattern; the filter must still
+    // narrow that set to the production one.
     let idents = ctx
         .get_idents(["get", "%sets/%-creds", "-l", "environment=production"])
         .await;
@@ -403,18 +433,10 @@ pub async fn test_resources_label_filter_type_pattern_name_pattern(ctx: Resource
         )],
         "`%sets/%-creds -l environment=production` should exclude the staging SecretSet"
     );
-}
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// Coverage gap closed: `TypePatternAll` (`<type-pattern> all`, e.g. `%sets
-// all`) is resolved via `search_handles` with `name_pattern: Some("%")` — not
-// testable with a label filter until that selector shape worked at all.
-pub async fn test_resources_label_filter_type_pattern_all(ctx: ResourceCtx) {
-    seed_labeled_cross_type_resources(&ctx).await;
-
-    // `%sets all` spans every VariableSet and SecretSet; the filter must still
-    // narrow that set to the production ones.
+    // ── TypePatternAll: `%sets all` ──────────────────────────────────────────
+    // Spans every VariableSet and SecretSet; the filter must still narrow that
+    // set to the production ones.
     let idents = ctx
         .get_idents(["get", "%sets", "all", "-l", "environment=production"])
         .await;
@@ -431,40 +453,6 @@ pub async fn test_resources_label_filter_type_pattern_all(ctx: ResourceCtx) {
             ),
         ],
         "`%sets all -l environment=production` should exclude the staging SecretSet"
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub async fn test_resources_label_filter_structured_not_selectable(ctx: ResourceCtx) {
-    // A structured (non-string) label value is stored but deliberately not
-    // indexed, so it can never be selected by an equality filter. The resource
-    // must remain fully reachable *without* the filter — proving this is an
-    // indexing boundary, not data loss.
-    let name = "structured-label-vars";
-    let manifest = fixtures::variable_set_manifest_with_structured_label(name);
-    ctx.assert_success_with_stdin(["apply", "--stdin"], &manifest, None)
-        .await;
-
-    assert_eq!(
-        ctx.list_names("vs").await,
-        [name],
-        "the resource must be listed when no filter is applied"
-    );
-
-    // The value is a JSON object; the CLI grammar can only express string
-    // equality, so no selector spelling can match it.
-    assert_eq!(
-        ctx.list_names_with_labels("vs", &["coordinates=1"]).await,
-        Vec::<String>::new(),
-        "a structured label value must not be selectable by equality"
-    );
-
-    let view = ctx.get_one(["get", "vs", name]).await;
-    assert_eq!(
-        view.label("coordinates").cloned(),
-        Some(serde_json::json!({ "lat": 1, "lon": 2 })),
-        "the structured value must still be readable via `get`"
     );
 }
 

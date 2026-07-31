@@ -16,17 +16,7 @@ use kamu_cli_e2e_common::prelude::*;
 
 kamu_cli_resource_e2e_test!(
     storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_resources_extension_schema_canonicalization
-);
-
-kamu_cli_resource_e2e_test!(
-    storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_resources_extension_schema_rejections
-);
-
-kamu_cli_resource_e2e_test!(
-    storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_resources_extension_schema_warnings
+    fixture = kamu_cli_e2e_repo_tests::commands::test_resources_extension_schema_behavior
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
