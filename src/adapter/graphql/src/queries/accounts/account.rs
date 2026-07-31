@@ -105,11 +105,14 @@ impl Account {
             // Safety: In multi-tenant, we have a name.
             let account_name = alias.account_name.as_ref().unwrap().clone();
 
+            // todo понять различие между аккаунтом, который вызывает этот метод и
+            // аккаунтом, который владеет датасетом
             Ok(Self::from_account_name(ctx, account_name).await?)
         } else {
             let current_account_subject = from_catalog_n!(ctx, CurrentAccountSubject);
 
             Ok(Some(match current_account_subject.as_ref() {
+                // todo подумать стоит ли тут менять?
                 CurrentAccountSubject::Anonymous(_) => Self::new(
                     DEFAULT_ACCOUNT_ID.clone().into(),
                     DEFAULT_ACCOUNT_NAME.clone().into(),

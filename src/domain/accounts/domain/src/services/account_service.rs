@@ -78,10 +78,12 @@ pub trait AccountService: Sync + Send {
         pagination: PaginationOpts,
     ) -> AccountPageStream<'a>;
 
+    // todo refactor: multi version
     async fn create_wallet_account(&self, did_pkh: &DidPkh) -> Result<Account, CreateAccountError>;
 
     async fn delete_account_by_id(&self, account_id: &odf::AccountID) -> Result<(), InternalError>;
 
+    // todo refs combine with?
     // TODO: Remove this method during refactoring:
     //       https://github.com/kamu-data/kamu-cli/issues/1270
     async fn save_account_password(

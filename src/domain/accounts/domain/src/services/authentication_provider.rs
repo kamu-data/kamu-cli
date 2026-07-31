@@ -30,6 +30,7 @@ pub trait AuthenticationProvider: Sync + Send {
 
 #[derive(Debug)]
 pub struct ProviderLoginResponse {
+    // todo Option<odf::AccountID>
     pub account_id: odf::AccountID,
     pub account_name: odf::AccountName,
     pub email: Email,

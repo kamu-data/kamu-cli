@@ -17,6 +17,8 @@ use crate::{Account, AccountConfig, CreateAccountError, Password};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// todo CreateAccountUseCase::exec add options
+
 #[async_trait::async_trait]
 pub trait CreateAccountUseCase: Send + Sync {
     async fn execute(
@@ -29,6 +31,7 @@ pub trait CreateAccountUseCase: Send + Sync {
         &self,
         creator_account: &Account,
         account_name: &odf::AccountName,
+        // todo rename CreateAccountUseCaseOptions
         options: CreateAccountUseCaseOptions,
     ) -> Result<Account, CreateAccountError>;
 

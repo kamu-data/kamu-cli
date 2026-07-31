@@ -77,6 +77,7 @@ impl Command for SystemE2ECommand {
                 for account_name in &self.arguments {
                     eprint!("Add {account_name}... ");
 
+                    // todo: action: обновить
                     let account_config = AccountConfig::test_config_from_name(
                         odf::AccountName::new_unchecked(account_name),
                     );

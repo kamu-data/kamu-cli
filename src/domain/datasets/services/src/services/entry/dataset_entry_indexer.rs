@@ -222,6 +222,7 @@ impl DatasetEntryIndexer {
                 tracing::debug!(account_id=%account.id, account_name=%account_name, "Account resolved by dataset indexing job");
                 Ok(account.id)
             }
+            // todo подумать стоит ли тут менять?
             None => Ok(DEFAULT_ACCOUNT_ID.clone()),
         }
     }

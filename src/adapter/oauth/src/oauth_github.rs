@@ -156,6 +156,7 @@ impl AuthenticationProvider for OAuthGithub {
             serde_json::from_str::<GithubLoginCredentials>(login_credentials_json.as_str())
                 .map_err(ProviderLoginError::invalid_credentials)?;
 
+        // todo ref reuse http client
         // Prepare HTTP client for GitHub
         let client = self.get_client().int_err()?;
 
@@ -187,6 +188,7 @@ impl AuthenticationProvider for OAuthGithub {
 
         // Extract matching fields
         Ok(ProviderLoginResponse {
+            // todo
             // For GitHub, generate a random DID, regardless of the name
             account_id: odf::AccountID::new_generated_ed25519().1,
             account_name: odf::AccountName::new_unchecked(&github_account_info.login),

@@ -41,8 +41,10 @@ pub struct CreateAccountUseCaseImpl {
     account_service: Arc<dyn AccountService>,
     outbox: Arc<dyn messaging_outbox::Outbox>,
     time_source: Arc<dyn SystemTimeSource>,
+    // todo refactor: extract to service -->
     did_secret_key_repo: Arc<dyn DidSecretKeyRepository>,
     did_secret_encryption_key: Option<SecretString>,
+    // <--
 }
 
 #[dill::component(pub)]
@@ -97,8 +99,10 @@ impl CreateAccountUseCaseImpl {
         &self,
         account: &Account,
         password: &Password,
-        account_key: odf::metadata::SigningKey,
+        maybe_account_key: Option<odf::metadata::SigningKey>,
     ) -> Result<(), CreateAccountError> {
+        // todo use PasswordAccount?
+
         if !AccountProvider::is_password(&account.provider) {
             return Err(NonPasswordProviderError {
                 provider: account.provider.clone(),
@@ -106,15 +110,20 @@ impl CreateAccountUseCaseImpl {
             }
             .int_err()
             .into());
-        };
+        }
 
+        // todo join_all -->
+
+        // TODO: refactor: combine to one method ??? -->
         self.account_service.save_account(account).await?;
         self.account_service
             .save_account_password(account, password)
             .await?;
-
-        self.maybe_save_private_key(&account.id, account_key)
+        // <--
+        self.maybe_save_private_key(&account.id, maybe_account_key)
             .await?;
+
+        // <-- join_all
 
         Ok(())
     }
@@ -122,8 +131,13 @@ impl CreateAccountUseCaseImpl {
     async fn maybe_save_private_key(
         &self,
         account_id: &odf::AccountID,
-        key: odf::metadata::SigningKey,
+        maybe_account_key: Option<odf::metadata::SigningKey>,
     ) -> Result<(), InternalError> {
+        // No key, nothing to do
+        let Some(account_key) = maybe_account_key else {
+            return Ok(());
+        };
+
         let Some(did_secret_encryption_key) = &self.did_secret_encryption_key else {
             return Ok(());
         };
@@ -131,15 +145,25 @@ impl CreateAccountUseCaseImpl {
         use odf::metadata::AsStackString;
 
         let account_id = account_id.as_stack_string();
-        let did_secret_key =
-            DidSecretKey::try_new(&key.into(), did_secret_encryption_key.expose_secret())
-                .int_err()?;
+        let did_secret_key = DidSecretKey::try_new(
+            &account_key.into(),
+            did_secret_encryption_key.expose_secret(),
+        )
+        .int_err()?;
         let account_entity = DidEntity::new_account(account_id.as_str());
 
-        self.did_secret_key_repo
+        println!("!!!5.1: {:?}", did_secret_key);
+
+        // todo: info: тут сохраняем
+        let a = self
+            .did_secret_key_repo
             .save_did_secret_key(&account_entity, &did_secret_key)
             .await
-            .int_err()
+            .int_err();
+
+        println!("!!!5.2 +");
+
+        a
     }
 
     async fn notify_account_created(&self, new_account: &Account) -> Result<(), InternalError> {
@@ -169,10 +193,42 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
         account_config: &AccountConfig,
         quiet: bool,
     ) -> Result<Account, CreateAccountError> {
-        let (account_key, account_id) = odf::AccountID::new_generated_ed25519();
+        /*
+        impl From<&AccountConfig> for Account {
+            fn from(account_config: &AccountConfig) -> Self {
+            Account {
+                id: account_config.get_id(),
+                account_name: account_config.account_name.clone(),
+                email: account_config.email.clone(),
+                display_name: account_config.get_display_name(),
+                account_type: account_config.account_type,
+                avatar_url: account_config.avatar_url.clone(),
+                registered_at: account_config.registered_at.unwrap_or_else(Utc::now),
+                provider: account_config.provider.clone(),
+                provider_identity_key: account_config.account_name.to_string(),
+            }
+            }
+        }
+        */
+
+        let (account_key, new_account_id) = odf::AccountID::new_generated_ed25519();
+
+        println!("!!!4: {account_config:?}");
 
         let new_account = Account {
-            id: account_id,
+            // TODO temp test
+            // id: account_id,
+            // fed016b61ed2ab1b63a006b61ed2ab1b63a00b016d65607000000e0821aafbf163e6f
+            // fed016b61ed2ab1b63a006b61ed2ab1b63a00b016d65607000000e0821aafbf163e6f
+            //
+            // id: account_config.get_id(),
+            id: {
+                if let Some(account_id_from_config) = &account_config.id {
+                    account_id_from_config.clone()
+                } else {
+                    new_account_id
+                }
+            },
             account_name: account_config.account_name.clone(),
             email: account_config.email.clone(),
             display_name: account_config.get_display_name(),
@@ -185,7 +241,8 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
             provider_identity_key: account_config.account_name.to_string(),
         };
 
-        self.save_password_account(&new_account, &account_config.password, account_key)
+        // todo сохраняем, если это новый аккаунт id -- обновить это место
+        self.save_password_account(&new_account, &account_config.password, Some(account_key))
             .await?;
 
         if !quiet {
@@ -227,7 +284,7 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
             provider_identity_key: account_name.to_string(),
         };
 
-        self.save_password_account(&new_account, &password, account_key)
+        self.save_password_account(&new_account, &password, Some(account_key))
             .await?;
 
         self.notify_account_created(&new_account).await?;
@@ -237,6 +294,7 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
 
     async fn execute_multi_wallet_accounts(
         &self,
+        // todo vec?
         wallet_addresses: HashSet<DidPkh>,
     ) -> Result<Vec<Account>, CreateMultiWalletAccountsError> {
         let account_ids = wallet_addresses
@@ -277,6 +335,7 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
         }
 
         for created_account in &created_accounts {
+            // TODO: batch message
             self.notify_account_created(created_account).await?;
         }
 

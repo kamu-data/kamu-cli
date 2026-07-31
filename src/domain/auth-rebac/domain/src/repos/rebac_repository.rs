@@ -29,6 +29,7 @@ pub trait RebacRepository: Send + Sync {
     // Properties
     async fn properties_count(&self) -> Result<usize, PropertiesCountError>;
 
+    // TODO: ref: опционально -- множественная установка (upsert)
     async fn set_entity_property(
         &self,
         entity: &Entity,

@@ -9,6 +9,7 @@
 
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
+use std::error::Error;
 use std::sync::Arc;
 
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
@@ -61,19 +62,21 @@ impl PredefinedAccountsRegistrator {
     }
 
     async fn process_account(&self, account_config: &AccountConfig) -> Result<(), InternalError> {
+        // todo это проблема
         let account_id = account_config.get_id();
 
         match self.account_service.get_account_by_id(&account_id).await {
-            Ok(account) => {
-                self.compare_and_maybe_update_account(account, account_config)
+            Ok(original_account) => {
+                self.compare_and_maybe_update_account(original_account, account_config)
                     .await?;
             }
             Err(GetAccountByIdError::NotFound(_)) => {
                 self.register_unknown_account(account_config).await?;
             }
-            Err(GetAccountByIdError::Internal(e)) => return Err(e),
+            Err(e @ GetAccountByIdError::Internal(_)) => return Err(e.int_err()),
         }
 
+        // todo для обновления: если не изменились, то и выставлять не нужно?
         self.set_rebac_properties(&account_id, account_config)
             .await?;
 
@@ -85,6 +88,7 @@ impl PredefinedAccountsRegistrator {
         account_id: &odf::AccountID,
         account_config: &AccountConfig,
     ) -> Result<(), InternalError> {
+        // todo: ref
         // TODO: Revisit if batch property setting will be implemented
         for name in [
             AccountPropertyName::IsAdmin,
@@ -109,10 +113,14 @@ impl PredefinedAccountsRegistrator {
         &self,
         account_config: &AccountConfig,
     ) -> Result<(), InternalError> {
+        println!("!!!2.1\n{account_config:?}");
+
         self.create_account_use_case
             .execute(account_config, true /* quiet */)
             .await
             .int_err()?;
+
+        println!("!!!2.2\n{account_config:?}");
 
         Ok(())
     }
@@ -122,7 +130,10 @@ impl PredefinedAccountsRegistrator {
         original_account: Account,
         account_config: &AccountConfig,
     ) -> Result<(), InternalError> {
+        println!("!!!1.1\n{account_config:?}\n{original_account:?}");
+
         let updated_account = Account {
+            // todo ???
             id: account_config.get_id(),
             account_name: account_config.account_name.clone(),
             email: account_config.email.clone(),
@@ -155,6 +166,8 @@ impl PredefinedAccountsRegistrator {
             }
         }
 
+        println!("!!!1.2 {}", original_account != updated_account);
+
         if original_account != updated_account {
             tracing::info!(
                 "Updating modified predefined account: old: {original_account:?}, new: \
@@ -181,22 +194,35 @@ impl InitOnStartup for PredefinedAccountsRegistrator {
         name = "PredefinedAccountsRegistrator::run_initialization"
     )]
     async fn run_initialization(&self) -> Result<(), InternalError> {
+        // todo размышление: различие между сингл тенант и мульти тенант?
+
         // If there are duplicates by account ID, skip them.
         // This could happen i.e., when a predefined user gets renamed,
-        // but the implicit CLI config for current user still points to same ID
+        // but the implicit CLI config for the current user still points to the same ID
         let mut account_config_by_id = HashMap::new();
+
         for account_config in &self.predefined_accounts_config.predefined {
+            // todo это проблема
             let account_id = account_config.get_id();
+
             match account_config_by_id.entry(account_id.clone()) {
                 Entry::Vacant(entry) => {
                     entry.insert(account_config.clone());
                 }
-                Entry::Occupied(_) => {
+                Entry::Occupied(stored) => {
+                    // let previously_stored_config = stored.get();
+                    // let duplicate_account_id = account_id;
+
                     tracing::warn!(
-                        "Duplicate account configuration found for account ID: {account_id} ({}). \
-                         Skipping.",
-                        account_config.account_name
+                        %account_id,
+                        "Duplicate account configuration found for account ID. Skipping.",
                     );
+
+                    // tracing::warn!(
+                    //     %previously_stored_config.id,
+                    //     %duplicate_account_id,
+                    //     "Duplicate account configuration found for account
+                    // ID. Skipping.", );
                 }
             }
         }
@@ -206,6 +232,7 @@ impl InitOnStartup for PredefinedAccountsRegistrator {
         let mut join_set = tokio::task::JoinSet::new();
         for account_config in account_config_by_id.into_values() {
             let registrator = self.clone();
+            println!("!!!6: {account_config:?}");
             join_set.spawn(async move { registrator.process_account(&account_config).await });
         }
 
@@ -216,6 +243,8 @@ impl InitOnStartup for PredefinedAccountsRegistrator {
         let mut had_errors = false;
         for result in results {
             if let Err(err) = result {
+                println!("!!!7: {:#?}", err.source());
+
                 had_errors = true;
                 tracing::error!(
                     error = ?err,
@@ -224,6 +253,10 @@ impl InitOnStartup for PredefinedAccountsRegistrator {
                 );
             }
         }
+
+        // Err(InternalError::new(
+        //     "One or more predefined accounts failed to register/update.",
+        // ))
 
         // Interrupt initialization if there were errors
         if had_errors {

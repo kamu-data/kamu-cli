@@ -85,6 +85,7 @@ impl CurrentAccountIndication {
     ) -> Result<CurrentAccountSubject, ToCurrentAccountSubjectError> {
         match tenancy_config {
             TenancyConfig::SingleTenant => {
+                // todo подумать стоит ли тут менять?
                 // NOTE: At this stage, we don't care whether the argument applies
                 //       in the case of multi-tenant workspace -- this will be checked later.
                 Ok(CurrentAccountSubject::logged(

@@ -15,7 +15,7 @@ use crate::{
     AccountDisplayName,
     AccountProvider,
     AccountType,
-    DEFAULT_ACCOUNT_ID,
+    // DEFAULT_ACCOUNT_ID,
     DEFAULT_ACCOUNT_NAME,
     DEFAULT_ACCOUNT_PASSWORD,
     DEFAULT_PASSWORD_STR,
@@ -46,7 +46,8 @@ impl PredefinedAccountsConfig {
     pub fn single_tenant() -> Self {
         Self {
             predefined: vec![AccountConfig {
-                id: Some(DEFAULT_ACCOUNT_ID.clone()),
+                // id: Some(DEFAULT_ACCOUNT_ID.clone()),
+                id: None,
                 account_name: DEFAULT_ACCOUNT_NAME.clone(),
                 password: DEFAULT_ACCOUNT_PASSWORD.clone(),
                 account_type: AccountType::User,
@@ -89,6 +90,7 @@ pub enum AccountPropertyName {
 #[setty::derive(setty::Config, Clone)]
 pub struct AccountConfig {
     /// Auto-derived from `account_name` if omitted
+    // TODO: Extend AccountConfig to carry optional private key
     #[config(combine(replace))]
     pub id: Option<odf::AccountID>,
 
@@ -113,6 +115,7 @@ pub struct AccountConfig {
 
     pub avatar_url: Option<String>,
 
+    // ???
     // TODO: This should not be in config - we are mixing configuration and domain model here
     #[config(combine(replace))]
     pub registered_at: Option<DateTime<Utc>>,
@@ -125,6 +128,7 @@ pub struct AccountConfig {
 }
 
 impl AccountConfig {
+    //
     #[cfg(any(feature = "testing", test))]
     pub fn test_config_from_name(account_name: odf::AccountName) -> Self {
         let email = Email::parse(&format!("{account_name}@example.com")).unwrap();
@@ -145,6 +149,8 @@ impl AccountConfig {
         }
     }
 
+    //
+    // todo: action: делаем тудушку -- вроде только добавить фичу
     // TODO: Do not use the method outside of tests
     // #[cfg(any(feature = "testing", test))]
     pub fn test_config_from_subject(subject: LoggedAccount) -> Self {
@@ -194,6 +200,14 @@ impl AccountConfig {
         }
     }
 
+    // TODO (refactoring): update?
+    //     pub fn get_display_name(&self) -> Cow<&AccountDisplayName> {
+    //     if let Some(display_name) = &self.display_name {
+    //         Cow::Borrowed(display_name)
+    //     } else {
+    //         Cow::Owned(self.account_name.to_string())
+    //     }
+    // }
     pub fn get_display_name(&self) -> AccountDisplayName {
         if let Some(display_name) = &self.display_name {
             display_name.clone()

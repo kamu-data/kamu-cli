@@ -77,6 +77,7 @@ impl APIServerRunCommand {
             .predefined_accounts_config
             .find_account_config_by_name(&current_account_name)
             .or_else(|| {
+                // todo: action: обновить
                 Some(AccountConfig::test_config_from_name(
                     current_account_name.clone(),
                 ))

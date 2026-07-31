@@ -59,6 +59,7 @@ impl AuthenticationProvider for LoginPasswordAuthProvider {
             ProviderLoginError::RejectedCredentials(RejectedCredentialsError {})
         })?;
 
+        // todo если пароль не найден, то считается что аккаунта нет
         self.account_service
             .verify_account_password(&account_name, &password)
             .await
@@ -73,7 +74,8 @@ impl AuthenticationProvider for LoginPasswordAuthProvider {
                 }
             })?;
 
-        // Extract known account data
+        // todo сделать реджект, если аккаунт не найден -- выходит, что пароль есть, а
+        // аккаунта нет Extract known account data
         let account = self
             .account_service
             .get_account_by_name(&account_name)
