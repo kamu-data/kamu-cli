@@ -28,6 +28,7 @@ use kamu_accounts_services::utils::{
     MockAccountAuthorizationHelper,
 };
 use messaging_outbox::{MockOutbox, Outbox};
+use pretty_assertions::assert_matches;
 
 use crate::tests::use_cases::{AccountBaseUseCaseHarness, AccountBaseUseCaseHarnessOpts};
 
@@ -48,14 +49,14 @@ async fn test_modify_account_password_success() {
         .create_account_with_password(initial_password.clone())
         .await;
 
-    pretty_assertions::assert_matches!(
+    assert_matches!(
         harness
             .account_service()
             .verify_account_password_by_name(&account.account_name, &initial_password)
             .await,
         Ok(_),
     );
-    pretty_assertions::assert_matches!(
+    assert_matches!(
         harness
             .account_service()
             .verify_account_password_by_id(&account.id, &initial_password)
@@ -65,7 +66,7 @@ async fn test_modify_account_password_success() {
 
     let new_password = Password::try_new("new_password").unwrap();
 
-    pretty_assertions::assert_matches!(
+    assert_matches!(
         harness
             .modify_account_password_use_case
             .execute(&account, new_password.clone())
@@ -73,28 +74,28 @@ async fn test_modify_account_password_success() {
         Ok(_),
     );
 
-    pretty_assertions::assert_matches!(
+    assert_matches!(
         harness
             .account_service()
             .verify_account_password_by_name(&account.account_name, &initial_password)
             .await,
         Err(VerifyPasswordError::IncorrectPassword(_)),
     );
-    pretty_assertions::assert_matches!(
+    assert_matches!(
         harness
             .account_service()
             .verify_account_password_by_id(&account.id, &initial_password)
             .await,
         Err(VerifyPasswordError::IncorrectPassword(_)),
     );
-    pretty_assertions::assert_matches!(
+    assert_matches!(
         harness
             .account_service()
             .verify_account_password_by_name(&account.account_name, &new_password)
             .await,
         Ok(_),
     );
-    pretty_assertions::assert_matches!(
+    assert_matches!(
         harness
             .account_service()
             .verify_account_password_by_id(&account.id, &new_password)
@@ -120,7 +121,7 @@ async fn test_modify_account_password_not_admin() {
         .await;
     let new_password = Password::try_new("new_password_1").unwrap();
 
-    pretty_assertions::assert_matches!(
+    assert_matches!(
         harness
             .modify_account_password_use_case
             .execute(&account, new_password.clone())
@@ -128,14 +129,14 @@ async fn test_modify_account_password_not_admin() {
         Err(ModifyAccountPasswordError::Access(odf::AccessError::Unauthenticated(e)))
             if e.to_string() == "Account 'user-without-access' is not authorized to modify account's password 'new-account'"
     );
-    pretty_assertions::assert_matches!(
+    assert_matches!(
         harness
             .account_service()
             .verify_account_password_by_name(&account.account_name, &new_password)
             .await,
         Err(VerifyPasswordError::IncorrectPassword(_)),
     );
-    pretty_assertions::assert_matches!(
+    assert_matches!(
         harness
             .account_service()
             .verify_account_password_by_id(&account.id, &new_password)
@@ -162,7 +163,7 @@ async fn test_modify_account_password_with_confirmation_success() {
         .await;
     let new_password = Password::try_new("new_password").unwrap();
 
-    pretty_assertions::assert_matches!(
+    assert_matches!(
         harness
             .modify_account_password_use_case
             .execute_with_confirmation(&account, initial_password.clone(), new_password.clone())
@@ -170,28 +171,28 @@ async fn test_modify_account_password_with_confirmation_success() {
         Ok(_),
     );
 
-    pretty_assertions::assert_matches!(
+    assert_matches!(
         harness
             .account_service()
             .verify_account_password_by_name(&account.account_name, &initial_password)
             .await,
         Err(VerifyPasswordError::IncorrectPassword(_)),
     );
-    pretty_assertions::assert_matches!(
+    assert_matches!(
         harness
             .account_service()
             .verify_account_password_by_id(&account.id, &initial_password)
             .await,
         Err(VerifyPasswordError::IncorrectPassword(_)),
     );
-    pretty_assertions::assert_matches!(
+    assert_matches!(
         harness
             .account_service()
             .verify_account_password_by_name(&account.account_name, &new_password)
             .await,
         Ok(_),
     );
-    pretty_assertions::assert_matches!(
+    assert_matches!(
         harness
             .account_service()
             .verify_account_password_by_id(&account.id, &new_password)
@@ -218,7 +219,7 @@ async fn test_modify_account_password_with_confirmation_incorrect_old_password()
     let wrong_old_password = Password::try_new("wrong-old-password").unwrap();
     let new_password = Password::try_new("new_password").unwrap();
 
-    pretty_assertions::assert_matches!(
+    assert_matches!(
         harness
             .modify_account_password_use_case
             .execute_with_confirmation(&account, wrong_old_password, new_password)
@@ -245,7 +246,7 @@ async fn test_modify_account_password_with_confirmation_incorrect_not_enough_per
         .await;
     let new_password = Password::try_new("new_password").unwrap();
 
-    pretty_assertions::assert_matches!(
+    assert_matches!(
         harness
             .modify_account_password_use_case
             .execute_with_confirmation(&account, initial_password, new_password)
