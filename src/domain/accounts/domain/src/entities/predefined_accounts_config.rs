@@ -9,6 +9,7 @@
 
 use chrono::{DateTime, Utc};
 use email_utils::Email;
+use internal_error::BatchError;
 use url::Url;
 
 use super::{DUMMY_EMAIL_ADDRESS, LoggedAccount};
@@ -76,6 +77,25 @@ impl PredefinedAccountsConfig {
         }
 
         None
+    }
+
+    pub fn validate(&self) -> Result<(), BatchError<AccountConfigValidationError>> {
+        let mut failures = vec![];
+        for (index, account_config) in self.predefined.iter().enumerate() {
+            if let Err(e) = account_config.validate() {
+                failures.push((index, e));
+            }
+        }
+
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(BatchError {
+                failed: 0,
+                total: self.predefined.len(),
+                failures,
+            })
+        }
     }
 }
 

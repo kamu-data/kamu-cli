@@ -7125,6 +7125,7 @@ dependencies = [
  "dill",
  "email-utils",
  "event-sourcing",
+ "format-utils",
  "futures",
  "init-on-startup",
  "internal-error",

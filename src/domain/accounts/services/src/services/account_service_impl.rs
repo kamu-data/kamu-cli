@@ -338,13 +338,6 @@ impl AccountService for AccountServiceImpl {
     async fn update_account(&self, account: &Account) -> Result<(), UpdateAccountError> {
         self.account_repo.update_account(account).await
     }
-
-    async fn find_account_id_by_email(
-        &self,
-        email: &email_utils::Email,
-    ) -> Result<Option<odf::AccountID>, FindAccountIdByEmailError> {
-        self.account_repo.find_account_id_by_email(email).await
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

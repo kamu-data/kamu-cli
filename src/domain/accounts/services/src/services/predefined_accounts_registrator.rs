@@ -21,7 +21,6 @@ use kamu_auth_rebac::{
     RebacService,
     boolean_property_value,
 };
-use odf::metadata::AsStackString;
 use secrecy::{ExposeSecret, SecretString};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -72,35 +71,105 @@ impl PredefinedAccountsRegistrator {
         }
     }
 
-    async fn process_account(&self, account_config: &AccountConfig) -> Result<(), InternalError> {
-        let maybe_account_id = account_config.resolve_account_id().int_err()?;
+    async fn resolve_account_ids(&self) -> Result<AccountIdsResolution, InternalError> {
+        use futures::future::try_join_all;
 
-        /*
-        - accountName: kamu
-          password: 1
-          avatarUrl: https://avatars.githubusercontent.com/u/50896974?s=200&v=4
-          properties:
-            - Admin
-          treatDatasetsAsPublic: true
-          email: support+kamu@kamu.dev
+        // NOTE: PERF: io-bound futures so `tokio::Task`s are unneeded
+        let resolutions: Vec<_> =
+            try_join_all(self.predefined_accounts_config.predefined.iter().map(
+                |account_config| async move {
+                    let maybe_resolved_account_id = account_config.resolve_account_id();
 
-        - accountName: sh101-bowen
-          password: sh101-bowen
-          avatarUrl: https://cdn-icons-png.flaticon.com/512/3118/3118054.png
-          treatDatasetsAsPublic: true
-          email: support+sh101-bowen@kamu.dev
-        */
+                    if let Some(resolved_account_id) = maybe_resolved_account_id {
+                        // We have explicit ID -- just use it
+                        return Ok(AccountIdResolution::Resolved((
+                            resolved_account_id,
+                            account_config.clone(),
+                        )));
+                    };
 
-        // todo информация: какие у нас есть кодовые пути
-        //                  1) попытаться создать неизвестный
-        //                  - если есть id/ключи
-        //                  - если не найден по уникальным полям
-        //                  - если найден: ???
-        //                  2) обновить известный если есть id и/или ключ
+                    let mut account_ids = self
+                        .account_service
+                        .find_account_ids_by_unique_fields(
+                            &account_config.account_name,
+                            &account_config.email,
+                            &account_config.provider_identity_key(),
+                        )
+                        .await
+                        .int_err()?;
+                    let result = match account_ids.len() {
+                        0 => {
+                            // Vacant space for insertion
+                            AccountIdResolution::Unresolved(account_config.clone())
+                        }
+                        1 => {
+                            // Exact match: an account has most likely already been created.
+                            let account_id = account_ids.swap_remove(0);
+                            AccountIdResolution::Resolved((account_id, account_config.clone()))
+                        }
+                        _ => {
+                            let account_name = account_config.account_name.clone();
+                            AccountIdResolution::Conflicted(AccountUniqueFieldsConflictError {
+                                account_name,
+                                account_ids,
+                            })
+                        }
+                    };
 
+                    Ok::<_, InternalError>(result)
+                },
+            ))
+            .await?;
+
+        // If there are duplicates by account ID, skip them.
+        // This could happen i.e., when a predefined user gets renamed,
+        // but the implicit CLI config for the current user still points to the same ID
+        let mut account_config_by_id = HashMap::new();
+        let mut unresolved = Vec::new();
+        let mut conflicted = Vec::new();
+
+        for result in resolutions {
+            match result {
+                AccountIdResolution::Resolved((account_id, account_config)) => {
+                    match account_config_by_id.entry(account_id.clone()) {
+                        Entry::Vacant(entry) => {
+                            entry.insert(account_config.clone());
+                        }
+                        Entry::Occupied(entry) => {
+                            let previously_stored_config = entry.get();
+                            let stored_account_name = &previously_stored_config.account_name;
+                            let duplicate_account_name = account_config.account_name;
+
+                            tracing::warn!(
+                                %stored_account_name,
+                                %duplicate_account_name,
+                                %account_id,
+                                "Duplicate account configuration found. Skipping",
+                            );
+                        }
+                    }
+                }
+                AccountIdResolution::Unresolved(ac) => unresolved.push(ac),
+                AccountIdResolution::Conflicted(e) => conflicted.push(e),
+            }
+        }
+
+        Ok(AccountIdsResolution {
+            resolved: account_config_by_id,
+            unresolved,
+            conflicted,
+        })
+    }
+
+    async fn process_account(
+        &self,
+        maybe_account_id: Option<odf::AccountID>,
+        account_config: &AccountConfig,
+    ) -> Result<(), InternalError> {
         let account_id = if let Some(account_id) = maybe_account_id {
             match self.account_service.get_account_by_id(&account_id).await {
                 Ok(original_account) => {
+                    // 1) An account has an ID set to it and was found -- let's update it
                     self.compare_and_maybe_update_account(
                         &account_id,
                         original_account,
@@ -110,83 +179,19 @@ impl PredefinedAccountsRegistrator {
                     account_id
                 }
                 Err(GetAccountByIdError::NotFound(_)) => {
-                    self.preflight_unique_fields(account_config).await?;
+                    // 2) An account has an ID set to it but not found -- let's register it
                     self.register_unknown_account(account_config).await?
                 }
-                Err(e @ GetAccountByIdError::Internal(_)) => return Err(e.int_err()),
+                Err(e) => return Err(e.int_err()),
             }
         } else {
-            match self
-                .account_service
-                .account_by_name(&account_config.account_name)
-                .await?
-            {
-                Some(_existing) => {
-                    tracing::warn!(
-                        account_name = %account_config.account_name,
-                        "Predefined account already exists; skipping update without id",
-                    );
-                    return Ok(());
-                }
-                None => {
-                    self.preflight_unique_fields(account_config).await?;
-                    self.register_unknown_account(account_config).await?
-                }
-            }
+            // 3) We were previously unable to find the ID based on the fields, which means
+            //    an account does not exist. Register it
+            self.register_unknown_account(account_config).await?
         };
 
         self.set_rebac_properties(&account_id, account_config)
             .await?;
-
-        Ok(())
-    }
-
-    async fn preflight_unique_fields(
-        &self,
-        account_config: &AccountConfig,
-    ) -> Result<(), InternalError> {
-        // todo проверка за один запрос?
-
-        if let Some(existing_id) = self
-            .account_service
-            .find_account_id_by_email(&account_config.email)
-            .await
-            .int_err()?
-        {
-            let existing = self
-                .account_service
-                .get_account_by_id(&existing_id)
-                .await
-                .int_err()?;
-            return Err(PredefinedAccountUniqueConflictError {
-                field: AccountDuplicateField::Email,
-                configured_account_name: account_config.account_name.clone(),
-                existing_account_name: existing.account_name,
-                existing_account_id: existing.id,
-            }
-            .int_err());
-        }
-
-        let provider_identity_key = account_config.provider_identity_key();
-        if let Some(existing_id) = self
-            .account_service
-            .find_account_id_by_provider_identity_key(&provider_identity_key)
-            .await
-            .int_err()?
-        {
-            let existing = self
-                .account_service
-                .get_account_by_id(&existing_id)
-                .await
-                .int_err()?;
-            return Err(PredefinedAccountUniqueConflictError {
-                field: AccountDuplicateField::ProviderIdentityKey,
-                configured_account_name: account_config.account_name.clone(),
-                existing_account_name: existing.account_name,
-                existing_account_id: existing.id,
-            }
-            .int_err());
-        }
 
         Ok(())
     }
@@ -309,6 +314,8 @@ impl PredefinedAccountsRegistrator {
             return Ok(());
         };
 
+        use odf::metadata::AsStackString;
+
         let account_id_str = account_id.as_stack_string();
         let account_entity = DidEntity::new_account(account_id_str.as_str());
 
@@ -363,35 +370,44 @@ impl InitOnStartup for PredefinedAccountsRegistrator {
         name = "PredefinedAccountsRegistrator::run_initialization"
     )]
     async fn run_initialization(&self) -> Result<(), InternalError> {
-        // If there are duplicates by account ID, skip them.
-        // This could happen i.e., when a predefined user gets renamed,
-        // but the implicit CLI config for current user still points to same ID
-        let mut account_config_by_id = HashMap::new();
-        for account_config in &self.predefined_accounts_config.predefined {
-            let account_id = account_config.get_id();
-            match account_config_by_id.entry(account_id.clone()) {
-                Entry::Vacant(entry) => {
-                    entry.insert(account_config.clone());
-                }
-                Entry::Occupied(_) => {
-                    tracing::warn!(
-                        "Duplicate account configuration found for account ID: {}. Skipping.",
-                        account_id
-                    );
-                }
-            }
+        // Pre-flight checks
+        self.predefined_accounts_config.validate().int_err()?;
+
+        // Resolve account IDs for predefined accounts w/o IDs
+        let account_ids_resolution = self.resolve_account_ids().await?;
+
+        // Log configs with conflicting fields
+        for e in account_ids_resolution.conflicted {
+            tracing::warn!(
+                error = ?e,
+                error_msg = %e,
+                "Skip a predefined account w/ potentially conflicting fields. Skipping",
+            );
         }
 
         // Process accounts in parallel using tasks
         // Note: these are heavy operations, because of password hashing, ReBAC activity
+        let resolved_iter = account_ids_resolution
+            .resolved
+            .into_iter()
+            .map(|(account_id, account_config)| (Some(account_id), account_config));
+        let unresolved_iter = account_ids_resolution
+            .unresolved
+            .into_iter()
+            .map(|account_config| (None, account_config));
+
+        let account_configs_iter = resolved_iter.chain(unresolved_iter);
+
         let mut join_set = tokio::task::JoinSet::new();
-        // for account_config in unique_configs.into_values() {
-        for account_config in &self.predefined_accounts_config.predefined {
+        for (maybe_account_id, account_config) in account_configs_iter {
             let registrator = self.clone();
-            let account_config_clone = account_config.clone();
 
             println!("!!!6: {account_config:?}");
-            join_set.spawn(async move { registrator.process_account(&account_config_clone).await });
+            join_set.spawn(async move {
+                registrator
+                    .process_account(maybe_account_id, &account_config)
+                    .await
+            });
         }
 
         // Execute jobs in parallel
@@ -412,10 +428,6 @@ impl InitOnStartup for PredefinedAccountsRegistrator {
             }
         }
 
-        // Err(InternalError::new(
-        //     "One or more predefined accounts failed to register/update.",
-        // ))
-
         // Interrupt initialization if there were errors
         if had_errors {
             Err(InternalError::new(
@@ -429,16 +441,30 @@ impl InitOnStartup for PredefinedAccountsRegistrator {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+enum AccountIdResolution {
+    Resolved((odf::AccountID, AccountConfig)),
+    Unresolved(AccountConfig),
+    Conflicted(AccountUniqueFieldsConflictError),
+}
+
+struct AccountIdsResolution {
+    pub resolved: HashMap<odf::AccountID, AccountConfig>,
+    pub unresolved: Vec<AccountConfig>,
+    pub conflicted: Vec<AccountUniqueFieldsConflictError>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Errors
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(thiserror::Error, Debug)]
 #[error(
-    "Cannot create predefined account '{configured_account_name}': field '{field}' already used \
-     by account '{existing_account_name}' ({existing_account_id})"
+    "Account '{account_name}': found more than one account with the same unique fields: {}",
+    format_utils::format_collection(account_ids)
 )]
-struct PredefinedAccountUniqueConflictError {
-    field: AccountDuplicateField,
-    configured_account_name: odf::AccountName,
-    existing_account_name: odf::AccountName,
-    existing_account_id: odf::AccountID,
+pub struct AccountUniqueFieldsConflictError {
+    pub account_name: odf::AccountName,
+    pub account_ids: Vec<odf::AccountID>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

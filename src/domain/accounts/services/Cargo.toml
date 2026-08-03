@@ -33,6 +33,7 @@ database-common = { workspace = true }
 database-common-macros = { workspace = true }
 email-utils = { workspace = true }
 event-sourcing = { workspace = true }
+format-utils = { workspace = true }
 init-on-startup = { workspace = true }
 internal-error = { workspace = true }
 kamu-accounts = { workspace = true }

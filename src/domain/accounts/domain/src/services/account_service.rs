@@ -75,6 +75,8 @@ pub trait AccountService: Sync + Send {
         provider_identity_key: &str,
     ) -> Result<Option<odf::AccountID>, FindAccountIdByProviderIdentityKeyError>;
 
+    // TODO: PERF: vectorize?
+    //             Input: Vec<(account_name, email, provider_identity_key)>
     async fn find_account_ids_by_unique_fields(
         &self,
         account_name: &odf::AccountName,
@@ -129,11 +131,6 @@ pub trait AccountService: Sync + Send {
     async fn save_account(&self, account: &Account) -> Result<(), CreateAccountError>;
 
     async fn update_account(&self, updated_account: &Account) -> Result<(), UpdateAccountError>;
-
-    async fn find_account_id_by_email(
-        &self,
-        email: &email_utils::Email,
-    ) -> Result<Option<odf::AccountID>, FindAccountIdByEmailError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
