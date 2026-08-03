@@ -47,6 +47,7 @@ impl AccountID {
         (key, Self::Odf(did))
     }
 
+    // todo feature gate
     /// For testing purposes only. Use [`AccountID::new_generated_ed25519`] for
     /// cryptographically secure generation
     pub fn new_seeded_ed25519(seed: &[u8]) -> Self {

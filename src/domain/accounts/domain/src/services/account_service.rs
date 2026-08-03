@@ -19,6 +19,7 @@ use crate::{
     AccountNotFoundByNameError,
     AccountPageStream,
     CreateAccountError,
+    FindAccountIdByEmailError,
     FindAccountIdByProviderIdentityKeyError,
     FindAccountIdsByUniqueFieldsError,
     GetAccountByIdError,

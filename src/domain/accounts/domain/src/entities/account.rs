@@ -72,6 +72,7 @@ pub struct Account {
     pub provider_identity_key: ProviderIdentityKey,
 }
 
+// todo use?
 #[derive(Debug)]
 pub struct PasswordAccount {
     pub account: Account,

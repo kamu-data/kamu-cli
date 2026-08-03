@@ -16,6 +16,7 @@ use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::{
     Account,
     AccountConfig,
+    // AccountConfigIdentityError,
     AccountLifecycleMessage,
     AccountProvider,
     AccountService,
@@ -97,12 +98,11 @@ impl CreateAccountUseCaseImpl {
 
     async fn save_password_account(
         &self,
+        // todo use PasswordAccount?
         account: &Account,
         password: &Password,
         maybe_account_key: Option<odf::metadata::SigningKey>,
     ) -> Result<(), CreateAccountError> {
-        // todo use PasswordAccount?
-
         if !AccountProvider::is_password(&account.provider) {
             return Err(NonPasswordProviderError {
                 provider: account.provider.clone(),
@@ -152,7 +152,7 @@ impl CreateAccountUseCaseImpl {
         .int_err()?;
         let account_entity = DidEntity::new_account(account_id.as_str());
 
-        println!("!!!5.1: {:?}", did_secret_key);
+        println!("!!!5.1: {did_secret_key:?}");
 
         // todo: info: тут сохраняем
         let a = self
@@ -164,6 +164,21 @@ impl CreateAccountUseCaseImpl {
         println!("!!!5.2 +");
 
         a
+    }
+
+    // todo нуженн ли этот метод
+    fn resolve_account_key_and_id(
+        account_config: &AccountConfig,
+        // ) -> Result<(Option<odf::metadata::SigningKey>, odf::AccountID),
+        // AccountConfigIdentityError>
+    ) -> Result<(Option<odf::metadata::SigningKey>, odf::AccountID), InternalError> {
+        if let Some(id) = account_config.resolve_account_id().int_err()? {
+            let maybe_account_key = account_config.private_key.clone().map(Into::into);
+            Ok((maybe_account_key, id))
+        } else {
+            let (account_key, account_id) = odf::AccountID::new_generated_ed25519();
+            Ok((Some(account_key), account_id))
+        }
     }
 
     async fn notify_account_created(&self, new_account: &Account) -> Result<(), InternalError> {

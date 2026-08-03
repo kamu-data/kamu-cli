@@ -87,6 +87,9 @@ pub enum AccountPropertyName {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// todo может быть делать ворнинги а не валить весь сервис
+// todo сделать метод валидации?
+
 /// The declarative account configuration used to register an account if one
 /// does not already exist.
 ///
@@ -122,9 +125,10 @@ pub struct AccountConfig {
     #[config(default = AccountProvider::Password.to_string())]
     pub provider: String,
 
+    #[config(combine(replace))]
     pub avatar_url: Option<String>,
 
-    // ???
+    // todo ref delete?
     // TODO: This should not be in config - we are mixing configuration and domain model here
     #[config(combine(replace))]
     pub registered_at: Option<DateTime<Utc>>,
@@ -159,8 +163,7 @@ impl AccountConfig {
         }
     }
 
-    //
-    // todo: action: делаем тудушку -- вроде только добавить фичу
+    // todo: action:
     // TODO: Do not use the method outside of tests
     // #[cfg(any(feature = "testing", test))]
     pub fn test_config_from_subject(subject: LoggedAccount) -> Self {
@@ -203,13 +206,16 @@ impl AccountConfig {
         self
     }
 
+    // todo internal_error?
     /// Resolves account ID from `id` and/or `private_key`.
     /// Returns `None` when neither is set.
     pub fn resolve_account_id(
         &self,
-    ) -> Result<Option<Cow<'_, odf::AccountID>>, DerivedAccountIdMismatchError> {
+    ) -> Result<Option<odf::AccountID>, DerivedAccountIdMismatchError> {
         let id = match (&self.id, &self.private_key) {
             (Some(configured_id), Some(private_key)) => {
+                // TODO: тут будет ошибка, если pkh и did
+                // todo похоже нужно делать энам и какой-то метод верификации
                 let derived_id = odf::AccountID::from_signing_key(private_key);
 
                 if *configured_id != derived_id {
@@ -220,13 +226,12 @@ impl AccountConfig {
                     });
                 }
 
-                Some(Cow::Owned(derived_id))
+                Some(derived_id)
             }
-            (Some(id), None) => Some(Cow::Borrowed(id)),
+            (Some(id), None) => Some(id.clone()),
             (None, Some(private_key)) => {
                 let id = odf::AccountID::from_signing_key(private_key);
-
-                Some(Cow::Owned(id))
+                Some(id)
             }
             (None, None) => None,
         };
@@ -256,6 +261,20 @@ impl AccountConfig {
 
     pub fn generate_password(account_name: &odf::AccountName) -> Password {
         Password::try_new(format!("{DEFAULT_PASSWORD_STR}:{account_name}")).unwrap()
+    }
+
+    pub fn get_id(&self) -> odf::AccountID {
+        todo!("remove me")
+    }
+
+    pub fn validate(&self) -> Result<(), String> {
+        if let Some(email) = &self.email {
+            if !email.is_valid() {
+                return Err(format!("Invalid email: {}", email));
+            }
+        }
+
+        Ok(())
     }
 }
 
