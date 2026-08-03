@@ -158,7 +158,9 @@ impl PredefinedAccountsRegistrator {
             {
                 Ok(_) => Ok(false),
                 Err(E::IncorrectPassword(_)) => Ok(true),
-                Err(e @ (E::AccountNotFound(_) | E::Internal(_))) => Err(e.int_err()),
+                Err(
+                    e @ (E::AccountNotFoundByName(_) | E::AccountNotFoundById(_) | E::Internal(_)),
+                ) => Err(e.int_err()),
             }?;
 
             if has_password_changed {

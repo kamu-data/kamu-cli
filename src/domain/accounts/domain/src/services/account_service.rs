@@ -15,6 +15,7 @@ use odf::metadata::DidPkh;
 
 use crate::{
     Account,
+    AccountNotFoundByIdError,
     AccountNotFoundByNameError,
     AccountPageStream,
     CreateAccountError,
@@ -98,6 +99,12 @@ pub trait AccountService: Sync + Send {
         password: &Password,
     ) -> Result<(), VerifyPasswordError>;
 
+    async fn verify_account_password_by_id(
+        &self,
+        account_id: &odf::AccountID,
+        password: &Password,
+    ) -> Result<(), VerifyPasswordError>;
+
     async fn modify_account_password(
         &self,
         account_id: &odf::AccountID,
@@ -151,7 +158,10 @@ pub enum GetAccountMapError {
 #[derive(thiserror::Error, Debug)]
 pub enum VerifyPasswordError {
     #[error(transparent)]
-    AccountNotFound(#[from] AccountNotFoundByNameError),
+    AccountNotFoundByName(#[from] AccountNotFoundByNameError),
+
+    #[error(transparent)]
+    AccountNotFoundById(#[from] AccountNotFoundByIdError),
 
     #[error(transparent)]
     IncorrectPassword(#[from] IncorrectPasswordError),

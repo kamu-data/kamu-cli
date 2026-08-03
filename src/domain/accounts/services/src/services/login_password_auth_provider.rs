@@ -66,11 +66,13 @@ impl AuthenticationProvider for LoginPasswordAuthProvider {
             .map_err(|e| {
                 use VerifyPasswordError as E;
                 match e {
-                    e @ (E::AccountNotFound(_) | E::IncorrectPassword(_)) => {
+                    e @ (E::AccountNotFoundByName(_) | E::IncorrectPassword(_)) => {
                         tracing::debug!(%account_name, %e, "Failed to verify a password");
                         ProviderLoginError::RejectedCredentials(RejectedCredentialsError {})
                     }
-                    e @ E::Internal(_) => ProviderLoginError::Internal(e.int_err()),
+                    e @ (E::AccountNotFoundById(_) | E::Internal(_)) => {
+                        ProviderLoginError::Internal(e.int_err())
+                    }
                 }
             })?;
 

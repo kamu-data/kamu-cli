@@ -44,6 +44,23 @@ impl AccountServiceImpl {
                 .map_or(PasswordHashingMode::Default, |mode| *mode),
         }
     }
+
+    async fn verify_password_hash(
+        password: &Password,
+        password_hash: &str,
+        password_hashing_mode: PasswordHashingMode,
+    ) -> Result<(), VerifyPasswordError> {
+        let is_password_correct =
+            Argon2Hasher::verify_async(password.as_bytes(), password_hash, password_hashing_mode)
+                .await
+                .int_err()?;
+
+        if !is_password_correct {
+            return Err(IncorrectPasswordError.into());
+        }
+
+        Ok(())
+    }
 }
 
 #[async_trait::async_trait]
@@ -246,21 +263,32 @@ impl AccountService for AccountServiceImpl {
             }
         };
 
-        let is_password_correct = Argon2Hasher::verify_async(
-            password.as_bytes(),
-            password_hash.as_str(),
-            self.password_hashing_mode,
-        )
-        .await
-        .int_err()?;
+        Self::verify_password_hash(password, &password_hash, self.password_hashing_mode).await
+    }
 
-        if !is_password_correct {
-            return Err(VerifyPasswordError::IncorrectPassword(
-                IncorrectPasswordError,
-            ));
-        }
+    async fn verify_account_password_by_id(
+        &self,
+        account_id: &odf::AccountID,
+        password: &Password,
+    ) -> Result<(), VerifyPasswordError> {
+        let password_hash = match self
+            .password_hash_repository
+            .find_password_hash_by_account_id(account_id)
+            .await
+        {
+            Ok(Some(password_hash)) => password_hash,
+            Ok(None) => {
+                return Err(AccountNotFoundByIdError {
+                    account_id: account_id.clone(),
+                }
+                .into());
+            }
+            Err(e) => {
+                return Err(VerifyPasswordError::Internal(e.int_err()));
+            }
+        };
 
-        Ok(())
+        Self::verify_password_hash(password, &password_hash, self.password_hashing_mode).await
     }
 
     async fn modify_account_password(

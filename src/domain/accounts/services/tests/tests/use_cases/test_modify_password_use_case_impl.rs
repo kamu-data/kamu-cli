@@ -55,6 +55,13 @@ async fn test_modify_account_password_success() {
             .await,
         Ok(_),
     );
+    pretty_assertions::assert_matches!(
+        harness
+            .account_service()
+            .verify_account_password_by_id(&account.id, &initial_password)
+            .await,
+        Ok(_),
+    );
 
     let new_password = Password::try_new("new_password").unwrap();
 
@@ -76,7 +83,21 @@ async fn test_modify_account_password_success() {
     pretty_assertions::assert_matches!(
         harness
             .account_service()
+            .verify_account_password_by_id(&account.id, &initial_password)
+            .await,
+        Err(VerifyPasswordError::IncorrectPassword(_)),
+    );
+    pretty_assertions::assert_matches!(
+        harness
+            .account_service()
             .verify_account_password_by_name(&account.account_name, &new_password)
+            .await,
+        Ok(_),
+    );
+    pretty_assertions::assert_matches!(
+        harness
+            .account_service()
+            .verify_account_password_by_id(&account.id, &new_password)
             .await,
         Ok(_),
     );
@@ -111,6 +132,13 @@ async fn test_modify_account_password_not_admin() {
         harness
             .account_service()
             .verify_account_password_by_name(&account.account_name, &new_password)
+            .await,
+        Err(VerifyPasswordError::IncorrectPassword(_)),
+    );
+    pretty_assertions::assert_matches!(
+        harness
+            .account_service()
+            .verify_account_password_by_id(&account.id, &new_password)
             .await,
         Err(VerifyPasswordError::IncorrectPassword(_)),
     );
@@ -152,7 +180,21 @@ async fn test_modify_account_password_with_confirmation_success() {
     pretty_assertions::assert_matches!(
         harness
             .account_service()
+            .verify_account_password_by_id(&account.id, &initial_password)
+            .await,
+        Err(VerifyPasswordError::IncorrectPassword(_)),
+    );
+    pretty_assertions::assert_matches!(
+        harness
+            .account_service()
             .verify_account_password_by_name(&account.account_name, &new_password)
+            .await,
+        Ok(_),
+    );
+    pretty_assertions::assert_matches!(
+        harness
+            .account_service()
+            .verify_account_password_by_id(&account.id, &new_password)
             .await,
         Ok(_),
     );
