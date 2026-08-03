@@ -9,6 +9,7 @@
 
 use chrono::{DateTime, Utc};
 use email_utils::Email;
+use url::Url;
 
 use super::{DUMMY_EMAIL_ADDRESS, LoggedAccount};
 use crate::{
@@ -24,7 +25,9 @@ use crate::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-const DEFAULT_AVATAR_URL: &str = "https://avatars.githubusercontent.com/u/50896974?s=200&v=4";
+static DEFAULT_AVATAR_URL: std::sync::LazyLock<Url> = std::sync::LazyLock::new(|| {
+    Url::parse("https://avatars.githubusercontent.com/u/50896974?s=200&v=4").unwrap()
+});
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -52,7 +55,7 @@ impl PredefinedAccountsConfig {
                 password: DEFAULT_ACCOUNT_PASSWORD.clone(),
                 account_type: AccountType::User,
                 display_name: None,
-                avatar_url: Some(String::from(DEFAULT_AVATAR_URL)),
+                avatar_url: Some(DEFAULT_AVATAR_URL.clone()),
                 properties: vec![AccountPropertyName::IsAdmin],
                 registered_at: None,
                 provider: AccountProvider::Password.to_string(),
@@ -126,7 +129,7 @@ pub struct AccountConfig {
     pub provider: String,
 
     #[config(combine(replace))]
-    pub avatar_url: Option<String>,
+    pub avatar_url: Option<Url>,
 
     // todo ref delete?
     // TODO: This should not be in config - we are mixing configuration and domain model here

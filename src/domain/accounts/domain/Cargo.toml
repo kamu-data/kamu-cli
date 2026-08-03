@@ -66,6 +66,9 @@ strum = { version = "0.28", features = [
 thiserror = { version = "2", default-features = false, features = [
     "std",
 ] }
+url = { version = "2", default-features = false, features = [
+    "serde",
+] }
 uuid = { version = "1", default-features = false, features = [
     "v4",
     "v5",
