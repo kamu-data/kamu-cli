@@ -69,6 +69,18 @@ pub trait AccountService: Sync + Send {
         account_name: &odf::AccountName,
     ) -> Result<Option<odf::AccountID>, InternalError>;
 
+    async fn find_account_id_by_provider_identity_key(
+        &self,
+        provider_identity_key: &str,
+    ) -> Result<Option<odf::AccountID>, FindAccountIdByProviderIdentityKeyError>;
+
+    async fn find_account_ids_by_unique_fields(
+        &self,
+        account_name: &odf::AccountName,
+        email: &email_utils::Email,
+        provider_identity_key: &str,
+    ) -> Result<Vec<odf::AccountID>, FindAccountIdsByUniqueFieldsError>;
+
     async fn find_account_name_by_id(
         &self,
         account_id: &odf::AccountID,
@@ -117,22 +129,10 @@ pub trait AccountService: Sync + Send {
 
     async fn update_account(&self, updated_account: &Account) -> Result<(), UpdateAccountError>;
 
-    async fn find_account_id_by_provider_identity_key(
-        &self,
-        provider_identity_key: &str,
-    ) -> Result<Option<odf::AccountID>, FindAccountIdByProviderIdentityKeyError>;
-
     async fn find_account_id_by_email(
         &self,
         email: &email_utils::Email,
     ) -> Result<Option<odf::AccountID>, FindAccountIdByEmailError>;
-
-    async fn find_account_ids_by_unique_fields(
-        &self,
-        account_name: &odf::AccountName,
-        email: &email_utils::Email,
-        provider_identity_key: &str,
-    ) -> Result<Vec<odf::AccountID>, FindAccountIdsByUniqueFieldsError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
