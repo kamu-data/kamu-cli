@@ -327,6 +327,24 @@ impl AccountService for AccountServiceImpl {
             .find_account_id_by_provider_identity_key(provider_identity_key)
             .await
     }
+
+    async fn find_account_id_by_email(
+        &self,
+        email: &email_utils::Email,
+    ) -> Result<Option<odf::AccountID>, FindAccountIdByEmailError> {
+        self.account_repo.find_account_id_by_email(email).await
+    }
+
+    async fn find_account_ids_by_unique_fields(
+        &self,
+        account_name: &odf::AccountName,
+        email: &email_utils::Email,
+        provider_identity_key: &str,
+    ) -> Result<Vec<odf::AccountID>, FindAccountIdsByUniqueFieldsError> {
+        self.account_repo
+            .find_account_ids_by_unique_fields(account_name, email, provider_identity_key)
+            .await
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

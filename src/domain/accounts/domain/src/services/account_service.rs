@@ -20,6 +20,7 @@ use crate::{
     AccountPageStream,
     CreateAccountError,
     FindAccountIdByProviderIdentityKeyError,
+    FindAccountIdsByUniqueFieldsError,
     GetAccountByIdError,
     GetAccountByNameError,
     ModifyAccountPasswordError,
@@ -119,6 +120,18 @@ pub trait AccountService: Sync + Send {
         &self,
         provider_identity_key: &str,
     ) -> Result<Option<odf::AccountID>, FindAccountIdByProviderIdentityKeyError>;
+
+    async fn find_account_id_by_email(
+        &self,
+        email: &email_utils::Email,
+    ) -> Result<Option<odf::AccountID>, FindAccountIdByEmailError>;
+
+    async fn find_account_ids_by_unique_fields(
+        &self,
+        account_name: &odf::AccountName,
+        email: &email_utils::Email,
+        provider_identity_key: &str,
+    ) -> Result<Vec<odf::AccountID>, FindAccountIdsByUniqueFieldsError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

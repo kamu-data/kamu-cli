@@ -446,6 +446,35 @@ impl AccountRepository for MySqlAccountRepository {
         Ok(maybe_account_row.map(|account_row| account_row.id))
     }
 
+    async fn find_account_ids_by_unique_fields(
+        &self,
+        account_name: &odf::AccountName,
+        email: &Email,
+        provider_identity_key: &str,
+    ) -> Result<Vec<odf::AccountID>, FindAccountIdsByUniqueFieldsError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let account_rows = sqlx::query!(
+            r#"
+            SELECT DISTINCT id as "id: odf::AccountID"
+            FROM accounts
+            WHERE lower(account_name) = lower(?)
+               OR email = ?
+               OR provider_identity_key = ?
+            "#,
+            account_name.as_str(),
+            email.as_ref(),
+            provider_identity_key
+        )
+        .fetch_all(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(account_rows.into_iter().map(|row| row.id).collect())
+    }
+
     fn search_accounts_by_name_pattern<'a>(
         &'a self,
         name_pattern: &'a str,

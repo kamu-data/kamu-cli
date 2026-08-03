@@ -991,6 +991,123 @@ pub async fn test_delete_account(catalog: &Catalog) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_find_account_ids_by_unique_fields(catalog: &dill::Catalog) {
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+
+    let not_found_name = odf::AccountName::new_unchecked("not-found");
+    let not_found_email = Email::parse("not-found@example.com").unwrap();
+    let not_found_provider_identity_key = "not-found";
+
+    // 1. Empty repository — no matches
+    assert_matches!(
+        account_repo
+            .find_account_ids_by_unique_fields(
+                &not_found_name,
+                &not_found_email,
+                not_found_provider_identity_key,
+            )
+            .await,
+        Ok(ids) if ids.is_empty()
+    );
+
+    let account_by_name = make_test_account(
+        "alice",
+        "alice@example.com",
+        AccountProvider::Password.into(),
+        "alice",
+    );
+    let account_by_email = make_test_account(
+        "bob",
+        "bob@example.com",
+        AccountProvider::Password.into(),
+        "bob",
+    );
+    let account_by_provider = make_test_account(
+        "carol",
+        "carol@example.com",
+        AccountProvider::Password.into(),
+        "carol",
+    );
+
+    account_repo.save_account(&account_by_name).await.unwrap();
+    account_repo.save_account(&account_by_email).await.unwrap();
+    account_repo
+        .save_account(&account_by_provider)
+        .await
+        .unwrap();
+
+    // 2. Match only by name
+    assert_matches!(
+        account_repo
+            .find_account_ids_by_unique_fields(
+                &account_by_name.account_name,
+                &not_found_email,
+                not_found_provider_identity_key,
+            )
+            .await,
+        Ok(ids) if ids == vec![account_by_name.id.clone()]
+    );
+
+    // 3. Match only by email
+    assert_matches!(
+        account_repo
+            .find_account_ids_by_unique_fields(
+                &not_found_name,
+                &account_by_email.email,
+                not_found_provider_identity_key,
+            )
+            .await,
+        Ok(ids) if ids == vec![account_by_email.id.clone()]
+    );
+
+    // 4. Match only by provider_identity_key
+    assert_matches!(
+        account_repo
+            .find_account_ids_by_unique_fields(
+                &not_found_name,
+                &not_found_email,
+                &account_by_provider.provider_identity_key,
+            )
+            .await,
+        Ok(ids) if ids == vec![account_by_provider.id.clone()]
+    );
+
+    // 5. The same account matches multiple fields -- single distinct id
+    assert_matches!(
+        account_repo
+            .find_account_ids_by_unique_fields(
+                &account_by_name.account_name,
+                &account_by_name.email,
+                &account_by_name.provider_identity_key,
+            )
+            .await,
+        Ok(ids) if ids == vec![account_by_name.id.clone()]
+    );
+
+    // 6. Three different accounts, each by its own field
+    let mut actual_ids = account_repo
+        .find_account_ids_by_unique_fields(
+            &account_by_name.account_name,
+            &account_by_email.email,
+            &account_by_provider.provider_identity_key,
+        )
+        .await
+        .unwrap();
+
+    let mut expected_ids = vec![
+        account_by_name.id,
+        account_by_email.id,
+        account_by_provider.id,
+    ];
+
+    actual_ids.sort();
+    expected_ids.sort();
+
+    assert_eq!(expected_ids, actual_ids);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
