@@ -111,6 +111,7 @@ pub struct AccountConfig {
     #[config(combine(replace))]
     pub account_name: odf::AccountName,
 
+    // TODO: The password must be checked only for the "Password" provider, not for all of them.
     #[config(combine(replace))]
     pub password: Password,
 
