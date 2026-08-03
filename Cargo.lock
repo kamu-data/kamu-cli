@@ -7060,6 +7060,7 @@ dependencies = [
  "test-group",
  "test-log",
  "tracing",
+ "url",
  "uuid",
 ]
 
@@ -7085,6 +7086,7 @@ dependencies = [
  "test-group",
  "test-log",
  "tracing",
+ "url",
  "uuid",
 ]
 
@@ -7105,6 +7107,7 @@ dependencies = [
  "password-hash",
  "pretty_assertions",
  "rand 0.9.4",
+ "url",
  "uuid",
 ]
 
@@ -7151,6 +7154,7 @@ dependencies = [
  "time-source",
  "tokio",
  "tracing",
+ "url",
  "uuid",
 ]
 
@@ -7176,6 +7180,7 @@ dependencies = [
  "test-group",
  "test-log",
  "tracing",
+ "url",
  "uuid",
 ]
 

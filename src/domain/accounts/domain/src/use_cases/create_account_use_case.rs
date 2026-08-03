@@ -12,6 +12,7 @@ use std::collections::HashSet;
 use email_utils::Email;
 use internal_error::InternalError;
 use odf::metadata::DidPkh;
+use url::Url;
 
 use crate::{Account, AccountConfig, CreateAccountError, Password};
 
@@ -48,7 +49,7 @@ pub struct CreateAccountUseCaseOptions {
     pub email: Option<Email>,
     pub password: Option<Password>,
     pub display_name: Option<String>,
-    pub avatar_url: Option<String>,
+    pub avatar_url: Option<Url>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

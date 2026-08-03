@@ -13,6 +13,7 @@ use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use sqlx::Row;
 use sqlx::error::DatabaseError;
 use sqlx::mysql::MySqlRow;
+use url::Url;
 
 use crate::domain::*;
 
@@ -61,7 +62,9 @@ impl MySqlAccountRepository {
             email: Email::parse(account_row.get(2)).unwrap(),
             display_name: account_row.get(3),
             account_type: account_row.get_unchecked(4),
-            avatar_url: account_row.get(5),
+            avatar_url: account_row
+                .get::<Option<&str>, _>(5)
+                .map(|url| Url::parse(url).unwrap()),
             registered_at: account_row.get(6),
             provider: account_row.get(7),
             provider_identity_key: account_row.get(8),
@@ -86,7 +89,7 @@ impl AccountRepository for MySqlAccountRepository {
             account.email.as_ref().to_ascii_lowercase(),
             account.display_name,
             account.account_type,
-            account.avatar_url,
+            account.avatar_url.as_ref().map(Url::as_str),
             account.registered_at,
             account.provider.clone(),
             account.provider_identity_key.clone(),
@@ -129,7 +132,7 @@ impl AccountRepository for MySqlAccountRepository {
             updated_account.email.as_ref().to_ascii_lowercase(),
             updated_account.display_name,
             updated_account.account_type as AccountType,
-            updated_account.avatar_url,
+            updated_account.avatar_url.as_ref().map(Url::as_str),
             updated_account.registered_at,
             updated_account.provider.clone(),
             updated_account.provider_identity_key.clone(),

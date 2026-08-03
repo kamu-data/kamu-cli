@@ -13,6 +13,7 @@ use database_common::{PaginationOpts, TransactionRefT, sqlite_generate_placehold
 use email_utils::Email;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use sqlx::error::DatabaseError;
+use url::Url;
 
 use crate::domain::*;
 
@@ -58,23 +59,27 @@ impl AccountRepository for SqliteAccountRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        let account_id = account.id.to_string();
+        use odf::metadata::AsStackString;
+
+        let account_id_stack = account.id.as_stack_string();
+        let account_id_str = account_id_stack.as_str();
         let account_name = account.account_name.as_str();
         let email = account.email.as_ref().to_ascii_lowercase();
-        let provider = account.provider.clone();
-        let provider_identity_key = account.provider_identity_key.clone();
+        let avatar_url_as_str = account.avatar_url.as_ref().map(Url::as_str);
+        let provider = account.provider.as_str();
+        let provider_identity_key = account.provider_identity_key.as_str();
 
         sqlx::query!(
             r#"
             INSERT INTO accounts (id, account_name, email, display_name, account_type, avatar_url, registered_at, provider, provider_identity_key)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             "#,
-            account_id,
+            account_id_str,
             account_name,
             email,
             account.display_name,
             account.account_type,
-            account.avatar_url,
+            avatar_url_as_str,
             account.registered_at,
             provider,
             provider_identity_key
@@ -100,11 +105,15 @@ impl AccountRepository for SqliteAccountRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        let account_id = updated_account.id.to_string();
+        use odf::metadata::AsStackString;
+
+        let account_id_stack = updated_account.id.as_stack_string();
+        let account_id_str = account_id_stack.as_str();
         let account_name = updated_account.account_name.as_str();
         let email = updated_account.email.as_ref().to_ascii_lowercase();
-        let provider = updated_account.provider.clone();
-        let provider_identity_key = updated_account.provider_identity_key.clone();
+        let avatar_url_as_str = updated_account.avatar_url.as_ref().map(Url::as_str);
+        let provider = updated_account.provider.as_str();
+        let provider_identity_key = updated_account.provider_identity_key.as_str();
 
         let update_result = sqlx::query!(
             r#"
@@ -119,12 +128,12 @@ impl AccountRepository for SqliteAccountRepository {
                 provider_identity_key = $9
             WHERE id = $1
             "#,
-            account_id,
+            account_id_str,
             account_name,
             email,
             updated_account.display_name,
             updated_account.account_type,
-            updated_account.avatar_url,
+            avatar_url_as_str,
             updated_account.registered_at,
             provider,
             provider_identity_key

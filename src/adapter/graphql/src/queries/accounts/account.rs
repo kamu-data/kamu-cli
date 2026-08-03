@@ -16,6 +16,7 @@ use kamu_accounts::{
 use kamu_auth_rebac::{RebacService, RebacServiceExt};
 use kamu_datasets::{DatasetAction, DatasetActionAuthorizer, DatasetActionAuthorizerExt};
 use tokio::sync::OnceCell;
+use url::Url;
 
 use super::AccountFlows;
 use crate::prelude::*;
@@ -213,7 +214,7 @@ impl Account {
     }
 
     /// Avatar URL
-    async fn avatar_url(&self, ctx: &Context<'_>) -> Result<&Option<String>> {
+    async fn avatar_url(&self, ctx: &Context<'_>) -> Result<&Option<Url>> {
         let full_account_info = self.get_full_account_info(ctx).await?;
 
         Ok(&full_account_info.avatar_url)

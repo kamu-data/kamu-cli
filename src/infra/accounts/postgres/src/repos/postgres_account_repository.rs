@@ -11,6 +11,7 @@ use database_common::{PaginationOpts, TransactionRefT};
 use email_utils::Email;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use sqlx::error::DatabaseError;
+use url::Url;
 
 use crate::domain::*;
 
@@ -67,7 +68,7 @@ impl AccountRepository for PostgresAccountRepository {
             account.email.as_ref().to_ascii_lowercase(),
             account.display_name,
             account.account_type as AccountType,
-            account.avatar_url,
+            account.avatar_url.as_ref().map(Url::as_str),
             account.registered_at,
             account.provider,
             account.provider_identity_key,
@@ -115,7 +116,7 @@ impl AccountRepository for PostgresAccountRepository {
             updated_account.email.as_ref().to_ascii_lowercase(),
             updated_account.display_name,
             updated_account.account_type as AccountType,
-            updated_account.avatar_url,
+            updated_account.avatar_url.as_ref().map(Url::as_str),
             updated_account.registered_at,
             updated_account.provider,
             updated_account.provider_identity_key,

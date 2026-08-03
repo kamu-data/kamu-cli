@@ -14,6 +14,7 @@ use database_common::PaginationOpts;
 use email_utils::Email;
 use kamu_accounts::*;
 use pretty_assertions::{assert_eq, assert_matches};
+use url::Url;
 
 use crate::make_test_account;
 
@@ -619,7 +620,7 @@ pub async fn test_update_account_success(catalog: &dill::Catalog) {
         account_name: updated_name.clone(),
         email: updated_email.clone(),
         display_name: "Wasilius".to_string(),
-        avatar_url: Some("wasilius.png".to_string()),
+        avatar_url: Some(Url::parse("http://wasilius.me/avatar.png").unwrap()),
         ..account.clone()
     };
 

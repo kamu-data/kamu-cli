@@ -14,6 +14,7 @@ use chrono::TimeZone;
 use chrono::{DateTime, Utc};
 use email_utils::Email;
 use serde::{Deserialize, Serialize};
+use url::Url;
 
 use crate::Password;
 
@@ -66,7 +67,7 @@ pub struct Account {
     pub email: Email,
     pub display_name: AccountDisplayName,
     pub account_type: AccountType,
-    pub avatar_url: Option<String>,
+    pub avatar_url: Option<Url>,
     pub registered_at: DateTime<Utc>,
     pub provider: String,
     pub provider_identity_key: ProviderIdentityKey,
@@ -154,7 +155,7 @@ impl From<AccountRowModel> for Account {
             email: Email::parse(&value.email).unwrap(),
             display_name: value.display_name,
             account_type: value.account_type,
-            avatar_url: value.avatar_url,
+            avatar_url: value.avatar_url.map(|url| Url::parse(&url).unwrap()),
             registered_at: value.registered_at,
             provider: value.provider,
             provider_identity_key: value.provider_identity_key,
@@ -171,7 +172,7 @@ impl From<AccountWithTokenRowModel> for Account {
             email: Email::parse(&value.email).unwrap(),
             display_name: value.display_name,
             account_type: value.account_type,
-            avatar_url: value.avatar_url,
+            avatar_url: value.avatar_url.map(|url| Url::parse(&url).unwrap()),
             registered_at: value.registered_at,
             provider: value.provider,
             provider_identity_key: value.provider_identity_key,
