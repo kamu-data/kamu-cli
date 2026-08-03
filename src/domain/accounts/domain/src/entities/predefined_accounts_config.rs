@@ -90,9 +90,8 @@ pub enum AccountPropertyName {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// todo может быть делать ворнинги а не валить весь сервис
-// todo сделать метод валидации?
-
+// TODO: Embed the `AccountConfig::validate()` call
+//       into setty validation mechanism (for whole struct).
 /// The declarative account configuration used to register an account if one
 /// does not already exist.
 ///
@@ -209,27 +208,17 @@ impl AccountConfig {
         self
     }
 
-    // todo internal_error?
     /// Resolves account ID from `id` and/or `private_key`.
     /// Returns `None` when neither is set.
-    pub fn resolve_account_id(
-        &self,
-    ) -> Result<Option<odf::AccountID>, DerivedAccountIdMismatchError> {
-        let id = match (&self.id, &self.private_key) {
-            (Some(configured_id), Some(private_key)) => {
-                // TODO: тут будет ошибка, если pkh и did
-                // todo похоже нужно делать энам и какой-то метод верификации
-                let derived_id = odf::AccountID::from_signing_key(private_key);
-
-                if *configured_id != derived_id {
-                    return Err(DerivedAccountIdMismatchError {
-                        configured_id: configured_id.clone(),
-                        derived_id,
-                        account_name: self.account_name.clone(),
-                    });
-                }
-
-                Some(derived_id)
+    ///
+    /// NOTE: It is assumed that we call `validate()` first before using the
+    ///       values.
+    pub fn resolve_account_id(&self) -> Option<odf::AccountID> {
+        match (&self.id, &self.private_key) {
+            (Some(configured_id), Some(_private_key)) => {
+                // NOTE: Important: In this method, we do not verify that the derived ID
+                //       (from `private_key`) matches the configured ID.
+                Some(configured_id.clone())
             }
             (Some(id), None) => Some(id.clone()),
             (None, Some(private_key)) => {
@@ -237,9 +226,7 @@ impl AccountConfig {
                 Some(id)
             }
             (None, None) => None,
-        };
-
-        Ok(id)
+        }
     }
 
     pub fn provider_identity_key(&self) -> ProviderIdentityKey {
@@ -270,10 +257,62 @@ impl AccountConfig {
         todo!("remove me")
     }
 
-    pub fn validate(&self) -> Result<(), String> {
-        if let Some(email) = &self.email {
-            if !email.is_valid() {
-                return Err(format!("Invalid email: {}", email));
+    pub fn validate(&self) -> Result<(), AccountConfigValidationError> {
+        use std::str::FromStr;
+
+        if let (Some(configured_id), Some(private_key)) = (&self.id, &self.private_key) {
+            let derived_id = odf::AccountID::from_signing_key(private_key);
+
+            if *configured_id != derived_id {
+                return Err(AccountConfigValidationError::IdMismatch {
+                    account_name: self.account_name.clone(),
+                    configured_id: configured_id.clone(),
+                    derived_id,
+                });
+            }
+        }
+
+        Email::parse(self.email.as_ref()).map_err(|_| {
+            AccountConfigValidationError::InvalidEmail {
+                account_name: self.account_name.clone(),
+                email: self.email.to_string(),
+            }
+        })?;
+
+        let provider = AccountProvider::from_str(&self.provider).map_err(|_| {
+            AccountConfigValidationError::InvalidProvider {
+                account_name: self.account_name.clone(),
+                provider: self.provider.clone(),
+            }
+        })?;
+
+        match provider {
+            AccountProvider::OAuthGitHub | AccountProvider::Web3Wallet => {
+                if self.private_key.is_some() {
+                    return Err(AccountConfigValidationError::PrivateKeyNotAllowed {
+                        account_name: self.account_name.clone(),
+                        provider: self.provider.clone(),
+                    });
+                }
+            }
+            AccountProvider::Password => { /* nothing */ }
+        }
+
+        if let Some(id) = &self.id {
+            match provider {
+                AccountProvider::OAuthGitHub if id.as_did_odf().is_none() => {
+                    return Err(AccountConfigValidationError::ExpectedDidOdf {
+                        id: id.clone(),
+                        account_name: self.account_name.clone(),
+                    });
+                }
+                AccountProvider::Web3Wallet if id.as_did_pkh().is_none() => {
+                    return Err(AccountConfigValidationError::ExpectedDidPkh {
+                        id: id.clone(),
+                        account_name: self.account_name.clone(),
+                    });
+                }
+                _ => { /* nothing */ }
             }
         }
 
@@ -284,13 +323,195 @@ impl AccountConfig {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(thiserror::Error, Debug)]
-#[error(
-    "Account '{account_name}': ID mismatch — configured '{configured_id}', derived '{derived_id}'"
-)]
-pub struct DerivedAccountIdMismatchError {
-    account_name: odf::AccountName,
-    configured_id: odf::AccountID,
-    derived_id: odf::AccountID,
+pub enum AccountConfigValidationError {
+    #[error(
+        "Account '{account_name}': ID mismatch -- configured '{configured_id}', derived \
+         '{derived_id}'"
+    )]
+    IdMismatch {
+        account_name: odf::AccountName,
+        configured_id: odf::AccountID,
+        derived_id: odf::AccountID,
+    },
+
+    #[error("Account '{account_name}': invalid email '{email}'")]
+    InvalidEmail {
+        account_name: odf::AccountName,
+        email: String,
+    },
+
+    #[error("Account '{account_name}': invalid provider '{provider}'")]
+    InvalidProvider {
+        account_name: odf::AccountName,
+        provider: String,
+    },
+
+    #[error("Account '{account_name}': private key is not allowed for provider '{provider}'")]
+    PrivateKeyNotAllowed {
+        account_name: odf::AccountName,
+        provider: String,
+    },
+
+    #[error(
+        "Account '{account_name}': OAuthGitHub provider requires did:odf account id, got '{id}'"
+    )]
+    ExpectedDidOdf {
+        account_name: odf::AccountName,
+        id: odf::AccountID,
+    },
+
+    #[error(
+        "Account '{account_name}': Web3Wallet provider requires did:pkh account id, got '{id}'"
+    )]
+    ExpectedDidPkh {
+        account_name: odf::AccountName,
+        id: odf::AccountID,
+    },
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn base_config() -> AccountConfig {
+        AccountConfig::test_config_from_name(odf::AccountName::new_unchecked("alice"))
+    }
+
+    fn sample_pkh_id() -> odf::AccountID {
+        odf::AccountID::parse_caip10_account_id(
+            "eip155:1:0xb9c5714089478a327f09197987f16f9e5d936e8a",
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn test_validate_password_without_id_or_key_ok() {
+        assert!(base_config().validate().is_ok());
+    }
+
+    #[test]
+    fn test_validate_matching_id_and_private_key_ok() {
+        let (signing_key, id) = odf::AccountID::new_generated_ed25519();
+
+        let mut config = base_config();
+        config.id = Some(id);
+        config.private_key = Some(signing_key.into());
+
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn test_validate_mismatched_id_and_private_key_err() {
+        let (signing_key, _) = odf::AccountID::new_generated_ed25519();
+        let (_, other_id) = odf::AccountID::new_generated_ed25519();
+
+        let mut config = base_config();
+        config.id = Some(other_id);
+        config.private_key = Some(signing_key.into());
+
+        assert!(matches!(
+            config.validate(),
+            Err(AccountConfigValidationError::IdMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn test_validate_invalid_email_err() {
+        let mut config = base_config();
+        config.email = serde_json::from_str("\"not-an-email\"").unwrap();
+
+        assert!(matches!(
+            config.validate(),
+            Err(AccountConfigValidationError::InvalidEmail { .. })
+        ));
+    }
+
+    #[test]
+    fn test_validate_invalid_provider_err() {
+        let mut config = base_config();
+        config.provider = "unknown".to_string();
+
+        assert!(matches!(
+            config.validate(),
+            Err(AccountConfigValidationError::InvalidProvider { .. })
+        ));
+    }
+
+    #[test]
+    fn test_validate_oauth_github_with_private_key_err() {
+        let (signing_key, _) = odf::AccountID::new_generated_ed25519();
+
+        let mut config = base_config();
+        config.provider = AccountProvider::OAuthGitHub.to_string();
+        config.private_key = Some(signing_key.into());
+
+        assert!(matches!(
+            config.validate(),
+            Err(AccountConfigValidationError::PrivateKeyNotAllowed { .. })
+        ));
+    }
+
+    #[test]
+    fn test_validate_web3_wallet_with_private_key_err() {
+        let (signing_key, _) = odf::AccountID::new_generated_ed25519();
+
+        let mut config = base_config();
+        config.provider = AccountProvider::Web3Wallet.to_string();
+        config.private_key = Some(signing_key.into());
+
+        assert!(matches!(
+            config.validate(),
+            Err(AccountConfigValidationError::PrivateKeyNotAllowed { .. })
+        ));
+    }
+
+    #[test]
+    fn test_validate_oauth_github_with_pkh_id_err() {
+        let mut config = base_config();
+        config.provider = AccountProvider::OAuthGitHub.to_string();
+        config.id = Some(sample_pkh_id());
+
+        assert!(matches!(
+            config.validate(),
+            Err(AccountConfigValidationError::ExpectedDidOdf { .. })
+        ));
+    }
+
+    #[test]
+    fn test_validate_oauth_github_with_odf_id_ok() {
+        let (_, id) = odf::AccountID::new_generated_ed25519();
+
+        let mut config = base_config();
+        config.provider = AccountProvider::OAuthGitHub.to_string();
+        config.id = Some(id);
+
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn test_validate_web3_wallet_with_odf_id_err() {
+        let (_, id) = odf::AccountID::new_generated_ed25519();
+
+        let mut config = base_config();
+        config.provider = AccountProvider::Web3Wallet.to_string();
+        config.id = Some(id);
+
+        assert!(matches!(
+            config.validate(),
+            Err(AccountConfigValidationError::ExpectedDidPkh { .. })
+        ));
+    }
+
+    #[test]
+    fn test_validate_web3_wallet_with_pkh_id_ok() {
+        let mut config = base_config();
+        config.provider = AccountProvider::Web3Wallet.to_string();
+        config.id = Some(sample_pkh_id());
+
+        assert!(config.validate().is_ok());
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
