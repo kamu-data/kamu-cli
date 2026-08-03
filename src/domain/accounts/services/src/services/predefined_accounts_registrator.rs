@@ -150,7 +150,10 @@ impl PredefinedAccountsRegistrator {
 
             let has_password_changed = match self
                 .account_service
-                .verify_account_password(&updated_account.account_name, &account_config.password)
+                .verify_account_password_by_name(
+                    &original_account.account_name,
+                    &account_config.password,
+                )
                 .await
             {
                 Ok(_) => Ok(false),

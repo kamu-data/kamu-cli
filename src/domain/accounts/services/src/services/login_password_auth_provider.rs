@@ -61,7 +61,7 @@ impl AuthenticationProvider for LoginPasswordAuthProvider {
 
         // todo если пароль не найден, то считается что аккаунта нет
         self.account_service
-            .verify_account_password(&account_name, &password)
+            .verify_account_password_by_name(&account_name, &password)
             .await
             .map_err(|e| {
                 use VerifyPasswordError as E;

@@ -51,7 +51,7 @@ async fn test_modify_account_password_success() {
     pretty_assertions::assert_matches!(
         harness
             .account_service()
-            .verify_account_password(&account.account_name, &initial_password)
+            .verify_account_password_by_name(&account.account_name, &initial_password)
             .await,
         Ok(_),
     );
@@ -69,14 +69,14 @@ async fn test_modify_account_password_success() {
     pretty_assertions::assert_matches!(
         harness
             .account_service()
-            .verify_account_password(&account.account_name, &initial_password)
+            .verify_account_password_by_name(&account.account_name, &initial_password)
             .await,
         Err(VerifyPasswordError::IncorrectPassword(_)),
     );
     pretty_assertions::assert_matches!(
         harness
             .account_service()
-            .verify_account_password(&account.account_name, &new_password)
+            .verify_account_password_by_name(&account.account_name, &new_password)
             .await,
         Ok(_),
     );
@@ -110,7 +110,7 @@ async fn test_modify_account_password_not_admin() {
     pretty_assertions::assert_matches!(
         harness
             .account_service()
-            .verify_account_password(&account.account_name, &new_password)
+            .verify_account_password_by_name(&account.account_name, &new_password)
             .await,
         Err(VerifyPasswordError::IncorrectPassword(_)),
     );
@@ -145,14 +145,14 @@ async fn test_modify_account_password_with_confirmation_success() {
     pretty_assertions::assert_matches!(
         harness
             .account_service()
-            .verify_account_password(&account.account_name, &initial_password)
+            .verify_account_password_by_name(&account.account_name, &initial_password)
             .await,
         Err(VerifyPasswordError::IncorrectPassword(_)),
     );
     pretty_assertions::assert_matches!(
         harness
             .account_service()
-            .verify_account_password(&account.account_name, &new_password)
+            .verify_account_password_by_name(&account.account_name, &new_password)
             .await,
         Ok(_),
     );

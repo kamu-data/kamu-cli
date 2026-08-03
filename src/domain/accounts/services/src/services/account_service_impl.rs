@@ -224,7 +224,7 @@ impl AccountService for AccountServiceImpl {
             .int_err()
     }
 
-    async fn verify_account_password(
+    async fn verify_account_password_by_name(
         &self,
         account_name: &odf::AccountName,
         password: &Password,

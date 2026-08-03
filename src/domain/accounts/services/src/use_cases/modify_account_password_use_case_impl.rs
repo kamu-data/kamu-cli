@@ -89,7 +89,7 @@ impl ModifyAccountPasswordUseCase for ModifyAccountPasswordUseCaseImpl {
             .await?;
 
         self.account_service
-            .verify_account_password(&account.account_name, &old_password)
+            .verify_account_password_by_name(&account.account_name, &old_password)
             .await?;
 
         self.account_service

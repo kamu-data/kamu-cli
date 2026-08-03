@@ -92,7 +92,7 @@ pub trait AccountService: Sync + Send {
         password: &Password,
     ) -> Result<(), InternalError>;
 
-    async fn verify_account_password(
+    async fn verify_account_password_by_name(
         &self,
         account_name: &odf::AccountName,
         password: &Password,
