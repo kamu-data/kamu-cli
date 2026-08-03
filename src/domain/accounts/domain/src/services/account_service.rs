@@ -26,6 +26,7 @@ use crate::{
     GetAccountByNameError,
     ModifyAccountPasswordError,
     Password,
+    ProviderIdentityKey,
     SearchAccountsByNamePatternFilters,
     UpdateAccountError,
 };
@@ -78,7 +79,7 @@ pub trait AccountService: Sync + Send {
         &self,
         account_name: &odf::AccountName,
         email: &email_utils::Email,
-        provider_identity_key: &str,
+        provider_identity_key: &ProviderIdentityKey,
     ) -> Result<Vec<odf::AccountID>, FindAccountIdsByUniqueFieldsError>;
 
     async fn find_account_name_by_id(

@@ -188,7 +188,7 @@ impl AccountService for AccountServiceImpl {
         &self,
         account_name: &odf::AccountName,
         email: &email_utils::Email,
-        provider_identity_key: &str,
+        provider_identity_key: &ProviderIdentityKey,
     ) -> Result<Vec<odf::AccountID>, FindAccountIdsByUniqueFieldsError> {
         self.account_repo
             .find_account_ids_by_unique_fields(account_name, email, provider_identity_key)
