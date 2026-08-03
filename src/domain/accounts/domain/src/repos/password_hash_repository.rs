@@ -32,6 +32,11 @@ pub trait PasswordHashRepository: Send + Sync {
         &self,
         account_name: &odf::AccountName,
     ) -> Result<Option<String>, FindPasswordHashError>;
+
+    async fn find_password_hash_by_account_id(
+        &self,
+        account_id: &odf::AccountID,
+    ) -> Result<Option<String>, FindPasswordHashError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -47,9 +52,10 @@ pub enum SavePasswordHashError {
 #[derive(Error, Debug)]
 pub enum ModifyPasswordHashError {
     #[error(transparent)]
-    Internal(#[from] InternalError),
-    #[error(transparent)]
     AccountNotFound(#[from] AccountNotFoundByIdError),
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

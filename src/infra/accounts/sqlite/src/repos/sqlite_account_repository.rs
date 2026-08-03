@@ -703,6 +703,34 @@ impl PasswordHashRepository for SqliteAccountRepository {
 
         Ok(maybe_password_row.map(|password_row| password_row.password_hash))
     }
+
+    async fn find_password_hash_by_account_id(
+        &self,
+        account_id: &odf::AccountID,
+    ) -> Result<Option<String>, FindPasswordHashError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        use odf::metadata::AsStackString;
+
+        let account_id_stack = account_id.as_stack_string();
+        let account_id_str = account_id_stack.as_str();
+
+        let maybe_password_row = sqlx::query!(
+            r#"
+            SELECT password_hash
+            FROM accounts_passwords
+            WHERE account_id = $1
+            "#,
+            account_id_str,
+        )
+        .fetch_optional(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(maybe_password_row.map(|password_row| password_row.password_hash))
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

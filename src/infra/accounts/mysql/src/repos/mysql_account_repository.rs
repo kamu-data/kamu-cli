@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use database_common::{PaginationOpts, TransactionRefT, mysql_generate_placeholders_list};
-use dill::{component, interface};
 use email_utils::Email;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use sqlx::Row;
@@ -19,10 +18,10 @@ use crate::domain::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component]
-#[interface(dyn AccountRepository)]
-#[interface(dyn ExpensiveAccountRepository)]
-#[interface(dyn PasswordHashRepository)]
+#[dill::component]
+#[dill::interface(dyn AccountRepository)]
+#[dill::interface(dyn ExpensiveAccountRepository)]
+#[dill::interface(dyn PasswordHashRepository)]
 pub struct MySqlAccountRepository {
     transaction: TransactionRefT<sqlx::MySql>,
 }
@@ -688,6 +687,33 @@ impl PasswordHashRepository for MySqlAccountRepository {
             WHERE lower(account_name) = lower(?)
             "#,
             account_name.as_str(),
+        )
+        .fetch_optional(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(maybe_password_row.map(|password_row| password_row.password_hash))
+    }
+
+    async fn find_password_hash_by_account_id(
+        &self,
+        account_id: &odf::AccountID,
+    ) -> Result<Option<String>, FindPasswordHashError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        use odf::metadata::AsStackString;
+
+        let account_id_stack = account_id.as_stack_string();
+
+        let maybe_password_row = sqlx::query!(
+            r#"
+            SELECT password_hash
+            FROM accounts_passwords
+            WHERE account_id = ?
+            "#,
+            account_id_stack.as_str(),
         )
         .fetch_optional(connection_mut)
         .await

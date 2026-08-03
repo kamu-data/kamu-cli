@@ -11,7 +11,6 @@ use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 
 use database_common::PaginationOpts;
-use dill::*;
 use email_utils::Email;
 use internal_error::ErrorIntoInternal;
 
@@ -92,11 +91,11 @@ impl State {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
-#[interface(dyn AccountRepository)]
-#[interface(dyn ExpensiveAccountRepository)]
-#[interface(dyn PasswordHashRepository)]
-#[scope(Singleton)]
+#[dill::component(pub)]
+#[dill::interface(dyn AccountRepository)]
+#[dill::interface(dyn ExpensiveAccountRepository)]
+#[dill::interface(dyn PasswordHashRepository)]
+#[dill::scope(dill::Singleton)]
 impl InMemoryAccountRepository {
     pub fn new() -> Self {
         Self {
@@ -498,6 +497,17 @@ impl PasswordHashRepository for InMemoryAccountRepository {
             .get(&existing_account.id)
             .cloned();
         Ok(maybe_hash_as_string)
+    }
+
+    async fn find_password_hash_by_account_id(
+        &self,
+        account_id: &odf::AccountID,
+    ) -> Result<Option<String>, FindPasswordHashError> {
+        let guard = self.state.lock().unwrap();
+
+        let maybe_password_hash = guard.password_hash_by_account_id.get(account_id).cloned();
+
+        Ok(maybe_password_hash)
     }
 }
 
