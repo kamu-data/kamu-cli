@@ -99,8 +99,8 @@ impl UpdateAccountUseCase for UpdateAccountUseCaseImpl {
         original_account: &Account,
     ) -> Result<(), UpdateAccountError> {
         let mut account_to_update = account.clone();
-        if original_account.account_name != account.account_name
-            && account.provider == AccountProvider::Password.to_string()
+        if original_account.account_name != account_to_update.account_name
+            && AccountProvider::is_password(&account.provider)
         {
             account_to_update.provider_identity_key = account.account_name.to_string();
         }
