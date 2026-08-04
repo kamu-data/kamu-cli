@@ -278,7 +278,13 @@ impl AuthenticationService for AuthenticationServiceImpl {
                     email: provider_response.email,
                     display_name: provider_response.display_name,
                     account_type: provider_response.account_type,
-                    avatar_url: provider_response.avatar_url,
+                    avatar_url: {
+                        // todo temp?
+                        provider_response
+                            .avatar_url
+                            .as_ref()
+                            .map(|url| url::Url::parse(url).unwrap())
+                    },
                     registered_at: Utc::now(),
                     provider: String::from(login_method),
                     provider_identity_key: provider_response.provider_identity_key,

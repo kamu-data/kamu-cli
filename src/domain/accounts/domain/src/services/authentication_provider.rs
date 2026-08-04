@@ -20,6 +20,7 @@ use crate::{AccountDisplayName, AccountType};
 pub trait AuthenticationProvider: Sync + Send {
     fn provider_name(&self) -> &'static str;
 
+    // todo return AccountConfig
     async fn login(
         &self,
         login_credentials_json: String,

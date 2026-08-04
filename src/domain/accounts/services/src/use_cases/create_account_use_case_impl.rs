@@ -166,18 +166,16 @@ impl CreateAccountUseCaseImpl {
         a
     }
 
-    // todo нуженн ли этот метод
+    // todo нужен ли этот метод
     fn resolve_account_key_and_id(
         account_config: &AccountConfig,
-        // ) -> Result<(Option<odf::metadata::SigningKey>, odf::AccountID),
-        // AccountConfigIdentityError>
-    ) -> Result<(Option<odf::metadata::SigningKey>, odf::AccountID), InternalError> {
-        if let Some(id) = account_config.resolve_account_id().int_err()? {
+    ) -> (Option<odf::metadata::SigningKey>, odf::AccountID) {
+        if let Some(id) = account_config.resolve_account_id() {
             let maybe_account_key = account_config.private_key.clone().map(Into::into);
-            Ok((maybe_account_key, id))
+            (maybe_account_key, id)
         } else {
             let (account_key, account_id) = odf::AccountID::new_generated_ed25519();
-            Ok((Some(account_key), account_id))
+            (Some(account_key), account_id)
         }
     }
 
@@ -208,8 +206,7 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
         account_config: &AccountConfig,
         quiet: bool,
     ) -> Result<Account, CreateAccountError> {
-        let (maybe_account_key, account_id) =
-            Self::resolve_account_key_and_id(account_config).int_err()?;
+        let (maybe_account_key, account_id) = Self::resolve_account_key_and_id(account_config);
 
         println!("!!!4: {account_config:?}");
 
@@ -227,7 +224,6 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
             provider_identity_key: account_config.provider_identity_key(),
         };
 
-        // todo сохраняем, если это новый аккаунт id -- обновить это место
         self.save_password_account(&new_account, &account_config.password, maybe_account_key)
             .await?;
 

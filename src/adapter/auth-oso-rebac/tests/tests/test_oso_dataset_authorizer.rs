@@ -817,6 +817,7 @@ impl DatasetAuthorizerHarness {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn account_id(alias: &odf::DatasetAlias) -> odf::AccountID {
+    // todo нужно обновлять, чтобы был детерменированный генератор идентичности
     odf::AccountID::new_seeded_ed25519(alias.account_name.as_ref().unwrap().as_bytes())
 }
 

@@ -169,7 +169,7 @@ impl PredefinedAccountsRegistrator {
         let account_id = if let Some(account_id) = maybe_account_id {
             match self.account_service.get_account_by_id(&account_id).await {
                 Ok(original_account) => {
-                    // 1) An account has an ID set to it and was found -- let's update it
+                    // 1) An account has an ID set to it and was found -- update it
                     self.compare_and_maybe_update_account(
                         &account_id,
                         original_account,
@@ -179,7 +179,7 @@ impl PredefinedAccountsRegistrator {
                     account_id
                 }
                 Err(GetAccountByIdError::NotFound(_)) => {
-                    // 2) An account has an ID set to it but not found -- let's register it
+                    // 2) An account has an ID set to it but not found -- register it
                     self.register_unknown_account(account_config).await?
                 }
                 Err(e) => return Err(e.int_err()),

@@ -88,10 +88,11 @@ impl AuthenticationProvider for LoginPasswordAuthProvider {
             // For password-based accounts
             account_id: odf::AccountID::new_seeded_ed25519(account_name.as_bytes()),
             account_name,
-            email: account.email.clone(),
+            email: account.email,
             display_name: password_login_credentials.login.clone(),
             account_type: account.account_type,
-            avatar_url: account.avatar_url.clone(),
+            // todo temp
+            avatar_url: account.avatar_url.as_ref().map(ToString::to_string),
             provider_identity_key: password_login_credentials.login.to_ascii_lowercase(),
         })
     }
