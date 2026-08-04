@@ -60,7 +60,6 @@ impl AccountBaseUseCaseHarness {
                 .add::<CreateAccountUseCaseImpl>()
                 .add::<UpdateAccountUseCaseImpl>()
                 .add::<DeleteAccountUseCaseImpl>()
-                .add::<AccountIdentityGeneratorSeeded>()
                 .add::<kamu_auth_rebac_services::RebacServiceImpl>()
                 .add::<kamu_auth_rebac_inmem::InMemoryRebacRepository>()
                 .add_value(kamu_auth_rebac_services::DefaultAccountProperties::default())
@@ -68,6 +67,7 @@ impl AccountBaseUseCaseHarness {
 
             if let Some(predefined_account_config) = opts.maybe_predefined_accounts_config {
                 b.add::<PredefinedAccountsRegistrator>();
+                b.add::<AccountIdentityGeneratorSeeded>();
                 b.add::<LoginPasswordAuthProvider>();
                 b.add_value(predefined_account_config);
             }
