@@ -51,7 +51,7 @@ lint-rustfmt:
 
 .PHONY: lint-repo
 lint-repo:
-	cargo test -p kamu-repo-tools
+	cargo nextest run -p kamu-repo-tools
 
 
 .PHONY: lint-deps
