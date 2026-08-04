@@ -19,6 +19,7 @@ use kamu_accounts::{
 };
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::{
+    AccountIdentityGeneratorSeeded,
     AccountServiceImpl,
     CreateAccountUseCaseImpl,
     LoginPasswordAuthProvider,
@@ -208,6 +209,7 @@ async fn make_catalog() -> dill::Catalog {
         .add_value(DefaultAccountProperties::default())
         .add_value(DefaultDatasetProperties::default())
         .add::<PredefinedAccountsRegistrator>()
+        .add::<AccountIdentityGeneratorSeeded>()
         .add::<DummyOutboxImpl>();
 
     NoOpDatabasePlugin::init_database_components(&mut b);
