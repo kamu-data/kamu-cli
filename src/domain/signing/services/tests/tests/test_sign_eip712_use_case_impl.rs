@@ -26,6 +26,7 @@ use kamu_accounts::{
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::utils::AccountAuthorizationHelperImpl;
 use kamu_accounts_services::{
+    AccountIdentityGeneratorSeeded,
     AccountServiceImpl,
     CreateAccountUseCaseImpl,
     PredefinedAccountsRegistrator,
@@ -582,6 +583,7 @@ impl SignEip712UseCaseHarness {
         b.add::<SystemTimeSourceDefault>()
             .add_value(predefined_accounts_config)
             .add::<PredefinedAccountsRegistrator>()
+            .add::<AccountIdentityGeneratorSeeded>()
             .add::<InMemoryAccountRepository>()
             .add::<InMemoryDidSecretKeyRepository>()
             .add_value(DidSecretEncryptionConfig::sample())
@@ -717,31 +719,31 @@ impl SignEip712UseCaseHarness {
 
 // Account IDs
 fn molecule_account_id() -> odf::AccountID {
-    odf::AccountID::new_seeded_ed25519("molecule".as_bytes())
+    odf::metadata::testing::account_id(&"molecule")
 }
 
 fn molecule_project_account_id() -> odf::AccountID {
-    odf::AccountID::new_seeded_ed25519("molecule.project".as_bytes())
+    odf::metadata::testing::account_id(&"molecule.project")
 }
 
 fn molecule_dev_account_id() -> odf::AccountID {
-    odf::AccountID::new_seeded_ed25519("molecule.dev".as_bytes())
+    odf::metadata::testing::account_id(&"molecule.dev")
 }
 
 fn molecule_dev_project_account_id() -> odf::AccountID {
-    odf::AccountID::new_seeded_ed25519("molecule.dev.project".as_bytes())
+    odf::metadata::testing::account_id(&"molecule.dev.project")
 }
 
 fn user_account_id() -> odf::AccountID {
-    odf::AccountID::new_seeded_ed25519("user".as_bytes())
+    odf::metadata::testing::account_id(&"user")
 }
 
 fn admin_id() -> odf::AccountID {
-    odf::AccountID::new_seeded_ed25519("admin".as_bytes())
+    odf::metadata::testing::account_id(&"admin")
 }
 
 fn not_found_account_id() -> odf::AccountID {
-    odf::AccountID::new_seeded_ed25519("not_found_account_id".as_bytes())
+    odf::metadata::testing::account_id(&"not_found_account_id")
 }
 
 fn to_odf_did(account_id: &odf::AccountID) -> odf::metadata::DidOdf {
