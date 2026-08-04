@@ -274,10 +274,6 @@ impl AccountConfig {
         Password::try_new(format!("{DEFAULT_PASSWORD_STR}:{account_name}")).unwrap()
     }
 
-    pub fn get_id(&self) -> odf::AccountID {
-        todo!("remove me")
-    }
-
     pub fn validate(&self) -> Result<(), AccountConfigValidationError> {
         use std::str::FromStr;
 
