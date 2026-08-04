@@ -49,6 +49,7 @@ impl GraphQLAccountQuotasHarness {
             .add::<kamu_accounts_services::AccessTokenServiceImpl>()
             .add::<kamu_accounts_services::AuthenticationServiceImpl>()
             .add::<kamu_accounts_services::CreateAccountUseCaseImpl>()
+            .add::<kamu_accounts_services::AccountIdentityGeneratorSeeded>()
             .add::<kamu_accounts_services::ModifyAccountPasswordUseCaseImpl>()
             .add::<kamu_accounts_services::DeleteAccountUseCaseImpl>()
             .add::<kamu_accounts_services::UpdateAccountUseCaseImpl>()
