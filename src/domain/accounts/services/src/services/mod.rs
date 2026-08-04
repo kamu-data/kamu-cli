@@ -8,6 +8,8 @@
 // by the Apache License, Version 2.0.
 
 mod access_token_service_impl;
+mod account_identity_generator_default;
+mod account_identity_generator_seeded;
 mod account_quota_service_impl;
 mod account_service_impl;
 mod authentication_service_impl;
@@ -18,6 +20,8 @@ mod predefined_accounts_registrator;
 mod predefined_oauth_device_code_generator;
 
 pub use access_token_service_impl::*;
+pub use account_identity_generator_default::*;
+pub use account_identity_generator_seeded::*;
 pub use account_quota_service_impl::*;
 pub use account_service_impl::*;
 pub use authentication_service_impl::*;

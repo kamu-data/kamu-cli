@@ -42,6 +42,12 @@ pub fn register_dependencies(b: &mut CatalogBuilder, options: AccountDomainDepen
 
     b.add::<utils::AccountAuthorizationHelperImpl>();
 
+    if options.production {
+        b.add::<AccountIdentityGeneratorDefault>();
+    } else {
+        b.add::<AccountIdentityGeneratorSeeded>();
+    }
+
     if options.needs_indexing {
         b.add::<OAuthDeviceCodeServiceImpl>();
 
