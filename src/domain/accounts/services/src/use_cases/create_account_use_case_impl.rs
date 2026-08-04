@@ -174,7 +174,10 @@ impl CreateAccountUseCaseImpl {
             let maybe_account_key = account_config.private_key.clone().map(Into::into);
             (maybe_account_key, id)
         } else {
-            let (account_key, account_id) = odf::AccountID::new_generated_ed25519();
+            // TODO: TEST: remove
+            let (account_key, _account_id) = odf::AccountID::new_generated_ed25519();
+            let account_id =
+                odf::AccountID::new_seeded_ed25519(account_config.account_name.as_bytes());
             (Some(account_key), account_id)
         }
     }
@@ -208,7 +211,7 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
     ) -> Result<Account, CreateAccountError> {
         let (maybe_account_key, account_id) = Self::resolve_account_key_and_id(account_config);
 
-        println!("!!!4: {account_config:?}");
+        eprintln!("!!!4: {account_config:?}");
 
         let new_account = Account {
             id: account_id,
