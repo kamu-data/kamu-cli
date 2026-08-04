@@ -109,8 +109,8 @@ async fn test_predefined_mt_datasets_indexed_properly(ctx: Arc<ElasticsearchTest
         odf::AccountName::new_unchecked("bob"),
     ];
 
-    let alice_id = odf::AccountID::new_seeded_ed25519("alice".as_bytes());
-    let bob_id = odf::AccountID::new_seeded_ed25519("bob".as_bytes());
+    let alice_id = odf::metadata::testing::account_id(&"alice");
+    let bob_id = odf::metadata::testing::account_id(&"bob");
 
     let aliases = vec![
         odf::DatasetAlias::new(
@@ -279,8 +279,8 @@ async fn test_creating_mt_datasets_reflected_in_index(ctx: Arc<ElasticsearchTest
         .create_mt_datasets(&[("alice", "alpha"), ("bob", "beta"), ("alice", "gamma")])
         .await;
 
-    let alice_id = odf::AccountID::new_seeded_ed25519("alice".as_bytes());
-    let bob_id = odf::AccountID::new_seeded_ed25519("bob".as_bytes());
+    let alice_id = odf::metadata::testing::account_id(&"alice");
+    let bob_id = odf::metadata::testing::account_id(&"bob");
 
     let datasets_index_response = harness.view_datasets_index_as_admin().await;
     assert_eq!(datasets_index_response.total_hits(), Some(3));
@@ -517,8 +517,8 @@ async fn test_account_rename_reflected_in_index(ctx: Arc<ElasticsearchTestContex
         .create_mt_datasets(&[("alice", "alpha"), ("bob", "beta"), ("alice", "gamma")])
         .await;
 
-    let alice_id = odf::AccountID::new_seeded_ed25519("alice".as_bytes());
-    let bob_id = odf::AccountID::new_seeded_ed25519("bob".as_bytes());
+    let alice_id = odf::metadata::testing::account_id(&"alice");
+    let bob_id = odf::metadata::testing::account_id(&"bob");
 
     // Force outbox processing to ensure search index is up to date
     harness.process_outbox_messages().await;
@@ -600,7 +600,7 @@ async fn test_account_delete_reflected_in_index(ctx: Arc<ElasticsearchTestContex
         .create_mt_datasets(&[("alice", "alpha"), ("bob", "beta"), ("alice", "gamma")])
         .await;
 
-    let bob_id = odf::AccountID::new_seeded_ed25519("bob".as_bytes());
+    let bob_id = odf::metadata::testing::account_id(&"bob");
 
     // Force outbox processing to ensure search index is up to date
     harness.process_outbox_messages().await;
@@ -1107,9 +1107,9 @@ async fn test_collaboration_updates_reflected_in_index(ctx: Arc<ElasticsearchTes
     let alpha_id = dataset_ids.first().unwrap();
     let beta_id = dataset_ids.get(1).unwrap();
 
-    let alice_id = odf::AccountID::new_seeded_ed25519("alice".as_bytes());
-    let bob_id = odf::AccountID::new_seeded_ed25519("bob".as_bytes());
-    let charlie_id = odf::AccountID::new_seeded_ed25519("charlie".as_bytes());
+    let alice_id = odf::metadata::testing::account_id(&"alice");
+    let bob_id = odf::metadata::testing::account_id(&"bob");
+    let charlie_id = odf::metadata::testing::account_id(&"charlie");
 
     // Ensure initial indexing is done
     harness.synchronize().await;

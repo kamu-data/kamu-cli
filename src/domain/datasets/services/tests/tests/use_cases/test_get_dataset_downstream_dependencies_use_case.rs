@@ -18,6 +18,7 @@ use kamu_accounts::{
 };
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::{
+    AccountIdentityGeneratorSeeded,
     AccountServiceImpl,
     CreateAccountUseCaseImpl,
     LoginPasswordAuthProvider,
@@ -136,17 +137,17 @@ async fn test_all_downstream_dependencies_are_accessible() {
         [
             DatasetDependency::resolved(
                 alice_derived_4_dataset_handle,
-                odf::AccountID::new_seeded_ed25519(alice.as_bytes()),
+                odf::metadata::testing::account_id(&alice),
                 alice.clone(),
             ),
             DatasetDependency::resolved(
                 alice_derived_5_dataset_handle,
-                odf::AccountID::new_seeded_ed25519(alice.as_bytes()),
+                odf::metadata::testing::account_id(&alice),
                 alice,
             ),
             DatasetDependency::resolved(
                 bob_derived_6_dataset_handle,
-                odf::AccountID::new_seeded_ed25519(bob.as_bytes()),
+                odf::metadata::testing::account_id(&bob),
                 bob,
             ),
         ],
@@ -247,7 +248,7 @@ async fn test_inaccessible_downstream_dependencies_excluded() {
     pretty_assertions::assert_eq!(
         [DatasetDependency::resolved(
             alice_public_derived_4_dataset_handle,
-            odf::AccountID::new_seeded_ed25519(alice.as_bytes()),
+            odf::metadata::testing::account_id(&alice),
             alice.clone(),
         )],
         *actual_res,
@@ -282,6 +283,7 @@ impl GetDatasetDownstreamDependenciesUseCaseHarness {
             .bind::<dyn Outbox, OutboxImmediateImpl>()
             .add::<GetDatasetDownstreamDependenciesUseCaseImpl>()
             .add::<PredefinedAccountsRegistrator>()
+            .add::<AccountIdentityGeneratorSeeded>()
             .add::<RebacServiceImpl>()
             .add::<InMemoryRebacRepository>()
             .add::<UpdateAccountUseCaseImpl>()
