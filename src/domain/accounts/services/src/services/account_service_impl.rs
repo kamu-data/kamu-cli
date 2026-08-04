@@ -330,7 +330,7 @@ impl AccountService for AccountServiceImpl {
     }
 
     async fn save_account(&self, account: &Account) -> Result<(), CreateAccountError> {
-        println!("!!!3\n{account:?}");
+        eprintln!("!!!3\n{account:?}");
 
         self.account_repo.save_account(account).await
     }

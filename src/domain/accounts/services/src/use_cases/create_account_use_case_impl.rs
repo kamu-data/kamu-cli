@@ -152,7 +152,7 @@ impl CreateAccountUseCaseImpl {
         .int_err()?;
         let account_entity = DidEntity::new_account(account_id.as_str());
 
-        println!("!!!5.1: {did_secret_key:?}");
+        eprintln!("!!!5.1: {did_secret_key:?}");
 
         // todo: info: тут сохраняем
         let a = self
@@ -161,7 +161,7 @@ impl CreateAccountUseCaseImpl {
             .await
             .int_err();
 
-        println!("!!!5.2 +");
+        eprintln!("!!!5.2 +");
 
         a
     }
