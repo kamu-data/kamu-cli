@@ -18,6 +18,7 @@ POSTGRES_CRATES := \
 MYSQL_CRATES := \
 	./src/e2e/app/cli/mysql \
 	./src/infra/accounts/mysql \
+	./src/infra/datasets/mysql
 
 SQLITE_CRATES := \
 	./src/e2e/app/cli/sqlite \
