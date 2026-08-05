@@ -150,6 +150,7 @@ where
     }
 }
 
+//
 // TODO: test
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -172,11 +173,14 @@ where
     E: std::error::Error + Send + Sync + 'static,
 {
     pub fn report(&self) -> String {
-        let mut report = format!("{self}\n");
+        use std::fmt::Write;
+
+        let mut res = String::new();
+        let _ = writeln!(res, "{self}");
         for (index, err) in &self.failures {
-            report.push_str(&format!("  [{index}] {err}\n"));
+            let _ = writeln!(res, "  [{index}] {err}");
         }
-        report
+        res
     }
 }
 
