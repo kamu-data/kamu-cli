@@ -202,9 +202,7 @@ impl LocalFacadeHarness {
             MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
         );
 
-        let catalog =
-            kamu_resources_services::build_catalog_with_resource_extension_schema_registry(b)
-                .unwrap();
+        let catalog = b.build();
 
         // Run startup jobs to register predefined accounts
         init_on_startup::run_startup_jobs_ex(

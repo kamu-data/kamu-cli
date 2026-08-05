@@ -225,10 +225,8 @@ mod tests {
     fn resolver() -> std::sync::Arc<ResourceExtensionSchemaResolver> {
         let mut builder = dill::CatalogBuilder::new();
         kamu_resources_services::register_dependencies(&mut builder);
-        let catalog =
-            kamu_resources_services::build_catalog_with_resource_extension_schema_registry(builder)
-                .unwrap();
 
+        let catalog = builder.build();
         catalog.get_one().unwrap()
     }
 

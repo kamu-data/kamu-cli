@@ -75,7 +75,13 @@ pub struct ResourceExtensionSchemaRegistry {
     any_resource_names: BTreeMap<AnyNameKey, Arc<ResourceExtensionSchemaRegistration>>,
 }
 
+#[dill::component(pub)]
+#[dill::scope(dill::Singleton)]
 impl ResourceExtensionSchemaRegistry {
+    pub fn new(catalog: &Catalog) -> Self {
+        Self::try_new(catalog).unwrap()
+    }
+
     pub fn try_new(catalog: &Catalog) -> Result<Self, InternalError> {
         let mut registry = Self {
             by_uri: BTreeMap::new(),

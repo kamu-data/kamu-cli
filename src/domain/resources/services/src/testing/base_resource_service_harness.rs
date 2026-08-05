@@ -113,7 +113,7 @@ impl BaseResourceServiceHarness {
             MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
         );
 
-        let catalog = crate::build_catalog_with_resource_extension_schema_registry(b).unwrap();
+        let catalog = b.build();
 
         let generic_query_svc = catalog.get_one().unwrap();
         let resource_repo = catalog.get_one().unwrap();

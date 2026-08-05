@@ -189,36 +189,22 @@ fn test_short_name_resolution_uses_precedence_tiers() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
+#[should_panic(expected = "Duplicate resource extension schema URI")]
 fn test_duplicate_schema_registration_fails_registry_construction() {
-    let error = expect_registry_construction_error(|| {
-        ExtensionRegistryHarness::try_with_test_dispatchers(|b| {
-            b.add::<DuplicateEnvironmentDispatcher>();
-        })
+    ExtensionRegistryHarness::with_test_dispatchers(|b| {
+        b.add::<DuplicateEnvironmentDispatcher>();
     });
-
-    assert!(
-        error
-            .reason()
-            .contains("Duplicate resource extension schema URI")
-    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test]
+#[should_panic(expected = "Resource extension short-name conflict")]
 fn test_duplicate_alias_registration_fails_registry_construction() {
-    let error = expect_registry_construction_error(|| {
-        ExtensionRegistryHarness::try_with_test_dispatchers(|b| {
-            b.add::<AnyTierDispatcher>();
-            b.add::<AnyTierAliasConflictDispatcher>();
-        })
+    ExtensionRegistryHarness::with_test_dispatchers(|b| {
+        b.add::<AnyTierDispatcher>();
+        b.add::<AnyTierAliasConflictDispatcher>();
     });
-
-    assert!(
-        error
-            .reason()
-            .contains("Resource extension short-name conflict")
-    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -234,24 +220,15 @@ impl ExtensionRegistryHarness {
     }
 
     fn with_test_dispatchers(register: impl FnOnce(&mut CatalogBuilder)) -> Self {
-        Self::try_with_test_dispatchers(register).unwrap()
-    }
-
-    fn try_with_test_dispatchers(
-        register: impl FnOnce(&mut CatalogBuilder),
-    ) -> Result<Self, internal_error::InternalError> {
         let mut builder = CatalogBuilder::new();
         kamu_resources_services::register_dependencies(&mut builder);
         register(&mut builder);
-        let catalog =
-            kamu_resources_services::build_catalog_with_resource_extension_schema_registry(
-                builder,
-            )?;
+        let catalog = builder.build();
 
-        Ok(Self {
+        Self {
             registry: catalog.get_one().unwrap(),
             default_schema: Self::schema("https://example.com/schemas/config/v1alpha1/Widget"),
-        })
+        }
     }
 
     fn schema(schema: &str) -> ResourceSchemaId {
@@ -370,17 +347,6 @@ impl ExtensionRegistryHarness {
             .unwrap();
 
         registration.dispatcher().validate_value(value).unwrap_err()
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-fn expect_registry_construction_error(
-    f: impl FnOnce() -> Result<ExtensionRegistryHarness, internal_error::InternalError>,
-) -> internal_error::InternalError {
-    match f() {
-        Ok(_) => panic!("expected registry construction error"),
-        Err(error) => error,
     }
 }
 
