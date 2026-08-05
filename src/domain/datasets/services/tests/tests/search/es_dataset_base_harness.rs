@@ -360,7 +360,7 @@ impl ElasticsearchDatasetBaseHarness {
     pub async fn view_datasets_index_as_admin(&self) -> SearchTestResponse {
         self.synchronize().await;
 
-        let seach_response = self
+        let search_response = self
             .search_repo()
             .listing_search(
                 SearchSecurityContext::Unrestricted,
@@ -378,7 +378,7 @@ impl ElasticsearchDatasetBaseHarness {
             .await
             .unwrap();
 
-        SearchTestResponse(seach_response)
+        SearchTestResponse(search_response)
     }
 
     pub async fn process_outbox_messages(&self) {

@@ -122,10 +122,7 @@ pub(crate) fn create_cli_user_catalog(
     tenancy_config: TenancyConfig,
 ) -> dill::Catalog {
     let current_account_subject = match tenancy_config {
-        TenancyConfig::SingleTenant => CurrentAccountSubject::logged(
-            odf::metadata::testing::account_id(&DEFAULT_ACCOUNT_NAME_STR),
-            DEFAULT_ACCOUNT_NAME.clone(),
-        ),
+        TenancyConfig::SingleTenant => CurrentAccountSubject::new_test(),
         TenancyConfig::MultiTenant => CurrentAccountSubject::logged(
             odf::metadata::testing::account_id(&SERVER_ACCOUNT_NAME),
             odf::AccountName::new_unchecked(SERVER_ACCOUNT_NAME),

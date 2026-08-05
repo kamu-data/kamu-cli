@@ -41,7 +41,7 @@ static DUMMY_REGISTRATION_TIME: LazyLock<DateTime<Utc>> =
     LazyLock::new(|| Utc.with_ymd_and_hms(2024, 4, 1, 12, 0, 0).unwrap());
 
 #[cfg(any(feature = "testing", test))]
-static TEST_ACCOUNT_ID: LazyLock<odf::AccountID> =
+pub static TEST_ACCOUNT_ID: LazyLock<odf::AccountID> =
     LazyLock::new(|| odf::metadata::testing::account_id(&DEFAULT_ACCOUNT_NAME_STR));
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
