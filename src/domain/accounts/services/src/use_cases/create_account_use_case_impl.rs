@@ -16,7 +16,7 @@ use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::{
     Account,
     AccountConfig,
-    // AccountConfigIdentityError,
+    AccountIdentityGenerator,
     AccountLifecycleMessage,
     AccountProvider,
     AccountService,
@@ -42,6 +42,7 @@ pub struct CreateAccountUseCaseImpl {
     account_service: Arc<dyn AccountService>,
     outbox: Arc<dyn messaging_outbox::Outbox>,
     time_source: Arc<dyn SystemTimeSource>,
+    account_identity_generator: Arc<dyn AccountIdentityGenerator>,
     // todo refactor: extract to service -->
     did_secret_key_repo: Arc<dyn DidSecretKeyRepository>,
     did_secret_encryption_key: Option<SecretString>,
@@ -56,6 +57,7 @@ impl CreateAccountUseCaseImpl {
         account_service: Arc<dyn AccountService>,
         outbox: Arc<dyn messaging_outbox::Outbox>,
         time_source: Arc<dyn SystemTimeSource>,
+        account_identity_generator: Arc<dyn AccountIdentityGenerator>,
         did_secret_key_repo: Arc<dyn DidSecretKeyRepository>,
         did_secret_encryption_config: Arc<DidSecretEncryptionConfig>,
     ) -> Self {
@@ -63,6 +65,7 @@ impl CreateAccountUseCaseImpl {
             account_service,
             outbox,
             time_source,
+            account_identity_generator,
             did_secret_encryption_key: did_secret_encryption_config
                 .encryption_key
                 .as_ref()
@@ -166,18 +169,20 @@ impl CreateAccountUseCaseImpl {
         a
     }
 
-    // todo нужен ли этот метод
     fn resolve_account_key_and_id(
+        &self,
         account_config: &AccountConfig,
     ) -> (Option<odf::metadata::SigningKey>, odf::AccountID) {
         if let Some(id) = account_config.resolve_account_id() {
+            // if there is an ID, we use it and the private key, if specified. ...
             let maybe_account_key = account_config.private_key.clone().map(Into::into);
             (maybe_account_key, id)
         } else {
-            // TODO: TEST: remove
-            let (account_key, _account_id) = odf::AccountID::new_generated_ed25519();
-            let account_id =
-                odf::AccountID::new_seeded_ed25519(account_config.account_name.as_bytes());
+            // ... Otherwise, create a new pair
+            let (account_key, account_id) = self
+                .account_identity_generator
+                .generate_ed25519(account_config);
+
             (Some(account_key), account_id)
         }
     }
@@ -209,9 +214,7 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
         account_config: &AccountConfig,
         quiet: bool,
     ) -> Result<Account, CreateAccountError> {
-        let (maybe_account_key, account_id) = Self::resolve_account_key_and_id(account_config);
-
-        eprintln!("!!!4: {account_config:?}");
+        let (maybe_account_key, account_id) = self.resolve_account_key_and_id(account_config);
 
         let new_account = Account {
             id: account_id,
