@@ -10,7 +10,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use dill::{component, interface, meta};
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{
@@ -38,9 +37,9 @@ pub struct DatasetEntryIndexer {
     account_service: Arc<dyn AccountService>,
 }
 
-#[component(pub)]
-#[interface(dyn InitOnStartup)]
-#[meta(InitOnStartupMeta {
+#[dill::component(pub)]
+#[dill::interface(dyn InitOnStartup)]
+#[dill::meta(InitOnStartupMeta {
     job_name: JOB_KAMU_DATASETS_DATASET_ENTRY_INDEXER,
     depends_on: &[
         JOB_MESSAGING_OUTBOX_STARTUP,
@@ -222,8 +221,15 @@ impl DatasetEntryIndexer {
                 tracing::debug!(account_id=%account.id, account_name=%account_name, "Account resolved by dataset indexing job");
                 Ok(account.id)
             }
-            // todo подумать стоит ли тут менять?
-            None => Ok(DEFAULT_ACCOUNT_ID.clone()),
+            None => {
+                // NOTE: This is a single-tenant scenario
+                let account = self
+                    .account_service
+                    .get_account_by_name(&DEFAULT_ACCOUNT_NAME)
+                    .await?;
+
+                Ok(account.id)
+            }
         }
     }
 }
