@@ -7,12 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_accounts::{
-    AccountNotFoundByIdError,
-    CurrentAccountSubject,
-    DEFAULT_ACCOUNT_ID,
-    DEFAULT_ACCOUNT_NAME,
-};
+use kamu_accounts::{AccountNotFoundByIdError, CurrentAccountSubject};
 use kamu_auth_rebac::{RebacService, RebacServiceExt};
 use kamu_datasets::{DatasetAction, DatasetActionAuthorizer, DatasetActionAuthorizerExt};
 use tokio::sync::OnceCell;
@@ -106,22 +101,17 @@ impl Account {
             // Safety: In multi-tenant, we have a name.
             let account_name = alias.account_name.as_ref().unwrap().clone();
 
-            // todo понять различие между аккаунтом, который вызывает этот метод и
-            // аккаунтом, который владеет датасетом
             Ok(Self::from_account_name(ctx, account_name).await?)
         } else {
             let current_account_subject = from_catalog_n!(ctx, CurrentAccountSubject);
 
-            Ok(Some(match current_account_subject.as_ref() {
-                // todo подумать стоит ли тут менять?
-                CurrentAccountSubject::Anonymous(_) => Self::new(
-                    DEFAULT_ACCOUNT_ID.clone().into(),
-                    DEFAULT_ACCOUNT_NAME.clone().into(),
-                ),
-                CurrentAccountSubject::Logged(l) => {
-                    Self::new(l.account_id.clone().into(), l.account_name.clone().into())
-                }
-            }))
+            Ok(match current_account_subject.as_ref() {
+                CurrentAccountSubject::Anonymous(_) => None,
+                CurrentAccountSubject::Logged(l) => Some(Self::new(
+                    l.account_id.clone().into(),
+                    l.account_name.clone().into(),
+                )),
+            })
         }
     }
 
