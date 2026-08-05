@@ -9,7 +9,6 @@
 
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
-use std::error::Error;
 use std::sync::Arc;
 
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
@@ -226,15 +225,11 @@ impl PredefinedAccountsRegistrator {
         &self,
         account_config: &AccountConfig,
     ) -> Result<odf::AccountID, InternalError> {
-        eprintln!("!!!2.1\n{account_config:?}");
-
         let created = self
             .create_account_use_case
             .execute(account_config, true /* quiet */)
             .await
             .int_err()?;
-
-        eprintln!("!!!2.2\n{account_config:?}");
 
         Ok(created.id)
     }
@@ -279,8 +274,6 @@ impl PredefinedAccountsRegistrator {
                     .int_err()?;
             }
         }
-
-        eprintln!("!!!1.2 {}", original_account != updated_account);
 
         if original_account != updated_account {
             tracing::info!(
@@ -402,7 +395,6 @@ impl InitOnStartup for PredefinedAccountsRegistrator {
         for (maybe_account_id, account_config) in account_configs_iter {
             let registrator = self.clone();
 
-            eprintln!("!!!6: {account_config:?}");
             join_set.spawn(async move {
                 registrator
                     .process_account(maybe_account_id, &account_config)
@@ -417,8 +409,6 @@ impl InitOnStartup for PredefinedAccountsRegistrator {
         let mut had_errors = false;
         for result in results {
             if let Err(err) = result {
-                eprintln!("!!!7: {:#?}", err.source());
-
                 had_errors = true;
                 tracing::error!(
                     error = ?err,

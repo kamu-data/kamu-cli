@@ -7,9 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-#[cfg(any(feature = "testing", test))]
-use crate::DEFAULT_ACCOUNT_ID;
 use crate::DEFAULT_ACCOUNT_NAME;
+#[cfg(any(feature = "testing", test))]
+use crate::DEFAULT_ACCOUNT_NAME_STR;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -51,7 +51,10 @@ impl CurrentAccountSubject {
 
     #[cfg(any(feature = "testing", test))]
     pub fn new_test() -> Self {
-        Self::logged(DEFAULT_ACCOUNT_ID.clone(), DEFAULT_ACCOUNT_NAME.clone())
+        Self::logged(
+            odf::metadata::testing::account_id(&DEFAULT_ACCOUNT_NAME_STR),
+            DEFAULT_ACCOUNT_NAME.clone(),
+        )
     }
 
     #[cfg(any(feature = "testing", test))]

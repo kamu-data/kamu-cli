@@ -155,7 +155,7 @@ impl AccountService for AccountServiceImpl {
         account_name: &odf::AccountName,
     ) -> Result<Option<Account>, InternalError> {
         match self.account_repo.get_account_by_name(account_name).await {
-            Ok(account) => Ok(Some(account.clone())),
+            Ok(account) => Ok(Some(account)),
             Err(GetAccountByNameError::NotFound(_)) => Ok(None),
             Err(GetAccountByNameError::Internal(e)) => Err(e),
         }
@@ -330,8 +330,6 @@ impl AccountService for AccountServiceImpl {
     }
 
     async fn save_account(&self, account: &Account) -> Result<(), CreateAccountError> {
-        eprintln!("!!!3\n{account:?}");
-
         self.account_repo.save_account(account).await
     }
 
