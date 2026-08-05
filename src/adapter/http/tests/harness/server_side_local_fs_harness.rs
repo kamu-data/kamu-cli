@@ -18,8 +18,8 @@ use kamu_accounts::{
     Account,
     AccountConfig,
     AuthConfig,
-    DEFAULT_ACCOUNT_ID,
     DEFAULT_ACCOUNT_NAME,
+    DEFAULT_ACCOUNT_NAME_STR,
     DidSecretEncryptionConfig,
     JwtAuthenticationConfig,
     PredefinedAccountsConfig,
@@ -151,8 +151,8 @@ impl ServerSideLocalFsHarness {
                 .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
                     datasets_dir,
                 ))
-                .add::<kamu_datasets_services::DatasetLfsBuilderDatabaseBackedImpl>()
-                .add_value(kamu_datasets_services::MetadataChainDbBackedConfig::default())
+                .add::<DatasetLfsBuilderDatabaseBackedImpl>()
+                .add_value(MetadataChainDbBackedConfig::default())
                 .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))
                 .add_value(EngineConfigDatafusionEmbeddedCompaction::default())
                 .add::<CompactionPlannerImpl>()
@@ -184,6 +184,7 @@ impl ServerSideLocalFsHarness {
                 .add::<RebacServiceImpl>()
                 .add::<UpdateAccountUseCaseImpl>()
                 .add::<CreateAccountUseCaseImpl>()
+                .add::<AccountIdentityGeneratorSeeded>()
                 .add::<InMemoryAccountQuotaEventStore>()
                 .add::<AccountQuotaServiceImpl>()
                 .add::<InMemoryDatasetStatisticsRepository>()
@@ -239,10 +240,10 @@ impl ServerSideLocalFsHarness {
 impl ServerSideHarness for ServerSideLocalFsHarness {
     fn server_account_id(&self) -> odf::AccountID {
         match self.options.tenancy_config {
-            TenancyConfig::MultiTenant => {
-                odf::AccountID::new_seeded_ed25519(SERVER_ACCOUNT_NAME.as_bytes())
+            TenancyConfig::MultiTenant => odf::metadata::testing::account_id(&SERVER_ACCOUNT_NAME),
+            TenancyConfig::SingleTenant => {
+                odf::metadata::testing::account_id(&DEFAULT_ACCOUNT_NAME_STR)
             }
-            TenancyConfig::SingleTenant => DEFAULT_ACCOUNT_ID.clone(),
         }
     }
 

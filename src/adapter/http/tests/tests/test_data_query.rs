@@ -25,197 +25,10 @@ use crate::harness::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct Harness {
-    #[allow(dead_code)]
-    run_info_dir: tempfile::TempDir,
-    server_harness: ServerSideLocalFsHarness,
-    root_url: url::Url,
-    dataset_handle: odf::DatasetHandle,
-    dataset_url: url::Url,
-    ed25519_private_key: odf::metadata::PrivateKey,
-}
-
-impl Harness {
-    async fn new() -> Self {
-        // TODO: Need access to these from harness level
-        let run_info_dir = tempfile::tempdir().unwrap();
-
-        let ed25519_private_key = odf::metadata::PrivateKey::from_bytes(&[123; _]);
-        let identity_config = kamu_signing::entities::IdentityConfig {
-            ed25519_private_key: Some(ed25519_private_key.clone()),
-            secp256k1_private_key: Some(
-                kamu_signing::utils::Secp256k1Signer::from_bytes(&[124; _].into()).unwrap(),
-            ),
-        };
-
-        let catalog = dill::CatalogBuilder::new()
-            .add_value(RunInfoDir::new(run_info_dir.path()))
-            .add_value(identity_config)
-            .add::<DataFormatRegistryImpl>()
-            .add_value(EngineConfigDatafusionEmbeddedBatchQuery::default())
-            .add::<QueryServiceImpl>()
-            .add::<QueryDatasetDataUseCaseImpl>()
-            .add::<SessionContextBuilder>()
-            .add::<EngineProvisionerNull>()
-            .build();
-
-        let server_harness = ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
-            tenancy_config: TenancyConfig::MultiTenant,
-            authorized_writes: true,
-            base_catalog: Some(catalog),
-        })
-        .await;
-
-        let system_time = Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap();
-        server_harness.system_time_source().set(system_time);
-
-        let alias = odf::DatasetAlias::new(
-            server_harness.operating_account_name(),
-            odf::DatasetName::new_unchecked("population"),
-        );
-        let create_result = server_harness
-            .cli_create_dataset_use_case()
-            .execute(
-                &alias,
-                MetadataFactory::metadata_block(
-                    MetadataFactory::seed(odf::DatasetKind::Root).build(),
-                )
-                .system_time(system_time)
-                .build_typed(),
-                Default::default(),
-            )
-            .await
-            .unwrap();
-
-        for event in [
-            odf::metadata::SetAttachments {
-                attachments: odf::metadata::Attachments::Embedded(
-                    odf::metadata::AttachmentsEmbedded {
-                        items: vec![odf::metadata::AttachmentEmbedded {
-                            path: "README.md".to_string(),
-                            content: "Blah".to_string(),
-                        }],
-                    },
-                ),
-            }
-            .into(),
-            odf::metadata::SetInfo {
-                description: Some("Test dataset".to_string()),
-                keywords: Some(vec!["foo".to_string(), "bar".to_string()]),
-            }
-            .into(),
-            odf::metadata::SetLicense {
-                short_name: "apache-2.0".to_string(),
-                name: "apache-2.0".to_string(),
-                spdx_id: None,
-                website_url: "https://www.apache.org/licenses/LICENSE-2.0".to_string(),
-            }
-            .into(),
-        ] {
-            create_result
-                .dataset
-                .commit_event(
-                    event,
-                    odf::dataset::CommitOpts {
-                        system_time: Some(system_time),
-                        ..Default::default()
-                    },
-                )
-                .await
-                .unwrap();
-        }
-
-        let target = ResolvedDataset::from_created(&create_result);
-
-        let ctx = SessionContext::new_with_config(
-            // Override parquet `created_by` field for reproducible data and block hashes
-            SessionConfig::from_string_hash_map(
-                &[(
-                    "datafusion.execution.parquet.created_by".to_string(),
-                    "kamu tests".to_string(),
-                )]
-                .into_iter()
-                .collect(),
-            )
-            .unwrap(),
-        );
-        let mut writer = DataWriterDataFusion::from_metadata_chain(
-            ctx.clone(),
-            target.clone(),
-            &odf::BlockRef::Head,
-            None,
-        )
-        .await
-        .unwrap();
-
-        let write_result = writer
-            .write(
-                Some(
-                    ctx.read_batch(
-                        RecordBatch::try_new(
-                            Arc::new(Schema::new(vec![
-                                Field::new("city", DataType::Utf8, false),
-                                Field::new("population", DataType::UInt64, false),
-                            ])),
-                            vec![
-                                Arc::new(StringArray::from(vec!["A", "B"])),
-                                Arc::new(UInt64Array::from(vec![100, 200])),
-                            ],
-                        )
-                        .unwrap(),
-                    )
-                    .unwrap()
-                    .into(),
-                ),
-                WriteDataOpts {
-                    system_time,
-                    source_event_time: system_time,
-                    new_watermark: None,
-                    new_source_state: None,
-                    data_staging_path: run_info_dir.path().join(".temp-data.parquet"),
-                },
-            )
-            .await
-            .unwrap();
-
-        target
-            .as_metadata_chain()
-            .set_ref(
-                &odf::BlockRef::Head,
-                &write_result.new_head,
-                odf::dataset::SetRefOpts {
-                    validate_block_present: true,
-                    check_ref_is: Some(Some(&write_result.old_head)),
-                },
-            )
-            .await
-            .unwrap();
-
-        let root_url = url::Url::parse(
-            format!("http://{}", server_harness.api_server_addr()).trim_end_matches('/'),
-        )
-        .unwrap();
-
-        let dataset_url =
-            server_harness.dataset_url_with_scheme(&create_result.dataset_handle.alias, "http");
-
-        Self {
-            run_info_dir,
-            server_harness,
-            root_url,
-            dataset_handle: create_result.dataset_handle,
-            dataset_url,
-            ed25519_private_key,
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_data_tail_handler() {
-    let harness = Harness::new().await;
+    let harness = DataQueryHarness::new().await;
 
     let client = async move {
         let cl = reqwest::Client::new();
@@ -368,7 +181,7 @@ async fn test_data_tail_handler() {
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_data_query_handler_success() {
-    let harness = Harness::new().await;
+    let harness = DataQueryHarness::new().await;
 
     let client = async move {
         let cl = reqwest::Client::new();
@@ -601,7 +414,7 @@ async fn test_data_query_handler_success() {
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_data_verify_handler() {
-    let harness = Harness::new().await;
+    let harness = DataQueryHarness::new().await;
 
     let client = async move {
         let cl = reqwest::Client::new();
@@ -894,7 +707,7 @@ async fn test_data_verify_handler() {
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_data_query_handler_error_sql_unparsable() {
-    let harness = Harness::new().await;
+    let harness = DataQueryHarness::new().await;
 
     let client = async move {
         let cl = reqwest::Client::new();
@@ -933,7 +746,7 @@ async fn test_data_query_handler_error_sql_unparsable() {
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_data_query_handler_error_sql_missing_column() {
-    let harness = Harness::new().await;
+    let harness = DataQueryHarness::new().await;
 
     let client = async move {
         let cl = reqwest::Client::new();
@@ -978,7 +791,7 @@ async fn test_data_query_handler_error_sql_missing_column() {
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_data_query_handler_error_sql_missing_function() {
-    let harness = Harness::new().await;
+    let harness = DataQueryHarness::new().await;
 
     let client = async move {
         let cl = reqwest::Client::new();
@@ -1022,7 +835,7 @@ async fn test_data_query_handler_error_sql_missing_function() {
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_data_query_handler_error_dataset_does_not_exist() {
-    let harness = Harness::new().await;
+    let harness = DataQueryHarness::new().await;
 
     let client = async move {
         let cl = reqwest::Client::new();
@@ -1061,7 +874,7 @@ async fn test_data_query_handler_error_dataset_does_not_exist() {
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_data_query_handler_dataset_error_bad_alias() {
-    let harness = Harness::new().await;
+    let harness = DataQueryHarness::new().await;
 
     let client = async move {
         let cl = reqwest::Client::new();
@@ -1110,7 +923,7 @@ async fn test_data_query_handler_dataset_error_bad_alias() {
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_data_query_handler_ranges() {
-    let harness = Harness::new().await;
+    let harness = DataQueryHarness::new().await;
 
     let client = async move {
         let cl = reqwest::Client::new();
@@ -1178,7 +991,7 @@ async fn test_data_query_handler_ranges() {
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_data_query_handler_data_formats() {
-    let harness = Harness::new().await;
+    let harness = DataQueryHarness::new().await;
 
     let client = async move {
         let cl = reqwest::Client::new();
@@ -1269,7 +1082,7 @@ async fn test_data_query_handler_data_formats() {
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_data_query_handler_schema_formats() {
-    let harness = Harness::new().await;
+    let harness = DataQueryHarness::new().await;
 
     let client = async move {
         let cl = reqwest::Client::new();
@@ -1520,7 +1333,7 @@ async fn test_data_query_handler_schema_formats() {
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_metadata_handler_aspects() {
-    let harness = Harness::new().await;
+    let harness = DataQueryHarness::new().await;
 
     let client = async move {
         let cl = reqwest::Client::new();
@@ -1623,7 +1436,7 @@ async fn test_metadata_handler_aspects() {
 #[test_group::group(engine, datafusion)]
 #[test_log::test(tokio::test)]
 async fn test_metadata_handler_schema_formats() {
-    let harness = Harness::new().await;
+    let harness = DataQueryHarness::new().await;
 
     let client = async move {
         let cl = reqwest::Client::new();
@@ -1902,6 +1715,195 @@ async fn test_metadata_handler_schema_formats() {
     };
 
     await_client_server_flow!(harness.server_harness.api_server_run(), client);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Harness
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct DataQueryHarness {
+    #[allow(dead_code)]
+    run_info_dir: tempfile::TempDir,
+    server_harness: ServerSideLocalFsHarness,
+    root_url: url::Url,
+    dataset_handle: odf::DatasetHandle,
+    dataset_url: url::Url,
+    ed25519_private_key: odf::metadata::PrivateKey,
+}
+
+impl DataQueryHarness {
+    async fn new() -> Self {
+        // TODO: Need access to these from harness level
+        let run_info_dir = tempfile::tempdir().unwrap();
+
+        let ed25519_private_key = odf::metadata::PrivateKey::from_bytes(&[123; _]);
+        let identity_config = kamu_signing::entities::IdentityConfig {
+            ed25519_private_key: Some(ed25519_private_key.clone()),
+            secp256k1_private_key: Some(
+                kamu_signing::utils::Secp256k1Signer::from_bytes(&[124; _].into()).unwrap(),
+            ),
+        };
+
+        let catalog = dill::CatalogBuilder::new()
+            .add_value(RunInfoDir::new(run_info_dir.path()))
+            .add_value(identity_config)
+            .add::<DataFormatRegistryImpl>()
+            .add_value(EngineConfigDatafusionEmbeddedBatchQuery::default())
+            .add::<QueryServiceImpl>()
+            .add::<QueryDatasetDataUseCaseImpl>()
+            .add::<SessionContextBuilder>()
+            .add::<EngineProvisionerNull>()
+            .build();
+
+        let server_harness = ServerSideLocalFsHarness::new(ServerSideHarnessOptions {
+            tenancy_config: TenancyConfig::MultiTenant,
+            authorized_writes: true,
+            base_catalog: Some(catalog),
+        })
+        .await;
+
+        let system_time = Utc.with_ymd_and_hms(2050, 1, 1, 12, 0, 0).unwrap();
+        server_harness.system_time_source().set(system_time);
+
+        let alias = odf::DatasetAlias::new(
+            server_harness.operating_account_name(),
+            odf::DatasetName::new_unchecked("population"),
+        );
+        let create_result = server_harness
+            .cli_create_dataset_use_case()
+            .execute(
+                &alias,
+                MetadataFactory::metadata_block(
+                    MetadataFactory::seed(odf::DatasetKind::Root).build(),
+                )
+                .system_time(system_time)
+                .build_typed(),
+                Default::default(),
+            )
+            .await
+            .unwrap();
+
+        for event in [
+            odf::metadata::SetAttachments {
+                attachments: odf::metadata::Attachments::Embedded(
+                    odf::metadata::AttachmentsEmbedded {
+                        items: vec![odf::metadata::AttachmentEmbedded {
+                            path: "README.md".to_string(),
+                            content: "Blah".to_string(),
+                        }],
+                    },
+                ),
+            }
+            .into(),
+            odf::metadata::SetInfo {
+                description: Some("Test dataset".to_string()),
+                keywords: Some(vec!["foo".to_string(), "bar".to_string()]),
+            }
+            .into(),
+            odf::metadata::SetLicense {
+                short_name: "apache-2.0".to_string(),
+                name: "apache-2.0".to_string(),
+                spdx_id: None,
+                website_url: "https://www.apache.org/licenses/LICENSE-2.0".to_string(),
+            }
+            .into(),
+        ] {
+            create_result
+                .dataset
+                .commit_event(
+                    event,
+                    odf::dataset::CommitOpts {
+                        system_time: Some(system_time),
+                        ..Default::default()
+                    },
+                )
+                .await
+                .unwrap();
+        }
+
+        let target = ResolvedDataset::from_created(&create_result);
+
+        let ctx = SessionContext::new_with_config(
+            // Override parquet `created_by` field for reproducible data and block hashes
+            SessionConfig::from_string_hash_map(
+                &[(
+                    "datafusion.execution.parquet.created_by".to_string(),
+                    "kamu tests".to_string(),
+                )]
+                .into_iter()
+                .collect(),
+            )
+            .unwrap(),
+        );
+        let mut writer = DataWriterDataFusion::from_metadata_chain(
+            ctx.clone(),
+            target.clone(),
+            &odf::BlockRef::Head,
+            None,
+        )
+        .await
+        .unwrap();
+
+        let write_result = writer
+            .write(
+                Some(
+                    ctx.read_batch(
+                        RecordBatch::try_new(
+                            Arc::new(Schema::new(vec![
+                                Field::new("city", DataType::Utf8, false),
+                                Field::new("population", DataType::UInt64, false),
+                            ])),
+                            vec![
+                                Arc::new(StringArray::from(vec!["A", "B"])),
+                                Arc::new(UInt64Array::from(vec![100, 200])),
+                            ],
+                        )
+                        .unwrap(),
+                    )
+                    .unwrap()
+                    .into(),
+                ),
+                WriteDataOpts {
+                    system_time,
+                    source_event_time: system_time,
+                    new_watermark: None,
+                    new_source_state: None,
+                    data_staging_path: run_info_dir.path().join(".temp-data.parquet"),
+                },
+            )
+            .await
+            .unwrap();
+
+        target
+            .as_metadata_chain()
+            .set_ref(
+                &odf::BlockRef::Head,
+                &write_result.new_head,
+                odf::dataset::SetRefOpts {
+                    validate_block_present: true,
+                    check_ref_is: Some(Some(&write_result.old_head)),
+                },
+            )
+            .await
+            .unwrap();
+
+        let root_url = url::Url::parse(
+            format!("http://{}", server_harness.api_server_addr()).trim_end_matches('/'),
+        )
+        .unwrap();
+
+        let dataset_url =
+            server_harness.dataset_url_with_scheme(&create_result.dataset_handle.alias, "http");
+
+        Self {
+            run_info_dir,
+            server_harness,
+            root_url,
+            dataset_handle: create_result.dataset_handle,
+            dataset_url,
+            ed25519_private_key,
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

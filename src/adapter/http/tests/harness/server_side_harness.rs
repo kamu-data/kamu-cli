@@ -18,8 +18,8 @@ use kamu_accounts::{
     AccountProvider,
     AccountType,
     CurrentAccountSubject,
-    DEFAULT_ACCOUNT_ID,
     DEFAULT_ACCOUNT_NAME,
+    DEFAULT_ACCOUNT_NAME_STR,
 };
 use kamu_core::{CompactionExecutor, CompactionPlanner, TenancyConfig};
 use kamu_datasets::{
@@ -101,7 +101,7 @@ pub(crate) struct ServerSideHarnessOptions {
 pub(crate) fn make_server_account(tenancy_config: TenancyConfig) -> Account {
     match tenancy_config {
         TenancyConfig::MultiTenant => Account {
-            id: odf::AccountID::new_seeded_ed25519(SERVER_ACCOUNT_NAME.as_bytes()),
+            id: odf::metadata::testing::account_id(&SERVER_ACCOUNT_NAME),
             account_name: odf::AccountName::new_unchecked(SERVER_ACCOUNT_NAME),
             account_type: AccountType::User,
             display_name: SERVER_ACCOUNT_NAME.to_string(),
@@ -122,11 +122,12 @@ pub(crate) fn create_cli_user_catalog(
     tenancy_config: TenancyConfig,
 ) -> dill::Catalog {
     let current_account_subject = match tenancy_config {
-        TenancyConfig::SingleTenant => {
-            CurrentAccountSubject::logged(DEFAULT_ACCOUNT_ID.clone(), DEFAULT_ACCOUNT_NAME.clone())
-        }
+        TenancyConfig::SingleTenant => CurrentAccountSubject::logged(
+            odf::metadata::testing::account_id(&DEFAULT_ACCOUNT_NAME_STR),
+            DEFAULT_ACCOUNT_NAME.clone(),
+        ),
         TenancyConfig::MultiTenant => CurrentAccountSubject::logged(
-            odf::AccountID::new_seeded_ed25519(SERVER_ACCOUNT_NAME.as_bytes()),
+            odf::metadata::testing::account_id(&SERVER_ACCOUNT_NAME),
             odf::AccountName::new_unchecked(SERVER_ACCOUNT_NAME),
         ),
     };
