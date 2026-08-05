@@ -40,6 +40,10 @@ pub static DUMMY_EMAIL_ADDRESS: LazyLock<Email> =
 static DUMMY_REGISTRATION_TIME: LazyLock<DateTime<Utc>> =
     LazyLock::new(|| Utc.with_ymd_and_hms(2024, 4, 1, 12, 0, 0).unwrap());
 
+#[cfg(any(feature = "testing", test))]
+static TEST_ACCOUNT_ID: LazyLock<odf::AccountID> =
+    LazyLock::new(|| odf::metadata::testing::account_id(&DEFAULT_ACCOUNT_NAME_STR));
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(strum::EnumString, strum::Display, strum::IntoStaticStr, Copy, Clone)]
@@ -104,7 +108,7 @@ pub enum AccountType {
 #[cfg(any(feature = "testing", test))]
 impl Account {
     pub fn dummy() -> Self {
-        Self::test(DEFAULT_ACCOUNT_ID.clone(), DEFAULT_ACCOUNT_NAME_STR)
+        Self::test(TEST_ACCOUNT_ID.clone(), DEFAULT_ACCOUNT_NAME_STR)
     }
 
     pub fn test(id: odf::AccountID, name: &str) -> Self {

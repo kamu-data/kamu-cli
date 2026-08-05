@@ -78,22 +78,22 @@ async fn test_predefined_st_datasets_indexed_properly(ctx: Arc<ElasticsearchTest
                 dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
                 dataset_search_schema::fields::DATASET_NAME: "bar",
                 dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
-                dataset_search_schema::fields::OWNER_ID: DEFAULT_ACCOUNT_ID.to_string(),
+                dataset_search_schema::fields::OWNER_ID: TEST_ACCOUNT_ID.to_string(),
                 dataset_search_schema::fields::OWNER_NAME: DEFAULT_ACCOUNT_NAME_STR,
                 dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
                 kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
-                kamu_search::fields::PRINCIPAL_IDS: vec![DEFAULT_ACCOUNT_ID.to_string()],
+                kamu_search::fields::PRINCIPAL_IDS: vec![TEST_ACCOUNT_ID.to_string()],
             }),
             serde_json::json!({
                 dataset_search_schema::fields::ALIAS: "foo",
                 dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
                 dataset_search_schema::fields::DATASET_NAME: "foo",
                 dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
-                dataset_search_schema::fields::OWNER_ID: DEFAULT_ACCOUNT_ID.to_string(),
+                dataset_search_schema::fields::OWNER_ID: TEST_ACCOUNT_ID.to_string(),
                 dataset_search_schema::fields::OWNER_NAME: DEFAULT_ACCOUNT_NAME_STR,
                 dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
                 kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
-                kamu_search::fields::PRINCIPAL_IDS: vec![DEFAULT_ACCOUNT_ID.to_string()],
+                kamu_search::fields::PRINCIPAL_IDS: vec![TEST_ACCOUNT_ID.to_string()],
             })
         ]
     );
@@ -225,33 +225,33 @@ async fn test_creating_st_datasets_reflected_in_index(ctx: Arc<ElasticsearchTest
                 dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
                 dataset_search_schema::fields::DATASET_NAME: "alpha",
                 dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
-                dataset_search_schema::fields::OWNER_ID: DEFAULT_ACCOUNT_ID.to_string(),
+                dataset_search_schema::fields::OWNER_ID: TEST_ACCOUNT_ID.to_string(),
                 dataset_search_schema::fields::OWNER_NAME: DEFAULT_ACCOUNT_NAME_STR,
                 dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
                 kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
-                kamu_search::fields::PRINCIPAL_IDS: vec![DEFAULT_ACCOUNT_ID.to_string()],
+                kamu_search::fields::PRINCIPAL_IDS: vec![TEST_ACCOUNT_ID.to_string()],
             }),
             serde_json::json!({
                 dataset_search_schema::fields::ALIAS: "beta",
                 dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
                 dataset_search_schema::fields::DATASET_NAME: "beta",
                 dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
-                dataset_search_schema::fields::OWNER_ID: DEFAULT_ACCOUNT_ID.to_string(),
+                dataset_search_schema::fields::OWNER_ID: TEST_ACCOUNT_ID.to_string(),
                 dataset_search_schema::fields::OWNER_NAME: DEFAULT_ACCOUNT_NAME_STR,
                 dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
                 kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
-                kamu_search::fields::PRINCIPAL_IDS: vec![DEFAULT_ACCOUNT_ID.to_string()],
+                kamu_search::fields::PRINCIPAL_IDS: vec![TEST_ACCOUNT_ID.to_string()],
             }),
             serde_json::json!({
                 dataset_search_schema::fields::ALIAS: "gamma",
                 dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
                 dataset_search_schema::fields::DATASET_NAME: "gamma",
                 dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
-                dataset_search_schema::fields::OWNER_ID: DEFAULT_ACCOUNT_ID.to_string(),
+                dataset_search_schema::fields::OWNER_ID: TEST_ACCOUNT_ID.to_string(),
                 dataset_search_schema::fields::OWNER_NAME: DEFAULT_ACCOUNT_NAME_STR,
                 dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
                 kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
-                kamu_search::fields::PRINCIPAL_IDS: vec![DEFAULT_ACCOUNT_ID.to_string()],
+                kamu_search::fields::PRINCIPAL_IDS: vec![TEST_ACCOUNT_ID.to_string()],
             }),
         ]
     );
@@ -393,33 +393,33 @@ async fn test_renaming_datasets_reflected_in_index(ctx: Arc<ElasticsearchTestCon
                 dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
                 dataset_search_schema::fields::DATASET_NAME: "beta-renamed",
                 dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
-                dataset_search_schema::fields::OWNER_ID: DEFAULT_ACCOUNT_ID.to_string(),
+                dataset_search_schema::fields::OWNER_ID: TEST_ACCOUNT_ID.to_string(),
                 dataset_search_schema::fields::OWNER_NAME: DEFAULT_ACCOUNT_NAME_STR,
                 dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
                 kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
-                kamu_search::fields::PRINCIPAL_IDS: vec![DEFAULT_ACCOUNT_ID.to_string()],
+                kamu_search::fields::PRINCIPAL_IDS: vec![TEST_ACCOUNT_ID.to_string()],
             }),
             serde_json::json!({
                 dataset_search_schema::fields::ALIAS: "gamma",
                 dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
                 dataset_search_schema::fields::DATASET_NAME: "gamma",
                 dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
-                dataset_search_schema::fields::OWNER_ID: DEFAULT_ACCOUNT_ID.to_string(),
+                dataset_search_schema::fields::OWNER_ID: TEST_ACCOUNT_ID.to_string(),
                 dataset_search_schema::fields::OWNER_NAME: DEFAULT_ACCOUNT_NAME_STR,
                 dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
                 kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
-                kamu_search::fields::PRINCIPAL_IDS: vec![DEFAULT_ACCOUNT_ID.to_string()],
+                kamu_search::fields::PRINCIPAL_IDS: vec![TEST_ACCOUNT_ID.to_string()],
             }),
             serde_json::json!({
                 dataset_search_schema::fields::ALIAS: "test-alpha",
                 dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
                 dataset_search_schema::fields::DATASET_NAME: "test-alpha",
                 dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
-                dataset_search_schema::fields::OWNER_ID: DEFAULT_ACCOUNT_ID.to_string(),
+                dataset_search_schema::fields::OWNER_ID: TEST_ACCOUNT_ID.to_string(),
                 dataset_search_schema::fields::OWNER_NAME: DEFAULT_ACCOUNT_NAME_STR,
                 dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
                 kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
-                kamu_search::fields::PRINCIPAL_IDS: vec![DEFAULT_ACCOUNT_ID.to_string()],
+                kamu_search::fields::PRINCIPAL_IDS: vec![TEST_ACCOUNT_ID.to_string()],
             }),
         ]
     );
@@ -474,22 +474,22 @@ async fn test_deleting_datasets_reflected_in_index(ctx: Arc<ElasticsearchTestCon
                 dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
                 dataset_search_schema::fields::DATASET_NAME: "alpha",
                 dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
-                dataset_search_schema::fields::OWNER_ID: DEFAULT_ACCOUNT_ID.to_string(),
+                dataset_search_schema::fields::OWNER_ID: TEST_ACCOUNT_ID.to_string(),
                 dataset_search_schema::fields::OWNER_NAME: DEFAULT_ACCOUNT_NAME_STR,
                 dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
                 kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
-                kamu_search::fields::PRINCIPAL_IDS: vec![DEFAULT_ACCOUNT_ID.to_string()],
+                kamu_search::fields::PRINCIPAL_IDS: vec![TEST_ACCOUNT_ID.to_string()],
             }),
             serde_json::json!({
                 dataset_search_schema::fields::ALIAS: "gamma",
                 dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
                 dataset_search_schema::fields::DATASET_NAME: "gamma",
                 dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
-                dataset_search_schema::fields::OWNER_ID: DEFAULT_ACCOUNT_ID.to_string(),
+                dataset_search_schema::fields::OWNER_ID: TEST_ACCOUNT_ID.to_string(),
                 dataset_search_schema::fields::OWNER_NAME: DEFAULT_ACCOUNT_NAME_STR,
                 dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
                 kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
-                kamu_search::fields::PRINCIPAL_IDS: vec![DEFAULT_ACCOUNT_ID.to_string()],
+                kamu_search::fields::PRINCIPAL_IDS: vec![TEST_ACCOUNT_ID.to_string()],
             }),
         ]
     );
@@ -711,7 +711,7 @@ async fn test_index_dataset_with_all_kinds_of_metadata(ctx: Arc<ElasticsearchTes
             dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
             dataset_search_schema::fields::DATASET_NAME: "foo",
             dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
-            dataset_search_schema::fields::OWNER_ID: DEFAULT_ACCOUNT_ID.to_string(),
+            dataset_search_schema::fields::OWNER_ID: TEST_ACCOUNT_ID.to_string(),
             dataset_search_schema::fields::OWNER_NAME: DEFAULT_ACCOUNT_NAME_STR,
             dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
             dataset_search_schema::fields::DESCRIPTION: "Nice root dataset",
@@ -722,7 +722,7 @@ async fn test_index_dataset_with_all_kinds_of_metadata(ctx: Arc<ElasticsearchTes
                 "population",
             ],
             kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
-            kamu_search::fields::PRINCIPAL_IDS: vec![DEFAULT_ACCOUNT_ID.to_string()],
+            kamu_search::fields::PRINCIPAL_IDS: vec![TEST_ACCOUNT_ID.to_string()],
         }),]
     );
 }
@@ -779,13 +779,13 @@ async fn test_partial_updates_all_kinds_of_metadata(ctx: Arc<ElasticsearchTestCo
             dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
             dataset_search_schema::fields::DATASET_NAME: "foo",
             dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
-            dataset_search_schema::fields::OWNER_ID: DEFAULT_ACCOUNT_ID.to_string(),
+            dataset_search_schema::fields::OWNER_ID: TEST_ACCOUNT_ID.to_string(),
             dataset_search_schema::fields::OWNER_NAME: DEFAULT_ACCOUNT_NAME_STR,
             dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
             dataset_search_schema::fields::DESCRIPTION: "Nice root dataset",
             dataset_search_schema::fields::KEYWORDS: vec!["test", "nice"],
             kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
-            kamu_search::fields::PRINCIPAL_IDS: vec![DEFAULT_ACCOUNT_ID.to_string()],
+            kamu_search::fields::PRINCIPAL_IDS: vec![TEST_ACCOUNT_ID.to_string()],
         }),]
     );
 
@@ -830,7 +830,7 @@ async fn test_partial_updates_all_kinds_of_metadata(ctx: Arc<ElasticsearchTestCo
             dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
             dataset_search_schema::fields::DATASET_NAME: "foo",
             dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
-            dataset_search_schema::fields::OWNER_ID: DEFAULT_ACCOUNT_ID.to_string(),
+            dataset_search_schema::fields::OWNER_ID: TEST_ACCOUNT_ID.to_string(),
             dataset_search_schema::fields::OWNER_NAME: DEFAULT_ACCOUNT_NAME_STR,
             dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
             dataset_search_schema::fields::DESCRIPTION: "Nice root dataset",
@@ -841,7 +841,7 @@ async fn test_partial_updates_all_kinds_of_metadata(ctx: Arc<ElasticsearchTestCo
                 "population",
             ],
             kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
-            kamu_search::fields::PRINCIPAL_IDS: vec![DEFAULT_ACCOUNT_ID.to_string()],
+            kamu_search::fields::PRINCIPAL_IDS: vec![TEST_ACCOUNT_ID.to_string()],
         }),]
     );
 
@@ -883,7 +883,7 @@ async fn test_partial_updates_all_kinds_of_metadata(ctx: Arc<ElasticsearchTestCo
             dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
             dataset_search_schema::fields::DATASET_NAME: "foo",
             dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
-            dataset_search_schema::fields::OWNER_ID: DEFAULT_ACCOUNT_ID.to_string(),
+            dataset_search_schema::fields::OWNER_ID: TEST_ACCOUNT_ID.to_string(),
             dataset_search_schema::fields::OWNER_NAME: DEFAULT_ACCOUNT_NAME_STR,
             dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
             dataset_search_schema::fields::DESCRIPTION: "Nice root dataset",
@@ -895,7 +895,7 @@ async fn test_partial_updates_all_kinds_of_metadata(ctx: Arc<ElasticsearchTestCo
             ],
             dataset_search_schema::fields::ATTACHMENTS: vec!["foo dataset readme"],
             kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
-            kamu_search::fields::PRINCIPAL_IDS: vec![DEFAULT_ACCOUNT_ID.to_string()],
+            kamu_search::fields::PRINCIPAL_IDS: vec![TEST_ACCOUNT_ID.to_string()],
         }),]
     );
 
@@ -925,7 +925,7 @@ async fn test_partial_updates_all_kinds_of_metadata(ctx: Arc<ElasticsearchTestCo
             dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
             dataset_search_schema::fields::DATASET_NAME: "foo",
             dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
-            dataset_search_schema::fields::OWNER_ID: DEFAULT_ACCOUNT_ID.to_string(),
+            dataset_search_schema::fields::OWNER_ID: TEST_ACCOUNT_ID.to_string(),
             dataset_search_schema::fields::OWNER_NAME: DEFAULT_ACCOUNT_NAME_STR,
             dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
             dataset_search_schema::fields::DESCRIPTION: serde_json::Value::Null,
@@ -937,7 +937,7 @@ async fn test_partial_updates_all_kinds_of_metadata(ctx: Arc<ElasticsearchTestCo
             ],
             dataset_search_schema::fields::ATTACHMENTS: vec!["foo dataset readme"],
             kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
-            kamu_search::fields::PRINCIPAL_IDS: vec![DEFAULT_ACCOUNT_ID.to_string()],
+            kamu_search::fields::PRINCIPAL_IDS: vec![TEST_ACCOUNT_ID.to_string()],
         }),]
     );
 
@@ -990,7 +990,7 @@ async fn test_partial_updates_all_kinds_of_metadata(ctx: Arc<ElasticsearchTestCo
             dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
             dataset_search_schema::fields::DATASET_NAME: "foo",
             dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
-            dataset_search_schema::fields::OWNER_ID: DEFAULT_ACCOUNT_ID.to_string(),
+            dataset_search_schema::fields::OWNER_ID: TEST_ACCOUNT_ID.to_string(),
             dataset_search_schema::fields::OWNER_NAME: DEFAULT_ACCOUNT_NAME_STR,
             dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
             dataset_search_schema::fields::DESCRIPTION: serde_json::Value::Null,
@@ -1003,7 +1003,7 @@ async fn test_partial_updates_all_kinds_of_metadata(ctx: Arc<ElasticsearchTestCo
             ],
             dataset_search_schema::fields::ATTACHMENTS: serde_json::Value::Null,
             kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
-            kamu_search::fields::PRINCIPAL_IDS: vec![DEFAULT_ACCOUNT_ID.to_string()],
+            kamu_search::fields::PRINCIPAL_IDS: vec![TEST_ACCOUNT_ID.to_string()],
         }),]
     );
 }
@@ -1046,7 +1046,7 @@ async fn test_visibility_updates_reflected_in_index(ctx: Arc<ElasticsearchTestCo
             dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
             dataset_search_schema::fields::DATASET_NAME: "foo",
             dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
-            dataset_search_schema::fields::OWNER_ID: DEFAULT_ACCOUNT_ID.to_string(),
+            dataset_search_schema::fields::OWNER_ID: TEST_ACCOUNT_ID.to_string(),
             dataset_search_schema::fields::OWNER_NAME: DEFAULT_ACCOUNT_NAME_STR,
             dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
             kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PUBLIC_GUEST,
@@ -1073,11 +1073,11 @@ async fn test_visibility_updates_reflected_in_index(ctx: Arc<ElasticsearchTestCo
             dataset_search_schema::fields::CREATED_AT: harness.fixed_time().to_rfc3339(),
             dataset_search_schema::fields::DATASET_NAME: "foo",
             dataset_search_schema::fields::KIND: dataset_search_schema::fields::values::KIND_ROOT,
-            dataset_search_schema::fields::OWNER_ID: DEFAULT_ACCOUNT_ID.to_string(),
+            dataset_search_schema::fields::OWNER_ID: TEST_ACCOUNT_ID.to_string(),
             dataset_search_schema::fields::OWNER_NAME: DEFAULT_ACCOUNT_NAME_STR,
             dataset_search_schema::fields::REF_CHANGED_AT: harness.fixed_time().to_rfc3339(),
             kamu_search::fields::VISIBILITY: kamu_search::fields::values::VISIBILITY_PRIVATE,
-            kamu_search::fields::PRINCIPAL_IDS: vec![DEFAULT_ACCOUNT_ID.to_string()],
+            kamu_search::fields::PRINCIPAL_IDS: vec![TEST_ACCOUNT_ID.to_string()],
         })]
     );
 }
