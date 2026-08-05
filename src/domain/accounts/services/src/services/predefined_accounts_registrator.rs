@@ -85,7 +85,7 @@ impl PredefinedAccountsRegistrator {
                             resolved_account_id,
                             account_config.clone(),
                         )));
-                    };
+                    }
 
                     let mut account_ids = self
                         .account_service

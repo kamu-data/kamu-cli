@@ -178,8 +178,6 @@ impl DatasetEntryRepository for MySqlDatasetEntryRepository {
         });
         query_builder.push("ORDER BY owner_name, dataset_name");
 
-        dbg!(query_builder.sql());
-
         let dataset_rows = query_builder
             .build_query_as::<MySqlDatasetEntryRowModel>()
             .fetch_all(connection_mut)

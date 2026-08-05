@@ -13,14 +13,7 @@ use std::sync::Arc;
 use chrono::Utc;
 use email_utils::Email;
 use internal_error::InternalError;
-use kamu_accounts::{
-    Account,
-    AccountProvider,
-    AccountType,
-    CurrentAccountSubject,
-    DEFAULT_ACCOUNT_NAME,
-    DEFAULT_ACCOUNT_NAME_STR,
-};
+use kamu_accounts::{Account, AccountProvider, AccountType, CurrentAccountSubject};
 use kamu_core::{CompactionExecutor, CompactionPlanner, TenancyConfig};
 use kamu_datasets::{
     AlwaysHappyDatasetActionAuthorizer,

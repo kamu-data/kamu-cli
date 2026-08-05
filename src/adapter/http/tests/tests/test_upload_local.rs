@@ -142,8 +142,6 @@ async fn test_attempt_upload_file_authorized() {
     let cache_dir = harness.cache_dir.clone();
 
     let client = async move {
-        dbg!("!!!", &upload_prepare_url);
-
         let client = reqwest::Client::new();
 
         let upload_prepare_response = client
@@ -153,14 +151,12 @@ async fn test_attempt_upload_file_authorized() {
             .await
             .unwrap();
 
-        dbg!("!!!", &upload_prepare_response);
         pretty_assertions::assert_eq!(http::StatusCode::OK, upload_prepare_response.status());
 
         let upload_context = upload_prepare_response
             .json::<UploadContext>()
             .await
             .unwrap();
-        dbg!("!!!", &upload_context);
         pretty_assertions::assert_eq!(http::method::Method::POST.as_str(), upload_context.method);
         assert!(upload_context.use_multipart);
         assert!(upload_context.fields.is_empty());
@@ -183,12 +179,10 @@ async fn test_attempt_upload_file_authorized() {
             .await
             .unwrap();
 
-        dbg!("!!!", &upload_main_response);
         pretty_assertions::assert_eq!(http::StatusCode::OK, upload_main_response.status());
 
         let expected_upload_path =
             UploadLocalHarness::target_path_from_upload_url(&cache_dir, &upload_main_url);
-        dbg!("!!!", &expected_upload_path);
         let file_body = std::fs::read_to_string(expected_upload_path).unwrap();
         pretty_assertions::assert_eq!(FILE_BODY, file_body);
     };
