@@ -36,7 +36,7 @@ async fn test_account_by_id() {
                 }}
             }}
             "#,
-            *DEFAULT_ACCOUNT_ID
+            *TEST_ACCOUNT_ID
         )))
         .await;
 
@@ -185,7 +185,7 @@ async fn test_account_attributes() {
                 }}
             }}
             "#,
-            *DEFAULT_ACCOUNT_ID
+            *TEST_ACCOUNT_ID
         )))
         .await;
 
@@ -195,7 +195,7 @@ async fn test_account_attributes() {
         value!({
             "accounts": {
                 "byId": {
-                    "id": DEFAULT_ACCOUNT_ID.to_string(),
+                    "id": TEST_ACCOUNT_ID.to_string(),
                     "accountName": DEFAULT_ACCOUNT_NAME_STR,
                     "displayName": DEFAULT_ACCOUNT_NAME_STR,
                     "accountType": "USER",
@@ -223,7 +223,7 @@ async fn test_account_attributes() {
                 }}
             }}
             "#,
-            *DEFAULT_ACCOUNT_ID
+            *TEST_ACCOUNT_ID
         )))
         .await;
 
@@ -233,7 +233,7 @@ async fn test_account_attributes() {
         value!({
             "accounts": {
                 "byId": {
-                    "id": DEFAULT_ACCOUNT_ID.to_string(),
+                    "id": TEST_ACCOUNT_ID.to_string(),
                     "accountName": DEFAULT_ACCOUNT_NAME_STR,
                     "displayName": DEFAULT_ACCOUNT_NAME_STR,
                     "accountType": "USER",
@@ -255,7 +255,7 @@ async fn test_account_attributes() {
                 }}
             }}
             "#,
-            *DEFAULT_ACCOUNT_ID
+            *TEST_ACCOUNT_ID
         )))
         .await;
 
@@ -286,7 +286,7 @@ async fn test_update_email_success() {
                 }}
             }}
             "#,
-            *DEFAULT_ACCOUNT_ID, "wasya@example.com"
+            *TEST_ACCOUNT_ID, "wasya@example.com"
         )))
         .await;
 
@@ -325,7 +325,7 @@ async fn test_update_email_bad_email() {
                 }}
             }}
             "#,
-            *DEFAULT_ACCOUNT_ID, "wasya#example.com"
+            *TEST_ACCOUNT_ID, "wasya#example.com"
         )))
         .await;
 
@@ -1094,7 +1094,7 @@ async fn test_non_admin_try_to_rename_other_account() {
 async fn test_create_and_get_access_token() {
     let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts::default()).await;
 
-    let mutation_request = create_access_token_request(&DEFAULT_ACCOUNT_ID.to_string(), "foo");
+    let mutation_request = create_access_token_request(&TEST_ACCOUNT_ID.to_string(), "foo");
 
     let res = harness.execute_authorized_query(mutation_request).await;
 
@@ -1106,7 +1106,7 @@ async fn test_create_and_get_access_token() {
     let created_token_id =
         json["accounts"]["byId"]["accessTokens"]["createAccessToken"]["token"]["id"].clone();
 
-    let query_request = get_access_tokens_request(&DEFAULT_ACCOUNT_ID.to_string());
+    let query_request = get_access_tokens_request(&TEST_ACCOUNT_ID.to_string());
     let res = harness.execute_authorized_query(query_request).await;
 
     assert_eq!(
@@ -1128,7 +1128,7 @@ async fn test_create_and_get_access_token() {
         })
     );
 
-    let mutation_request = create_access_token_request(&DEFAULT_ACCOUNT_ID.to_string(), "foo");
+    let mutation_request = create_access_token_request(&TEST_ACCOUNT_ID.to_string(), "foo");
 
     let res = harness.execute_authorized_query(mutation_request).await;
 
@@ -1155,7 +1155,7 @@ async fn test_create_and_get_access_token() {
 async fn test_revoke_access_token() {
     let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts::default()).await;
 
-    let mutation_request = create_access_token_request(&DEFAULT_ACCOUNT_ID.to_string(), "foo");
+    let mutation_request = create_access_token_request(&TEST_ACCOUNT_ID.to_string(), "foo");
 
     let res = harness.execute_authorized_query(mutation_request).await;
 
@@ -1167,10 +1167,8 @@ async fn test_revoke_access_token() {
     let created_token_id =
         json["accounts"]["byId"]["accessTokens"]["createAccessToken"]["token"]["id"].clone();
 
-    let mutation_request = revoke_access_token_request(
-        &DEFAULT_ACCOUNT_ID.to_string(),
-        &created_token_id.to_string(),
-    );
+    let mutation_request =
+        revoke_access_token_request(&TEST_ACCOUNT_ID.to_string(), &created_token_id.to_string());
 
     let res = harness.execute_anonymous_query(mutation_request).await;
 
@@ -1181,10 +1179,8 @@ async fn test_revoke_access_token() {
         "Access token access error".to_string()
     );
 
-    let mutation_request = revoke_access_token_request(
-        &DEFAULT_ACCOUNT_ID.to_string(),
-        &created_token_id.to_string(),
-    );
+    let mutation_request =
+        revoke_access_token_request(&TEST_ACCOUNT_ID.to_string(), &created_token_id.to_string());
 
     let res = harness.execute_authorized_query(mutation_request).await;
 
@@ -1205,10 +1201,8 @@ async fn test_revoke_access_token() {
         })
     );
 
-    let mutation_request = revoke_access_token_request(
-        &DEFAULT_ACCOUNT_ID.to_string(),
-        &created_token_id.to_string(),
-    );
+    let mutation_request =
+        revoke_access_token_request(&TEST_ACCOUNT_ID.to_string(), &created_token_id.to_string());
 
     let res = harness.execute_authorized_query(mutation_request).await;
 

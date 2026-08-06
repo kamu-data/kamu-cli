@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_accounts::{AccountNotFoundByIdError, CurrentAccountSubject};
+use kamu_accounts::{AccountNotFoundByIdError, CurrentAccountSubject, DEFAULT_ACCOUNT_NAME};
 use kamu_auth_rebac::{RebacService, RebacServiceExt};
 use kamu_datasets::{DatasetAction, DatasetActionAuthorizer, DatasetActionAuthorizerExt};
 use tokio::sync::OnceCell;
@@ -106,7 +106,16 @@ impl Account {
             let current_account_subject = from_catalog_n!(ctx, CurrentAccountSubject);
 
             Ok(match current_account_subject.as_ref() {
-                CurrentAccountSubject::Anonymous(_) => None,
+                CurrentAccountSubject::Anonymous(_) => {
+                    let account_service = from_catalog_n!(ctx, dyn kamu_accounts::AccountService);
+
+                    let account = account_service
+                        .get_account_by_name(&DEFAULT_ACCOUNT_NAME)
+                        .await
+                        .int_err()?;
+
+                    Some(Self::new(account.id.into(), account.account_name.into()))
+                }
                 CurrentAccountSubject::Logged(l) => Some(Self::new(
                     l.account_id.clone().into(),
                     l.account_name.clone().into(),
