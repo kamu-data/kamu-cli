@@ -119,14 +119,12 @@ impl CreateAccountUseCaseImpl {
 
         // TODO: refactor: combine to one method ??? -->
         self.account_service.save_account(account).await?;
-        self.account_service
-            .save_account_password(account, password)
-            .await?;
-        // <--
-        self.maybe_save_private_key(&account.id, maybe_account_key)
-            .await?;
 
-        // <-- join_all
+        futures::try_join!(
+            self.account_service
+                .save_account_password(&account.id, password),
+            self.maybe_save_private_key(&account.id, maybe_account_key)
+        )?;
 
         Ok(())
     }
@@ -155,18 +153,10 @@ impl CreateAccountUseCaseImpl {
         .int_err()?;
         let account_entity = DidEntity::new_account(account_id.as_str());
 
-        eprintln!("!!!5.1: {did_secret_key:?}");
-
-        // todo: info: тут сохраняем
-        let a = self
-            .did_secret_key_repo
+        self.did_secret_key_repo
             .save_did_secret_key(&account_entity, &did_secret_key)
             .await
-            .int_err();
-
-        eprintln!("!!!5.2 +");
-
-        a
+            .int_err()
     }
 
     fn resolve_account_key_and_id(
