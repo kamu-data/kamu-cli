@@ -9,10 +9,10 @@
 
 use std::sync::Arc;
 
-use dill::*;
 use email_utils::Email;
 use internal_error::ResultIntoInternal;
 use kamu_accounts::*;
+use reqwest::Url;
 use serde::Deserialize;
 use thiserror::Error;
 
@@ -30,9 +30,9 @@ pub struct OAuthGithub {
     config: Arc<GithubAuthenticationConfig>,
 }
 
-#[component(pub)]
-#[interface(dyn AuthenticationProvider)]
-#[scope(Singleton)]
+#[dill::component(pub)]
+#[dill::interface(dyn AuthenticationProvider)]
+#[dill::scope(Singleton)]
 impl OAuthGithub {
     pub fn new(config: Arc<GithubAuthenticationConfig>) -> Self {
         Self {
@@ -170,7 +170,7 @@ impl AuthenticationProvider for OAuthGithub {
             ));
         };
 
-        // Validate email
+        // Validate email & extract avatar URL
         let email = Email::parse(
             github_account_info
                 .email
@@ -178,10 +178,12 @@ impl AuthenticationProvider for OAuthGithub {
                 .as_str(),
         )
         .unwrap();
+        let avatar_url = github_account_info
+            .avatar_url
+            .map(|url| Url::parse(&url).unwrap());
 
         // Extract matching fields
         Ok(ProviderLoginResponse {
-            // todo
             // For GitHub, generate a random DID, regardless of the name
             account_id: odf::AccountID::new_generated_ed25519().1,
             account_name: odf::AccountName::new_unchecked(&github_account_info.login),
@@ -190,7 +192,7 @@ impl AuthenticationProvider for OAuthGithub {
             display_name: github_account_info
                 .name
                 .unwrap_or(github_account_info.login),
-            avatar_url: github_account_info.avatar_url,
+            avatar_url,
             // Use GitHub ID as an identity key
             provider_identity_key: github_account_info.id.to_string(),
         })
@@ -282,8 +284,8 @@ impl GithubAuthenticationConfig {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
-#[interface(dyn AuthenticationProvider)]
+#[dill::component(pub)]
+#[dill::interface(dyn AuthenticationProvider)]
 pub struct DummyOAuthGithub {}
 
 #[async_trait::async_trait]
