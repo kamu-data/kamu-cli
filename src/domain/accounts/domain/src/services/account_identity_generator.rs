@@ -12,7 +12,7 @@
 pub trait AccountIdentityGenerator: Sync + Send {
     fn generate_ed25519(
         &self,
-        _account_name: &odf::AccountName,
+        account_name: &odf::AccountName,
     ) -> (odf::metadata::SigningKey, odf::AccountID);
 }
 
