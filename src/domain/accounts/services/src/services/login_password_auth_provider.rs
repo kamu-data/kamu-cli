@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::str::FromStr;
 use std::sync::Arc;
 
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
@@ -43,6 +42,8 @@ impl AuthenticationProvider for LoginPasswordAuthProvider {
         &self,
         login_credentials_json: String,
     ) -> Result<ProviderLoginResponse, ProviderLoginError> {
+        use std::str::FromStr;
+
         // Decode credentials
         let password_login_credentials =
             serde_json::from_str::<PasswordLoginCredentials>(login_credentials_json.as_str())
@@ -59,7 +60,6 @@ impl AuthenticationProvider for LoginPasswordAuthProvider {
             ProviderLoginError::RejectedCredentials(RejectedCredentialsError {})
         })?;
 
-        // todo если пароль не найден, то считается что аккаунта нет
         self.account_service
             .verify_account_password_by_name(&account_name, &password)
             .await
@@ -76,8 +76,7 @@ impl AuthenticationProvider for LoginPasswordAuthProvider {
                 }
             })?;
 
-        // todo сделать реджект, если аккаунт не найден -- выходит, что пароль есть, а
-        // аккаунта нет Extract known account data
+        // Extract known account data
         let account = self
             .account_service
             .get_account_by_name(&account_name)
@@ -85,15 +84,13 @@ impl AuthenticationProvider for LoginPasswordAuthProvider {
             .int_err()?;
 
         Ok(ProviderLoginResponse {
-            // For password-based accounts
-            account_id: odf::AccountID::new_seeded_ed25519(account_name.as_bytes()),
-            account_name,
+            account_id: account.id,
+            account_name: account.account_name,
             email: account.email,
-            display_name: password_login_credentials.login.clone(),
+            display_name: account.display_name,
             account_type: account.account_type,
-            // todo temp
-            avatar_url: account.avatar_url.as_ref().map(ToString::to_string),
-            provider_identity_key: password_login_credentials.login.to_ascii_lowercase(),
+            avatar_url: account.avatar_url,
+            provider_identity_key: account.provider_identity_key,
         })
     }
 }
