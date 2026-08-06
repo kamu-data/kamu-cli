@@ -75,19 +75,6 @@ pub struct Account {
     pub provider_identity_key: ProviderIdentityKey,
 }
 
-// todo use?
-#[derive(Debug)]
-pub struct PasswordAccount {
-    pub account: Account,
-    pub password: Password,
-}
-
-impl PasswordAccount {
-    pub fn try_new(account: Account, password: Password) -> Option<Self> {
-        AccountProvider::is_password(&account.provider).then_some(Self { account, password })
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
