@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use chrono::Utc;
-use kamu_accounts::DEFAULT_ACCOUNT_ID;
+use kamu_accounts::TEST_ACCOUNT_ID;
 use kamu_adapter_flow_dataset::*;
 use kamu_adapter_task_dataset::{LogicalPlanDatasetUpdate, TaskResultDatasetUpdate};
 use kamu_core::{PullResult, PullResultUpToDate};
@@ -209,7 +209,7 @@ impl FlowControllerTransformHarness {
             transform_dataset_binding(dataset_id),
             FlowActivationCause::Manual(FlowActivationCauseManual {
                 activation_time: Utc::now(),
-                initiator_account_id: DEFAULT_ACCOUNT_ID.clone(),
+                initiator_account_id: TEST_ACCOUNT_ID.clone(),
             }),
             None,
             None,

@@ -30,8 +30,6 @@ pub const DEFAULT_PASSWORD_STR: &str = "kamu.dev";
 
 pub static DEFAULT_ACCOUNT_NAME: LazyLock<odf::AccountName> =
     LazyLock::new(|| odf::AccountName::new_unchecked(DEFAULT_ACCOUNT_NAME_STR));
-pub static DEFAULT_ACCOUNT_ID: LazyLock<odf::AccountID> =
-    LazyLock::new(|| odf::AccountID::new_seeded_ed25519(DEFAULT_ACCOUNT_NAME_STR.as_bytes()));
 pub static DEFAULT_ACCOUNT_PASSWORD: LazyLock<Password> =
     LazyLock::new(|| Password::try_new(DEFAULT_PASSWORD_STR).unwrap());
 pub static DUMMY_EMAIL_ADDRESS: LazyLock<Email> =
