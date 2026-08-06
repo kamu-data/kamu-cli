@@ -44,10 +44,8 @@ pub struct CreateAccountUseCaseImpl {
     outbox: Arc<dyn messaging_outbox::Outbox>,
     time_source: Arc<dyn SystemTimeSource>,
     account_identity_generator: Arc<dyn AccountIdentityGenerator>,
-    // todo refactor: extract to service -->
     did_secret_key_repo: Arc<dyn DidSecretKeyRepository>,
     did_secret_encryption_key: Option<SecretString>,
-    // <--
 }
 
 #[dill::component(pub)]

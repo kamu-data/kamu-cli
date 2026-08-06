@@ -41,7 +41,7 @@ pub struct DidSecretService {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl DidSecretService {
-    async fn delete_did_secret(&self, did_entity: DidEntity) -> Result<(), InternalError> {
+    async fn delete_did_secret(&self, did_entity: DidEntity<'_>) -> Result<(), InternalError> {
         match self
             .did_secret_key_repo
             .delete_did_secret_key(&did_entity)

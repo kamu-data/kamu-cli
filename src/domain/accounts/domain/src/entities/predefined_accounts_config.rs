@@ -151,7 +151,6 @@ pub struct AccountConfig {
     #[config(combine(replace))]
     pub avatar_url: Option<Url>,
 
-    // todo ref delete?
     // TODO: This should not be in config - we are mixing configuration and domain model here
     #[config(combine(replace))]
     pub registered_at: Option<DateTime<Utc>>,

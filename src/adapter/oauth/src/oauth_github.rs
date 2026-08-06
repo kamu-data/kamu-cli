@@ -32,7 +32,7 @@ pub struct OAuthGithub {
 
 #[dill::component(pub)]
 #[dill::interface(dyn AuthenticationProvider)]
-#[dill::scope(Singleton)]
+#[dill::scope(dill::Singleton)]
 impl OAuthGithub {
     pub fn new(config: Arc<GithubAuthenticationConfig>) -> Self {
         Self {
