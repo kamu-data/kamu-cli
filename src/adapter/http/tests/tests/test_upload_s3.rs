@@ -16,11 +16,11 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu::domain::{FileUploadLimitConfig, ServerUrlConfig, TenancyConfig, UploadContext};
 use kamu_accounts::{
     AuthConfig,
-    DEFAULT_ACCOUNT_NAME_STR,
     DidSecretEncryptionConfig,
     JwtAuthenticationConfig,
     JwtTokenIssuer,
     PredefinedAccountsConfig,
+    TEST_ACCOUNT_ID,
 };
 use kamu_accounts_inmem::{
     InMemoryAccessTokenRepository,
@@ -100,9 +100,7 @@ async fn test_attempt_upload_file_authorized() {
     let harness = UploadS3Harness::new().await;
 
     let upload_prepare_url = harness.upload_prepare_url("test.txt", "text/plain", FILE_BODY.len());
-    let access_token = harness.make_access_token(&odf::metadata::testing::account_id(
-        &DEFAULT_ACCOUNT_NAME_STR,
-    ));
+    let access_token = harness.make_access_token(&TEST_ACCOUNT_ID);
     let upload_bucket_context = harness.s3_upload_context.clone();
 
     let client = async move {
@@ -146,8 +144,7 @@ async fn test_attempt_upload_file_authorized() {
 
         let expected_key = format!(
             "{}/{}/test.txt",
-            odf::metadata::testing::account_id(&DEFAULT_ACCOUNT_NAME_STR)
-                .as_id_without_did_prefix(),
+            TEST_ACCOUNT_ID.as_id_without_did_prefix(),
             upload_token.upload_id
         );
         let file_exists = upload_bucket_context
@@ -181,9 +178,7 @@ async fn test_attempt_upload_file_that_is_too_large() {
     let harness = UploadS3Harness::new().await;
 
     let upload_prepare_url = harness.upload_prepare_url("test.txt", "text/plain", FILE_BODY.len());
-    let access_token = harness.make_access_token(&odf::metadata::testing::account_id(
-        &DEFAULT_ACCOUNT_NAME_STR,
-    ));
+    let access_token = harness.make_access_token(&TEST_ACCOUNT_ID);
 
     let client = async move {
         let client = reqwest::Client::new();
@@ -225,9 +220,7 @@ async fn test_upload_then_read_file() {
     let harness = UploadS3Harness::new().await;
     let upload_prepare_url = harness.upload_prepare_url("test.txt", "text/plain", FILE_BODY.len());
     let retrieve_url = harness.upload_retrieve_url();
-    let access_token = harness.make_access_token(&odf::metadata::testing::account_id(
-        &DEFAULT_ACCOUNT_NAME_STR,
-    ));
+    let access_token = harness.make_access_token(&TEST_ACCOUNT_ID);
     let different_access_token =
         harness.make_access_token(&(odf::AccountID::new_generated_ed25519().1));
 

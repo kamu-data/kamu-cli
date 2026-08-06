@@ -132,7 +132,6 @@ impl CreateDatasetFromSnapshotUseCase for CreateDatasetFromSnapshotUseCaseImpl {
                 DidSecretKey::try_new(&dataset_did.1, did_secret_encryption_key.expose_secret())
                     .int_err()?;
 
-            // todo info: тут сохраняем
             // Note: subject and target might be two different accounts, but we use subject
             // here as the creator of the key
             self.did_secret_key_repo

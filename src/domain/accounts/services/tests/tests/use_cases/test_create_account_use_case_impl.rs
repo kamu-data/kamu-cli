@@ -17,7 +17,7 @@ use kamu_accounts::{
     AccountDisplayName,
     AccountLifecycleMessage,
     CreateAccountUseCase,
-    CreateAccountUseCaseOptions,
+    CreateDerivedAccountUseCaseOptions,
     DidPkhAccountIdentity,
     MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
     PredefinedAccountsConfig,
@@ -72,7 +72,7 @@ async fn test_create_account() {
             .execute_derived(
                 &creator_account,
                 &new_account_name_with_email,
-                CreateAccountUseCaseOptions::builder().email(new_account_email.clone()).build())
+                CreateDerivedAccountUseCaseOptions::builder().email(new_account_email.clone()).build())
             .await,
         Ok(account)
             if account.email == new_account_email
@@ -86,7 +86,7 @@ async fn test_create_account() {
             .execute_derived(
                 &creator_account,
                 &new_account_name_without_email,
-                CreateAccountUseCaseOptions::default()
+                CreateDerivedAccountUseCaseOptions::default()
             )
             .await,
         Ok(account)

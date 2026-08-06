@@ -13,7 +13,7 @@ use kamu_accounts::{
     Account,
     AccountLifecycleMessage,
     CreateAccountUseCase,
-    CreateAccountUseCaseOptions,
+    CreateDerivedAccountUseCaseOptions,
     MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
     ModifyAccountPasswordError,
     ModifyAccountPasswordUseCase,
@@ -298,7 +298,7 @@ impl ModifyAccountPasswordUseCaseImplHarness {
             .execute_derived(
                 &creator_account,
                 &account_name,
-                CreateAccountUseCaseOptions::builder()
+                CreateDerivedAccountUseCaseOptions::builder()
                     .password(password)
                     .build(),
             )

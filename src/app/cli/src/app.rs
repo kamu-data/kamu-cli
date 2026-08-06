@@ -815,7 +815,6 @@ pub fn register_config_in_catalog(
         let accounts_config = if tenancy_config == TenancyConfig::MultiTenant {
             let mut accounts_config = config.auth.users.clone();
 
-            // todo: action: обновить
             let mt_account = AccountConfig::test_config_from_name(odf::AccountName::new_unchecked(
                 AccountService::default_account_name(TenancyConfig::MultiTenant).as_str(),
             ))
@@ -827,7 +826,6 @@ pub fn register_config_in_catalog(
             accounts_config.predefined.push(mt_account);
 
             if is_e2e_testing {
-                // todo: action: обновить
                 let e2e_user_config = AccountConfig::test_config_from_name(
                     odf::AccountName::new_unchecked("e2e-user"),
                 );

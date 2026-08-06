@@ -24,6 +24,7 @@ use kamu_accounts::{
     CreateAccountError,
     CreateAccountUseCase,
     CreateAccountUseCaseOptions,
+    CreateDerivedAccountUseCaseOptions,
     CreateMultiWalletAccountsError,
     DidEntity,
     DidSecretEncryptionConfig,
@@ -171,7 +172,7 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
     async fn execute(
         &self,
         account_config: &AccountConfig,
-        quiet: bool,
+        options: CreateAccountUseCaseOptions,
     ) -> Result<Account, CreateAccountError> {
         let (maybe_account_key, account_id) = self.resolve_account_key_and_id(account_config);
 
@@ -204,7 +205,7 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
             self.maybe_save_private_key(&new_account.id, maybe_account_key)
         )?;
 
-        if !quiet {
+        if !options.quiet {
             self.notify_account_created(&new_account).await?;
         }
 
@@ -215,7 +216,7 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
         &self,
         creator_account: &Account,
         account_name: &odf::AccountName,
-        options: CreateAccountUseCaseOptions,
+        options: CreateDerivedAccountUseCaseOptions,
     ) -> Result<Account, CreateAccountError> {
         let email = if let Some(email) = options.email {
             email

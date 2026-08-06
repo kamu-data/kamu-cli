@@ -14,6 +14,7 @@ use kamu_accounts::{
     AccountConfig,
     AccountService,
     CreateAccountUseCase,
+    CreateAccountUseCaseOptions,
     CurrentAccountSubject,
     DeleteAccountUseCase,
     DidSecretEncryptionConfig,
@@ -106,7 +107,10 @@ impl AccountBaseUseCaseHarness {
 
         let create_account_uc = catalog.get_one::<dyn CreateAccountUseCase>().unwrap();
         create_account_uc
-            .execute(&account_config, false /* quiet */)
+            .execute(
+                &account_config,
+                CreateAccountUseCaseOptions { quiet: false },
+            )
             .await
             .unwrap()
     }

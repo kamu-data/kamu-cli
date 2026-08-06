@@ -19,10 +19,10 @@ use kamu_accounts::{
     AccountConfig,
     AuthConfig,
     DEFAULT_ACCOUNT_NAME,
-    DEFAULT_ACCOUNT_NAME_STR,
     DidSecretEncryptionConfig,
     JwtAuthenticationConfig,
     PredefinedAccountsConfig,
+    TEST_ACCOUNT_ID,
 };
 use kamu_accounts_inmem::{
     InMemoryAccessTokenRepository,
@@ -241,9 +241,7 @@ impl ServerSideHarness for ServerSideLocalFsHarness {
     fn server_account_id(&self) -> odf::AccountID {
         match self.options.tenancy_config {
             TenancyConfig::MultiTenant => odf::metadata::testing::account_id(&SERVER_ACCOUNT_NAME),
-            TenancyConfig::SingleTenant => {
-                odf::metadata::testing::account_id(&DEFAULT_ACCOUNT_NAME_STR)
-            }
+            TenancyConfig::SingleTenant => TEST_ACCOUNT_ID.clone(),
         }
     }
 

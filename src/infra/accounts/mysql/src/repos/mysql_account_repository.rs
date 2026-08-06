@@ -19,8 +19,6 @@ use crate::domain::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// todo lower for email
-
 #[dill::component]
 #[dill::interface(dyn AccountRepository)]
 #[dill::interface(dyn ExpensiveAccountRepository)]

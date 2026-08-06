@@ -218,9 +218,7 @@ impl ServerSideHarness for ServerSideS3Harness {
     fn server_account_id(&self) -> odf::AccountID {
         match self.options.tenancy_config {
             TenancyConfig::MultiTenant => odf::metadata::testing::account_id(&SERVER_ACCOUNT_NAME),
-            TenancyConfig::SingleTenant => {
-                odf::metadata::testing::account_id(&DEFAULT_ACCOUNT_NAME_STR)
-            }
+            TenancyConfig::SingleTenant => TEST_ACCOUNT_ID.clone(),
         }
     }
 

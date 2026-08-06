@@ -25,11 +25,11 @@ use kamu::domain::{CacheDir, ServerUrlConfig};
 use kamu_accounts::{
     AccountConfig,
     AuthConfig,
-    DEFAULT_ACCOUNT_NAME_STR,
     DidSecretEncryptionConfig,
     JwtAuthenticationConfig,
     JwtTokenIssuer,
     PredefinedAccountsConfig,
+    TEST_ACCOUNT_ID,
 };
 use kamu_accounts_inmem::{
     InMemoryAccessTokenRepository,
@@ -136,9 +136,7 @@ async fn test_attempt_upload_file_authorized() {
 
     let harness = UploadLocalHarness::new().await;
     let upload_prepare_url = harness.upload_prepare_url("test.txt", "text/plain", FILE_BODY.len());
-    let access_token = harness.make_access_token(&odf::metadata::testing::account_id(
-        &DEFAULT_ACCOUNT_NAME_STR,
-    ));
+    let access_token = harness.make_access_token(&TEST_ACCOUNT_ID);
     let cache_dir = harness.cache_dir.clone();
 
     let client = async move {
@@ -198,9 +196,7 @@ async fn test_attempt_upload_file_by_different_user() {
 
     let harness = UploadLocalHarness::new().await;
     let upload_prepare_url = harness.upload_prepare_url("test.txt", "text/plain", FILE_BODY.len());
-    let access_token = harness.make_access_token(&odf::metadata::testing::account_id(
-        &DEFAULT_ACCOUNT_NAME_STR,
-    ));
+    let access_token = harness.make_access_token(&TEST_ACCOUNT_ID);
     let different_access_token = harness.make_access_token(&harness.another_account_id);
 
     let client = async move {
@@ -262,9 +258,7 @@ async fn test_attempt_upload_file_that_is_too_large() {
     let harness = UploadLocalHarness::new().await;
     let upload_prepare_url = harness.upload_prepare_url("test.txt", "text/plain", FILE_BODY.len());
     let upload_main_url = harness.upload_main_url();
-    let access_token = harness.make_access_token(&odf::metadata::testing::account_id(
-        &DEFAULT_ACCOUNT_NAME_STR,
-    ));
+    let access_token = harness.make_access_token(&TEST_ACCOUNT_ID);
     let upload_token = harness.mock_upload_token();
 
     let client = async move {
@@ -330,9 +324,7 @@ async fn test_attempt_upload_file_that_has_different_length_than_declared() {
 
     let harness = UploadLocalHarness::new().await;
     let upload_prepare_url = harness.upload_prepare_url("test.txt", "text/plain", FILE_BODY.len());
-    let access_token = harness.make_access_token(&odf::metadata::testing::account_id(
-        &DEFAULT_ACCOUNT_NAME_STR,
-    ));
+    let access_token = harness.make_access_token(&TEST_ACCOUNT_ID);
 
     let client = async move {
         let client = reqwest::Client::new();
@@ -391,9 +383,7 @@ async fn test_upload_then_read_file() {
 
     let harness = UploadLocalHarness::new().await;
     let upload_prepare_url = harness.upload_prepare_url("test.txt", "text/plain", FILE_BODY.len());
-    let access_token = harness.make_access_token(&odf::metadata::testing::account_id(
-        &DEFAULT_ACCOUNT_NAME_STR,
-    ));
+    let access_token = harness.make_access_token(&TEST_ACCOUNT_ID);
     let different_access_token = harness.make_access_token(&harness.another_account_id);
 
     let client = async move {
@@ -563,9 +553,7 @@ impl UploadLocalHarness {
         UploadTokenBase64Json(UploadToken {
             upload_id: "123".to_string(),
             file_name: "someFile.json".to_string(),
-            owner_account_id: odf::metadata::testing::account_id(&DEFAULT_ACCOUNT_NAME_STR)
-                .as_id_without_did_prefix()
-                .to_string(),
+            owner_account_id: TEST_ACCOUNT_ID.as_id_without_did_prefix().to_string(),
             content_length: 123,
             content_type: Some(MediaType::JSON.to_owned()),
         })
@@ -595,11 +583,7 @@ impl UploadLocalHarness {
 
         cache_dir
             .join("uploads")
-            .join(
-                odf::metadata::testing::account_id(&DEFAULT_ACCOUNT_NAME_STR)
-                    .as_id_without_did_prefix()
-                    .to_string(),
-            )
+            .join(TEST_ACCOUNT_ID.as_id_without_did_prefix().to_string())
             .join(upload_token.upload_id)
             .join(upload_token.file_name)
     }

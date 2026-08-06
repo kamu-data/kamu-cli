@@ -150,9 +150,6 @@ where
     }
 }
 
-//
-// TODO: test
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub type ErrorIndex = usize;
@@ -176,9 +173,9 @@ where
         use std::fmt::Write;
 
         let mut res = String::new();
-        let _ = writeln!(res, "{self}");
+        writeln!(res, "{self}").unwrap();
         for (index, err) in &self.failures {
-            let _ = writeln!(res, "  [{index}] {err}");
+            writeln!(res, "  [{index}] {err}").unwrap();
         }
         res
     }

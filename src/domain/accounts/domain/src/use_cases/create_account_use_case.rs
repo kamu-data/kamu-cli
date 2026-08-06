@@ -18,22 +18,19 @@ use crate::{Account, AccountConfig, CreateAccountError, Password};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// todo CreateAccountUseCase::exec add options
-
 #[async_trait::async_trait]
 pub trait CreateAccountUseCase: Send + Sync {
     async fn execute(
         &self,
         account_config: &AccountConfig,
-        quiet: bool,
+        options: CreateAccountUseCaseOptions,
     ) -> Result<Account, CreateAccountError>;
 
     async fn execute_derived(
         &self,
         creator_account: &Account,
         account_name: &odf::AccountName,
-        // todo rename CreateAccountUseCaseOptions
-        options: CreateAccountUseCaseOptions,
+        options: CreateDerivedAccountUseCaseOptions,
     ) -> Result<Account, CreateAccountError>;
 
     async fn execute_multi_wallet_accounts(
@@ -46,6 +43,13 @@ pub trait CreateAccountUseCase: Send + Sync {
 
 #[derive(bon::Builder, Default)]
 pub struct CreateAccountUseCaseOptions {
+    pub quiet: bool,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(bon::Builder, Default)]
+pub struct CreateDerivedAccountUseCaseOptions {
     pub email: Option<Email>,
     pub password: Option<Password>,
     pub display_name: Option<String>,

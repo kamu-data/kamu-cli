@@ -200,7 +200,6 @@ impl PredefinedAccountsRegistrator {
         account_id: &odf::AccountID,
         account_config: &AccountConfig,
     ) -> Result<(), InternalError> {
-        // todo: ref
         // TODO: Revisit if batch property setting will be implemented
         for name in [
             AccountPropertyName::IsAdmin,
@@ -227,7 +226,7 @@ impl PredefinedAccountsRegistrator {
     ) -> Result<odf::AccountID, InternalError> {
         let created = self
             .create_account_use_case
-            .execute(account_config, true /* quiet */)
+            .execute(account_config, CreateAccountUseCaseOptions { quiet: true })
             .await
             .int_err()?;
 
@@ -293,7 +292,6 @@ impl PredefinedAccountsRegistrator {
         Ok(())
     }
 
-    // todo action этот метод нужно пересмотреть
     async fn maybe_update_private_key(
         &self,
         account_id: &odf::AccountID,
@@ -331,7 +329,6 @@ impl PredefinedAccountsRegistrator {
             return Ok(());
         }
 
-        // Repository save is insert-only; replace existing key if present.
         match self
             .did_secret_key_repo
             .delete_did_secret_key(&account_entity)

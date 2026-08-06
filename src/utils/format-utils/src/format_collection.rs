@@ -11,23 +11,24 @@ use std::fmt::Display;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// todo return std::fmt::Result?
 pub fn format_collection<T: Display>(collection_iter: impl IntoIterator<Item = T>) -> String {
     use std::fmt::Write;
 
     let mut iter = collection_iter.into_iter();
-    let mut result = String::from("[");
+    let mut res = String::new();
+
+    write!(res, "[").unwrap();
 
     if let Some(first) = iter.next() {
-        write!(result, "{first}").unwrap();
+        write!(res, "{first}").unwrap();
         for item in iter {
-            result.push_str(", ");
-            write!(result, "{item}").unwrap();
+            res.push_str(", ");
+            write!(res, "{item}").unwrap();
         }
     }
 
-    result.push(']');
-    result
+    res.push(']');
+    res
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

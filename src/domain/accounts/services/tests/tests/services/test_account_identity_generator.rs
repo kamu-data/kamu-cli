@@ -9,7 +9,7 @@
 
 use kamu_accounts::AccountIdentityGenerator;
 use kamu_accounts_services::{AccountIdentityGeneratorDefault, AccountIdentityGeneratorSeeded};
-use pretty_assertions::assert_eq;
+use pretty_assertions::{assert_eq, assert_ne};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // AccountIdentityGeneratorSeeded

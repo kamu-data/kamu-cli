@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use chrono::Utc;
+use kamu_accounts::TEST_ACCOUNT_ID;
 use kamu_core::TenancyConfig;
 use odf::metadata::testing::MetadataFactory;
 use serde_json::json;
@@ -58,7 +59,7 @@ async fn test_get_dataset_info_by_id() {
                 "id": create_result.dataset_handle.id,
                 "datasetName": create_result.dataset_handle.alias.dataset_name,
                 "owner": {
-                    "accountId": odf::metadata::testing::account_id(&"kamu"),
+                    "accountId": *TEST_ACCOUNT_ID,
                     "accountName": "kamu"
                 }
             })

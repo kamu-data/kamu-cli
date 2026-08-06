@@ -184,9 +184,7 @@ impl AccountConfig {
         }
     }
 
-    // todo: action:
-    // TODO: Do not use the method outside of tests
-    // #[cfg(any(feature = "testing", test))]
+    #[cfg(any(feature = "testing", test))]
     pub fn test_config_from_subject(subject: LoggedAccount) -> Self {
         let email = Email::parse(&format!("{}@example.com", subject.account_name)).unwrap();
         let password = Self::generate_password(&subject.account_name);
@@ -252,14 +250,6 @@ impl AccountConfig {
         self.account_name.to_string()
     }
 
-    // TODO (refactoring): update?
-    //     pub fn get_display_name(&self) -> Cow<&AccountDisplayName> {
-    //     if let Some(display_name) = &self.display_name {
-    //         Cow::Borrowed(display_name)
-    //     } else {
-    //         Cow::Owned(self.account_name.to_string())
-    //     }
-    // }
     pub fn get_display_name(&self) -> AccountDisplayName {
         if let Some(display_name) = &self.display_name {
             display_name.clone()

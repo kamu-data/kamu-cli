@@ -71,7 +71,6 @@ impl DidKey {
         (keypair, id)
     }
 
-    // todo ref hide w/ testing/test condcomp gate
     /// For testing purposes only. Use [`DidKey::new_generated_ed25519`] for
     /// cryptographically secure generation
     pub fn new_seeded_ed25519(seed: &[u8]) -> Self {
