@@ -95,7 +95,6 @@ pub trait AccountService: Sync + Send {
         pagination: PaginationOpts,
     ) -> AccountPageStream<'a>;
 
-    // todo refactor: multi version
     async fn create_wallet_account(&self, did_pkh: &DidPkh) -> Result<Account, CreateAccountError>;
 
     async fn delete_account_by_id(&self, account_id: &odf::AccountID) -> Result<(), InternalError>;

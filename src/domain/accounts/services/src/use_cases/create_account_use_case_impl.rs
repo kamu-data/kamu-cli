@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use database_common::BatchLookup;
 use email_utils::Email;
-use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
+use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{
     Account,
     AccountConfig,
@@ -35,6 +35,7 @@ use kamu_accounts::{
 use odf::metadata::DidPkh;
 use secrecy::{ExposeSecret, SecretString};
 use time_source::SystemTimeSource;
+use tokio::try_join;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -99,36 +100,6 @@ impl CreateAccountUseCaseImpl {
         Password::try_new(random_password).int_err()
     }
 
-    async fn save_password_account(
-        &self,
-        // todo use PasswordAccount?
-        account: &Account,
-        password: &Password,
-        maybe_account_key: Option<odf::metadata::SigningKey>,
-    ) -> Result<(), CreateAccountError> {
-        if !AccountProvider::is_password(&account.provider) {
-            return Err(NonPasswordProviderError {
-                provider: account.provider.clone(),
-                account_name: account.account_name.clone(),
-            }
-            .int_err()
-            .into());
-        }
-
-        // todo join_all -->
-
-        // TODO: refactor: combine to one method ??? -->
-        self.account_service.save_account(account).await?;
-
-        futures::try_join!(
-            self.account_service
-                .save_account_password(&account.id, password),
-            self.maybe_save_private_key(&account.id, maybe_account_key)
-        )?;
-
-        Ok(())
-    }
-
     async fn maybe_save_private_key(
         &self,
         account_id: &odf::AccountID,
@@ -171,7 +142,7 @@ impl CreateAccountUseCaseImpl {
             // ... Otherwise, create a new pair
             let (account_key, account_id) = self
                 .account_identity_generator
-                .generate_ed25519(account_config);
+                .generate_ed25519(&account_config.account_name);
 
             (Some(account_key), account_id)
         }
@@ -220,8 +191,20 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
             provider_identity_key: account_config.provider_identity_key(),
         };
 
-        self.save_password_account(&new_account, &account_config.password, maybe_account_key)
-            .await?;
+        self.account_service.save_account(&new_account).await?;
+
+        try_join!(
+            async {
+                if AccountProvider::is_password(&new_account.provider) {
+                    self.account_service
+                        .save_account_password(&new_account.id, &account_config.password)
+                        .await
+                } else {
+                    Ok(())
+                }
+            },
+            self.maybe_save_private_key(&new_account.id, maybe_account_key)
+        )?;
 
         if !quiet {
             self.notify_account_created(&new_account).await?;
@@ -248,7 +231,9 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
             Self::generate_password()?
         };
 
-        let (account_key, account_id) = odf::AccountID::new_generated_ed25519();
+        let (account_key, account_id) = self
+            .account_identity_generator
+            .generate_ed25519(account_name);
 
         let new_account = Account {
             id: account_id,
@@ -262,8 +247,13 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
             provider_identity_key: account_name.to_string(),
         };
 
-        self.save_password_account(&new_account, &password, Some(account_key))
-            .await?;
+        self.account_service.save_account(&new_account).await?;
+
+        try_join!(
+            self.account_service
+                .save_account_password(&new_account.id, &password),
+            self.maybe_save_private_key(&new_account.id, Some(account_key))
+        )?;
 
         self.notify_account_created(&new_account).await?;
 
@@ -272,7 +262,6 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
 
     async fn execute_multi_wallet_accounts(
         &self,
-        // todo vec?
         wallet_addresses: HashSet<DidPkh>,
     ) -> Result<Vec<Account>, CreateMultiWalletAccountsError> {
         let account_ids = wallet_addresses
@@ -313,7 +302,7 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
         }
 
         for created_account in &created_accounts {
-            // TODO: batch message
+            // TODO: PEFF: batch message
             self.notify_account_created(created_account).await?;
         }
 
@@ -321,15 +310,6 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
 
         Ok(created_accounts)
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(thiserror::Error, Debug)]
-#[error("Non-password provider '{provider}' for password account '{account_name}'")]
-struct NonPasswordProviderError {
-    pub provider: String,
-    pub account_name: odf::AccountName,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
