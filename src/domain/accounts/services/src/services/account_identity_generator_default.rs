@@ -15,7 +15,6 @@ use kamu_accounts::AccountIdentityGenerator;
 #[dill::interface(dyn AccountIdentityGenerator)]
 pub struct AccountIdentityGeneratorDefault;
 
-// TODO: tests
 impl AccountIdentityGenerator for AccountIdentityGeneratorDefault {
     fn generate_ed25519(
         &self,
