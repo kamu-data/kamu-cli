@@ -246,7 +246,7 @@ impl AccountService for AccountServiceImpl {
 
     async fn save_account_password(
         &self,
-        account: &Account,
+        account_id: &odf::AccountID,
         password: &Password,
     ) -> Result<(), InternalError> {
         // Save account password
@@ -256,7 +256,7 @@ impl AccountService for AccountServiceImpl {
                 .int_err()?;
 
         self.password_hash_repository
-            .save_password_hash(&account.id, password_hash)
+            .save_password_hash(account_id, password_hash)
             .await
             .int_err()
     }

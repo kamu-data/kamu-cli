@@ -100,12 +100,11 @@ pub trait AccountService: Sync + Send {
 
     async fn delete_account_by_id(&self, account_id: &odf::AccountID) -> Result<(), InternalError>;
 
-    // todo refs combine with?
     // TODO: Remove this method during refactoring:
     //       https://github.com/kamu-data/kamu-cli/issues/1270
     async fn save_account_password(
         &self,
-        account: &Account,
+        account_id: &odf::AccountID,
         password: &Password,
     ) -> Result<(), InternalError>;
 
