@@ -91,7 +91,7 @@ impl PredefinedAccountsConfig {
             Ok(())
         } else {
             Err(BatchError {
-                failed: 0,
+                failed: failures.len(),
                 total: self.predefined.len(),
                 failures,
             })
