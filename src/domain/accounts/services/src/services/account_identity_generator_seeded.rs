@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_accounts::{AccountConfig, AccountIdentityGenerator};
+use kamu_accounts::AccountIdentityGenerator;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -19,17 +19,11 @@ pub struct AccountIdentityGeneratorSeeded;
 impl AccountIdentityGenerator for AccountIdentityGeneratorSeeded {
     fn generate_ed25519(
         &self,
-        account_config: &AccountConfig,
+        account_name: &odf::AccountName,
     ) -> (odf::metadata::SigningKey, odf::AccountID) {
         use odf::metadata::PrivateKey;
 
-        let account_name_bytes = account_config.account_name.as_bytes();
-
-        let mut seed_buf = [0_u8; PrivateKey::SECRET_KEY_LENGTH];
-        let copy_len = account_name_bytes.len().min(seed_buf.len());
-        seed_buf[..copy_len].copy_from_slice(&account_name_bytes[..copy_len]);
-
-        let private_key = PrivateKey::from_bytes(&seed_buf);
+        let private_key = PrivateKey::from_bytes_padded(account_name.as_bytes());
         let account_id = odf::AccountID::from_signing_key(&private_key);
 
         (private_key.into(), account_id)

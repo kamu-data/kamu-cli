@@ -7,7 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_accounts::{AccountConfig, AccountIdentityGenerator};
+use kamu_accounts::AccountIdentityGenerator;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -19,7 +19,7 @@ pub struct AccountIdentityGeneratorDefault;
 impl AccountIdentityGenerator for AccountIdentityGeneratorDefault {
     fn generate_ed25519(
         &self,
-        _account_config: &AccountConfig,
+        _account_name: &odf::AccountName,
     ) -> (odf::metadata::SigningKey, odf::AccountID) {
         odf::AccountID::new_generated_ed25519()
     }
