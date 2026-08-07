@@ -24,6 +24,10 @@ newtype_str!(
 );
 
 impl DatasetName {
+    // TODO: This limit currently exists only on database layer and needs to be
+    // mentioned in ODF spec and enforced on input
+    pub const MAX_LEN: usize = 100;
+
     pub fn as_local_ref(&self) -> DatasetRef {
         DatasetRef::Alias(DatasetAlias::new(None, self.clone()))
     }
