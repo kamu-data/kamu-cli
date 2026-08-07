@@ -102,7 +102,7 @@ impl UpdateAccountUseCase for UpdateAccountUseCaseImpl {
         if original_account.account_name != account_to_update.account_name
             && AccountProvider::is_password(&account.provider)
         {
-            account_to_update.provider_identity_key = account.account_name.to_string();
+            account_to_update.provider_identity_key = account_to_update.account_name.to_string();
         }
 
         self.account_service

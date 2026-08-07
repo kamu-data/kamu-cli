@@ -22,6 +22,8 @@ impl AccountIdentityGenerator for AccountIdentityGeneratorSeeded {
     ) -> (odf::metadata::SigningKey, odf::AccountID) {
         use odf::metadata::PrivateKey;
 
+        // NOTE: The buffer for the private key is only 32 bytes,
+        //       so we need to either pad or truncate the data.
         let private_key = PrivateKey::from_bytes_padded(account_name.as_bytes());
         let account_id = odf::AccountID::from_signing_key(&private_key);
 

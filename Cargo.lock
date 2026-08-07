@@ -7229,7 +7229,6 @@ dependencies = [
  "time-source",
  "tokio",
  "tracing",
- "url",
  "uuid",
 ]
 

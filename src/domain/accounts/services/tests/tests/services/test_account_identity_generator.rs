@@ -63,6 +63,8 @@ fn test_seeded_aligned_with_testing_shortcut() {
 
 #[test]
 fn test_seeded_padding_short_name() {
+    // NOTE: The buffer for the private key is only 32 bytes,
+    //       so we need to either pad or truncate the data.
     let name = odf::AccountName::new_unchecked("a");
 
     let (key1, id1) = AccountIdentityGeneratorSeeded.generate_ed25519(&name);
@@ -77,6 +79,8 @@ fn test_seeded_padding_short_name() {
 
 #[test]
 fn test_seeded_long_name() {
+    // NOTE: The buffer for the private key is only 32 bytes,
+    //       so we need to either pad or truncate the data.
     let name_1 = odf::AccountName::new_unchecked("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0000");
     let name_2 = odf::AccountName::new_unchecked("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1111");
     //                                            |                              |

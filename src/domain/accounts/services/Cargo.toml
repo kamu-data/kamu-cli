@@ -58,8 +58,6 @@ setty = { version = "1.0", default-features = false }
 thiserror = "2"
 tokio = { version = "1", default-features = false }
 tracing = { version = "0.1", default-features = false }
-#todo temp?
-url = { version = "2", default-features = false }
 uuid = { version = "1", default-features = false }
 
 # Optional
