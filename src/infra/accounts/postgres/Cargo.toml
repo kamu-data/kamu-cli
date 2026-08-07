@@ -43,6 +43,7 @@ sqlx = { version = "0.8", default-features = false, features = [
 ] }
 serde_json = "1"
 tracing = { version = "0.1", default-features = false }
+url = { version = "2", default-features = false }
 uuid = "1"
 
 

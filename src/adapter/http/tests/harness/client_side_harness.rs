@@ -107,7 +107,7 @@ impl ClientSideHarness {
             }
             TenancyConfig::MultiTenant => {
                 b.add_value(CurrentAccountSubject::logged(
-                    odf::AccountID::new_seeded_ed25519(CLIENT_ACCOUNT_NAME.as_bytes()),
+                    odf::metadata::testing::account_id(&CLIENT_ACCOUNT_NAME),
                     odf::AccountName::new_unchecked(CLIENT_ACCOUNT_NAME),
                 ));
 
@@ -138,8 +138,8 @@ impl ClientSideHarness {
         b.add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
             datasets_dir,
         ));
-        b.add::<kamu_datasets_services::DatasetLfsBuilderDatabaseBackedImpl>();
-        b.add_value(kamu_datasets_services::MetadataChainDbBackedConfig::default());
+        b.add::<DatasetLfsBuilderDatabaseBackedImpl>();
+        b.add_value(MetadataChainDbBackedConfig::default());
 
         b.add::<RemoteRepositoryRegistryImpl>();
 
@@ -199,6 +199,7 @@ impl ClientSideHarness {
 
         b.add::<AccountServiceImpl>();
         b.add::<CreateAccountUseCaseImpl>();
+        b.add::<AccountIdentityGeneratorSeeded>();
         b.add::<UpdateAccountUseCaseImpl>();
         b.add::<ModifyAccountPasswordUseCaseImpl>();
         b.add::<InMemoryAccountRepository>();

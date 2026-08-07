@@ -121,8 +121,8 @@ impl ServerSideS3Harness {
                 .add::<InMemoryDatasetDependencyRepository>()
                 .add_value(options.tenancy_config)
                 .add_builder(odf::dataset::DatasetStorageUnitS3::builder(s3.ctx.clone()))
-                .add::<kamu_datasets_services::DatasetS3BuilderDatabaseBackedImpl>()
-                .add_value(kamu_datasets_services::MetadataChainDbBackedConfig::default())
+                .add::<DatasetS3BuilderDatabaseBackedImpl>()
+                .add_value(MetadataChainDbBackedConfig::default())
                 .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))
                 .add_value(EngineConfigDatafusionEmbeddedCompaction::default())
                 .add::<CompactionPlannerImpl>()
@@ -149,6 +149,7 @@ impl ServerSideS3Harness {
                 .add::<AuthenticationServiceImpl>()
                 .add::<AccountServiceImpl>()
                 .add::<CreateAccountUseCaseImpl>()
+                .add::<AccountIdentityGeneratorSeeded>()
                 .add::<UpdateAccountUseCaseImpl>()
                 .add::<ModifyAccountPasswordUseCaseImpl>()
                 .add::<InMemoryAccountRepository>()
@@ -216,10 +217,8 @@ impl ServerSideS3Harness {
 impl ServerSideHarness for ServerSideS3Harness {
     fn server_account_id(&self) -> odf::AccountID {
         match self.options.tenancy_config {
-            TenancyConfig::MultiTenant => {
-                odf::AccountID::new_seeded_ed25519(SERVER_ACCOUNT_NAME.as_bytes())
-            }
-            TenancyConfig::SingleTenant => DEFAULT_ACCOUNT_ID.clone(),
+            TenancyConfig::MultiTenant => odf::metadata::testing::account_id(&SERVER_ACCOUNT_NAME),
+            TenancyConfig::SingleTenant => TEST_ACCOUNT_ID.clone(),
         }
     }
 

@@ -12,7 +12,7 @@ use kamu_cli_puppet::KamuCliPuppet;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub async fn test_generate_token(kamu: KamuCliPuppet) {
-    kamu.execute(["system", "generate-token", "--login", "test"])
+    kamu.execute(["system", "generate-token", "--login", "kamu"])
         .await
         .success();
 }

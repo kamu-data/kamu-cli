@@ -26,6 +26,7 @@ use kamu_accounts::{
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::utils::AccountAuthorizationHelperImpl;
 use kamu_accounts_services::{
+    AccountIdentityGeneratorSeeded,
     AccountServiceImpl,
     CreateAccountUseCaseImpl,
     PredefinedAccountsRegistrator,
@@ -582,6 +583,7 @@ impl SignEip712UseCaseHarness {
         b.add::<SystemTimeSourceDefault>()
             .add_value(predefined_accounts_config)
             .add::<PredefinedAccountsRegistrator>()
+            .add::<AccountIdentityGeneratorSeeded>()
             .add::<InMemoryAccountRepository>()
             .add::<InMemoryDidSecretKeyRepository>()
             .add_value(DidSecretEncryptionConfig::sample())
@@ -637,8 +639,8 @@ impl SignEip712UseCaseHarness {
         // Initialization
         let did_secret_repo = catalog.get_one::<dyn DidSecretKeyRepository>().unwrap();
 
+        // For accounts, DID secrets are already saved -- add for datasets
         for (did_entity, private_key_bytes) in [
-            // Datasets
             (
                 DidEntity::new_dataset(molecule_dataset_id().to_string()),
                 [1; _],
@@ -659,28 +661,6 @@ impl SignEip712UseCaseHarness {
                 DidEntity::new_dataset(user_dataset_id().to_string()),
                 [5; _],
             ),
-            // Accounts
-            (
-                DidEntity::new_account(molecule_account_id().to_string()),
-                [6; _],
-            ),
-            (
-                DidEntity::new_account(molecule_project_account_id().to_string()),
-                [7; _],
-            ),
-            (
-                DidEntity::new_account(molecule_dev_account_id().to_string()),
-                [8; _],
-            ),
-            (
-                DidEntity::new_account(molecule_dev_project_account_id().to_string()),
-                [9; _],
-            ),
-            (
-                DidEntity::new_account(user_account_id().to_string()),
-                [10; _],
-            ),
-            (DidEntity::new_account(admin_id().to_string()), [11; _]),
         ] {
             let private_key = odf::metadata::PrivateKey::from_bytes(&private_key_bytes);
             let did_secret_key =
@@ -717,31 +697,29 @@ impl SignEip712UseCaseHarness {
 
 // Account IDs
 fn molecule_account_id() -> odf::AccountID {
-    odf::AccountID::new_seeded_ed25519("molecule".as_bytes())
+    odf::metadata::testing::account_id(&"molecule")
 }
 
+#[expect(unused)]
 fn molecule_project_account_id() -> odf::AccountID {
-    odf::AccountID::new_seeded_ed25519("molecule.project".as_bytes())
+    odf::metadata::testing::account_id(&"molecule.project")
 }
 
 fn molecule_dev_account_id() -> odf::AccountID {
-    odf::AccountID::new_seeded_ed25519("molecule.dev".as_bytes())
+    odf::metadata::testing::account_id(&"molecule.dev")
 }
 
+#[expect(unused)]
 fn molecule_dev_project_account_id() -> odf::AccountID {
-    odf::AccountID::new_seeded_ed25519("molecule.dev.project".as_bytes())
+    odf::metadata::testing::account_id(&"molecule.dev.project")
 }
 
 fn user_account_id() -> odf::AccountID {
-    odf::AccountID::new_seeded_ed25519("user".as_bytes())
-}
-
-fn admin_id() -> odf::AccountID {
-    odf::AccountID::new_seeded_ed25519("admin".as_bytes())
+    odf::metadata::testing::account_id(&"user")
 }
 
 fn not_found_account_id() -> odf::AccountID {
-    odf::AccountID::new_seeded_ed25519("not_found_account_id".as_bytes())
+    odf::metadata::testing::account_id(&"not_found_account_id")
 }
 
 fn to_odf_did(account_id: &odf::AccountID) -> odf::metadata::DidOdf {
@@ -854,12 +832,12 @@ fn mock_dataset_action_authorizer() -> MockDatasetActionAuthorizer {
 fn expected_ok_response_for_molecule_account_id() -> Result<serde_json::Value, String> {
     Ok(json!({
         "type": "Ed25519Signature2020",
-        "verificationMethod": "did:key:z6Mkon22vwz9JoNpGDxCrGZRgeNFTdRTwXYYN3fvAhA3K19x",
-        "signature": "uOwr4WVV4m7knrGkxZBzTmCpB54p9PM6HCGgn82_j-VMcV2ZyJd0P017s_hwYVXHmMLevjlMcW2mpb3CW9UW3Dw",
+        "verificationMethod": "did:key:z6MkjUv2SDfM3xy8Ara9m1TNCjRv4DZanYshrWhQvzFGGH83",
+        "signature": "uMsyFqYjiX31t5m4s7DB4UQqFpjKWOQNSO0xpvQI9u7CKji9WVRvRHcM8Wi5X5fxUG7yWju9UUlg2LGnI3dxuBA",
         "proof": {
             "type": "EcdsaSecp256k1Signature2019",
             "verificationMethod": "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31",
-            "signature": "0x7babd3a1d73b49f703a638bc2adc74f8abb8f57f048517330a760e1e105a7b7e2916a6a0bc10e3eccb4fa80f399cc8a2d3fcc3e37fa0041e685bb0ff3e615b381b"
+            "signature": "0x67286ddd1756fde756f7ebd20705ef9a034f9c68c632fa3045f1c42a1ac29ec21989fcb74209bc9d36983624452eac8e0f46dd06e9f45e43108d67e454c99d831c"
         }
     }))
 }
@@ -883,12 +861,12 @@ fn expected_ok_response_for_molecule_project_account_id() -> Result<serde_json::
 fn expected_ok_response_for_molecule_dev_account_id() -> Result<serde_json::Value, String> {
     Ok(json!({
         "type": "Ed25519Signature2020",
-        "verificationMethod": "did:key:z6Mkfmm57fsb6VL7zVusP8zeA9SYkCKdvUhby2G7Yh8vvQ1P",
-        "signature": "u-KIngmQQ2uFw0IbXLc4f-DPmBrnuAxAkhinFbQFNsRL0-V5QbHmIwq5GfNngQWToV8WkY8JuCWoSH0iU4158AQ",
+        "verificationMethod": "did:key:z6Mkq5nZc651PomaThttq6yAHV8N5Zi9tuFe925N6hFcXwpz",
+        "signature": "uGf3-BQw8hXSRA75Qv36UWOmy-_Upp0nOSXwBfK8_HpOwJwrXNpmUpPmRLLVn2lo-ea_zok1CIAW9038AQFqoBw",
         "proof": {
             "type": "EcdsaSecp256k1Signature2019",
             "verificationMethod": "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31",
-            "signature": "0x4a6821f92b37fa00ad50145610e31d5b442e6b66f4dfc64655a69aee787cdaad7e777d7aa64863c8e8cc9be94f994856f1eac927738ca526e7baa456fe549af41b"
+            "signature": "0xa33cf574c848cbd47485255e4a8360a8f3b11c6a02957c1b7b33d43c531bc6aa33221f1b4e53eee5f3eea60ce12c341a6773a5e965b28f18e736d8ea036e7ff11b"
         }
     }))
 }
@@ -912,12 +890,12 @@ fn expected_ok_response_for_molecule_dev_project_account_id() -> Result<serde_js
 fn expected_ok_response_for_user_account_id() -> Result<serde_json::Value, String> {
     Ok(json!({
         "type": "Ed25519Signature2020",
-        "verificationMethod": "did:key:z6Mkj1MDZKcfx9AX5CeXHdysiGkRLzBbALyFuShD6wNeY1E3",
-        "signature": "ubKzLjYBRr9Rg0BrAmCWN331Q_njju_SAL0Hj7CsGE6rde_T6VOlwMqBikgxNgtYoQVQ9KIA3mIAMSRoqDKZdBQ",
+        "verificationMethod": "did:key:z6MkfVC4yYwkK8k91WsHByNzRdftUsx5EVMsdSFhd81BJV1P",
+        "signature": "uMW-raV_VQEOfNRJ3UJvht-4eMc2floBE44fIthH7hmtSKYHLWSJI7WJaVsG18g8yBw3NRAeCe5NG-Imdt0KUBQ",
         "proof": {
             "type": "EcdsaSecp256k1Signature2019",
             "verificationMethod": "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31",
-            "signature": "0x07512adfb7e8d7f56c4b14f88c4fe7636767cacdb743b49fc39294accf7882be7d0cb6b693f94b25cb0fedab9cb636f3f9d80bea51411c781b476527e38a77d31c"
+            "signature": "0x18001886d55b11891d8ff9edefa0f4ddfa2dfd7324668055b4ba43216591fbd532d0387866eeb9fbdfec41037a48721e23599062d4fc3e01f59be946af1745511b"
         }
     }))
 }

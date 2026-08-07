@@ -8,8 +8,7 @@
 // by the Apache License, Version 2.0.
 
 #[cfg(any(feature = "testing", test))]
-use crate::DEFAULT_ACCOUNT_ID;
-use crate::DEFAULT_ACCOUNT_NAME;
+use crate::{DEFAULT_ACCOUNT_NAME, TEST_ACCOUNT_ID};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -51,7 +50,7 @@ impl CurrentAccountSubject {
 
     #[cfg(any(feature = "testing", test))]
     pub fn new_test() -> Self {
-        Self::logged(DEFAULT_ACCOUNT_ID.clone(), DEFAULT_ACCOUNT_NAME.clone())
+        Self::logged(TEST_ACCOUNT_ID.clone(), DEFAULT_ACCOUNT_NAME.clone())
     }
 
     #[cfg(any(feature = "testing", test))]

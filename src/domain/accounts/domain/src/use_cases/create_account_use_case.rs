@@ -12,8 +12,9 @@ use std::collections::HashSet;
 use email_utils::Email;
 use internal_error::InternalError;
 use odf::metadata::DidPkh;
+use url::Url;
 
-use crate::{Account, CreateAccountError, Password};
+use crate::{Account, AccountConfig, CreateAccountError, Password};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -21,16 +22,15 @@ use crate::{Account, CreateAccountError, Password};
 pub trait CreateAccountUseCase: Send + Sync {
     async fn execute(
         &self,
-        account: &Account,
-        password: &Password,
-        quiet: bool,
+        account_config: &AccountConfig,
+        options: CreateAccountUseCaseOptions,
     ) -> Result<Account, CreateAccountError>;
 
     async fn execute_derived(
         &self,
         creator_account: &Account,
         account_name: &odf::AccountName,
-        options: CreateAccountUseCaseOptions,
+        options: CreateDerivedAccountUseCaseOptions,
     ) -> Result<Account, CreateAccountError>;
 
     async fn execute_multi_wallet_accounts(
@@ -43,10 +43,17 @@ pub trait CreateAccountUseCase: Send + Sync {
 
 #[derive(bon::Builder, Default)]
 pub struct CreateAccountUseCaseOptions {
+    pub quiet: bool,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(bon::Builder, Default)]
+pub struct CreateDerivedAccountUseCaseOptions {
     pub email: Option<Email>,
     pub password: Option<Password>,
     pub display_name: Option<String>,
-    pub avatar_url: Option<String>,
+    pub avatar_url: Option<Url>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

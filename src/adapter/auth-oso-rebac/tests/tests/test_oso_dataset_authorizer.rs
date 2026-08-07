@@ -22,6 +22,7 @@ use kamu_accounts::{
 };
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::{
+    AccountIdentityGeneratorSeeded,
     AccountServiceImpl,
     CreateAccountUseCaseImpl,
     LoginPasswordAuthProvider,
@@ -712,6 +713,7 @@ impl DatasetAuthorizerHarness {
                 .add_value(current_account_subject)
                 .add_value(predefined_accounts_config)
                 .add::<PredefinedAccountsRegistrator>()
+                .add::<AccountIdentityGeneratorSeeded>()
                 .add::<kamu_auth_rebac_services::RebacServiceImpl>()
                 .add_value(kamu_auth_rebac_services::DefaultAccountProperties::default())
                 .add_value(kamu_auth_rebac_services::DefaultDatasetProperties::default())
@@ -817,7 +819,7 @@ impl DatasetAuthorizerHarness {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn account_id(alias: &odf::DatasetAlias) -> odf::AccountID {
-    odf::AccountID::new_seeded_ed25519(alias.account_name.as_ref().unwrap().as_bytes())
+    odf::metadata::testing::account_id(&alias.account_name.as_ref().unwrap())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -9,7 +9,6 @@
 
 use std::sync::Arc;
 
-use dill::{component, interface};
 use internal_error::*;
 use kamu_accounts::{
     CurrentAccountSubject,
@@ -47,8 +46,8 @@ pub struct CreateDatasetFromSnapshotUseCaseImpl {
     rebac_svc: dill::Lazy<Arc<dyn kamu_auth_rebac::RebacService>>,
 }
 
-#[component(pub)]
-#[interface(dyn CreateDatasetFromSnapshotUseCase)]
+#[dill::component(pub)]
+#[dill::interface(dyn CreateDatasetFromSnapshotUseCase)]
 impl CreateDatasetFromSnapshotUseCaseImpl {
     #[allow(clippy::needless_pass_by_value)]
     pub fn new(

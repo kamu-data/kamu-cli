@@ -22,6 +22,7 @@ use kamu_accounts_inmem::{
 };
 use kamu_accounts_services::{
     AccessTokenServiceImpl,
+    AccountIdentityGeneratorSeeded,
     AccountServiceImpl,
     AuthenticationServiceImpl,
     CreateAccountUseCaseImpl,
@@ -54,99 +55,9 @@ const USER_PETYA: &str = "petya";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct Harness {
-    #[allow(dead_code)]
-    run_info_dir: tempfile::TempDir,
-    api_server: TestAPIServer,
-    system_time_source_stub: Arc<SystemTimeSourceStub>,
-}
-
-impl Harness {
-    async fn new() -> Self {
-        let run_info_dir = tempfile::tempdir().unwrap();
-
-        let mut predefined_accounts_config = PredefinedAccountsConfig::new();
-        predefined_accounts_config.predefined.push(
-            AccountConfig::test_config_from_name(odf::AccountName::new_unchecked(USER_WASYA))
-                .set_password(Password::try_new(PASSWORD_WASYA).unwrap()),
-        );
-        predefined_accounts_config
-            .predefined
-            .push(AccountConfig::test_config_from_name(
-                odf::AccountName::new_unchecked(USER_PETYA),
-            ));
-
-        let catalog = {
-            let mut b = dill::CatalogBuilder::new();
-
-            b.add::<AuthenticationServiceImpl>()
-                .add_value(predefined_accounts_config)
-                .add::<InMemoryAccountRepository>()
-                .add_value(SystemTimeSourceStub::new())
-                .add_value(AuthConfig::sample())
-                .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
-                .add::<LoginPasswordAuthProvider>()
-                .add::<AccountServiceImpl>()
-                .add::<InMemoryDidSecretKeyRepository>()
-                .add_value(DidSecretEncryptionConfig::sample())
-                .add_value(JwtAuthenticationConfig::default())
-                .add::<DatabaseTransactionRunner>()
-                .add::<AccessTokenServiceImpl>()
-                .add::<InMemoryAccessTokenRepository>()
-                .add::<PredefinedAccountsRegistrator>()
-                .add::<RebacServiceImpl>()
-                .add::<InMemoryRebacRepository>()
-                .add::<UpdateAccountUseCaseImpl>()
-                .add::<CreateAccountUseCaseImpl>()
-                .add_value(DefaultAccountProperties::default())
-                .add_value(DefaultDatasetProperties::default())
-                .add::<DummyOutboxImpl>()
-                .add::<OAuthDeviceCodeServiceImpl>()
-                .add::<OAuthDeviceCodeGeneratorDefault>()
-                .add::<InMemoryOAuthDeviceCodeRepository>();
-
-            NoOpDatabasePlugin::init_database_components(&mut b);
-
-            b.build()
-        };
-
-        init_on_startup::run_startup_jobs(&catalog).await.unwrap();
-
-        let system_time_source_stub = catalog.get_one::<SystemTimeSourceStub>().unwrap();
-
-        let addr = SocketAddr::from(([127, 0, 0, 1], 0));
-        let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-        let api_server = TestAPIServer::new(catalog, listener, TenancyConfig::MultiTenant);
-
-        Self {
-            run_info_dir,
-            api_server,
-            system_time_source_stub,
-        }
-    }
-
-    fn api_server_addr(&self) -> String {
-        self.api_server.local_addr().to_string()
-    }
-
-    fn login_url(&self) -> String {
-        format!("http://{}/platform/login", self.api_server_addr())
-    }
-
-    fn validate_url(&self) -> String {
-        format!("http://{}/platform/token/validate", self.api_server_addr())
-    }
-
-    async fn api_server_run(self) -> Result<(), InternalError> {
-        self.api_server.run().await.int_err()
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #[test_log::test(tokio::test)]
 async fn test_login_with_password_method_success() {
-    let harness = Harness::new().await;
+    let harness = PlatformLoginHarness::new().await;
 
     let login_url = harness.login_url();
     let validate_url = harness.validate_url();
@@ -189,7 +100,7 @@ async fn test_login_with_password_method_success() {
 
 #[test_log::test(tokio::test)]
 async fn test_login_with_password_method_invalid_credentials() {
-    let harness = Harness::new().await;
+    let harness = PlatformLoginHarness::new().await;
 
     let login_url = harness.login_url();
 
@@ -228,7 +139,7 @@ async fn test_login_with_password_method_invalid_credentials() {
 
 #[test_log::test(tokio::test)]
 async fn test_login_with_password_method_expired_credentials() {
-    let harness = Harness::new().await;
+    let harness = PlatformLoginHarness::new().await;
     let time_source_stub = harness.system_time_source_stub.clone();
 
     let login_url = harness.login_url();
@@ -283,7 +194,7 @@ async fn test_login_with_password_method_expired_credentials() {
 
 #[test_log::test(tokio::test)]
 async fn test_validate_invalid_token_fails() {
-    let harness = Harness::new().await;
+    let harness = PlatformLoginHarness::new().await;
     let validate_url = harness.validate_url();
 
     let client = async move {
@@ -312,7 +223,7 @@ async fn test_validate_invalid_token_fails() {
 
 #[test_log::test(tokio::test)]
 async fn test_validate_without_token_fails() {
-    let harness = Harness::new().await;
+    let harness = PlatformLoginHarness::new().await;
     let validate_url = harness.validate_url();
 
     let client = async move {
@@ -330,6 +241,99 @@ async fn test_validate_without_token_fails() {
     };
 
     await_client_server_flow!(harness.api_server_run(), client);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Harness
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct PlatformLoginHarness {
+    #[allow(dead_code)]
+    run_info_dir: tempfile::TempDir,
+    api_server: TestAPIServer,
+    system_time_source_stub: Arc<SystemTimeSourceStub>,
+}
+
+impl PlatformLoginHarness {
+    async fn new() -> Self {
+        let run_info_dir = tempfile::tempdir().unwrap();
+
+        let mut predefined_accounts_config = PredefinedAccountsConfig::new();
+        predefined_accounts_config.predefined.push(
+            AccountConfig::test_config_from_name(odf::AccountName::new_unchecked(USER_WASYA))
+                .set_password(Password::try_new(PASSWORD_WASYA).unwrap()),
+        );
+        predefined_accounts_config
+            .predefined
+            .push(AccountConfig::test_config_from_name(
+                odf::AccountName::new_unchecked(USER_PETYA),
+            ));
+
+        let catalog = {
+            let mut b = dill::CatalogBuilder::new();
+
+            b.add::<AuthenticationServiceImpl>()
+                .add_value(predefined_accounts_config)
+                .add::<InMemoryAccountRepository>()
+                .add_value(SystemTimeSourceStub::new())
+                .add_value(AuthConfig::sample())
+                .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
+                .add::<LoginPasswordAuthProvider>()
+                .add::<AccountServiceImpl>()
+                .add::<InMemoryDidSecretKeyRepository>()
+                .add_value(DidSecretEncryptionConfig::sample())
+                .add_value(JwtAuthenticationConfig::default())
+                .add::<DatabaseTransactionRunner>()
+                .add::<AccessTokenServiceImpl>()
+                .add::<InMemoryAccessTokenRepository>()
+                .add::<PredefinedAccountsRegistrator>()
+                .add::<RebacServiceImpl>()
+                .add::<InMemoryRebacRepository>()
+                .add::<UpdateAccountUseCaseImpl>()
+                .add::<CreateAccountUseCaseImpl>()
+                .add::<AccountIdentityGeneratorSeeded>()
+                .add_value(DefaultAccountProperties::default())
+                .add_value(DefaultDatasetProperties::default())
+                .add::<DummyOutboxImpl>()
+                .add::<OAuthDeviceCodeServiceImpl>()
+                .add::<OAuthDeviceCodeGeneratorDefault>()
+                .add::<InMemoryOAuthDeviceCodeRepository>();
+
+            NoOpDatabasePlugin::init_database_components(&mut b);
+
+            b.build()
+        };
+
+        init_on_startup::run_startup_jobs(&catalog).await.unwrap();
+
+        let system_time_source_stub = catalog.get_one::<SystemTimeSourceStub>().unwrap();
+
+        let addr = SocketAddr::from(([127, 0, 0, 1], 0));
+        let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+        let api_server = TestAPIServer::new(catalog, listener, TenancyConfig::MultiTenant);
+
+        Self {
+            run_info_dir,
+            api_server,
+            system_time_source_stub,
+        }
+    }
+
+    fn api_server_addr(&self) -> String {
+        self.api_server.local_addr().to_string()
+    }
+
+    fn login_url(&self) -> String {
+        format!("http://{}/platform/login", self.api_server_addr())
+    }
+
+    fn validate_url(&self) -> String {
+        format!("http://{}/platform/token/validate", self.api_server_addr())
+    }
+
+    async fn api_server_run(self) -> Result<(), InternalError> {
+        self.api_server.run().await.int_err()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

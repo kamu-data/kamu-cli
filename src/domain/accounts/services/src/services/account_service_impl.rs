@@ -44,6 +44,23 @@ impl AccountServiceImpl {
                 .map_or(PasswordHashingMode::Default, |mode| *mode),
         }
     }
+
+    async fn verify_password_hash(
+        password: &Password,
+        password_hash: &str,
+        password_hashing_mode: PasswordHashingMode,
+    ) -> Result<(), VerifyPasswordError> {
+        let is_password_correct =
+            Argon2Hasher::verify_async(password.as_bytes(), password_hash, password_hashing_mode)
+                .await
+                .int_err()?;
+
+        if !is_password_correct {
+            return Err(IncorrectPasswordError.into());
+        }
+
+        Ok(())
+    }
 }
 
 #[async_trait::async_trait]
@@ -138,7 +155,7 @@ impl AccountService for AccountServiceImpl {
         account_name: &odf::AccountName,
     ) -> Result<Option<Account>, InternalError> {
         match self.account_repo.get_account_by_name(account_name).await {
-            Ok(account) => Ok(Some(account.clone())),
+            Ok(account) => Ok(Some(account)),
             Err(GetAccountByNameError::NotFound(_)) => Ok(None),
             Err(GetAccountByNameError::Internal(e)) => Err(e),
         }
@@ -156,6 +173,26 @@ impl AccountService for AccountServiceImpl {
             Ok(maybe_account_id) => Ok(maybe_account_id),
             Err(FindAccountIdByNameError::Internal(e)) => Err(e),
         }
+    }
+
+    async fn find_account_id_by_provider_identity_key(
+        &self,
+        provider_identity_key: &str,
+    ) -> Result<Option<odf::AccountID>, FindAccountIdByProviderIdentityKeyError> {
+        self.account_repo
+            .find_account_id_by_provider_identity_key(provider_identity_key)
+            .await
+    }
+
+    async fn find_account_ids_by_unique_fields(
+        &self,
+        account_name: &odf::AccountName,
+        email: &email_utils::Email,
+        provider_identity_key: &ProviderIdentityKey,
+    ) -> Result<Vec<odf::AccountID>, FindAccountIdsByUniqueFieldsError> {
+        self.account_repo
+            .find_account_ids_by_unique_fields(account_name, email, provider_identity_key)
+            .await
     }
 
     async fn find_account_name_by_id(
@@ -209,7 +246,7 @@ impl AccountService for AccountServiceImpl {
 
     async fn save_account_password(
         &self,
-        account: &Account,
+        account_id: &odf::AccountID,
         password: &Password,
     ) -> Result<(), InternalError> {
         // Save account password
@@ -219,12 +256,12 @@ impl AccountService for AccountServiceImpl {
                 .int_err()?;
 
         self.password_hash_repository
-            .save_password_hash(&account.id, password_hash)
+            .save_password_hash(account_id, password_hash)
             .await
             .int_err()
     }
 
-    async fn verify_account_password(
+    async fn verify_account_password_by_name(
         &self,
         account_name: &odf::AccountName,
         password: &Password,
@@ -246,21 +283,32 @@ impl AccountService for AccountServiceImpl {
             }
         };
 
-        let is_password_correct = Argon2Hasher::verify_async(
-            password.as_bytes(),
-            password_hash.as_str(),
-            self.password_hashing_mode,
-        )
-        .await
-        .int_err()?;
+        Self::verify_password_hash(password, &password_hash, self.password_hashing_mode).await
+    }
 
-        if !is_password_correct {
-            return Err(VerifyPasswordError::IncorrectPassword(
-                IncorrectPasswordError,
-            ));
-        }
+    async fn verify_account_password_by_id(
+        &self,
+        account_id: &odf::AccountID,
+        password: &Password,
+    ) -> Result<(), VerifyPasswordError> {
+        let password_hash = match self
+            .password_hash_repository
+            .find_password_hash_by_account_id(account_id)
+            .await
+        {
+            Ok(Some(password_hash)) => password_hash,
+            Ok(None) => {
+                return Err(AccountNotFoundByIdError {
+                    account_id: account_id.clone(),
+                }
+                .into());
+            }
+            Err(e) => {
+                return Err(VerifyPasswordError::Internal(e.int_err()));
+            }
+        };
 
-        Ok(())
+        Self::verify_password_hash(password, &password_hash, self.password_hashing_mode).await
     }
 
     async fn modify_account_password(
@@ -287,15 +335,6 @@ impl AccountService for AccountServiceImpl {
 
     async fn update_account(&self, account: &Account) -> Result<(), UpdateAccountError> {
         self.account_repo.update_account(account).await
-    }
-
-    async fn find_account_id_by_provider_identity_key(
-        &self,
-        provider_identity_key: &str,
-    ) -> Result<Option<odf::AccountID>, FindAccountIdByProviderIdentityKeyError> {
-        self.account_repo
-            .find_account_id_by_provider_identity_key(provider_identity_key)
-            .await
     }
 }
 

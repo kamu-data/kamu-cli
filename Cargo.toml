@@ -79,6 +79,7 @@ members = [
     "src/infra/accounts/sqlite",
     ## Datasets
     "src/infra/datasets/inmem",
+    "src/infra/datasets/mysql",
     "src/infra/datasets/postgres",
     "src/infra/datasets/sqlite",
     ## Search
@@ -229,6 +230,7 @@ kamu-accounts-sqlite = { version = "0.265.0", path = "src/infra/accounts/sqlite"
 kamu-accounts-repo-tests = { version = "0.265.0", path = "src/infra/accounts/repo-tests", default-features = false }
 ## Datasets
 kamu-datasets-inmem = { version = "0.265.0", path = "src/infra/datasets/inmem", default-features = false }
+kamu-datasets-mysql = { version = "0.265.0", path = "src/infra/datasets/mysql", default-features = false }
 kamu-datasets-postgres = { version = "0.265.0", path = "src/infra/datasets/postgres", default-features = false }
 kamu-datasets-sqlite = { version = "0.265.0", path = "src/infra/datasets/sqlite", default-features = false }
 kamu-datasets-repo-tests = { version = "0.265.0", path = "src/infra/datasets/repo-tests", default-features = false }

@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use chrono::Utc;
-use kamu_accounts::{DEFAULT_ACCOUNT_ID, DEFAULT_ACCOUNT_NAME};
+use kamu_accounts::{DEFAULT_ACCOUNT_NAME, TEST_ACCOUNT_ID};
 use kamu_adapter_flow_dataset::{DATASET_RESOURCE_TYPE, FLOW_TYPE_DATASET_INGEST};
 use kamu_adapter_flow_webhook::*;
 use kamu_adapter_task_webhook::LogicalPlanWebhookDeliver;
@@ -94,7 +94,7 @@ async fn test_delivery_logical_plan() {
                     "dataset_id": foo_dataset_id.to_string(),
                     "is_breaking_change": false,
                     "new_hash": new_head.to_string(),
-                    "owner_account_id": DEFAULT_ACCOUNT_ID.to_string(),
+                    "owner_account_id": TEST_ACCOUNT_ID.to_string(),
                     "version": 2,
                 }
 
@@ -144,7 +144,7 @@ async fn test_delivery_logical_plan_multiple_updates() {
                     "is_breaking_change": false,
                     "old_hash": old_head.to_string(),
                     "new_hash": new_head_2.to_string(),
-                    "owner_account_id": DEFAULT_ACCOUNT_ID.to_string(),
+                    "owner_account_id": TEST_ACCOUNT_ID.to_string(),
                     "version": 2,
                 }
 
@@ -193,7 +193,7 @@ async fn test_delivery_logical_plan_breaking() {
                     "is_breaking_change": true,
                     "new_hash": new_head.to_string(),
                     "old_hash": old_head.to_string(),
-                    "owner_account_id": DEFAULT_ACCOUNT_ID.to_string(),
+                    "owner_account_id": TEST_ACCOUNT_ID.to_string(),
                     "version": 2,
                 }
 
@@ -266,7 +266,7 @@ impl FlowControllerWebhookDeliverHarness {
     fn register_dataset(&self, dataset_id: &odf::DatasetID) {
         self.fake_dataset_entry_service.add_entry(DatasetEntry {
             id: dataset_id.clone(),
-            owner_id: DEFAULT_ACCOUNT_ID.clone(),
+            owner_id: TEST_ACCOUNT_ID.clone(),
             owner_name: DEFAULT_ACCOUNT_NAME.clone(),
             name: odf::DatasetName::new_unchecked("foo"),
             created_at: Utc::now(),

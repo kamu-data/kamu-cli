@@ -17,6 +17,7 @@ use kamu::domain::*;
 use kamu_accounts::{CurrentAccountSubject, DidSecretEncryptionConfig, PredefinedAccountsConfig};
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::{
+    AccountIdentityGeneratorSeeded,
     AccountServiceImpl,
     CreateAccountUseCaseImpl,
     LoginPasswordAuthProvider,
@@ -76,8 +77,8 @@ async fn setup_repo() -> RepoFixture {
         .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
             datasets_dir,
         ))
-        .add::<kamu_datasets_services::DatasetLfsBuilderDatabaseBackedImpl>()
-        .add_value(kamu_datasets_services::MetadataChainDbBackedConfig::default())
+        .add::<DatasetLfsBuilderDatabaseBackedImpl>()
+        .add_value(MetadataChainDbBackedConfig::default())
         .add_value(CurrentAccountSubject::new_test())
         .add::<AlwaysHappyDatasetActionAuthorizer>()
         .add::<CreateDatasetFromSnapshotUseCaseImpl>()
@@ -92,6 +93,7 @@ async fn setup_repo() -> RepoFixture {
         .add::<AccountServiceImpl>()
         .add::<UpdateAccountUseCaseImpl>()
         .add::<CreateAccountUseCaseImpl>()
+        .add::<AccountIdentityGeneratorSeeded>()
         .add::<InMemoryAccountRepository>()
         .add::<PredefinedAccountsRegistrator>()
         .add::<RebacServiceImpl>()
@@ -148,10 +150,7 @@ async fn setup_server<IdExt, Extractor>(
     catalog: dill::Catalog,
     path: &str,
     identity_extractor: IdExt,
-) -> (
-    impl std::future::Future<Output = Result<(), std::io::Error>>,
-    SocketAddr,
-)
+) -> (impl Future<Output = Result<(), std::io::Error>>, SocketAddr)
 where
     IdExt: Fn(Extractor) -> odf::DatasetRef,
     IdExt: Clone + Send + Sync + 'static,
@@ -343,7 +342,7 @@ async fn test_routing_dataset_name_case_insensetive() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[allow(dead_code)]
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 struct DatasetByAccountAndName {
     account_name: odf::AccountName,
     dataset_name: odf::DatasetName,
@@ -362,8 +361,6 @@ async fn test_routing_dataset_account_and_name() {
         },
     )
     .await;
-
-    println!("{local_addr}");
 
     let dataset_url = url::Url::parse(&format!(
         "http://{}/kamu/{}/",

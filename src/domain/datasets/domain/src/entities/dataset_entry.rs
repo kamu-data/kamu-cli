@@ -72,7 +72,7 @@ pub struct DatasetEntryRowModel {
     derive(sqlx::Type),
     sqlx(type_name = "dataset_kind", rename_all = "lowercase")
 )]
-#[derive(Debug, Clone, Copy, strum::Display)]
+#[derive(Debug, Clone, Copy, strum::Display, strum::EnumString, strum::IntoStaticStr)]
 #[strum(serialize_all = "snake_case")]
 pub enum DatasetEntryKindRowModel {
     Root,
@@ -85,6 +85,16 @@ impl From<odf::DatasetKind> for DatasetEntryKindRowModel {
         match value {
             odf::DatasetKind::Root => Self::Root,
             odf::DatasetKind::Derivative => Self::Derivative,
+        }
+    }
+}
+
+#[cfg(feature = "sqlx")]
+impl From<DatasetEntryKindRowModel> for odf::DatasetKind {
+    fn from(value: DatasetEntryKindRowModel) -> Self {
+        match value {
+            DatasetEntryKindRowModel::Root => Self::Root,
+            DatasetEntryKindRowModel::Derivative => Self::Derivative,
         }
     }
 }

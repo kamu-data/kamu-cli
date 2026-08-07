@@ -732,7 +732,7 @@ async fn test_fetch_mqtt_empty() {
     let broker = crate::MqttBroker::new().await;
 
     let fetch_step = odf::metadata::FetchStep::Mqtt(odf::metadata::FetchStepMqtt {
-        host: "localhost".to_string(),
+        host: broker.address.clone(),
         port: i32::from(broker.host_port),
         username: None,
         password: None,
@@ -777,7 +777,7 @@ async fn test_fetch_mqtt_one_record() {
 
     // Publish one (retained) event
     let (client, mut eventloop) = rumqttc::AsyncClient::new(
-        rumqttc::MqttOptions::new("kamu-publisher", "localhost", broker.host_port),
+        rumqttc::MqttOptions::new("kamu-publisher", &broker.address, broker.host_port),
         1,
     );
     let data = b"{\"data\": 123}";
@@ -796,7 +796,7 @@ async fn test_fetch_mqtt_one_record() {
 
     // Read retained event
     let fetch_step = odf::metadata::FetchStep::Mqtt(odf::metadata::FetchStepMqtt {
-        host: "localhost".to_string(),
+        host: broker.address.clone(),
         port: i32::from(broker.host_port),
         username: None,
         password: None,

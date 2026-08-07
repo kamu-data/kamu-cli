@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use database_common::TransactionRefT;
-use internal_error::ResultIntoInternal;
+use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use kamu_accounts::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -43,7 +43,15 @@ impl DidSecretKeyRepository for PostgresDidSecretKeyRepository {
         )
         .execute(connection_mut)
         .await
-        .int_err()?;
+        .map_err(|e: sqlx::Error| {
+            use SaveDidSecretKeyError as E;
+            match e {
+                sqlx::Error::Database(e) if e.is_unique_violation() => {
+                    E::Duplicate(DidSecretKeyDuplicateError::new(entity))
+                }
+                _ => E::Internal(e.int_err()),
+            }
+        })?;
 
         Ok(())
     }
