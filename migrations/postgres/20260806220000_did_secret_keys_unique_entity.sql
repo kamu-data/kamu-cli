@@ -9,9 +9,10 @@ FROM did_secret_keys t
 WHERE t.ctid = dup.ctid
   AND dup.rn > 1;
 
-DROP INDEX idx_auth_did_secret_keys;
+-- NOTE: Leave the previous index as is:
+--       idx_auth_did_secret_keys (entity_type, entity_id);
 
-CREATE UNIQUE INDEX idx_auth_did_secret_keys
-    ON did_secret_keys (entity_type, entity_id);
+CREATE UNIQUE INDEX idx_auth_did_secret_keys_unique_entity_id
+    ON did_secret_keys (entity_id);
 
 /* ------------------------------ */
