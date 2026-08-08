@@ -11,7 +11,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use axum::body::Body;
-use axum::response::Response;
+use axum::response::{IntoResponse, Response};
 use graphql_parser::query::{Definition, parse_query};
 use http::{Request, StatusCode};
 use http_body_util::BodyExt;
@@ -57,10 +57,13 @@ impl<Svc> AuthPolicyMiddleware<Svc> {
 
         match current_account_subject.as_ref() {
             CurrentAccountSubject::Logged(_) => Ok(()),
-            CurrentAccountSubject::Anonymous(_) => Err(Response::builder()
-                .status(StatusCode::UNAUTHORIZED)
-                .body("Anonymous account is restricted".into())
-                .unwrap()),
+            CurrentAccountSubject::Anonymous(_) => Err((
+                StatusCode::UNAUTHORIZED,
+                axum::Json(http_common::ApiErrorResponse {
+                    message: "Anonymous account is restricted".to_string(),
+                }),
+            )
+                .into_response()),
         }
     }
 
@@ -162,5 +165,35 @@ where
 
             inner.call(request).await
         })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_anonymous_subject_error_is_json() {
+        let mut catalog_builder = dill::CatalogBuilder::new();
+        catalog_builder.add_value(CurrentAccountSubject::anonymous(
+            kamu_accounts::AnonymousAccountReason::NoAuthenticationProvided,
+        ));
+        let catalog = catalog_builder.build();
+
+        let response = AuthPolicyMiddleware::<()>::check_http_subject(&catalog).unwrap_err();
+
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+        assert_eq!(
+            response.headers()[http::header::CONTENT_TYPE],
+            "application/json"
+        );
+
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        assert_eq!(
+            serde_json::from_slice::<Value>(&body).unwrap(),
+            serde_json::json!({"message": "Anonymous account is restricted"})
+        );
     }
 }

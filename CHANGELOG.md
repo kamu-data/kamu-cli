@@ -15,6 +15,7 @@ Recommendation: for ease of reading, use the following format:
 
 # [Unreleased]
 ### Fixed
+- Return JSON responses for authentication policy errors (#1675)
 - Restored decimal type support in DDL schema (#1670)
 
 ## [0.265.0] - 2026-07-27
