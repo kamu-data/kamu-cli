@@ -133,7 +133,7 @@ impl CreateAccountUseCaseImpl {
         &self,
         account_config: &AccountConfig,
     ) -> (Option<odf::metadata::SigningKey>, odf::AccountID) {
-        if let Some(id) = account_config.resolve_account_id() {
+        if let Some(id) = account_config.get_account_id_from_config_or_private_key() {
             // if there is an ID, we use it and the private key, if specified. ...
             let maybe_account_key = account_config.private_key.clone().map(Into::into);
             (maybe_account_key, id)

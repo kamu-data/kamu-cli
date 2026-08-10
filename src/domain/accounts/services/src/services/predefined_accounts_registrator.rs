@@ -77,7 +77,8 @@ impl PredefinedAccountsRegistrator {
         let resolutions: Vec<_> =
             try_join_all(self.predefined_accounts_config.predefined.iter().map(
                 |account_config| async move {
-                    let maybe_resolved_account_id = account_config.resolve_account_id();
+                    let maybe_resolved_account_id =
+                        account_config.get_account_id_from_config_or_private_key();
 
                     if let Some(resolved_account_id) = maybe_resolved_account_id {
                         // We have explicit ID -- just use it

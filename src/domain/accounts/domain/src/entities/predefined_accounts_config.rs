@@ -225,12 +225,12 @@ impl AccountConfig {
         self
     }
 
-    /// Resolves account ID from `id` and/or `private_key`.
+    /// Gets account ID from `id` and/or `private_key`.
     /// Returns `None` when neither is set.
     ///
     /// NOTE: It is assumed that we call `validate()` first before using the
     ///       values.
-    pub fn resolve_account_id(&self) -> Option<odf::AccountID> {
+    pub fn get_account_id_from_config_or_private_key(&self) -> Option<odf::AccountID> {
         match (&self.id, &self.private_key) {
             (Some(configured_id), Some(_private_key)) => {
                 // NOTE: Important: In this method, we do not verify that the derived ID
