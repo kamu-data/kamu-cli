@@ -2,7 +2,18 @@ name: build
 on:
   push:
     branches:
+      - master
+    paths:
       - "**"
+      - "!.github/**"
+      - ".github/workflows/build.yaml"
+      - "!docs/**"
+      - "!examples/**"
+      - "!images/**"
+      - "!**.md"
+      - "!**.ipynb"
+      - "resources/**"
+  pull_request:
     paths:
       - "**"
       - "!.github/**"
