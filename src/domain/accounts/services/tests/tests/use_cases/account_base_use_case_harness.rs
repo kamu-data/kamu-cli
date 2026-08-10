@@ -109,7 +109,7 @@ impl AccountBaseUseCaseHarness {
         create_account_uc
             .execute(
                 &account_config,
-                CreateAccountUseCaseOptions { quiet: false },
+                CreateAccountUseCaseOptions::builder().build(),
             )
             .await
             .unwrap()

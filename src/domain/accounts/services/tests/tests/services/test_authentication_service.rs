@@ -243,7 +243,7 @@ impl AuthenticationProvider for DummyAuthenticationProviderA {
         _login_credentials_json: String,
     ) -> Result<ProviderLoginResponse, ProviderLoginError> {
         Ok(ProviderLoginResponse {
-            account_id: TEST_ACCOUNT_ID.clone(),
+            account_id: Some(TEST_ACCOUNT_ID.clone()),
             account_name: DEFAULT_ACCOUNT_NAME.clone(),
             email: DUMMY_EMAIL_ADDRESS.clone(),
             display_name: String::from(DEFAULT_ACCOUNT_NAME_STR),
@@ -265,7 +265,7 @@ impl AuthenticationProvider for DummyAuthenticationProviderB {
         _login_credentials_json: String,
     ) -> Result<ProviderLoginResponse, ProviderLoginError> {
         Ok(ProviderLoginResponse {
-            account_id: TEST_ACCOUNT_ID.clone(),
+            account_id: Some(TEST_ACCOUNT_ID.clone()),
             account_name: DEFAULT_ACCOUNT_NAME.clone(),
             email: DUMMY_EMAIL_ADDRESS.clone(),
             display_name: String::from(DEFAULT_ACCOUNT_NAME_STR),
