@@ -11,12 +11,10 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::sync::Arc;
 
-use chrono::Utc;
 use internal_error::*;
 use jsonwebtoken::errors::ErrorKind;
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, encode};
 use kamu_accounts::*;
-use messaging_outbox::{Outbox, OutboxExt};
 use odf::dataset::DUMMY_ODF_ACCESS_TOKEN;
 use thiserror::Error;
 use time_source::SystemTimeSource;
@@ -36,10 +34,10 @@ pub struct AuthenticationServiceImpl {
     authentication_providers_by_method: HashMap<String, Arc<dyn AuthenticationProvider>>,
     account_service: Arc<dyn AccountService>,
     access_token_svc: Arc<dyn AccessTokenService>,
-    outbox: Arc<dyn Outbox>,
     maybe_dummy_token_account: Option<Account>,
     auth_config: Arc<AuthConfig>,
     oauth_device_code_service: Arc<dyn OAuthDeviceCodeService>,
+    create_account_use_case: Arc<dyn CreateAccountUseCase>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -55,9 +53,9 @@ impl AuthenticationServiceImpl {
         access_token_svc: Arc<dyn AccessTokenService>,
         time_source: Arc<dyn SystemTimeSource>,
         config: Arc<JwtAuthenticationConfig>,
-        outbox: Arc<dyn Outbox>,
         auth_config: Arc<AuthConfig>,
         oauth_device_code_service: Arc<dyn OAuthDeviceCodeService>,
+        create_account_use_case: Arc<dyn CreateAccountUseCase>,
     ) -> Self {
         let mut authentication_providers_by_method = HashMap::new();
 
@@ -80,10 +78,10 @@ impl AuthenticationServiceImpl {
             authentication_providers_by_method,
             account_service,
             access_token_svc,
-            outbox,
             oauth_device_code_service,
             auth_config,
             maybe_dummy_token_account: config.maybe_dummy_token_account.clone(),
+            create_account_use_case,
         }
     }
 
@@ -213,19 +211,41 @@ impl AuthenticationServiceImpl {
         }
     }
 
-    async fn notify_account_created(&self, new_account: &Account) -> Result<(), InternalError> {
-        self.outbox
-            .post_message(
-                MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
-                AccountLifecycleMessage::created(
-                    new_account.registered_at,
-                    new_account.id.clone(),
-                    new_account.email.clone(),
-                    new_account.account_name.clone(),
-                    new_account.display_name.clone(),
-                ),
-            )
-            .await
+    async fn create_account(
+        &self,
+        login_method: &str,
+        provider_response: ProviderLoginResponse,
+    ) -> Result<odf::AccountID, CreateAccountError> {
+        let provider = login_method.to_lowercase();
+
+        let new_account_config = AccountConfig {
+            id: None,
+            private_key: None,
+            account_name: provider_response.account_name,
+            password: {
+                // NOTE: Tricky code:
+                //       1) A password account cannot be created via login
+                assert!(!AccountProvider::is_password(&provider));
+                //       2) This password will not be used
+                DEFAULT_ACCOUNT_PASSWORD.clone()
+            },
+            email: provider_response.email,
+            display_name: Some(provider_response.display_name),
+            account_type: provider_response.account_type,
+            provider,
+            avatar_url: provider_response.avatar_url,
+            registered_at: None,
+            properties: vec![],
+            treat_datasets_as_public: false,
+        };
+        let options = CreateAccountUseCaseOptions::builder().build();
+
+        let new_account = self
+            .create_account_use_case
+            .execute(&new_account_config, options)
+            .await?;
+
+        Ok(new_account.id)
     }
 }
 
@@ -261,6 +281,7 @@ impl AuthenticationService for AuthenticationServiceImpl {
             .find_account_id_by_provider_identity_key(&provider_response.provider_identity_key)
             .await?;
 
+        let account_name = provider_response.account_name.clone();
         let account_id = match maybe_account_id {
             // Account already exists
             Some(account_id) => account_id,
@@ -271,32 +292,15 @@ impl AuthenticationService for AuthenticationServiceImpl {
                     return Err(LoginError::RestrictedLogin);
                 }
 
-                // Create a new account
-                let new_account = Account {
-                    id: provider_response.account_id,
-                    account_name: provider_response.account_name.clone(),
-                    email: provider_response.email,
-                    display_name: provider_response.display_name,
-                    account_type: provider_response.account_type,
-                    avatar_url: provider_response.avatar_url,
-                    registered_at: Utc::now(),
-                    provider: String::from(login_method),
-                    provider_identity_key: provider_response.provider_identity_key,
-                };
-
-                // Register an account
-                self.account_service
-                    .save_account(&new_account)
+                self.create_account(login_method, provider_response)
                     .await
-                    .map_err(|e| match e {
-                        CreateAccountError::Duplicate(_) => LoginError::DuplicateCredentials,
-                        CreateAccountError::Internal(e) => LoginError::Internal(e),
-                    })?;
-
-                // Notify interested parties
-                self.notify_account_created(&new_account).await?;
-
-                new_account.id
+                    .map_err(|e| {
+                        use CreateAccountError as E;
+                        match e {
+                            E::Duplicate(_) => LoginError::DuplicateCredentials,
+                            E::Internal(_) => LoginError::Internal(e.int_err()),
+                        }
+                    })?
             }
         };
 
@@ -324,7 +328,7 @@ impl AuthenticationService for AuthenticationServiceImpl {
         Ok(LoginResponse {
             access_token: access_token.into_inner(),
             account_id,
-            account_name: provider_response.account_name,
+            account_name,
         })
     }
 
