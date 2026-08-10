@@ -129,7 +129,7 @@ impl CreateAccountUseCaseImpl {
             .int_err()
     }
 
-    fn resolve_account_key_and_id(
+    fn get_or_generate_account_key_and_id(
         &self,
         account_config: &AccountConfig,
     ) -> (Option<odf::metadata::SigningKey>, odf::AccountID) {
@@ -174,7 +174,8 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
         account_config: &AccountConfig,
         options: CreateAccountUseCaseOptions,
     ) -> Result<Account, CreateAccountError> {
-        let (maybe_account_key, account_id) = self.resolve_account_key_and_id(account_config);
+        let (maybe_account_key, account_id) =
+            self.get_or_generate_account_key_and_id(account_config);
 
         let new_account = Account {
             id: account_id,
