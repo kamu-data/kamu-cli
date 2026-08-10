@@ -219,7 +219,7 @@ impl AuthenticationServiceImpl {
         let provider = login_method.to_lowercase();
 
         let new_account_config = AccountConfig {
-            id: None,
+            id: provider_response.account_id,
             private_key: None,
             account_name: provider_response.account_name,
             password: {
