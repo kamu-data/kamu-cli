@@ -73,7 +73,7 @@ kamu-adapter-http = { workspace = true, default-features = false, features = [
 kamu-adapter-oauth = { workspace = true }
 kamu-adapter-odata = { workspace = true }
 kamu-datafusion-cli = { workspace = true }
-odf = { workspace = true, features = [
+odf = { workspace = true, default-features = false, features = [
     "datafusion",
     "http",
     "lfs",
