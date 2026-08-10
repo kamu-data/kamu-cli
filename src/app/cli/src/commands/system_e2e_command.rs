@@ -80,9 +80,10 @@ impl Command for SystemE2ECommand {
                     let account_config = AccountConfig::test_config_from_name(
                         odf::AccountName::new_unchecked(account_name),
                     );
+                    let options = CreateAccountUseCaseOptions::builder().build();
 
                     self.create_account_use_case
-                        .execute(&account_config, CreateAccountUseCaseOptions { quiet: true })
+                        .execute(&account_config, options)
                         .await
                         .int_err()?;
 

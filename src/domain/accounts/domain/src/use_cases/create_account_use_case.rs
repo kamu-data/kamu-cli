@@ -43,7 +43,8 @@ pub trait CreateAccountUseCase: Send + Sync {
 
 #[derive(bon::Builder, Default)]
 pub struct CreateAccountUseCaseOptions {
-    pub quiet: bool,
+    /// Do not send messages to the Outbox
+    pub quiet: Option<bool>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

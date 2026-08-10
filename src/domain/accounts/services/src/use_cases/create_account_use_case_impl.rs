@@ -206,7 +206,7 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
             self.maybe_save_private_key(&new_account.id, maybe_account_key)
         )?;
 
-        if !options.quiet {
+        if !options.quiet.unwrap_or(false) {
             self.notify_account_created(&new_account).await?;
         }
 
