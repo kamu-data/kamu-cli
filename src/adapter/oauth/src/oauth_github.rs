@@ -184,8 +184,7 @@ impl AuthenticationProvider for OAuthGithub {
 
         // Extract matching fields
         Ok(ProviderLoginResponse {
-            // For GitHub, generate a random DID, regardless of the name
-            account_id: odf::AccountID::new_generated_ed25519().1,
+            account_id: None,
             account_name: odf::AccountName::new_unchecked(&github_account_info.login),
             account_type: AccountType::User,
             email,
@@ -301,7 +300,7 @@ impl AuthenticationProvider for DummyOAuthGithub {
         let account = "e2e-user".to_string();
 
         Ok(ProviderLoginResponse {
-            account_id: odf::AccountID::new_generated_ed25519().1,
+            account_id: None,
             account_name: odf::AccountName::new_unchecked(&account),
             account_type: AccountType::User,
             email: Email::parse("e2e-user@example.com").unwrap(),

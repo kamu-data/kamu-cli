@@ -179,7 +179,7 @@ impl AuthenticationProvider for Web3WalletAuthenticationProvider {
         let identity = DidPkhAccountIdentity::from_did_pkh(&did_pkh)?;
 
         Ok(ProviderLoginResponse {
-            account_id: did_pkh.into(),
+            account_id: Some(did_pkh.into()),
             account_name: identity.account_name,
             // TODO: Wallet-based auth: replace with none
             email: identity.email,
