@@ -44,6 +44,12 @@ pub static TEST_ACCOUNT_ID: LazyLock<odf::AccountID> =
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: Concerns: Provider mechanism is meant to be as a plug-in extension
+//                 point, so there shouldn't be an enum listing
+//                 all implementations because some of them can be not
+//                 owned by us. This is why Account::provider is a string
+//                 and not an enum after all
+//                 (c) https://github.com/kamu-data/kamu-cli/pull/1674#discussion_r3746118759
 #[derive(strum::EnumString, strum::Display, strum::IntoStaticStr, Copy, Clone)]
 pub enum AccountProvider {
     #[strum(serialize = "password")]
