@@ -76,7 +76,7 @@ pub trait AccountService: Sync + Send {
 
     // TODO: PERF: vectorize?
     //             Input: Vec<(account_name, email, provider_identity_key)>
-    async fn find_account_ids_by_unique_fields(
+    async fn find_account_ids_by_one_of_unique_fields(
         &self,
         account_name: &odf::AccountName,
         email: &email_utils::Email,
