@@ -32,6 +32,7 @@ pub struct ResourceManifest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ResourceManifestHeaders {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub id: Option<ResourceID>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[serde_as(as = "Option<odf::metadata::serde::yaml::auth::AccountRef>")]
@@ -172,8 +173,13 @@ mod tests {
             Some(ResourceAccountRef { did: Some(actual), .. }) if *actual == did
         );
 
-        let round_tripped: ResourceManifestHeaders =
-            serde_json::from_str(&serde_json::to_string(&headers).unwrap()).unwrap();
+        let serialized = serde_json::to_string(&headers).unwrap();
+        // `id` was deserialized as `None` above: it must be omitted on
+        // serialization, not round-tripped as an explicit `null`, since ODF
+        // schemas don't accept `null` for optional manifest header fields.
+        assert!(!serialized.contains("\"id\""), "{serialized}");
+
+        let round_tripped: ResourceManifestHeaders = serde_json::from_str(&serialized).unwrap();
         assert_matches!(
             round_tripped.account,
             Some(ResourceAccountRef { did: Some(actual), .. }) if actual == did
