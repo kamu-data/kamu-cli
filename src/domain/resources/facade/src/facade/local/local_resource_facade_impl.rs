@@ -686,7 +686,7 @@ impl LocalResourceFacadeImpl {
             }
         }
 
-        descriptors.sort_by(|a, b| a.schema.cmp(&b.schema));
+        descriptors.sort_by(|a, b| a.canonical_selector.cmp(&b.canonical_selector));
 
         descriptors
     }

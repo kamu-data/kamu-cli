@@ -33,7 +33,7 @@ pub async fn test_resources_delete_semantics(ctx: ResourceCtx) {
     ctx.assert_success(
         ["delete", "vs", app_vars, "--force"],
         Some(&[
-            r#"Deleted: variablesets/app-vars"#,
+            r#"Deleted: VariableSet/app-vars"#,
             r#"Summary 1 item\(s\): 1 deleted, 0 ignored, 0 failed"#,
         ]),
     )
@@ -48,7 +48,7 @@ pub async fn test_resources_delete_semantics(ctx: ResourceCtx) {
     ctx.assert_success(
         ["delete", "vs/temp-vars", "--force"],
         Some(&[
-            r#"Deleted: variablesets/temp-vars"#,
+            r#"Deleted: VariableSet/temp-vars"#,
             r#"Summary 1 item\(s\): 1 deleted, 0 ignored, 0 failed"#,
         ]),
     )
@@ -62,7 +62,7 @@ pub async fn test_resources_delete_semantics(ctx: ResourceCtx) {
     ctx.assert_success(
         ["delete", "ss", "temp-%", "--force"],
         Some(&[
-            r#"Deleted: secretsets/temp-secrets"#,
+            r#"Deleted: SecretSet/temp-secrets"#,
             r#"Summary 1 item\(s\): 1 deleted, 0 ignored, 0 failed"#,
         ]),
     )
@@ -81,8 +81,8 @@ pub async fn test_resources_delete_semantics(ctx: ResourceCtx) {
     assert_output_contains_all(
         &variableset_dry_run,
         &[
-            "Would delete: variablesets/app-vars",
-            "Would delete: variablesets/temp-vars",
+            "Would delete: VariableSet/app-vars",
+            "Would delete: VariableSet/temp-vars",
             "Summary 2 item(s): 2 would delete, 0 ignored, 0 failed",
         ],
         "delete variablesets --all --dry-run",
@@ -100,8 +100,8 @@ pub async fn test_resources_delete_semantics(ctx: ResourceCtx) {
     assert_output_contains_all(
         &variableset_delete,
         &[
-            "Deleted: variablesets/app-vars",
-            "Deleted: variablesets/temp-vars",
+            "Deleted: VariableSet/app-vars",
+            "Deleted: VariableSet/temp-vars",
             "Summary 2 item(s): 2 deleted, 0 ignored, 0 failed",
         ],
         "delete variablesets --all --force",
@@ -121,10 +121,10 @@ pub async fn test_resources_delete_semantics(ctx: ResourceCtx) {
     assert_output_contains_all(
         &all_dry_run,
         &[
-            "Would delete: variablesets/app-vars",
-            "Would delete: variablesets/temp-vars",
-            "Would delete: secretsets/app-secrets",
-            "Would delete: secretsets/temp-secrets",
+            "Would delete: VariableSet/app-vars",
+            "Would delete: VariableSet/temp-vars",
+            "Would delete: SecretSet/app-secrets",
+            "Would delete: SecretSet/temp-secrets",
             "Summary 4 item(s): 4 would delete, 0 ignored, 0 failed",
         ],
         "delete all --dry-run",
@@ -140,10 +140,10 @@ pub async fn test_resources_delete_semantics(ctx: ResourceCtx) {
     assert_output_contains_all(
         &all_delete,
         &[
-            "Deleted: variablesets/app-vars",
-            "Deleted: variablesets/temp-vars",
-            "Deleted: secretsets/app-secrets",
-            "Deleted: secretsets/temp-secrets",
+            "Deleted: VariableSet/app-vars",
+            "Deleted: VariableSet/temp-vars",
+            "Deleted: SecretSet/app-secrets",
+            "Deleted: SecretSet/temp-secrets",
             "Summary 4 item(s): 4 deleted, 0 ignored, 0 failed",
         ],
         "delete all --force",

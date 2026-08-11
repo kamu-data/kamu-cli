@@ -109,7 +109,7 @@ pub async fn test_resources_variableset_lifecycle(ctx: ResourceCtx) {
     ctx.assert_success(
         ["delete", "vs", resource_name, "--force"],
         Some(&[
-            r#"Deleted: variablesets/app-vars"#,
+            r#"Deleted: VariableSet/app-vars"#,
             r#"Summary 1 item\(s\): 1 deleted, 0 ignored, 0 failed"#,
         ]),
     )

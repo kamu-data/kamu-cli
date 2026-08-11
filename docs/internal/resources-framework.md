@@ -122,7 +122,7 @@ long-term goal. This page documents what exists now.
 | **Resource** | A single managed object instance of a given type, identified by a `ResourceID`. |
 | **Schema** | The canonical resource-type identity URL, e.g. `.../config/v1alpha1/VariableSet`. Carried as a `TypeUri` (opaque identity); `ResourceSchemaId` is a parsed lens over it. Its last path segment is a `TypeName` (e.g. `VariableSet`). |
 | **Type name** | Human-facing resource type label derived from the schema's last path segment (`TypeName`, e.g. `VariableSet`). `ResourceTypeCountSummary` and `ResourceNameNotFoundError` carry this value as `type_name`; `ResourceHandle` does not store it and instead derives it on demand via `ResourceSchemaId`/`resource_type_name()`. |
-| **Selector name / alias** | A resource *type's* CLI/API lookup name used only to resolve raw selector input before dispatch: canonical (`variablesets`, `secretsets`) or a short alias (`vs`, `ss`). Both are `ResourceSelectorName` values and live in selector-resolution structures (`ResourceTypeDescriptor`, `ResourcePresentationDefinition`, `ResourceDispatcherMeta`, CLI selector services). They are not ODF `TypeName`s and are not persisted identity. |
+| **Selector name / alias** | A resource *type's* CLI/API lookup name used only to resolve raw selector input before dispatch: canonical (the schema `TypeName`, e.g. `VariableSet`, `SecretSet`) or an alias (e.g. `variablesets`, `vs`, `secretsets`, `ss`). Both are `ResourceSelectorName` values and live in selector-resolution structures (`ResourceTypeDescriptor`, `ResourcePresentationDefinition`, `ResourceDispatcherMeta`, CLI selector services). Matching is case-insensitive and exact (no automatic singular/plural inflection) — every accepted spelling is explicitly registered. |
 | **Resource type selector** | Raw user/API input identifying a *type* before resolution (`ResourceTypeSelectorRaw`; matches a selector name or alias). Distinct from **Selector**, which identifies an *instance*. |
 | **Descriptor** | Schema (`TypeUri`) + selector name/aliases identifying a type for routing/presentation; domain type `ResourceTypeDescriptor`, carried in `dill` as `ResourceDispatcherMeta`. |
 | **Manifest** | The user-authored wire document (`$schema`/`headers`/`spec`) in YAML or JSON. |
@@ -157,9 +157,9 @@ not break; most are enforced in code and exercised by tests — pointers given w
   as a `TypeUri` and string-equal on the wire/in storage (the dill registry key is an equivalent
   `&'static str`, see [§9](#9-services-kamu-resources-services)).
 - **Selectors are presentation names, not manifest identity.** CLI and GraphQL selectors still use
-  friendly selector names and aliases (`variablesets`, `vs`, `secretsets`, `ss`), typed as
-  `ResourceTypeSelectorRaw` before resolution, which are resolved to a `ResourceTypeDescriptor.schema`
-  before repository or dispatcher access.
+  friendly selector names and aliases (`VariableSet`, `variablesets`, `vs`, `SecretSet`, `secretsets`,
+  `ss`), typed as `ResourceTypeSelectorRaw` before resolution, which are resolved to a
+  `ResourceTypeDescriptor.schema` before repository or dispatcher access.
 - **`headers.generation` changes only when desired state changes.** It starts at 1 on create and is
   bumped by the aggregate only when an apply produces a real headers/spec change (`Update`); an
   unchanged apply is `Untouched` and does not bump it.
@@ -1320,13 +1320,24 @@ stateDiagram-v2
 ## 14. Concrete resource types (`kamu-configuration`)
 
 Two types are functional today, both under the config `v1alpha1` schema namespace. (A third, `Storage`
-(`st`/`storage`), lives under `src/domain/storage/` and is wired through the same machinery but is
-**work in progress / not yet complete** — treat it as an in-flight example, not a supported type.)
+(canonical selector `Storage`, aliases `storages`/`st`), lives under `src/domain/storage/`
+and is wired through the same machinery but is **work in progress / not yet complete** — treat it as
+an in-flight example, not a supported type.)
 
-| Schema | Selector name | Short name | Spec | Reconciliation |
+The canonical selector name is the schema's `TypeName` (its last path segment, e.g. `VariableSet`).
+Matching against it is already case-insensitive, so `VariableSet`, `variableset`, and `VARIABLESET`
+all resolve without a separate alias entry; the registered aliases below add the old
+lowercase-plural form and the short code. (A lowercase spelling of the canonical name itself is
+deliberately **not** registered as its own alias — it would collide with the canonical name under
+case-insensitive matching and trip the CLI's duplicate-selector check; see
+[`declare_resource_selector_constants!`](/src/domain/resources/domain/src/values/resource_type_selector.rs),
+which generates the raw `&'static str` consts and the typed [`ResourceSelectorName`] consts from one
+list of literals per type, so the two representations cannot drift.)
+
+| Schema | Canonical selector | Aliases | Spec | Reconciliation |
 | --- | --- | --- | --- | --- |
-| `https://opendatafabric.org/schemas/config/v1alpha1/VariableSet` | `variablesets` | `vs` | `spec.variables` (name → `{ value }`; accepts scalar shorthand on input via ODF's `StructOrString`, but always round-trips as the structured `{ value }` form once parsed — RFC-adopted, see [`VariableSetSpec`](/src/domain/configuration/domain/src/resources/variable_set/spec.rs)) | Projects variable entries; status uses the standard ODF resource status. |
-| `https://opendatafabric.org/schemas/config/v1alpha1/SecretSet` | `secretsets` | `ss` | `spec.secrets` (name → plaintext / `{ value }` / `{ value, contentEncoding: jwe }`) | Materializes an **encrypted** read-side projection (`SecretSetEntry`) for consumers (see [Secret handling](#secret-handling-invariant) for where encryption actually happens). |
+| `https://opendatafabric.org/schemas/config/v1alpha1/VariableSet` | `VariableSet` | `variablesets`, `vs` | `spec.variables` (name → `{ value }`; accepts scalar shorthand on input via ODF's `StructOrString`, but always round-trips as the structured `{ value }` form once parsed — RFC-adopted, see [`VariableSetSpec`](/src/domain/configuration/domain/src/resources/variable_set/spec.rs)) | Projects variable entries; status uses the standard ODF resource status. |
+| `https://opendatafabric.org/schemas/config/v1alpha1/SecretSet` | `SecretSet` | `secretsets`, `ss` | `spec.secrets` (name → plaintext / `{ value }` / `{ value, contentEncoding: jwe }`) | Materializes an **encrypted** read-side projection (`SecretSetEntry`) for consumers (see [Secret handling](#secret-handling-invariant) for where encryption actually happens). |
 
 ### Secret handling invariant
 
@@ -1377,14 +1388,13 @@ Each resource declares its identity and implements the core traits, e.g.:
 impl VariableSetResource {
     // Raw `*_STR`/`*_STRS` consts are the const dill-registry keys (`#[meta]` requires consts);
     // the typed `CANONICAL_SELECTOR_NAME`/`SELECTOR_ALIASES` feed `ResourcePresentationDefinition`.
-    // `selector_constants_stay_in_sync` unit-tests the two agree.
+    // `declare_resource_selector_constants!` generates both representations from one list of
+    // literals, so they cannot drift apart (no separate sync test needed). The canonical name is
+    // the schema `TypeName`; aliases cover the old lowercase-plural form and the short code (the
+    // singular "variableset" is not a separate alias — it already resolves case-insensitively
+    // against the canonical "VariableSet").
     pub const SCHEMA_STR: &'static str = odf::metadata::config::VariableSet::schema_str();
-    pub const CANONICAL_SELECTOR_NAME_STR: &'static str = "variablesets";
-    pub const CANONICAL_SELECTOR_NAME: ResourceSelectorName =
-        ResourceSelectorName::new_unchecked_static(Self::CANONICAL_SELECTOR_NAME_STR);
-    pub const SELECTOR_ALIAS_STRS: &'static [&'static str] = &["vs"];
-    pub const SELECTOR_ALIASES: &'static [ResourceSelectorName] =
-        &[ResourceSelectorName::new_unchecked_static("vs")];
+    kamu_resources::declare_resource_selector_constants!("VariableSet", ["variablesets", "vs"]);
 }
 // Typed schema identity is a TypeUri accessor (not a const); it and SCHEMA_STR share one
 // generated static, so they cannot drift.
@@ -1416,10 +1426,12 @@ pub fn register_variable_set_resource_crud_dispatcher(catalog_builder: &mut dill
    (`#[serde(deny_unknown_fields)]`, with validation + lint), `state.rs`, `event.rs`,
    and `resource.rs` implementing `ResourceSchemaProvider`, `DeclarativeResource`,
    `ReconcilableResource`/`ReconcilableEventSourcedResource`, and `ResourcePresentation`
-   (implement `schema() -> &'static TypeUri`, and set `SCHEMA_STR`, `CANONICAL_SELECTOR_NAME_STR`,
-   `SELECTOR_ALIAS_STRS`, `CANONICAL_SELECTOR_NAME`, `SELECTOR_ALIASES`). No `status.rs` is needed —
-   status is inherited automatically via the shared `ResourceStatus`/`ResourceStatusExt`, driven
-   purely by the generic reconciliation-event projector.
+   (implement `schema() -> &'static TypeUri`, and set `SCHEMA_STR` plus the selector consts via
+   `kamu_resources::declare_resource_selector_constants!("TypeName", ["alias1", "alias2", ...])` —
+   canonical should be the schema `TypeName`; include at least the singular and plural lowercase
+   forms and a short code as aliases). No `status.rs` is needed — status is inherited automatically
+   via the shared `ResourceStatus`/`ResourceStatusExt`, driven purely by the generic
+   reconciliation-event projector.
 2. **Implement a `Reconciler<R>`** in `configuration/services/src/reconcilers/` (no-op projection is
    fine if there's nothing to do; transform the spec here if needed — see `SecretSet`).
 3. **Declare dispatchers** with `declare_resource_crud_dispatcher!` /

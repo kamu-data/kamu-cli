@@ -45,7 +45,7 @@ impl ContextApiResourcesCommand {
             .iter()
             .map(|item| item.canonical_selector.to_string())
             .collect();
-        let col_short_names: Vec<_> = supported_resource_types
+        let col_aliases: Vec<_> = supported_resource_types
             .iter()
             .map(|item| {
                 item.selector_aliases
@@ -62,7 +62,7 @@ impl ContextApiResourcesCommand {
 
         self.records(vec![
             Arc::new(StringArray::from(col_name)),
-            Arc::new(StringArray::from(col_short_names)),
+            Arc::new(StringArray::from(col_aliases)),
             Arc::new(StringArray::from(col_schema)),
         ])
         .map_err(CLIError::critical)
@@ -111,7 +111,7 @@ impl OutputWriter for ContextApiResourcesCommand {
     fn schema(&self) -> Arc<Schema> {
         Arc::new(Schema::new(vec![
             Field::new("Name", DataType::Utf8, false),
-            Field::new("Short Names", DataType::Utf8, false),
+            Field::new("Aliases", DataType::Utf8, false),
             Field::new("Schema", DataType::Utf8, false),
         ]))
     }

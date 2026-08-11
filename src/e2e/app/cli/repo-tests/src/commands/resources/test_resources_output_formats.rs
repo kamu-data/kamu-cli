@@ -61,7 +61,7 @@ pub async fn test_resources_output_formats(ctx: ResourceCtx) {
     let get_name = ctx.stdout(["get", "vs", resource_name, "-o", "name"]).await;
     assert_eq!(
         get_name.trim(),
-        format!("variablesets/{resource_name}"),
+        format!("VariableSet/{resource_name}"),
         "`get vs <name> -o name` should emit the canonical resource ref, got:\n{get_name}"
     );
 
@@ -108,8 +108,8 @@ pub async fn test_resources_output_formats(ctx: ResourceCtx) {
 
     // `context api-resources -o json`: parseable records array listing the
     // supported resource types. The `"Schema"` column carries the canonical
-    // `$schema` URI; `"Name"` carries the canonical lowercase plural (e.g.
-    // "variablesets"). Assert by Schema only — the plural name is an
+    // `$schema` URI; `"Name"` carries the type name (e.g. "VariableSet").
+    // Assert by Schema only — the exact `Name`/`Aliases` values are an
     // implementation detail.
     let api_resources_json = ctx
         .stdout_json(["context", "api-resources", "-o", "json"])

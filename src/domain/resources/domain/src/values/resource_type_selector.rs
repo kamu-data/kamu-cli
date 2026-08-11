@@ -126,6 +126,37 @@ resource_selector_value!(
     "Raw user/API selector for a resource type before it is resolved to a schema."
 );
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Declares a resource type's canonical selector name and aliases from a
+/// single list of `&'static str` literals, generating both the raw
+/// `&'static str` consts (needed as `dill` `#[meta]` registry keys) and the
+/// typed [`ResourceSelectorName`] consts from the same literals — so the two
+/// representations cannot drift apart, with no separate sync test needed.
+///
+/// Selector matching is case-insensitive, so do not list an alias that is
+/// just the canonical name in a different case (e.g. `"secretset"` alongside
+/// canonical `"SecretSet"`) — it already resolves via the canonical name and
+/// registering it separately trips the CLI's duplicate-selector check.
+///
+/// ```ignore
+/// kamu_resources::declare_resource_selector_constants!("SecretSet", ["secretsets", "ss"]);
+/// ```
+#[macro_export]
+macro_rules! declare_resource_selector_constants {
+    ($canonical:literal, [$($alias:literal),* $(,)?]) => {
+        pub const CANONICAL_SELECTOR_NAME_STR: &'static str = $canonical;
+        pub const CANONICAL_SELECTOR_NAME: $crate::ResourceSelectorName =
+            $crate::ResourceSelectorName::new_unchecked_static(Self::CANONICAL_SELECTOR_NAME_STR);
+
+        pub const SELECTOR_ALIAS_STRS: &'static [&'static str] = &[$($alias),*];
+        pub const SELECTOR_ALIASES: &'static [$crate::ResourceSelectorName] =
+            &[$($crate::ResourceSelectorName::new_unchecked_static($alias)),*];
+    };
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl From<ResourceSelectorName> for ResourceTypeSelectorRaw {
     fn from(value: ResourceSelectorName) -> Self {
         Self(value.0)
@@ -173,8 +204,13 @@ mod tests {
     #[test]
     fn selector_values_accept_current_resource_selectors() {
         for value in [
+            "VariableSet",
+            "variableset",
             "variablesets",
+            "SecretSet",
+            "secretset",
             "secretsets",
+            "Storage",
             "storages",
             "vs",
             "ss",

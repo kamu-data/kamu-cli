@@ -98,13 +98,12 @@ pub async fn test_lists_supported_resource_types(h: &impl FacadeContractHarness)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // RF-002
-// Current behavior: selector aliases ("vs", "ss") are informational only and
-// are NOT accepted as input selectors  in facade APIs.  The dispatcher registry
-// matches on the exact canonical resource_type string, so passing "vs" to
-// list/get/etc. returns UnsupportedSelector just like any other unknown type
-// string. This test documents the current contract.  If short-name resolution
-// is added to the dispatcher lookup in the future, update this test
-// accordingly.
+// Current behavior: the canonical selector (the schema TypeName, e.g.
+// "VariableSet") and every registered alias (e.g. "vs", "variablesets")
+// resolve case-insensitively to the same type. Only strings that are not
+// registered as the canonical name or an alias for any type are rejected
+// with UnsupportedSelector — matching is exact-registered-string, not
+// inflected (no automatic singular/plural folding).
 contract_test!(
     selector_aliases_resolve_consistently,
     super::test_selector_aliases_resolve_consistently
@@ -187,19 +186,41 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
         );
     }
 
-    let schema_type_name_result = facade
+    // The schema TypeName ("VariableSet") is itself the canonical selector today
+    // (see VARIABLE_SET_CANONICAL_SELECTOR), so it resolves like any other
+    // canonical/alias selector.
+    let type_name_summaries = facade
         .list(ListResourcesRequest {
             raw_type_selector: "VariableSet".parse().unwrap(),
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
             label_filter: None,
         })
+        .await
+        .expect("schema TypeName 'VariableSet' must resolve for list");
+    for s in &type_name_summaries {
+        assert_eq!(
+            s.schema,
+            *VariableSetResource::schema(),
+            "TypeName selector list schema must be canonical"
+        );
+    }
+
+    // An unregistered singular-of-plural-only spelling still does not resolve
+    // (selectors are exact registered strings, not inflected).
+    let bad_result = facade
+        .list(ListResourcesRequest {
+            raw_type_selector: "NoSuchResourceTypeXYZ".parse().unwrap(),
+            account: None,
+            pagination: PaginationOpts::from_max_results(1000),
+            label_filter: None,
+        })
         .await;
-    match schema_type_name_result {
+    match bad_result {
         Err(ListResourcesError::UnsupportedSelector(err)) => {
-            assert_unsupported_selector(&err, "VariableSet");
+            assert_unsupported_selector(&err, "NoSuchResourceTypeXYZ");
         }
-        other => panic!("schema TypeName must not resolve as selector, got: {other:?}"),
+        other => panic!("unregistered selector must not resolve, got: {other:?}"),
     }
 }
 

@@ -182,7 +182,7 @@ pub async fn test_resources_label_filter_delete(ctx: ResourceCtx) {
     assert_output_contains_all(
         &dry_run,
         &[
-            "Would delete: variablesets/stage-vars",
+            "Would delete: VariableSet/stage-vars",
             "Summary 1 item(s): 1 would delete, 0 ignored, 0 failed",
         ],
         "delete variablesets --all -l environment=staging --dry-run",
@@ -198,7 +198,7 @@ pub async fn test_resources_label_filter_delete(ctx: ResourceCtx) {
             "--force",
         ],
         Some(&[
-            r#"Deleted: variablesets/stage-vars"#,
+            r#"Deleted: VariableSet/stage-vars"#,
             r#"Summary 1 item\(s\): 1 deleted, 0 ignored, 0 failed"#,
         ]),
     )

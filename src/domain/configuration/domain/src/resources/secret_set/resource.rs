@@ -19,7 +19,6 @@ use kamu_resources::{
     ResourcePresentation,
     ResourcePresentationDefinition,
     ResourceSchemaProvider,
-    ResourceSelectorName,
     TypeUri,
 };
 
@@ -39,13 +38,9 @@ impl SecretSetResource {
     /// the typed identity is [`Self::schema`] returning a `TypeUri`.
     pub const SCHEMA_STR: &'static str = odf::metadata::config::SecretSet::schema_str();
 
-    pub const CANONICAL_SELECTOR_NAME_STR: &'static str = "secretsets";
-    pub const CANONICAL_SELECTOR_NAME: ResourceSelectorName =
-        ResourceSelectorName::new_unchecked_static(Self::CANONICAL_SELECTOR_NAME_STR);
-
-    pub const SELECTOR_ALIAS_STRS: &'static [&'static str] = &["ss"];
-    pub const SELECTOR_ALIASES: &'static [ResourceSelectorName] =
-        &[ResourceSelectorName::new_unchecked_static("ss")];
+    // "secretset" (lowercase-of-canonical) is deliberately omitted: matching is
+    // already case-insensitive, so it would collide with the canonical name.
+    kamu_resources::declare_resource_selector_constants!("SecretSet", ["secretsets", "ss"]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -85,30 +80,6 @@ impl ResourcePresentation for SecretSetResource {
                 u64::try_from(state.spec().secrets.entries.len()).unwrap(),
             ),
         }]
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-    #[test]
-    fn selector_constants_stay_in_sync() {
-        assert_eq!(
-            SecretSetResource::CANONICAL_SELECTOR_NAME_STR,
-            SecretSetResource::CANONICAL_SELECTOR_NAME.as_str()
-        );
-        assert_eq!(
-            SecretSetResource::SELECTOR_ALIAS_STRS,
-            SecretSetResource::SELECTOR_ALIASES
-                .iter()
-                .map(ResourceSelectorName::as_str)
-                .collect::<Vec<_>>()
-        );
     }
 }
 
