@@ -202,9 +202,38 @@ impl From<&domain::ResourceSearchQuery> for ResourceSearchQueryInput {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::InputObject, Debug, Clone)]
+#[cynic(graphql_type = "ResourceTypeScopeInput")]
+pub(crate) struct ResourceTypeScopeInput {
+    pub any_type: Option<bool>,
+    pub types: Option<Vec<ResourceTypeSelectorInput>>,
+}
+
+impl From<&crate::SearchResourceTypeScope> for ResourceTypeScopeInput {
+    fn from(value: &crate::SearchResourceTypeScope) -> Self {
+        match value {
+            crate::SearchResourceTypeScope::AnyType => Self {
+                any_type: Some(true),
+                types: None,
+            },
+            crate::SearchResourceTypeScope::Types(raw_type_selectors) => Self {
+                any_type: None,
+                types: Some(
+                    raw_type_selectors
+                        .iter()
+                        .map(ResourceTypeSelectorInput::from_resource_type)
+                        .collect(),
+                ),
+            },
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::InputObject, Debug, Clone)]
 #[cynic(graphql_type = "SearchResourceHandlesInput")]
 pub(crate) struct SearchResourceHandlesInput {
-    pub resource_types: Vec<ResourceTypeSelectorInput>,
+    pub scope: ResourceTypeScopeInput,
     pub query: ResourceSearchQueryInput,
     pub account: Option<AccountRefInput>,
     pub label_filter: Option<ResourceLabelFilterInput>,
@@ -215,11 +244,7 @@ impl TryFrom<&SearchResourceHandlesRequest> for SearchResourceHandlesInput {
 
     fn try_from(value: &SearchResourceHandlesRequest) -> Result<Self, Self::Error> {
         Ok(Self {
-            resource_types: value
-                .raw_type_selectors
-                .iter()
-                .map(ResourceTypeSelectorInput::from_resource_type)
-                .collect(),
+            scope: (&value.type_scope).into(),
             query: (&value.query).into(),
             account: value.account.as_ref().map(Into::into),
             label_filter: value.label_filter.as_ref().map(Into::into),

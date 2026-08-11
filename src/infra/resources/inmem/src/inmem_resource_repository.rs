@@ -34,6 +34,7 @@ use kamu_resources::{
     ResourceSnapshotStream,
     ResourceSnapshotUpdate,
     ResourceSummaryRow,
+    ResourceTypeScope,
     TypeRef,
     TypeUri,
     UpdateResourceError,
@@ -345,12 +346,14 @@ impl ResourceRepository for InMemoryResourceRepository {
     async fn search_resource_handles(
         &self,
         account_id: &odf::AccountID,
-        schemas: &[TypeUri],
+        scope: &ResourceTypeScope,
         query: &ResourceSearchQuery,
         label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceHandleRow>, InternalError> {
-        if schemas.is_empty() || query.is_vacuous() {
+        if matches!(scope, ResourceTypeScope::Types(schemas) if schemas.is_empty())
+            || query.is_vacuous()
+        {
             return Ok(Vec::new());
         }
 
@@ -359,7 +362,7 @@ impl ResourceRepository for InMemoryResourceRepository {
 
         let mut snapshots = {
             let guard = self.state.lock().unwrap();
-            filter_search_snapshots(&guard, account_id, schemas, query, &label_pairs)
+            filter_search_snapshots(&guard, account_id, scope, query, &label_pairs)
                 .into_iter()
                 .cloned()
                 .collect::<Vec<_>>()
@@ -390,11 +393,13 @@ impl ResourceRepository for InMemoryResourceRepository {
     async fn count_search_resource_handles(
         &self,
         account_id: &odf::AccountID,
-        schemas: &[TypeUri],
+        scope: &ResourceTypeScope,
         query: &ResourceSearchQuery,
         label_filter: &ResolvedResourceLabelFilter,
     ) -> Result<usize, InternalError> {
-        if schemas.is_empty() || query.is_vacuous() {
+        if matches!(scope, ResourceTypeScope::Types(schemas) if schemas.is_empty())
+            || query.is_vacuous()
+        {
             return Ok(0);
         }
 
@@ -403,7 +408,7 @@ impl ResourceRepository for InMemoryResourceRepository {
 
         let guard = self.state.lock().unwrap();
 
-        Ok(filter_search_snapshots(&guard, account_id, schemas, query, &label_pairs).len())
+        Ok(filter_search_snapshots(&guard, account_id, scope, query, &label_pairs).len())
     }
 
     async fn find_resource_snapshot(
@@ -728,7 +733,7 @@ fn resource_name_matches_pattern(name: &str, pattern: &str) -> bool {
 fn filter_search_snapshots<'a>(
     guard: &'a State,
     account_id: &odf::AccountID,
-    schemas: &[TypeUri],
+    scope: &ResourceTypeScope,
     query: &ResourceSearchQuery,
     label_pairs: &[(&TypeRef, &str)],
 ) -> Vec<&'a ResourceSnapshot> {
@@ -736,7 +741,10 @@ fn filter_search_snapshots<'a>(
         .snapshots_by_id
         .values()
         .filter(|snapshot| snapshot.headers.account.did == *account_id)
-        .filter(|snapshot| schemas.contains(&snapshot.schema))
+        .filter(|snapshot| match scope {
+            ResourceTypeScope::AnyType => true,
+            ResourceTypeScope::Types(schemas) => schemas.contains(&snapshot.schema),
+        })
         .filter(|snapshot| snapshot.headers.deleted_at.is_none())
         .filter(|snapshot| match query {
             ResourceSearchQuery::ExactNames(names) => names.contains(&snapshot.headers.name),

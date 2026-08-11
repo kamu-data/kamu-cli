@@ -1,0 +1,59 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    SELECT\n                        r.resource_id as \"id: uuid::Uuid\",\n                        r.resource_schema as schema,\n                        r.resource_name as name,\n                        r.account_id as \"account_id: odf::AccountID\",\n                        COALESCE(a.resource_id, '00000000-0000-0000-0000-000000000000'::uuid) as \"account_resource_id!: uuid::Uuid\",\n                        COALESCE(a.account_name, $6) as \"account_name!\"\n                    FROM resources r\n                    LEFT JOIN accounts a ON a.id = r.account_id\n                    WHERE r.account_id = $1\n                      AND ($2::text[] IS NULL OR r.resource_schema = ANY($2))\n                      AND r.resource_id = ANY($3::uuid[])\n                      AND r.deleted_at IS NULL\n                      AND NOT EXISTS (\n                          SELECT 1\n                          FROM UNNEST($7::text[], $8::text[]) AS f(k, v)\n                          WHERE NOT EXISTS (\n                              SELECT 1\n                              FROM resource_labels_projection rl\n                              WHERE rl.resource_id = r.resource_id\n                                AND rl.label_key = f.k\n                                AND rl.label_value = f.v\n                          )\n                      )\n                    ORDER BY r.updated_at DESC, r.resource_id DESC\n                    LIMIT $4 OFFSET $5\n                    ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: uuid::Uuid",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "schema",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "account_id: odf::AccountID",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "account_resource_id!: uuid::Uuid",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 5,
+        "name": "account_name!",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "TextArray",
+        "UuidArray",
+        "Int8",
+        "Int8",
+        "Varchar",
+        "TextArray",
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "db68a915e8d63801fbedfa52b16e8436c9b8739450036bcd70f894a005dc1f5c"
+}

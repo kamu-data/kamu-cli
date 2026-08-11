@@ -21,6 +21,8 @@ pub(super) enum ParsedSyntax<'a> {
     All {
         shadowed_inputs: Vec<ShadowedParsedInput<'a>>,
     },
+    /// A single bare arg that parses as a `UUIDv4` resource ID.
+    ById { input: &'a str },
     /// `type sel1 sel2 ...` — type is a plain word, selectors have no `/`
     SameType {
         type_str: &'a str,
@@ -111,6 +113,12 @@ impl ResourceSelectionSyntaxParser {
 
             // Same-type form: `type sel1 sel2 ...`
             if args.len() < 2 {
+                if Self::is_resource_id(&args[0]) {
+                    return Ok(ParsedSyntax::ById {
+                        input: args[0].as_str(),
+                    });
+                }
+
                 return Err(CLIError::usage_error(format!(
                     "Invalid resource reference `{}`. Expected `type/name`",
                     args[0]
@@ -123,6 +131,11 @@ impl ResourceSelectionSyntaxParser {
                 selector_inputs,
             })
         }
+    }
+
+    /// Mirrors the `UUIDv4` check in `resolve_single_selector`.
+    fn is_resource_id(arg: &str) -> bool {
+        uuid::Uuid::parse_str(arg).is_ok_and(|id| id.get_version() == Some(uuid::Version::Random))
     }
 
     fn parse_ref_arg(arg: &str) -> Result<(&str, &str), CLIError> {
@@ -364,6 +377,24 @@ mod tests {
     #[test]
     fn test_parse_syntax_single_no_slash_is_error() {
         let a = args(&["vs"]);
+        assert_matches!(ResourceSelectionSyntaxParser::parse(&a), Err(_));
+    }
+
+    #[test]
+    fn test_parse_syntax_bare_uuid_v4_is_by_id() {
+        let uuid = uuid::Uuid::new_v4().to_string();
+        let a = args(&[&uuid]);
+        assert_matches!(
+            ResourceSelectionSyntaxParser::parse(&a),
+            Ok(ParsedSyntax::ById { input }) if input == uuid
+        );
+    }
+
+    #[test]
+    fn test_parse_syntax_bare_non_v4_uuid_is_error() {
+        // A nil (all-zero) UUID is syntactically valid but not version 4, so it
+        // must not be treated as a resolvable resource ID.
+        let a = args(&["00000000-0000-0000-0000-000000000000"]);
         assert_matches!(ResourceSelectionSyntaxParser::parse(&a), Err(_));
     }
 

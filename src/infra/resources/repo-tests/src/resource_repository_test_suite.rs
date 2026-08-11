@@ -30,6 +30,7 @@ use kamu_resources::{
     ResourceSnapshot,
     ResourceSnapshotUpdate,
     ResourceSummaryRow,
+    ResourceTypeScope,
     TypeRef,
     TypeUri,
     UpdateResourceError,
@@ -386,7 +387,7 @@ pub async fn test_search_resource_handles(catalog: &Catalog) {
     let rows = repo
         .search_resource_handles(
             &account_handle.did,
-            std::slice::from_ref(&TEST_KIND),
+            &ResourceTypeScope::types(vec![TEST_KIND.clone()]),
             &ResourceSearchQuery::NamePattern("app-%".to_string()),
             &ResolvedResourceLabelFilter::default(),
             PaginationOpts::from_max_results(10),
@@ -399,7 +400,7 @@ pub async fn test_search_resource_handles(catalog: &Catalog) {
     let rows = repo
         .search_resource_handles(
             &account_handle.did,
-            std::slice::from_ref(&TEST_KIND),
+            &ResourceTypeScope::types(vec![TEST_KIND.clone()]),
             &ResourceSearchQuery::NamePattern("APP-%".to_string()),
             &ResolvedResourceLabelFilter::default(),
             PaginationOpts::from_max_results(10),
@@ -412,7 +413,7 @@ pub async fn test_search_resource_handles(catalog: &Catalog) {
     let rows = repo
         .search_resource_handles(
             &account_handle.did,
-            std::slice::from_ref(&TEST_KIND),
+            &ResourceTypeScope::types(vec![TEST_KIND.clone()]),
             &ResourceSearchQuery::ExactNames(vec![
                 "app-alpha".parse().unwrap(),
                 "db-alpha".parse().unwrap(),
@@ -429,7 +430,7 @@ pub async fn test_search_resource_handles(catalog: &Catalog) {
     let rows = repo
         .search_resource_handles(
             &account_handle.did,
-            std::slice::from_ref(&TEST_KIND),
+            &ResourceTypeScope::types(vec![TEST_KIND.clone()]),
             &ResourceSearchQuery::ExactNames(vec![
                 "App-Alpha".parse().unwrap(),
                 "DB-ALPHA".parse().unwrap(),
@@ -446,7 +447,7 @@ pub async fn test_search_resource_handles(catalog: &Catalog) {
     let rows = repo
         .search_resource_handles(
             &account_handle.did,
-            &[TEST_KIND.clone(), OTHER_KIND.clone()],
+            &ResourceTypeScope::types(vec![TEST_KIND.clone(), OTHER_KIND.clone()]),
             &ResourceSearchQuery::NamePattern("app-%".to_string()),
             &ResolvedResourceLabelFilter::default(),
             PaginationOpts::from_max_results(10),
@@ -463,7 +464,7 @@ pub async fn test_search_resource_handles(catalog: &Catalog) {
     let rows = repo
         .search_resource_handles(
             &account_handle.did,
-            std::slice::from_ref(&TEST_KIND),
+            &ResourceTypeScope::types(vec![TEST_KIND.clone()]),
             &ResourceSearchQuery::NamePattern("%".to_string()),
             &ResolvedResourceLabelFilter::default(),
             PaginationOpts::from_max_results(10),
@@ -475,7 +476,7 @@ pub async fn test_search_resource_handles(catalog: &Catalog) {
     let rows = repo
         .search_resource_handles(
             &account_handle.did,
-            std::slice::from_ref(&TEST_KIND),
+            &ResourceTypeScope::types(vec![TEST_KIND.clone()]),
             &ResourceSearchQuery::NamePattern("app-other-%".to_string()),
             &ResolvedResourceLabelFilter::default(),
             PaginationOpts::from_max_results(10),
@@ -487,7 +488,7 @@ pub async fn test_search_resource_handles(catalog: &Catalog) {
     let rows = repo
         .search_resource_handles(
             &account_handle.did,
-            std::slice::from_ref(&TEST_KIND),
+            &ResourceTypeScope::types(vec![TEST_KIND.clone()]),
             &ResourceSearchQuery::NamePattern(String::new()),
             &ResolvedResourceLabelFilter::default(),
             PaginationOpts::from_max_results(10),
@@ -508,7 +509,7 @@ pub async fn test_search_resource_handles_exact_ids(catalog: &Catalog) {
     let rows = repo
         .search_resource_handles(
             &account_handle.did,
-            std::slice::from_ref(&TEST_KIND),
+            &ResourceTypeScope::types(vec![TEST_KIND.clone()]),
             &ResourceSearchQuery::ExactIds(vec![ids.app_alpha]),
             &ResolvedResourceLabelFilter::default(),
             PaginationOpts::from_max_results(10),
@@ -521,7 +522,7 @@ pub async fn test_search_resource_handles_exact_ids(catalog: &Catalog) {
     let rows = repo
         .search_resource_handles(
             &account_handle.did,
-            std::slice::from_ref(&TEST_KIND),
+            &ResourceTypeScope::types(vec![TEST_KIND.clone()]),
             &ResourceSearchQuery::ExactIds(vec![ids.app_alpha, ids.db_alpha]),
             &ResolvedResourceLabelFilter::default(),
             PaginationOpts::from_max_results(10),
@@ -536,7 +537,7 @@ pub async fn test_search_resource_handles_exact_ids(catalog: &Catalog) {
     let rows = repo
         .search_resource_handles(
             &account_handle.did,
-            std::slice::from_ref(&TEST_KIND),
+            &ResourceTypeScope::types(vec![TEST_KIND.clone()]),
             &ResourceSearchQuery::ExactIds(vec![ids.app_alpha, missing_id]),
             &ResolvedResourceLabelFilter::default(),
             PaginationOpts::from_max_results(10),
@@ -549,7 +550,7 @@ pub async fn test_search_resource_handles_exact_ids(catalog: &Catalog) {
     let rows = repo
         .search_resource_handles(
             &account_handle.did,
-            std::slice::from_ref(&OTHER_KIND),
+            &ResourceTypeScope::types(vec![OTHER_KIND.clone()]),
             &ResourceSearchQuery::ExactIds(vec![ids.app_alpha]),
             &ResolvedResourceLabelFilter::default(),
             PaginationOpts::from_max_results(10),
@@ -561,7 +562,7 @@ pub async fn test_search_resource_handles_exact_ids(catalog: &Catalog) {
     let rows = repo
         .search_resource_handles(
             &account_handle.did,
-            std::slice::from_ref(&TEST_KIND),
+            &ResourceTypeScope::types(vec![TEST_KIND.clone()]),
             &ResourceSearchQuery::ExactIds(vec![ids.other_account]),
             &ResolvedResourceLabelFilter::default(),
             PaginationOpts::from_max_results(10),
@@ -573,7 +574,7 @@ pub async fn test_search_resource_handles_exact_ids(catalog: &Catalog) {
     let rows = repo
         .search_resource_handles(
             &account_handle.did,
-            &[TEST_KIND.clone(), OTHER_KIND.clone()],
+            &ResourceTypeScope::types(vec![TEST_KIND.clone(), OTHER_KIND.clone()]),
             &ResourceSearchQuery::ExactIds(vec![ids.app_alpha, ids.app_gamma]),
             &ResolvedResourceLabelFilter::default(),
             PaginationOpts::from_max_results(10),
@@ -587,7 +588,7 @@ pub async fn test_search_resource_handles_exact_ids(catalog: &Catalog) {
     let rows = repo
         .search_resource_handles(
             &account_handle.did,
-            std::slice::from_ref(&TEST_KIND),
+            &ResourceTypeScope::types(vec![TEST_KIND.clone()]),
             &ResourceSearchQuery::ExactIds(vec![]),
             &ResolvedResourceLabelFilter::default(),
             PaginationOpts::from_max_results(10),
@@ -595,6 +596,78 @@ pub async fn test_search_resource_handles_exact_ids(catalog: &Catalog) {
         .await
         .unwrap();
     assert!(rows.is_empty());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_search_resource_handles_any_type(catalog: &Catalog) {
+    let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+
+    let account_handle = odf::AccountHandle::new_test("test-account");
+    let ids = seed_search_resource_handles(repo.as_ref(), &account_handle).await;
+
+    // `AnyType` finds a match regardless of which seeded schema it carries,
+    // with no schema filter narrowing the search.
+    let rows = repo
+        .search_resource_handles(
+            &account_handle.did,
+            &ResourceTypeScope::AnyType,
+            &ResourceSearchQuery::ExactIds(vec![ids.app_alpha, ids.app_gamma]),
+            &ResolvedResourceLabelFilter::default(),
+            PaginationOpts::from_max_results(10),
+        )
+        .await
+        .unwrap();
+    let mut names = rows.into_iter().map(|row| row.name).collect::<Vec<_>>();
+    names.sort();
+    assert_eq!(
+        names,
+        vec!["app-alpha", "app-gamma"],
+        "AnyType must match ids across differing schemas"
+    );
+
+    // Account scoping still applies under `AnyType` — it only removes the
+    // schema filter, not the account filter.
+    let rows = repo
+        .search_resource_handles(
+            &account_handle.did,
+            &ResourceTypeScope::AnyType,
+            &ResourceSearchQuery::ExactIds(vec![ids.other_account]),
+            &ResolvedResourceLabelFilter::default(),
+            PaginationOpts::from_max_results(10),
+        )
+        .await
+        .unwrap();
+    assert!(rows.is_empty(), "AnyType must not cross account boundaries");
+
+    let rows = repo
+        .search_resource_handles(
+            &account_handle.did,
+            &ResourceTypeScope::AnyType,
+            &ResourceSearchQuery::NamePattern("app-%".to_string()),
+            &ResolvedResourceLabelFilter::default(),
+            PaginationOpts::from_max_results(10),
+        )
+        .await
+        .unwrap();
+    let mut names = rows.into_iter().map(|row| row.name).collect::<Vec<_>>();
+    names.sort();
+    assert_eq!(
+        names,
+        vec!["app-alpha", "app-beta", "app-delta", "app-gamma"],
+        "AnyType name-pattern search must span every schema"
+    );
+
+    let count = repo
+        .count_search_resource_handles(
+            &account_handle.did,
+            &ResourceTypeScope::AnyType,
+            &ResourceSearchQuery::ExactIds(vec![ids.app_alpha, ids.app_gamma]),
+            &ResolvedResourceLabelFilter::default(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(count, 2);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -608,7 +681,7 @@ pub async fn test_count_search_resource_handles_exact_ids(catalog: &Catalog) {
     let count = repo
         .count_search_resource_handles(
             &account_handle.did,
-            std::slice::from_ref(&TEST_KIND),
+            &ResourceTypeScope::types(vec![TEST_KIND.clone()]),
             &ResourceSearchQuery::ExactIds(vec![ids.app_alpha, ids.db_alpha]),
             &ResolvedResourceLabelFilter::default(),
         )
@@ -620,7 +693,7 @@ pub async fn test_count_search_resource_handles_exact_ids(catalog: &Catalog) {
     let count = repo
         .count_search_resource_handles(
             &account_handle.did,
-            std::slice::from_ref(&TEST_KIND),
+            &ResourceTypeScope::types(vec![TEST_KIND.clone()]),
             &ResourceSearchQuery::ExactIds(vec![ids.app_alpha, missing_id]),
             &ResolvedResourceLabelFilter::default(),
         )
@@ -631,7 +704,7 @@ pub async fn test_count_search_resource_handles_exact_ids(catalog: &Catalog) {
     let count = repo
         .count_search_resource_handles(
             &account_handle.did,
-            std::slice::from_ref(&TEST_KIND),
+            &ResourceTypeScope::types(vec![TEST_KIND.clone()]),
             &ResourceSearchQuery::ExactIds(vec![]),
             &ResolvedResourceLabelFilter::default(),
         )
@@ -660,7 +733,7 @@ pub async fn test_search_resource_handles_pattern_special_characters(catalog: &C
     let rows = repo
         .search_resource_handles(
             &account_handle.did,
-            std::slice::from_ref(&TEST_KIND),
+            &ResourceTypeScope::types(vec![TEST_KIND.clone()]),
             &ResourceSearchQuery::NamePattern("a_b".to_string()),
             &ResolvedResourceLabelFilter::default(),
             PaginationOpts::from_max_results(10),
@@ -673,7 +746,7 @@ pub async fn test_search_resource_handles_pattern_special_characters(catalog: &C
     let rows = repo
         .search_resource_handles(
             &account_handle.did,
-            std::slice::from_ref(&TEST_KIND),
+            &ResourceTypeScope::types(vec![TEST_KIND.clone()]),
             &ResourceSearchQuery::NamePattern("a-b-%".to_string()),
             &ResolvedResourceLabelFilter::default(),
             PaginationOpts::from_max_results(10),
@@ -696,7 +769,7 @@ pub async fn test_count_search_resource_handles(catalog: &Catalog) {
     let count = repo
         .count_search_resource_handles(
             &account_handle.did,
-            std::slice::from_ref(&TEST_KIND),
+            &ResourceTypeScope::types(vec![TEST_KIND.clone()]),
             &ResourceSearchQuery::NamePattern("app-%".to_string()),
             &ResolvedResourceLabelFilter::default(),
         )
@@ -707,7 +780,7 @@ pub async fn test_count_search_resource_handles(catalog: &Catalog) {
     let count = repo
         .count_search_resource_handles(
             &account_handle.did,
-            std::slice::from_ref(&TEST_KIND),
+            &ResourceTypeScope::types(vec![TEST_KIND.clone()]),
             &ResourceSearchQuery::ExactNames(vec![
                 "App-Alpha".parse().unwrap(),
                 "DB-ALPHA".parse().unwrap(),
@@ -721,7 +794,7 @@ pub async fn test_count_search_resource_handles(catalog: &Catalog) {
     let count = repo
         .count_search_resource_handles(
             &account_handle.did,
-            &[TEST_KIND.clone(), OTHER_KIND.clone()],
+            &ResourceTypeScope::types(vec![TEST_KIND.clone(), OTHER_KIND.clone()]),
             &ResourceSearchQuery::NamePattern("app-%".to_string()),
             &ResolvedResourceLabelFilter::default(),
         )
@@ -732,7 +805,7 @@ pub async fn test_count_search_resource_handles(catalog: &Catalog) {
     let count = repo
         .count_search_resource_handles(
             &account_handle.did,
-            std::slice::from_ref(&TEST_KIND),
+            &ResourceTypeScope::types(vec![TEST_KIND.clone()]),
             &ResourceSearchQuery::NamePattern("app-other-%".to_string()),
             &ResolvedResourceLabelFilter::default(),
         )
@@ -743,7 +816,7 @@ pub async fn test_count_search_resource_handles(catalog: &Catalog) {
     let count = repo
         .count_search_resource_handles(
             &account_handle.did,
-            std::slice::from_ref(&TEST_KIND),
+            &ResourceTypeScope::types(vec![TEST_KIND.clone()]),
             &ResourceSearchQuery::ExactNames(vec![]),
             &ResolvedResourceLabelFilter::default(),
         )
@@ -810,7 +883,7 @@ pub async fn test_resource_name_case_insensitive(catalog: &Catalog) {
     let rows = repo
         .search_resource_handles(
             &account_handle.did,
-            std::slice::from_ref(&TEST_KIND),
+            &ResourceTypeScope::types(vec![TEST_KIND.clone()]),
             &ResourceSearchQuery::ExactNames(vec!["MY-RESOURCE".parse().unwrap()]),
             &ResolvedResourceLabelFilter::default(),
             PaginationOpts::from_max_results(10),
@@ -823,7 +896,7 @@ pub async fn test_resource_name_case_insensitive(catalog: &Catalog) {
     let rows = repo
         .search_resource_handles(
             &account_handle.did,
-            std::slice::from_ref(&TEST_KIND),
+            &ResourceTypeScope::types(vec![TEST_KIND.clone()]),
             &ResourceSearchQuery::NamePattern("MY-%".to_string()),
             &ResolvedResourceLabelFilter::default(),
             PaginationOpts::from_max_results(10),
@@ -981,7 +1054,7 @@ pub async fn test_search_resource_handles_label_filtering(catalog: &Catalog) {
     let rows = repo
         .search_resource_handles(
             &account_handle.did,
-            std::slice::from_ref(&TEST_KIND),
+            &ResourceTypeScope::types(vec![TEST_KIND.clone()]),
             &ResourceSearchQuery::NamePattern("%".to_string()),
             &filter,
             PaginationOpts::from_max_results(10),
@@ -995,7 +1068,7 @@ pub async fn test_search_resource_handles_label_filtering(catalog: &Catalog) {
     let count = repo
         .count_search_resource_handles(
             &account_handle.did,
-            std::slice::from_ref(&TEST_KIND),
+            &ResourceTypeScope::types(vec![TEST_KIND.clone()]),
             &ResourceSearchQuery::NamePattern("%".to_string()),
             &filter,
         )
@@ -1006,7 +1079,7 @@ pub async fn test_search_resource_handles_label_filtering(catalog: &Catalog) {
     let rows = repo
         .search_resource_handles(
             &account_handle.did,
-            std::slice::from_ref(&TEST_KIND),
+            &ResourceTypeScope::types(vec![TEST_KIND.clone()]),
             &ResourceSearchQuery::NamePattern("%-infra".to_string()),
             &filter,
             PaginationOpts::from_max_results(10),

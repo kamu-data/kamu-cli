@@ -40,6 +40,7 @@ use kamu_resources::{
     ResourceSnapshotRow,
     ResourceSnapshotStream,
     ResourceSummaryRow,
+    ResourceTypeScope,
     TypeRef,
     TypeUri,
     UpdateResourceError,
@@ -344,12 +345,14 @@ impl ResourceRepository for SqliteResourceRepository {
     async fn search_resource_handles(
         &self,
         account_id: &odf::AccountID,
-        schemas: &[TypeUri],
+        scope: &ResourceTypeScope,
         query: &ResourceSearchQuery,
         label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceHandleRow>, InternalError> {
-        if schemas.is_empty() || query.is_vacuous() {
+        if matches!(scope, ResourceTypeScope::Types(schemas) if schemas.is_empty())
+            || query.is_vacuous()
+        {
             return Ok(Vec::new());
         }
 
@@ -383,14 +386,17 @@ impl ResourceRepository for SqliteResourceRepository {
         );
         query_builder
             .push_bind(account_id_str)
-            .push(" AND r.deleted_at IS NULL AND r.resource_schema IN (");
-        {
-            let mut separated = query_builder.separated(", ");
-            for schema in schemas {
-                separated.push_bind(schema.as_str());
+            .push(" AND r.deleted_at IS NULL");
+        if let ResourceTypeScope::Types(schemas) = scope {
+            query_builder.push(" AND r.resource_schema IN (");
+            {
+                let mut separated = query_builder.separated(", ");
+                for schema in schemas {
+                    separated.push_bind(schema.as_str());
+                }
             }
+            query_builder.push(")");
         }
-        query_builder.push(")");
 
         push_search_query_predicate(&mut query_builder, query);
         push_label_filter_predicates(&mut query_builder, &label_pairs);
@@ -411,11 +417,13 @@ impl ResourceRepository for SqliteResourceRepository {
     async fn count_search_resource_handles(
         &self,
         account_id: &odf::AccountID,
-        schemas: &[TypeUri],
+        scope: &ResourceTypeScope,
         query: &ResourceSearchQuery,
         label_filter: &ResolvedResourceLabelFilter,
     ) -> Result<usize, InternalError> {
-        if schemas.is_empty() || query.is_vacuous() {
+        if matches!(scope, ResourceTypeScope::Types(schemas) if schemas.is_empty())
+            || query.is_vacuous()
+        {
             return Ok(0);
         }
 
@@ -436,14 +444,17 @@ impl ResourceRepository for SqliteResourceRepository {
         );
         query_builder
             .push_bind(account_id_str)
-            .push(" AND r.deleted_at IS NULL AND r.resource_schema IN (");
-        {
-            let mut separated = query_builder.separated(", ");
-            for schema in schemas {
-                separated.push_bind(schema.as_str());
+            .push(" AND r.deleted_at IS NULL");
+        if let ResourceTypeScope::Types(schemas) = scope {
+            query_builder.push(" AND r.resource_schema IN (");
+            {
+                let mut separated = query_builder.separated(", ");
+                for schema in schemas {
+                    separated.push_bind(schema.as_str());
+                }
             }
+            query_builder.push(")");
         }
-        query_builder.push(")");
 
         push_search_query_predicate(&mut query_builder, query);
         push_label_filter_predicates(&mut query_builder, &label_pairs);

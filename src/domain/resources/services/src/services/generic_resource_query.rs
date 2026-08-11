@@ -28,6 +28,7 @@ use crate::domain::{
     ResourceSnapshot,
     ResourceSummaryRow,
     ResourceTypeMismatchError,
+    ResourceTypeScope,
     TypeUri,
 };
 
@@ -82,25 +83,25 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
     async fn search_resource_handles(
         &self,
         account_id: &odf::AccountID,
-        schemas: &[TypeUri],
+        scope: &ResourceTypeScope,
         query: &ResourceSearchQuery,
         label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceHandleRow>, InternalError> {
         self.resource_repository
-            .search_resource_handles(account_id, schemas, query, label_filter, pagination)
+            .search_resource_handles(account_id, scope, query, label_filter, pagination)
             .await
     }
 
     async fn count_search_resource_handles(
         &self,
         account_id: &odf::AccountID,
-        schemas: &[TypeUri],
+        scope: &ResourceTypeScope,
         query: &ResourceSearchQuery,
         label_filter: &ResolvedResourceLabelFilter,
     ) -> Result<usize, InternalError> {
         self.resource_repository
-            .count_search_resource_handles(account_id, schemas, query, label_filter)
+            .count_search_resource_handles(account_id, scope, query, label_filter)
             .await
     }
 

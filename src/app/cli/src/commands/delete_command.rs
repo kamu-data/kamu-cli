@@ -391,6 +391,12 @@ impl<'a> DeleteRequestResolver<'a> {
                 return self.resolve_resource_request(raw_args).await;
             }
 
+            // A bare ID has no type prefix but is still unambiguous (IDs are
+            // globally unique), so route it as a resource, not a dataset.
+            if raw_args.len() == 1 && Self::is_resource_id(&raw_args[0]) {
+                return self.resolve_resource_request(raw_args).await;
+            }
+
             return Ok(ResolvedDeleteRequest::Datasets {
                 dataset_args: raw_args,
             });
@@ -564,6 +570,11 @@ impl<'a> DeleteRequestResolver<'a> {
     fn is_potential_resource_type_pattern(prefix: &str) -> bool {
         prefix.contains('%')
     }
+
+    /// Mirrors the `UUIDv4` check in `ResourceSelectionSyntaxParser`.
+    fn is_resource_id(arg: &str) -> bool {
+        uuid::Uuid::parse_str(arg).is_ok_and(|id| id.get_version() == Some(uuid::Version::Random))
+    }
 }
 
 enum ClassifiedSlashDeleteRequest {
@@ -582,6 +593,20 @@ mod tests {
     use kamu_resources::{ResourceTypeDescriptor, TypeUri};
 
     use super::{ClassifiedSlashDeleteRequest, DeleteRequestResolver};
+
+    #[test]
+    fn test_is_resource_id_accepts_uuid_v4() {
+        let uuid = uuid::Uuid::new_v4().to_string();
+        assert!(DeleteRequestResolver::is_resource_id(&uuid));
+    }
+
+    #[test]
+    fn test_is_resource_id_rejects_non_v4_uuid_and_plain_names() {
+        assert!(!DeleteRequestResolver::is_resource_id(
+            "00000000-0000-0000-0000-000000000000"
+        ));
+        assert!(!DeleteRequestResolver::is_resource_id("my-dataset"));
+    }
 
     #[test]
     fn test_classify_slash_request_routes_resource_prefixes_to_resources() {

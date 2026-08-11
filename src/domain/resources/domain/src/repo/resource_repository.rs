@@ -82,11 +82,11 @@ pub trait ResourceRepository: Send + Sync {
     ) -> Result<Vec<(ResourceName, ResourceID)>, InternalError>;
 
     /// `label_filter` must be one that resolves identically for every schema
-    /// in `schemas`.
+    /// in `scope`.
     async fn search_resource_handles(
         &self,
         account_id: &odf::AccountID,
-        schemas: &[TypeUri],
+        scope: &ResourceTypeScope,
         query: &ResourceSearchQuery,
         label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
@@ -95,7 +95,7 @@ pub trait ResourceRepository: Send + Sync {
     async fn count_search_resource_handles(
         &self,
         account_id: &odf::AccountID,
-        schemas: &[TypeUri],
+        scope: &ResourceTypeScope,
         query: &ResourceSearchQuery,
         label_filter: &ResolvedResourceLabelFilter,
     ) -> Result<usize, InternalError>;
@@ -156,6 +156,28 @@ pub trait ResourceRepository: Send + Sync {
         &self,
         account_id: odf::AccountID,
     ) -> Result<Vec<ResourceSummaryRow>, InternalError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Which schemas a `search_resource_handles` call is scoped to.
+#[derive(Debug, Clone)]
+pub enum ResourceTypeScope {
+    /// No schema filter — matches every registered resource type.
+    AnyType,
+    /// Non-empty by construction: use `AnyType` instead of an empty list.
+    Types(Vec<TypeUri>),
+}
+
+impl ResourceTypeScope {
+    /// Panics if `schemas` is empty — callers must use `AnyType` for that.
+    pub fn types(schemas: Vec<TypeUri>) -> Self {
+        assert!(
+            !schemas.is_empty(),
+            "ResourceTypeScope::Types must not be empty; use AnyType instead"
+        );
+        Self::Types(schemas)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

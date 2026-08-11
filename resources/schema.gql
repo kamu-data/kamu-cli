@@ -4361,6 +4361,14 @@ type ResourceTypeDescriptor {
 	listColumns: [ResourceListColumnDescriptor!]!
 }
 
+"""
+Exactly one way to scope a search by resource type.
+"""
+input ResourceTypeScopeInput @oneOf {
+	anyType: Boolean
+	types: [ResourceTypeSelectorInput!]
+}
+
 input ResourceTypeSelectorInput {
 	selector: ResourceTypeSelectorRaw!
 }
@@ -4534,7 +4542,7 @@ enum SearchEntityName {
 }
 
 input SearchResourceHandlesInput {
-	resourceTypes: [ResourceTypeSelectorInput!]!
+	scope: ResourceTypeScopeInput!
 	query: ResourceSearchQueryInput!
 	account: AccountRefInput
 	labelFilter: ResourceLabelFilterInput

@@ -126,3 +126,4 @@ Each RF scenario from the original plan is listed with its status.
 | RF-166  | apply_manifest_batch.rs | Active | Batch dry-run same-name create/update plans both as create            | Pins no same-batch write visibility during planning                    |
 | RF-167  | apply_manifest_batch.rs | Active | Live batch same-name create/update reads own writes                   |                                                                        |
 | RF-168  | apply_manifest_batch.rs | Active | Raw GraphQL batch rejection returns rollback extensions               | Verifies `extensions.batch` envelope                                   |
+| RF-169  | list_search.rs      | Active   | Search with AnyType scope spans every schema, still respects account  | Covers `SearchResourceTypeScope::AnyType`                              |

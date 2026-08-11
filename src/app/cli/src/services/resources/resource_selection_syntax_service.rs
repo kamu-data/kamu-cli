@@ -20,6 +20,7 @@ pub trait ResourceSelectionSyntaxService: Send + Sync {
     ///
     /// Accepted forms:
     /// - `all`
+    /// - `id` — a bare `UUIDv4`, resolved across all supported types
     /// - `type all` or `type/all`
     /// - `type name ...` — same-type selectors, none containing `/`
     /// - `type/name ...` — slash selectors, each containing exactly one `/`
@@ -48,6 +49,11 @@ pub enum ResourceSelectionItem {
         selector_input: String,
     },
     Exact(ResourceExactSelector),
+    /// A bare ID, no type given — resolved across all supported types.
+    ExactAnyType {
+        selector_input: String,
+        resource_ref: ResourceRef,
+    },
     NamePattern {
         type_descriptor: ResourceTypeDescriptor,
         selector_input: String,

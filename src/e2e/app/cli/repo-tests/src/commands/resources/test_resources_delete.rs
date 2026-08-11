@@ -165,6 +165,56 @@ pub async fn test_resources_delete_semantics(ctx: ResourceCtx) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Scenario: bare resource ID selector (no type token)
+//
+// IMPORTANT: this scenario applies a `SecretSet` resource (to prove a bare ID
+// resolves across differing resource types, not just the first one tried), so
+// it must be wired with
+// `Options::with_kamu_config(fixtures::SECRETS_ENCRYPTION_KAMU_CONFIG)`.
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_resources_bare_id_selector(ctx: ResourceCtx) {
+    let vars_name = "bare-id-vars";
+    let secrets_name = "bare-id-secrets";
+    ctx.apply_variable_set(vars_name, "some-value").await;
+    ctx.apply_secret_set(secrets_name, "some-token", "some-password")
+        .await;
+
+    let vars_id = ctx.resource_id("vs", vars_name).await;
+    let secrets_id = ctx.resource_id("ss", secrets_name).await;
+
+    // A bare ID resolves regardless of which resource type it belongs to —
+    // this only holds if the search genuinely spans every type rather than
+    // stopping at the first one tried.
+    let view = ctx.get_one(["get", &vars_id]).await;
+    assert_eq!(view.name(), vars_name);
+
+    let secrets_view = ctx.get_one(["get", &secrets_id]).await;
+    assert_eq!(secrets_view.name(), secrets_name);
+
+    // Type given explicitly still works.
+    let view_with_type = ctx.get_one(["get", "vs", &vars_id]).await;
+    assert_eq!(view_with_type.name(), vars_name);
+
+    let missing_id = "51a420dc-f0a0-4842-a148-4481195a4b34";
+    ctx.assert_failure(["get", missing_id], None).await;
+
+    ctx.assert_success(
+        ["delete", &vars_id, "--force"],
+        Some(&[format!(r#"Deleted: VariableSet/{vars_name}"#).as_str()]),
+    )
+    .await;
+    ctx.assert_success(
+        ["delete", &secrets_id, "--force"],
+        Some(&[format!(r#"Deleted: SecretSet/{secrets_name}"#).as_str()]),
+    )
+    .await;
+
+    ctx.assert_resource_absent("vs", vars_name).await;
+    ctx.assert_resource_absent("ss", secrets_name).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Helpers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

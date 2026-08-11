@@ -51,6 +51,15 @@ impl ResourceSelectionSyntaxService for ResourceSelectionSyntaxServiceImpl {
     ) -> Result<ResourceSelectionSyntax, CLIError> {
         let parsed = ResourceSelectionSyntaxParser::parse(args)?;
 
+        if let ParsedSyntax::ById { input } = parsed {
+            let resolved = self
+                .resource_selector_resolution_service
+                .resolve_single_selector(input)
+                .await?;
+
+            return Ok(Self::by_id_syntax(resolved));
+        }
+
         let supported_resource_types = self
             .resource_type_lookup_service
             .list_supported_resource_types(explicit_context_name)
@@ -83,6 +92,9 @@ impl ResourceSelectionSyntaxServiceImpl {
         let mut shadowed_selectors = Vec::new();
 
         match parsed {
+            // Handled directly in `parse_get_args` before reaching here.
+            ParsedSyntax::ById { .. } => unreachable!("ById is handled in parse_get_args"),
+
             ParsedSyntax::All { shadowed_inputs } => {
                 items.push(ResourceSelectionItem::All);
 
@@ -251,6 +263,16 @@ impl ResourceSelectionSyntaxServiceImpl {
 
     fn is_pattern(input: &str) -> bool {
         input.contains('%')
+    }
+
+    fn by_id_syntax(resolved: ResolvedResourceSelector) -> ResourceSelectionSyntax {
+        ResourceSelectionSyntax {
+            items: vec![ResourceSelectionItem::ExactAnyType {
+                selector_input: resolved.input,
+                resource_ref: resolved.resource_ref,
+            }],
+            shadowed_selectors: Vec::new(),
+        }
     }
 
     fn make_all_by_type_item(
@@ -600,6 +622,9 @@ mod tests {
                 "exact:{}:{selector_input}",
                 type_descriptor.canonical_selector
             ),
+            ResourceSelectionItem::ExactAnyType { selector_input, .. } => {
+                format!("exact-any-type:{selector_input}")
+            }
             ResourceSelectionItem::NamePattern {
                 type_descriptor,
                 selector_input,
@@ -805,6 +830,23 @@ mod tests {
                 case.name,
             );
         }
+    }
+
+    #[test]
+    fn test_by_id_syntax_bare_uuid_produces_exact_any_type_item() {
+        let uuid = uuid::Uuid::new_v4();
+        let resolved = ResolvedResourceSelector {
+            input: uuid.to_string(),
+            resource_ref: ResourceRef::ById(kamu_resources::ResourceID::new(uuid)),
+        };
+
+        let syntax = ResourceSelectionSyntaxServiceImpl::by_id_syntax(resolved);
+
+        assert_eq!(
+            describe_items(&syntax),
+            vec![format!("exact-any-type:{uuid}")]
+        );
+        assert!(describe_shadowed(&syntax).is_empty());
     }
 
     #[tokio::test]

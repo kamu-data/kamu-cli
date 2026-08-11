@@ -61,6 +61,15 @@ impl ResourceSelectionResolutionService for ResourceSelectionResolutionServiceIm
         let supported_resource_types =
             Self::supported_resource_types_for_patterns(&selection, resource_facade).await?;
 
+        // Prefetch exact-any-type selectors (bare IDs) in batches, replayed by index.
+        let exact_any_type_results = Self::fetch_exact_any_type_identities(
+            &selection,
+            resource_facade,
+            options.label_filter.as_ref(),
+        )
+        .await?;
+        let mut exact_any_type_results = exact_any_type_results.into_iter();
+
         // Prefetch exact selectors in batches, then replay them in input order.
         let exact_results = Self::fetch_exact_identities(
             &selection,
@@ -109,6 +118,21 @@ impl ResourceSelectionResolutionService for ResourceSelectionResolutionServiceIm
                     Self::process_exact_item(
                         selector,
                         &mut exact_results,
+                        &mut seen_target_keys,
+                        &mut targets,
+                        &mut ignored_selectors,
+                        options,
+                    )?;
+                }
+
+                ResourceSelectionItem::ExactAnyType { selector_input, .. } => {
+                    let matched_resource_types = supported_resource_types
+                        .as_deref()
+                        .expect("ExactAnyType requires supported types");
+                    Self::process_exact_any_type_item(
+                        selector_input,
+                        matched_resource_types,
+                        &mut exact_any_type_results,
                         &mut seen_target_keys,
                         &mut targets,
                         &mut ignored_selectors,
@@ -250,6 +274,7 @@ impl ResourceSelectionResolutionServiceImpl {
             matches!(
                 item,
                 ResourceSelectionItem::All
+                    | ResourceSelectionItem::ExactAnyType { .. }
                     | ResourceSelectionItem::TypePatternExactName { .. }
                     | ResourceSelectionItem::TypePatternAll { .. }
                     | ResourceSelectionItem::TypePatternNamePattern { .. }
@@ -281,6 +306,7 @@ impl ResourceSelectionResolutionServiceImpl {
                 )),
                 ResourceSelectionItem::All
                 | ResourceSelectionItem::AllByType { .. }
+                | ResourceSelectionItem::ExactAnyType { .. }
                 | ResourceSelectionItem::NamePattern { .. }
                 | ResourceSelectionItem::TypePatternExactName { .. }
                 | ResourceSelectionItem::TypePatternAll { .. }
@@ -324,7 +350,9 @@ impl ResourceSelectionResolutionServiceImpl {
                 let ids = by_id.iter().map(|(_, id)| *id).collect::<Vec<_>>();
                 let found = resource_facade
                     .search_handles(SearchResourceHandlesRequest {
-                        raw_type_selectors: vec![resource_type.clone()],
+                        type_scope: kamu_resources_facade::SearchResourceTypeScope::Types(vec![
+                            resource_type.clone(),
+                        ]),
                         query: kamu_resources::ResourceSearchQuery::ExactIds(ids),
                         account: None,
                         label_filter: label_filter.cloned(),
@@ -358,7 +386,9 @@ impl ResourceSelectionResolutionServiceImpl {
                     .collect::<Vec<_>>();
                 let found = resource_facade
                     .search_handles(SearchResourceHandlesRequest {
-                        raw_type_selectors: vec![resource_type.clone()],
+                        type_scope: kamu_resources_facade::SearchResourceTypeScope::Types(vec![
+                            resource_type.clone(),
+                        ]),
                         query: kamu_resources::ResourceSearchQuery::ExactNames(names),
                         account: None,
                         label_filter: label_filter.cloned(),
@@ -395,6 +425,107 @@ impl ResourceSelectionResolutionServiceImpl {
         }
 
         Ok(exact_results.into_iter().flatten().collect())
+    }
+
+    /// Batches `ExactAnyType` selectors (bare IDs) into one search spanning
+    /// every resource type, with no schema filter needed.
+    async fn fetch_exact_any_type_identities(
+        selection: &ResourceSelectionSyntax,
+        resource_facade: &dyn ResourceFacade,
+        label_filter: Option<&kamu_resources::ResourceLabelFilterInput>,
+    ) -> Result<Vec<Result<ResourceHandle, GetResourceError>>, CLIError> {
+        let ids = selection
+            .items
+            .iter()
+            .filter_map(|item| match item {
+                ResourceSelectionItem::ExactAnyType { resource_ref, .. } => match resource_ref {
+                    kamu_resources_facade::ResourceRef::ById(id) => Some(*id),
+                    kamu_resources_facade::ResourceRef::ByName(_) => None,
+                },
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let found = resource_facade
+            .search_handles(SearchResourceHandlesRequest {
+                type_scope: kamu_resources_facade::SearchResourceTypeScope::AnyType,
+                query: kamu_resources::ResourceSearchQuery::ExactIds(ids.clone()),
+                account: None,
+                label_filter: label_filter.cloned(),
+                pagination: PaginationOpts {
+                    limit: ids.len(),
+                    offset: 0,
+                },
+            })
+            .await?
+            .items
+            .into_iter()
+            .map(|handle| (handle.id, handle))
+            .collect::<HashMap<_, _>>();
+
+        Ok(ids
+            .into_iter()
+            .map(|id| match found.get(&id) {
+                Some(handle) => Ok(handle.clone()),
+                None => Err(GetResourceError::LookupProblem(
+                    kamu_resources_facade::ResourceLookupProblem::IDNotFound(
+                        kamu_resources::ResourceIDNotFoundError(id),
+                    ),
+                )),
+            })
+            .collect())
+    }
+
+    fn process_exact_any_type_item(
+        selector_input: String,
+        supported_resource_types: &[ResourceTypeDescriptor],
+        exact_any_type_results: &mut std::vec::IntoIter<Result<ResourceHandle, GetResourceError>>,
+        seen_target_keys: &mut HashSet<ResourceTargetKey>,
+        targets: &mut Vec<ResourceTarget>,
+        ignored_selectors: &mut Vec<ResourceIgnoredSelector>,
+        options: &ResourceSelectionResolutionOptions,
+    ) -> Result<(), CLIError> {
+        let result = exact_any_type_results
+            .next()
+            .expect("Every ExactAnyType selector must have a batch result");
+
+        match result {
+            Ok(handle) => {
+                let canonical_selectors_by_schema =
+                    Self::canonical_selectors_by_schema(supported_resource_types);
+                let canonical_selector = Self::canonical_selector_for_schema(
+                    &canonical_selectors_by_schema,
+                    &handle.r#type,
+                )?
+                .clone();
+
+                let target = Self::target_from_handle(handle, canonical_selector, selector_input);
+
+                if seen_target_keys.insert(Self::target_key(&target)) {
+                    targets.push(target);
+                }
+            }
+            Err(GetResourceError::LookupProblem(
+                ResourceLookupProblem::NameNotFound(_) | ResourceLookupProblem::IDNotFound(_),
+            )) if options.ignore_not_found => {
+                // Type is unknown for an unmatched ID; only `selector_input` is
+                // actually surfaced, so any type descriptor works as a placeholder.
+                let type_descriptor = supported_resource_types
+                    .first()
+                    .expect("at least one resource type must be supported")
+                    .clone();
+                ignored_selectors.push(ResourceIgnoredSelector {
+                    type_descriptor,
+                    selector_input,
+                });
+            }
+            Err(error) => return Err(error.into()),
+        }
+        Ok(())
     }
 
     async fn process_all_item(
@@ -532,12 +663,14 @@ impl ResourceSelectionResolutionServiceImpl {
             options.max_expanded_results,
             seen_target_keys,
             |pagination| {
-                let raw_type_selectors = matched_resource_type_selectors.clone();
+                let type_scope = kamu_resources_facade::SearchResourceTypeScope::Types(
+                    matched_resource_type_selectors.clone(),
+                );
                 let request_label_filter = options.label_filter.clone();
                 async move {
                     resource_facade
                         .search_handles(SearchResourceHandlesRequest {
-                            raw_type_selectors,
+                            type_scope,
                             // `%` matches every name.
                             query: kamu_resources::ResourceSearchQuery::NamePattern(
                                 "%".to_string(),
@@ -591,7 +724,9 @@ impl ResourceSelectionResolutionServiceImpl {
                 async move {
                     resource_facade
                         .search_handles(SearchResourceHandlesRequest {
-                            raw_type_selectors: vec![(&type_descriptor.canonical_selector).into()],
+                            type_scope: kamu_resources_facade::SearchResourceTypeScope::Types(
+                                vec![(&type_descriptor.canonical_selector).into()],
+                            ),
                             query: kamu_resources::ResourceSearchQuery::NamePattern(
                                 request_name_pattern,
                             ),
@@ -676,13 +811,15 @@ impl ResourceSelectionResolutionServiceImpl {
             options.max_expanded_results,
             seen_target_keys,
             |pagination| {
-                let raw_type_selectors = matched_resource_type_selectors.clone();
+                let type_scope = kamu_resources_facade::SearchResourceTypeScope::Types(
+                    matched_resource_type_selectors.clone(),
+                );
                 let request_query = query.clone();
                 let request_label_filter = options.label_filter.clone();
                 async move {
                     resource_facade
                         .search_handles(SearchResourceHandlesRequest {
-                            raw_type_selectors,
+                            type_scope,
                             query: request_query,
                             account: None,
                             label_filter: request_label_filter,
@@ -763,13 +900,15 @@ impl ResourceSelectionResolutionServiceImpl {
             options.max_expanded_results,
             seen_target_keys,
             |pagination| {
-                let request_resource_types = matched_resource_type_selectors.clone();
+                let type_scope = kamu_resources_facade::SearchResourceTypeScope::Types(
+                    matched_resource_type_selectors.clone(),
+                );
                 let request_name_pattern = name_pattern.clone();
                 let request_label_filter = options.label_filter.clone();
                 async move {
                     resource_facade
                         .search_handles(SearchResourceHandlesRequest {
-                            raw_type_selectors: request_resource_types,
+                            type_scope,
                             query: kamu_resources::ResourceSearchQuery::NamePattern(
                                 request_name_pattern,
                             ),

@@ -33,6 +33,7 @@ use kamu_resources::{
     ResourceSnapshotStream,
     ResourceSnapshotUpdate,
     ResourceSummaryRow,
+    ResourceTypeScope,
     TypeUri,
     UpdateResourceError,
 };
@@ -389,12 +390,14 @@ impl ResourceRepository for PostgresResourceRepository {
     async fn search_resource_handles(
         &self,
         account_id: &odf::AccountID,
-        schemas: &[TypeUri],
+        scope: &ResourceTypeScope,
         query: &ResourceSearchQuery,
         label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceHandleRow>, InternalError> {
-        if schemas.is_empty() || query.is_vacuous() {
+        if matches!(scope, ResourceTypeScope::Types(schemas) if schemas.is_empty())
+            || query.is_vacuous()
+        {
             return Ok(Vec::new());
         }
 
@@ -404,7 +407,14 @@ impl ResourceRepository for PostgresResourceRepository {
         let connection_mut = tr.connection_mut().await?;
 
         let account_id_stack = account_id.as_stack_string();
-        let schema_strs = schemas.iter().map(TypeUri::as_str).collect::<Vec<_>>();
+        // `NULL` means "no schema filter" — see the `$2::text[] IS NULL OR ...`
+        // predicate below.
+        let schema_strs = match scope {
+            ResourceTypeScope::AnyType => None,
+            ResourceTypeScope::Types(schemas) => {
+                Some(schemas.iter().map(TypeUri::as_str).collect::<Vec<_>>())
+            }
+        };
         let limit = i64::try_from(pagination.limit).int_err()?;
         let offset = i64::try_from(pagination.offset).int_err()?;
 
@@ -428,7 +438,7 @@ impl ResourceRepository for PostgresResourceRepository {
                     FROM resources r
                     LEFT JOIN accounts a ON a.id = r.account_id
                     WHERE r.account_id = $1
-                      AND r.resource_schema = ANY($2)
+                      AND ($2::text[] IS NULL OR r.resource_schema = ANY($2))
                       AND LOWER(r.resource_name) = ANY($3)
                       AND r.deleted_at IS NULL
                       -- Every requested label pair must be present.
@@ -474,7 +484,7 @@ impl ResourceRepository for PostgresResourceRepository {
                     FROM resources r
                     LEFT JOIN accounts a ON a.id = r.account_id
                     WHERE r.account_id = $1
-                      AND r.resource_schema = ANY($2)
+                      AND ($2::text[] IS NULL OR r.resource_schema = ANY($2))
                       AND r.resource_id = ANY($3::uuid[])
                       AND r.deleted_at IS NULL
                       AND NOT EXISTS (
@@ -519,7 +529,7 @@ impl ResourceRepository for PostgresResourceRepository {
                     FROM resources r
                     LEFT JOIN accounts a ON a.id = r.account_id
                     WHERE r.account_id = $1
-                      AND r.resource_schema = ANY($2)
+                      AND ($2::text[] IS NULL OR r.resource_schema = ANY($2))
                       AND r.resource_name ILIKE $3 ESCAPE '\'
                       AND r.deleted_at IS NULL
                       AND NOT EXISTS (
@@ -557,11 +567,13 @@ impl ResourceRepository for PostgresResourceRepository {
     async fn count_search_resource_handles(
         &self,
         account_id: &odf::AccountID,
-        schemas: &[TypeUri],
+        scope: &ResourceTypeScope,
         query: &ResourceSearchQuery,
         label_filter: &ResolvedResourceLabelFilter,
     ) -> Result<usize, InternalError> {
-        if schemas.is_empty() || query.is_vacuous() {
+        if matches!(scope, ResourceTypeScope::Types(schemas) if schemas.is_empty())
+            || query.is_vacuous()
+        {
             return Ok(0);
         }
 
@@ -571,7 +583,12 @@ impl ResourceRepository for PostgresResourceRepository {
         let connection_mut = tr.connection_mut().await?;
 
         let account_id_stack = account_id.as_stack_string();
-        let schema_strs = schemas.iter().map(TypeUri::as_str).collect::<Vec<_>>();
+        let schema_strs = match scope {
+            ResourceTypeScope::AnyType => None,
+            ResourceTypeScope::Types(schemas) => {
+                Some(schemas.iter().map(TypeUri::as_str).collect::<Vec<_>>())
+            }
+        };
 
         let count = match query {
             ResourceSearchQuery::ExactNames(names) => {
@@ -584,7 +601,7 @@ impl ResourceRepository for PostgresResourceRepository {
                     SELECT COUNT(*) AS count
                     FROM resources r
                     WHERE r.account_id = $1
-                      AND r.resource_schema = ANY($2)
+                      AND ($2::text[] IS NULL OR r.resource_schema = ANY($2))
                       AND LOWER(r.resource_name) = ANY($3)
                       AND r.deleted_at IS NULL
                       AND NOT EXISTS (
@@ -617,7 +634,7 @@ impl ResourceRepository for PostgresResourceRepository {
                     SELECT COUNT(*) AS count
                     FROM resources r
                     WHERE r.account_id = $1
-                      AND r.resource_schema = ANY($2)
+                      AND ($2::text[] IS NULL OR r.resource_schema = ANY($2))
                       AND r.resource_id = ANY($3::uuid[])
                       AND r.deleted_at IS NULL
                       AND NOT EXISTS (
@@ -650,7 +667,7 @@ impl ResourceRepository for PostgresResourceRepository {
                     SELECT COUNT(*) AS count
                     FROM resources r
                     WHERE r.account_id = $1
-                      AND r.resource_schema = ANY($2)
+                      AND ($2::text[] IS NULL OR r.resource_schema = ANY($2))
                       AND r.resource_name ILIKE $3 ESCAPE '\'
                       AND r.deleted_at IS NULL
                       AND NOT EXISTS (

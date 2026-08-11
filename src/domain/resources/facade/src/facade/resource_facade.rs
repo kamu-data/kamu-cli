@@ -265,11 +265,22 @@ pub struct ListResourceHandlesRequest {
 
 #[derive(Debug, Clone)]
 pub struct SearchResourceHandlesRequest {
-    pub raw_type_selectors: Vec<ResourceTypeSelectorRaw>,
+    pub type_scope: SearchResourceTypeScope,
     pub query: ResourceSearchQuery,
     pub account: Option<ResourceAccountRef>,
     pub label_filter: Option<ResourceLabelFilterInput>,
     pub pagination: PaginationOpts,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Which resource types a [`SearchResourceHandlesRequest`] is scoped to.
+#[derive(Debug, Clone)]
+pub enum SearchResourceTypeScope {
+    /// No type filter — matches every registered resource type.
+    AnyType,
+    /// Non-empty by construction: use `AnyType` instead of an empty list.
+    Types(Vec<ResourceTypeSelectorRaw>),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

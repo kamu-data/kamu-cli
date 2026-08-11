@@ -19,6 +19,7 @@ use crate::{
     ResourceSnapshot,
     ResourceSummaryRow,
     ResourceTypeMismatchError,
+    ResourceTypeScope,
     TypeUri,
 };
 
@@ -58,7 +59,7 @@ pub trait GenericResourceQueryService: Send + Sync {
     async fn search_resource_handles(
         &self,
         account_id: &odf::AccountID,
-        schemas: &[TypeUri],
+        scope: &ResourceTypeScope,
         query: &ResourceSearchQuery,
         label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
@@ -67,7 +68,7 @@ pub trait GenericResourceQueryService: Send + Sync {
     async fn count_search_resource_handles(
         &self,
         account_id: &odf::AccountID,
-        schemas: &[TypeUri],
+        scope: &ResourceTypeScope,
         query: &ResourceSearchQuery,
         label_filter: &ResolvedResourceLabelFilter,
     ) -> Result<usize, InternalError>;

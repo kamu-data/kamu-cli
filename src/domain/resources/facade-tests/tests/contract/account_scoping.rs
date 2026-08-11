@@ -27,6 +27,7 @@ use kamu_resources_facade::{
     ResourceSelector,
     ResourcesSummaryRequest,
     SearchResourceHandlesRequest,
+    SearchResourceTypeScope,
     SpecViewMode,
 };
 use pretty_assertions::{assert_eq, assert_matches};
@@ -457,7 +458,9 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
 
     let alice_search = alice
         .search_handles(SearchResourceHandlesRequest {
-            raw_type_selectors: vec![VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()],
+            type_scope: SearchResourceTypeScope::Types(vec![
+                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            ]),
             query: ResourceSearchQuery::NamePattern("acct-%".to_string()),
             account: None,
             label_filter: None,
@@ -467,7 +470,9 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
         .unwrap();
     let bob_search = bob
         .search_handles(SearchResourceHandlesRequest {
-            raw_type_selectors: vec![VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()],
+            type_scope: SearchResourceTypeScope::Types(vec![
+                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            ]),
             query: ResourceSearchQuery::NamePattern("acct-%".to_string()),
             account: None,
             label_filter: None,

@@ -15,6 +15,7 @@ use kamu_resources_facade::{
     ListResourcesRequest,
     ResourceLabelFilterProblemCode,
     SearchResourceHandlesRequest,
+    SearchResourceTypeScope,
 };
 use pretty_assertions::{assert_eq, assert_matches};
 
@@ -353,7 +354,9 @@ pub async fn test_search_by_exact_names(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
     let response = facade
         .search_handles(SearchResourceHandlesRequest {
-            raw_type_selectors: vec![VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()],
+            type_scope: SearchResourceTypeScope::Types(vec![
+                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            ]),
             query: ResourceSearchQuery::ExactNames(vec![
                 "search-exact-alpha".parse().unwrap(),
                 "search-exact-beta".parse().unwrap(),
@@ -386,7 +389,9 @@ pub async fn test_search_exact_names_ignores_missing(h: &impl FacadeContractHarn
     let facade = h.facade_for(TestAccount::Alice);
     let response = facade
         .search_handles(SearchResourceHandlesRequest {
-            raw_type_selectors: vec![VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()],
+            type_scope: SearchResourceTypeScope::Types(vec![
+                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            ]),
             query: ResourceSearchQuery::ExactNames(vec![
                 "search-missing-present".parse().unwrap(),
                 "search-missing-absent".parse().unwrap(),
@@ -427,7 +432,9 @@ pub async fn test_search_by_exact_ids(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
     let response = facade
         .search_handles(SearchResourceHandlesRequest {
-            raw_type_selectors: vec![VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()],
+            type_scope: SearchResourceTypeScope::Types(vec![
+                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            ]),
             query: ResourceSearchQuery::ExactIds(vec![alpha_id, beta_id]),
             account: None,
             label_filter: None,
@@ -463,7 +470,9 @@ pub async fn test_search_exact_ids_ignores_missing(h: &impl FacadeContractHarnes
     let facade = h.facade_for(TestAccount::Alice);
     let response = facade
         .search_handles(SearchResourceHandlesRequest {
-            raw_type_selectors: vec![VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()],
+            type_scope: SearchResourceTypeScope::Types(vec![
+                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            ]),
             query: ResourceSearchQuery::ExactIds(vec![present_id, missing_id]),
             account: None,
             label_filter: None,
@@ -500,7 +509,9 @@ pub async fn test_search_exact_ids_account_scoping(h: &impl FacadeContractHarnes
     let facade = h.facade_for(TestAccount::Alice);
     let response = facade
         .search_handles(SearchResourceHandlesRequest {
-            raw_type_selectors: vec![VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()],
+            type_scope: SearchResourceTypeScope::Types(vec![
+                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            ]),
             query: ResourceSearchQuery::ExactIds(vec![bob_id]),
             account: None,
             label_filter: None,
@@ -526,7 +537,9 @@ pub async fn test_search_by_name_pattern(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
     let response = facade
         .search_handles(SearchResourceHandlesRequest {
-            raw_type_selectors: vec![VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()],
+            type_scope: SearchResourceTypeScope::Types(vec![
+                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            ]),
             query: ResourceSearchQuery::NamePattern("search-pattern-%".to_string()),
             account: None,
             label_filter: None,
@@ -572,10 +585,10 @@ pub async fn test_search_multi_type(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
     let response = facade
         .search_handles(SearchResourceHandlesRequest {
-            raw_type_selectors: vec![
+            type_scope: SearchResourceTypeScope::Types(vec![
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
                 SECRET_SET_CANONICAL_SELECTOR.parse().unwrap(),
-            ],
+            ]),
             query: ResourceSearchQuery::NamePattern("multi-type-%".to_string()),
             account: None,
             label_filter: None,
@@ -614,6 +627,69 @@ pub async fn test_search_multi_type(h: &impl FacadeContractHarness) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// RF-169
+contract_test!(search_any_type, super::test_search_any_type);
+
+pub async fn test_search_any_type(h: &impl FacadeContractHarness) {
+    apply_manifest_and_get_id(
+        h,
+        TestAccount::Alice,
+        variable_set_manifest_json("any-type-vs", None, &[("K", "v")]),
+    )
+    .await;
+    apply_manifest_and_get_id(
+        h,
+        TestAccount::Alice,
+        secret_set_manifest_json("any-type-ss", None, &[("K", "v")]),
+    )
+    .await;
+    // A resource under a different account must not leak into the results.
+    apply_manifest_and_get_id(
+        h,
+        TestAccount::Bob,
+        variable_set_manifest_json("any-type-vs", None, &[("K", "v")]),
+    )
+    .await;
+
+    let facade = h.facade_for(TestAccount::Alice);
+    let response = facade
+        .search_handles(SearchResourceHandlesRequest {
+            type_scope: SearchResourceTypeScope::AnyType,
+            query: ResourceSearchQuery::NamePattern("any-type-%".to_string()),
+            account: None,
+            label_filter: None,
+            pagination: PaginationOpts::from_max_results(1000),
+        })
+        .await
+        .unwrap();
+
+    assert_eq!(
+        response.total_count, 2,
+        "AnyType must find matches across every schema without a type selector"
+    );
+
+    let schemas: std::collections::HashSet<_> =
+        response.items.iter().map(|i| i.r#type.as_str()).collect();
+    assert!(
+        schemas.contains(VARIABLE_SET_SCHEMA_STR),
+        "result must include VariableSet schema"
+    );
+    assert!(
+        schemas.contains(SECRET_SET_SCHEMA_STR),
+        "result must include SecretSet schema"
+    );
+
+    for item in &response.items {
+        assert_eq!(
+            item.account.name,
+            h.account_name(TestAccount::Alice),
+            "AnyType must still respect account scoping"
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // RF-094
 contract_test!(
     search_empty_exact_names_returns_no_matches,
@@ -627,7 +703,9 @@ pub async fn test_search_empty_exact_names_returns_no_matches(h: &impl FacadeCon
 
     let response = facade
         .search_handles(SearchResourceHandlesRequest {
-            raw_type_selectors: vec![VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()],
+            type_scope: SearchResourceTypeScope::Types(vec![
+                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            ]),
             query: ResourceSearchQuery::ExactNames(vec![]),
             account: None,
             label_filter: None,
@@ -656,7 +734,9 @@ pub async fn test_search_pagination_and_total_count(h: &impl FacadeContractHarne
     let facade = h.facade_for(TestAccount::Alice);
     let response = facade
         .search_handles(SearchResourceHandlesRequest {
-            raw_type_selectors: vec![VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()],
+            type_scope: SearchResourceTypeScope::Types(vec![
+                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            ]),
             query: ResourceSearchQuery::NamePattern("search-page-%".to_string()),
             account: None,
             label_filter: None,
@@ -683,7 +763,9 @@ pub async fn test_search_account_scoping(h: &impl FacadeContractHarness) {
     let alice_response = h
         .facade_for(TestAccount::Alice)
         .search_handles(SearchResourceHandlesRequest {
-            raw_type_selectors: vec![VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()],
+            type_scope: SearchResourceTypeScope::Types(vec![
+                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            ]),
             query: ResourceSearchQuery::NamePattern("search-scope-%".to_string()),
             account: None,
             label_filter: None,
@@ -694,7 +776,9 @@ pub async fn test_search_account_scoping(h: &impl FacadeContractHarness) {
     let bob_response = h
         .facade_for(TestAccount::Bob)
         .search_handles(SearchResourceHandlesRequest {
-            raw_type_selectors: vec![VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()],
+            type_scope: SearchResourceTypeScope::Types(vec![
+                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            ]),
             query: ResourceSearchQuery::NamePattern("search-scope-%".to_string()),
             account: None,
             label_filter: None,
@@ -1083,7 +1167,9 @@ pub async fn test_search_handles_filter_narrows_candidates(h: &impl FacadeContra
 
     let response = facade
         .search_handles(SearchResourceHandlesRequest {
-            raw_type_selectors: vec![VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()],
+            type_scope: SearchResourceTypeScope::Types(vec![
+                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            ]),
             query: ResourceSearchQuery::NamePattern("search-filter-%".to_string()),
             account: None,
             label_filter: Some(label_filter(&[("environment", "prod")])),

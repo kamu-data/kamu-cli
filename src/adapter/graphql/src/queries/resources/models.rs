@@ -179,9 +179,32 @@ impl From<ResourceSearchQueryInput> for kamu_resources::ResourceSearchQuery {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Exactly one way to scope a search by resource type.
+#[derive(OneofObject, Debug, Clone)]
+pub enum ResourceTypeScopeInput {
+    AnyType(bool),
+    Types(Vec<ResourceTypeSelectorInput>),
+}
+
+impl From<ResourceTypeScopeInput> for kamu_resources_facade::SearchResourceTypeScope {
+    fn from(value: ResourceTypeScopeInput) -> Self {
+        match value {
+            ResourceTypeScopeInput::AnyType(_) => Self::AnyType,
+            ResourceTypeScopeInput::Types(resource_types) => Self::Types(
+                resource_types
+                    .into_iter()
+                    .map(ResourceTypeSelectorInput::into_resource_type_selector)
+                    .collect(),
+            ),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(InputObject, Debug, Clone)]
 pub struct SearchResourceHandlesInput {
-    pub resource_types: Vec<ResourceTypeSelectorInput>,
+    pub scope: ResourceTypeScopeInput,
     pub query: ResourceSearchQueryInput,
     pub account: Option<AccountRefInput>,
     pub label_filter: Option<ResourceLabelFilterInput>,
@@ -193,11 +216,7 @@ impl SearchResourceHandlesInput {
         pagination: PaginationOpts,
     ) -> Result<kamu_resources_facade::SearchResourceHandlesRequest, GqlError> {
         Ok(kamu_resources_facade::SearchResourceHandlesRequest {
-            raw_type_selectors: self
-                .resource_types
-                .into_iter()
-                .map(ResourceTypeSelectorInput::into_resource_type_selector)
-                .collect(),
+            type_scope: self.scope.into(),
             query: self.query.into(),
             account: self.account.map(AccountRefInput::into_manifest_account),
             label_filter: into_facade_filter(self.label_filter)?,

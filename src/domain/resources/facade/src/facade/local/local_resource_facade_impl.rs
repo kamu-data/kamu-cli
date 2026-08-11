@@ -323,38 +323,14 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .resolve_target_account(request.account.as_ref())
             .await?;
 
-        let schemas = request
-            .raw_type_selectors
-            .iter()
-            .map(|resource_type| {
-                self.resolve_schema_for_selector::<ListResourcesError>(resource_type)
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-
-        let resource_schema_ids = schemas
-            .iter()
-            .map(|schema| ResourceSchemaId::try_from(schema).int_err())
-            .collect::<Result<Vec<_>, _>>()?;
-
-        // Resolution can drop schemas that cannot carry the requested labels.
-        let (applicable_schema_ids, label_filter) = resolve_label_filter_for_schemas(
-            &self.resource_extension_schema_resolver,
-            request.label_filter,
-            &resource_schema_ids,
-        )?;
-
-        let schemas = schemas
-            .into_iter()
-            .zip(&resource_schema_ids)
-            .filter(|(_, schema_id)| applicable_schema_ids.contains(schema_id))
-            .map(|(schema, _)| schema)
-            .collect::<Vec<_>>();
+        let (scope, label_filter) =
+            self.resolve_search_type_scope(request.type_scope, request.label_filter)?;
 
         let rows = self
             .generic_resource_query_service
             .search_resource_handles(
                 &target_account.did,
-                &schemas,
+                &scope,
                 &request.query,
                 &label_filter,
                 request.pagination,
@@ -364,7 +340,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .generic_resource_query_service
             .count_search_resource_handles(
                 &target_account.did,
-                &schemas,
+                &scope,
                 &request.query,
                 &label_filter,
             )
@@ -706,6 +682,65 @@ impl LocalResourceFacadeImpl {
                 raw_selector: selector.clone(),
             })
             .map_err(Into::into)
+    }
+
+    /// Resolves a search request's type scope and label filter together,
+    /// since narrowing to applicable schemas requires resolving the filter.
+    fn resolve_search_type_scope(
+        &self,
+        type_scope: SearchResourceTypeScope,
+        label_filter: Option<ResourceLabelFilterInput>,
+    ) -> Result<(ResourceTypeScope, ResolvedResourceLabelFilter), ListResourcesError> {
+        let raw_type_selectors = match type_scope {
+            SearchResourceTypeScope::AnyType if label_filter.is_none() => {
+                return Ok((
+                    ResourceTypeScope::AnyType,
+                    ResolvedResourceLabelFilter::default(),
+                ));
+            }
+            // A label filter still needs a concrete schema to resolve label keys
+            // against, so `AnyType` falls back to every registered schema here.
+            SearchResourceTypeScope::AnyType => self
+                .list_resource_type_descriptors()
+                .into_iter()
+                .map(|descriptor| descriptor.canonical_selector.into())
+                .collect(),
+            SearchResourceTypeScope::Types(raw_type_selectors) => raw_type_selectors,
+        };
+
+        let schemas = raw_type_selectors
+            .iter()
+            .map(|resource_type| {
+                self.resolve_schema_for_selector::<ListResourcesError>(resource_type)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let resource_schema_ids = schemas
+            .iter()
+            .map(|schema| ResourceSchemaId::try_from(schema).int_err())
+            .collect::<Result<Vec<_>, _>>()?;
+
+        // Resolution can drop schemas that cannot carry the requested labels.
+        let (applicable_schema_ids, resolved_label_filter) = resolve_label_filter_for_schemas(
+            &self.resource_extension_schema_resolver,
+            label_filter,
+            &resource_schema_ids,
+        )?;
+
+        let schemas = schemas
+            .into_iter()
+            .zip(&resource_schema_ids)
+            .filter(|(_, schema_id)| applicable_schema_ids.contains(schema_id))
+            .map(|(schema, _)| schema)
+            .collect::<Vec<_>>();
+
+        let scope = if schemas.is_empty() {
+            ResourceTypeScope::Types(Vec::new())
+        } else {
+            ResourceTypeScope::types(schemas)
+        };
+
+        Ok((scope, resolved_label_filter))
     }
 
     async fn resolve_resource_view<E>(&self, selector: ResourceSelector) -> Result<Resource, E>
