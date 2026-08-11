@@ -171,7 +171,6 @@ fn make_catalog(catalog_opts: CatalogOpts) -> dill::Catalog {
         .add::<DummyAuthenticationProviderB>()
         .add::<AuthenticationServiceImpl>()
         .add::<CreateAccountUseCaseImpl>()
-
         .add::<InMemoryAccountRepository>()
         .add::<AccountServiceImpl>()
         .add::<InMemoryDidSecretKeyRepository>()
@@ -250,6 +249,7 @@ impl AuthenticationProvider for DummyAuthenticationProviderA {
             account_name: DEFAULT_ACCOUNT_NAME.clone(),
             email: DUMMY_EMAIL_ADDRESS.clone(),
             display_name: String::from(DEFAULT_ACCOUNT_NAME_STR),
+            avatar_url: None,
             provider_identity_key: String::from(DEFAULT_ACCOUNT_NAME_STR),
         })
     }
@@ -270,6 +270,7 @@ impl AuthenticationProvider for DummyAuthenticationProviderB {
             account_name: DEFAULT_ACCOUNT_NAME.clone(),
             email: DUMMY_EMAIL_ADDRESS.clone(),
             display_name: String::from(DEFAULT_ACCOUNT_NAME_STR),
+            avatar_url: None,
             provider_identity_key: String::from(DEFAULT_ACCOUNT_NAME_STR),
         })
     }

@@ -183,6 +183,7 @@ impl AuthenticationProvider for Web3WalletAuthenticationProvider {
             // TODO: Wallet-based auth: replace with none
             email: identity.email,
             display_name: identity.display_name,
+            avatar_url: None,
             provider_identity_key: identity.provider_identity_key,
         })
     }

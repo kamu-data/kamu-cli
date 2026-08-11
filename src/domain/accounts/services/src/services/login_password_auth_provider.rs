@@ -88,6 +88,7 @@ impl AuthenticationProvider for LoginPasswordAuthProvider {
             account_name: account.account_name,
             email: account.email,
             display_name: account.display_name,
+            avatar_url: account.avatar_url,
             provider_identity_key: account.provider_identity_key,
         })
     }
