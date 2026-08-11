@@ -135,4 +135,13 @@ ignore = [
     # Waiting for upstream crates to migrate to other implementation
     # https://rustsec.org/advisories/RUSTSEC-2026-0215
     "RUSTSEC-2026-0215",
+    # Unmaintained (bitmaps, im, sized-chunks)
+    # Transitive via linked-data -> im; no safe upgrade available, waiting for
+    # upstream to migrate to the imbl fork
+    # https://rustsec.org/advisories/RUSTSEC-2026-0247
+    # https://rustsec.org/advisories/RUSTSEC-2026-0248
+    # https://rustsec.org/advisories/RUSTSEC-2026-0251
+    "RUSTSEC-2026-0247",
+    "RUSTSEC-2026-0248",
+    "RUSTSEC-2026-0251",
 ]
