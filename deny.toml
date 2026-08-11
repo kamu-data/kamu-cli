@@ -138,4 +138,13 @@ ignore = [
     # Waiting for upstream crates to migrate to other implementation
     # https://rustsec.org/advisories/RUSTSEC-2026-0215
     "RUSTSEC-2026-0215",
+    # Unmaintained (bitmaps)
+    # https://rustsec.org/advisories/RUSTSEC-2026-0247
+    "RUSTSEC-2026-0247",
+    # Unmaintained (im)
+    # https://rustsec.org/advisories/RUSTSEC-2026-0248
+    "RUSTSEC-2026-0248",
+    # Unmaintained (sized-chunks)
+    # https://rustsec.org/advisories/RUSTSEC-2026-0251
+    "RUSTSEC-2026-0251",
 ]
