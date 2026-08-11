@@ -84,7 +84,7 @@ impl AuthenticationProvider for LoginPasswordAuthProvider {
             .int_err()?;
 
         Ok(ProviderLoginResponse {
-            account_id: Some(account.id),
+            account_id: None,
             account_name: account.account_name,
             email: account.email,
             display_name: account.display_name,
