@@ -18,7 +18,7 @@ use crate::tests::use_cases::{AccountBaseUseCaseHarness, AccountBaseUseCaseHarne
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 const ADMIN: &str = "admin";
-const REGULAR_USER: &str = "regular_user";
+const REGULAR_USER: &str = "regular-user";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -135,7 +135,7 @@ struct DeleteAccountUseCaseImplHarness {
 }
 
 impl DeleteAccountUseCaseImplHarness {
-    async fn new(current_account_subject: CurrentAccountSubject, outbox: MockOutbox) -> Self {
+    async fn new(current_account_subject: CurrentAccountSubject, mut outbox: MockOutbox) -> Self {
         let predefined_account_config = {
             let mut p = PredefinedAccountsConfig::new();
             p.predefined = vec![
@@ -145,6 +145,7 @@ impl DeleteAccountUseCaseImplHarness {
             ];
             p
         };
+        Self::expect_outbox_account_created(&mut outbox);
 
         let account_base_harness = AccountBaseUseCaseHarness::new(AccountBaseUseCaseHarnessOpts {
             maybe_predefined_accounts_config: Some(predefined_account_config),
@@ -180,6 +181,23 @@ impl DeleteAccountUseCaseImplHarness {
                         serde_json::from_value::<AccountLifecycleMessage>(message_as_json.clone())
                             .unwrap();
                     matches!(message_res, AccountLifecycleMessage::Deleted(_))
+                }),
+                eq(2),
+            )
+            .returning(|_, _, _| Ok(()));
+    }
+
+    fn expect_outbox_account_created(mock_outbox: &mut MockOutbox) {
+        use mockall::predicate::{eq, function};
+        mock_outbox
+            .expect_post_message_as_json()
+            .with(
+                eq(MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE),
+                function(|message_as_json: &serde_json::Value| {
+                    let message_res =
+                        serde_json::from_value::<AccountLifecycleMessage>(message_as_json.clone())
+                            .unwrap();
+                    matches!(message_res, AccountLifecycleMessage::Created(_))
                 }),
                 eq(2),
             )

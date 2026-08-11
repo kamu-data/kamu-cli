@@ -154,7 +154,7 @@ struct CreateAccountUseCaseImplHarness {
 }
 
 impl CreateAccountUseCaseImplHarness {
-    async fn new(mock_outbox: MockOutbox) -> Self {
+    async fn new(mut mock_outbox: MockOutbox) -> Self {
         let mut predefined_account_config = PredefinedAccountsConfig::new();
         {
             let account_name = WASYA;
@@ -163,6 +163,13 @@ impl CreateAccountUseCaseImplHarness {
                 .push(AccountConfig::test_config_from_name(
                     odf::AccountName::new_unchecked(account_name),
                 ));
+
+            expect_outbox_account_created_once(
+                &mut mock_outbox,
+                odf::AccountName::new_unchecked(account_name),
+                account_name.to_string(),
+                Email::parse("wasya@example.com").unwrap(),
+            );
         }
 
         let account_base_harness = AccountBaseUseCaseHarness::new(AccountBaseUseCaseHarnessOpts {

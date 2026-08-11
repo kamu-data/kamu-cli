@@ -293,9 +293,9 @@ impl AccountIndexingHarness {
 
         let catalog = b.build();
 
-        init_on_startup::run_startup_jobs(&catalog).await.unwrap();
-
         ElasticsearchBaseHarness::run_initial_indexing(&catalog).await;
+
+        init_on_startup::run_startup_jobs(&catalog).await.unwrap();
 
         Self {
             es_base_harness,
