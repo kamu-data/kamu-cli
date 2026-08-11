@@ -290,7 +290,6 @@ impl PlatformLoginHarness {
                 .add::<InMemoryRebacRepository>()
                 .add::<UpdateAccountUseCaseImpl>()
                 .add::<CreateAccountUseCaseImpl>()
-
                 .add_value(DefaultAccountProperties::default())
                 .add_value(DefaultDatasetProperties::default())
                 .add::<DummyOutboxImpl>()
