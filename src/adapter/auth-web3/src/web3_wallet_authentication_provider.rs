@@ -12,7 +12,6 @@ use std::sync::Arc;
 use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_accounts::{
     AccountProvider,
-    AccountType,
     AuthenticationProvider,
     DidPkhAccountIdentity,
     ProviderLoginError,
@@ -184,8 +183,6 @@ impl AuthenticationProvider for Web3WalletAuthenticationProvider {
             // TODO: Wallet-based auth: replace with none
             email: identity.email,
             display_name: identity.display_name,
-            account_type: AccountType::User,
-            avatar_url: None,
             provider_identity_key: identity.provider_identity_key,
         })
     }

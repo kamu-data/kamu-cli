@@ -12,7 +12,6 @@ use std::sync::Arc;
 use email_utils::Email;
 use internal_error::ResultIntoInternal;
 use kamu_accounts::*;
-use reqwest::Url;
 use serde::Deserialize;
 use thiserror::Error;
 
@@ -170,7 +169,7 @@ impl AuthenticationProvider for OAuthGithub {
             ));
         };
 
-        // Validate email & extract avatar URL
+        // Validate email
         let email = Email::parse(
             github_account_info
                 .email
@@ -178,20 +177,15 @@ impl AuthenticationProvider for OAuthGithub {
                 .as_str(),
         )
         .unwrap();
-        let avatar_url = github_account_info
-            .avatar_url
-            .map(|url| Url::parse(&url).unwrap());
 
         // Extract matching fields
         Ok(ProviderLoginResponse {
             account_id: None,
             account_name: odf::AccountName::new_unchecked(&github_account_info.login),
-            account_type: AccountType::User,
             email,
             display_name: github_account_info
                 .name
                 .unwrap_or(github_account_info.login),
-            avatar_url,
             // Use GitHub ID as an identity key
             provider_identity_key: github_account_info.id.to_string(),
         })
@@ -302,10 +296,8 @@ impl AuthenticationProvider for DummyOAuthGithub {
         Ok(ProviderLoginResponse {
             account_id: None,
             account_name: odf::AccountName::new_unchecked(&account),
-            account_type: AccountType::User,
             email: Email::parse("e2e-user@example.com").unwrap(),
             display_name: account.clone(),
-            avatar_url: None,
             provider_identity_key: account,
         })
     }
