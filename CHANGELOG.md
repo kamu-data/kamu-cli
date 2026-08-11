@@ -27,6 +27,7 @@ Recommendation: for ease of reading, use the following format:
 - More strict typing in some places (using `Url` and `Email` instead of `String`) (#1674)
 - The uniqueness of the DID secret for accounts and datasets is guaranteed (#1674)
 ### Fixed
+- Return JSON responses for authentication policy errors (#1675)
 - Restored decimal type support in DDL schema (#1670)
 - Fixed the tests failing on Fedora (MQTT, ODFEngine) (#1674):
   - MQTT: `localhost` replaced w/ direct container host

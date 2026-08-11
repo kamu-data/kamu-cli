@@ -24,31 +24,39 @@ impl DatasetNameGenerator {
         path: &CollectionPathV2,
         uuid: uuid::Uuid,
     ) -> odf::DatasetName {
+        use std::fmt::Write;
+
         // Dataset name PEG grammar: [a-zA-Z0-9]+ ("-" [a-zA-Z0-9]+)*
         // Based on: <https://github.com/kamu-data/open-data-fabric/blob/master/open-data-fabric.md#dataset-identity>
-        let mut s = String::with_capacity(path.as_str().len());
+        let mut s = String::with_capacity(odf::DatasetName::MAX_LEN);
 
-        for segment in path.as_str().split('/') {
-            // SAFETY: Path is already validated
-            let segment_decoded = urlencoding::decode(segment).unwrap();
+        write!(&mut s, "{uuid}-").unwrap();
 
-            for c in segment_decoded.chars() {
-                if c.is_ascii_alphanumeric() {
-                    s.push(c);
-                } else if !s.ends_with('-') {
-                    s.push('-');
-                }
-            }
+        // Handle V1 path names without `/` prefix just in case
+        let basename_encoded = if path.starts_with('/') {
+            path.as_str().rsplit_once('/').unwrap().1
+        } else {
+            path.as_str()
+        };
 
-            if !s.ends_with('-') {
+        // SAFETY: Path is already validated
+        let basename_decoded = urlencoding::decode(basename_encoded).unwrap();
+
+        for c in basename_decoded.chars() {
+            if c.is_ascii_alphanumeric() {
+                s.push(c);
+            } else if !s.ends_with('-') {
                 s.push('-');
             }
         }
 
-        let sanitized_path = s.trim_matches('-');
+        while s.ends_with('-') {
+            s.pop();
+        }
 
-        let raw = format!("{uuid}-{sanitized_path}");
-        odf::DatasetName::try_from(raw).unwrap()
+        s.truncate(odf::DatasetName::MAX_LEN);
+
+        odf::DatasetName::new_unchecked(&s)
     }
 }
 
