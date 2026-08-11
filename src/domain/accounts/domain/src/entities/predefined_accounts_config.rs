@@ -110,8 +110,10 @@ pub enum AccountPropertyName {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: Embed the `AccountConfig::validate()` call
-//       into setty validation mechanism (for whole struct).
+// TODO: Embed the `AccountConfig::validate()` call into setty
+//       for struct level validation.
+//       Please check: https://github.com/Keats/validator#struct-level-validation
+
 /// The declarative account configuration used to register an account if one
 /// does not already exist.
 ///
