@@ -225,11 +225,9 @@ impl PredefinedAccountsRegistrator {
         &self,
         account_config: &AccountConfig,
     ) -> Result<odf::AccountID, InternalError> {
-        let options = CreateAccountUseCaseOptions::builder().build();
-
         let created = self
             .create_account_use_case
-            .execute(account_config, options)
+            .execute(account_config)
             .await
             .int_err()?;
 

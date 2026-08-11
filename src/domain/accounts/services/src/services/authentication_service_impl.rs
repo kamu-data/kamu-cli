@@ -238,11 +238,10 @@ impl AuthenticationServiceImpl {
             properties: vec![],
             treat_datasets_as_public: false,
         };
-        let options = CreateAccountUseCaseOptions::builder().build();
 
         let new_account = self
             .create_account_use_case
-            .execute(&new_account_config, options)
+            .execute(&new_account_config)
             .await?;
 
         Ok(new_account.id)

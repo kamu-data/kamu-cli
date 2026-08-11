@@ -28,11 +28,7 @@ pub struct SeedDidsFromNamesInTests;
 
 #[async_trait::async_trait]
 pub trait CreateAccountUseCase: Send + Sync {
-    async fn execute(
-        &self,
-        account_config: &AccountConfig,
-        options: CreateAccountUseCaseOptions,
-    ) -> Result<Account, CreateAccountError>;
+    async fn execute(&self, account_config: &AccountConfig) -> Result<Account, CreateAccountError>;
 
     async fn execute_derived(
         &self,
@@ -45,14 +41,6 @@ pub trait CreateAccountUseCase: Send + Sync {
         &self,
         wallet_addresses: HashSet<DidPkh>,
     ) -> Result<Vec<Account>, CreateMultiWalletAccountsError>;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(bon::Builder, Default)]
-pub struct CreateAccountUseCaseOptions {
-    /// Do not send messages to the Outbox
-    pub quiet: Option<bool>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

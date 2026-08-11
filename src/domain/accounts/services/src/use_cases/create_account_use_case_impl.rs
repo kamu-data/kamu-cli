@@ -22,7 +22,6 @@ use kamu_accounts::{
     AccountType,
     CreateAccountError,
     CreateAccountUseCase,
-    CreateAccountUseCaseOptions,
     CreateDerivedAccountUseCaseOptions,
     CreateMultiWalletAccountsError,
     DidEntity,
@@ -182,11 +181,7 @@ impl CreateAccountUseCaseImpl {
 
 #[async_trait::async_trait]
 impl CreateAccountUseCase for CreateAccountUseCaseImpl {
-    async fn execute(
-        &self,
-        account_config: &AccountConfig,
-        options: CreateAccountUseCaseOptions,
-    ) -> Result<Account, CreateAccountError> {
+    async fn execute(&self, account_config: &AccountConfig) -> Result<Account, CreateAccountError> {
         let (maybe_account_key, account_id) =
             self.get_or_generate_account_key_and_id(account_config);
 
@@ -219,9 +214,7 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
             self.maybe_save_private_key(&new_account.id, maybe_account_key)
         )?;
 
-        if !options.quiet.unwrap_or(false) {
-            self.notify_account_created(&new_account).await?;
-        }
+        self.notify_account_created(&new_account).await?;
 
         Ok(new_account)
     }

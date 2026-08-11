@@ -10,7 +10,7 @@
 use std::sync::Arc;
 
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
-use kamu_accounts::{AccountConfig, CreateAccountUseCase, CreateAccountUseCaseOptions};
+use kamu_accounts::{AccountConfig, CreateAccountUseCase};
 use kamu_datasets::{DatasetRegistry, DatasetRegistryExt};
 
 use super::{CLIError, Command};
@@ -80,10 +80,9 @@ impl Command for SystemE2ECommand {
                     let account_config = AccountConfig::test_config_from_name(
                         odf::AccountName::new_unchecked(account_name),
                     );
-                    let options = CreateAccountUseCaseOptions::builder().build();
 
                     self.create_account_use_case
-                        .execute(&account_config, options)
+                        .execute(&account_config)
                         .await
                         .int_err()?;
 
