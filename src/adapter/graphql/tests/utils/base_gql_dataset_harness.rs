@@ -74,7 +74,7 @@ impl BaseGQLDatasetHarness {
                 .add::<CreateDatasetUseCaseImpl>()
                 .add::<UpdateAccountUseCaseImpl>()
                 .add::<CreateAccountUseCaseImpl>()
-                .add_value(SeedDidsFromNamesInTests)
+
                 .add::<CreateDatasetUseCaseHelper>()
                 .add::<DatasetReferenceServiceImpl>()
                 .add::<InMemoryDatasetReferenceRepository>()

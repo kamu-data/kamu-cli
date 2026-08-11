@@ -171,7 +171,7 @@ fn make_catalog(catalog_opts: CatalogOpts) -> dill::Catalog {
         .add::<DummyAuthenticationProviderB>()
         .add::<AuthenticationServiceImpl>()
         .add::<CreateAccountUseCaseImpl>()
-        .add_value(SeedDidsFromNamesInTests)
+
         .add::<InMemoryAccountRepository>()
         .add::<AccountServiceImpl>()
         .add::<InMemoryDidSecretKeyRepository>()

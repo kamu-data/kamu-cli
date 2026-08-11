@@ -16,7 +16,6 @@ use kamu_accounts::{
     DidSecretKey,
     PredefinedAccountsConfig,
     SAMPLE_DID_SECRET_KEY_ENCRYPTION_KEY,
-    SeedDidsFromNamesInTests,
 };
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::{
@@ -203,7 +202,6 @@ async fn make_catalog() -> dill::Catalog {
         .add::<RebacServiceImpl>()
         .add::<UpdateAccountUseCaseImpl>()
         .add::<CreateAccountUseCaseImpl>()
-        .add_value(SeedDidsFromNamesInTests)
         .add::<InMemoryRebacRepository>()
         .add_value(DidSecretEncryptionConfig::sample())
         .add::<InMemoryDidSecretKeyRepository>()
