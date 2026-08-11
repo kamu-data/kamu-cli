@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-# Show all PR comments (general + review + inline) as Markdown,
+# Show threads and PR comments (general + review + inline) as Markdown,
 # sorted from newest to oldest, with links to the threads.
 #
 # Dependencies: gh (gh auth login), jq.
@@ -50,6 +50,7 @@ trap 'rm -f "$TMP"' EXIT
       path: null,
       line: null,
       resolved: null,
+      thread_id: null,
       body: .body
     }'
 
@@ -64,6 +65,7 @@ trap 'rm -f "$TMP"' EXIT
             reviewThreads(first: 100, after: $endCursor) {
               pageInfo { hasNextPage endCursor }
               nodes {
+                id
                 isResolved
                 path
                 comments(first: 100) {
@@ -91,6 +93,7 @@ trap 'rm -f "$TMP"' EXIT
         path: $t.path,
         line: (.line // .originalLine),
         resolved: $t.isResolved,
+        thread_id: $t.id,
         body: .body
       }'
 
@@ -104,6 +107,7 @@ trap 'rm -f "$TMP"' EXIT
       path: null,
       line: null,
       resolved: null,
+      thread_id: null,
       body: .body
     }'
 } >> "$TMP"
@@ -111,34 +115,79 @@ trap 'rm -f "$TMP"' EXIT
 echo "# PR comments for [$OWNER/$REPO#$PR](https://github.com/$OWNER/$REPO/pull/$PR)"
 echo
 
-# Output comments desc, example:
-#
+# Output:
 # ```md
+# ## Threads
+# - 🟢 Resolved | https://github.com/kamu-data/kamu-cli/pull/1674#discussion_r3752782360
+# ...
+#
+# ## Comments
 # ### 2026-08-10T19:39:59Z — s373r (review-comment)
 # - Thread status: 🟢 Resolved
 # - Local path: [src/domain/accounts/domain/src/services/authentication_provider.rs:33](src/domain/accounts/domain/src/services/authentication_provider.rs)
 # - GitHub link: https://github.com/kamu-data/kamu-cli/pull/1674#discussion_r3752782360
 #
 # Not actual anymore
-#```
-jq -s --argjson show_all "$SHOW_ALL" '
-    sort_by(.date) | reverse | map(select($show_all == 1 or .resolved != true)) | .[]
-  ' "$TMP" \
-  | jq -r '
-    "### " + .date + " — " + .author + " (" + .kind + ")\n" +
-    (if .resolved != null then
-      "- Thread status: " + (if .resolved then "🟢 Resolved" else "🔴 Open" end) + "\n"
-    else
-      ""
-    end) +
-    (if .path then
-      "- Local path: [" + .path + (if .line then ":" + (.line|tostring) else "" end) + "](" + .path + ")\n"
-    else
-      ""
-    end) +
-    "- Thread link: " + .url + "\n" +
-    "\n" +
-    .body + "\n" +
-    "\n" +
-    "---\n"
-  '
+# ...
+# ```
+
+jq -s --argjson show_all "$SHOW_ALL" -r '
+    map(select($show_all == 1 or .resolved != true)) as $items |
+
+    ## Thread index
+    (
+      [$items[] | select(.thread_id != null)]
+      | group_by(.thread_id)
+      | map(
+          (sort_by(.date) | .[0]) as $first |
+          {
+            resolved: $first.resolved,
+            url: $first.url,
+            updated: (map(.date) | max)
+          }
+        )
+      | sort_by(.updated)
+      | reverse
+    ) as $threads |
+
+    "## Threads\n",
+    (
+      if ($threads | length) == 0 then
+        "_No review threads._\n"
+      else
+        (
+          $threads[]
+          | . as $t |
+          ($t.resolved | if . then "🟢 Resolved" else "🔴 Open" end) as $status |
+          "- " + $status + " | " + $t.url
+        ),
+        ""
+      end
+    ),
+
+    "## Comments\n",
+    (
+      $items
+      | sort_by(.date)
+      | reverse
+      | .[]
+      | (
+          "### " + .date + " — " + .author + " (" + .kind + ")\n" +
+          (if .resolved != null then
+            "- Thread status: " + (if .resolved then "🟢 Resolved" else "🔴 Open" end) + "\n"
+          else
+            ""
+          end) +
+          (if .path then
+            "- Local path: [" + .path + (if .line then ":" + (.line|tostring) else "" end) + "](" + .path + ")\n"
+          else
+            ""
+          end) +
+          "- Thread link: " + .url + "\n" +
+          "\n" +
+          .body + "\n" +
+          "\n" +
+          "---"
+        )
+    )
+  ' "$TMP"
