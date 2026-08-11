@@ -19,10 +19,10 @@ use kamu_accounts::{
     CurrentAccountSubject,
     DEFAULT_ACCOUNT_NAME,
     PredefinedAccountsConfig,
+    SeedDidsFromNamesInTests,
 };
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::{
-    AccountIdentityGeneratorSeeded,
     AccountServiceImpl,
     CreateAccountUseCaseImpl,
     LoginPasswordAuthProvider,
@@ -713,7 +713,6 @@ impl DatasetAuthorizerHarness {
                 .add_value(current_account_subject)
                 .add_value(predefined_accounts_config)
                 .add::<PredefinedAccountsRegistrator>()
-                .add::<AccountIdentityGeneratorSeeded>()
                 .add::<kamu_auth_rebac_services::RebacServiceImpl>()
                 .add_value(kamu_auth_rebac_services::DefaultAccountProperties::default())
                 .add_value(kamu_auth_rebac_services::DefaultDatasetProperties::default())
@@ -722,6 +721,7 @@ impl DatasetAuthorizerHarness {
                 .add::<DeleteDatasetRebacPropertiesUseCaseImpl>()
                 .add::<UpdateAccountUseCaseImpl>()
                 .add::<CreateAccountUseCaseImpl>()
+                .add_value(SeedDidsFromNamesInTests)
                 .add::<InMemoryRebacRepository>()
                 .add_builder(OutboxImmediateImpl::builder(ConsumerFilter::AllConsumers))
                 .bind::<dyn Outbox, OutboxImmediateImpl>()

@@ -199,7 +199,7 @@ impl ClientSideHarness {
 
         b.add::<AccountServiceImpl>();
         b.add::<CreateAccountUseCaseImpl>();
-        b.add::<AccountIdentityGeneratorSeeded>();
+        b.add_value(SeedDidsFromNamesInTests);
         b.add::<UpdateAccountUseCaseImpl>();
         b.add::<ModifyAccountPasswordUseCaseImpl>();
         b.add::<InMemoryAccountRepository>();

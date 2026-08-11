@@ -16,7 +16,6 @@ use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{
     Account,
     AccountConfig,
-    AccountIdentityGenerator,
     AccountLifecycleMessage,
     AccountProvider,
     AccountService,
@@ -32,6 +31,7 @@ use kamu_accounts::{
     DidSecretKeyRepository,
     MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
     Password,
+    SeedDidsFromNamesInTests,
 };
 use odf::metadata::DidPkh;
 use secrecy::{ExposeSecret, SecretString};
@@ -44,9 +44,9 @@ pub struct CreateAccountUseCaseImpl {
     account_service: Arc<dyn AccountService>,
     outbox: Arc<dyn messaging_outbox::Outbox>,
     time_source: Arc<dyn SystemTimeSource>,
-    account_identity_generator: Arc<dyn AccountIdentityGenerator>,
     did_secret_key_repo: Arc<dyn DidSecretKeyRepository>,
     did_secret_encryption_key: Option<SecretString>,
+    seed_dids_from_names: bool,
 }
 
 #[dill::component(pub)]
@@ -57,20 +57,20 @@ impl CreateAccountUseCaseImpl {
         account_service: Arc<dyn AccountService>,
         outbox: Arc<dyn messaging_outbox::Outbox>,
         time_source: Arc<dyn SystemTimeSource>,
-        account_identity_generator: Arc<dyn AccountIdentityGenerator>,
         did_secret_key_repo: Arc<dyn DidSecretKeyRepository>,
         did_secret_encryption_config: Arc<DidSecretEncryptionConfig>,
+        maybe_seed_dids_from_names_in_tests: Option<Arc<SeedDidsFromNamesInTests>>,
     ) -> Self {
         Self {
             account_service,
             outbox,
             time_source,
-            account_identity_generator,
             did_secret_encryption_key: did_secret_encryption_config
                 .encryption_key
                 .as_ref()
                 .map(|encryption_key| SecretString::from(encryption_key.clone())),
             did_secret_key_repo,
+            seed_dids_from_names: maybe_seed_dids_from_names_in_tests.is_some(),
         }
     }
 
@@ -129,6 +129,20 @@ impl CreateAccountUseCaseImpl {
             .int_err()
     }
 
+    fn generate_account_key_and_id(
+        &self,
+        account_name: &odf::AccountName,
+    ) -> (odf::metadata::SigningKey, odf::AccountID) {
+        if self.seed_dids_from_names {
+            // NOTE: used only in tests
+            let private_key = odf::metadata::PrivateKey::from_bytes_padded(account_name.as_bytes());
+            let account_id = odf::AccountID::from_signing_key(&private_key);
+            (private_key.into(), account_id)
+        } else {
+            odf::AccountID::new_generated_ed25519()
+        }
+    }
+
     fn get_or_generate_account_key_and_id(
         &self,
         account_config: &AccountConfig,
@@ -139,9 +153,8 @@ impl CreateAccountUseCaseImpl {
             (maybe_account_key, id)
         } else {
             // ... Otherwise, create a new pair
-            let (account_key, account_id) = self
-                .account_identity_generator
-                .generate_ed25519(&account_config.account_name);
+            let (account_key, account_id) =
+                self.generate_account_key_and_id(&account_config.account_name);
 
             (Some(account_key), account_id)
         }
@@ -231,9 +244,7 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
             Self::generate_password()?
         };
 
-        let (account_key, account_id) = self
-            .account_identity_generator
-            .generate_ed25519(account_name);
+        let (account_key, account_id) = self.generate_account_key_and_id(account_name);
 
         let new_account = Account {
             id: account_id,

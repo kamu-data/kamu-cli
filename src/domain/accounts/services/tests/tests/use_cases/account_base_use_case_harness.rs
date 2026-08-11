@@ -19,13 +19,13 @@ use kamu_accounts::{
     DeleteAccountUseCase,
     DidSecretEncryptionConfig,
     PredefinedAccountsConfig,
+    SeedDidsFromNamesInTests,
     TEST_PASSWORD,
     UpdateAccountUseCase,
 };
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::utils::AccountAuthorizationHelperTestProvider;
 use kamu_accounts_services::{
-    AccountIdentityGeneratorSeeded,
     AccountServiceImpl,
     CreateAccountUseCaseImpl,
     DeleteAccountUseCaseImpl,
@@ -59,7 +59,7 @@ impl AccountBaseUseCaseHarness {
                 .add_value(DidSecretEncryptionConfig::sample())
                 .add::<AccountServiceImpl>()
                 .add::<CreateAccountUseCaseImpl>()
-                .add::<AccountIdentityGeneratorSeeded>()
+                .add_value(SeedDidsFromNamesInTests)
                 .add::<UpdateAccountUseCaseImpl>()
                 .add::<DeleteAccountUseCaseImpl>()
                 .add::<kamu_auth_rebac_services::RebacServiceImpl>()

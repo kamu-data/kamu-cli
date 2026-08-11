@@ -193,9 +193,9 @@ impl ElasticsearchDatasetBaseHarness {
                 let mut b = dill::CatalogBuilder::new_chained(no_subject_catalog);
                 b.add_value(predefined_accounts_config);
                 b.add::<PredefinedAccountsRegistrator>();
-                b.add::<AccountIdentityGeneratorSeeded>();
                 b.add::<LoginPasswordAuthProvider>();
                 b.add::<CreateAccountUseCaseImpl>();
+                b.add_value(SeedDidsFromNamesInTests);
                 b.add::<UpdateAccountUseCaseImpl>();
                 b.build()
             };

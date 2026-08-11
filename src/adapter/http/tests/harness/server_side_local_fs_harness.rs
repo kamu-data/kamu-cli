@@ -22,6 +22,7 @@ use kamu_accounts::{
     DidSecretEncryptionConfig,
     JwtAuthenticationConfig,
     PredefinedAccountsConfig,
+    SeedDidsFromNamesInTests,
     TEST_ACCOUNT_ID,
 };
 use kamu_accounts_inmem::{
@@ -184,7 +185,7 @@ impl ServerSideLocalFsHarness {
                 .add::<RebacServiceImpl>()
                 .add::<UpdateAccountUseCaseImpl>()
                 .add::<CreateAccountUseCaseImpl>()
-                .add::<AccountIdentityGeneratorSeeded>()
+                .add_value(SeedDidsFromNamesInTests)
                 .add::<InMemoryAccountQuotaEventStore>()
                 .add::<AccountQuotaServiceImpl>()
                 .add::<InMemoryDatasetStatisticsRepository>()

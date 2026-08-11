@@ -14,14 +14,18 @@ use database_common::NoOpDatabasePlugin;
 use indoc::indoc;
 use kamu::domain::*;
 use kamu::*;
-use kamu_accounts::{CurrentAccountSubject, DidSecretEncryptionConfig, PredefinedAccountsConfig};
+use kamu_accounts::{
+    CurrentAccountSubject,
+    DidSecretEncryptionConfig,
+    PredefinedAccountsConfig,
+    SeedDidsFromNamesInTests,
+};
 use kamu_accounts_inmem::{
     InMemoryAccountQuotaEventStore,
     InMemoryAccountRepository,
     InMemoryDidSecretKeyRepository,
 };
 use kamu_accounts_services::{
-    AccountIdentityGeneratorSeeded,
     AccountQuotaServiceImpl,
     AccountServiceImpl,
     CreateAccountUseCaseImpl,
@@ -430,11 +434,11 @@ impl TestHarness {
                 .add::<InMemoryDatasetDataBlockRepository>()
                 .add_value(PredefinedAccountsConfig::single_tenant())
                 .add::<PredefinedAccountsRegistrator>()
-                .add::<AccountIdentityGeneratorSeeded>()
                 .add::<RebacServiceImpl>()
                 .add::<InMemoryRebacRepository>()
                 .add::<UpdateAccountUseCaseImpl>()
                 .add::<CreateAccountUseCaseImpl>()
+                .add_value(SeedDidsFromNamesInTests)
                 .add_value(DefaultAccountProperties::default())
                 .add_value(DefaultDatasetProperties::default())
                 .add::<LoginPasswordAuthProvider>()

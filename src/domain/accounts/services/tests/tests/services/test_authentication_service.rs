@@ -19,7 +19,6 @@ use kamu_accounts_inmem::{
 };
 use kamu_accounts_services::{
     AccessTokenServiceImpl,
-    AccountIdentityGeneratorSeeded,
     AccountServiceImpl,
     AuthenticationServiceImpl,
     CreateAccountUseCaseImpl,
@@ -172,7 +171,7 @@ fn make_catalog(catalog_opts: CatalogOpts) -> dill::Catalog {
         .add::<DummyAuthenticationProviderB>()
         .add::<AuthenticationServiceImpl>()
         .add::<CreateAccountUseCaseImpl>()
-        .add::<AccountIdentityGeneratorSeeded>()
+        .add_value(SeedDidsFromNamesInTests)
         .add::<InMemoryAccountRepository>()
         .add::<AccountServiceImpl>()
         .add::<InMemoryDidSecretKeyRepository>()

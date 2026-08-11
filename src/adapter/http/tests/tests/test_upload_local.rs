@@ -29,6 +29,7 @@ use kamu_accounts::{
     JwtAuthenticationConfig,
     JwtTokenIssuer,
     PredefinedAccountsConfig,
+    SeedDidsFromNamesInTests,
     TEST_ACCOUNT_ID,
 };
 use kamu_accounts_inmem::{
@@ -39,7 +40,6 @@ use kamu_accounts_inmem::{
 };
 use kamu_accounts_services::{
     AccessTokenServiceImpl,
-    AccountIdentityGeneratorSeeded,
     AccountServiceImpl,
     AuthenticationServiceImpl,
     CreateAccountUseCaseImpl,
@@ -510,7 +510,7 @@ impl UploadLocalHarness {
                 .add::<InMemoryRebacRepository>()
                 .add::<UpdateAccountUseCaseImpl>()
                 .add::<CreateAccountUseCaseImpl>()
-                .add::<AccountIdentityGeneratorSeeded>()
+                .add_value(SeedDidsFromNamesInTests)
                 .add_value(DefaultAccountProperties::default())
                 .add_value(DefaultDatasetProperties::default())
                 .add::<DummyOutboxImpl>()

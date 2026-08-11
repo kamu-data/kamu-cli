@@ -15,10 +15,10 @@ use kamu_accounts::{
     DEFAULT_ACCOUNT_NAME_STR,
     DidSecretEncryptionConfig,
     PredefinedAccountsConfig,
+    SeedDidsFromNamesInTests,
 };
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::{
-    AccountIdentityGeneratorSeeded,
     AccountServiceImpl,
     CreateAccountUseCaseImpl,
     LoginPasswordAuthProvider,
@@ -302,11 +302,11 @@ impl GetDatasetUpstreamDependenciesUseCaseHarness {
             .bind::<dyn Outbox, OutboxImmediateImpl>()
             .add::<GetDatasetUpstreamDependenciesUseCaseImpl>()
             .add::<PredefinedAccountsRegistrator>()
-            .add::<AccountIdentityGeneratorSeeded>()
             .add::<RebacServiceImpl>()
             .add::<InMemoryRebacRepository>()
             .add::<UpdateAccountUseCaseImpl>()
             .add::<CreateAccountUseCaseImpl>()
+            .add_value(SeedDidsFromNamesInTests)
             .add_value(DefaultAccountProperties::default())
             .add_value(DefaultDatasetProperties::default())
             .add_value(PredefinedAccountsConfig {

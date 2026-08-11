@@ -387,7 +387,7 @@ async fn test_create_account() {
             is_admin: false,
             can_provision_accounts: true,
         })
-        .use_default_account_identity_generator_default(true)
+        .seed_dids_from_names(false)
         .build()
         .await;
 
@@ -1264,7 +1264,7 @@ impl GraphQLAccountsHarness {
     #[builder]
     pub async fn new(
         predefined_account_opts: Option<PredefinedAccountOpts>,
-        use_default_account_identity_generator_default: Option<bool>,
+        seed_dids_from_names: Option<bool>,
     ) -> Self {
         let mut b = dill::CatalogBuilder::new();
         database_common::NoOpDatabasePlugin::init_database_components(&mut b);
@@ -1295,11 +1295,9 @@ impl GraphQLAccountsHarness {
                 ))
                 .bind::<dyn messaging_outbox::Outbox, messaging_outbox::OutboxImmediateImpl>();
 
-            if use_default_account_identity_generator_default.unwrap_or(false) {
-                b.add::<kamu_accounts_services::AccountIdentityGeneratorDefault>()
-            } else {
-                b.add::<kamu_accounts_services::AccountIdentityGeneratorSeeded>()
-            };
+            if seed_dids_from_names.unwrap_or(true) {
+                b.add_value(SeedDidsFromNamesInTests);
+            }
 
             b.build()
         };

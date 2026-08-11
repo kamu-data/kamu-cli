@@ -21,9 +21,6 @@ Recommendation: for ease of reading, use the following format:
 - Revised approaches for handling predefined accounts (mostly `PredefinedAccountsRegistrator`) (#1674):
   - Now, every predefined password account has its own unique key, even for single-tenant workspaces
   - Stricter validation of predefined accounts
-  - `AccountIdentityGenerator` has been added, with two implementations: 
-    - `AccountIdentityGeneratorDefault`: generating an ID from an DID secret
-    - `AccountIdentityGeneratorSeeded`: for tests
 - New account IDs are derived from DID secret keys, not from names (#1674):
   - `DEFAULT_ACCOUNT_ID` has been removed; now we only use `TEST_ACCOUNT_ID` for testing, 
     which does not exist in the production code paths (affects new single-tenant workspaces)

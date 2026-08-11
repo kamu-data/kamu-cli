@@ -16,7 +16,6 @@ interface "AccessTokenRepository" <<i>>
 interface "AccessTokenService" <<i>>
 interface "AccessTokenStore" <<i>>
 interface "AccountAuthorizationHelper" <<i>>
-interface "AccountIdentityGenerator" <<i>>
 interface "AccountQuotaEventStore" <<i>>
 interface "AccountQuotaService" <<i>>
 interface "AccountQuotaStorageChecker" <<i>>
@@ -155,7 +154,6 @@ interface "WebhookSubscriptionEventStore" <<i>>
 class "AccessTokenRegistryService"
 class "AccessTokenServiceImpl"
 class "AccountAuthorizationHelperImpl"
-class "AccountIdentityGeneratorDefault"
 class "AccountProperties" <<singleton>>
 class "AccountQuotaCheckerStorageImpl"
 class "AccountQuotaServiceImpl"
@@ -543,7 +541,6 @@ class "WsSmartTransferProtocolClient"
 "AccessTokenServiceImpl"  --> "AccessTokenRepository"
 "AccessTokenServiceImpl"  --> "Outbox"
 "AccessTokenServiceImpl"  --> "SystemTimeSource"
-"AccountIdentityGenerator" <|-- "AccountIdentityGeneratorDefault"
 "AccountQuotaService" <|-- "AccountQuotaServiceImpl"
 "AccountQuotaServiceImpl"  --> "AccountQuotaEventStore"
 "AccountQuotaServiceImpl"  --> "SystemTimeSource"
@@ -580,11 +577,11 @@ class "WsSmartTransferProtocolClient"
 "PredefinedAccountsRegistrator"  --> "AccountProperties"
 "CreateAccountUseCase" <|-- "CreateAccountUseCaseImpl"
 "CreateAccountUseCaseImpl"  --> "DidSecretKeyRepository"
-"CreateAccountUseCaseImpl"  --> "AccountIdentityGenerator"
 "CreateAccountUseCaseImpl"  --> "AccountService"
 "CreateAccountUseCaseImpl"  --> "Outbox"
 "CreateAccountUseCaseImpl"  --> "SystemTimeSource"
 "CreateAccountUseCaseImpl"  --> "DidSecretEncryptionConfig"
+"CreateAccountUseCaseImpl" "?" --> "SeedDidsFromNamesInTests"
 "DeleteAccountUseCase" <|-- "DeleteAccountUseCaseImpl"
 "DeleteAccountUseCaseImpl"  --> "AccountService"
 "DeleteAccountUseCaseImpl"  --> "AccountAuthorizationHelper"

@@ -14,10 +14,14 @@ use ::serde::Deserialize;
 use axum::extract::{FromRequestParts, Path};
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use kamu::domain::*;
-use kamu_accounts::{CurrentAccountSubject, DidSecretEncryptionConfig, PredefinedAccountsConfig};
+use kamu_accounts::{
+    CurrentAccountSubject,
+    DidSecretEncryptionConfig,
+    PredefinedAccountsConfig,
+    SeedDidsFromNamesInTests,
+};
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::{
-    AccountIdentityGeneratorSeeded,
     AccountServiceImpl,
     CreateAccountUseCaseImpl,
     LoginPasswordAuthProvider,
@@ -93,7 +97,7 @@ async fn setup_repo() -> RepoFixture {
         .add::<AccountServiceImpl>()
         .add::<UpdateAccountUseCaseImpl>()
         .add::<CreateAccountUseCaseImpl>()
-        .add::<AccountIdentityGeneratorSeeded>()
+        .add_value(SeedDidsFromNamesInTests)
         .add::<InMemoryAccountRepository>()
         .add::<PredefinedAccountsRegistrator>()
         .add::<RebacServiceImpl>()

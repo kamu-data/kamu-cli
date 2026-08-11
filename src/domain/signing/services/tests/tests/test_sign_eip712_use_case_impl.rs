@@ -22,11 +22,11 @@ use kamu_accounts::{
     DidSecretKeyRepository,
     PredefinedAccountsConfig,
     SAMPLE_DID_SECRET_KEY_ENCRYPTION_KEY,
+    SeedDidsFromNamesInTests,
 };
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::utils::AccountAuthorizationHelperImpl;
 use kamu_accounts_services::{
-    AccountIdentityGeneratorSeeded,
     AccountServiceImpl,
     CreateAccountUseCaseImpl,
     PredefinedAccountsRegistrator,
@@ -583,13 +583,13 @@ impl SignEip712UseCaseHarness {
         b.add::<SystemTimeSourceDefault>()
             .add_value(predefined_accounts_config)
             .add::<PredefinedAccountsRegistrator>()
-            .add::<AccountIdentityGeneratorSeeded>()
             .add::<InMemoryAccountRepository>()
             .add::<InMemoryDidSecretKeyRepository>()
             .add_value(DidSecretEncryptionConfig::sample())
             .add::<AccountServiceImpl>()
             .add::<UpdateAccountUseCaseImpl>()
             .add::<CreateAccountUseCaseImpl>()
+            .add_value(SeedDidsFromNamesInTests)
             .add::<AccountAuthorizationHelperImpl>()
             .add::<RebacServiceImpl>()
             .add::<InMemoryRebacRepository>()

@@ -149,7 +149,7 @@ impl ServerSideS3Harness {
                 .add::<AuthenticationServiceImpl>()
                 .add::<AccountServiceImpl>()
                 .add::<CreateAccountUseCaseImpl>()
-                .add::<AccountIdentityGeneratorSeeded>()
+                .add_value(SeedDidsFromNamesInTests)
                 .add::<UpdateAccountUseCaseImpl>()
                 .add::<ModifyAccountPasswordUseCaseImpl>()
                 .add::<InMemoryAccountRepository>()

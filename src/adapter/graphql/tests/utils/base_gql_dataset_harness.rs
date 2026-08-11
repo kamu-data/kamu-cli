@@ -9,10 +9,9 @@
 
 use bon::bon;
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
-use kamu_accounts::{CurrentAccountSubject, LoggedAccount};
+use kamu_accounts::{CurrentAccountSubject, LoggedAccount, SeedDidsFromNamesInTests};
 use kamu_accounts_inmem::{InMemoryAccountQuotaEventStore, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::{
-    AccountIdentityGeneratorSeeded,
     AccountQuotaServiceImpl,
     CreateAccountUseCaseImpl,
     UpdateAccountUseCaseImpl,
@@ -75,7 +74,7 @@ impl BaseGQLDatasetHarness {
                 .add::<CreateDatasetUseCaseImpl>()
                 .add::<UpdateAccountUseCaseImpl>()
                 .add::<CreateAccountUseCaseImpl>()
-                .add::<AccountIdentityGeneratorSeeded>()
+                .add_value(SeedDidsFromNamesInTests)
                 .add::<CreateDatasetUseCaseHelper>()
                 .add::<DatasetReferenceServiceImpl>()
                 .add::<InMemoryDatasetReferenceRepository>()
