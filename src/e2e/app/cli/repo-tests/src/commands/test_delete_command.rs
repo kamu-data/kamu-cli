@@ -122,8 +122,8 @@ pub async fn test_delete_dataset_dry_run(kamu: KamuCliPuppet) {
         ["delete", "player-scores", "--dry-run"],
         None,
         Some([
-            r#"Would delete: player-scores"#,
-            r#"Summary 1 item\(s\): 1 would delete, 0 ignored, 0 failed"#,
+            r#"Deleted \(dry-run\): player-scores"#,
+            r#"Summary 1 item\(s\): 1 deleted \(dry-run\), 0 ignored, 0 failed"#,
         ]),
     )
     .await;
@@ -521,9 +521,9 @@ pub async fn test_delete_dataset_recursive_force_dry_run_previews_foreign_downst
         ],
         None,
         Some([
-            r#"Would leave behind: 1 inaccessible downstream dataset\(s\)"#,
-            r#"Would delete: alice/alice-root"#,
-            r#"Summary 2 item\(s\): 1 would delete, 1 ignored, 0 failed"#,
+            r#"Left behind \(dry-run\): 1 inaccessible downstream dataset\(s\)"#,
+            r#"Deleted \(dry-run\): alice/alice-root"#,
+            r#"Summary 2 item\(s\): 1 deleted \(dry-run\), 1 ignored, 0 failed"#,
         ]),
     )
     .await;

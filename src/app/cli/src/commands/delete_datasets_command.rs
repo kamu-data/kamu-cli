@@ -403,7 +403,7 @@ struct DeleteDatasetsPrinter;
 impl DeleteDatasetsPrinter {
     fn print_success(dataset_handle: &odf::DatasetHandle, dry_run: bool) {
         let label = if dry_run {
-            console::style("Would delete").cyan().bold()
+            console::style("Deleted (dry-run)").cyan().bold()
         } else {
             console::style("Deleted").green().bold()
         };
@@ -413,7 +413,7 @@ impl DeleteDatasetsPrinter {
 
     fn print_inaccessible_downstream_count(count: usize, dry_run: bool) {
         let label = if dry_run {
-            "Would leave behind"
+            "Left behind (dry-run)"
         } else {
             "Left behind"
         };
@@ -426,7 +426,7 @@ impl DeleteDatasetsPrinter {
 
     fn print_left_behind(dataset_handle: &odf::DatasetHandle, dry_run: bool) {
         let label = if dry_run {
-            "Would leave behind"
+            "Left behind (dry-run)"
         } else {
             "Left behind"
         };
@@ -449,7 +449,11 @@ impl DeleteDatasetsPrinter {
     }
 
     fn print_summary(summary: &DeleteDatasetsSummary, dry_run: bool) {
-        let deleted_label = if dry_run { "would delete" } else { "deleted" };
+        let deleted_label = if dry_run {
+            "deleted (dry-run)"
+        } else {
+            "deleted"
+        };
 
         eprintln!(
             "{} {} item(s): {} {}, {} ignored, 0 failed",

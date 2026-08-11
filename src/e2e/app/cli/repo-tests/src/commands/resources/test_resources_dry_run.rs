@@ -76,8 +76,8 @@ pub async fn test_resources_dry_run_safety(ctx: ResourceCtx) {
     ctx.assert_success(
         ["delete", "vs", resource_name, "--dry-run"],
         Some(&[
-            r#"Would delete: VariableSet/dry-run-vars"#,
-            r#"Summary 1 item\(s\): 1 would delete, 0 ignored, 0 failed"#,
+            r#"Deleted \(dry-run\): VariableSet/dry-run-vars"#,
+            r#"Summary 1 item\(s\): 1 deleted \(dry-run\), 0 ignored, 0 failed"#,
         ]),
     )
     .await;

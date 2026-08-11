@@ -435,7 +435,7 @@ impl DeleteResourcesPrinter {
         }
 
         let label = if dry_run {
-            console::style("Would delete").cyan().bold()
+            console::style("Deleted (dry-run)").cyan().bold()
         } else {
             console::style("Deleted").green().bold()
         };
@@ -469,7 +469,11 @@ impl DeleteResourcesPrinter {
     }
 
     fn print_summary(summary: &DeleteResourcesSummary, dry_run: bool) {
-        let deleted_label = if dry_run { "would delete" } else { "deleted" };
+        let deleted_label = if dry_run {
+            "deleted (dry-run)"
+        } else {
+            "deleted"
+        };
 
         eprintln!(
             "{} {} item(s): {} {}, {} ignored, {} failed",
