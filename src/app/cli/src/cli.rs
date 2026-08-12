@@ -272,7 +272,7 @@ pub enum SummaryOutputFormat {
 #[derive(Debug, clap::Args)]
 pub struct ResourceContextArgs {
     /// Override the current resource context for this invocation
-    #[arg(long, short = 'c', value_name = "NAME")]
+    #[arg(long, short = 'c', value_name = "CONTEXT_NAME")]
     pub context: Option<String>,
 }
 
@@ -447,7 +447,7 @@ pub struct ContextAdd {
 
     /// Context name
     #[arg()]
-    pub name: String,
+    pub new_name: String,
 }
 
 /// List configured resource contexts
@@ -1487,7 +1487,7 @@ pub struct New {
 
     /// Name of the new dataset
     #[arg(value_parser = parsers::dataset_name)]
-    pub name: odf::DatasetName,
+    pub dataset_name: odf::DatasetName,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1575,7 +1575,7 @@ pub struct Pull {
     pub fetch_uncacheable: bool,
 
     /// Local name of a dataset to use when syncing from a repository
-    #[arg(long, value_name = "NAME", value_parser = parsers::dataset_name)]
+    #[arg(long, value_name = "DATASET_NAME", value_parser = parsers::dataset_name)]
     pub r#as: Option<odf::DatasetName>,
 
     /// Don't automatically add a remote push alias for this destination
@@ -1688,7 +1688,7 @@ pub struct Rename {
 
     /// The new name to give it
     #[arg(index = 2, value_parser = parsers::dataset_name)]
-    pub name: odf::DatasetName,
+    pub new_name: odf::DatasetName,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1762,7 +1762,7 @@ For ODF-compatible smart repositories use:
 pub struct RepoAdd {
     /// Local alias of the repository
     #[arg(index = 1, value_parser = parsers::repo_name)]
-    pub name: odf::RepoName,
+    pub repo_name: odf::RepoName,
 
     /// URL of the repository
     #[arg(index = 2)]
