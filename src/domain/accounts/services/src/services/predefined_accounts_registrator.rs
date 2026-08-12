@@ -7,8 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::collections::HashMap;
 use std::collections::hash_map::Entry;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use init_on_startup::{InitOnStartup, InitOnStartupMeta};
@@ -70,13 +70,19 @@ impl PredefinedAccountsRegistrator {
         }
     }
 
-    async fn resolve_account_ids(&self) -> Result<AccountIdsResolution, InternalError> {
+    async fn resolve_account_ids(
+        &self,
+        invalid_configs_by_name: HashSet<odf::AccountName>,
+    ) -> Result<AccountIdsResolution, InternalError> {
         use futures::future::try_join_all;
 
         // NOTE: PERF: io-bound futures so `tokio::Task`s are unneeded
-        let resolutions: Vec<_> =
-            try_join_all(self.predefined_accounts_config.predefined.iter().map(
-                |account_config| async move {
+        let resolutions: Vec<_> = try_join_all(
+            self.predefined_accounts_config
+                .predefined
+                .iter()
+                .filter(|config| !invalid_configs_by_name.contains(&config.account_name))
+                .map(|account_config| async move {
                     let maybe_resolved_account_id =
                         account_config.get_account_id_from_config_or_private_key();
 
@@ -117,9 +123,9 @@ impl PredefinedAccountsRegistrator {
                     };
 
                     Ok::<_, InternalError>(result)
-                },
-            ))
-            .await?;
+                }),
+        )
+        .await?;
 
         // If there are duplicates by account ID, skip them.
         // This could happen i.e., when a predefined user gets renamed,
@@ -133,7 +139,7 @@ impl PredefinedAccountsRegistrator {
                 AccountIdResolution::Resolved((account_id, account_config)) => {
                     match account_config_by_id.entry(account_id.clone()) {
                         Entry::Vacant(entry) => {
-                            entry.insert(account_config.clone());
+                            entry.insert(account_config);
                         }
                         Entry::Occupied(entry) => {
                             let previously_stored_config = entry.get();
@@ -361,18 +367,29 @@ impl InitOnStartup for PredefinedAccountsRegistrator {
         name = "PredefinedAccountsRegistrator::run_initialization"
     )]
     async fn run_initialization(&self) -> Result<(), InternalError> {
-        // Pre-flight checks
-        self.predefined_accounts_config.validate().int_err()?;
+        // Skip invalid configs
+        let mut invalid_configs_by_name = HashSet::new();
+        if let Err(batch_error) = self.predefined_accounts_config.validate() {
+            for (_, e) in batch_error.failures {
+                tracing::warn!(
+                    error = ?e,
+                    error_msg = %e,
+                    "Skip a predefined account w/ invalid config",
+                );
+                invalid_configs_by_name.insert(e.account_name().clone());
+            }
+        }
 
         // Resolve account IDs for predefined accounts w/o IDs
-        let account_ids_resolution = self.resolve_account_ids().await?;
+        let account_ids_resolution = self.resolve_account_ids(invalid_configs_by_name).await?;
 
         // Log configs with conflicting fields
         for e in account_ids_resolution.conflicted {
             tracing::warn!(
                 error = ?e,
                 error_msg = %e,
-                "Skip a predefined account w/ potentially conflicting fields. Skipping",
+                account_name = %e.account_name,
+                "Skip a predefined account w/ potentially conflicting fields",
             );
         }
 

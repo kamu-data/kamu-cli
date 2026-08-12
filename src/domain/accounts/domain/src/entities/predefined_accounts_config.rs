@@ -402,4 +402,17 @@ pub enum AccountConfigValidationError {
     },
 }
 
+impl AccountConfigValidationError {
+    pub fn account_name(&self) -> &odf::AccountName {
+        match self {
+            AccountConfigValidationError::IdMismatch { account_name, .. }
+            | AccountConfigValidationError::InvalidEmail { account_name, .. }
+            | AccountConfigValidationError::InvalidProvider { account_name, .. }
+            | AccountConfigValidationError::PrivateKeyNotAllowed { account_name, .. }
+            | AccountConfigValidationError::ExpectedDidOdf { account_name, .. }
+            | AccountConfigValidationError::ExpectedDidPkh { account_name, .. } => account_name,
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
