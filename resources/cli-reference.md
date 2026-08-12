@@ -117,7 +117,7 @@ Create or update resources from manifest files
 
 **Options:**
 
-* `-c`, `--context <NAME>` — Override the current resource context for this invocation
+* `-c`, `--context <CONTEXT_NAME>` — Override the current resource context for this invocation
 * `--dry-run` — Preview the accepted changes without applying them
 * `--format <FMT>` — Parse all selected files using the specified manifest format
 
@@ -425,11 +425,11 @@ List supported resource types from a specific context:
 
 Register a new remote resource context
 
-**Usage:** `kamu context add [OPTIONS] --url <URL> <NAME>`
+**Usage:** `kamu context add [OPTIONS] --url <URL> <NEW_NAME>`
 
 **Arguments:**
 
-* `<NAME>` — Context name
+* `<NEW_NAME>` — Context name
 
 **Options:**
 
@@ -585,7 +585,7 @@ List supported resource types in the active context
 
 **Options:**
 
-* `-c`, `--context <NAME>` — Override the current resource context for this invocation
+* `-c`, `--context <CONTEXT_NAME>` — Override the current resource context for this invocation
 * `-o`, `--output-format <FMT>` — Format to display the results in
 
   Possible values:
@@ -671,7 +671,7 @@ Delete datasets or resources
 
 **Options:**
 
-* `-c`, `--context <NAME>` — Override the current resource context for this invocation
+* `-c`, `--context <CONTEXT_NAME>` — Override the current resource context for this invocation
 * `-a`, `--all` — Delete all matched datasets or all resources in the selected scope
 * `-r`, `--recursive` — Also delete all transitive dependencies of specified datasets
 * `-f`, `--force` — Do not ask for confirmation
@@ -792,7 +792,7 @@ Returns manifest representation of a resource
 
 **Options:**
 
-* `-c`, `--context <NAME>` — Override the current resource context for this invocation
+* `-c`, `--context <CONTEXT_NAME>` — Override the current resource context for this invocation
 * `-o`, `--output-format <FMT>` — Serialization format of the returned object
 
   Default value: `yaml`
@@ -1050,7 +1050,7 @@ List datasets or resources
 
 **Options:**
 
-* `-c`, `--context <NAME>` — Override the current resource context for this invocation
+* `-c`, `--context <CONTEXT_NAME>` — Override the current resource context for this invocation
 * `-o`, `--output-format <FMT>` — Format to display the results in
 
   Possible values:
@@ -1254,11 +1254,11 @@ Logs out from a remote Kamu server
 
 Creates a new dataset manifest from a template
 
-**Usage:** `kamu new [OPTIONS] <NAME>`
+**Usage:** `kamu new [OPTIONS] <DATASET_NAME>`
 
 **Arguments:**
 
-* `<NAME>` — Name of the new dataset
+* `<DATASET_NAME>` — Name of the new dataset
 
 **Options:**
 
@@ -1314,7 +1314,7 @@ Pull new data into the datasets
 * `-a`, `--all` — Pull all datasets in the workspace
 * `-r`, `--recursive` — Also pull all transitive dependencies of specified datasets
 * `--fetch-uncacheable` — Pull latest data from uncacheable data sources
-* `--as <NAME>` — Local name of a dataset to use when syncing from a repository
+* `--as <DATASET_NAME>` — Local name of a dataset to use when syncing from a repository
 * `--no-alias` — Don't automatically add a remote push alias for this destination
 * `--set-watermark <TIME>` — Injects a manual watermark into the dataset to signify that no data is expected to arrive with event time that precedes it
 * `-f`, `--force` — Overwrite local version with remote, even if revisions have diverged
@@ -1420,12 +1420,12 @@ Add dataset to local IPFS node and update IPNS entry to the new CID:
 
 Rename a dataset
 
-**Usage:** `kamu rename <DATASET> <NAME>`
+**Usage:** `kamu rename <DATASET> <NEW_NAME>`
 
 **Arguments:**
 
 * `<DATASET>` — Dataset reference
-* `<NAME>` — The new name to give it
+* `<NEW_NAME>` — The new name to give it
 
 Use this command to rename a dataset in your local workspace. Renaming is safe in terms of downstream derivative datasets as they use stable dataset IDs to define their inputs.
 
@@ -1489,11 +1489,11 @@ Add S3 bucket as a repository:
 
 Adds a repository
 
-**Usage:** `kamu repo add <NAME> <URL>`
+**Usage:** `kamu repo add <REPO_NAME> <URL>`
 
 **Arguments:**
 
-* `<NAME>` — Local alias of the repository
+* `<REPO_NAME>` — Local alias of the repository
 * `<URL>` — URL of the repository
 
 For local file system repositories use the following URL formats:
@@ -1832,7 +1832,7 @@ Show resource summary for the active context
 
 **Options:**
 
-* `-c`, `--context <NAME>` — Override the current resource context for this invocation
+* `-c`, `--context <CONTEXT_NAME>` — Override the current resource context for this invocation
 * `-o`, `--output-format <FMT>` — Format to display the results in
 
   Possible values: `table`, `json`, `yaml`
