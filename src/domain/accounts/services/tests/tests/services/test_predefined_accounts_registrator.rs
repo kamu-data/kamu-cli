@@ -211,7 +211,7 @@ async fn test_mt_emulate_running_a_node_with_updated_registrator() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_mt_alice_has_wrong_config() {
+async fn test_mt_skip_alice_wrong_config() {
     let alice_account_name = odf::AccountName::new_unchecked("alice");
     let alice_account_id = odf::metadata::testing::account_id(&alice_account_name);
     let bob_account_name = odf::AccountName::new_unchecked("bob");
@@ -783,6 +783,100 @@ async fn test_mt_alice_change_rebac_properties() {
             harness
                 .try_get_account_properties(&second_run_catalog, &second_run_alice_account.id)
                 .await
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_mt_skip_accounts_with_conflicting_fields() {
+    let alice_account_name = odf::AccountName::new_unchecked("alice");
+    let bob_account_name = odf::AccountName::new_unchecked("bob");
+    let carol_account_name = odf::AccountName::new_unchecked("carol");
+
+    let mut outbox = MockOutbox::new();
+    // Only Alice's account will be created -- rest skipped
+    kamu_accounts::testing::expect_outbox_account_created()
+        .mock_outbox(&mut outbox)
+        .expected_account_name(alice_account_name.clone())
+        .expected_display_name("alice".to_string())
+        .expected_email(Email::parse("alice@example.com").unwrap())
+        .expected_times(1)
+        .call();
+
+    let harness = PredefinedAccountsRegistratorHarness::builder()
+        .mock_outbox(outbox)
+        .build();
+
+    let predefined_accounts_config = PredefinedAccountsConfig {
+        predefined: vec![AccountConfig::test_config_from_name(
+            alice_account_name.clone(),
+        )],
+    };
+
+    // 1. Create Alice's account
+    let first_run_alice_account = {
+        let first_run_catalog = harness.build_catalog(predefined_accounts_config.clone());
+
+        assert_matches!(harness.run_initialization(&first_run_catalog).await, Ok(_));
+
+        assert_matches!(
+            harness
+                .try_get_account_by_name(&first_run_catalog, &bob_account_name)
+                .await,
+            None
+        );
+        assert_matches!(
+            harness
+                .try_get_account_by_name(&first_run_catalog, &carol_account_name)
+                .await,
+            None
+        );
+
+        harness
+            .try_get_account_by_name(&first_run_catalog, &alice_account_name)
+            .await
+            .unwrap()
+    };
+
+    // 2. Create Alice's account
+    {
+        let second_run_catalog = harness.build_catalog({
+            let mut c = predefined_accounts_config;
+            // Bob is trying to steal the account_name / provider_identity_key
+            c.predefined.push(
+                AccountConfig::test_config_from_name(bob_account_name.clone())
+                    .set_account_name(alice_account_name.clone()),
+            );
+            // Carol is trying to steal the email
+            c.predefined.push(
+                AccountConfig::test_config_from_name(carol_account_name.clone())
+                    .set_email(Email::parse("alice@example.com").unwrap()),
+            );
+            c
+        });
+
+        assert_matches!(harness.run_initialization(&second_run_catalog).await, Ok(_));
+
+        let second_run_alice_account = harness
+            .try_get_account_by_name(&second_run_catalog, &alice_account_name)
+            .await
+            .unwrap();
+
+        assert_eq!(first_run_alice_account, second_run_alice_account);
+
+        assert_matches!(
+            harness
+                .try_get_account_by_name(&second_run_catalog, &bob_account_name)
+                .await,
+            None
+        );
+        assert_matches!(
+            harness
+                .try_get_account_by_name(&second_run_catalog, &carol_account_name)
+                .await,
+            None
         );
     }
 }
