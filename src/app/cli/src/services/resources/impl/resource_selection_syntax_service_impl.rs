@@ -13,7 +13,6 @@ use std::sync::Arc;
 use kamu_resources::ResourceTypeDescriptor;
 
 use super::resource_selection_syntax_parser::{
-    ALL_SELECTOR,
     ANY_SELECTOR,
     ParsedSyntax,
     ResourceSelectionSyntaxParser,
@@ -110,60 +109,31 @@ impl ResourceSelectionSyntaxServiceImpl {
             // Handled directly in `parse_get_args` before reaching here.
             ParsedSyntax::ById { .. } => unreachable!("ById is handled in parse_get_args"),
 
-            ParsedSyntax::All { shadowed_inputs } => {
-                items.push(ResourceSelectionItem::All);
-
-                // Shadowed selectors are reported separately instead of being kept in
-                // `items`, so downstream resolution never wastes backend lookups on
-                // selectors whose scope is already covered by `all`.
-                for shadowed_input in shadowed_inputs {
-                    if let Some(type_str) = shadowed_input.type_str {
-                        Self::validate_shadowed_resource_type_target(
-                            supported_resource_types,
-                            type_str,
-                        )?;
-                    }
-                    shadowed_selectors.push(ResourceShadowedSelector {
-                        selector_input: shadowed_input.display.to_owned(),
-                    });
-                }
-            }
-
             // type sel1 sel2 ..
             ParsedSyntax::SameType {
                 type_str,
                 selector_inputs,
             } => {
                 // Same-type syntax has a single explicit type and only varies by
-                // selector names. The only broad token in this mode is `all`,
-                // so coverage checks are O(n) and local to the selector list.
-
-                // Note: parsing ensured `type_str` is never "all", that goes to
-                // `ParsedSyntax::All`. `type_str` can still be `%` (all types).
+                // selector names. The only broad token in this mode is `%`, so
+                // coverage checks are O(n) and local to the selector list.
+                // `type_str` may still be `%` (all types).
 
                 if selector_inputs
                     .iter()
-                    .any(|selector_input| selector_input.eq_ignore_ascii_case(ALL_SELECTOR))
+                    .any(|selector_input| Self::is_broad_name_selector(selector_input))
                 {
-                    // Keep the original `all` spelling as typed by user in
-                    // `selector_input` for diagnostics output.
                     items.push(Self::make_all_by_type_item(
                         supported_resource_types,
                         type_str,
-                        selector_inputs
-                            .iter()
-                            .find(|selector_input| {
-                                selector_input.eq_ignore_ascii_case(ALL_SELECTOR)
-                            })
-                            .expect("same-type all selector should exist")
-                            .to_string(),
+                        ANY_SELECTOR.to_owned(),
                     )?);
 
                     // Any concrete selector for the same type is fully covered
-                    // by `<type>/all`, so record it as shadowed instead of
+                    // by `<type>/%`, so record it as shadowed instead of
                     // scheduling additional selector-resolution work.
                     for selector_input in selector_inputs {
-                        if !selector_input.eq_ignore_ascii_case(ALL_SELECTOR) {
+                        if !Self::is_broad_name_selector(selector_input) {
                             // Keep only the broad selector in `items`; narrower selectors
                             // move to `shadowed_selectors` so resolution and delete
                             // validation can treat them as already covered.
@@ -222,7 +192,7 @@ impl ResourceSelectionSyntaxServiceImpl {
                         continue;
                     };
 
-                    let is_broad_selector = Self::is_ref_form_broad_selector(selector_input);
+                    let is_broad_selector = Self::is_broad_name_selector(selector_input);
                     // Broad selector is shadowed when some other broad selector
                     // covers a strict superset of its matched types.
                     let is_shadowed_by_broader_selector =
@@ -328,29 +298,20 @@ impl ResourceSelectionSyntaxServiceImpl {
         }
     }
 
-    /// Builds the item for a broad (`all` / `%`) name selector on `type_str`.
+    /// Builds the item for a broad (`%`) name selector on `type_str`.
     fn make_all_by_type_item(
         supported_resource_types: &[ResourceTypeDescriptor],
         type_str: &str,
         selector_input: String,
     ) -> Result<ResourceSelectionItem, CLIError> {
         match Self::classify_type_token(supported_resource_types, type_str)? {
-            // Every type, every name — indistinguishable from a plain `all`.
+            // Every type, every name.
             ResourceTypeToken::AnyType => Ok(ResourceSelectionItem::All),
             ResourceTypeToken::Exact(type_descriptor) => Ok(ResourceSelectionItem::AllByType {
                 type_descriptor: *type_descriptor,
                 selector_input,
             }),
         }
-    }
-
-    fn validate_shadowed_resource_type_target(
-        supported_resource_types: &[ResourceTypeDescriptor],
-        type_str: &str,
-    ) -> Result<(), CLIError> {
-        Self::classify_type_token(supported_resource_types, type_str)?;
-
-        Ok(())
     }
 
     async fn make_selector_item(
@@ -454,9 +415,9 @@ impl ResourceSelectionSyntaxServiceImpl {
         targets
     }
 
-    /// A broad *name* selector: `all` or `%`, both meaning "every name".
-    fn is_ref_form_broad_selector(selector_input: &str) -> bool {
-        selector_input.eq_ignore_ascii_case(ALL_SELECTOR) || selector_input == ANY_SELECTOR
+    /// A broad *name* selector: `%`, meaning "every name".
+    fn is_broad_name_selector(selector_input: &str) -> bool {
+        selector_input == ANY_SELECTOR
     }
 
     fn ref_form_broad_resource_type_coverage(
@@ -464,7 +425,7 @@ impl ResourceSelectionSyntaxServiceImpl {
         type_str: &str,
         selector_input: &str,
     ) -> Option<TypeCoverage> {
-        Self::is_ref_form_broad_selector(selector_input)
+        Self::is_broad_name_selector(selector_input)
             .then(|| {
                 Self::resource_type_coverage_for_selector_target(supported_resource_types, type_str)
             })
@@ -678,13 +639,13 @@ mod tests {
         let cases = [
             Case {
                 name: "global broad shadows exact type broad",
-                input: &["%/all", "ss/%"],
+                input: &["%/%", "ss/%"],
                 expected_items: &["all"],
                 expected_shadowed: &["ss/%"],
             },
             Case {
                 name: "equal broad coverages emit once without shadowing",
-                input: &["ss/%", "secrets/all"],
+                input: &["ss/%", "secrets/%"],
                 expected_items: &["all-by-type:secrets:%"],
                 expected_shadowed: &[],
             },
@@ -702,9 +663,9 @@ mod tests {
             },
             Case {
                 name: "global broad shadows every exact type broad",
-                input: &["%/%", "ss/%", "vs/all"],
+                input: &["%/%", "ss/%", "vs/%"],
                 expected_items: &["all"],
-                expected_shadowed: &["ss/%", "vs/all"],
+                expected_shadowed: &["ss/%", "vs/%"],
             },
         ];
 
@@ -808,11 +769,26 @@ mod tests {
                 expected_items: &["name-pattern:variables:app-%"],
                 expected_shadowed: &[],
             },
+            // This is the form `delete <type> --all` desugars to, so it must
+            // yield a broad item rather than a name pattern.
             Case {
-                name: "same-type all remains case insensitive",
-                input: &["vs", "ALL", "my-vars"],
-                expected_items: &["all-by-type:variables:ALL"],
+                name: "same-type broad selector shadows narrower names",
+                input: &["vs", "%", "my-vars"],
+                expected_items: &["all-by-type:variables:%"],
                 expected_shadowed: &["my-vars"],
+            },
+            Case {
+                name: "same-type broad selector alone",
+                input: &["vs", "%"],
+                expected_items: &["all-by-type:variables:%"],
+                expected_shadowed: &[],
+            },
+            // `all` lost its special meaning: it is now just a name.
+            Case {
+                name: "all is an ordinary name",
+                input: &["vs", "all"],
+                expected_items: &["exact:variables:all"],
+                expected_shadowed: &[],
             },
         ];
 
@@ -862,16 +838,16 @@ mod tests {
 
         let cases = [
             Case {
-                name: "global all keeps shadowed ref selector",
-                input: &["all", "vs/app-%"],
+                name: "global broad keeps shadowed name pattern",
+                input: &["%/%", "vs/app-%"],
                 expected_items: &["all"],
                 expected_shadowed: &["vs/app-%"],
             },
             Case {
-                name: "global all keeps shadowed plain selector",
-                input: &["all", "my-vars"],
+                name: "global broad keeps shadowed exact selector",
+                input: &["%/%", "vs/my-vars"],
                 expected_items: &["all"],
-                expected_shadowed: &["my-vars"],
+                expected_shadowed: &["vs/my-vars"],
             },
         ];
 
@@ -895,7 +871,17 @@ mod tests {
 
     #[tokio::test]
     async fn test_interpret_all_rejects_unsupported_shadowed_type() {
-        assert_matches!(try_interpret(&["all", "unknown/foo"]).await, Err(_));
+        assert_matches!(try_interpret(&["%/%", "unknown/foo"]).await, Err(_));
+    }
+
+    // The mixed plain/slash form had one exemption, for a leading `all`. With
+    // that keyword gone the rule is unconditional.
+    #[tokio::test]
+    async fn test_interpret_rejects_mixed_plain_and_slash_forms() {
+        assert_matches!(
+            try_interpret(&["%", "vs/app-%"]).await,
+            Err(ref e) if e.to_string().contains("mix")
+        );
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -910,8 +896,8 @@ mod tests {
             &["%TS/db-creds"][..],
             &["s%/%"][..],
             &["s%", "db-creds"][..],
-            &["%sets", "all"][..],
-            &["all", "unknown%/foo"][..],
+            &["%sets", "%"][..],
+            &["unknown%/foo"][..],
         ] {
             let result = try_interpret(input).await;
 

@@ -18,7 +18,7 @@ mod resource_summary_service;
 mod resource_type_lookup_service;
 
 use dill::CatalogBuilder;
-pub use r#impl::ResourceLabelSelectorParser;
+pub use r#impl::{ANY_SELECTOR, ResourceLabelSelectorParser};
 pub use resource_facade_factory::*;
 pub use resource_manifest_discovery_service::*;
 pub use resource_manifest_execution_service::*;

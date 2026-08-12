@@ -18,6 +18,7 @@ use crate::accounts;
 use crate::output::OutputConfig;
 use crate::resource_context::{ResourceContextReporter, ResourceContextResolver};
 use crate::resources::{
+    ANY_SELECTOR,
     ResourceFacadeFactory,
     ResourceLabelSelectorParser,
     ResourceTypeLookupErrorOptions,
@@ -27,7 +28,6 @@ use crate::resources::{
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 const DATASETS_TARGET: &str = "datasets";
-const ALL_TARGET: &str = "all";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -79,7 +79,7 @@ impl ListCommand {
         match self.target.as_deref() {
             None => ListMode::Datasets,
             Some(target) if target.eq_ignore_ascii_case(DATASETS_TARGET) => ListMode::Datasets,
-            Some(target) if target.eq_ignore_ascii_case(ALL_TARGET) => ListMode::ResourcesAll,
+            Some(target) if target == ANY_SELECTOR => ListMode::ResourcesAll,
             Some(_) => ListMode::ResourcesByType,
         }
     }
@@ -120,7 +120,7 @@ impl ListCommand {
                         self.explicit_context_name.as_deref(),
                         self.target.as_deref().unwrap(),
                         ResourceTypeLookupErrorOptions::new("Unsupported list target")
-                            .with_additional_targets([DATASETS_TARGET, ALL_TARGET]),
+                            .with_additional_targets([DATASETS_TARGET, ANY_SELECTOR]),
                     )
                     .await?,
             ),

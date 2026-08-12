@@ -19,6 +19,7 @@ use crate::cli_commands::validate_many_dataset_patterns_with_workspace;
 use crate::output::OutputConfig;
 use crate::resource_context::{ResourceContextReporter, ResourceContextResolver};
 use crate::resources::{
+    ANY_SELECTOR,
     ResourceFacadeFactory,
     ResourceLabelSelectorParser,
     ResourceSelectionResolutionService,
@@ -31,7 +32,6 @@ use crate::{ConfirmDeleteService, Interact, WorkspaceService, cli_value_parser a
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 const DATASETS_TARGET: &str = "datasets";
-const ALL_TARGET: &str = "all";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -344,7 +344,7 @@ impl<'a> DeleteRequestResolver<'a> {
     // Mirrors `list` dispatch, but with delete-specific dataset/resource
     // precedence:
     // - `kamu delete` / `kamu delete datasets ...` => datasets mode
-    // - `kamu delete all` => resource all-types mode
+    // - `kamu delete %` => resource all-types mode
     // - `kamu delete storages warehouse` => resource same-type mode
     // - `kamu delete foo.bar` => datasets mode when `foo.bar` is not a known
     //   resource type
@@ -367,10 +367,14 @@ impl<'a> DeleteRequestResolver<'a> {
 
         let raw_args = self.raw_args();
 
-        if raw_args
-            .first()
-            .is_some_and(|arg| arg.eq_ignore_ascii_case(ALL_TARGET))
-        {
+        // No descriptor matches `%`, so without this the all-types form would
+        // fall through to the dataset path and glob-delete every dataset.
+        if raw_args.first().is_some_and(|arg| arg == ANY_SELECTOR) {
+            let raw_args = if self.params.all {
+                Self::with_resource_all(raw_args)
+            } else {
+                raw_args
+            };
             return self.resolve_resource_request(raw_args).await;
         }
 
@@ -438,7 +442,7 @@ impl<'a> DeleteRequestResolver<'a> {
     }
 
     fn with_resource_all(mut raw_args: Vec<String>) -> Vec<String> {
-        raw_args.push(ALL_TARGET.to_owned());
+        raw_args.push(ANY_SELECTOR.to_owned());
         raw_args
     }
 
@@ -599,7 +603,7 @@ mod tests {
 
     use kamu_resources::{ResourceTypeDescriptor, TypeUri};
 
-    use super::{ClassifiedSlashDeleteRequest, DeleteRequestResolver};
+    use super::{ANY_SELECTOR, ClassifiedSlashDeleteRequest, DeleteRequestResolver};
 
     #[test]
     fn test_is_resource_id_accepts_uuid_v4() {
@@ -735,6 +739,19 @@ mod tests {
         assert!(!DeleteRequestResolver::matches_resource_target_prefix_with(
             &supported_resource_types,
             "S%",
+        ));
+    }
+
+    // No descriptor matches a bare `%`, which is why `resolve` short-circuits on
+    // it before the dataset fallback: otherwise `kamu delete %` would reach the
+    // dataset path and glob-delete every dataset.
+    #[test]
+    fn test_matches_resource_target_prefix_does_not_match_bare_any_selector() {
+        let supported_resource_types = test_resource_types();
+
+        assert!(!DeleteRequestResolver::matches_resource_target_prefix_with(
+            &supported_resource_types,
+            ANY_SELECTOR,
         ));
     }
 

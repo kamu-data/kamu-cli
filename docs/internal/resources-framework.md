@@ -1082,7 +1082,7 @@ implementation files carry `_resource(s)_` names:
 | Subcommand | Implementation file | Purpose |
 | --- | --- | --- |
 | `kamu apply` | `apply_command.rs` | Discover manifests (files/dir/stdin) and apply/plan them as a single all-or-nothing batch by default; `--dry-run`, `--recursive`, `--stdin`, `--continue-on-error`. |
-| `kamu list` | `list_resources_command.rs` | List resources by type or all; renders Table/CSV/JSON/Parquet. |
+| `kamu list` | `list_resources_command.rs` | List resources by type or `%` for all; renders Table/CSV/JSON/Parquet. |
 | `kamu get` | `get_resource_command.rs` | Get resource(s) by selector(s); names or full manifest; `--spec`, `--revealed`. |
 | `kamu delete` | `delete_resources_command.rs` | Delete by selector(s); `--force`, `--ignore-not-found`, `--dry-run`. |
 
@@ -1112,15 +1112,15 @@ themselves are agnostic. Selector grammar is specified below, after the semantic
 
 | Aspect | `apply` | `get` | `list` | `delete` |
 | --- | --- | --- | --- | --- |
-| Input | manifest(s): `-f <file>`, dir + `--recursive`, or `--stdin` | selector(s) | positional `target` (a type or `all`) | selector(s) |
-| Selector / target examples | n/a (identity from manifest) | `vs my-vars`, `vs/my-vars`, `secretset/db%`, `vs all`, `%/my-vars` | `kamu list variablesets` (or `vs`, `secretsets`, `ss`, `all`) | `vs my-vars`, `vs/my%`, `vs all` |
+| Input | manifest(s): `-f <file>`, dir + `--recursive`, or `--stdin` | selector(s) | positional `target` (a type or `%`) | selector(s) |
+| Selector / target examples | n/a (identity from manifest) | `vs my-vars`, `vs/my-vars`, `secretset/db%`, `vs/%`, `%/my-vars` | `kamu list variablesets` (or `vs`, `secretsets`, `ss`, `%`) | `vs my-vars`, `vs/my%`, `vs/%` |
 | `%` name patterns | n/a | **yes** | n/a (lists whole type) | **yes** |
 | `%` type wildcards | n/a | **only bare `%`** (= all types); `%set`/`s%` rejected | n/a | **only bare `%`**; `%set`/`s%` rejected |
 | May return / act on multiple | yes (per manifest) | **yes, but bounded** — selector-driven, capped by `max_results`, `--unbounded` to lift | yes (bounded by `--max-results`/`--unbounded`) | yes |
 | Output modes | summary + changes (`--dry-run`)/warnings; verbose | `-o name` \| `-o json` \| `-o yaml`; `--spec` for apply-compatible spec | Table/CSV/JSON/Parquet (via `OutputConfig`), `-w` for wider detail | summary / dry-run preview |
 | Default secret visibility | n/a | **`Encrypted`** (ciphertext); `--revealed` to decrypt | secrets not expanded in list columns | n/a |
 | Relevant flags | `--dry-run`, `--recursive`, `--stdin`, `--continue-on-error` | `--ignore-not-found`, `--spec`, `--revealed`, `--max-results`/`--unbounded`, `--label`/`-l` | `--max-results`/`--unbounded`, `-w`, `-o`, `--label`/`-l` | `--force`, `--ignore-not-found`, `--dry-run`, `--label`/`-l` |
-| Label filtering | n/a | `-l` narrows the selector expansion | `-l` narrows the listing (incl. `list all`) | `-l` narrows what `--all`/patterns resolve to |
+| Label filtering | n/a | `-l` narrows the selector expansion | `-l` narrows the listing (incl. `list %`) | `-l` narrows what `--all`/patterns resolve to |
 | Flag semantics | default: whole batch is one transaction, a rejection/failure rolls back every manifest including earlier successes; `--continue-on-error`: apply each manifest independently so earlier successes survive a later failure; `--dry-run`: plan only, no writes | `--ignore-not-found`: skip missing selectors instead of erroring | — | `--force`: skip confirmation prompt; `--ignore-not-found`: exit OK if absent; `--dry-run`: preview resolved deletions |
 | Local vs remote | identical behavior; chosen by context (`--context` to override) | identical | identical | identical |
 
@@ -1129,14 +1129,18 @@ themselves are agnostic. Selector grammar is specified below, after the semantic
 
 **Selector grammar — accepted forms** (parsed by `ResourceSelectionSyntaxParser`,
 [`resource_selection_syntax_parser.rs`](/src/app/cli/src/services/resources/impl/resource_selection_syntax_parser.rs)):
-`all`; same-type list `type name1 name2 …` (no slash); slash form `type/name …` (each arg exactly one
-`/`); `type all` or `type/all`.
+same-type list `type name1 name2 …` (no slash); slash form `type/name …` (each arg exactly one `/`);
+broad forms `type %` or `type/%` (one type) and `%/%` (everything).
+
+`%` is the **only** broad token — there is no `all` keyword. It was removed as redundant: every role
+it played already had a `%` spelling, and reserving a real word at argument 0 forced a dedicated
+parser variant plus an exemption to the no-mixing rule. `kamu delete --all` covers the flag form.
 
 **The `%` wildcard is asymmetric between the two halves — this is the point.**
 
 - **Names** may use `%` patterns freely: `vs app-%`, `vs/db-%`, `variablesets/%`.
 - **Types** are matched **exactly** (case-insensitively) against a canonical selector name or alias.
-  The one special token is `%` **alone**, meaning *all types*: `%/my-vars`, `%/db-%`, `% all`, `%/%`.
+  The one special token is `%` **alone**, meaning *all types*: `%/my-vars`, `%/db-%`, `%/%`.
   Any other `%`-carrying spelling in the type position (`%set`, `s%`, `%TS`) is a **usage error**, not
   a pattern.
 
@@ -1155,14 +1159,17 @@ half is validated later, when `ResourceSelectionSyntaxServiceImpl::classify_type
   A `%`-carrying type half stays on the *resource* path in `kamu delete` even when it names no
   supported type, so the user gets this error rather than a confusing legacy-dataset one.
 - `kamu get vs/foo bar` — **mixing** slash and same-type list forms in one command is rejected
-  ("Cannot mix positional `type name` and slash `type/name` syntax"). The one exception is a leading
-  `all` (e.g. `all vs/foo` is accepted, with the rest treated as shadowed).
+  ("Cannot mix positional `type name` and slash `type/name` syntax"), with no exceptions.
 - `kamu get vs/foo/extra` — the slash form must contain **exactly one** `/` (rejected: "Invalid
   resource reference").
 - `kamu get vs` — a bare type with **no selector** is rejected ("Expected `type/name`"); use
-  `kamu get vs all` / `kamu get vs/all`, or `kamu list vs`, to enumerate the type.
+  `kamu get vs %` / `kamu get vs/%`, or `kamu list vs`, to enumerate the type.
+- `kamu get %` / `kamu delete %` — a bare `%` is a *single plain arg*, so it hits the same rule and is
+  rejected. The all-resources spelling is `%/%`. (`kamu delete %` is still routed to the resource path
+  rather than the dataset one, so the user gets this selector error instead of a dataset glob that
+  would match every dataset — see `DeleteRequestResolver::resolve`.)
 
-(`kamu get all` *is* accepted, bounded by `--max-results`/`--unbounded`; prefer `kamu list all` for
+(`kamu get %/%` *is* accepted, bounded by `--max-results`/`--unbounded`; prefer `kamu list %` for
 unbounded enumeration — a guidance boundary, not a parser rejection.)
 
 **Label selector grammar (`--label`/`-l`)** — parsed by `ResourceLabelSelectorParser`

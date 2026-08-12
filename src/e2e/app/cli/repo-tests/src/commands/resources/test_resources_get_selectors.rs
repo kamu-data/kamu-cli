@@ -31,7 +31,7 @@ use crate::resources::{ResourceCtx, fixtures};
 //   - Three equivalent selector forms for one resource
 //   - Multi-name same-type, mixed ref-form
 //   - Name pattern, `%` any-type forms, and rejected type wildcards
-//   - `--max-results` truncation, `--unbounded`, and `% all`
+//   - `--max-results` truncation, `--unbounded`, and the broad `%/%` forms
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Identity constants — kept terse so assertions read as "which resources came
@@ -150,28 +150,14 @@ pub async fn test_resources_get_selectors(ctx: ResourceCtx) {
     assert_eq!(view.ident(), (fixtures::VARIABLE_SET_SCHEMA, "db-creds"));
     assert_eq!(view.variable("MESSAGE"), Some(db_creds_value));
 
-    // ── 9. `--unbounded`: every resource ──────────────────────────────────────
+    // ── 9. Broad forms select every resource ──────────────────────────────────
     //
-    // `get all --unbounded` returns all four seeded resources and only those.
-
-    let idents = ctx.get_idents(["get", "all", "--unbounded"]).await;
-    assert_eq!(
-        idents,
-        [
-            ss("app-secrets"),
-            ss("db-creds"),
-            vs("app-vars"),
-            vs("db-creds"),
-        ]
-    );
-
-    // ── 10. Any-type broad forms: `get % all` and `get %/%` ───────────────────
-    //
-    // Both collapse to the same selection as `get all`.
+    // `%/%` is the all-resources form; `% %` is the equivalent positional
+    // spelling. Both are bounded by `--max-results` unless `--unbounded`.
 
     for form in [
-        vec!["get", "%", "all", "--unbounded"],
         vec!["get", "%/%", "--unbounded"],
+        vec!["get", "%", "%", "--unbounded"],
     ] {
         let idents = ctx.get_idents(form.clone()).await;
         assert_eq!(
@@ -186,6 +172,17 @@ pub async fn test_resources_get_selectors(ctx: ResourceCtx) {
             form.join(" ")
         );
     }
+
+    // ── 10. `all` is an ordinary name ─────────────────────────────────────────
+    //
+    // It carries no special meaning, so it resolves like any other name — and
+    // matches nothing here, since no seeded resource is called `all`.
+
+    ctx.assert_failure(
+        ["get", "vs", "all"],
+        Some(&[r#"Resource 'all' of type 'VariableSet' was not found"#]),
+    )
+    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

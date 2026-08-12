@@ -92,10 +92,10 @@ pub async fn test_resources_label_filter_read_paths(ctx: ResourceCtx) {
     );
 
     assert_eq!(
-        ctx.list_names_with_labels("all", &["environment=production"])
+        ctx.list_names_with_labels("%", &["environment=production"])
             .await,
         ["prod-team", "prod-vars"],
-        "`list all -l` should narrow across the multi-type path"
+        "`list % -l` should narrow across the multi-type path"
     );
 
     ctx.assert_failure(
@@ -344,7 +344,7 @@ pub async fn test_resources_label_filter_any_type_multitype(ctx: ResourceCtx) {
     );
 
     let idents = ctx
-        .get_idents(["get", "%", "all", "-l", "environment=production"])
+        .get_idents(["get", "%/%", "-l", "environment=production"])
         .await;
     assert_eq!(
         idents,
@@ -358,7 +358,7 @@ pub async fn test_resources_label_filter_any_type_multitype(ctx: ResourceCtx) {
                 "prod-vars".to_string()
             ),
         ],
-        "`% all -l environment=production` should exclude the staging SecretSet"
+        "`%/% -l environment=production` should exclude the staging SecretSet"
     );
 }
 

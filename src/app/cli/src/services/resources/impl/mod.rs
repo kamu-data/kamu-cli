@@ -24,6 +24,7 @@ pub use resource_label_selector_parser::*;
 pub use resource_manifest_discovery_service_impl::*;
 pub use resource_manifest_execution_service_impl::*;
 pub use resource_selection_resolution_service_impl::*;
+pub use resource_selection_syntax_parser::ANY_SELECTOR;
 pub use resource_selection_syntax_service_impl::*;
 pub use resource_selector_resolution_service_impl::*;
 pub use resource_summary_service_impl::*;

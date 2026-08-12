@@ -11,20 +11,14 @@ use crate::CLIError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(super) const ALL_SELECTOR: &str = "all";
-
 /// In the type position this is the sole accepted wildcard, meaning all types;
 /// in the name position it is an ordinary `%` pattern matching every name.
-pub(super) const ANY_SELECTOR: &str = "%";
+pub const ANY_SELECTOR: &str = "%";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
 pub(super) enum ParsedSyntax<'a> {
-    /// `all` — all resources across supported types; other args are shadowed.
-    All {
-        shadowed_inputs: Vec<ShadowedParsedInput<'a>>,
-    },
     /// A single bare arg that parses as a `UUIDv4` resource ID.
     ById { input: &'a str },
     /// `type sel1 sel2 ...` — type is a plain word, selectors have no `/`
@@ -34,12 +28,6 @@ pub(super) enum ParsedSyntax<'a> {
     },
     /// `type/sel1 type/sel2 ...` — every arg contains exactly one `/`
     RefForm { pairs: Vec<(&'a str, &'a str)> },
-}
-
-#[derive(Debug)]
-pub(super) struct ShadowedParsedInput<'a> {
-    pub(super) type_str: Option<&'a str>,
-    pub(super) display: &'a str,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -64,32 +52,6 @@ impl ResourceSelectionSyntaxParser {
         let has_plain = args.iter().any(|a| !a.contains('/'));
 
         if has_slash && has_plain {
-            if args
-                .first()
-                .is_some_and(|arg| arg.eq_ignore_ascii_case(ALL_SELECTOR))
-            {
-                let mut shadowed_inputs = Vec::new();
-                for arg in args {
-                    if arg.eq_ignore_ascii_case(ALL_SELECTOR) {
-                        continue;
-                    }
-
-                    if arg.contains('/') {
-                        let (type_str, _) = Self::parse_ref_arg(arg)?;
-                        shadowed_inputs.push(ShadowedParsedInput {
-                            type_str: Some(type_str),
-                            display: arg,
-                        });
-                    } else {
-                        shadowed_inputs.push(ShadowedParsedInput {
-                            type_str: None,
-                            display: arg,
-                        });
-                    }
-                }
-                return Ok(ParsedSyntax::All { shadowed_inputs });
-            }
-
             return Err(CLIError::usage_error(
                 "Cannot mix positional `type name` and slash `type/name` syntax in the same \
                  command",
@@ -104,17 +66,6 @@ impl ResourceSelectionSyntaxParser {
             }
             Ok(ParsedSyntax::RefForm { pairs })
         } else {
-            if args[0].eq_ignore_ascii_case(ALL_SELECTOR) {
-                let shadowed_inputs = args[1..]
-                    .iter()
-                    .map(|arg| ShadowedParsedInput {
-                        type_str: None,
-                        display: arg.as_str(),
-                    })
-                    .collect();
-                return Ok(ParsedSyntax::All { shadowed_inputs });
-            }
-
             // Same-type form: `type sel1 sel2 ...`
             if args.len() < 2 {
                 if Self::is_resource_id(&args[0]) {
@@ -221,109 +172,55 @@ mod tests {
         );
     }
 
+    // `all` carries no special meaning: it tokenizes as an ordinary name, and
+    // resolves as one.
     #[test]
-    fn test_parse_syntax_all() {
-        let a = args(&["all"]);
-        assert_matches!(
-            ResourceSelectionSyntaxParser::parse(&a),
-            Ok(ParsedSyntax::All {
-                shadowed_inputs,
-            }) if shadowed_inputs.is_empty()
-        );
-    }
-
-    #[test]
-    fn test_parse_syntax_all_is_case_insensitive() {
-        let a = args(&["ALL"]);
-        assert_matches!(
-            ResourceSelectionSyntaxParser::parse(&a),
-            Ok(ParsedSyntax::All {
-                shadowed_inputs,
-            }) if shadowed_inputs.is_empty()
-        );
-    }
-
-    #[test]
-    fn test_parse_syntax_all_with_shadowed_plain() {
-        let a = args(&["all", "some-name"]);
-        assert_matches!(
-            ResourceSelectionSyntaxParser::parse(&a),
-            Ok(ParsedSyntax::All {
-                shadowed_inputs,
-            }) if shadowed_inputs.len() == 1
-                && shadowed_inputs[0].type_str.is_none()
-                && shadowed_inputs[0].display == "some-name"
-        );
-    }
-
-    #[test]
-    fn test_parse_syntax_all_with_shadowed_ref_form() {
-        let a = args(&["all", "vs/my-vars"]);
-        assert_matches!(
-            ResourceSelectionSyntaxParser::parse(&a),
-            Ok(ParsedSyntax::All {
-                shadowed_inputs,
-            }) if shadowed_inputs.len() == 1
-                && shadowed_inputs[0].type_str == Some("vs")
-                && shadowed_inputs[0].display == "vs/my-vars"
-        );
-    }
-
-    #[test]
-    fn test_parse_syntax_all_with_mixed_shadowed() {
-        let a = args(&["all", "vs/my-vars", "some-name"]);
-        assert_matches!(
-            ResourceSelectionSyntaxParser::parse(&a),
-            Ok(ParsedSyntax::All { shadowed_inputs })
-            if shadowed_inputs.len() == 2
-                && shadowed_inputs[0].type_str == Some("vs")
-                && shadowed_inputs[0].display == "vs/my-vars"
-                && shadowed_inputs[1].type_str.is_none()
-                && shadowed_inputs[1].display == "some-name"
-        );
-    }
-
-    #[test]
-    fn test_parse_syntax_all_with_mixed_shadowed_is_case_insensitive() {
-        let a = args(&["AlL", "vs/my-vars", "some-name"]);
-        assert_matches!(
-            ResourceSelectionSyntaxParser::parse(&a),
-            Ok(ParsedSyntax::All { shadowed_inputs })
-            if shadowed_inputs.len() == 2
-                && shadowed_inputs[0].type_str == Some("vs")
-                && shadowed_inputs[0].display == "vs/my-vars"
-                && shadowed_inputs[1].type_str.is_none()
-                && shadowed_inputs[1].display == "some-name"
-        );
-    }
-
-    #[test]
-    fn test_parse_syntax_same_type_all() {
-        let a = args(&["vs", "all", "my-vars"]);
+    fn test_parse_syntax_all_is_an_ordinary_name() {
+        let a = args(&["vs", "all"]);
         assert_matches!(
             ResourceSelectionSyntaxParser::parse(&a),
             Ok(ParsedSyntax::SameType {
                 type_str: "vs",
                 selector_inputs,
-            }) if selector_inputs == vec!["all", "my-vars"]
+            }) if selector_inputs == vec!["all"]
+        );
+    }
+
+    // A bare `%` is a single plain arg, so it hits the same-type minimum-arg
+    // rule. The all-resources form is `%/%`.
+    #[test]
+    fn test_parse_syntax_bare_any_selector_is_error() {
+        let a = args(&["%"]);
+        assert_matches!(ResourceSelectionSyntaxParser::parse(&a), Err(_));
+    }
+
+    #[test]
+    fn test_parse_syntax_same_type_broad() {
+        let a = args(&["vs", "%", "my-vars"]);
+        assert_matches!(
+            ResourceSelectionSyntaxParser::parse(&a),
+            Ok(ParsedSyntax::SameType {
+                type_str: "vs",
+                selector_inputs,
+            }) if selector_inputs == vec!["%", "my-vars"]
         );
     }
 
     #[test]
     fn test_parse_syntax_slash_form_all_by_type_single() {
-        let a = args(&["vs/all"]);
+        let a = args(&["vs/%"]);
         assert_matches!(
             ResourceSelectionSyntaxParser::parse(&a),
-            Ok(ParsedSyntax::RefForm { pairs }) if pairs == vec![("vs", "all")]
+            Ok(ParsedSyntax::RefForm { pairs }) if pairs == vec![("vs", "%")]
         );
     }
 
     #[test]
     fn test_parse_syntax_slash_form_all_by_type_with_shadowed() {
-        let a = args(&["vs/all", "vs/my-vars"]);
+        let a = args(&["vs/%", "vs/my-vars"]);
         assert_matches!(
             ResourceSelectionSyntaxParser::parse(&a),
-            Ok(ParsedSyntax::RefForm { pairs }) if pairs == vec![("vs", "all"), ("vs", "my-vars")]
+            Ok(ParsedSyntax::RefForm { pairs }) if pairs == vec![("vs", "%"), ("vs", "my-vars")]
         );
     }
 
@@ -440,9 +337,11 @@ mod tests {
         );
     }
 
+    // No arg is exempt from the mixing rule — a leading broad selector does not
+    // license a plain arg alongside a slash one.
     #[test]
-    fn test_parse_syntax_non_leading_all_in_mixed_syntax_is_error() {
-        let a = args(&["vs", "all", "ss/db-creds"]);
+    fn test_parse_syntax_leading_broad_selector_in_mixed_syntax_is_error() {
+        let a = args(&["%", "ss/db-creds"]);
         assert_matches!(
             ResourceSelectionSyntaxParser::parse(&a),
             Err(ref e) if e.to_string().contains("mix")

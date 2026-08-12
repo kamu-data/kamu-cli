@@ -200,7 +200,8 @@ impl GetResourceCommand {
 
     fn print_shadowed_selector_warning(selector_input: &str) {
         eprintln!(
-            "Warning: selector `{selector_input}` ignored because `all` selects the same scope"
+            "Warning: selector `{selector_input}` ignored because a broader selector already \
+             covers it"
         );
     }
 

@@ -19,11 +19,11 @@ pub trait ResourceSelectionSyntaxService: Send + Sync {
     /// Parses positional CLI arguments into a normalized resource selection.
     ///
     /// Accepted forms:
-    /// - `all`
     /// - `id` — a bare `UUIDv4`, resolved across all supported types
-    /// - `type all` or `type/all`
     /// - `type name ...` — same-type selectors, none containing `/`
     /// - `type/name ...` — slash selectors, each containing exactly one `/`
+    /// - `type %` or `type/%` — every resource of one type
+    /// - `%/%` — every resource of every type
     ///
     /// The `type` part is matched exactly (case-insensitively) against a
     /// canonical selector name or alias, with the single exception of `%`,
@@ -59,12 +59,12 @@ pub struct ResourceSelectionSyntax {
 pub enum ResourceSelectionItem {
     /// Every resource of every type.
     ///
-    /// `kamu get all`, `kamu get %/%`, `kamu get % all`
+    /// `kamu get %/%`, `kamu get % %`
     All,
 
     /// Every resource of one type.
     ///
-    /// `kamu get vs all`, `kamu get vs/all`, `kamu get vs/%`
+    /// `kamu get vs %`, `kamu get vs/%`, `kamu delete vs --all`
     AllByType {
         type_descriptor: ResourceTypeDescriptor,
         selector_input: String,
@@ -132,7 +132,7 @@ pub struct ResourceExactSelector {
 /// the same command, so resolving it would only repeat backend work. Reported
 /// to the user rather than silently dropped.
 ///
-/// In `kamu get all vs/my-vars`, the `vs/my-vars` part is shadowed by `all`.
+/// In `kamu get %/% vs/my-vars`, the `vs/my-vars` part is shadowed by `%/%`.
 #[derive(Debug, Clone)]
 pub struct ResourceShadowedSelector {
     pub selector_input: String,

@@ -666,7 +666,7 @@ Delete datasets or resources
 
 **Arguments:**
 
-* `<TARGET>` — Target to delete: `datasets`, `all`, or a resource selector such as `variablesets`, `vs`, `secretsets`, `ss`, `storages`, or `st`
+* `<TARGET>` — Target to delete: `datasets`, `%` (all resource types), or a resource selector such as `variablesets`, `vs`, `secretsets`, `ss`, `storages`, or `st`
 * `<ARGS>` — Dataset selector(s) in dataset mode, or a single resource selector in resource mode
 
 **Options:**
@@ -714,7 +714,7 @@ Delete all resources of a type:
 
 Delete all resources across types:
 
-    kamu delete all
+    kamu delete '%/%'
 
 Delete resources using slash selectors:
 
@@ -730,7 +730,7 @@ Delete resources matching a name pattern across every resource type:
 
 Delete all resources of a type using a slash selector:
 
-    kamu delete storages/all
+    kamu delete 'storages/%'
 
 Delete a dataset and a resource in one command:
 
@@ -851,6 +851,10 @@ Get the same exact name across every resource type:
 Get resources matching a name pattern across every resource type:
 
     kamu get %/db-%
+
+Get every resource of every type:
+
+    kamu get '%/%'
 
 Get a resource by UUID:
 
@@ -1042,7 +1046,7 @@ List datasets or resources
 
 **Arguments:**
 
-* `<TARGET>` — Target to list: `datasets`, `all`, or a resource selector such as `variablesets`, `vs`, `secretsets`, `ss`, `storages`, or `st`
+* `<TARGET>` — Target to list: `datasets`, `%` (all resource types), or a resource selector such as `variablesets`, `vs`, `secretsets`, `ss`, `storages`, or `st`
 
 **Options:**
 
@@ -1082,7 +1086,7 @@ To list datasets explicitly:
 
 To list all resources across all types:
 
-    kamu list all
+    kamu list '%'
 
 To list variable sets:
 
@@ -1106,7 +1110,7 @@ To require several labels at once:
 
 To get a machine-readable list of all resources:
 
-    kamu list all -o csv
+    kamu list '%' -o csv
 
 To get a machine-readable list of datasets:
 

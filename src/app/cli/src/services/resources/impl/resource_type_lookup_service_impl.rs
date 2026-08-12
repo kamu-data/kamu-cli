@@ -15,6 +15,7 @@ use kamu_resources::ResourceTypeDescriptor;
 
 use crate::CLIError;
 use crate::resources::{
+    ANY_SELECTOR,
     ResourceFacadeFactory,
     ResourceTypeLookupErrorOptions,
     ResourceTypeLookupService,
@@ -85,14 +86,22 @@ impl ResourceTypeLookupService for ResourceTypeLookupServiceImpl {
             .find(|descriptor| descriptor.matches_selector(target))
             .cloned()
             .ok_or_else(|| {
+                let targets = Self::supported_targets(
+                    &supported_resource_types,
+                    &error_options.additional_targets,
+                );
+                // `%` sorts ahead of every name, so it leads the list and reads
+                // as noise without a gloss.
+                let hint = if targets.iter().any(|target| target == ANY_SELECTOR) {
+                    format!(" (`{ANY_SELECTOR}` means all resource types)")
+                } else {
+                    String::new()
+                };
+
                 CLIError::usage_error(format!(
-                    "{} '{target}'. Supported targets: {}",
+                    "{} '{target}'. Supported targets: {}{hint}",
                     error_options.unsupported_prefix,
-                    Self::supported_targets(
-                        &supported_resource_types,
-                        &error_options.additional_targets
-                    )
-                    .join(", ")
+                    targets.join(", ")
                 ))
             })
     }

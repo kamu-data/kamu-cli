@@ -41,7 +41,7 @@ pub async fn test_resources_empty_context_baseline(ctx: ResourceCtx) {
     }
 
     // `list all` succeeds and reports no user-created resources (empty JSON array).
-    let list_all = ctx.stdout(["list", "all"]).await;
+    let list_all = ctx.stdout(["list", "%"]).await;
     assert_eq!(
         list_all.trim(),
         "[]",
