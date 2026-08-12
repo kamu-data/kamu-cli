@@ -9,7 +9,7 @@
 
 use email_utils::Email;
 use internal_error::InternalError;
-use kamu_accounts::{Account, AccountConfig, PredefinedAccountsConfig};
+use kamu_accounts::{Account, AccountConfig, AccountPropertyName, PredefinedAccountsConfig};
 use messaging_outbox::MockOutbox;
 use pretty_assertions::{assert_eq, assert_matches};
 
@@ -52,7 +52,15 @@ async fn test_st_create_once_reuse_after() {
         .await
         .unwrap();
 
-    // todo check rebac
+    assert_eq!(
+        kamu_auth_rebac::AccountProperties {
+            is_admin: true,
+            can_provision_accounts: false
+        },
+        harness
+            .try_get_account_properties(&catalog, &first_run_account.id)
+            .await
+    );
 
     // 2. Re-use the account
     assert_matches!(harness.run_initialization(&catalog).await, Ok(_));
@@ -68,6 +76,16 @@ async fn test_st_create_once_reuse_after() {
 
     assert_eq!(first_run_account, second_run_account);
     assert_eq!(first_run_secret, second_run_secret);
+
+    assert_eq!(
+        kamu_auth_rebac::AccountProperties {
+            is_admin: true,
+            can_provision_accounts: false
+        },
+        harness
+            .try_get_account_properties(&catalog, &first_run_account.id)
+            .await
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -148,7 +166,18 @@ async fn test_mt_emulate_running_a_node_with_updated_registrator() {
     assert_eq!(alice_account_id, first_run_alice_account.id);
     assert_eq!(bob_account_id, first_run_bob_account.id);
 
-    // todo check rebac
+    assert_eq!(
+        kamu_auth_rebac_services::DefaultAccountProperties::default(),
+        harness
+            .try_get_account_properties(&catalog, &alice_account_id)
+            .await
+    );
+    assert_eq!(
+        kamu_auth_rebac_services::DefaultAccountProperties::default(),
+        harness
+            .try_get_account_properties(&catalog, &bob_account_id)
+            .await
+    );
 
     // 2. Re-use the accounts -- simulate start w/ new version
     assert_matches!(harness.run_initialization(&catalog).await, Ok(_));
@@ -164,6 +193,19 @@ async fn test_mt_emulate_running_a_node_with_updated_registrator() {
 
     assert_eq!(first_run_alice_account, second_run_alice_account);
     assert_eq!(first_run_bob_account, second_run_bob_account);
+
+    assert_eq!(
+        kamu_auth_rebac_services::DefaultAccountProperties::default(),
+        harness
+            .try_get_account_properties(&catalog, &alice_account_id)
+            .await
+    );
+    assert_eq!(
+        kamu_auth_rebac_services::DefaultAccountProperties::default(),
+        harness
+            .try_get_account_properties(&catalog, &bob_account_id)
+            .await
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -202,7 +244,7 @@ async fn test_mt_alice_has_wrong_config() {
 
     assert_matches!(harness.run_initialization(&catalog).await, Ok(_));
 
-    // Alice account creation was skipped because invalid config
+    // Alice account creation was skipped because of invalid config
     assert_matches!(
         harness
             .try_get_account_by_name(&catalog, &alice_account_name)
@@ -667,6 +709,85 @@ async fn test_mt_users_change_own_config_data() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_mt_alice_change_rebac_properties() {
+    let alice_account_name = odf::AccountName::new_unchecked("alice");
+
+    let mut outbox = MockOutbox::new();
+    kamu_accounts::testing::expect_outbox_account_created()
+        .mock_outbox(&mut outbox)
+        .expected_account_name(alice_account_name.clone())
+        .expected_display_name("alice".to_string())
+        .expected_email(Email::parse("alice@example.com").unwrap())
+        .expected_times(1)
+        .call();
+
+    let harness = PredefinedAccountsRegistratorHarness::builder()
+        .mock_outbox(outbox)
+        .build();
+
+    // 1. Create an account
+    let predefined_accounts_config = PredefinedAccountsConfig {
+        predefined: vec![AccountConfig::test_config_from_name(
+            alice_account_name.clone(),
+        )],
+    };
+    let first_run_alice_account = {
+        let first_run_catalog = harness.build_catalog(predefined_accounts_config.clone());
+
+        assert_matches!(harness.run_initialization(&first_run_catalog).await, Ok(_));
+
+        let alice_account = harness
+            .try_get_account_by_name(&first_run_catalog, &alice_account_name)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            kamu_auth_rebac_services::DefaultAccountProperties::default(),
+            harness
+                .try_get_account_properties(&first_run_catalog, &alice_account.id)
+                .await
+        );
+
+        alice_account
+    };
+
+    // 2. Re-use the account but update its ReBAC properties
+    {
+        let mut updated_config = predefined_accounts_config;
+        if let Some(ac) = updated_config.predefined.first_mut() {
+            *ac = ac.clone().set_properties(vec![
+                AccountPropertyName::IsAdmin,
+                AccountPropertyName::CanProvisionAccounts,
+            ]);
+        } else {
+            unreachable!()
+        }
+        let second_run_catalog = harness.build_catalog(updated_config);
+
+        assert_matches!(harness.run_initialization(&second_run_catalog).await, Ok(_));
+
+        let second_run_alice_account = harness
+            .try_get_account_by_name(&second_run_catalog, &alice_account_name)
+            .await
+            .unwrap();
+
+        assert_eq!(first_run_alice_account, second_run_alice_account);
+
+        assert_eq!(
+            kamu_auth_rebac::AccountProperties {
+                is_admin: true,
+                can_provision_accounts: true
+            },
+            harness
+                .try_get_account_properties(&second_run_catalog, &second_run_alice_account.id)
+                .await
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -685,7 +806,6 @@ impl PredefinedAccountsRegistratorHarness {
             b.add::<kamu_accounts_services::PredefinedAccountsRegistrator>();
             b.add::<kamu_accounts_services::AccountServiceImpl>();
             b.add::<kamu_auth_rebac_services::RebacServiceImpl>();
-            // todo as a param?
             b.add_value(kamu_auth_rebac_services::DefaultAccountProperties::default());
             b.add::<kamu_accounts_services::UpdateAccountUseCaseImpl>();
             b.add::<kamu_accounts_services::CreateAccountUseCaseImpl>();
@@ -694,7 +814,6 @@ impl PredefinedAccountsRegistratorHarness {
 
             // AccountServiceImpl
             b.add::<kamu_accounts_inmem::InMemoryAccountRepository>();
-            // todo add PasswordHashingMode?
 
             // RebacServiceImpl
             b.add::<kamu_auth_rebac_inmem::InMemoryRebacRepository>();
@@ -770,6 +889,21 @@ impl PredefinedAccountsRegistratorHarness {
             Err(E::NotFound(_)) => None,
             Err(e) => panic!("Unexpected: {e:?}"),
         }
+    }
+
+    pub async fn try_get_account_properties(
+        &self,
+        catalog: &dill::Catalog,
+        account_id: &odf::AccountID,
+    ) -> kamu_auth_rebac::AccountProperties {
+        let rebac_service = catalog
+            .get_one::<dyn kamu_auth_rebac::RebacService>()
+            .unwrap();
+
+        rebac_service
+            .get_account_properties(account_id)
+            .await
+            .unwrap()
     }
 }
 
