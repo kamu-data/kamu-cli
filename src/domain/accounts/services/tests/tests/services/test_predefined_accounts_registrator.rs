@@ -840,7 +840,7 @@ async fn test_mt_skip_accounts_with_conflicting_fields() {
             .unwrap()
     };
 
-    // 2. Create Alice's account
+    // 2. Attempt to create accounts using stolen data
     {
         let second_run_catalog = harness.build_catalog({
             let mut c = predefined_accounts_config;
@@ -877,6 +877,88 @@ async fn test_mt_skip_accounts_with_conflicting_fields() {
                 .try_get_account_by_name(&second_run_catalog, &carol_account_name)
                 .await,
             None
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_mt_add_new_account() {
+    let alice_account_name = odf::AccountName::new_unchecked("alice");
+    let bob_account_name = odf::AccountName::new_unchecked("bob");
+
+    let mut outbox = MockOutbox::new();
+    kamu_accounts::testing::expect_outbox_account_created()
+        .mock_outbox(&mut outbox)
+        .expected_account_name(alice_account_name.clone())
+        .expected_display_name("alice".to_string())
+        .expected_email(Email::parse("alice@example.com").unwrap())
+        .expected_times(1)
+        .call();
+    kamu_accounts::testing::expect_outbox_account_created()
+        .mock_outbox(&mut outbox)
+        .expected_account_name(bob_account_name.clone())
+        .expected_display_name("bob".to_string())
+        .expected_email(Email::parse("bob@example.com").unwrap())
+        .expected_times(1)
+        .call();
+
+    let harness = PredefinedAccountsRegistratorHarness::builder()
+        .mock_outbox(outbox)
+        .build();
+
+    let predefined_accounts_config = PredefinedAccountsConfig {
+        predefined: vec![AccountConfig::test_config_from_name(
+            alice_account_name.clone(),
+        )],
+    };
+
+    // 1. Create Alice's account
+    let first_run_alice_account = {
+        let first_run_catalog = harness.build_catalog(predefined_accounts_config.clone());
+
+        assert_matches!(harness.run_initialization(&first_run_catalog).await, Ok(_));
+
+        assert_matches!(
+            harness
+                .try_get_account_by_name(&first_run_catalog, &bob_account_name)
+                .await,
+            None
+        );
+
+        harness
+            .try_get_account_by_name(&first_run_catalog, &alice_account_name)
+            .await
+            .unwrap()
+    };
+
+    // 2. Create Alice's account
+    {
+        let second_run_catalog = harness.build_catalog({
+            let mut c = predefined_accounts_config;
+            // Bob is a freshman
+            c.predefined.push(
+                AccountConfig::test_config_from_name(bob_account_name.clone())
+                    .set_account_name(alice_account_name.clone()),
+            );
+            c
+        });
+
+        assert_matches!(harness.run_initialization(&second_run_catalog).await, Ok(_));
+
+        let second_run_alice_account = harness
+            .try_get_account_by_name(&second_run_catalog, &alice_account_name)
+            .await
+            .unwrap();
+
+        assert_eq!(first_run_alice_account, second_run_alice_account);
+
+        assert_matches!(
+            harness
+                .try_get_account_by_name(&second_run_catalog, &bob_account_name)
+                .await,
+            Some(_)
         );
     }
 }
