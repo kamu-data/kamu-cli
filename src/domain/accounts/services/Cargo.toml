@@ -75,6 +75,7 @@ kamu-accounts-services = { workspace = true, default-features = false, features 
 ] }
 kamu-auth-rebac-inmem = { workspace = true }
 kamu-auth-rebac-services = { workspace = true }
+kamu-core = { workspace = true }
 kamu-search-elasticsearch = { workspace = true, default-features = false, features = [
     "testing",
 ] }

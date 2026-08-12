@@ -164,6 +164,8 @@ pub struct AccountConfig {
     pub treat_datasets_as_public: bool,
 }
 
+// TODO: extract testing methods into own impl AccountConfig
+//       and hide w/ feature gate
 impl AccountConfig {
     #[cfg(any(feature = "testing", test))]
     pub fn test_config_from_name(account_name: odf::AccountName) -> Self {
@@ -207,8 +209,32 @@ impl AccountConfig {
         }
     }
 
+    #[cfg(any(feature = "testing", test))]
+    pub fn set_id(mut self, maybe_account_id: Option<odf::AccountID>) -> Self {
+        self.id = maybe_account_id;
+        self
+    }
+
+    #[cfg(any(feature = "testing", test))]
+    pub fn set_private_key(mut self, private_key: odf::metadata::PrivateKey) -> Self {
+        self.private_key = Some(private_key);
+        self
+    }
+
+    #[cfg(any(feature = "testing", test))]
+    pub fn set_account_name(mut self, account_name: odf::AccountName) -> Self {
+        self.account_name = account_name;
+        self
+    }
+
     pub fn set_password(mut self, password: Password) -> Self {
         self.password = password;
+        self
+    }
+
+    #[cfg(any(feature = "testing", test))]
+    pub fn set_email(mut self, email: Email) -> Self {
+        self.email = email;
         self
     }
 
@@ -329,7 +355,7 @@ impl AccountConfig {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(thiserror::Error, Debug)]
+#[derive(thiserror::Error, Debug, PartialEq, Eq)]
 pub enum AccountConfigValidationError {
     #[error(
         "Account '{account_name}': ID mismatch -- configured '{configured_id}', derived \

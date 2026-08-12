@@ -7287,6 +7287,7 @@ dependencies = [
  "kamu-auth-rebac",
  "kamu-auth-rebac-inmem",
  "kamu-auth-rebac-services",
+ "kamu-core",
  "kamu-search",
  "kamu-search-elasticsearch",
  "kamu-search-services",

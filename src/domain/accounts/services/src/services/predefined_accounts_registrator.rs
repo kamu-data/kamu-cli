@@ -435,6 +435,7 @@ enum AccountIdResolution {
     Conflicted(AccountUniqueFieldsConflictError),
 }
 
+#[derive(Debug)]
 struct AccountIdsResolution {
     pub resolved: HashMap<odf::AccountID, AccountConfig>,
     pub unresolved: Vec<AccountConfig>,
