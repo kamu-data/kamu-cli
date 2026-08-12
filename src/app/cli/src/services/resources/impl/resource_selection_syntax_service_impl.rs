@@ -10,11 +10,11 @@
 use std::future::Future;
 use std::sync::Arc;
 
-use fixedbitset::FixedBitSet;
 use kamu_resources::ResourceTypeDescriptor;
 
 use super::resource_selection_syntax_parser::{
     ALL_SELECTOR,
+    ANY_SELECTOR,
     ParsedSyntax,
     ResourceSelectionSyntaxParser,
 };
@@ -30,6 +30,21 @@ use crate::resources::{
     ResourceTypeLookupErrorOptions,
     ResourceTypeLookupService,
 };
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+const UNSUPPORTED_TYPE_TARGET_PREFIX: &str = "Unsupported get target";
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The type part of a selector, once classified.
+#[derive(Debug, Clone)]
+enum ResourceTypeToken {
+    /// `%` — spans every supported type.
+    AnyType,
+    /// An exact canonical selector name or alias.
+    Exact(Box<ResourceTypeDescriptor>),
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -123,8 +138,8 @@ impl ResourceSelectionSyntaxServiceImpl {
                 // selector names. The only broad token in this mode is `all`,
                 // so coverage checks are O(n) and local to the selector list.
 
-                // Note: parsing ensured `type_str` is never "all" or "%", that goes to
-                // `ParsedSyntax::All`. `type_str` can still be a pattern.
+                // Note: parsing ensured `type_str` is never "all", that goes to
+                // `ParsedSyntax::All`. `type_str` can still be `%` (all types).
 
                 if selector_inputs
                     .iter()
@@ -169,27 +184,25 @@ impl ResourceSelectionSyntaxServiceImpl {
 
             // type1/sel1 type2/sel2 ..
             ParsedSyntax::RefForm { pairs } => {
-                // Broad selector coverage is represented as a bit mask over the
-                // fixed supported-type ordering, so superset/equality checks do
-                // not allocate or compare string sets.
-                let mut broad_selector_coverages = Vec::new();
-                let mut broad_selector_union_coverage =
-                    TypeCoverageMask::new(supported_resource_types.len());
+                // Broad selector coverage is either one type or `%` (all of
+                // them), so superset checks are direct comparisons.
+                let mut broad_selector_coverages: Vec<TypeCoverage> = Vec::new();
+                let mut broad_selector_union_coverage = TypeCoverageUnion::default();
                 for (type_str, selector_input) in &pairs {
                     if let Some(coverage) = Self::ref_form_broad_resource_type_coverage(
                         supported_resource_types,
                         type_str,
                         selector_input,
                     ) {
-                        broad_selector_union_coverage.union_with(&coverage);
+                        broad_selector_union_coverage.union_with(coverage);
                         Self::push_unique_coverage(&mut broad_selector_coverages, coverage);
                     }
                 }
 
                 // Avoid emitting duplicate broad selectors that expand to exactly
-                // the same set of target types (e.g. aliases or equivalent
-                // patterns), while still reporting shadowed specifics.
-                let mut emitted_broad_selectors = Vec::new();
+                // the same set of target types (e.g. aliases), while still
+                // reporting shadowed specifics.
+                let mut emitted_broad_selectors: Vec<TypeCoverage> = Vec::new();
 
                 for (type_str, selector_input) in pairs {
                     let selector_display = format!("{type_str}/{selector_input}");
@@ -214,8 +227,8 @@ impl ResourceSelectionSyntaxServiceImpl {
                     // covers a strict superset of its matched types.
                     let is_shadowed_by_broader_selector =
                         broad_selector_coverages.iter().any(|broad_coverage| {
-                            broad_coverage != &current_selector_matched_types
-                                && broad_coverage.is_superset(&current_selector_matched_types)
+                            *broad_coverage != current_selector_matched_types
+                                && broad_coverage.is_superset(current_selector_matched_types)
                         });
 
                     if is_shadowed_by_broader_selector {
@@ -228,16 +241,18 @@ impl ResourceSelectionSyntaxServiceImpl {
                     if is_broad_selector {
                         // Emit only once per covered type-set to keep `items`
                         // minimal and deterministic.
-                        let emission_key = current_selector_matched_types.clone();
-                        if Self::push_unique_coverage(&mut emitted_broad_selectors, emission_key) {
-                            items.push(Self::make_ref_form_broad_item(
+                        if Self::push_unique_coverage(
+                            &mut emitted_broad_selectors,
+                            current_selector_matched_types,
+                        ) {
+                            items.push(Self::make_all_by_type_item(
                                 supported_resource_types,
                                 type_str,
                                 selector_input.to_owned(),
                             )?);
                         }
                     } else if broad_selector_union_coverage
-                        .is_superset(&current_selector_matched_types)
+                        .is_superset(current_selector_matched_types)
                     {
                         // Narrow selector in ref-form is shadowed when its
                         // matched type-set is contained in the union of broad
@@ -261,8 +276,46 @@ impl ResourceSelectionSyntaxServiceImpl {
         })
     }
 
-    fn is_pattern(input: &str) -> bool {
+    /// Only *names* may carry `%` wildcards.
+    fn is_name_pattern(input: &str) -> bool {
         input.contains('%')
+    }
+
+    /// The type part is matched exactly, with `%` as the sole special token
+    /// meaning "all types". Any other `%` spelling (`%set`, `s%`) is rejected:
+    /// wildcard type matching is hard to read back and dangerous on `delete`.
+    fn classify_type_token(
+        supported_resource_types: &[ResourceTypeDescriptor],
+        type_str: &str,
+    ) -> Result<ResourceTypeToken, CLIError> {
+        if type_str == ANY_SELECTOR {
+            return Ok(ResourceTypeToken::AnyType);
+        }
+
+        if Self::is_name_pattern(type_str) {
+            return Err(Self::unsupported_type_target_error(
+                supported_resource_types,
+                type_str,
+            ));
+        }
+
+        let type_descriptor = Self::resolve_type_descriptor(
+            supported_resource_types,
+            type_str,
+            &ResourceTypeLookupErrorOptions::new(UNSUPPORTED_TYPE_TARGET_PREFIX),
+        )?;
+
+        Ok(ResourceTypeToken::Exact(Box::new(type_descriptor)))
+    }
+
+    fn unsupported_type_target_error(
+        supported_resource_types: &[ResourceTypeDescriptor],
+        type_str: &str,
+    ) -> CLIError {
+        CLIError::usage_error(format!(
+            "{UNSUPPORTED_TYPE_TARGET_PREFIX} '{type_str}'. Supported targets: {}",
+            Self::supported_targets(supported_resource_types, &[]).join(", ")
+        ))
     }
 
     fn by_id_syntax(resolved: ResolvedResourceSelector) -> ResourceSelectionSyntax {
@@ -275,68 +328,27 @@ impl ResourceSelectionSyntaxServiceImpl {
         }
     }
 
+    /// Builds the item for a broad (`all` / `%`) name selector on `type_str`.
     fn make_all_by_type_item(
         supported_resource_types: &[ResourceTypeDescriptor],
         type_str: &str,
         selector_input: String,
     ) -> Result<ResourceSelectionItem, CLIError> {
-        if Self::is_pattern(type_str) {
-            if type_str == "%" {
-                return Ok(ResourceSelectionItem::All);
-            }
-            return Ok(ResourceSelectionItem::TypePatternAll {
-                type_pattern: type_str.to_owned(),
+        match Self::classify_type_token(supported_resource_types, type_str)? {
+            // Every type, every name — indistinguishable from a plain `all`.
+            ResourceTypeToken::AnyType => Ok(ResourceSelectionItem::All),
+            ResourceTypeToken::Exact(type_descriptor) => Ok(ResourceSelectionItem::AllByType {
+                type_descriptor: *type_descriptor,
                 selector_input,
-            });
+            }),
         }
-
-        let type_descriptor = Self::resolve_type_descriptor(
-            supported_resource_types,
-            type_str,
-            &ResourceTypeLookupErrorOptions::new("Unsupported get target"),
-        )?;
-
-        Ok(ResourceSelectionItem::AllByType {
-            type_descriptor,
-            selector_input,
-        })
-    }
-
-    fn make_ref_form_broad_item(
-        supported_resource_types: &[ResourceTypeDescriptor],
-        type_str: &str,
-        selector_input: String,
-    ) -> Result<ResourceSelectionItem, CLIError> {
-        if selector_input == "%" {
-            return Self::make_all_by_type_item(supported_resource_types, type_str, selector_input);
-        }
-
-        Self::make_all_by_type_item(supported_resource_types, type_str, selector_input)
     }
 
     fn validate_shadowed_resource_type_target(
         supported_resource_types: &[ResourceTypeDescriptor],
         type_str: &str,
     ) -> Result<(), CLIError> {
-        if Self::is_pattern(type_str) {
-            if supported_resource_types
-                .iter()
-                .any(|descriptor| descriptor.matches_selector_pattern(type_str))
-            {
-                return Ok(());
-            }
-
-            return Err(CLIError::usage_error(format!(
-                "Unsupported get target '{type_str}'. Supported targets: {}",
-                Self::supported_targets(supported_resource_types, &[]).join(", ")
-            )));
-        }
-
-        Self::resolve_type_descriptor(
-            supported_resource_types,
-            type_str,
-            &ResourceTypeLookupErrorOptions::new("Unsupported get target"),
-        )?;
+        Self::classify_type_token(supported_resource_types, type_str)?;
 
         Ok(())
     }
@@ -370,48 +382,34 @@ impl ResourceSelectionSyntaxServiceImpl {
         F: Fn(String) -> Fut,
         Fut: Future<Output = Result<ResolvedResourceSelector, CLIError>>,
     {
-        match (
-            Self::is_pattern(type_str.as_str()),
-            Self::is_pattern(selector_input.as_str()),
-        ) {
-            (false, false) => {
-                let type_descriptor = Self::resolve_type_descriptor(
-                    supported_resource_types,
-                    type_str.as_str(),
-                    &ResourceTypeLookupErrorOptions::new("Unsupported get target"),
-                )?;
+        let type_token = Self::classify_type_token(supported_resource_types, type_str.as_str())?;
+
+        match (type_token, Self::is_name_pattern(selector_input.as_str())) {
+            (ResourceTypeToken::Exact(type_descriptor), false) => {
                 let resolved = resolve_selector(selector_input).await?;
 
                 Ok(ResourceSelectionItem::Exact(ResourceExactSelector {
-                    type_descriptor,
+                    type_descriptor: *type_descriptor,
                     selector_input: resolved.input,
                     resource_ref: resolved.resource_ref,
                 }))
             }
-            (false, true) => {
-                let type_descriptor = Self::resolve_type_descriptor(
-                    supported_resource_types,
-                    type_str.as_str(),
-                    &ResourceTypeLookupErrorOptions::new("Unsupported get target"),
-                )?;
-
+            (ResourceTypeToken::Exact(type_descriptor), true) => {
                 Ok(ResourceSelectionItem::NamePattern {
-                    type_descriptor,
+                    type_descriptor: *type_descriptor,
                     selector_input: selector_input.clone(),
                     name_pattern: selector_input,
                 })
             }
-            (true, false) => {
-                let resolved = resolve_selector(selector_input.clone()).await?;
+            (ResourceTypeToken::AnyType, false) => {
+                let resolved = resolve_selector(selector_input).await?;
 
-                Ok(ResourceSelectionItem::TypePatternExactName {
-                    type_pattern: type_str.clone(),
+                Ok(ResourceSelectionItem::AnyTypeExactRef {
                     selector_input: format!("{type_str}/{}", resolved.input),
                     resource_ref: resolved.resource_ref,
                 })
             }
-            (true, true) => Ok(ResourceSelectionItem::TypePatternNamePattern {
-                type_pattern: type_str.clone(),
+            (ResourceTypeToken::AnyType, true) => Ok(ResourceSelectionItem::AnyTypeNamePattern {
                 selector_input: format!("{type_str}/{selector_input}"),
                 name_pattern: selector_input,
             }),
@@ -456,15 +454,16 @@ impl ResourceSelectionSyntaxServiceImpl {
         targets
     }
 
+    /// A broad *name* selector: `all` or `%`, both meaning "every name".
     fn is_ref_form_broad_selector(selector_input: &str) -> bool {
-        selector_input.eq_ignore_ascii_case(ALL_SELECTOR) || selector_input == "%"
+        selector_input.eq_ignore_ascii_case(ALL_SELECTOR) || selector_input == ANY_SELECTOR
     }
 
     fn ref_form_broad_resource_type_coverage(
         supported_resource_types: &[ResourceTypeDescriptor],
         type_str: &str,
         selector_input: &str,
-    ) -> Option<TypeCoverageMask> {
+    ) -> Option<TypeCoverage> {
         Self::is_ref_form_broad_selector(selector_input)
             .then(|| {
                 Self::resource_type_coverage_for_selector_target(supported_resource_types, type_str)
@@ -472,11 +471,8 @@ impl ResourceSelectionSyntaxServiceImpl {
             .flatten()
     }
 
-    fn push_unique_coverage(
-        coverages: &mut Vec<TypeCoverageMask>,
-        coverage: TypeCoverageMask,
-    ) -> bool {
-        if coverages.iter().any(|existing| existing == &coverage) {
+    fn push_unique_coverage(coverages: &mut Vec<TypeCoverage>, coverage: TypeCoverage) -> bool {
+        if coverages.contains(&coverage) {
             false
         } else {
             coverages.push(coverage);
@@ -484,57 +480,71 @@ impl ResourceSelectionSyntaxServiceImpl {
         }
     }
 
+    /// The set of types a selector target can touch, or `None` when the target
+    /// resolves to no known type.
     fn resource_type_coverage_for_selector_target(
         supported_resource_types: &[ResourceTypeDescriptor],
         type_str: &str,
-    ) -> Option<TypeCoverageMask> {
-        if Self::is_pattern(type_str) {
-            let mut matched_types = TypeCoverageMask::new(supported_resource_types.len());
-            for (index, descriptor) in supported_resource_types.iter().enumerate() {
-                if descriptor.matches_selector_pattern(type_str) {
-                    matched_types.insert(index);
-                }
-            }
-
-            return Some(matched_types);
+    ) -> Option<TypeCoverage> {
+        if type_str == ANY_SELECTOR {
+            return Some(TypeCoverage::AllTypes);
         }
 
         supported_resource_types
             .iter()
-            .enumerate()
-            .find(|(_, descriptor)| descriptor.matches_selector(type_str))
-            .map(|(index, _)| {
-                let mut matched_types = TypeCoverageMask::new(supported_resource_types.len());
-                matched_types.insert(index);
-                matched_types
-            })
+            .position(|descriptor| descriptor.matches_selector(type_str))
+            .map(TypeCoverage::OneType)
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct TypeCoverageMask {
-    bits: FixedBitSet,
+/// Which types a selector covers. Coverage never partially overlaps: a selector
+/// names exactly one type or, via `%`, all of them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TypeCoverage {
+    AllTypes,
+    OneType(usize),
 }
 
-impl TypeCoverageMask {
-    fn new(num_types: usize) -> Self {
-        Self {
-            bits: FixedBitSet::with_capacity(num_types),
+impl TypeCoverage {
+    fn is_superset(self, other: Self) -> bool {
+        match (self, other) {
+            (Self::AllTypes, _) => true,
+            (Self::OneType(_), Self::AllTypes) => false,
+            (Self::OneType(lhs), Self::OneType(rhs)) => lhs == rhs,
+        }
+    }
+}
+
+/// The union of the broad selectors seen so far.
+#[derive(Debug, Default)]
+struct TypeCoverageUnion {
+    all_types: bool,
+    types: Vec<usize>,
+}
+
+impl TypeCoverageUnion {
+    fn union_with(&mut self, coverage: TypeCoverage) {
+        match coverage {
+            TypeCoverage::AllTypes => self.all_types = true,
+            TypeCoverage::OneType(index) => {
+                if !self.types.contains(&index) {
+                    self.types.push(index);
+                }
+            }
         }
     }
 
-    fn insert(&mut self, index: usize) {
-        self.bits.insert(index);
-    }
+    fn is_superset(&self, coverage: TypeCoverage) -> bool {
+        if self.all_types {
+            return true;
+        }
 
-    fn is_superset(&self, other: &Self) -> bool {
-        self.bits.is_superset(&other.bits)
-    }
-
-    fn union_with(&mut self, other: &Self) {
-        self.bits.union_with(&other.bits);
+        match coverage {
+            TypeCoverage::AllTypes => false,
+            TypeCoverage::OneType(index) => self.types.contains(&index),
+        }
     }
 }
 
@@ -542,8 +552,11 @@ impl TypeCoverageMask {
 
 #[cfg(test)]
 mod tests {
+    use std::assert_matches;
+
     use kamu_resources::TypeUri;
     use kamu_resources_facade::ResourceRef;
+    use pretty_assertions::assert_eq;
 
     use super::*;
 
@@ -575,9 +588,9 @@ mod tests {
         }
     }
 
-    async fn interpret(selector_args: &[&str]) -> ResourceSelectionSyntax {
+    async fn try_interpret(selector_args: &[&str]) -> Result<ResourceSelectionSyntax, CLIError> {
         let selector_args = args(selector_args);
-        let parsed = ResourceSelectionSyntaxParser::parse(&selector_args).unwrap();
+        let parsed = ResourceSelectionSyntaxParser::parse(&selector_args)?;
         let supported_resource_types = supported_resource_types();
 
         ResourceSelectionSyntaxServiceImpl::interpret_parsed_syntax_with(
@@ -597,7 +610,10 @@ mod tests {
             },
         )
         .await
-        .unwrap()
+    }
+
+    async fn interpret(selector_args: &[&str]) -> ResourceSelectionSyntax {
+        try_interpret(selector_args).await.unwrap()
     }
 
     fn describe_item(item: &ResourceSelectionItem) -> String {
@@ -610,10 +626,6 @@ mod tests {
                 "all-by-type:{}:{selector_input}",
                 type_descriptor.canonical_selector
             ),
-            ResourceSelectionItem::TypePatternAll {
-                type_pattern,
-                selector_input,
-            } => format!("type-pattern-all:{type_pattern}:{selector_input}"),
             ResourceSelectionItem::Exact(ResourceExactSelector {
                 type_descriptor,
                 selector_input,
@@ -633,16 +645,12 @@ mod tests {
                 "name-pattern:{}:{selector_input}",
                 type_descriptor.canonical_selector
             ),
-            ResourceSelectionItem::TypePatternExactName {
-                type_pattern,
-                selector_input,
-                ..
-            } => format!("type-pattern-exact:{type_pattern}:{selector_input}"),
-            ResourceSelectionItem::TypePatternNamePattern {
-                type_pattern,
-                selector_input,
-                ..
-            } => format!("type-pattern-name:{type_pattern}:{selector_input}"),
+            ResourceSelectionItem::AnyTypeExactRef { selector_input, .. } => {
+                format!("any-type-exact:{selector_input}")
+            }
+            ResourceSelectionItem::AnyTypeNamePattern { selector_input, .. } => {
+                format!("any-type-name:{selector_input}")
+            }
         }
     }
 
@@ -669,12 +677,6 @@ mod tests {
 
         let cases = [
             Case {
-                name: "global broad shadows narrower broad",
-                input: &["%/%", "s%/%"],
-                expected_items: &["all"],
-                expected_shadowed: &["s%/%"],
-            },
-            Case {
                 name: "global broad shadows exact type broad",
                 input: &["%/all", "ss/%"],
                 expected_items: &["all"],
@@ -699,10 +701,10 @@ mod tests {
                 expected_shadowed: &[],
             },
             Case {
-                name: "type pattern wildcard emits type-pattern-all",
-                input: &["s%/%"],
-                expected_items: &["type-pattern-all:s%:%"],
-                expected_shadowed: &[],
+                name: "global broad shadows every exact type broad",
+                input: &["%/%", "ss/%", "vs/all"],
+                expected_items: &["all"],
+                expected_shadowed: &["ss/%", "vs/all"],
             },
         ];
 
@@ -735,18 +737,6 @@ mod tests {
 
         let cases = [
             Case {
-                name: "narrow exact is shadowed by matching broad pattern",
-                input: &["s%/%", "ss/db-creds"],
-                expected_items: &["type-pattern-all:s%:%"],
-                expected_shadowed: &["ss/db-creds"],
-            },
-            Case {
-                name: "narrow exact is not shadowed by non superset broad pattern",
-                input: &["s%/%", "vs/my-vars"],
-                expected_items: &["type-pattern-all:s%:%", "exact:variables:my-vars"],
-                expected_shadowed: &[],
-            },
-            Case {
                 name: "global broad shadows exact selector",
                 input: &["%/%", "vs/my-vars"],
                 expected_items: &["all"],
@@ -765,9 +755,21 @@ mod tests {
                 expected_shadowed: &[],
             },
             Case {
-                name: "type pattern exact name is preserved",
-                input: &["s%/db-creds"],
-                expected_items: &["type-pattern-exact:s%:s%/db-creds"],
+                name: "any-type exact ref is preserved",
+                input: &["%/db-creds"],
+                expected_items: &["any-type-exact:%/db-creds"],
+                expected_shadowed: &[],
+            },
+            Case {
+                name: "any-type name pattern is preserved",
+                input: &["%/db-%"],
+                expected_items: &["any-type-name:%/db-%"],
+                expected_shadowed: &[],
+            },
+            Case {
+                name: "any-type exact ref is not shadowed by a single-type broad selector",
+                input: &["ss/%", "%/db-creds"],
+                expected_items: &["all-by-type:secrets:%", "any-type-exact:%/db-creds"],
                 expected_shadowed: &[],
             },
         ];
@@ -892,30 +894,33 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_interpret_all_rejects_unsupported_shadowed_type_pattern() {
-        let selector_args = args(&["all", "unknown%/foo"]);
-        let parsed = ResourceSelectionSyntaxParser::parse(&selector_args).unwrap();
-        let supported_resource_types = supported_resource_types();
+    async fn test_interpret_all_rejects_unsupported_shadowed_type() {
+        assert_matches!(try_interpret(&["all", "unknown/foo"]).await, Err(_));
+    }
 
-        let result = ResourceSelectionSyntaxServiceImpl::interpret_parsed_syntax_with(
-            &supported_resource_types,
-            parsed,
-            |type_str, selector_input| {
-                let supported_resource_types = supported_resource_types.clone();
-                async move {
-                    ResourceSelectionSyntaxServiceImpl::make_selector_item_with(
-                        &supported_resource_types,
-                        type_str,
-                        selector_input,
-                        |selector_input| async move { Ok(resolved_selector(&selector_input)) },
-                    )
-                    .await
-                }
-            },
-        )
-        .await;
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-        assert!(result.is_err());
+    #[tokio::test]
+    async fn test_interpret_rejects_type_wildcards() {
+        // `%` alone means "all types"; every other wildcard spelling in the type
+        // position is a usage error rather than a pattern over type names.
+        for input in [
+            &["s%/db-creds"][..],
+            &["%sets/db-creds"][..],
+            &["%TS/db-creds"][..],
+            &["s%/%"][..],
+            &["s%", "db-creds"][..],
+            &["%sets", "all"][..],
+            &["all", "unknown%/foo"][..],
+        ] {
+            let result = try_interpret(input).await;
+
+            assert_matches!(
+                result,
+                Err(ref e) if e.to_string().contains("Unsupported get target"),
+                "expected a usage error for {input:?}",
+            );
+        }
     }
 }
 

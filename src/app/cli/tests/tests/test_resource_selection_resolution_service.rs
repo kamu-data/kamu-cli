@@ -49,7 +49,6 @@ const STORAGES_SHORT_NAME: &str = "st";
 
 const NAME_APP_PATTERN: &str = "app-%";
 const NAME_MISSING_PATTERN: &str = "missing-%";
-const TYPE_PATTERN_S: &str = "S%";
 const RESOURCE_DB_CREDS: &str = "db-creds";
 
 fn raw_selector_strings(type_scope: &kamu_resources_facade::SearchResourceTypeScope) -> Vec<&str> {
@@ -191,296 +190,6 @@ async fn errors_on_unmatched_name_patterns_by_default() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn resolves_type_patterns_with_exact_names_in_supported_type_order() {
-    let mut harness = ResourceSelectionResolutionHarness::new();
-    harness.expect_list_supported_resource_types(vec![
-        harness.secretset_type_descriptor(),
-        harness.storage_type_descriptor(),
-    ]);
-
-    let search_requests = Arc::new(Mutex::new(Vec::new()));
-    harness.expect_search_handles(
-        1,
-        vec![
-            ResourceHandle {
-                r#type: secretset_type_uri().clone(),
-                did: None,
-                id: ResourceID::new(uuid::Uuid::new_v4()),
-                name: RESOURCE_DB_CREDS.parse().unwrap(),
-                account: DEFAULT_ACCOUNT_HANDLE.clone(),
-            },
-            ResourceHandle {
-                r#type: STORAGE_TYPE_URI.clone(),
-                did: None,
-                id: ResourceID::new(uuid::Uuid::new_v4()),
-                name: RESOURCE_DB_CREDS.parse().unwrap(),
-                account: DEFAULT_ACCOUNT_HANDLE.clone(),
-            },
-        ],
-        Arc::clone(&search_requests),
-    );
-
-    let result = harness
-        .service
-        .resolve(
-            ResourceSelectionSyntax {
-                items: vec![ResourceSelectionItem::TypePatternExactName {
-                    type_pattern: TYPE_PATTERN_S.to_string(),
-                    selector_input: format!("{TYPE_PATTERN_S}/{RESOURCE_DB_CREDS}"),
-                    resource_ref: kamu_resources_facade::ResourceRef::ByName(
-                        RESOURCE_DB_CREDS.parse().unwrap(),
-                    ),
-                }],
-                shadowed_selectors: Vec::new(),
-            },
-            &harness.facade,
-            &ResourceSelectionResolutionOptions {
-                ignore_not_found: false,
-                max_expanded_results: Some(10),
-                label_filter: None,
-            },
-        )
-        .await
-        .unwrap();
-
-    assert_eq!(result.targets.len(), 2);
-    assert_eq!(
-        result.targets[0].canonical_selector.as_str(),
-        SECRETSETS_NAME
-    );
-    assert_eq!(result.targets[1].canonical_selector.as_str(), STORAGES_NAME);
-    assert!(
-        result
-            .targets
-            .iter()
-            .all(|target| target.selector_input == format!("{TYPE_PATTERN_S}/{RESOURCE_DB_CREDS}"))
-    );
-
-    let requests = search_requests.lock().unwrap();
-    assert_eq!(requests.len(), 1);
-    assert_eq!(
-        raw_selector_strings(&requests[0].type_scope),
-        vec![SECRETSETS_NAME, STORAGES_NAME]
-    );
-    assert_matches!(
-        &requests[0].query,
-        kamu_resources::ResourceSearchQuery::ExactNames(names)
-            if names == &vec![RESOURCE_DB_CREDS.parse::<kamu_resources::ResourceName>().unwrap()]
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn resolves_type_pattern_all_via_search_across_matched_types() {
-    let mut harness = ResourceSelectionResolutionHarness::new();
-    harness.expect_list_supported_resource_types(vec![
-        harness.secretset_type_descriptor(),
-        harness.storage_type_descriptor(),
-    ]);
-
-    let search_requests = Arc::new(Mutex::new(Vec::new()));
-    harness.expect_search_handles(
-        1,
-        vec![
-            ResourceHandle {
-                r#type: secretset_type_uri().clone(),
-                did: None,
-                id: ResourceID::new(uuid::Uuid::new_v4()),
-                name: "db-creds".parse().unwrap(),
-                account: DEFAULT_ACCOUNT_HANDLE.clone(),
-            },
-            ResourceHandle {
-                r#type: STORAGE_TYPE_URI.clone(),
-                did: None,
-                id: ResourceID::new(uuid::Uuid::new_v4()),
-                name: "warehouse".parse().unwrap(),
-                account: DEFAULT_ACCOUNT_HANDLE.clone(),
-            },
-        ],
-        Arc::clone(&search_requests),
-    );
-
-    let result = harness
-        .service
-        .resolve(
-            ResourceSelectionSyntax {
-                items: vec![ResourceSelectionItem::TypePatternAll {
-                    type_pattern: TYPE_PATTERN_S.to_string(),
-                    selector_input: "%".to_string(),
-                }],
-                shadowed_selectors: Vec::new(),
-            },
-            &harness.facade,
-            &ResourceSelectionResolutionOptions {
-                ignore_not_found: false,
-                max_expanded_results: Some(10),
-                label_filter: None,
-            },
-        )
-        .await
-        .unwrap();
-
-    assert_eq!(result.targets.len(), 2);
-    assert_eq!(
-        result.targets[0].canonical_selector.as_str(),
-        SECRETSETS_NAME
-    );
-    assert_eq!(result.targets[1].canonical_selector.as_str(), STORAGES_NAME);
-
-    let requests = search_requests.lock().unwrap();
-    assert_eq!(requests.len(), 1);
-    assert_eq!(
-        raw_selector_strings(&requests[0].type_scope),
-        vec![SECRETSETS_NAME, STORAGES_NAME]
-    );
-    assert_matches!(
-        &requests[0].query,
-        kamu_resources::ResourceSearchQuery::NamePattern(p) if p == "%"
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn resolves_type_pattern_name_patterns_via_single_search_across_matched_types() {
-    let mut harness = ResourceSelectionResolutionHarness::new();
-    harness.expect_list_supported_resource_types(vec![
-        harness.secretset_type_descriptor(),
-        harness.storage_type_descriptor(),
-    ]);
-
-    let search_requests = Arc::new(Mutex::new(Vec::new()));
-    harness.expect_search_handles(
-        1,
-        vec![
-            ResourceHandle {
-                r#type: secretset_type_uri().clone(),
-                did: None,
-                id: ResourceID::new(uuid::Uuid::new_v4()),
-                name: "db-creds".parse().unwrap(),
-                account: DEFAULT_ACCOUNT_HANDLE.clone(),
-            },
-            ResourceHandle {
-                r#type: STORAGE_TYPE_URI.clone(),
-                did: None,
-                id: ResourceID::new(uuid::Uuid::new_v4()),
-                name: "db-warehouse".parse().unwrap(),
-                account: DEFAULT_ACCOUNT_HANDLE.clone(),
-            },
-        ],
-        Arc::clone(&search_requests),
-    );
-
-    let result = harness
-        .service
-        .resolve(
-            ResourceSelectionSyntax {
-                items: vec![ResourceSelectionItem::TypePatternNamePattern {
-                    type_pattern: TYPE_PATTERN_S.to_string(),
-                    selector_input: format!("{TYPE_PATTERN_S}/db-%"),
-                    name_pattern: "db-%".to_string(),
-                }],
-                shadowed_selectors: Vec::new(),
-            },
-            &harness.facade,
-            &ResourceSelectionResolutionOptions {
-                ignore_not_found: false,
-                max_expanded_results: Some(10),
-                label_filter: None,
-            },
-        )
-        .await
-        .unwrap();
-
-    assert_eq!(result.targets.len(), 2);
-    assert_eq!(
-        result.targets[0].canonical_selector.as_str(),
-        SECRETSETS_NAME
-    );
-    assert_eq!(result.targets[1].canonical_selector.as_str(), STORAGES_NAME);
-    assert!(
-        result
-            .targets
-            .iter()
-            .all(|target| target.selector_input == format!("{TYPE_PATTERN_S}/db-%"))
-    );
-
-    let requests = search_requests.lock().unwrap();
-    assert_eq!(requests.len(), 1);
-    assert_eq!(
-        raw_selector_strings(&requests[0].type_scope),
-        vec![SECRETSETS_NAME, STORAGES_NAME]
-    );
-    assert_matches!(
-        &requests[0].query,
-        kamu_resources::ResourceSearchQuery::NamePattern(p) if p == "db-%"
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn type_pattern_exact_id_tries_every_matched_type() {
-    let mut harness = ResourceSelectionResolutionHarness::new();
-    let id = ResourceID::new(uuid::Uuid::new_v4());
-    harness.expect_list_supported_resource_types(vec![
-        harness.secretset_type_descriptor(),
-        harness.storage_type_descriptor(),
-    ]);
-
-    let search_requests = Arc::new(Mutex::new(Vec::new()));
-    harness.expect_search_handles(
-        1,
-        vec![ResourceHandle {
-            r#type: STORAGE_TYPE_URI.clone(),
-            did: None,
-            id,
-            name: RESOURCE_DB_CREDS.parse().unwrap(),
-            account: DEFAULT_ACCOUNT_HANDLE.clone(),
-        }],
-        Arc::clone(&search_requests),
-    );
-
-    let result = harness
-        .service
-        .resolve(
-            ResourceSelectionSyntax {
-                items: vec![ResourceSelectionItem::TypePatternExactName {
-                    type_pattern: TYPE_PATTERN_S.to_string(),
-                    selector_input: format!("{TYPE_PATTERN_S}/{id}"),
-                    resource_ref: kamu_resources_facade::ResourceRef::ById(id),
-                }],
-                shadowed_selectors: Vec::new(),
-            },
-            &harness.facade,
-            &ResourceSelectionResolutionOptions {
-                ignore_not_found: false,
-                max_expanded_results: Some(10),
-                label_filter: None,
-            },
-        )
-        .await
-        .unwrap();
-
-    assert_eq!(result.targets.len(), 1);
-    assert_eq!(result.targets[0].canonical_selector.as_str(), STORAGES_NAME);
-
-    let requests = search_requests.lock().unwrap();
-    assert_eq!(requests.len(), 1);
-    assert_eq!(
-        raw_selector_strings(&requests[0].type_scope),
-        vec![SECRETSETS_NAME, STORAGES_NAME]
-    );
-    assert_matches!(
-        &requests[0].query,
-        kamu_resources::ResourceSearchQuery::ExactIds(ids) if ids == &vec![id]
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
 async fn exact_any_type_searches_across_every_supported_type() {
     let mut harness = ResourceSelectionResolutionHarness::new();
     let id = ResourceID::new(uuid::Uuid::new_v4());
@@ -578,22 +287,189 @@ async fn exact_any_type_not_found_errors_by_default() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn ignores_unmatched_type_pattern_exact_selectors_when_requested() {
+async fn resolves_any_type_exact_ref_across_every_supported_type() {
     let mut harness = ResourceSelectionResolutionHarness::new();
-    harness.expect_list_supported_resource_types(vec![harness.secretset_type_descriptor()]);
-    harness.expect_search_handles(1, Vec::new(), Arc::new(Mutex::new(Vec::new())));
+    harness.expect_list_supported_resource_types(vec![
+        harness.secretset_type_descriptor(),
+        harness.storage_type_descriptor(),
+    ]);
+
+    let search_requests = Arc::new(Mutex::new(Vec::new()));
+    harness.expect_search_handles(
+        1,
+        vec![
+            ResourceHandle {
+                r#type: secretset_type_uri().clone(),
+                did: None,
+                id: ResourceID::new(uuid::Uuid::new_v4()),
+                name: RESOURCE_DB_CREDS.parse().unwrap(),
+                account: DEFAULT_ACCOUNT_HANDLE.clone(),
+            },
+            ResourceHandle {
+                r#type: STORAGE_TYPE_URI.clone(),
+                did: None,
+                id: ResourceID::new(uuid::Uuid::new_v4()),
+                name: RESOURCE_DB_CREDS.parse().unwrap(),
+                account: DEFAULT_ACCOUNT_HANDLE.clone(),
+            },
+        ],
+        Arc::clone(&search_requests),
+    );
+
+    let selector_input = format!("%/{RESOURCE_DB_CREDS}");
+    let result = harness
+        .service
+        .resolve(
+            ResourceSelectionSyntax {
+                items: vec![ResourceSelectionItem::AnyTypeExactRef {
+                    selector_input: selector_input.clone(),
+                    resource_ref: kamu_resources_facade::ResourceRef::ByName(
+                        RESOURCE_DB_CREDS.parse().unwrap(),
+                    ),
+                }],
+                shadowed_selectors: Vec::new(),
+            },
+            &harness.facade,
+            &ResourceSelectionResolutionOptions {
+                ignore_not_found: false,
+                max_expanded_results: Some(10),
+                label_filter: None,
+            },
+        )
+        .await
+        .unwrap();
+
+    // Each hit is labelled by its own schema, not by a single requested type.
+    assert_eq!(result.targets.len(), 2);
+    assert_eq!(
+        result.targets[0].canonical_selector.as_str(),
+        SECRETSETS_NAME
+    );
+    assert_eq!(result.targets[1].canonical_selector.as_str(), STORAGES_NAME);
+    assert!(
+        result
+            .targets
+            .iter()
+            .all(|target| target.selector_input == selector_input)
+    );
+
+    let requests = search_requests.lock().unwrap();
+    assert_eq!(requests.len(), 1);
+    assert_matches!(
+        &requests[0].type_scope,
+        kamu_resources_facade::SearchResourceTypeScope::AnyType
+    );
+    assert_matches!(
+        &requests[0].query,
+        kamu_resources::ResourceSearchQuery::ExactNames(names)
+            if names == &vec![RESOURCE_DB_CREDS.parse::<kamu_resources::ResourceName>().unwrap()]
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn resolves_any_type_name_pattern_via_a_single_search() {
+    let mut harness = ResourceSelectionResolutionHarness::new();
+    harness.expect_list_supported_resource_types(vec![
+        harness.variableset_type_descriptor(),
+        harness.secretset_type_descriptor(),
+    ]);
+
+    let search_requests = Arc::new(Mutex::new(Vec::new()));
+    harness.expect_search_handles(
+        1,
+        vec![
+            ResourceHandle {
+                r#type: variableset_type_uri().clone(),
+                did: None,
+                id: ResourceID::new(uuid::Uuid::new_v4()),
+                name: "app-alpha".parse().unwrap(),
+                account: DEFAULT_ACCOUNT_HANDLE.clone(),
+            },
+            ResourceHandle {
+                r#type: secretset_type_uri().clone(),
+                did: None,
+                id: ResourceID::new(uuid::Uuid::new_v4()),
+                name: "app-beta".parse().unwrap(),
+                account: DEFAULT_ACCOUNT_HANDLE.clone(),
+            },
+        ],
+        Arc::clone(&search_requests),
+    );
 
     let result = harness
         .service
         .resolve(
             ResourceSelectionSyntax {
-                items: vec![ResourceSelectionItem::TypePatternExactName {
-                    type_pattern: TYPE_PATTERN_S.to_string(),
-                    selector_input: format!("{TYPE_PATTERN_S}/missing"),
-                    resource_ref: kamu_resources_facade::ResourceRef::ByName(
-                        "missing".parse().unwrap(),
-                    ),
+                items: vec![ResourceSelectionItem::AnyTypeNamePattern {
+                    selector_input: format!("%/{NAME_APP_PATTERN}"),
+                    name_pattern: NAME_APP_PATTERN.to_string(),
                 }],
+                shadowed_selectors: Vec::new(),
+            },
+            &harness.facade,
+            &ResourceSelectionResolutionOptions {
+                ignore_not_found: false,
+                max_expanded_results: Some(10),
+                label_filter: Some(environment_label_filter()),
+            },
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(result.targets.len(), 2);
+    assert_eq!(
+        result.targets[0].canonical_selector.as_str(),
+        VARIABLESETS_NAME
+    );
+    assert_eq!(
+        result.targets[1].canonical_selector.as_str(),
+        SECRETSETS_NAME
+    );
+
+    let requests = search_requests.lock().unwrap();
+    assert_eq!(requests.len(), 1);
+    assert_matches!(
+        &requests[0].type_scope,
+        kamu_resources_facade::SearchResourceTypeScope::AnyType
+    );
+    assert_matches!(
+        &requests[0].query,
+        kamu_resources::ResourceSearchQuery::NamePattern(p) if p == NAME_APP_PATTERN
+    );
+    assert_eq!(
+        requests[0].label_filter.as_ref(),
+        Some(&environment_label_filter()),
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn ignores_unmatched_any_type_selectors_when_requested() {
+    let mut harness = ResourceSelectionResolutionHarness::new();
+    harness.expect_list_supported_resource_types(vec![harness.variableset_type_descriptor()]);
+
+    let search_requests = Arc::new(Mutex::new(Vec::new()));
+    harness.expect_search_handles(2, Vec::new(), Arc::clone(&search_requests));
+
+    let result = harness
+        .service
+        .resolve(
+            ResourceSelectionSyntax {
+                items: vec![
+                    ResourceSelectionItem::AnyTypeExactRef {
+                        selector_input: format!("%/{RESOURCE_DB_CREDS}"),
+                        resource_ref: kamu_resources_facade::ResourceRef::ByName(
+                            RESOURCE_DB_CREDS.parse().unwrap(),
+                        ),
+                    },
+                    ResourceSelectionItem::AnyTypeNamePattern {
+                        selector_input: format!("%/{NAME_MISSING_PATTERN}"),
+                        name_pattern: NAME_MISSING_PATTERN.to_string(),
+                    },
+                ],
                 shadowed_selectors: Vec::new(),
             },
             &harness.facade,
@@ -607,123 +483,53 @@ async fn ignores_unmatched_type_pattern_exact_selectors_when_requested() {
         .unwrap();
 
     assert!(result.targets.is_empty());
-    assert_eq!(result.ignored_selectors.len(), 1);
-    assert_eq!(
-        result.ignored_selectors[0].selector_input,
-        format!("{TYPE_PATTERN_S}/missing")
-    );
+    assert_eq!(result.ignored_selectors.len(), 2);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn errors_on_unmatched_type_pattern_exact_selectors_by_default() {
-    let mut harness = ResourceSelectionResolutionHarness::new();
-    harness.expect_list_supported_resource_types(vec![harness.secretset_type_descriptor()]);
-    harness.expect_search_handles(1, Vec::new(), Arc::new(Mutex::new(Vec::new())));
+async fn errors_on_unmatched_any_type_selectors_by_default() {
+    for item in [
+        ResourceSelectionItem::AnyTypeExactRef {
+            selector_input: format!("%/{RESOURCE_DB_CREDS}"),
+            resource_ref: kamu_resources_facade::ResourceRef::ByName(
+                RESOURCE_DB_CREDS.parse().unwrap(),
+            ),
+        },
+        ResourceSelectionItem::AnyTypeNamePattern {
+            selector_input: format!("%/{NAME_MISSING_PATTERN}"),
+            name_pattern: NAME_MISSING_PATTERN.to_string(),
+        },
+    ] {
+        let mut harness = ResourceSelectionResolutionHarness::new();
+        harness.expect_list_supported_resource_types(vec![harness.variableset_type_descriptor()]);
 
-    let error = harness
-        .service
-        .resolve(
-            ResourceSelectionSyntax {
-                items: vec![ResourceSelectionItem::TypePatternExactName {
-                    type_pattern: TYPE_PATTERN_S.to_string(),
-                    selector_input: format!("{TYPE_PATTERN_S}/missing"),
-                    resource_ref: kamu_resources_facade::ResourceRef::ByName(
-                        "missing".parse().unwrap(),
-                    ),
-                }],
-                shadowed_selectors: Vec::new(),
-            },
-            &harness.facade,
-            &ResourceSelectionResolutionOptions {
-                ignore_not_found: false,
-                max_expanded_results: Some(10),
-                label_filter: None,
-            },
-        )
-        .await
-        .unwrap_err();
+        let search_requests = Arc::new(Mutex::new(Vec::new()));
+        harness.expect_search_handles(1, Vec::new(), Arc::clone(&search_requests));
 
-    assert_eq!(
-        error.to_string(),
-        format!("Selector `missing` did not match any resource type matched by `{TYPE_PATTERN_S}`")
-    );
-}
+        let result = harness
+            .service
+            .resolve(
+                ResourceSelectionSyntax {
+                    items: vec![item.clone()],
+                    shadowed_selectors: Vec::new(),
+                },
+                &harness.facade,
+                &ResourceSelectionResolutionOptions {
+                    ignore_not_found: false,
+                    max_expanded_results: Some(10),
+                    label_filter: None,
+                },
+            )
+            .await;
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn ignores_unmatched_type_pattern_name_patterns_when_requested() {
-    let mut harness = ResourceSelectionResolutionHarness::new();
-    harness.expect_list_supported_resource_types(vec![harness.secretset_type_descriptor()]);
-    harness.expect_search_handles(1, Vec::new(), Arc::new(Mutex::new(Vec::new())));
-
-    let result = harness
-        .service
-        .resolve(
-            ResourceSelectionSyntax {
-                items: vec![ResourceSelectionItem::TypePatternNamePattern {
-                    type_pattern: TYPE_PATTERN_S.to_string(),
-                    selector_input: format!("{TYPE_PATTERN_S}/{NAME_MISSING_PATTERN}"),
-                    name_pattern: NAME_MISSING_PATTERN.to_string(),
-                }],
-                shadowed_selectors: Vec::new(),
-            },
-            &harness.facade,
-            &ResourceSelectionResolutionOptions {
-                ignore_not_found: true,
-                max_expanded_results: Some(10),
-                label_filter: None,
-            },
-        )
-        .await
-        .unwrap();
-
-    assert!(result.targets.is_empty());
-    assert_eq!(result.ignored_selectors.len(), 1);
-    assert_eq!(
-        result.ignored_selectors[0].selector_input,
-        format!("{TYPE_PATTERN_S}/{NAME_MISSING_PATTERN}")
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn errors_on_unmatched_type_pattern_name_patterns_by_default() {
-    let mut harness = ResourceSelectionResolutionHarness::new();
-    harness.expect_list_supported_resource_types(vec![harness.secretset_type_descriptor()]);
-    harness.expect_search_handles(1, Vec::new(), Arc::new(Mutex::new(Vec::new())));
-
-    let error = harness
-        .service
-        .resolve(
-            ResourceSelectionSyntax {
-                items: vec![ResourceSelectionItem::TypePatternNamePattern {
-                    type_pattern: TYPE_PATTERN_S.to_string(),
-                    selector_input: format!("{TYPE_PATTERN_S}/{NAME_MISSING_PATTERN}"),
-                    name_pattern: NAME_MISSING_PATTERN.to_string(),
-                }],
-                shadowed_selectors: Vec::new(),
-            },
-            &harness.facade,
-            &ResourceSelectionResolutionOptions {
-                ignore_not_found: false,
-                max_expanded_results: Some(10),
-                label_filter: None,
-            },
-        )
-        .await
-        .unwrap_err();
-
-    assert_eq!(
-        error.to_string(),
-        format!(
-            "Pattern `{NAME_MISSING_PATTERN}` did not match any resource type matched by \
-             `{TYPE_PATTERN_S}`"
-        )
-    );
+        assert_matches!(
+            result,
+            Err(ref e) if e.to_string().contains("did not match any resource of any type"),
+            "expected a not-found error for {item:?}",
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -776,183 +582,6 @@ async fn deduplicates_overlapping_name_patterns_before_counting_max_results() {
     assert_eq!(result.targets.len(), 1);
     assert_eq!(result.targets[0].id, shared_id);
     assert_eq!(result.targets[0].selector_input, NAME_APP_PATTERN);
-
-    let requests = search_requests.lock().unwrap();
-    assert_eq!(requests.len(), 2);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn deduplicates_repeated_type_pattern_exact_name_matches() {
-    let mut harness = ResourceSelectionResolutionHarness::new();
-    let shared_id = ResourceID::new(uuid::Uuid::new_v4());
-    harness.expect_list_supported_resource_types(vec![harness.secretset_type_descriptor()]);
-
-    let search_requests = Arc::new(Mutex::new(Vec::new()));
-    harness.expect_search_handles(
-        2,
-        vec![ResourceHandle {
-            r#type: secretset_type_uri().clone(),
-            did: None,
-            id: shared_id,
-            name: RESOURCE_DB_CREDS.parse().unwrap(),
-            account: DEFAULT_ACCOUNT_HANDLE.clone(),
-        }],
-        Arc::clone(&search_requests),
-    );
-
-    let result = harness
-        .service
-        .resolve(
-            ResourceSelectionSyntax {
-                items: vec![
-                    ResourceSelectionItem::TypePatternExactName {
-                        type_pattern: TYPE_PATTERN_S.to_string(),
-                        selector_input: format!("{TYPE_PATTERN_S}/{RESOURCE_DB_CREDS}"),
-                        resource_ref: kamu_resources_facade::ResourceRef::ByName(
-                            RESOURCE_DB_CREDS.parse().unwrap(),
-                        ),
-                    },
-                    ResourceSelectionItem::TypePatternExactName {
-                        type_pattern: TYPE_PATTERN_S.to_string(),
-                        selector_input: format!("{TYPE_PATTERN_S}/{RESOURCE_DB_CREDS}"),
-                        resource_ref: kamu_resources_facade::ResourceRef::ByName(
-                            RESOURCE_DB_CREDS.parse().unwrap(),
-                        ),
-                    },
-                ],
-                shadowed_selectors: Vec::new(),
-            },
-            &harness.facade,
-            &ResourceSelectionResolutionOptions {
-                ignore_not_found: false,
-                max_expanded_results: Some(1),
-                label_filter: None,
-            },
-        )
-        .await
-        .unwrap();
-
-    assert_eq!(result.targets.len(), 1);
-    assert_eq!(result.targets[0].id, shared_id);
-
-    let requests = search_requests.lock().unwrap();
-    assert_eq!(requests.len(), 2);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn deduplicates_type_pattern_all_before_counting_max_results() {
-    let mut harness = ResourceSelectionResolutionHarness::new();
-    let shared_id = ResourceID::new(uuid::Uuid::new_v4());
-    harness.expect_list_supported_resource_types(vec![harness.secretset_type_descriptor()]);
-
-    let search_requests = Arc::new(Mutex::new(Vec::new()));
-    harness.expect_search_handles(
-        2,
-        vec![ResourceHandle {
-            r#type: secretset_type_uri().clone(),
-            did: None,
-            id: shared_id,
-            name: RESOURCE_DB_CREDS.parse().unwrap(),
-            account: DEFAULT_ACCOUNT_HANDLE.clone(),
-        }],
-        Arc::clone(&search_requests),
-    );
-
-    let result = harness
-        .service
-        .resolve(
-            ResourceSelectionSyntax {
-                items: vec![
-                    ResourceSelectionItem::TypePatternAll {
-                        type_pattern: TYPE_PATTERN_S.to_string(),
-                        selector_input: "%".to_string(),
-                    },
-                    ResourceSelectionItem::TypePatternExactName {
-                        type_pattern: TYPE_PATTERN_S.to_string(),
-                        selector_input: format!("{TYPE_PATTERN_S}/{RESOURCE_DB_CREDS}"),
-                        resource_ref: kamu_resources_facade::ResourceRef::ByName(
-                            RESOURCE_DB_CREDS.parse().unwrap(),
-                        ),
-                    },
-                ],
-                shadowed_selectors: Vec::new(),
-            },
-            &harness.facade,
-            &ResourceSelectionResolutionOptions {
-                ignore_not_found: false,
-                max_expanded_results: Some(1),
-                label_filter: None,
-            },
-        )
-        .await
-        .unwrap();
-
-    assert_eq!(result.targets.len(), 1);
-    assert_eq!(result.targets[0].id, shared_id);
-
-    let search_requests = search_requests.lock().unwrap();
-    assert_eq!(search_requests.len(), 2);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn deduplicates_type_pattern_name_patterns_before_counting_max_results() {
-    let mut harness = ResourceSelectionResolutionHarness::new();
-    let shared_id = ResourceID::new(uuid::Uuid::new_v4());
-    harness.expect_list_supported_resource_types(vec![harness.secretset_type_descriptor()]);
-
-    let search_requests = Arc::new(Mutex::new(Vec::new()));
-    harness.expect_search_handles(
-        2,
-        vec![ResourceHandle {
-            r#type: secretset_type_uri().clone(),
-            did: None,
-            id: shared_id,
-            name: RESOURCE_DB_CREDS.parse().unwrap(),
-            account: DEFAULT_ACCOUNT_HANDLE.clone(),
-        }],
-        Arc::clone(&search_requests),
-    );
-
-    let result = harness
-        .service
-        .resolve(
-            ResourceSelectionSyntax {
-                items: vec![
-                    ResourceSelectionItem::TypePatternNamePattern {
-                        type_pattern: TYPE_PATTERN_S.to_string(),
-                        selector_input: format!("{TYPE_PATTERN_S}/db-%"),
-                        name_pattern: "db-%".to_string(),
-                    },
-                    ResourceSelectionItem::TypePatternNamePattern {
-                        type_pattern: TYPE_PATTERN_S.to_string(),
-                        selector_input: format!("{TYPE_PATTERN_S}/%creds"),
-                        name_pattern: "%creds".to_string(),
-                    },
-                ],
-                shadowed_selectors: Vec::new(),
-            },
-            &harness.facade,
-            &ResourceSelectionResolutionOptions {
-                ignore_not_found: false,
-                max_expanded_results: Some(1),
-                label_filter: None,
-            },
-        )
-        .await
-        .unwrap();
-
-    assert_eq!(result.targets.len(), 1);
-    assert_eq!(result.targets[0].id, shared_id);
-    assert_eq!(
-        result.targets[0].selector_input,
-        format!("{TYPE_PATTERN_S}/db-%")
-    );
 
     let requests = search_requests.lock().unwrap();
     assert_eq!(requests.len(), 2);

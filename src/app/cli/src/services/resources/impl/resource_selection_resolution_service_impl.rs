@@ -59,7 +59,8 @@ impl ResourceSelectionResolutionService for ResourceSelectionResolutionServiceIm
         let mut seen_target_keys = HashSet::new();
 
         let supported_resource_types =
-            Self::supported_resource_types_for_patterns(&selection, resource_facade).await?;
+            Self::supported_resource_types_for_cross_type_items(&selection, resource_facade)
+                .await?;
 
         // Prefetch exact-any-type selectors (bare IDs) in batches, replayed by index.
         let exact_any_type_results = Self::fetch_exact_any_type_identities(
@@ -160,19 +161,17 @@ impl ResourceSelectionResolutionService for ResourceSelectionResolutionServiceIm
                         Self::append_new_targets(&mut targets, &mut seen_target_keys, new_targets);
                 }
 
-                ResourceSelectionItem::TypePatternExactName {
-                    type_pattern,
+                ResourceSelectionItem::AnyTypeExactRef {
                     selector_input,
                     resource_ref,
                 } => {
-                    let matched_resource_types = supported_resource_types
+                    let all_resource_types = supported_resource_types
                         .as_deref()
-                        .expect("type patterns require supported types");
-                    let new_targets = Self::process_type_pattern_exact_name_item(
+                        .expect("AnyTypeExactRef requires supported types");
+                    let new_targets = Self::process_any_type_exact_ref_item(
                         resource_facade,
-                        matched_resource_types,
+                        all_resource_types,
                         &seen_target_keys,
-                        type_pattern,
                         selector_input,
                         resource_ref,
                         expanded_results,
@@ -184,40 +183,17 @@ impl ResourceSelectionResolutionService for ResourceSelectionResolutionServiceIm
                         Self::append_new_targets(&mut targets, &mut seen_target_keys, new_targets);
                 }
 
-                ResourceSelectionItem::TypePatternAll {
-                    type_pattern,
-                    selector_input,
-                } => {
-                    let matched_resource_types = supported_resource_types
-                        .as_deref()
-                        .expect("type patterns require supported types");
-                    let new_targets = Self::process_type_pattern_all_item(
-                        resource_facade,
-                        matched_resource_types,
-                        &seen_target_keys,
-                        type_pattern,
-                        selector_input,
-                        expanded_results,
-                        options,
-                    )
-                    .await?;
-                    expanded_results +=
-                        Self::append_new_targets(&mut targets, &mut seen_target_keys, new_targets);
-                }
-
-                ResourceSelectionItem::TypePatternNamePattern {
-                    type_pattern,
+                ResourceSelectionItem::AnyTypeNamePattern {
                     selector_input,
                     name_pattern,
                 } => {
-                    let matched_resource_types = supported_resource_types
+                    let all_resource_types = supported_resource_types
                         .as_deref()
-                        .expect("type patterns require supported types");
-                    let new_targets = Self::process_type_pattern_name_pattern_item(
+                        .expect("AnyTypeNamePattern requires supported types");
+                    let new_targets = Self::process_any_type_name_pattern_item(
                         resource_facade,
-                        matched_resource_types,
+                        all_resource_types,
                         &seen_target_keys,
-                        type_pattern,
                         selector_input,
                         name_pattern,
                         expanded_results,
@@ -266,7 +242,9 @@ impl ResourceSelectionResolutionServiceImpl {
         appended
     }
 
-    async fn supported_resource_types_for_patterns(
+    /// Cross-type items label their results by each handle's own schema, so
+    /// they need the full descriptor list; single-type items already carry it.
+    async fn supported_resource_types_for_cross_type_items(
         selection: &ResourceSelectionSyntax,
         resource_facade: &dyn ResourceFacade,
     ) -> Result<Option<Vec<ResourceTypeDescriptor>>, CLIError> {
@@ -275,9 +253,8 @@ impl ResourceSelectionResolutionServiceImpl {
                 item,
                 ResourceSelectionItem::All
                     | ResourceSelectionItem::ExactAnyType { .. }
-                    | ResourceSelectionItem::TypePatternExactName { .. }
-                    | ResourceSelectionItem::TypePatternAll { .. }
-                    | ResourceSelectionItem::TypePatternNamePattern { .. }
+                    | ResourceSelectionItem::AnyTypeExactRef { .. }
+                    | ResourceSelectionItem::AnyTypeNamePattern { .. }
             )
         });
 
@@ -308,9 +285,8 @@ impl ResourceSelectionResolutionServiceImpl {
                 | ResourceSelectionItem::AllByType { .. }
                 | ResourceSelectionItem::ExactAnyType { .. }
                 | ResourceSelectionItem::NamePattern { .. }
-                | ResourceSelectionItem::TypePatternExactName { .. }
-                | ResourceSelectionItem::TypePatternAll { .. }
-                | ResourceSelectionItem::TypePatternNamePattern { .. } => None,
+                | ResourceSelectionItem::AnyTypeExactRef { .. }
+                | ResourceSelectionItem::AnyTypeNamePattern { .. } => None,
             })
             .collect::<Vec<_>>();
 
@@ -633,77 +609,6 @@ impl ResourceSelectionResolutionServiceImpl {
             .collect())
     }
 
-    async fn process_type_pattern_all_item(
-        resource_facade: &dyn ResourceFacade,
-        supported_resource_types: &[ResourceTypeDescriptor],
-        seen_target_keys: &HashSet<ResourceTargetKey>,
-        type_pattern: String,
-        selector_input: String,
-        expanded_results: usize,
-        options: &ResourceSelectionResolutionOptions,
-    ) -> Result<Vec<ResourceTarget>, CLIError> {
-        let matched_types = Self::matched_type_descriptors(supported_resource_types, &type_pattern);
-
-        if matched_types.is_empty() {
-            return Err(Self::unsupported_resource_type_pattern_error(
-                supported_resource_types,
-                &type_pattern,
-            ));
-        }
-
-        let matched_resource_type_selectors = matched_types
-            .iter()
-            .map(|descriptor| (&descriptor.canonical_selector).into())
-            .collect::<Vec<_>>();
-
-        let canonical_selectors_by_schema = Self::canonical_selectors_by_schema(&matched_types);
-
-        let collected = Self::collect_unique_bounded_identities(
-            Self::remaining_expanded_results(expanded_results, options),
-            options.max_expanded_results,
-            seen_target_keys,
-            |pagination| {
-                let type_scope = kamu_resources_facade::SearchResourceTypeScope::Types(
-                    matched_resource_type_selectors.clone(),
-                );
-                let request_label_filter = options.label_filter.clone();
-                async move {
-                    resource_facade
-                        .search_handles(SearchResourceHandlesRequest {
-                            type_scope,
-                            // `%` matches every name.
-                            query: kamu_resources::ResourceSearchQuery::NamePattern(
-                                "%".to_string(),
-                            ),
-                            account: None,
-                            label_filter: request_label_filter,
-                            pagination,
-                        })
-                        .await
-                        .map(|response| response.items)
-                        .map_err(Into::into)
-                }
-            },
-        )
-        .await?;
-
-        collected
-            .identities
-            .into_iter()
-            .map(|handle| {
-                let canonical_selector = Self::canonical_selector_for_schema(
-                    &canonical_selectors_by_schema,
-                    &handle.r#type,
-                )?;
-                Ok(Self::target_from_handle(
-                    handle,
-                    canonical_selector.clone(),
-                    selector_input.clone(),
-                ))
-            })
-            .collect()
-    }
-
     async fn process_name_pattern_item(
         resource_facade: &dyn ResourceFacade,
         type_descriptor: &ResourceTypeDescriptor,
@@ -770,33 +675,18 @@ impl ResourceSelectionResolutionServiceImpl {
             .collect())
     }
 
-    async fn process_type_pattern_exact_name_item(
+    /// `%/<name>` or `%/<id>` — one exact reference, searched across every
+    /// type.
+    async fn process_any_type_exact_ref_item(
         resource_facade: &dyn ResourceFacade,
         supported_resource_types: &[ResourceTypeDescriptor],
         seen_target_keys: &HashSet<ResourceTargetKey>,
-        type_pattern: String,
         selector_input: String,
         resource_ref: kamu_resources_facade::ResourceRef,
         expanded_results: usize,
         ignored_selectors: &mut Vec<ResourceIgnoredSelector>,
         options: &ResourceSelectionResolutionOptions,
     ) -> Result<Vec<ResourceTarget>, CLIError> {
-        let matched_types = Self::matched_type_descriptors(supported_resource_types, &type_pattern);
-
-        if matched_types.is_empty() {
-            return Err(Self::unsupported_resource_type_pattern_error(
-                supported_resource_types,
-                &type_pattern,
-            ));
-        }
-
-        let matched_resource_type_selectors = matched_types
-            .iter()
-            .map(|descriptor| (&descriptor.canonical_selector).into())
-            .collect::<Vec<_>>();
-
-        let canonical_selectors_by_schema = Self::canonical_selectors_by_schema(&matched_types);
-
         let query = match &resource_ref {
             kamu_resources_facade::ResourceRef::ById(id) => {
                 kamu_resources::ResourceSearchQuery::ExactIds(vec![*id])
@@ -811,15 +701,12 @@ impl ResourceSelectionResolutionServiceImpl {
             options.max_expanded_results,
             seen_target_keys,
             |pagination| {
-                let type_scope = kamu_resources_facade::SearchResourceTypeScope::Types(
-                    matched_resource_type_selectors.clone(),
-                );
                 let request_query = query.clone();
                 let request_label_filter = options.label_filter.clone();
                 async move {
                     resource_facade
                         .search_handles(SearchResourceHandlesRequest {
-                            type_scope,
+                            type_scope: kamu_resources_facade::SearchResourceTypeScope::AnyType,
                             query: request_query,
                             account: None,
                             label_filter: request_label_filter,
@@ -835,80 +722,46 @@ impl ResourceSelectionResolutionServiceImpl {
 
         if collected.identities.is_empty() && !collected.had_any_match {
             if options.ignore_not_found {
-                ignored_selectors.push(ResourceIgnoredSelector {
-                    type_descriptor: matched_types
-                        .first()
-                        .expect("matched types should be non-empty")
-                        .clone(),
+                Self::push_any_type_ignored_selector(
+                    ignored_selectors,
+                    supported_resource_types,
                     selector_input,
-                });
+                );
                 return Ok(Vec::new());
             }
 
-            return Err(Self::type_pattern_exact_selector_not_found_error(
-                &type_pattern,
-                &resource_ref,
-            ));
+            return Err(Self::any_type_exact_selector_not_found_error(&resource_ref));
         }
 
-        collected
-            .identities
-            .into_iter()
-            .map(|handle| {
-                let canonical_selector = Self::canonical_selector_for_schema(
-                    &canonical_selectors_by_schema,
-                    &handle.r#type,
-                )?;
-                Ok(Self::target_from_handle(
-                    handle,
-                    canonical_selector.clone(),
-                    selector_input.clone(),
-                ))
-            })
-            .collect()
+        Self::targets_labelled_by_schema(
+            collected.identities,
+            supported_resource_types,
+            &selector_input,
+        )
     }
 
-    async fn process_type_pattern_name_pattern_item(
+    /// `%/<pattern>` — one name pattern, searched across every type.
+    async fn process_any_type_name_pattern_item(
         resource_facade: &dyn ResourceFacade,
         supported_resource_types: &[ResourceTypeDescriptor],
         seen_target_keys: &HashSet<ResourceTargetKey>,
-        type_pattern: String,
         selector_input: String,
         name_pattern: String,
         expanded_results: usize,
         ignored_selectors: &mut Vec<ResourceIgnoredSelector>,
         options: &ResourceSelectionResolutionOptions,
     ) -> Result<Vec<ResourceTarget>, CLIError> {
-        let matched_types = Self::matched_type_descriptors(supported_resource_types, &type_pattern);
-
-        if matched_types.is_empty() {
-            return Err(Self::unsupported_resource_type_pattern_error(
-                supported_resource_types,
-                &type_pattern,
-            ));
-        }
-
-        let matched_resource_type_selectors = matched_types
-            .iter()
-            .map(|descriptor| (&descriptor.canonical_selector).into())
-            .collect::<Vec<_>>();
-
-        let canonical_selectors_by_schema = Self::canonical_selectors_by_schema(&matched_types);
-
         let collected = Self::collect_unique_bounded_identities(
             Self::remaining_expanded_results(expanded_results, options),
             options.max_expanded_results,
             seen_target_keys,
             |pagination| {
-                let type_scope = kamu_resources_facade::SearchResourceTypeScope::Types(
-                    matched_resource_type_selectors.clone(),
-                );
                 let request_name_pattern = name_pattern.clone();
                 let request_label_filter = options.label_filter.clone();
                 async move {
                     resource_facade
                         .search_handles(SearchResourceHandlesRequest {
-                            type_scope,
+                            type_scope: kamu_resources_facade::SearchResourceTypeScope::AnyType,
                             query: kamu_resources::ResourceSearchQuery::NamePattern(
                                 request_name_pattern,
                             ),
@@ -926,24 +779,34 @@ impl ResourceSelectionResolutionServiceImpl {
 
         if collected.identities.is_empty() && !collected.had_any_match {
             if options.ignore_not_found {
-                ignored_selectors.push(ResourceIgnoredSelector {
-                    type_descriptor: matched_types
-                        .first()
-                        .expect("matched types should be non-empty")
-                        .clone(),
+                Self::push_any_type_ignored_selector(
+                    ignored_selectors,
+                    supported_resource_types,
                     selector_input,
-                });
+                );
                 return Ok(Vec::new());
             }
 
-            return Err(Self::type_pattern_name_pattern_not_found_error(
-                &type_pattern,
-                &name_pattern,
-            ));
+            return Err(Self::any_type_name_pattern_not_found_error(&name_pattern));
         }
 
-        collected
-            .identities
+        Self::targets_labelled_by_schema(
+            collected.identities,
+            supported_resource_types,
+            &selector_input,
+        )
+    }
+
+    /// Labels each handle with the canonical selector of its own schema.
+    fn targets_labelled_by_schema(
+        identities: Vec<ResourceHandle>,
+        supported_resource_types: &[ResourceTypeDescriptor],
+        selector_input: &str,
+    ) -> Result<Vec<ResourceTarget>, CLIError> {
+        let canonical_selectors_by_schema =
+            Self::canonical_selectors_by_schema(supported_resource_types);
+
+        identities
             .into_iter()
             .map(|handle| {
                 let canonical_selector = Self::canonical_selector_for_schema(
@@ -953,10 +816,28 @@ impl ResourceSelectionResolutionServiceImpl {
                 Ok(Self::target_from_handle(
                     handle,
                     canonical_selector.clone(),
-                    selector_input.clone(),
+                    selector_input.to_owned(),
                 ))
             })
             .collect()
+    }
+
+    /// An unmatched any-type selector has no single type to attribute; only
+    /// `selector_input` is surfaced, so any descriptor serves as a placeholder.
+    fn push_any_type_ignored_selector(
+        ignored_selectors: &mut Vec<ResourceIgnoredSelector>,
+        supported_resource_types: &[ResourceTypeDescriptor],
+        selector_input: String,
+    ) {
+        let type_descriptor = supported_resource_types
+            .first()
+            .expect("at least one resource type must be supported")
+            .clone();
+
+        ignored_selectors.push(ResourceIgnoredSelector {
+            type_descriptor,
+            selector_input,
+        });
     }
 
     fn process_exact_item(
@@ -1068,17 +949,6 @@ impl ResourceSelectionResolutionServiceImpl {
         ))
     }
 
-    fn matched_type_descriptors(
-        supported_resource_types: &[ResourceTypeDescriptor],
-        type_pattern: &str,
-    ) -> Vec<ResourceTypeDescriptor> {
-        supported_resource_types
-            .iter()
-            .filter(|descriptor| descriptor.matches_selector_pattern(type_pattern))
-            .cloned()
-            .collect()
-    }
-
     fn canonical_selectors_by_schema(
         resource_types: &[ResourceTypeDescriptor],
     ) -> CanonicalSelectorsBySchema<'_> {
@@ -1086,16 +956,6 @@ impl ResourceSelectionResolutionServiceImpl {
             .iter()
             .map(|descriptor| (&descriptor.schema, &descriptor.canonical_selector))
             .collect()
-    }
-
-    fn unsupported_resource_type_pattern_error(
-        supported_resource_types: &[ResourceTypeDescriptor],
-        type_pattern: &str,
-    ) -> CLIError {
-        CLIError::usage_error(format!(
-            "Unsupported get target '{type_pattern}'. Supported targets: {}",
-            Self::supported_targets(supported_resource_types).join(", ")
-        ))
     }
 
     fn name_pattern_not_found_error(
@@ -1108,8 +968,7 @@ impl ResourceSelectionResolutionServiceImpl {
         ))
     }
 
-    fn type_pattern_exact_selector_not_found_error(
-        type_pattern: &str,
+    fn any_type_exact_selector_not_found_error(
         resource_ref: &kamu_resources_facade::ResourceRef,
     ) -> CLIError {
         let selector = match resource_ref {
@@ -1118,30 +977,14 @@ impl ResourceSelectionResolutionServiceImpl {
         };
 
         CLIError::usage_error(format!(
-            "Selector `{selector}` did not match any resource type matched by `{type_pattern}`"
+            "Selector `{selector}` did not match any resource of any type"
         ))
     }
 
-    fn type_pattern_name_pattern_not_found_error(
-        type_pattern: &str,
-        name_pattern: &str,
-    ) -> CLIError {
+    fn any_type_name_pattern_not_found_error(name_pattern: &str) -> CLIError {
         CLIError::usage_error(format!(
-            "Pattern `{name_pattern}` did not match any resource type matched by `{type_pattern}`"
+            "Pattern `{name_pattern}` did not match any resource of any type"
         ))
-    }
-
-    fn supported_targets(supported_resource_types: &[ResourceTypeDescriptor]) -> Vec<String> {
-        let mut targets = Vec::new();
-
-        for descriptor in supported_resource_types {
-            targets.push(descriptor.canonical_selector.to_string());
-            targets.extend(descriptor.selector_aliases.iter().map(ToString::to_string));
-        }
-
-        targets.sort();
-        targets.dedup();
-        targets
     }
 
     fn target_from_handle(

@@ -30,8 +30,8 @@ use crate::resources::{ResourceCtx, fixtures};
 // Covers:
 //   - Three equivalent selector forms for one resource
 //   - Multi-name same-type, mixed ref-form
-//   - Name pattern, type pattern, type+name pattern, `%sets`
-//   - `--max-results` truncation, `--unbounded`, and `%sets all`
+//   - Name pattern, `%` any-type forms, and rejected type wildcards
+//   - `--max-results` truncation, `--unbounded`, and `% all`
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Identity constants — kept terse so assertions read as "which resources came
@@ -104,33 +104,39 @@ pub async fn test_resources_get_selectors(ctx: ResourceCtx) {
     assert_eq!(view.ident(), (fixtures::VARIABLE_SET_SCHEMA, "app-vars"));
     assert_eq!(view.variable("MESSAGE"), Some(app_vars_value));
 
-    // ── 5. Type pattern + exact name: `get s%/db-creds` ───────────────────────
+    // ── 5. Any-type + exact name: `get %/db-creds` ────────────────────────────
     //
-    // Case-insensitive type prefix `s%` matches SecretSet only; `db-creds`
-    // selects exactly the SecretSet (not the VariableSet of the same name).
+    // `%` spans every type; `db-creds` exists as both a VariableSet and a
+    // SecretSet → exactly those two.
 
-    let view = ctx.get_one(["get", "s%/db-creds"]).await;
-    assert_eq!(view.ident(), (fixtures::SECRET_SET_SCHEMA, "db-creds"));
-    assert!(
-        view.has_secret("API_TOKEN"),
-        "ss/db-creds should expose its API_TOKEN secret key:\n{}",
-        view.as_json()
-    );
-
-    // ── 6. Type + name pattern: `get s%/db-%` ─────────────────────────────────
-    //
-    // Type starts `s`, name starts `db-` → only ss/db-creds.
-
-    let view = ctx.get_one(["get", "s%/db-%"]).await;
-    assert_eq!(view.ident(), (fixtures::SECRET_SET_SCHEMA, "db-creds"));
-
-    // ── 7. Type pattern spanning types: `get %sets db-creds` ──────────────────
-    //
-    // `%sets` matches both variablesets and secretsets; name `db-creds` exists
-    // in both → exactly those two.
-
-    let idents = ctx.get_idents(["get", "%sets", "db-creds"]).await;
+    let idents = ctx.get_idents(["get", "%/db-creds"]).await;
     assert_eq!(idents, [ss("db-creds"), vs("db-creds")]);
+
+    // Same selection via the positional form.
+    let idents = ctx.get_idents(["get", "%", "db-creds"]).await;
+    assert_eq!(idents, [ss("db-creds"), vs("db-creds")]);
+
+    // ── 6. Any-type + name pattern: `get %/db-%` ──────────────────────────────
+    //
+    // Every type, names starting `db-` → both `db-creds` resources.
+
+    let idents = ctx.get_idents(["get", "%/db-%"]).await;
+    assert_eq!(idents, [ss("db-creds"), vs("db-creds")]);
+
+    // ── 7. Type wildcards are rejected ────────────────────────────────────────
+    //
+    // Only `%` alone is accepted in the type position: matching type names by
+    // pattern is hard to read back and dangerous on `delete`.
+
+    for type_wildcard in ["s%/db-creds", "%sets/db-creds", "s%/%"] {
+        ctx.assert_failure(["get", type_wildcard], Some(&["Unsupported get target"]))
+            .await;
+    }
+    ctx.assert_failure(
+        ["get", "%sets", "db-creds"],
+        Some(&["Unsupported get target"]),
+    )
+    .await;
 
     // ── 8. `--max-results 1`: wildcard expansion truncated ────────────────────
     //
@@ -159,20 +165,27 @@ pub async fn test_resources_get_selectors(ctx: ResourceCtx) {
         ]
     );
 
-    // ── 10. Type pattern + `all` name selector: `get %sets all` ───────────────
+    // ── 10. Any-type broad forms: `get % all` and `get %/%` ───────────────────
     //
-    // Equivalent to `%sets/%`: every VariableSet and SecretSet.
+    // Both collapse to the same selection as `get all`.
 
-    let idents = ctx.get_idents(["get", "%sets", "all"]).await;
-    assert_eq!(
-        idents,
-        [
-            ss("app-secrets"),
-            ss("db-creds"),
-            vs("app-vars"),
-            vs("db-creds"),
-        ]
-    );
+    for form in [
+        vec!["get", "%", "all", "--unbounded"],
+        vec!["get", "%/%", "--unbounded"],
+    ] {
+        let idents = ctx.get_idents(form.clone()).await;
+        assert_eq!(
+            idents,
+            [
+                ss("app-secrets"),
+                ss("db-creds"),
+                vs("app-vars"),
+                vs("db-creds"),
+            ],
+            "`{}` should select every resource",
+            form.join(" ")
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

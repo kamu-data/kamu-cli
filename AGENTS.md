@@ -2,6 +2,14 @@
 
 Small project-specific guidance for coding agents working in this repository.
 
+## Git
+
+- **Never commit without explicit approval.** Do not run `git commit`, `git push`,
+  `git merge`, `git rebase`, or any other history-altering command unless the user
+  asks for it in that specific instance. Leave finished work staged or unstaged in
+  the working tree and let the user review and commit it themselves.
+- Approval to commit once is not standing approval for later commits; ask again.
+
 ## Validation
 
 - Run `cargo fmt` after edits.
@@ -38,7 +46,10 @@ cargo nextest run -E 'test(test_name_here)'
 - Prefer inline formatting like `format!("value={value}")`.
 - Prefer checked numeric conversions like `usize::try_from(x).unwrap()` when narrowing types.
 - Respect exact long separator comment style where surrounding files use it.
-- Keep comments short — one or two lines. State the non-obvious fact (a constraint, invariant, or reason), not a walkthrough of the code or the history of how it got there. Never cite plan/spec/issue identifiers (e.g. "plan 7 item 3") in code comments — plans are not part of the codebase and the reference rots.
+- Keep comments concise — one or two lines, never prose poems.
+- Never explain what the code plainly says. If a reader can see it, do not restate it.
+- Comment the WHY: a constraint, a non-obvious invariant, a reason a choice was made. Not the how, and not the history of how the code got here ("used to be X", "after removing Y") — that belongs in commit messages, not in the source.
+- Never cite plan/spec/issue identifiers (e.g. "plan 7 item 3") in code comments — plans are not part of the codebase and the reference rots.
 - Keep macros declarative. Put algorithmic logic into ordinary helper functions or services.
 - When logic becomes conceptually distinct, split it into its own module early.
 - Organize model files top-down: highest-level result/union type first, then referenced structs/enums, with impl blocks immediately after the type.

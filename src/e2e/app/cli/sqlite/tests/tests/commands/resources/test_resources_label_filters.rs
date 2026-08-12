@@ -26,14 +26,13 @@ kamu_cli_resource_e2e_test!(
 
 kamu_cli_resource_e2e_test!(
     storage = sqlite,
-    fixture =
-        kamu_cli_e2e_repo_tests::commands::test_resources_label_filter_type_pattern_exact_name
+    fixture = kamu_cli_e2e_repo_tests::commands::test_resources_label_filter_any_type_exact_ref
 );
 
 // Applies `SecretSet`s, hence `with_kamu_config`.
 kamu_cli_resource_e2e_test!(
     storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_resources_label_filter_type_pattern_multitype,
+    fixture = kamu_cli_e2e_repo_tests::commands::test_resources_label_filter_any_type_multitype,
     options = Options::default().with_kamu_config(
         kamu_cli_e2e_repo_tests::resources::fixtures::SECRETS_ENCRYPTION_KAMU_CONFIG
     )

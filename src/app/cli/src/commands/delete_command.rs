@@ -474,7 +474,7 @@ impl<'a> DeleteRequestResolver<'a> {
             .await?;
 
         Ok(Self::classify_slash_request_with(raw_args, |prefix| {
-            Self::matches_resource_target_prefix_with(&supported_resource_types, prefix)
+            Self::matches_resource_slash_prefix_with(&supported_resource_types, prefix)
         }))
     }
 
@@ -482,13 +482,21 @@ impl<'a> DeleteRequestResolver<'a> {
         supported_resource_types: &[ResourceTypeDescriptor],
         prefix: &str,
     ) -> bool {
-        supported_resource_types.iter().any(|descriptor| {
-            if Self::is_potential_resource_type_pattern(prefix) {
-                descriptor.matches_selector_pattern(prefix)
-            } else {
-                descriptor.matches_selector(prefix)
-            }
-        })
+        supported_resource_types
+            .iter()
+            .any(|descriptor| descriptor.matches_selector(prefix))
+    }
+
+    /// A `%`-carrying type half claims the resource path even when it names no
+    /// supported type, so the user gets the resource-selector usage error
+    /// rather than a dataset error. Dataset names may contain `%` but never
+    /// appear as the type half.
+    fn matches_resource_slash_prefix_with(
+        supported_resource_types: &[ResourceTypeDescriptor],
+        prefix: &str,
+    ) -> bool {
+        prefix.contains('%')
+            || Self::matches_resource_target_prefix_with(supported_resource_types, prefix)
     }
 
     fn classify_slash_request_with<F>(
@@ -567,16 +575,13 @@ impl<'a> DeleteRequestResolver<'a> {
         Ok(syntax)
     }
 
-    fn is_potential_resource_type_pattern(prefix: &str) -> bool {
-        prefix.contains('%')
-    }
-
     /// Mirrors the `UUIDv4` check in `ResourceSelectionSyntaxParser`.
     fn is_resource_id(arg: &str) -> bool {
         uuid::Uuid::parse_str(arg).is_ok_and(|id| id.get_version() == Some(uuid::Version::Random))
     }
 }
 
+#[derive(Debug)]
 enum ClassifiedSlashDeleteRequest {
     Datasets(Vec<String>),
     Resources(Vec<String>),
@@ -590,6 +595,8 @@ enum ClassifiedSlashDeleteRequest {
 
 #[cfg(test)]
 mod tests {
+    use std::assert_matches;
+
     use kamu_resources::{ResourceTypeDescriptor, TypeUri};
 
     use super::{ClassifiedSlashDeleteRequest, DeleteRequestResolver};
@@ -615,11 +622,11 @@ mod tests {
             |prefix| matches!(prefix, "vs" | "ss"),
         );
 
-        assert!(matches!(
+        assert_matches!(
             request,
             ClassifiedSlashDeleteRequest::Resources(args)
                 if args == vec!["vs/foo".to_owned(), "ss/bar".to_owned()]
-        ));
+        );
     }
 
     #[test]
@@ -629,11 +636,11 @@ mod tests {
             |_| false,
         );
 
-        assert!(matches!(
+        assert_matches!(
             request,
             ClassifiedSlashDeleteRequest::Datasets(args)
                 if args == vec!["account/foo".to_owned()]
-        ));
+        );
     }
 
     #[test]
@@ -643,11 +650,11 @@ mod tests {
             |_| false,
         );
 
-        assert!(matches!(
+        assert_matches!(
             request,
             ClassifiedSlashDeleteRequest::Datasets(args)
                 if args == vec!["foo".to_owned(), "bar".to_owned()]
-        ));
+        );
     }
 
     #[test]
@@ -657,40 +664,26 @@ mod tests {
             |prefix| prefix == "vs",
         );
 
-        assert!(matches!(
+        assert_matches!(
             request,
             ClassifiedSlashDeleteRequest::Mixed { dataset_args, resource_args }
                 if dataset_args == vec!["foo".to_owned()]
                     && resource_args == vec!["vs/bar".to_owned()]
-        ));
+        );
     }
 
     #[test]
-    fn test_classify_slash_request_routes_matching_type_patterns_to_resources() {
+    fn test_classify_slash_request_routes_any_type_wildcard_to_resources() {
         let request = DeleteRequestResolver::classify_slash_request_with(
-            vec!["s%/db-creds".to_owned()],
-            |prefix| prefix.eq_ignore_ascii_case("s%"),
+            vec!["%/db-creds".to_owned()],
+            |prefix| prefix == "%",
         );
 
-        assert!(matches!(
+        assert_matches!(
             request,
             ClassifiedSlashDeleteRequest::Resources(args)
-                if args == vec!["s%/db-creds".to_owned()]
-        ));
-    }
-
-    #[test]
-    fn test_classify_slash_request_keeps_unknown_type_patterns_on_dataset_path() {
-        let request = DeleteRequestResolver::classify_slash_request_with(
-            vec!["unknown%/db-creds".to_owned()],
-            |_| false,
+                if args == vec!["%/db-creds".to_owned()]
         );
-
-        assert!(matches!(
-            request,
-            ClassifiedSlashDeleteRequest::Datasets(args)
-                if args == vec!["unknown%/db-creds".to_owned()]
-        ));
     }
 
     #[test]
@@ -700,16 +693,15 @@ mod tests {
             |_| true,
         );
 
-        assert!(matches!(
+        assert_matches!(
             request,
             ClassifiedSlashDeleteRequest::Datasets(args)
                 if args == vec!["foo".to_owned()]
-        ));
+        );
     }
 
-    #[test]
-    fn test_matches_resource_target_prefix_with_type_patterns_case_insensitively() {
-        let supported_resource_types = vec![
+    fn test_resource_types() -> Vec<ResourceTypeDescriptor> {
+        vec![
             ResourceTypeDescriptor {
                 canonical_selector: kamu_resources::ResourceSelectorName::new("variablesets")
                     .unwrap(),
@@ -724,19 +716,49 @@ mod tests {
                 schema: TypeUri::new_unchecked("dev.kamu/secretset/v1"),
                 list_columns: Vec::new(),
             },
-        ];
+        ]
+    }
+
+    #[test]
+    fn test_matches_resource_target_prefix_matches_exact_names_case_insensitively() {
+        let supported_resource_types = test_resource_types();
 
         assert!(DeleteRequestResolver::matches_resource_target_prefix_with(
             &supported_resource_types,
             "VS",
         ));
-        assert!(DeleteRequestResolver::matches_resource_target_prefix_with(
+        // A dataset name may contain `%`; only the type half is wildcard-aware.
+        assert!(!DeleteRequestResolver::matches_resource_target_prefix_with(
             &supported_resource_types,
-            "S%",
+            "my.dataset.%",
         ));
         assert!(!DeleteRequestResolver::matches_resource_target_prefix_with(
             &supported_resource_types,
-            "X%",
+            "S%",
+        ));
+    }
+
+    #[test]
+    fn test_matches_resource_slash_prefix_claims_every_wildcard_type_half() {
+        let supported_resource_types = test_resource_types();
+
+        assert!(DeleteRequestResolver::matches_resource_slash_prefix_with(
+            &supported_resource_types,
+            "%",
+        ));
+        // Rejected type wildcards stay on the resource path so the user gets the
+        // resource-selector usage error rather than a dataset error.
+        assert!(DeleteRequestResolver::matches_resource_slash_prefix_with(
+            &supported_resource_types,
+            "S%",
+        ));
+        assert!(DeleteRequestResolver::matches_resource_slash_prefix_with(
+            &supported_resource_types,
+            "unknown%",
+        ));
+        assert!(!DeleteRequestResolver::matches_resource_slash_prefix_with(
+            &supported_resource_types,
+            "unknown",
         ));
     }
 }

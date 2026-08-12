@@ -13,6 +13,10 @@ use crate::CLIError;
 
 pub(super) const ALL_SELECTOR: &str = "all";
 
+/// In the type position this is the sole accepted wildcard, meaning all types;
+/// in the name position it is an ordinary `%` pattern matching every name.
+pub(super) const ANY_SELECTOR: &str = "%";
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug)]
@@ -324,11 +328,11 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_syntax_slash_form_pattern_all_wildcard() {
-        let a = args(&["s%/%"]);
+    fn test_parse_syntax_slash_form_any_type_all_wildcard() {
+        let a = args(&["%/%"]);
         assert_matches!(
             ResourceSelectionSyntaxParser::parse(&a),
-            Ok(ParsedSyntax::RefForm { pairs }) if pairs == vec![("s%", "%")]
+            Ok(ParsedSyntax::RefForm { pairs }) if pairs == vec![("%", "%")]
         );
     }
 
@@ -344,13 +348,15 @@ mod tests {
         );
     }
 
+    // Parsing is purely lexical: a `%`-carrying type is tokenized here and
+    // accepted or rejected later, when types are resolved.
     #[test]
-    fn test_parse_syntax_same_type_pattern() {
-        let a = args(&["s%", "db-creds"]);
+    fn test_parse_syntax_same_type_wildcard() {
+        let a = args(&["%", "db-creds"]);
         assert_matches!(
             ResourceSelectionSyntaxParser::parse(&a),
             Ok(ParsedSyntax::SameType {
-                type_str: "s%",
+                type_str: "%",
                 selector_inputs,
             }) if selector_inputs == vec!["db-creds"]
         );
@@ -366,11 +372,11 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_syntax_slash_form_type_pattern() {
-        let a = args(&["s%/db-creds"]);
+    fn test_parse_syntax_slash_form_any_type() {
+        let a = args(&["%/db-creds"]);
         assert_matches!(
             ResourceSelectionSyntaxParser::parse(&a),
-            Ok(ParsedSyntax::RefForm { pairs }) if pairs == vec![("s%", "db-creds")]
+            Ok(ParsedSyntax::RefForm { pairs }) if pairs == vec![("%", "db-creds")]
         );
     }
 

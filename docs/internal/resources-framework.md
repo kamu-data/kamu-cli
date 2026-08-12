@@ -899,10 +899,11 @@ producer of a non-`None` value (`Exact` selector resolution) has since moved to
 `search_handles`, so the field was removed rather than left permanently unused.
 
 Filtering covers `get` and `delete` as well as `list` because the CLI resolves
-those in **two phases**: it first expands type/name patterns into identifiers via
-`search_handles`/`list_handles`, then operates on the resulting `ResourceRef::ById`
-set. A label filter is a *narrowing of the candidate identifier set* — structurally
-the same job as a name pattern — so it belongs to that phase-1 expansion. The
+those in **two phases**: it first expands name patterns and the `%` all-types
+token into identifiers via `search_handles`/`list_handles`, then operates on the
+resulting `ResourceRef::ById` set. A label filter is a *narrowing of the candidate
+identifier set* — structurally the same job as a name pattern — so it belongs to
+that phase-1 expansion. The
 phase-2 batch calls (`get_many`, `delete_many`, `render_manifests`) structurally
 **cannot** carry a filter — `ResourceBatchSelector` has no such field — so the old
 "pass `label_filter: None` by convention" precondition is now enforced by the type
@@ -924,7 +925,10 @@ receive only the resolved predicate and never resolve aliases or touch the
 extension-schema registry.
 
 **Multi-type queries resolve the filter per schema and collapse.** `search_handles`
-may span several schemas. The filter is resolved once per candidate schema and the
+may span several schemas — via `SearchResourceTypeScope::AnyType` (what the CLI's
+`%` all-types token produces), or via an explicit multi-element
+`SearchResourceTypeScope::Types`, which remains available to GraphQL clients even
+though the CLI now always passes a single type there. The filter is resolved once per candidate schema and the
 resolved trees compared: today they are always equal — the built-in `environment`
 label applies to every resource type and unregistered short names resolve to
 free-form identity — so the uniform single-predicate path is taken. The divergent
@@ -1109,8 +1113,9 @@ themselves are agnostic. Selector grammar is specified below, after the semantic
 | Aspect | `apply` | `get` | `list` | `delete` |
 | --- | --- | --- | --- | --- |
 | Input | manifest(s): `-f <file>`, dir + `--recursive`, or `--stdin` | selector(s) | positional `target` (a type or `all`) | selector(s) |
-| Selector / target examples | n/a (identity from manifest) | `vs my-vars`, `vs/my-vars`, `secretset/db%`, `vs all` | `kamu list variablesets` (or `vs`, `secretsets`, `ss`, `all`) | `vs my-vars`, `vs/my%`, `vs all` |
+| Selector / target examples | n/a (identity from manifest) | `vs my-vars`, `vs/my-vars`, `secretset/db%`, `vs all`, `%/my-vars` | `kamu list variablesets` (or `vs`, `secretsets`, `ss`, `all`) | `vs my-vars`, `vs/my%`, `vs all` |
 | `%` name patterns | n/a | **yes** | n/a (lists whole type) | **yes** |
+| `%` type wildcards | n/a | **only bare `%`** (= all types); `%set`/`s%` rejected | n/a | **only bare `%`**; `%set`/`s%` rejected |
 | May return / act on multiple | yes (per manifest) | **yes, but bounded** — selector-driven, capped by `max_results`, `--unbounded` to lift | yes (bounded by `--max-results`/`--unbounded`) | yes |
 | Output modes | summary + changes (`--dry-run`)/warnings; verbose | `-o name` \| `-o json` \| `-o yaml`; `--spec` for apply-compatible spec | Table/CSV/JSON/Parquet (via `OutputConfig`), `-w` for wider detail | summary / dry-run preview |
 | Default secret visibility | n/a | **`Encrypted`** (ciphertext); `--revealed` to decrypt | secrets not expanded in list columns | n/a |
@@ -1125,10 +1130,30 @@ themselves are agnostic. Selector grammar is specified below, after the semantic
 **Selector grammar — accepted forms** (parsed by `ResourceSelectionSyntaxParser`,
 [`resource_selection_syntax_parser.rs`](/src/app/cli/src/services/resources/impl/resource_selection_syntax_parser.rs)):
 `all`; same-type list `type name1 name2 …` (no slash); slash form `type/name …` (each arg exactly one
-`/`); `type all` or `type/all`; names may use `%` patterns.
+`/`); `type all` or `type/all`.
+
+**The `%` wildcard is asymmetric between the two halves — this is the point.**
+
+- **Names** may use `%` patterns freely: `vs app-%`, `vs/db-%`, `variablesets/%`.
+- **Types** are matched **exactly** (case-insensitively) against a canonical selector name or alias.
+  The one special token is `%` **alone**, meaning *all types*: `%/my-vars`, `%/db-%`, `% all`, `%/%`.
+  Any other `%`-carrying spelling in the type position (`%set`, `s%`, `%TS`) is a **usage error**, not
+  a pattern.
+
+Matching *types* by wildcard was supported once and removed: it is hard to read back (`%set` silently
+covering `VariableSet` + `SecretSet` but not `Storage`) and outright dangerous on `delete`, where a
+mistyped pattern widens the blast radius to types the user never named. Exact-or-everything is the
+whole rule.
+
+Parsing is purely lexical — `ResourceSelectionSyntaxParser` tokenizes `%set/foo` happily; the type
+half is validated later, when `ResourceSelectionSyntaxServiceImpl::classify_type_token` resolves it.
 
 **Intentionally rejected** (documented as a contract, not just left implicit):
 
+- `kamu get %set foo` / `kamu get s%/db-creds` — **type wildcards** other than bare `%` are rejected
+  ("Unsupported get target '…'. Supported targets: …"). Use the exact type, or `%` for all types.
+  A `%`-carrying type half stays on the *resource* path in `kamu delete` even when it names no
+  supported type, so the user gets this error rather than a confusing legacy-dataset one.
 - `kamu get vs/foo bar` — **mixing** slash and same-type list forms in one command is rejected
   ("Cannot mix positional `type name` and slash `type/name` syntax"). The one exception is a leading
   `all` (e.g. `all vs/foo` is accepted, with the rest treated as shadowed).

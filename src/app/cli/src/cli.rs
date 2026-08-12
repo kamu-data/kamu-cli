@@ -838,13 +838,13 @@ Delete resources using slash selectors:
 
     kamu delete vs/my-vars ss/my-secrets
 
-Delete the same exact name across a matched type pattern:
+Delete the same exact name across every resource type:
 
-    kamu delete s% db-creds
+    kamu delete % db-creds
 
-Delete matched resources across a type pattern and name pattern:
+Delete resources matching a name pattern across every resource type:
 
-    kamu delete s%/db-%
+    kamu delete %/db-%
 
 Delete all resources of a type using a slash selector:
 
@@ -979,13 +979,13 @@ Get multiple resources by slash-separated ref form:
 
     kamu get vs/vars-a ss/db-creds
 
-Get the same exact name across a matched type pattern:
+Get the same exact name across every resource type:
 
-    kamu get s% db-creds
+    kamu get % db-creds
 
-Get matched resources across a type pattern and name pattern:
+Get resources matching a name pattern across every resource type:
 
-    kamu get s%/db-%
+    kamu get %/db-%
 
 Get a resource by UUID:
 

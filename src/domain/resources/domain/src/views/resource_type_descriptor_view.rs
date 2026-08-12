@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use like::ILike;
-
 use crate::{ResourceListColumnDescriptor, ResourceSelectorName, TypeUri};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -25,14 +23,6 @@ pub struct ResourceTypeDescriptor {
 impl ResourceTypeDescriptor {
     pub fn matches_selector(&self, selector: impl AsRef<str>) -> bool {
         resource_type_matches_selector(&self.canonical_selector, &self.selector_aliases, selector)
-    }
-
-    pub fn matches_selector_pattern(&self, pattern: &str) -> bool {
-        matches_wildcard_pattern(pattern, self.canonical_selector.as_str())
-            || self
-                .selector_aliases
-                .iter()
-                .any(|alias| matches_wildcard_pattern(pattern, alias.as_str()))
     }
 }
 
@@ -60,10 +50,6 @@ pub fn resource_selector_parts_match<'a>(
             .any(|alias| alias.eq_ignore_ascii_case(selector))
 }
 
-fn matches_wildcard_pattern(pattern: &str, value: &str) -> bool {
-    ILike::<false>::ilike(value, pattern).unwrap()
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[cfg(test)]
@@ -86,7 +72,7 @@ mod tests {
     }
 
     #[test]
-    fn matches_patterns_case_insensitively_for_names_and_short_names() {
+    fn does_not_match_wildcard_type_selectors() {
         let descriptor = ResourceTypeDescriptor {
             canonical_selector: ResourceSelectorName::new("secretsets").unwrap(),
             selector_aliases: vec![ResourceSelectorName::new("ss").unwrap()],
@@ -94,9 +80,11 @@ mod tests {
             list_columns: Vec::new(),
         };
 
-        assert!(descriptor.matches_selector_pattern("S%"));
-        assert!(descriptor.matches_selector_pattern("%TS"));
-        assert!(!descriptor.matches_selector_pattern("V%"));
+        // Type selectors are matched exactly — `%` carries no wildcard meaning
+        // here, and is resolved as an all-types token by the CLI instead.
+        assert!(!descriptor.matches_selector(ResourceTypeSelectorRaw::new("S%").unwrap()));
+        assert!(!descriptor.matches_selector(ResourceTypeSelectorRaw::new("%TS").unwrap()));
+        assert!(!descriptor.matches_selector(ResourceTypeSelectorRaw::new("%").unwrap()));
     }
 }
 

@@ -219,7 +219,7 @@ pub async fn test_resources_label_filter_delete(ctx: ResourceCtx) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_resources_label_filter_type_pattern_exact_name(ctx: ResourceCtx) {
+pub async fn test_resources_label_filter_any_type_exact_ref(ctx: ResourceCtx) {
     seed_labeled_variable_sets(&ctx).await;
 
     let excluded = ctx
@@ -235,7 +235,7 @@ pub async fn test_resources_label_filter_type_pattern_exact_name(ctx: ResourceCt
         .await;
     assert!(
         excluded.trim().is_empty(),
-        "a type-pattern + exact-name selector must still be subject to the label filter, \
+        "an any-type + exact-name selector must still be subject to the label filter, \
          got:\n{excluded}"
     );
 
@@ -259,7 +259,7 @@ pub async fn test_resources_label_filter_type_pattern_exact_name(ctx: ResourceCt
         .await;
     assert!(
         excluded_by_id.trim().is_empty(),
-        "a type-pattern + exact-id selector must still be subject to the label filter, \
+        "an any-type + exact-id selector must still be subject to the label filter, \
          got:\n{excluded_by_id}"
     );
 
@@ -328,11 +328,11 @@ async fn seed_labeled_cross_type_resources(ctx: &ResourceCtx) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_resources_label_filter_type_pattern_multitype(ctx: ResourceCtx) {
+pub async fn test_resources_label_filter_any_type_multitype(ctx: ResourceCtx) {
     seed_labeled_cross_type_resources(&ctx).await;
 
     let idents = ctx
-        .get_idents(["get", "%sets/%-creds", "-l", "environment=production"])
+        .get_idents(["get", "%/%-creds", "-l", "environment=production"])
         .await;
     assert_eq!(
         idents,
@@ -340,11 +340,11 @@ pub async fn test_resources_label_filter_type_pattern_multitype(ctx: ResourceCtx
             fixtures::SECRET_SET_SCHEMA.to_string(),
             "prod-creds".to_string()
         )],
-        "`%sets/%-creds -l environment=production` should exclude the staging SecretSet"
+        "`%/%-creds -l environment=production` should exclude the staging SecretSet"
     );
 
     let idents = ctx
-        .get_idents(["get", "%sets", "all", "-l", "environment=production"])
+        .get_idents(["get", "%", "all", "-l", "environment=production"])
         .await;
     assert_eq!(
         idents,
@@ -358,7 +358,7 @@ pub async fn test_resources_label_filter_type_pattern_multitype(ctx: ResourceCtx
                 "prod-vars".to_string()
             ),
         ],
-        "`%sets all -l environment=production` should exclude the staging SecretSet"
+        "`% all -l environment=production` should exclude the staging SecretSet"
     );
 }
 
