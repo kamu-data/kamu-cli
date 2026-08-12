@@ -96,7 +96,7 @@ pub fn get_command(
         cli::Command::Context(c) => match c.subcommand {
             Some(cli::ContextSubCommand::Add(sc)) => Box::new(
                 ContextAddCommand::builder(
-                    sc.name,
+                    sc.new_name,
                     sc.url.into(),
                     if sc.user {
                         resource_context::ResourceContextStoreScope::User
@@ -316,7 +316,7 @@ pub fn get_command(
         ),
 
         cli::Command::New(c) => {
-            Box::new(NewDatasetCommand::builder(c.name, c.root, c.derivative, None).cast())
+            Box::new(NewDatasetCommand::builder(c.dataset_name, c.root, c.derivative, None).cast())
         }
 
         cli::Command::Notebook(c) => Box::new(
@@ -387,12 +387,13 @@ pub fn get_command(
         ),
 
         cli::Command::Rename(c) => Box::new(
-            RenameCommand::builder(validate_dataset_ref(cli_catalog, c.dataset)?, c.name).cast(),
+            RenameCommand::builder(validate_dataset_ref(cli_catalog, c.dataset)?, c.new_name)
+                .cast(),
         ),
 
         cli::Command::Repo(c) => match c.subcommand {
             cli::RepoSubCommand::Add(sc) => {
-                Box::new(RepositoryAddCommand::builder(sc.name, sc.url).cast())
+                Box::new(RepositoryAddCommand::builder(sc.repo_name, sc.url).cast())
             }
             cli::RepoSubCommand::Delete(sc) => Box::new(
                 RepositoryDeleteCommand::builder(sc.repository.unwrap_or_default(), sc.all).cast(),
