@@ -14,12 +14,7 @@ use ::serde::Deserialize;
 use axum::extract::{FromRequestParts, Path};
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
 use kamu::domain::*;
-use kamu_accounts::{
-    CurrentAccountSubject,
-    DidSecretEncryptionConfig,
-    PredefinedAccountsConfig,
-    SeedDidsFromNamesInTests,
-};
+use kamu_accounts::{CurrentAccountSubject, DidSecretEncryptionConfig, PredefinedAccountsConfig};
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::{
     AccountServiceImpl,
@@ -97,7 +92,6 @@ async fn setup_repo() -> RepoFixture {
         .add::<AccountServiceImpl>()
         .add::<UpdateAccountUseCaseImpl>()
         .add::<CreateAccountUseCaseImpl>()
-        .add_value(SeedDidsFromNamesInTests)
         .add::<InMemoryAccountRepository>()
         .add::<PredefinedAccountsRegistrator>()
         .add::<RebacServiceImpl>()
@@ -106,7 +100,7 @@ async fn setup_repo() -> RepoFixture {
         .add_value(DidSecretEncryptionConfig::sample())
         .add_value(DefaultAccountProperties::default())
         .add_value(DefaultDatasetProperties::default())
-        .add_value(PredefinedAccountsConfig::single_tenant())
+        .add_value(PredefinedAccountsConfig::test_single_tenant_with_id())
         .add::<LoginPasswordAuthProvider>();
 
     NoOpDatabasePlugin::init_database_components(&mut b);
