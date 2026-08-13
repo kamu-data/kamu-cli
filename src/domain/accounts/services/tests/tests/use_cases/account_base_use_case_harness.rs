@@ -18,7 +18,6 @@ use kamu_accounts::{
     DeleteAccountUseCase,
     DidSecretEncryptionConfig,
     PredefinedAccountsConfig,
-    SeedDidsFromNamesInTests,
     TEST_PASSWORD,
     UpdateAccountUseCase,
 };
@@ -58,7 +57,6 @@ impl AccountBaseUseCaseHarness {
                 .add_value(DidSecretEncryptionConfig::sample())
                 .add::<AccountServiceImpl>()
                 .add::<CreateAccountUseCaseImpl>()
-                .add_value(SeedDidsFromNamesInTests)
                 .add::<UpdateAccountUseCaseImpl>()
                 .add::<DeleteAccountUseCaseImpl>()
                 .add::<kamu_auth_rebac_services::RebacServiceImpl>()
@@ -101,7 +99,9 @@ impl AccountBaseUseCaseHarness {
         let account_config = AccountConfig {
             registered_at: Some(self.system_time_source.now()),
             password: TEST_PASSWORD.clone(),
-            ..AccountConfig::test_config_from_name(odf::AccountName::new_unchecked(account_name))
+            ..AccountConfig::test_config_from_name_with_id(odf::AccountName::new_unchecked(
+                account_name,
+            ))
         };
 
         let create_account_uc = catalog.get_one::<dyn CreateAccountUseCase>().unwrap();

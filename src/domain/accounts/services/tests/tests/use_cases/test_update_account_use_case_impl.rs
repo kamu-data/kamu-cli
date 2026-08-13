@@ -224,9 +224,11 @@ async fn test_admin_renames_other_account() {
     let predefined_account_config = {
         let mut p = PredefinedAccountsConfig::new();
         p.predefined = vec![
-            AccountConfig::test_config_from_name(odf::AccountName::new_unchecked(ADMIN))
+            AccountConfig::test_config_from_name_with_id(odf::AccountName::new_unchecked(ADMIN))
                 .set_properties(vec![AccountPropertyName::IsAdmin]),
-            AccountConfig::test_config_from_name(odf::AccountName::new_unchecked(REGULAR_USER)),
+            AccountConfig::test_config_from_name_with_id(odf::AccountName::new_unchecked(
+                REGULAR_USER,
+            )),
         ];
         p
     };

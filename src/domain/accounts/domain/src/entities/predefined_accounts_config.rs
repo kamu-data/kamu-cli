@@ -203,6 +203,14 @@ impl AccountConfig {
     }
 
     #[cfg(any(feature = "testing", test))]
+    pub fn test_config_from_name_with_id(account_name: odf::AccountName) -> Self {
+        Self {
+            id: Some(odf::metadata::testing::account_id(&account_name)),
+            ..Self::test_config_from_name(account_name)
+        }
+    }
+
+    #[cfg(any(feature = "testing", test))]
     pub fn test_config_from_subject(subject: LoggedAccount) -> Self {
         let email = Email::parse(&format!("{}@example.com", subject.account_name)).unwrap();
         let password = Self::generate_password(&subject.account_name);

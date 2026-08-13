@@ -697,8 +697,7 @@ impl DatasetAuthorizerHarness {
                 account_properties.push(AccountPropertyName::IsAdmin);
             }
             let account_config =
-                AccountConfig::test_config_from_name(logged_account.account_name.clone())
-                    .set_id(Some(logged_account.account_id.clone()))
+                AccountConfig::test_config_from_name_with_id(logged_account.account_name.clone())
                     .set_properties(account_properties);
 
             predefined_accounts_config.predefined.push(account_config);
