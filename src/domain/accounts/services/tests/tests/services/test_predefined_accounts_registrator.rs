@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use email_utils::Email;
-use internal_error::InternalError;
+use internal_error::{BatchError, InternalError};
 use kamu_accounts::{Account, AccountConfig, AccountPropertyName, PredefinedAccountsConfig};
 use messaging_outbox::MockOutbox;
 use pretty_assertions::{assert_eq, assert_matches};
@@ -211,26 +211,20 @@ async fn test_mt_emulate_running_a_node_with_updated_registrator() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_mt_skip_alice_wrong_config() {
+async fn test_mt_alice_has_wrong_config() {
     let alice_account_name = odf::AccountName::new_unchecked("alice");
     let alice_account_id = odf::metadata::testing::account_id(&alice_account_name);
     let bob_account_name = odf::AccountName::new_unchecked("bob");
 
-    let mut outbox = MockOutbox::new();
-    // Only Bob's account will be created
-    kamu_accounts::testing::expect_outbox_account_created()
-        .mock_outbox(&mut outbox)
-        .expected_account_name(bob_account_name.clone())
-        .expected_display_name("bob".to_string())
-        .expected_email(Email::parse("bob@example.com").unwrap())
-        .expected_times(1)
-        .call();
+    let outbox = MockOutbox::new();
+    // No account will be created
 
     let harness = PredefinedAccountsRegistratorHarness::builder()
         .mock_outbox(outbox)
         .build();
 
     let key = odf::metadata::PrivateKey::from_bytes_padded(b"I-have-a-different-verification-key");
+    let derived_id = odf::AccountID::from_signing_key(&key);
 
     let predefined_accounts_config = PredefinedAccountsConfig {
         predefined: vec![
@@ -242,21 +236,33 @@ async fn test_mt_skip_alice_wrong_config() {
     };
     let catalog = harness.build_catalog(predefined_accounts_config);
 
-    assert_matches!(harness.run_initialization(&catalog).await, Ok(_));
+    let initialization_err = harness.run_initialization(&catalog).await.unwrap_err();
 
-    // Alice account creation was skipped because of invalid config
-    assert_matches!(
-        harness
-            .try_get_account_by_name(&catalog, &alice_account_name)
-            .await,
-        None
+    // Is a validation error?
+    use std::error::Error;
+
+    use kamu_accounts::AccountConfigValidationError;
+
+    let source_err = initialization_err.source().unwrap();
+    let down_casted_err = source_err
+        .downcast_ref::<BatchError<AccountConfigValidationError>>()
+        .unwrap();
+
+    assert_eq!(1, down_casted_err.failed);
+    assert_eq!(2, down_casted_err.total);
+    assert_eq!(
+        [(
+            0, /* error index */
+            AccountConfigValidationError::IdMismatch {
+                account_name: alice_account_name,
+                configured_id: alice_account_id,
+                derived_id,
+            }
+        )],
+        *down_casted_err.failures,
     );
-    assert_matches!(
-        harness
-            .try_get_account_by_name(&catalog, &bob_account_name)
-            .await,
-        Some(_)
-    );
+
+    panic!();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
