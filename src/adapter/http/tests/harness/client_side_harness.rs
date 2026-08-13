@@ -103,7 +103,7 @@ impl ClientSideHarness {
         match options.tenancy_config {
             TenancyConfig::SingleTenant => {
                 b.add_value(CurrentAccountSubject::new_test());
-                b.add_value(PredefinedAccountsConfig::single_tenant());
+                b.add_value(PredefinedAccountsConfig::test_single_tenant_with_id());
             }
             TenancyConfig::MultiTenant => {
                 b.add_value(CurrentAccountSubject::logged(
@@ -112,11 +112,11 @@ impl ClientSideHarness {
                 ));
 
                 let mut predefined_accounts_config = PredefinedAccountsConfig::new();
-                predefined_accounts_config
-                    .predefined
-                    .push(AccountConfig::test_config_from_name(
-                        odf::AccountName::new_unchecked(CLIENT_ACCOUNT_NAME),
-                    ));
+                predefined_accounts_config.predefined.push(
+                    AccountConfig::test_config_from_name_with_id(odf::AccountName::new_unchecked(
+                        CLIENT_ACCOUNT_NAME,
+                    )),
+                );
                 b.add_value(predefined_accounts_config);
             }
         }
@@ -199,7 +199,6 @@ impl ClientSideHarness {
 
         b.add::<AccountServiceImpl>();
         b.add::<CreateAccountUseCaseImpl>();
-        b.add_value(SeedDidsFromNamesInTests);
         b.add::<UpdateAccountUseCaseImpl>();
         b.add::<ModifyAccountPasswordUseCaseImpl>();
         b.add::<InMemoryAccountRepository>();
