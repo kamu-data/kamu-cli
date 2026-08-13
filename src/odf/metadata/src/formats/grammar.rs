@@ -329,6 +329,46 @@ impl Grammar {
             }
         }
     }
+
+    // ResourceNamePattern = ResourceName with possible wildcard symbols
+    pub fn match_resource_name_pattern(s: &str) -> Option<(&str, &str)> {
+        // Try parsing as pattern (with wildcards) or a plain name (without)
+        Self::match_alt(s, Self::match_hostname_pattern, Self::match_hostname)
+    }
+
+    // ResourceSelector = ResourceTypeName ":" (AccountName "/")?
+    // ResourceNamePattern
+    //
+    // Mirrors `match_resource_ref`, but the name position accepts a SQL `LIKE`
+    // pattern, since a selector matches zero or many resources.
+    pub fn match_resource_selector(s: &str) -> Option<(&str, Option<&str>, &str)> {
+        match s.split_once(':') {
+            None => None,
+            Some((typ, rest)) => {
+                let (typ, "") = Self::match_resource_type_name(typ)? else {
+                    return None;
+                };
+
+                match rest.split_once('/') {
+                    None => {
+                        let (name, "") = Self::match_resource_name_pattern(rest)? else {
+                            return None;
+                        };
+                        Some((typ, None, name))
+                    }
+                    Some((acc, name)) => {
+                        let (acc, "") = Self::match_account_name(acc)? else {
+                            return None;
+                        };
+                        let (name, "") = Self::match_resource_name_pattern(name)? else {
+                            return None;
+                        };
+                        Some((typ, Some(acc), name))
+                    }
+                }
+            }
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

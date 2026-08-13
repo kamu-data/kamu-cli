@@ -1571,3 +1571,65 @@ fn test_serde_account_ref() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// `struct-or-string` means a bare string deserializes through `FromStr`, which
+// used to be `todo!()` — so short-form selectors in YAML panicked.
+#[test]
+fn test_serde_resource_selector_short_form() {
+    let selector: ResourceSelector = serde_yaml::from_str::<
+        serde::StructOrString<serde::resource::ResourceSelector>,
+    >("SecretSet:alice/app-%")
+    .unwrap()
+    .0
+    .into_dto()
+    .unwrap();
+
+    assert_eq!(selector.r#type.as_str(), "SecretSet");
+    assert_eq!(selector.name.as_deref(), Some("app-%"));
+    assert_matches!(
+        selector.account,
+        Some(AccountRef { name: Some(ref n), .. }) if n.as_str() == "alice"
+    );
+
+    // A malformed short form must be a deserialization error, never a panic.
+    assert_matches!(
+        serde_yaml::from_str::<serde::StructOrString<serde::resource::ResourceSelector>>(
+            "not a selector"
+        ),
+        Err(_)
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Proxy conversions are hand-written (`rust.dtoType`), and every field but
+// `account` used to be silently discarded.
+#[test]
+fn test_serde_resource_selector() {
+    let selector = ResourceSelector {
+        account: Some(AccountRef {
+            id: None,
+            did: None,
+            name: Some("alice".parse().unwrap()),
+        }),
+        r#type: TypeName::new_unchecked("SecretSet").into(),
+        id: Some(ResourceID::new(uuid::Uuid::new_v4())),
+        name: Some("app-%".to_string()),
+        labels: Some(LabelFilter {
+            entries: [("environment".to_string(), json!("production"))]
+                .into_iter()
+                .collect(),
+        }),
+    };
+
+    let round_tripped: ResourceSelector =
+        serde_json::to_value(serde::resource::ResourceSelector::from(selector.clone()))
+            .and_then(serde_json::from_value::<serde::resource::ResourceSelector>)
+            .unwrap()
+            .into_dto()
+            .unwrap();
+
+    assert_eq!(round_tripped, selector);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
