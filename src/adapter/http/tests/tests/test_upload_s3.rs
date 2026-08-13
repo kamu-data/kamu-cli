@@ -20,7 +20,6 @@ use kamu_accounts::{
     JwtAuthenticationConfig,
     JwtTokenIssuer,
     PredefinedAccountsConfig,
-    SeedDidsFromNamesInTests,
     TEST_ACCOUNT_ID,
 };
 use kamu_accounts_inmem::{
@@ -329,7 +328,6 @@ impl UploadS3Harness {
                 .add::<InMemoryRebacRepository>()
                 .add::<UpdateAccountUseCaseImpl>()
                 .add::<CreateAccountUseCaseImpl>()
-                .add_value(SeedDidsFromNamesInTests)
                 .add_value(DefaultAccountProperties::default())
                 .add_value(DefaultDatasetProperties::default())
                 .add::<DummyOutboxImpl>()

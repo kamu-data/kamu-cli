@@ -589,6 +589,7 @@ impl SignEip712UseCaseHarness {
             .add::<AccountServiceImpl>()
             .add::<UpdateAccountUseCaseImpl>()
             .add::<CreateAccountUseCaseImpl>()
+            // NOTE: We need deterministic secrets for testing
             .add_value(SeedDidsFromNamesInTests)
             .add::<AccountAuthorizationHelperImpl>()
             .add::<RebacServiceImpl>()
