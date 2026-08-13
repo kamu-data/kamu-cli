@@ -66,22 +66,22 @@ members = [
     "src/infra/core",
     "src/infra/datafusion-udf",
     "src/infra/ingest-datafusion",
-    ## Flow System
+    # Infra - Flow System
     "src/infra/flow-system/repo-tests",
     "src/infra/flow-system/inmem",
     "src/infra/flow-system/postgres",
     "src/infra/flow-system/sqlite",
-    ## Accounts
+    # Infra - Accounts
     "src/infra/accounts/repo-tests",
     "src/infra/accounts/inmem",
     "src/infra/accounts/mysql",
     "src/infra/accounts/postgres",
     "src/infra/accounts/sqlite",
-    ## Datasets
+    # Infra - Datasets
     "src/infra/datasets/inmem",
     "src/infra/datasets/postgres",
     "src/infra/datasets/sqlite",
-    ## Search
+    # Infra - Search
     "src/infra/search/openai",
     "src/infra/search/elasticsearch",
     "src/infra/search/elasticsearch-macros",
@@ -89,27 +89,27 @@ members = [
     "src/infra/search/cache-inmem",
     "src/infra/search/cache-postgres",
     "src/infra/search/cache-sqlite",
-    ## Task System
+    # Infra - Task System
     "src/infra/task-system/repo-tests",
     "src/infra/task-system/inmem",
     "src/infra/task-system/postgres",
     "src/infra/task-system/sqlite",
-    ## ReBAC
+    # Infra - ReBAC
     "src/infra/auth-rebac/inmem",
     "src/infra/auth-rebac/repo-tests",
     "src/infra/auth-rebac/postgres",
     "src/infra/auth-rebac/sqlite",
-    ## Outbox
+    # Infra - Outbox
     "src/infra/messaging-outbox/repo-tests",
     "src/infra/messaging-outbox/inmem",
     "src/infra/messaging-outbox/postgres",
     "src/infra/messaging-outbox/sqlite",
-    ## Webhooks
+    # Infra - Webhooks
     "src/infra/webhooks/repo-tests",
     "src/infra/webhooks/inmem",
     "src/infra/webhooks/postgres",
     "src/infra/webhooks/sqlite",
-    ## Web3
+    # Infra - Web3
     "src/infra/auth-web3/inmem",
     "src/infra/auth-web3/postgres",
     "src/infra/auth-web3/repo-tests",
