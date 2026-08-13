@@ -32,11 +32,11 @@ dill = { version = "0.15", default-features = false }
 futures = "0.3"
 serde_json = "1"
 sqlx = { version = "0.8", default-features = false, features = [
-    "runtime-tokio",
+    "chrono",
     "json",
     "macros",
     "postgres",
-    "chrono",
+    "runtime-tokio",
 ] }
 
 
@@ -45,5 +45,7 @@ database-common-macros = { workspace = true }
 internal-error = { workspace = true }
 kamu-task-system-repo-tests = { workspace = true }
 
-test-log = { version = "0.2", features = ["trace"] }
+test-log = { version = "0.2", features = [
+    "trace",
+] }
 test-group = { version = "1" }

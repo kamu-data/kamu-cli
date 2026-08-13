@@ -36,4 +36,6 @@ database-common-macros = { workspace = true }
 kamu-messaging-outbox-repo-tests = { workspace = true }
 
 test-group = { version = "1" }
-test-log = { version = "0.2", features = ["trace"] }
+test-log = { version = "0.2", features = [
+    "trace",
+] }

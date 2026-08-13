@@ -39,13 +39,19 @@ extensions = [
 # No features
 assert_cmd = "2"
 bon = { version = "3", default-features = false }
-chrono = { version = "0.4", default-features = false, features = ["alloc"] }
+chrono = { version = "0.4", default-features = false, features = [
+    "alloc",
+] }
 regex = { version = "1", default-features = false }
 tempfile = "3"
-tokio = { version = "1", default-features = false, features = ["rt"] }
+tokio = { version = "1", default-features = false, features = [
+    "rt",
+] }
 
 # Feature: extensions
-odf = { optional = true, workspace = true, features = ["testing"] }
+odf = { optional = true, workspace = true, features = [
+    "testing",
+] }
 
 async-trait = { optional = true, version = "0.1" }
 datafusion = { optional = true, version = "54", default-features = false }
@@ -55,7 +61,9 @@ serde = { optional = true, version = "1", default-features = false, features = [
     "derive",
 ] }
 serde_json = { optional = true, version = "1" }
-url = { version = "2", features = ["serde"] }
+url = { version = "2", features = [
+    "serde",
+] }
 
 
 [dev-dependencies]

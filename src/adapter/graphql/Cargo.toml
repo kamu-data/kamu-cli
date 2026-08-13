@@ -22,8 +22,10 @@ doctest = false
 
 
 [features]
-default = []
-testing = []
+default = [
+]
+testing = [
+]
 
 
 [dependencies]
@@ -49,8 +51,12 @@ kamu-flow-system-services = { workspace = true }
 kamu-search = { workspace = true }
 kamu-webhooks = { workspace = true }
 kamu-task-system = { workspace = true }
-observability = { workspace = true, features = ["dill"] }
-odf = { workspace = true, default-features = false, features = ["arrow"] }
+observability = { workspace = true, features = [
+    "dill",
+] }
+odf = { workspace = true, default-features = false, features = [
+    "arrow",
+] }
 random-strings = { workspace = true }
 time-source = { workspace = true }
 
@@ -66,10 +72,14 @@ bytes = { version = "1", default-features = false }
 num-bigint = { version = "0.4", default-features = false }
 chrono = "0.4"
 # TODO: Currently needed for type conversions but ideally should be encapsulated by kamu-core
-datafusion = { version = "54", default-features = false, features = ["serde"] }
+datafusion = { version = "54", default-features = false, features = [
+    "serde",
+] }
 dill = { version = "0.15", default-features = false }
 fallible_map = { version = "0.1.1", default-features = false }
-futures = { version = "0.3", default-features = false, features = ["alloc"] }
+futures = { version = "0.3", default-features = false, features = [
+    "alloc",
+] }
 http = { version = "1", default-features = false }
 humansize = { version = "2", default-features = false }
 indoc = "2"
@@ -80,24 +90,33 @@ secrecy = "0.10"
 serde = { version = "1", default-features = false }
 serde_json = "1"
 setty = { version = "1", default-features = false, features = [
+    "derive-async-graphql",
     "types-bytesize",
     "types-duration-string",
-    "derive-async-graphql",
 ] }
 sha3 = "0.10"
-strum = { version = "0.28", default-features = false, features = ["derive"] }
+strum = { version = "0.28", default-features = false, features = [
+    "derive",
+] }
 thiserror = "2"
-tokio = { version = "1", default-features = false, features = [] }
+tokio = { version = "1", default-features = false, features = [
+] }
 tracing = "0.1"
 url = { version = "2", default-features = false }
-uuid = { version = "1", default-features = false, features = ["v4"] }
+uuid = { version = "1", default-features = false, features = [
+    "v4",
+] }
 
 
 [dev-dependencies]
 file-utils = { workspace = true }
 init-on-startup = { workspace = true }
-kamu = { workspace = true, features = ["testing"] }
-kamu-accounts = { workspace = true, features = ["testing"] }
+kamu = { workspace = true, features = [
+    "testing",
+] }
+kamu-accounts = { workspace = true, features = [
+    "testing",
+] }
 kamu-accounts-inmem = { workspace = true }
 kamu-accounts-services = { workspace = true }
 kamu-adapter-auth-oso-rebac = { workspace = true }
@@ -105,16 +124,22 @@ kamu-adapter-http = { workspace = true }
 kamu-auth-rebac-inmem = { workspace = true }
 kamu-auth-rebac-services = { workspace = true }
 kamu-datasets-inmem = { workspace = true }
-kamu-datasets-services = { workspace = true, features = ["testing"] }
+kamu-datasets-services = { workspace = true, features = [
+    "testing",
+] }
 kamu-flow-system-inmem = { workspace = true }
 kamu-flow-system-services = { workspace = true }
 kamu-task-system-inmem = { workspace = true }
 kamu-task-system-services = { workspace = true }
-kamu-webhooks = { workspace = true, features = ["testing"] }
+kamu-webhooks = { workspace = true, features = [
+    "testing",
+] }
 kamu-webhooks-inmem = { workspace = true }
 kamu-webhooks-services = { workspace = true }
 messaging-outbox = { workspace = true }
-odf = { workspace = true, default-features = false, features = ["testing"] }
+odf = { workspace = true, default-features = false, features = [
+    "testing",
+] }
 time-source = { workspace = true }
 
 bon = { version = "3", default-features = false }
@@ -123,6 +148,9 @@ paste = { version = "1", default-features = false }
 pretty_assertions = { version = "1" }
 tempfile = "3"
 test-group = { version = "1" }
-test-log = { version = "0.2", features = ["trace"] }
+test-log = { version = "0.2", features = [
+    "trace",
+] }
 thiserror = "2"
-tokio = { version = "1", default-features = false, features = [] }
+tokio = { version = "1", default-features = false, features = [
+] }

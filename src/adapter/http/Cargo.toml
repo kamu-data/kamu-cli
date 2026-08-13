@@ -22,9 +22,11 @@ doctest = false
 
 
 [features]
-default = []
+default = [
+]
 
-e2e = []
+e2e = [
+]
 
 
 [dependencies]
@@ -38,19 +40,26 @@ internal-error = { workspace = true }
 kamu = { workspace = true }
 kamu-accounts = { workspace = true }
 kamu-auth-rebac = { workspace = true }
-kamu-core = { workspace = true, features = ["utoipa"] }
+kamu-core = { workspace = true, features = [
+    "utoipa",
+] }
 kamu-datasets = { workspace = true }
 kamu-signing = { workspace = true, default-features = false, features = [
     "utoipa",
 ] }
 messaging-outbox = { workspace = true }
-odf = { workspace = true, features = ["utoipa"] }
+odf = { workspace = true, features = [
+    "utoipa",
+] }
 s3-utils = { workspace = true }
 time-source = { workspace = true }
 
 aws-sdk-s3 = { version = "1", default-features = false }
 
-axum = { version = "0.8", features = ["ws", "multipart"] }
+axum = { version = "0.8", features = [
+    "multipart",
+    "ws",
+] }
 axum-extra = { version = "0.12", features = [
     "async-read-body",
     "typed-header",
@@ -59,7 +68,9 @@ async-trait = "0.1"
 base64 = { version = "0.22", default-features = false }
 bytes = "1"
 canonical_json = { version = "0.7", default-features = false }
-chrono = { version = "0.4", features = ["serde"] }
+chrono = { version = "0.4", features = [
+    "serde",
+] }
 datafusion = { version = "54", default-features = false } # TODO: Currently needed for type conversions but ideally should be encapsulated by kamu-core
 dill = { version = "0.15", default-features = false }
 flate2 = "1" # GZip decoder
@@ -70,44 +81,65 @@ http = "1"
 http-body-util = { version = "0.1", default-features = false }
 indoc = "2"
 reqwest = { version = "0.12", default-features = false, features = [
-    "multipart",
-    "json",
-    "stream",
-    "gzip",
     "brotli",
     "deflate",
+    "gzip",
+    "json",
+    "multipart",
+    "stream",
 ] }
-serde = { version = "1", features = ["derive"] }
+serde = { version = "1", features = [
+    "derive",
+] }
 serde_json = { version = "1", default-features = false }
 serde_with = { version = "3", default-features = false }
 setty = { version = "1", default-features = false, features = [
     "types-duration-string",
 ] }
-strum = { version = "0.28", features = ["derive"] }
+strum = { version = "0.28", features = [
+    "derive",
+] }
 tar = "0.4"
-thiserror = { version = "2", default-features = false, features = ["std"] }
-tokio = { version = "1", default-features = false, features = [] }
+thiserror = { version = "2", default-features = false, features = [
+    "std",
+] }
+tokio = { version = "1", default-features = false, features = [
+] }
 tokio-stream = "0.1"
 tokio-util = { version = "0.7", default-features = false, features = [
     "codec",
     "compat",
     "io",
 ] }
-tokio-tungstenite = { version = "0.29", features = ["url"] }
+tokio-tungstenite = { version = "0.29", features = [
+    "url",
+] }
 tower = "0.5"
 tracing = "0.1"
-url = { version = "2", features = ["serde"] }
-utoipa = { version = "5", default-features = false, features = [] }
-utoipa-axum = { version = "0.2", default-features = false, features = [] }
-uuid = { version = "1", default-features = false, features = ["v4"] }
+url = { version = "2", features = [
+    "serde",
+] }
+utoipa = { version = "5", default-features = false, features = [
+] }
+utoipa-axum = { version = "0.2", default-features = false, features = [
+] }
+uuid = { version = "1", default-features = false, features = [
+    "v4",
+] }
 
 
 [dev-dependencies]
 container-runtime = { workspace = true }
 init-on-startup = { workspace = true }
-kamu = { workspace = true, features = ["testing"] }
-kamu-core = { workspace = true, features = ["testing"] }
-kamu-accounts = { workspace = true, features = ["testing"] }
+kamu = { workspace = true, features = [
+    "testing",
+] }
+kamu-core = { workspace = true, features = [
+    "testing",
+] }
+kamu-accounts = { workspace = true, features = [
+    "testing",
+] }
 kamu-accounts-inmem = { workspace = true }
 kamu-accounts-services = { workspace = true }
 kamu-auth-rebac-services = { workspace = true }
@@ -116,14 +148,21 @@ kamu-auth-rebac-inmem = { workspace = true }
 kamu-datasets-services = { workspace = true }
 kamu-ingest-datafusion = { workspace = true }
 messaging-outbox = { workspace = true }
-observability = { workspace = true, features = ["dill"] }
+observability = { workspace = true, features = [
+    "dill",
+] }
 test-utils = { workspace = true }
 
 paste = "1"
 pretty_assertions = { version = "1" }
 tempfile = "3"
 test-group = { version = "1" }
-test-log = { version = "0.2", features = ["trace"] }
-tower-http = { version = "0.6", features = ["trace", "cors"] }
+test-log = { version = "0.2", features = [
+    "trace",
+] }
+tower-http = { version = "0.6", features = [
+    "cors",
+    "trace",
+] }
 rand = "0.9"
 mockall = "0.14"

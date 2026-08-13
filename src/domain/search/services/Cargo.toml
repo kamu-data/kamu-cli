@@ -22,7 +22,8 @@ doctest = false
 
 
 [features]
-default = []
+default = [
+]
 
 
 [dependencies]
@@ -51,5 +52,10 @@ tokio = { version = "1", default-features = false }
 kamu-search-cache-inmem = { workspace = true }
 time-source = { workspace = true }
 
-test-log = { version = "0.2", features = ["trace"] }
-tokio = { version = "1", default-features = false, features = ["rt", "macros"] }
+test-log = { version = "0.2", features = [
+    "trace",
+] }
+tokio = { version = "1", default-features = false, features = [
+    "macros",
+    "rt",
+] }

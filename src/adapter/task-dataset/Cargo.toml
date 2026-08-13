@@ -22,8 +22,10 @@ doctest = false
 
 
 [features]
-default = []
-testing = []
+default = [
+]
+testing = [
+]
 
 
 [dependencies]
@@ -38,7 +40,9 @@ odf = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
 dill = { version = "0.15", default-features = false }
-serde = { version = "1", features = ["derive"] }
+serde = { version = "1", features = [
+    "derive",
+] }
 serde_json = { version = "1", default-features = false }
 tracing = "0.1"
 

@@ -22,7 +22,8 @@ doctest = false
 
 
 [features]
-default = []
+default = [
+]
 
 
 [dependencies]
@@ -32,7 +33,8 @@ kamu-accounts = { workspace = true }
 kamu-accounts-services = { workspace = true }
 kamu-datasets = { workspace = true }
 kamu-signing = { workspace = true }
-odf = { workspace = true, default-features = false, features = [] }
+odf = { workspace = true, default-features = false, features = [
+] }
 
 async-trait = { version = "0.1", default-features = false }
 dill = { version = "0.15", default-features = false }
@@ -50,7 +52,11 @@ messaging-outbox = { workspace = true }
 time-source = { workspace = true }
 
 bon = { version = "3", default-features = false }
-pretty_assertions = { version = "1", default-features = false, features = [] }
+pretty_assertions = { version = "1", default-features = false, features = [
+] }
 serde_json = { version = "1", default-features = false }
-test-log = { version = "0.2", features = ["trace"] }
-tokio = { version = "1", default-features = false, features = [] }
+test-log = { version = "0.2", features = [
+    "trace",
+] }
+tokio = { version = "1", default-features = false, features = [
+] }

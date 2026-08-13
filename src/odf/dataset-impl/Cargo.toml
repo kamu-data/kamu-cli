@@ -22,11 +22,21 @@ doctest = false
 
 
 [features]
-default = ["lfs"]
-lfs = ["dep:odf-storage-lfs"]
-http = ["dep:odf-storage-http"]
-s3 = ["dep:odf-storage-s3"]
-testing = ["dep:mockall"]
+default = [
+    "lfs",
+]
+lfs = [
+    "dep:odf-storage-lfs",
+]
+http = [
+    "dep:odf-storage-http",
+]
+s3 = [
+    "dep:odf-storage-s3",
+]
+testing = [
+    "dep:mockall",
+]
 
 
 [dependencies]
@@ -80,5 +90,7 @@ mockall = { version = "0.14", default-features = false }
 serde_json = { version = "1", default-features = false }
 tempfile = "3"
 thiserror = { version = "2", default-features = false }
-test-log = { version = "0.2", features = ["trace"] }
+test-log = { version = "0.2", features = [
+    "trace",
+] }
 test-group = { version = "1" }

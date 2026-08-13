@@ -22,27 +22,39 @@ doctest = false
 
 
 [features]
-default = []
+default = [
+]
 
-schemars = ["crypto-eip712-utils/schemars"]
-utoipa = ["dep:utoipa", "crypto-eip712-utils/utoipa"]
+schemars = [
+    "crypto-eip712-utils/schemars",
+]
+utoipa = [
+    "crypto-eip712-utils/utoipa",
+    "dep:utoipa",
+]
 
 [dependencies]
 internal-error = { workspace = true }
 crypto-eip712-utils = { workspace = true, default-features = false, features = [
-    "serde"
+    "serde",
 ] }
 odf = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
 bon = { version = "3", default-features = false }
-serde = { version = "1", features = ["derive"], default-features = false }
+serde = { version = "1", features = [
+    "derive",
+], default-features = false }
 setty = { version = "1.0", default-features = false }
 thiserror = { version = "2", default-features = false }
 
 # Optional
-utoipa = { optional = true, version = "5", default-features = false, features = [] }
+utoipa = { optional = true, version = "5", default-features = false, features = [
+] }
 
 [dev-dependencies]
 indoc = { version = "2", default-features = false }
-pretty_assertions = { version = "1", default-features = false, features = ["std", "unstable"] }
+pretty_assertions = { version = "1", default-features = false, features = [
+    "std",
+    "unstable",
+] }

@@ -22,13 +22,20 @@ doctest = false
 
 
 [features]
-default = []
-datafusion = ["dep:datafusion"]
-testing = ["dep:pretty_assertions"]
+default = [
+]
+datafusion = [
+    "dep:datafusion",
+]
+testing = [
+    "dep:pretty_assertions",
+]
 
 
 [dependencies]
-odf-metadata = { workspace = true, features = ["arrow"] }
+odf-metadata = { workspace = true, features = [
+    "arrow",
+] }
 
 async-trait = "0.1"
 arrow = { version = "58", default-features = false }
@@ -42,14 +49,20 @@ hex = "0.4"
 parquet = { version = "58", default-features = false }
 sha3 = "0.10"
 tracing = { version = "0.1", default-features = false }
-thiserror = { version = "2", default-features = false, features = ["std"] }
+thiserror = { version = "2", default-features = false, features = [
+    "std",
+] }
 url = "2"
 serde = { version = "1", default-features = false }
 serde_json = { version = "1", default-features = false }
 serde_yaml = { package = "serde_yaml_ng", version = "0.10", default-features = false }
 
 # Optional
-datafusion = { optional = true, version = "54", default-features = false, features = ["parquet", "serde", "sql"] }
+datafusion = { optional = true, version = "54", default-features = false, features = [
+    "parquet",
+    "serde",
+    "sql",
+] }
 pretty_assertions = { optional = true, version = "1" }
 
 
@@ -57,5 +70,10 @@ pretty_assertions = { optional = true, version = "1" }
 indoc = "2"
 pretty_assertions = { version = "1" }
 test-group = { version = "1" }
-test-log = { version = "0.2", features = ["trace"] }
-tokio = { version = "1", default-features = false, features = ["rt", "macros"] }
+test-log = { version = "0.2", features = [
+    "trace",
+] }
+tokio = { version = "1", default-features = false, features = [
+    "macros",
+    "rt",
+] }

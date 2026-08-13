@@ -22,8 +22,11 @@ doctest = false
 
 
 [features]
-default = []
-testing = ["dep:mockall"]
+default = [
+]
+testing = [
+    "dep:mockall",
+]
 
 [dependencies]
 database-common = { workspace = true }
@@ -36,8 +39,12 @@ dill = { version = "0.15", default-features = false }
 futures = { version = "0.3", default-features = false }
 serde = { version = "1", default-features = false }
 serde_json = { version = "1", default-features = false }
-strum = { version = "0.28", default-features = false, features = ["derive"] }
-thiserror = { version = "2", default-features = false, features = ["std"] }
+strum = { version = "0.28", default-features = false, features = [
+    "derive",
+] }
+thiserror = { version = "2", default-features = false, features = [
+    "std",
+] }
 
 mockall = { version = "0.14", optional = true }
 
