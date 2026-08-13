@@ -9,7 +9,6 @@
 
 use std::sync::Arc;
 
-use bon::bon;
 use crypto_eip712_utils::{Eip712TypedData, Secp256k1Signer};
 use database_common::NoOpDatabasePlugin;
 use kamu_accounts::{
@@ -22,7 +21,6 @@ use kamu_accounts::{
     DidSecretKeyRepository,
     PredefinedAccountsConfig,
     SAMPLE_DID_SECRET_KEY_ENCRYPTION_KEY,
-    SeedDidsFromNamesInTests,
 };
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::utils::AccountAuthorizationHelperImpl;
@@ -65,6 +63,15 @@ const MOLECULE_DEV: &str = "molecule.dev";
 const MOLECULE_DEV_PROJECT: &str = "molecule.dev.project";
 const USER: &str = "user";
 const ADMIN: &str = "admin";
+
+const L: usize = odf::metadata::PrivateKey::SECRET_KEY_LENGTH;
+
+const MOLECULE_KEY: [u8; L] = [1; L];
+const MOLECULE_PROJECT_KEY: [u8; L] = [2; L];
+const MOLECULE_DEV_KEY: [u8; L] = [3; L];
+const MOLECULE_DEV_PROJECT_KEY: [u8; L] = [4; L];
+const USER_KEY: [u8; L] = [5; L];
+const ADMIN_KEY: [u8; L] = [6; L];
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -132,7 +139,10 @@ async fn test_execute_matrix() {
     for (subject, mock_dataset_action_authorizer, test_cases) in [
         // 1. Admin has access to all datasets / accounts
         (
-            CurrentAccountSubject::new_test_with(&ADMIN),
+            CurrentAccountSubject::logged(
+                admin_account_id(),
+                odf::AccountName::new_unchecked(ADMIN),
+            ),
             mock_dataset_action_authorizer()
                 .expect_check_read_dataset(&molecule_dataset_id(), 1, true)
                 .expect_check_read_dataset(&molecule_project_dataset_id(), 1, true)
@@ -209,7 +219,10 @@ async fn test_execute_matrix() {
         ),
         // 2. Molecule has access to own/project datasets / accounts
         (
-            CurrentAccountSubject::new_test_with(&MOLECULE),
+            CurrentAccountSubject::logged(
+                molecule_account_id(),
+                odf::AccountName::new_unchecked(MOLECULE),
+            ),
             mock_dataset_action_authorizer()
                 .expect_check_read_dataset(&molecule_dataset_id(), 1, true)
                 .expect_check_read_dataset(&molecule_project_dataset_id(), 1, true)
@@ -286,7 +299,10 @@ async fn test_execute_matrix() {
         ),
         // 3. Molecule.dev has access to own/project datasets / accounts
         (
-            CurrentAccountSubject::new_test_with(&MOLECULE_DEV),
+            CurrentAccountSubject::logged(
+                molecule_dev_account_id(),
+                odf::AccountName::new_unchecked(MOLECULE_DEV),
+            ),
             mock_dataset_action_authorizer()
                 .expect_check_read_dataset(&molecule_dataset_id(), 1, false)
                 .expect_check_read_dataset(&molecule_project_dataset_id(), 1, false)
@@ -363,7 +379,7 @@ async fn test_execute_matrix() {
         ),
         // 4. User has access to their own datasets / accounts
         (
-            CurrentAccountSubject::new_test_with(&USER),
+            CurrentAccountSubject::logged(user_account_id(), odf::AccountName::new_unchecked(USER)),
             mock_dataset_action_authorizer()
                 .expect_check_read_dataset(&molecule_dataset_id(), 1, false)
                 .expect_check_read_dataset(&molecule_project_dataset_id(), 1, false)
@@ -551,7 +567,7 @@ pub struct SignEip712UseCaseHarness {
     pub use_case: Arc<dyn SignEip712UseCase>,
 }
 
-#[bon]
+#[bon::bon]
 impl SignEip712UseCaseHarness {
     #[builder]
     pub async fn new(
@@ -562,22 +578,26 @@ impl SignEip712UseCaseHarness {
         let mut b = dill::CatalogBuilder::new();
 
         let mut predefined_accounts_config = PredefinedAccountsConfig::new();
-        for (account_name, is_admin) in [
-            (MOLECULE, false),
-            (MOLECULE_PROJECT, false),
-            (MOLECULE_DEV, false),
-            (MOLECULE_DEV_PROJECT, false),
-            (USER, false),
-            (ADMIN, true),
+        for (account_name, is_admin, key_buf) in [
+            (MOLECULE, false, MOLECULE_KEY),
+            (MOLECULE_PROJECT, false, MOLECULE_PROJECT_KEY),
+            (MOLECULE_DEV, false, MOLECULE_DEV_KEY),
+            (MOLECULE_DEV_PROJECT, false, MOLECULE_DEV_PROJECT_KEY),
+            (USER, false, USER_KEY),
+            (ADMIN, true, ADMIN_KEY),
         ] {
-            let mut account =
-                AccountConfig::test_config_from_name(odf::AccountName::new_unchecked(account_name));
+            let private_key = odf::metadata::PrivateKey::from_bytes(&key_buf);
+            let account_id = odf::AccountID::from_signing_key(&private_key);
+            let mut config =
+                AccountConfig::test_config_from_name(odf::AccountName::new_unchecked(account_name))
+                    .set_id(Some(account_id))
+                    .set_private_key(private_key);
 
             if is_admin {
-                account.properties.push(AccountPropertyName::IsAdmin);
+                config.properties.push(AccountPropertyName::IsAdmin);
             }
 
-            predefined_accounts_config.predefined.push(account);
+            predefined_accounts_config.predefined.push(config);
         }
 
         b.add::<SystemTimeSourceDefault>()
@@ -589,8 +609,6 @@ impl SignEip712UseCaseHarness {
             .add::<AccountServiceImpl>()
             .add::<UpdateAccountUseCaseImpl>()
             .add::<CreateAccountUseCaseImpl>()
-            // NOTE: We need deterministic secrets for testing
-            .add_value(SeedDidsFromNamesInTests)
             .add::<AccountAuthorizationHelperImpl>()
             .add::<RebacServiceImpl>()
             .add::<InMemoryRebacRepository>()
@@ -698,25 +716,33 @@ impl SignEip712UseCaseHarness {
 
 // Account IDs
 fn molecule_account_id() -> odf::AccountID {
-    odf::metadata::testing::account_id(&"molecule")
+    odf::AccountID::from_signing_key(&odf::metadata::PrivateKey::from_bytes(&MOLECULE_KEY))
 }
 
 #[expect(unused)]
 fn molecule_project_account_id() -> odf::AccountID {
-    odf::metadata::testing::account_id(&"molecule.project")
+    odf::AccountID::from_signing_key(&odf::metadata::PrivateKey::from_bytes(
+        &MOLECULE_PROJECT_KEY,
+    ))
 }
 
 fn molecule_dev_account_id() -> odf::AccountID {
-    odf::metadata::testing::account_id(&"molecule.dev")
+    odf::AccountID::from_signing_key(&odf::metadata::PrivateKey::from_bytes(&MOLECULE_DEV_KEY))
 }
 
 #[expect(unused)]
 fn molecule_dev_project_account_id() -> odf::AccountID {
-    odf::metadata::testing::account_id(&"molecule.dev.project")
+    odf::AccountID::from_signing_key(&odf::metadata::PrivateKey::from_bytes(
+        &MOLECULE_DEV_PROJECT_KEY,
+    ))
 }
 
 fn user_account_id() -> odf::AccountID {
-    odf::metadata::testing::account_id(&"user")
+    odf::AccountID::from_signing_key(&odf::metadata::PrivateKey::from_bytes(&USER_KEY))
+}
+
+fn admin_account_id() -> odf::AccountID {
+    odf::AccountID::from_signing_key(&odf::metadata::PrivateKey::from_bytes(&ADMIN_KEY))
 }
 
 fn not_found_account_id() -> odf::AccountID {
@@ -833,12 +859,12 @@ fn mock_dataset_action_authorizer() -> MockDatasetActionAuthorizer {
 fn expected_ok_response_for_molecule_account_id() -> Result<serde_json::Value, String> {
     Ok(json!({
         "type": "Ed25519Signature2020",
-        "verificationMethod": "did:key:z6MkjUv2SDfM3xy8Ara9m1TNCjRv4DZanYshrWhQvzFGGH83",
-        "signature": "uMsyFqYjiX31t5m4s7DB4UQqFpjKWOQNSO0xpvQI9u7CKji9WVRvRHcM8Wi5X5fxUG7yWju9UUlg2LGnI3dxuBA",
+        "verificationMethod": "did:key:z6Mkon3Necd6NkkyfoGoHxid2znGc59LU3K7mubaRcFbLfLX",
+        "signature": "uP2Wm1caUZkB2h0eF5uWMohhOV1JBeFdpJuPJhp8JFmIZlShUwsCta13xf1r6jyRnqiwLyNYNG4ByirYTtjQGBA",
         "proof": {
             "type": "EcdsaSecp256k1Signature2019",
             "verificationMethod": "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31",
-            "signature": "0x67286ddd1756fde756f7ebd20705ef9a034f9c68c632fa3045f1c42a1ac29ec21989fcb74209bc9d36983624452eac8e0f46dd06e9f45e43108d67e454c99d831c"
+            "signature": "0x1d16b5f09481dcb5e7a8e58d9d7585c00d930d551b6c693894ebb74319f0f04f6792c9bbbc00cf3a8bca166dc7054e9b8da615b21be89e914b8074776a79f3f01c"
         }
     }))
 }
@@ -862,12 +888,12 @@ fn expected_ok_response_for_molecule_project_account_id() -> Result<serde_json::
 fn expected_ok_response_for_molecule_dev_account_id() -> Result<serde_json::Value, String> {
     Ok(json!({
         "type": "Ed25519Signature2020",
-        "verificationMethod": "did:key:z6Mkq5nZc651PomaThttq6yAHV8N5Zi9tuFe925N6hFcXwpz",
-        "signature": "uGf3-BQw8hXSRA75Qv36UWOmy-_Upp0nOSXwBfK8_HpOwJwrXNpmUpPmRLLVn2lo-ea_zok1CIAW9038AQFqoBw",
+        "verificationMethod": "did:key:z6MkvRXNYcE7MMduynWTgeKbDaT1iijDSC8pZqXZc8rHPrf2",
+        "signature": "ujeZTyGt6emrpISPWgwD-bbxAD69vCVXgIvzAjKcAQwi66K4FcoYd8z7sMt6MwJf8n2jPG7cQtoo59EF5fBD6CA",
         "proof": {
             "type": "EcdsaSecp256k1Signature2019",
             "verificationMethod": "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31",
-            "signature": "0xa33cf574c848cbd47485255e4a8360a8f3b11c6a02957c1b7b33d43c531bc6aa33221f1b4e53eee5f3eea60ce12c341a6773a5e965b28f18e736d8ea036e7ff11b"
+            "signature": "0xa303ef06e8fc3cc01beddcaeab7c32a5d17c70e3b5c55f54879c5c4940e9e2f653343bc05c6a2cc4c704aace774cc805d47042667e6143335d1074bc9d5ca0c51b"
         }
     }))
 }
@@ -891,12 +917,12 @@ fn expected_ok_response_for_molecule_dev_project_account_id() -> Result<serde_js
 fn expected_ok_response_for_user_account_id() -> Result<serde_json::Value, String> {
     Ok(json!({
         "type": "Ed25519Signature2020",
-        "verificationMethod": "did:key:z6MkfVC4yYwkK8k91WsHByNzRdftUsx5EVMsdSFhd81BJV1P",
-        "signature": "uMW-raV_VQEOfNRJ3UJvht-4eMc2floBE44fIthH7hmtSKYHLWSJI7WJaVsG18g8yBw3NRAeCe5NG-Imdt0KUBQ",
+        "verificationMethod": "did:key:z6MkmtWtY63GQVBrpMyRJWEzsnxfsGkemu6CtMDwGTv4RYj2",
+        "signature": "u5LoI2Nv7HkxihalcMhkNq7PKh39FR_doSNE-IpNAsVK3-Mozp5REKvdk2N19BF3l5nr3YtYABV-spDC0qdl6Cg",
         "proof": {
             "type": "EcdsaSecp256k1Signature2019",
             "verificationMethod": "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31",
-            "signature": "0x18001886d55b11891d8ff9edefa0f4ddfa2dfd7324668055b4ba43216591fbd532d0387866eeb9fbdfec41037a48721e23599062d4fc3e01f59be946af1745511b"
+            "signature": "0x9cb3b2bfe670e16ab19670d7a5bfd5fb159a1cf3bb4d3948c8015eb1dbd87bf775fe66258964416cf9e0f74e11f926b1bedb1ab450da72f5698f0c5ea68653001b"
         }
     }))
 }
