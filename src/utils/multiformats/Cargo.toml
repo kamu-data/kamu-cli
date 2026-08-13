@@ -13,6 +13,12 @@ edition = { workspace = true }
 publish = { workspace = true }
 
 
+[features]
+default = []
+schemars = ["dep:schemars"]
+utoipa = ["dep:utoipa", "dep:serde_json"]
+
+
 [lints]
 workspace = true
 
@@ -21,49 +27,28 @@ workspace = true
 doctest = false
 
 
-[features]
-default = [
-]
-schemars = [
-    "dep:schemars",
-]
-utoipa = [
-    "dep:serde_json",
-    "dep:utoipa",
-]
-
-
 [dependencies]
-base64 = { version = "0.22", default-features = false, features = [
-    "std",
-] }
-bs58 = { version = "0.5", default-features = false, features = [
-] }
-digest = { version = "0.10", default-features = false, features = [
-] }
+base64 = { version = "0.22", default-features = false, features = ["std"] }
+bs58 = { version = "0.5", default-features = false, features = [] }
+digest = { version = "0.10", default-features = false, features = [] }
 ed25519-dalek = { version = "2", default-features = false, features = [
     "fast",
     "rand_core",
     "std",
     "zeroize",
 ] }
-hex = { version = "0.4", default-features = false, features = [
-] }
+hex = { version = "0.4", default-features = false, features = [] }
 rand = { version = "0.9", default-features = false, features = [
-    "small_rng",
     "std",
     "std_rng",
+    "small_rng",
 ] }
 rand_core = { version = "0.6", default-features = false, features = [
     "getrandom",
 ] }
-serde = { version = "1", default-features = false, features = [
-] }
-sha3 = { version = "0.10", default-features = false, features = [
-] }
-thiserror = { version = "2", default-features = false, features = [
-    "std",
-] }
+sha3 = { version = "0.10", default-features = false, features = [] }
+serde = { version = "1", default-features = false, features = [] }
+thiserror = { version = "2", default-features = false, features = ["std"] }
 unsigned-varint = { version = "0.8", default-features = false, features = [
     "std",
 ] }
@@ -72,9 +57,9 @@ unsigned-varint = { version = "0.8", default-features = false, features = [
 schemars = { optional = true, version = "1", default-features = false, features = [
     "derive",
 ] }
-serde_json = { optional = true, version = "1", default-features = false }
 utoipa = { optional = true, version = "5", default-features = false, features = [
 ] }
+serde_json = { optional = true, version = "1", default-features = false }
 
 
 [dev-dependencies]

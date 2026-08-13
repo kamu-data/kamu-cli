@@ -22,8 +22,7 @@ doctest = false
 
 
 [features]
-default = [
-]
+default = []
 
 ingest-evm = [
     "dep:alloy",
@@ -32,19 +31,10 @@ ingest-evm = [
     "dep:alloy-transport-http",
     "dep:datafusion-ethers",
 ]
-ingest-ftp = [
-    "dep:curl",
-    "dep:curl-sys",
-]
-ingest-mqtt = [
-    "dep:rumqttc",
-]
-query-extensions-json = [
-    "dep:datafusion-functions-json",
-]
-query-extensions-nested-functions = [
-    "datafusion/nested_expressions",
-]
+ingest-ftp = ["dep:curl", "dep:curl-sys"]
+ingest-mqtt = ["dep:rumqttc"]
+query-extensions-json = ["dep:datafusion-functions-json"]
+query-extensions-nested-functions = ["datafusion/nested_expressions"]
 testing = [
     # Deps: kamu
     "dep:kamu-datasets-services",
@@ -94,9 +84,7 @@ time-source = { workspace = true }
 # Serialization
 flatbuffers = "25"
 hex = "0.4"
-serde = { version = "1", features = [
-    "derive",
-] }
+serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_with = { version = "3", default-features = false }
 serde_yaml = { package = "serde_yaml_ng", version = "0.10", default-features = false }
@@ -104,25 +92,23 @@ serde_yaml = { package = "serde_yaml_ng", version = "0.10", default-features = f
 # Ingest
 flate2 = "1" # GZip decoder
 reqwest = { version = "0.12", default-features = false, features = [
-    "brotli",
-    "deflate",
-    "gzip",
     "json",
     "stream",
+    "gzip",
+    "brotli",
+    "deflate",
 ] }
 ringbuf = "0.4"
 zip = { version = "8", default-features = false, features = [
-    "bzip2",
     "deflate",
+    "bzip2",
     "zstd",
 ] }
 
 
 # Data
 datafusion = { version = "54", default-features = false }
-object_store = { version = "0.13", features = [
-    "aws",
-] }
+object_store = { version = "0.13", features = ["aws"] }
 sha3 = "0.10"
 
 # Repositories
@@ -138,9 +124,7 @@ cfg-if = "1" # Conditional compilation
 cheap-clone = { version = "0.3", default-features = false, features = [
     "alloc",
 ] }
-chrono = { version = "0.4", features = [
-    "serde",
-] }
+chrono = { version = "0.4", features = ["serde"] }
 dashmap = { version = "6", default-features = false }
 dill = { version = "0.15", default-features = false }
 futures = "0.3"
@@ -150,18 +134,14 @@ itertools = "0.14"
 rand = "0.9"
 regex = "1"
 tempfile = "3"
-thiserror = { version = "2", default-features = false, features = [
-    "std",
-] }
+thiserror = { version = "2", default-features = false, features = ["std"] }
 tokio = { version = "1", default-features = false, features = [
     "fs",
     "process",
 ] }
 tokio-stream = "0.1"
 tracing = "0.1"
-url = { version = "2", features = [
-    "serde",
-] }
+url = { version = "2", features = ["serde"] }
 
 # Optional dependencies
 kamu-datasets-services = { optional = true, workspace = true, features = [
@@ -171,10 +151,10 @@ kamu-datasets-services = { optional = true, workspace = true, features = [
 # TODO: Unpin after upgrade to `reqwests 0.13`
 # See: https://github.com/kamu-data/kamu-cli/issues/1607
 alloy = { optional = true, version = "~1.7.3", default-features = false, features = [
+    "std",
     "provider-http",
     "provider-ws",
     "reqwest-rustls-tls",
-    "std",
 ] }
 # TODO: Remove these pins
 alloy-provider = { optional = true, version = "~1.7.3", default-features = false }
@@ -190,14 +170,12 @@ curl = { optional = true, version = "0.4", features = [
     "static-ssl",
 ] }
 curl-sys = { optional = true, version = "0.4" }
-datafusion-ethers = { optional = true, version = "54", features = [
-    "eip712",
-] }
+datafusion-ethers = { optional = true, version = "54", features = ["eip712"] }
 datafusion-functions-json = { optional = true, version = "0.54" }
-mockall = { optional = true, version = "0.14", default-features = false }
-oop = { optional = true, version = "0.0.2" }
 rumqttc = { optional = true, version = "0.25", default-features = false, features = [
 ] }
+mockall = { optional = true, version = "0.14", default-features = false }
+oop = { optional = true, version = "0.0.2" }
 
 
 [target.'cfg(unix)'.dependencies]
@@ -208,8 +186,6 @@ libc = "0.2" # For getting uid:gid
 kamu-accounts = { workspace = true, default-features = false, features = [
     "testing",
 ] }
-kamu-accounts-inmem = { workspace = true, default-features = false }
-kamu-accounts-services = { workspace = true, default-features = false }
 kamu-core = { workspace = true, default-features = false, features = [
     "testing",
 ] }
@@ -217,18 +193,14 @@ kamu-datasets-inmem = { workspace = true, default-features = false }
 kamu-datasets-services = { workspace = true, default-features = false, features = [
     "testing",
 ] }
-odf = { workspace = true, default-features = false, features = [
-    "testing",
-] }
+kamu-accounts-inmem = { workspace = true, default-features = false }
+kamu-accounts-services = { workspace = true, default-features = false }
+odf = { workspace = true, default-features = false, features = ["testing"] }
 test-utils = { workspace = true, default-features = false }
 
 bon = { version = "3", default-features = false }
-criterion = { version = "0.8", features = [
-    "async_tokio",
-] }
-datafusion = { version = "54", default-features = false, features = [
-    "parquet",
-] }
+criterion = { version = "0.8", features = ["async_tokio"] }
+datafusion = { version = "54", default-features = false, features = ["parquet"] }
 filetime = "0.2"
 indoc = "2"
 mockall = { version = "0.14", default-features = false }
@@ -238,14 +210,9 @@ pretty_assertions = { version = "1", default-features = false, features = [
     "unstable",
 ] }
 test-group = { version = "1" }
-test-log = { version = "0.2", features = [
-    "trace",
-] }
+test-log = { version = "0.2", features = ["trace"] }
 testing_logger = { version = "0.1" }
-tokio = { version = "1", default-features = false, features = [
-    "macros",
-    "rt",
-] }
+tokio = { version = "1", default-features = false, features = ["rt", "macros"] }
 
 [[bench]]
 name = "parallel_simple_transfer_protocol"

@@ -22,64 +22,32 @@ doctest = false
 
 
 [features]
-default = [
-    "lfs",
-]
+default = ["lfs"]
 
-arrow = [
-    "odf-metadata/arrow",
-]
+arrow = ["odf-metadata/arrow"]
 dataset = [
     "dep:odf-dataset-impl",
     # Dataset requires arrow for logical data hashing
     "arrow",
 ]
-datafusion = [
-    "arrow",
-    "odf-data-utils?/datafusion",
-]
-engine-rpc = [
-    "odf-metadata/engine-rpc",
-]
-http = [
-    "dep:odf-storage-http",
-    "odf-dataset-impl?/http",
-]
-lfs = [
-    "dep:odf-storage-lfs",
-    "odf-dataset-impl?/lfs",
-    "odf-dataset/lfs",
-]
-s3 = [
-    "dep:odf-storage-s3",
-    "odf-dataset-impl?/s3",
-    "odf-dataset/s3",
-]
-sqlx-mysql = [
-    "odf-metadata/sqlx-mysql",
-]
-sqlx-postgres = [
-    "odf-metadata/sqlx-postgres",
-]
-sqlx-sqlite = [
-    "odf-metadata/sqlx-sqlite",
-]
+datafusion = ["arrow", "odf-data-utils?/datafusion"]
+engine-rpc = ["odf-metadata/engine-rpc"]
+http = ["dep:odf-storage-http", "odf-dataset-impl?/http"]
+lfs = ["dep:odf-storage-lfs", "odf-dataset/lfs", "odf-dataset-impl?/lfs"]
+s3 = ["dep:odf-storage-s3", "odf-dataset/s3", "odf-dataset-impl?/s3"]
+sqlx-mysql = ["odf-metadata/sqlx-mysql"]
+sqlx-postgres = ["odf-metadata/sqlx-postgres"]
+sqlx-sqlite = ["odf-metadata/sqlx-sqlite"]
 testing = [
-    "odf-data-utils?/testing",
-    "odf-dataset-impl/testing",
     "odf-dataset/testing",
+    "odf-dataset-impl/testing",
     "odf-metadata/testing",
     "odf-storage/testing",
+    "odf-data-utils?/testing",
 ]
-schemars = [
-    "odf-metadata/schemars",
-]
-utils = [
-    "dep:odf-data-utils",
-]
-utoipa = [
-    "odf-metadata/utoipa",
-]
+schemars = ["odf-metadata/schemars"]
+utils = ["dep:odf-data-utils"]
+utoipa = ["odf-metadata/utoipa"]
 
 
 [dependencies]
@@ -87,8 +55,8 @@ odf-dataset = { workspace = true }
 odf-metadata = { workspace = true }
 odf-storage = { workspace = true }
 
-odf-data-utils = { optional = true, workspace = true }
 odf-dataset-impl = { optional = true, workspace = true }
+odf-data-utils = { optional = true, workspace = true }
 odf-storage-http = { optional = true, workspace = true }
 odf-storage-inmem = { workspace = true }
 odf-storage-lfs = { optional = true, workspace = true }

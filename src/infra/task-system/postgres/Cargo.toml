@@ -23,8 +23,8 @@ doctest = false
 
 [dependencies]
 database-common = { workspace = true }
-kamu-task-system = { workspace = true }
 odf = { workspace = true }
+kamu-task-system = { workspace = true }
 
 async-stream = "0.3"
 async-trait = { version = "0.1", default-features = false }
@@ -32,11 +32,11 @@ dill = { version = "0.15", default-features = false }
 futures = "0.3"
 serde_json = "1"
 sqlx = { version = "0.8", default-features = false, features = [
-    "chrono",
+    "runtime-tokio",
     "json",
     "macros",
     "postgres",
-    "runtime-tokio",
+    "chrono",
 ] }
 
 
@@ -45,7 +45,5 @@ database-common-macros = { workspace = true }
 internal-error = { workspace = true }
 kamu-task-system-repo-tests = { workspace = true }
 
+test-log = { version = "0.2", features = ["trace"] }
 test-group = { version = "1" }
-test-log = { version = "0.2", features = [
-    "trace",
-] }

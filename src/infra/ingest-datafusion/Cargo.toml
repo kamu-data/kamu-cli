@@ -26,38 +26,29 @@ file-utils = { workspace = true }
 internal-error = { workspace = true }
 kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
-odf = { workspace = true, features = [
-    "arrow",
-] }
+odf = { workspace = true, features = ["arrow"] }
 
 datafusion = { version = "54", default-features = false }
-geo-types = { version = "0.7", default-features = false, features = [
-] }
+geo-types = { version = "0.7", default-features = false, features = [] }
 geojson = { version = "1.0", default-features = false, features = [
     "geo-types",
 ] }
 glob = "0.3"
 serde = { version = "1" }
 serde_json = "1"
-shapefile = { version = "0.8", features = [
-    "geo-types",
-] }
+shapefile = { version = "0.8", features = ["geo-types"] }
 walkdir = "2"
 zip = { version = "8", default-features = false, features = [
-    "bzip2",
     "deflate",
+    "bzip2",
     "zstd",
 ] }
 
 # Utils
 async-trait = "0.1"
-chrono = { version = "0.4", features = [
-    "serde",
-] }
+chrono = { version = "0.4", features = ["serde"] }
 futures = "0.3"
-thiserror = { version = "2", default-features = false, features = [
-    "std",
-] }
+thiserror = { version = "2", default-features = false, features = ["std"] }
 tokio = { version = "1", default-features = false, features = [
     "fs",
     "process",
@@ -66,25 +57,16 @@ tracing = "0.1"
 
 
 [dev-dependencies]
-odf = { workspace = true, features = [
-    "testing",
-] }
+odf = { workspace = true, features = ["testing"] }
 
-criterion = { version = "0.8", features = [
-    "async_tokio",
-] }
+criterion = { version = "0.8", features = ["async_tokio"] }
 indoc = "2"
 pretty_assertions = "1"
 rand = "0.9"
-tempfile = "3"
 test-group = { version = "1" }
-test-log = { version = "0.2", features = [
-    "trace",
-] }
-tokio = { version = "1", default-features = false, features = [
-    "macros",
-    "rt",
-] }
+test-log = { version = "0.2", features = ["trace"] }
+tempfile = "3"
+tokio = { version = "1", default-features = false, features = ["rt", "macros"] }
 
 
 [[bench]]

@@ -21,11 +21,8 @@ workspace = true
 doctest = false
 
 [features]
-default = [
-]
-sqlx = [
-    "dep:sqlx",
-]
+default = []
+sqlx = ["dep:sqlx"]
 
 [dependencies]
 async-utils = { workspace = true }
@@ -33,9 +30,7 @@ database-common = { workspace = true }
 database-common-macros = { workspace = true }
 init-on-startup = { workspace = true }
 internal-error = { workspace = true }
-observability = { workspace = true, features = [
-    "prometheus",
-] }
+observability = { workspace = true, features = ["prometheus"] }
 time-source = { workspace = true }
 
 async-trait = "0.1"
@@ -45,13 +40,9 @@ futures = "0.3"
 itertools = "0.14"
 mockall = "0.14"
 prometheus = { version = "0.14", default-features = false }
-serde = { version = "1", features = [
-    "derive",
-] }
+serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-thiserror = { version = "2", default-features = false, features = [
-    "std",
-] }
+thiserror = { version = "2", default-features = false, features = ["std"] }
 tokio = { version = "1", default-features = false }
 tracing = "0.1"
 
@@ -66,13 +57,6 @@ kamu-messaging-outbox-inmem = { workspace = true }
 
 oop = { version = "0.0.2", default-features = false }
 paste = "1"
-serde = { version = "1", features = [
-    "derive",
-] }
-test-log = { version = "0.2", features = [
-    "trace",
-] }
-tokio = { version = "1", default-features = false, features = [
-    "macros",
-    "rt",
-] }
+serde = { version = "1", features = ["derive"] }
+test-log = { version = "0.2", features = ["trace"] }
+tokio = { version = "1", default-features = false, features = ["rt", "macros"] }

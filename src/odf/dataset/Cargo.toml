@@ -22,17 +22,10 @@ doctest = false
 
 
 [features]
-default = [
-    "lfs",
-]
-lfs = [
-]
-s3 = [
-    "dep:s3-utils",
-]
-testing = [
-    "dep:mockall",
-]
+default = ["lfs"]
+lfs = []
+s3 = ["dep:s3-utils"]
+testing = ["dep:mockall"]
 
 
 [dependencies]
@@ -47,22 +40,14 @@ bytes = "1"
 cheap-clone = { version = "0.3", default-features = false, features = [
     "alloc",
 ] }
-chrono = { version = "0.4", features = [
-    "serde",
-] }
+chrono = { version = "0.4", features = ["serde"] }
 dill = { version = "0.15", default-features = false }
 futures = { version = "0.3", default-features = false }
 mockall = { optional = true, version = "0.14", default-features = false }
 pin-project = { version = "1", default-features = false }
-serde = { version = "1", default-features = false, features = [
-    "derive",
-] }
-strum = { version = "0.28", default-features = false, features = [
-    "derive",
-] }
-thiserror = { version = "2", default-features = false, features = [
-    "std",
-] }
+serde = { version = "1", default-features = false, features = ["derive"] }
+strum = { version = "0.28", default-features = false, features = ["derive"] }
+thiserror = { version = "2", default-features = false, features = ["std"] }
 tokio-stream = { version = "0.1", default-features = false }
 tracing = { version = "0.1", default-features = false }
 url = { version = "2", default-features = false }

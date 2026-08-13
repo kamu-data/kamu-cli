@@ -29,28 +29,13 @@ doctest = false
 
 
 [features]
-default = [
-    "ingest-evm",
-    "ingest-mqtt",
-    "query-extensions-json",
-]
+default = ["ingest-evm", "ingest-mqtt", "query-extensions-json"]
 
-ingest-evm = [
-    "kamu/ingest-evm",
-]
-ingest-ftp = [
-    "kamu/ingest-ftp",
-]
-ingest-mqtt = [
-    "dep:rumqttc",
-    "kamu/ingest-mqtt",
-]
-query-extensions-json = [
-    "kamu/query-extensions-json",
-]
-web-ui = [
-    "rust-embed",
-]
+ingest-evm = ["kamu/ingest-evm"]
+ingest-ftp = ["kamu/ingest-ftp"]
+ingest-mqtt = ["kamu/ingest-mqtt", "dep:rumqttc"]
+query-extensions-json = ["kamu/query-extensions-json"]
+web-ui = ["rust-embed"]
 
 
 [dependencies]
@@ -62,89 +47,79 @@ database-common-macros = { workspace = true }
 file-utils = { workspace = true }
 init-on-startup = { workspace = true }
 internal-error = { workspace = true }
-observability = { workspace = true, features = [
-    "dill",
-    "prometheus",
-] }
+observability = { workspace = true, features = ["dill", "prometheus"] }
 server-console = { workspace = true }
 time-source = { workspace = true }
 
-kamu = { workspace = true, features = [
-    "query-extensions-nested-functions",
-] }
+kamu = { workspace = true, features = ["query-extensions-nested-functions"] }
 
-graphql-http = { workspace = true }
 kamu-adapter-auth-oso-rebac = { workspace = true }
 kamu-adapter-auth-web3 = { workspace = true }
 kamu-adapter-flight-sql = { workspace = true }
 kamu-adapter-flow-dataset = { workspace = true }
 kamu-adapter-flow-webhook = { workspace = true }
+kamu-adapter-task-dataset = { workspace = true }
+kamu-adapter-task-webhook = { workspace = true }
 kamu-adapter-graphql = { workspace = true }
+graphql-http = { workspace = true }
 kamu-adapter-http = { workspace = true, features = [
     "e2e",
 ], default-features = false }
 kamu-adapter-oauth = { workspace = true }
 kamu-adapter-odata = { workspace = true }
-kamu-adapter-task-dataset = { workspace = true }
-kamu-adapter-task-webhook = { workspace = true }
 kamu-datafusion-cli = { workspace = true }
-odf = { workspace = true, features = [
-    "datafusion",
-    "http",
-    "lfs",
-    "s3",
-] }
+odf = { workspace = true, features = ["datafusion", "http", "lfs", "s3"] }
 random-strings = { workspace = true }
 
 kamu-flow-system = { workspace = true }
+kamu-flow-system-services = { workspace = true }
 kamu-flow-system-inmem = { workspace = true }
 kamu-flow-system-postgres = { workspace = true }
-kamu-flow-system-services = { workspace = true }
 kamu-flow-system-sqlite = { workspace = true }
 
 kamu-task-system = { workspace = true }
+kamu-task-system-services = { workspace = true }
 kamu-task-system-inmem = { workspace = true }
 kamu-task-system-postgres = { workspace = true }
-kamu-task-system-services = { workspace = true }
 kamu-task-system-sqlite = { workspace = true }
 
 kamu-accounts = { workspace = true }
-kamu-accounts-inmem = { workspace = true }
-kamu-accounts-mysql = { workspace = true }
-kamu-accounts-postgres = { workspace = true }
 kamu-accounts-services = { workspace = true }
+kamu-accounts-inmem = { workspace = true }
+kamu-accounts-postgres = { workspace = true }
+kamu-accounts-mysql = { workspace = true }
 kamu-accounts-sqlite = { workspace = true }
 
+kamu-datasets-services = { workspace = true }
 kamu-datasets = { workspace = true }
 kamu-datasets-inmem = { workspace = true }
 kamu-datasets-postgres = { workspace = true }
-kamu-datasets-services = { workspace = true }
 kamu-datasets-sqlite = { workspace = true }
 
+messaging-outbox = { workspace = true }
 kamu-messaging-outbox-inmem = { workspace = true }
 kamu-messaging-outbox-postgres = { workspace = true }
 kamu-messaging-outbox-sqlite = { workspace = true }
-messaging-outbox = { workspace = true }
 
 kamu-auth-rebac = { workspace = true }
 kamu-auth-rebac-inmem = { workspace = true }
-kamu-auth-rebac-postgres = { workspace = true }
 kamu-auth-rebac-services = { workspace = true }
+kamu-auth-rebac-postgres = { workspace = true }
 kamu-auth-rebac-sqlite = { workspace = true }
 
 kamu-webhooks = { workspace = true }
+kamu-webhooks-services = { workspace = true }
 kamu-webhooks-inmem = { workspace = true }
 kamu-webhooks-postgres = { workspace = true }
-kamu-webhooks-services = { workspace = true }
 kamu-webhooks-sqlite = { workspace = true }
 
 kamu-search = { workspace = true }
+kamu-search-services = { workspace = true }
+kamu-search-openai = { workspace = true }
+kamu-search-elasticsearch = { workspace = true }
 kamu-search-cache-inmem = { workspace = true }
 kamu-search-cache-postgres = { workspace = true }
 kamu-search-cache-sqlite = { workspace = true }
-kamu-search-elasticsearch = { workspace = true }
-kamu-search-openai = { workspace = true }
-kamu-search-services = { workspace = true }
 
 kamu-auth-web3-inmem = { workspace = true }
 kamu-auth-web3-postgres = { workspace = true }
@@ -163,154 +138,118 @@ kamu-signing-services = { workspace = true }
 reqwest = { version = "0.12", default-features = false, features = [
     "rustls-tls-webpki-roots",
 ] }
-rumqttc = { optional = true, version = "0.25", default-features = false, features = [
-    "use-rustls",
-] }
 rustls = { version = "0.23", default-features = false, features = [
     "aws-lc-rs",
+] }
+rumqttc = { optional = true, version = "0.25", default-features = false, features = [
+    "use-rustls",
 ] }
 sqlx = { version = "0.8", default-features = false, features = [
     "tls-rustls-aws-lc-rs",
 ] }
-tokio-tungstenite = { version = "0.29", features = [
-    "rustls-tls-webpki-roots",
-] }
+tokio-tungstenite = { version = "0.29", features = ["rustls-tls-webpki-roots"] }
 
 # CLI
-chrono-humanize = "0.2" # Human readable durations
+chrono-humanize = "0.2"                                           # Human readable durations
 clap = "4"
 clap_complete = "4"
-console = "0.16" # Terminal colors
-humansize = "2" # Human readable data sizes
-indicatif = "0.18" # Progress bars and spinners
-minus = { version = "5", features = [
-    "search",
-    "static_output",
-] }
-num-format = "0.4" # Human-readable number formatting
-prettytable-rs = "0.10" # ASCII table formatting
-read_input = "0.8" # Basic user input
-webbrowser = "1" # For opening URLs in default system browser
+console = "0.16"                                                  # Terminal colors
+humansize = "2"                                                   # Human readable data sizes
+indicatif = "0.18"                                                # Progress bars and spinners
+minus = { version = "5", features = ["static_output", "search"] }
+num-format = "0.4"                                                # Human-readable number formatting
+prettytable-rs = "0.10"                                           # ASCII table formatting
+read_input = "0.8"                                                # Basic user input
+webbrowser = "1"                                                  # For opening URLs in default system browser
 
 # APIs
-arrow-flight = { version = "58", features = [
-    "flight-sql-experimental",
-] }
+arrow-flight = { version = "58", features = ["flight-sql-experimental"] }
 async-graphql = { version = "7", default-features = false }
 async-graphql-axum = "7"
-axum = { version = "0.8", features = [
-    "ws",
-] }
+axum = { version = "0.8", features = ["ws"] }
 http = "1"
 serde_json = "1"
 tonic = { version = "0.14", default-features = false }
-tower = { version = "0.5", features = [
-    "util",
-] }
-tower-http = { version = "0.6", features = [
-    "catch-panic",
-    "cors",
-    "trace",
-] }
-utoipa = { version = "5", default-features = true, features = [
-    "macros",
-] }
-utoipa-axum = { version = "0.2", default-features = true, features = [
-] }
+tower = { version = "0.5", features = ["util"] }
+tower-http = { version = "0.6", features = ["trace", "cors", "catch-panic"] }
+utoipa = { version = "5", default-features = true, features = ["macros"] }
+utoipa-axum = { version = "0.2", default-features = true, features = [] }
 
 # Web UI
+rust-embed = { optional = true, version = "8", features = [
+    "interpolate-folder-path",
+    "compression",
+] }
 mime = "0.3"
 mime_guess = "2"
-rust-embed = { optional = true, version = "8", features = [
-    "compression",
-    "interpolate-folder-path",
-] }
 
 # Config
-serde = { version = "1", features = [
-    "derive",
-] }
-serde_yaml = { package = "serde_yaml_ng", version = "0.10" }
 setty = { version = "1.0", features = [
-    "case-enums-any",
-    "case-enums-pascal",
-    "case-fields-camel",
     "derive-clone",
     "derive-debug",
-    "derive-deserialize",
-    "derive-jsonschema",
     "derive-partial-eq",
+    "derive-deserialize",
     "derive-serialize",
+    "derive-jsonschema",
+    "case-fields-camel",
+    "case-enums-pascal",
+    "case-enums-any",
     "fmt-json",
     "fmt-yaml",
     "fmt-yaml-arbitrary-precision-hack",
-    "gen-jsonschema",
-    "gen-markdown",
     "types-chrono",
     "types-duration-string",
     "types-url",
+    "gen-jsonschema",
+    "gen-markdown",
 ] }
+serde = { version = "1", features = ["derive"] }
+serde_yaml = { package = "serde_yaml_ng", version = "0.10" }
 
 # Tracing / logging / telemetry / metrics
 prometheus = { version = "0.14", default-features = false }
 tracing = "0.1"
 tracing-appender = "0.2"
-tracing-bunyan-formatter = "0.3"
-tracing-log = "0.2"
 tracing-perfetto = { workspace = true }
 tracing-subscriber = { version = "0.3", default-features = false, features = [
+    "std",
+    "fmt",
     "ansi",
     "env-filter",
-    "fmt",
-    "std",
 ] }
+tracing-log = "0.2"
+tracing-bunyan-formatter = "0.3"
 
 # Utils
 async-trait = "0.1"
-cfg-if = "1" # Conditional compilation
 chrono = "0.4"
-datafusion = { version = "54", default-features = false, features = [
-    "compression",
-    "crypto_expressions",
-    "encoding_expressions",
-    "parquet",
-    "regex_expressions",
-    "unicode_expressions",
-] }
+cfg-if = "1" # Conditional compilation
+datafusion = { version = "54", default-features = false, features = ["crypto_expressions", "encoding_expressions", "parquet", "regex_expressions", "unicode_expressions", "compression"] }
 dill = { version = "0.15", default-features = false }
 dirs = "6"
 fs_extra = "1.3"
 futures = "0.3"
 generic-array = "=0.14.7" # Pinned due to deprecation warnings
 glob = "0.3" # Used for path completions
-hex = { version = "0.4", default-features = false, features = [
-] }
+hex = { version = "0.4", default-features = false, features = [] }
 indoc = "2"
 itertools = "0.14"
 libc = "0.2" # Signal names
 regex = "1"
 secrecy = "0.10"
 shlex = "1" # Parsing partial input for custom completions
-strum = { version = "0.28", features = [
-    "derive",
-] }
 tempfile = "3"
-thiserror = { version = "2", default-features = false, features = [
-    "std",
-] }
+thiserror = { version = "2", default-features = false, features = ["std"] }
 tokio = { version = "1", default-features = false, features = [
-    "io-std",
     "io-util",
+    "io-std",
 ] }
-tokio-stream = { version = "0.1", default-features = false, features = [
-    "net",
-] }
-tokio-util = { version = "0.7", default-features = false, features = [
-    "io",
-] }
+tokio-stream = { version = "0.1", default-features = false, features = ["net"] }
+tokio-util = { version = "0.7", default-features = false, features = ["io"] }
 url = "2"
 urlencoding = "2"
 whoami = "1.6"
+strum = { version = "0.28", features = ["derive"] }
 
 
 [target.'cfg(unix)'.dependencies]
@@ -318,9 +257,7 @@ libc = "0.2" # For getting uid:gid
 
 
 [dev-dependencies]
-kamu = { workspace = true, features = [
-    "testing",
-] }
+kamu = { workspace = true, features = ["testing"] }
 kamu-cli-puppet = { workspace = true, default-features = false, features = [
     "extensions",
 ] }
@@ -328,9 +265,7 @@ kamu-cli-puppet = { workspace = true, default-features = false, features = [
 paste = { version = "1", default-features = false }
 pretty_assertions = { version = "1" }
 test-group = { version = "1" }
-test-log = { version = "0.2", features = [
-    "trace",
-] }
+test-log = { version = "0.2", features = ["trace"] }
 
 
 [build-dependencies]
