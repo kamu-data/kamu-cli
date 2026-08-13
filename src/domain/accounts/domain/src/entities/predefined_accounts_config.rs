@@ -99,6 +99,20 @@ impl PredefinedAccountsConfig {
     }
 }
 
+#[cfg(any(feature = "testing", test))]
+impl PredefinedAccountsConfig {
+    pub fn test_single_tenant_with_id() -> Self {
+        let mut c = Self::single_tenant();
+
+        assert_eq!(1, c.predefined.len());
+
+        if let Some(ac) = c.predefined.get_mut(0) {
+            ac.id = Some(crate::TEST_ACCOUNT_ID.clone());
+        }
+        c
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[setty::derive(setty::Config, Clone, Copy, PartialEq, Eq)]
