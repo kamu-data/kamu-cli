@@ -8,19 +8,19 @@
 // by the Apache License, Version 2.0.
 
 use database_common::{PaginationOpts, TransactionRefT};
-use dill::{component, interface};
 use email_utils::Email;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use sqlx::error::DatabaseError;
+use url::Url;
 
 use crate::domain::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component]
-#[interface(dyn AccountRepository)]
-#[interface(dyn ExpensiveAccountRepository)]
-#[interface(dyn PasswordHashRepository)]
+#[dill::component]
+#[dill::interface(dyn AccountRepository)]
+#[dill::interface(dyn ExpensiveAccountRepository)]
+#[dill::interface(dyn PasswordHashRepository)]
 pub struct PostgresAccountRepository {
     transaction: TransactionRefT<sqlx::Postgres>,
 }
@@ -68,7 +68,7 @@ impl AccountRepository for PostgresAccountRepository {
             account.email.as_ref().to_ascii_lowercase(),
             account.display_name,
             account.account_type as AccountType,
-            account.avatar_url,
+            account.avatar_url.as_ref().map(Url::as_str),
             account.registered_at,
             account.provider,
             account.provider_identity_key,
@@ -116,7 +116,7 @@ impl AccountRepository for PostgresAccountRepository {
             updated_account.email.as_ref().to_ascii_lowercase(),
             updated_account.display_name,
             updated_account.account_type as AccountType,
-            updated_account.avatar_url,
+            updated_account.avatar_url.as_ref().map(Url::as_str),
             updated_account.registered_at,
             updated_account.provider,
             updated_account.provider_identity_key,
@@ -382,6 +382,35 @@ impl AccountRepository for PostgresAccountRepository {
         .int_err()?;
 
         Ok(maybe_account_row.map(|account_row| account_row.id))
+    }
+
+    async fn find_account_ids_by_unique_fields(
+        &self,
+        account_name: &odf::AccountName,
+        email: &Email,
+        provider_identity_key: &str,
+    ) -> Result<Vec<odf::AccountID>, FindAccountIdsByUniqueFieldsError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let account_rows = sqlx::query!(
+            r#"
+            SELECT DISTINCT id as "id: odf::AccountID"
+            FROM accounts
+            WHERE lower(account_name) = lower($1)
+               OR lower(email) = lower($2)
+               OR provider_identity_key = $3
+            "#,
+            account_name.as_str(),
+            email.as_ref(),
+            provider_identity_key
+        )
+        .fetch_all(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(account_rows.into_iter().map(|row| row.id).collect())
     }
 
     fn search_accounts_by_name_pattern<'a>(
@@ -658,6 +687,33 @@ impl PasswordHashRepository for PostgresAccountRepository {
             WHERE lower(account_name) = lower($1)
             "#,
             account_name.as_str(),
+        )
+        .fetch_optional(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(maybe_password_row.map(|password_row| password_row.password_hash))
+    }
+
+    async fn find_password_hash_by_account_id(
+        &self,
+        account_id: &odf::AccountID,
+    ) -> Result<Option<String>, FindPasswordHashError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        use odf::metadata::AsStackString;
+
+        let account_id_stack = account_id.as_stack_string();
+
+        let maybe_password_row = sqlx::query!(
+            r#"
+            SELECT password_hash
+            FROM accounts_passwords
+            WHERE account_id = $1
+            "#,
+            account_id_stack.as_str(),
         )
         .fetch_optional(connection_mut)
         .await

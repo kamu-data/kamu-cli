@@ -12,25 +12,21 @@ use std::collections::HashSet;
 use email_utils::Email;
 use internal_error::InternalError;
 use odf::metadata::DidPkh;
+use url::Url;
 
-use crate::{Account, CreateAccountError, Password};
+use crate::{Account, AccountConfig, CreateAccountError, Password};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait CreateAccountUseCase: Send + Sync {
-    async fn execute(
-        &self,
-        account: &Account,
-        password: &Password,
-        quiet: bool,
-    ) -> Result<Account, CreateAccountError>;
+    async fn execute(&self, account_config: &AccountConfig) -> Result<Account, CreateAccountError>;
 
     async fn execute_derived(
         &self,
         creator_account: &Account,
         account_name: &odf::AccountName,
-        options: CreateAccountUseCaseOptions,
+        options: CreateDerivedAccountUseCaseOptions,
     ) -> Result<Account, CreateAccountError>;
 
     async fn execute_multi_wallet_accounts(
@@ -42,11 +38,11 @@ pub trait CreateAccountUseCase: Send + Sync {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(bon::Builder, Default)]
-pub struct CreateAccountUseCaseOptions {
+pub struct CreateDerivedAccountUseCaseOptions {
     pub email: Option<Email>,
     pub password: Option<Password>,
     pub display_name: Option<String>,
-    pub avatar_url: Option<String>,
+    pub avatar_url: Option<Url>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

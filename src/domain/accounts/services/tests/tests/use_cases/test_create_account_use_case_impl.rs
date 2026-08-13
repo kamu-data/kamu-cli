@@ -17,7 +17,7 @@ use kamu_accounts::{
     AccountDisplayName,
     AccountLifecycleMessage,
     CreateAccountUseCase,
-    CreateAccountUseCaseOptions,
+    CreateDerivedAccountUseCaseOptions,
     DidPkhAccountIdentity,
     MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE,
     PredefinedAccountsConfig,
@@ -72,7 +72,7 @@ async fn test_create_account() {
             .execute_derived(
                 &creator_account,
                 &new_account_name_with_email,
-                CreateAccountUseCaseOptions::builder().email(new_account_email.clone()).build())
+                CreateDerivedAccountUseCaseOptions::builder().email(new_account_email.clone()).build())
             .await,
         Ok(account)
             if account.email == new_account_email
@@ -86,7 +86,7 @@ async fn test_create_account() {
             .execute_derived(
                 &creator_account,
                 &new_account_name_without_email,
-                CreateAccountUseCaseOptions::default()
+                CreateDerivedAccountUseCaseOptions::default()
             )
             .await,
         Ok(account)
@@ -154,7 +154,7 @@ struct CreateAccountUseCaseImplHarness {
 }
 
 impl CreateAccountUseCaseImplHarness {
-    async fn new(mock_outbox: MockOutbox) -> Self {
+    async fn new(mut mock_outbox: MockOutbox) -> Self {
         let mut predefined_account_config = PredefinedAccountsConfig::new();
         {
             let account_name = WASYA;
@@ -163,6 +163,13 @@ impl CreateAccountUseCaseImplHarness {
                 .push(AccountConfig::test_config_from_name(
                     odf::AccountName::new_unchecked(account_name),
                 ));
+
+            expect_outbox_account_created_once(
+                &mut mock_outbox,
+                odf::AccountName::new_unchecked(account_name),
+                account_name.to_string(),
+                Email::parse("wasya@example.com").unwrap(),
+            );
         }
 
         let account_base_harness = AccountBaseUseCaseHarness::new(AccountBaseUseCaseHarnessOpts {

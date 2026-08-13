@@ -7063,7 +7063,6 @@ dependencies = [
  "common-macros",
  "container-runtime",
  "criterion",
- "crypto-utils",
  "curl",
  "curl-sys",
  "dashmap",
@@ -7165,6 +7164,7 @@ dependencies = [
  "sqlx",
  "strum 0.28.0",
  "thiserror 2.0.19",
+ "url",
  "uuid",
  "zeroize",
 ]
@@ -7211,6 +7211,7 @@ dependencies = [
  "test-group",
  "test-log",
  "tracing",
+ "url",
  "uuid",
 ]
 
@@ -7236,6 +7237,7 @@ dependencies = [
  "test-group",
  "test-log",
  "tracing",
+ "url",
  "uuid",
 ]
 
@@ -7256,6 +7258,7 @@ dependencies = [
  "password-hash",
  "pretty_assertions",
  "rand 0.9.5",
+ "url",
  "uuid",
 ]
 
@@ -7273,6 +7276,7 @@ dependencies = [
  "dill",
  "email-utils",
  "event-sourcing",
+ "format-utils",
  "futures",
  "init-on-startup",
  "internal-error",
@@ -7283,6 +7287,7 @@ dependencies = [
  "kamu-auth-rebac",
  "kamu-auth-rebac-inmem",
  "kamu-auth-rebac-services",
+ "kamu-core",
  "kamu-search",
  "kamu-search-elasticsearch",
  "kamu-search-services",
@@ -7327,6 +7332,7 @@ dependencies = [
  "test-group",
  "test-log",
  "tracing",
+ "url",
  "uuid",
 ]
 
@@ -7371,7 +7377,6 @@ dependencies = [
  "async-trait",
  "chrono",
  "dill",
- "email-utils",
  "hex",
  "indoc 2.0.7",
  "internal-error",
@@ -7433,8 +7438,6 @@ version = "0.265.0"
 dependencies = [
  "async-trait",
  "chrono",
- "database-common",
- "database-common-macros",
  "dill",
  "futures",
  "internal-error",
@@ -7465,10 +7468,7 @@ version = "0.265.0"
 dependencies = [
  "async-trait",
  "chrono",
- "database-common",
- "database-common-macros",
  "dill",
- "futures",
  "init-on-startup",
  "internal-error",
  "kamu-accounts",
@@ -7489,7 +7489,6 @@ dependencies = [
  "serde",
  "serde_json",
  "test-log",
- "thiserror 2.0.19",
  "time-source",
  "tokio",
  "tracing",
@@ -7559,7 +7558,6 @@ dependencies = [
  "opendatafabric",
  "paste",
  "pretty_assertions",
- "random-strings",
  "secrecy",
  "serde",
  "serde_json",
@@ -7739,14 +7737,10 @@ name = "kamu-adapter-task-webhook"
 version = "0.265.0"
 dependencies = [
  "async-trait",
- "chrono",
- "database-common",
- "database-common-macros",
  "dill",
  "internal-error",
  "kamu-task-system",
  "kamu-webhooks",
- "opendatafabric",
  "serde",
  "serde_json",
  "tracing",
@@ -7827,7 +7821,6 @@ dependencies = [
  "kamu-accounts",
  "kamu-auth-rebac",
  "kamu-auth-rebac-inmem",
- "kamu-core",
  "kamu-datasets",
  "kamu-datasets-services",
  "messaging-outbox",
@@ -8016,6 +8009,7 @@ dependencies = [
  "kamu-datafusion-cli",
  "kamu-datasets",
  "kamu-datasets-inmem",
+ "kamu-datasets-mysql",
  "kamu-datasets-postgres",
  "kamu-datasets-services",
  "kamu-datasets-sqlite",
@@ -8094,7 +8088,6 @@ dependencies = [
  "tracing-subscriber",
  "url",
  "urlencoding",
- "utoipa",
  "utoipa-axum",
  "vergen-gitcl",
  "webbrowser",
@@ -8179,32 +8172,27 @@ name = "kamu-cli-e2e-repo-tests"
 version = "0.265.0"
 dependencies = [
  "async-graphql",
- "base64",
  "chrono",
  "database-common",
  "datafusion",
  "http-common",
  "indoc 2.0.7",
- "kamu",
  "kamu-accounts",
  "kamu-adapter-graphql",
  "kamu-adapter-http",
  "kamu-auth-rebac",
  "kamu-cli-e2e-common",
  "kamu-cli-puppet",
- "kamu-flow-system",
+ "kamu-core",
  "opendatafabric",
  "paste",
  "pretty_assertions",
- "random-strings",
  "regex",
  "reqwest",
  "serde_json",
- "serde_yaml_ng",
  "tempfile",
  "test-utils",
  "tokio",
- "tokio-retry",
  "url",
 ]
 
@@ -8244,7 +8232,6 @@ dependencies = [
 name = "kamu-core"
 version = "0.265.0"
 dependencies = [
- "async-stream",
  "async-trait",
  "base64",
  "bytes",
@@ -8258,7 +8245,6 @@ dependencies = [
  "internal-error",
  "kamu-accounts",
  "kamu-datasets",
- "messaging-outbox",
  "mockall",
  "object_store",
  "opendatafabric",
@@ -8269,7 +8255,6 @@ dependencies = [
  "strum 0.28.0",
  "thiserror 2.0.19",
  "tokio",
- "tokio-stream",
  "tracing",
  "url",
  "utoipa",
@@ -8368,6 +8353,28 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "uuid",
+]
+
+[[package]]
+name = "kamu-datasets-mysql"
+version = "0.265.0"
+dependencies = [
+ "async-stream",
+ "async-trait",
+ "chrono",
+ "database-common",
+ "database-common-macros",
+ "dill",
+ "futures",
+ "internal-error",
+ "kamu-accounts-mysql",
+ "kamu-datasets",
+ "kamu-datasets-repo-tests",
+ "opendatafabric",
+ "sqlx",
+ "test-group",
+ "test-log",
+ "tracing",
 ]
 
 [[package]]
@@ -8812,7 +8819,6 @@ dependencies = [
  "chrono",
  "database-common",
  "dill",
- "futures",
  "internal-error",
  "mockall",
  "opendatafabric",
@@ -8952,18 +8958,13 @@ dependencies = [
  "async-trait",
  "chrono",
  "common-macros",
- "database-common",
- "database-common-macros",
  "dill",
- "futures",
  "init-on-startup",
  "internal-error",
- "itertools 0.14.0",
  "kamu-core",
  "kamu-search",
  "kamu-search-cache-inmem",
  "opendatafabric",
- "serde",
  "serde_json",
  "sha2 0.11.0",
  "test-log",

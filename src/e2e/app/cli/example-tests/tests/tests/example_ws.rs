@@ -9,6 +9,8 @@
 
 use std::path::PathBuf;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub struct ExampleWorkspace {
     pub root: PathBuf,
 }
@@ -19,7 +21,7 @@ impl ExampleWorkspace {
     }
 
     pub fn new_by_name_with_clean_state(name: &str) -> Self {
-        let root = Self::example_dir(name);
+        let root = Self::examples_dir(name);
         assert!(root.is_dir(), "Cannot find example at {}", root.display());
         let s = Self::new(root);
         s.cleanup();
@@ -27,7 +29,7 @@ impl ExampleWorkspace {
         s
     }
 
-    pub fn example_dir(name: &str) -> PathBuf {
+    pub fn examples_dir(name: &str) -> PathBuf {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("../../../../../examples");
         path.push(name);
@@ -57,3 +59,5 @@ impl Drop for ExampleWorkspace {
         self.cleanup();
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

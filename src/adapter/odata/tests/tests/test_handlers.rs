@@ -11,7 +11,6 @@ use std::sync::Arc;
 
 use chrono::{TimeZone, Utc};
 use database_common::NoOpDatabasePlugin;
-use dill::*;
 use indoc::indoc;
 use kamu::domain::*;
 use kamu::*;
@@ -361,7 +360,7 @@ async fn test_collection_handler_by_private_dataset_name_not_found() {
 
 struct TestHarness {
     temp_dir: tempfile::TempDir,
-    catalog: Catalog,
+    catalog: dill::Catalog,
     push_ingest_planner: Arc<dyn PushIngestPlanner>,
     push_ingest_executor: Arc<dyn PushIngestExecutor>,
     api_server: TestAPIServer,
@@ -404,7 +403,7 @@ impl TestHarness {
                     datasets_dir,
                 ))
                 .add::<DatasetLfsBuilderDatabaseBackedImpl>()
-                .add_value(kamu_datasets_services::MetadataChainDbBackedConfig::default())
+                .add_value(MetadataChainDbBackedConfig::default())
                 .add::<CreateDatasetFromSnapshotUseCaseImpl>()
                 .add::<CreateDatasetUseCaseHelper>()
                 .add_value(SystemTimeSourceStub::new_set(
@@ -428,7 +427,7 @@ impl TestHarness {
                 .add::<InMemoryDatasetDependencyRepository>()
                 .add::<InMemoryDatasetKeyBlockRepository>()
                 .add::<InMemoryDatasetDataBlockRepository>()
-                .add_value(PredefinedAccountsConfig::single_tenant())
+                .add_value(PredefinedAccountsConfig::test_single_tenant_with_id())
                 .add::<PredefinedAccountsRegistrator>()
                 .add::<RebacServiceImpl>()
                 .add::<InMemoryRebacRepository>()

@@ -25,7 +25,7 @@ pub struct DidPkhAccountIdentity {
 }
 
 impl DidPkhAccountIdentity {
-    /// Derives account identity fields from a did:pkh:ABC.. .
+    /// Derives account identity fields from a `did:pkh:1234...ABCD`.
     /// Guarantees uniqueness for the same wallet address across different
     /// networks by incorporating chain type and chain ID.
     pub fn from_did_pkh(did_pkh: &odf::metadata::DidPkh) -> Result<Self, InternalError> {

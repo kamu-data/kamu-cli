@@ -31,9 +31,7 @@ kamu-adapter-task-dataset = { workspace = true }
 kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
 kamu-flow-system = { workspace = true }
-kamu-task-system ={ workspace = true }
-database-common = { workspace = true }
-database-common-macros = { workspace = true }
+kamu-task-system = { workspace = true }
 internal-error = { workspace = true }
 messaging-outbox = { workspace = true }
 odf = { workspace = true }

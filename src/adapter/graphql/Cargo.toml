@@ -51,7 +51,6 @@ kamu-webhooks = { workspace = true }
 kamu-task-system = { workspace = true }
 observability = { workspace = true, features = ["dill"] }
 odf = { workspace = true, default-features = false, features = ["arrow"] }
-random-strings = { workspace = true }
 time-source = { workspace = true }
 
 async-graphql = { version = "7", default-features = false, features = [

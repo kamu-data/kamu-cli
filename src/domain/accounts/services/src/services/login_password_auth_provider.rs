@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::str::FromStr;
 use std::sync::Arc;
 
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
@@ -43,6 +42,8 @@ impl AuthenticationProvider for LoginPasswordAuthProvider {
         &self,
         login_credentials_json: String,
     ) -> Result<ProviderLoginResponse, ProviderLoginError> {
+        use std::str::FromStr;
+
         // Decode credentials
         let password_login_credentials =
             serde_json::from_str::<PasswordLoginCredentials>(login_credentials_json.as_str())
@@ -60,16 +61,18 @@ impl AuthenticationProvider for LoginPasswordAuthProvider {
         })?;
 
         self.account_service
-            .verify_account_password(&account_name, &password)
+            .verify_account_password_by_name(&account_name, &password)
             .await
             .map_err(|e| {
                 use VerifyPasswordError as E;
                 match e {
-                    e @ (E::AccountNotFound(_) | E::IncorrectPassword(_)) => {
+                    e @ (E::AccountNotFoundByName(_) | E::IncorrectPassword(_)) => {
                         tracing::debug!(%account_name, %e, "Failed to verify a password");
                         ProviderLoginError::RejectedCredentials(RejectedCredentialsError {})
                     }
-                    e @ E::Internal(_) => ProviderLoginError::Internal(e.int_err()),
+                    e @ (E::AccountNotFoundById(_) | E::Internal(_)) => {
+                        ProviderLoginError::Internal(e.int_err())
+                    }
                 }
             })?;
 
@@ -81,14 +84,12 @@ impl AuthenticationProvider for LoginPasswordAuthProvider {
             .int_err()?;
 
         Ok(ProviderLoginResponse {
-            // For password-based accounts
-            account_id: odf::AccountID::new_seeded_ed25519(account_name.as_bytes()),
-            account_name,
-            email: account.email.clone(),
-            display_name: password_login_credentials.login.clone(),
-            account_type: account.account_type,
-            avatar_url: account.avatar_url.clone(),
-            provider_identity_key: password_login_credentials.login.to_ascii_lowercase(),
+            account_id: None,
+            account_name: account.account_name,
+            email: account.email,
+            display_name: account.display_name,
+            avatar_url: account.avatar_url,
+            provider_identity_key: account.provider_identity_key,
         })
     }
 }

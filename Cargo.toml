@@ -136,6 +136,113 @@ members = [
     "src/utils/test-utils",
     "src/utils/time-source",
     "src/utils/tracing-perfetto",
+    # ODF
+    "src/odf/odf",
+    "src/odf/metadata",
+    "src/odf/data-utils",
+    "src/odf/dataset",
+    "src/odf/dataset-impl",
+    "src/odf/storage",
+    "src/odf/storage-http",
+    "src/odf/storage-inmem",
+    "src/odf/storage-lfs",
+    "src/odf/storage-s3",
+    # Domain
+    "src/domain/accounts/domain",
+    "src/domain/auth-rebac/domain",
+    "src/domain/auth-web3/domain",
+    "src/domain/signing/domain",
+    "src/domain/core",
+    "src/domain/datasets/domain",
+    "src/domain/flow-system/domain",
+    "src/domain/search/domain",
+    "src/domain/task-system/domain",
+    "src/domain/webhooks/domain",
+    # Domain service layer
+    "src/domain/accounts/services",
+    "src/domain/auth-rebac/services",
+    "src/domain/auth-web3/services",
+    "src/domain/signing/services",
+    "src/domain/datasets/services",
+    "src/domain/flow-system/services",
+    "src/domain/search/services",
+    "src/domain/task-system/services",
+    "src/domain/webhooks/services",
+    # Infra
+    "src/infra/core",
+    "src/infra/datafusion-udf",
+    "src/infra/ingest-datafusion",
+    ## Flow System
+    "src/infra/flow-system/repo-tests",
+    "src/infra/flow-system/inmem",
+    "src/infra/flow-system/postgres",
+    "src/infra/flow-system/sqlite",
+    ## Accounts
+    "src/infra/accounts/repo-tests",
+    "src/infra/accounts/inmem",
+    "src/infra/accounts/mysql",
+    "src/infra/accounts/postgres",
+    "src/infra/accounts/sqlite",
+    ## Datasets
+    "src/infra/datasets/inmem",
+    "src/infra/datasets/mysql",
+    "src/infra/datasets/postgres",
+    "src/infra/datasets/sqlite",
+    ## Search
+    "src/infra/search/openai",
+    "src/infra/search/elasticsearch",
+    "src/infra/search/elasticsearch-macros",
+    "src/infra/search/cache-repo-tests",
+    "src/infra/search/cache-inmem",
+    "src/infra/search/cache-postgres",
+    "src/infra/search/cache-sqlite",
+    ## Task System
+    "src/infra/task-system/repo-tests",
+    "src/infra/task-system/inmem",
+    "src/infra/task-system/postgres",
+    "src/infra/task-system/sqlite",
+    ## ReBAC
+    "src/infra/auth-rebac/inmem",
+    "src/infra/auth-rebac/repo-tests",
+    "src/infra/auth-rebac/postgres",
+    "src/infra/auth-rebac/sqlite",
+    ## Outbox
+    "src/infra/messaging-outbox/repo-tests",
+    "src/infra/messaging-outbox/inmem",
+    "src/infra/messaging-outbox/postgres",
+    "src/infra/messaging-outbox/sqlite",
+    ## Webhooks
+    "src/infra/webhooks/repo-tests",
+    "src/infra/webhooks/inmem",
+    "src/infra/webhooks/postgres",
+    "src/infra/webhooks/sqlite",
+    ## Web3
+    "src/infra/auth-web3/inmem",
+    "src/infra/auth-web3/postgres",
+    "src/infra/auth-web3/repo-tests",
+    "src/infra/auth-web3/sqlite",
+    # Adapters
+    "src/adapter/auth-oso-rebac",
+    "src/adapter/auth-web3",
+    "src/adapter/flight-sql",
+    "src/adapter/flow-dataset",
+    "src/adapter/flow-webhook",
+    "src/adapter/task-dataset",
+    "src/adapter/task-webhook",
+    "src/adapter/graphql",
+    "src/adapter/http",
+    "src/adapter/oauth",
+    "src/adapter/odata",
+    # Apps
+    "src/app/cli",
+    # E2E
+    "src/e2e/app/cli/common",
+    "src/e2e/app/cli/common-macros",
+    "src/e2e/app/cli/example-tests",
+    "src/e2e/app/cli/repo-tests",
+    "src/e2e/app/cli/postgres",
+    "src/e2e/app/cli/mysql",
+    "src/e2e/app/cli/sqlite",
 ]
 resolver = "3"
 
@@ -233,6 +340,7 @@ kamu-auth-web3-sqlite = { version = "0.265.0", path = "src/infra/auth-web3/sqlit
 kamu-datafusion-udf = { version = "0.265.0", path = "src/infra/datafusion-udf", default-features = false }
 ## Datasets
 kamu-datasets-inmem = { version = "0.265.0", path = "src/infra/datasets/inmem", default-features = false }
+kamu-datasets-mysql = { version = "0.265.0", path = "src/infra/datasets/mysql", default-features = false }
 kamu-datasets-postgres = { version = "0.265.0", path = "src/infra/datasets/postgres", default-features = false }
 kamu-datasets-repo-tests = { version = "0.265.0", path = "src/infra/datasets/repo-tests", default-features = false }
 kamu-datasets-sqlite = { version = "0.265.0", path = "src/infra/datasets/sqlite", default-features = false }

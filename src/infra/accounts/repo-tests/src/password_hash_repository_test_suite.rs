@@ -25,10 +25,17 @@ pub async fn test_no_password_stored(catalog: &Catalog) {
     let password_hash_repo = catalog.get_one::<dyn PasswordHashRepository>().unwrap();
 
     let account_name = odf::AccountName::new_unchecked("I don't exist");
+    let account_id = odf::AccountID::new_seeded_ed25519(b"I don't exist");
 
     assert_matches!(
         password_hash_repo
             .find_password_hash_by_account_name(&account_name)
+            .await,
+        Ok(None)
+    );
+    assert_matches!(
+        password_hash_repo
+            .find_password_hash_by_account_id(&account_id)
             .await,
         Ok(None)
     );
@@ -93,6 +100,20 @@ pub async fn test_store_couple_account_passwords(catalog: &Catalog) {
         Ok(Some(found_hash))
             if found_hash == hash_petya.to_string()
     );
+    assert_matches!(
+        password_hash_repo
+            .find_password_hash_by_account_id(&account_wasya.id)
+            .await,
+        Ok(Some(found_hash))
+            if found_hash == hash_wasya.to_string()
+    );
+    assert_matches!(
+        password_hash_repo
+            .find_password_hash_by_account_id(&account_petya.id)
+            .await,
+        Ok(Some(found_hash))
+            if found_hash == hash_petya.to_string()
+    );
 
     // Mixed case.
     assert_matches!(
@@ -144,6 +165,13 @@ pub async fn test_modify_password(catalog: &Catalog) {
         Ok(Some(found_hash))
             if found_hash == hash_petya.to_string()
     );
+    assert_matches!(
+        password_hash_repo
+            .find_password_hash_by_account_id(&account_petya.id)
+            .await,
+        Ok(Some(found_hash))
+            if found_hash == hash_petya.to_string()
+    );
 
     let password_petya = "new_password_petya";
     let salt = generate_salt();
@@ -160,6 +188,13 @@ pub async fn test_modify_password(catalog: &Catalog) {
     assert_matches!(
         password_hash_repo
             .find_password_hash_by_account_name(&account_petya.account_name)
+            .await,
+        Ok(Some(found_hash))
+            if found_hash == new_hash_petya.to_string()
+    );
+    assert_matches!(
+        password_hash_repo
+            .find_password_hash_by_account_id(&account_petya.id)
             .await,
         Ok(Some(found_hash))
             if found_hash == new_hash_petya.to_string()

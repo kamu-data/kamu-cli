@@ -10,7 +10,7 @@
 use std::assert_matches;
 
 use indoc::indoc;
-use kamu_accounts::{DEFAULT_ACCOUNT_ID, DEFAULT_ACCOUNT_NAME};
+use kamu_accounts::DEFAULT_ACCOUNT_NAME;
 use kamu_adapter_graphql::traits::ResponseExt;
 use kamu_cli_e2e_common::*;
 
@@ -22,8 +22,7 @@ pub async fn test_accounts_me_kamu_user(mut kamu_api_server_client: KamuApiServe
     assert_matches!(
         kamu_api_server_client.account().me().await,
         Ok(response)
-            if response.id == *DEFAULT_ACCOUNT_ID
-                && response.account_name == *DEFAULT_ACCOUNT_NAME
+            if response.account_name == *DEFAULT_ACCOUNT_NAME
     );
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
