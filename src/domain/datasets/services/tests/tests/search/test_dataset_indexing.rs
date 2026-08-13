@@ -507,7 +507,7 @@ async fn test_account_rename_reflected_in_index(ctx: Arc<ElasticsearchTestContex
             predefined: ["alice", "bob"]
                 .into_iter()
                 .map(odf::AccountName::new_unchecked)
-                .map(AccountConfig::test_config_from_name)
+                .map(AccountConfig::test_config_from_name_with_id)
                 .collect(),
         })
         .build()
@@ -590,7 +590,7 @@ async fn test_account_delete_reflected_in_index(ctx: Arc<ElasticsearchTestContex
             predefined: ["alice", "bob"]
                 .into_iter()
                 .map(odf::AccountName::new_unchecked)
-                .map(AccountConfig::test_config_from_name)
+                .map(AccountConfig::test_config_from_name_with_id)
                 .collect(),
         })
         .build()

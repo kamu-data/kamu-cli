@@ -195,7 +195,6 @@ impl ElasticsearchDatasetBaseHarness {
                 b.add::<PredefinedAccountsRegistrator>();
                 b.add::<LoginPasswordAuthProvider>();
                 b.add::<CreateAccountUseCaseImpl>();
-                b.add_value(SeedDidsFromNamesInTests);
                 b.add::<UpdateAccountUseCaseImpl>();
                 b.build()
             };
