@@ -26,11 +26,11 @@ impl ResourceID {
     }
 
     pub fn as_bytes(&self) -> &[u8] {
-        todo!()
+        self.0.as_bytes()
     }
 
-    pub fn from_bytes(_bytes: &[u8]) -> Result<Self, multiformats::DeserializeError<Self>> {
-        todo!()
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, multiformats::DeserializeError<Self>> {
+        Self::try_from(bytes)
     }
 }
 
@@ -50,8 +50,10 @@ impl std::str::FromStr for ResourceID {
 impl TryFrom<&[u8]> for ResourceID {
     type Error = multiformats::DeserializeError<Self>;
 
-    fn try_from(_value: &[u8]) -> Result<Self, Self::Error> {
-        todo!()
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        Ok(Self::new(uuid::Uuid::from_slice(value).map_err(
+            multiformats::DeserializeError::<Self>::new_from,
+        )?))
     }
 }
 

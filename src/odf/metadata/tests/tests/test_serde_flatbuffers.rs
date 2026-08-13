@@ -541,3 +541,75 @@ fn serde_execute_transform_response() {
         assert_eq!(actual, expected);
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// `ResourceSelector`'s flatbuffers conversions are hand-written
+// (`rust.dtoType`) and were `todo!()`. `ResourceRef` is generated, but its
+// round-trip goes through `ResourceID::as_bytes`/`from_bytes` — stubbed too.
+#[test]
+fn test_flatbuffers_resource_selectors() {
+    fn account_ref() -> opendatafabric_metadata::auth::AccountRef {
+        opendatafabric_metadata::auth::AccountRef {
+            id: None,
+            did: None,
+            name: Some("alice".parse().unwrap()),
+        }
+    }
+
+    // ResourceRef — exercises `ResourceID::as_bytes` / `from_bytes`
+    let expected = ResourceRef {
+        account: Some(account_ref()),
+        r#type: TypeName::new_unchecked("SecretSet").into(),
+        id: Some(ResourceID::new(uuid::Uuid::new_v4())),
+        did: None,
+        name: Some("my-secrets".parse().unwrap()),
+    };
+
+    let mut fb = ::flatbuffers::FlatBufferBuilder::new();
+    let offset = expected.serialize(&mut fb);
+    fb.finish(offset, None);
+    let data = fb.finished_data();
+
+    let actual = ResourceRef::deserialize(::flatbuffers::root::<fb::ResourceRef>(data).unwrap());
+    pretty_assertions::assert_eq!(expected, actual);
+
+    // ResourceSelector — every field populated
+    let expected = ResourceSelector {
+        account: Some(account_ref()),
+        r#type: TypeName::new_unchecked("SecretSet").into(),
+        id: Some(ResourceID::new(uuid::Uuid::new_v4())),
+        name: Some("app-%".to_string()),
+        labels: Some(LabelFilter {
+            entries: BTreeMap::from_iter([("environment".to_string(), json!("production"))]),
+        }),
+    };
+
+    let mut fb = ::flatbuffers::FlatBufferBuilder::new();
+    let offset = expected.serialize(&mut fb);
+    fb.finish(offset, None);
+    let data = fb.finished_data();
+
+    let actual =
+        ResourceSelector::deserialize(::flatbuffers::root::<fb::ResourceSelector>(data).unwrap());
+    pretty_assertions::assert_eq!(expected, actual);
+
+    // ResourceSelector — only the required `type`, so every optional field must
+    // survive as `None` rather than materializing a default
+    let expected = ResourceSelector {
+        account: None,
+        r#type: TypeName::new_unchecked("VariableSet").into(),
+        id: None,
+        name: None,
+        labels: None,
+    };
+
+    let mut fb = ::flatbuffers::FlatBufferBuilder::new();
+    let offset = expected.serialize(&mut fb);
+    fb.finish(offset, None);
+    let data = fb.finished_data();
+
+    let actual =
+        ResourceSelector::deserialize(::flatbuffers::root::<fb::ResourceSelector>(data).unwrap());
+    pretty_assertions::assert_eq!(expected, actual);
+}
