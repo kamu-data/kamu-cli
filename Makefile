@@ -89,7 +89,7 @@ lint-udeps:
 .PHONY: lint-udeps
 lint-cargo-toml:
 	taplo fmt --check
-	cargo sort -g -c
+	cargo sort -g -w -c
 
 ###############################################################################
 # Lint (with fixes)
@@ -99,7 +99,7 @@ lint-cargo-toml:
 lint-fix:
 	cargo clippy --workspace --all-targets --fix --allow-dirty --allow-staged --broken-code
 	cargo fmt --all
-	cargo sort -g
+	cargo sort -g -w
 	taplo fmt
 
 
