@@ -26,14 +26,16 @@ impl ResourceSelectorResolutionService for ResourceSelectorResolutionServiceImpl
         &self,
         selector: &str,
     ) -> Result<ResolvedResourceSelector, CLIError> {
-        let resource_ref = match uuid::Uuid::parse_str(selector) {
-            Ok(id) if id.get_version() == Some(uuid::Version::Random) => {
-                ResourceRef::ById(kamu_resources::ResourceID::new(id))
-            }
-            _ => ResourceRef::ByName(selector.parse().map_err(|_| {
-                CLIError::usage_error(format!("Invalid resource name: {selector}"))
-            })?),
-        };
+        let resource_ref =
+            if super::resource_ref_classifier::is_resource_id(selector) {
+                ResourceRef::ById(kamu_resources::ResourceID::new(
+                    uuid::Uuid::parse_str(selector).expect("checked to be a UUID"),
+                ))
+            } else {
+                ResourceRef::ByName(selector.parse().map_err(|_| {
+                    CLIError::usage_error(format!("Invalid resource name: {selector}"))
+                })?)
+            };
 
         Ok(ResolvedResourceSelector {
             input: selector.to_owned(),

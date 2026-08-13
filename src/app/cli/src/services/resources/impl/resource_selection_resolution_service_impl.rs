@@ -326,10 +326,10 @@ impl ResourceSelectionResolutionServiceImpl {
                 let ids = by_id.iter().map(|(_, id)| *id).collect::<Vec<_>>();
                 let found = resource_facade
                     .search_handles(SearchResourceHandlesRequest {
-                        type_scope: kamu_resources_facade::SearchResourceTypeScope::Types(vec![
+                        scope: kamu_resources_facade::RawResourceScope::one_type(
                             resource_type.clone(),
-                        ]),
-                        query: kamu_resources::ResourceSearchQuery::ExactIds(ids),
+                            Some(kamu_resources::ResourceQuery::ExactIds(ids)),
+                        ),
                         account: None,
                         label_filter: label_filter.cloned(),
                         pagination: PaginationOpts {
@@ -362,10 +362,10 @@ impl ResourceSelectionResolutionServiceImpl {
                     .collect::<Vec<_>>();
                 let found = resource_facade
                     .search_handles(SearchResourceHandlesRequest {
-                        type_scope: kamu_resources_facade::SearchResourceTypeScope::Types(vec![
+                        scope: kamu_resources_facade::RawResourceScope::one_type(
                             resource_type.clone(),
-                        ]),
-                        query: kamu_resources::ResourceSearchQuery::ExactNames(names),
+                            Some(kamu_resources::ResourceQuery::ExactNames(names)),
+                        ),
                         account: None,
                         label_filter: label_filter.cloned(),
                         pagination: PaginationOpts {
@@ -428,8 +428,9 @@ impl ResourceSelectionResolutionServiceImpl {
 
         let found = resource_facade
             .search_handles(SearchResourceHandlesRequest {
-                type_scope: kamu_resources_facade::SearchResourceTypeScope::AnyType,
-                query: kamu_resources::ResourceSearchQuery::ExactIds(ids.clone()),
+                scope: kamu_resources_facade::RawResourceScope::AnyType(Some(
+                    kamu_resources::ResourceQuery::ExactIds(ids.clone()),
+                )),
                 account: None,
                 label_filter: label_filter.cloned(),
                 pagination: PaginationOpts {
@@ -629,11 +630,11 @@ impl ResourceSelectionResolutionServiceImpl {
                 async move {
                     resource_facade
                         .search_handles(SearchResourceHandlesRequest {
-                            type_scope: kamu_resources_facade::SearchResourceTypeScope::Types(
-                                vec![(&type_descriptor.canonical_selector).into()],
-                            ),
-                            query: kamu_resources::ResourceSearchQuery::NamePattern(
-                                request_name_pattern,
+                            scope: kamu_resources_facade::RawResourceScope::one_type(
+                                (&type_descriptor.canonical_selector).into(),
+                                Some(kamu_resources::ResourceQuery::NamePattern(
+                                    request_name_pattern,
+                                )),
                             ),
                             account: None,
                             label_filter: request_label_filter,
@@ -689,10 +690,10 @@ impl ResourceSelectionResolutionServiceImpl {
     ) -> Result<Vec<ResourceTarget>, CLIError> {
         let query = match &resource_ref {
             kamu_resources_facade::ResourceRef::ById(id) => {
-                kamu_resources::ResourceSearchQuery::ExactIds(vec![*id])
+                kamu_resources::ResourceQuery::ExactIds(vec![*id])
             }
             kamu_resources_facade::ResourceRef::ByName(name) => {
-                kamu_resources::ResourceSearchQuery::ExactNames(vec![name.clone()])
+                kamu_resources::ResourceQuery::ExactNames(vec![name.clone()])
             }
         };
 
@@ -706,8 +707,9 @@ impl ResourceSelectionResolutionServiceImpl {
                 async move {
                     resource_facade
                         .search_handles(SearchResourceHandlesRequest {
-                            type_scope: kamu_resources_facade::SearchResourceTypeScope::AnyType,
-                            query: request_query,
+                            scope: kamu_resources_facade::RawResourceScope::AnyType(Some(
+                                request_query,
+                            )),
                             account: None,
                             label_filter: request_label_filter,
                             pagination,
@@ -761,10 +763,9 @@ impl ResourceSelectionResolutionServiceImpl {
                 async move {
                     resource_facade
                         .search_handles(SearchResourceHandlesRequest {
-                            type_scope: kamu_resources_facade::SearchResourceTypeScope::AnyType,
-                            query: kamu_resources::ResourceSearchQuery::NamePattern(
-                                request_name_pattern,
-                            ),
+                            scope: kamu_resources_facade::RawResourceScope::AnyType(Some(
+                                kamu_resources::ResourceQuery::NamePattern(request_name_pattern),
+                            )),
                             account: None,
                             label_filter: request_label_filter,
                             pagination,

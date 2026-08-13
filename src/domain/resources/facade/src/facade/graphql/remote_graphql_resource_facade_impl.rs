@@ -227,6 +227,7 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
             request.account.as_ref(),
             request.label_filter.as_ref(),
             request.pagination,
+            request.query.as_ref(),
         )
         .map_err(ListResourcesError::Internal)?;
 
@@ -249,6 +250,7 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
             request.account.as_ref(),
             request.label_filter.as_ref(),
             request.pagination,
+            None,
         )
         .map_err(ListResourcesError::Internal)?;
 
@@ -289,6 +291,7 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
             request.account.as_ref(),
             request.label_filter.as_ref(),
             request.pagination,
+            Some(&request.scope),
         )
         .map_err(ListAllResourcesError::Internal)?;
 
@@ -310,6 +313,7 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
             request.account.as_ref(),
             request.label_filter.as_ref(),
             request.pagination,
+            None,
         )
         .map_err(ListAllResourcesError::Internal)?;
 

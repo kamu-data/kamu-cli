@@ -283,20 +283,9 @@ pub enum ListResourcesError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Debug, Error)]
-pub enum ListAllResourcesError {
-    #[error(transparent)]
-    BadAccount(#[from] ResolveManifestAccountError),
-
-    #[error(transparent)]
-    InvalidLabelFilter(#[from] ResourceInvalidLabelFilterError),
-
-    #[error(transparent)]
-    RemoteRequest(#[from] GraphqlHttpRequestError),
-
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
+/// Listing every type is just a listing with an all-types scope, so it carries
+/// the same failures.
+pub type ListAllResourcesError = ListResourcesError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

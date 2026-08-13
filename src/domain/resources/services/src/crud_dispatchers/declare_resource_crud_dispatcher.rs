@@ -123,7 +123,12 @@ macro_rules! declare_resource_crud_dispatcher {
             ) -> Result<Vec<kamu_resources::ResourceSummaryView>, internal_error::InternalError> {
                 let states = self
                     .list_resources_by_type_use_case
-                    .execute(request.account_id, request.pagination, request.label_filter)
+                    .execute(
+                        request.account_id,
+                        request.pagination,
+                        request.label_filter,
+                        request.query,
+                    )
                     .await?;
 
                 Ok(states

@@ -27,14 +27,14 @@ use kamu_resources::{
     ResourceName,
     ResourcePhase,
     ResourcePhaseCounts,
+    ResourceQuery,
     ResourceRawEventQuery,
     ResourceRepository,
-    ResourceSearchQuery,
+    ResourceScope,
     ResourceSnapshot,
     ResourceSnapshotStream,
     ResourceSnapshotUpdate,
     ResourceSummaryRow,
-    ResourceTypeScope,
     TypeRef,
     TypeUri,
     UpdateResourceError,
@@ -346,14 +346,11 @@ impl ResourceRepository for InMemoryResourceRepository {
     async fn search_resource_handles(
         &self,
         account_id: &odf::AccountID,
-        scope: &ResourceTypeScope,
-        query: &ResourceSearchQuery,
+        scope: &ResourceScope,
         label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceHandleRow>, InternalError> {
-        if matches!(scope, ResourceTypeScope::Types(schemas) if schemas.is_empty())
-            || query.is_vacuous()
-        {
+        if scope.is_vacuous() {
             return Ok(Vec::new());
         }
 
@@ -362,7 +359,7 @@ impl ResourceRepository for InMemoryResourceRepository {
 
         let mut snapshots = {
             let guard = self.state.lock().unwrap();
-            filter_search_snapshots(&guard, account_id, scope, query, &label_pairs)
+            filter_scoped_snapshots(&guard, account_id, scope, &label_pairs)
                 .into_iter()
                 .cloned()
                 .collect::<Vec<_>>()
@@ -393,13 +390,10 @@ impl ResourceRepository for InMemoryResourceRepository {
     async fn count_search_resource_handles(
         &self,
         account_id: &odf::AccountID,
-        scope: &ResourceTypeScope,
-        query: &ResourceSearchQuery,
+        scope: &ResourceScope,
         label_filter: &ResolvedResourceLabelFilter,
     ) -> Result<usize, InternalError> {
-        if matches!(scope, ResourceTypeScope::Types(schemas) if schemas.is_empty())
-            || query.is_vacuous()
-        {
+        if scope.is_vacuous() {
             return Ok(0);
         }
 
@@ -408,7 +402,7 @@ impl ResourceRepository for InMemoryResourceRepository {
 
         let guard = self.state.lock().unwrap();
 
-        Ok(filter_search_snapshots(&guard, account_id, scope, query, &label_pairs).len())
+        Ok(filter_scoped_snapshots(&guard, account_id, scope, &label_pairs).len())
     }
 
     async fn find_resource_snapshot(
@@ -525,15 +519,16 @@ impl ResourceRepository for InMemoryResourceRepository {
         Box::pin(futures::stream::iter(resource_ids_page))
     }
 
-    fn list_resource_snapshots_by_schema(
+    fn list_resource_snapshots(
         &self,
-        account_id: odf::AccountID,
-        schema: &TypeUri,
-        pagination: PaginationOpts,
+        account_id: &odf::AccountID,
+        scope: &ResourceScope,
         label_filter: &ResolvedResourceLabelFilter,
+        pagination: PaginationOpts,
     ) -> ResourceSnapshotStream<'_> {
-        let schema = schema.clone();
+        let account_id = account_id.clone();
         let label_filter = label_filter.clone();
+        let scope = scope.clone();
 
         let stream = futures::stream::once(async move {
             let label_pairs =
@@ -541,66 +536,8 @@ impl ResourceRepository for InMemoryResourceRepository {
 
             let mut snapshots_page: Vec<_> = {
                 let guard = self.state.lock().unwrap();
-                guard
-                    .snapshots_by_id
-                    .values()
-                    .filter(|snapshot| {
-                        snapshot.headers.account.did == account_id
-                            && snapshot.schema == schema
-                            && snapshot.headers.deleted_at.is_none()
-                    })
-                    .filter(|snapshot| snapshot_matches_label_pairs(snapshot, &label_pairs))
-                    .cloned()
-                    .collect()
-            };
-
-            snapshots_page.sort_by(|lhs, rhs| {
-                rhs.headers
-                    .updated_at
-                    .cmp(&lhs.headers.updated_at)
-                    .then_with(|| rhs.id.cmp(&lhs.id))
-            });
-
-            let snapshots_page: Vec<_> = snapshots_page
-                .into_iter()
-                .skip(pagination.offset)
-                .take(pagination.limit)
-                .collect();
-
-            Ok(self.resolve_snapshots(snapshots_page).await)
-        })
-        .flat_map(|snapshots: Result<Vec<_>, InternalError>| match snapshots {
-            Ok(snapshots) => {
-                futures::stream::iter(snapshots.into_iter().map(Ok).collect::<Vec<_>>())
-            }
-            Err(err) => futures::stream::iter(vec![Err(err)]),
-        });
-
-        Box::pin(stream)
-    }
-
-    fn list_all_resource_snapshots(
-        &self,
-        account_id: odf::AccountID,
-        label_filter: &ResolvedResourceLabelFilter,
-        pagination: PaginationOpts,
-    ) -> ResourceSnapshotStream<'_> {
-        let label_filter = label_filter.clone();
-
-        let stream = futures::stream::once(async move {
-            let label_pairs =
-                ResourceLabelFilterPredicate::flatten_conjunction(&label_filter).int_err()?;
-
-            let mut snapshots_page: Vec<_> = {
-                let guard = self.state.lock().unwrap();
-                guard
-                    .snapshots_by_id
-                    .values()
-                    .filter(|snapshot| {
-                        snapshot.headers.account.did == account_id
-                            && snapshot.headers.deleted_at.is_none()
-                    })
-                    .filter(|snapshot| snapshot_matches_label_pairs(snapshot, &label_pairs))
+                filter_scoped_snapshots(&guard, &account_id, &scope, &label_pairs)
+                    .into_iter()
                     .cloned()
                     .collect()
             };
@@ -686,6 +623,39 @@ impl ResourceRepository for InMemoryResourceRepository {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// The single place query semantics are decided, so `list` and `search` cannot
+/// drift apart.
+fn snapshot_matches_query(snapshot: &ResourceSnapshot, query: &ResourceQuery) -> bool {
+    match query {
+        ResourceQuery::ExactNames(names) => names.contains(&snapshot.headers.name),
+        ResourceQuery::ExactIds(ids) => ids.contains(&snapshot.id),
+        ResourceQuery::NamePattern(pattern) => {
+            resource_name_matches_pattern(&snapshot.headers.name, pattern)
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A snapshot passes when its schema is in scope *and* that schema's own query
+/// matches — each type carries its own query, so the checks cannot be split.
+fn snapshot_matches_scope(snapshot: &ResourceSnapshot, scope: &ResourceScope) -> bool {
+    match scope {
+        ResourceScope::AnyType(query) => query
+            .as_ref()
+            .is_none_or(|query| snapshot_matches_query(snapshot, query)),
+        ResourceScope::Types(types) => types.iter().any(|entry| {
+            snapshot.schema == entry.schema
+                && entry
+                    .query
+                    .as_ref()
+                    .is_none_or(|query| snapshot_matches_query(snapshot, query))
+        }),
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 fn resource_name_matches_pattern(name: &str, pattern: &str) -> bool {
     // Resource names are compared case-insensitively, so we fold both sides to
     // lowercase before matching to mirror Postgres ILIKE / SQLite
@@ -730,29 +700,18 @@ fn resource_name_matches_pattern(name: &str, pattern: &str) -> bool {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn filter_search_snapshots<'a>(
+fn filter_scoped_snapshots<'a>(
     guard: &'a State,
     account_id: &odf::AccountID,
-    scope: &ResourceTypeScope,
-    query: &ResourceSearchQuery,
+    scope: &ResourceScope,
     label_pairs: &[(&TypeRef, &str)],
 ) -> Vec<&'a ResourceSnapshot> {
     guard
         .snapshots_by_id
         .values()
         .filter(|snapshot| snapshot.headers.account.did == *account_id)
-        .filter(|snapshot| match scope {
-            ResourceTypeScope::AnyType => true,
-            ResourceTypeScope::Types(schemas) => schemas.contains(&snapshot.schema),
-        })
         .filter(|snapshot| snapshot.headers.deleted_at.is_none())
-        .filter(|snapshot| match query {
-            ResourceSearchQuery::ExactNames(names) => names.contains(&snapshot.headers.name),
-            ResourceSearchQuery::ExactIds(ids) => ids.contains(&snapshot.id),
-            ResourceSearchQuery::NamePattern(pattern) => {
-                resource_name_matches_pattern(&snapshot.headers.name, pattern)
-            }
-        })
+        .filter(|snapshot| snapshot_matches_scope(snapshot, scope))
         .filter(|snapshot| snapshot_matches_label_pairs(snapshot, label_pairs))
         .collect()
 }

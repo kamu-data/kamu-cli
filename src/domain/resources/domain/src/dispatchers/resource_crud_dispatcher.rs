@@ -24,6 +24,7 @@ use crate::{
     ResourceHeadersInput,
     ResourceID,
     ResourceIDNotFoundError,
+    ResourceQuery,
     ResourceSummaryView,
     ResourceTypeMismatchError,
     ResourceTypeSelectorRaw,
@@ -86,6 +87,8 @@ pub struct ResourceCrudDispatcherListRequest {
     pub account_id: odf::AccountID,
     pub pagination: PaginationOpts,
     pub label_filter: ResolvedResourceLabelFilter,
+    /// Narrows the listing within the dispatcher's own type.
+    pub query: Option<ResourceQuery>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

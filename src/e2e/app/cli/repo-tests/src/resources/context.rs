@@ -490,6 +490,60 @@ impl ResourceCtx {
         names
     }
 
+    /// Run `list <target>… -o json` and return the sorted resource names.
+    ///
+    /// Unlike [`Self::list_names`], accepts several targets so multi-type
+    /// listings can be exercised.
+    pub async fn list_names_of(&self, targets: &[&str]) -> Vec<String> {
+        let doc = self.list_json(targets).await;
+        let label = format!("list {} -o json", targets.join(" "));
+
+        let mut names: Vec<String> = doc
+            .as_array()
+            .unwrap_or_else(|| panic!("`{label}` should be a JSON array:\n{doc}"))
+            .iter()
+            .map(|row| {
+                row.get("Name")
+                    .and_then(serde_json::Value::as_str)
+                    .unwrap_or_else(|| panic!("`{label}` row has no Name:\n{row}"))
+                    .to_string()
+            })
+            .collect();
+        names.sort();
+        names
+    }
+
+    /// Run `list <target>… -o json` and return the parsed document, which must
+    /// be a single JSON array regardless of how many targets were given.
+    pub async fn list_json(&self, targets: &[&str]) -> serde_json::Value {
+        let mut args = vec!["list".to_string()];
+        args.extend(targets.iter().map(ToString::to_string));
+        args.push("-o".to_string());
+        args.push("json".to_string());
+
+        self.stdout_json(args).await
+    }
+
+    /// The column names a `list` invocation renders, in order.
+    pub async fn list_columns(&self, targets: &[&str]) -> Vec<String> {
+        let doc = self.list_json(targets).await;
+        let label = format!("list {} -o json", targets.join(" "));
+
+        let rows = doc
+            .as_array()
+            .unwrap_or_else(|| panic!("`{label}` should be a JSON array:\n{doc}"));
+        let first = rows
+            .first()
+            .unwrap_or_else(|| panic!("`{label}` returned no rows, so it has no columns"));
+
+        first
+            .as_object()
+            .unwrap_or_else(|| panic!("`{label}` row should be an object:\n{first}"))
+            .keys()
+            .cloned()
+            .collect()
+    }
+
     /// Return the `summary -o json` total count for a resource type.
     pub async fn summary_count(&self, type_selector: &str) -> u64 {
         let doc = self.stdout_json(["summary", "-o", "json"]).await;

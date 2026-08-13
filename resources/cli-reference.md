@@ -1042,11 +1042,11 @@ Show physical schema of the underlying Parquet files:
 
 List datasets or resources
 
-**Usage:** `kamu list [OPTIONS] [TARGET]`
+**Usage:** `kamu list [OPTIONS] [TARGETS]...`
 
 **Arguments:**
 
-* `<TARGET>` — Target to list: `datasets`, `%` (all resource types), or a resource selector such as `variablesets`, `vs`, `secretsets`, `ss`, `storages`, or `st`
+* `<TARGETS>` — Targets to list: `datasets`, `%` (all resource types), a resource selector such as `variablesets`, `vs`, `secretsets`, `ss`, `storages`, or `st`, optionally narrowed as `type/name`, `type/pattern-%` or `type/<id>`. Several resource selectors may be given at once
 
 **Options:**
 
@@ -1091,6 +1091,19 @@ To list all resources across all types:
 To list variable sets:
 
     kamu list variablesets
+
+To list variable sets whose name matches a pattern:
+
+    kamu list 'vs/my-%'
+
+To list one resource by name or ID:
+
+    kamu list 'vs/my-vars'
+    kamu list 3d8d6d1c-6f7c-4c62-9f4e-7d8295e8fb69
+
+To list several resource types at once:
+
+    kamu list 'vs/app-%' 'ss/app-%'
 
 To list storages from a specific context:
 

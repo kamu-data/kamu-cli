@@ -33,14 +33,14 @@ use kamu_resources::{
     ResourceLabelFilterPredicate,
     ResourceName,
     ResourcePhaseCounts,
+    ResourceQuery,
     ResourceRawEventQuery,
     ResourceRepository,
-    ResourceSearchQuery,
+    ResourceScope,
     ResourceSnapshot,
     ResourceSnapshotRow,
     ResourceSnapshotStream,
     ResourceSummaryRow,
-    ResourceTypeScope,
     TypeRef,
     TypeUri,
     UpdateResourceError,
@@ -345,14 +345,11 @@ impl ResourceRepository for SqliteResourceRepository {
     async fn search_resource_handles(
         &self,
         account_id: &odf::AccountID,
-        scope: &ResourceTypeScope,
-        query: &ResourceSearchQuery,
+        scope: &ResourceScope,
         label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceHandleRow>, InternalError> {
-        if matches!(scope, ResourceTypeScope::Types(schemas) if schemas.is_empty())
-            || query.is_vacuous()
-        {
+        if scope.is_vacuous() {
             return Ok(Vec::new());
         }
 
@@ -387,18 +384,8 @@ impl ResourceRepository for SqliteResourceRepository {
         query_builder
             .push_bind(account_id_str)
             .push(" AND r.deleted_at IS NULL");
-        if let ResourceTypeScope::Types(schemas) = scope {
-            query_builder.push(" AND r.resource_schema IN (");
-            {
-                let mut separated = query_builder.separated(", ");
-                for schema in schemas {
-                    separated.push_bind(schema.as_str());
-                }
-            }
-            query_builder.push(")");
-        }
 
-        push_search_query_predicate(&mut query_builder, query);
+        push_scope_predicate(&mut query_builder, scope);
         push_label_filter_predicates(&mut query_builder, &label_pairs);
 
         query_builder
@@ -417,13 +404,10 @@ impl ResourceRepository for SqliteResourceRepository {
     async fn count_search_resource_handles(
         &self,
         account_id: &odf::AccountID,
-        scope: &ResourceTypeScope,
-        query: &ResourceSearchQuery,
+        scope: &ResourceScope,
         label_filter: &ResolvedResourceLabelFilter,
     ) -> Result<usize, InternalError> {
-        if matches!(scope, ResourceTypeScope::Types(schemas) if schemas.is_empty())
-            || query.is_vacuous()
-        {
+        if scope.is_vacuous() {
             return Ok(0);
         }
 
@@ -445,18 +429,8 @@ impl ResourceRepository for SqliteResourceRepository {
         query_builder
             .push_bind(account_id_str)
             .push(" AND r.deleted_at IS NULL");
-        if let ResourceTypeScope::Types(schemas) = scope {
-            query_builder.push(" AND r.resource_schema IN (");
-            {
-                let mut separated = query_builder.separated(", ");
-                for schema in schemas {
-                    separated.push_bind(schema.as_str());
-                }
-            }
-            query_builder.push(")");
-        }
 
-        push_search_query_predicate(&mut query_builder, query);
+        push_scope_predicate(&mut query_builder, scope);
         push_label_filter_predicates(&mut query_builder, &label_pairs);
 
         let row = query_builder
@@ -760,15 +734,16 @@ impl ResourceRepository for SqliteResourceRepository {
         })
     }
 
-    fn list_resource_snapshots_by_schema(
+    fn list_resource_snapshots(
         &self,
-        account_id: odf::AccountID,
-        schema: &TypeUri,
-        pagination: PaginationOpts,
+        account_id: &odf::AccountID,
+        scope: &ResourceScope,
         label_filter: &ResolvedResourceLabelFilter,
+        pagination: PaginationOpts,
     ) -> ResourceSnapshotStream<'_> {
-        let resource_schema = schema.as_str().to_owned();
+        let account_id = account_id.clone();
         let label_filter = label_filter.clone();
+        let scope = scope.clone();
 
         Box::pin(async_stream::stream! {
             let label_pairs =
@@ -809,10 +784,9 @@ impl ResourceRepository for SqliteResourceRepository {
                 WHERE r.account_id = "#,
             );
             query_builder.push_bind(account_id_str);
-            query_builder.push(" AND r.resource_schema = ");
-            query_builder.push_bind(resource_schema);
             query_builder.push(" AND r.deleted_at IS NULL");
 
+            push_scope_predicate(&mut query_builder, &scope);
             push_label_filter_predicates(&mut query_builder, &label_pairs);
 
             query_builder
@@ -825,74 +799,6 @@ impl ResourceRepository for SqliteResourceRepository {
                 .build_query_as::<ResourceSnapshotRow>()
                 .fetch(connection_mut)
                 .map_err(ErrorIntoInternal::int_err);
-
-            while let Some(row) = query_stream.try_next().await? {
-                yield Ok(row.into_snapshot());
-            }
-        })
-    }
-
-    fn list_all_resource_snapshots(
-        &self,
-        account_id: odf::AccountID,
-        label_filter: &ResolvedResourceLabelFilter,
-        pagination: PaginationOpts,
-    ) -> ResourceSnapshotStream<'_> {
-        let label_filter = label_filter.clone();
-
-        Box::pin(async_stream::stream! {
-            let label_pairs =
-                ResourceLabelFilterPredicate::flatten_conjunction(&label_filter).int_err()?;
-
-            let mut tr = self.transaction.lock().await;
-            let connection_mut = tr.connection_mut().await?;
-
-            let account_id_stack = account_id.as_stack_string();
-            let account_id_str = account_id_stack.as_str();
-            let limit = i64::try_from(pagination.limit).int_err()?;
-            let offset = i64::try_from(pagination.offset).int_err()?;
-
-            let mut query_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
-                r#"
-                SELECT
-                    r.resource_id as id,
-                    r.account_id,
-                    COALESCE(a.resource_id, X'00000000000000000000000000000000') as account_resource_id,
-                    COALESCE(a.account_name, "#,
-            );
-            query_builder.push_bind(DELETED_ACCOUNT_NAME_SENTINEL);
-            query_builder.push(
-                r#") as account_name,
-                    r.resource_schema,
-                    r.resource_name,
-                    r.labels,
-                    r.annotations,
-                    r.spec,
-                    r.status,
-                    r.generation,
-                    r.created_at,
-                    r.updated_at,
-                    r.deleted_at,
-                    r.last_event_id
-                FROM resources r
-                LEFT JOIN accounts a ON a.id = r.account_id
-                WHERE r.account_id = "#,
-            );
-            query_builder.push_bind(account_id_str);
-            query_builder.push(" AND r.deleted_at IS NULL");
-
-            push_label_filter_predicates(&mut query_builder, &label_pairs);
-
-            query_builder
-                .push(" ORDER BY r.updated_at DESC, r.resource_id DESC LIMIT ")
-                .push_bind(limit)
-                .push(" OFFSET ")
-                .push_bind(offset);
-
-            let mut query_stream = query_builder
-                .build_query_as::<ResourceSnapshotRow>()
-            .fetch(connection_mut)
-            .map_err(ErrorIntoInternal::int_err);
 
             while let Some(row) = query_stream.try_next().await? {
                 yield Ok(row.into_snapshot());
@@ -991,32 +897,74 @@ impl ResourceRepository for SqliteResourceRepository {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Appends the predicate matching `query`'s one active mode.
-fn push_search_query_predicate(
+/// Appends the bare predicate matching `query`'s one active mode, with no
+/// leading connective so it can be combined either way.
+fn push_query_predicate(
     query_builder: &mut sqlx::QueryBuilder<'_, sqlx::Sqlite>,
-    query: &ResourceSearchQuery,
+    query: &ResourceQuery,
 ) {
     match query {
-        ResourceSearchQuery::ExactNames(names) => {
-            query_builder.push(" AND r.resource_name COLLATE NOCASE IN (");
+        ResourceQuery::ExactNames(names) => {
+            query_builder.push("r.resource_name COLLATE NOCASE IN (");
             let mut separated = query_builder.separated(", ");
             for name in names {
                 separated.push_bind(name.to_string());
             }
             query_builder.push(")");
         }
-        ResourceSearchQuery::ExactIds(ids) => {
-            query_builder.push(" AND r.resource_id IN (");
+        ResourceQuery::ExactIds(ids) => {
+            query_builder.push("r.resource_id IN (");
             let mut separated = query_builder.separated(", ");
             for id in ids {
                 separated.push_bind(*id.as_ref());
             }
             query_builder.push(")");
         }
-        ResourceSearchQuery::NamePattern(pattern) => {
-            query_builder.push(" AND r.resource_name LIKE ");
+        // An ID is matched exactly above; only a pattern is LIKE-escaped.
+        ResourceQuery::NamePattern(pattern) => {
+            query_builder.push("r.resource_name LIKE ");
             query_builder.push_bind(sql_like_escape_pattern(pattern));
             query_builder.push(r#" ESCAPE '\' COLLATE NOCASE"#);
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Appends the scope predicate: one `OR` group per type, each pairing the
+/// schema with that type's own query.
+fn push_scope_predicate(
+    query_builder: &mut sqlx::QueryBuilder<'_, sqlx::Sqlite>,
+    scope: &ResourceScope,
+) {
+    match scope {
+        ResourceScope::AnyType(None) => {}
+        ResourceScope::AnyType(Some(query)) => {
+            query_builder.push(" AND ");
+            push_query_predicate(query_builder, query);
+        }
+        ResourceScope::Types(types) => {
+            // An empty scope matches nothing; without this the `OR` chain would
+            // collapse to an always-true `AND ()`.
+            if types.is_empty() {
+                query_builder.push(" AND 1 = 0");
+                return;
+            }
+
+            query_builder.push(" AND (");
+            for (index, entry) in types.iter().enumerate() {
+                if index > 0 {
+                    query_builder.push(" OR ");
+                }
+                query_builder.push("(r.resource_schema = ");
+                query_builder.push_bind(entry.schema.as_str().to_owned());
+                if let Some(query) = &entry.query {
+                    query_builder.push(" AND ");
+                    push_query_predicate(query_builder, query);
+                }
+                query_builder.push(")");
+            }
+            query_builder.push(")");
         }
     }
 }

@@ -3911,6 +3911,13 @@ type Resource {
 
 scalar ResourceAnnotations
 
+"""
+Every resource type, optionally narrowed by one query applying to all.
+"""
+input ResourceAnyTypeScopeInput {
+	query: ResourceQueryInput
+}
+
 type ResourceApplyChange {
 	kind: ResourceApplyChangeKind!
 	path: String!
@@ -4260,6 +4267,15 @@ type ResourcePhaseCounts {
 	failed: Uint64!
 }
 
+"""
+Exactly one way to narrow a search.
+"""
+input ResourceQueryInput @oneOf {
+	exactNames: [ResourceName!]
+	exactIds: [ResourceID!]
+	namePattern: String
+}
+
 input ResourceRefInput @oneOf {
 	byId: ResourceID
 	byName: ResourceByNameSelectorInput
@@ -4280,12 +4296,11 @@ type ResourceSchemaMismatchProblem {
 }
 
 """
-Exactly one way to narrow a search.
+Exactly one way to scope a search or listing by resource type.
 """
-input ResourceSearchQueryInput @oneOf {
-	exactNames: [ResourceName!]
-	exactIds: [ResourceID!]
-	namePattern: String
+input ResourceScopeInput @oneOf {
+	anyType: ResourceAnyTypeScopeInput
+	types: [ResourceTypeQueryInput!]
 }
 
 input ResourceSelectorInput {
@@ -4362,11 +4377,11 @@ type ResourceTypeDescriptor {
 }
 
 """
-Exactly one way to scope a search by resource type.
+One resource type in a scope, with the query narrowing it.
 """
-input ResourceTypeScopeInput @oneOf {
-	anyType: Boolean
-	types: [ResourceTypeSelectorInput!]
+input ResourceTypeQueryInput {
+	resourceType: ResourceTypeSelectorInput!
+	query: ResourceQueryInput
 }
 
 input ResourceTypeSelectorInput {
@@ -4427,7 +4442,7 @@ type Resources {
 	"""
 	Returns resources of the specified resource type
 	"""
-	listByResourceType(resourceType: ResourceTypeSelectorInput!, account: AccountRefInput, labelFilter: ResourceLabelFilterInput, page: Int, perPage: Int): ResourceListOutcome!
+	listByResourceType(resourceType: ResourceTypeSelectorInput!, account: AccountRefInput, labelFilter: ResourceLabelFilterInput, query: ResourceQueryInput, page: Int, perPage: Int): ResourceListOutcome!
 	"""
 	Returns resource handles of the specified resource type
 	"""
@@ -4439,7 +4454,7 @@ type Resources {
 	"""
 	Returns resources across all resource types
 	"""
-	listAll(account: AccountRefInput, labelFilter: ResourceLabelFilterInput, page: Int, perPage: Int): ResourceListAllOutcome!
+	listAll(account: AccountRefInput, labelFilter: ResourceLabelFilterInput, scope: ResourceScopeInput, page: Int, perPage: Int): ResourceListAllOutcome!
 	"""
 	Returns resource handles across all resource types
 	"""
@@ -4542,8 +4557,7 @@ enum SearchEntityName {
 }
 
 input SearchResourceHandlesInput {
-	scope: ResourceTypeScopeInput!
-	query: ResourceSearchQueryInput!
+	scope: ResourceScopeInput!
 	account: AccountRefInput
 	labelFilter: ResourceLabelFilterInput
 }

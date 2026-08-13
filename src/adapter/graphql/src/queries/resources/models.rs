@@ -157,45 +157,68 @@ impl TryFrom<ResourceBatchSelectorInput> for kamu_resources_facade::ResourceBatc
 
 /// Exactly one way to narrow a search.
 #[derive(OneofObject, Debug, Clone)]
-pub enum ResourceSearchQueryInput {
+pub enum ResourceQueryInput {
     ExactNames(Vec<ResourceName<'static>>),
     ExactIds(Vec<ResourceID<'static>>),
     NamePattern(String),
 }
 
-impl From<ResourceSearchQueryInput> for kamu_resources::ResourceSearchQuery {
-    fn from(value: ResourceSearchQueryInput) -> Self {
+impl From<ResourceQueryInput> for kamu_resources::ResourceQuery {
+    fn from(value: ResourceQueryInput) -> Self {
         match value {
-            ResourceSearchQueryInput::ExactNames(names) => {
+            ResourceQueryInput::ExactNames(names) => {
                 Self::ExactNames(names.into_iter().map(Into::into).collect())
             }
-            ResourceSearchQueryInput::ExactIds(ids) => {
+            ResourceQueryInput::ExactIds(ids) => {
                 Self::ExactIds(ids.into_iter().map(Into::into).collect())
             }
-            ResourceSearchQueryInput::NamePattern(pattern) => Self::NamePattern(pattern),
+            ResourceQueryInput::NamePattern(pattern) => Self::NamePattern(pattern),
         }
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Exactly one way to scope a search by resource type.
-#[derive(OneofObject, Debug, Clone)]
-pub enum ResourceTypeScopeInput {
-    AnyType(bool),
-    Types(Vec<ResourceTypeSelectorInput>),
+/// One resource type in a scope, with the query narrowing it.
+#[derive(InputObject, Debug, Clone)]
+pub struct ResourceTypeQueryInput {
+    pub resource_type: ResourceTypeSelectorInput,
+    pub query: Option<ResourceQueryInput>,
 }
 
-impl From<ResourceTypeScopeInput> for kamu_resources_facade::SearchResourceTypeScope {
-    fn from(value: ResourceTypeScopeInput) -> Self {
+impl From<ResourceTypeQueryInput> for kamu_resources_facade::RawResourceTypeQuery {
+    fn from(value: ResourceTypeQueryInput) -> Self {
+        Self {
+            raw_type_selector: value.resource_type.into_resource_type_selector(),
+            query: value.query.map(Into::into),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Every resource type, optionally narrowed by one query applying to all.
+#[derive(InputObject, Debug, Clone)]
+pub struct ResourceAnyTypeScopeInput {
+    pub query: Option<ResourceQueryInput>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Exactly one way to scope a search or listing by resource type.
+#[derive(OneofObject, Debug, Clone)]
+pub enum ResourceScopeInput {
+    AnyType(ResourceAnyTypeScopeInput),
+    Types(Vec<ResourceTypeQueryInput>),
+}
+
+impl From<ResourceScopeInput> for kamu_resources_facade::RawResourceScope {
+    fn from(value: ResourceScopeInput) -> Self {
         match value {
-            ResourceTypeScopeInput::AnyType(_) => Self::AnyType,
-            ResourceTypeScopeInput::Types(resource_types) => Self::Types(
-                resource_types
-                    .into_iter()
-                    .map(ResourceTypeSelectorInput::into_resource_type_selector)
-                    .collect(),
-            ),
+            ResourceScopeInput::AnyType(scope) => Self::AnyType(scope.query.map(Into::into)),
+            ResourceScopeInput::Types(type_queries) => {
+                Self::Types(type_queries.into_iter().map(Into::into).collect())
+            }
         }
     }
 }
@@ -204,8 +227,7 @@ impl From<ResourceTypeScopeInput> for kamu_resources_facade::SearchResourceTypeS
 
 #[derive(InputObject, Debug, Clone)]
 pub struct SearchResourceHandlesInput {
-    pub scope: ResourceTypeScopeInput,
-    pub query: ResourceSearchQueryInput,
+    pub scope: ResourceScopeInput,
     pub account: Option<AccountRefInput>,
     pub label_filter: Option<ResourceLabelFilterInput>,
 }
@@ -216,8 +238,7 @@ impl SearchResourceHandlesInput {
         pagination: PaginationOpts,
     ) -> Result<kamu_resources_facade::SearchResourceHandlesRequest, GqlError> {
         Ok(kamu_resources_facade::SearchResourceHandlesRequest {
-            type_scope: self.scope.into(),
-            query: self.query.into(),
+            scope: self.scope.into(),
             account: self.account.map(AccountRefInput::into_manifest_account),
             label_filter: into_facade_filter(self.label_filter)?,
             pagination,

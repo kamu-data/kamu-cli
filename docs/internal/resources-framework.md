@@ -826,7 +826,7 @@ pub trait ResourceFacade: Send + Sync {
 
     async fn list(&self, request: ListResourcesRequest) -> Result<Vec<ResourceSummaryView>, ...>;
     async fn list_handles(&self, request: ListResourceHandlesRequest) -> ...;
-    async fn search_handles(&self, request: SearchResourceHandlesRequest) -> ...; // request.query: ResourceSearchQuery
+    async fn search_handles(&self, request: SearchResourceHandlesRequest) -> ...; // request.scope: RawResourceScope
     async fn list_all(&self, request: ListAllResourcesRequest) -> ...;
     async fn list_all_handles(&self, request: ListAllResourceHandlesRequest) -> ...;
 
@@ -909,11 +909,17 @@ phase-2 batch calls (`get_many`, `delete_many`, `render_manifests`) structurally
 "pass `label_filter: None` by convention" precondition is now enforced by the type
 system instead of by discipline.
 
-`search_handles`'s `query: ResourceSearchQuery` field (`ExactNames(Vec<ResourceName>)`
-/ `ExactIds(Vec<ResourceID>)` / `NamePattern(String)`) replaces what used to be two
-independently-optional fields (`exact_names`, `name_pattern`) that were never
-legitimately combined — every caller set exactly one. The enum makes "exactly one
-selection mode" a type-level invariant instead of a runtime convention.
+`ResourceQuery` (`ExactNames(Vec<ResourceName>)` / `ExactIds(Vec<ResourceID>)` /
+`NamePattern(String)`) replaces what used to be two independently-optional fields
+(`exact_names`, `name_pattern`) that were never legitimately combined — every caller
+set exactly one. The enum makes "exactly one selection mode" a type-level invariant
+instead of a runtime convention.
+
+It is shared by search *and* listing: `search_handles`, `list` and `list_all` all
+narrow through the same type, so the two paths cannot drift apart on pattern or ID
+semantics. `ResourceScope` pairs each type with its own optional `ResourceQuery`,
+which is what lets one call express `vs/a-% ss/b-%`; the facade's `RawResourceScope`
+is the same shape carrying unresolved selectors (`vs`) rather than schemas.
 
 Resolution happens in the local facade, strictly before dispatch, through the same
 `ResourceExtensionSchemaResolver` used by manifest apply (`ResourceExtensionKind::Label`).
@@ -925,10 +931,10 @@ receive only the resolved predicate and never resolve aliases or touch the
 extension-schema registry.
 
 **Multi-type queries resolve the filter per schema and collapse.** `search_handles`
-may span several schemas — via `SearchResourceTypeScope::AnyType` (what the CLI's
+may span several schemas — via `RawResourceScope::AnyType` (what the CLI's
 `%` all-types token produces), or via an explicit multi-element
-`SearchResourceTypeScope::Types`, which remains available to GraphQL clients even
-though the CLI now always passes a single type there. The filter is resolved once per candidate schema and the
+`RawResourceScope::Types`, which the CLI now also uses for multi-type listings
+(`kamu list vs/a-% ss/b-%`). The filter is resolved once per candidate schema and the
 resolved trees compared: today they are always equal — the built-in `environment`
 label applies to every resource type and unregistered short names resolve to
 free-form identity — so the uniform single-predicate path is taken. The divergent
@@ -1049,9 +1055,10 @@ carries the filter, where each entry is `{ key: String!, value: JSON! }`. It is 
 `ResourceBatchSelectorInput` — used by the batch `resources`/`render_manifests` queries and the
 `delete_many` mutation — does not carry a `labelFilter` field at all.
 
-**`search_handles`'s query is a `oneOf` input.** `SearchResourceHandlesInput.query:
-ResourceSearchQueryInput!` replaces the old independently-optional `names`/`namePattern`
-fields. `ResourceSearchQueryInput` is declared `@oneOf` with three single-field
+**The resource query is a `oneOf` input.** `ResourceQueryInput` replaces the old
+independently-optional `names`/`namePattern` fields, and now also appears on
+`listByResourceType` and (nested in `ResourceScopeInput`) on `listAll`.
+`ResourceQueryInput` is declared `@oneOf` with three single-field
 variants (`exactNames: [ResourceName!]`, `exactIds: [ResourceID!]`, `namePattern: String`) —
 exactly one may be set, enforced by the GraphQL layer itself before the resolver runs. On the
 Rust side this is `#[derive(async_graphql::OneofObject)]`; the `cynic` client side has matching
@@ -1112,10 +1119,10 @@ themselves are agnostic. Selector grammar is specified below, after the semantic
 
 | Aspect | `apply` | `get` | `list` | `delete` |
 | --- | --- | --- | --- | --- |
-| Input | manifest(s): `-f <file>`, dir + `--recursive`, or `--stdin` | selector(s) | positional `target` (a type or `%`) | selector(s) |
-| Selector / target examples | n/a (identity from manifest) | `vs my-vars`, `vs/my-vars`, `secretset/db%`, `vs/%`, `%/my-vars` | `kamu list variablesets` (or `vs`, `secretsets`, `ss`, `%`) | `vs my-vars`, `vs/my%`, `vs/%` |
-| `%` name patterns | n/a | **yes** | n/a (lists whole type) | **yes** |
-| `%` type wildcards | n/a | **only bare `%`** (= all types); `%set`/`s%` rejected | n/a | **only bare `%`**; `%set`/`s%` rejected |
+| Input | manifest(s): `-f <file>`, dir + `--recursive`, or `--stdin` | selector(s) | one or more `type[/name]` targets, or `%` | selector(s) |
+| Selector / target examples | n/a (identity from manifest) | `vs my-vars`, `vs/my-vars`, `secretset/db%`, `vs/%`, `%/my-vars` | `kamu list vs`, `vs/my-%`, `vs/<id>`, `<id>`, `%`, `%/app-%`, `vs/a-% ss/b-%` | `vs my-vars`, `vs/my%`, `vs/%` |
+| `%` name patterns | n/a | **yes** | **yes** (`vs/my-%`); an exact name is a degenerate pattern, a `UUIDv4` is matched as an ID | **yes** |
+| `%` type wildcards | n/a | **only bare `%`** (= all types); `%set`/`s%` rejected | **only bare `%`**; cannot be combined with narrower selectors | **only bare `%`**; `%set`/`s%` rejected |
 | May return / act on multiple | yes (per manifest) | **yes, but bounded** — selector-driven, capped by `max_results`, `--unbounded` to lift | yes (bounded by `--max-results`/`--unbounded`) | yes |
 | Output modes | summary + changes (`--dry-run`)/warnings; verbose | `-o name` \| `-o json` \| `-o yaml`; `--spec` for apply-compatible spec | Table/CSV/JSON/Parquet (via `OutputConfig`), `-w` for wider detail | summary / dry-run preview |
 | Default secret visibility | n/a | **`Encrypted`** (ciphertext); `--revealed` to decrypt | secrets not expanded in list columns | n/a |
@@ -1124,8 +1131,26 @@ themselves are agnostic. Selector grammar is specified below, after the semantic
 | Flag semantics | default: whole batch is one transaction, a rejection/failure rolls back every manifest including earlier successes; `--continue-on-error`: apply each manifest independently so earlier successes survive a later failure; `--dry-run`: plan only, no writes | `--ignore-not-found`: skip missing selectors instead of erroring | — | `--force`: skip confirmation prompt; `--ignore-not-found`: exit OK if absent; `--dry-run`: preview resolved deletions |
 | Local vs remote | identical behavior; chosen by context (`--context` to override) | identical | identical | identical |
 
-> The `get` vs `list` boundary is intentional: `get` is for *named/selected* resources (bounded),
-> `list` is for *enumeration* (paginated). Keep `get` from growing into a second `list`.
+> The `get` vs `list` boundary is *bounded selection* vs *paginated enumeration* — not the presence
+> of name patterns, which both support. Keep `get` from growing into a second `list`, and keep
+> `list` from adopting what makes `get` a selection command: the bare same-type form
+> (`list vs a b` stays rejected), erroring when a selection overflows `--max-results` (`list`
+> truncates), and erroring when nothing matches (`list` prints an empty table).
+
+> **Column shape follows request arity, never results.** One named type renders that type's own
+> `list_columns`; two or more (and bare `%`) fall back to generic columns plus `Type`. A two-type
+> request keeps the generic shape even when only one type matches — letting the *results* decide
+> would make the output schema depend on the data, so the same command could emit different columns
+> on different days. A name pattern never changes the column shape.
+
+**`list` has its own, smaller grammar.** It never invokes `ResourceSelectionSyntaxParser`; it splits
+each target on the first `/` in
+[`list_command.rs`](/src/app/cli/src/commands/list_command.rs). Accepted: `datasets` (alone), one or
+more `type[/name]` targets, bare `%` or `%/pattern`, and a bare `UUIDv4` spanning every type. The
+name half is classified by the same `UUIDv4` rule the other commands use (shared as
+`is_resource_id`), so an ID is matched exactly and everything else is a `%` pattern. Rejected:
+mixing `datasets` with resource types, `datasets/<name>`, combining `%` with narrower selectors,
+more than one `/` in a target, and the bare same-type form (`list vs a b`) that belongs to `get`.
 
 **Selector grammar — accepted forms** (parsed by `ResourceSelectionSyntaxParser`,
 [`resource_selection_syntax_parser.rs`](/src/app/cli/src/services/resources/impl/resource_selection_syntax_parser.rs)):

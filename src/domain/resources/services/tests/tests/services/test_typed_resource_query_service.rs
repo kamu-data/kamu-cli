@@ -146,6 +146,7 @@ async fn test_list_states_filters_by_account() {
             account_handle_a.did,
             PaginationOpts::from_max_results(usize::MAX),
             ResolvedResourceLabelFilter::default(),
+            None,
         )
         .await
         .unwrap();
@@ -158,6 +159,7 @@ async fn test_list_states_filters_by_account() {
             account_handle_b.did,
             PaginationOpts::from_max_results(usize::MAX),
             ResolvedResourceLabelFilter::default(),
+            None,
         )
         .await
         .unwrap();

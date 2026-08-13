@@ -88,9 +88,8 @@ impl ResourceSelectionSyntaxParser {
         }
     }
 
-    /// Mirrors the `UUIDv4` check in `resolve_single_selector`.
     fn is_resource_id(arg: &str) -> bool {
-        uuid::Uuid::parse_str(arg).is_ok_and(|id| id.get_version() == Some(uuid::Version::Random))
+        super::resource_ref_classifier::is_resource_id(arg)
     }
 
     fn parse_ref_arg(arg: &str) -> Result<(&str, &str), CLIError> {

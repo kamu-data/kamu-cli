@@ -1262,6 +1262,19 @@ To list variable sets:
 
     kamu list variablesets
 
+To list variable sets whose name matches a pattern:
+
+    kamu list 'vs/my-%'
+
+To list one resource by name or ID:
+
+    kamu list 'vs/my-vars'
+    kamu list 3d8d6d1c-6f7c-4c62-9f4e-7d8295e8fb69
+
+To list several resource types at once:
+
+    kamu list 'vs/app-%' 'ss/app-%'
+
 To list storages from a specific context:
 
     kamu list storages --context prod
@@ -1287,10 +1300,12 @@ To get a machine-readable list of datasets:
     kamu list -o csv
 "#)]
 pub struct List {
-    /// Target to list: `datasets`, `%` (all resource types), or a resource
+    /// Targets to list: `datasets`, `%` (all resource types), a resource
     /// selector such as `variablesets`, `vs`, `secretsets`, `ss`, `storages`,
-    /// or `st`
-    pub target: Option<String>,
+    /// or `st`, optionally narrowed as `type/name`, `type/pattern-%` or
+    /// `type/<id>`. Several resource selectors may be given at once.
+    #[arg(num_args = 0..)]
+    pub targets: Vec<String>,
 
     #[command(flatten)]
     pub resource_context: ResourceContextArgs,

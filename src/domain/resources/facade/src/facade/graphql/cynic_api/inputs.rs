@@ -170,27 +170,27 @@ pub(crate) struct ApplyManifestInput {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::InputObject, Debug, Clone)]
-#[cynic(graphql_type = "ResourceSearchQueryInput")]
-pub(crate) struct ResourceSearchQueryInput {
+#[cynic(graphql_type = "ResourceQueryInput")]
+pub(crate) struct ResourceQueryInput {
     pub exact_names: Option<Vec<domain::ResourceName>>,
     pub exact_ids: Option<Vec<domain::ResourceID>>,
     pub name_pattern: Option<String>,
 }
 
-impl From<&domain::ResourceSearchQuery> for ResourceSearchQueryInput {
-    fn from(value: &domain::ResourceSearchQuery) -> Self {
+impl From<&domain::ResourceQuery> for ResourceQueryInput {
+    fn from(value: &domain::ResourceQuery) -> Self {
         match value {
-            domain::ResourceSearchQuery::ExactNames(names) => Self {
+            domain::ResourceQuery::ExactNames(names) => Self {
                 exact_names: Some(names.clone()),
                 exact_ids: None,
                 name_pattern: None,
             },
-            domain::ResourceSearchQuery::ExactIds(ids) => Self {
+            domain::ResourceQuery::ExactIds(ids) => Self {
                 exact_names: None,
                 exact_ids: Some(ids.clone()),
                 name_pattern: None,
             },
-            domain::ResourceSearchQuery::NamePattern(pattern) => Self {
+            domain::ResourceQuery::NamePattern(pattern) => Self {
                 exact_names: None,
                 exact_ids: None,
                 name_pattern: Some(pattern.clone()),
@@ -202,27 +202,42 @@ impl From<&domain::ResourceSearchQuery> for ResourceSearchQueryInput {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::InputObject, Debug, Clone)]
-#[cynic(graphql_type = "ResourceTypeScopeInput")]
-pub(crate) struct ResourceTypeScopeInput {
-    pub any_type: Option<bool>,
-    pub types: Option<Vec<ResourceTypeSelectorInput>>,
+#[cynic(graphql_type = "ResourceTypeQueryInput")]
+pub(crate) struct ResourceTypeQueryInput {
+    pub resource_type: ResourceTypeSelectorInput,
+    pub query: Option<ResourceQueryInput>,
 }
 
-impl From<&crate::SearchResourceTypeScope> for ResourceTypeScopeInput {
-    fn from(value: &crate::SearchResourceTypeScope) -> Self {
+impl From<&crate::RawResourceTypeQuery> for ResourceTypeQueryInput {
+    fn from(value: &crate::RawResourceTypeQuery) -> Self {
+        Self {
+            resource_type: ResourceTypeSelectorInput::from_resource_type(&value.raw_type_selector),
+            query: value.query.as_ref().map(Into::into),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::InputObject, Debug, Clone)]
+#[cynic(graphql_type = "ResourceScopeInput")]
+pub(crate) struct ResourceScopeInput {
+    pub any_type: Option<ResourceAnyTypeScopeInput>,
+    pub types: Option<Vec<ResourceTypeQueryInput>>,
+}
+
+impl From<&crate::RawResourceScope> for ResourceScopeInput {
+    fn from(value: &crate::RawResourceScope) -> Self {
         match value {
-            crate::SearchResourceTypeScope::AnyType => Self {
-                any_type: Some(true),
+            crate::RawResourceScope::AnyType(query) => Self {
+                any_type: Some(ResourceAnyTypeScopeInput {
+                    query: query.as_ref().map(Into::into),
+                }),
                 types: None,
             },
-            crate::SearchResourceTypeScope::Types(raw_type_selectors) => Self {
+            crate::RawResourceScope::Types(type_queries) => Self {
                 any_type: None,
-                types: Some(
-                    raw_type_selectors
-                        .iter()
-                        .map(ResourceTypeSelectorInput::from_resource_type)
-                        .collect(),
-                ),
+                types: Some(type_queries.iter().map(Into::into).collect()),
             },
         }
     }
@@ -231,10 +246,17 @@ impl From<&crate::SearchResourceTypeScope> for ResourceTypeScopeInput {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::InputObject, Debug, Clone)]
+#[cynic(graphql_type = "ResourceAnyTypeScopeInput")]
+pub(crate) struct ResourceAnyTypeScopeInput {
+    pub query: Option<ResourceQueryInput>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::InputObject, Debug, Clone)]
 #[cynic(graphql_type = "SearchResourceHandlesInput")]
 pub(crate) struct SearchResourceHandlesInput {
-    pub scope: ResourceTypeScopeInput,
-    pub query: ResourceSearchQueryInput,
+    pub scope: ResourceScopeInput,
     pub account: Option<AccountRefInput>,
     pub label_filter: Option<ResourceLabelFilterInput>,
 }
@@ -244,8 +266,7 @@ impl TryFrom<&SearchResourceHandlesRequest> for SearchResourceHandlesInput {
 
     fn try_from(value: &SearchResourceHandlesRequest) -> Result<Self, Self::Error> {
         Ok(Self {
-            scope: (&value.type_scope).into(),
-            query: (&value.query).into(),
+            scope: (&value.scope).into(),
             account: value.account.as_ref().map(Into::into),
             label_filter: value.label_filter.as_ref().map(Into::into),
         })
