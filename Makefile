@@ -41,7 +41,7 @@ KAMU_CONTAINER_RUNTIME_TYPE ?= podman
 ###############################################################################
 
 .PHONY: lint
-lint: lint-rustfmt lint-repo lint-deps clippy lint-openapi lint-sqlx
+lint: lint-rustfmt lint-cargo-toml lint-repo lint-deps lint-udeps clippy lint-openapi lint-sqlx
 
 
 .PHONY: lint-rustfmt
@@ -85,6 +85,12 @@ lint-openapi:
 lint-udeps:
 	cargo udeps --all-targets
 
+
+.PHONY: lint-udeps
+lint-cargo-toml:
+	taplo fmt --check
+	cargo sort -g -c
+
 ###############################################################################
 # Lint (with fixes)
 ###############################################################################
@@ -93,6 +99,8 @@ lint-udeps:
 lint-fix:
 	cargo clippy --workspace --all-targets --fix --allow-dirty --allow-staged --broken-code
 	cargo fmt --all
+	taplo fmt
+	cargo sort -g
 
 
 ###############################################################################

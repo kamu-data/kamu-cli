@@ -22,7 +22,8 @@ doctest = false
 
 
 [features]
-default = []
+default = [
+]
 
 
 [dependencies]
@@ -56,5 +57,8 @@ pretty_assertions = { version = "1", default-features = false, features = [
     "std",
     "unstable",
 ] }
-test-log = { version = "0.2", features = ["trace"] }
-tokio = { version = "1", default-features = false, features = [] }
+test-log = { version = "0.2", features = [
+    "trace",
+] }
+tokio = { version = "1", default-features = false, features = [
+] }

@@ -58,6 +58,8 @@ Prerequisites:
     * `cargo binstall bunyan -y` - for pretty-printing the JSON logs
     * `cargo binstall cargo-llvm-cov -y` - for test coverage
     * `cargo binstall cargo-cache -y` - to keep track of cargo cache usage
+    * `cargo install taplo-cli` - for formatting `Cargo.toml` files
+    * `cargo install cargo-sort` - for sorting `Cargo.toml` files
   * Optional - if you will be doing releases:
     * `cargo binstall cargo-edit -y` - for setting crate versions during release
     * `cargo binstall cargo-update -y` - for keeping up with major dependency updates
