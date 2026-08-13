@@ -309,7 +309,7 @@ impl UploadS3Harness {
         let catalog = {
             let mut b = dill::CatalogBuilder::new();
 
-            b.add_value(PredefinedAccountsConfig::single_tenant())
+            b.add_value(PredefinedAccountsConfig::test_single_tenant_with_id())
                 .add::<AuthenticationServiceImpl>()
                 .add::<InMemoryAccountRepository>()
                 .add::<AccessTokenServiceImpl>()

@@ -29,7 +29,6 @@ use kamu_accounts::{
     JwtAuthenticationConfig,
     JwtTokenIssuer,
     PredefinedAccountsConfig,
-    SeedDidsFromNamesInTests,
     TEST_ACCOUNT_ID,
 };
 use kamu_accounts_inmem::{
@@ -482,12 +481,13 @@ impl UploadLocalHarness {
         let catalog = {
             let mut b = dill::CatalogBuilder::new();
 
-            let mut predefined_account_configs = PredefinedAccountsConfig::single_tenant();
-            predefined_account_configs
-                .predefined
-                .push(AccountConfig::test_config_from_name(
-                    odf::AccountName::new_unchecked(ANOTHER_ACCOUNT_NAME),
-                ));
+            let mut predefined_account_configs =
+                PredefinedAccountsConfig::test_single_tenant_with_id();
+            predefined_account_configs.predefined.push(
+                AccountConfig::test_config_from_name_with_id(odf::AccountName::new_unchecked(
+                    ANOTHER_ACCOUNT_NAME,
+                )),
+            );
 
             b.add_value(CacheDir::new(cache_dir.clone()))
                 .add_value(predefined_account_configs)
@@ -510,7 +510,6 @@ impl UploadLocalHarness {
                 .add::<InMemoryRebacRepository>()
                 .add::<UpdateAccountUseCaseImpl>()
                 .add::<CreateAccountUseCaseImpl>()
-                .add_value(SeedDidsFromNamesInTests)
                 .add_value(DefaultAccountProperties::default())
                 .add_value(DefaultDatasetProperties::default())
                 .add::<DummyOutboxImpl>()
