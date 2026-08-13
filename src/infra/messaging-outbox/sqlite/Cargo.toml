@@ -23,10 +23,10 @@ doctest = false
 
 [dependencies]
 database-common = { workspace = true }
+internal-error = { workspace = true }
 messaging-outbox = { workspace = true, features = [
     "sqlx",
 ] }
-internal-error = { workspace = true }
 
 async-stream = "0.3"
 async-trait = { version = "0.1", default-features = false }

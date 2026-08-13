@@ -74,15 +74,15 @@ chrono = { version = "0.4", features = [
     "serde",
 ] }
 digest = "0.10"
-thiserror = { version = "2", default-features = false, features = [
-    "std",
-] }
 setty = { version = "1", default-features = false, features = [
     "types-bytesize",
     "types-duration-string",
 ] }
 strum = { version = "0.28", default-features = false, features = [
     "derive",
+] }
+thiserror = { version = "2", default-features = false, features = [
+    "std",
 ] }
 
 like = { version = "0.3", default-features = false }
@@ -125,16 +125,16 @@ prost = { optional = true, version = "0.14", default-features = false, features 
     "derive",
     "std",
 ] }
-tonic = { optional = true, version = "0.14", default-features = false, features = [
-    "codegen",
-    "transport",
-] }
-tonic-prost = { optional = true, version = "0.14", default-features = false }
 rand = { optional = true, version = "0.9", default-features = false }
 schemars = { optional = true, version = "1", default-features = false, features = [
     "derive",
 ] }
 sqlx = { optional = true, version = "0.8", default-features = false }
+tonic = { optional = true, version = "0.14", default-features = false, features = [
+    "codegen",
+    "transport",
+] }
+tonic-prost = { optional = true, version = "0.14", default-features = false }
 utoipa = { optional = true, version = "5", default-features = false, features = [
     "macros",
 ] }

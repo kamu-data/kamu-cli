@@ -23,10 +23,10 @@ doctest = false
 
 [dependencies]
 database-common = { workspace = true }
+internal-error = { workspace = true }
 kamu-datasets = { workspace = true, features = [
     "sqlx",
 ] }
-internal-error = { workspace = true }
 odf = { workspace = true, features = [
     "sqlx-postgres",
 ] }
@@ -55,7 +55,7 @@ internal-error = { workspace = true }
 kamu-accounts-postgres = { workspace = true }
 kamu-datasets-repo-tests = { workspace = true }
 
+test-group = { version = "1" }
 test-log = { version = "0.2", features = [
     "trace",
 ] }
-test-group = { version = "1" }

@@ -42,10 +42,10 @@ arrow = { version = "58", default-features = false }
 async-trait = "0.1"
 aws-config = "1"
 aws-credential-types = "1"
+chrono = { version = "0.4" }
 clap = { version = "4", features = [
     "derive",
 ] }
-chrono = { version = "0.4" }
 datafusion = { version = "54", features = [
     "compression",
     "crypto_expressions",

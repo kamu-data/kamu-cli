@@ -37,9 +37,9 @@ database-common = { workspace = true }
 enum-variants = { workspace = true }
 event-sourcing = { workspace = true }
 internal-error = { workspace = true }
+kamu-task-system = { workspace = true }
 messaging-outbox = { workspace = true }
 odf = { workspace = true }
-kamu-task-system = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
@@ -57,10 +57,10 @@ strum = { version = "0.28", features = [
 thiserror = { version = "2", default-features = false, features = [
     "std",
 ] }
+tokio-stream = { version = "0.1", default-features = false }
 tracing = { version = "0.1", default-features = false, features = [
     "std",
 ] }
-tokio-stream = { version = "0.1", default-features = false }
 
 # TODO: Make serde optional
 serde = { version = "1", default-features = false, features = [

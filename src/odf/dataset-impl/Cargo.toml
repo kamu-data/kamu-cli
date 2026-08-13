@@ -41,10 +41,10 @@ testing = [
 
 [dependencies]
 common-macros = { workspace = true }
-internal-error = { workspace = true }
 file-utils = { workspace = true }
-odf-dataset = { workspace = true }
+internal-error = { workspace = true }
 odf-data-utils = { workspace = true }
+odf-dataset = { workspace = true }
 odf-metadata = { workspace = true }
 odf-storage = { workspace = true }
 odf-storage-http = { optional = true, workspace = true }
@@ -89,8 +89,8 @@ futures = "0.3"
 mockall = { version = "0.14", default-features = false }
 serde_json = { version = "1", default-features = false }
 tempfile = "3"
-thiserror = { version = "2", default-features = false }
+test-group = { version = "1" }
 test-log = { version = "0.2", features = [
     "trace",
 ] }
-test-group = { version = "1" }
+thiserror = { version = "2", default-features = false }

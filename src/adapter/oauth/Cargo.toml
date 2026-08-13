@@ -24,8 +24,8 @@ doctest = false
 [dependencies]
 email-utils = { workspace = true }
 internal-error = { workspace = true }
-odf = { workspace = true }
 kamu-accounts = { workspace = true }
+odf = { workspace = true }
 
 async-trait = "0.1"
 dill = { version = "0.15", default-features = false }

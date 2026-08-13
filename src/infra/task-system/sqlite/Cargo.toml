@@ -23,8 +23,8 @@ doctest = false
 
 [dependencies]
 database-common = { workspace = true }
-odf = { workspace = true }
 kamu-task-system = { workspace = true }
+odf = { workspace = true }
 
 async-stream = "0.3"
 async-trait = { version = "0.1", default-features = false }
@@ -46,7 +46,7 @@ database-common-macros = { workspace = true }
 internal-error = { workspace = true }
 kamu-task-system-repo-tests = { workspace = true }
 
+test-group = { version = "1" }
 test-log = { version = "0.2", features = [
     "trace",
 ] }
-test-group = { version = "1" }

@@ -44,7 +44,7 @@ database-common = { workspace = true }
 database-common-macros = { workspace = true }
 kamu-search-cache-repo-tests = { workspace = true }
 
+test-group = { version = "1" }
 test-log = { version = "0.2", features = [
     "trace",
 ] }
-test-group = { version = "1" }

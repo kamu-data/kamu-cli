@@ -34,6 +34,7 @@ odf = { workspace = true, default-features = false, features = [
 argon2 = { version = "0.5" }
 chrono = { version = "0.4", default-features = false }
 dill = { version = "0.15", default-features = false }
+event-sourcing = { workspace = true }
 futures = "0.3"
 password-hash = { version = "0.5", default-features = false }
 pretty_assertions = { version = "1", default-features = false, features = [
@@ -42,4 +43,3 @@ pretty_assertions = { version = "1", default-features = false, features = [
 ] }
 rand = "0.9"
 uuid = "1"
-event-sourcing = { workspace = true }

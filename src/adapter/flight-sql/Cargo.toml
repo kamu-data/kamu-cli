@@ -22,9 +22,9 @@ doctest = false
 
 
 [dependencies]
+database-common = { workspace = true }
 kamu-accounts = { workspace = true }
 kamu-core = { workspace = true }
-database-common = { workspace = true }
 time-source = { workspace = true }
 
 arrow-flight = { version = "58", features = [

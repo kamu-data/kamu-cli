@@ -12,17 +12,17 @@ include = { workspace = true }
 edition = { workspace = true }
 publish = { workspace = true }
 
-[features]
-testing = [
-    "dep:mockall",
-]
-
 [lints]
 workspace = true
 
 
 [lib]
 doctest = false
+
+[features]
+testing = [
+    "dep:mockall",
+]
 
 
 [dependencies]

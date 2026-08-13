@@ -87,8 +87,8 @@ odf-dataset = { workspace = true }
 odf-metadata = { workspace = true }
 odf-storage = { workspace = true }
 
-odf-dataset-impl = { optional = true, workspace = true }
 odf-data-utils = { optional = true, workspace = true }
+odf-dataset-impl = { optional = true, workspace = true }
 odf-storage-http = { optional = true, workspace = true }
 odf-storage-inmem = { workspace = true }
 odf-storage-lfs = { optional = true, workspace = true }

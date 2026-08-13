@@ -23,10 +23,10 @@ doctest = false
 
 [dependencies]
 database-common = { workspace = true }
+internal-error = { workspace = true }
 messaging-outbox = { workspace = true, features = [
     "sqlx",
 ] }
-internal-error = { workspace = true }
 
 async-stream = "0.3"
 async-trait = { version = "0.1", default-features = false }
@@ -48,10 +48,10 @@ tracing = { version = "0.1", default-features = false }
 database-common-macros = { workspace = true }
 kamu-messaging-outbox-repo-tests = { workspace = true }
 
+serde = { version = "1", features = [
+    "derive",
+] }
 test-group = { version = "1" }
 test-log = { version = "0.2", features = [
     "trace",
-] }
-serde = { version = "1", features = [
-    "derive",
 ] }

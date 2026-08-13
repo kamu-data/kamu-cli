@@ -73,20 +73,20 @@ kamu = { workspace = true, features = [
     "query-extensions-nested-functions",
 ] }
 
+graphql-http = { workspace = true }
 kamu-adapter-auth-oso-rebac = { workspace = true }
 kamu-adapter-auth-web3 = { workspace = true }
 kamu-adapter-flight-sql = { workspace = true }
 kamu-adapter-flow-dataset = { workspace = true }
 kamu-adapter-flow-webhook = { workspace = true }
-kamu-adapter-task-dataset = { workspace = true }
-kamu-adapter-task-webhook = { workspace = true }
 kamu-adapter-graphql = { workspace = true }
-graphql-http = { workspace = true }
 kamu-adapter-http = { workspace = true, features = [
     "e2e",
 ], default-features = false }
 kamu-adapter-oauth = { workspace = true }
 kamu-adapter-odata = { workspace = true }
+kamu-adapter-task-dataset = { workspace = true }
+kamu-adapter-task-webhook = { workspace = true }
 kamu-datafusion-cli = { workspace = true }
 odf = { workspace = true, features = [
     "datafusion",
@@ -97,54 +97,54 @@ odf = { workspace = true, features = [
 random-strings = { workspace = true }
 
 kamu-flow-system = { workspace = true }
-kamu-flow-system-services = { workspace = true }
 kamu-flow-system-inmem = { workspace = true }
 kamu-flow-system-postgres = { workspace = true }
+kamu-flow-system-services = { workspace = true }
 kamu-flow-system-sqlite = { workspace = true }
 
 kamu-task-system = { workspace = true }
-kamu-task-system-services = { workspace = true }
 kamu-task-system-inmem = { workspace = true }
 kamu-task-system-postgres = { workspace = true }
+kamu-task-system-services = { workspace = true }
 kamu-task-system-sqlite = { workspace = true }
 
 kamu-accounts = { workspace = true }
-kamu-accounts-services = { workspace = true }
 kamu-accounts-inmem = { workspace = true }
-kamu-accounts-postgres = { workspace = true }
 kamu-accounts-mysql = { workspace = true }
+kamu-accounts-postgres = { workspace = true }
+kamu-accounts-services = { workspace = true }
 kamu-accounts-sqlite = { workspace = true }
 
-kamu-datasets-services = { workspace = true }
 kamu-datasets = { workspace = true }
 kamu-datasets-inmem = { workspace = true }
 kamu-datasets-postgres = { workspace = true }
+kamu-datasets-services = { workspace = true }
 kamu-datasets-sqlite = { workspace = true }
 
-messaging-outbox = { workspace = true }
 kamu-messaging-outbox-inmem = { workspace = true }
 kamu-messaging-outbox-postgres = { workspace = true }
 kamu-messaging-outbox-sqlite = { workspace = true }
+messaging-outbox = { workspace = true }
 
 kamu-auth-rebac = { workspace = true }
 kamu-auth-rebac-inmem = { workspace = true }
-kamu-auth-rebac-services = { workspace = true }
 kamu-auth-rebac-postgres = { workspace = true }
+kamu-auth-rebac-services = { workspace = true }
 kamu-auth-rebac-sqlite = { workspace = true }
 
 kamu-webhooks = { workspace = true }
-kamu-webhooks-services = { workspace = true }
 kamu-webhooks-inmem = { workspace = true }
 kamu-webhooks-postgres = { workspace = true }
+kamu-webhooks-services = { workspace = true }
 kamu-webhooks-sqlite = { workspace = true }
 
 kamu-search = { workspace = true }
-kamu-search-services = { workspace = true }
-kamu-search-openai = { workspace = true }
-kamu-search-elasticsearch = { workspace = true }
 kamu-search-cache-inmem = { workspace = true }
 kamu-search-cache-postgres = { workspace = true }
 kamu-search-cache-sqlite = { workspace = true }
+kamu-search-elasticsearch = { workspace = true }
+kamu-search-openai = { workspace = true }
+kamu-search-services = { workspace = true }
 
 kamu-auth-web3-inmem = { workspace = true }
 kamu-auth-web3-postgres = { workspace = true }
@@ -163,11 +163,11 @@ kamu-signing-services = { workspace = true }
 reqwest = { version = "0.12", default-features = false, features = [
     "rustls-tls-webpki-roots",
 ] }
-rustls = { version = "0.23", default-features = false, features = [
-    "aws-lc-rs",
-] }
 rumqttc = { optional = true, version = "0.25", default-features = false, features = [
     "use-rustls",
+] }
+rustls = { version = "0.23", default-features = false, features = [
+    "aws-lc-rs",
 ] }
 sqlx = { version = "0.8", default-features = false, features = [
     "tls-rustls-aws-lc-rs",
@@ -219,14 +219,18 @@ utoipa-axum = { version = "0.2", default-features = true, features = [
 ] }
 
 # Web UI
+mime = "0.3"
+mime_guess = "2"
 rust-embed = { optional = true, version = "8", features = [
     "compression",
     "interpolate-folder-path",
 ] }
-mime = "0.3"
-mime_guess = "2"
 
 # Config
+serde = { version = "1", features = [
+    "derive",
+] }
+serde_yaml = { package = "serde_yaml_ng", version = "0.10" }
 setty = { version = "1.0", features = [
     "case-enums-any",
     "case-enums-pascal",
@@ -246,15 +250,13 @@ setty = { version = "1.0", features = [
     "types-duration-string",
     "types-url",
 ] }
-serde = { version = "1", features = [
-    "derive",
-] }
-serde_yaml = { package = "serde_yaml_ng", version = "0.10" }
 
 # Tracing / logging / telemetry / metrics
 prometheus = { version = "0.14", default-features = false }
 tracing = "0.1"
 tracing-appender = "0.2"
+tracing-bunyan-formatter = "0.3"
+tracing-log = "0.2"
 tracing-perfetto = { workspace = true }
 tracing-subscriber = { version = "0.3", default-features = false, features = [
     "ansi",
@@ -262,13 +264,11 @@ tracing-subscriber = { version = "0.3", default-features = false, features = [
     "fmt",
     "std",
 ] }
-tracing-log = "0.2"
-tracing-bunyan-formatter = "0.3"
 
 # Utils
 async-trait = "0.1"
-chrono = "0.4"
 cfg-if = "1" # Conditional compilation
+chrono = "0.4"
 datafusion = { version = "54", default-features = false, features = [
     "compression",
     "crypto_expressions",
@@ -291,6 +291,9 @@ libc = "0.2" # Signal names
 regex = "1"
 secrecy = "0.10"
 shlex = "1" # Parsing partial input for custom completions
+strum = { version = "0.28", features = [
+    "derive",
+] }
 tempfile = "3"
 thiserror = { version = "2", default-features = false, features = [
     "std",
@@ -308,9 +311,6 @@ tokio-util = { version = "0.7", default-features = false, features = [
 url = "2"
 urlencoding = "2"
 whoami = "1.6"
-strum = { version = "0.28", features = [
-    "derive",
-] }
 
 
 [target.'cfg(unix)'.dependencies]

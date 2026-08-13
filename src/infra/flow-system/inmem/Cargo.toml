@@ -23,8 +23,8 @@ doctest = false
 
 [dependencies]
 database-common = { workspace = true }
-odf = { workspace = true }
 messaging-outbox = { workspace = true }
+odf = { workspace = true }
 time-source = { workspace = true }
 
 kamu-flow-system = { workspace = true }

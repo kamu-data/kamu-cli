@@ -37,25 +37,25 @@ odf-metadata = { workspace = true, features = [
     "arrow",
 ] }
 
-async-trait = "0.1"
 arrow = { version = "58", default-features = false }
 arrow-digest = { version = "58", default-features = false }
 arrow-json = { version = "58", default-features = false }
 arrow-schema = { version = "58", default-features = false, features = [
     "serde",
 ] }
+async-trait = "0.1"
 digest = "0.10"
 hex = "0.4"
 parquet = { version = "58", default-features = false }
-sha3 = "0.10"
-tracing = { version = "0.1", default-features = false }
-thiserror = { version = "2", default-features = false, features = [
-    "std",
-] }
-url = "2"
 serde = { version = "1", default-features = false }
 serde_json = { version = "1", default-features = false }
 serde_yaml = { package = "serde_yaml_ng", version = "0.10", default-features = false }
+sha3 = "0.10"
+thiserror = { version = "2", default-features = false, features = [
+    "std",
+] }
+tracing = { version = "0.1", default-features = false }
+url = "2"
 
 # Optional
 datafusion = { optional = true, version = "54", default-features = false, features = [

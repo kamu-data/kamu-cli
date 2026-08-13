@@ -194,10 +194,10 @@ datafusion-ethers = { optional = true, version = "54", features = [
     "eip712",
 ] }
 datafusion-functions-json = { optional = true, version = "0.54" }
-rumqttc = { optional = true, version = "0.25", default-features = false, features = [
-] }
 mockall = { optional = true, version = "0.14", default-features = false }
 oop = { optional = true, version = "0.0.2" }
+rumqttc = { optional = true, version = "0.25", default-features = false, features = [
+] }
 
 
 [target.'cfg(unix)'.dependencies]
@@ -208,6 +208,8 @@ libc = "0.2" # For getting uid:gid
 kamu-accounts = { workspace = true, default-features = false, features = [
     "testing",
 ] }
+kamu-accounts-inmem = { workspace = true, default-features = false }
+kamu-accounts-services = { workspace = true, default-features = false }
 kamu-core = { workspace = true, default-features = false, features = [
     "testing",
 ] }
@@ -215,8 +217,6 @@ kamu-datasets-inmem = { workspace = true, default-features = false }
 kamu-datasets-services = { workspace = true, default-features = false, features = [
     "testing",
 ] }
-kamu-accounts-inmem = { workspace = true, default-features = false }
-kamu-accounts-services = { workspace = true, default-features = false }
 odf = { workspace = true, default-features = false, features = [
     "testing",
 ] }

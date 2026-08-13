@@ -54,12 +54,17 @@ axum = { version = "0.8", default-features = false, features = [
     "query",
 ] }
 http = { version = "1", default-features = false }
+pin-project-lite = { version = "0.2" }
 serde = { version = "1", default-features = false, features = [
     "derive",
 ] }
 serde_json = { version = "1", default-features = false }
 thiserror = { version = "2", default-features = false, features = [
     "std",
+] }
+tower = { version = "0.5", default-features = false }
+tower-http = { version = "0.6", default-features = false, features = [
+    "trace",
 ] }
 tracing = { version = "0.1", default-features = false }
 tracing-appender = { version = "0.2", default-features = false }
@@ -68,25 +73,20 @@ tracing-subscriber = { version = "0.3", features = [
     "json",
     "tracing-log",
 ] }
-pin-project-lite = { version = "0.2" }
-tower = { version = "0.5", default-features = false }
-tower-http = { version = "0.6", default-features = false, features = [
-    "trace",
-] }
 
 dill = { optional = true, version = "0.15", default-features = false }
 opentelemetry = { optional = true, version = "0.31", default-features = false, features = [
     "internal-logs",
     "trace",
 ] }
-opentelemetry_sdk = { optional = true, version = "0.31", default-features = false, features = [
-    "rt-tokio",
-] }
 opentelemetry-otlp = { optional = true, version = "0.31", default-features = false, features = [
     "grpc-tonic",
     "trace",
 ] }
 opentelemetry-semantic-conventions = { optional = true, version = "0.31", default-features = false }
+opentelemetry_sdk = { optional = true, version = "0.31", default-features = false, features = [
+    "rt-tokio",
+] }
 tracing-error = { optional = true, version = "0.2", default-features = false }
 tracing-opentelemetry = { optional = true, version = "0.32", default-features = false }
 

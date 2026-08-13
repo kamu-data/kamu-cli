@@ -34,10 +34,10 @@ utoipa = [
 ]
 
 [dependencies]
-internal-error = { workspace = true }
 crypto-eip712-utils = { workspace = true, default-features = false, features = [
     "serde",
 ] }
+internal-error = { workspace = true }
 odf = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }

@@ -30,14 +30,14 @@ testing = [
 
 
 [dependencies]
+database-common = { workspace = true }
+database-common-macros = { workspace = true }
+internal-error = { workspace = true }
 kamu-adapter-task-dataset = { workspace = true }
 kamu-core = { workspace = true }
 kamu-datasets = { workspace = true }
 kamu-flow-system = { workspace = true }
 kamu-task-system = { workspace = true }
-database-common = { workspace = true }
-database-common-macros = { workspace = true }
-internal-error = { workspace = true }
 messaging-outbox = { workspace = true }
 odf = { workspace = true }
 time-source = { workspace = true }
@@ -50,8 +50,8 @@ serde = { version = "1", features = [
     "derive",
 ] }
 serde_json = { version = "1", default-features = false }
-tracing = "0.1"
 thiserror = { version = "2", default-features = false }
+tracing = "0.1"
 
 mockall = { version = "0.14", optional = true }
 
