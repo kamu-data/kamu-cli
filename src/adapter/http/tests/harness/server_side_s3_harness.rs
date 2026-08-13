@@ -84,14 +84,14 @@ impl ServerSideS3Harness {
         let account = make_server_account(options.tenancy_config);
 
         let predefined_accounts_config = match options.tenancy_config {
-            TenancyConfig::SingleTenant => PredefinedAccountsConfig::single_tenant(),
+            TenancyConfig::SingleTenant => PredefinedAccountsConfig::test_single_tenant_with_id(),
             TenancyConfig::MultiTenant => {
                 let mut predefined_accounts_config = PredefinedAccountsConfig::new();
-                predefined_accounts_config
-                    .predefined
-                    .push(AccountConfig::test_config_from_name(
-                        odf::AccountName::new_unchecked(SERVER_ACCOUNT_NAME),
-                    ));
+                predefined_accounts_config.predefined.push(
+                    AccountConfig::test_config_from_name_with_id(odf::AccountName::new_unchecked(
+                        SERVER_ACCOUNT_NAME,
+                    )),
+                );
                 predefined_accounts_config
             }
         };
@@ -149,7 +149,6 @@ impl ServerSideS3Harness {
                 .add::<AuthenticationServiceImpl>()
                 .add::<AccountServiceImpl>()
                 .add::<CreateAccountUseCaseImpl>()
-                .add_value(SeedDidsFromNamesInTests)
                 .add::<UpdateAccountUseCaseImpl>()
                 .add::<ModifyAccountPasswordUseCaseImpl>()
                 .add::<InMemoryAccountRepository>()
