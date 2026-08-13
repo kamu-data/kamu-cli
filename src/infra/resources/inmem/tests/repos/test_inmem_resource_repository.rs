@@ -194,7 +194,15 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem,
-    fixture = resource_repo_suite::test_list_resource_snapshots_by_schema,
+    fixture = resource_repo_suite::test_list_resource_snapshots_by_scope,
+    harness = InMemoryResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture = resource_repo_suite::test_list_resource_snapshots_with_queries,
     harness = InMemoryResourceRepositoryHarness
 );
 

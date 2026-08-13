@@ -15,6 +15,7 @@ use crate::{
     ResolvedResourceLabelFilter,
     ResourceID,
     ResourceIDNotFoundError,
+    ResourceQuery,
     ResourceTypeMismatchError,
 };
 
@@ -38,6 +39,7 @@ pub trait TypedResourceQueryService<R: DeclarativeResource>: Send + Sync {
         account_id: odf::AccountID,
         pagination: PaginationOpts,
         label_filter: ResolvedResourceLabelFilter,
+        query: Option<ResourceQuery>,
     ) -> Result<Vec<R::ResourceState>, InternalError>;
 }
 

@@ -9,7 +9,7 @@
 
 use database_common::PaginationOpts;
 use kamu_configuration::VariableSetResource;
-use kamu_resources::{ResourceAccountRef, ResourceID, ResourceSchemaProvider, ResourceSearchQuery};
+use kamu_resources::{ResourceAccountRef, ResourceID, ResourceQuery, ResourceSchemaProvider};
 use kamu_resources_facade::{
     ApplyManifestError,
     ApplyManifestRequest,
@@ -20,6 +20,7 @@ use kamu_resources_facade::{
     ListResourceHandlesRequest,
     ListResourcesError,
     ListResourcesRequest,
+    RawResourceScope,
     ResolveManifestAccountError,
     ResourceBatchSelector,
     ResourceManifestFormat,
@@ -27,7 +28,6 @@ use kamu_resources_facade::{
     ResourceSelector,
     ResourcesSummaryRequest,
     SearchResourceHandlesRequest,
-    SearchResourceTypeScope,
     SpecViewMode,
 };
 use pretty_assertions::{assert_eq, assert_matches};
@@ -327,6 +327,7 @@ pub async fn test_account_name_id_mismatch_is_rejected(h: &impl FacadeContractHa
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
             label_filter: None,
+            query: None,
         })
         .await
         .unwrap();
@@ -350,6 +351,7 @@ pub async fn test_unknown_account_is_rejected(h: &impl FacadeContractHarness) {
             account: Some(unknown_account_by_name()),
             pagination: PaginationOpts::from_max_results(1000),
             label_filter: None,
+            query: None,
         })
         .await;
     let by_id = facade
@@ -357,6 +359,7 @@ pub async fn test_unknown_account_is_rejected(h: &impl FacadeContractHarness) {
             account: Some(unknown_account_by_id()),
             label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
+            scope: RawResourceScope::AnyType(None),
         })
         .await;
 
@@ -458,10 +461,10 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
 
     let alice_search = alice
         .search_handles(SearchResourceHandlesRequest {
-            type_scope: SearchResourceTypeScope::Types(vec![
+            scope: RawResourceScope::one_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-            ]),
-            query: ResourceSearchQuery::NamePattern("acct-%".to_string()),
+                Some(ResourceQuery::NamePattern("acct-%".to_string())),
+            ),
             account: None,
             label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
@@ -470,10 +473,10 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
         .unwrap();
     let bob_search = bob
         .search_handles(SearchResourceHandlesRequest {
-            type_scope: SearchResourceTypeScope::Types(vec![
+            scope: RawResourceScope::one_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-            ]),
-            query: ResourceSearchQuery::NamePattern("acct-%".to_string()),
+                Some(ResourceQuery::NamePattern("acct-%".to_string())),
+            ),
             account: None,
             label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
@@ -502,6 +505,7 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
             account: None,
             label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
+            scope: RawResourceScope::AnyType(None),
         })
         .await
         .unwrap();

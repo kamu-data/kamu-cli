@@ -86,8 +86,7 @@ pub trait ResourceRepository: Send + Sync {
     async fn search_resource_handles(
         &self,
         account_id: &odf::AccountID,
-        scope: &ResourceTypeScope,
-        query: &ResourceSearchQuery,
+        scope: &ResourceScope,
         label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceHandleRow>, InternalError>;
@@ -95,8 +94,7 @@ pub trait ResourceRepository: Send + Sync {
     async fn count_search_resource_handles(
         &self,
         account_id: &odf::AccountID,
-        scope: &ResourceTypeScope,
-        query: &ResourceSearchQuery,
+        scope: &ResourceScope,
         label_filter: &ResolvedResourceLabelFilter,
     ) -> Result<usize, InternalError>;
 
@@ -129,19 +127,12 @@ pub trait ResourceRepository: Send + Sync {
         pagination: PaginationOpts,
     ) -> ResourceIDStream<'_>;
 
-    fn list_resource_snapshots_by_schema(
-        &self,
-        account_id: odf::AccountID,
-        schema: &TypeUri,
-        pagination: PaginationOpts,
-        label_filter: &ResolvedResourceLabelFilter,
-    ) -> ResourceSnapshotStream<'_>;
-
-    /// Spans every schema the account owns, so `label_filter` must be one that
+    /// Spans the schemas named by `scope`, so `label_filter` must be one that
     /// resolves identically for all of them.
-    fn list_all_resource_snapshots(
+    fn list_resource_snapshots(
         &self,
-        account_id: odf::AccountID,
+        account_id: &odf::AccountID,
+        scope: &ResourceScope,
         label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
     ) -> ResourceSnapshotStream<'_>;
@@ -160,37 +151,16 @@ pub trait ResourceRepository: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Which schemas a `search_resource_handles` call is scoped to.
-#[derive(Debug, Clone)]
-pub enum ResourceTypeScope {
-    /// No schema filter — matches every registered resource type.
-    AnyType,
-    /// Non-empty by construction: use `AnyType` instead of an empty list.
-    Types(Vec<TypeUri>),
-}
-
-impl ResourceTypeScope {
-    /// Panics if `schemas` is empty — callers must use `AnyType` for that.
-    pub fn types(schemas: Vec<TypeUri>) -> Self {
-        assert!(
-            !schemas.is_empty(),
-            "ResourceTypeScope::Types must not be empty; use AnyType instead"
-        );
-        Self::Types(schemas)
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Exactly one way to narrow a `search_resource_handles` call.
-#[derive(Debug, Clone)]
-pub enum ResourceSearchQuery {
+/// Exactly one way to narrow a resource search or listing to specific
+/// resources within a type.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ResourceQuery {
     ExactNames(Vec<ResourceName>),
     ExactIds(Vec<ResourceID>),
     NamePattern(String),
 }
 
-impl ResourceSearchQuery {
+impl ResourceQuery {
     /// An empty `ExactNames`/`ExactIds` list can never match anything.
     pub fn is_vacuous(&self) -> bool {
         match self {
@@ -198,6 +168,69 @@ impl ResourceSearchQuery {
             Self::ExactIds(ids) => ids.is_empty(),
             Self::NamePattern(_) => false,
         }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// One resource type in a scope, with the query that narrows it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResourceTypeQuery {
+    pub schema: TypeUri,
+    pub query: Option<ResourceQuery>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Which resources a search or listing spans: the types, plus the query
+/// narrowing each one.
+///
+/// A per-type query is what lets one call express `vs/a-% ss/b-%`, where each
+/// type carries a different query.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ResourceScope {
+    /// Every registered resource type, optionally narrowed by one query that
+    /// applies uniformly.
+    AnyType(Option<ResourceQuery>),
+    /// Non-empty by construction: use `AnyType` instead of an empty list.
+    Types(Vec<ResourceTypeQuery>),
+}
+
+impl ResourceScope {
+    /// Panics if `types` is empty — callers must use `AnyType` for that.
+    pub fn types(types: Vec<ResourceTypeQuery>) -> Self {
+        assert!(
+            !types.is_empty(),
+            "ResourceScope::Types must not be empty; use AnyType instead"
+        );
+        Self::Types(types)
+    }
+
+    /// The common single-type case, with or without a query.
+    pub fn one_type(schema: TypeUri, query: Option<ResourceQuery>) -> Self {
+        Self::Types(vec![ResourceTypeQuery { schema, query }])
+    }
+
+    /// Every type, narrowed by one query applying to all of them.
+    pub fn any_type_with_query(query: ResourceQuery) -> Self {
+        Self::AnyType(Some(query))
+    }
+
+    /// Whether no resource can possibly match, so callers can skip the query
+    /// entirely.
+    pub fn is_vacuous(&self) -> bool {
+        match self {
+            Self::AnyType(query) => query.as_ref().is_some_and(ResourceQuery::is_vacuous),
+            Self::Types(types) => types
+                .iter()
+                .all(|entry| entry.query.as_ref().is_some_and(ResourceQuery::is_vacuous)),
+        }
+    }
+}
+
+impl Default for ResourceScope {
+    fn default() -> Self {
+        Self::AnyType(None)
     }
 }
 

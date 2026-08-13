@@ -268,6 +268,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
                 account_id: target_account.did,
                 pagination: request.pagination,
                 label_filter,
+                query: request.query,
             })
             .await
             .map_err(Into::into)
@@ -295,9 +296,9 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 
         let snapshots = self
             .generic_resource_query_service
-            .list_snapshots_by_schema(
-                target_account.did,
-                &schema,
+            .list_snapshots(
+                &target_account.did,
+                &ResourceScope::one_type(schema, None),
                 &label_filter,
                 request.pagination,
             )
@@ -310,40 +311,33 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         &self,
         request: SearchResourceHandlesRequest,
     ) -> Result<SearchResourceHandlesResponse, ListResourcesError> {
+        let target_account = self
+            .resource_account_resolver
+            .resolve_target_account(request.account.as_ref())
+            .await?;
+
+        let (scope, label_filter) = self.resolve_scope(request.scope, request.label_filter)?;
+
         // Empty exact-name/id queries are vacuous.
-        if request.query.is_vacuous() {
+        if scope.is_vacuous() {
             return Ok(SearchResourceHandlesResponse {
                 items: Vec::new(),
                 total_count: 0,
             });
         }
 
-        let target_account = self
-            .resource_account_resolver
-            .resolve_target_account(request.account.as_ref())
-            .await?;
-
-        let (scope, label_filter) =
-            self.resolve_search_type_scope(request.type_scope, request.label_filter)?;
-
         let rows = self
             .generic_resource_query_service
             .search_resource_handles(
                 &target_account.did,
                 &scope,
-                &request.query,
                 &label_filter,
                 request.pagination,
             )
             .await?;
         let total_count = self
             .generic_resource_query_service
-            .count_search_resource_handles(
-                &target_account.did,
-                &scope,
-                &request.query,
-                &label_filter,
-            )
+            .count_search_resource_handles(&target_account.did, &scope, &label_filter)
             .await?;
 
         let items = rows
@@ -363,11 +357,20 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .resolve_target_account(request.account.as_ref())
             .await?;
 
-        let label_filter = self.resolve_label_filter_for_all_schemas(request.label_filter)?;
+        let (scope, label_filter) = self.resolve_scope(request.scope, request.label_filter)?;
+
+        if scope.is_vacuous() {
+            return Ok(Vec::new());
+        }
 
         let snapshots = self
             .generic_resource_query_service
-            .list_all_snapshots(target_account.did, &label_filter, request.pagination)
+            .list_snapshots(
+                &target_account.did,
+                &scope,
+                &label_filter,
+                request.pagination,
+            )
             .await?;
 
         Ok(snapshots.into_iter().map(Into::into).collect())
@@ -386,7 +389,12 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 
         let snapshots = self
             .generic_resource_query_service
-            .list_all_snapshots(target_account.did, &label_filter, request.pagination)
+            .list_snapshots(
+                &target_account.did,
+                &ResourceScope::default(),
+                &label_filter,
+                request.pagination,
+            )
             .await?;
 
         Ok(map_snapshots_to_handles(snapshots))
@@ -684,34 +692,40 @@ impl LocalResourceFacadeImpl {
             .map_err(Into::into)
     }
 
-    /// Resolves a search request's type scope and label filter together,
-    /// since narrowing to applicable schemas requires resolving the filter.
-    fn resolve_search_type_scope(
+    /// Resolves a request's scope and label filter together, since narrowing to
+    /// applicable schemas requires resolving the filter.
+    ///
+    /// Each type keeps its own query through resolution, so a multi-type scope
+    /// like `vs/a-% ss/b-%` stays intact.
+    fn resolve_scope(
         &self,
-        type_scope: SearchResourceTypeScope,
+        scope: RawResourceScope,
         label_filter: Option<ResourceLabelFilterInput>,
-    ) -> Result<(ResourceTypeScope, ResolvedResourceLabelFilter), ListResourcesError> {
-        let raw_type_selectors = match type_scope {
-            SearchResourceTypeScope::AnyType if label_filter.is_none() => {
+    ) -> Result<(ResourceScope, ResolvedResourceLabelFilter), ListResourcesError> {
+        let raw_type_queries = match scope {
+            RawResourceScope::AnyType(query) if label_filter.is_none() => {
                 return Ok((
-                    ResourceTypeScope::AnyType,
+                    ResourceScope::AnyType(query),
                     ResolvedResourceLabelFilter::default(),
                 ));
             }
             // A label filter still needs a concrete schema to resolve label keys
             // against, so `AnyType` falls back to every registered schema here.
-            SearchResourceTypeScope::AnyType => self
+            RawResourceScope::AnyType(query) => self
                 .list_resource_type_descriptors()
                 .into_iter()
-                .map(|descriptor| descriptor.canonical_selector.into())
+                .map(|descriptor| RawResourceTypeQuery {
+                    raw_type_selector: descriptor.canonical_selector.into(),
+                    query: query.clone(),
+                })
                 .collect(),
-            SearchResourceTypeScope::Types(raw_type_selectors) => raw_type_selectors,
+            RawResourceScope::Types(raw_type_queries) => raw_type_queries,
         };
 
-        let schemas = raw_type_selectors
+        let schemas = raw_type_queries
             .iter()
-            .map(|resource_type| {
-                self.resolve_schema_for_selector::<ListResourcesError>(resource_type)
+            .map(|entry| {
+                self.resolve_schema_for_selector::<ListResourcesError>(&entry.raw_type_selector)
             })
             .collect::<Result<Vec<_>, _>>()?;
 
@@ -727,20 +741,18 @@ impl LocalResourceFacadeImpl {
             &resource_schema_ids,
         )?;
 
-        let schemas = schemas
+        let type_queries = schemas
             .into_iter()
             .zip(&resource_schema_ids)
-            .filter(|(_, schema_id)| applicable_schema_ids.contains(schema_id))
-            .map(|(schema, _)| schema)
+            .zip(raw_type_queries)
+            .filter(|((_, schema_id), _)| applicable_schema_ids.contains(schema_id))
+            .map(|((schema, _), entry)| ResourceTypeQuery {
+                schema,
+                query: entry.query,
+            })
             .collect::<Vec<_>>();
 
-        let scope = if schemas.is_empty() {
-            ResourceTypeScope::Types(Vec::new())
-        } else {
-            ResourceTypeScope::types(schemas)
-        };
-
-        Ok((scope, resolved_label_filter))
+        Ok((ResourceScope::Types(type_queries), resolved_label_filter))
     }
 
     async fn resolve_resource_view<E>(&self, selector: ResourceSelector) -> Result<Resource, E>

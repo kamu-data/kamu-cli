@@ -51,14 +51,29 @@ const NAME_APP_PATTERN: &str = "app-%";
 const NAME_MISSING_PATTERN: &str = "missing-%";
 const RESOURCE_DB_CREDS: &str = "db-creds";
 
-fn raw_selector_strings(type_scope: &kamu_resources_facade::SearchResourceTypeScope) -> Vec<&str> {
-    match type_scope {
-        kamu_resources_facade::SearchResourceTypeScope::AnyType => {
+/// The single query a scope carries, for scopes that apply one uniformly.
+fn scope_query(scope: &kamu_resources_facade::RawResourceScope) -> &kamu_resources::ResourceQuery {
+    match scope {
+        kamu_resources_facade::RawResourceScope::AnyType(query) => {
+            query.as_ref().expect("expected a query")
+        }
+        kamu_resources_facade::RawResourceScope::Types(type_queries) => type_queries
+            .first()
+            .expect("expected at least one type")
+            .query
+            .as_ref()
+            .expect("expected a query"),
+    }
+}
+
+fn raw_selector_strings(scope: &kamu_resources_facade::RawResourceScope) -> Vec<&str> {
+    match scope {
+        kamu_resources_facade::RawResourceScope::AnyType(_) => {
             panic!("expected a concrete type list, got AnyType")
         }
-        kamu_resources_facade::SearchResourceTypeScope::Types(selectors) => selectors
+        kamu_resources_facade::RawResourceScope::Types(type_queries) => type_queries
             .iter()
-            .map(kamu_resources::ResourceTypeSelectorRaw::as_str)
+            .map(|entry| entry.raw_type_selector.as_str())
             .collect(),
     }
 }
@@ -108,12 +123,12 @@ async fn resolves_exact_type_name_patterns_via_search() {
     let requests = search_requests.lock().unwrap();
     assert_eq!(requests.len(), 1);
     assert_eq!(
-        raw_selector_strings(&requests[0].type_scope),
+        raw_selector_strings(&requests[0].scope),
         vec![VARIABLESETS_NAME]
     );
     assert_matches!(
-        &requests[0].query,
-        kamu_resources::ResourceSearchQuery::NamePattern(p) if p == NAME_APP_PATTERN
+        scope_query(&requests[0].scope),
+        kamu_resources::ResourceQuery::NamePattern(p) if p == NAME_APP_PATTERN
     );
 }
 
@@ -239,12 +254,12 @@ async fn exact_any_type_searches_across_every_supported_type() {
     let requests = search_requests.lock().unwrap();
     assert_eq!(requests.len(), 1);
     assert_matches!(
-        &requests[0].type_scope,
-        kamu_resources_facade::SearchResourceTypeScope::AnyType
+        &requests[0].scope,
+        kamu_resources_facade::RawResourceScope::AnyType(_)
     );
     assert_matches!(
-        &requests[0].query,
-        kamu_resources::ResourceSearchQuery::ExactIds(ids) if ids == &vec![id]
+        scope_query(&requests[0].scope),
+        kamu_resources::ResourceQuery::ExactIds(ids) if ids == &vec![id]
     );
 }
 
@@ -356,12 +371,12 @@ async fn resolves_any_type_exact_ref_across_every_supported_type() {
     let requests = search_requests.lock().unwrap();
     assert_eq!(requests.len(), 1);
     assert_matches!(
-        &requests[0].type_scope,
-        kamu_resources_facade::SearchResourceTypeScope::AnyType
+        &requests[0].scope,
+        kamu_resources_facade::RawResourceScope::AnyType(_)
     );
     assert_matches!(
-        &requests[0].query,
-        kamu_resources::ResourceSearchQuery::ExactNames(names)
+        scope_query(&requests[0].scope),
+        kamu_resources::ResourceQuery::ExactNames(names)
             if names == &vec![RESOURCE_DB_CREDS.parse::<kamu_resources::ResourceName>().unwrap()]
     );
 }
@@ -431,12 +446,12 @@ async fn resolves_any_type_name_pattern_via_a_single_search() {
     let requests = search_requests.lock().unwrap();
     assert_eq!(requests.len(), 1);
     assert_matches!(
-        &requests[0].type_scope,
-        kamu_resources_facade::SearchResourceTypeScope::AnyType
+        &requests[0].scope,
+        kamu_resources_facade::RawResourceScope::AnyType(_)
     );
     assert_matches!(
-        &requests[0].query,
-        kamu_resources::ResourceSearchQuery::NamePattern(p) if p == NAME_APP_PATTERN
+        scope_query(&requests[0].scope),
+        kamu_resources::ResourceQuery::NamePattern(p) if p == NAME_APP_PATTERN
     );
     assert_eq!(
         requests[0].label_filter.as_ref(),

@@ -17,7 +17,7 @@ use domain::{
     ResourceID,
     ResourceLabelFilterInput,
     ResourceName,
-    ResourceSearchQuery,
+    ResourceQuery,
     ResourceSummaryView,
     ResourceTypeDescriptor,
     ResourceTypeSelectorRaw,
@@ -249,6 +249,8 @@ pub struct ListResourcesRequest {
     pub account: Option<ResourceAccountRef>,
     pub pagination: PaginationOpts,
     pub label_filter: Option<ResourceLabelFilterInput>,
+    /// Narrows the listing within the type; `None` lists every resource of it.
+    pub query: Option<ResourceQuery>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -265,8 +267,7 @@ pub struct ListResourceHandlesRequest {
 
 #[derive(Debug, Clone)]
 pub struct SearchResourceHandlesRequest {
-    pub type_scope: SearchResourceTypeScope,
-    pub query: ResourceSearchQuery,
+    pub scope: RawResourceScope,
     pub account: Option<ResourceAccountRef>,
     pub label_filter: Option<ResourceLabelFilterInput>,
     pub pagination: PaginationOpts,
@@ -274,13 +275,38 @@ pub struct SearchResourceHandlesRequest {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Which resource types a [`SearchResourceHandlesRequest`] is scoped to.
+/// One resource type in a [`RawResourceScope`], with the query narrowing it.
 #[derive(Debug, Clone)]
-pub enum SearchResourceTypeScope {
-    /// No type filter — matches every registered resource type.
-    AnyType,
+pub struct RawResourceTypeQuery {
+    pub raw_type_selector: ResourceTypeSelectorRaw,
+    pub query: Option<ResourceQuery>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The facade-level twin of [`kamu_resources::ResourceScope`], carrying raw
+/// type selectors (`vs`) rather than resolved schemas — the facade is where
+/// selectors are resolved.
+#[derive(Debug, Clone)]
+pub enum RawResourceScope {
+    /// No type filter — matches every registered resource type, optionally
+    /// narrowed by one query applying to all of them.
+    AnyType(Option<ResourceQuery>),
     /// Non-empty by construction: use `AnyType` instead of an empty list.
-    Types(Vec<ResourceTypeSelectorRaw>),
+    Types(Vec<RawResourceTypeQuery>),
+}
+
+impl RawResourceScope {
+    /// The common single-type case, with or without a query.
+    pub fn one_type(
+        raw_type_selector: ResourceTypeSelectorRaw,
+        query: Option<ResourceQuery>,
+    ) -> Self {
+        Self::Types(vec![RawResourceTypeQuery {
+            raw_type_selector,
+            query,
+        }])
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -299,6 +325,9 @@ pub struct ListAllResourcesRequest {
     /// Resolved against every registered schema.
     pub label_filter: Option<ResourceLabelFilterInput>,
     pub pagination: PaginationOpts,
+    /// Which types to span and how to narrow each. Defaults to every type,
+    /// unnarrowed.
+    pub scope: RawResourceScope,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

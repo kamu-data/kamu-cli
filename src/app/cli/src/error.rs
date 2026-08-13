@@ -26,7 +26,6 @@ use kamu_resources_facade::{
     BatchResourceError,
     DeleteResourceError,
     GetResourceError,
-    ListAllResourcesError,
     ListResourcesError,
     ListSupportedResourceTypesError,
     RenderResourceManifestError,
@@ -291,18 +290,6 @@ impl From<ListResourcesError> for CLIError {
             e @ (E::UnsupportedSelector(_) | E::BadAccount(_) | E::InvalidLabelFilter(_)) => {
                 Self::failure(e)
             }
-            E::RemoteRequest(err) => Self::from(err),
-            E::Internal(err) => Self::critical(err),
-        }
-    }
-}
-
-impl From<ListAllResourcesError> for CLIError {
-    fn from(e: ListAllResourcesError) -> Self {
-        use ListAllResourcesError as E;
-
-        match e {
-            e @ (E::BadAccount(_) | E::InvalidLabelFilter(_)) => Self::failure(e),
             E::RemoteRequest(err) => Self::from(err),
             E::Internal(err) => Self::critical(err),
         }

@@ -25,7 +25,9 @@ use crate::queries::{
     ResourceInvalidLabelFilterProblem,
     ResourceLabelFilterInput,
     ResourceManifestFormat,
+    ResourceQueryInput,
     ResourceRenderManifestResult,
+    ResourceScopeInput,
     ResourceSelectorInput,
     ResourceSelectorProblem,
     ResourceSelectorProblemResult,
@@ -222,6 +224,7 @@ impl Resources {
         resource_type: ResourceTypeSelectorInput,
         account: Option<AccountRefInput>,
         label_filter: Option<ResourceLabelFilterInput>,
+        query: Option<ResourceQueryInput>,
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<ResourceListOutcome> {
@@ -235,6 +238,7 @@ impl Resources {
                 account: account.map(AccountRefInput::into_manifest_account),
                 pagination: PaginationOpts::from_page(page, per_page),
                 label_filter: into_facade_filter(label_filter)?,
+                query: query.map(Into::into),
             })
             .await
         {
@@ -360,6 +364,7 @@ impl Resources {
         ctx: &Context<'_>,
         account: Option<AccountRefInput>,
         label_filter: Option<ResourceLabelFilterInput>,
+        scope: Option<ResourceScopeInput>,
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<ResourceListAllOutcome> {
@@ -372,6 +377,10 @@ impl Resources {
                 label_filter: into_facade_filter(label_filter)?,
                 account: account.map(AccountRefInput::into_manifest_account),
                 pagination: PaginationOpts::from_page(page, per_page),
+                scope: scope.map_or(
+                    kamu_resources_facade::RawResourceScope::AnyType(None),
+                    Into::into,
+                ),
             })
             .await
         {
@@ -391,7 +400,7 @@ impl Resources {
             Err(kamu_resources_facade::ListAllResourcesError::InvalidLabelFilter(error)) => {
                 Ok(ResourceListAllOutcome::InvalidLabelFilter(error.into()))
             }
-            Err(error) => Err(map_list_all_resources_error(error)),
+            Err(error) => Err(map_list_resources_error(error)),
         }
     }
 
@@ -431,7 +440,7 @@ impl Resources {
             Err(kamu_resources_facade::ListAllResourcesError::InvalidLabelFilter(error)) => Ok(
                 ResourceHandleListAllOutcome::InvalidLabelFilter(error.into()),
             ),
-            Err(error) => Err(map_list_all_resources_error(error)),
+            Err(error) => Err(map_list_resources_error(error)),
         }
     }
 
@@ -639,19 +648,6 @@ fn map_list_resources_error(error: kamu_resources_facade::ListResourcesError) ->
 
     match error {
         E::UnsupportedSelector(_) => GqlError::gql("Unsupported resource type selector"),
-        E::BadAccount(error) => map_resolve_manifest_account_error(error),
-        E::InvalidLabelFilter(error) => GqlError::gql(error.to_string()),
-        E::RemoteRequest(error) => error.int_err().into(),
-        E::Internal(error) => error.into(),
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-fn map_list_all_resources_error(error: kamu_resources_facade::ListAllResourcesError) -> GqlError {
-    use kamu_resources_facade::ListAllResourcesError as E;
-
-    match error {
         E::BadAccount(error) => map_resolve_manifest_account_error(error),
         E::InvalidLabelFilter(error) => GqlError::gql(error.to_string()),
         E::RemoteRequest(error) => error.int_err().into(),

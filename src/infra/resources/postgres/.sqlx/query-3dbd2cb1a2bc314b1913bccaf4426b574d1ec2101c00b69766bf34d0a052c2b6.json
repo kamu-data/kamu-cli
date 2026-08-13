@@ -1,0 +1,115 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                SELECT\n                    r.resource_id as \"id: uuid::Uuid\",\n                    r.account_id as \"account_id: odf::AccountID\",\n                -- LEFT JOIN: a.resource_id is NULL only when the owning account\n                -- row is gone (deletion racing async cleanup), same case the\n                -- account_name sentinel covers. Substitute the nil resource id.\n                COALESCE(a.resource_id, '00000000-0000-0000-0000-000000000000'::uuid) as \"account_resource_id!: uuid::Uuid\",\n                    COALESCE(a.account_name, $9) as \"account_name!\",\n                    r.resource_schema,\n                    r.resource_name,\n                    r.labels,\n                    r.annotations,\n                    r.spec,\n                    r.status,\n                    r.generation,\n                    r.created_at,\n                    r.updated_at,\n                    r.deleted_at,\n                    r.last_event_id\n                FROM resources r\n                LEFT JOIN accounts a ON a.id = r.account_id\n                WHERE r.account_id = $1\n                  AND r.deleted_at IS NULL\n                  -- Each type carries its own query, re-paired here. A NULL\n                  -- schema array means \"every type\", in which case the single\n                  -- row of query columns applies uniformly.\n                  AND EXISTS (\n                      SELECT 1\n                      FROM UNNEST(\n                               COALESCE($2::text[], ARRAY[NULL]::text[]),\n                               $3::text[],\n                               $4::text[],\n                               $5::text[]\n                           ) AS f(schema, name_pattern, exact_names, exact_ids)\n                      WHERE (f.schema IS NULL OR r.resource_schema = f.schema)\n                        AND (f.name_pattern IS NULL\n                             OR r.resource_name ILIKE f.name_pattern ESCAPE '\\')\n                        AND (f.exact_names IS NULL\n                             OR LOWER(r.resource_name) = ANY(STRING_TO_ARRAY(f.exact_names, ',')))\n                        AND (f.exact_ids IS NULL\n                             OR r.resource_id = ANY(CAST(STRING_TO_ARRAY(f.exact_ids, ',') AS uuid[])))\n                  )\n                  AND NOT EXISTS (\n                      SELECT 1\n                      FROM UNNEST($6::text[], $7::text[]) AS f(k, v)\n                      WHERE NOT EXISTS (\n                          SELECT 1\n                          FROM resource_labels_projection rl\n                          WHERE rl.resource_id = r.resource_id\n                            AND rl.label_key = f.k\n                            AND rl.label_value = f.v\n                      )\n                  )\n                ORDER BY r.updated_at DESC, r.resource_id DESC\n                LIMIT $8 OFFSET $10\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: uuid::Uuid",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "account_id: odf::AccountID",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "account_resource_id!: uuid::Uuid",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "account_name!",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "resource_schema",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "resource_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "labels",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 7,
+        "name": "annotations",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 8,
+        "name": "spec",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 9,
+        "name": "status",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 10,
+        "name": "generation",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 11,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 12,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 13,
+        "name": "deleted_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 14,
+        "name": "last_event_id",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "TextArray",
+        "TextArray",
+        "TextArray",
+        "TextArray",
+        "TextArray",
+        "TextArray",
+        "Int8",
+        "Varchar",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      null,
+      null,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "3dbd2cb1a2bc314b1913bccaf4426b574d1ec2101c00b69766bf34d0a052c2b6"
+}

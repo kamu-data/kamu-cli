@@ -27,6 +27,7 @@ use kamu_resources_facade::{
     ListAllResourcesRequest,
     ListResourcesError,
     ListResourcesRequest,
+    RawResourceScope,
     RenderResourceManifestError,
     ResourceBatchSelector,
     ResourceLookupProblem,
@@ -438,6 +439,7 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
             raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             pagination: PaginationOpts::from_max_results(1),
             label_filter: None,
+            query: None,
         })
         .await;
     assert_matches!(
@@ -452,6 +454,7 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
             account: Some(unknown_account.clone()),
             label_filter: None,
             pagination: PaginationOpts::from_max_results(1),
+            scope: RawResourceScope::AnyType(None),
         })
         .await;
     assert_matches!(

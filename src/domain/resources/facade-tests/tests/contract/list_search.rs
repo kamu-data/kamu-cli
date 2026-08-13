@@ -8,14 +8,15 @@
 // by the Apache License, Version 2.0.
 
 use database_common::PaginationOpts;
-use kamu_resources::{RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI, ResourceID, ResourceSearchQuery};
+use kamu_resources::{RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI, ResourceID, ResourceQuery};
 use kamu_resources_facade::{
     ListResourceHandlesRequest,
     ListResourcesError,
     ListResourcesRequest,
+    RawResourceScope,
+    RawResourceTypeQuery,
     ResourceLabelFilterProblemCode,
     SearchResourceHandlesRequest,
-    SearchResourceTypeScope,
 };
 use pretty_assertions::{assert_eq, assert_matches};
 
@@ -50,6 +51,89 @@ async fn create_resource(h: &impl FacadeContractHarness, account: TestAccount, n
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// RF-087
+contract_test!(list_narrowed_by_query, super::test_list_narrowed_by_query);
+
+/// `list` gained a query, narrowing within one type while keeping the rich
+/// summary view. Local and remote must agree, since the query travels over
+/// GraphQL.
+pub async fn test_list_narrowed_by_query(h: &impl FacadeContractHarness) {
+    for name in ["query-app-one", "query-app-two", "query-db-one"] {
+        create_resource(h, TestAccount::Alice, name).await;
+    }
+    create_resource(h, TestAccount::Bob, "query-app-bob").await;
+
+    let facade = h.facade_for(TestAccount::Alice);
+
+    let list = async |query: Option<kamu_resources::ResourceQuery>| {
+        let mut summaries = facade
+            .list(ListResourcesRequest {
+                raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+                account: None,
+                pagination: PaginationOpts::from_max_results(1000),
+                label_filter: None,
+                query,
+            })
+            .await
+            .unwrap();
+        normalize_summary_views(&mut summaries);
+        summaries
+            .into_iter()
+            .map(|summary| summary.name.to_string())
+            .collect::<Vec<_>>()
+    };
+
+    // A name pattern narrows the listing…
+    assert_eq!(
+        list(Some(kamu_resources::ResourceQuery::NamePattern(
+            "query-app-%".to_string()
+        )))
+        .await,
+        vec!["query-app-one", "query-app-two"]
+    );
+
+    // …and stays account-scoped: Bob's matching resource is not visible.
+    assert_eq!(
+        list(Some(kamu_resources::ResourceQuery::NamePattern(
+            "query-app-bob".to_string()
+        )))
+        .await,
+        Vec::<String>::new()
+    );
+
+    // Exact names.
+    assert_eq!(
+        list(Some(kamu_resources::ResourceQuery::ExactNames(vec![
+            "query-db-one".parse().unwrap()
+        ])))
+        .await,
+        vec!["query-db-one"]
+    );
+
+    // Exact IDs.
+    let id = apply_manifest_and_get_id(
+        h,
+        TestAccount::Alice,
+        variable_set_manifest_json("query-by-id", None, &[("K", "v")]),
+    )
+    .await;
+    assert_eq!(
+        list(Some(kamu_resources::ResourceQuery::ExactIds(vec![id]))).await,
+        vec!["query-by-id"]
+    );
+
+    // An empty exact list is vacuous, not an error — mirrors RF-094 for search.
+    assert_eq!(
+        list(Some(kamu_resources::ResourceQuery::ExactIds(Vec::new()))).await,
+        Vec::<String>::new()
+    );
+
+    // No query still lists the whole type.
+    assert!(list(None).await.len() >= 4);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // RF-080
 contract_test!(
     list_summaries_for_account,
@@ -70,6 +154,7 @@ pub async fn test_list_summaries_for_account(h: &impl FacadeContractHarness) {
             account: None, // default = alice
             pagination: PaginationOpts::from_max_results(1000),
             label_filter: None,
+            query: None,
         })
         .await
         .unwrap();
@@ -163,6 +248,7 @@ pub async fn test_list_supports_pagination_limit(h: &impl FacadeContractHarness)
             account: None,
             pagination: PaginationOpts::from_page(0, 2),
             label_filter: None,
+            query: None,
         })
         .await
         .unwrap();
@@ -195,6 +281,7 @@ pub async fn test_list_supports_pagination_offset(h: &impl FacadeContractHarness
             account: None,
             pagination: PaginationOpts::from_page(0, 2),
             label_filter: None,
+            query: None,
         })
         .await
         .unwrap();
@@ -204,6 +291,7 @@ pub async fn test_list_supports_pagination_offset(h: &impl FacadeContractHarness
             account: None,
             pagination: PaginationOpts::from_page(1, 2),
             label_filter: None,
+            query: None,
         })
         .await
         .unwrap();
@@ -239,6 +327,7 @@ pub async fn test_list_handles_pagination_mirrors_list(h: &impl FacadeContractHa
             account: None,
             pagination: PaginationOpts::from_page(1, 2),
             label_filter: None,
+            query: None,
         })
         .await
         .unwrap();
@@ -279,6 +368,7 @@ pub async fn test_list_empty_account_returns_empty(h: &impl FacadeContractHarnes
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
             label_filter: None,
+            query: None,
         })
         .await
         .unwrap();
@@ -314,6 +404,7 @@ pub async fn test_list_unsupported_kind_returns_error(h: &impl FacadeContractHar
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
             label_filter: None,
+            query: None,
         })
         .await;
     let handles = facade
@@ -354,13 +445,13 @@ pub async fn test_search_by_exact_names(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
     let response = facade
         .search_handles(SearchResourceHandlesRequest {
-            type_scope: SearchResourceTypeScope::Types(vec![
+            scope: RawResourceScope::one_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-            ]),
-            query: ResourceSearchQuery::ExactNames(vec![
-                "search-exact-alpha".parse().unwrap(),
-                "search-exact-beta".parse().unwrap(),
-            ]),
+                Some(ResourceQuery::ExactNames(vec![
+                    "search-exact-alpha".parse().unwrap(),
+                    "search-exact-beta".parse().unwrap(),
+                ])),
+            ),
             account: None,
             label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
@@ -389,13 +480,13 @@ pub async fn test_search_exact_names_ignores_missing(h: &impl FacadeContractHarn
     let facade = h.facade_for(TestAccount::Alice);
     let response = facade
         .search_handles(SearchResourceHandlesRequest {
-            type_scope: SearchResourceTypeScope::Types(vec![
+            scope: RawResourceScope::one_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-            ]),
-            query: ResourceSearchQuery::ExactNames(vec![
-                "search-missing-present".parse().unwrap(),
-                "search-missing-absent".parse().unwrap(),
-            ]),
+                Some(ResourceQuery::ExactNames(vec![
+                    "search-missing-present".parse().unwrap(),
+                    "search-missing-absent".parse().unwrap(),
+                ])),
+            ),
             account: None,
             label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
@@ -432,10 +523,10 @@ pub async fn test_search_by_exact_ids(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
     let response = facade
         .search_handles(SearchResourceHandlesRequest {
-            type_scope: SearchResourceTypeScope::Types(vec![
+            scope: RawResourceScope::one_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-            ]),
-            query: ResourceSearchQuery::ExactIds(vec![alpha_id, beta_id]),
+                Some(ResourceQuery::ExactIds(vec![alpha_id, beta_id])),
+            ),
             account: None,
             label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
@@ -470,10 +561,10 @@ pub async fn test_search_exact_ids_ignores_missing(h: &impl FacadeContractHarnes
     let facade = h.facade_for(TestAccount::Alice);
     let response = facade
         .search_handles(SearchResourceHandlesRequest {
-            type_scope: SearchResourceTypeScope::Types(vec![
+            scope: RawResourceScope::one_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-            ]),
-            query: ResourceSearchQuery::ExactIds(vec![present_id, missing_id]),
+                Some(ResourceQuery::ExactIds(vec![present_id, missing_id])),
+            ),
             account: None,
             label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
@@ -509,10 +600,10 @@ pub async fn test_search_exact_ids_account_scoping(h: &impl FacadeContractHarnes
     let facade = h.facade_for(TestAccount::Alice);
     let response = facade
         .search_handles(SearchResourceHandlesRequest {
-            type_scope: SearchResourceTypeScope::Types(vec![
+            scope: RawResourceScope::one_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-            ]),
-            query: ResourceSearchQuery::ExactIds(vec![bob_id]),
+                Some(ResourceQuery::ExactIds(vec![bob_id])),
+            ),
             account: None,
             label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
@@ -537,10 +628,10 @@ pub async fn test_search_by_name_pattern(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
     let response = facade
         .search_handles(SearchResourceHandlesRequest {
-            type_scope: SearchResourceTypeScope::Types(vec![
+            scope: RawResourceScope::one_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-            ]),
-            query: ResourceSearchQuery::NamePattern("search-pattern-%".to_string()),
+                Some(ResourceQuery::NamePattern("search-pattern-%".to_string())),
+            ),
             account: None,
             label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
@@ -585,11 +676,16 @@ pub async fn test_search_multi_type(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
     let response = facade
         .search_handles(SearchResourceHandlesRequest {
-            type_scope: SearchResourceTypeScope::Types(vec![
-                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-                SECRET_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            scope: RawResourceScope::Types(vec![
+                RawResourceTypeQuery {
+                    raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+                    query: Some(ResourceQuery::NamePattern("multi-type-%".to_string())),
+                },
+                RawResourceTypeQuery {
+                    raw_type_selector: SECRET_SET_CANONICAL_SELECTOR.parse().unwrap(),
+                    query: Some(ResourceQuery::NamePattern("multi-type-%".to_string())),
+                },
             ]),
-            query: ResourceSearchQuery::NamePattern("multi-type-%".to_string()),
             account: None,
             label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
@@ -654,8 +750,9 @@ pub async fn test_search_any_type(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
     let response = facade
         .search_handles(SearchResourceHandlesRequest {
-            type_scope: SearchResourceTypeScope::AnyType,
-            query: ResourceSearchQuery::NamePattern("any-type-%".to_string()),
+            scope: RawResourceScope::AnyType(Some(ResourceQuery::NamePattern(
+                "any-type-%".to_string(),
+            ))),
             account: None,
             label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
@@ -703,10 +800,10 @@ pub async fn test_search_empty_exact_names_returns_no_matches(h: &impl FacadeCon
 
     let response = facade
         .search_handles(SearchResourceHandlesRequest {
-            type_scope: SearchResourceTypeScope::Types(vec![
+            scope: RawResourceScope::one_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-            ]),
-            query: ResourceSearchQuery::ExactNames(vec![]),
+                Some(ResourceQuery::ExactNames(vec![])),
+            ),
             account: None,
             label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
@@ -734,10 +831,10 @@ pub async fn test_search_pagination_and_total_count(h: &impl FacadeContractHarne
     let facade = h.facade_for(TestAccount::Alice);
     let response = facade
         .search_handles(SearchResourceHandlesRequest {
-            type_scope: SearchResourceTypeScope::Types(vec![
+            scope: RawResourceScope::one_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-            ]),
-            query: ResourceSearchQuery::NamePattern("search-page-%".to_string()),
+                Some(ResourceQuery::NamePattern("search-page-%".to_string())),
+            ),
             account: None,
             label_filter: None,
             pagination: PaginationOpts::from_page(1, 2),
@@ -763,10 +860,10 @@ pub async fn test_search_account_scoping(h: &impl FacadeContractHarness) {
     let alice_response = h
         .facade_for(TestAccount::Alice)
         .search_handles(SearchResourceHandlesRequest {
-            type_scope: SearchResourceTypeScope::Types(vec![
+            scope: RawResourceScope::one_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-            ]),
-            query: ResourceSearchQuery::NamePattern("search-scope-%".to_string()),
+                Some(ResourceQuery::NamePattern("search-scope-%".to_string())),
+            ),
             account: None,
             label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
@@ -776,10 +873,10 @@ pub async fn test_search_account_scoping(h: &impl FacadeContractHarness) {
     let bob_response = h
         .facade_for(TestAccount::Bob)
         .search_handles(SearchResourceHandlesRequest {
-            type_scope: SearchResourceTypeScope::Types(vec![
+            scope: RawResourceScope::one_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-            ]),
-            query: ResourceSearchQuery::NamePattern("search-scope-%".to_string()),
+                Some(ResourceQuery::NamePattern("search-scope-%".to_string())),
+            ),
             account: None,
             label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
@@ -832,6 +929,7 @@ pub async fn test_list_filter_by_canonical_label_uri(h: &impl FacadeContractHarn
                 RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI,
                 "prod",
             )])),
+            query: None,
         })
         .await
         .unwrap();
@@ -868,6 +966,7 @@ pub async fn test_list_filter_by_short_label_name(h: &impl FacadeContractHarness
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
             label_filter: Some(label_filter(&[("environment", "prod")])),
+            query: None,
         })
         .await
         .unwrap();
@@ -907,6 +1006,7 @@ pub async fn test_list_filter_by_free_form_label(h: &impl FacadeContractHarness)
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
             label_filter: Some(label_filter(&[("team", "data")])),
+            query: None,
         })
         .await
         .unwrap();
@@ -931,6 +1031,7 @@ pub async fn test_list_filter_invalid_key_is_rejected(h: &impl FacadeContractHar
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
             label_filter: Some(label_filter(&[("not a valid key=", "x")])),
+            query: None,
         })
         .await;
 
@@ -960,6 +1061,7 @@ pub async fn test_list_filter_unknown_uri_is_rejected(h: &impl FacadeContractHar
                 "https://kamu.dev/schemas/resource/v1alpha1/labels/DoesNotExist",
                 "x",
             )])),
+            query: None,
         })
         .await;
 
@@ -994,6 +1096,7 @@ pub async fn test_list_filter_non_string_value_is_rejected(h: &impl FacadeContra
                     serde_json::json!({"not": "a string"}),
                 )]),
             }),
+            query: None,
         })
         .await;
 
@@ -1025,6 +1128,7 @@ pub async fn test_list_filter_duplicate_after_canonicalization_is_rejected(
                 ("environment", "prod"),
                 (RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI, "prod"),
             ])),
+            query: None,
         })
         .await;
 
@@ -1059,6 +1163,7 @@ pub async fn test_list_filter_not_operator_is_rejected(h: &impl FacadeContractHa
                     serde_json::json!({"environment": "prod"}),
                 )]),
             }),
+            query: None,
         })
         .await;
 
@@ -1093,6 +1198,7 @@ pub async fn test_list_filter_or_operator_is_rejected(h: &impl FacadeContractHar
                     serde_json::json!([{"environment": "prod"}, {"environment": "staging"}]),
                 )]),
             }),
+            query: None,
         })
         .await;
 
@@ -1127,6 +1233,7 @@ pub async fn test_list_filter_malformed_not_operator_is_rejected(h: &impl Facade
                     serde_json::json!("not-an-object"),
                 )]),
             }),
+            query: None,
         })
         .await;
 
@@ -1167,10 +1274,10 @@ pub async fn test_search_handles_filter_narrows_candidates(h: &impl FacadeContra
 
     let response = facade
         .search_handles(SearchResourceHandlesRequest {
-            type_scope: SearchResourceTypeScope::Types(vec![
+            scope: RawResourceScope::one_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-            ]),
-            query: ResourceSearchQuery::NamePattern("search-filter-%".to_string()),
+                Some(ResourceQuery::NamePattern("search-filter-%".to_string())),
+            ),
             account: None,
             label_filter: Some(label_filter(&[("environment", "prod")])),
             pagination: PaginationOpts::from_max_results(1000),

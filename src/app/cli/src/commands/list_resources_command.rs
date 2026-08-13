@@ -26,6 +26,7 @@ use kamu_resources::{
     ResourceListColumnDescriptor,
     ResourceListColumnValue,
     ResourceListColumnVisibility,
+    ResourceQuery,
     ResourceSummaryView,
     ResourceTypeDescriptor,
     resource_type_name,
@@ -114,8 +115,8 @@ impl ListResourcesCommand {
 
     fn selected_resource_columns(&self) -> Vec<ResourceListColumnDescriptor> {
         match &self.scope {
-            ListResourcesScope::All => Vec::new(),
-            ListResourcesScope::ByType(type_descriptor) => type_descriptor
+            ListResourcesScope::All(_) | ListResourcesScope::Types(_) => Vec::new(),
+            ListResourcesScope::ByType(type_descriptor, _) => type_descriptor
                 .list_columns
                 .iter()
                 .filter(|column| {
@@ -129,7 +130,7 @@ impl ListResourcesCommand {
     }
 
     fn is_all_scope(&self) -> bool {
-        matches!(self.scope, ListResourcesScope::All)
+        self.scope.is_generic()
     }
 
     fn resource_schema(&self, extra_columns: &[ResourceListColumnDescriptor]) -> Arc<Schema> {
@@ -276,6 +277,7 @@ impl ListResourcesCommand {
     async fn list_resources_by_selector(
         &self,
         selector_name: &kamu_resources::ResourceSelectorName,
+        query: Option<&ResourceQuery>,
     ) -> Result<Vec<ResourceSummaryView>, CLIError> {
         if let Some(max_results) = self.max_results {
             self.resource_facade
@@ -284,6 +286,7 @@ impl ListResourcesCommand {
                     account: None,
                     pagination: PaginationOpts::from_max_results(max_results.get()),
                     label_filter: self.label_filter.clone(),
+                    query: query.cloned(),
                 })
                 .await
                 .map_err(Into::into)
@@ -295,6 +298,7 @@ impl ListResourcesCommand {
                         account: None,
                         pagination,
                         label_filter: self.label_filter.clone(),
+                        query: query.cloned(),
                     })
                     .await
                     .map_err(Into::into)
@@ -303,13 +307,17 @@ impl ListResourcesCommand {
         }
     }
 
-    async fn list_all_resources(&self) -> Result<Vec<ResourceSummaryView>, CLIError> {
+    async fn list_all_resources(
+        &self,
+        scope: &kamu_resources_facade::RawResourceScope,
+    ) -> Result<Vec<ResourceSummaryView>, CLIError> {
         if let Some(max_results) = self.max_results {
             self.resource_facade
                 .list_all(kamu_resources_facade::ListAllResourcesRequest {
                     account: None,
                     label_filter: self.label_filter.clone(),
                     pagination: PaginationOpts::from_max_results(max_results.get()),
+                    scope: scope.clone(),
                 })
                 .await
                 .map_err(Into::into)
@@ -320,6 +328,7 @@ impl ListResourcesCommand {
                         account: None,
                         label_filter: self.label_filter.clone(),
                         pagination,
+                        scope: scope.clone(),
                     })
                     .await
                     .map_err(Into::into)
@@ -330,24 +339,48 @@ impl ListResourcesCommand {
 
     async fn load_resources(&self) -> Result<Vec<ResourceSummaryView>, CLIError> {
         match &self.scope {
-            ListResourcesScope::ByType(type_descriptor) => {
+            ListResourcesScope::ByType(type_descriptor, query) => {
                 let mut resources = self
-                    .list_resources_by_selector(&type_descriptor.canonical_selector)
+                    .list_resources_by_selector(&type_descriptor.canonical_selector, query.as_ref())
                     .await?;
                 resources.sort_by(|lhs, rhs| lhs.name.cmp(&rhs.name));
                 Ok(resources)
             }
-            ListResourcesScope::All => {
-                let mut resources = self.list_all_resources().await?;
-                resources.sort_by(|lhs, rhs| {
-                    lhs.name
-                        .cmp(&rhs.name)
-                        .then_with(|| lhs.schema.cmp(&rhs.schema))
-                        .then_with(|| lhs.id.to_string().cmp(&rhs.id.to_string()))
-                });
-                Ok(resources)
+            ListResourcesScope::Types(type_queries) => {
+                let scope = kamu_resources_facade::RawResourceScope::Types(
+                    type_queries
+                        .iter()
+                        .map(|(type_descriptor, query)| {
+                            kamu_resources_facade::RawResourceTypeQuery {
+                                raw_type_selector: (&type_descriptor.canonical_selector).into(),
+                                query: query.clone(),
+                            }
+                        })
+                        .collect(),
+                );
+                self.load_generic_resources(&scope).await
+            }
+            ListResourcesScope::All(query) => {
+                self.load_generic_resources(&kamu_resources_facade::RawResourceScope::AnyType(
+                    query.clone(),
+                ))
+                .await
             }
         }
+    }
+
+    async fn load_generic_resources(
+        &self,
+        scope: &kamu_resources_facade::RawResourceScope,
+    ) -> Result<Vec<ResourceSummaryView>, CLIError> {
+        let mut resources = self.list_all_resources(scope).await?;
+        resources.sort_by(|lhs, rhs| {
+            lhs.name
+                .cmp(&rhs.name)
+                .then_with(|| lhs.schema.cmp(&rhs.schema))
+                .then_with(|| lhs.id.to_string().cmp(&rhs.id.to_string()))
+        });
+        Ok(resources)
     }
 
     fn make_writer(
@@ -537,10 +570,29 @@ impl Command for ListResourcesCommand {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// What `kamu list` was asked to show.
+///
+/// Column shape follows the *arity* of the request, not its results: one type
+/// keeps that type's own columns, more than one falls back to generic columns
+/// plus `Type`. Letting the results decide would make the output schema depend
+/// on the data, so the same command could emit different columns on different
+/// days.
 #[derive(Debug, Clone)]
 pub enum ListResourcesScope {
-    ByType(ResourceTypeDescriptor),
-    All,
+    /// One type, optionally narrowed by a name pattern or exact ID.
+    ByType(ResourceTypeDescriptor, Option<ResourceQuery>),
+    /// Two or more named types, each with its own query.
+    Types(Vec<(ResourceTypeDescriptor, Option<ResourceQuery>)>),
+    /// Every type, optionally narrowed by one query applying to all.
+    All(Option<ResourceQuery>),
+}
+
+impl ListResourcesScope {
+    /// Whether the generic column set applies (`Type` column, no per-type
+    /// columns).
+    pub(crate) fn is_generic(&self) -> bool {
+        !matches!(self, Self::ByType(..))
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -43,8 +43,9 @@ impl DeleteAccountResourcesUsecaseImpl {
         collect_all_pages(PAGE_SIZE, |pagination| async move {
             self.generic_resource_query_service
                 // Account teardown sweeps every resource, never a subset.
-                .list_all_snapshots(
-                    account_id.clone(),
+                .list_snapshots(
+                    account_id,
+                    &kamu_resources::ResourceScope::default(),
                     &kamu_resources::ResolvedResourceLabelFilter::True,
                     pagination,
                 )

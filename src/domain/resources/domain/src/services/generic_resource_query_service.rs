@@ -15,11 +15,10 @@ use crate::{
     ResourceHandleRow,
     ResourceID,
     ResourceName,
-    ResourceSearchQuery,
+    ResourceScope,
     ResourceSnapshot,
     ResourceSummaryRow,
     ResourceTypeMismatchError,
-    ResourceTypeScope,
     TypeUri,
 };
 
@@ -59,8 +58,7 @@ pub trait GenericResourceQueryService: Send + Sync {
     async fn search_resource_handles(
         &self,
         account_id: &odf::AccountID,
-        scope: &ResourceTypeScope,
-        query: &ResourceSearchQuery,
+        scope: &ResourceScope,
         label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceHandleRow>, InternalError>;
@@ -68,8 +66,7 @@ pub trait GenericResourceQueryService: Send + Sync {
     async fn count_search_resource_handles(
         &self,
         account_id: &odf::AccountID,
-        scope: &ResourceTypeScope,
-        query: &ResourceSearchQuery,
+        scope: &ResourceScope,
         label_filter: &ResolvedResourceLabelFilter,
     ) -> Result<usize, InternalError>;
 
@@ -98,17 +95,10 @@ pub trait GenericResourceQueryService: Send + Sync {
         ids: &[ResourceID],
     ) -> Result<Vec<ResourceSnapshot>, InternalError>;
 
-    async fn list_snapshots_by_schema(
+    async fn list_snapshots(
         &self,
-        account_id: odf::AccountID,
-        schema: &TypeUri,
-        label_filter: &ResolvedResourceLabelFilter,
-        pagination: PaginationOpts,
-    ) -> Result<Vec<ResourceSnapshot>, InternalError>;
-
-    async fn list_all_snapshots(
-        &self,
-        account_id: odf::AccountID,
+        account_id: &odf::AccountID,
+        scope: &ResourceScope,
         label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceSnapshot>, InternalError>;
