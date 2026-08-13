@@ -59,9 +59,15 @@ impl DidSecretKeyRepository for InMemoryDidSecretKeyRepository {
     ) -> Result<(), SaveDidSecretKeyError> {
         let mut state = self.state.lock().unwrap();
 
+        let owned_entity = entity.clone().into_owned();
+
+        if state.did_secret_keys_by_entity.contains_key(&owned_entity) {
+            return Err(DidSecretKeyDuplicateError::new(entity).into());
+        }
+
         state
             .did_secret_keys_by_entity
-            .insert(entity.clone().into_owned(), did_secret_key.clone());
+            .insert(owned_entity, did_secret_key.clone());
 
         Ok(())
     }

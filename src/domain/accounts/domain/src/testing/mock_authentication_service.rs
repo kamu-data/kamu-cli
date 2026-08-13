@@ -16,13 +16,13 @@ use crate::{
     AccessTokenError,
     Account,
     AuthenticationService,
-    DEFAULT_ACCOUNT_ID,
     DEFAULT_ACCOUNT_NAME,
     DUMMY_ACCESS_TOKEN,
     DeviceCode,
     GetAccountInfoError,
     LoginError,
     LoginResponse,
+    TEST_ACCOUNT_ID,
     UnsupportedLoginMethodError,
 };
 
@@ -63,7 +63,7 @@ impl MockAuthenticationService {
             .returning(|_, _, _| {
                 Ok(LoginResponse {
                     access_token: DUMMY_ACCESS_TOKEN.to_string(),
-                    account_id: DEFAULT_ACCOUNT_ID.clone(),
+                    account_id: TEST_ACCOUNT_ID.clone(),
                     account_name: DEFAULT_ACCOUNT_NAME.clone(),
                 })
             });

@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use dill::CatalogBuilder;
-
 use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -22,7 +20,10 @@ pub struct AccountDomainDependenciesOptions {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn register_dependencies(b: &mut CatalogBuilder, options: AccountDomainDependenciesOptions) {
+pub fn register_dependencies(
+    b: &mut dill::CatalogBuilder,
+    options: AccountDomainDependenciesOptions,
+) {
     b.add::<AccountSearchSchemaProvider>();
     if options.incremental_search_indexing {
         b.add::<AccountSearchUpdater>();

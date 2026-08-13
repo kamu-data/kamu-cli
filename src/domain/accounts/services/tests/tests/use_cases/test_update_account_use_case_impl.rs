@@ -32,7 +32,7 @@ const NEW_REGULAR_USER_NAME: &str = "regular-user-new";
 #[test_log::test(tokio::test)]
 async fn test_update_account_email_success() {
     let mut mock_outbox = MockOutbox::new();
-    UpdateAccountUseCaseImplHarness::expect_outbox_account_created(&mut mock_outbox);
+    UpdateAccountUseCaseImplHarness::expect_outbox_account_created(&mut mock_outbox, 1);
     UpdateAccountUseCaseImplHarness::expect_outbox_account_email_changed(&mut mock_outbox);
 
     let harness = UpdateAccountUseCaseImplHarness::builder()
@@ -66,7 +66,7 @@ async fn test_update_account_email_success() {
 #[test_log::test(tokio::test)]
 async fn test_update_account_email_duplicate_error() {
     let mut mock_outbox = MockOutbox::new();
-    UpdateAccountUseCaseImplHarness::expect_outbox_account_created(&mut mock_outbox);
+    UpdateAccountUseCaseImplHarness::expect_outbox_account_created(&mut mock_outbox, 2);
 
     let harness = UpdateAccountUseCaseImplHarness::builder()
         .account_authorization_helper_provider(AccountAuthorizationHelperTestProvider::Mock(
@@ -96,7 +96,7 @@ async fn test_update_account_email_duplicate_error() {
 #[test_log::test(tokio::test)]
 async fn test_update_account_display_name_success() {
     let mut mock_outbox = MockOutbox::new();
-    UpdateAccountUseCaseImplHarness::expect_outbox_account_created(&mut mock_outbox);
+    UpdateAccountUseCaseImplHarness::expect_outbox_account_created(&mut mock_outbox, 1);
     UpdateAccountUseCaseImplHarness::expect_outbox_account_display_name_changed(&mut mock_outbox);
 
     let harness = UpdateAccountUseCaseImplHarness::builder()
@@ -131,6 +131,7 @@ async fn test_update_account_display_name_success() {
 #[test_log::test(tokio::test)]
 async fn test_rename_own_account() {
     let mut outbox = MockOutbox::new();
+    UpdateAccountUseCaseImplHarness::expect_outbox_account_created(&mut outbox, 2);
     UpdateAccountUseCaseImplHarness::expect_outbox_account_renamed(&mut outbox);
 
     let predefined_account_config = {
@@ -172,6 +173,9 @@ async fn test_rename_own_account() {
 
 #[test_log::test(tokio::test)]
 async fn test_duplicate_name() {
+    let mut outbox = MockOutbox::new();
+    UpdateAccountUseCaseImplHarness::expect_outbox_account_created(&mut outbox, 2);
+
     let predefined_account_config = {
         let mut p = PredefinedAccountsConfig::new();
         p.predefined = vec![
@@ -186,7 +190,7 @@ async fn test_duplicate_name() {
         .account_authorization_helper_provider(Default::default())
         .maybe_predefined_accounts_config(predefined_account_config)
         .current_account_subject(CurrentAccountSubject::new_test_with(&REGULAR_USER))
-        .mock_outbox(MockOutbox::new())
+        .mock_outbox(outbox)
         .build()
         .await;
 
@@ -214,14 +218,17 @@ async fn test_duplicate_name() {
 #[test_log::test(tokio::test)]
 async fn test_admin_renames_other_account() {
     let mut outbox = MockOutbox::new();
+    UpdateAccountUseCaseImplHarness::expect_outbox_account_created(&mut outbox, 2);
     UpdateAccountUseCaseImplHarness::expect_outbox_account_renamed(&mut outbox);
 
     let predefined_account_config = {
         let mut p = PredefinedAccountsConfig::new();
         p.predefined = vec![
-            AccountConfig::test_config_from_name(odf::AccountName::new_unchecked(ADMIN))
+            AccountConfig::test_config_from_name_with_id(odf::AccountName::new_unchecked(ADMIN))
                 .set_properties(vec![AccountPropertyName::IsAdmin]),
-            AccountConfig::test_config_from_name(odf::AccountName::new_unchecked(REGULAR_USER)),
+            AccountConfig::test_config_from_name_with_id(odf::AccountName::new_unchecked(
+                REGULAR_USER,
+            )),
         ];
         p
     };
@@ -255,6 +262,9 @@ async fn test_admin_renames_other_account() {
 
 #[test_log::test(tokio::test)]
 async fn test_anonymous_try_to_rename_account() {
+    let mut outbox = MockOutbox::new();
+    UpdateAccountUseCaseImplHarness::expect_outbox_account_created(&mut outbox, 2);
+
     let predefined_account_config = {
         let mut p = PredefinedAccountsConfig::new();
         p.predefined = vec![
@@ -271,7 +281,7 @@ async fn test_anonymous_try_to_rename_account() {
         .current_account_subject(CurrentAccountSubject::anonymous(
             AnonymousAccountReason::NoAuthenticationProvided,
         ))
-        .mock_outbox(MockOutbox::new())
+        .mock_outbox(outbox)
         .build()
         .await;
 
@@ -288,6 +298,9 @@ async fn test_anonymous_try_to_rename_account() {
 
 #[test_log::test(tokio::test)]
 async fn test_non_admin_try_to_rename_other_account() {
+    let mut outbox = MockOutbox::new();
+    UpdateAccountUseCaseImplHarness::expect_outbox_account_created(&mut outbox, 2);
+
     let predefined_account_config = {
         let mut p = PredefinedAccountsConfig::new();
         p.predefined = vec![
@@ -302,7 +315,7 @@ async fn test_non_admin_try_to_rename_other_account() {
         .account_authorization_helper_provider(Default::default())
         .maybe_predefined_accounts_config(predefined_account_config)
         .current_account_subject(CurrentAccountSubject::new_test_with(&REGULAR_USER))
-        .mock_outbox(MockOutbox::new())
+        .mock_outbox(outbox)
         .build()
         .await;
 
@@ -359,7 +372,7 @@ impl UpdateAccountUseCaseImplHarness {
         }
     }
 
-    pub fn expect_outbox_account_created(mock_outbox: &mut MockOutbox) {
+    pub fn expect_outbox_account_created(mock_outbox: &mut MockOutbox, expected_count: usize) {
         use mockall::predicate::{always, eq, function};
         mock_outbox
             .expect_post_message_as_json()
@@ -373,6 +386,7 @@ impl UpdateAccountUseCaseImplHarness {
                 }),
                 always(),
             )
+            .times(expected_count)
             .returning(|_, _, _| Ok(()));
     }
 

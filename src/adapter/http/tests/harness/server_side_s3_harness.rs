@@ -84,14 +84,14 @@ impl ServerSideS3Harness {
         let account = make_server_account(options.tenancy_config);
 
         let predefined_accounts_config = match options.tenancy_config {
-            TenancyConfig::SingleTenant => PredefinedAccountsConfig::single_tenant(),
+            TenancyConfig::SingleTenant => PredefinedAccountsConfig::test_single_tenant_with_id(),
             TenancyConfig::MultiTenant => {
                 let mut predefined_accounts_config = PredefinedAccountsConfig::new();
-                predefined_accounts_config
-                    .predefined
-                    .push(AccountConfig::test_config_from_name(
-                        odf::AccountName::new_unchecked(SERVER_ACCOUNT_NAME),
-                    ));
+                predefined_accounts_config.predefined.push(
+                    AccountConfig::test_config_from_name_with_id(odf::AccountName::new_unchecked(
+                        SERVER_ACCOUNT_NAME,
+                    )),
+                );
                 predefined_accounts_config
             }
         };
@@ -121,8 +121,8 @@ impl ServerSideS3Harness {
                 .add::<InMemoryDatasetDependencyRepository>()
                 .add_value(options.tenancy_config)
                 .add_builder(odf::dataset::DatasetStorageUnitS3::builder(s3.ctx.clone()))
-                .add::<kamu_datasets_services::DatasetS3BuilderDatabaseBackedImpl>()
-                .add_value(kamu_datasets_services::MetadataChainDbBackedConfig::default())
+                .add::<DatasetS3BuilderDatabaseBackedImpl>()
+                .add_value(MetadataChainDbBackedConfig::default())
                 .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))
                 .add_value(EngineConfigDatafusionEmbeddedCompaction::default())
                 .add::<CompactionPlannerImpl>()
@@ -216,10 +216,8 @@ impl ServerSideS3Harness {
 impl ServerSideHarness for ServerSideS3Harness {
     fn server_account_id(&self) -> odf::AccountID {
         match self.options.tenancy_config {
-            TenancyConfig::MultiTenant => {
-                odf::AccountID::new_seeded_ed25519(SERVER_ACCOUNT_NAME.as_bytes())
-            }
-            TenancyConfig::SingleTenant => DEFAULT_ACCOUNT_ID.clone(),
+            TenancyConfig::MultiTenant => odf::metadata::testing::account_id(&SERVER_ACCOUNT_NAME),
+            TenancyConfig::SingleTenant => TEST_ACCOUNT_ID.clone(),
         }
     }
 

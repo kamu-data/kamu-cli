@@ -16,7 +16,7 @@ pub struct CurrentAccountSubjectTestHelper {}
 impl CurrentAccountSubjectTestHelper {
     pub fn logged(account_name: &str) -> CurrentAccountSubject {
         let account_name = odf::AccountName::new_unchecked(account_name);
-        let account_id = odf::AccountID::new_seeded_ed25519(account_name.as_bytes());
+        let account_id = odf::metadata::testing::account_id(&account_name);
 
         CurrentAccountSubject::logged(account_id, account_name)
     }

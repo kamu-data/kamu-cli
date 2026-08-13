@@ -9,22 +9,26 @@
 
 use chrono::{DateTime, Utc};
 use email_utils::Email;
+use internal_error::BatchError;
+use url::Url;
 
 use super::{DUMMY_EMAIL_ADDRESS, LoggedAccount};
 use crate::{
     AccountDisplayName,
     AccountProvider,
     AccountType,
-    DEFAULT_ACCOUNT_ID,
     DEFAULT_ACCOUNT_NAME,
     DEFAULT_ACCOUNT_PASSWORD,
     DEFAULT_PASSWORD_STR,
     Password,
+    ProviderIdentityKey,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-const DEFAULT_AVATAR_URL: &str = "https://avatars.githubusercontent.com/u/50896974?s=200&v=4";
+static DEFAULT_AVATAR_URL: std::sync::LazyLock<Url> = std::sync::LazyLock::new(|| {
+    Url::parse("https://avatars.githubusercontent.com/u/50896974?s=200&v=4").unwrap()
+});
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -46,12 +50,13 @@ impl PredefinedAccountsConfig {
     pub fn single_tenant() -> Self {
         Self {
             predefined: vec![AccountConfig {
-                id: Some(DEFAULT_ACCOUNT_ID.clone()),
+                id: None,
+                private_key: None,
                 account_name: DEFAULT_ACCOUNT_NAME.clone(),
                 password: DEFAULT_ACCOUNT_PASSWORD.clone(),
                 account_type: AccountType::User,
                 display_name: None,
-                avatar_url: Some(String::from(DEFAULT_AVATAR_URL)),
+                avatar_url: Some(DEFAULT_AVATAR_URL.clone()),
                 properties: vec![AccountPropertyName::IsAdmin],
                 registered_at: None,
                 provider: AccountProvider::Password.to_string(),
@@ -73,6 +78,39 @@ impl PredefinedAccountsConfig {
 
         None
     }
+
+    pub fn validate(&self) -> Result<(), BatchError<AccountConfigValidationError>> {
+        let mut failures = vec![];
+        for (index, account_config) in self.predefined.iter().enumerate() {
+            if let Err(e) = account_config.validate() {
+                failures.push((index, e));
+            }
+        }
+
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(BatchError {
+                failed: failures.len(),
+                total: self.predefined.len(),
+                failures,
+            })
+        }
+    }
+}
+
+#[cfg(any(feature = "testing", test))]
+impl PredefinedAccountsConfig {
+    pub fn test_single_tenant_with_id() -> Self {
+        let mut c = Self::single_tenant();
+
+        assert_eq!(1, c.predefined.len());
+
+        if let Some(ac) = c.predefined.get_mut(0) {
+            ac.id = Some(crate::TEST_ACCOUNT_ID.clone());
+        }
+        c
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -86,15 +124,30 @@ pub enum AccountPropertyName {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: Embed the `AccountConfig::validate()` call into setty
+//       for struct level validation.
+//       Please check: https://github.com/Keats/validator#struct-level-validation
+
+/// The declarative account configuration used to register an account if one
+/// does not already exist.
+///
+/// To update an existing account, either `id` or `private_key` must be
+/// specified.
 #[setty::derive(setty::Config, Clone)]
 pub struct AccountConfig {
-    /// Auto-derived from `account_name` if omitted
+    /// May be omitted in favor of `private_key`.
     #[config(combine(replace))]
     pub id: Option<odf::AccountID>,
+
+    /// Optional ed25519 private key. When set, `id` is derived from it
+    /// (and must match `id` if both are present).
+    #[config(combine(replace))]
+    pub private_key: Option<odf::metadata::PrivateKey>,
 
     #[config(combine(replace))]
     pub account_name: odf::AccountName,
 
+    // TODO: The password must be checked only for the "Password" provider, not for all of them.
     #[config(combine(replace))]
     pub password: Password,
 
@@ -111,7 +164,8 @@ pub struct AccountConfig {
     #[config(default = AccountProvider::Password.to_string())]
     pub provider: String,
 
-    pub avatar_url: Option<String>,
+    #[config(combine(replace))]
+    pub avatar_url: Option<Url>,
 
     // TODO: This should not be in config - we are mixing configuration and domain model here
     #[config(combine(replace))]
@@ -124,15 +178,17 @@ pub struct AccountConfig {
     pub treat_datasets_as_public: bool,
 }
 
+// TODO: extract testing methods into own impl AccountConfig
+//       and hide w/ feature gate
 impl AccountConfig {
-    // TODO: Do not use the method outside of tests
-    // #[cfg(any(feature = "testing", test))]
+    #[cfg(any(feature = "testing", test))]
     pub fn test_config_from_name(account_name: odf::AccountName) -> Self {
         let email = Email::parse(&format!("{account_name}@example.com")).unwrap();
         let password = Self::generate_password(&account_name);
 
         Self {
             id: None,
+            private_key: None,
             account_name,
             password,
             email,
@@ -146,14 +202,22 @@ impl AccountConfig {
         }
     }
 
-    // TODO: Do not use the method outside of tests
-    // #[cfg(any(feature = "testing", test))]
+    #[cfg(any(feature = "testing", test))]
+    pub fn test_config_from_name_with_id(account_name: odf::AccountName) -> Self {
+        Self {
+            id: Some(odf::metadata::testing::account_id(&account_name)),
+            ..Self::test_config_from_name(account_name)
+        }
+    }
+
+    #[cfg(any(feature = "testing", test))]
     pub fn test_config_from_subject(subject: LoggedAccount) -> Self {
         let email = Email::parse(&format!("{}@example.com", subject.account_name)).unwrap();
         let password = Self::generate_password(&subject.account_name);
 
         Self {
             id: Some(subject.account_id),
+            private_key: None,
             account_name: subject.account_name,
             password,
             email,
@@ -167,8 +231,32 @@ impl AccountConfig {
         }
     }
 
+    #[cfg(any(feature = "testing", test))]
+    pub fn set_id(mut self, maybe_account_id: Option<odf::AccountID>) -> Self {
+        self.id = maybe_account_id;
+        self
+    }
+
+    #[cfg(any(feature = "testing", test))]
+    pub fn set_private_key(mut self, private_key: odf::metadata::PrivateKey) -> Self {
+        self.private_key = Some(private_key);
+        self
+    }
+
+    #[cfg(any(feature = "testing", test))]
+    pub fn set_account_name(mut self, account_name: odf::AccountName) -> Self {
+        self.account_name = account_name;
+        self
+    }
+
     pub fn set_password(mut self, password: Password) -> Self {
         self.password = password;
+        self
+    }
+
+    #[cfg(any(feature = "testing", test))]
+    pub fn set_email(mut self, email: Email) -> Self {
+        self.email = email;
         self
     }
 
@@ -187,12 +275,29 @@ impl AccountConfig {
         self
     }
 
-    pub fn get_id(&self) -> odf::AccountID {
-        if let Some(id) = &self.id {
-            id.clone()
-        } else {
-            odf::AccountID::new_seeded_ed25519(self.account_name.as_bytes())
+    /// Gets account ID from `id` and/or `private_key`.
+    /// Returns `None` when neither is set.
+    ///
+    /// NOTE: It is assumed that we call `validate()` first before using the
+    ///       values.
+    pub fn get_account_id_from_config_or_private_key(&self) -> Option<odf::AccountID> {
+        match (&self.id, &self.private_key) {
+            (Some(configured_id), Some(_private_key)) => {
+                // NOTE: Important: In this method, we do not verify that the derived ID
+                //       (from `private_key`) matches the configured ID.
+                Some(configured_id.clone())
+            }
+            (Some(id), None) => Some(id.clone()),
+            (None, Some(private_key)) => {
+                let id = odf::AccountID::from_signing_key(private_key);
+                Some(id)
+            }
+            (None, None) => None,
         }
+    }
+
+    pub fn provider_identity_key(&self) -> ProviderIdentityKey {
+        self.account_name.to_string()
     }
 
     pub fn get_display_name(&self) -> AccountDisplayName {
@@ -205,6 +310,130 @@ impl AccountConfig {
 
     pub fn generate_password(account_name: &odf::AccountName) -> Password {
         Password::try_new(format!("{DEFAULT_PASSWORD_STR}:{account_name}")).unwrap()
+    }
+
+    pub fn validate(&self) -> Result<(), AccountConfigValidationError> {
+        use std::str::FromStr;
+
+        if let (Some(configured_id), Some(private_key)) = (&self.id, &self.private_key) {
+            let derived_id = odf::AccountID::from_signing_key(private_key);
+
+            if *configured_id != derived_id {
+                return Err(AccountConfigValidationError::IdMismatch {
+                    account_name: self.account_name.clone(),
+                    configured_id: configured_id.clone(),
+                    derived_id,
+                });
+            }
+        }
+
+        Email::parse(self.email.as_ref()).map_err(|_| {
+            AccountConfigValidationError::InvalidEmail {
+                account_name: self.account_name.clone(),
+                email: self.email.to_string(),
+            }
+        })?;
+
+        let provider = AccountProvider::from_str(&self.provider).map_err(|_| {
+            AccountConfigValidationError::InvalidProvider {
+                account_name: self.account_name.clone(),
+                provider: self.provider.clone(),
+            }
+        })?;
+
+        match provider {
+            AccountProvider::OAuthGitHub | AccountProvider::Web3Wallet => {
+                if self.private_key.is_some() {
+                    return Err(AccountConfigValidationError::PrivateKeyNotAllowed {
+                        account_name: self.account_name.clone(),
+                        provider: self.provider.clone(),
+                    });
+                }
+            }
+            AccountProvider::Password => { /* nothing */ }
+        }
+
+        if let Some(id) = &self.id {
+            match provider {
+                AccountProvider::OAuthGitHub if id.as_did_odf().is_none() => {
+                    return Err(AccountConfigValidationError::ExpectedDidOdf {
+                        id: id.clone(),
+                        account_name: self.account_name.clone(),
+                    });
+                }
+                AccountProvider::Web3Wallet if id.as_did_pkh().is_none() => {
+                    return Err(AccountConfigValidationError::ExpectedDidPkh {
+                        id: id.clone(),
+                        account_name: self.account_name.clone(),
+                    });
+                }
+                _ => { /* nothing */ }
+            }
+        }
+
+        Ok(())
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(thiserror::Error, Debug, PartialEq, Eq)]
+pub enum AccountConfigValidationError {
+    #[error(
+        "Account '{account_name}': ID mismatch -- configured '{configured_id}', derived \
+         '{derived_id}'"
+    )]
+    IdMismatch {
+        account_name: odf::AccountName,
+        configured_id: odf::AccountID,
+        derived_id: odf::AccountID,
+    },
+
+    #[error("Account '{account_name}': invalid email '{email}'")]
+    InvalidEmail {
+        account_name: odf::AccountName,
+        email: String,
+    },
+
+    #[error("Account '{account_name}': invalid provider '{provider}'")]
+    InvalidProvider {
+        account_name: odf::AccountName,
+        provider: String,
+    },
+
+    #[error("Account '{account_name}': private key is not allowed for provider '{provider}'")]
+    PrivateKeyNotAllowed {
+        account_name: odf::AccountName,
+        provider: String,
+    },
+
+    #[error(
+        "Account '{account_name}': OAuthGitHub provider requires did:odf account id, got '{id}'"
+    )]
+    ExpectedDidOdf {
+        account_name: odf::AccountName,
+        id: odf::AccountID,
+    },
+
+    #[error(
+        "Account '{account_name}': Web3Wallet provider requires did:pkh account id, got '{id}'"
+    )]
+    ExpectedDidPkh {
+        account_name: odf::AccountName,
+        id: odf::AccountID,
+    },
+}
+
+impl AccountConfigValidationError {
+    pub fn account_name(&self) -> &odf::AccountName {
+        match self {
+            AccountConfigValidationError::IdMismatch { account_name, .. }
+            | AccountConfigValidationError::InvalidEmail { account_name, .. }
+            | AccountConfigValidationError::InvalidProvider { account_name, .. }
+            | AccountConfigValidationError::PrivateKeyNotAllowed { account_name, .. }
+            | AccountConfigValidationError::ExpectedDidOdf { account_name, .. }
+            | AccountConfigValidationError::ExpectedDidPkh { account_name, .. } => account_name,
+        }
     }
 }
 

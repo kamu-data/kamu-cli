@@ -76,7 +76,7 @@ async fn test_create_root_dataset_from_snapshot() {
               Created {
                 Dataset ID: <foo_id>
                 Dataset Name: foo
-                Owner: did:odf:fed016b61ed2ab1b63a006b61ed2ab1b63a00b016d65607000000e0821aafbf163e6f
+                Owner: did:odf:fed01f9a23c901fda61bf94b6105a09f4d05764e333193ea78dedc392486e6154be62
                 Visibility: private
               }
             Dataset Reference Messages: 1
@@ -193,13 +193,13 @@ async fn test_create_derived_dataset_from_snapshot() {
               Created {
                 Dataset ID: <foo_id>
                 Dataset Name: foo
-                Owner: did:odf:fed016b61ed2ab1b63a006b61ed2ab1b63a00b016d65607000000e0821aafbf163e6f
+                Owner: did:odf:fed01f9a23c901fda61bf94b6105a09f4d05764e333193ea78dedc392486e6154be62
                 Visibility: private
               }
               Created {
                 Dataset ID: <bar_id>
                 Dataset Name: bar
-                Owner: did:odf:fed016b61ed2ab1b63a006b61ed2ab1b63a00b016d65607000000e0821aafbf163e6f
+                Owner: did:odf:fed01f9a23c901fda61bf94b6105a09f4d05764e333193ea78dedc392486e6154be62
                 Visibility: private
               }
             Dataset Reference Messages: 2

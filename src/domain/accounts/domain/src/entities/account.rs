@@ -14,21 +14,22 @@ use chrono::TimeZone;
 use chrono::{DateTime, Utc};
 use email_utils::Email;
 use serde::{Deserialize, Serialize};
+use url::Url;
 
-use crate::{AccountConfig, Password};
+use crate::Password;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // TODO: have some length restrictions (0 < .. < limit)
 pub type AccountDisplayName = String;
+// TODO: have some length restrictions (0 < .. < limit)
+pub type ProviderIdentityKey = String;
 
 pub const DEFAULT_ACCOUNT_NAME_STR: &str = "kamu";
 pub const DEFAULT_PASSWORD_STR: &str = "kamu.dev";
 
 pub static DEFAULT_ACCOUNT_NAME: LazyLock<odf::AccountName> =
     LazyLock::new(|| odf::AccountName::new_unchecked(DEFAULT_ACCOUNT_NAME_STR));
-pub static DEFAULT_ACCOUNT_ID: LazyLock<odf::AccountID> =
-    LazyLock::new(|| odf::AccountID::new_seeded_ed25519(DEFAULT_ACCOUNT_NAME_STR.as_bytes()));
 pub static DEFAULT_ACCOUNT_PASSWORD: LazyLock<Password> =
     LazyLock::new(|| Password::try_new(DEFAULT_PASSWORD_STR).unwrap());
 pub static DUMMY_EMAIL_ADDRESS: LazyLock<Email> =
@@ -37,8 +38,18 @@ pub static DUMMY_EMAIL_ADDRESS: LazyLock<Email> =
 static DUMMY_REGISTRATION_TIME: LazyLock<DateTime<Utc>> =
     LazyLock::new(|| Utc.with_ymd_and_hms(2024, 4, 1, 12, 0, 0).unwrap());
 
+#[cfg(any(feature = "testing", test))]
+pub static TEST_ACCOUNT_ID: LazyLock<odf::AccountID> =
+    LazyLock::new(|| odf::metadata::testing::account_id(&DEFAULT_ACCOUNT_NAME_STR));
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: Concerns: Provider mechanism is meant to be as a plug-in extension
+//                 point, so there shouldn't be an enum listing
+//                 all implementations because some of them can be not
+//                 owned by us. This is why Account::provider is a string
+//                 and not an enum after all
+//                 (c) https://github.com/kamu-data/kamu-cli/pull/1674#discussion_r3746118759
 #[derive(strum::EnumString, strum::Display, strum::IntoStaticStr, Copy, Clone)]
 pub enum AccountProvider {
     #[strum(serialize = "password")]
@@ -47,6 +58,12 @@ pub enum AccountProvider {
     OAuthGitHub,
     #[strum(serialize = "web3_wallet")]
     Web3Wallet,
+}
+
+impl AccountProvider {
+    pub fn is_password(provider: &str) -> bool {
+        provider == <&'static str>::from(AccountProvider::Password)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -58,28 +75,10 @@ pub struct Account {
     pub email: Email,
     pub display_name: AccountDisplayName,
     pub account_type: AccountType,
-    pub avatar_url: Option<String>,
+    pub avatar_url: Option<Url>,
     pub registered_at: DateTime<Utc>,
     pub provider: String,
-    pub provider_identity_key: String,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl From<&AccountConfig> for Account {
-    fn from(account_config: &AccountConfig) -> Self {
-        Account {
-            id: account_config.get_id(),
-            account_name: account_config.account_name.clone(),
-            email: account_config.email.clone(),
-            display_name: account_config.get_display_name(),
-            account_type: account_config.account_type,
-            avatar_url: account_config.avatar_url.clone(),
-            registered_at: account_config.registered_at.unwrap_or_else(Utc::now),
-            provider: account_config.provider.clone(),
-            provider_identity_key: account_config.account_name.to_string(),
-        }
-    }
+    pub provider_identity_key: ProviderIdentityKey,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -100,7 +99,7 @@ pub enum AccountType {
 #[cfg(any(feature = "testing", test))]
 impl Account {
     pub fn dummy() -> Self {
-        Self::test(DEFAULT_ACCOUNT_ID.clone(), DEFAULT_ACCOUNT_NAME_STR)
+        Self::test(TEST_ACCOUNT_ID.clone(), DEFAULT_ACCOUNT_NAME_STR)
     }
 
     pub fn test(id: odf::AccountID, name: &str) -> Self {
@@ -151,7 +150,7 @@ impl From<AccountRowModel> for Account {
             email: Email::parse(&value.email).unwrap(),
             display_name: value.display_name,
             account_type: value.account_type,
-            avatar_url: value.avatar_url,
+            avatar_url: value.avatar_url.map(|url| Url::parse(&url).unwrap()),
             registered_at: value.registered_at,
             provider: value.provider,
             provider_identity_key: value.provider_identity_key,
@@ -168,7 +167,7 @@ impl From<AccountWithTokenRowModel> for Account {
             email: Email::parse(&value.email).unwrap(),
             display_name: value.display_name,
             account_type: value.account_type,
-            avatar_url: value.avatar_url,
+            avatar_url: value.avatar_url.map(|url| Url::parse(&url).unwrap()),
             registered_at: value.registered_at,
             provider: value.provider,
             provider_identity_key: value.provider_identity_key,

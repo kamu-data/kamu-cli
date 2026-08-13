@@ -12,10 +12,10 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::pin::Pin;
 use std::sync::Arc;
 
-use axum::http::Uri;
 use axum::response::{IntoResponse, Response};
 use database_common::DatabaseTransactionRunner;
 use dill::{Catalog, CatalogBuilder};
+use http::Uri;
 use internal_error::*;
 use kamu::domain::{FileUploadLimitConfig, Protocols, ServerUrlConfig, TenancyConfig};
 use kamu_accounts::{

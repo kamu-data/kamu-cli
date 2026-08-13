@@ -10,8 +10,7 @@
 use std::sync::Arc;
 
 use chrono::{Duration, Utc};
-use dill::*;
-use kamu_accounts::{DEFAULT_ACCOUNT_ID, DEFAULT_ACCOUNT_NAME};
+use kamu_accounts::{DEFAULT_ACCOUNT_NAME, TEST_ACCOUNT_ID};
 use kamu_adapter_flow_webhook::{
     FLOW_TYPE_WEBHOOK_DELIVER,
     FlowScopeSubscription,
@@ -424,7 +423,7 @@ impl TestWebhooksEventBridgeHarness {
 
         let mock_flow_trigger_service = overrides.mock_flow_trigger_service.unwrap_or_default();
 
-        let mut b = CatalogBuilder::new();
+        let mut b = dill::CatalogBuilder::new();
         b.add::<FlowWebhooksEventBridge>()
             .add_builder(messaging_outbox::OutboxImmediateImpl::builder(
                 messaging_outbox::ConsumerFilter::AllConsumers,
@@ -475,7 +474,7 @@ impl TestWebhooksEventBridgeHarness {
     fn register_dataset_entry(&self, dataset_id: &odf::DatasetID, dataset_name: &str) {
         self.fake_dataset_entry_service.add_entry(DatasetEntry::new(
             dataset_id.clone(),
-            DEFAULT_ACCOUNT_ID.clone(),
+            TEST_ACCOUNT_ID.clone(),
             DEFAULT_ACCOUNT_NAME.clone(),
             odf::DatasetName::new_unchecked(dataset_name),
             Utc::now(),
