@@ -43,10 +43,6 @@ pub fn register_dependencies(
 
     b.add::<utils::AccountAuthorizationHelperImpl>();
 
-    if !options.production {
-        b.add_value(domain::SeedDidsFromNamesInTests);
-    }
-
     if options.needs_indexing {
         b.add::<OAuthDeviceCodeServiceImpl>();
 

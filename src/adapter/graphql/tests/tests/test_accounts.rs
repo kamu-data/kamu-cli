@@ -387,7 +387,6 @@ async fn test_create_account() {
             is_admin: false,
             can_provision_accounts: true,
         })
-        .seed_dids_from_names(false)
         .build()
         .await;
 
@@ -1262,10 +1261,7 @@ struct GraphQLAccountsHarness {
 #[bon::bon]
 impl GraphQLAccountsHarness {
     #[builder]
-    pub async fn new(
-        predefined_account_opts: Option<PredefinedAccountOpts>,
-        seed_dids_from_names: Option<bool>,
-    ) -> Self {
+    pub async fn new(predefined_account_opts: Option<PredefinedAccountOpts>) -> Self {
         let mut b = dill::CatalogBuilder::new();
         database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 
@@ -1294,10 +1290,6 @@ impl GraphQLAccountsHarness {
                     messaging_outbox::ConsumerFilter::AllConsumers,
                 ))
                 .bind::<dyn messaging_outbox::Outbox, messaging_outbox::OutboxImmediateImpl>();
-
-            if seed_dids_from_names.unwrap_or(true) {
-                b.add_value(SeedDidsFromNamesInTests);
-            }
 
             b.build()
         };

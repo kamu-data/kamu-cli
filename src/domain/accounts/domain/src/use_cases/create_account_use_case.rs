@@ -18,14 +18,6 @@ use crate::{Account, AccountConfig, CreateAccountError, Password};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// This DI marker is used only for tests. When registered,
-/// [`CreateAccountUseCase`] derives deterministic DID keypairs from account
-/// names. Never register in production.
-#[derive(Debug, Clone, Copy)]
-pub struct SeedDidsFromNamesInTests;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #[async_trait::async_trait]
 pub trait CreateAccountUseCase: Send + Sync {
     async fn execute(&self, account_config: &AccountConfig) -> Result<Account, CreateAccountError>;
