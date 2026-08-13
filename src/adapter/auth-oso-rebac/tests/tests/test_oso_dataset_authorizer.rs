@@ -19,7 +19,6 @@ use kamu_accounts::{
     CurrentAccountSubject,
     DEFAULT_ACCOUNT_NAME,
     PredefinedAccountsConfig,
-    SeedDidsFromNamesInTests,
 };
 use kamu_accounts_inmem::{InMemoryAccountRepository, InMemoryDidSecretKeyRepository};
 use kamu_accounts_services::{
@@ -699,6 +698,7 @@ impl DatasetAuthorizerHarness {
             }
             let account_config =
                 AccountConfig::test_config_from_name(logged_account.account_name.clone())
+                    .set_id(Some(logged_account.account_id.clone()))
                     .set_properties(account_properties);
 
             predefined_accounts_config.predefined.push(account_config);
@@ -721,7 +721,6 @@ impl DatasetAuthorizerHarness {
                 .add::<DeleteDatasetRebacPropertiesUseCaseImpl>()
                 .add::<UpdateAccountUseCaseImpl>()
                 .add::<CreateAccountUseCaseImpl>()
-                .add_value(SeedDidsFromNamesInTests)
                 .add::<InMemoryRebacRepository>()
                 .add_builder(OutboxImmediateImpl::builder(ConsumerFilter::AllConsumers))
                 .bind::<dyn Outbox, OutboxImmediateImpl>()
