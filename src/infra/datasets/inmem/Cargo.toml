@@ -23,12 +23,14 @@ doctest = false
 
 [dependencies]
 database-common = { workspace = true }
+internal-error = { workspace = true }
 kamu-datasets = { workspace = true }
 odf = { workspace = true }
-internal-error = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
-cheap-clone = { version = "0.3", default-features = false, features = ["alloc"] }
+cheap-clone = { version = "0.3", default-features = false, features = [
+    "alloc",
+] }
 dill = { version = "0.15", default-features = false }
 futures = { version = "0.3", default-features = false }
 tokio = { version = "1", default-features = false }
@@ -42,4 +44,6 @@ kamu-accounts-inmem = { workspace = true }
 kamu-datasets-repo-tests = { workspace = true }
 
 test-group = { version = "1" }
-test-log = { version = "0.2", features = ["trace"] }
+test-log = { version = "0.2", features = [
+    "trace",
+] }

@@ -22,21 +22,29 @@ doctest = false
 
 
 [features]
-default = []
-sqlx = ["dep:sqlx"]
-testing = ["dep:mockall", "odf/testing"]
+default = [
+]
+sqlx = [
+    "dep:sqlx",
+]
+testing = [
+    "dep:mockall",
+    "odf/testing",
+]
 
 
 [dependencies]
-database-common = { workspace = true }
 crypto-utils = { workspace = true }
+database-common = { workspace = true }
 email-utils = { workspace = true }
 event-sourcing = { workspace = true }
 internal-error = { workspace = true }
-messaging-outbox = { workspace = true }
-odf = { workspace = true, default-features = false, features = ["schemars"] }
-random-strings = { workspace = true }
 kamu-search = { workspace = true }
+messaging-outbox = { workspace = true }
+odf = { workspace = true, default-features = false, features = [
+    "schemars",
+] }
+random-strings = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
 base32 = { version = "0.5" }
@@ -62,7 +70,8 @@ serde_json = { version = "1", default-features = false }
 serde_with = { version = "3", default-features = false }
 setty = { version = "1.0", default-features = false }
 strum = { version = "0.28", features = [
-    "derive", ] }
+    "derive",
+] }
 thiserror = { version = "2", default-features = false, features = [
     "std",
 ] }
@@ -70,11 +79,12 @@ url = { version = "2", default-features = false, features = [
     "serde",
 ] }
 uuid = { version = "1", default-features = false, features = [
+    "serde",
     "v4",
     "v5",
-    "serde",
 ] }
-zeroize = { version = "1", default-features = false, features = [] }
+zeroize = { version = "1", default-features = false, features = [
+] }
 
 # Optional
 sqlx = { optional = true, version = "0.8", default-features = false, features = [
@@ -82,8 +92,10 @@ sqlx = { optional = true, version = "0.8", default-features = false, features = 
 ] }
 
 [dev-dependencies]
-constcat = { version = "0.6", default-features = false, features = [] }
+constcat = { version = "0.6", default-features = false, features = [
+] }
 pretty_assertions = { version = "1", default-features = false, features = [
     "unstable",
 ] }
-rstest = { version = "0.26", default-features = false, features = [] }
+rstest = { version = "0.26", default-features = false, features = [
+] }

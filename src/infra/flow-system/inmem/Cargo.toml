@@ -23,8 +23,8 @@ doctest = false
 
 [dependencies]
 database-common = { workspace = true }
-odf = { workspace = true }
 messaging-outbox = { workspace = true }
+odf = { workspace = true }
 time-source = { workspace = true }
 
 kamu-flow-system = { workspace = true }
@@ -37,8 +37,11 @@ dill = { version = "0.15", default-features = false }
 futures = "0.3"
 serde = { version = "1", default-features = false }
 serde_json = { version = "1", default-features = false }
-strum = { version = "0.28", features = ["derive"] }
-tokio = { version = "1", default-features = false, features = [] }
+strum = { version = "0.28", features = [
+    "derive",
+] }
+tokio = { version = "1", default-features = false, features = [
+] }
 tracing = { version = "0.1", default-features = false }
 
 
@@ -47,4 +50,6 @@ database-common-macros = { workspace = true }
 kamu-flow-system-repo-tests = { workspace = true }
 
 test-group = { version = "1" }
-test-log = { version = "0.2", features = ["trace"] }
+test-log = { version = "0.2", features = [
+    "trace",
+] }

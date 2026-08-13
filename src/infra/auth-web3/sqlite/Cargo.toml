@@ -24,7 +24,9 @@ doctest = false
 [dependencies]
 database-common = { workspace = true }
 internal-error = { workspace = true }
-kamu-auth-web3 = { workspace = true, default-features = false, features = ["sqlx"] }
+kamu-auth-web3 = { workspace = true, default-features = false, features = [
+    "sqlx",
+] }
 
 async-trait = "0.1"
 chrono = { version = "0.4", default-features = false }
@@ -42,5 +44,10 @@ database-common-macros = { workspace = true }
 kamu-auth-web3-repo-tests = { workspace = true }
 
 test-group = { version = "1" }
-test-log = { version = "0.2", features = ["trace"] }
-tokio = { version = "1", default-features = false, features = ["rt", "macros"] }
+test-log = { version = "0.2", features = [
+    "trace",
+] }
+tokio = { version = "1", default-features = false, features = [
+    "macros",
+    "rt",
+] }

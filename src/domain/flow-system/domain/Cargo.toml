@@ -22,9 +22,14 @@ doctest = false
 
 
 [features]
-default = []
-sqlx = ["dep:sqlx"]
-testing = ["dep:mockall"]
+default = [
+]
+sqlx = [
+    "dep:sqlx",
+]
+testing = [
+    "dep:mockall",
+]
 
 [dependencies]
 async-utils = { workspace = true }
@@ -32,24 +37,35 @@ database-common = { workspace = true }
 enum-variants = { workspace = true }
 event-sourcing = { workspace = true }
 internal-error = { workspace = true }
+kamu-task-system = { workspace = true }
 messaging-outbox = { workspace = true }
 odf = { workspace = true }
-kamu-task-system = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
 cron = { version = "0.16", default-features = false }
 dill = { version = "0.15", default-features = false }
-nutype = { version = "0.7", default-features = false, features = ["serde", "new_unchecked"] }
+nutype = { version = "0.7", default-features = false, features = [
+    "new_unchecked",
+    "serde",
+] }
 rand = { version = "0.9", default-features = false }
 serde_json = { version = "1", default-features = false }
-strum = { version = "0.28", features = ["derive"] }
-thiserror = { version = "2", default-features = false, features = ["std"] }
-tracing = { version = "0.1", default-features = false, features = ["std"] }
+strum = { version = "0.28", features = [
+    "derive",
+] }
+thiserror = { version = "2", default-features = false, features = [
+    "std",
+] }
 tokio-stream = { version = "0.1", default-features = false }
+tracing = { version = "0.1", default-features = false, features = [
+    "std",
+] }
 
 # TODO: Make serde optional
-serde = { version = "1", default-features = false, features = ["derive"] }
+serde = { version = "1", default-features = false, features = [
+    "derive",
+] }
 serde_with = { version = "3", default-features = false, features = [
     "chrono_0_4",
 ] }

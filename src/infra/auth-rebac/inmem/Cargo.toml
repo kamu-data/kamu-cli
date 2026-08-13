@@ -26,7 +26,8 @@ kamu-auth-rebac = { workspace = true }
 
 async-trait = "0.1"
 dill = { version = "0.15", default-features = false }
-tokio = { version = "1", default-features = false, features = [] }
+tokio = { version = "1", default-features = false, features = [
+] }
 
 
 [dev-dependencies]
@@ -34,4 +35,6 @@ database-common-macros = { workspace = true }
 kamu-auth-rebac-repo-tests = { workspace = true }
 
 test-group = { version = "1" }
-test-log = { version = "0.2", features = ["trace"] }
+test-log = { version = "0.2", features = [
+    "trace",
+] }
