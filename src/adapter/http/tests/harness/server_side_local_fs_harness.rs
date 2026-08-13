@@ -22,7 +22,6 @@ use kamu_accounts::{
     DidSecretEncryptionConfig,
     JwtAuthenticationConfig,
     PredefinedAccountsConfig,
-    SeedDidsFromNamesInTests,
     TEST_ACCOUNT_ID,
 };
 use kamu_accounts_inmem::{
@@ -119,13 +118,15 @@ impl ServerSideLocalFsHarness {
             let base_url_rest = format!("http://{}", listener.local_addr().unwrap());
 
             let predefined_accounts_config = match options.tenancy_config {
-                TenancyConfig::SingleTenant => PredefinedAccountsConfig::single_tenant(),
+                TenancyConfig::SingleTenant => {
+                    PredefinedAccountsConfig::test_single_tenant_with_id()
+                }
                 TenancyConfig::MultiTenant => {
                     let mut predefined_accounts_config = PredefinedAccountsConfig::new();
                     predefined_accounts_config.predefined.push(
-                        AccountConfig::test_config_from_name(odf::AccountName::new_unchecked(
-                            SERVER_ACCOUNT_NAME,
-                        )),
+                        AccountConfig::test_config_from_name_with_id(
+                            odf::AccountName::new_unchecked(SERVER_ACCOUNT_NAME),
+                        ),
                     );
                     predefined_accounts_config
                 }
@@ -185,7 +186,6 @@ impl ServerSideLocalFsHarness {
                 .add::<RebacServiceImpl>()
                 .add::<UpdateAccountUseCaseImpl>()
                 .add::<CreateAccountUseCaseImpl>()
-                .add_value(SeedDidsFromNamesInTests)
                 .add::<InMemoryAccountQuotaEventStore>()
                 .add::<AccountQuotaServiceImpl>()
                 .add::<InMemoryDatasetStatisticsRepository>()
