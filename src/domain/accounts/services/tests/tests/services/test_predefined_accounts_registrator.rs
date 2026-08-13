@@ -933,15 +933,14 @@ async fn test_mt_add_new_account() {
             .unwrap()
     };
 
-    // 2. Create Alice's account
+    // 2. Create Bob's account
     {
         let second_run_catalog = harness.build_catalog({
             let mut c = predefined_accounts_config;
             // Bob is a freshman
-            c.predefined.push(
-                AccountConfig::test_config_from_name(bob_account_name.clone())
-                    .set_account_name(alice_account_name.clone()),
-            );
+            c.predefined.push(AccountConfig::test_config_from_name(
+                bob_account_name.clone(),
+            ));
             c
         });
 
