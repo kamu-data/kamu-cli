@@ -16,7 +16,7 @@ indent_string = "    "
 
 # Expand features arrays
 [[rule]]
-keys = ["features", "dependencies", "dev-dependencies"]
+keys = ["features", "dependencies", "dev-dependencies", "workspace.package"]
 
 [rule.formatting]
 column_width = 1

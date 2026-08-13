@@ -99,8 +99,8 @@ lint-cargo-toml:
 lint-fix:
 	cargo clippy --workspace --all-targets --fix --allow-dirty --allow-staged --broken-code
 	cargo fmt --all
-	taplo fmt
 	cargo sort -g
+	taplo fmt
 
 
 ###############################################################################
