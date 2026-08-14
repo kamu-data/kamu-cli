@@ -46,6 +46,24 @@ const RESOURCE_PAGE_SIZE: usize = 100;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Escapes a literal so it matches only itself when used as a `LIKE` pattern.
+///
+/// Needed because a selector's `name` is a pattern by ODF definition, so an
+/// exact name spelled by the user has to be neutralised before it travels as
+/// one.
+fn sql_like_escape_literal(literal: &str) -> String {
+    let mut escaped = String::with_capacity(literal.len());
+    for ch in literal.chars() {
+        if matches!(ch, '%' | '_' | '\\') {
+            escaped.push('\\');
+        }
+        escaped.push(ch);
+    }
+    escaped
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[async_trait::async_trait]
 impl ResourceSelectionResolutionService for ResourceSelectionResolutionServiceImpl {
     async fn resolve(
@@ -310,7 +328,7 @@ impl ResourceSelectionResolutionServiceImpl {
                 .push((exact_index, resource_ref));
         }
 
-        for (resource_type, (schema, entries)) in groups {
+        for (_resource_type, (schema, entries)) in groups {
             // `search_handles` carries one query mode at a time.
             let mut by_id = Vec::new();
             let mut by_name = Vec::new();
@@ -329,9 +347,9 @@ impl ResourceSelectionResolutionServiceImpl {
                 let ids = by_id.iter().map(|(_, id)| *id).collect::<Vec<_>>();
                 let found = resource_facade
                     .search_handles(SearchResourceHandlesRequest {
-                        scope: kamu_resources_facade::RawResourceScope::one_type(
-                            resource_type.clone(),
-                            Some(kamu_resources::ResourceQuery::ExactIds(ids)),
+                        selectors: kamu_resources::ResourceSelector::ids_of_type(
+                            &schema.clone().into(),
+                            ids,
                         ),
                         account: None,
                         label_filter: label_filter.cloned(),
@@ -359,28 +377,62 @@ impl ResourceSelectionResolutionServiceImpl {
             }
 
             if !by_name.is_empty() {
-                let names = by_name
-                    .iter()
-                    .map(|(_, name)| name.clone())
-                    .collect::<Vec<_>>();
-                let found = resource_facade
-                    .search_handles(SearchResourceHandlesRequest {
-                        scope: kamu_resources_facade::RawResourceScope::one_type(
-                            resource_type.clone(),
-                            Some(kamu_resources::ResourceQuery::ExactNames(names)),
-                        ),
-                        account: None,
-                        label_filter: label_filter.cloned(),
-                        pagination: PaginationOpts {
-                            limit: by_name.len(),
-                            offset: 0,
-                        },
-                    })
-                    .await?
-                    .items
-                    .into_iter()
-                    .map(|handle| (handle.name.to_ascii_lowercase(), handle))
-                    .collect::<HashMap<_, _>>();
+                // Two paths, because the ref API carries no label filter.
+                //
+                // Unfiltered, exact names go through the ref API rather than
+                // selectors: a selector's `name` is a `LIKE` pattern by ODF
+                // definition, so routing names through it would turn one
+                // batched `ExactNames` row into one `ILIKE` row per name.
+                //
+                // With a label filter there is no ref-API equivalent, so names
+                // are escaped into wildcard-free patterns and searched. That
+                // costs one `ILIKE` row per name, which is the price of
+                // filtering; correctness wins over the batching.
+                let found = if let Some(label_filter) = label_filter {
+                    resource_facade
+                        .search_handles(SearchResourceHandlesRequest {
+                            selectors: by_name
+                                .iter()
+                                .map(|(_, name)| {
+                                    kamu_resources::ResourceSelector::name_pattern(
+                                        schema.clone().into(),
+                                        sql_like_escape_literal(name.as_str()),
+                                    )
+                                })
+                                .collect(),
+                            account: None,
+                            label_filter: Some(label_filter.clone()),
+                            pagination: PaginationOpts {
+                                limit: by_name.len(),
+                                offset: 0,
+                            },
+                        })
+                        .await?
+                        .items
+                        .into_iter()
+                        .map(|handle| (handle.name.to_ascii_lowercase(), handle))
+                        .collect::<HashMap<_, _>>()
+                } else {
+                    let refs = by_name
+                        .iter()
+                        .map(|(_, name)| kamu_resources::ResourceRef {
+                            account: None,
+                            r#type: schema.clone().into(),
+                            id: None,
+                            did: None,
+                            name: Some(name.clone()),
+                        })
+                        .collect::<Vec<_>>();
+
+                    resource_facade
+                        .get_handles(refs)
+                        .await
+                        .map_err(CLIError::critical)?
+                        .successes
+                        .into_iter()
+                        .map(|success| (success.item.name.to_ascii_lowercase(), success.item))
+                        .collect::<HashMap<_, _>>()
+                };
 
                 // Registered descriptor schemas must parse back into TypeUri.
                 let type_name =
@@ -431,9 +483,7 @@ impl ResourceSelectionResolutionServiceImpl {
 
         let found = resource_facade
             .search_handles(SearchResourceHandlesRequest {
-                scope: kamu_resources_facade::RawResourceScope::AnyType(Some(
-                    kamu_resources::ResourceQuery::ExactIds(ids.clone()),
-                )),
+                selectors: kamu_resources::ResourceSelector::any_type_ids(ids.clone()),
                 account: None,
                 label_filter: label_filter.cloned(),
                 pagination: PaginationOpts {
@@ -588,7 +638,9 @@ impl ResourceSelectionResolutionServiceImpl {
                 async move {
                     resource_facade
                         .list_handles(ListResourceHandlesRequest {
-                            raw_type_selector: (&type_descriptor.canonical_selector).into(),
+                            selectors: vec![kamu_resources::ResourceSelector::of_type(
+                                type_descriptor.schema.clone().into(),
+                            )],
                             account: None,
                             label_filter: request_label_filter,
                             pagination,
@@ -633,12 +685,10 @@ impl ResourceSelectionResolutionServiceImpl {
                 async move {
                     resource_facade
                         .search_handles(SearchResourceHandlesRequest {
-                            scope: kamu_resources_facade::RawResourceScope::one_type(
-                                (&type_descriptor.canonical_selector).into(),
-                                Some(kamu_resources::ResourceQuery::NamePattern(
-                                    request_name_pattern,
-                                )),
-                            ),
+                            selectors: vec![kamu_resources::ResourceSelector::name_pattern(
+                                type_descriptor.schema.clone().into(),
+                                request_name_pattern,
+                            )],
                             account: None,
                             label_filter: request_label_filter,
                             pagination,
@@ -691,10 +741,15 @@ impl ResourceSelectionResolutionServiceImpl {
         ignored_selectors: &mut Vec<ResourceIgnoredSelector>,
         options: &ResourceSelectionResolutionOptions,
     ) -> Result<Vec<ResourceTarget>, CLIError> {
-        let query = match &resource_ref {
-            ExactResourceRef::ById(id) => kamu_resources::ResourceQuery::ExactIds(vec![*id]),
+        // One exact ref spanning every type. A single selector, so the
+        // escape-to-pattern cost that rules selectors out for name *batches*
+        // does not apply here.
+        let selector = match &resource_ref {
+            ExactResourceRef::ById(id) => kamu_resources::ResourceSelector::any_type_id(*id),
             ExactResourceRef::ByName(name) => {
-                kamu_resources::ResourceQuery::ExactNames(vec![name.clone()])
+                kamu_resources::ResourceSelector::any_type_name_pattern(sql_like_escape_literal(
+                    name.as_str(),
+                ))
             }
         };
 
@@ -703,14 +758,12 @@ impl ResourceSelectionResolutionServiceImpl {
             options.max_expanded_results,
             seen_target_keys,
             |pagination| {
-                let request_query = query.clone();
+                let request_selector = selector.clone();
                 let request_label_filter = options.label_filter.clone();
                 async move {
                     resource_facade
                         .search_handles(SearchResourceHandlesRequest {
-                            scope: kamu_resources_facade::RawResourceScope::AnyType(Some(
-                                request_query,
-                            )),
+                            selectors: vec![request_selector],
                             account: None,
                             label_filter: request_label_filter,
                             pagination,
@@ -764,9 +817,11 @@ impl ResourceSelectionResolutionServiceImpl {
                 async move {
                     resource_facade
                         .search_handles(SearchResourceHandlesRequest {
-                            scope: kamu_resources_facade::RawResourceScope::AnyType(Some(
-                                kamu_resources::ResourceQuery::NamePattern(request_name_pattern),
-                            )),
+                            selectors: vec![
+                                kamu_resources::ResourceSelector::any_type_name_pattern(
+                                    request_name_pattern,
+                                ),
+                            ],
                             account: None,
                             label_filter: request_label_filter,
                             pagination,

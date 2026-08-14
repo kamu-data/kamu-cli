@@ -13,9 +13,8 @@ use internal_error::InternalError;
 use crate::facade::graphql::cynic_api::inputs::{
     AccountRefInput,
     ResourceLabelFilterInput,
-    ResourceQueryInput,
-    ResourceScopeInput,
-    ResourceTypeSelectorInput,
+    ResourceSelectorInput,
+    resource_selector_inputs,
 };
 use crate::facade::graphql::cynic_api::schema;
 
@@ -23,28 +22,25 @@ use crate::facade::graphql::cynic_api::schema;
 
 #[derive(cynic::QueryVariables, Debug, Clone)]
 pub(crate) struct ListByResourceTypeVariables {
-    pub resource_type: ResourceTypeSelectorInput,
+    pub selectors: Vec<ResourceSelectorInput>,
     pub account: Option<AccountRefInput>,
     pub label_filter: Option<ResourceLabelFilterInput>,
-    pub query: Option<ResourceQueryInput>,
     pub page: i32,
     pub per_page: i32,
 }
 
 impl ListByResourceTypeVariables {
     pub(crate) fn new(
-        resource_type: &kamu_resources::ResourceTypeSelectorRaw,
+        selectors: &[kamu_resources::ResourceSelector],
         account: Option<&kamu_resources::ResourceAccountRef>,
         label_filter: Option<&kamu_resources::ResourceLabelFilterInput>,
         pagination: PaginationOpts,
-        query: Option<&kamu_resources::ResourceQuery>,
     ) -> Result<Self, InternalError> {
         let (page, per_page) = pagination.as_page_params(Self::DEFAULT_PAGE_SIZE)?;
         Ok(Self {
-            resource_type: ResourceTypeSelectorInput::from_resource_type(resource_type),
+            selectors: resource_selector_inputs(selectors),
             account: account.map(Into::into),
             label_filter: label_filter.map(Into::into),
-            query: query.map(Into::into),
             page,
             per_page,
         })
@@ -59,7 +55,7 @@ impl ListByResourceTypeVariables {
 pub(crate) struct ListAllVariables {
     pub account: Option<AccountRefInput>,
     pub label_filter: Option<ResourceLabelFilterInput>,
-    pub scope: Option<ResourceScopeInput>,
+    pub selectors: Option<Vec<ResourceSelectorInput>>,
     pub page: i32,
     pub per_page: i32,
 }
@@ -69,13 +65,13 @@ impl ListAllVariables {
         account: Option<&kamu_resources::ResourceAccountRef>,
         label_filter: Option<&kamu_resources::ResourceLabelFilterInput>,
         pagination: PaginationOpts,
-        scope: Option<&crate::RawResourceScope>,
+        selectors: &[kamu_resources::ResourceSelector],
     ) -> Result<Self, InternalError> {
         let (page, per_page) = pagination.as_page_params(Self::DEFAULT_PAGE_SIZE)?;
         Ok(Self {
             account: account.map(Into::into),
             label_filter: label_filter.map(Into::into),
-            scope: scope.map(Into::into),
+            selectors: Some(resource_selector_inputs(selectors)),
             page,
             per_page,
         })

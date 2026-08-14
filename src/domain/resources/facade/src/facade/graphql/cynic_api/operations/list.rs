@@ -35,7 +35,7 @@ pub(crate) struct ListByResourceTypeQuery {
 #[derive(cynic::QueryFragment, Debug, Clone)]
 #[cynic(graphql_type = "Resources", variables = "ListByResourceTypeVariables")]
 pub(crate) struct ListByResourceTypeResources {
-    #[arguments(resourceType: $resource_type, account: $account, labelFilter: $label_filter, query: $query, page: $page, perPage: $per_page)]
+    #[arguments(selectors: $selectors, account: $account, labelFilter: $label_filter, page: $page, perPage: $per_page)]
     pub list_by_resource_type: ResourceListOutcome,
 }
 
@@ -50,7 +50,7 @@ pub(crate) struct ListAllQuery {
 #[derive(cynic::QueryFragment, Debug, Clone)]
 #[cynic(graphql_type = "Resources", variables = "ListAllVariables")]
 pub(crate) struct ListAllResources {
-    #[arguments(account: $account, labelFilter: $label_filter, scope: $scope, page: $page, perPage: $per_page)]
+    #[arguments(account: $account, labelFilter: $label_filter, selectors: $selectors, page: $page, perPage: $per_page)]
     pub list_all: ResourceListAllOutcome,
 }
 
@@ -65,7 +65,7 @@ pub(crate) struct ListHandlesByResourceTypeQuery {
 #[derive(cynic::QueryFragment, Debug, Clone)]
 #[cynic(graphql_type = "Resources", variables = "ListByResourceTypeVariables")]
 pub(crate) struct ListHandlesByResourceTypeResources {
-    #[arguments(resourceType: $resource_type, account: $account, labelFilter: $label_filter, page: $page, perPage: $per_page)]
+    #[arguments(selectors: $selectors, account: $account, labelFilter: $label_filter, page: $page, perPage: $per_page)]
     pub list_handles_by_resource_type: ResourceHandleListOutcome,
 }
 

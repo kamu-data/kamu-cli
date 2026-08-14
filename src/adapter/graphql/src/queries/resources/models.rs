@@ -137,79 +137,55 @@ pub(crate) fn into_resource_refs(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Exactly one way to narrow a search.
-#[derive(OneofObject, Debug, Clone)]
-pub enum ResourceQueryInput {
-    ExactNames(Vec<ResourceName<'static>>),
-    ExactIds(Vec<ResourceID<'static>>),
-    NamePattern(String),
-}
-
-impl From<ResourceQueryInput> for kamu_resources::ResourceQuery {
-    fn from(value: ResourceQueryInput) -> Self {
-        match value {
-            ResourceQueryInput::ExactNames(names) => {
-                Self::ExactNames(names.into_iter().map(Into::into).collect())
-            }
-            ResourceQueryInput::ExactIds(ids) => {
-                Self::ExactIds(ids.into_iter().map(Into::into).collect())
-            }
-            ResourceQueryInput::NamePattern(pattern) => Self::NamePattern(pattern),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// One resource type in a scope, with the query narrowing it.
+/// Matches zero or many resources, mirroring the ODF `ResourceSelector`.
+///
+/// Several selectors in one call act as a logical OR, which is what lets a
+/// single call span resource types. Every field is optional: a selector with no
+/// `type` spans every type, and one narrowing by nothing matches all of them.
 #[derive(InputObject, Debug, Clone)]
-pub struct ResourceTypeQueryInput {
-    pub resource_type: ResourceTypeSelectorInput,
-    pub query: Option<ResourceQueryInput>,
+pub struct ResourceSelectorInput {
+    pub account: Option<AccountRefInput>,
+    /// Canonical selector (`variablesets`), alias (`vs`), ODF type name
+    /// (`VariableSet`), or full schema URI. `null` spans every type.
+    pub r#type: Option<ResourceTypeSelectorInput>,
+    pub id: Option<ResourceID<'static>>,
+    /// Name pattern in SQL `LIKE` format, per the ODF schema — `%` and `_` are
+    /// wildcards. A pattern with no wildcards matches that name exactly.
+    pub name: Option<String>,
+    pub labels: Option<ResourceLabelFilterInput>,
 }
 
-impl From<ResourceTypeQueryInput> for kamu_resources_facade::RawResourceTypeQuery {
-    fn from(value: ResourceTypeQueryInput) -> Self {
+impl From<ResourceSelectorInput> for kamu_resources::ResourceSelector {
+    fn from(value: ResourceSelectorInput) -> Self {
         Self {
-            raw_type_selector: value.resource_type.into_resource_type_selector(),
-            query: value.query.map(Into::into),
+            account: value.account.map(AccountRefInput::into_manifest_account),
+            r#type: value.r#type.map(ResourceTypeSelectorInput::into_type_ref),
+            id: value.id.map(Into::into),
+            name: value.name,
+            // Per-selector labels are not resolved yet; the call-level filter
+            // applies to every selector.
+            labels: None,
         }
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Every resource type, optionally narrowed by one query applying to all.
-#[derive(InputObject, Debug, Clone)]
-pub struct ResourceAnyTypeScopeInput {
-    pub query: Option<ResourceQueryInput>,
+pub(crate) fn into_resource_selectors(
+    selectors: Vec<ResourceSelectorInput>,
+) -> Vec<kamu_resources::ResourceSelector> {
+    selectors.into_iter().map(Into::into).collect()
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Exactly one way to scope a search or listing by resource type.
-#[derive(OneofObject, Debug, Clone)]
-pub enum ResourceScopeInput {
-    AnyType(ResourceAnyTypeScopeInput),
-    Types(Vec<ResourceTypeQueryInput>),
-}
-
-impl From<ResourceScopeInput> for kamu_resources_facade::RawResourceScope {
-    fn from(value: ResourceScopeInput) -> Self {
-        match value {
-            ResourceScopeInput::AnyType(scope) => Self::AnyType(scope.query.map(Into::into)),
-            ResourceScopeInput::Types(type_queries) => {
-                Self::Types(type_queries.into_iter().map(Into::into).collect())
-            }
-        }
-    }
+/// The all-types, unnarrowed selector — what a listing means with no selectors
+/// given.
+pub(crate) fn any_resource_selector() -> kamu_resources::ResourceSelector {
+    kamu_resources::ResourceSelector::default()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(InputObject, Debug, Clone)]
 pub struct SearchResourceHandlesInput {
-    pub scope: ResourceScopeInput,
+    pub selectors: Vec<ResourceSelectorInput>,
     pub account: Option<AccountRefInput>,
     pub label_filter: Option<ResourceLabelFilterInput>,
 }
@@ -220,7 +196,7 @@ impl SearchResourceHandlesInput {
         pagination: PaginationOpts,
     ) -> Result<kamu_resources_facade::SearchResourceHandlesRequest, GqlError> {
         Ok(kamu_resources_facade::SearchResourceHandlesRequest {
-            scope: self.scope.into(),
+            selectors: into_resource_selectors(self.selectors),
             account: self.account.map(AccountRefInput::into_manifest_account),
             label_filter: into_facade_filter(self.label_filter)?,
             pagination,

@@ -24,20 +24,20 @@ use crate::queries::{
     ResourceInvalidLabelFilterProblem,
     ResourceLabelFilterInput,
     ResourceManifestFormat,
-    ResourceQueryInput,
     ResourceRefInput,
     ResourceRenderManifestResult,
-    ResourceScopeInput,
+    ResourceSelectorInput,
     ResourceSelectorProblem,
     ResourceSelectorProblemResult,
     ResourceSummary,
     ResourceTypeDescriptor,
-    ResourceTypeSelectorInput,
     ResourceUnsupportedSelectorProblem,
     ResourcesSummary,
     SearchResourceHandlesInput,
+    any_resource_selector,
     into_facade_filter,
     into_resource_refs,
+    into_resource_selectors,
     map_unsupported_selector_problem,
 };
 
@@ -222,15 +222,14 @@ impl Resources {
     }
 
     /// Returns resources of the specified resource type
-    #[tracing::instrument(level = "info", name = Resources_list_by_resource_type, skip_all, fields(?resource_type, ?page, ?per_page))]
+    #[tracing::instrument(level = "info", name = Resources_list_by_resource_type, skip_all, fields(selector_count = selectors.len(), ?page, ?per_page))]
     #[graphql(guard = "LoggedInGuard::new()")]
     async fn list_by_resource_type(
         &self,
         ctx: &Context<'_>,
-        resource_type: ResourceTypeSelectorInput,
+        selectors: Vec<ResourceSelectorInput>,
         account: Option<AccountRefInput>,
         label_filter: Option<ResourceLabelFilterInput>,
-        query: Option<ResourceQueryInput>,
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<ResourceListOutcome> {
@@ -240,11 +239,10 @@ impl Resources {
 
         match resource_facade
             .list(kamu_resources_facade::ListResourcesRequest {
-                raw_type_selector: resource_type.into_resource_type_selector(),
+                selectors: into_resource_selectors(selectors),
                 account: account.map(AccountRefInput::into_manifest_account),
                 pagination: PaginationOpts::from_page(page, per_page),
                 label_filter: into_facade_filter(label_filter)?,
-                query: query.map(Into::into),
             })
             .await
         {
@@ -272,12 +270,12 @@ impl Resources {
     }
 
     /// Returns resource handles of the specified resource type
-    #[tracing::instrument(level = "info", name = Resources_list_handles_by_resource_type, skip_all, fields(?resource_type, ?page, ?per_page))]
+    #[tracing::instrument(level = "info", name = Resources_list_handles_by_resource_type, skip_all, fields(selector_count = selectors.len(), ?page, ?per_page))]
     #[graphql(guard = "LoggedInGuard::new()")]
     async fn list_handles_by_resource_type(
         &self,
         ctx: &Context<'_>,
-        resource_type: ResourceTypeSelectorInput,
+        selectors: Vec<ResourceSelectorInput>,
         account: Option<AccountRefInput>,
         label_filter: Option<ResourceLabelFilterInput>,
         page: Option<usize>,
@@ -289,7 +287,7 @@ impl Resources {
 
         match resource_facade
             .list_handles(kamu_resources_facade::ListResourceHandlesRequest {
-                raw_type_selector: resource_type.into_resource_type_selector(),
+                selectors: into_resource_selectors(selectors),
                 account: account.map(AccountRefInput::into_manifest_account),
                 label_filter: into_facade_filter(label_filter)?,
                 pagination: PaginationOpts::from_page(page, per_page),
@@ -370,7 +368,7 @@ impl Resources {
         ctx: &Context<'_>,
         account: Option<AccountRefInput>,
         label_filter: Option<ResourceLabelFilterInput>,
-        scope: Option<ResourceScopeInput>,
+        selectors: Option<Vec<ResourceSelectorInput>>,
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<ResourceListAllOutcome> {
@@ -383,10 +381,8 @@ impl Resources {
                 label_filter: into_facade_filter(label_filter)?,
                 account: account.map(AccountRefInput::into_manifest_account),
                 pagination: PaginationOpts::from_page(page, per_page),
-                scope: scope.map_or(
-                    kamu_resources_facade::RawResourceScope::AnyType(None),
-                    Into::into,
-                ),
+                selectors: selectors
+                    .map_or_else(|| vec![any_resource_selector()], into_resource_selectors),
             })
             .await
         {
@@ -661,6 +657,7 @@ fn map_list_resources_error(error: kamu_resources_facade::ListResourcesError) ->
         E::UnsupportedSelector(_) => GqlError::gql("Unsupported resource type selector"),
         E::BadAccount(error) => map_resolve_manifest_account_error(error),
         E::InvalidLabelFilter(error) => GqlError::gql(error.to_string()),
+        E::UnrepresentableScope(error) => GqlError::gql(error.to_string()),
         E::RemoteRequest(error) => error.int_err().into(),
         E::Internal(error) => error.into(),
     }

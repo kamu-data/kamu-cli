@@ -140,7 +140,7 @@ impl From<ResourceLabelFilterExprParseError> for ResourceInvalidLabelFilterError
     }
 }
 
-use crate::ResolveManifestAccountError;
+use crate::{ResolveManifestAccountError, UnrepresentableScopeError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -303,6 +303,9 @@ pub enum ListResourcesError {
 
     #[error(transparent)]
     InvalidLabelFilter(#[from] ResourceInvalidLabelFilterError),
+
+    #[error(transparent)]
+    UnrepresentableScope(#[from] UnrepresentableScopeError),
 
     #[error(transparent)]
     RemoteRequest(#[from] GraphqlHttpRequestError),

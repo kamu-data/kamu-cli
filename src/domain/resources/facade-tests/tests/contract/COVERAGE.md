@@ -63,15 +63,15 @@ Each RF scenario from the original plan is listed with its status.
 | RF-084  | list_search.rs      | Active   | list_handles pagination mirrors list pagination                    |                                                                        |
 | RF-085  | list_search.rs      | Active   | List empty account/type returns empty result                          |                                                                        |
 | RF-086  | list_search.rs      | Active   | List unsupported type returns unsupported descriptor error            |                                                                        |
-| RF-087  | list_search.rs      | Active   | List narrowed by query (pattern / exact names / exact ids)            | `list` keeps summary views while narrowing; vacuous empty list mirrors RF-094 |
-| RF-090  | list_search.rs      | Active   | Search by exact names                                                 |                                                                        |
-| RF-091  | list_search.rs      | Active   | Search by exact names with missing names                              |                                                                        |
+| RF-087  | list_search.rs      | Active   | List narrowed by selectors (name pattern / id)                        | `list` keeps summary views while narrowing. Unlike `search`, it renders typed columns through one type's dispatcher, so an empty selector list is rejected rather than vacuous — the vacuous case is RF-094 |
+| RF-090  | list_search.rs      | Active   | Search by exact names                                                 | An exact name is a wildcard-free `LIKE` pattern: a selector's `name` is a pattern by ODF definition, so listing has no separate exact-name mode |
+| RF-091  | list_search.rs      | Active   | Search by exact names with missing names                              | Same wildcard-free-pattern form as RF-090                              |
 | RF-091A | list_search.rs      | Active   | Search by exact ids                                                   | Extension beyond original plan                                         |
 | RF-091B | list_search.rs      | Active   | Search by exact ids with missing ids                                  | Extension beyond original plan                                         |
 | RF-091C | list_search.rs      | Active   | Search by exact ids is account-scoped                                 | Extension beyond original plan                                         |
 | RF-092  | list_search.rs      | Active   | Search by name pattern                                                |                                                                        |
 | RF-093  | list_search.rs      | Active   | Search by multiple types                                              |                                                                        |
-| RF-094  | list_search.rs      | Active   | Search with an empty exact-names/ids list is vacuous, not rejected    | `ResourceQuery` makes "no query mode" unrepresentable                   |
+| RF-094  | list_search.rs      | Active   | Search with an empty selector list is vacuous, not rejected           | Empty is "match nothing", *not* "match everything" — the latter needs an explicit type-less, unnarrowed selector |
 | RF-095  | list_search.rs      | Active   | Search pagination and total_count                                     |                                                                        |
 | RF-096  | list_search.rs      | Active   | Search account scoping                                                |                                                                        |
 | RF-097  | list_search.rs      | Active   | List filter by canonical label URI is accepted                        | Local-only: repo matching is Phase 9, remote transport is Phase 10   |
@@ -84,11 +84,12 @@ Each RF scenario from the original plan is listed with its status.
 | RF-099E | list_search.rs      | Active   | List filter `$not` operator is rejected                               | Recognized (ODF `LabelFilter` schema shape) but not evaluated yet     |
 | RF-099F | list_search.rs      | Active   | List filter `$or` operator is rejected                                | Recognized but not evaluated yet, same reason as RF-099E              |
 | RF-099G | list_search.rs      | Active   | List filter malformed `$not` operator is rejected                     | Parse failure shares the same code as a well-formed but unevaluated `$not` |
+| RF-099H | list_search.rs      | Active   | search_handles label filter narrows candidates                        | Extension beyond original plan                                         |
 | RF-100  | list_all.rs         | Active   | list_all returns summaries across supported types                     |                                                                        |
 | RF-101  | list_all.rs         | Active   | list_all_handles returns handles across supported types         |                                                                        |
 | RF-102  | list_all.rs         | Active   | list_all pagination                                                   |                                                                        |
 | RF-103  | list_all.rs         | Active   | list_all empty account returns empty result                           |                                                                        |
-| RF-104  | list_all.rs         | Active   | list_all narrowed by scope: type subset + per-type query              | Pins positional type/query pairing, so a cross-wired scope fails       |
+| RF-104  | list_all.rs         | Active   | list_all narrowed by selectors: type subset + per-selector pattern    | Pins per-selector type/pattern pairing, so a cross-wired selector list fails |
 | RF-110  | summary.rs          | Active   | Summary for empty account                                             |                                                                        |
 | RF-111  | summary.rs          | Active   | Summary counts resources by type                                      |                                                                        |
 | RF-112  | summary.rs          | Active   | Summary phase counts (pending → ready transition)                     | Reconciling is an internal transient not observable at facade granularity |
@@ -96,9 +97,11 @@ Each RF scenario from the original plan is listed with its status.
 | RF-120  | account_scoping.rs  | Active   | Default account selector resolves to current account                  |                                                                        |
 | RF-121  | account_scoping.rs  | Active   | Account by name resolves correctly                                    |                                                                        |
 | RF-122  | account_scoping.rs  | Active   | Account by id resolves correctly                                      |                                                                        |
+| RF-122B | account_scoping.rs  | Active   | Agreeing account name and id resolve correctly                        | Extension beyond original plan; the positive counterpart to RF-123     |
 | RF-123  | account_scoping.rs  | Active   | Account name/id mismatch is rejected                                  |                                                                        |
 | RF-124  | account_scoping.rs  | Active   | Unknown account name/id is rejected                                   |                                                                        |
 | RF-125  | account_scoping.rs  | Active   | Account isolation across all read APIs                                |                                                                        |
+| RF-126  | account_scoping.rs  | Active   | Explicit empty account selector `{}` is rejected                      | Distinct from omitting `account` entirely (RF-120); rejected by account resolution, not parsing |
 | RF-130  | delete.rs           | Active   | Delete by name removes resource                                       |                                                                        |
 | RF-131  | delete.rs           | Active   | Delete by UID removes resource                                        |                                                                        |
 | RF-132  | delete.rs           | Active   | Delete missing name returns lookup problem                            |                                                                        |
@@ -125,4 +128,4 @@ Each RF scenario from the original plan is listed with its status.
 | RF-166  | apply_manifest_batch.rs | Active | Batch dry-run same-name create/update plans both as create            | Pins no same-batch write visibility during planning                    |
 | RF-167  | apply_manifest_batch.rs | Active | Live batch same-name create/update reads own writes                   |                                                                        |
 | RF-168  | apply_manifest_batch.rs | Active | Raw GraphQL batch rejection returns rollback extensions               | Verifies `extensions.batch` envelope                                   |
-| RF-169  | list_search.rs      | Active   | Search with AnyType scope spans every schema, still respects account  | Covers `RawResourceScope::AnyType`                                     |
+| RF-169  | list_search.rs      | Active   | Search with a type-less selector spans every schema, still respects account | Covers the type-less (`type: None`) selector, which resolves to `ResourceScope::AnyType` |

@@ -16,7 +16,13 @@
 //! account-accepting API (not demoted to internal errors).
 
 use database_common::PaginationOpts;
-use kamu_resources::{ApplyResourceOutcome, ResourceAccountRef, ResourceRef, TypeName};
+use kamu_resources::{
+    ApplyResourceOutcome,
+    ResourceAccountRef,
+    ResourceRef,
+    ResourceSelector,
+    TypeName,
+};
 use kamu_resources_facade::{
     ApplyManifestError,
     ApplyManifestRequest,
@@ -27,7 +33,6 @@ use kamu_resources_facade::{
     ListAllResourcesRequest,
     ListResourcesError,
     ListResourcesRequest,
-    RawResourceScope,
     RenderResourceManifestError,
     ResourceLookupProblem,
     ResourceManifestFormat,
@@ -458,10 +463,11 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
     let result = facade
         .list(ListResourcesRequest {
             account: Some(unknown_account.clone()),
-            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            selectors: vec![ResourceSelector::of_type(
+                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            )],
             pagination: PaginationOpts::from_max_results(1),
             label_filter: None,
-            query: None,
         })
         .await;
     assert_matches!(
@@ -476,7 +482,7 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
             account: Some(unknown_account.clone()),
             label_filter: None,
             pagination: PaginationOpts::from_max_results(1),
-            scope: RawResourceScope::AnyType(None),
+            selectors: vec![ResourceSelector::default()],
         })
         .await;
     assert_matches!(

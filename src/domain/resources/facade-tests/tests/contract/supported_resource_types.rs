@@ -12,6 +12,7 @@ use kamu_configuration::{SecretSetResource, VariableSetResource};
 use kamu_resources::{
     ResourceRef,
     ResourceSchemaProvider,
+    ResourceSelector,
     TypeName,
     UnsupportedResourceSelectorError,
 };
@@ -126,11 +127,12 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
     // Canonical selector name works for list, list_handles, and get
     let summaries = facade
         .list(ListResourcesRequest {
-            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            selectors: vec![ResourceSelector::of_type(
+                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            )],
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
             label_filter: None,
-            query: None,
         })
         .await
         .expect("list with canonical selector must succeed");
@@ -144,7 +146,9 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
 
     let handles = facade
         .list_handles(ListResourceHandlesRequest {
-            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            selectors: vec![ResourceSelector::of_type(
+                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            )],
             account: None,
             label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
@@ -179,11 +183,10 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
     // Short name "vs" resolves to the canonical VariableSet schema.
     let short_name_summaries = facade
         .list(ListResourcesRequest {
-            raw_type_selector: "vs".parse().unwrap(),
+            selectors: vec![ResourceSelector::of_type("vs".parse().unwrap())],
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
             label_filter: None,
-            query: None,
         })
         .await
         .expect("short name 'vs' must resolve for list");
@@ -200,11 +203,10 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
     // canonical/alias selector.
     let type_name_summaries = facade
         .list(ListResourcesRequest {
-            raw_type_selector: "VariableSet".parse().unwrap(),
+            selectors: vec![ResourceSelector::of_type("VariableSet".parse().unwrap())],
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
             label_filter: None,
-            query: None,
         })
         .await
         .expect("schema TypeName 'VariableSet' must resolve for list");
@@ -220,11 +222,12 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
     // (selectors are exact registered strings, not inflected).
     let bad_result = facade
         .list(ListResourcesRequest {
-            raw_type_selector: "NoSuchResourceTypeXYZ".parse().unwrap(),
+            selectors: vec![ResourceSelector::of_type(
+                "NoSuchResourceTypeXYZ".parse().unwrap(),
+            )],
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
             label_filter: None,
-            query: None,
         })
         .await;
     match bad_result {
@@ -314,11 +317,10 @@ pub async fn test_unsupported_schema_rejected_consistently(h: &impl FacadeContra
     // list — UnsupportedSelector (type validated before DB query)
     let list_result = facade
         .list(ListResourcesRequest {
-            raw_type_selector: bad_type.parse().unwrap(),
+            selectors: vec![ResourceSelector::of_type(bad_type.parse().unwrap())],
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
             label_filter: None,
-            query: None,
         })
         .await;
     match list_result {
@@ -333,7 +335,7 @@ pub async fn test_unsupported_schema_rejected_consistently(h: &impl FacadeContra
     // list_handles — UnsupportedSelector
     let li_result = facade
         .list_handles(ListResourceHandlesRequest {
-            raw_type_selector: bad_type.parse().unwrap(),
+            selectors: vec![ResourceSelector::of_type(bad_type.parse().unwrap())],
             account: None,
             label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
