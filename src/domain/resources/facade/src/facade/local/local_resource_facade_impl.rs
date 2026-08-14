@@ -619,6 +619,31 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Resolves one raw type selector against an already-built descriptor list.
+///
+/// Building that list constructs every registered dispatcher, so callers
+/// resolving more than one selector must build it once and reuse it here rather
+/// than going through
+/// [`LocalResourceFacadeImpl::resolve_schema_for_selector`] per selector.
+fn resolve_schema_in_descriptors<E>(
+    descriptors: &[ResourceTypeDescriptor],
+    selector: &ResourceTypeSelectorRaw,
+) -> Result<TypeUri, E>
+where
+    E: From<UnsupportedResourceSelectorError>,
+{
+    descriptors
+        .iter()
+        .find(|descriptor| descriptor.matches_selector(selector))
+        .map(|descriptor| descriptor.schema.clone())
+        .ok_or_else(|| UnsupportedResourceSelectorError::NotFound {
+            raw_selector: selector.clone(),
+        })
+        .map_err(Into::into)
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 impl LocalResourceFacadeImpl {
     /// Resolves an authored filter for the `all` scope.
     fn resolve_label_filter_for_all_schemas(
@@ -640,6 +665,7 @@ impl LocalResourceFacadeImpl {
 
         Ok(resolved)
     }
+
     fn list_resource_type_descriptors(&self) -> Vec<ResourceTypeDescriptor> {
         let mut seen = HashSet::new();
         let mut descriptors = Vec::new();
@@ -682,14 +708,7 @@ impl LocalResourceFacadeImpl {
     where
         E: From<UnsupportedResourceSelectorError>,
     {
-        self.list_resource_type_descriptors()
-            .into_iter()
-            .find(|descriptor| descriptor.matches_selector(selector))
-            .map(|descriptor| descriptor.schema)
-            .ok_or_else(|| UnsupportedResourceSelectorError::NotFound {
-                raw_selector: selector.clone(),
-            })
-            .map_err(Into::into)
+        resolve_schema_in_descriptors(&self.list_resource_type_descriptors(), selector)
     }
 
     /// Resolves a request's scope and label filter together, since narrowing to
@@ -702,32 +721,50 @@ impl LocalResourceFacadeImpl {
         scope: RawResourceScope,
         label_filter: Option<ResourceLabelFilterInput>,
     ) -> Result<(ResourceScope, ResolvedResourceLabelFilter), ListResourcesError> {
-        let raw_type_queries = match scope {
-            RawResourceScope::AnyType(query) if label_filter.is_none() => {
-                return Ok((
-                    ResourceScope::AnyType(query),
-                    ResolvedResourceLabelFilter::default(),
-                ));
-            }
+        // Without a label filter, `AnyType` needs no schemas at all, so it can
+        // answer before touching the catalog.
+        if let RawResourceScope::AnyType(query) = &scope
+            && label_filter.is_none()
+        {
+            return Ok((
+                ResourceScope::AnyType(query.clone()),
+                ResolvedResourceLabelFilter::default(),
+            ));
+        }
+
+        // Built once: constructing it instantiates every registered dispatcher,
+        // so both branches below resolve against this one list.
+        let descriptors = self.list_resource_type_descriptors();
+
+        let (queries, schemas) = match scope {
             // A label filter still needs a concrete schema to resolve label keys
             // against, so `AnyType` falls back to every registered schema here.
-            RawResourceScope::AnyType(query) => self
-                .list_resource_type_descriptors()
-                .into_iter()
-                .map(|descriptor| RawResourceTypeQuery {
-                    raw_type_selector: descriptor.canonical_selector.into(),
-                    query: query.clone(),
-                })
-                .collect(),
-            RawResourceScope::Types(raw_type_queries) => raw_type_queries,
+            // Their schemas come straight off the descriptors, with no lookup.
+            RawResourceScope::AnyType(query) => {
+                let schemas = descriptors
+                    .iter()
+                    .map(|descriptor| descriptor.schema.clone())
+                    .collect::<Vec<_>>();
+                let queries = std::iter::repeat_n(query, schemas.len()).collect::<Vec<_>>();
+                (queries, schemas)
+            }
+            RawResourceScope::Types(raw_type_queries) => {
+                let schemas = raw_type_queries
+                    .iter()
+                    .map(|entry| {
+                        resolve_schema_in_descriptors::<ListResourcesError>(
+                            &descriptors,
+                            &entry.raw_type_selector,
+                        )
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                let queries = raw_type_queries
+                    .into_iter()
+                    .map(|entry| entry.query)
+                    .collect::<Vec<_>>();
+                (queries, schemas)
+            }
         };
-
-        let schemas = raw_type_queries
-            .iter()
-            .map(|entry| {
-                self.resolve_schema_for_selector::<ListResourcesError>(&entry.raw_type_selector)
-            })
-            .collect::<Result<Vec<_>, _>>()?;
 
         let resource_schema_ids = schemas
             .iter()
@@ -744,12 +781,9 @@ impl LocalResourceFacadeImpl {
         let type_queries = schemas
             .into_iter()
             .zip(&resource_schema_ids)
-            .zip(raw_type_queries)
+            .zip(queries)
             .filter(|((_, schema_id), _)| applicable_schema_ids.contains(schema_id))
-            .map(|((schema, _), entry)| ResourceTypeQuery {
-                schema,
-                query: entry.query,
-            })
+            .map(|((schema, _), query)| ResourceTypeQuery { schema, query })
             .collect::<Vec<_>>();
 
         Ok((ResourceScope::Types(type_queries), resolved_label_filter))
@@ -778,15 +812,16 @@ impl LocalResourceFacadeImpl {
         )
         .await?;
 
-        let snapshot = self
-            .resolve_snapshot_for_schema::<E>(&schema, &target_account.did, id)
+        // Not redundant with the dispatcher read below: a `ById` selector is
+        // taken on trust, so this is what turns an unknown or wrong-typed ID
+        // into `IDNotFound` / a schema mismatch rather than a dispatcher error.
+        self.resolve_snapshot_for_schema::<E>(&schema, &target_account.did, id)
             .await?;
 
-        // Registered selector schemas must have a dispatcher.
-        let dispatcher = get_resource_crud_dispatcher_for_trusted_schema(
-            &self.catalog,
-            snapshot.schema.as_str(),
-        )?;
+        // Registered selector schemas must have a dispatcher, and the snapshot
+        // was just checked to carry this exact schema.
+        let dispatcher =
+            get_resource_crud_dispatcher_for_trusted_schema(&self.catalog, schema.as_str())?;
 
         let view = dispatcher
             .get(ResourceCrudDispatcherGetRequest {
