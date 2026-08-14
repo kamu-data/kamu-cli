@@ -79,8 +79,12 @@ impl From<&domain::ResourceRef> for ResourceRefInput {
             type_: ResourceTypeSelectorInput::from_type_ref(&value.r#type),
             id: value.id,
             name: value.name.clone(),
-            // `did` is deliberately absent: the facade rejects a populated one
-            // before a request is ever built, so it can never reach the wire.
+            // `did` is deliberately absent: it has no wire representation, and
+            // no caller can populate one today — the GraphQL adapter rejects it
+            // via `validate_ref`, and every CLI construction site hardcodes
+            // `None`. Should a ref ever carry one, it would be dropped here
+            // rather than rejected, so a new producer must validate at its own
+            // entry point.
         }
     }
 }

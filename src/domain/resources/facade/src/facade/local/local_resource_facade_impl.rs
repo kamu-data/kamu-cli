@@ -497,16 +497,25 @@ impl ResourceFacade for LocalResourceFacadeImpl {
                 .map(|row| (row.id, row))
                 .collect::<HashMap<_, _>>();
 
-            for (request_index, _, id) in resolution_response.id_entries {
+            for (request_index, resource_ref, id) in resolution_response.id_entries {
                 let row_result = rows_by_id
                     .get(id.as_ref())
                     .cloned()
                     .ok_or_else(|| id_not_found(id));
 
+                // Only a ref that supplied its own id asserts a name to verify:
+                // for a name-keyed ref the name *is* how the id was found.
+                let expected_name = if resource_ref.id.is_some() {
+                    resource_ref.name.as_ref()
+                } else {
+                    None
+                };
+
                 match row_result.and_then(|row| {
                     validate_handle_row(
                         row,
                         &group.schema,
+                        expected_name,
                         ensure_schema_matches::<ResourceLookupProblem>,
                     )
                 }) {
@@ -939,7 +948,15 @@ impl LocalResourceFacadeImpl {
                 .map(|snapshot| (snapshot.id, snapshot))
                 .collect::<HashMap<_, _>>();
 
-            for (request_index, _, id) in resolution_response.id_entries {
+            for (request_index, resource_ref, id) in resolution_response.id_entries {
+                // Only a ref that supplied its own id asserts a name to verify:
+                // for a name-keyed ref the name *is* how the id was found.
+                let expected_name = if resource_ref.id.is_some() {
+                    resource_ref.name.clone()
+                } else {
+                    None
+                };
+
                 match snapshots_by_id
                     .get(&id)
                     .cloned()
@@ -952,6 +969,20 @@ impl LocalResourceFacadeImpl {
                             &group.schema,
                             snapshot.schema.as_str(),
                         )?;
+                        // The other half of the `id` + `name` consistency
+                        // assertion; without it the id silently wins and the
+                        // caller reads a resource they did not name.
+                        if let Some(expected_name) = expected_name
+                            && expected_name != snapshot.headers.name
+                        {
+                            return Err(ResourceLookupProblem::NameMismatch(
+                                ResourceNameMismatchError {
+                                    id: snapshot.id,
+                                    expected_name,
+                                    actual_name: snapshot.headers.name.clone(),
+                                },
+                            ));
+                        }
                         Ok(snapshot)
                     }) {
                     Ok(snapshot) => {
@@ -1025,9 +1056,22 @@ impl LocalResourceFacadeImpl {
                 _ => id_not_found(id),
             };
 
+            // Only a ref that supplied its own id asserts a name to verify: for
+            // a name-keyed ref the name *is* how the id was found.
+            let expected_name = if resource_ref.id.is_some() {
+                resource_ref.name.as_ref()
+            } else {
+                None
+            };
+
             let row_result = rows_by_id.get(id.as_ref()).cloned().ok_or_else(not_found);
             match row_result.and_then(|row| {
-                validate_handle_row(row, schema, ensure_schema_matches::<ResourceLookupProblem>)
+                validate_handle_row(
+                    row,
+                    schema,
+                    expected_name,
+                    ensure_schema_matches::<ResourceLookupProblem>,
+                )
             }) {
                 Ok(row) => {
                     let handle = resource_handle_from_row(row);

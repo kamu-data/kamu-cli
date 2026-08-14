@@ -149,6 +149,13 @@ pub(crate) struct ResourceSchemaMismatchProblem {
     pub actual_schema: kamu_resources::TypeUri,
 }
 
+#[derive(cynic::QueryFragment, Debug, Clone)]
+pub(crate) struct ResourceNameMismatchProblem {
+    pub id: kamu_resources::ResourceID,
+    pub expected_name: kamu_resources::ResourceName,
+    pub actual_name: kamu_resources::ResourceName,
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::InlineFragments, Debug, Clone)]
@@ -156,6 +163,7 @@ pub(crate) enum ResourceLookupProblem {
     ResourceIDNotFoundProblem(ResourceIDNotFoundProblem),
     ResourceNameNotFoundProblem(ResourceNameNotFoundProblem),
     ResourceSchemaMismatchProblem(ResourceSchemaMismatchProblem),
+    ResourceNameMismatchProblem(ResourceNameMismatchProblem),
     #[cynic(fallback)]
     Unknown,
 }
@@ -167,6 +175,7 @@ pub(crate) enum ResourceSelectorProblem {
     ResourceIDNotFoundProblem(ResourceIDNotFoundProblem),
     ResourceNameNotFoundProblem(ResourceNameNotFoundProblem),
     ResourceSchemaMismatchProblem(ResourceSchemaMismatchProblem),
+    ResourceNameMismatchProblem(ResourceNameMismatchProblem),
     ResourceUnsupportedSelectorProblem(ResourceUnsupportedSelectorProblem),
     ResourceBadAccountProblem(ResourceBadAccountProblem),
     #[cynic(fallback)]

@@ -4219,7 +4219,7 @@ enum ResourceListColumnVisibility {
 
 union ResourceListOutcome = ResourceConnection | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem | ResourceInvalidLabelFilterProblem
 
-union ResourceLookupProblem = ResourceIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceSchemaMismatchProblem | ResourceEmptyRefProblem
+union ResourceLookupProblem = ResourceIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceSchemaMismatchProblem | ResourceNameMismatchProblem | ResourceEmptyRefProblem
 
 enum ResourceManifestFormat {
 	JSON
@@ -4227,6 +4227,18 @@ enum ResourceManifestFormat {
 }
 
 scalar ResourceName
+
+"""
+A reference supplied both an `id` and a `name` that name different
+resources. The pair is a consistency assertion, so the mismatch fails the
+entry rather than letting the `id` silently win.
+"""
+type ResourceNameMismatchProblem {
+	id: ResourceID!
+	expectedName: ResourceName!
+	actualName: ResourceName!
+	message: String!
+}
 
 type ResourceNameNotFoundProblem {
 	typeName: TypeName!
@@ -4319,7 +4331,7 @@ input ResourceSelectorInput {
 
 scalar ResourceSelectorName
 
-union ResourceSelectorProblem = ResourceIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceSchemaMismatchProblem | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem | ResourceEmptyRefProblem
+union ResourceSelectorProblem = ResourceIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceSchemaMismatchProblem | ResourceNameMismatchProblem | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem | ResourceEmptyRefProblem
 
 type ResourceSelectorProblemResult {
 	problem: ResourceSelectorProblem!

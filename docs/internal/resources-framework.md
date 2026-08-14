@@ -863,6 +863,19 @@ Every `ResourceSelector` field is optional, so one selector can span every type
 and account. Several selectors act as a logical **OR**; an empty list matches
 nothing.
 
+A `ResourceRef` may carry **both** an `id` and a `name`. ODF treats the pair as a *consistency
+assertion* rather than two lookups: the `id` is the authoritative half the lookup uses, and the
+`name` is verified against the resolved resource. If they disagree the entry fails with a
+`NameMismatch` problem (RF-170) — otherwise pairing one resource's id with another's name would
+read, render, or delete the resource the `id` names while the caller believes they addressed the
+one they spelled out.
+
+The fields *within* one selector are a **conjunction**, but the repository's per-type rows are
+OR'd — so a selector narrowing by more than one of `id` / `name` cannot be expressed as rows
+without widening the match, and is rejected as `SelectorNarrowsBySeveralModes`. Unlike the
+`AnyType*` limits, this one is not a property of `ResourceScope::AnyType` and survives the
+per-row-type stage.
+
 Batch operations return `BatchResourceResponse<T, E>` with positional `successes` / `problems`
 (each tagged by `request_index`) — so a partial batch reports per-item outcomes.
 
@@ -1114,7 +1127,8 @@ call rather than dropping that selector (RF-105).
 One field exists on the wire but is **not honoured yet**, and is rejected rather than ignored so a
 caller learns their request was not what they asked for:
 
-- `labels` — the call-level `labelFilter` applies to every selector.
+- `labels` — the call-level `labelFilter` applies to every selector. Dropping it silently would
+  return a *wider* result set than was asked for, which the caller has no way to detect.
 
 The wire is scalar where the repository is list-carrying: a batch of N ids arrives as N selectors and
 `coalesce_selectors` folds them into one row. Two type-less selectors that narrow differently, or a

@@ -972,3 +972,90 @@ pub async fn test_batch_spans_types_and_accounts(h: &impl FacadeContractHarness)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-170
+contract_test!(
+    ref_id_and_name_must_agree,
+    super::test_ref_id_and_name_must_agree
+);
+
+/// A ref supplying **both** an `id` and a `name` asserts they describe the same
+/// resource, and the mismatch must fail the entry.
+///
+/// ODF allows the pair as a consistency assertion, and the id is the
+/// authoritative half the lookup uses — so if the name is not checked, the
+/// assertion is decorative. Pairing one resource's id with another's name would
+/// then read, render, or **delete** the resource the id names while the caller
+/// believes they addressed the one they spelled out.
+///
+/// The surviving entry is asserted alongside the failing one: this must be a
+/// per-item problem, not a whole-batch rejection.
+pub async fn test_ref_id_and_name_must_agree(h: &impl FacadeContractHarness) {
+    let alpha_id = create_resource(h, "agree-alpha").await;
+    create_resource(h, "agree-beta").await;
+
+    let facade = h.facade_for(TestAccount::Alice);
+
+    // Index 0 pairs alpha's id with beta's name; index 1 is a plain, valid ref.
+    let mismatched = || {
+        vec![
+            ResourceRef {
+                account: None,
+                r#type: VARIABLE_SET_CANONICAL_SELECTOR
+                    .parse::<TypeName>()
+                    .unwrap()
+                    .into(),
+                id: Some(alpha_id),
+                did: None,
+                name: Some("agree-beta".parse().unwrap()),
+            },
+            ResourceRef {
+                account: None,
+                r#type: VARIABLE_SET_CANONICAL_SELECTOR
+                    .parse::<TypeName>()
+                    .unwrap()
+                    .into(),
+                id: None,
+                did: None,
+                name: Some("agree-beta".parse().unwrap()),
+            },
+        ]
+    };
+
+    let response = facade
+        .get_many(mismatched(), SpecViewMode::Encrypted)
+        .await
+        .expect("a mismatched ref is a per-item problem, not a batch failure");
+    assert_batch_indexes(&response, &[1], &[0]);
+
+    let handles = facade
+        .get_handles(mismatched())
+        .await
+        .expect("get_handles must report the mismatch per item");
+    assert_batch_indexes(&handles, &[1], &[0]);
+
+    // The one that would silently destroy the wrong resource.
+    let deleted = facade
+        .delete_many(mismatched())
+        .await
+        .expect("delete_many must report the mismatch per item");
+    assert_batch_indexes(&deleted, &[1], &[0]);
+
+    // Alpha must still be there: its id was named, but under the wrong name.
+    let survivors = facade
+        .get_handles(vec![ResourceRef {
+            account: None,
+            r#type: VARIABLE_SET_CANONICAL_SELECTOR
+                .parse::<TypeName>()
+                .unwrap()
+                .into(),
+            id: Some(alpha_id),
+            did: None,
+            name: None,
+        }])
+        .await
+        .expect("alpha must survive a delete that named it by a mismatched pair");
+    assert_batch_indexes(&survivors, &[0], &[]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

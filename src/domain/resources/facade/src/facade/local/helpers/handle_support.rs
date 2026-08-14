@@ -16,7 +16,7 @@ use kamu_resources::{
     TypeUri,
 };
 
-use crate::ResourceLookupProblem;
+use crate::{ResourceLookupProblem, ResourceNameMismatchError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -53,15 +53,38 @@ pub(crate) fn resource_handle_from_row(row: ResourceHandleRow) -> ResourceHandle
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Checks a resolved row against what the ref asserted about it.
+///
+/// `expected_name` is the name of a ref that supplied **both** an id and a
+/// name. ODF treats that pair as a consistency assertion, and the id is the
+/// authoritative half used for the lookup — so the name is only meaningful if
+/// it is verified here. Left unchecked, a ref pairing one resource's id with
+/// another's name would read, render, or delete the resource the id names while
+/// the caller believes they addressed the one they named.
+///
+/// `None` for a ref that named only an id, which asserts nothing to check.
 pub(crate) fn validate_handle_row<F>(
     row: ResourceHandleRow,
     expected_schema: &TypeUri,
+    expected_name: Option<&ResourceName>,
     ensure_schema_matches: F,
 ) -> Result<ResourceHandleRow, ResourceLookupProblem>
 where
     F: FnOnce(ResourceID, &TypeUri, &str) -> Result<(), ResourceLookupProblem>,
 {
     ensure_schema_matches(ResourceID::new(row.id), expected_schema, &row.schema)?;
+
+    if let Some(expected_name) = expected_name
+        && expected_name.as_str() != row.name
+    {
+        return Err(ResourceLookupProblem::NameMismatch(
+            ResourceNameMismatchError {
+                id: ResourceID::new(row.id),
+                expected_name: expected_name.clone(),
+                actual_name: ResourceName::new_unchecked(&row.name),
+            },
+        ));
+    }
 
     Ok(row)
 }
