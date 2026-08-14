@@ -16,7 +16,7 @@ use kamu_accounts::{
     AccountServiceExt,
     CreateAccountError,
     CreateAccountUseCase,
-    CreateAccountUseCaseOptions,
+    CreateDerivedAccountUseCaseOptions,
     LoggedAccount,
 };
 use kamu_auth_rebac::RebacService;
@@ -24,6 +24,7 @@ use kamu_core::PushIngestResult;
 use kamu_datasets::{CreateDatasetFromSnapshotUseCase, CreateDatasetUseCaseOptions};
 use kamu_molecule_domain::*;
 use messaging_outbox::{Outbox, OutboxExt};
+use url::Url;
 
 use crate::MoleculeProjectsService;
 use crate::services::MoleculeDatasetWriterPushNdjsonDataOptions;
@@ -115,13 +116,13 @@ impl MoleculeCreateProjectUseCase for MoleculeCreateProjectUseCaseImpl {
                 .parse()
                 .unwrap();
             let avatar_url =
-                "https://avatars.githubusercontent.com/u/37688345?s=200&v=4".to_string();
+                Url::parse("https://avatars.githubusercontent.com/u/37688345?s=200&v=4").unwrap();
 
             self.create_account_use_case
                 .execute_derived(
                     &molecule_account,
                     &project_account_name,
-                    CreateAccountUseCaseOptions::builder()
+                    CreateDerivedAccountUseCaseOptions::builder()
                         .display_name(display_name)
                         .email(project_email)
                         .avatar_url(avatar_url)
