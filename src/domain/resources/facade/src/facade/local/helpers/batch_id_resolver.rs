@@ -15,17 +15,12 @@ use kamu_resources::{
     ResourceIDNotFoundError,
     ResourceName,
     ResourceNameNotFoundError,
+    ResourceRef,
     TypeUri,
     resource_type_name,
 };
 
-use crate::{
-    BatchResourceError,
-    BatchResourceProblem,
-    ResourceBatchSelector,
-    ResourceLookupProblem,
-    ResourceRef,
-};
+use crate::{BatchResourceError, BatchResourceProblem, ResourceLookupProblem};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -37,6 +32,9 @@ pub(crate) type BatchNameEntries = Vec<(usize, ResourceRef, ResourceName)>;
 pub(crate) struct BatchResourceRefGroups {
     pub id_entries: BatchIdEntries,
     pub name_entries: BatchNameEntries,
+    /// Refs naming neither an id nor a name, carried as per-item problems so a
+    /// bad entry fails only itself and the surviving indexes stay aligned.
+    pub problems: Vec<BatchResourceProblem<ResourceLookupProblem>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -50,28 +48,32 @@ pub(crate) struct BatchIdsResolutionResponse {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Split a flat list of requests into those already keyed by UID and those
-/// that still need a name→UID lookup.
-pub(crate) fn group_batch_resource_refs(selector: ResourceBatchSelector) -> BatchResourceRefGroups {
+/// Split a flat list of refs into those already keyed by ID and those that
+/// still need a name→ID lookup.
+///
+/// A ref carrying both is keyed by its ID: ODF treats the pair as a consistency
+/// assertion rather than two lookups, and the ID is the authoritative half. The
+/// name is verified against the resolved resource downstream.
+pub(crate) fn group_batch_resource_refs(resource_refs: Vec<ResourceRef>) -> BatchResourceRefGroups {
     let mut uid_entries = Vec::new();
     let mut name_entries = Vec::new();
+    let mut problems = Vec::new();
 
-    for (request_index, resource_ref) in selector.resource_refs.into_iter().enumerate() {
-        match &resource_ref {
-            ResourceRef::ById(id) => {
-                let id = *id;
-                uid_entries.push((request_index, resource_ref, id));
-            }
-            ResourceRef::ByName(name) => {
-                let name = name.clone();
-                name_entries.push((request_index, resource_ref, name));
-            }
+    for (request_index, resource_ref) in resource_refs.into_iter().enumerate() {
+        match (resource_ref.id, resource_ref.name.clone()) {
+            (Some(id), _) => uid_entries.push((request_index, resource_ref, id)),
+            (None, Some(name)) => name_entries.push((request_index, resource_ref, name)),
+            (None, None) => problems.push(BatchResourceProblem {
+                request_index,
+                error: ResourceLookupProblem::EmptyRef,
+            }),
         }
     }
 
     BatchResourceRefGroups {
         id_entries: uid_entries,
         name_entries,
+        problems,
     }
 }
 
@@ -87,7 +89,7 @@ pub(crate) async fn resolve_batch_ids(
     groups: BatchResourceRefGroups,
 ) -> Result<BatchIdsResolutionResponse, BatchResourceError> {
     let mut id_entries = groups.id_entries;
-    let mut problems = Vec::new();
+    let mut problems = groups.problems;
 
     if !groups.name_entries.is_empty() {
         let names = groups
@@ -135,23 +137,28 @@ pub(crate) async fn resolve_resource_id<E>(
 where
     E: From<internal_error::InternalError> + From<ResourceLookupProblem>,
 {
-    match resource_ref {
-        ResourceRef::ById(id) => Ok(*id),
-        ResourceRef::ByName(name) => {
-            match query_service
-                .find_resource_id_by_name(account_id, schema, name)
-                .await?
-            {
-                Some(id) => Ok(id),
-                None => Err(
-                    ResourceLookupProblem::NameNotFound(ResourceNameNotFoundError {
-                        type_name: resource_type_name(schema)?,
-                        name: name.clone(),
-                    })
-                    .into(),
-                ),
-            }
-        }
+    // An id wins over a name when both are present: ODF treats the pair as a
+    // consistency assertion, and the id is the authoritative half.
+    if let Some(id) = resource_ref.id {
+        return Ok(id);
+    }
+
+    let Some(name) = resource_ref.name.as_ref() else {
+        return Err(ResourceLookupProblem::EmptyRef.into());
+    };
+
+    match query_service
+        .find_resource_id_by_name(account_id, schema, name)
+        .await?
+    {
+        Some(id) => Ok(id),
+        None => Err(
+            ResourceLookupProblem::NameNotFound(ResourceNameNotFoundError {
+                type_name: resource_type_name(schema)?,
+                name: name.clone(),
+            })
+            .into(),
+        ),
     }
 }
 

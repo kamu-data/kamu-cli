@@ -45,6 +45,20 @@ impl ResourceTypeSelectorInput {
     pub fn into_resource_type_selector(self) -> kamu_resources::ResourceTypeSelectorRaw {
         self.selector.into()
     }
+
+    /// Reinterprets the authored selector as an ODF type reference.
+    ///
+    /// Lossless in practice: descriptors resolve canonical selectors, aliases,
+    /// ODF type names, and schema URIs alike, and `TypeRef::from_str` routes
+    /// `https:`-prefixed input to `Uri` and everything else to `Name`. Both
+    /// arms are matched by the same descriptor lookup.
+    pub fn into_type_ref(self) -> kamu_resources::TypeRef {
+        let selector: kamu_resources::ResourceTypeSelectorRaw = self.selector.into();
+        selector
+            .as_str()
+            .parse()
+            .unwrap_or_else(|_| kamu_resources::TypeName::new_unchecked(selector.as_str()).into())
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -111,46 +125,14 @@ impl AccountRefInput {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(InputObject, Debug, Clone)]
-pub struct ResourceSelectorInput {
-    pub resource_type: ResourceTypeSelectorInput,
-    #[graphql(name = "ref")]
-    pub resource_ref: ResourceRefInput,
-    pub account: Option<AccountRefInput>,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(InputObject, Debug, Clone)]
-pub struct ResourceBatchSelectorInput {
-    pub resource_type: ResourceTypeSelectorInput,
-    #[graphql(name = "refs")]
-    pub resource_refs: Vec<ResourceRefInput>,
-    pub account: Option<AccountRefInput>,
-}
-
-impl From<ResourceSelectorInput> for kamu_resources_facade::ResourceSelector {
-    fn from(value: ResourceSelectorInput) -> Self {
-        Self {
-            account: value.account.map(AccountRefInput::into_manifest_account),
-            resource_type: value.resource_type.into_resource_type_selector(),
-            resource_ref: value.resource_ref.into(),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl TryFrom<ResourceBatchSelectorInput> for kamu_resources_facade::ResourceBatchSelector {
-    type Error = GqlError;
-
-    fn try_from(value: ResourceBatchSelectorInput) -> Result<Self, GqlError> {
-        Ok(Self {
-            account: value.account.map(AccountRefInput::into_manifest_account),
-            resource_type: value.resource_type.into_resource_type_selector(),
-            resource_refs: value.resource_refs.into_iter().map(Into::into).collect(),
-        })
-    }
+/// Converts a batch of authored refs, validating each.
+///
+/// Replaces the former `ResourceBatchSelectorInput`, which pinned one type and
+/// one account for the whole call — every ref now carries its own.
+pub(crate) fn into_resource_refs(
+    resource_refs: Vec<ResourceRefInput>,
+) -> Result<Vec<kamu_resources::ResourceRef>, GqlError> {
+    resource_refs.into_iter().map(TryInto::try_into).collect()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -248,26 +230,42 @@ impl SearchResourceHandlesInput {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(OneofObject, Debug, Clone)]
-pub enum ResourceRefInput {
-    ById(ResourceID<'static>),
-    ByName(ResourceByNameSelectorInput),
-}
-
-impl From<ResourceRefInput> for kamu_resources_facade::ResourceRef {
-    fn from(value: ResourceRefInput) -> Self {
-        match value {
-            ResourceRefInput::ById(id) => Self::ById(id.into()),
-            ResourceRefInput::ByName(by_name) => Self::ByName(by_name.name.clone().into()),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+/// Reference to exactly one resource, mirroring the ODF `ResourceRef`.
+///
+/// Not a `oneOf`: ODF allows `id` and `name` together as a consistency
+/// assertion, so both are accepted and at least one is required. Validation
+/// happens at conversion rather than in the schema, which cannot express
+/// "at least one of".
 #[derive(InputObject, Debug, Clone)]
-pub struct ResourceByNameSelectorInput {
-    pub name: ResourceName<'static>,
+pub struct ResourceRefInput {
+    pub account: Option<AccountRefInput>,
+    /// Canonical selector (`variablesets`), alias (`vs`), ODF type name
+    /// (`VariableSet`), or full schema URI — all resolve to the same type.
+    pub r#type: ResourceTypeSelectorInput,
+    pub id: Option<ResourceID<'static>>,
+    /// Exact name. Never a pattern; use a selector for pattern matching.
+    pub name: Option<ResourceName<'static>>,
+}
+
+impl TryFrom<ResourceRefInput> for kamu_resources::ResourceRef {
+    type Error = GqlError;
+
+    fn try_from(value: ResourceRefInput) -> Result<Self, GqlError> {
+        let resource_ref = Self {
+            account: value.account.map(AccountRefInput::into_manifest_account),
+            r#type: value.r#type.into_type_ref(),
+            id: value.id.map(Into::into),
+            // Reserved in ODF for when datasets and accounts become resources;
+            // the facade rejects a populated `did`, so it is not accepted here.
+            did: None,
+            name: value.name.map(Into::into),
+        };
+
+        kamu_resources_facade::validate_ref(&resource_ref)
+            .map_err(|e| GqlError::gql(e.to_string()))?;
+
+        Ok(resource_ref)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -456,11 +454,18 @@ pub struct ResourceSchemaMismatchProblem {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// A reference that named neither an id nor a name.
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ResourceEmptyRefProblem {
+    pub message: String,
+}
+
 #[derive(Union, Debug, Clone)]
 pub enum ResourceLookupProblem {
     UidNotFound(ResourceIDNotFoundProblem),
     NameNotFound(ResourceNameNotFoundProblem),
     SchemaMismatch(ResourceSchemaMismatchProblem),
+    EmptyRef(ResourceEmptyRefProblem),
 }
 
 impl From<kamu_resources_facade::ResourceLookupProblem> for ResourceLookupProblem {
@@ -485,6 +490,9 @@ impl From<kamu_resources_facade::ResourceLookupProblem> for ResourceLookupProble
                     message,
                 })
             }
+            P::EmptyRef => Self::EmptyRef(ResourceEmptyRefProblem {
+                message: P::EmptyRef.to_string(),
+            }),
         }
     }
 }
@@ -498,6 +506,7 @@ pub enum ResourceSelectorProblem {
     SchemaMismatch(ResourceSchemaMismatchProblem),
     UnsupportedSelector(ResourceUnsupportedSelectorProblem),
     BadAccount(ResourceBadAccountProblem),
+    EmptyRef(ResourceEmptyRefProblem),
 }
 
 impl From<kamu_resources_facade::ResourceLookupProblem> for ResourceSelectorProblem {
@@ -506,6 +515,7 @@ impl From<kamu_resources_facade::ResourceLookupProblem> for ResourceSelectorProb
             ResourceLookupProblem::UidNotFound(p) => Self::UidNotFound(p),
             ResourceLookupProblem::NameNotFound(p) => Self::NameNotFound(p),
             ResourceLookupProblem::SchemaMismatch(p) => Self::SchemaMismatch(p),
+            ResourceLookupProblem::EmptyRef(p) => Self::EmptyRef(p),
         }
     }
 }

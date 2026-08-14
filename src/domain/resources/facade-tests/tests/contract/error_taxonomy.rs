@@ -16,7 +16,7 @@
 //! account-accepting API (not demoted to internal errors).
 
 use database_common::PaginationOpts;
-use kamu_resources::{ApplyResourceOutcome, ResourceAccountRef};
+use kamu_resources::{ApplyResourceOutcome, ResourceAccountRef, ResourceRef, TypeName};
 use kamu_resources_facade::{
     ApplyManifestError,
     ApplyManifestRequest,
@@ -29,11 +29,8 @@ use kamu_resources_facade::{
     ListResourcesRequest,
     RawResourceScope,
     RenderResourceManifestError,
-    ResourceBatchSelector,
     ResourceLookupProblem,
     ResourceManifestFormat,
-    ResourceRef,
-    ResourceSelector,
     ResourcesSummaryError,
     ResourcesSummaryRequest,
     SpecViewMode,
@@ -52,36 +49,46 @@ use crate::helpers::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn by_name(name: &str) -> ResourceSelector {
-    ResourceSelector {
+fn by_name(name: &str) -> ResourceRef {
+    ResourceRef {
         account: None,
-        resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-        resource_ref: ResourceRef::ByName(name.parse().unwrap()),
+        r#type: VARIABLE_SET_CANONICAL_SELECTOR
+            .parse::<TypeName>()
+            .unwrap()
+            .into(),
+        id: None,
+        did: None,
+        name: Some(name.parse().unwrap()),
     }
 }
 
-fn by_id(id: &kamu_resources::ResourceID) -> ResourceSelector {
-    ResourceSelector {
+fn by_id(id: &kamu_resources::ResourceID) -> ResourceRef {
+    ResourceRef {
         account: None,
-        resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-        resource_ref: ResourceRef::ById(*id),
+        r#type: VARIABLE_SET_CANONICAL_SELECTOR
+            .parse::<TypeName>()
+            .unwrap()
+            .into(),
+        id: Some(*id),
+        did: None,
+        name: None,
     }
 }
 
-fn batch_by_name(name: &str) -> ResourceBatchSelector {
-    ResourceBatchSelector {
-        account: None,
-        resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-        resource_refs: vec![ResourceRef::ByName(name.parse().unwrap())],
-    }
+fn batch_by_name(name: &str) -> Vec<ResourceRef> {
+    vec![by_name(name)]
 }
 
-fn batch_by_id(id: kamu_resources::ResourceID) -> ResourceBatchSelector {
-    ResourceBatchSelector {
-        account: None,
-        resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-        resource_refs: vec![ResourceRef::ById(id)],
-    }
+/// A one-element batch naming `account`, for the bad-account paths.
+fn batch_by_name_for_account(name: &str, account: ResourceAccountRef) -> Vec<ResourceRef> {
+    vec![ResourceRef {
+        account: Some(account),
+        ..by_name(name)
+    }]
+}
+
+fn batch_by_id(id: kamu_resources::ResourceID) -> Vec<ResourceRef> {
+    vec![by_id(&id)]
 }
 
 async fn create_resource(h: &impl FacadeContractHarness, name: &str) -> kamu_resources::ResourceID {
@@ -205,10 +212,15 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
     );
 
     // --- SchemaMismatch ---
-    let wrong_schema_selector = ResourceSelector {
+    let wrong_schema_selector = ResourceRef {
         account: None,
-        resource_type: SECRET_SET_CANONICAL_SELECTOR.parse().unwrap(),
-        resource_ref: ResourceRef::ById(id),
+        r#type: SECRET_SET_CANONICAL_SELECTOR
+            .parse::<TypeName>()
+            .unwrap()
+            .into(),
+        id: Some(id),
+        did: None,
+        name: None,
     };
 
     let get = facade
@@ -355,10 +367,15 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
     // --- get ---
     let result = facade
         .get(
-            ResourceSelector {
+            ResourceRef {
                 account: Some(unknown_account.clone()),
-                resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-                resource_ref: ResourceRef::ByName("bad-acct-get".parse().unwrap()),
+                r#type: VARIABLE_SET_CANONICAL_SELECTOR
+                    .parse::<TypeName>()
+                    .unwrap()
+                    .into(),
+                id: None,
+                did: None,
+                name: Some("bad-acct-get".parse().unwrap()),
             },
             SpecViewMode::Encrypted,
         )
@@ -372,11 +389,7 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
     // --- get_many ---
     let result = facade
         .get_many(
-            ResourceBatchSelector {
-                account: Some(unknown_account.clone()),
-                resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-                resource_refs: vec![ResourceRef::ByName("bad-acct-get-many".parse().unwrap())],
-            },
+            batch_by_name_for_account("bad-acct-get-many", unknown_account.clone()),
             SpecViewMode::Encrypted,
         )
         .await;
@@ -389,10 +402,15 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
     // --- render_manifest ---
     let result = facade
         .render_manifest(
-            ResourceSelector {
+            ResourceRef {
                 account: Some(unknown_account.clone()),
-                resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-                resource_ref: ResourceRef::ByName("bad-acct-render".parse().unwrap()),
+                r#type: VARIABLE_SET_CANONICAL_SELECTOR
+                    .parse::<TypeName>()
+                    .unwrap()
+                    .into(),
+                id: None,
+                did: None,
+                name: Some("bad-acct-render".parse().unwrap()),
             },
             ResourceManifestFormat::Json,
             SpecViewMode::Encrypted,
@@ -406,10 +424,15 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
 
     // --- delete ---
     let result = facade
-        .delete(ResourceSelector {
+        .delete(ResourceRef {
             account: Some(unknown_account.clone()),
-            resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-            resource_ref: ResourceRef::ByName("bad-acct-delete".parse().unwrap()),
+            r#type: VARIABLE_SET_CANONICAL_SELECTOR
+                .parse::<TypeName>()
+                .unwrap()
+                .into(),
+            id: None,
+            did: None,
+            name: Some("bad-acct-delete".parse().unwrap()),
         })
         .await;
     assert_matches!(
@@ -420,11 +443,10 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
 
     // --- delete_many ---
     let result = facade
-        .delete_many(ResourceBatchSelector {
-            account: Some(unknown_account.clone()),
-            resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-            resource_refs: vec![ResourceRef::ByName("bad-acct-delete-many".parse().unwrap())],
-        })
+        .delete_many(batch_by_name_for_account(
+            "bad-acct-delete-many",
+            unknown_account.clone(),
+        ))
         .await;
     assert_matches!(
         result,

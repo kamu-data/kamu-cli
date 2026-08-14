@@ -516,10 +516,10 @@ mod tests {
     use std::assert_matches;
 
     use kamu_resources::TypeUri;
-    use kamu_resources_facade::ResourceRef;
     use pretty_assertions::assert_eq;
 
     use super::*;
+    use crate::resources::ExactResourceRef;
 
     fn args(v: &[&str]) -> Vec<String> {
         v.iter().map(ToString::to_string).collect()
@@ -545,7 +545,7 @@ mod tests {
     fn resolved_selector(input: &str) -> ResolvedResourceSelector {
         ResolvedResourceSelector {
             input: input.to_owned(),
-            resource_ref: ResourceRef::ByName(input.parse().unwrap()),
+            resource_ref: ExactResourceRef::ByName(input.parse().unwrap()),
         }
     }
 
@@ -815,7 +815,7 @@ mod tests {
         let uuid = uuid::Uuid::new_v4();
         let resolved = ResolvedResourceSelector {
             input: uuid.to_string(),
-            resource_ref: ResourceRef::ById(kamu_resources::ResourceID::new(uuid)),
+            resource_ref: ExactResourceRef::ById(kamu_resources::ResourceID::new(uuid)),
         };
 
         let syntax = ResourceSelectionSyntaxServiceImpl::by_id_syntax(resolved);

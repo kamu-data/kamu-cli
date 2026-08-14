@@ -16,8 +16,8 @@ use domain::{
     ResourceHandle,
     ResourceID,
     ResourceLabelFilterInput,
-    ResourceName,
     ResourceQuery,
+    ResourceRef,
     ResourceSummaryView,
     ResourceTypeDescriptor,
     ResourceTypeSelectorRaw,
@@ -54,36 +54,36 @@ pub trait ResourceFacade: Send + Sync {
 
     async fn get(
         &self,
-        selector: ResourceSelector,
+        resource_ref: ResourceRef,
         spec_view_mode: SpecViewMode,
     ) -> Result<Resource, GetResourceError>;
 
     async fn get_many(
         &self,
-        selector: ResourceBatchSelector,
+        resource_refs: Vec<ResourceRef>,
         spec_view_mode: SpecViewMode,
     ) -> Result<BatchResourceResponse<Resource, ResourceLookupProblem>, BatchResourceError>;
 
     async fn get_handle(
         &self,
-        selector: ResourceSelector,
+        resource_ref: ResourceRef,
     ) -> Result<ResourceHandle, GetResourceError>;
 
     async fn get_handles(
         &self,
-        selector: ResourceBatchSelector,
+        resource_refs: Vec<ResourceRef>,
     ) -> Result<BatchResourceResponse<ResourceHandle, ResourceLookupProblem>, BatchResourceError>;
 
     async fn render_manifest(
         &self,
-        selector: ResourceSelector,
+        resource_ref: ResourceRef,
         format: ResourceManifestFormat,
         spec_view_mode: SpecViewMode,
     ) -> Result<RenderResourceManifestResult, RenderResourceManifestError>;
 
     async fn render_manifests(
         &self,
-        selector: ResourceBatchSelector,
+        resource_refs: Vec<ResourceRef>,
         format: ResourceManifestFormat,
         spec_view_mode: SpecViewMode,
     ) -> Result<
@@ -136,31 +136,15 @@ pub trait ResourceFacade: Send + Sync {
         request: ApplyManifestBatchRequest,
     ) -> Result<ApplyManifestBatchResponse<ApplyManifestApplicationDecision>, BatchResourceError>;
 
-    async fn delete(&self, selector: ResourceSelector) -> Result<ResourceID, DeleteResourceError>;
+    async fn delete(&self, resource_ref: ResourceRef) -> Result<ResourceID, DeleteResourceError>;
 
     async fn delete_many(
         &self,
-        selector: ResourceBatchSelector,
+        resource_refs: Vec<ResourceRef>,
     ) -> Result<BatchResourceResponse<ResourceID, ResourceLookupProblem>, BatchResourceError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone)]
-pub struct ResourceSelector {
-    pub account: Option<ResourceAccountRef>,
-    pub resource_type: ResourceTypeSelectorRaw,
-    pub resource_ref: ResourceRef,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone)]
-pub struct ResourceBatchSelector {
-    pub account: Option<ResourceAccountRef>,
-    pub resource_type: ResourceTypeSelectorRaw,
-    pub resource_refs: Vec<ResourceRef>,
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -231,14 +215,6 @@ pub struct ApplyManifestBatchItemResult<D> {
 pub enum ResourceManifestFormat {
     Json,
     Yaml,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone)]
-pub enum ResourceRef {
-    ById(ResourceID),
-    ByName(ResourceName),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

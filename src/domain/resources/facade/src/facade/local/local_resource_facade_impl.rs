@@ -76,11 +76,11 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 
     async fn get(
         &self,
-        selector: ResourceSelector,
+        resource_ref: ResourceRef,
         spec_view_mode: SpecViewMode,
     ) -> Result<Resource, GetResourceError> {
         let mut view = self
-            .resolve_resource_view::<GetResourceError>(selector)
+            .resolve_resource_view::<GetResourceError>(resource_ref)
             .await?;
 
         self.apply_spec_view_mode::<GetResourceError>(&mut view, spec_view_mode)?;
@@ -90,11 +90,11 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 
     async fn get_many(
         &self,
-        selector: ResourceBatchSelector,
+        resource_refs: Vec<ResourceRef>,
         spec_view_mode: SpecViewMode,
     ) -> Result<BatchResourceResponse<Resource, ResourceLookupProblem>, BatchResourceError> {
         let (mut indexed_resources, problems) =
-            self.resolve_multiple_resource_views(selector).await?;
+            self.resolve_multiple_resource_views(resource_refs).await?;
 
         self.apply_spec_view_mode_batch::<BatchResourceError>(
             &mut indexed_resources,
@@ -117,21 +117,20 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 
     async fn get_handle(
         &self,
-        selector: ResourceSelector,
+        resource_ref: ResourceRef,
     ) -> Result<ResourceHandle, GetResourceError> {
         let target_account = self
             .resource_account_resolver
-            .resolve_target_account(selector.account.as_ref())
+            .resolve_target_account(resource_ref.account.as_ref())
             .await?;
 
-        let schema =
-            self.resolve_schema_for_selector::<GetResourceError>(&selector.resource_type)?;
+        let schema = self.resolve_schema_for_selector::<GetResourceError>(&resource_ref.r#type)?;
 
         let id = resolve_resource_id::<GetResourceError>(
             self.generic_resource_query_service.as_ref(),
             &schema,
             &target_account.did,
-            &selector.resource_ref,
+            &resource_ref,
         )
         .await?;
 
@@ -144,18 +143,22 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 
     async fn get_handles(
         &self,
-        selector: ResourceBatchSelector,
+        resource_refs: Vec<ResourceRef>,
     ) -> Result<BatchResourceResponse<ResourceHandle, ResourceLookupProblem>, BatchResourceError>
     {
+        // An empty batch names nothing, so it yields an empty response.
+        let Some(target) = uniform_batch_target(&resource_refs)? else {
+            return Ok(BatchResourceResponse::empty());
+        };
+
         let target_account = self
             .resource_account_resolver
-            .resolve_target_account(selector.account.as_ref())
+            .resolve_target_account(target.account.as_ref())
             .await?;
 
-        let schema =
-            self.resolve_schema_for_selector::<BatchResourceError>(&selector.resource_type)?;
+        let schema = self.resolve_schema_for_selector::<BatchResourceError>(&target.r#type)?;
 
-        let groups = group_batch_resource_refs(selector);
+        let groups = group_batch_resource_refs(resource_refs);
         let resolution_response = resolve_batch_ids(
             self.generic_resource_query_service.as_ref(),
             &target_account.did,
@@ -187,12 +190,12 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 
     async fn render_manifest(
         &self,
-        selector: ResourceSelector,
+        resource_ref: ResourceRef,
         format: ResourceManifestFormat,
         spec_view_mode: SpecViewMode,
     ) -> Result<RenderResourceManifestResult, RenderResourceManifestError> {
         let mut view = self
-            .resolve_resource_view::<RenderResourceManifestError>(selector)
+            .resolve_resource_view::<RenderResourceManifestError>(resource_ref)
             .await?;
 
         self.apply_spec_view_mode::<RenderResourceManifestError>(&mut view, spec_view_mode)?;
@@ -206,7 +209,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 
     async fn render_manifests(
         &self,
-        selector: ResourceBatchSelector,
+        resource_refs: Vec<ResourceRef>,
         format: ResourceManifestFormat,
         spec_view_mode: SpecViewMode,
     ) -> Result<
@@ -214,7 +217,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         BatchResourceError,
     > {
         let (mut indexed_resources, problems) =
-            self.resolve_multiple_resource_views(selector).await?;
+            self.resolve_multiple_resource_views(resource_refs).await?;
 
         self.apply_spec_view_mode_batch::<BatchResourceError>(
             &mut indexed_resources,
@@ -513,17 +516,21 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 
     async fn delete_many(
         &self,
-        selector: ResourceBatchSelector,
+        resource_refs: Vec<ResourceRef>,
     ) -> Result<BatchResourceResponse<ResourceID, ResourceLookupProblem>, BatchResourceError> {
+        // An empty batch names nothing, so it yields an empty response.
+        let Some(target) = uniform_batch_target(&resource_refs)? else {
+            return Ok(BatchResourceResponse::empty());
+        };
+
         let target_account = self
             .resource_account_resolver
-            .resolve_target_account(selector.account.as_ref())
+            .resolve_target_account(target.account.as_ref())
             .await?;
 
-        let schema =
-            self.resolve_schema_for_selector::<BatchResourceError>(&selector.resource_type)?;
+        let schema = self.resolve_schema_for_selector::<BatchResourceError>(&target.r#type)?;
 
-        let groups = group_batch_resource_refs(selector);
+        let groups = group_batch_resource_refs(resource_refs);
         let resolution_response = resolve_batch_ids(
             self.generic_resource_query_service.as_ref(),
             &target_account.did,
@@ -598,14 +605,8 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         })
     }
 
-    async fn delete(&self, selector: ResourceSelector) -> Result<ResourceID, DeleteResourceError> {
-        let response = self
-            .delete_many(ResourceBatchSelector {
-                account: selector.account,
-                resource_type: selector.resource_type,
-                resource_refs: vec![selector.resource_ref],
-            })
-            .await?;
+    async fn delete(&self, resource_ref: ResourceRef) -> Result<ResourceID, DeleteResourceError> {
+        let response = self.delete_many(vec![resource_ref]).await?;
 
         if let Some(success) = response.successes.into_iter().next() {
             Ok(success.item)
@@ -625,19 +626,24 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 /// resolving more than one selector must build it once and reuse it here rather
 /// than going through
 /// [`LocalResourceFacadeImpl::resolve_schema_for_selector`] per selector.
+/// Accepts anything spelling a type — a raw CLI selector (`vs`), an ODF
+/// `TypeRef` (`VariableSet`), or a schema URI — since descriptors match all
+/// four forms.
 fn resolve_schema_in_descriptors<E>(
     descriptors: &[ResourceTypeDescriptor],
-    selector: &ResourceTypeSelectorRaw,
+    selector: impl AsRef<str>,
 ) -> Result<TypeUri, E>
 where
     E: From<UnsupportedResourceSelectorError>,
 {
+    let selector = selector.as_ref();
+
     descriptors
         .iter()
         .find(|descriptor| descriptor.matches_selector(selector))
         .map(|descriptor| descriptor.schema.clone())
         .ok_or_else(|| UnsupportedResourceSelectorError::NotFound {
-            raw_selector: selector.clone(),
+            raw_selector: ResourceTypeSelectorRaw::new_unchecked(selector),
         })
         .map_err(Into::into)
 }
@@ -701,10 +707,7 @@ impl LocalResourceFacadeImpl {
         descriptors
     }
 
-    fn resolve_schema_for_selector<E>(
-        &self,
-        selector: &ResourceTypeSelectorRaw,
-    ) -> Result<TypeUri, E>
+    fn resolve_schema_for_selector<E>(&self, selector: impl AsRef<str>) -> Result<TypeUri, E>
     where
         E: From<UnsupportedResourceSelectorError>,
     {
@@ -789,7 +792,7 @@ impl LocalResourceFacadeImpl {
         Ok((ResourceScope::Types(type_queries), resolved_label_filter))
     }
 
-    async fn resolve_resource_view<E>(&self, selector: ResourceSelector) -> Result<Resource, E>
+    async fn resolve_resource_view<E>(&self, resource_ref: ResourceRef) -> Result<Resource, E>
     where
         E: From<ResolveManifestAccountError>
             + From<ResourceLookupProblem>
@@ -799,16 +802,16 @@ impl LocalResourceFacadeImpl {
     {
         let target_account = self
             .resource_account_resolver
-            .resolve_target_account(selector.account.as_ref())
+            .resolve_target_account(resource_ref.account.as_ref())
             .await?;
 
-        let schema = self.resolve_schema_for_selector::<E>(&selector.resource_type)?;
+        let schema = self.resolve_schema_for_selector::<E>(&resource_ref.r#type)?;
 
         let id = resolve_resource_id::<E>(
             self.generic_resource_query_service.as_ref(),
             &schema,
             &target_account.did,
-            &selector.resource_ref,
+            &resource_ref,
         )
         .await?;
 
@@ -841,7 +844,7 @@ impl LocalResourceFacadeImpl {
 
     async fn resolve_multiple_resource_views(
         &self,
-        selector: ResourceBatchSelector,
+        resource_refs: Vec<ResourceRef>,
     ) -> Result<
         (
             Vec<IndexedResource<Resource>>,
@@ -849,16 +852,20 @@ impl LocalResourceFacadeImpl {
         ),
         BatchResourceError,
     > {
+        // An empty batch names nothing, so it yields an empty result.
+        let Some(target) = uniform_batch_target(&resource_refs)? else {
+            return Ok((Vec::new(), Vec::new()));
+        };
+
         let target_account = self
             .resource_account_resolver
-            .resolve_target_account(selector.account.as_ref())
+            .resolve_target_account(target.account.as_ref())
             .await?;
 
-        let schema =
-            self.resolve_schema_for_selector::<BatchResourceError>(&selector.resource_type)?;
+        let schema = self.resolve_schema_for_selector::<BatchResourceError>(&target.r#type)?;
 
-        // Batch selectors name their targets explicitly.
-        let groups = group_batch_resource_refs(selector);
+        // Batch refs name their targets explicitly.
+        let groups = group_batch_resource_refs(resource_refs);
 
         let resolution_response = resolve_batch_ids(
             self.generic_resource_query_service.as_ref(),
@@ -956,9 +963,10 @@ impl LocalResourceFacadeImpl {
 
         let mut handles = Vec::new();
         for (request_index, resource_ref, id) in id_entries {
-            // Report misses in the terms the caller selected by.
-            let not_found = || match &resource_ref {
-                ResourceRef::ByName(name) => resource_type_name(schema)
+            // Report misses in the terms the caller selected by. A ref carrying
+            // both is resolved by its id, so it reports as an id miss.
+            let not_found = || match (&resource_ref.id, &resource_ref.name) {
+                (None, Some(name)) => resource_type_name(schema)
                     .map(|type_name| {
                         ResourceLookupProblem::NameNotFound(ResourceNameNotFoundError {
                             type_name,
@@ -966,7 +974,7 @@ impl LocalResourceFacadeImpl {
                         })
                     })
                     .unwrap_or_else(|_| id_not_found(id)),
-                ResourceRef::ById(_) => id_not_found(id),
+                _ => id_not_found(id),
             };
 
             let row_result = rows_by_id.get(id.as_ref()).cloned().ok_or_else(not_found);

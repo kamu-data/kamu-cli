@@ -16,15 +16,8 @@
 //! back to the `Literal` plaintext.
 
 use kamu_configuration::SecretSetResource;
-use kamu_resources::{ApplyResourceOutcome, ResourceSchemaProvider};
-use kamu_resources_facade::{
-    ApplyManifestRequest,
-    ResourceBatchSelector,
-    ResourceManifestFormat,
-    ResourceRef,
-    ResourceSelector,
-    SpecViewMode,
-};
+use kamu_resources::{ApplyResourceOutcome, ResourceRef, ResourceSchemaProvider, TypeName};
+use kamu_resources_facade::{ApplyManifestRequest, ResourceManifestFormat, SpecViewMode};
 use pretty_assertions::assert_eq;
 
 use crate::contract_test;
@@ -39,11 +32,16 @@ use crate::helpers::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn secret_selector(name: &str) -> ResourceSelector {
-    ResourceSelector {
+fn secret_selector(name: &str) -> ResourceRef {
+    ResourceRef {
         account: None,
-        resource_type: SECRET_SET_CANONICAL_SELECTOR.parse().unwrap(),
-        resource_ref: ResourceRef::ByName(name.parse().unwrap()),
+        r#type: SECRET_SET_CANONICAL_SELECTOR
+            .parse::<TypeName>()
+            .unwrap()
+            .into(),
+        id: None,
+        did: None,
+        name: Some(name.parse().unwrap()),
     }
 }
 
@@ -144,11 +142,28 @@ pub async fn test_spec_view_mode_applies_to_batch_get(h: &impl FacadeContractHar
     let id_b = create_secret_resource(h, "sv-batch-b", &[("TOKEN_B", "secret-b-value")]).await;
     let facade = h.facade_for(TestAccount::Alice);
 
-    let batch_selector = ResourceBatchSelector {
-        account: None,
-        resource_type: SECRET_SET_CANONICAL_SELECTOR.parse().unwrap(),
-        resource_refs: vec![ResourceRef::ById(id_a), ResourceRef::ById(id_b)],
-    };
+    let batch_selector = vec![
+        ResourceRef {
+            account: None,
+            r#type: SECRET_SET_CANONICAL_SELECTOR
+                .parse::<TypeName>()
+                .unwrap()
+                .into(),
+            id: Some(id_a),
+            did: None,
+            name: None,
+        },
+        ResourceRef {
+            account: None,
+            r#type: SECRET_SET_CANONICAL_SELECTOR
+                .parse::<TypeName>()
+                .unwrap()
+                .into(),
+            id: Some(id_b),
+            did: None,
+            name: None,
+        },
+    ];
 
     // Encrypted view — no plaintext
     let enc_resp = facade

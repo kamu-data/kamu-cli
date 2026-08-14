@@ -18,11 +18,9 @@ use kamu_resources::TypeUri;
 use kamu_resources_facade::{
     BatchResourceProblem,
     RenderResourceManifestError,
-    ResourceBatchSelector,
     ResourceFacade,
     ResourceLookupProblem,
     ResourceManifestFormat as FacadeResourceManifestFormat,
-    ResourceRef,
 };
 
 use super::{CLIError, Command, common};
@@ -223,21 +221,7 @@ impl GetResourceCommand {
             for chunk in entries.chunks(Self::MATERIALIZATION_BATCH_SIZE) {
                 let result = resource_facade
                     .render_manifests(
-                        ResourceBatchSelector {
-                            account: None,
-                            resource_type: chunk
-                                .first()
-                                .map(|(_, target)| {
-                                    kamu_resources::ResourceTypeSelectorRaw::from(
-                                        &target.canonical_selector,
-                                    )
-                                })
-                                .expect("non-empty chunk"),
-                            resource_refs: chunk
-                                .iter()
-                                .map(|(_, target)| ResourceRef::ById(target.id))
-                                .collect(),
-                        },
+                        Self::chunk_resource_refs(chunk),
                         format,
                         self.spec_view_mode(),
                     )
@@ -266,22 +250,7 @@ impl GetResourceCommand {
         for (_schema, entries) in Self::group_targets_by_schema(targets) {
             for chunk in entries.chunks(Self::MATERIALIZATION_BATCH_SIZE) {
                 let result = resource_facade
-                    .get_many(
-                        ResourceBatchSelector {
-                            account: None,
-                            resource_type: kamu_resources::ResourceTypeSelectorRaw::new_unchecked(
-                                chunk
-                                    .first()
-                                    .map(|(_, target)| target.canonical_selector.to_string())
-                                    .unwrap_or_default(),
-                            ),
-                            resource_refs: chunk
-                                .iter()
-                                .map(|(_, target)| ResourceRef::ById(target.id))
-                                .collect(),
-                        },
-                        self.spec_view_mode(),
-                    )
+                    .get_many(Self::chunk_resource_refs(chunk), self.spec_view_mode())
                     .await?;
 
                 self.handle_get_resource_problems(result.problems)?;
@@ -295,6 +264,24 @@ impl GetResourceCommand {
         }
 
         Ok(rendered_items.into_iter().flatten().collect())
+    }
+
+    /// Builds one ref per already-resolved target.
+    ///
+    /// Targets carry their resolved schema, so the ref names the type by URI
+    /// rather than by the selector the user typed — no second resolution, and
+    /// no dependence on the chunk being single-type.
+    fn chunk_resource_refs(chunk: &[(usize, &ResourceTarget)]) -> Vec<kamu_resources::ResourceRef> {
+        chunk
+            .iter()
+            .map(|(_, target)| kamu_resources::ResourceRef {
+                account: None,
+                r#type: target.schema.clone().into(),
+                id: Some(target.id),
+                did: None,
+                name: None,
+            })
+            .collect()
     }
 
     fn group_targets_by_schema(

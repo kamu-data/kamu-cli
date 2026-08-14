@@ -14,6 +14,7 @@ use dill::CatalogBuilder;
 use kamu_accounts::DEFAULT_ACCOUNT_HANDLE;
 use kamu_cli::services::resources::{
     self,
+    ExactResourceRef,
     ResourceSelectionItem,
     ResourceSelectionResolutionOptions,
     ResourceSelectionResolutionService,
@@ -22,7 +23,6 @@ use kamu_cli::services::resources::{
 use kamu_resources::{ResourceHandle, ResourceID, ResourceTypeDescriptor, TypeUri};
 use kamu_resources_facade::{
     MockResourceFacade,
-    ResourceRef,
     SearchResourceHandlesRequest,
     SearchResourceHandlesResponse,
 };
@@ -233,7 +233,7 @@ async fn exact_any_type_searches_across_every_supported_type() {
             ResourceSelectionSyntax {
                 items: vec![ResourceSelectionItem::ExactAnyType {
                     selector_input: id.to_string(),
-                    resource_ref: kamu_resources_facade::ResourceRef::ById(id),
+                    resource_ref: ExactResourceRef::ById(id),
                 }],
                 shadowed_selectors: Vec::new(),
             },
@@ -280,7 +280,7 @@ async fn exact_any_type_not_found_errors_by_default() {
             ResourceSelectionSyntax {
                 items: vec![ResourceSelectionItem::ExactAnyType {
                     selector_input: id.to_string(),
-                    resource_ref: kamu_resources_facade::ResourceRef::ById(id),
+                    resource_ref: ExactResourceRef::ById(id),
                 }],
                 shadowed_selectors: Vec::new(),
             },
@@ -338,9 +338,7 @@ async fn resolves_any_type_exact_ref_across_every_supported_type() {
             ResourceSelectionSyntax {
                 items: vec![ResourceSelectionItem::AnyTypeExactRef {
                     selector_input: selector_input.clone(),
-                    resource_ref: kamu_resources_facade::ResourceRef::ByName(
-                        RESOURCE_DB_CREDS.parse().unwrap(),
-                    ),
+                    resource_ref: ExactResourceRef::ByName(RESOURCE_DB_CREDS.parse().unwrap()),
                 }],
                 shadowed_selectors: Vec::new(),
             },
@@ -476,9 +474,7 @@ async fn ignores_unmatched_any_type_selectors_when_requested() {
                 items: vec![
                     ResourceSelectionItem::AnyTypeExactRef {
                         selector_input: format!("%/{RESOURCE_DB_CREDS}"),
-                        resource_ref: kamu_resources_facade::ResourceRef::ByName(
-                            RESOURCE_DB_CREDS.parse().unwrap(),
-                        ),
+                        resource_ref: ExactResourceRef::ByName(RESOURCE_DB_CREDS.parse().unwrap()),
                     },
                     ResourceSelectionItem::AnyTypeNamePattern {
                         selector_input: format!("%/{NAME_MISSING_PATTERN}"),
@@ -508,9 +504,7 @@ async fn errors_on_unmatched_any_type_selectors_by_default() {
     for item in [
         ResourceSelectionItem::AnyTypeExactRef {
             selector_input: format!("%/{RESOURCE_DB_CREDS}"),
-            resource_ref: kamu_resources_facade::ResourceRef::ByName(
-                RESOURCE_DB_CREDS.parse().unwrap(),
-            ),
+            resource_ref: ExactResourceRef::ByName(RESOURCE_DB_CREDS.parse().unwrap()),
         },
         ResourceSelectionItem::AnyTypeNamePattern {
             selector_input: format!("%/{NAME_MISSING_PATTERN}"),
@@ -903,7 +897,7 @@ impl ResourceSelectionResolutionHarness {
         ResourceSelectionItem::Exact(resources::ResourceExactSelector {
             type_descriptor: self.variableset_type_descriptor(),
             selector_input: format!("{VARIABLESETS_SHORT_NAME}/{name}"),
-            resource_ref: ResourceRef::ByName(name.parse().unwrap()),
+            resource_ref: ExactResourceRef::ByName(name.parse().unwrap()),
         })
     }
 

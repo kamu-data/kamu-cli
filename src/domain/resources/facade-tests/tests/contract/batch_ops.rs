@@ -8,16 +8,13 @@
 // by the Apache License, Version 2.0.
 
 use kamu_configuration::VariableSetResource;
-use kamu_resources::{ApplyResourceOutcome, ResourceAccountRef, ResourceSchemaProvider};
+use kamu_resources::{ApplyResourceOutcome, ResourceRef, ResourceSchemaProvider, TypeName};
 use kamu_resources_facade::{
     ApplyManifestRequest,
     BatchResourceError,
     GetResourceError,
-    ResourceBatchSelector,
     ResourceLookupProblem,
     ResourceManifestFormat,
-    ResourceRef,
-    ResourceSelector,
     SpecViewMode,
 };
 use pretty_assertions::{assert_eq, assert_matches};
@@ -60,14 +57,28 @@ pub async fn test_get_many_all_successes(h: &impl FacadeContractHarness) {
     let id_b = create_resource(h, "batch-b").await;
     let facade = h.facade_for(TestAccount::Alice);
 
-    let selector = ResourceBatchSelector {
-        account: None,
-        resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-        resource_refs: vec![
-            ResourceRef::ByName("batch-a".parse().unwrap()),
-            ResourceRef::ById(id_b),
-        ],
-    };
+    let selector = vec![
+        ResourceRef {
+            account: None,
+            r#type: VARIABLE_SET_CANONICAL_SELECTOR
+                .parse::<TypeName>()
+                .unwrap()
+                .into(),
+            id: None,
+            did: None,
+            name: Some("batch-a".parse().unwrap()),
+        },
+        ResourceRef {
+            account: None,
+            r#type: VARIABLE_SET_CANONICAL_SELECTOR
+                .parse::<TypeName>()
+                .unwrap()
+                .into(),
+            id: Some(id_b),
+            did: None,
+            name: None,
+        },
+    ];
 
     let response = facade
         .get_many(selector, SpecViewMode::Encrypted)
@@ -108,16 +119,48 @@ pub async fn test_get_many_mixed_successes_problems(h: &impl FacadeContractHarne
 
     let response = facade
         .get_many(
-            ResourceBatchSelector {
-                account: None,
-                resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-                resource_refs: vec![
-                    ResourceRef::ByName("mixed-a".parse().unwrap()), // idx 0 — exists
-                    ResourceRef::ByName("no-such-name".parse().unwrap()), // idx 1 — missing name
-                    ResourceRef::ById(id_existing),                  // idx 2 — exists by id
-                    ResourceRef::ById(absent_id),                    // idx 3 — missing id
-                ],
-            },
+            vec![
+                ResourceRef {
+                    account: None,
+                    r#type: VARIABLE_SET_CANONICAL_SELECTOR
+                        .parse::<TypeName>()
+                        .unwrap()
+                        .into(),
+                    id: None,
+                    did: None,
+                    name: Some("mixed-a".parse().unwrap()),
+                }, // idx 0 — exists
+                ResourceRef {
+                    account: None,
+                    r#type: VARIABLE_SET_CANONICAL_SELECTOR
+                        .parse::<TypeName>()
+                        .unwrap()
+                        .into(),
+                    id: None,
+                    did: None,
+                    name: Some("no-such-name".parse().unwrap()),
+                }, // idx 1 — missing name
+                ResourceRef {
+                    account: None,
+                    r#type: VARIABLE_SET_CANONICAL_SELECTOR
+                        .parse::<TypeName>()
+                        .unwrap()
+                        .into(),
+                    id: Some(id_existing),
+                    did: None,
+                    name: None,
+                }, // idx 2 — exists by id
+                ResourceRef {
+                    account: None,
+                    r#type: VARIABLE_SET_CANONICAL_SELECTOR
+                        .parse::<TypeName>()
+                        .unwrap()
+                        .into(),
+                    id: Some(absent_id),
+                    did: None,
+                    name: None,
+                }, // idx 3 — missing id
+            ],
             SpecViewMode::Encrypted,
         )
         .await
@@ -155,14 +198,28 @@ pub async fn test_get_many_duplicate_refs(h: &impl FacadeContractHarness) {
 
     let response = facade
         .get_many(
-            ResourceBatchSelector {
-                account: None,
-                resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-                resource_refs: vec![
-                    ResourceRef::ByName("dup-ref".parse().unwrap()), // idx 0
-                    ResourceRef::ByName("dup-ref".parse().unwrap()), // idx 1 — same ref
-                ],
-            },
+            vec![
+                ResourceRef {
+                    account: None,
+                    r#type: VARIABLE_SET_CANONICAL_SELECTOR
+                        .parse::<TypeName>()
+                        .unwrap()
+                        .into(),
+                    id: None,
+                    did: None,
+                    name: Some("dup-ref".parse().unwrap()),
+                }, // idx 0
+                ResourceRef {
+                    account: None,
+                    r#type: VARIABLE_SET_CANONICAL_SELECTOR
+                        .parse::<TypeName>()
+                        .unwrap()
+                        .into(),
+                    id: None,
+                    did: None,
+                    name: Some("dup-ref".parse().unwrap()),
+                }, // idx 1 — same ref
+            ],
             SpecViewMode::Encrypted,
         )
         .await
@@ -180,198 +237,64 @@ pub async fn test_get_many_duplicate_refs(h: &impl FacadeContractHarness) {
 // RF-053
 contract_test!(get_many_empty_refs, super::test_get_many_empty_refs);
 
+/// An empty batch names nothing, so every batch operation answers with an
+/// empty result rather than an error — batch calls stay idempotent.
+///
+/// This once had three companions (RF-053A/B/C) asserting that an empty batch
+/// still validated the type and account. Both used to live on the batch
+/// wrapper; they now live on each ref, so an empty batch carries neither and
+/// there is nothing left to validate.
 pub async fn test_get_many_empty_refs(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
     let response = facade
-        .get_many(
-            ResourceBatchSelector {
-                account: None,
-                resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-                resource_refs: vec![],
-            },
+        .get_many(vec![], SpecViewMode::Encrypted)
+        .await
+        .unwrap();
+    assert!(
+        response.successes.is_empty(),
+        "get_many successes must be empty"
+    );
+    assert!(
+        response.problems.is_empty(),
+        "get_many problems must be empty"
+    );
+
+    let response = facade.get_handles(vec![]).await.unwrap();
+    assert!(
+        response.successes.is_empty(),
+        "get_handles successes must be empty"
+    );
+    assert!(
+        response.problems.is_empty(),
+        "get_handles problems must be empty"
+    );
+
+    let response = facade
+        .render_manifests(
+            vec![],
+            ResourceManifestFormat::Json,
             SpecViewMode::Encrypted,
         )
         .await
         .unwrap();
-
-    assert!(response.successes.is_empty(), "successes must be empty");
-    assert!(response.problems.is_empty(), "problems must be empty");
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// RF-053A
-contract_test!(
-    get_many_empty_refs_validates_unsupported_kind,
-    super::test_get_many_empty_refs_validates_unsupported_kind
-);
-
-pub async fn test_get_many_empty_refs_validates_unsupported_kind(h: &impl FacadeContractHarness) {
-    let facade = h.facade_for(TestAccount::Alice);
-
-    let result = facade
-        .get_many(
-            ResourceBatchSelector {
-                account: None,
-                resource_type: "NoSuchResourceKindXYZ".parse().unwrap(),
-                resource_refs: vec![],
-            },
-            SpecViewMode::Encrypted,
-        )
-        .await;
-
-    assert_matches!(
-        result,
-        Err(BatchResourceError::UnsupportedSelector(_)),
-        "empty batch with unsupported type must still be rejected"
+    assert!(
+        response.successes.is_empty(),
+        "render_manifests successes must be empty"
     );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// RF-053B
-contract_test!(
-    get_many_empty_refs_validates_bad_account,
-    super::test_get_many_empty_refs_validates_bad_account
-);
-
-pub async fn test_get_many_empty_refs_validates_bad_account(h: &impl FacadeContractHarness) {
-    let facade = h.facade_for(TestAccount::Alice);
-
-    let result = facade
-        .get_many(
-            ResourceBatchSelector {
-                account: Some(ResourceAccountRef {
-                    id: None,
-                    did: None,
-                    name: Some(odf::AccountName::new_unchecked(
-                        "unknown-resource-contract-account",
-                    )),
-                }),
-                resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-                resource_refs: vec![],
-            },
-            SpecViewMode::Encrypted,
-        )
-        .await;
-
-    assert_matches!(
-        result,
-        Err(BatchResourceError::BadAccount(_)),
-        "empty batch with bad account must still be rejected"
-    );
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// RF-053C
-contract_test!(
-    batch_empty_refs_validation_is_consistent,
-    super::test_batch_empty_refs_validation_is_consistent
-);
-
-pub async fn test_batch_empty_refs_validation_is_consistent(h: &impl FacadeContractHarness) {
-    let facade = h.facade_for(TestAccount::Alice);
-    let bad_type = "NoSuchResourceTypeXYZ";
-    let bad_account = Some(ResourceAccountRef {
-        id: None,
-        did: None,
-        name: Some(odf::AccountName::new_unchecked(
-            "unknown-resource-contract-account",
-        )),
-    });
-
-    // get_handles: unsupported type
-    let gi_type = facade
-        .get_handles(ResourceBatchSelector {
-            account: None,
-            resource_type: bad_type.parse().unwrap(),
-            resource_refs: vec![],
-        })
-        .await;
-    assert_matches!(
-        gi_type,
-        Err(BatchResourceError::UnsupportedSelector(_)),
-        "get_handles empty+bad type must be rejected"
+    assert!(
+        response.problems.is_empty(),
+        "render_manifests problems must be empty"
     );
 
-    // get_handles: bad account
-    let gi_acct = facade
-        .get_handles(ResourceBatchSelector {
-            account: bad_account.clone(),
-            resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-            resource_refs: vec![],
-        })
-        .await;
-    assert_matches!(
-        gi_acct,
-        Err(BatchResourceError::BadAccount(_)),
-        "get_handles empty+bad account must be rejected"
+    let response = facade.delete_many(vec![]).await.unwrap();
+    assert!(
+        response.successes.is_empty(),
+        "delete_many successes must be empty"
     );
-
-    // render_manifests: unsupported type
-    let rm_type = facade
-        .render_manifests(
-            ResourceBatchSelector {
-                account: None,
-                resource_type: bad_type.parse().unwrap(),
-                resource_refs: vec![],
-            },
-            ResourceManifestFormat::Json,
-            SpecViewMode::Encrypted,
-        )
-        .await;
-    assert_matches!(
-        rm_type,
-        Err(BatchResourceError::UnsupportedSelector(_)),
-        "render_manifests empty+bad type must be rejected"
-    );
-
-    // render_manifests: bad account
-    let rm_acct = facade
-        .render_manifests(
-            ResourceBatchSelector {
-                account: bad_account.clone(),
-                resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-                resource_refs: vec![],
-            },
-            ResourceManifestFormat::Json,
-            SpecViewMode::Encrypted,
-        )
-        .await;
-    assert_matches!(
-        rm_acct,
-        Err(BatchResourceError::BadAccount(_)),
-        "render_manifests empty+bad account must be rejected"
-    );
-
-    // delete_many: unsupported type
-    let dm_type = facade
-        .delete_many(ResourceBatchSelector {
-            account: None,
-            resource_type: bad_type.parse().unwrap(),
-            resource_refs: vec![],
-        })
-        .await;
-    assert_matches!(
-        dm_type,
-        Err(BatchResourceError::UnsupportedSelector(_)),
-        "delete_many empty+bad type must be rejected"
-    );
-
-    // delete_many: bad account
-    let dm_acct = facade
-        .delete_many(ResourceBatchSelector {
-            account: bad_account.clone(),
-            resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-            resource_refs: vec![],
-        })
-        .await;
-    assert_matches!(
-        dm_acct,
-        Err(BatchResourceError::BadAccount(_)),
-        "delete_many empty+bad account must be rejected"
+    assert!(
+        response.problems.is_empty(),
+        "delete_many problems must be empty"
     );
 }
 
@@ -386,13 +309,18 @@ pub async fn test_get_many_wrong_schema(h: &impl FacadeContractHarness) {
 
     let response = facade
         .get_many(
-            ResourceBatchSelector {
-                account: None,
-                resource_type: SECRET_SET_CANONICAL_SELECTOR.parse().unwrap(),
-                resource_refs: vec![
-                    ResourceRef::ById(id), // idx 0 — exists but wrong schema
-                ],
-            },
+            vec![
+                ResourceRef {
+                    account: None,
+                    r#type: SECRET_SET_CANONICAL_SELECTOR
+                        .parse::<TypeName>()
+                        .unwrap()
+                        .into(),
+                    id: Some(id),
+                    did: None,
+                    name: None,
+                }, // idx 0 — exists but wrong schema
+            ],
             SpecViewMode::Encrypted,
         )
         .await
@@ -423,15 +351,38 @@ pub async fn test_get_handles_mirrors_get_many(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
     let response = facade
-        .get_handles(ResourceBatchSelector {
-            account: None,
-            resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-            resource_refs: vec![
-                ResourceRef::ByName("idents-a".parse().unwrap()), // idx 0 — exists
-                ResourceRef::ByName("no-such-ident".parse().unwrap()), // idx 1 — missing
-                ResourceRef::ById(absent_uid),                    // idx 2 — missing id
-            ],
-        })
+        .get_handles(vec![
+            ResourceRef {
+                account: None,
+                r#type: VARIABLE_SET_CANONICAL_SELECTOR
+                    .parse::<TypeName>()
+                    .unwrap()
+                    .into(),
+                id: None,
+                did: None,
+                name: Some("idents-a".parse().unwrap()),
+            }, // idx 0 — exists
+            ResourceRef {
+                account: None,
+                r#type: VARIABLE_SET_CANONICAL_SELECTOR
+                    .parse::<TypeName>()
+                    .unwrap()
+                    .into(),
+                id: None,
+                did: None,
+                name: Some("no-such-ident".parse().unwrap()),
+            }, // idx 1 — missing
+            ResourceRef {
+                account: None,
+                r#type: VARIABLE_SET_CANONICAL_SELECTOR
+                    .parse::<TypeName>()
+                    .unwrap()
+                    .into(),
+                id: Some(absent_uid),
+                did: None,
+                name: None,
+            }, // idx 2 — missing id
+        ])
         .await
         .unwrap();
 
@@ -470,14 +421,28 @@ pub async fn test_render_manifests_all_successes(h: &impl FacadeContractHarness)
     ] {
         let response = facade
             .render_manifests(
-                ResourceBatchSelector {
-                    account: None,
-                    resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-                    resource_refs: vec![
-                        ResourceRef::ById(id_a), // idx 0
-                        ResourceRef::ById(id_b), // idx 1
-                    ],
-                },
+                vec![
+                    ResourceRef {
+                        account: None,
+                        r#type: VARIABLE_SET_CANONICAL_SELECTOR
+                            .parse::<TypeName>()
+                            .unwrap()
+                            .into(),
+                        id: Some(id_a),
+                        did: None,
+                        name: None,
+                    }, // idx 0
+                    ResourceRef {
+                        account: None,
+                        r#type: VARIABLE_SET_CANONICAL_SELECTOR
+                            .parse::<TypeName>()
+                            .unwrap()
+                            .into(),
+                        id: Some(id_b),
+                        did: None,
+                        name: None,
+                    }, // idx 1
+                ],
                 format,
                 SpecViewMode::Encrypted,
             )
@@ -528,15 +493,38 @@ pub async fn test_render_manifests_mixed_successes_problems(h: &impl FacadeContr
 
     let response = facade
         .render_manifests(
-            ResourceBatchSelector {
-                account: None,
-                resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-                resource_refs: vec![
-                    ResourceRef::ById(uid_existing), // idx 0 — exists
-                    ResourceRef::ByName("render-missing".parse().unwrap()), // idx 1 — missing
-                    ResourceRef::ById(absent_uid),   // idx 2 — missing id
-                ],
-            },
+            vec![
+                ResourceRef {
+                    account: None,
+                    r#type: VARIABLE_SET_CANONICAL_SELECTOR
+                        .parse::<TypeName>()
+                        .unwrap()
+                        .into(),
+                    id: Some(uid_existing),
+                    did: None,
+                    name: None,
+                }, // idx 0 — exists
+                ResourceRef {
+                    account: None,
+                    r#type: VARIABLE_SET_CANONICAL_SELECTOR
+                        .parse::<TypeName>()
+                        .unwrap()
+                        .into(),
+                    id: None,
+                    did: None,
+                    name: Some("render-missing".parse().unwrap()),
+                }, // idx 1 — missing
+                ResourceRef {
+                    account: None,
+                    r#type: VARIABLE_SET_CANONICAL_SELECTOR
+                        .parse::<TypeName>()
+                        .unwrap()
+                        .into(),
+                    id: Some(absent_uid),
+                    did: None,
+                    name: None,
+                }, // idx 2 — missing id
+            ],
             kamu_resources_facade::ResourceManifestFormat::Json,
             SpecViewMode::Encrypted,
         )
@@ -574,15 +562,38 @@ pub async fn test_delete_many_all_successes(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
     let response = facade
-        .delete_many(ResourceBatchSelector {
-            account: None,
-            resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-            resource_refs: vec![
-                ResourceRef::ByName("del-many-a".parse().unwrap()), // idx 0
-                ResourceRef::ById(id_b),                            // idx 1
-                ResourceRef::ByName("del-many-c".parse().unwrap()), // idx 2
-            ],
-        })
+        .delete_many(vec![
+            ResourceRef {
+                account: None,
+                r#type: VARIABLE_SET_CANONICAL_SELECTOR
+                    .parse::<TypeName>()
+                    .unwrap()
+                    .into(),
+                id: None,
+                did: None,
+                name: Some("del-many-a".parse().unwrap()),
+            }, // idx 0
+            ResourceRef {
+                account: None,
+                r#type: VARIABLE_SET_CANONICAL_SELECTOR
+                    .parse::<TypeName>()
+                    .unwrap()
+                    .into(),
+                id: Some(id_b),
+                did: None,
+                name: None,
+            }, // idx 1
+            ResourceRef {
+                account: None,
+                r#type: VARIABLE_SET_CANONICAL_SELECTOR
+                    .parse::<TypeName>()
+                    .unwrap()
+                    .into(),
+                id: None,
+                did: None,
+                name: Some("del-many-c".parse().unwrap()),
+            }, // idx 2
+        ])
         .await
         .unwrap();
 
@@ -606,10 +617,15 @@ pub async fn test_delete_many_all_successes(h: &impl FacadeContractHarness) {
     ] {
         let get = facade
             .get(
-                ResourceSelector {
+                ResourceRef {
                     account: None,
-                    resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-                    resource_ref: ResourceRef::ByName(name.parse().unwrap()),
+                    r#type: VARIABLE_SET_CANONICAL_SELECTOR
+                        .parse::<TypeName>()
+                        .unwrap()
+                        .into(),
+                    id: None,
+                    did: None,
+                    name: Some(name.parse().unwrap()),
                 },
                 SpecViewMode::Encrypted,
             )
@@ -635,15 +651,39 @@ pub async fn test_delete_many_mixed_successes_problems(h: &impl FacadeContractHa
     let facade = h.facade_for(TestAccount::Alice);
 
     let response = facade
-        .delete_many(ResourceBatchSelector {
-            account: None,
-            resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-            resource_refs: vec![
-                ResourceRef::ByName("del-mix-exists".parse().unwrap()), // idx 0 — exists
-                ResourceRef::ByName("del-mix-missing".parse().unwrap()), // idx 1 — missing name
-                ResourceRef::ById(absent_uid),                          // idx 2 — missing id
-            ],
-        })
+        .delete_many(vec![
+            ResourceRef {
+                account: None,
+                r#type: VARIABLE_SET_CANONICAL_SELECTOR
+                    .parse::<TypeName>()
+                    .unwrap()
+                    .into(),
+                id: None,
+                did: None,
+                name: Some("del-mix-exists".parse().unwrap()),
+            }, // idx 0 — exists
+            ResourceRef {
+                account: None,
+                r#type: VARIABLE_SET_CANONICAL_SELECTOR
+                    .parse::<TypeName>()
+                    .unwrap()
+                    .into(),
+                id: None,
+                did: None,
+                name: Some("del-mix-missing".parse().unwrap()),
+            }, /* idx 1 — missing
+                * name */
+            ResourceRef {
+                account: None,
+                r#type: VARIABLE_SET_CANONICAL_SELECTOR
+                    .parse::<TypeName>()
+                    .unwrap()
+                    .into(),
+                id: Some(absent_uid),
+                did: None,
+                name: None,
+            }, // idx 2 — missing id
+        ])
         .await
         .unwrap();
 
@@ -690,14 +730,28 @@ pub async fn test_delete_many_duplicate_refs_is_deterministic(h: &impl FacadeCon
     let facade = h.facade_for(TestAccount::Alice);
 
     let response = facade
-        .delete_many(ResourceBatchSelector {
-            account: None,
-            resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-            resource_refs: vec![
-                ResourceRef::ByName("del-dup-ref".parse().unwrap()), // idx 0
-                ResourceRef::ByName("del-dup-ref".parse().unwrap()), // idx 1 — duplicate
-            ],
-        })
+        .delete_many(vec![
+            ResourceRef {
+                account: None,
+                r#type: VARIABLE_SET_CANONICAL_SELECTOR
+                    .parse::<TypeName>()
+                    .unwrap()
+                    .into(),
+                id: None,
+                did: None,
+                name: Some("del-dup-ref".parse().unwrap()),
+            }, // idx 0
+            ResourceRef {
+                account: None,
+                r#type: VARIABLE_SET_CANONICAL_SELECTOR
+                    .parse::<TypeName>()
+                    .unwrap()
+                    .into(),
+                id: None,
+                did: None,
+                name: Some("del-dup-ref".parse().unwrap()),
+            }, // idx 1 — duplicate
+        ])
         .await
         .unwrap();
 
@@ -749,11 +803,13 @@ pub async fn test_batch_apis_reject_unsupported_type(h: &impl FacadeContractHarn
     let facade = h.facade_for(TestAccount::Alice);
     let bad_type = "NoSuchResourceTypeXYZ";
 
-    let selector = ResourceBatchSelector {
+    let selector = vec![ResourceRef {
         account: None,
-        resource_type: bad_type.parse().unwrap(),
-        resource_refs: vec![ResourceRef::ById(id)],
-    };
+        r#type: bad_type.parse::<TypeName>().unwrap().into(),
+        id: Some(id),
+        did: None,
+        name: None,
+    }];
 
     let gm = facade
         .get_many(selector.clone(), SpecViewMode::Encrypted)

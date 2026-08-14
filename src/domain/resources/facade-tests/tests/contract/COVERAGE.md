@@ -42,10 +42,7 @@ Each RF scenario from the original plan is listed with its status.
 | RF-050  | batch_ops.rs        | Active   | get_many all successes by mixed refs                                  |                                                                        |
 | RF-051  | batch_ops.rs        | Active   | get_many mixed successes and lookup problems                          |                                                                        |
 | RF-052  | batch_ops.rs        | Active   | get_many duplicate refs preserve request indexes                      |                                                                        |
-| RF-053  | batch_ops.rs        | Active   | get_many empty refs returns empty result                              |                                                                        |
-| RF-053A | batch_ops.rs        | Active   | Empty batch still validates unsupported type                          | Extension beyond original plan                                         |
-| RF-053B | batch_ops.rs        | Active   | Empty batch still validates bad account                               | Extension beyond original plan                                         |
-| RF-053C | batch_ops.rs        | Active   | Empty-batch validation mirrors RF-053A/B across all batch ops         | Extension beyond original plan                                         |
+| RF-053  | batch_ops.rs        | Active   | Empty refs returns an empty result across all batch ops               | RF-053A/B/C retired: the batch wrapper that carried a type and account to validate is gone |
 | RF-054  | batch_ops.rs        | Active   | get_many wrong schema produces per-item mismatch problems        |                                                                        |
 | RF-055  | batch_ops.rs        | Active   | get_handles mirrors get_many lookup behavior                       |                                                                        |
 | RF-056  | batch_ops.rs        | Active   | render_manifests all successes                                        |                                                                        |

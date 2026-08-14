@@ -3998,16 +3998,6 @@ enum ResourceBadAccountProblemCode {
 	SELECTOR_MISMATCH
 }
 
-input ResourceBatchSelectorInput {
-	resourceType: ResourceTypeSelectorInput!
-	refs: [ResourceRefInput!]!
-	account: AccountRefInput
-}
-
-input ResourceByNameSelectorInput {
-	name: ResourceName!
-}
-
 scalar ResourceConditions
 
 type ResourceConnection {
@@ -4046,6 +4036,13 @@ type ResourceDeleteSuccess {
 
 type ResourceEdge {
 	node: ResourceSummary!
+}
+
+"""
+A reference that named neither an id nor a name.
+"""
+type ResourceEmptyRefProblem {
+	message: String!
 }
 
 union ResourceGetHandleOutcome = ResourceHandle | ResourceSelectorProblemResult
@@ -4233,7 +4230,7 @@ enum ResourceListColumnVisibility {
 
 union ResourceListOutcome = ResourceConnection | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem | ResourceInvalidLabelFilterProblem
 
-union ResourceLookupProblem = ResourceIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceSchemaMismatchProblem
+union ResourceLookupProblem = ResourceIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceSchemaMismatchProblem | ResourceEmptyRefProblem
 
 enum ResourceManifestFormat {
 	JSON
@@ -4276,9 +4273,26 @@ input ResourceQueryInput @oneOf {
 	namePattern: String
 }
 
-input ResourceRefInput @oneOf {
-	byId: ResourceID
-	byName: ResourceByNameSelectorInput
+"""
+Reference to exactly one resource, mirroring the ODF `ResourceRef`.
+
+Not a `oneOf`: ODF allows `id` and `name` together as a consistency
+assertion, so both are accepted and at least one is required. Validation
+happens at conversion rather than in the schema, which cannot express
+"at least one of".
+"""
+input ResourceRefInput {
+	account: AccountRefInput
+	"""
+	Canonical selector (`variablesets`), alias (`vs`), ODF type name
+	(`VariableSet`), or full schema URI — all resolve to the same type.
+	"""
+	type: ResourceTypeSelectorInput!
+	id: ResourceID
+	"""
+	Exact name. Never a pattern; use a selector for pattern matching.
+	"""
+	name: ResourceName
 }
 
 union ResourceRenderManifestOutcome = ResourceRenderManifestResult | ResourceSelectorProblemResult
@@ -4303,15 +4317,9 @@ input ResourceScopeInput @oneOf {
 	types: [ResourceTypeQueryInput!]
 }
 
-input ResourceSelectorInput {
-	resourceType: ResourceTypeSelectorInput!
-	ref: ResourceRefInput!
-	account: AccountRefInput
-}
-
 scalar ResourceSelectorName
 
-union ResourceSelectorProblem = ResourceIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceSchemaMismatchProblem | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem
+union ResourceSelectorProblem = ResourceIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceSchemaMismatchProblem | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem | ResourceEmptyRefProblem
 
 type ResourceSelectorProblemResult {
 	problem: ResourceSelectorProblem!
@@ -4426,19 +4434,19 @@ type Resources {
 	"""
 	Returns a resource by selector, if found
 	"""
-	resource(selector: ResourceSelectorInput!, revealed: Boolean! = false): ResourceGetOutcome!
+	resource(resourceRef: ResourceRefInput!, revealed: Boolean! = false): ResourceGetOutcome!
 	"""
 	Returns resources by selectors
 	"""
-	resources(selector: ResourceBatchSelectorInput!, revealed: Boolean! = false): BatchResourcesOutcome!
+	resources(resourceRefs: [ResourceRefInput!]!, revealed: Boolean! = false): BatchResourcesOutcome!
 	"""
 	Returns resource handle by selector, if found
 	"""
-	resourceHandle(selector: ResourceSelectorInput!): ResourceGetHandleOutcome!
+	resourceHandle(resourceRef: ResourceRefInput!): ResourceGetHandleOutcome!
 	"""
 	Returns resource handles by selectors
 	"""
-	resourceHandles(selector: ResourceBatchSelectorInput!): BatchResourceHandlesOutcome!
+	resourceHandles(resourceRefs: [ResourceRefInput!]!): BatchResourceHandlesOutcome!
 	"""
 	Returns resources of the specified resource type
 	"""
@@ -4462,18 +4470,18 @@ type Resources {
 	"""
 	Renders a canonical manifest representation from a stored resource
 	"""
-	renderManifest(selector: ResourceSelectorInput!, format: ResourceManifestFormat!, revealed: Boolean! = false): ResourceRenderManifestOutcome!
+	renderManifest(resourceRef: ResourceRefInput!, format: ResourceManifestFormat!, revealed: Boolean! = false): ResourceRenderManifestOutcome!
 	"""
 	Renders canonical manifest representations from stored resources
 	"""
-	renderManifests(selector: ResourceBatchSelectorInput!, format: ResourceManifestFormat!, revealed: Boolean! = false): BatchResourceManifestsOutcome!
+	renderManifests(resourceRefs: [ResourceRefInput!]!, format: ResourceManifestFormat!, revealed: Boolean! = false): BatchResourceManifestsOutcome!
 }
 
 type ResourcesMut {
 	applyManifest(manifest: String!, format: ResourceManifestFormat!, dryRun: Boolean): ResourceApplyOutcome!
 	applyManifests(manifests: [ApplyManifestInput!]!, dryRun: Boolean): ResourceApplyManifestsResult!
-	delete(selector: ResourceSelectorInput!): ResourceDeleteOutcome!
-	deleteMany(selector: ResourceBatchSelectorInput!): ResourceDeleteManyOutcome!
+	delete(resourceRef: ResourceRefInput!): ResourceDeleteOutcome!
+	deleteMany(resourceRefs: [ResourceRefInput!]!): ResourceDeleteManyOutcome!
 }
 
 type ResourcesSummary {

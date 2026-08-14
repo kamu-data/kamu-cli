@@ -7,9 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources_facade::ResourceRef;
-
 use crate::CLIError;
+use crate::resources::ExactResourceRef;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -26,7 +25,7 @@ pub trait ResourceSelectorResolutionService: Send + Sync {
 #[derive(Debug, Clone)]
 pub struct ResolvedResourceSelector {
     pub input: String,
-    pub resource_ref: ResourceRef,
+    pub resource_ref: ExactResourceRef,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

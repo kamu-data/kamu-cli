@@ -15,10 +15,7 @@ use crate::facade::graphql::cynic_api::fragments::{
     ResourceSelectorProblemResult,
     ResourceUnsupportedSelectorProblem,
 };
-use crate::facade::graphql::cynic_api::inputs::{
-    ResourceBatchSelectorInput,
-    ResourceSelectorInput,
-};
+use crate::facade::graphql::cynic_api::inputs::ResourceRefInput;
 use crate::facade::graphql::cynic_api::schema;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -32,7 +29,7 @@ pub(crate) struct DeleteMutation {
 #[derive(cynic::QueryFragment, Debug, Clone)]
 #[cynic(graphql_type = "ResourcesMut", variables = "DeleteVariables")]
 pub(crate) struct ResourcesMutDelete {
-    #[arguments(selector: $selector)]
+    #[arguments(resourceRef: $resource_ref)]
     pub delete: ResourceDeleteOutcome,
 }
 
@@ -47,7 +44,7 @@ pub(crate) struct DeleteManyMutation {
 #[derive(cynic::QueryFragment, Debug, Clone)]
 #[cynic(graphql_type = "ResourcesMut", variables = "DeleteManyVariables")]
 pub(crate) struct ResourcesMutDeleteMany {
-    #[arguments(selector: $selector)]
+    #[arguments(resourceRefs: $resource_refs)]
     pub delete_many: ResourceDeleteManyOutcome,
 }
 
@@ -93,12 +90,12 @@ pub(crate) struct ResourceDeleteManySuccess {
 
 #[derive(cynic::QueryVariables, Debug, Clone)]
 pub(crate) struct DeleteVariables {
-    pub selector: ResourceSelectorInput,
+    pub resource_ref: ResourceRefInput,
 }
 
 #[derive(cynic::QueryVariables, Debug, Clone)]
 pub(crate) struct DeleteManyVariables {
-    pub selector: ResourceBatchSelectorInput,
+    pub resource_refs: Vec<ResourceRefInput>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

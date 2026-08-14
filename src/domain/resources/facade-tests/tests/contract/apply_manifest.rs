@@ -15,8 +15,10 @@ use kamu_resources::{
     ApplyResourceOutcome,
     RESOURCE_ANNOTATION_DESCRIPTION_SCHEMA_URI,
     RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI,
+    ResourceRef,
     ResourceSchemaProvider,
     ResourceWarning,
+    TypeName,
     WARNING_CODE_RESOURCE_FREEFORM_ANNOTATIONS,
     WARNING_CODE_RESOURCE_FREEFORM_LABELS,
     WARNING_CODE_RESOURCE_LABEL_NOT_INDEXED,
@@ -27,8 +29,6 @@ use kamu_resources_facade::{
     GetResourceError,
     ResourceHeadersValidationProblemCode,
     ResourceManifestFormat,
-    ResourceRef,
-    ResourceSelector,
     SpecViewMode,
 };
 use pretty_assertions::{assert_eq, assert_matches};
@@ -47,11 +47,13 @@ use crate::helpers::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn make_selector(resource_type: &str, _schema: &str, name: &str) -> ResourceSelector {
-    ResourceSelector {
+fn make_selector(resource_type: &str, _schema: &str, name: &str) -> ResourceRef {
+    ResourceRef {
         account: None,
-        resource_type: resource_type.parse().unwrap(),
-        resource_ref: ResourceRef::ByName(name.parse().unwrap()),
+        r#type: resource_type.parse::<TypeName>().unwrap().into(),
+        id: None,
+        did: None,
+        name: Some(name.parse().unwrap()),
     }
 }
 

@@ -301,9 +301,10 @@ impl From<BatchResourceError> for CLIError {
         use BatchResourceError as E;
 
         match e {
-            e @ (E::UnsupportedSelector(_) | E::BadAccount(_) | E::InvalidLabelFilter(_)) => {
-                Self::failure(e)
-            }
+            e @ (E::UnsupportedSelector(_)
+            | E::BadAccount(_)
+            | E::InvalidLabelFilter(_)
+            | E::NonUniformBatch(_)) => Self::failure(e),
             E::RemoteRequest(err) => Self::from(err),
             E::Internal(err) => Self::critical(err),
         }
@@ -443,6 +444,11 @@ enum ResourceLookupCliError {
         expected_schema: String,
         actual_schema: String,
     },
+
+    /// Unreachable from the CLI, which always spells exactly one of the two,
+    /// but representable on the wire.
+    #[error("Resource reference specified neither an id nor a name")]
+    EmptyRef,
 }
 
 impl From<ResourceLookupProblem> for ResourceLookupCliError {
@@ -458,6 +464,7 @@ impl From<ResourceLookupProblem> for ResourceLookupCliError {
                 expected_schema: err.expected_schema.to_string(),
                 actual_schema: err.actual_schema.to_string(),
             },
+            ResourceLookupProblem::EmptyRef => Self::EmptyRef,
         }
     }
 }

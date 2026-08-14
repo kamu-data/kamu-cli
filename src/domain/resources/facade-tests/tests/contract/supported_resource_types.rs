@@ -9,14 +9,18 @@
 
 use database_common::PaginationOpts;
 use kamu_configuration::{SecretSetResource, VariableSetResource};
-use kamu_resources::{ResourceSchemaProvider, UnsupportedResourceSelectorError};
+use kamu_resources::{
+    ResourceRef,
+    ResourceSchemaProvider,
+    TypeName,
+    UnsupportedResourceSelectorError,
+};
 use kamu_resources_facade::{
     DeleteResourceError,
     GetResourceError,
     ListResourceHandlesRequest,
     ListResourcesError,
     ListResourcesRequest,
-    ResourceSelector,
     SpecViewMode,
 };
 
@@ -157,12 +161,15 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
 
     facade
         .get(
-            ResourceSelector {
+            ResourceRef {
                 account: None,
-                resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-                resource_ref: kamu_resources_facade::ResourceRef::ByName(
-                    "alias-check".parse().unwrap(),
-                ),
+                r#type: VARIABLE_SET_CANONICAL_SELECTOR
+                    .parse::<TypeName>()
+                    .unwrap()
+                    .into(),
+                id: None,
+                did: None,
+                name: Some("alias-check".parse().unwrap()),
             },
             SpecViewMode::Encrypted,
         )
@@ -265,12 +272,12 @@ pub async fn test_unsupported_schema_rejected_consistently(h: &impl FacadeContra
     // get by ByName — unsupported selector is rejected before lookup
     let get_by_name = facade
         .get(
-            ResourceSelector {
+            ResourceRef {
                 account: None,
-                resource_type: bad_type.parse().unwrap(),
-                resource_ref: kamu_resources_facade::ResourceRef::ByName(
-                    "unsupported-type-base".parse().unwrap(),
-                ),
+                r#type: bad_type.parse::<TypeName>().unwrap().into(),
+                id: None,
+                did: None,
+                name: Some("unsupported-type-base".parse().unwrap()),
             },
             SpecViewMode::Encrypted,
         )
@@ -286,12 +293,12 @@ pub async fn test_unsupported_schema_rejected_consistently(h: &impl FacadeContra
 
     // get_handle by ByName — same UnsupportedSelector behavior
     let gi_by_name = facade
-        .get_handle(ResourceSelector {
+        .get_handle(ResourceRef {
             account: None,
-            resource_type: bad_type.parse().unwrap(),
-            resource_ref: kamu_resources_facade::ResourceRef::ByName(
-                "unsupported-type-base".parse().unwrap(),
-            ),
+            r#type: bad_type.parse::<TypeName>().unwrap().into(),
+            id: None,
+            did: None,
+            name: Some("unsupported-type-base".parse().unwrap()),
         })
         .await;
     match gi_by_name {
@@ -360,10 +367,12 @@ pub async fn test_unsupported_schema_rejected_consistently(h: &impl FacadeContra
 
     // delete by ById — UnsupportedSelector (type validated after UID is known)
     let delete_result = facade
-        .delete(ResourceSelector {
+        .delete(ResourceRef {
             account: None,
-            resource_type: bad_type.parse().unwrap(),
-            resource_ref: kamu_resources_facade::ResourceRef::ById(id),
+            r#type: bad_type.parse::<TypeName>().unwrap().into(),
+            id: Some(id),
+            did: None,
+            name: None,
         })
         .await;
     match delete_result {

@@ -8,12 +8,14 @@
 // by the Apache License, Version 2.0.
 
 mod batch_id_resolver;
+mod batch_uniformity;
 mod handle_support;
 mod label_filter_support;
 mod manifest_support;
 mod validation_helpers;
 
 pub(crate) use batch_id_resolver::*;
+pub(crate) use batch_uniformity::*;
 pub(crate) use handle_support::*;
 pub(crate) use label_filter_support::*;
 pub(crate) use manifest_support::*;

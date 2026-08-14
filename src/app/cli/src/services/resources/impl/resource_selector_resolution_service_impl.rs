@@ -7,10 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources_facade::ResourceRef;
-
 use crate::CLIError;
-use crate::resources::{ResolvedResourceSelector, ResourceSelectorResolutionService};
+use crate::resources::{
+    ExactResourceRef,
+    ResolvedResourceSelector,
+    ResourceSelectorResolutionService,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -28,11 +30,11 @@ impl ResourceSelectorResolutionService for ResourceSelectorResolutionServiceImpl
     ) -> Result<ResolvedResourceSelector, CLIError> {
         let resource_ref =
             if super::resource_ref_classifier::is_resource_id(selector) {
-                ResourceRef::ById(kamu_resources::ResourceID::new(
+                ExactResourceRef::ById(kamu_resources::ResourceID::new(
                     uuid::Uuid::parse_str(selector).expect("checked to be a UUID"),
                 ))
             } else {
-                ResourceRef::ByName(selector.parse().map_err(|_| {
+                ExactResourceRef::ByName(selector.parse().map_err(|_| {
                     CLIError::usage_error(format!("Invalid resource name: {selector}"))
                 })?)
             };
