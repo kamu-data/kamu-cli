@@ -342,6 +342,7 @@ impl AccountRepository for SqliteAccountRepository {
 
     async fn find_account_id_by_provider_identity_key(
         &self,
+        provider: &str,
         provider_identity_key: &str,
     ) -> Result<Option<odf::AccountID>, FindAccountIdByProviderIdentityKeyError> {
         let mut tr = self.transaction.lock().await;
@@ -352,8 +353,10 @@ impl AccountRepository for SqliteAccountRepository {
             r#"
             SELECT id as "id: odf::AccountID"
             FROM accounts
-            WHERE provider_identity_key = $1
+            WHERE provider = $1
+              AND provider_identity_key = $2
             "#,
+            provider,
             provider_identity_key
         )
         .fetch_optional(connection_mut)
