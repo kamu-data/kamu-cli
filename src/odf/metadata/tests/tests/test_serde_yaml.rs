@@ -1255,7 +1255,7 @@ fn test_serde_resource_input_refs() {
                 relations: Some(vec![RelationInput {
                     subject: ResourceRef {
                         account: None,
-                        r#type: TypeRef::Name("Account".parse().unwrap()),
+                        r#type: Some(TypeRef::Name("Account".parse().unwrap())),
                         id: None,
                         did: None,
                         name: Some("alice".parse().unwrap()),
@@ -1268,7 +1268,7 @@ fn test_serde_resource_input_refs() {
                             did: None,
                             name: Some("bob".parse().unwrap()),
                         }),
-                        r#type: TypeRef::Name("Dataset".parse().unwrap()),
+                        r#type: Some(TypeRef::Name("Dataset".parse().unwrap())),
                         id: None,
                         did: None,
                         name: Some("bobs-dataset".parse().unwrap()),
@@ -1281,7 +1281,7 @@ fn test_serde_resource_input_refs() {
                             did: None,
                             name: Some("bob".parse().unwrap()),
                         }),
-                        r#type: TypeRef::Name("Dataset".parse().unwrap()),
+                        r#type: Some(TypeRef::Name("Dataset".parse().unwrap())),
                         id: None,
                         did: None,
                         name: Some("bobs-dataset".parse().unwrap()),

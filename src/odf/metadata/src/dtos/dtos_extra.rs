@@ -76,7 +76,7 @@ impl std::str::FromStr for resource::ResourceRef {
 
         Ok(Self {
             account: account.map(|s| AccountName::new_unchecked(s).into()),
-            r#type: resource::TypeName::new_unchecked(typ).into(),
+            r#type: Some(resource::TypeName::new_unchecked(typ).into()),
             id: None,
             did: None,
             name: Some(resource::ResourceName::new_unchecked(name)),
@@ -102,7 +102,7 @@ impl From<resource::ResourceHandle> for resource::ResourceRef {
         } = value;
         Self {
             account: Some(account.into()),
-            r#type: r#type.into(),
+            r#type: Some(r#type.into()),
             id: Some(id),
             did,
             name: Some(name),
@@ -169,7 +169,7 @@ impl From<auth::AccountRef> for resource::ResourceRef {
         let auth::AccountRef { id, did, name } = value;
         Self {
             account: None,
-            r#type: auth::Account::schema().clone().into(),
+            r#type: Some(auth::Account::schema().clone().into()),
             id,
             did: did.map(Into::into),
             name: name.map(Into::into),
@@ -269,7 +269,7 @@ impl From<config::ValueHandle> for resource::ResourceRef {
         } = value;
         Self {
             account: Some(account.into()),
-            r#type: r#type.into(),
+            r#type: Some(r#type.into()),
             id: Some(id),
             did: None,
             name: Some(name),
@@ -297,7 +297,7 @@ impl From<storage::PersistentVolumeRef> for resource::ResourceRef {
         let storage::PersistentVolumeRef { account, id, name } = value;
         Self {
             account,
-            r#type: storage::PersistentVolume::schema().clone().into(),
+            r#type: Some(storage::PersistentVolume::schema().clone().into()),
             id,
             did: None,
             name,
