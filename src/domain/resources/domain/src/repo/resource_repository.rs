@@ -178,6 +178,21 @@ impl ResourceQuery {
 pub struct ResourceTypeQuery {
     pub schema: TypeUri,
     pub query: Option<ResourceQuery>,
+    /// Which account this row spans. `None` means the call-level account, which
+    /// every row used to share — the scoped reads still take that as a scalar
+    /// argument and it remains the default.
+    ///
+    /// Set only when a caller names an account per selector. Rows naming
+    /// different accounts cannot merge, so the coalescer groups by
+    /// `(schema, account)` rather than by schema alone.
+    pub account_id: Option<odf::AccountID>,
+}
+
+impl ResourceTypeQuery {
+    /// The account this row applies to, falling back to the call-level one.
+    pub fn effective_account_id<'a>(&'a self, default: &'a odf::AccountID) -> &'a odf::AccountID {
+        self.account_id.as_ref().unwrap_or(default)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -206,9 +221,14 @@ impl ResourceScope {
         Self::Types(types)
     }
 
-    /// The common single-type case, with or without a query.
+    /// The common single-type case, with or without a query, spanning the
+    /// call-level account.
     pub fn one_type(schema: TypeUri, query: Option<ResourceQuery>) -> Self {
-        Self::Types(vec![ResourceTypeQuery { schema, query }])
+        Self::Types(vec![ResourceTypeQuery {
+            schema,
+            query,
+            account_id: None,
+        }])
     }
 
     /// Every type, narrowed by one query applying to all of them.

@@ -639,13 +639,24 @@ fn snapshot_matches_query(snapshot: &ResourceSnapshot, query: &ResourceQuery) ->
 
 /// A snapshot passes when its schema is in scope *and* that schema's own query
 /// matches — each type carries its own query, so the checks cannot be split.
-fn snapshot_matches_scope(snapshot: &ResourceSnapshot, scope: &ResourceScope) -> bool {
+/// Mirrors the SQL backends: the account is matched *inside* the scope, per
+/// row, so a row naming its own account is checked against that one and every
+/// other row against the call-level default.
+fn snapshot_matches_scope(
+    snapshot: &ResourceSnapshot,
+    scope: &ResourceScope,
+    default_account_id: &odf::AccountID,
+) -> bool {
     match scope {
-        ResourceScope::AnyType(query) => query
-            .as_ref()
-            .is_none_or(|query| snapshot_matches_query(snapshot, query)),
+        ResourceScope::AnyType(query) => {
+            snapshot.headers.account.did == *default_account_id
+                && query
+                    .as_ref()
+                    .is_none_or(|query| snapshot_matches_query(snapshot, query))
+        }
         ResourceScope::Types(types) => types.iter().any(|entry| {
             snapshot.schema == entry.schema
+                && snapshot.headers.account.did == *entry.effective_account_id(default_account_id)
                 && entry
                     .query
                     .as_ref()
@@ -709,9 +720,10 @@ fn filter_scoped_snapshots<'a>(
     guard
         .snapshots_by_id
         .values()
-        .filter(|snapshot| snapshot.headers.account.did == *account_id)
         .filter(|snapshot| snapshot.headers.deleted_at.is_none())
-        .filter(|snapshot| snapshot_matches_scope(snapshot, scope))
+        // Account is matched inside the scope, not here: a row may name its own
+        // account, and `account_id` is only the default for rows that do not.
+        .filter(|snapshot| snapshot_matches_scope(snapshot, scope, account_id))
         .filter(|snapshot| snapshot_matches_label_pairs(snapshot, label_pairs))
         .collect()
 }

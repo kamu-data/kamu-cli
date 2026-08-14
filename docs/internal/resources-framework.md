@@ -942,11 +942,23 @@ single row. Two consequences worth remembering:
   second field. Exact-name *lookups* therefore go through the ref API
   (`get_handles`), which preserves one batched `ExactNames` row instead of one
   `ILIKE` row per name.
-- **`ResourceSelector::account` is not honoured yet.** Listing resolves one account
-  per call — `ResourceRepository`'s scoped reads take a single scalar `account_id`
-  alongside the scope — so a selector carrying an account is *rejected*
-  (`UnsupportedSelectorFieldError::PerSelectorAccount`), never silently ignored.
-  Pinned by RF-105.
+- **`ResourceSelector::account` is per-row.** `ResourceTypeQuery` carries an
+  optional `account_id`; `None` means the call-level account, which the scoped
+  reads still take as a scalar and use as the default. That is what lets one
+  call span several accounts, and it is why the coalescer groups by
+  `(schema, account)` rather than by schema alone — two selectors differing only
+  by account describe different resources and must not merge.
+
+  Accounts are resolved in one batch, deduplicated by spelling, with the
+  permission check applied per **distinct** account. **Any denial fails the whole
+  call**: a partial result would narrow the caller's request without saying so.
+  Pinned by RF-105, and by `test_search_resource_handles_per_row_account` in the
+  shared repository suite — the only safety net for SQLite, whose scope predicate
+  is not compile-time checked.
+
+  `ResourceScope::AnyType` carries no per-row account, so a type-less selector
+  naming one is rejected (`UnrepresentableScopeError::AnyTypeWithAccount`)
+  rather than silently scoped to the caller.
 
 Resolution happens in the local facade, strictly before dispatch, through the same
 `ResourceExtensionSchemaResolver` used by manifest apply (`ResourceExtensionKind::Label`).
@@ -1088,10 +1100,13 @@ carry no `labelFilter` field at all.
 optional; several selectors act as a logical OR, which is what lets one call span resource types.
 A selector with no `type` spans every type.
 
-Two fields exist on the wire but are **not honoured yet**, and are rejected rather than ignored so a
+`account` is honoured per selector, so one call can span several accounts — the second headline
+benefit of the ODF-shaped API. Naming an account you are not allowed to read denies the **whole**
+call rather than dropping that selector (RF-105).
+
+One field exists on the wire but is **not honoured yet**, and is rejected rather than ignored so a
 caller learns their request was not what they asked for:
 
-- `account` — listing resolves one account per call; use the call-level `account` (RF-105).
 - `labels` — the call-level `labelFilter` applies to every selector.
 
 The wire is scalar where the repository is list-carrying: a batch of N ids arrives as N selectors and

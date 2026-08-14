@@ -95,6 +95,14 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = postgres,
+    fixture = resource_repo_suite::test_search_resource_handles_per_row_account,
+    harness = PostgresResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
     fixture = resource_repo_suite::test_search_resource_handles_pattern_special_characters,
     harness = PostgresResourceRepositoryHarness
 );

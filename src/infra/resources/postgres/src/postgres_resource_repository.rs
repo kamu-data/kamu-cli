@@ -394,7 +394,7 @@ impl ResourceRepository for PostgresResourceRepository {
         label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceHandleRow>, InternalError> {
-        let flat = FlatScope::new(scope);
+        let flat = FlatScope::new(scope, account_id);
         if flat.vacuous {
             return Ok(Vec::new());
         }
@@ -404,7 +404,6 @@ impl ResourceRepository for PostgresResourceRepository {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
-        let account_id_stack = account_id.as_stack_string();
         let limit = i64::try_from(pagination.limit).int_err()?;
         let offset = i64::try_from(pagination.offset).int_err()?;
 
@@ -421,20 +420,22 @@ impl ResourceRepository for PostgresResourceRepository {
                 COALESCE(a.account_name, $9) as "account_name!"
             FROM resources r
             LEFT JOIN accounts a ON a.id = r.account_id
-            WHERE r.account_id = $1
-              AND r.deleted_at IS NULL
-              -- Each type carries its own query, re-paired here. A NULL schema
-              -- array means "every type", in which case the single row of
-              -- query columns applies uniformly.
+            WHERE r.deleted_at IS NULL
+              -- Each type carries its own query and account, re-paired here.
+              -- A NULL schema array means "every type", in which case the
+              -- single row of query columns applies uniformly. The account is
+              -- inside the EXISTS so a row may span an account of its own.
               AND EXISTS (
                   SELECT 1
                   FROM UNNEST(
                            COALESCE($2::text[], ARRAY[NULL]::text[]),
                            $3::text[],
                            $4::text[],
-                           $5::text[]
-                       ) AS f(schema, name_pattern, exact_names, exact_ids)
-                  WHERE (f.schema IS NULL OR r.resource_schema = f.schema)
+                           $5::text[],
+                           $1::text[]
+                       ) AS f(schema, name_pattern, exact_names, exact_ids, account_id)
+                  WHERE r.account_id = f.account_id
+                    AND (f.schema IS NULL OR r.resource_schema = f.schema)
                     AND (f.name_pattern IS NULL
                          OR r.resource_name ILIKE f.name_pattern ESCAPE '\')
                     AND (f.exact_names IS NULL
@@ -457,7 +458,7 @@ impl ResourceRepository for PostgresResourceRepository {
             ORDER BY r.updated_at DESC, r.resource_id DESC
             LIMIT $8 OFFSET $10
             "#,
-            account_id_stack.as_str(),
+            flat.account_ids(),
             flat.schemas() as _,
             flat.name_patterns() as _,
             flat.exact_names() as _,
@@ -479,7 +480,7 @@ impl ResourceRepository for PostgresResourceRepository {
         scope: &ResourceScope,
         label_filter: &ResolvedResourceLabelFilter,
     ) -> Result<usize, InternalError> {
-        let flat = FlatScope::new(scope);
+        let flat = FlatScope::new(scope, account_id);
         if flat.vacuous {
             return Ok(0);
         }
@@ -489,26 +490,26 @@ impl ResourceRepository for PostgresResourceRepository {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
-        let account_id_stack = account_id.as_stack_string();
-
         let count = sqlx::query!(
             r#"
             SELECT COUNT(*) AS "count!: i64"
             FROM resources r
-            WHERE r.account_id = $1
-              AND r.deleted_at IS NULL
-              -- Each type carries its own query, re-paired here. A NULL schema
-              -- array means "every type", in which case the single row of
-              -- query columns applies uniformly.
+            WHERE r.deleted_at IS NULL
+              -- Each type carries its own query and account, re-paired here.
+              -- A NULL schema array means "every type", in which case the
+              -- single row of query columns applies uniformly. The account is
+              -- inside the EXISTS so a row may span an account of its own.
               AND EXISTS (
                   SELECT 1
                   FROM UNNEST(
                            COALESCE($2::text[], ARRAY[NULL]::text[]),
                            $3::text[],
                            $4::text[],
-                           $5::text[]
-                       ) AS f(schema, name_pattern, exact_names, exact_ids)
-                  WHERE (f.schema IS NULL OR r.resource_schema = f.schema)
+                           $5::text[],
+                           $1::text[]
+                       ) AS f(schema, name_pattern, exact_names, exact_ids, account_id)
+                  WHERE r.account_id = f.account_id
+                    AND (f.schema IS NULL OR r.resource_schema = f.schema)
                     AND (f.name_pattern IS NULL
                          OR r.resource_name ILIKE f.name_pattern ESCAPE '\')
                     AND (f.exact_names IS NULL
@@ -528,7 +529,7 @@ impl ResourceRepository for PostgresResourceRepository {
                   )
               )
             "#,
-            account_id_stack.as_str(),
+            flat.account_ids(),
             flat.schemas() as _,
             flat.name_patterns() as _,
             flat.exact_names() as _,
@@ -864,9 +865,8 @@ impl ResourceRepository for PostgresResourceRepository {
         label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
     ) -> ResourceSnapshotStream<'_> {
-        let account_id = account_id.clone();
         let label_filter = label_filter.clone();
-        let flat = FlatScope::new(scope);
+        let flat = FlatScope::new(scope, account_id);
 
         Box::pin(async_stream::stream! {
             if flat.vacuous {
@@ -878,7 +878,8 @@ impl ResourceRepository for PostgresResourceRepository {
             let mut tr = self.transaction.lock().await;
             let connection_mut = tr.connection_mut().await?;
 
-            let account_id_stack = account_id.as_stack_string();
+            // The account travels inside `flat`, which owns its strings, so the
+            // stream borrows nothing from the caller's `account_id`.
             let limit = i64::try_from(pagination.limit).int_err()?;
             let offset = i64::try_from(pagination.offset).int_err()?;
 
@@ -905,20 +906,22 @@ impl ResourceRepository for PostgresResourceRepository {
                     r.last_event_id
                 FROM resources r
                 LEFT JOIN accounts a ON a.id = r.account_id
-                WHERE r.account_id = $1
-                  AND r.deleted_at IS NULL
-                  -- Each type carries its own query, re-paired here. A NULL
-                  -- schema array means "every type", in which case the single
-                  -- row of query columns applies uniformly.
+                WHERE r.deleted_at IS NULL
+                  -- Each type carries its own query and account, re-paired
+                  -- here. A NULL schema array means "every type", in which case
+                  -- the single row of query columns applies uniformly. The
+                  -- account is inside the EXISTS so a row may span its own.
                   AND EXISTS (
                       SELECT 1
                       FROM UNNEST(
                                COALESCE($2::text[], ARRAY[NULL]::text[]),
                                $3::text[],
                                $4::text[],
-                               $5::text[]
-                           ) AS f(schema, name_pattern, exact_names, exact_ids)
-                      WHERE (f.schema IS NULL OR r.resource_schema = f.schema)
+                               $5::text[],
+                               $1::text[]
+                           ) AS f(schema, name_pattern, exact_names, exact_ids, account_id)
+                      WHERE r.account_id = f.account_id
+                        AND (f.schema IS NULL OR r.resource_schema = f.schema)
                         AND (f.name_pattern IS NULL
                              OR r.resource_name ILIKE f.name_pattern ESCAPE '\')
                         AND (f.exact_names IS NULL
@@ -940,7 +943,7 @@ impl ResourceRepository for PostgresResourceRepository {
                 ORDER BY r.updated_at DESC, r.resource_id DESC
                 LIMIT $8 OFFSET $10
                 "#,
-                account_id_stack.as_str(),
+                flat.account_ids(),
                 flat.schemas() as _,
                 flat.name_patterns() as _,
                 flat.exact_names() as _,
@@ -1101,6 +1104,10 @@ struct FlatScope {
     exact_names: Vec<Option<String>>,
     /// Per row: exact IDs joined by [`Self::LIST_SEPARATOR`], or `NULL`.
     exact_ids: Vec<Option<String>>,
+    /// Per row: the account that row spans — its own if it named one, else the
+    /// call-level default. Never `NULL`, so the predicate needs no `IS NULL`
+    /// branch.
+    account_ids: Vec<String>,
     /// Set when the scope cannot match anything, letting callers skip the
     /// round-trip entirely.
     vacuous: bool,
@@ -1111,19 +1118,26 @@ impl FlatScope {
     /// collide with list contents.
     const LIST_SEPARATOR: char = ',';
 
-    fn new(scope: &ResourceScope) -> Self {
+    fn new(scope: &ResourceScope, default_account_id: &odf::AccountID) -> Self {
         let mut flat = Self {
             vacuous: scope.is_vacuous(),
             ..Default::default()
         };
 
         match scope {
-            ResourceScope::AnyType(query) => flat.push_row(query.as_ref()),
+            // `AnyType` carries no per-row account, so the one row takes the
+            // call-level default.
+            ResourceScope::AnyType(query) => {
+                flat.push_row(query.as_ref(), default_account_id.to_string());
+            }
             ResourceScope::Types(types) => {
                 let mut schemas = Vec::with_capacity(types.len());
                 for entry in types {
                     schemas.push(entry.schema.as_str().to_owned());
-                    flat.push_row(entry.query.as_ref());
+                    flat.push_row(
+                        entry.query.as_ref(),
+                        entry.effective_account_id(default_account_id).to_string(),
+                    );
                 }
                 flat.schemas = Some(schemas);
             }
@@ -1134,7 +1148,7 @@ impl FlatScope {
 
     /// Appends one row's worth of query columns, at most one of which is
     /// non-`NULL`.
-    fn push_row(&mut self, query: Option<&ResourceQuery>) {
+    fn push_row(&mut self, query: Option<&ResourceQuery>, account_id: String) {
         let (name_pattern, exact_names, exact_ids) = match query {
             None => (None, None, None),
             // An ID is matched exactly; only a pattern is `LIKE`-escaped.
@@ -1167,10 +1181,15 @@ impl FlatScope {
         self.name_patterns.push(name_pattern);
         self.exact_names.push(exact_names);
         self.exact_ids.push(exact_ids);
+        self.account_ids.push(account_id);
     }
 
     fn schemas(&self) -> Option<&[String]> {
         self.schemas.as_deref()
+    }
+
+    fn account_ids(&self) -> &[String] {
+        &self.account_ids
     }
 
     fn name_patterns(&self) -> &[Option<String>] {

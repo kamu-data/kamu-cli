@@ -49,30 +49,6 @@ pub enum UnsupportedSelectorFieldError {
 
     #[error("Resource reference must specify at least one of `id` or `name`")]
     EmptyRef,
-
-    /// The listing pipeline resolves one account per call, not per selector:
-    /// `ResourceRepository`'s scoped reads take a single scalar `account_id`
-    /// alongside the scope. Until that is per-row, honouring this field is
-    /// impossible — and silently ignoring it would scope the call to the
-    /// caller's own account while the caller believes otherwise, which is a
-    /// wrong-data bug rather than a missing feature.
-    #[error(
-        "Per-selector `account` is not supported yet — use the call-level account instead. Every \
-         selector in one call must span the same account"
-    )]
-    PerSelectorAccount,
-}
-
-/// Rejects a selector carrying a field the listing pipeline would drop.
-///
-/// Mirrors [`validate_ref`] for the selector half. A selector narrowing by
-/// nothing is meaningful (it matches its whole type), so unlike a ref there is
-/// no "empty" case to reject.
-pub fn validate_selector(value: &ResourceSelector) -> Result<(), UnsupportedSelectorFieldError> {
-    if value.account.is_some() {
-        return Err(UnsupportedSelectorFieldError::PerSelectorAccount);
-    }
-    Ok(())
 }
 
 /// Rejects a ref the facade cannot resolve: one carrying a `did`, or one
@@ -126,6 +102,12 @@ fn sql_like_escape_literal(literal: &str) -> String {
 // Coalescing
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// `(schema, account)` — what makes two selectors mergeable.
+type GroupKey = (Option<TypeUri>, Option<odf::AccountID>);
+
+/// The same, as owned strings, so groups sort deterministically.
+type GroupSortKey = (Option<String>, Option<String>);
+
 /// One [`ResourceRef`] or [`ResourceSelector`] after its type has been resolved
 /// to a concrete schema.
 ///
@@ -145,6 +127,9 @@ pub struct ResolvedSelector {
     pub name: Option<ResourceName>,
     /// SQL `LIKE` pattern, from a [`ResourceSelector`].
     pub name_pattern: Option<String>,
+    /// `None` means the call-level account. Two selectors differing only by
+    /// account must **not** merge, so this is part of the grouping key.
+    pub account_id: Option<odf::AccountID>,
 }
 
 /// Folds scalar, ODF-shaped selectors into the list-carrying per-type queries
@@ -174,46 +159,79 @@ pub fn coalesce_selectors(
         return Ok(None);
     }
 
-    // Grouped by schema, preserving first-appearance order so the emitted rows
-    // are stable and diffable. `None` (any-type) is its own group.
-    let mut order: Vec<Option<TypeUri>> = Vec::new();
-    let mut groups: BTreeMap<Option<String>, SelectorGroup> = BTreeMap::new();
+    // Grouped by `(schema, account)`, preserving first-appearance order so the
+    // emitted rows are stable and diffable. `None` schema (any-type) is its own
+    // group.
+    //
+    // The account is part of the key because two selectors differing only by
+    // account describe different resources: merging them would silently widen
+    // one to the other's account.
+    let mut order: Vec<GroupKey> = Vec::new();
+    let mut groups: BTreeMap<GroupSortKey, SelectorGroup> = BTreeMap::new();
 
     for selector in selectors {
-        let key = selector.schema.as_ref().map(|s| s.as_str().to_owned());
-        let group = groups.entry(key).or_insert_with(|| {
-            order.push(selector.schema.clone());
+        let key = (selector.schema.clone(), selector.account_id.clone());
+        let sort_key = (
+            key.0.as_ref().map(|s| s.as_str().to_owned()),
+            key.1.as_ref().map(ToString::to_string),
+        );
+        let group = groups.entry(sort_key).or_insert_with(|| {
+            order.push(key);
             SelectorGroup::default()
         });
         group.push(selector);
     }
 
-    // An unnarrowed any-type selector matches everything, so it subsumes every
-    // other selector in the call and collapses the whole scope.
-    let any_type_group = groups.get(&None);
-    if any_type_group.is_some_and(|group| group.unnarrowed) {
-        return Ok(Some(ResourceScope::AnyType(None)));
-    }
+    // The any-type groups, across every account.
+    let any_type_keys = order
+        .iter()
+        .filter(|(schema, _)| schema.is_none())
+        .cloned()
+        .collect::<Vec<_>>();
 
-    // A narrowed any-type selector spans every type, so it cannot be expressed
-    // as a per-type row. `ResourceScope::AnyType` carries a single query, so it
-    // is representable only as the sole selector with a single query mode.
-    if let Some(group) = any_type_group {
+    if !any_type_keys.is_empty() {
+        // Checked before anything else: an unnarrowed, account-less type-less
+        // selector matches every resource under the call-level account, so it
+        // subsumes every other selector rather than conflicting with them.
+        let unnarrowed_any_account = any_type_keys.iter().any(|(_, account_id)| {
+            account_id.is_none()
+                && groups
+                    .get(&(None, None))
+                    .is_some_and(|group| group.unnarrowed)
+        });
+        if unnarrowed_any_account {
+            return Ok(Some(ResourceScope::AnyType(None)));
+        }
+
+        // A type-less selector already spans every type, so pairing it with any
+        // other group cannot be expressed as per-type rows.
         if order.len() > 1 {
             return Err(UnrepresentableScopeError::AnyTypeMixedWithTypedSelectors);
         }
-        return group
+
+        let (_, account_id) = &any_type_keys[0];
+
+        // `AnyType` carries no per-row account, so one naming its own account
+        // cannot be represented.
+        if account_id.is_some() {
+            return Err(UnrepresentableScopeError::AnyTypeWithAccount);
+        }
+
+        return groups[&(None, None)]
             .single_any_type_query()
             .map(|query| Some(ResourceScope::AnyType(Some(query))));
     }
 
     let mut type_queries = Vec::new();
-    for schema in order {
-        let key = schema.as_ref().map(|s| s.as_str().to_owned());
-        let Some(group) = groups.remove(&key) else {
+    for (schema, account_id) in order {
+        let sort_key = (
+            schema.as_ref().map(|s| s.as_str().to_owned()),
+            account_id.as_ref().map(ToString::to_string),
+        );
+        let Some(group) = groups.remove(&sort_key) else {
             continue;
         };
-        group.emit_into(schema, &mut type_queries);
+        group.emit_into(schema, account_id, &mut type_queries);
     }
 
     if type_queries.is_empty() {
@@ -235,6 +253,16 @@ pub enum UnrepresentableScopeError {
          already spans every type"
     )]
     AnyTypeMixedWithTypedSelectors,
+
+    /// `ResourceScope::AnyType` carries no per-row account, so a type-less
+    /// selector cannot name one. Disappears if `AnyType` ever grows a per-row
+    /// account, the same way the two variants above disappear once every row
+    /// carries its own type.
+    #[error(
+        "A type-less selector cannot name an account, because it spans every type under the \
+         call-level account"
+    )]
+    AnyTypeWithAccount,
 
     #[error(
         "A type-less selector may narrow by only one of `id`, `name`, or `name` pattern at a time"
@@ -262,7 +290,10 @@ struct SelectorGroup {
 impl SelectorGroup {
     fn push(&mut self, selector: ResolvedSelector) {
         let ResolvedSelector {
+            // Both are part of the group key, so every selector reaching one
+            // group already agrees on them.
             schema: _,
+            account_id: _,
             id,
             name,
             name_pattern,
@@ -313,7 +344,12 @@ impl SelectorGroup {
         Ok(ResourceQuery::NamePattern(self.patterns[0].clone()))
     }
 
-    fn emit_into(self, schema: Option<TypeUri>, out: &mut Vec<ResourceTypeQuery>) {
+    fn emit_into(
+        self,
+        schema: Option<TypeUri>,
+        account_id: Option<odf::AccountID>,
+        out: &mut Vec<ResourceTypeQuery>,
+    ) {
         // Only reached for a concrete schema — any-type groups are resolved by
         // the caller, which owns the `AnyType` variant.
         let Some(schema) = schema else {
@@ -326,6 +362,7 @@ impl SelectorGroup {
             out.push(ResourceTypeQuery {
                 schema,
                 query: None,
+                account_id,
             });
             return;
         }
@@ -334,18 +371,21 @@ impl SelectorGroup {
             out.push(ResourceTypeQuery {
                 schema: schema.clone(),
                 query: Some(ResourceQuery::ExactIds(self.ids)),
+                account_id: account_id.clone(),
             });
         }
         if !self.names.is_empty() {
             out.push(ResourceTypeQuery {
                 schema: schema.clone(),
                 query: Some(ResourceQuery::ExactNames(self.names)),
+                account_id: account_id.clone(),
             });
         }
         for pattern in self.patterns {
             out.push(ResourceTypeQuery {
                 schema: schema.clone(),
                 query: Some(ResourceQuery::NamePattern(pattern)),
+                account_id: account_id.clone(),
             });
         }
     }
@@ -387,6 +427,7 @@ mod tests {
             id: None,
             name: None,
             name_pattern: None,
+            account_id: None,
         }
     }
 
@@ -574,6 +615,7 @@ mod tests {
             id: None,
             name: None,
             name_pattern: None,
+            account_id: None,
         }]);
 
         assert_eq!(scope, Some(ResourceScope::AnyType(None)));
@@ -586,6 +628,7 @@ mod tests {
             id: None,
             name: Some(name("a")),
             name_pattern: None,
+            account_id: None,
         }]);
 
         assert_eq!(
@@ -607,6 +650,7 @@ mod tests {
                 id: None,
                 name: None,
                 name_pattern: None,
+                account_id: None,
             },
         ]);
 
@@ -625,6 +669,7 @@ mod tests {
                 id: None,
                 name: Some(name("a")),
                 name_pattern: None,
+                account_id: None,
             },
         ]);
 
@@ -642,12 +687,14 @@ mod tests {
                 id: None,
                 name: Some(name("a")),
                 name_pattern: None,
+                account_id: None,
             },
             ResolvedSelector {
                 schema: None,
                 id: None,
                 name: None,
                 name_pattern: Some("app-%".to_string()),
+                account_id: None,
             },
         ]);
 

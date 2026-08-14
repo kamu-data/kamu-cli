@@ -359,8 +359,6 @@ impl ResourceRepository for SqliteResourceRepository {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
-        let account_id_stack = account_id.as_stack_string();
-        let account_id_str = account_id_stack.as_str();
         let limit = i64::try_from(pagination.limit).int_err()?;
         let offset = i64::try_from(pagination.offset).int_err()?;
 
@@ -379,13 +377,10 @@ impl ResourceRepository for SqliteResourceRepository {
             r#") as account_name
             FROM resources r
             LEFT JOIN accounts a ON a.id = r.account_id
-            WHERE r.account_id = "#,
+            WHERE r.deleted_at IS NULL"#,
         );
-        query_builder
-            .push_bind(account_id_str)
-            .push(" AND r.deleted_at IS NULL");
 
-        push_scope_predicate(&mut query_builder, scope);
+        push_scope_predicate(&mut query_builder, scope, account_id);
         push_label_filter_predicates(&mut query_builder, &label_pairs);
 
         query_builder
@@ -417,20 +412,14 @@ impl ResourceRepository for SqliteResourceRepository {
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
 
-        let account_id_stack = account_id.as_stack_string();
-        let account_id_str = account_id_stack.as_str();
-
         let mut query_builder = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
             r#"
             SELECT COUNT(*) as count
             FROM resources r
-            WHERE r.account_id = "#,
+            WHERE r.deleted_at IS NULL"#,
         );
-        query_builder
-            .push_bind(account_id_str)
-            .push(" AND r.deleted_at IS NULL");
 
-        push_scope_predicate(&mut query_builder, scope);
+        push_scope_predicate(&mut query_builder, scope, account_id);
         push_label_filter_predicates(&mut query_builder, &label_pairs);
 
         let row = query_builder
@@ -752,8 +741,6 @@ impl ResourceRepository for SqliteResourceRepository {
             let mut tr = self.transaction.lock().await;
             let connection_mut = tr.connection_mut().await?;
 
-            let account_id_stack = account_id.as_stack_string();
-            let account_id_str = account_id_stack.as_str();
             let limit = i64::try_from(pagination.limit).int_err()?;
             let offset = i64::try_from(pagination.offset).int_err()?;
 
@@ -781,12 +768,10 @@ impl ResourceRepository for SqliteResourceRepository {
                     r.last_event_id
                 FROM resources r
                 LEFT JOIN accounts a ON a.id = r.account_id
-                WHERE r.account_id = "#,
+                WHERE r.deleted_at IS NULL"#,
             );
-            query_builder.push_bind(account_id_str);
-            query_builder.push(" AND r.deleted_at IS NULL");
 
-            push_scope_predicate(&mut query_builder, &scope);
+            push_scope_predicate(&mut query_builder, &scope, &account_id);
             push_label_filter_predicates(&mut query_builder, &label_pairs);
 
             query_builder
@@ -933,15 +918,31 @@ fn push_query_predicate(
 
 /// Appends the scope predicate: one `OR` group per type, each pairing the
 /// schema with that type's own query.
+/// Appends the scope predicate, **including the account**.
+///
+/// The account lives inside each OR-group rather than as one outer
+/// `r.account_id = ?`, because a row may name its own account; rows that do not
+/// use `default_account_id`. `AnyType` carries no per-row account, so it keeps
+/// the single outer term.
 fn push_scope_predicate(
     query_builder: &mut sqlx::QueryBuilder<'_, sqlx::Sqlite>,
     scope: &ResourceScope,
+    default_account_id: &odf::AccountID,
 ) {
+    let push_account = |query_builder: &mut sqlx::QueryBuilder<'_, sqlx::Sqlite>,
+                        account_id: &odf::AccountID| {
+        query_builder.push("r.account_id = ");
+        query_builder.push_bind(account_id.to_string());
+    };
+
     match scope {
-        ResourceScope::AnyType(None) => {}
-        ResourceScope::AnyType(Some(query)) => {
+        ResourceScope::AnyType(query) => {
             query_builder.push(" AND ");
-            push_query_predicate(query_builder, query);
+            push_account(query_builder, default_account_id);
+            if let Some(query) = query {
+                query_builder.push(" AND ");
+                push_query_predicate(query_builder, query);
+            }
         }
         ResourceScope::Types(types) => {
             // An empty scope matches nothing; without this the `OR` chain would
@@ -956,7 +957,12 @@ fn push_scope_predicate(
                 if index > 0 {
                     query_builder.push(" OR ");
                 }
-                query_builder.push("(r.resource_schema = ");
+                query_builder.push("(");
+                push_account(
+                    query_builder,
+                    entry.effective_account_id(default_account_id),
+                );
+                query_builder.push(" AND r.resource_schema = ");
                 query_builder.push_bind(entry.schema.as_str().to_owned());
                 if let Some(query) = &entry.query {
                     query_builder.push(" AND ");
