@@ -87,15 +87,15 @@ impl AuthenticationServiceImpl {
 
     fn resolve_authentication_provider(
         &self,
-        login_method: &str,
+        login_method_lowercase: &str,
     ) -> Result<Arc<dyn AuthenticationProvider>, UnsupportedLoginMethodError> {
         match self
             .authentication_providers_by_method
-            .get(&login_method.to_lowercase())
+            .get(&login_method_lowercase.to_lowercase())
         {
             Some(provider) => Ok(provider.clone()),
             None => Err(UnsupportedLoginMethodError {
-                method: login_method.into(),
+                method: login_method_lowercase.into(),
             }),
         }
     }
@@ -269,7 +269,8 @@ impl AuthenticationService for AuthenticationServiceImpl {
         device_code: Option<DeviceCode>,
     ) -> Result<LoginResponse, LoginError> {
         // Resolve provider via a specified login method
-        let provider = self.resolve_authentication_provider(login_method)?;
+        let login_method = login_method.to_lowercase();
+        let provider = self.resolve_authentication_provider(&login_method)?;
 
         // Attempt to login via provider
         let provider_response = provider.login(login_credentials_json).await?;
@@ -277,7 +278,10 @@ impl AuthenticationService for AuthenticationServiceImpl {
         // Try to resolve an existing account via the provider's identity key
         let maybe_account_id = self
             .account_service
-            .find_account_id_by_provider_identity_key(&provider_response.provider_identity_key)
+            .find_account_id_by_provider_identity_key(
+                &login_method,
+                &provider_response.provider_identity_key,
+            )
             .await?;
 
         let account_name = provider_response.account_name.clone();
@@ -291,7 +295,7 @@ impl AuthenticationService for AuthenticationServiceImpl {
                     return Err(LoginError::RestrictedLogin);
                 }
 
-                self.create_account(login_method, provider_response)
+                self.create_account(&login_method, provider_response)
                     .await
                     .map_err(|e| {
                         use CreateAccountError as E;

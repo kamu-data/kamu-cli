@@ -177,10 +177,11 @@ impl AccountService for AccountServiceImpl {
 
     async fn find_account_id_by_provider_identity_key(
         &self,
+        provider: &str,
         provider_identity_key: &str,
     ) -> Result<Option<odf::AccountID>, FindAccountIdByProviderIdentityKeyError> {
         self.account_repo
-            .find_account_id_by_provider_identity_key(provider_identity_key)
+            .find_account_id_by_provider_identity_key(provider, provider_identity_key)
             .await
     }
 
