@@ -293,7 +293,9 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 
         // Goes through `resolve_scope` like every other listing, so a selector's
         // name pattern is honoured here too. It used to be discarded.
-        let (scope, label_filter) = self.resolve_scope(request.selectors, request.label_filter)?;
+        let (scope, label_filter) = self
+            .resolve_scope(request.selectors, request.label_filter)
+            .await?;
 
         if scope.is_vacuous() {
             return Ok(Vec::new());
@@ -321,7 +323,9 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .resolve_target_account(request.account.as_ref())
             .await?;
 
-        let (scope, label_filter) = self.resolve_scope(request.selectors, request.label_filter)?;
+        let (scope, label_filter) = self
+            .resolve_scope(request.selectors, request.label_filter)
+            .await?;
 
         // Empty exact-name/id queries are vacuous.
         if scope.is_vacuous() {
@@ -362,7 +366,9 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .resolve_target_account(request.account.as_ref())
             .await?;
 
-        let (scope, label_filter) = self.resolve_scope(request.selectors, request.label_filter)?;
+        let (scope, label_filter) = self
+            .resolve_scope(request.selectors, request.label_filter)
+            .await?;
 
         if scope.is_vacuous() {
             return Ok(Vec::new());
@@ -757,25 +763,20 @@ impl LocalResourceFacadeImpl {
     ///
     /// Each type keeps its own query through resolution, so a multi-type scope
     /// like `vs/a-% ss/b-%` stays intact.
-    fn resolve_scope(
+    async fn resolve_scope(
         &self,
         selectors: Vec<ResourceSelector>,
         label_filter: Option<ResourceLabelFilterInput>,
     ) -> Result<(ResourceScope, ResolvedResourceLabelFilter), ListResourcesError> {
-        // Before anything else, including the fast path below: a selector
-        // carrying an account would otherwise be scoped to the caller's own
-        // account without saying so.
-        for selector in &selectors {
-            validate_selector(selector)?;
-        }
-
-        // A lone type-less, unnarrowed selector needs no schemas at all, so
-        // without a label filter it can answer before touching the catalog.
+        // A lone type-less, unnarrowed, account-less selector needs no schemas
+        // at all, so without a label filter it can answer before touching the
+        // catalog or resolving any account.
         if label_filter.is_none()
             && let [selector] = selectors.as_slice()
             && selector.r#type.is_none()
             && selector.id.is_none()
             && selector.name.is_none()
+            && selector.account.is_none()
         {
             return Ok((
                 ResourceScope::AnyType(None),
@@ -783,13 +784,37 @@ impl LocalResourceFacadeImpl {
             ));
         }
 
+        // Resolved in one batch, deduplicated by spelling, with the permission
+        // check applied per distinct account. Any denial fails the whole call.
+        //
+        // `None` stays `None` rather than resolving to the caller's own
+        // account: the repository takes the call-level account as the default
+        // for exactly those rows, so resolving here would be redundant work and
+        // would lose the "unset" distinction the scope relies on.
+        let account_refs = selectors
+            .iter()
+            .map(|selector| selector.account.clone())
+            .collect::<Vec<_>>();
+        let account_ids = if account_refs.iter().all(Option::is_none) {
+            vec![None; account_refs.len()]
+        } else {
+            self.resource_account_resolver
+                .resolve_target_accounts(&account_refs)
+                .await?
+                .into_iter()
+                .zip(account_refs.iter())
+                .map(|(handle, requested)| requested.as_ref().map(|_| handle.did))
+                .collect()
+        };
+
         // Built once: constructing it instantiates every registered dispatcher,
         // so every selector resolves against this one list.
         let descriptors = self.list_resource_type_descriptors();
 
         let resolved = selectors
             .into_iter()
-            .map(|selector| {
+            .zip(account_ids)
+            .map(|(selector, account_id)| {
                 let schema = selector
                     .r#type
                     .as_ref()
@@ -805,6 +830,7 @@ impl LocalResourceFacadeImpl {
                     // an exact name arrives as a `ResourceRef`, not here.
                     name: None,
                     name_pattern: selector.name,
+                    account_id,
                 })
             })
             .collect::<Result<Vec<_>, ListResourcesError>>()?;

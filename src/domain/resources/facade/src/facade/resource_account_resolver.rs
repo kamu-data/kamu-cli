@@ -19,6 +19,37 @@ pub trait ResourceAccountResolver: Send + Sync {
         &self,
         selector: Option<&ResourceAccountRef>,
     ) -> Result<odf::AccountHandle, ResolveManifestAccountError>;
+
+    /// Resolves several account refs at once, for calls whose selectors each
+    /// name their own account.
+    ///
+    /// Returns one handle per input, in order, so callers can zip the result
+    /// back onto their selectors. **Any denial fails the whole call** — a
+    /// partial result would silently narrow the caller's request.
+    ///
+    /// Deduplicated by spelling: the same account named twice resolves once.
+    /// Two spellings of one account (by id and by name) still resolve twice,
+    /// which costs a lookup but cannot produce a wrong answer.
+    async fn resolve_target_accounts(
+        &self,
+        selectors: &[Option<ResourceAccountRef>],
+    ) -> Result<Vec<odf::AccountHandle>, ResolveManifestAccountError> {
+        let mut resolved: Vec<(Option<ResourceAccountRef>, odf::AccountHandle)> = Vec::new();
+        let mut out = Vec::with_capacity(selectors.len());
+
+        for selector in selectors {
+            if let Some((_, handle)) = resolved.iter().find(|(seen, _)| seen == selector) {
+                out.push(handle.clone());
+                continue;
+            }
+
+            let handle = self.resolve_target_account(selector.as_ref()).await?;
+            resolved.push((selector.clone(), handle.clone()));
+            out.push(handle);
+        }
+
+        Ok(out)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

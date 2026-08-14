@@ -461,10 +461,12 @@ pub async fn test_search_resource_handles(catalog: &Catalog) {
                 ResourceTypeQuery {
                     schema: TEST_KIND.clone(),
                     query: Some(ResourceQuery::NamePattern("app-%".to_string())),
+                    account_id: None,
                 },
                 ResourceTypeQuery {
                     schema: OTHER_KIND.clone(),
                     query: Some(ResourceQuery::NamePattern("app-%".to_string())),
+                    account_id: None,
                 },
             ]),
             &ResolvedResourceLabelFilter::default(),
@@ -612,10 +614,12 @@ pub async fn test_search_resource_handles_exact_ids(catalog: &Catalog) {
                 ResourceTypeQuery {
                     schema: TEST_KIND.clone(),
                     query: Some(ResourceQuery::ExactIds(vec![ids.app_alpha, ids.app_gamma])),
+                    account_id: None,
                 },
                 ResourceTypeQuery {
                     schema: OTHER_KIND.clone(),
                     query: Some(ResourceQuery::ExactIds(vec![ids.app_alpha, ids.app_gamma])),
+                    account_id: None,
                 },
             ]),
             &ResolvedResourceLabelFilter::default(),
@@ -852,10 +856,12 @@ pub async fn test_count_search_resource_handles(catalog: &Catalog) {
                 ResourceTypeQuery {
                     schema: TEST_KIND.clone(),
                     query: Some(ResourceQuery::NamePattern("app-%".to_string())),
+                    account_id: None,
                 },
                 ResourceTypeQuery {
                     schema: OTHER_KIND.clone(),
                     query: Some(ResourceQuery::NamePattern("app-%".to_string())),
+                    account_id: None,
                 },
             ]),
             &ResolvedResourceLabelFilter::default(),
@@ -1173,6 +1179,109 @@ struct SeededSearchHandleIds {
     app_gamma: ResourceID,
     other_account: ResourceID,
 }
+
+/// Per-row account: a scope row may name its own account, and rows that do not
+/// fall back to the call-level scalar.
+///
+/// This is the *only* safety net for the `SQLite` backend, whose scope
+/// predicate is built with a runtime `QueryBuilder` and so is not compile-time
+/// checked.
+pub async fn test_search_resource_handles_per_row_account(catalog: &Catalog) {
+    let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+
+    let account_handle = odf::AccountHandle::new_test("test-account");
+    let other_account_handle = odf::AccountHandle::new_test("other-account");
+    seed_search_resource_handles(repo.as_ref(), &account_handle).await;
+
+    let search = async |scope: ResourceScope| {
+        let rows = repo
+            .search_resource_handles(
+                &account_handle.did,
+                &scope,
+                &ResolvedResourceLabelFilter::default(),
+                PaginationOpts::from_max_results(100),
+            )
+            .await
+            .unwrap();
+        let mut names = rows.into_iter().map(|row| row.name).collect::<Vec<_>>();
+        names.sort();
+        names
+    };
+
+    // A row naming another account reads that account, not the caller's — the
+    // whole point of the stage.
+    assert_eq!(
+        search(ResourceScope::Types(vec![ResourceTypeQuery {
+            schema: TEST_KIND.clone(),
+            query: None,
+            account_id: Some(other_account_handle.did.clone()),
+        }]))
+        .await,
+        vec!["app-other-account"]
+    );
+
+    // A row with no account falls back to the call-level one, unchanged from
+    // before this stage.
+    assert_eq!(
+        search(ResourceScope::Types(vec![ResourceTypeQuery {
+            schema: TEST_KIND.clone(),
+            query: None,
+            account_id: None,
+        }]))
+        .await,
+        vec!["app-alpha", "app-beta", "db-alpha"]
+    );
+
+    // Both in one call: the two rows are a logical OR spanning two accounts,
+    // which is what the ODF-shaped API exists to express.
+    assert_eq!(
+        search(ResourceScope::Types(vec![
+            ResourceTypeQuery {
+                schema: TEST_KIND.clone(),
+                query: Some(ResourceQuery::NamePattern("app-a%".to_string())),
+                account_id: None,
+            },
+            ResourceTypeQuery {
+                schema: TEST_KIND.clone(),
+                query: None,
+                account_id: Some(other_account_handle.did.clone()),
+            },
+        ]))
+        .await,
+        vec!["app-alpha", "app-other-account"]
+    );
+
+    // The per-row account narrows as well as redirects: the caller's own
+    // resources are excluded from a row naming someone else.
+    assert_eq!(
+        search(ResourceScope::Types(vec![ResourceTypeQuery {
+            schema: TEST_KIND.clone(),
+            query: Some(ResourceQuery::NamePattern("app-a%".to_string())),
+            account_id: Some(other_account_handle.did.clone()),
+        }]))
+        .await,
+        Vec::<String>::new(),
+        "`app-alpha` belongs to the caller, so a row naming another account must not see it"
+    );
+
+    // `count_search_resource_handles` shares the scope predicate with
+    // `search_resource_handles`, so it must agree row-for-row.
+    let count = repo
+        .count_search_resource_handles(
+            &account_handle.did,
+            &ResourceScope::Types(vec![ResourceTypeQuery {
+                schema: TEST_KIND.clone(),
+                query: None,
+                account_id: Some(other_account_handle.did.clone()),
+            }]),
+            &ResolvedResourceLabelFilter::default(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(count, 1, "count must honour the per-row account too");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 async fn seed_search_resource_handles(
     repo: &dyn ResourceRepository,
@@ -1695,10 +1804,12 @@ pub async fn test_list_resource_snapshots_with_queries(catalog: &Catalog) {
                 ResourceTypeQuery {
                     schema: KIND_A.clone(),
                     query: Some(ResourceQuery::NamePattern("app-%".to_string())),
+                    account_id: None,
                 },
                 ResourceTypeQuery {
                     schema: KIND_B.clone(),
                     query: Some(ResourceQuery::NamePattern("app-%".to_string())),
+                    account_id: None,
                 },
             ]),
             &no_filter,
@@ -1717,10 +1828,12 @@ pub async fn test_list_resource_snapshots_with_queries(catalog: &Catalog) {
                 ResourceTypeQuery {
                     schema: KIND_A.clone(),
                     query: Some(ResourceQuery::NamePattern("db-%".to_string())),
+                    account_id: None,
                 },
                 ResourceTypeQuery {
                     schema: KIND_B.clone(),
                     query: None,
+                    account_id: None,
                 },
             ]),
             &no_filter,
@@ -1768,10 +1881,12 @@ pub async fn test_list_resource_snapshots_with_queries(catalog: &Catalog) {
                 ResourceTypeQuery {
                     schema: KIND_A.clone(),
                     query: Some(ResourceQuery::ExactNames(vec!["db-alpha".parse().unwrap()])),
+                    account_id: None,
                 },
                 ResourceTypeQuery {
                     schema: KIND_B.clone(),
                     query: Some(ResourceQuery::ExactNames(vec!["app-beta".parse().unwrap()])),
+                    account_id: None,
                 },
             ]),
             &no_filter,
@@ -1792,10 +1907,12 @@ pub async fn test_list_resource_snapshots_with_queries(catalog: &Catalog) {
                 ResourceTypeQuery {
                     schema: KIND_A.clone(),
                     query: Some(ResourceQuery::ExactIds(vec![db_a.id])),
+                    account_id: None,
                 },
                 ResourceTypeQuery {
                     schema: KIND_B.clone(),
                     query: Some(ResourceQuery::NamePattern("app-%".to_string())),
+                    account_id: None,
                 },
             ]),
             &no_filter,
@@ -1815,10 +1932,12 @@ pub async fn test_list_resource_snapshots_with_queries(catalog: &Catalog) {
                 ResourceTypeQuery {
                     schema: KIND_A.clone(),
                     query: Some(ResourceQuery::NamePattern("app-%".to_string())),
+                    account_id: None,
                 },
                 ResourceTypeQuery {
                     schema: KIND_B.clone(),
                     query: Some(ResourceQuery::ExactIds(vec![db_a.id])),
+                    account_id: None,
                 },
             ]),
             &no_filter,

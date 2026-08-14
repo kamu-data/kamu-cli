@@ -213,66 +213,63 @@ pub async fn test_list_handles_honours_selectors(h: &impl FacadeContractHarness)
 
 // RF-105
 contract_test!(
-    per_selector_account_is_rejected,
-    super::test_per_selector_account_is_rejected
+    per_selector_account_is_authorized,
+    super::test_per_selector_account_is_authorized
 );
 
-/// The ODF selector carries an `account`, and the GraphQL input exposes it, but
-/// the listing pipeline resolves one account per call — `ResourceRepository`'s
-/// scoped reads take a single scalar `account_id` alongside the scope.
+/// A selector naming another account is **denied** for a non-admin, and the
+/// denial must not reveal whether that account or its resources exist.
 ///
-/// Honouring it is a later stage. Until then it must be *rejected*, never
-/// ignored: silently dropping it would scope the call to the caller's own
-/// account while the caller believes they asked for another's, which is a
-/// wrong-data bug rather than a missing feature.
-pub async fn test_per_selector_account_is_rejected(h: &impl FacadeContractHarness) {
+/// The whole call fails rather than silently dropping the unauthorized
+/// selector: a partial result would narrow the caller's request without saying
+/// so, which is the same class of bug as ignoring the field entirely.
+pub async fn test_per_selector_account_is_authorized(h: &impl FacadeContractHarness) {
+    create_resource(h, TestAccount::Bob, "bob-secret").await;
+
     let facade = h.facade_for(TestAccount::Alice);
 
-    let with_account = |selector: ResourceSelector| ResourceSelector {
+    let bobs_selector = ResourceSelector {
         account: Some(kamu_resources::ResourceAccountRef {
             id: None,
             did: None,
             name: Some(h.account_name(TestAccount::Bob)),
         }),
-        ..selector
+        ..ResourceSelector::of_type(VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap())
     };
 
-    let typed = with_account(ResourceSelector::of_type(
-        VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-    ));
-
     let err = facade
         .search_handles(SearchResourceHandlesRequest {
-            selectors: vec![typed.clone()],
+            selectors: vec![bobs_selector.clone()],
             account: None,
             label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
-        .expect_err("per-selector account is not supported yet");
+        .expect_err("a non-admin must not read another account's resources");
     assert!(
-        err.to_string().contains("Per-selector `account`"),
-        "unexpected error: {err:?}"
+        !err.to_string().contains("bob-secret"),
+        "the denial must not leak resource names: {err}"
     );
 
-    // Also rejected on the type-less fast path, which answers without touching
-    // the catalog and so would otherwise skip the check entirely.
-    let err = facade
-        .search_handles(SearchResourceHandlesRequest {
-            selectors: vec![with_account(ResourceSelector::default())],
-            account: None,
-            label_filter: None,
-            pagination: PaginationOpts::from_max_results(1000),
-        })
-        .await
-        .expect_err("per-selector account is not supported on the fast path either");
-    assert!(
-        err.to_string().contains("Per-selector `account`"),
-        "unexpected error: {err:?}"
-    );
-
-    // The call-level account remains the supported way to span another account.
+    // Pairing it with a selector the caller *is* allowed to read must still fail
+    // the whole call — no partial results.
+    create_resource(h, TestAccount::Alice, "alice-own").await;
     facade
+        .search_handles(SearchResourceHandlesRequest {
+            selectors: vec![
+                ResourceSelector::of_type(VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()),
+                bobs_selector,
+            ],
+            account: None,
+            label_filter: None,
+            pagination: PaginationOpts::from_max_results(1000),
+        })
+        .await
+        .expect_err("one denied selector must fail the whole call");
+
+    // The caller's own resources stay readable, so the denial above is about
+    // authorization rather than the selector shape.
+    let response = facade
         .search_handles(SearchResourceHandlesRequest {
             selectors: vec![ResourceSelector::of_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
@@ -282,7 +279,8 @@ pub async fn test_per_selector_account_is_rejected(h: &impl FacadeContractHarnes
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
-        .expect("the same selector without an account must still work");
+        .expect("the caller's own resources must remain readable");
+    assert_eq!(sorted_handle_names(response.items), vec!["alice-own"]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -336,6 +334,27 @@ pub async fn test_any_type_selector_scope_limits(h: &impl FacadeContractHarness)
     .expect_err("a type-less selector may narrow by only one mode");
     assert!(
         err.to_string().contains("only one of"),
+        "unexpected error: {err:?}"
+    );
+
+    // `AnyType` carries no per-row account, so a type-less selector naming one
+    // is rejected rather than silently scoped to the caller.
+    //
+    // Named as the *caller's own* account deliberately: authorization runs
+    // before coalescing, so naming another account would be denied there and
+    // this representability limit would never be reached.
+    let err = search(vec![ResourceSelector {
+        account: Some(kamu_resources::ResourceAccountRef {
+            id: None,
+            did: None,
+            name: Some(h.account_name(TestAccount::Alice)),
+        }),
+        ..ResourceSelector::any_type_name_pattern("account-%")
+    }])
+    .await
+    .expect_err("a type-less selector cannot name an account");
+    assert!(
+        err.to_string().contains("cannot name an account"),
         "unexpected error: {err:?}"
     );
 
