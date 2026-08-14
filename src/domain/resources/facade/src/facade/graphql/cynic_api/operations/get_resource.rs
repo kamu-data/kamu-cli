@@ -18,13 +18,13 @@ use crate::facade::graphql::cynic_api::schema;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
-#[cynic(graphql_type = "Query", variables = "ResourceSelectorVariables")]
+#[cynic(graphql_type = "Query", variables = "ResourceRefVariables")]
 pub(crate) struct GetResourceQuery {
     pub resources: GetResourceResources,
 }
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
-#[cynic(graphql_type = "Resources", variables = "ResourceSelectorVariables")]
+#[cynic(graphql_type = "Resources", variables = "ResourceRefVariables")]
 pub(crate) struct GetResourceResources {
     #[arguments(resourceRef: $resource_ref, revealed: $revealed)]
     pub resource: ResourceGetOutcome,
@@ -43,12 +43,12 @@ pub(crate) enum ResourceGetOutcome {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::QueryVariables, Debug, Clone)]
-pub(crate) struct ResourceSelectorVariables {
+pub(crate) struct ResourceRefVariables {
     pub resource_ref: ResourceRefInput,
     pub revealed: bool,
 }
 
-impl ResourceSelectorVariables {
+impl ResourceRefVariables {
     pub(crate) fn new(resource_ref: &ResourceRef, spec_view_mode: SpecViewMode) -> Self {
         Self {
             resource_ref: resource_ref.into(),
@@ -60,8 +60,8 @@ impl ResourceSelectorVariables {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn build_operation(
-    variables: ResourceSelectorVariables,
-) -> cynic::Operation<GetResourceQuery, ResourceSelectorVariables> {
+    variables: ResourceRefVariables,
+) -> cynic::Operation<GetResourceQuery, ResourceRefVariables> {
     GetResourceQuery::build(variables)
 }
 

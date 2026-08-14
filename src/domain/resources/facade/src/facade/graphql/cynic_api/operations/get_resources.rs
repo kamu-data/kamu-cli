@@ -23,16 +23,13 @@ use crate::facade::graphql::cynic_api::schema;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
-#[cynic(graphql_type = "Query", variables = "ResourceBatchSelectorVariables")]
+#[cynic(graphql_type = "Query", variables = "ResourceRefsVariables")]
 pub(crate) struct GetResourcesQuery {
     pub resources: GetResourcesResources,
 }
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
-#[cynic(
-    graphql_type = "Resources",
-    variables = "ResourceBatchSelectorVariables"
-)]
+#[cynic(graphql_type = "Resources", variables = "ResourceRefsVariables")]
 pub(crate) struct GetResourcesResources {
     #[arguments(resourceRefs: $resource_refs, revealed: $revealed)]
     pub resources: BatchResourcesOutcome,
@@ -62,12 +59,12 @@ pub(crate) struct BatchResourceSuccess {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::QueryVariables, Debug, Clone)]
-pub(crate) struct ResourceBatchSelectorVariables {
+pub(crate) struct ResourceRefsVariables {
     pub resource_refs: Vec<ResourceRefInput>,
     pub revealed: bool,
 }
 
-impl ResourceBatchSelectorVariables {
+impl ResourceRefsVariables {
     pub(crate) fn new(resource_refs: &[ResourceRef], spec_view_mode: SpecViewMode) -> Self {
         Self {
             resource_refs: resource_ref_inputs(resource_refs),
@@ -79,8 +76,8 @@ impl ResourceBatchSelectorVariables {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn build_operation(
-    variables: ResourceBatchSelectorVariables,
-) -> cynic::Operation<GetResourcesQuery, ResourceBatchSelectorVariables> {
+    variables: ResourceRefsVariables,
+) -> cynic::Operation<GetResourcesQuery, ResourceRefsVariables> {
     GetResourcesQuery::build(variables)
 }
 

@@ -144,7 +144,10 @@ pub trait ResourceFacade: Send + Sync {
         request: ApplyManifestBatchRequest,
     ) -> Result<ApplyManifestBatchResponse<ApplyManifestApplicationDecision>, BatchResourceError>;
 
-    async fn delete(&self, resource_ref: ResourceRef) -> Result<ResourceID, DeleteResourceError>;
+    /// Provided: delegates to [`ResourceFacade::delete_many`].
+    async fn delete(&self, resource_ref: ResourceRef) -> Result<ResourceID, DeleteResourceError> {
+        single_from_batch(self.delete_many(vec![resource_ref]).await?, "Delete")
+    }
 
     async fn delete_many(
         &self,
