@@ -113,7 +113,7 @@ jobs:
       - run: |
           curl -fsSL "https://github.com/tamasfe/taplo/releases/download/0.10.0/taplo-linux-x86_64.gz" \
             | gzip -d \
-            | install -m 755 /dev/stdin "$CARGO_HOME/bin/taplo"
+            | install -m 755 /dev/stdin /usr/local/bin/taplo
       - run: taplo fmt --check
 
   test:
