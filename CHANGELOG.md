@@ -13,7 +13,7 @@ Recommendation: for ease of reading, use the following format:
 ### Fixed
 -->
 
-# [Unreleased]
+## [0.266.0] - 2026-08-13
 ### Added:
 - `MySqlDatasetEntryRepository` has been implemented:
   - To fix a previously masked error w/ dataset searching in E2E tests
