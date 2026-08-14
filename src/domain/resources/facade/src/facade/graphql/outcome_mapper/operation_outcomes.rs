@@ -26,13 +26,13 @@ use crate::{
     BatchResourceResponse,
     DeleteResourceError,
     GetResourceError,
-    ListAllResourcesError,
     ListResourcesError,
     RenderResourceManifestError,
     RenderResourceManifestResult,
     ResourceLookupProblem,
     ResourcesSummaryError,
     SearchResourceHandlesResponse,
+    SearchResourcesResponse,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -55,69 +55,29 @@ pub(crate) fn map_summary_outcome(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn map_list_outcome(
-    outcome: cynic_api::operations::list::ResourceListOutcome,
-) -> Result<Vec<domain::ResourceSummaryView>, ListResourcesError> {
-    use cynic_api::operations::list::ResourceListOutcome as O;
+pub(crate) fn map_search_outcome(
+    outcome: cynic_api::operations::search_summaries::ResourceListOutcome,
+) -> Result<SearchResourcesResponse, ListResourcesError> {
+    use cynic_api::operations::search_summaries::ResourceListOutcome as O;
 
     match outcome {
-        O::ResourceConnection(connection) => connection
-            .nodes
-            .into_iter()
-            .map(TryInto::try_into)
-            .collect::<Result<Vec<_>, InternalError>>()
-            .map_err(ListResourcesError::Internal),
-        O::ResourceUnsupportedSelectorProblem(problem) => {
-            Err(unsupported_selector_problem_error(problem).into())
-        }
-        O::ResourceBadAccountProblem(problem) => Err(ListResourcesError::BadAccount(
-            bad_account_problem_error(problem).map_err(ListResourcesError::Internal)?,
-        )),
-        O::ResourceInvalidLabelFilterProblem(problem) => {
-            Err(ListResourcesError::InvalidLabelFilter(problem.into()))
-        }
-        O::Unknown => Err(ListResourcesError::Internal(InternalError::new(
-            "Remote list returned an unrecognized ResourceListOutcome variant",
-        ))),
-    }
-}
+        O::ResourceConnection(connection) => {
+            let total_count = usize::try_from(connection.total_count).map_err(|_| {
+                ListResourcesError::Internal(InternalError::new(format!(
+                    "Remote search total_count {} cannot be converted to usize",
+                    connection.total_count
+                )))
+            })?;
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) fn map_list_all_outcome(
-    outcome: cynic_api::operations::list::ResourceListAllOutcome,
-) -> Result<Vec<domain::ResourceSummaryView>, ListAllResourcesError> {
-    use cynic_api::operations::list::ResourceListAllOutcome as O;
-
-    match outcome {
-        O::ResourceConnection(connection) => connection
-            .nodes
-            .into_iter()
-            .map(TryInto::try_into)
-            .collect::<Result<Vec<_>, InternalError>>()
-            .map_err(ListAllResourcesError::Internal),
-        O::ResourceBadAccountProblem(problem) => Err(ListAllResourcesError::BadAccount(
-            bad_account_problem_error(problem).map_err(ListAllResourcesError::Internal)?,
-        )),
-        O::ResourceInvalidLabelFilterProblem(problem) => {
-            Err(ListAllResourcesError::InvalidLabelFilter(problem.into()))
-        }
-        O::Unknown => Err(ListAllResourcesError::Internal(InternalError::new(
-            "Remote list_all returned an unrecognized ResourceListAllOutcome variant",
-        ))),
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) fn map_list_handles_outcome(
-    outcome: cynic_api::operations::list::ResourceHandleListOutcome,
-) -> Result<Vec<domain::ResourceHandle>, ListResourcesError> {
-    use cynic_api::operations::list::ResourceHandleListOutcome as O;
-
-    match outcome {
-        O::ResourceHandleConnection(connection) => {
-            Ok(connection.nodes.into_iter().map(Into::into).collect())
+            Ok(SearchResourcesResponse {
+                items: connection
+                    .nodes
+                    .into_iter()
+                    .map(TryInto::try_into)
+                    .collect::<Result<Vec<_>, InternalError>>()
+                    .map_err(ListResourcesError::Internal)?,
+                total_count,
+            })
         }
         O::ResourceUnsupportedSelectorProblem(problem) => {
             Err(unsupported_selector_problem_error(problem).into())
@@ -129,30 +89,7 @@ pub(crate) fn map_list_handles_outcome(
             Err(ListResourcesError::InvalidLabelFilter(problem.into()))
         }
         O::Unknown => Err(ListResourcesError::Internal(InternalError::new(
-            "Remote list_handles returned an unrecognized ResourceHandleListOutcome variant",
-        ))),
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) fn map_list_all_handles_outcome(
-    outcome: cynic_api::operations::list::ResourceHandleListAllOutcome,
-) -> Result<Vec<domain::ResourceHandle>, ListAllResourcesError> {
-    use cynic_api::operations::list::ResourceHandleListAllOutcome as O;
-
-    match outcome {
-        O::ResourceHandleConnection(connection) => {
-            Ok(connection.nodes.into_iter().map(Into::into).collect())
-        }
-        O::ResourceBadAccountProblem(problem) => Err(ListAllResourcesError::BadAccount(
-            bad_account_problem_error(problem).map_err(ListAllResourcesError::Internal)?,
-        )),
-        O::ResourceInvalidLabelFilterProblem(problem) => {
-            Err(ListAllResourcesError::InvalidLabelFilter(problem.into()))
-        }
-        O::Unknown => Err(ListAllResourcesError::Internal(InternalError::new(
-            "Remote list_all_handles returned an unrecognized ResourceHandleListAllOutcome variant",
+            "Remote search returned an unrecognized ResourceListOutcome variant",
         ))),
     }
 }

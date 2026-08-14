@@ -9,7 +9,7 @@
 
 use database_common::PaginationOpts;
 use kamu_resources::ResourceSelector;
-use kamu_resources_facade::{ListAllResourceHandlesRequest, ListAllResourcesRequest};
+use kamu_resources_facade::{SearchResourceHandlesRequest, SearchResourcesRequest};
 use pretty_assertions::assert_eq;
 
 use crate::contract_test;
@@ -74,14 +74,15 @@ pub async fn list_all_summaries_across_supported_resource_types(h: &impl FacadeC
 
     let summaries = h
         .facade_for(TestAccount::Alice)
-        .list_all(ListAllResourcesRequest {
+        .search(SearchResourcesRequest {
             account: None,
             label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
             selectors: vec![ResourceSelector::default()],
         })
         .await
-        .unwrap();
+        .unwrap()
+        .items;
 
     assert_eq!(
         summary_keys(summaries),
@@ -127,7 +128,7 @@ pub async fn list_all_narrowed_by_scope_query(h: &impl FacadeContractHarness) {
 
     let list_all = async |selectors: Vec<ResourceSelector>| {
         h.facade_for(TestAccount::Alice)
-            .list_all(ListAllResourcesRequest {
+            .search(SearchResourcesRequest {
                 account: None,
                 label_filter: None,
                 pagination: PaginationOpts::from_max_results(1000),
@@ -135,6 +136,7 @@ pub async fn list_all_narrowed_by_scope_query(h: &impl FacadeContractHarness) {
             })
             .await
             .unwrap()
+            .items
     };
 
     // A type-less selector spans every type.
@@ -238,13 +240,16 @@ pub async fn test_list_all_handles_across_supported_resource_types(h: &impl Faca
 
     let handles = h
         .facade_for(TestAccount::Alice)
-        .list_all_handles(ListAllResourceHandlesRequest {
+        .search_handles(SearchResourceHandlesRequest {
+            // Spans every type, as `list_all_handles` did.
+            selectors: vec![ResourceSelector::default()],
             account: None,
             label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
-        .unwrap();
+        .unwrap()
+        .items;
 
     assert_eq!(
         handle_keys(handles),
@@ -291,31 +296,36 @@ pub async fn test_list_all_supports_pagination(h: &impl FacadeContractHarness) {
 
     let facade = h.facade_for(TestAccount::Alice);
     let first_page = facade
-        .list_all(ListAllResourcesRequest {
+        .search(SearchResourcesRequest {
             account: None,
             label_filter: None,
             pagination: PaginationOpts::from_page(0, 2),
             selectors: vec![ResourceSelector::default()],
         })
         .await
-        .unwrap();
+        .unwrap()
+        .items;
     let second_page = facade
-        .list_all(ListAllResourcesRequest {
+        .search(SearchResourcesRequest {
             account: None,
             label_filter: None,
             pagination: PaginationOpts::from_page(1, 2),
             selectors: vec![ResourceSelector::default()],
         })
         .await
-        .unwrap();
+        .unwrap()
+        .items;
     let handle_second_page = facade
-        .list_all_handles(ListAllResourceHandlesRequest {
+        .search_handles(SearchResourceHandlesRequest {
+            // Spans every type, as `list_all_handles` did.
+            selectors: vec![ResourceSelector::default()],
             account: None,
             label_filter: None,
             pagination: PaginationOpts::from_page(1, 2),
         })
         .await
-        .unwrap();
+        .unwrap()
+        .items;
 
     assert_eq!(first_page.len(), 2);
     assert_eq!(second_page.len(), 1);
@@ -349,22 +359,26 @@ pub async fn test_list_all_empty_account_returns_empty(h: &impl FacadeContractHa
 
     let facade = h.facade_for(TestAccount::Bob);
     let summaries = facade
-        .list_all(ListAllResourcesRequest {
+        .search(SearchResourcesRequest {
             account: None,
             label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
             selectors: vec![ResourceSelector::default()],
         })
         .await
-        .unwrap();
+        .unwrap()
+        .items;
     let handles = facade
-        .list_all_handles(ListAllResourceHandlesRequest {
+        .search_handles(SearchResourceHandlesRequest {
+            // Spans every type, as `list_all_handles` did.
+            selectors: vec![ResourceSelector::default()],
             account: None,
             label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
-        .unwrap();
+        .unwrap()
+        .items;
 
     assert!(summaries.is_empty());
     assert!(handles.is_empty());

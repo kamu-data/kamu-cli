@@ -21,16 +21,12 @@ use kamu_resources_facade::{
     ApplyManifestError,
     ApplyManifestRequest,
     GetResourceError,
-    ListAllResourceHandlesRequest,
-    ListAllResourcesError,
-    ListAllResourcesRequest,
-    ListResourceHandlesRequest,
     ListResourcesError,
-    ListResourcesRequest,
     ResolveManifestAccountError,
     ResourceManifestFormat,
     ResourcesSummaryRequest,
     SearchResourceHandlesRequest,
+    SearchResourcesRequest,
     SpecViewMode,
 };
 use pretty_assertions::{assert_eq, assert_matches};
@@ -323,7 +319,7 @@ pub async fn test_account_name_id_mismatch_is_rejected(h: &impl FacadeContractHa
 
     let list = h
         .facade_for(TestAccount::Alice)
-        .list(ListResourcesRequest {
+        .search(SearchResourcesRequest {
             selectors: vec![ResourceSelector::of_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             )],
@@ -332,7 +328,8 @@ pub async fn test_account_name_id_mismatch_is_rejected(h: &impl FacadeContractHa
             label_filter: None,
         })
         .await
-        .unwrap();
+        .unwrap()
+        .items;
     assert!(list.iter().all(|item| item.name != "acct-mismatch"));
 }
 
@@ -348,7 +345,7 @@ pub async fn test_unknown_account_is_rejected(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
     let by_name = facade
-        .list(ListResourcesRequest {
+        .search(SearchResourcesRequest {
             selectors: vec![ResourceSelector::of_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             )],
@@ -358,7 +355,7 @@ pub async fn test_unknown_account_is_rejected(h: &impl FacadeContractHarness) {
         })
         .await;
     let by_id = facade
-        .list_all(ListAllResourcesRequest {
+        .search(SearchResourcesRequest {
             account: Some(unknown_account_by_id()),
             label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
@@ -371,7 +368,7 @@ pub async fn test_unknown_account_is_rejected(h: &impl FacadeContractHarness) {
         "unknown account name must be rejected with BadAccount, got: {by_name:?}"
     );
     assert!(
-        matches!(by_id, Err(ListAllResourcesError::BadAccount(_))),
+        matches!(by_id, Err(ListResourcesError::BadAccount(_))),
         "unknown account id must be rejected with BadAccount, got: {by_id:?}"
     );
 }
@@ -436,7 +433,7 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
     assert_eq!(bob_batch.successes[0].item.headers.id, bob_id);
 
     let alice_list = alice
-        .list_handles(ListResourceHandlesRequest {
+        .search_handles(SearchResourceHandlesRequest {
             selectors: vec![ResourceSelector::of_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             )],
@@ -445,9 +442,10 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
-        .unwrap();
+        .unwrap()
+        .items;
     let bob_list = bob
-        .list_handles(ListResourceHandlesRequest {
+        .search_handles(SearchResourceHandlesRequest {
             selectors: vec![ResourceSelector::of_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             )],
@@ -456,7 +454,8 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
-        .unwrap();
+        .unwrap()
+        .items;
     assert_eq!(
         sorted_handle_names(alice_list),
         vec!["acct-alice-only", "acct-isolated"]
@@ -477,7 +476,8 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
-        .unwrap();
+        .unwrap()
+        .items;
     let bob_search = bob
         .search_handles(SearchResourceHandlesRequest {
             selectors: vec![ResourceSelector::name_pattern(
@@ -489,33 +489,38 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
-        .unwrap();
+        .unwrap()
+        .items;
     assert_eq!(
-        sorted_handle_names(alice_search.items),
+        sorted_handle_names(alice_search),
         vec!["acct-alice-only", "acct-isolated"]
     );
     assert_eq!(
-        sorted_handle_names(bob_search.items),
+        sorted_handle_names(bob_search),
         vec!["acct-bob-only", "acct-isolated"]
     );
 
     let alice_all = alice
-        .list_all_handles(ListAllResourceHandlesRequest {
+        .search_handles(SearchResourceHandlesRequest {
+            // Spans every type, as `list_all_handles` did.
+            selectors: vec![ResourceSelector::default()],
             account: None,
             label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
-        .unwrap();
+        .unwrap()
+        .items;
     let bob_all = bob
-        .list_all(ListAllResourcesRequest {
+        .search(SearchResourcesRequest {
             account: None,
             label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
             selectors: vec![ResourceSelector::default()],
         })
         .await
-        .unwrap();
+        .unwrap()
+        .items;
     assert_eq!(
         sorted_handle_names(alice_all),
         vec!["acct-alice-only", "acct-isolated"]

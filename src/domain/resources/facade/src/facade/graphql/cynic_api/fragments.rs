@@ -78,6 +78,7 @@ pub(crate) struct ResourceListColumnValueView {
 #[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct ResourceConnection {
     pub nodes: Vec<ResourceSummary>,
+    pub total_count: i32,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

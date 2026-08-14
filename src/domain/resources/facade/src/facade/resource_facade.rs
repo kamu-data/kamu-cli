@@ -22,6 +22,7 @@ use domain::{
     ResourceTypeDescriptor,
     ResourcesSummary,
 };
+use internal_error::InternalError;
 use kamu_resources as domain;
 
 use crate::{
@@ -29,7 +30,6 @@ use crate::{
     BatchResourceError,
     DeleteResourceError,
     GetResourceError,
-    ListAllResourcesError,
     ListResourcesError,
     ListSupportedResourceTypesError,
     RenderResourceManifestError,
@@ -51,11 +51,18 @@ pub trait ResourceFacade: Send + Sync {
         request: ResourcesSummaryRequest,
     ) -> Result<ResourcesSummary, ResourcesSummaryError>;
 
+    /// Fetches one resource. Provided: delegates to
+    /// [`ResourceFacade::get_many`] with a one-element batch.
     async fn get(
         &self,
         resource_ref: ResourceRef,
         spec_view_mode: SpecViewMode,
-    ) -> Result<Resource, GetResourceError>;
+    ) -> Result<Resource, GetResourceError> {
+        single_from_batch(
+            self.get_many(vec![resource_ref], spec_view_mode).await?,
+            "Get",
+        )
+    }
 
     async fn get_many(
         &self,
@@ -63,22 +70,32 @@ pub trait ResourceFacade: Send + Sync {
         spec_view_mode: SpecViewMode,
     ) -> Result<BatchResourceResponse<Resource, ResourceLookupProblem>, BatchResourceError>;
 
+    /// Provided: delegates to [`ResourceFacade::get_handles`].
     async fn get_handle(
         &self,
         resource_ref: ResourceRef,
-    ) -> Result<ResourceHandle, GetResourceError>;
+    ) -> Result<ResourceHandle, GetResourceError> {
+        single_from_batch(self.get_handles(vec![resource_ref]).await?, "Get handle")
+    }
 
     async fn get_handles(
         &self,
         resource_refs: Vec<ResourceRef>,
     ) -> Result<BatchResourceResponse<ResourceHandle, ResourceLookupProblem>, BatchResourceError>;
 
+    /// Provided: delegates to [`ResourceFacade::render_manifests`].
     async fn render_manifest(
         &self,
         resource_ref: ResourceRef,
         format: ResourceManifestFormat,
         spec_view_mode: SpecViewMode,
-    ) -> Result<RenderResourceManifestResult, RenderResourceManifestError>;
+    ) -> Result<RenderResourceManifestResult, RenderResourceManifestError> {
+        single_from_batch(
+            self.render_manifests(vec![resource_ref], format, spec_view_mode)
+                .await?,
+            "Render manifest",
+        )
+    }
 
     async fn render_manifests(
         &self,
@@ -90,30 +107,22 @@ pub trait ResourceFacade: Send + Sync {
         BatchResourceError,
     >;
 
-    async fn list(
+    /// Lists resources matching the selectors, with typed columns rendered.
+    ///
+    /// Replaces the former `list`/`list_all` pair: `list` could render typed
+    /// columns but only for one type, `list_all` could span types but rendered
+    /// none. This spans types *and* renders columns for every result.
+    async fn search(
         &self,
-        request: ListResourcesRequest,
-    ) -> Result<Vec<ResourceSummaryView>, ListResourcesError>;
+        request: SearchResourcesRequest,
+    ) -> Result<SearchResourcesResponse, ListResourcesError>;
 
-    async fn list_handles(
-        &self,
-        request: ListResourceHandlesRequest,
-    ) -> Result<Vec<ResourceHandle>, ListResourcesError>;
-
+    /// The handle-only form of [`ResourceFacade::search`], for callers that
+    /// need identity rather than presentation.
     async fn search_handles(
         &self,
         request: SearchResourceHandlesRequest,
     ) -> Result<SearchResourceHandlesResponse, ListResourcesError>;
-
-    async fn list_all(
-        &self,
-        request: ListAllResourcesRequest,
-    ) -> Result<Vec<ResourceSummaryView>, ListAllResourcesError>;
-
-    async fn list_all_handles(
-        &self,
-        request: ListAllResourceHandlesRequest,
-    ) -> Result<Vec<ResourceHandle>, ListAllResourcesError>;
 
     async fn plan_apply_manifest(
         &self,
@@ -144,6 +153,29 @@ pub trait ResourceFacade: Send + Sync {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Unwraps a one-element batch response into a scalar result.
+///
+/// The scalar operations are provided methods delegating to their batch form,
+/// so this is where a batch of one becomes an `Ok(item)` or the item's own
+/// error. An empty response means the batch neither succeeded nor reported a
+/// problem, which is a bug in the batch implementation rather than a user
+/// error — hence the internal error naming the operation.
+fn single_from_batch<T, E, Err>(
+    response: BatchResourceResponse<T, E>,
+    operation: &str,
+) -> Result<T, Err>
+where
+    Err: From<E> + From<InternalError>,
+{
+    if let Some(success) = response.successes.into_iter().next() {
+        Ok(success.item)
+    } else if let Some(problem) = response.problems.into_iter().next() {
+        Err(problem.error.into())
+    } else {
+        Err(InternalError::new(format!("{operation} response did not contain an item")).into())
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -219,31 +251,31 @@ pub enum ResourceManifestFormat {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
-pub struct ListResourcesRequest {
+pub struct SearchResourcesRequest {
     /// Which resources to span. Several selectors act as a logical OR; an empty
-    /// list matches nothing.
+    /// list matches nothing, and a single type-less unnarrowed selector spans
+    /// every type.
     pub selectors: Vec<ResourceSelector>,
+    /// The account rows fall back to when a selector names none.
     pub account: Option<ResourceAccountRef>,
-    pub pagination: PaginationOpts,
     pub label_filter: Option<ResourceLabelFilterInput>,
+    pub pagination: PaginationOpts,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
-pub struct ListResourceHandlesRequest {
-    /// See [`ListResourcesRequest::selectors`].
-    pub selectors: Vec<ResourceSelector>,
-    pub account: Option<ResourceAccountRef>,
-    pub label_filter: Option<ResourceLabelFilterInput>,
-    pub pagination: PaginationOpts,
+pub struct SearchResourcesResponse {
+    pub items: Vec<ResourceSummaryView>,
+    /// Total matching the selectors, ignoring pagination.
+    pub total_count: usize,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
 pub struct SearchResourceHandlesRequest {
-    /// See [`ListResourcesRequest::selectors`].
+    /// See [`SearchResourcesRequest::selectors`].
     pub selectors: Vec<ResourceSelector>,
     pub account: Option<ResourceAccountRef>,
     pub label_filter: Option<ResourceLabelFilterInput>,
@@ -256,29 +288,6 @@ pub struct SearchResourceHandlesRequest {
 pub struct SearchResourceHandlesResponse {
     pub items: Vec<ResourceHandle>,
     pub total_count: usize,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone)]
-pub struct ListAllResourcesRequest {
-    pub account: Option<ResourceAccountRef>,
-    /// Resolved against every registered schema.
-    pub label_filter: Option<ResourceLabelFilterInput>,
-    pub pagination: PaginationOpts,
-    /// See [`ListResourcesRequest::selectors`]. A single type-less, unnarrowed
-    /// selector spans every type.
-    pub selectors: Vec<ResourceSelector>,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone)]
-pub struct ListAllResourceHandlesRequest {
-    pub account: Option<ResourceAccountRef>,
-    /// See [`ListAllResourcesRequest::label_filter`].
-    pub label_filter: Option<ResourceLabelFilterInput>,
-    pub pagination: PaginationOpts,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

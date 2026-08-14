@@ -243,9 +243,12 @@ pub fn coalesce_selectors(
 
 /// A selector combination the repository's scope shape cannot express.
 ///
-/// Both variants are limits of [`ResourceScope::AnyType`] carrying exactly one
-/// query rather than a per-type list. Stage 5 removes them by giving every row
-/// its own account and type.
+/// Every variant is a limit of [`ResourceScope::AnyType`] carrying exactly one
+/// query rather than a per-type list. They disappear once `AnyType` gives each
+/// row its own type and account.
+///
+/// A fourth variant, `SingleTypeRequired`, was retired when `list` became the
+/// multi-type `search`: rendering typed columns no longer forces one type.
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum UnrepresentableScopeError {
     #[error(
@@ -255,9 +258,7 @@ pub enum UnrepresentableScopeError {
     AnyTypeMixedWithTypedSelectors,
 
     /// `ResourceScope::AnyType` carries no per-row account, so a type-less
-    /// selector cannot name one. Disappears if `AnyType` ever grows a per-row
-    /// account, the same way the two variants above disappear once every row
-    /// carries its own type.
+    /// selector cannot name one.
     #[error(
         "A type-less selector cannot name an account, because it spans every type under the \
          call-level account"
@@ -268,12 +269,6 @@ pub enum UnrepresentableScopeError {
         "A type-less selector may narrow by only one of `id`, `name`, or `name` pattern at a time"
     )]
     AnyTypeMultipleQueryModes,
-
-    /// `list` renders typed columns through one type's dispatcher, so it cannot
-    /// span types the way the other listings can. Lifted when `list` becomes a
-    /// multi-type `search`.
-    #[error("This operation requires exactly one typed selector, but got {count}")]
-    SingleTypeRequired { count: usize },
 }
 
 /// The distinct query modes seen for one schema, deduplicated.

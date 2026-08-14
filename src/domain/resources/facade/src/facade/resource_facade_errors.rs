@@ -316,12 +316,6 @@ pub enum ListResourcesError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Listing every type is just a listing with an all-types scope, so it carries
-/// the same failures.
-pub type ListAllResourcesError = ListResourcesError;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #[derive(Debug, Error)]
 pub enum ResourcesSummaryError {
     #[error(transparent)]
@@ -375,6 +369,35 @@ impl From<BatchResourceError> for DeleteResourceError {
             BatchResourceError::InvalidLabelFilter(err) => Self::Internal(err.int_err()),
             // Likewise unreachable: a one-element batch is uniform by
             // construction.
+            BatchResourceError::NonUniformBatch(err) => Self::Internal(err.int_err()),
+            BatchResourceError::RemoteRequest(err) => Self::RemoteRequest(err),
+            BatchResourceError::Internal(err) => Self::Internal(err),
+        }
+    }
+}
+
+impl From<BatchResourceError> for GetResourceError {
+    fn from(err: BatchResourceError) -> Self {
+        match err {
+            BatchResourceError::UnsupportedSelector(err) => Self::UnsupportedSelector(err),
+            BatchResourceError::BadAccount(err) => Self::BadAccount(err),
+            // A scalar get carries no label filter, and a one-element batch is
+            // uniform by construction, so neither can surface here.
+            BatchResourceError::InvalidLabelFilter(err) => Self::Internal(err.int_err()),
+            BatchResourceError::NonUniformBatch(err) => Self::Internal(err.int_err()),
+            BatchResourceError::RemoteRequest(err) => Self::RemoteRequest(err),
+            BatchResourceError::Internal(err) => Self::Internal(err),
+        }
+    }
+}
+
+impl From<BatchResourceError> for RenderResourceManifestError {
+    fn from(err: BatchResourceError) -> Self {
+        match err {
+            BatchResourceError::UnsupportedSelector(err) => Self::UnsupportedSelector(err),
+            BatchResourceError::BadAccount(err) => Self::BadAccount(err),
+            // See the note on the `GetResourceError` conversion above.
+            BatchResourceError::InvalidLabelFilter(err) => Self::Internal(err.int_err()),
             BatchResourceError::NonUniformBatch(err) => Self::Internal(err.int_err()),
             BatchResourceError::RemoteRequest(err) => Self::RemoteRequest(err),
             BatchResourceError::Internal(err) => Self::Internal(err),

@@ -15,7 +15,6 @@ use kamu_resources::*;
 use kamu_resources_services::{
     ResourceExtensionSchemaResolver,
     get_resource_crud_dispatcher,
-    get_resource_crud_dispatcher_by_raw_selector,
     get_resource_crud_dispatcher_for_trusted_schema,
 };
 
@@ -244,63 +243,29 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         })
     }
 
-    async fn list(
+    async fn search(
         &self,
-        request: ListResourcesRequest,
-    ) -> Result<Vec<ResourceSummaryView>, ListResourcesError> {
+        request: SearchResourcesRequest,
+    ) -> Result<SearchResourcesResponse, ListResourcesError> {
         let target_account = self
             .resource_account_resolver
             .resolve_target_account(request.account.as_ref())
             .await?;
 
-        // `list` renders typed columns, which only a type's own dispatcher can
-        // produce — so unlike the other listings it needs exactly one type.
-        // Stage 6 replaces it with a multi-type `search`.
-        let (raw_type_selector, query) = single_type_selector(request.selectors)?;
-
-        let dispatcher = get_resource_crud_dispatcher_by_raw_selector::<ListResourcesError>(
-            &self.catalog,
-            &raw_type_selector,
-        )?;
-
-        let resource_schema = ResourceSchemaId::try_from(dispatcher.schema()).int_err()?;
-
-        let label_filter = resolve_label_filter(
-            &self.resource_extension_schema_resolver,
-            request.label_filter,
-            &resource_schema,
-        )?;
-
-        dispatcher
-            .list(ResourceCrudDispatcherListRequest {
-                account_id: target_account.did,
-                pagination: request.pagination,
-                label_filter,
-                query,
-            })
-            .await
-            .map_err(Into::into)
-    }
-
-    async fn list_handles(
-        &self,
-        request: ListResourceHandlesRequest,
-    ) -> Result<Vec<ResourceHandle>, ListResourcesError> {
-        let target_account = self
-            .resource_account_resolver
-            .resolve_target_account(request.account.as_ref())
-            .await?;
-
-        // Goes through `resolve_scope` like every other listing, so a selector's
-        // name pattern is honoured here too. It used to be discarded.
         let (scope, label_filter) = self
             .resolve_scope(request.selectors, request.label_filter)
             .await?;
 
         if scope.is_vacuous() {
-            return Ok(Vec::new());
+            return Ok(SearchResourcesResponse {
+                items: Vec::new(),
+                total_count: 0,
+            });
         }
 
+        // One scoped query for every type in the scope, so pagination is global
+        // rather than per type. The former `list` ran a separate paginated query
+        // through one type's dispatcher, which is why it could not span types.
         let snapshots = self
             .generic_resource_query_service
             .list_snapshots(
@@ -310,8 +275,14 @@ impl ResourceFacade for LocalResourceFacadeImpl {
                 request.pagination,
             )
             .await?;
+        let total_count = self
+            .generic_resource_query_service
+            .count_search_resource_handles(&target_account.did, &scope, &label_filter)
+            .await?;
 
-        Ok(map_snapshots_to_handles(snapshots))
+        let items = self.summary_views_with_columns(snapshots)?;
+
+        Ok(SearchResourcesResponse { items, total_count })
     }
 
     async fn search_handles(
@@ -355,60 +326,6 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .collect::<Vec<_>>();
 
         Ok(SearchResourceHandlesResponse { items, total_count })
-    }
-
-    async fn list_all(
-        &self,
-        request: ListAllResourcesRequest,
-    ) -> Result<Vec<ResourceSummaryView>, ListAllResourcesError> {
-        let target_account = self
-            .resource_account_resolver
-            .resolve_target_account(request.account.as_ref())
-            .await?;
-
-        let (scope, label_filter) = self
-            .resolve_scope(request.selectors, request.label_filter)
-            .await?;
-
-        if scope.is_vacuous() {
-            return Ok(Vec::new());
-        }
-
-        let snapshots = self
-            .generic_resource_query_service
-            .list_snapshots(
-                &target_account.did,
-                &scope,
-                &label_filter,
-                request.pagination,
-            )
-            .await?;
-
-        Ok(snapshots.into_iter().map(Into::into).collect())
-    }
-
-    async fn list_all_handles(
-        &self,
-        request: ListAllResourceHandlesRequest,
-    ) -> Result<Vec<ResourceHandle>, ListAllResourcesError> {
-        let target_account = self
-            .resource_account_resolver
-            .resolve_target_account(request.account.as_ref())
-            .await?;
-
-        let label_filter = self.resolve_label_filter_for_all_schemas(request.label_filter)?;
-
-        let snapshots = self
-            .generic_resource_query_service
-            .list_snapshots(
-                &target_account.did,
-                &ResourceScope::default(),
-                &label_filter,
-                request.pagination,
-            )
-            .await?;
-
-        Ok(map_snapshots_to_handles(snapshots))
     }
 
     async fn plan_apply_manifest(
@@ -634,42 +551,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 /// resolving more than one selector must build it once and reuse it here rather
 /// than going through
 /// [`LocalResourceFacadeImpl::resolve_schema_for_selector`] per selector.
-/// Narrows a selector list down to the one type and query that `list` needs,
-/// since it renders typed columns through a single type's dispatcher.
 ///
-/// Rejects anything the dispatcher route cannot serve: no type, several types,
-/// or an id-narrowed selector. Stage 6 removes this by replacing `list` with a
-/// multi-type `search`.
-fn single_type_selector(
-    selectors: Vec<ResourceSelector>,
-) -> Result<(ResourceTypeSelectorRaw, Option<ResourceQuery>), ListResourcesError> {
-    let [selector] = <[ResourceSelector; 1]>::try_from(selectors).map_err(|selectors| {
-        UnrepresentableScopeError::SingleTypeRequired {
-            count: selectors.len(),
-        }
-    })?;
-
-    let Some(r#type) = selector.r#type else {
-        return Err(UnrepresentableScopeError::SingleTypeRequired { count: 0 }.into());
-    };
-
-    let query = match (selector.id, selector.name) {
-        (Some(id), None) => Some(ResourceQuery::ExactIds(vec![id])),
-        (None, Some(pattern)) => Some(ResourceQuery::NamePattern(pattern)),
-        (None, None) => None,
-        (Some(_), Some(_)) => {
-            return Err(UnrepresentableScopeError::AnyTypeMultipleQueryModes.into());
-        }
-    };
-
-    Ok((
-        ResourceTypeSelectorRaw::new_unchecked(r#type.as_str()),
-        query,
-    ))
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 /// Accepts anything spelling a type — a raw CLI selector (`vs`), an ODF
 /// `TypeRef` (`VariableSet`), or a schema URI — since descriptors match all
 /// four forms.
@@ -695,27 +577,6 @@ where
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl LocalResourceFacadeImpl {
-    /// Resolves an authored filter for the `all` scope.
-    fn resolve_label_filter_for_all_schemas(
-        &self,
-        label_filter: Option<ResourceLabelFilterInput>,
-    ) -> Result<ResolvedResourceLabelFilter, ResourceInvalidLabelFilterError> {
-        let resource_schema_ids = self
-            .list_resource_type_descriptors()
-            .iter()
-            .map(|descriptor| ResourceSchemaId::try_from(&descriptor.schema))
-            .collect::<Result<Vec<_>, _>>()
-            .expect("registered descriptors always carry canonical schema URIs");
-
-        let (_, resolved) = resolve_label_filter_for_schemas(
-            &self.resource_extension_schema_resolver,
-            label_filter,
-            &resource_schema_ids,
-        )?;
-
-        Ok(resolved)
-    }
-
     fn list_resource_type_descriptors(&self) -> Vec<ResourceTypeDescriptor> {
         let mut seen = HashSet::new();
         let mut descriptors = Vec::new();
@@ -756,6 +617,49 @@ impl LocalResourceFacadeImpl {
         E: From<UnsupportedResourceSelectorError>,
     {
         resolve_schema_in_descriptors(&self.list_resource_type_descriptors(), selector)
+    }
+
+    /// Converts snapshots into summary views, rendering each one's typed list
+    /// columns.
+    ///
+    /// The results may span several types, so presentation dispatchers are
+    /// looked up **once per distinct schema** rather than per row — otherwise a
+    /// page of N results would construct N dispatchers.
+    fn summary_views_with_columns(
+        &self,
+        snapshots: Vec<ResourceSnapshot>,
+    ) -> Result<Vec<ResourceSummaryView>, InternalError> {
+        let mut dispatchers: HashMap<TypeUri, Arc<dyn ResourcePresentationDispatcher>> =
+            HashMap::new();
+
+        for builder in self
+            .catalog
+            .builders_for::<dyn ResourcePresentationDispatcher>()
+        {
+            let dispatcher = builder.get(&self.catalog).int_err()?;
+            dispatchers
+                .entry(dispatcher.schema().clone())
+                .or_insert(dispatcher);
+        }
+
+        snapshots
+            .into_iter()
+            .map(|snapshot| {
+                // A schema with no presentation dispatcher is not selectable in
+                // the first place — the descriptor list this scope was resolved
+                // against is built from exactly this registry — so a miss means
+                // stored data of a type that is no longer registered. Render it
+                // without typed columns rather than failing the whole listing.
+                let list_values = match dispatchers.get(&snapshot.schema) {
+                    Some(dispatcher) => dispatcher.list_column_values_for_snapshot(&snapshot)?,
+                    None => Vec::new(),
+                };
+
+                let mut view = ResourceSummaryView::from(snapshot);
+                view.list_values = list_values;
+                Ok(view)
+            })
+            .collect()
     }
 
     /// Resolves a request's scope and label filter together, since narrowing to

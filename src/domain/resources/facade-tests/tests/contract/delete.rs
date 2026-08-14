@@ -13,9 +13,9 @@ use kamu_resources_facade::{
     ApplyManifestRequest,
     DeleteResourceError,
     GetResourceError,
-    ListResourcesRequest,
     ResourceLookupProblem,
     ResourceManifestFormat,
+    SearchResourcesRequest,
     SpecViewMode,
 };
 use pretty_assertions::assert_eq;
@@ -102,7 +102,7 @@ pub async fn test_delete_by_name(h: &impl FacadeContractHarness) {
 
     // Resource must not appear in list
     let list = facade
-        .list(ListResourcesRequest {
+        .search(SearchResourcesRequest {
             selectors: vec![ResourceSelector::of_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             )],
@@ -116,7 +116,7 @@ pub async fn test_delete_by_name(h: &impl FacadeContractHarness) {
         .await
         .unwrap();
     assert!(
-        !list.iter().any(|s| s.id == id),
+        !list.items.iter().any(|s| s.id == id),
         "deleted resource must not appear in list"
     );
 }
