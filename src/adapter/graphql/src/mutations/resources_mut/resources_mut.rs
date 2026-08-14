@@ -561,7 +561,6 @@ fn map_batch_delete_resource_error(error: kamu_resources_facade::BatchResourceEr
         E::UnsupportedSelector(_) => GqlError::gql("Unsupported resource type selector"),
         E::BadAccount(error) => map_resolve_manifest_account_error(error),
         E::InvalidLabelFilter(error) => GqlError::gql(error.to_string()),
-        E::NonUniformBatch(error) => GqlError::gql(error.to_string()),
         E::RemoteRequest(error) => error.int_err().into(),
         E::Internal(error) => error.into(),
     }
@@ -576,7 +575,6 @@ fn map_batch_apply_resource_error(error: kamu_resources_facade::BatchResourceErr
         E::UnsupportedSelector(_) => GqlError::gql("Unsupported resource type selector"),
         E::BadAccount(error) => map_resolve_manifest_account_error(error),
         E::InvalidLabelFilter(error) => GqlError::gql(error.to_string()),
-        E::NonUniformBatch(error) => GqlError::gql(error.to_string()),
         E::RemoteRequest(error) => error.int_err().into(),
         E::Internal(error) => error.into(),
     }

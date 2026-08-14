@@ -25,9 +25,11 @@ use crate::helpers::{
     SECRET_SET_CANONICAL_SELECTOR,
     VARIABLE_SET_CANONICAL_SELECTOR,
     VARIABLE_SET_SCHEMA_STR,
+    apply_manifest_and_get_id,
     assert_applied_outcome,
     assert_batch_indexes,
     assert_resource_view_fields,
+    secret_set_manifest_json,
     variable_set_manifest_json,
 };
 
@@ -842,6 +844,131 @@ pub async fn test_batch_apis_reject_unsupported_type(h: &impl FacadeContractHarn
         matches!(dm, Err(BatchResourceError::UnsupportedSelector(_))),
         "delete_many: unsupported type must be a batch-level UnsupportedSelector, got: {dm:?}"
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-108
+contract_test!(
+    batch_spans_types_and_accounts,
+    super::test_batch_spans_types_and_accounts
+);
+
+/// One batch can name resources of **different types** belonging to
+/// **different accounts** — the capability the ODF-shaped `ResourceRef` was
+/// adopted for, since each ref carries its own `account` and `type`.
+///
+/// Until the batch pipelines fanned out by `(account, schema)` this was
+/// rejected at runtime by `uniform_batch_target`, even though the wire format
+/// had permitted it since the refs became ODF-shaped. Nothing pinned that
+/// rejection, so nothing would have caught it silently coming back either.
+///
+/// Alice is used for both halves: a *cross-account* batch is separately
+/// governed by authorization (RF-105 covers the denial), so naming Bob here
+/// would test permissions rather than fan-out.
+pub async fn test_batch_spans_types_and_accounts(h: &impl FacadeContractHarness) {
+    create_resource(h, "span-vars").await;
+    apply_manifest_and_get_id(
+        h,
+        TestAccount::Alice,
+        secret_set_manifest_json("span-secrets", None, &[("TOKEN", "t")]),
+    )
+    .await;
+
+    let facade = h.facade_for(TestAccount::Alice);
+
+    let mixed_types = || {
+        vec![
+            ResourceRef {
+                account: None,
+                r#type: VARIABLE_SET_CANONICAL_SELECTOR
+                    .parse::<TypeName>()
+                    .unwrap()
+                    .into(),
+                id: None,
+                did: None,
+                name: Some("span-vars".parse().unwrap()),
+            },
+            ResourceRef {
+                account: None,
+                r#type: SECRET_SET_CANONICAL_SELECTOR
+                    .parse::<TypeName>()
+                    .unwrap()
+                    .into(),
+                id: None,
+                did: None,
+                name: Some("span-secrets".parse().unwrap()),
+            },
+        ]
+    };
+
+    // Every read path resolves both entries, and the positional indexes survive
+    // the grouping — a fan-out that lost order would still "succeed" here, so
+    // the indexes are the real assertion.
+    let response = facade
+        .get_many(mixed_types(), SpecViewMode::Encrypted)
+        .await
+        .expect("a batch spanning two types must resolve");
+    assert_batch_indexes(&response, &[0, 1], &[]);
+
+    let handles = facade
+        .get_handles(mixed_types())
+        .await
+        .expect("get_handles must span two types");
+    assert_batch_indexes(&handles, &[0, 1], &[]);
+
+    let manifests = facade
+        .render_manifests(
+            mixed_types(),
+            ResourceManifestFormat::Json,
+            SpecViewMode::Encrypted,
+        )
+        .await
+        .expect("render_manifests must span two types");
+    assert_batch_indexes(&manifests, &[0, 1], &[]);
+
+    // Naming the account explicitly must behave the same as leaving it unset,
+    // since both resolve to the caller. This is the path that used to compare
+    // account refs *structurally* and reject a batch that spelled the same
+    // account two different ways.
+    let spelled_out = vec![
+        ResourceRef {
+            account: Some(kamu_resources::ResourceAccountRef {
+                id: None,
+                did: None,
+                name: Some(h.account_name(TestAccount::Alice)),
+            }),
+            r#type: VARIABLE_SET_CANONICAL_SELECTOR
+                .parse::<TypeName>()
+                .unwrap()
+                .into(),
+            id: None,
+            did: None,
+            name: Some("span-vars".parse().unwrap()),
+        },
+        ResourceRef {
+            account: None,
+            r#type: SECRET_SET_CANONICAL_SELECTOR
+                .parse::<TypeName>()
+                .unwrap()
+                .into(),
+            id: None,
+            did: None,
+            name: Some("span-secrets".parse().unwrap()),
+        },
+    ];
+    let handles = facade
+        .get_handles(spelled_out)
+        .await
+        .expect("one account spelled two ways must not split the batch");
+    assert_batch_indexes(&handles, &[0, 1], &[]);
+
+    // The write path last, since it consumes the fixtures.
+    let deleted = facade
+        .delete_many(mixed_types())
+        .await
+        .expect("delete_many must span two types");
+    assert_batch_indexes(&deleted, &[0, 1], &[]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

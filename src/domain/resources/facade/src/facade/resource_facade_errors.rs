@@ -223,35 +223,10 @@ pub enum BatchResourceError {
     InvalidLabelFilter(#[from] ResourceInvalidLabelFilterError),
 
     #[error(transparent)]
-    NonUniformBatch(#[from] NonUniformBatchError),
-
-    #[error(transparent)]
     RemoteRequest(#[from] GraphqlHttpRequestError),
 
     #[error(transparent)]
     Internal(#[from] InternalError),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// A batch whose references disagree on the account or type they target.
-///
-/// Temporary: the API shape already allows both to vary per reference, but
-/// account resolution is still singular below the facade. Lifting this is the
-/// remaining half of the acceptance request.
-#[derive(Debug, Error)]
-pub enum NonUniformBatchError {
-    #[error(
-        "Batch operations cannot yet span resource types: got both `{first}` and `{other}`. Issue \
-         one call per type."
-    )]
-    MixedTypes { first: String, other: String },
-
-    #[error(
-        "Batch operations cannot yet span accounts. Issue one call per account, and spell the \
-         account the same way in every reference."
-    )]
-    MixedAccounts,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -367,9 +342,6 @@ impl From<BatchResourceError> for DeleteResourceError {
             // `delete` resolves a single pre-selected ref, so it never carries
             // a label filter for this to surface from.
             BatchResourceError::InvalidLabelFilter(err) => Self::Internal(err.int_err()),
-            // Likewise unreachable: a one-element batch is uniform by
-            // construction.
-            BatchResourceError::NonUniformBatch(err) => Self::Internal(err.int_err()),
             BatchResourceError::RemoteRequest(err) => Self::RemoteRequest(err),
             BatchResourceError::Internal(err) => Self::Internal(err),
         }
@@ -384,7 +356,6 @@ impl From<BatchResourceError> for GetResourceError {
             // A scalar get carries no label filter, and a one-element batch is
             // uniform by construction, so neither can surface here.
             BatchResourceError::InvalidLabelFilter(err) => Self::Internal(err.int_err()),
-            BatchResourceError::NonUniformBatch(err) => Self::Internal(err.int_err()),
             BatchResourceError::RemoteRequest(err) => Self::RemoteRequest(err),
             BatchResourceError::Internal(err) => Self::Internal(err),
         }
@@ -398,7 +369,6 @@ impl From<BatchResourceError> for RenderResourceManifestError {
             BatchResourceError::BadAccount(err) => Self::BadAccount(err),
             // See the note on the `GetResourceError` conversion above.
             BatchResourceError::InvalidLabelFilter(err) => Self::Internal(err.int_err()),
-            BatchResourceError::NonUniformBatch(err) => Self::Internal(err.int_err()),
             BatchResourceError::RemoteRequest(err) => Self::RemoteRequest(err),
             BatchResourceError::Internal(err) => Self::Internal(err),
         }
