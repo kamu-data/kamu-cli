@@ -454,6 +454,16 @@ pub enum ResourceLookupCliError {
     /// but representable on the wire.
     #[error("Resource reference specified neither an id nor a name")]
     EmptyRef,
+
+    /// Also unreachable from the CLI for the same reason: a reference naming
+    /// both an id and a name asserts they agree, and only the wire can spell
+    /// that pair.
+    #[error("Resource {id} is named '{actual_name}', not '{expected_name}'")]
+    NameMismatch {
+        id: kamu_resources::ResourceID,
+        expected_name: String,
+        actual_name: String,
+    },
 }
 
 impl From<ResourceLookupProblem> for ResourceLookupCliError {
@@ -468,6 +478,11 @@ impl From<ResourceLookupProblem> for ResourceLookupCliError {
                 id: err.id,
                 expected_schema: err.expected_schema.to_string(),
                 actual_schema: err.actual_schema.to_string(),
+            },
+            ResourceLookupProblem::NameMismatch(err) => Self::NameMismatch {
+                id: err.id,
+                expected_name: err.expected_name.to_string(),
+                actual_name: err.actual_name.to_string(),
             },
             ResourceLookupProblem::EmptyRef => Self::EmptyRef,
         }

@@ -53,7 +53,8 @@ pub(crate) struct BatchIdsResolutionResponse {
 ///
 /// A ref carrying both is keyed by its ID: ODF treats the pair as a consistency
 /// assertion rather than two lookups, and the ID is the authoritative half. The
-/// name is verified against the resolved resource downstream.
+/// assertion's other half is checked by `validate_handle_row`, which fails the
+/// entry if the resolved resource turns out to carry a different name.
 pub(crate) fn group_batch_resource_refs(resource_refs: Vec<ResourceRef>) -> BatchResourceRefGroups {
     let mut uid_entries = Vec::new();
     let mut name_entries = Vec::new();

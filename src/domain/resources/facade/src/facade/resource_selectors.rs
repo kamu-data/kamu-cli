@@ -159,6 +159,19 @@ pub fn coalesce_selectors(
         return Ok(None);
     }
 
+    // Checked before grouping, which merges selectors and loses the per-selector
+    // identity this needs. One selector's fields are a *conjunction*, but the
+    // repository's per-type rows are OR'd together, so a selector narrowing by
+    // more than one mode cannot be expressed as rows without widening it.
+    for selector in &selectors {
+        let modes = usize::from(selector.id.is_some())
+            + usize::from(selector.name.is_some())
+            + usize::from(selector.name_pattern.is_some());
+        if modes > 1 {
+            return Err(UnrepresentableScopeError::SelectorNarrowsBySeveralModes);
+        }
+    }
+
     // Grouped by `(schema, account)`, preserving first-appearance order so the
     // emitted rows are stable and diffable. `None` schema (any-type) is its own
     // group.
@@ -269,6 +282,14 @@ pub enum UnrepresentableScopeError {
         "A type-less selector may narrow by only one of `id`, `name`, or `name` pattern at a time"
     )]
     AnyTypeMultipleQueryModes,
+
+    /// Unlike the `AnyType*` variants, this one is not a limit of
+    /// [`ResourceScope::AnyType`]: a selector's fields are a conjunction, while
+    /// the repository's per-type rows are OR'd. Emitting one row per mode would
+    /// widen the match rather than narrow it, so this survives the per-row-type
+    /// stage.
+    #[error("A selector may narrow by only one of `id` or `name` at a time")]
+    SelectorNarrowsBySeveralModes,
 }
 
 /// The distinct query modes seen for one schema, deduplicated.
@@ -601,6 +622,24 @@ mod tests {
     #[test]
     fn test_empty_input_is_vacuous_not_match_everything() {
         assert_eq!(coalesce(vec![]), None);
+    }
+
+    // One selector's fields are a conjunction: `id=A AND name LIKE 'b-%'` means
+    // "A, if it is also named b-something". Emitting an id row and a pattern row
+    // would have the repository OR them, returning A *plus* every `b-%` resource
+    // — a silently wider result than was asked for.
+    #[test]
+    fn test_one_selector_narrowing_by_id_and_pattern_is_rejected() {
+        let result = coalesce_selectors(vec![ResolvedSelector {
+            id: Some(id(1)),
+            name_pattern: Some("b-%".to_string()),
+            ..any_of(SCHEMA_A)
+        }]);
+
+        assert_matches!(
+            result,
+            Err(UnrepresentableScopeError::SelectorNarrowsBySeveralModes)
+        );
     }
 
     #[test]

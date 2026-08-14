@@ -158,24 +158,34 @@ pub struct ResourceSelectorInput {
     pub labels: Option<ResourceLabelFilterInput>,
 }
 
-impl From<ResourceSelectorInput> for kamu_resources::ResourceSelector {
-    fn from(value: ResourceSelectorInput) -> Self {
-        Self {
+impl TryFrom<ResourceSelectorInput> for kamu_resources::ResourceSelector {
+    type Error = GqlError;
+
+    fn try_from(value: ResourceSelectorInput) -> Result<Self, GqlError> {
+        // Per-selector labels are not resolved yet — only the call-level
+        // `labelFilter` is. Rejected rather than dropped: silently ignoring the
+        // constraint would return a *wider* result set than was asked for, and
+        // the caller would have no way to tell.
+        if value.labels.is_some() {
+            return Err(GqlError::gql(
+                "Per-selector `labels` are not supported yet; use the call-level `labelFilter`",
+            ));
+        }
+
+        Ok(Self {
             account: value.account.map(AccountRefInput::into_manifest_account),
             r#type: value.r#type.map(ResourceTypeSelectorInput::into_type_ref),
             id: value.id.map(Into::into),
             name: value.name,
-            // Per-selector labels are not resolved yet; the call-level filter
-            // applies to every selector.
             labels: None,
-        }
+        })
     }
 }
 
 pub(crate) fn into_resource_selectors(
     selectors: Vec<ResourceSelectorInput>,
-) -> Vec<kamu_resources::ResourceSelector> {
-    selectors.into_iter().map(Into::into).collect()
+) -> Result<Vec<kamu_resources::ResourceSelector>, GqlError> {
+    selectors.into_iter().map(TryInto::try_into).collect()
 }
 
 /// The all-types, unnarrowed selector — what a listing means with no selectors
@@ -199,7 +209,7 @@ impl SearchResourceHandlesInput {
         pagination: PaginationOpts,
     ) -> Result<kamu_resources_facade::SearchResourceHandlesRequest, GqlError> {
         Ok(kamu_resources_facade::SearchResourceHandlesRequest {
-            selectors: into_resource_selectors(self.selectors),
+            selectors: into_resource_selectors(self.selectors)?,
             account: self.account.map(AccountRefInput::into_manifest_account),
             label_filter: into_facade_filter(self.label_filter)?,
             pagination,
@@ -227,9 +237,10 @@ impl SearchResourcesInput {
         pagination: PaginationOpts,
     ) -> Result<kamu_resources_facade::SearchResourcesRequest, GqlError> {
         Ok(kamu_resources_facade::SearchResourcesRequest {
-            selectors: self
-                .selectors
-                .map_or_else(|| vec![any_resource_selector()], into_resource_selectors),
+            selectors: match self.selectors {
+                Some(selectors) => into_resource_selectors(selectors)?,
+                None => vec![any_resource_selector()],
+            },
             account: self.account.map(AccountRefInput::into_manifest_account),
             label_filter: into_facade_filter(self.label_filter)?,
             pagination,
@@ -461,6 +472,17 @@ pub struct ResourceSchemaMismatchProblem {
     pub message: String,
 }
 
+/// A reference supplied both an `id` and a `name` that name different
+/// resources. The pair is a consistency assertion, so the mismatch fails the
+/// entry rather than letting the `id` silently win.
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ResourceNameMismatchProblem {
+    pub id: ResourceID<'static>,
+    pub expected_name: ResourceName<'static>,
+    pub actual_name: ResourceName<'static>,
+    pub message: String,
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// A reference that named neither an id nor a name.
@@ -474,6 +496,7 @@ pub enum ResourceLookupProblem {
     UidNotFound(ResourceIDNotFoundProblem),
     NameNotFound(ResourceNameNotFoundProblem),
     SchemaMismatch(ResourceSchemaMismatchProblem),
+    NameMismatch(ResourceNameMismatchProblem),
     EmptyRef(ResourceEmptyRefProblem),
 }
 
@@ -499,6 +522,15 @@ impl From<kamu_resources_facade::ResourceLookupProblem> for ResourceLookupProble
                     message,
                 })
             }
+            P::NameMismatch(e) => {
+                let message = e.to_string();
+                Self::NameMismatch(ResourceNameMismatchProblem {
+                    id: e.id.into(),
+                    expected_name: e.expected_name.clone().into(),
+                    actual_name: e.actual_name.clone().into(),
+                    message,
+                })
+            }
             P::EmptyRef => Self::EmptyRef(ResourceEmptyRefProblem {
                 message: P::EmptyRef.to_string(),
             }),
@@ -513,6 +545,7 @@ pub enum ResourceSelectorProblem {
     UidNotFound(ResourceIDNotFoundProblem),
     NameNotFound(ResourceNameNotFoundProblem),
     SchemaMismatch(ResourceSchemaMismatchProblem),
+    NameMismatch(ResourceNameMismatchProblem),
     UnsupportedSelector(ResourceUnsupportedSelectorProblem),
     BadAccount(ResourceBadAccountProblem),
     EmptyRef(ResourceEmptyRefProblem),
@@ -524,6 +557,7 @@ impl From<kamu_resources_facade::ResourceLookupProblem> for ResourceSelectorProb
             ResourceLookupProblem::UidNotFound(p) => Self::UidNotFound(p),
             ResourceLookupProblem::NameNotFound(p) => Self::NameNotFound(p),
             ResourceLookupProblem::SchemaMismatch(p) => Self::SchemaMismatch(p),
+            ResourceLookupProblem::NameMismatch(p) => Self::NameMismatch(p),
             ResourceLookupProblem::EmptyRef(p) => Self::EmptyRef(p),
         }
     }

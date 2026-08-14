@@ -20,6 +20,7 @@ use kamu_resources::{
     ResourceIDNotFoundError,
     ResourceInvalidSpecError,
     ResourceLabelFilterExprParseError,
+    ResourceName,
     ResourceNameNotFoundError,
     TypeRef,
     TypeUri,
@@ -202,6 +203,12 @@ pub enum ResourceLookupProblem {
 
     #[error(transparent)]
     SchemaMismatch(#[from] ResourceSchemaMismatchError),
+
+    /// A reference supplied both an id and a name, and they name different
+    /// resources. Its own variant rather than a `NameNotFound`: the named
+    /// resource may well exist — it simply is not the one the id addresses.
+    #[error(transparent)]
+    NameMismatch(#[from] ResourceNameMismatchError),
 
     /// A reference naming neither an id nor a name. Its own variant rather than
     /// a `NameNotFound`, which would wrongly claim a lookup was attempted.
@@ -462,6 +469,16 @@ pub struct ResourceSchemaMismatchError {
     pub id: ResourceID,
     pub expected_schema: TypeUri,
     pub actual_schema: TypeUri,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+#[error("Resource id {id} is named '{actual_name}', not '{expected_name}'")]
+pub struct ResourceNameMismatchError {
+    pub id: ResourceID,
+    pub expected_name: ResourceName,
+    pub actual_name: ResourceName,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

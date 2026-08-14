@@ -11,7 +11,12 @@ use internal_error::InternalError;
 use kamu_resources as domain;
 
 use crate::facade::graphql::cynic_api;
-use crate::{BatchResourceError, ResourceLookupProblem, ResourceSchemaMismatchError};
+use crate::{
+    BatchResourceError,
+    ResourceLookupProblem,
+    ResourceNameMismatchError,
+    ResourceSchemaMismatchError,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -23,6 +28,7 @@ pub(crate) fn map_batch_lookup_problem(
         P::ResourceIDNotFoundProblem(p) => Ok(map_id_not_found(p)),
         P::ResourceNameNotFoundProblem(p) => Ok(map_name_not_found(p)),
         P::ResourceSchemaMismatchProblem(p) => Ok(map_schema_mismatch(p)),
+        P::ResourceNameMismatchProblem(p) => Ok(map_name_mismatch(p)),
         P::Unknown => Err(BatchResourceError::Internal(InternalError::new(
             "Remote batch problem contains unrecognized ResourceLookupProblem variant",
         ))),
@@ -132,6 +138,18 @@ pub(crate) fn map_schema_mismatch(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub(crate) fn map_name_mismatch(
+    p: cynic_api::fragments::ResourceNameMismatchProblem,
+) -> ResourceLookupProblem {
+    ResourceLookupProblem::NameMismatch(ResourceNameMismatchError {
+        id: p.id,
+        expected_name: p.expected_name,
+        actual_name: p.actual_name,
+    })
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub(crate) fn map_selector_problem_result<E, FLookup, FUnsupported, FBadAccount>(
     result: cynic_api::fragments::ResourceSelectorProblemResult,
     map_lookup: FLookup,
@@ -148,6 +166,7 @@ where
         P::ResourceIDNotFoundProblem(p) => Ok(map_lookup(map_id_not_found(p))),
         P::ResourceNameNotFoundProblem(p) => Ok(map_lookup(map_name_not_found(p))),
         P::ResourceSchemaMismatchProblem(p) => Ok(map_lookup(map_schema_mismatch(p))),
+        P::ResourceNameMismatchProblem(p) => Ok(map_lookup(map_name_mismatch(p))),
         P::ResourceUnsupportedSelectorProblem(p) => {
             Ok(map_unsupported(unsupported_selector_problem_error(p)))
         }
