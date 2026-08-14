@@ -31,7 +31,7 @@ impl PostgresAccountRepository {
             Some("accounts_pkey") => AccountDuplicateField::Id,
             Some("idx_accounts_email") => AccountDuplicateField::Email,
             Some("idx_accounts_name") => AccountDuplicateField::Name,
-            Some("idx_accounts_provider_identity_key") => {
+            Some("idx_uniq_accounts_provider_provider_identity_key") => {
                 AccountDuplicateField::ProviderIdentityKey
             }
             _ => {
