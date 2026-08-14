@@ -292,7 +292,7 @@ pub struct AuthenticationServiceHarness {
 impl AuthenticationServiceHarness {
     #[builder]
     pub fn new(mock_outbox: Option<MockOutbox>, auth_config: Option<AuthConfig>) -> Self {
-        let mock_outbox = mock_outbox.unwrap_or_else(MockOutbox::new);
+        let mock_outbox = mock_outbox.unwrap_or_default();
         let auth_config = auth_config.unwrap_or_else(AuthConfig::sample);
 
         let mut b = dill::CatalogBuilder::new();
