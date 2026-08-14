@@ -14,7 +14,8 @@ reorder_keys = false # delegate to cargo-sort
 reorder_arrays = true
 indent_string = "    "
 
-# Expand features arrays
+# Expand arrays
+# TODO: Do not expand empty arrays when this is supported
 [[rule]]
 keys = ["features", "dependencies", "dev-dependencies", "workspace.package"]
 
