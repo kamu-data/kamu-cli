@@ -35,6 +35,65 @@ pub struct ResourceSelector {
     pub labels: Option<ResourceLabelFilterInput>,
 }
 
+impl ResourceSelector {
+    /// Every resource of `r#type`.
+    pub fn of_type(r#type: TypeRef) -> Self {
+        Self {
+            r#type: Some(r#type),
+            ..Default::default()
+        }
+    }
+
+    /// Resources of `r#type` whose names match a SQL `LIKE` pattern.
+    pub fn name_pattern(r#type: TypeRef, pattern: impl Into<String>) -> Self {
+        Self {
+            name: Some(pattern.into()),
+            ..Self::of_type(r#type)
+        }
+    }
+
+    /// One resource of `r#type`, by id.
+    pub fn id_of_type(r#type: TypeRef, id: ResourceID) -> Self {
+        Self {
+            id: Some(id),
+            ..Self::of_type(r#type)
+        }
+    }
+
+    /// One resource of any type, by id.
+    pub fn any_type_id(id: ResourceID) -> Self {
+        Self {
+            id: Some(id),
+            ..Default::default()
+        }
+    }
+
+    /// Resources of any type whose names match a SQL `LIKE` pattern.
+    pub fn any_type_name_pattern(pattern: impl Into<String>) -> Self {
+        Self {
+            name: Some(pattern.into()),
+            ..Default::default()
+        }
+    }
+
+    /// One selector per id, all of `r#type`.
+    ///
+    /// The wire is scalar, so a batch of ids fans out here and is folded back
+    /// into a single `ExactIds` row by the facade's coalescer.
+    pub fn ids_of_type(r#type: &TypeRef, ids: impl IntoIterator<Item = ResourceID>) -> Vec<Self> {
+        ids.into_iter()
+            .map(|id| Self::id_of_type(r#type.clone(), id))
+            .collect()
+    }
+
+    /// One selector per id, spanning every type.
+    pub fn any_type_ids(ids: impl IntoIterator<Item = ResourceID>) -> Vec<Self> {
+        ids.into_iter().map(Self::any_type_id).collect()
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Widens a manifest-authored ODF selector, whose `type` is required, into the
 /// optional-type form. Destructured so a field added upstream breaks
 /// compilation rather than being silently dropped.

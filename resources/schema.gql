@@ -3911,13 +3911,6 @@ type Resource {
 
 scalar ResourceAnnotations
 
-"""
-Every resource type, optionally narrowed by one query applying to all.
-"""
-input ResourceAnyTypeScopeInput {
-	query: ResourceQueryInput
-}
-
 type ResourceApplyChange {
 	kind: ResourceApplyChangeKind!
 	path: String!
@@ -4265,15 +4258,6 @@ type ResourcePhaseCounts {
 }
 
 """
-Exactly one way to narrow a search.
-"""
-input ResourceQueryInput @oneOf {
-	exactNames: [ResourceName!]
-	exactIds: [ResourceID!]
-	namePattern: String
-}
-
-"""
 Reference to exactly one resource, mirroring the ODF `ResourceRef`.
 
 Not a `oneOf`: ODF allows `id` and `name` together as a consistency
@@ -4310,11 +4294,26 @@ type ResourceSchemaMismatchProblem {
 }
 
 """
-Exactly one way to scope a search or listing by resource type.
+Matches zero or many resources, mirroring the ODF `ResourceSelector`.
+
+Several selectors in one call act as a logical OR, which is what lets a
+single call span resource types. Every field is optional: a selector with no
+`type` spans every type, and one narrowing by nothing matches all of them.
 """
-input ResourceScopeInput @oneOf {
-	anyType: ResourceAnyTypeScopeInput
-	types: [ResourceTypeQueryInput!]
+input ResourceSelectorInput {
+	account: AccountRefInput
+	"""
+	Canonical selector (`variablesets`), alias (`vs`), ODF type name
+	(`VariableSet`), or full schema URI. `null` spans every type.
+	"""
+	type: ResourceTypeSelectorInput
+	id: ResourceID
+	"""
+	Name pattern in SQL `LIKE` format, per the ODF schema — `%` and `_` are
+	wildcards. A pattern with no wildcards matches that name exactly.
+	"""
+	name: String
+	labels: ResourceLabelFilterInput
 }
 
 scalar ResourceSelectorName
@@ -4384,14 +4383,6 @@ type ResourceTypeDescriptor {
 	listColumns: [ResourceListColumnDescriptor!]!
 }
 
-"""
-One resource type in a scope, with the query narrowing it.
-"""
-input ResourceTypeQueryInput {
-	resourceType: ResourceTypeSelectorInput!
-	query: ResourceQueryInput
-}
-
 input ResourceTypeSelectorInput {
 	selector: ResourceTypeSelectorRaw!
 }
@@ -4450,11 +4441,11 @@ type Resources {
 	"""
 	Returns resources of the specified resource type
 	"""
-	listByResourceType(resourceType: ResourceTypeSelectorInput!, account: AccountRefInput, labelFilter: ResourceLabelFilterInput, query: ResourceQueryInput, page: Int, perPage: Int): ResourceListOutcome!
+	listByResourceType(selectors: [ResourceSelectorInput!]!, account: AccountRefInput, labelFilter: ResourceLabelFilterInput, page: Int, perPage: Int): ResourceListOutcome!
 	"""
 	Returns resource handles of the specified resource type
 	"""
-	listHandlesByResourceType(resourceType: ResourceTypeSelectorInput!, account: AccountRefInput, labelFilter: ResourceLabelFilterInput, page: Int, perPage: Int): ResourceHandleListOutcome!
+	listHandlesByResourceType(selectors: [ResourceSelectorInput!]!, account: AccountRefInput, labelFilter: ResourceLabelFilterInput, page: Int, perPage: Int): ResourceHandleListOutcome!
 	"""
 	Searches resource handles across the specified exact resource types
 	"""
@@ -4462,7 +4453,7 @@ type Resources {
 	"""
 	Returns resources across all resource types
 	"""
-	listAll(account: AccountRefInput, labelFilter: ResourceLabelFilterInput, scope: ResourceScopeInput, page: Int, perPage: Int): ResourceListAllOutcome!
+	listAll(account: AccountRefInput, labelFilter: ResourceLabelFilterInput, selectors: [ResourceSelectorInput!], page: Int, perPage: Int): ResourceListAllOutcome!
 	"""
 	Returns resource handles across all resource types
 	"""
@@ -4565,7 +4556,7 @@ enum SearchEntityName {
 }
 
 input SearchResourceHandlesInput {
-	scope: ResourceScopeInput!
+	selectors: [ResourceSelectorInput!]!
 	account: AccountRefInput
 	labelFilter: ResourceLabelFilterInput
 }

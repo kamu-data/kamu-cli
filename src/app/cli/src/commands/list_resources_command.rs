@@ -276,17 +276,16 @@ impl ListResourcesCommand {
 
     async fn list_resources_by_selector(
         &self,
-        selector_name: &kamu_resources::ResourceSelectorName,
+        schema: &kamu_resources::TypeUri,
         query: Option<&ResourceQuery>,
     ) -> Result<Vec<ResourceSummaryView>, CLIError> {
         if let Some(max_results) = self.max_results {
             self.resource_facade
                 .list(kamu_resources_facade::ListResourcesRequest {
-                    raw_type_selector: selector_name.into(),
+                    selectors: selectors_for_type(schema, query),
                     account: None,
                     pagination: PaginationOpts::from_max_results(max_results.get()),
                     label_filter: self.label_filter.clone(),
-                    query: query.cloned(),
                 })
                 .await
                 .map_err(Into::into)
@@ -294,11 +293,10 @@ impl ListResourcesCommand {
             collect_all_pages(RESOURCE_PAGE_SIZE, |pagination| async move {
                 self.resource_facade
                     .list(kamu_resources_facade::ListResourcesRequest {
-                        raw_type_selector: selector_name.into(),
+                        selectors: selectors_for_type(schema, query),
                         account: None,
                         pagination,
                         label_filter: self.label_filter.clone(),
-                        query: query.cloned(),
                     })
                     .await
                     .map_err(Into::into)
@@ -309,7 +307,7 @@ impl ListResourcesCommand {
 
     async fn list_all_resources(
         &self,
-        scope: &kamu_resources_facade::RawResourceScope,
+        selectors: &[kamu_resources::ResourceSelector],
     ) -> Result<Vec<ResourceSummaryView>, CLIError> {
         if let Some(max_results) = self.max_results {
             self.resource_facade
@@ -317,7 +315,7 @@ impl ListResourcesCommand {
                     account: None,
                     label_filter: self.label_filter.clone(),
                     pagination: PaginationOpts::from_max_results(max_results.get()),
-                    scope: scope.clone(),
+                    selectors: selectors.to_vec(),
                 })
                 .await
                 .map_err(Into::into)
@@ -328,7 +326,7 @@ impl ListResourcesCommand {
                         account: None,
                         label_filter: self.label_filter.clone(),
                         pagination,
-                        scope: scope.clone(),
+                        selectors: selectors.to_vec(),
                     })
                     .await
                     .map_err(Into::into)
@@ -341,39 +339,32 @@ impl ListResourcesCommand {
         match &self.scope {
             ListResourcesScope::ByType(type_descriptor, query) => {
                 let mut resources = self
-                    .list_resources_by_selector(&type_descriptor.canonical_selector, query.as_ref())
+                    .list_resources_by_selector(&type_descriptor.schema, query.as_ref())
                     .await?;
                 resources.sort_by(|lhs, rhs| lhs.name.cmp(&rhs.name));
                 Ok(resources)
             }
             ListResourcesScope::Types(type_queries) => {
-                let scope = kamu_resources_facade::RawResourceScope::Types(
-                    type_queries
-                        .iter()
-                        .map(|(type_descriptor, query)| {
-                            kamu_resources_facade::RawResourceTypeQuery {
-                                raw_type_selector: (&type_descriptor.canonical_selector).into(),
-                                query: query.clone(),
-                            }
-                        })
-                        .collect(),
-                );
-                self.load_generic_resources(&scope).await
+                let selectors = type_queries
+                    .iter()
+                    .flat_map(|(type_descriptor, query)| {
+                        selectors_for_type(&type_descriptor.schema, query.as_ref())
+                    })
+                    .collect::<Vec<_>>();
+                self.load_generic_resources(&selectors).await
             }
             ListResourcesScope::All(query) => {
-                self.load_generic_resources(&kamu_resources_facade::RawResourceScope::AnyType(
-                    query.clone(),
-                ))
-                .await
+                self.load_generic_resources(&any_type_selectors(query.as_ref()))
+                    .await
             }
         }
     }
 
     async fn load_generic_resources(
         &self,
-        scope: &kamu_resources_facade::RawResourceScope,
+        selectors: &[kamu_resources::ResourceSelector],
     ) -> Result<Vec<ResourceSummaryView>, CLIError> {
-        let mut resources = self.list_all_resources(scope).await?;
+        let mut resources = self.list_all_resources(selectors).await?;
         resources.sort_by(|lhs, rhs| {
             lhs.name
                 .cmp(&rhs.name)
@@ -609,6 +600,87 @@ enum ResourceGenericColumn {
     Generation,
     ObservedGeneration,
     Age,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A selector for one type, carrying whatever narrows it.
+///
+/// `ResourceQuery`'s exact-name and exact-id list forms cannot appear here: the
+/// CLI only reaches this path for `all`-style and pattern selectors, exact refs
+/// having gone through the ref API instead.
+fn selectors_for_type(
+    schema: &kamu_resources::TypeUri,
+    query: Option<&kamu_resources::ResourceQuery>,
+) -> Vec<kamu_resources::ResourceSelector> {
+    selectors_for_query(Some(schema), query)
+}
+
+/// The same, spanning every type.
+fn any_type_selectors(
+    query: Option<&kamu_resources::ResourceQuery>,
+) -> Vec<kamu_resources::ResourceSelector> {
+    selectors_for_query(None, query)
+}
+
+/// Fans a query out into scalar, ODF-shaped selectors — one per exact id or
+/// name, since a selector carries a single `id` and a single `name` pattern.
+/// The facade's coalescer folds them back into one repository row per type.
+///
+/// The match is exhaustive on purpose: a variant falling through would widen
+/// the selector to the whole type rather than narrowing it.
+fn selectors_for_query(
+    schema: Option<&kamu_resources::TypeUri>,
+    query: Option<&kamu_resources::ResourceQuery>,
+) -> Vec<kamu_resources::ResourceSelector> {
+    let base = || kamu_resources::ResourceSelector {
+        r#type: schema.map(|schema| schema.clone().into()),
+        ..Default::default()
+    };
+
+    let Some(query) = query else {
+        return vec![base()];
+    };
+
+    match query {
+        kamu_resources::ResourceQuery::NamePattern(pattern) => {
+            vec![kamu_resources::ResourceSelector {
+                name: Some(pattern.clone()),
+                ..base()
+            }]
+        }
+        kamu_resources::ResourceQuery::ExactIds(ids) => ids
+            .iter()
+            .map(|id| kamu_resources::ResourceSelector {
+                id: Some(*id),
+                ..base()
+            })
+            .collect(),
+        // An exact name is a wildcard-free `LIKE` pattern: a selector's `name`
+        // is a pattern by ODF definition, so the literal must be escaped rather
+        // than passed through.
+        kamu_resources::ResourceQuery::ExactNames(names) => names
+            .iter()
+            .map(|name| kamu_resources::ResourceSelector {
+                name: Some(sql_like_escape_literal(name.as_str())),
+                ..base()
+            })
+            .collect(),
+    }
+}
+
+/// Escapes a literal so it matches only itself when used as a `LIKE` pattern.
+fn sql_like_escape_literal(literal: &str) -> String {
+    let mut escaped = String::with_capacity(literal.len());
+    for ch in literal.chars() {
+        if matches!(ch, '%' | '_' | '\\') {
+            escaped.push('\\');
+        }
+        escaped.push(ch);
+    }
+    escaped
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

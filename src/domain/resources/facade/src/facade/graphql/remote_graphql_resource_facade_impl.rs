@@ -227,11 +227,10 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
         use cynic_api::operations::list as Operation;
 
         let variables = cynic_api::variables::ListByResourceTypeVariables::new(
-            &request.raw_type_selector,
+            &request.selectors,
             request.account.as_ref(),
             request.label_filter.as_ref(),
             request.pagination,
-            request.query.as_ref(),
         )
         .map_err(ListResourcesError::Internal)?;
 
@@ -250,11 +249,10 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
         use cynic_api::operations::list as Operation;
 
         let variables = cynic_api::variables::ListByResourceTypeVariables::new(
-            &request.raw_type_selector,
+            &request.selectors,
             request.account.as_ref(),
             request.label_filter.as_ref(),
             request.pagination,
-            None,
         )
         .map_err(ListResourcesError::Internal)?;
 
@@ -295,7 +293,7 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
             request.account.as_ref(),
             request.label_filter.as_ref(),
             request.pagination,
-            Some(&request.scope),
+            &request.selectors,
         )
         .map_err(ListAllResourcesError::Internal)?;
 
@@ -317,7 +315,8 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
             request.account.as_ref(),
             request.label_filter.as_ref(),
             request.pagination,
-            None,
+            // `list_all_handles` has no scope of its own: it spans every type.
+            &[],
         )
         .map_err(ListAllResourcesError::Internal)?;
 

@@ -8,12 +8,8 @@
 // by the Apache License, Version 2.0.
 
 use database_common::PaginationOpts;
-use kamu_resources_facade::{
-    ListAllResourceHandlesRequest,
-    ListAllResourcesRequest,
-    RawResourceScope,
-    RawResourceTypeQuery,
-};
+use kamu_resources::ResourceSelector;
+use kamu_resources_facade::{ListAllResourceHandlesRequest, ListAllResourcesRequest};
 use pretty_assertions::assert_eq;
 
 use crate::contract_test;
@@ -82,7 +78,7 @@ pub async fn list_all_summaries_across_supported_resource_types(h: &impl FacadeC
             account: None,
             label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
-            scope: RawResourceScope::AnyType(None),
+            selectors: vec![ResourceSelector::default()],
         })
         .await
         .unwrap();
@@ -110,8 +106,9 @@ contract_test!(
     super::list_all_narrowed_by_scope_query
 );
 
-/// `list_all` gained a scope: it can span a subset of types, each with its own
-/// query. Local and remote must agree, since the query travels over GraphQL.
+/// `list_all` takes selectors: it can span a subset of types, each with its own
+/// name pattern. Local and remote must agree, since selectors travel over
+/// GraphQL.
 pub async fn list_all_narrowed_by_scope_query(h: &impl FacadeContractHarness) {
     for name in ["scoped-app-var", "scoped-db-var"] {
         apply_manifest_and_get_id(
@@ -128,22 +125,22 @@ pub async fn list_all_narrowed_by_scope_query(h: &impl FacadeContractHarness) {
     )
     .await;
 
-    let list_all = async |scope: RawResourceScope| {
+    let list_all = async |selectors: Vec<ResourceSelector>| {
         h.facade_for(TestAccount::Alice)
             .list_all(ListAllResourcesRequest {
                 account: None,
                 label_filter: None,
                 pagination: PaginationOpts::from_max_results(1000),
-                scope,
+                selectors,
             })
             .await
             .unwrap()
     };
 
-    // A query spanning every type.
-    let any_type = list_all(RawResourceScope::AnyType(Some(
-        kamu_resources::ResourceQuery::NamePattern("scoped-app-%".to_string()),
-    )))
+    // A type-less selector spans every type.
+    let any_type = list_all(vec![ResourceSelector::any_type_name_pattern(
+        "scoped-app-%",
+    )])
     .await;
     assert_eq!(
         summary_keys(any_type),
@@ -159,11 +156,10 @@ pub async fn list_all_narrowed_by_scope_query(h: &impl FacadeContractHarness) {
         ]
     );
 
-    // Restricting to one type drops the other, even without a query.
-    let one_type = list_all(RawResourceScope::one_type(
+    // Restricting to one type drops the other, even unnarrowed.
+    let one_type = list_all(vec![ResourceSelector::of_type(
         VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-        None,
-    ))
+    )])
     .await;
     assert_eq!(
         summary_keys(one_type),
@@ -179,22 +175,19 @@ pub async fn list_all_narrowed_by_scope_query(h: &impl FacadeContractHarness) {
         ]
     );
 
-    // Each type carries its own query: swapping them must change the result,
-    // proving the pairing is positional rather than "any query, any type".
-    let per_type = list_all(RawResourceScope::Types(vec![
-        RawResourceTypeQuery {
-            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-            query: Some(kamu_resources::ResourceQuery::NamePattern(
-                "scoped-db-%".to_string(),
-            )),
-        },
-        RawResourceTypeQuery {
-            raw_type_selector: SECRET_SET_CANONICAL_SELECTOR.parse().unwrap(),
-            query: Some(kamu_resources::ResourceQuery::NamePattern(
-                "scoped-app-%".to_string(),
-            )),
-        },
-    ]))
+    // Each selector carries its own pattern: swapping them must change the
+    // result, proving the pairing is per-selector rather than "any pattern,
+    // any type".
+    let per_type = list_all(vec![
+        ResourceSelector::name_pattern(
+            VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            "scoped-db-%",
+        ),
+        ResourceSelector::name_pattern(
+            SECRET_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            "scoped-app-%",
+        ),
+    ])
     .await;
     assert_eq!(
         summary_keys(per_type),
@@ -210,11 +203,8 @@ pub async fn list_all_narrowed_by_scope_query(h: &impl FacadeContractHarness) {
         ]
     );
 
-    // A query that matches nothing yields an empty listing, not an error.
-    let no_match = list_all(RawResourceScope::AnyType(Some(
-        kamu_resources::ResourceQuery::NamePattern("nomatch-%".to_string()),
-    )))
-    .await;
+    // A pattern that matches nothing yields an empty listing, not an error.
+    let no_match = list_all(vec![ResourceSelector::any_type_name_pattern("nomatch-%")]).await;
     assert!(summary_keys(no_match).is_empty());
 }
 
@@ -305,7 +295,7 @@ pub async fn test_list_all_supports_pagination(h: &impl FacadeContractHarness) {
             account: None,
             label_filter: None,
             pagination: PaginationOpts::from_page(0, 2),
-            scope: RawResourceScope::AnyType(None),
+            selectors: vec![ResourceSelector::default()],
         })
         .await
         .unwrap();
@@ -314,7 +304,7 @@ pub async fn test_list_all_supports_pagination(h: &impl FacadeContractHarness) {
             account: None,
             label_filter: None,
             pagination: PaginationOpts::from_page(1, 2),
-            scope: RawResourceScope::AnyType(None),
+            selectors: vec![ResourceSelector::default()],
         })
         .await
         .unwrap();
@@ -363,7 +353,7 @@ pub async fn test_list_all_empty_account_returns_empty(h: &impl FacadeContractHa
             account: None,
             label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
-            scope: RawResourceScope::AnyType(None),
+            selectors: vec![ResourceSelector::default()],
         })
         .await
         .unwrap();

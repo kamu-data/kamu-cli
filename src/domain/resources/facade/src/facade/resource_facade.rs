@@ -16,11 +16,10 @@ use domain::{
     ResourceHandle,
     ResourceID,
     ResourceLabelFilterInput,
-    ResourceQuery,
     ResourceRef,
+    ResourceSelector,
     ResourceSummaryView,
     ResourceTypeDescriptor,
-    ResourceTypeSelectorRaw,
     ResourcesSummary,
 };
 use kamu_resources as domain;
@@ -221,19 +220,20 @@ pub enum ResourceManifestFormat {
 
 #[derive(Debug, Clone)]
 pub struct ListResourcesRequest {
-    pub raw_type_selector: ResourceTypeSelectorRaw,
+    /// Which resources to span. Several selectors act as a logical OR; an empty
+    /// list matches nothing.
+    pub selectors: Vec<ResourceSelector>,
     pub account: Option<ResourceAccountRef>,
     pub pagination: PaginationOpts,
     pub label_filter: Option<ResourceLabelFilterInput>,
-    /// Narrows the listing within the type; `None` lists every resource of it.
-    pub query: Option<ResourceQuery>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
 pub struct ListResourceHandlesRequest {
-    pub raw_type_selector: ResourceTypeSelectorRaw,
+    /// See [`ListResourcesRequest::selectors`].
+    pub selectors: Vec<ResourceSelector>,
     pub account: Option<ResourceAccountRef>,
     pub label_filter: Option<ResourceLabelFilterInput>,
     pub pagination: PaginationOpts,
@@ -243,46 +243,11 @@ pub struct ListResourceHandlesRequest {
 
 #[derive(Debug, Clone)]
 pub struct SearchResourceHandlesRequest {
-    pub scope: RawResourceScope,
+    /// See [`ListResourcesRequest::selectors`].
+    pub selectors: Vec<ResourceSelector>,
     pub account: Option<ResourceAccountRef>,
     pub label_filter: Option<ResourceLabelFilterInput>,
     pub pagination: PaginationOpts,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// One resource type in a [`RawResourceScope`], with the query narrowing it.
-#[derive(Debug, Clone)]
-pub struct RawResourceTypeQuery {
-    pub raw_type_selector: ResourceTypeSelectorRaw,
-    pub query: Option<ResourceQuery>,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// The facade-level twin of [`kamu_resources::ResourceScope`], carrying raw
-/// type selectors (`vs`) rather than resolved schemas — the facade is where
-/// selectors are resolved.
-#[derive(Debug, Clone)]
-pub enum RawResourceScope {
-    /// No type filter — matches every registered resource type, optionally
-    /// narrowed by one query applying to all of them.
-    AnyType(Option<ResourceQuery>),
-    /// Non-empty by construction: use `AnyType` instead of an empty list.
-    Types(Vec<RawResourceTypeQuery>),
-}
-
-impl RawResourceScope {
-    /// The common single-type case, with or without a query.
-    pub fn one_type(
-        raw_type_selector: ResourceTypeSelectorRaw,
-        query: Option<ResourceQuery>,
-    ) -> Self {
-        Self::Types(vec![RawResourceTypeQuery {
-            raw_type_selector,
-            query,
-        }])
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -301,9 +266,9 @@ pub struct ListAllResourcesRequest {
     /// Resolved against every registered schema.
     pub label_filter: Option<ResourceLabelFilterInput>,
     pub pagination: PaginationOpts,
-    /// Which types to span and how to narrow each. Defaults to every type,
-    /// unnarrowed.
-    pub scope: RawResourceScope,
+    /// See [`ListResourcesRequest::selectors`]. A single type-less, unnarrowed
+    /// selector spans every type.
+    pub selectors: Vec<ResourceSelector>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

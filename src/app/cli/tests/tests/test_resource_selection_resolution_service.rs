@@ -51,31 +51,57 @@ const NAME_APP_PATTERN: &str = "app-%";
 const NAME_MISSING_PATTERN: &str = "missing-%";
 const RESOURCE_DB_CREDS: &str = "db-creds";
 
-/// The single query a scope carries, for scopes that apply one uniformly.
-fn scope_query(scope: &kamu_resources_facade::RawResourceScope) -> &kamu_resources::ResourceQuery {
-    match scope {
-        kamu_resources_facade::RawResourceScope::AnyType(query) => {
-            query.as_ref().expect("expected a query")
-        }
-        kamu_resources_facade::RawResourceScope::Types(type_queries) => type_queries
-            .first()
-            .expect("expected at least one type")
-            .query
-            .as_ref()
-            .expect("expected a query"),
-    }
+/// The single name pattern the selectors carry, for requests that apply one
+/// uniformly.
+fn selectors_name_pattern(selectors: &[kamu_resources::ResourceSelector]) -> &str {
+    let mut patterns = selectors
+        .iter()
+        .map(|selector| selector.name.as_deref().expect("expected a name pattern"))
+        .collect::<Vec<_>>();
+    patterns.dedup();
+    assert_eq!(patterns.len(), 1, "expected one uniform name pattern");
+    patterns[0]
 }
 
-fn raw_selector_strings(scope: &kamu_resources_facade::RawResourceScope) -> Vec<&str> {
-    match scope {
-        kamu_resources_facade::RawResourceScope::AnyType(_) => {
-            panic!("expected a concrete type list, got AnyType")
-        }
-        kamu_resources_facade::RawResourceScope::Types(type_queries) => type_queries
-            .iter()
-            .map(|entry| entry.raw_type_selector.as_str())
-            .collect(),
-    }
+/// The name pattern each selector carries, in order.
+fn selectors_name_pattern_each(selectors: &[kamu_resources::ResourceSelector]) -> Vec<&str> {
+    selectors
+        .iter()
+        .map(|selector| selector.name.as_deref().expect("expected a name pattern"))
+        .collect()
+}
+
+/// The type each selector names, in order. Panics on a type-less selector, so a
+/// test asserting concrete types cannot silently pass on an any-type request.
+fn selector_type_strings(selectors: &[kamu_resources::ResourceSelector]) -> Vec<&str> {
+    selectors
+        .iter()
+        .map(|selector| {
+            selector
+                .r#type
+                .as_ref()
+                .expect("expected a concrete type, got a type-less selector")
+                .as_ref()
+        })
+        .collect()
+}
+
+/// Asserts every selector spans all types.
+fn assert_any_type(selectors: &[kamu_resources::ResourceSelector]) {
+    assert!(
+        selectors.iter().all(|selector| selector.r#type.is_none()),
+        "expected type-less selectors, got {selectors:?}"
+    );
+}
+
+/// The ids the selectors carry, in order. The wire is scalar, so a batch of ids
+/// arrives as one selector each and the facade's coalescer folds them back into
+/// a single row.
+fn selector_ids(selectors: &[kamu_resources::ResourceSelector]) -> Vec<ResourceID> {
+    selectors
+        .iter()
+        .map(|selector| selector.id.expect("expected an id"))
+        .collect()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -122,13 +148,14 @@ async fn resolves_exact_type_name_patterns_via_search() {
 
     let requests = search_requests.lock().unwrap();
     assert_eq!(requests.len(), 1);
+    // Selectors carry the resolved schema URI, not the CLI's short selector.
     assert_eq!(
-        raw_selector_strings(&requests[0].scope),
-        vec![VARIABLESETS_NAME]
+        selector_type_strings(&requests[0].selectors),
+        vec![variableset_type_uri().as_str()]
     );
-    assert_matches!(
-        scope_query(&requests[0].scope),
-        kamu_resources::ResourceQuery::NamePattern(p) if p == NAME_APP_PATTERN
+    assert_eq!(
+        selectors_name_pattern(&requests[0].selectors),
+        NAME_APP_PATTERN
     );
 }
 
@@ -253,14 +280,8 @@ async fn exact_any_type_searches_across_every_supported_type() {
 
     let requests = search_requests.lock().unwrap();
     assert_eq!(requests.len(), 1);
-    assert_matches!(
-        &requests[0].scope,
-        kamu_resources_facade::RawResourceScope::AnyType(_)
-    );
-    assert_matches!(
-        scope_query(&requests[0].scope),
-        kamu_resources::ResourceQuery::ExactIds(ids) if ids == &vec![id]
-    );
+    assert_any_type(&requests[0].selectors);
+    assert_eq!(selector_ids(&requests[0].selectors), vec![id]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -368,14 +389,13 @@ async fn resolves_any_type_exact_ref_across_every_supported_type() {
 
     let requests = search_requests.lock().unwrap();
     assert_eq!(requests.len(), 1);
-    assert_matches!(
-        &requests[0].scope,
-        kamu_resources_facade::RawResourceScope::AnyType(_)
-    );
-    assert_matches!(
-        scope_query(&requests[0].scope),
-        kamu_resources::ResourceQuery::ExactNames(names)
-            if names == &vec![RESOURCE_DB_CREDS.parse::<kamu_resources::ResourceName>().unwrap()]
+    assert_any_type(&requests[0].selectors);
+    // An exact any-type name travels as a wildcard-free `LIKE` pattern: the
+    // selector's `name` is a pattern by ODF definition, so the literal is
+    // escaped rather than widened.
+    assert_eq!(
+        selectors_name_pattern(&requests[0].selectors),
+        RESOURCE_DB_CREDS
     );
 }
 
@@ -443,13 +463,10 @@ async fn resolves_any_type_name_pattern_via_a_single_search() {
 
     let requests = search_requests.lock().unwrap();
     assert_eq!(requests.len(), 1);
-    assert_matches!(
-        &requests[0].scope,
-        kamu_resources_facade::RawResourceScope::AnyType(_)
-    );
-    assert_matches!(
-        scope_query(&requests[0].scope),
-        kamu_resources::ResourceQuery::NamePattern(p) if p == NAME_APP_PATTERN
+    assert_any_type(&requests[0].selectors);
+    assert_eq!(
+        selectors_name_pattern(&requests[0].selectors),
+        NAME_APP_PATTERN
     );
     assert_eq!(
         requests[0].label_filter.as_ref(),
@@ -800,11 +817,18 @@ async fn narrows_exact_selectors_by_the_label_filter() {
     assert_eq!(result.targets[0].id, matching_id);
     assert_eq!(result.ignored_selectors.len(), 1);
 
+    // A label filter must reach the facade. The ref API carries none, so exact
+    // names fall back to escaped, wildcard-free patterns here — otherwise the
+    // filter would be silently dropped and non-matching resources returned.
     let requests = search_requests.lock().unwrap();
     assert_eq!(requests.len(), 1);
     assert_eq!(
         requests[0].label_filter.as_ref(),
         Some(&environment_label_filter())
+    );
+    assert_eq!(
+        selectors_name_pattern_each(&requests[0].selectors),
+        vec!["vars-a", "vars-b"]
     );
 }
 
@@ -821,7 +845,8 @@ async fn leaves_exact_selectors_untouched_without_a_label_filter() {
     };
 
     let mut harness = ResourceSelectionResolutionHarness::new();
-    harness.expect_search_handles(1, vec![handle], Arc::new(Mutex::new(Vec::new())));
+    let get_requests = Arc::new(Mutex::new(Vec::new()));
+    harness.expect_get_handles(1, vec![handle], Arc::clone(&get_requests));
 
     let result = harness
         .service
@@ -841,6 +866,19 @@ async fn leaves_exact_selectors_untouched_without_a_label_filter() {
         .unwrap();
 
     assert_eq!(result.targets.len(), 1);
+
+    // Without a label filter an exact name resolves through the ref API, which
+    // keeps the whole batch in one request rather than one `ILIKE` row per
+    // name.
+    let requests = get_requests.lock().unwrap();
+    assert_eq!(requests.len(), 1);
+    assert_eq!(
+        requests[0]
+            .iter()
+            .map(|resource_ref| resource_ref.name.as_ref().unwrap().as_str())
+            .collect::<Vec<_>>(),
+        vec!["vars-a"]
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -912,6 +950,35 @@ impl ResourceSelectionResolutionHarness {
             .returning(move |request| {
                 requests.lock().unwrap().push(request);
                 Ok(handles.clone())
+            });
+    }
+
+    /// Exact names without a label filter resolve through the ref API, which
+    /// keeps an N-name batch as a single request.
+    fn expect_get_handles(
+        &mut self,
+        times: usize,
+        handles: Vec<ResourceHandle>,
+        requests: Arc<Mutex<Vec<Vec<kamu_resources::ResourceRef>>>>,
+    ) {
+        self.facade
+            .expect_get_handles()
+            .times(times)
+            .returning(move |resource_refs| {
+                requests.lock().unwrap().push(resource_refs);
+                Ok(kamu_resources_facade::BatchResourceResponse {
+                    successes: handles
+                        .iter()
+                        .enumerate()
+                        .map(|(request_index, handle)| {
+                            kamu_resources_facade::BatchResourceSuccess {
+                                request_index,
+                                item: handle.clone(),
+                            }
+                        })
+                        .collect(),
+                    problems: Vec::new(),
+                })
             });
     }
 

@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use database_common::PaginationOpts;
-use kamu_resources::{ApplyResourceOutcome, ResourceRef, TypeName};
+use kamu_resources::{ApplyResourceOutcome, ResourceRef, ResourceSelector, TypeName};
 use kamu_resources_facade::{
     ApplyManifestRequest,
     DeleteResourceError,
@@ -103,14 +103,15 @@ pub async fn test_delete_by_name(h: &impl FacadeContractHarness) {
     // Resource must not appear in list
     let list = facade
         .list(ListResourcesRequest {
-            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            selectors: vec![ResourceSelector::of_type(
+                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            )],
             account: None,
             pagination: PaginationOpts {
                 limit: 1000,
                 offset: 0,
             },
             label_filter: None,
-            query: None,
         })
         .await
         .unwrap();

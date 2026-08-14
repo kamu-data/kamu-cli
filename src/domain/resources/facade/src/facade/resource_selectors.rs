@@ -216,6 +216,12 @@ pub enum UnrepresentableScopeError {
         "A type-less selector may narrow by only one of `id`, `name`, or `name` pattern at a time"
     )]
     AnyTypeMultipleQueryModes,
+
+    /// `list` renders typed columns through one type's dispatcher, so it cannot
+    /// span types the way the other listings can. Lifted when `list` becomes a
+    /// multi-type `search`.
+    #[error("This operation requires exactly one typed selector, but got {count}")]
+    SingleTypeRequired { count: usize },
 }
 
 /// The distinct query modes seen for one schema, deduplicated.
