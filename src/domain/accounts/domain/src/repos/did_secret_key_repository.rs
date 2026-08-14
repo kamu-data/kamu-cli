@@ -8,7 +8,6 @@
 // by the Apache License, Version 2.0.
 
 use internal_error::InternalError;
-use thiserror::Error;
 
 use crate::{DidEntity, DidSecretKey};
 
@@ -37,15 +36,32 @@ pub trait DidSecretKeyRepository: Send + Sync {
 // Errors
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Error, Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum SaveDidSecretKeyError {
+    #[error(transparent)]
+    Duplicate(#[from] DidSecretKeyDuplicateError),
+
     #[error(transparent)]
     Internal(#[from] InternalError),
 }
 
+#[derive(thiserror::Error, Debug)]
+#[error("Entity's DID secret key already exists: '{entity:?}'")]
+pub struct DidSecretKeyDuplicateError {
+    pub entity: DidEntity<'static>,
+}
+
+impl DidSecretKeyDuplicateError {
+    pub fn new(entity: &DidEntity<'_>) -> Self {
+        Self {
+            entity: entity.clone().into_owned(),
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Error, Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum GetDidSecretKeyError {
     #[error(transparent)]
     NotFound(#[from] DidSecretKeyNotFoundError),
@@ -54,7 +70,7 @@ pub enum GetDidSecretKeyError {
     Internal(#[from] InternalError),
 }
 
-#[derive(Error, Debug)]
+#[derive(thiserror::Error, Debug)]
 #[error("Entity's DID secret key not found: '{entity:?}'")]
 pub struct DidSecretKeyNotFoundError {
     pub entity: DidEntity<'static>,
@@ -76,7 +92,7 @@ impl From<DidEntity<'static>> for DidSecretKeyNotFoundError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Error, Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum DeleteDidSecretKeyError {
     #[error(transparent)]
     NotFound(#[from] DidSecretKeyNotFoundError),

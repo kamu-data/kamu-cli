@@ -55,6 +55,13 @@ pub trait AccountRepository: Send + Sync {
         account_name: &odf::AccountName,
     ) -> Result<Option<odf::AccountID>, FindAccountIdByNameError>;
 
+    async fn find_account_ids_by_unique_fields(
+        &self,
+        account_name: &odf::AccountName,
+        email: &Email,
+        provider_identity_key: &str,
+    ) -> Result<Vec<odf::AccountID>, FindAccountIdsByUniqueFieldsError>;
+
     fn search_accounts_by_name_pattern<'a>(
         &'a self,
         name_pattern: &'a str,
@@ -241,6 +248,14 @@ pub enum FindAccountIdByEmailError {
 
 #[derive(Error, Debug)]
 pub enum FindAccountIdByNameError {
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Error, Debug)]
+pub enum FindAccountIdsByUniqueFieldsError {
     #[error(transparent)]
     Internal(#[from] InternalError),
 }

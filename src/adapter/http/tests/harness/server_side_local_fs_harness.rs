@@ -18,11 +18,11 @@ use kamu_accounts::{
     Account,
     AccountConfig,
     AuthConfig,
-    DEFAULT_ACCOUNT_ID,
     DEFAULT_ACCOUNT_NAME,
     DidSecretEncryptionConfig,
     JwtAuthenticationConfig,
     PredefinedAccountsConfig,
+    TEST_ACCOUNT_ID,
 };
 use kamu_accounts_inmem::{
     InMemoryAccessTokenRepository,
@@ -118,13 +118,15 @@ impl ServerSideLocalFsHarness {
             let base_url_rest = format!("http://{}", listener.local_addr().unwrap());
 
             let predefined_accounts_config = match options.tenancy_config {
-                TenancyConfig::SingleTenant => PredefinedAccountsConfig::single_tenant(),
+                TenancyConfig::SingleTenant => {
+                    PredefinedAccountsConfig::test_single_tenant_with_id()
+                }
                 TenancyConfig::MultiTenant => {
                     let mut predefined_accounts_config = PredefinedAccountsConfig::new();
                     predefined_accounts_config.predefined.push(
-                        AccountConfig::test_config_from_name(odf::AccountName::new_unchecked(
-                            SERVER_ACCOUNT_NAME,
-                        )),
+                        AccountConfig::test_config_from_name_with_id(
+                            odf::AccountName::new_unchecked(SERVER_ACCOUNT_NAME),
+                        ),
                     );
                     predefined_accounts_config
                 }
@@ -151,8 +153,8 @@ impl ServerSideLocalFsHarness {
                 .add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
                     datasets_dir,
                 ))
-                .add::<kamu_datasets_services::DatasetLfsBuilderDatabaseBackedImpl>()
-                .add_value(kamu_datasets_services::MetadataChainDbBackedConfig::default())
+                .add::<DatasetLfsBuilderDatabaseBackedImpl>()
+                .add_value(MetadataChainDbBackedConfig::default())
                 .add_value(ServerUrlConfig::new_test(Some(&base_url_rest)))
                 .add_value(EngineConfigDatafusionEmbeddedCompaction::default())
                 .add::<CompactionPlannerImpl>()
@@ -239,10 +241,8 @@ impl ServerSideLocalFsHarness {
 impl ServerSideHarness for ServerSideLocalFsHarness {
     fn server_account_id(&self) -> odf::AccountID {
         match self.options.tenancy_config {
-            TenancyConfig::MultiTenant => {
-                odf::AccountID::new_seeded_ed25519(SERVER_ACCOUNT_NAME.as_bytes())
-            }
-            TenancyConfig::SingleTenant => DEFAULT_ACCOUNT_ID.clone(),
+            TenancyConfig::MultiTenant => odf::metadata::testing::account_id(&SERVER_ACCOUNT_NAME),
+            TenancyConfig::SingleTenant => TEST_ACCOUNT_ID.clone(),
         }
     }
 

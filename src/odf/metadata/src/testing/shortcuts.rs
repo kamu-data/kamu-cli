@@ -41,8 +41,9 @@ pub fn alias(account: &impl AsRef<str>, dataset_name: &impl AsRef<str>) -> Datas
 }
 
 pub fn account_id(name: &impl AsRef<str>) -> AccountID {
-    let name = AccountName::new_unchecked(name.as_ref());
-    AccountID::new_seeded_ed25519(name.as_bytes())
+    // NOTE: Seeding a private key from a buffer is fast
+    let key = multiformats::PrivateKey::from_bytes_padded(name.as_ref().as_bytes());
+    AccountID::from_signing_key(&key)
 }
 
 pub fn account_name(value: &impl AsRef<str>) -> AccountName {
@@ -51,9 +52,9 @@ pub fn account_name(value: &impl AsRef<str>) -> AccountName {
 
 pub fn account_id_by_maybe_name(maybe_name: &Option<AccountName>, default_name: &str) -> AccountID {
     if let Some(name) = maybe_name {
-        AccountID::new_seeded_ed25519(name.as_bytes())
+        account_id(name)
     } else {
-        AccountID::new_seeded_ed25519(default_name.as_bytes())
+        account_id(&default_name)
     }
 }
 

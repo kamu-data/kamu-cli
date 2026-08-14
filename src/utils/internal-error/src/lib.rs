@@ -11,15 +11,13 @@
 
 use std::backtrace::Backtrace;
 
-use thiserror::Error;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub type BoxedError = Box<dyn std::error::Error + Send + Sync>;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(Error, Debug)]
+#[derive(thiserror::Error, Debug)]
 #[error("Internal error")]
 pub struct InternalError {
     #[source]
@@ -149,6 +147,37 @@ where
     #[inline]
     fn context_int_err(self, context: impl Into<String>) -> Result<OK, InternalError> {
         self.int_err().map_err(|e| e.with_context(context))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub type ErrorIndex = usize;
+
+#[derive(thiserror::Error, Debug)]
+#[error("Batch operation partially failed: {failed}/{total} items")]
+pub struct BatchError<E>
+where
+    E: std::error::Error + Send + Sync + 'static,
+{
+    pub failed: usize,
+    pub total: usize,
+    pub failures: Vec<(ErrorIndex, E)>,
+}
+
+impl<E> BatchError<E>
+where
+    E: std::error::Error + Send + Sync + 'static,
+{
+    pub fn report(&self) -> String {
+        use std::fmt::Write;
+
+        let mut res = String::new();
+        writeln!(res, "{self}").unwrap();
+        for (index, err) in &self.failures {
+            writeln!(res, "  [{index}] {err}").unwrap();
+        }
+        res
     }
 }
 

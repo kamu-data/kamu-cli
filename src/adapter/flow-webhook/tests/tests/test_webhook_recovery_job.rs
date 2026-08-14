@@ -10,9 +10,8 @@
 use std::sync::Arc;
 
 use chrono::Utc;
-use dill::CatalogBuilder;
 use init_on_startup::InitOnStartup;
-use kamu_accounts::{DEFAULT_ACCOUNT_ID, DEFAULT_ACCOUNT_NAME};
+use kamu_accounts::{DEFAULT_ACCOUNT_NAME, TEST_ACCOUNT_ID};
 use kamu_adapter_flow_webhook::{WebhookTriggerStartupRecoveryJob, webhook_deliver_binding};
 use kamu_datasets::DatasetEntry;
 use kamu_datasets_services::testing::FakeDatasetEntryService;
@@ -109,7 +108,7 @@ struct WebhookRecoveryJobHarness {
 
 impl WebhookRecoveryJobHarness {
     fn new() -> Self {
-        let mut b = CatalogBuilder::new();
+        let mut b = dill::CatalogBuilder::new();
         b.add_builder(OutboxImmediateImpl::builder(
             messaging_outbox::ConsumerFilter::AllConsumers,
         ))
@@ -142,7 +141,7 @@ impl WebhookRecoveryJobHarness {
     fn register_dataset_entry(&self, dataset_id: &odf::DatasetID, dataset_name: &str) {
         self.fake_dataset_entry_service.add_entry(DatasetEntry::new(
             dataset_id.clone(),
-            DEFAULT_ACCOUNT_ID.clone(),
+            TEST_ACCOUNT_ID.clone(),
             DEFAULT_ACCOUNT_NAME.clone(),
             odf::DatasetName::new_unchecked(dataset_name),
             Utc::now(),

@@ -205,6 +205,7 @@ impl PushDatasetUseCase for PushDatasetUseCaseImpl {
                     .sync(sync_request, options.sync_options, listener)
             })
             .collect();
+        // TODO: PERF: use tokio-tasks?
         let sync_results = futures::future::join_all(futures).await;
 
         // Convert results

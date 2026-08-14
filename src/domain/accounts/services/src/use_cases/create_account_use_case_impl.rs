@@ -15,13 +15,14 @@ use email_utils::Email;
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_accounts::{
     Account,
+    AccountConfig,
     AccountLifecycleMessage,
     AccountProvider,
     AccountService,
     AccountType,
     CreateAccountError,
     CreateAccountUseCase,
-    CreateAccountUseCaseOptions,
+    CreateDerivedAccountUseCaseOptions,
     CreateMultiWalletAccountsError,
     DidEntity,
     DidSecretEncryptionConfig,
@@ -33,6 +34,7 @@ use kamu_accounts::{
 use odf::metadata::DidPkh;
 use secrecy::{ExposeSecret, SecretString};
 use time_source::SystemTimeSource;
+use tokio::try_join;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -92,27 +94,16 @@ impl CreateAccountUseCaseImpl {
         Password::try_new(random_password).int_err()
     }
 
-    async fn save_account(
-        &self,
-        account: &Account,
-        password: &Password,
-    ) -> Result<(), CreateAccountError> {
-        self.account_service.save_account(account).await?;
-
-        if account.provider == <&'static str>::from(AccountProvider::Password) {
-            self.account_service
-                .save_account_password(account, password)
-                .await?;
-        }
-
-        Ok(())
-    }
-
     async fn maybe_save_private_key(
         &self,
         account_id: &odf::AccountID,
-        key: odf::metadata::SigningKey,
+        maybe_account_key: Option<odf::metadata::SigningKey>,
     ) -> Result<(), InternalError> {
+        // No key, nothing to do
+        let Some(account_key) = maybe_account_key else {
+            return Ok(());
+        };
+
         let Some(did_secret_encryption_key) = &self.did_secret_encryption_key else {
             return Ok(());
         };
@@ -120,15 +111,33 @@ impl CreateAccountUseCaseImpl {
         use odf::metadata::AsStackString;
 
         let account_id = account_id.as_stack_string();
-        let did_secret_key =
-            DidSecretKey::try_new(&key.into(), did_secret_encryption_key.expose_secret())
-                .int_err()?;
+        let did_secret_key = DidSecretKey::try_new(
+            &account_key.into(),
+            did_secret_encryption_key.expose_secret(),
+        )
+        .int_err()?;
         let account_entity = DidEntity::new_account(account_id.as_str());
 
         self.did_secret_key_repo
             .save_did_secret_key(&account_entity, &did_secret_key)
             .await
             .int_err()
+    }
+
+    fn get_or_generate_account_key_and_id(
+        &self,
+        account_config: &AccountConfig,
+    ) -> (Option<odf::metadata::SigningKey>, odf::AccountID) {
+        if let Some(id) = account_config.get_account_id_from_config_or_private_key() {
+            // if there is an ID, we use it and the private key, if specified. ...
+            let maybe_account_key = account_config.private_key.clone().map(Into::into);
+            (maybe_account_key, id)
+        } else {
+            // ... Otherwise, create a new pair
+            let (account_key, account_id) = odf::AccountID::new_generated_ed25519();
+
+            (Some(account_key), account_id)
+        }
     }
 
     async fn notify_account_created(&self, new_account: &Account) -> Result<(), InternalError> {
@@ -153,26 +162,49 @@ impl CreateAccountUseCaseImpl {
 
 #[async_trait::async_trait]
 impl CreateAccountUseCase for CreateAccountUseCaseImpl {
-    async fn execute(
-        &self,
-        account: &Account,
-        password: &Password,
-        quiet: bool,
-    ) -> Result<Account, CreateAccountError> {
-        self.save_account(account, password).await?;
+    async fn execute(&self, account_config: &AccountConfig) -> Result<Account, CreateAccountError> {
+        let (maybe_account_key, account_id) =
+            self.get_or_generate_account_key_and_id(account_config);
 
-        if !quiet {
-            self.notify_account_created(account).await?;
-        }
+        let new_account = Account {
+            id: account_id,
+            account_name: account_config.account_name.clone(),
+            email: account_config.email.clone(),
+            display_name: account_config.get_display_name(),
+            account_type: account_config.account_type,
+            avatar_url: account_config.avatar_url.clone(),
+            registered_at: account_config
+                .registered_at
+                .unwrap_or_else(|| self.time_source.now()),
+            provider: account_config.provider.clone(),
+            provider_identity_key: account_config.provider_identity_key(),
+        };
 
-        Ok(account.clone())
+        self.account_service.save_account(&new_account).await?;
+
+        try_join!(
+            async {
+                if AccountProvider::is_password(&new_account.provider) {
+                    self.account_service
+                        .save_account_password(&new_account.id, &account_config.password)
+                        .await
+                } else {
+                    Ok(())
+                }
+            },
+            self.maybe_save_private_key(&new_account.id, maybe_account_key)
+        )?;
+
+        self.notify_account_created(&new_account).await?;
+
+        Ok(new_account)
     }
 
     async fn execute_derived(
         &self,
         creator_account: &Account,
         account_name: &odf::AccountName,
-        options: CreateAccountUseCaseOptions,
+        options: CreateDerivedAccountUseCaseOptions,
     ) -> Result<Account, CreateAccountError> {
         let email = if let Some(email) = options.email {
             email
@@ -188,7 +220,7 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
 
         let (account_key, account_id) = odf::AccountID::new_generated_ed25519();
 
-        let account = Account {
+        let new_account = Account {
             id: account_id,
             account_name: account_name.clone(),
             email,
@@ -197,16 +229,20 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
             avatar_url: options.avatar_url,
             registered_at: self.time_source.now(),
             provider: AccountProvider::Password.to_string(),
-            provider_identity_key: String::from(account_name.as_str()),
+            provider_identity_key: account_name.to_string(),
         };
 
-        self.save_account(&account, &password).await?;
-        self.maybe_save_private_key(&account.id, account_key)
-            .await?;
+        self.account_service.save_account(&new_account).await?;
 
-        self.notify_account_created(&account).await?;
+        try_join!(
+            self.account_service
+                .save_account_password(&new_account.id, &password),
+            self.maybe_save_private_key(&new_account.id, Some(account_key))
+        )?;
 
-        Ok(account)
+        self.notify_account_created(&new_account).await?;
+
+        Ok(new_account)
     }
 
     async fn execute_multi_wallet_accounts(
@@ -251,6 +287,7 @@ impl CreateAccountUseCase for CreateAccountUseCaseImpl {
         }
 
         for created_account in &created_accounts {
+            // TODO: PEFF: batch message
             self.notify_account_created(created_account).await?;
         }
 

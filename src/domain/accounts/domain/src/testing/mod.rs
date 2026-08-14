@@ -9,6 +9,8 @@
 
 mod current_account_subject_helper;
 mod mock_authentication_service;
+mod mock_messages;
 
 pub use current_account_subject_helper::*;
 pub use mock_authentication_service::*;
+pub use mock_messages::*;

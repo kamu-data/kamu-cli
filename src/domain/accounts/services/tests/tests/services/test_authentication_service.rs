@@ -21,6 +21,7 @@ use kamu_accounts_services::{
     AccessTokenServiceImpl,
     AccountServiceImpl,
     AuthenticationServiceImpl,
+    CreateAccountUseCaseImpl,
     OAuthDeviceCodeGeneratorDefault,
     OAuthDeviceCodeServiceImpl,
 };
@@ -169,6 +170,7 @@ fn make_catalog(catalog_opts: CatalogOpts) -> dill::Catalog {
     b.add::<DummyAuthenticationProviderA>()
         .add::<DummyAuthenticationProviderB>()
         .add::<AuthenticationServiceImpl>()
+        .add::<CreateAccountUseCaseImpl>()
         .add::<InMemoryAccountRepository>()
         .add::<AccountServiceImpl>()
         .add::<InMemoryDidSecretKeyRepository>()
@@ -243,11 +245,10 @@ impl AuthenticationProvider for DummyAuthenticationProviderA {
         _login_credentials_json: String,
     ) -> Result<ProviderLoginResponse, ProviderLoginError> {
         Ok(ProviderLoginResponse {
-            account_id: DEFAULT_ACCOUNT_ID.clone(),
+            account_id: Some(TEST_ACCOUNT_ID.clone()),
             account_name: DEFAULT_ACCOUNT_NAME.clone(),
             email: DUMMY_EMAIL_ADDRESS.clone(),
             display_name: String::from(DEFAULT_ACCOUNT_NAME_STR),
-            account_type: AccountType::User,
             avatar_url: None,
             provider_identity_key: String::from(DEFAULT_ACCOUNT_NAME_STR),
         })
@@ -265,11 +266,10 @@ impl AuthenticationProvider for DummyAuthenticationProviderB {
         _login_credentials_json: String,
     ) -> Result<ProviderLoginResponse, ProviderLoginError> {
         Ok(ProviderLoginResponse {
-            account_id: DEFAULT_ACCOUNT_ID.clone(),
+            account_id: Some(TEST_ACCOUNT_ID.clone()),
             account_name: DEFAULT_ACCOUNT_NAME.clone(),
             email: DUMMY_EMAIL_ADDRESS.clone(),
             display_name: String::from(DEFAULT_ACCOUNT_NAME_STR),
-            account_type: AccountType::User,
             avatar_url: None,
             provider_identity_key: String::from(DEFAULT_ACCOUNT_NAME_STR),
         })

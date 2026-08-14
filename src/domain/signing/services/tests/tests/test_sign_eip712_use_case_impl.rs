@@ -9,7 +9,6 @@
 
 use std::sync::Arc;
 
-use bon::bon;
 use crypto_eip712_utils::{Eip712TypedData, Secp256k1Signer};
 use database_common::NoOpDatabasePlugin;
 use kamu_accounts::{
@@ -64,6 +63,15 @@ const MOLECULE_DEV: &str = "molecule.dev";
 const MOLECULE_DEV_PROJECT: &str = "molecule.dev.project";
 const USER: &str = "user";
 const ADMIN: &str = "admin";
+
+const L: usize = odf::metadata::PrivateKey::SECRET_KEY_LENGTH;
+
+const MOLECULE_KEY: [u8; L] = [1; L];
+const MOLECULE_PROJECT_KEY: [u8; L] = [2; L];
+const MOLECULE_DEV_KEY: [u8; L] = [3; L];
+const MOLECULE_DEV_PROJECT_KEY: [u8; L] = [4; L];
+const USER_KEY: [u8; L] = [5; L];
+const ADMIN_KEY: [u8; L] = [6; L];
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -129,7 +137,10 @@ async fn test_execute_matrix() {
     for (subject, mock_dataset_action_authorizer, test_cases) in [
         // 1. Admin has access to all datasets / accounts
         (
-            CurrentAccountSubject::new_test_with(&ADMIN),
+            CurrentAccountSubject::logged(
+                admin_account_id(),
+                odf::AccountName::new_unchecked(ADMIN),
+            ),
             mock_dataset_action_authorizer()
                 .expect_check_read_dataset(&molecule_dataset_id(), 1, true)
                 .expect_check_read_dataset(&molecule_project_dataset_id(), 1, true)
@@ -216,7 +227,10 @@ async fn test_execute_matrix() {
         ),
         // 2. Molecule has access to own/project datasets / accounts
         (
-            CurrentAccountSubject::new_test_with(&MOLECULE),
+            CurrentAccountSubject::logged(
+                molecule_account_id(),
+                odf::AccountName::new_unchecked(MOLECULE),
+            ),
             mock_dataset_action_authorizer()
                 .expect_check_read_dataset(&molecule_dataset_id(), 1, true)
                 .expect_check_read_dataset(&molecule_project_dataset_id(), 1, true)
@@ -303,7 +317,10 @@ async fn test_execute_matrix() {
         ),
         // 3. Molecule.dev has access to own/project datasets / accounts
         (
-            CurrentAccountSubject::new_test_with(&MOLECULE_DEV),
+            CurrentAccountSubject::logged(
+                molecule_dev_account_id(),
+                odf::AccountName::new_unchecked(MOLECULE_DEV),
+            ),
             mock_dataset_action_authorizer()
                 .expect_check_read_dataset(&molecule_dataset_id(), 1, false)
                 .expect_check_read_dataset(&molecule_project_dataset_id(), 1, false)
@@ -390,7 +407,7 @@ async fn test_execute_matrix() {
         ),
         // 4. User has access to their own datasets / accounts
         (
-            CurrentAccountSubject::new_test_with(&USER),
+            CurrentAccountSubject::logged(user_account_id(), odf::AccountName::new_unchecked(USER)),
             mock_dataset_action_authorizer()
                 .expect_check_read_dataset(&molecule_dataset_id(), 1, false)
                 .expect_check_read_dataset(&molecule_project_dataset_id(), 1, false)
@@ -598,7 +615,7 @@ pub struct SignEip712UseCaseHarness {
     pub use_case: Arc<dyn SignEip712UseCase>,
 }
 
-#[bon]
+#[bon::bon]
 impl SignEip712UseCaseHarness {
     #[builder]
     pub async fn new(
@@ -609,22 +626,26 @@ impl SignEip712UseCaseHarness {
         let mut b = dill::CatalogBuilder::new();
 
         let mut predefined_accounts_config = PredefinedAccountsConfig::new();
-        for (account_name, is_admin) in [
-            (MOLECULE, false),
-            (MOLECULE_PROJECT, false),
-            (MOLECULE_DEV, false),
-            (MOLECULE_DEV_PROJECT, false),
-            (USER, false),
-            (ADMIN, true),
+        for (account_name, is_admin, key_buf) in [
+            (MOLECULE, false, MOLECULE_KEY),
+            (MOLECULE_PROJECT, false, MOLECULE_PROJECT_KEY),
+            (MOLECULE_DEV, false, MOLECULE_DEV_KEY),
+            (MOLECULE_DEV_PROJECT, false, MOLECULE_DEV_PROJECT_KEY),
+            (USER, false, USER_KEY),
+            (ADMIN, true, ADMIN_KEY),
         ] {
-            let mut account =
-                AccountConfig::test_config_from_name(odf::AccountName::new_unchecked(account_name));
+            let private_key = odf::metadata::PrivateKey::from_bytes(&key_buf);
+            let account_id = odf::AccountID::from_signing_key(&private_key);
+            let mut config =
+                AccountConfig::test_config_from_name(odf::AccountName::new_unchecked(account_name))
+                    .set_id(Some(account_id))
+                    .set_private_key(private_key);
 
             if is_admin {
-                account.properties.push(AccountPropertyName::IsAdmin);
+                config.properties.push(AccountPropertyName::IsAdmin);
             }
 
-            predefined_accounts_config.predefined.push(account);
+            predefined_accounts_config.predefined.push(config);
         }
 
         b.add::<SystemTimeSourceDefault>()
@@ -685,8 +706,8 @@ impl SignEip712UseCaseHarness {
         // Initialization
         let did_secret_repo = catalog.get_one::<dyn DidSecretKeyRepository>().unwrap();
 
+        // For accounts, DID secrets are already saved -- add for datasets
         for (did_entity, private_key_bytes) in [
-            // Datasets
             (
                 DidEntity::new_dataset(molecule_dataset_id().to_string()),
                 [1; _],
@@ -707,28 +728,6 @@ impl SignEip712UseCaseHarness {
                 DidEntity::new_dataset(user_dataset_id().to_string()),
                 [5; _],
             ),
-            // Accounts
-            (
-                DidEntity::new_account(molecule_account_id().to_string()),
-                [6; _],
-            ),
-            (
-                DidEntity::new_account(molecule_project_account_id().to_string()),
-                [7; _],
-            ),
-            (
-                DidEntity::new_account(molecule_dev_account_id().to_string()),
-                [8; _],
-            ),
-            (
-                DidEntity::new_account(molecule_dev_project_account_id().to_string()),
-                [9; _],
-            ),
-            (
-                DidEntity::new_account(user_account_id().to_string()),
-                [10; _],
-            ),
-            (DidEntity::new_account(admin_id().to_string()), [11; _]),
         ] {
             let private_key = odf::metadata::PrivateKey::from_bytes(&private_key_bytes);
             let did_secret_key =
@@ -765,31 +764,37 @@ impl SignEip712UseCaseHarness {
 
 // Account IDs
 fn molecule_account_id() -> odf::AccountID {
-    odf::AccountID::new_seeded_ed25519("molecule".as_bytes())
+    odf::AccountID::from_signing_key(&odf::metadata::PrivateKey::from_bytes(&MOLECULE_KEY))
 }
 
+#[expect(unused)]
 fn molecule_project_account_id() -> odf::AccountID {
-    odf::AccountID::new_seeded_ed25519("molecule.project".as_bytes())
+    odf::AccountID::from_signing_key(&odf::metadata::PrivateKey::from_bytes(
+        &MOLECULE_PROJECT_KEY,
+    ))
 }
 
 fn molecule_dev_account_id() -> odf::AccountID {
-    odf::AccountID::new_seeded_ed25519("molecule.dev".as_bytes())
+    odf::AccountID::from_signing_key(&odf::metadata::PrivateKey::from_bytes(&MOLECULE_DEV_KEY))
 }
 
+#[expect(unused)]
 fn molecule_dev_project_account_id() -> odf::AccountID {
-    odf::AccountID::new_seeded_ed25519("molecule.dev.project".as_bytes())
+    odf::AccountID::from_signing_key(&odf::metadata::PrivateKey::from_bytes(
+        &MOLECULE_DEV_PROJECT_KEY,
+    ))
 }
 
 fn user_account_id() -> odf::AccountID {
-    odf::AccountID::new_seeded_ed25519("user".as_bytes())
+    odf::AccountID::from_signing_key(&odf::metadata::PrivateKey::from_bytes(&USER_KEY))
 }
 
-fn admin_id() -> odf::AccountID {
-    odf::AccountID::new_seeded_ed25519("admin".as_bytes())
+fn admin_account_id() -> odf::AccountID {
+    odf::AccountID::from_signing_key(&odf::metadata::PrivateKey::from_bytes(&ADMIN_KEY))
 }
 
 fn not_found_account_id() -> odf::AccountID {
-    odf::AccountID::new_seeded_ed25519("not_found_account_id".as_bytes())
+    odf::metadata::testing::account_id(&"not_found_account_id")
 }
 
 fn to_odf_did(account_id: &odf::AccountID) -> odf::metadata::DidOdf {
@@ -900,12 +905,12 @@ fn mock_dataset_action_authorizer() -> MockDatasetActionAuthorizer {
 fn expected_ok_response_for_molecule_account_id() -> Result<serde_json::Value, String> {
     Ok(json!({
         "type": "Ed25519Signature2020",
-        "verificationMethod": "did:key:z6Mkon22vwz9JoNpGDxCrGZRgeNFTdRTwXYYN3fvAhA3K19x",
-        "signature": "uOwr4WVV4m7knrGkxZBzTmCpB54p9PM6HCGgn82_j-VMcV2ZyJd0P017s_hwYVXHmMLevjlMcW2mpb3CW9UW3Dw",
+        "verificationMethod": "did:key:z6Mkon3Necd6NkkyfoGoHxid2znGc59LU3K7mubaRcFbLfLX",
+        "signature": "uP2Wm1caUZkB2h0eF5uWMohhOV1JBeFdpJuPJhp8JFmIZlShUwsCta13xf1r6jyRnqiwLyNYNG4ByirYTtjQGBA",
         "proof": {
             "type": "EcdsaSecp256k1Signature2019",
             "verificationMethod": "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31",
-            "signature": "0x7babd3a1d73b49f703a638bc2adc74f8abb8f57f048517330a760e1e105a7b7e2916a6a0bc10e3eccb4fa80f399cc8a2d3fcc3e37fa0041e685bb0ff3e615b381b"
+            "signature": "0x1d16b5f09481dcb5e7a8e58d9d7585c00d930d551b6c693894ebb74319f0f04f6792c9bbbc00cf3a8bca166dc7054e9b8da615b21be89e914b8074776a79f3f01c"
         }
     }))
 }
@@ -928,12 +933,12 @@ fn expected_ok_response_for_molecule_project_account_id() -> Result<serde_json::
 fn expected_ok_response_for_molecule_dev_account_id() -> Result<serde_json::Value, String> {
     Ok(json!({
         "type": "Ed25519Signature2020",
-        "verificationMethod": "did:key:z6Mkfmm57fsb6VL7zVusP8zeA9SYkCKdvUhby2G7Yh8vvQ1P",
-        "signature": "u-KIngmQQ2uFw0IbXLc4f-DPmBrnuAxAkhinFbQFNsRL0-V5QbHmIwq5GfNngQWToV8WkY8JuCWoSH0iU4158AQ",
+        "verificationMethod": "did:key:z6MkvRXNYcE7MMduynWTgeKbDaT1iijDSC8pZqXZc8rHPrf2",
+        "signature": "ujeZTyGt6emrpISPWgwD-bbxAD69vCVXgIvzAjKcAQwi66K4FcoYd8z7sMt6MwJf8n2jPG7cQtoo59EF5fBD6CA",
         "proof": {
             "type": "EcdsaSecp256k1Signature2019",
             "verificationMethod": "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31",
-            "signature": "0x4a6821f92b37fa00ad50145610e31d5b442e6b66f4dfc64655a69aee787cdaad7e777d7aa64863c8e8cc9be94f994856f1eac927738ca526e7baa456fe549af41b"
+            "signature": "0xa303ef06e8fc3cc01beddcaeab7c32a5d17c70e3b5c55f54879c5c4940e9e2f653343bc05c6a2cc4c704aace774cc805d47042667e6143335d1074bc9d5ca0c51b"
         }
     }))
 }
@@ -956,12 +961,12 @@ fn expected_ok_response_for_molecule_dev_project_account_id() -> Result<serde_js
 fn expected_ok_response_for_user_account_id() -> Result<serde_json::Value, String> {
     Ok(json!({
         "type": "Ed25519Signature2020",
-        "verificationMethod": "did:key:z6Mkj1MDZKcfx9AX5CeXHdysiGkRLzBbALyFuShD6wNeY1E3",
-        "signature": "ubKzLjYBRr9Rg0BrAmCWN331Q_njju_SAL0Hj7CsGE6rde_T6VOlwMqBikgxNgtYoQVQ9KIA3mIAMSRoqDKZdBQ",
+        "verificationMethod": "did:key:z6MkmtWtY63GQVBrpMyRJWEzsnxfsGkemu6CtMDwGTv4RYj2",
+        "signature": "u5LoI2Nv7HkxihalcMhkNq7PKh39FR_doSNE-IpNAsVK3-Mozp5REKvdk2N19BF3l5nr3YtYABV-spDC0qdl6Cg",
         "proof": {
             "type": "EcdsaSecp256k1Signature2019",
             "verificationMethod": "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31",
-            "signature": "0x07512adfb7e8d7f56c4b14f88c4fe7636767cacdb743b49fc39294accf7882be7d0cb6b693f94b25cb0fedab9cb636f3f9d80bea51411c781b476527e38a77d31c"
+            "signature": "0x9cb3b2bfe670e16ab19670d7a5bfd5fb159a1cf3bb4d3948c8015eb1dbd87bf775fe66258964416cf9e0f74e11f926b1bedb1ab450da72f5698f0c5ea68653001b"
         }
     }))
 }

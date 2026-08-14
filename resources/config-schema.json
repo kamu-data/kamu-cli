@@ -2,6 +2,7 @@
   "$defs": {
     "AccountConfig": {
       "additionalProperties": false,
+      "description": "The declarative account configuration used to register an account if one\ndoes not already exist.\n\nTo update an existing account, either `id` or `private_key` must be\nspecified.",
       "properties": {
         "accountName": {
           "$ref": "#/$defs/AccountName",
@@ -13,6 +14,8 @@
           "default": "User"
         },
         "avatarUrl": {
+          "combine": "replace",
+          "format": "uri",
           "type": [
             "string",
             "null"
@@ -40,11 +43,23 @@
             }
           ],
           "combine": "replace",
-          "description": "Auto-derived from `account_name` if omitted"
+          "description": "May be omitted in favor of `private_key`."
         },
         "password": {
           "$ref": "#/$defs/Password",
           "combine": "replace"
+        },
+        "privateKey": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PrivateKey"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "combine": "replace",
+          "description": "Optional ed25519 private key. When set, `id` is derived from it\n(and must match `id` if both are present)."
         },
         "properties": {
           "default": [],
@@ -845,7 +860,7 @@
           "type": "integer"
         },
         "userAgent": {
-          "default": "kamu-cli/0.265.0",
+          "default": "kamu-cli/0.266.0",
           "description": "Value to use for User-Agent header",
           "type": "string"
         }
@@ -1211,7 +1226,7 @@
           "default": {
             "connectTimeout": "30s",
             "maxRedirects": 10,
-            "userAgent": "kamu-cli/0.265.0"
+            "userAgent": "kamu-cli/0.266.0"
           },
           "description": "HTTP-specific configuration"
         },
@@ -1463,7 +1478,7 @@
         "http": {
           "connectTimeout": "30s",
           "maxRedirects": 10,
-          "userAgent": "kamu-cli/0.265.0"
+          "userAgent": "kamu-cli/0.266.0"
         },
         "mqtt": {
           "brokerIdleTimeout": "1s"

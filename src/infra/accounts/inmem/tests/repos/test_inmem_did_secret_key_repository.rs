@@ -14,7 +14,16 @@ use database_common_macros::database_transactional_test;
 database_transactional_test!(
     storage = inmem,
     fixture =
-        kamu_accounts_repo_tests::did_secret_key_repository::test_insert_and_locate_did_secret_keys,
+        kamu_accounts_repo_tests::did_secret_key_repository::test_insert_and_locate_account_did_secret_key,
+    harness = InMemoryDidSecretKeyRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
+    fixture =
+        kamu_accounts_repo_tests::did_secret_key_repository::test_insert_and_locate_dataset_did_secret_key,
     harness = InMemoryDidSecretKeyRepositoryHarness
 );
 

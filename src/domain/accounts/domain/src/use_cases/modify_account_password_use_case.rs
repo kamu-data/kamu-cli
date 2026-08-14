@@ -87,7 +87,9 @@ impl From<VerifyPasswordError> for ModifyAccountPasswordWithConfirmationError {
 
         match e {
             E::IncorrectPassword(e) => Self::WrongOldPassword(e),
-            e @ (E::AccountNotFound(_) | E::Internal(_)) => Self::Internal(e.int_err()),
+            e @ (E::AccountNotFoundByName(_) | E::AccountNotFoundById(_) | E::Internal(_)) => {
+                Self::Internal(e.int_err())
+            }
         }
     }
 }
