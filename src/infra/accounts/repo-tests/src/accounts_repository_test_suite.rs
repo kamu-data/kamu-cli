@@ -30,6 +30,7 @@ pub async fn test_missing_account_not_found(catalog: &dill::Catalog) {
 
     let account_id = odf::AccountID::new_seeded_ed25519(b"wrong");
     let account_name = odf::AccountName::new_unchecked("wasya");
+    let provider: &str = AccountProvider::Password.into();
     let provider_identity_key = "wasya";
     let email = Email::parse("test@example.com").unwrap();
 
@@ -54,7 +55,7 @@ pub async fn test_missing_account_not_found(catalog: &dill::Catalog) {
 
     assert_matches!(
         account_repo
-            .find_account_id_by_provider_identity_key(provider_identity_key)
+            .find_account_id_by_provider_identity_key(provider, provider_identity_key)
             .await,
         Ok(None)
     );
@@ -363,6 +364,58 @@ pub async fn test_duplicate_github_account_provider_identity(catalog: &dill::Cat
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_same_provider_identity_key_different_providers_allowed(catalog: &dill::Catalog) {
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+
+    const SHARED_IDENTITY_KEY: &str = "shared-identity-key";
+
+    let password_account = make_test_account(
+        "wasya",
+        "wasya@example.com",
+        AccountProvider::Password.into(),
+        SHARED_IDENTITY_KEY,
+    );
+    let github_account = make_test_account(
+        "petya",
+        "petya@example.com",
+        AccountProvider::OAuthGitHub.into(),
+        SHARED_IDENTITY_KEY,
+    );
+
+    account_repo.save_account(&password_account).await.unwrap();
+    account_repo.save_account(&github_account).await.unwrap();
+
+    assert_matches!(
+        account_repo
+            .find_account_id_by_provider_identity_key(
+                &password_account.provider,
+                SHARED_IDENTITY_KEY
+            )
+            .await,
+        Ok(Some(account_id)) if account_id == password_account.id
+    );
+    assert_matches!(
+        account_repo
+            .find_account_id_by_provider_identity_key(
+                &github_account.provider,
+                SHARED_IDENTITY_KEY
+            )
+            .await,
+        Ok(Some(account_id)) if account_id == github_account.id
+    );
+    assert_matches!(
+        account_repo
+            .find_account_id_by_provider_identity_key(
+                AccountProvider::Web3Wallet.into(),
+                SHARED_IDENTITY_KEY
+            )
+            .await,
+        Ok(None)
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_duplicate_github_account_email(catalog: &dill::Catalog) {
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
 
@@ -550,7 +603,10 @@ pub async fn test_update_email_success(catalog: &dill::Catalog) {
 
     assert_matches!(
         account_repo
-            .find_account_id_by_provider_identity_key(&updated_account.provider_identity_key)
+            .find_account_id_by_provider_identity_key(
+                &updated_account.provider,
+                &updated_account.provider_identity_key
+            )
             .await,
         Ok(Some(account_id)) if updated_account.id == account_id
     );
@@ -657,7 +713,10 @@ pub async fn test_update_account_success(catalog: &dill::Catalog) {
 
     assert_matches!(
         account_repo
-            .find_account_id_by_provider_identity_key(&updated_account.provider_identity_key)
+            .find_account_id_by_provider_identity_key(
+                &updated_account.provider,
+                &updated_account.provider_identity_key
+            )
             .await,
         Ok(Some(account_id)) if updated_account.id == account_id
     );
@@ -1160,7 +1219,10 @@ async fn test_locale_account(
     // 2. Get account id(s)
     assert_matches!(
         account_repo
-            .find_account_id_by_provider_identity_key(&account.provider_identity_key)
+            .find_account_id_by_provider_identity_key(
+                &account.provider,
+                &account.provider_identity_key
+            )
             .await,
         Ok(Some(found_id))
             if found_id == account.id,

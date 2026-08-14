@@ -95,6 +95,14 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = inmem,
+    fixture = kamu_accounts_repo_tests::test_same_provider_identity_key_different_providers_allowed,
+    harness = InMemoryAccountRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = inmem,
     fixture = kamu_accounts_repo_tests::test_duplicate_github_account_email,
     harness = InMemoryAccountRepositoryHarness
 );
