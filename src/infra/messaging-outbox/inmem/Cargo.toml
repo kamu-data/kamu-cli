@@ -22,8 +22,8 @@ doctest = false
 
 
 [dependencies]
-internal-error = { workspace = true }
 messaging-outbox = { workspace = true }
+internal-error = { workspace = true }
 
 async-trait = { version = "0.1", default-features = false }
 dill = { version = "0.15", default-features = false }
@@ -36,6 +36,4 @@ database-common-macros = { workspace = true }
 kamu-messaging-outbox-repo-tests = { workspace = true }
 
 test-group = { version = "1" }
-test-log = { version = "0.2", features = [
-    "trace",
-] }
+test-log = { version = "0.2", features = ["trace"] }

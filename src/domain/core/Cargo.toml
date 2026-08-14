@@ -22,15 +22,11 @@ doctest = false
 
 
 [features]
-default = [
-]
+default = []
 
-testing = [
-    "dep:mockall",
-]
-utoipa = [
-    "dep:utoipa",
-]
+testing = ["dep:mockall"]
+utoipa = ["dep:utoipa"]
+
 
 
 [dependencies]
@@ -39,9 +35,7 @@ file-utils = { workspace = true }
 internal-error = { workspace = true }
 kamu-accounts = { workspace = true }
 kamu-datasets = { workspace = true }
-odf = { workspace = true, features = [
-    "datafusion",
-] }
+odf = { workspace = true, features = ["datafusion"] }
 
 async-trait = { version = "0.1", default-features = false }
 base64 = { version = "0.22", default-features = false }

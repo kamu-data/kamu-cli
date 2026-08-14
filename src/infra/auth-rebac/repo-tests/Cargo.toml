@@ -25,7 +25,4 @@ doctest = false
 kamu-auth-rebac = { workspace = true }
 
 dill = { version = "0.15", default-features = false }
-pretty_assertions = { version = "1", default-features = false, features = [
-    "std",
-    "unstable",
-] }
+pretty_assertions = { version = "1", default-features = false, features = ["std", "unstable"] }

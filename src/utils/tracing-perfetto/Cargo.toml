@@ -24,20 +24,11 @@ doctest = false
 [dependencies]
 conv = "0.3"
 serde = { version = "1", default-features = false }
-serde_json = { version = "1", default-features = false, features = [
-    "std",
-] }
+serde_json = { version = "1", default-features = false, features = ["std"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", default-features = false }
 
 
 [dev-dependencies]
-tokio = { version = "1", default-features = false, features = [
-    "macros",
-    "rt",
-    "rt-multi-thread",
-    "time",
-] }
-tracing-subscriber = { version = "0.3", features = [
-    "env-filter",
-] }
+tokio = { version = "1", default-features = false, features=["rt", "rt-multi-thread", "macros", "time"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }

@@ -32,9 +32,7 @@ kamu-datasets = { workspace = true, default-features = false, features = [
     "oso",
 ] }
 messaging-outbox = { workspace = true, default-features = false }
-odf = { workspace = true, default-features = false, features = [
-    "arrow",
-] }
+odf = { workspace = true, default-features = false, features = ["arrow"] }
 
 async-trait = "0.1"
 dill = { version = "0.15", default-features = false }

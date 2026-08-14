@@ -21,14 +21,9 @@ workspace = true
 doctest = false
 
 [features]
-default = [
-]
-sqlx = [
-    "dep:sqlx",
-]
-testing = [
-    "dep:mockall",
-]
+default = []
+sqlx = ["dep:sqlx"]
+testing = ["dep:mockall"]
 
 [dependencies]
 crypto-utils = { workspace = true }
@@ -43,26 +38,20 @@ async-trait = { version = "0.1", default-features = false }
 bytes = { version = "1", default-features = false }
 chrono = { version = "0.4", default-features = false }
 http = { version = "1", default-features = false }
-nutype = { version = "0.7", default-features = false, features = [
-    "serde",
-] }
+nutype = { version = "0.7", default-features = false, features = ["serde"] }
 secrecy = "0.10"
 serde = { version = "1", default-features = false }
 serde_json = { version = "1", default-features = false }
 thiserror = { version = "2", default-features = false }
-url = { version = "2", default-features = false, features = [
-    "serde",
-] }
-uuid = { version = "1", default-features = false, features = [
-    "serde",
-    "v4",
-] }
+url = { version = "2", default-features = false, features = ["serde"] }
+uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
 
 # Optional
 mockall = { optional = true, version = "0.14", default-features = false }
 sqlx = { optional = true, version = "0.8", default-features = false, features = [
     "macros",
 ] }
+
 
 
 [dev-dependencies]

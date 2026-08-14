@@ -27,12 +27,8 @@ internal-error = { workspace = true }
 
 async-stream = "0.3"
 async-trait = { version = "0.1", default-features = false }
-serde = { version = "1", default-features = false, features = [
-    "derive",
-] }
-thiserror = { version = "2", default-features = false, features = [
-    "std",
-] }
+serde = { version = "1", default-features = false, features = ["derive"] }
+thiserror = { version = "2", default-features = false, features = ["std"] }
 tokio-stream = { version = "0.1", default-features = false }
 tracing = { version = "0.1", default-features = false, features = [
     "attributes",
@@ -41,7 +37,4 @@ tracing = { version = "0.1", default-features = false, features = [
 
 [dev-dependencies]
 futures = { version = "0.3", default-features = false }
-tokio = { version = "1", default-features = false, features = [
-    "macros",
-    "rt",
-] }
+tokio = { version = "1", default-features = false, features = ["rt", "macros"] }
