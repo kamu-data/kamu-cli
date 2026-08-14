@@ -550,18 +550,6 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             problems,
         })
     }
-
-    async fn delete(&self, resource_ref: ResourceRef) -> Result<ResourceID, DeleteResourceError> {
-        let response = self.delete_many(vec![resource_ref]).await?;
-
-        if let Some(success) = response.successes.into_iter().next() {
-            Ok(success.item)
-        } else if let Some(problem) = response.problems.into_iter().next() {
-            Err(problem.error.into())
-        } else {
-            Err(InternalError::new("Delete response did not contain an item").into())
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

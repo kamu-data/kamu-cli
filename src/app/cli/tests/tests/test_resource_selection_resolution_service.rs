@@ -762,8 +762,9 @@ async fn passes_the_label_filter_to_the_all_selector() {
     let mut harness = ResourceSelectionResolutionHarness::new();
     harness.expect_list_supported_resource_types(vec![harness.variableset_type_descriptor()]);
 
-    let list_all_requests = Arc::new(Mutex::new(Vec::new()));
-    harness.expect_list_all_handles(
+    let search_requests = Arc::new(Mutex::new(Vec::new()));
+    harness.expect_search_handles(
+        1,
         vec![ResourceHandle {
             r#type: variableset_type_uri().clone(),
             did: None,
@@ -771,7 +772,7 @@ async fn passes_the_label_filter_to_the_all_selector() {
             name: "app-alpha".parse().unwrap(),
             account: DEFAULT_ACCOUNT_HANDLE.clone(),
         }],
-        Arc::clone(&list_all_requests),
+        Arc::clone(&search_requests),
     );
 
     let result = harness
@@ -793,7 +794,7 @@ async fn passes_the_label_filter_to_the_all_selector() {
 
     assert_eq!(result.targets.len(), 1);
 
-    let requests = list_all_requests.lock().unwrap();
+    let requests = search_requests.lock().unwrap();
     assert_eq!(requests.len(), 1);
     assert_eq!(
         requests[0].label_filter.as_ref(),
@@ -963,23 +964,6 @@ impl ResourceSelectionResolutionHarness {
             selector_input: format!("{VARIABLESETS_SHORT_NAME}/{name}"),
             resource_ref: ExactResourceRef::ByName(name.parse().unwrap()),
         })
-    }
-
-    fn expect_list_all_handles(
-        &mut self,
-        handles: Vec<ResourceHandle>,
-        requests: Arc<Mutex<Vec<kamu_resources_facade::SearchResourceHandlesRequest>>>,
-    ) {
-        self.facade
-            .expect_search_handles()
-            .times(1)
-            .returning(move |request| {
-                requests.lock().unwrap().push(request);
-                Ok(kamu_resources_facade::SearchResourceHandlesResponse {
-                    total_count: handles.len(),
-                    items: handles.clone(),
-                })
-            });
     }
 
     /// Exact names without a label filter resolve through the ref API, which

@@ -23,16 +23,13 @@ use crate::facade::graphql::cynic_api::schema;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
-#[cynic(graphql_type = "Query", variables = "ResourceHandleSelectorVariables")]
+#[cynic(graphql_type = "Query", variables = "ResourceHandleRefVariables")]
 pub(crate) struct GetResourceHandleQuery {
     pub resources: ResourceHandleResources,
 }
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
-#[cynic(
-    graphql_type = "Resources",
-    variables = "ResourceHandleSelectorVariables"
-)]
+#[cynic(graphql_type = "Resources", variables = "ResourceHandleRefVariables")]
 pub(crate) struct ResourceHandleResources {
     #[arguments(resourceRef: $resource_ref)]
     pub resource_handle: ResourceGetHandleOutcome,
@@ -51,19 +48,13 @@ pub(crate) enum ResourceGetHandleOutcome {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
-#[cynic(
-    graphql_type = "Query",
-    variables = "ResourceHandleBatchSelectorVariables"
-)]
+#[cynic(graphql_type = "Query", variables = "ResourceHandleRefsVariables")]
 pub(crate) struct GetResourceHandlesQuery {
     pub resources: ResourceHandlesResources,
 }
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
-#[cynic(
-    graphql_type = "Resources",
-    variables = "ResourceHandleBatchSelectorVariables"
-)]
+#[cynic(graphql_type = "Resources", variables = "ResourceHandleRefsVariables")]
 pub(crate) struct ResourceHandlesResources {
     #[arguments(resourceRefs: $resource_refs)]
     pub resource_handles: BatchResourceHandlesOutcome,
@@ -93,11 +84,11 @@ pub(crate) struct BatchResourceHandleSuccess {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::QueryVariables, Debug, Clone)]
-pub(crate) struct ResourceHandleSelectorVariables {
+pub(crate) struct ResourceHandleRefVariables {
     pub resource_ref: ResourceRefInput,
 }
 
-impl ResourceHandleSelectorVariables {
+impl ResourceHandleRefVariables {
     pub(crate) fn new(resource_ref: &ResourceRef) -> Self {
         Self {
             resource_ref: resource_ref.into(),
@@ -108,11 +99,11 @@ impl ResourceHandleSelectorVariables {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::QueryVariables, Debug, Clone)]
-pub(crate) struct ResourceHandleBatchSelectorVariables {
+pub(crate) struct ResourceHandleRefsVariables {
     pub resource_refs: Vec<ResourceRefInput>,
 }
 
-impl ResourceHandleBatchSelectorVariables {
+impl ResourceHandleRefsVariables {
     pub(crate) fn new(resource_refs: &[ResourceRef]) -> Self {
         Self {
             resource_refs: resource_ref_inputs(resource_refs),
@@ -123,14 +114,14 @@ impl ResourceHandleBatchSelectorVariables {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) fn build_handle_operation(
-    variables: ResourceHandleSelectorVariables,
-) -> cynic::Operation<GetResourceHandleQuery, ResourceHandleSelectorVariables> {
+    variables: ResourceHandleRefVariables,
+) -> cynic::Operation<GetResourceHandleQuery, ResourceHandleRefVariables> {
     GetResourceHandleQuery::build(variables)
 }
 
 pub(crate) fn build_handles_operation(
-    variables: ResourceHandleBatchSelectorVariables,
-) -> cynic::Operation<GetResourceHandlesQuery, ResourceHandleBatchSelectorVariables> {
+    variables: ResourceHandleRefsVariables,
+) -> cynic::Operation<GetResourceHandlesQuery, ResourceHandleRefsVariables> {
     GetResourceHandlesQuery::build(variables)
 }
 

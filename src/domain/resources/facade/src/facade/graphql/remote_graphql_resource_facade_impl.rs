@@ -100,7 +100,7 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
     ) -> Result<domain::Resource, GetResourceError> {
         use cynic_api::operations::get_resource as Operation;
 
-        let variables = Operation::ResourceSelectorVariables::new(&resource_ref, spec_view_mode);
+        let variables = Operation::ResourceRefVariables::new(&resource_ref, spec_view_mode);
 
         let response: Operation::GetResourceQuery = self
             .graphql_client
@@ -118,8 +118,7 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
     {
         use cynic_api::operations::get_resources as Operation;
 
-        let variables =
-            Operation::ResourceBatchSelectorVariables::new(&resource_refs, spec_view_mode);
+        let variables = Operation::ResourceRefsVariables::new(&resource_refs, spec_view_mode);
 
         let response: Operation::GetResourcesQuery = self
             .graphql_client
@@ -138,7 +137,7 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
     ) -> Result<domain::ResourceHandle, GetResourceError> {
         use cynic_api::operations::handle as Operation;
 
-        let variables = Operation::ResourceHandleSelectorVariables::new(&resource_ref);
+        let variables = Operation::ResourceHandleRefVariables::new(&resource_ref);
 
         let response: Operation::GetResourceHandleQuery = self
             .graphql_client
@@ -157,7 +156,7 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
     > {
         use cynic_api::operations::handle as Operation;
 
-        let variables = Operation::ResourceHandleBatchSelectorVariables::new(&resource_refs);
+        let variables = Operation::ResourceHandleRefsVariables::new(&resource_refs);
 
         let response: Operation::GetResourceHandlesQuery = self
             .graphql_client
