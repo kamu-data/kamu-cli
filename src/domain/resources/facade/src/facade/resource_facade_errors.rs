@@ -140,7 +140,11 @@ impl From<ResourceLabelFilterExprParseError> for ResourceInvalidLabelFilterError
     }
 }
 
-use crate::{ResolveManifestAccountError, UnrepresentableScopeError};
+use crate::{
+    ResolveManifestAccountError,
+    UnrepresentableScopeError,
+    UnsupportedSelectorFieldError,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -306,6 +310,10 @@ pub enum ListResourcesError {
 
     #[error(transparent)]
     UnrepresentableScope(#[from] UnrepresentableScopeError),
+
+    /// A selector set a field the listing pipeline cannot honour.
+    #[error(transparent)]
+    UnsupportedSelectorField(#[from] UnsupportedSelectorFieldError),
 
     #[error(transparent)]
     RemoteRequest(#[from] GraphqlHttpRequestError),

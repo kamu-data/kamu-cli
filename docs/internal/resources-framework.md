@@ -133,7 +133,8 @@ long-term goal. This page documents what exists now.
 | **Condition** | A status signal keyed by a condition schema URI. Built-ins: `Accepted`, `Ready`, `Reconciling`; each value has `value`, `reason`, optional `message`, `lastTransitionTime`. |
 | **generation / observedGeneration** | `generation` bumps on each spec/headers change; `observedGeneration` records the last one reconciliation processed. Absent or lower → reconcile. |
 | **Reconciliation** | Driving actual state toward the spec (e.g. `SecretSet` materializes its encrypted read-side projection). |
-| **Selector** | Identifies one (`ResourceSelector`) or many (`ResourceBatchSelector`) resource *instances*, by name or UID, optionally account-scoped. |
+| **Ref** | Identifies exactly one resource *instance* (`ResourceRef`), by exact name or UID, optionally account- and type-scoped. A batch is `Vec<ResourceRef>`. |
+| **Selector** | Matches zero or many resource *instances* (`ResourceSelector`), by SQL `LIKE` name pattern and/or UID. Several selectors act as a logical OR. |
 | **SpecViewMode** | How sensitive spec fields render. Two modes: `Encrypted` (default — stored ciphertext as-is) and `Revealed` (decrypted). No "redacted" mode today. |
 | **Dispatcher** | Per-type adapter (`ResourceCrudDispatcher`, …) registered in `dill`, looked up by schema or selector metadata. |
 | **Facade** | The single API seam (`ResourceFacade`); local or remote-GraphQL impl. |
@@ -814,19 +815,21 @@ pub trait ResourceFacade: Send + Sync {
     async fn list_supported_resource_types(&self) -> Result<Vec<ResourceTypeDescriptor>, ...>;
     async fn summary(&self, request: ResourcesSummaryRequest) -> Result<ResourcesSummary, ...>;
 
-    async fn get(&self, selector: ResourceSelector, spec_view_mode: SpecViewMode) -> Result<Resource, ...>;
-    async fn get_many(&self, selector: ResourceBatchSelector, spec_view_mode: SpecViewMode)
+    // Point lookups and batches take ODF `ResourceRef`s: each ref carries its
+    // own account and type, so one batch can span both.
+    async fn get(&self, resource_ref: ResourceRef, spec_view_mode: SpecViewMode) -> Result<Resource, ...>;
+    async fn get_many(&self, resource_refs: Vec<ResourceRef>, spec_view_mode: SpecViewMode)
         -> Result<BatchResourceResponse<Resource, ResourceLookupProblem>, ...>;
-    async fn get_handle(&self, selector: ResourceSelector) -> Result<ResourceHandle, ...>;
-    async fn get_handles(&self, selector: ResourceBatchSelector)
+    async fn get_handle(&self, resource_ref: ResourceRef) -> Result<ResourceHandle, ...>;
+    async fn get_handles(&self, resource_refs: Vec<ResourceRef>)
         -> Result<BatchResourceResponse<ResourceHandle, ResourceLookupProblem>, ...>;
-    async fn render_manifest(&self, selector, format: ResourceManifestFormat, spec_view_mode) -> ...;
-    async fn render_manifests(&self, selector: ResourceBatchSelector, format: ResourceManifestFormat, spec_view_mode)
+    async fn render_manifest(&self, resource_ref, format: ResourceManifestFormat, spec_view_mode) -> ...;
+    async fn render_manifests(&self, resource_refs: Vec<ResourceRef>, format: ResourceManifestFormat, spec_view_mode)
         -> Result<BatchResourceResponse<RenderResourceManifestResult, ResourceLookupProblem>, ...>;
 
     async fn list(&self, request: ListResourcesRequest) -> Result<Vec<ResourceSummaryView>, ...>;
     async fn list_handles(&self, request: ListResourceHandlesRequest) -> ...;
-    async fn search_handles(&self, request: SearchResourceHandlesRequest) -> ...; // request.scope: RawResourceScope
+    async fn search_handles(&self, request: SearchResourceHandlesRequest) -> ...; // request.selectors: Vec<ResourceSelector>
     async fn list_all(&self, request: ListAllResourcesRequest) -> ...;
     async fn list_all_handles(&self, request: ListAllResourceHandlesRequest) -> ...;
 
@@ -836,8 +839,8 @@ pub trait ResourceFacade: Send + Sync {
         -> Result<ApplyManifestBatchResponse<ApplyManifestPlanningDecision>, BatchResourceError>;
     async fn apply_manifests(&self, request: ApplyManifestBatchRequest)
         -> Result<ApplyManifestBatchResponse<ApplyManifestApplicationDecision>, BatchResourceError>;
-    async fn delete(&self, selector: ResourceSelector) -> Result<ResourceID, ...>;
-    async fn delete_many(&self, selector: ResourceBatchSelector) -> ...;
+    async fn delete(&self, resource_ref: ResourceRef) -> Result<ResourceID, ...>;
+    async fn delete_many(&self, resource_refs: Vec<ResourceRef>) -> ...;
 }
 ```
 
@@ -893,10 +896,10 @@ on demand by the CLI for remote contexts — see [§12](#12-cli).)
 `ListResourceHandlesRequest`, and `SearchResourceHandlesRequest` each carry an
 optional `label_filter: Option<ResourceLabelFilterInput>` (`ResourceLabelFilterInput`
 is a `kamu_resources` type alias to `odf::metadata::resource::LabelFilter`, raw
-`String`-keyed entries). `ResourceBatchSelector` does **not** — it never did
-anything but forward the field to `get_handles`/`delete_many`, and the last
-producer of a non-`None` value (`Exact` selector resolution) has since moved to
-`search_handles`, so the field was removed rather than left permanently unused.
+`String`-keyed entries). The batch calls take a bare `Vec<ResourceRef>` and carry
+no filter at all — the wrapper that once did never did anything but forward the
+field to `get_handles`/`delete_many`, so it was removed rather than left
+permanently unused.
 
 Filtering covers `get` and `delete` as well as `list` because the CLI resolves
 those in **two phases**: it first expands name patterns and the `%` all-types
@@ -905,9 +908,16 @@ resulting `ResourceRef::ById` set. A label filter is a *narrowing of the candida
 identifier set* — structurally the same job as a name pattern — so it belongs to
 that phase-1 expansion. The
 phase-2 batch calls (`get_many`, `delete_many`, `render_manifests`) structurally
-**cannot** carry a filter — `ResourceBatchSelector` has no such field — so the old
+**cannot** carry a filter — they take a bare `Vec<ResourceRef>` — so the old
 "pass `label_filter: None` by convention" precondition is now enforced by the type
 system instead of by discipline.
+
+One consequence of the ref/selector split is worth noting here: because a filtered
+lookup cannot go through the ref API, the CLI routes exact names through
+`get_handles` only when there is **no** label filter, and falls back to escaped
+wildcard-free patterns via `search_handles` when there is. The first keeps an
+N-name batch a single row; the second costs one `ILIKE` row per name, which is the
+price of filtering.
 
 `ResourceQuery` (`ExactNames(Vec<ResourceName>)` / `ExactIds(Vec<ResourceID>)` /
 `NamePattern(String)`) replaces what used to be two independently-optional fields
@@ -918,8 +928,25 @@ instead of a runtime convention.
 It is shared by search *and* listing: `search_handles`, `list` and `list_all` all
 narrow through the same type, so the two paths cannot drift apart on pattern or ID
 semantics. `ResourceScope` pairs each type with its own optional `ResourceQuery`,
-which is what lets one call express `vs/a-% ss/b-%`; the facade's `RawResourceScope`
-is the same shape carrying unresolved selectors (`vs`) rather than schemas.
+which is what lets one call express `vs/a-% ss/b-%`.
+
+**`ResourceQuery` is repository-facing only.** The facade and GraphQL speak ODF's
+`ResourceSelector` — scalar, one `id` and one `name` *pattern* per selector, with
+several selectors acting as a logical OR. `coalesce_selectors` folds those into the
+repository's list-carrying `ResourceScope`, which is what keeps an N-id batch a
+single row. Two consequences worth remembering:
+
+- **Listing has no exact-name mode.** A selector's `name` is a `LIKE` pattern by ODF
+  definition, so an exact name travels as a wildcard-free escaped pattern. The
+  exact-vs-pattern distinction is the `ResourceRef`/`ResourceSelector` split, not a
+  second field. Exact-name *lookups* therefore go through the ref API
+  (`get_handles`), which preserves one batched `ExactNames` row instead of one
+  `ILIKE` row per name.
+- **`ResourceSelector::account` is not honoured yet.** Listing resolves one account
+  per call — `ResourceRepository`'s scoped reads take a single scalar `account_id`
+  alongside the scope — so a selector carrying an account is *rejected*
+  (`UnsupportedSelectorFieldError::PerSelectorAccount`), never silently ignored.
+  Pinned by RF-105.
 
 Resolution happens in the local facade, strictly before dispatch, through the same
 `ResourceExtensionSchemaResolver` used by manifest apply (`ResourceExtensionKind::Label`).
@@ -931,9 +958,9 @@ receive only the resolved predicate and never resolve aliases or touch the
 extension-schema registry.
 
 **Multi-type queries resolve the filter per schema and collapse.** `search_handles`
-may span several schemas — via `RawResourceScope::AnyType` (what the CLI's
-`%` all-types token produces), or via an explicit multi-element
-`RawResourceScope::Types`, which the CLI now also uses for multi-type listings
+may span several schemas — via a type-less selector (what the CLI's `%` all-types
+token produces, coalescing to `ResourceScope::AnyType`), or via several typed
+selectors, which the CLI also uses for multi-type listings
 (`kamu list vs/a-% ss/b-%`). The filter is resolved once per candidate schema and the
 resolved trees compared: today they are always equal — the built-in `environment`
 label applies to every resource type and unregistered short names resolve to
@@ -1051,18 +1078,27 @@ These map directly from the domain views in
 
 **Label-filter transport.** `ResourceLabelFilterInput { entries: [ResourceLabelFilterEntryInput!]! }`
 carries the filter, where each entry is `{ key: String!, value: JSON! }`. It is accepted by
-`list_by_resource_type`, `list_handles_by_resource_type`, and `search_handles`.
-`ResourceBatchSelectorInput` — used by the batch `resources`/`render_manifests` queries and the
-`delete_many` mutation — does not carry a `labelFilter` field at all.
+`listByResourceType`, `listHandlesByResourceType`, `listAll`, and `searchHandles`. The batch
+`resources`/`renderManifests` queries and the `deleteMany` mutation take `[ResourceRefInput!]!` and
+carry no `labelFilter` field at all.
 
-**The resource query is a `oneOf` input.** `ResourceQueryInput` replaces the old
-independently-optional `names`/`namePattern` fields, and now also appears on
-`listByResourceType` and (nested in `ResourceScopeInput`) on `listAll`.
-`ResourceQueryInput` is declared `@oneOf` with three single-field
-variants (`exactNames: [ResourceName!]`, `exactIds: [ResourceID!]`, `namePattern: String`) —
-exactly one may be set, enforced by the GraphQL layer itself before the resolver runs. On the
-Rust side this is `#[derive(async_graphql::OneofObject)]`; the `cynic` client side has matching
-`oneOf`-input codegen.
+**Listing takes a selector list.** `ResourceSelectorInput` mirrors the ODF `ResourceSelector`
+(`account`, `type`, `id`, `name`, `labels`) and replaced four earlier inputs — `ResourceQueryInput`,
+`ResourceTypeQueryInput`, `ResourceAnyTypeScopeInput`, and `ResourceScopeInput`. Every field is
+optional; several selectors act as a logical OR, which is what lets one call span resource types.
+A selector with no `type` spans every type.
+
+Two fields exist on the wire but are **not honoured yet**, and are rejected rather than ignored so a
+caller learns their request was not what they asked for:
+
+- `account` — listing resolves one account per call; use the call-level `account` (RF-105).
+- `labels` — the call-level `labelFilter` applies to every selector.
+
+The wire is scalar where the repository is list-carrying: a batch of N ids arrives as N selectors and
+`coalesce_selectors` folds them into one row. Two type-less selectors that narrow differently, or a
+type-less selector mixed with typed ones, cannot be expressed as per-type rows and surface as
+`UnrepresentableScopeError` (RF-106) — a limit of `ResourceScope::AnyType` carrying a single query,
+which disappears once every row carries its own type.
 
 Entries are a **list, not a map**, so a key repeated by the caller reaches the server intact and is
 reported as a duplicate rather than one spelling silently winning — a map would collapse it in the
@@ -1611,9 +1647,9 @@ Otherwise the behavior is already guaranteed for both implementations by the con
 - **Phase-1 expansion is where label filters apply — phase-2 has no filter to misuse.** `get` and
   `delete` first expand selectors into identifiers (filtered), then act on those ids by
   `ResourceRef::ById`. The phase-2 batch calls — `get_many`, `delete_many`, `render_manifests` —
-  take a `ResourceBatchSelector`, which has no `label_filter` field at all, so a future caller
+  take a bare `Vec<ResourceRef>`, which has no `label_filter` field at all, so a future caller
   cannot reach those methods with an unfiltered id set and a forgotten filter: there is nothing to
-  forget. If a new batch selector shape ever needs filtering, filter during expansion (phase 1)
+  forget. If a new batch shape ever needs filtering, filter during expansion (phase 1)
   rather than adding a filter field to the batch call.
 - **The label-filter capability boundary is `flatten_conjunction`, in one place.** The resolved
   filter is a full boolean tree, but evaluation is AND-only. Every backend routes through that one

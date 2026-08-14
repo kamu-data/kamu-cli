@@ -762,6 +762,13 @@ impl LocalResourceFacadeImpl {
         selectors: Vec<ResourceSelector>,
         label_filter: Option<ResourceLabelFilterInput>,
     ) -> Result<(ResourceScope, ResolvedResourceLabelFilter), ListResourcesError> {
+        // Before anything else, including the fast path below: a selector
+        // carrying an account would otherwise be scoped to the caller's own
+        // account without saying so.
+        for selector in &selectors {
+            validate_selector(selector)?;
+        }
+
         // A lone type-less, unnarrowed selector needs no schemas at all, so
         // without a label filter it can answer before touching the catalog.
         if label_filter.is_none()

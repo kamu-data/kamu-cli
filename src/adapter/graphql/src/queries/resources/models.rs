@@ -144,6 +144,9 @@ pub(crate) fn into_resource_refs(
 /// `type` spans every type, and one narrowing by nothing matches all of them.
 #[derive(InputObject, Debug, Clone)]
 pub struct ResourceSelectorInput {
+    /// Not supported yet — setting it is an error, not a silent no-op. Listing
+    /// resolves one account per call, so use the call-level `account` instead;
+    /// every selector in one call spans the same account.
     pub account: Option<AccountRefInput>,
     /// Canonical selector (`variablesets`), alias (`vs`), ODF type name
     /// (`VariableSet`), or full schema URI. `null` spans every type.
