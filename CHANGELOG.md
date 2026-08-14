@@ -15,7 +15,7 @@ Recommendation: for ease of reading, use the following format:
 
 ## Unreleased
 ### Fixed
-- Login, OAuth: login error if system (local) username matches GitHub username (#996)
+- Login, OAuth: login error if system (local) username matches GitHub username (#1684)
 
 ## [0.266.0] - 2026-08-13
 ### Added:
