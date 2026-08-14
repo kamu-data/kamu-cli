@@ -13,6 +13,10 @@ Recommendation: for ease of reading, use the following format:
 ### Fixed
 -->
 
+## Unreleased
+### Fixed
+- Login, OAuth: login error if system (local) username matches GitHub username (#996)
+
 ## [0.266.0] - 2026-08-13
 ### Added:
 - `MySqlDatasetEntryRepository` has been implemented:
