@@ -31,10 +31,10 @@ async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
 dill = { version = "0.15", default-features = false }
 sqlx = { version = "0.8", default-features = false, features = [
-    "runtime-tokio",
+    "chrono",
     "macros",
     "postgres",
-    "chrono",
+    "runtime-tokio",
 ] }
 tracing = "0.1"
 
@@ -44,5 +44,7 @@ database-common = { workspace = true }
 database-common-macros = { workspace = true }
 kamu-search-cache-repo-tests = { workspace = true }
 
-test-log = { version = "0.2", features = ["trace"] }
+test-log = { version = "0.2", features = [
+    "trace",
+] }
 test-group = { version = "1" }

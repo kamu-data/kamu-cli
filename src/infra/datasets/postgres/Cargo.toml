@@ -23,21 +23,27 @@ doctest = false
 
 [dependencies]
 database-common = { workspace = true }
-kamu-datasets = { workspace = true, features = ["sqlx"] }
 internal-error = { workspace = true }
-odf = { workspace = true, features = ["sqlx-postgres"] }
+kamu-datasets = { workspace = true, features = [
+    "sqlx",
+] }
+odf = { workspace = true, features = [
+    "sqlx-postgres",
+] }
 
 async-stream = "0.3"
 async-trait = { version = "0.1", default-features = false }
 bytes = { version = "1", default-features = false }
-cheap-clone = { version = "0.3", default-features = false, features = ["alloc"] }
+cheap-clone = { version = "0.3", default-features = false, features = [
+    "alloc",
+] }
 dill = { version = "0.15", default-features = false }
 futures = "0.3"
 sqlx = { version = "0.8", default-features = false, features = [
-    "runtime-tokio",
+    "chrono",
     "macros",
     "postgres",
-    "chrono",
+    "runtime-tokio",
 ] }
 tracing = "0.1"
 uuid = "1"
@@ -49,5 +55,7 @@ internal-error = { workspace = true }
 kamu-accounts-postgres = { workspace = true }
 kamu-datasets-repo-tests = { workspace = true }
 
-test-log = { version = "0.2", features = ["trace"] }
 test-group = { version = "1" }
+test-log = { version = "0.2", features = [
+    "trace",
+] }

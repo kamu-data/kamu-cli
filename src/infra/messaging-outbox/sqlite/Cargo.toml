@@ -23,8 +23,10 @@ doctest = false
 
 [dependencies]
 database-common = { workspace = true }
-messaging-outbox = { workspace = true, features = ["sqlx"] }
 internal-error = { workspace = true }
+messaging-outbox = { workspace = true, features = [
+    "sqlx",
+] }
 
 async-stream = "0.3"
 async-trait = { version = "0.1", default-features = false }
@@ -33,18 +35,20 @@ dill = { version = "0.15", default-features = false }
 futures = "0.3"
 serde_json = { version = "1", default-features = false }
 sqlx = { version = "0.8", default-features = false, features = [
-    "runtime-tokio",
-    "macros",
-    "sqlite",
     "chrono",
     "json",
+    "macros",
+    "runtime-tokio",
+    "sqlite",
 ] }
 tokio = { version = "1", default-features = false }
-tracing = { version = "0.1", default-features = false}
+tracing = { version = "0.1", default-features = false }
 
 [dev-dependencies]
 database-common-macros = { workspace = true }
 kamu-messaging-outbox-repo-tests = { workspace = true }
 
 test-group = { version = "1" }
-test-log = { version = "0.2", features = ["trace"] }
+test-log = { version = "0.2", features = [
+    "trace",
+] }
