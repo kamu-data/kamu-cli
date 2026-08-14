@@ -7,15 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_accounts::{
-    AccountNotFoundByIdError,
-    CurrentAccountSubject,
-    DEFAULT_ACCOUNT_ID,
-    DEFAULT_ACCOUNT_NAME,
-};
+use kamu_accounts::{AccountNotFoundByIdError, CurrentAccountSubject, DEFAULT_ACCOUNT_NAME};
 use kamu_auth_rebac::{RebacService, RebacServiceExt};
 use kamu_datasets::{DatasetAction, DatasetActionAuthorizer, DatasetActionAuthorizerExt};
 use tokio::sync::OnceCell;
+use url::Url;
 
 use super::AccountFlows;
 use crate::prelude::*;
@@ -109,15 +105,22 @@ impl Account {
         } else {
             let current_account_subject = from_catalog_n!(ctx, CurrentAccountSubject);
 
-            Ok(Some(match current_account_subject.as_ref() {
-                CurrentAccountSubject::Anonymous(_) => Self::new(
-                    DEFAULT_ACCOUNT_ID.clone().into(),
-                    DEFAULT_ACCOUNT_NAME.clone().into(),
-                ),
-                CurrentAccountSubject::Logged(l) => {
-                    Self::new(l.account_id.clone().into(), l.account_name.clone().into())
+            Ok(match current_account_subject.as_ref() {
+                CurrentAccountSubject::Anonymous(_) => {
+                    let account_service = from_catalog_n!(ctx, dyn kamu_accounts::AccountService);
+
+                    let account = account_service
+                        .get_account_by_name(&DEFAULT_ACCOUNT_NAME)
+                        .await
+                        .int_err()?;
+
+                    Some(Self::new(account.id.into(), account.account_name.into()))
                 }
-            }))
+                CurrentAccountSubject::Logged(l) => Some(Self::new(
+                    l.account_id.clone().into(),
+                    l.account_name.clone().into(),
+                )),
+            })
         }
     }
 
@@ -210,7 +213,7 @@ impl Account {
     }
 
     /// Avatar URL
-    async fn avatar_url(&self, ctx: &Context<'_>) -> Result<&Option<String>> {
+    async fn avatar_url(&self, ctx: &Context<'_>) -> Result<&Option<Url>> {
         let full_account_info = self.get_full_account_info(ctx).await?;
 
         Ok(&full_account_info.avatar_url)

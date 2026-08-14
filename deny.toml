@@ -99,22 +99,22 @@ ignore = [
     # rsa crate vulnerability (used by sqlx), no fix available yet
     # https://rustsec.org/advisories/RUSTSEC-2023-0071.html
     "RUSTSEC-2023-0071",
-    # Unmaintained (proc-macro-error)
+    # Unmaintained: proc-macro-error
     # https://rustsec.org/advisories/RUSTSEC-2024-0370.html
     "RUSTSEC-2024-0370",
-    # Unmaintained (paste)
+    # Unmaintained: paste
     # https://rustsec.org/advisories/RUSTSEC-2024-0436
     "RUSTSEC-2024-0436",
-    # Unmaintained (backoff)
+    # Unmaintained: backoff
     # https://rustsec.org/advisories/RUSTSEC-2025-0012
     "RUSTSEC-2025-0012",
-    # Unmaintained (instant)
+    # Unmaintained: instant
     # https://rustsec.org/advisories/RUSTSEC-2024-0384
     "RUSTSEC-2024-0384",
-    # Unmaintained (custom_derive)
+    # Unmaintained: custom_derive
     # https://rustsec.org/advisories/RUSTSEC-2025-0058
     "RUSTSEC-2025-0058",
-    # Unmaintained (rustls-pemfile)
+    # Unmaintained: rustls-pemfile
     # https://rustsec.org/advisories/RUSTSEC-2025-0134
     "RUSTSEC-2025-0134",
     # rustls-webpki: transitive dependency; there are currently no updates for higher-order dependencies
@@ -126,16 +126,24 @@ ignore = [
     "RUSTSEC-2026-0049",
     "RUSTSEC-2026-0098",
     "RUSTSEC-2026-0099",
-    # Unmaintained (proc-macro-error2)
-    # https://rustsec.org/advisories/RUSTSEC-2026-0173
-    "RUSTSEC-2026-0173",
     # quick-xml: temporary ignore until upstream dependencies can move to >= 0.41.0
     # https://rustsec.org/advisories/RUSTSEC-2026-0194
     # https://rustsec.org/advisories/RUSTSEC-2026-0195
     "RUSTSEC-2026-0194",
     "RUSTSEC-2026-0195",
-    # Unmaintained (smallstr)
+    # Unmaintained: smallstr
     # Waiting for upstream crates to migrate to other implementation
     # https://rustsec.org/advisories/RUSTSEC-2026-0215
     "RUSTSEC-2026-0215",
+    # Unmaintained: im
+    # https://rustsec.org/advisories/RUSTSEC-2026-0248
+    "RUSTSEC-2026-0248",
+    # Unmaintained: bitmaps
+    # Dependency of the unmaintained `im` crate
+    # https://rustsec.org/advisories/RUSTSEC-2026-0247
+    "RUSTSEC-2026-0247",
+    # Unmaintained: sized-chunks
+    # Dependency of the unmaintained `im` crate
+    # https://rustsec.org/advisories/RUSTSEC-2026-0251
+    "RUSTSEC-2026-0251",
 ]

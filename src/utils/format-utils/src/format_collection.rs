@@ -11,15 +11,24 @@ use std::fmt::Display;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn format_collection<T: Display>(collection_it: impl IntoIterator<Item = T>) -> String {
-    format!(
-        "[{}]",
-        collection_it
-            .into_iter()
-            .map(|a| a.to_string())
-            .intersperse(", ".to_string())
-            .collect::<String>()
-    )
+pub fn format_collection<T: Display>(collection_iter: impl IntoIterator<Item = T>) -> String {
+    use std::fmt::Write;
+
+    let mut iter = collection_iter.into_iter();
+    let mut res = String::new();
+
+    write!(res, "[").unwrap();
+
+    if let Some(first) = iter.next() {
+        write!(res, "{first}").unwrap();
+        for item in iter {
+            res.push_str(", ");
+            write!(res, "{item}").unwrap();
+        }
+    }
+
+    res.push(']');
+    res
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

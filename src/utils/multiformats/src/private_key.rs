@@ -27,12 +27,26 @@ impl std::fmt::Debug for PrivateKey {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl PrivateKey {
-    pub fn from_bytes(bytes: &[u8; ed25519_dalek::SECRET_KEY_LENGTH]) -> Self {
+    pub const SECRET_KEY_LENGTH: usize = ed25519_dalek::SECRET_KEY_LENGTH;
+
+    pub fn from_bytes(bytes: &[u8; Self::SECRET_KEY_LENGTH]) -> Self {
         Self(ed25519_dalek::SigningKey::from_bytes(bytes))
     }
 
+    /// Creates a private key from bytes, zero-padding/truncating to
+    /// `SECRET_KEY_LENGTH`.
+    ///
+    /// **Not cryptographically secure** -- for tests only.
+    pub fn from_bytes_padded(bytes: &[u8]) -> Self {
+        let mut seed_buf = [0_u8; PrivateKey::SECRET_KEY_LENGTH];
+        let copy_len = bytes.len().min(seed_buf.len());
+        seed_buf[..copy_len].copy_from_slice(&bytes[..copy_len]);
+
+        Self::from_bytes(&seed_buf)
+    }
+
     pub fn from_multibase(s: &str) -> Result<Self, PrivateKeyDecodeError> {
-        let mut buf = [0u8; ed25519_dalek::SECRET_KEY_LENGTH];
+        let mut buf = [0u8; Self::SECRET_KEY_LENGTH];
         let len = Multibase::decode(s, &mut buf)?;
         if len != buf.len() {
             Err(PrivateKeyDecodeError::InvalidLength {
@@ -74,7 +88,7 @@ impl std::ops::Deref for PrivateKey {
 
 impl serde::Serialize for PrivateKey {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let multibase = Multibase::encode::<{ ed25519_dalek::SECRET_KEY_LENGTH * 2 }>(
+        let multibase = Multibase::encode::<{ Self::SECRET_KEY_LENGTH * 2 }>(
             &self.0.to_bytes(),
             Multibase::Base64Url,
         );

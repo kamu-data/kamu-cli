@@ -11,7 +11,6 @@ use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 
 use database_common::PaginationOpts;
-use dill::*;
 use email_utils::Email;
 use internal_error::ErrorIntoInternal;
 
@@ -92,11 +91,11 @@ impl State {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
-#[interface(dyn AccountRepository)]
-#[interface(dyn ExpensiveAccountRepository)]
-#[interface(dyn PasswordHashRepository)]
-#[scope(Singleton)]
+#[dill::component(pub)]
+#[dill::interface(dyn AccountRepository)]
+#[dill::interface(dyn ExpensiveAccountRepository)]
+#[dill::interface(dyn PasswordHashRepository)]
+#[dill::scope(dill::Singleton)]
 impl InMemoryAccountRepository {
     pub fn new() -> Self {
         Self {
@@ -311,6 +310,35 @@ impl AccountRepository for InMemoryAccountRepository {
         Ok(maybe_account.map(|a| a.id.clone()))
     }
 
+    async fn find_account_ids_by_unique_fields(
+        &self,
+        account_name: &odf::AccountName,
+        email: &Email,
+        provider_identity_key: &str,
+    ) -> Result<Vec<odf::AccountID>, FindAccountIdsByUniqueFieldsError> {
+        let guard = self.state.lock().unwrap();
+        let mut account_ids = Vec::new();
+
+        for account in guard.accounts_by_id.values() {
+            let matches_name = account
+                .account_name
+                .as_str()
+                .eq_ignore_ascii_case(account_name.as_ref());
+            let matches_email = account.email.as_ref().eq_ignore_ascii_case(email.as_ref());
+            let matches_provider_identity_key =
+                account.provider_identity_key == provider_identity_key;
+
+            if matches_name || matches_email || matches_provider_identity_key {
+                account_ids.push(account.id.clone());
+            }
+        }
+
+        account_ids.sort();
+        account_ids.dedup();
+
+        Ok(account_ids)
+    }
+
     fn search_accounts_by_name_pattern(
         &self,
         name_pattern: &str,
@@ -498,6 +526,17 @@ impl PasswordHashRepository for InMemoryAccountRepository {
             .get(&existing_account.id)
             .cloned();
         Ok(maybe_hash_as_string)
+    }
+
+    async fn find_password_hash_by_account_id(
+        &self,
+        account_id: &odf::AccountID,
+    ) -> Result<Option<String>, FindPasswordHashError> {
+        let guard = self.state.lock().unwrap();
+
+        let maybe_password_hash = guard.password_hash_by_account_id.get(account_id).cloned();
+
+        Ok(maybe_password_hash)
     }
 }
 

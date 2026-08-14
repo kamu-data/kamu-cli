@@ -9,10 +9,10 @@
 
 use std::sync::Arc;
 
-use dill::*;
 use email_utils::Email;
 use internal_error::ResultIntoInternal;
 use kamu_accounts::*;
+use reqwest::Url;
 use serde::Deserialize;
 use thiserror::Error;
 
@@ -20,34 +20,32 @@ use thiserror::Error;
 
 pub const ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_ID: &str = "KAMU_AUTH_GITHUB_CLIENT_ID";
 pub const ENV_VAR_KAMU_AUTH_GITHUB_CLIENT_SECRET: &str = "KAMU_AUTH_GITHUB_CLIENT_SECRET";
+const OAUTH_GITHUB_USER_AGENT: &str =
+    concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct OAuthGithub {
+    client: reqwest::Client,
     config: Arc<GithubAuthenticationConfig>,
 }
 
-#[component(pub)]
-#[interface(dyn AuthenticationProvider)]
-#[scope(Singleton)]
+#[dill::component(pub)]
+#[dill::interface(dyn AuthenticationProvider)]
+#[dill::scope(dill::Singleton)]
 impl OAuthGithub {
     pub fn new(config: Arc<GithubAuthenticationConfig>) -> Self {
-        Self { config }
-    }
-
-    fn get_client(&self) -> Result<reqwest::Client, reqwest::Error> {
-        reqwest::Client::builder()
-            .user_agent(concat!(
-                env!("CARGO_PKG_NAME"),
-                "/",
-                env!("CARGO_PKG_VERSION"),
-            ))
-            .build()
+        Self {
+            client: reqwest::Client::builder()
+                .user_agent(OAUTH_GITHUB_USER_AGENT)
+                .build()
+                .expect("Failed to build HTTP client"),
+            config,
+        }
     }
 
     async fn github_login_via_code(
         &self,
-        client: &reqwest::Client,
         code: String,
     ) -> Result<GithubAccountInfo, ProviderLoginError> {
         let params = [
@@ -56,7 +54,8 @@ impl OAuthGithub {
             ("code", code.as_str()),
         ];
 
-        let body = client
+        let body = self
+            .client
             .post("https://github.com/login/oauth/access_token")
             .header(http::header::ACCEPT, "application/json")
             .form(&params)
@@ -74,16 +73,16 @@ impl OAuthGithub {
         let github_access_token = serde_json::from_str::<GithubAccessToken>(&body)
             .map_err(|_| ProviderLoginError::RejectedCredentials(RejectedCredentialsError {}))?;
 
-        self.github_login_via_access_token(client, &github_access_token.access_token)
+        self.github_login_via_access_token(&github_access_token.access_token)
             .await
     }
 
     async fn github_login_via_access_token(
         &self,
-        client: &reqwest::Client,
         access_token: &String,
     ) -> Result<GithubAccountInfo, ProviderLoginError> {
-        let mut github_account_info = client
+        let mut github_account_info = self
+            .client
             .get("https://api.github.com/user")
             .bearer_auth(access_token)
             .header(http::header::ACCEPT, "application/vnd.github.v3+json")
@@ -100,8 +99,7 @@ impl OAuthGithub {
 
         // The user may not have a public email, request primary private email
         if github_account_info.email.is_none() {
-            github_account_info.email =
-                Some(self.fetch_user_primary_email(client, access_token).await?);
+            github_account_info.email = Some(self.fetch_user_primary_email(access_token).await?);
         }
 
         Ok(github_account_info)
@@ -109,11 +107,11 @@ impl OAuthGithub {
 
     async fn fetch_user_primary_email(
         &self,
-        client: &reqwest::Client,
         access_token: &String,
     ) -> Result<String, ProviderLoginError> {
         // Note: the request goes without pagination (first 30 emails)
-        let github_emails_response = client
+        let github_emails_response = self
+            .client
             .get("https://api.github.com/user/emails")
             .bearer_auth(access_token)
             .header(http::header::ACCEPT, "application/vnd.github.v3+json")
@@ -156,19 +154,15 @@ impl AuthenticationProvider for OAuthGithub {
             serde_json::from_str::<GithubLoginCredentials>(login_credentials_json.as_str())
                 .map_err(ProviderLoginError::invalid_credentials)?;
 
-        // Prepare HTTP client for GitHub
-        let client = self.get_client().int_err()?;
-
         // 2 types of login:
         //  - we have GitHub code, which we use to resolve the access token, and then
         //    use the token to get user info (UI flow)
         //  - we have GitHub access token already, which we use to get the user info
         //    quicker (silent login flow)
         let github_account_info = if let Some(code) = github_login_credentials.code {
-            self.github_login_via_code(&client, code).await?
+            self.github_login_via_code(code).await?
         } else if let Some(access_token) = github_login_credentials.access_token {
-            self.github_login_via_access_token(&client, &access_token)
-                .await?
+            self.github_login_via_access_token(&access_token).await?
         } else {
             // Either "code" or "access_token" are expected in the query
             return Err(ProviderLoginError::InvalidCredentials(
@@ -176,7 +170,7 @@ impl AuthenticationProvider for OAuthGithub {
             ));
         };
 
-        // Validate email
+        // Validate email & extract avatar URL
         let email = Email::parse(
             github_account_info
                 .email
@@ -184,18 +178,19 @@ impl AuthenticationProvider for OAuthGithub {
                 .as_str(),
         )
         .unwrap();
+        let avatar_url = github_account_info
+            .avatar_url
+            .map(|url| Url::parse(&url).unwrap());
 
         // Extract matching fields
         Ok(ProviderLoginResponse {
-            // For GitHub, generate a random DID, regardless of the name
-            account_id: odf::AccountID::new_generated_ed25519().1,
+            account_id: None,
             account_name: odf::AccountName::new_unchecked(&github_account_info.login),
-            account_type: AccountType::User,
             email,
             display_name: github_account_info
                 .name
                 .unwrap_or(github_account_info.login),
-            avatar_url: github_account_info.avatar_url,
+            avatar_url,
             // Use GitHub ID as an identity key
             provider_identity_key: github_account_info.id.to_string(),
         })
@@ -287,8 +282,8 @@ impl GithubAuthenticationConfig {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
-#[interface(dyn AuthenticationProvider)]
+#[dill::component(pub)]
+#[dill::interface(dyn AuthenticationProvider)]
 pub struct DummyOAuthGithub {}
 
 #[async_trait::async_trait]
@@ -304,9 +299,8 @@ impl AuthenticationProvider for DummyOAuthGithub {
         let account = "e2e-user".to_string();
 
         Ok(ProviderLoginResponse {
-            account_id: odf::AccountID::new_generated_ed25519().1,
+            account_id: None,
             account_name: odf::AccountName::new_unchecked(&account),
-            account_type: AccountType::User,
             email: Email::parse("e2e-user@example.com").unwrap(),
             display_name: account.clone(),
             avatar_url: None,

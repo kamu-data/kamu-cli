@@ -77,7 +77,7 @@ pub fn parse_ddl_to_odf_schema(
 fn convert_sql_to_odf_data_type(
     data_type: &datafusion::sql::sqlparser::ast::DataType,
 ) -> Result<odf_metadata::schema::DataType, odf_metadata::data::UnsupportedSchema> {
-    use datafusion::sql::sqlparser::ast::DataType as SqlDataType;
+    use datafusion::sql::sqlparser::ast::{DataType as SqlDataType, ExactNumberInfo};
     use odf_metadata::schema::*;
 
     let res = match data_type {
@@ -96,6 +96,12 @@ fn convert_sql_to_odf_data_type(
         SqlDataType::BigIntUnsigned(_) => DataType::u64().optional(),
         SqlDataType::Float(_) | SqlDataType::Float32 => DataType::f32().optional(),
         SqlDataType::Double(_) => DataType::f64().optional(),
+        SqlDataType::Decimal(ExactNumberInfo::PrecisionAndScale(precision, scale)) => {
+            DataType::decimal(
+                u32::try_from(*precision).unwrap(),
+                i32::try_from(*scale).unwrap(),
+            )
+        }
         SqlDataType::Date => DataType::date(),
         SqlDataType::Timestamp(_, _) => DataType::timestamp_millis_utc().optional(),
         SqlDataType::String(_)
@@ -126,6 +132,7 @@ fn convert_sql_to_odf_data_type(
         | SqlDataType::Char(_)
         | SqlDataType::CharacterVarying(_)
         | SqlDataType::CharVarying(_)
+        | SqlDataType::Decimal(ExactNumberInfo::None | ExactNumberInfo::Precision(_))
         | SqlDataType::DecimalUnsigned(_)
         | SqlDataType::DecUnsigned(_)
         | SqlDataType::FloatUnsigned(_)
@@ -145,7 +152,6 @@ fn convert_sql_to_odf_data_type(
         | SqlDataType::LongBlob
         | SqlDataType::Bytes(_)
         | SqlDataType::Numeric(_)
-        | SqlDataType::Decimal(_)
         | SqlDataType::BigNumeric(_)
         | SqlDataType::BigDecimal(_)
         | SqlDataType::Dec(_)

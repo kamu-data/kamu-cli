@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "\n            UPDATE dataset_entries\n            SET dataset_name = ?\n            WHERE dataset_id = ?\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "1ff8096afb64fa94ac4f37cb937c88d9ae444fbcff2546e5a12df90537d11940"
+}

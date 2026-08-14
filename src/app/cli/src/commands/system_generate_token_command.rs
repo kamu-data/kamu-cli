@@ -19,6 +19,7 @@ use crate::{CLIError, Command};
 #[dill::interface(dyn Command)]
 pub struct GenerateTokenCommand {
     jwt_token_issuer: Arc<dyn kamu_accounts::JwtTokenIssuer>,
+    account_service: Arc<dyn kamu_accounts::AccountService>,
 
     #[dill::component(explicit)]
     login: Option<String>,
@@ -34,9 +35,25 @@ pub struct GenerateTokenCommand {
 impl Command for GenerateTokenCommand {
     async fn run(&self) -> Result<(), CLIError> {
         let subject = if let Some(subject) = &self.subject {
-            odf::AccountID::from_did_str(subject).int_err()?
+            let candidate_account_id = odf::AccountID::from_did_str(subject).int_err()?;
+            let account = self
+                .account_service
+                .get_account_by_id(&candidate_account_id)
+                .await
+                .int_err()?;
+
+            account.id
         } else if let Some(login) = &self.login {
-            odf::AccountID::new_seeded_ed25519(login.as_bytes())
+            use std::str::FromStr;
+
+            let account_name = odf::AccountName::from_str(login).int_err()?;
+            let account = self
+                .account_service
+                .get_account_by_name(&account_name)
+                .await
+                .int_err()?;
+
+            account.id
         } else {
             return Err(CLIError::usage_error("Specify --login or --subject"));
         };

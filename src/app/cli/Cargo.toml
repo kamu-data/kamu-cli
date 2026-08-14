@@ -47,11 +47,16 @@ database-common-macros = { workspace = true }
 file-utils = { workspace = true }
 init-on-startup = { workspace = true }
 internal-error = { workspace = true }
-observability = { workspace = true, features = ["dill", "prometheus"] }
+observability = { workspace = true, features = [
+    "dill",
+    "prometheus",
+] }
 server-console = { workspace = true }
 time-source = { workspace = true }
 
-kamu = { workspace = true, features = ["query-extensions-nested-functions"] }
+kamu = { workspace = true, features = [
+    "query-extensions-nested-functions",
+] }
 
 kamu-adapter-auth-oso-rebac = { workspace = true }
 kamu-adapter-auth-web3 = { workspace = true }
@@ -62,13 +67,18 @@ kamu-adapter-task-dataset = { workspace = true }
 kamu-adapter-task-webhook = { workspace = true }
 kamu-adapter-graphql = { workspace = true }
 graphql-http = { workspace = true }
-kamu-adapter-http = { workspace = true, features = [
+kamu-adapter-http = { workspace = true, default-features = false, features = [
     "e2e",
-], default-features = false }
+] }
 kamu-adapter-oauth = { workspace = true }
 kamu-adapter-odata = { workspace = true }
 kamu-datafusion-cli = { workspace = true }
-odf = { workspace = true, features = ["datafusion", "http", "lfs", "s3"] }
+odf = { workspace = true, default-features = false, features = [
+    "datafusion",
+    "http",
+    "lfs",
+    "s3",
+] }
 random-strings = { workspace = true }
 
 kamu-flow-system = { workspace = true }
@@ -93,6 +103,7 @@ kamu-accounts-sqlite = { workspace = true }
 kamu-datasets-services = { workspace = true }
 kamu-datasets = { workspace = true }
 kamu-datasets-inmem = { workspace = true }
+kamu-datasets-mysql = { workspace = true }
 kamu-datasets-postgres = { workspace = true }
 kamu-datasets-sqlite = { workspace = true }
 
@@ -174,7 +185,6 @@ serde_json = "1"
 tonic = { version = "0.14", default-features = false }
 tower = { version = "0.5", features = ["util"] }
 tower-http = { version = "0.6", features = ["trace", "cors", "catch-panic"] }
-utoipa = { version = "5", default-features = true, features = ["macros"] }
 utoipa-axum = { version = "0.2", default-features = true, features = [] }
 
 # Web UI

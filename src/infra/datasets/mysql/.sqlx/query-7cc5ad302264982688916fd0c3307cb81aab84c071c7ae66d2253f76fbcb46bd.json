@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "\n            UPDATE dataset_entries\n            SET owner_name = ?\n            WHERE owner_id = ?\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "7cc5ad302264982688916fd0c3307cb81aab84c071c7ae66d2253f76fbcb46bd"
+}

@@ -44,11 +44,15 @@ async fn test_predefined_accounts_appear_in_index(ctx: Arc<ElasticsearchTestCont
     let predefined_account_config = {
         let mut p = PredefinedAccountsConfig::new();
         p.predefined = vec![
-            AccountConfig::test_config_from_name(odf::AccountName::new_unchecked("john-doe"))
-                .set_registered_at(registered_at)
-                .set_display_name("John Doe".to_string()),
-            AccountConfig::test_config_from_name(odf::AccountName::new_unchecked("jane-smith"))
-                .set_registered_at(registered_at),
+            AccountConfig::test_config_from_name_with_id(odf::AccountName::new_unchecked(
+                "john-doe",
+            ))
+            .set_registered_at(registered_at)
+            .set_display_name("John Doe".to_string()),
+            AccountConfig::test_config_from_name_with_id(odf::AccountName::new_unchecked(
+                "jane-smith",
+            ))
+            .set_registered_at(registered_at),
         ];
         p
     };
@@ -293,9 +297,9 @@ impl AccountIndexingHarness {
 
         let catalog = b.build();
 
-        init_on_startup::run_startup_jobs(&catalog).await.unwrap();
-
         ElasticsearchBaseHarness::run_initial_indexing(&catalog).await;
+
+        init_on_startup::run_startup_jobs(&catalog).await.unwrap();
 
         Self {
             es_base_harness,

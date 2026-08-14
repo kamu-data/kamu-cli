@@ -55,7 +55,7 @@ type Account {
 	"""
 	Avatar URL
 	"""
-	avatarUrl: String
+	avatarUrl: Url
 	"""
 	Indicates the administrator status
 	"""

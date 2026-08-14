@@ -54,14 +54,206 @@ const USER_PETYA: &str = "petya";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct Harness {
+#[test_log::test(tokio::test)]
+async fn test_login_with_password_method_success() {
+    let harness = PlatformLoginHarness::new().await;
+
+    let login_url = harness.login_url();
+    let validate_url = harness.validate_url();
+
+    let client = async move {
+        let client = reqwest::Client::new();
+
+        let login_credentials_json = json!({
+            "login": String::from(USER_WASYA),
+            "password": String::from(PASSWORD_WASYA)
+        })
+        .to_string();
+
+        let login_response = client
+            .post(login_url)
+            .json(&LoginRequestBody {
+                login_method: AccountProvider::Password.to_string(),
+                login_credentials_json,
+            })
+            .send()
+            .await
+            .unwrap();
+        pretty_assertions::assert_eq!(http::StatusCode::OK, login_response.status());
+
+        let login_response_body = login_response.json::<LoginResponseBody>().await.unwrap();
+
+        let validate_response = client
+            .get(validate_url)
+            .bearer_auth(login_response_body.access_token)
+            .send()
+            .await
+            .unwrap();
+        pretty_assertions::assert_eq!(http::StatusCode::OK, validate_response.status());
+    };
+
+    await_client_server_flow!(harness.api_server_run(), client);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_login_with_password_method_invalid_credentials() {
+    let harness = PlatformLoginHarness::new().await;
+
+    let login_url = harness.login_url();
+
+    let client = async move {
+        let client = reqwest::Client::new();
+
+        let login_credentials_json = json!({
+            "login": String::from(USER_WASYA),
+            "password": String::from("wrong-password")
+        })
+        .to_string();
+
+        let login_response = client
+            .post(login_url)
+            .json(&LoginRequestBody {
+                login_method: AccountProvider::Password.to_string(),
+                login_credentials_json,
+            })
+            .send()
+            .await
+            .unwrap();
+
+        pretty_assertions::assert_eq!(http::StatusCode::UNAUTHORIZED, login_response.status());
+        pretty_assertions::assert_eq!(
+            json!({
+                "message": "Rejected credentials: invalid login or password"
+            }),
+            login_response.json::<serde_json::Value>().await.unwrap()
+        );
+    };
+
+    await_client_server_flow!(harness.api_server_run(), client);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_login_with_password_method_expired_credentials() {
+    let harness = PlatformLoginHarness::new().await;
+    let time_source_stub = harness.system_time_source_stub.clone();
+
+    let login_url = harness.login_url();
+    let validate_url = harness.validate_url();
+
+    let client = async move {
+        let client = reqwest::Client::new();
+
+        // Roll back time on 2 days to get expired token
+        time_source_stub.set(Utc::now() - Duration::days(2));
+
+        let login_credentials_json = json!({
+            "login": String::from(USER_WASYA),
+            "password": String::from(PASSWORD_WASYA)
+        })
+        .to_string();
+
+        let login_response = client
+            .post(login_url)
+            .json(&LoginRequestBody {
+                login_method: AccountProvider::Password.to_string(),
+                login_credentials_json,
+            })
+            .send()
+            .await
+            .unwrap();
+
+        pretty_assertions::assert_eq!(http::StatusCode::OK, login_response.status());
+
+        let login_response_body = login_response.json::<LoginResponseBody>().await.unwrap();
+
+        let validate_response = client
+            .get(validate_url)
+            .bearer_auth(login_response_body.access_token)
+            .send()
+            .await
+            .unwrap();
+
+        pretty_assertions::assert_eq!(http::StatusCode::UNAUTHORIZED, validate_response.status());
+        pretty_assertions::assert_eq!(
+            json!({
+                "message": "Authentication token expired"
+            }),
+            validate_response.json::<serde_json::Value>().await.unwrap()
+        );
+    };
+
+    await_client_server_flow!(harness.api_server_run(), client);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_validate_invalid_token_fails() {
+    let harness = PlatformLoginHarness::new().await;
+    let validate_url = harness.validate_url();
+
+    let client = async move {
+        let client = reqwest::Client::new();
+
+        let validate_response = client
+            .get(validate_url)
+            .bearer_auth("bad-access-token")
+            .send()
+            .await
+            .unwrap();
+
+        pretty_assertions::assert_eq!(http::StatusCode::UNAUTHORIZED, validate_response.status());
+        pretty_assertions::assert_eq!(
+            json!({
+                "message": "Authentication token invalid"
+            }),
+            validate_response.json::<serde_json::Value>().await.unwrap()
+        );
+    };
+
+    await_client_server_flow!(harness.api_server_run(), client);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_validate_without_token_fails() {
+    let harness = PlatformLoginHarness::new().await;
+    let validate_url = harness.validate_url();
+
+    let client = async move {
+        let client = reqwest::Client::new();
+
+        let validate_response = client.get(validate_url).send().await.unwrap();
+
+        pretty_assertions::assert_eq!(http::StatusCode::UNAUTHORIZED, validate_response.status());
+        pretty_assertions::assert_eq!(
+            json!({
+                "message": "No authentication token provided"
+            }),
+            validate_response.json::<serde_json::Value>().await.unwrap()
+        );
+    };
+
+    await_client_server_flow!(harness.api_server_run(), client);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Harness
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct PlatformLoginHarness {
     #[allow(dead_code)]
     run_info_dir: tempfile::TempDir,
     api_server: TestAPIServer,
     system_time_source_stub: Arc<SystemTimeSourceStub>,
 }
 
-impl Harness {
+impl PlatformLoginHarness {
     async fn new() -> Self {
         let run_info_dir = tempfile::tempdir().unwrap();
 
@@ -140,196 +332,6 @@ impl Harness {
     async fn api_server_run(self) -> Result<(), InternalError> {
         self.api_server.run().await.int_err()
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_login_with_password_method_success() {
-    let harness = Harness::new().await;
-
-    let login_url = harness.login_url();
-    let validate_url = harness.validate_url();
-
-    let client = async move {
-        let client = reqwest::Client::new();
-
-        let login_credentials_json = json!({
-            "login": String::from(USER_WASYA),
-            "password": String::from(PASSWORD_WASYA)
-        })
-        .to_string();
-
-        let login_response = client
-            .post(login_url)
-            .json(&LoginRequestBody {
-                login_method: AccountProvider::Password.to_string(),
-                login_credentials_json,
-            })
-            .send()
-            .await
-            .unwrap();
-        pretty_assertions::assert_eq!(http::StatusCode::OK, login_response.status());
-
-        let login_response_body = login_response.json::<LoginResponseBody>().await.unwrap();
-
-        let validate_response = client
-            .get(validate_url)
-            .bearer_auth(login_response_body.access_token)
-            .send()
-            .await
-            .unwrap();
-        pretty_assertions::assert_eq!(http::StatusCode::OK, validate_response.status());
-    };
-
-    await_client_server_flow!(harness.api_server_run(), client);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_login_with_password_method_invalid_credentials() {
-    let harness = Harness::new().await;
-
-    let login_url = harness.login_url();
-
-    let client = async move {
-        let client = reqwest::Client::new();
-
-        let login_credentials_json = json!({
-            "login": String::from(USER_WASYA),
-            "password": String::from("wrong-password")
-        })
-        .to_string();
-
-        let login_response = client
-            .post(login_url)
-            .json(&LoginRequestBody {
-                login_method: AccountProvider::Password.to_string(),
-                login_credentials_json,
-            })
-            .send()
-            .await
-            .unwrap();
-
-        pretty_assertions::assert_eq!(http::StatusCode::UNAUTHORIZED, login_response.status());
-        pretty_assertions::assert_eq!(
-            json!({
-                "message": "Rejected credentials: invalid login or password"
-            }),
-            login_response.json::<serde_json::Value>().await.unwrap()
-        );
-    };
-
-    await_client_server_flow!(harness.api_server_run(), client);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_login_with_password_method_expired_credentials() {
-    let harness = Harness::new().await;
-    let time_source_stub = harness.system_time_source_stub.clone();
-
-    let login_url = harness.login_url();
-    let validate_url = harness.validate_url();
-
-    let client = async move {
-        let client = reqwest::Client::new();
-
-        // Roll back time on 2 days to get expired token
-        time_source_stub.set(Utc::now() - Duration::days(2));
-
-        let login_credentials_json = json!({
-            "login": String::from(USER_WASYA),
-            "password": String::from(PASSWORD_WASYA)
-        })
-        .to_string();
-
-        let login_response = client
-            .post(login_url)
-            .json(&LoginRequestBody {
-                login_method: AccountProvider::Password.to_string(),
-                login_credentials_json,
-            })
-            .send()
-            .await
-            .unwrap();
-
-        pretty_assertions::assert_eq!(http::StatusCode::OK, login_response.status());
-
-        let login_response_body = login_response.json::<LoginResponseBody>().await.unwrap();
-
-        let validate_response = client
-            .get(validate_url)
-            .bearer_auth(login_response_body.access_token)
-            .send()
-            .await
-            .unwrap();
-
-        pretty_assertions::assert_eq!(http::StatusCode::UNAUTHORIZED, validate_response.status());
-        pretty_assertions::assert_eq!(
-            json!({
-                "message": "Authentication token expired"
-            }),
-            validate_response.json::<serde_json::Value>().await.unwrap()
-        );
-    };
-
-    await_client_server_flow!(harness.api_server_run(), client);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_validate_invalid_token_fails() {
-    let harness = Harness::new().await;
-    let validate_url = harness.validate_url();
-
-    let client = async move {
-        let client = reqwest::Client::new();
-
-        let validate_response = client
-            .get(validate_url)
-            .bearer_auth("bad-access-token")
-            .send()
-            .await
-            .unwrap();
-
-        pretty_assertions::assert_eq!(http::StatusCode::UNAUTHORIZED, validate_response.status());
-        pretty_assertions::assert_eq!(
-            json!({
-                "message": "Authentication token invalid"
-            }),
-            validate_response.json::<serde_json::Value>().await.unwrap()
-        );
-    };
-
-    await_client_server_flow!(harness.api_server_run(), client);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[test_log::test(tokio::test)]
-async fn test_validate_without_token_fails() {
-    let harness = Harness::new().await;
-    let validate_url = harness.validate_url();
-
-    let client = async move {
-        let client = reqwest::Client::new();
-
-        let validate_response = client.get(validate_url).send().await.unwrap();
-
-        pretty_assertions::assert_eq!(http::StatusCode::UNAUTHORIZED, validate_response.status());
-        pretty_assertions::assert_eq!(
-            json!({
-                "message": "No authentication token provided"
-            }),
-            validate_response.json::<serde_json::Value>().await.unwrap()
-        );
-    };
-
-    await_client_server_flow!(harness.api_server_run(), client);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

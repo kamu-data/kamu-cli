@@ -33,6 +33,7 @@ impl DatasetID {
         (key, Self::new(did))
     }
 
+    #[cfg(any(feature = "testing", test))]
     /// For testing purposes only. Use [`DatasetID::new_generated_ed25519`] for
     /// cryptographically secure generation
     pub fn new_seeded_ed25519(seed: &[u8]) -> Self {
