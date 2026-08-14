@@ -49,6 +49,30 @@ pub enum UnsupportedSelectorFieldError {
 
     #[error("Resource reference must specify at least one of `id` or `name`")]
     EmptyRef,
+
+    /// The listing pipeline resolves one account per call, not per selector:
+    /// `ResourceRepository`'s scoped reads take a single scalar `account_id`
+    /// alongside the scope. Until that is per-row, honouring this field is
+    /// impossible — and silently ignoring it would scope the call to the
+    /// caller's own account while the caller believes otherwise, which is a
+    /// wrong-data bug rather than a missing feature.
+    #[error(
+        "Per-selector `account` is not supported yet — use the call-level account instead. Every \
+         selector in one call must span the same account"
+    )]
+    PerSelectorAccount,
+}
+
+/// Rejects a selector carrying a field the listing pipeline would drop.
+///
+/// Mirrors [`validate_ref`] for the selector half. A selector narrowing by
+/// nothing is meaningful (it matches its whole type), so unlike a ref there is
+/// no "empty" case to reject.
+pub fn validate_selector(value: &ResourceSelector) -> Result<(), UnsupportedSelectorFieldError> {
+    if value.account.is_some() {
+        return Err(UnsupportedSelectorFieldError::PerSelectorAccount);
+    }
+    Ok(())
 }
 
 /// Rejects a ref the facade cannot resolve: one carrying a `did`, or one

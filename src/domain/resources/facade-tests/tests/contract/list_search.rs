@@ -157,6 +157,196 @@ pub async fn test_list_narrowed_by_query(h: &impl FacadeContractHarness) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// RF-088
+contract_test!(
+    list_handles_honours_selectors,
+    super::test_list_handles_honours_selectors
+);
+
+/// `list_handles` used to hardcode an unnarrowed scope while its sibling `list`
+/// accepted a query. Unifying on selectors removed that asymmetry — this pins
+/// the new behaviour so it is not mistaken for an accident and quietly
+/// reverted.
+pub async fn test_list_handles_honours_selectors(h: &impl FacadeContractHarness) {
+    for name in ["handles-app-one", "handles-app-two", "handles-db-one"] {
+        create_resource(h, TestAccount::Alice, name).await;
+    }
+
+    let facade = h.facade_for(TestAccount::Alice);
+
+    let list_handles = async |selectors: Vec<ResourceSelector>| {
+        let mut handles = facade
+            .list_handles(ListResourceHandlesRequest {
+                selectors,
+                account: None,
+                label_filter: None,
+                pagination: PaginationOpts::from_max_results(1000),
+            })
+            .await
+            .unwrap();
+        normalize_handles(&mut handles);
+        sorted_handle_names(handles)
+    };
+
+    let variable_set = || VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap();
+
+    // A name pattern narrows…
+    assert_eq!(
+        list_handles(vec![ResourceSelector::name_pattern(
+            variable_set(),
+            "handles-app-%"
+        )])
+        .await,
+        vec!["handles-app-one", "handles-app-two"]
+    );
+
+    // …and an unnarrowed selector still returns the whole type, so the
+    // narrowing above is the selector's doing rather than an empty result.
+    let all = list_handles(vec![ResourceSelector::of_type(variable_set())]).await;
+    assert!(
+        all.len() >= 3,
+        "an unnarrowed selector must span the whole type, got {all:?}"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-105
+contract_test!(
+    per_selector_account_is_rejected,
+    super::test_per_selector_account_is_rejected
+);
+
+/// The ODF selector carries an `account`, and the GraphQL input exposes it, but
+/// the listing pipeline resolves one account per call — `ResourceRepository`'s
+/// scoped reads take a single scalar `account_id` alongside the scope.
+///
+/// Honouring it is a later stage. Until then it must be *rejected*, never
+/// ignored: silently dropping it would scope the call to the caller's own
+/// account while the caller believes they asked for another's, which is a
+/// wrong-data bug rather than a missing feature.
+pub async fn test_per_selector_account_is_rejected(h: &impl FacadeContractHarness) {
+    let facade = h.facade_for(TestAccount::Alice);
+
+    let with_account = |selector: ResourceSelector| ResourceSelector {
+        account: Some(kamu_resources::ResourceAccountRef {
+            id: None,
+            did: None,
+            name: Some(h.account_name(TestAccount::Bob)),
+        }),
+        ..selector
+    };
+
+    let typed = with_account(ResourceSelector::of_type(
+        VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+    ));
+
+    let err = facade
+        .search_handles(SearchResourceHandlesRequest {
+            selectors: vec![typed.clone()],
+            account: None,
+            label_filter: None,
+            pagination: PaginationOpts::from_max_results(1000),
+        })
+        .await
+        .expect_err("per-selector account is not supported yet");
+    assert!(
+        err.to_string().contains("Per-selector `account`"),
+        "unexpected error: {err:?}"
+    );
+
+    // Also rejected on the type-less fast path, which answers without touching
+    // the catalog and so would otherwise skip the check entirely.
+    let err = facade
+        .search_handles(SearchResourceHandlesRequest {
+            selectors: vec![with_account(ResourceSelector::default())],
+            account: None,
+            label_filter: None,
+            pagination: PaginationOpts::from_max_results(1000),
+        })
+        .await
+        .expect_err("per-selector account is not supported on the fast path either");
+    assert!(
+        err.to_string().contains("Per-selector `account`"),
+        "unexpected error: {err:?}"
+    );
+
+    // The call-level account remains the supported way to span another account.
+    facade
+        .search_handles(SearchResourceHandlesRequest {
+            selectors: vec![ResourceSelector::of_type(
+                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            )],
+            account: None,
+            label_filter: None,
+            pagination: PaginationOpts::from_max_results(1000),
+        })
+        .await
+        .expect("the same selector without an account must still work");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-106
+contract_test!(
+    any_type_selector_scope_limits,
+    super::test_any_type_selector_scope_limits
+);
+
+/// The two `AnyType` limits of `ResourceScope`, which carries a single query
+/// rather than a per-type list. Both became reachable when listing started
+/// taking selectors, and both disappear once every row carries its own type.
+///
+/// Asserted on the message rather than the variant: remote surfaces these as
+/// transport-level GraphQL errors, and they are temporary.
+pub async fn test_any_type_selector_scope_limits(h: &impl FacadeContractHarness) {
+    let facade = h.facade_for(TestAccount::Alice);
+
+    let search = async |selectors: Vec<ResourceSelector>| {
+        facade
+            .search_handles(SearchResourceHandlesRequest {
+                selectors,
+                account: None,
+                label_filter: None,
+                pagination: PaginationOpts::from_max_results(1000),
+            })
+            .await
+    };
+
+    // A type-less selector already spans every type, so pairing it with a typed
+    // one cannot be expressed as per-type rows.
+    let err = search(vec![
+        ResourceSelector::any_type_name_pattern("mixed-%"),
+        ResourceSelector::name_pattern(VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(), "mixed-%"),
+    ])
+    .await
+    .expect_err("a type-less selector cannot be combined with typed selectors");
+    assert!(
+        err.to_string().contains("cannot be combined with typed"),
+        "unexpected error: {err:?}"
+    );
+
+    // Two type-less selectors narrowing by different modes need two queries,
+    // but `AnyType` carries only one.
+    let err = search(vec![
+        ResourceSelector::any_type_name_pattern("modes-%"),
+        ResourceSelector::any_type_id(ResourceID::new(uuid::Uuid::new_v4())),
+    ])
+    .await
+    .expect_err("a type-less selector may narrow by only one mode");
+    assert!(
+        err.to_string().contains("only one of"),
+        "unexpected error: {err:?}"
+    );
+
+    // A single type-less selector with one mode stays representable.
+    search(vec![ResourceSelector::any_type_name_pattern("fine-%")])
+        .await
+        .expect("one type-less selector with one mode is representable");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // RF-080
 contract_test!(
     list_summaries_for_account,

@@ -4301,6 +4301,11 @@ single call span resource types. Every field is optional: a selector with no
 `type` spans every type, and one narrowing by nothing matches all of them.
 """
 input ResourceSelectorInput {
+	"""
+	Not supported yet — setting it is an error, not a silent no-op. Listing
+	resolves one account per call, so use the call-level `account` instead;
+	every selector in one call spans the same account.
+	"""
 	account: AccountRefInput
 	"""
 	Canonical selector (`variablesets`), alias (`vs`), ODF type name
