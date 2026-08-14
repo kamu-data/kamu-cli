@@ -65,8 +65,10 @@ impl From<&domain::ResourceAccountRef> for AccountRefInput {
 pub(crate) struct ResourceRefInput {
     pub account: Option<AccountRefInput>,
 
+    /// `None` spans every type — the server resolves which one holds the named
+    /// resource, and reports an ambiguity if several do.
     #[cynic(rename = "type")]
-    pub type_: ResourceTypeSelectorInput,
+    pub type_: Option<ResourceTypeSelectorInput>,
 
     pub id: Option<domain::ResourceID>,
     pub name: Option<domain::ResourceName>,
@@ -76,7 +78,10 @@ impl From<&domain::ResourceRef> for ResourceRefInput {
     fn from(value: &domain::ResourceRef) -> Self {
         Self {
             account: value.account.as_ref().map(Into::into),
-            type_: ResourceTypeSelectorInput::from_type_ref(&value.r#type),
+            type_: value
+                .r#type
+                .as_ref()
+                .map(ResourceTypeSelectorInput::from_type_ref),
             id: value.id,
             name: value.name.clone(),
             // `did` is deliberately absent: it has no wire representation, and

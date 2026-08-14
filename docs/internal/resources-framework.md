@@ -847,21 +847,47 @@ pub trait ResourceFacade: Send + Sync {
 **Selectors & view modes:**
 
 ```rust
-// Both mirror the ODF types. A `ResourceRef` is exact and names one resource;
-// a `ResourceSelector` carries a SQL LIKE pattern and matches zero or many.
-pub struct ResourceRef      { pub account: Option<ResourceAccountRef>, pub r#type: TypeRef,
-                              pub id: Option<ResourceID>, pub did: Option<...>,
+// Both *are* the ODF types — plain re-exports, not local twins. A `ResourceRef`
+// is exact and names one resource; a `ResourceSelector` carries a SQL LIKE
+// pattern and matches zero or many.
+pub type ResourceRef      = odf::metadata::resource::ResourceRef;
+pub type ResourceSelector = odf::metadata::resource::ResourceSelector;
+
+pub struct ResourceRef      { pub account: Option<ResourceAccountRef>, pub id: Option<ResourceID>,
+                              pub did: Option<Did>, pub r#type: Option<TypeRef>,
                               pub name: Option<ResourceName> }
-pub struct ResourceSelector { pub account: Option<ResourceAccountRef>, pub r#type: Option<TypeRef>,
-                              pub id: Option<ResourceID>, pub name: Option<String> /* LIKE pattern */,
+pub struct ResourceSelector { pub account: Option<ResourceAccountRef>, pub id: Option<ResourceID>,
+                              pub did: Option<Did>, pub r#type: Option<TypeRef>,
+                              pub name: Option<String> /* LIKE pattern */,
                               pub labels: Option<...> }
 pub enum   ResourceManifestFormat { Json, Yaml }
 pub enum   SpecViewMode { Encrypted /* default */, Revealed }
 ```
 
-Every `ResourceSelector` field is optional, so one selector can span every type
-and account. Several selectors act as a logical **OR**; an empty list matches
+Every field of both types is optional, so one selector can span every type and
+account. Several selectors act as a logical **OR**; an empty list matches
 nothing.
+
+> `ResourceSelector` used to be a kamu-local **twin** struct, existing solely because the spec
+> required `type` while the API needed type-less listing. ODF has since adopted the optional type
+> upstream, so the twin collapsed into the re-export above and its `From<odf …>` widening
+> conversion disappeared with it. Field order now follows ODF (`account, id, did, type, name`),
+> which the generated serde proxy and flatbuffers table also follow.
+
+`did` is forward-reserved in ODF for when datasets and accounts become resources. No repository can
+resolve by it, so it is **rejected rather than ignored** on both types — `validate_ref` for a ref
+and `validate_selector` for a selector. Silently dropping it would return a *wider* result set than
+was asked for, with no way for the caller to tell.
+
+A **type-less** `ResourceRef` (`type: None`) is resolved by searching every registered type. That
+resolution lives in `group_refs_by_target`, the shared front half of all three batch pipelines
+(`get_handles`, `resolve_multiple_resource_views` — which serves both `get_many` and
+`render_manifests` — and `delete_many`), so the three inherit it together rather than one at a time.
+Because a ref names *exactly one* resource, a name matching in several types is an **ambiguity**
+error (`AmbiguousType`, RF-172), not a multi-match: picking a winner would make `kamu get <name>`
+silently resolve to whichever type sorted first. A name matching in none is `AnyTypeNameNotFound`
+(RF-171). Contrast a type-less *selector*, for which several matches are the expected outcome —
+that asymmetry is the whole ref/selector distinction.
 
 A `ResourceRef` may carry **both** an `id` and a `name`. ODF treats the pair as a *consistency
 assertion* rather than two lookups: the `id` is the authoritative half the lookup uses, and the

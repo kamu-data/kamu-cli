@@ -142,10 +142,12 @@ fn unknown_account_by_id() -> ResourceAccountRef {
 fn selector_by_name(name: &str, account: Option<ResourceAccountRef>) -> ResourceRef {
     ResourceRef {
         account,
-        r#type: VARIABLE_SET_CANONICAL_SELECTOR
-            .parse::<TypeName>()
-            .unwrap()
-            .into(),
+        r#type: Some(
+            VARIABLE_SET_CANONICAL_SELECTOR
+                .parse::<TypeName>()
+                .unwrap()
+                .into(),
+        ),
         id: None,
         did: None,
         name: Some(name.parse().unwrap()),

@@ -36,10 +36,12 @@ use crate::helpers::{
 fn by_name_selector(name: &str) -> ResourceRef {
     ResourceRef {
         account: None,
-        r#type: VARIABLE_SET_CANONICAL_SELECTOR
-            .parse::<TypeName>()
-            .unwrap()
-            .into(),
+        r#type: Some(
+            VARIABLE_SET_CANONICAL_SELECTOR
+                .parse::<TypeName>()
+                .unwrap()
+                .into(),
+        ),
         id: None,
         did: None,
         name: Some(name.parse().unwrap()),
@@ -49,10 +51,12 @@ fn by_name_selector(name: &str) -> ResourceRef {
 fn by_id_selector(id: &kamu_resources::ResourceID) -> ResourceRef {
     ResourceRef {
         account: None,
-        r#type: VARIABLE_SET_CANONICAL_SELECTOR
-            .parse::<TypeName>()
-            .unwrap()
-            .into(),
+        r#type: Some(
+            VARIABLE_SET_CANONICAL_SELECTOR
+                .parse::<TypeName>()
+                .unwrap()
+                .into(),
+        ),
         id: Some(*id),
         did: None,
         name: None,
@@ -258,10 +262,12 @@ pub async fn test_get_wrong_schema_returns_mismatch(h: &impl FacadeContractHarne
 
     let wrong_schema_selector = ResourceRef {
         account: None,
-        r#type: SECRET_SET_CANONICAL_SELECTOR
-            .parse::<TypeName>()
-            .unwrap()
-            .into(),
+        r#type: Some(
+            SECRET_SET_CANONICAL_SELECTOR
+                .parse::<TypeName>()
+                .unwrap()
+                .into(),
+        ),
         id: Some(id),
         did: None,
         name: None,
@@ -308,10 +314,12 @@ pub async fn test_get_wrong_schema_returns_schema_mismatch(h: &impl FacadeContra
 
     let wrong_schema_selector = ResourceRef {
         account: None,
-        r#type: SECRET_SET_CANONICAL_SELECTOR
-            .parse::<TypeName>()
-            .unwrap()
-            .into(),
+        r#type: Some(
+            SECRET_SET_CANONICAL_SELECTOR
+                .parse::<TypeName>()
+                .unwrap()
+                .into(),
+        ),
         id: Some(id),
         did: None,
         name: None,

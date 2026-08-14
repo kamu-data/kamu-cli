@@ -1255,7 +1255,7 @@ fn test_serde_resource_input_refs() {
                 relations: Some(vec![RelationInput {
                     subject: ResourceRef {
                         account: None,
-                        r#type: TypeRef::Name("Account".parse().unwrap()),
+                        r#type: Some(TypeRef::Name("Account".parse().unwrap())),
                         id: None,
                         did: None,
                         name: Some("alice".parse().unwrap()),
@@ -1268,7 +1268,7 @@ fn test_serde_resource_input_refs() {
                             did: None,
                             name: Some("bob".parse().unwrap()),
                         }),
-                        r#type: TypeRef::Name("Dataset".parse().unwrap()),
+                        r#type: Some(TypeRef::Name("Dataset".parse().unwrap())),
                         id: None,
                         did: None,
                         name: Some("bobs-dataset".parse().unwrap()),
@@ -1281,7 +1281,7 @@ fn test_serde_resource_input_refs() {
                             did: None,
                             name: Some("bob".parse().unwrap()),
                         }),
-                        r#type: TypeRef::Name("Dataset".parse().unwrap()),
+                        r#type: Some(TypeRef::Name("Dataset".parse().unwrap())),
                         id: None,
                         did: None,
                         name: Some("bobs-dataset".parse().unwrap()),
@@ -1584,7 +1584,10 @@ fn test_serde_resource_selector_short_form() {
     .into_dto()
     .unwrap();
 
-    assert_eq!(selector.r#type.as_str(), "SecretSet");
+    assert_eq!(
+        selector.r#type.as_ref().map(TypeRef::as_str),
+        Some("SecretSet")
+    );
     assert_eq!(selector.name.as_deref(), Some("app-%"));
     assert_matches!(
         selector.account,
@@ -1612,8 +1615,9 @@ fn test_serde_resource_selector() {
             did: None,
             name: Some("alice".parse().unwrap()),
         }),
-        r#type: TypeName::new_unchecked("SecretSet").into(),
         id: Some(ResourceID::new(uuid::Uuid::new_v4())),
+        did: None,
+        r#type: Some(TypeName::new_unchecked("SecretSet").into()),
         name: Some("app-%".to_string()),
         labels: Some(LabelFilter {
             entries: [("environment".to_string(), json!("production"))]
@@ -1630,6 +1634,29 @@ fn test_serde_resource_selector() {
             .unwrap();
 
     assert_eq!(round_tripped, selector);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// `type` became optional when ODF adopted the type-less selector. A selector
+// that names no type must round-trip as `None` rather than failing the
+// now-absent required-field check.
+#[test]
+fn test_serde_resource_selector_without_type() {
+    let selector = ResourceSelector {
+        name: Some("app-%".to_string()),
+        ..Default::default()
+    };
+
+    let round_tripped: ResourceSelector =
+        serde_json::to_value(serde::resource::ResourceSelector::from(selector.clone()))
+            .and_then(serde_json::from_value::<serde::resource::ResourceSelector>)
+            .unwrap()
+            .into_dto()
+            .unwrap();
+
+    assert_eq!(round_tripped, selector);
+    assert!(round_tripped.r#type.is_none());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

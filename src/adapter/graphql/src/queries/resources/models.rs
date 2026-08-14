@@ -172,13 +172,21 @@ impl TryFrom<ResourceSelectorInput> for kamu_resources::ResourceSelector {
             ));
         }
 
-        Ok(Self {
+        let selector = Self {
             account: value.account.map(AccountRefInput::into_manifest_account),
             r#type: value.r#type.map(ResourceTypeSelectorInput::into_type_ref),
             id: value.id.map(Into::into),
+            // Reserved in ODF for when datasets and accounts become resources;
+            // the facade rejects a populated `did`, so it is not accepted here.
+            did: None,
             name: value.name,
             labels: None,
-        })
+        };
+
+        kamu_resources_facade::validate_selector(&selector)
+            .map_err(|e| GqlError::gql(e.to_string()))?;
+
+        Ok(selector)
     }
 }
 
@@ -261,7 +269,11 @@ pub struct ResourceRefInput {
     pub account: Option<AccountRefInput>,
     /// Canonical selector (`variablesets`), alias (`vs`), ODF type name
     /// (`VariableSet`), or full schema URI — all resolve to the same type.
-    pub r#type: ResourceTypeSelectorInput,
+    ///
+    /// `null` spans every type: the resource is looked up across all of them.
+    /// Since a ref names exactly one resource, a name matching in several types
+    /// is an ambiguity error rather than a multi-match.
+    pub r#type: Option<ResourceTypeSelectorInput>,
     pub id: Option<ResourceID<'static>>,
     /// Exact name. Never a pattern; use a selector for pattern matching.
     pub name: Option<ResourceName<'static>>,
@@ -273,7 +285,7 @@ impl TryFrom<ResourceRefInput> for kamu_resources::ResourceRef {
     fn try_from(value: ResourceRefInput) -> Result<Self, GqlError> {
         let resource_ref = Self {
             account: value.account.map(AccountRefInput::into_manifest_account),
-            r#type: value.r#type.into_type_ref(),
+            r#type: value.r#type.map(ResourceTypeSelectorInput::into_type_ref),
             id: value.id.map(Into::into),
             // Reserved in ODF for when datasets and accounts become resources;
             // the facade rejects a populated `did`, so it is not accepted here.
@@ -483,6 +495,24 @@ pub struct ResourceNameMismatchProblem {
     pub message: String,
 }
 
+/// A type-less reference whose name matched nothing in any type. Distinct from
+/// `ResourceNameNotFoundProblem`, which can name the single type it searched.
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ResourceAnyTypeNameNotFoundProblem {
+    pub name: ResourceName<'static>,
+    pub message: String,
+}
+
+/// A type-less reference whose name matched in several types. A reference names
+/// exactly one resource, so this is an addressing failure rather than a
+/// multi-match — the caller must say which type they meant.
+#[derive(SimpleObject, Debug, Clone)]
+pub struct ResourceAmbiguousTypeProblem {
+    pub name: ResourceName<'static>,
+    pub type_names: Vec<TypeName<'static>>,
+    pub message: String,
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// A reference that named neither an id nor a name.
@@ -495,6 +525,8 @@ pub struct ResourceEmptyRefProblem {
 pub enum ResourceLookupProblem {
     UidNotFound(ResourceIDNotFoundProblem),
     NameNotFound(ResourceNameNotFoundProblem),
+    AnyTypeNameNotFound(ResourceAnyTypeNameNotFoundProblem),
+    AmbiguousType(ResourceAmbiguousTypeProblem),
     SchemaMismatch(ResourceSchemaMismatchProblem),
     NameMismatch(ResourceNameMismatchProblem),
     EmptyRef(ResourceEmptyRefProblem),
@@ -513,6 +545,20 @@ impl From<kamu_resources_facade::ResourceLookupProblem> for ResourceLookupProble
                 name: e.name.clone().into(),
                 message: e.to_string(),
             }),
+            P::AnyTypeNameNotFound(e) => {
+                Self::AnyTypeNameNotFound(ResourceAnyTypeNameNotFoundProblem {
+                    name: e.name.clone().into(),
+                    message: e.to_string(),
+                })
+            }
+            P::AmbiguousType(e) => {
+                let message = e.to_string();
+                Self::AmbiguousType(ResourceAmbiguousTypeProblem {
+                    name: e.name.clone().into(),
+                    type_names: e.type_names.iter().cloned().map(Into::into).collect(),
+                    message,
+                })
+            }
             P::SchemaMismatch(e) => {
                 let message = e.to_string();
                 Self::SchemaMismatch(ResourceSchemaMismatchProblem {
@@ -544,6 +590,8 @@ impl From<kamu_resources_facade::ResourceLookupProblem> for ResourceLookupProble
 pub enum ResourceSelectorProblem {
     UidNotFound(ResourceIDNotFoundProblem),
     NameNotFound(ResourceNameNotFoundProblem),
+    AnyTypeNameNotFound(ResourceAnyTypeNameNotFoundProblem),
+    AmbiguousType(ResourceAmbiguousTypeProblem),
     SchemaMismatch(ResourceSchemaMismatchProblem),
     NameMismatch(ResourceNameMismatchProblem),
     UnsupportedSelector(ResourceUnsupportedSelectorProblem),
@@ -556,6 +604,8 @@ impl From<kamu_resources_facade::ResourceLookupProblem> for ResourceSelectorProb
         match ResourceLookupProblem::from(value) {
             ResourceLookupProblem::UidNotFound(p) => Self::UidNotFound(p),
             ResourceLookupProblem::NameNotFound(p) => Self::NameNotFound(p),
+            ResourceLookupProblem::AnyTypeNameNotFound(p) => Self::AnyTypeNameNotFound(p),
+            ResourceLookupProblem::AmbiguousType(p) => Self::AmbiguousType(p),
             ResourceLookupProblem::SchemaMismatch(p) => Self::SchemaMismatch(p),
             ResourceLookupProblem::NameMismatch(p) => Self::NameMismatch(p),
             ResourceLookupProblem::EmptyRef(p) => Self::EmptyRef(p),

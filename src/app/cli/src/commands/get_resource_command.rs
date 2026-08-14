@@ -276,7 +276,7 @@ impl GetResourceCommand {
             .iter()
             .map(|(_, target)| kamu_resources::ResourceRef {
                 account: None,
-                r#type: target.schema.clone().into(),
+                r#type: Some(target.schema.clone().into()),
                 id: Some(target.id),
                 did: None,
                 name: None,

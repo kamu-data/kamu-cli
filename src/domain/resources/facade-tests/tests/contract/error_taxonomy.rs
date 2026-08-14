@@ -55,10 +55,12 @@ use crate::helpers::{
 fn by_name(name: &str) -> ResourceRef {
     ResourceRef {
         account: None,
-        r#type: VARIABLE_SET_CANONICAL_SELECTOR
-            .parse::<TypeName>()
-            .unwrap()
-            .into(),
+        r#type: Some(
+            VARIABLE_SET_CANONICAL_SELECTOR
+                .parse::<TypeName>()
+                .unwrap()
+                .into(),
+        ),
         id: None,
         did: None,
         name: Some(name.parse().unwrap()),
@@ -68,10 +70,12 @@ fn by_name(name: &str) -> ResourceRef {
 fn by_id(id: &kamu_resources::ResourceID) -> ResourceRef {
     ResourceRef {
         account: None,
-        r#type: VARIABLE_SET_CANONICAL_SELECTOR
-            .parse::<TypeName>()
-            .unwrap()
-            .into(),
+        r#type: Some(
+            VARIABLE_SET_CANONICAL_SELECTOR
+                .parse::<TypeName>()
+                .unwrap()
+                .into(),
+        ),
         id: Some(*id),
         did: None,
         name: None,
@@ -217,10 +221,12 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
     // --- SchemaMismatch ---
     let wrong_schema_selector = ResourceRef {
         account: None,
-        r#type: SECRET_SET_CANONICAL_SELECTOR
-            .parse::<TypeName>()
-            .unwrap()
-            .into(),
+        r#type: Some(
+            SECRET_SET_CANONICAL_SELECTOR
+                .parse::<TypeName>()
+                .unwrap()
+                .into(),
+        ),
         id: Some(id),
         did: None,
         name: None,
@@ -372,10 +378,12 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
         .get(
             ResourceRef {
                 account: Some(unknown_account.clone()),
-                r#type: VARIABLE_SET_CANONICAL_SELECTOR
-                    .parse::<TypeName>()
-                    .unwrap()
-                    .into(),
+                r#type: Some(
+                    VARIABLE_SET_CANONICAL_SELECTOR
+                        .parse::<TypeName>()
+                        .unwrap()
+                        .into(),
+                ),
                 id: None,
                 did: None,
                 name: Some("bad-acct-get".parse().unwrap()),
@@ -407,10 +415,12 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
         .render_manifest(
             ResourceRef {
                 account: Some(unknown_account.clone()),
-                r#type: VARIABLE_SET_CANONICAL_SELECTOR
-                    .parse::<TypeName>()
-                    .unwrap()
-                    .into(),
+                r#type: Some(
+                    VARIABLE_SET_CANONICAL_SELECTOR
+                        .parse::<TypeName>()
+                        .unwrap()
+                        .into(),
+                ),
                 id: None,
                 did: None,
                 name: Some("bad-acct-render".parse().unwrap()),
@@ -429,10 +439,12 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
     let result = facade
         .delete(ResourceRef {
             account: Some(unknown_account.clone()),
-            r#type: VARIABLE_SET_CANONICAL_SELECTOR
-                .parse::<TypeName>()
-                .unwrap()
-                .into(),
+            r#type: Some(
+                VARIABLE_SET_CANONICAL_SELECTOR
+                    .parse::<TypeName>()
+                    .unwrap()
+                    .into(),
+            ),
             id: None,
             did: None,
             name: Some("bad-acct-delete".parse().unwrap()),

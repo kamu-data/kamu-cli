@@ -54,10 +54,12 @@ use crate::helpers::{
 fn by_name(name: &str) -> ResourceRef {
     ResourceRef {
         account: None,
-        r#type: VARIABLE_SET_CANONICAL_SELECTOR
-            .parse::<TypeName>()
-            .unwrap()
-            .into(),
+        r#type: Some(
+            VARIABLE_SET_CANONICAL_SELECTOR
+                .parse::<TypeName>()
+                .unwrap()
+                .into(),
+        ),
         id: None,
         did: None,
         name: Some(name.parse().unwrap()),
@@ -279,30 +281,36 @@ pub async fn test_batch_equivalence(h: &impl FacadeContractHarness) {
     let batch_selector = vec![
         ResourceRef {
             account: None,
-            r#type: VARIABLE_SET_CANONICAL_SELECTOR
-                .parse::<TypeName>()
-                .unwrap()
-                .into(),
+            r#type: Some(
+                VARIABLE_SET_CANONICAL_SELECTOR
+                    .parse::<TypeName>()
+                    .unwrap()
+                    .into(),
+            ),
             id: None,
             did: None,
             name: Some("cross-batch-a".parse().unwrap()),
         }, // idx 0 — exists
         ResourceRef {
             account: None,
-            r#type: VARIABLE_SET_CANONICAL_SELECTOR
-                .parse::<TypeName>()
-                .unwrap()
-                .into(),
+            r#type: Some(
+                VARIABLE_SET_CANONICAL_SELECTOR
+                    .parse::<TypeName>()
+                    .unwrap()
+                    .into(),
+            ),
             id: None,
             did: None,
             name: Some("cross-batch-missing".parse().unwrap()),
         }, /* idx 1 — missing name */
         ResourceRef {
             account: None,
-            r#type: VARIABLE_SET_CANONICAL_SELECTOR
-                .parse::<TypeName>()
-                .unwrap()
-                .into(),
+            r#type: Some(
+                VARIABLE_SET_CANONICAL_SELECTOR
+                    .parse::<TypeName>()
+                    .unwrap()
+                    .into(),
+            ),
             id: Some(absent_uid),
             did: None,
             name: None,

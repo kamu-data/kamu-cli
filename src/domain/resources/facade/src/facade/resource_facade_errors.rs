@@ -14,6 +14,8 @@ use kamu_resources::{
     ApplyResourceCrudDispatcherError,
     DeleteResourcesCrudDispatcherError,
     GetResourceCrudDispatcherError,
+    ResourceAmbiguousTypeError,
+    ResourceAnyTypeNameNotFoundError,
     ResourceExtensionResolutionError,
     ResourceHeadersValidationError,
     ResourceID,
@@ -200,6 +202,17 @@ pub enum ResourceLookupProblem {
 
     #[error(transparent)]
     NameNotFound(#[from] ResourceNameNotFoundError),
+
+    /// A type-less ref whose name matched nothing in any registered type. Its
+    /// own variant rather than a `NameNotFound`, which would have to name a
+    /// single type that was never searched in isolation.
+    #[error(transparent)]
+    AnyTypeNameNotFound(#[from] ResourceAnyTypeNameNotFoundError),
+
+    /// A type-less ref whose name matched in several types. A ref names exactly
+    /// one resource, so this is an addressing failure, not a multi-match.
+    #[error(transparent)]
+    AmbiguousType(#[from] ResourceAmbiguousTypeError),
 
     #[error(transparent)]
     SchemaMismatch(#[from] ResourceSchemaMismatchError),
