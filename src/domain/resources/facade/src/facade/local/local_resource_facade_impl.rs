@@ -146,43 +146,51 @@ impl ResourceFacade for LocalResourceFacadeImpl {
     ) -> Result<BatchResourceResponse<ResourceHandle, ResourceLookupProblem>, BatchResourceError>
     {
         // An empty batch names nothing, so it yields an empty response.
-        let Some(target) = uniform_batch_target(&resource_refs)? else {
-            return Ok(BatchResourceResponse::empty());
-        };
+        let mut successes = Vec::new();
+        let mut problems = Vec::new();
 
-        let target_account = self
-            .resource_account_resolver
-            .resolve_target_account(target.account.as_ref())
-            .await?;
+        for group in self.group_refs_by_target(resource_refs).await? {
+            let (indexes, refs): (Vec<_>, Vec<_>) = group.entries.into_iter().unzip();
 
-        let schema = self.resolve_schema_for_selector::<BatchResourceError>(&target.r#type)?;
-
-        let groups = group_batch_resource_refs(resource_refs);
-        let resolution_response = resolve_batch_ids(
-            self.generic_resource_query_service.as_ref(),
-            &target_account.did,
-            &schema,
-            groups,
-        )
-        .await?;
-
-        let (handles, problems) = self
-            .resolve_id_handle_groups(
-                &target_account.did,
-                &schema,
-                resolution_response.id_entries,
-                resolution_response.problems,
+            let grouped = group_batch_resource_refs(refs);
+            let resolution_response = resolve_batch_ids(
+                self.generic_resource_query_service.as_ref(),
+                &group.account.did,
+                &group.schema,
+                grouped,
             )
             .await?;
 
+            let (handles, group_problems) = self
+                .resolve_id_handle_groups(
+                    &group.account.did,
+                    &group.schema,
+                    resolution_response.id_entries,
+                    resolution_response.problems,
+                )
+                .await?;
+
+            // `group_batch_resource_refs` re-indexes from zero within the
+            // group, so map back to the caller's positions before merging.
+            successes.extend(handles.into_iter().map(|handle| BatchResourceSuccess {
+                request_index: indexes[handle.request_index],
+                item: handle.item,
+            }));
+            problems.extend(
+                group_problems
+                    .into_iter()
+                    .map(|problem| BatchResourceProblem {
+                        request_index: indexes[problem.request_index],
+                        error: problem.error,
+                    }),
+            );
+        }
+
+        successes.sort_by_key(|success| success.request_index);
+        problems.sort_by_key(|problem| problem.request_index);
+
         Ok(BatchResourceResponse {
-            successes: handles
-                .into_iter()
-                .map(|handle| BatchResourceSuccess {
-                    request_index: handle.request_index,
-                    item: handle.item,
-                })
-                .collect(),
+            successes,
             problems,
         })
     }
@@ -444,81 +452,94 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         resource_refs: Vec<ResourceRef>,
     ) -> Result<BatchResourceResponse<ResourceID, ResourceLookupProblem>, BatchResourceError> {
         // An empty batch names nothing, so it yields an empty response.
-        let Some(target) = uniform_batch_target(&resource_refs)? else {
-            return Ok(BatchResourceResponse::empty());
-        };
+        let mut successes = Vec::new();
+        let mut problems = Vec::new();
 
-        let target_account = self
-            .resource_account_resolver
-            .resolve_target_account(target.account.as_ref())
+        // One dispatcher call per `(account, schema)` group. The whole request
+        // runs inside a single database transaction — opened by the
+        // `#[transactional_handler]` GraphQL handler, or by the CLI's
+        // `DatabaseTransactionRunner` — so a failure in a later group rolls back
+        // the deletes an earlier one performed. Fanning out therefore does not
+        // introduce partial-delete semantics.
+        for group in self.group_refs_by_target(resource_refs).await? {
+            let (indexes, refs): (Vec<_>, Vec<_>) = group.entries.into_iter().unzip();
+
+            let grouped = group_batch_resource_refs(refs);
+            let resolution_response = resolve_batch_ids(
+                self.generic_resource_query_service.as_ref(),
+                &group.account.did,
+                &group.schema,
+                grouped,
+            )
             .await?;
 
-        let schema = self.resolve_schema_for_selector::<BatchResourceError>(&target.r#type)?;
-
-        let groups = group_batch_resource_refs(resource_refs);
-        let resolution_response = resolve_batch_ids(
-            self.generic_resource_query_service.as_ref(),
-            &target_account.did,
-            &schema,
-            groups,
-        )
-        .await?;
-
-        let mut problems = resolution_response.problems;
-        let mut successes = Vec::new();
-        let mut seen_valid_ids = HashSet::new();
-        let mut ids_to_delete = Vec::<ResourceID>::new();
-
-        let ids = resolution_response
-            .id_entries
-            .iter()
-            .map(|(_, _, id)| *id)
-            .collect::<Vec<_>>();
-
-        let rows_by_id = self
-            .generic_resource_query_service
-            .find_resource_handles_by_ids(&target_account.did, &ids)
-            .await?
-            .into_iter()
-            .map(|row| (row.id, row))
-            .collect::<HashMap<_, _>>();
-
-        for (request_index, _, id) in resolution_response.id_entries {
-            let row_result = rows_by_id
-                .get(id.as_ref())
-                .cloned()
-                .ok_or_else(|| id_not_found(id));
-
-            match row_result.and_then(|row| {
-                validate_handle_row(row, &schema, ensure_schema_matches::<ResourceLookupProblem>)
-            }) {
-                Ok(_) => {
-                    successes.push(BatchResourceSuccess {
-                        request_index,
-                        item: id,
-                    });
-
-                    if seen_valid_ids.insert(id) {
-                        ids_to_delete.push(id);
-                    }
+            problems.extend(resolution_response.problems.into_iter().map(|problem| {
+                BatchResourceProblem {
+                    request_index: indexes[problem.request_index],
+                    error: problem.error,
                 }
-                Err(error) => problems.push(BatchResourceProblem {
-                    request_index,
-                    error,
-                }),
-            }
-        }
+            }));
 
-        if !ids_to_delete.is_empty() {
-            // Registered selector schemas must have a dispatcher.
-            let dispatcher =
-                get_resource_crud_dispatcher_for_trusted_schema(&self.catalog, schema.as_str())?;
-            dispatcher
-                .delete(ResourceCrudDispatcherDeleteRequest {
-                    account_id: target_account.did.clone(),
-                    ids: ids_to_delete,
-                })
-                .await?;
+            let mut seen_valid_ids = HashSet::new();
+            let mut ids_to_delete = Vec::<ResourceID>::new();
+
+            let ids = resolution_response
+                .id_entries
+                .iter()
+                .map(|(_, _, id)| *id)
+                .collect::<Vec<_>>();
+
+            let rows_by_id = self
+                .generic_resource_query_service
+                .find_resource_handles_by_ids(&group.account.did, &ids)
+                .await?
+                .into_iter()
+                .map(|row| (row.id, row))
+                .collect::<HashMap<_, _>>();
+
+            for (request_index, _, id) in resolution_response.id_entries {
+                let row_result = rows_by_id
+                    .get(id.as_ref())
+                    .cloned()
+                    .ok_or_else(|| id_not_found(id));
+
+                match row_result.and_then(|row| {
+                    validate_handle_row(
+                        row,
+                        &group.schema,
+                        ensure_schema_matches::<ResourceLookupProblem>,
+                    )
+                }) {
+                    Ok(_) => {
+                        successes.push(BatchResourceSuccess {
+                            request_index: indexes[request_index],
+                            item: id,
+                        });
+
+                        if seen_valid_ids.insert(id) {
+                            ids_to_delete.push(id);
+                        }
+                    }
+                    Err(error) => problems.push(BatchResourceProblem {
+                        request_index: indexes[request_index],
+                        error,
+                    }),
+                }
+            }
+
+            if !ids_to_delete.is_empty() {
+                // Registered selector schemas must have a dispatcher.
+                let dispatcher = get_resource_crud_dispatcher_for_trusted_schema(
+                    &self.catalog,
+                    group.schema.as_str(),
+                )?;
+                dispatcher
+                    .delete(ResourceCrudDispatcherDeleteRequest {
+                        account_id: group.account.did.clone(),
+                        ids: ids_to_delete,
+                    })
+                    .await?;
+            }
         }
 
         successes.sort_by_key(|success| success.request_index);
@@ -617,6 +638,52 @@ impl LocalResourceFacadeImpl {
         E: From<UnsupportedResourceSelectorError>,
     {
         resolve_schema_in_descriptors(&self.list_resource_type_descriptors(), selector)
+    }
+
+    /// Resolves every ref's account and schema, then splits the batch into
+    /// `(account, schema)` groups.
+    ///
+    /// The shared front half of all three batch-ref pipelines. Accounts are
+    /// resolved in one deduplicated pass and schemas against a descriptor list
+    /// built once, so a batch costs one account lookup per distinct spelling
+    /// and no per-ref catalog work.
+    ///
+    /// An unresolvable account or unknown type fails the **whole** call rather
+    /// than becoming a per-item problem: both are addressing errors in the
+    /// request rather than facts about stored data, and the pre-fan-out code
+    /// rejected them the same way.
+    async fn group_refs_by_target(
+        &self,
+        resource_refs: Vec<ResourceRef>,
+    ) -> Result<Vec<BatchTargetGroup>, BatchResourceError> {
+        let account_refs = distinct_account_refs(&resource_refs);
+        let resolved_accounts = self
+            .resource_account_resolver
+            .resolve_target_accounts(&account_refs)
+            .await?;
+
+        let descriptors = self.list_resource_type_descriptors();
+
+        let entries = resource_refs
+            .into_iter()
+            .enumerate()
+            .map(|(request_index, resource_ref)| {
+                let account_position = account_refs
+                    .iter()
+                    .position(|account| account == &resource_ref.account)
+                    .expect("every ref's account is in the deduplicated list");
+                let account = resolved_accounts[account_position].clone();
+
+                let schema = resolve_schema_in_descriptors::<BatchResourceError>(
+                    &descriptors,
+                    &resource_ref.r#type,
+                )?;
+
+                Ok((request_index, resource_ref, account, schema))
+            })
+            .collect::<Result<Vec<_>, BatchResourceError>>()?;
+
+        Ok(group_by_account_and_schema(entries))
     }
 
     /// Converts snapshots into summary views, rendering each one's typed list
@@ -846,81 +913,81 @@ impl LocalResourceFacadeImpl {
         BatchResourceError,
     > {
         // An empty batch names nothing, so it yields an empty result.
-        let Some(target) = uniform_batch_target(&resource_refs)? else {
-            return Ok((Vec::new(), Vec::new()));
-        };
+        let mut indexed_resources = Vec::new();
+        let mut problems = Vec::new();
 
-        let target_account = self
-            .resource_account_resolver
-            .resolve_target_account(target.account.as_ref())
+        for group in self.group_refs_by_target(resource_refs).await? {
+            let (indexes, refs): (Vec<_>, Vec<_>) = group.entries.into_iter().unzip();
+
+            // Batch refs name their targets explicitly.
+            let grouped = group_batch_resource_refs(refs);
+
+            let resolution_response = resolve_batch_ids(
+                self.generic_resource_query_service.as_ref(),
+                &group.account.did,
+                &group.schema,
+                grouped,
+            )
             .await?;
 
-        let schema = self.resolve_schema_for_selector::<BatchResourceError>(&target.r#type)?;
-
-        // Batch refs name their targets explicitly.
-        let groups = group_batch_resource_refs(resource_refs);
-
-        let resolution_response = resolve_batch_ids(
-            self.generic_resource_query_service.as_ref(),
-            &target_account.did,
-            &schema,
-            groups,
-        )
-        .await?;
-
-        let mut indexed_resources = Vec::new();
-        let mut problems = resolution_response.problems;
-
-        let ids = resolution_response
-            .id_entries
-            .iter()
-            .map(|(_, _, id)| *id)
-            .collect::<Vec<_>>();
-
-        let snapshots_by_id = self
-            .generic_resource_query_service
-            .find_snapshots_by_ids(&target_account.did, &ids)
-            .await?
-            .into_iter()
-            .map(|snapshot| (snapshot.id, snapshot))
-            .collect::<HashMap<_, _>>();
-
-        for (request_index, _, id) in resolution_response.id_entries {
-            match snapshots_by_id
-                .get(&id)
-                .cloned()
-                .ok_or(ResourceLookupProblem::IDNotFound(ResourceIDNotFoundError(
-                    id,
-                )))
-                .and_then(|snapshot| {
-                    ensure_schema_matches::<ResourceLookupProblem>(
-                        snapshot.id,
-                        &schema,
-                        snapshot.schema.as_str(),
-                    )?;
-                    Ok(snapshot)
-                }) {
-                Ok(snapshot) => {
-                    let resource = Resource {
-                        schema: snapshot.schema,
-                        headers: kamu_resources::ResourceHeaders {
-                            account: target_account.clone(),
-                            ..snapshot.headers
-                        },
-                        spec: snapshot.spec,
-                        status: snapshot.status.unwrap_or_else(new_pending_resource_status),
-                    };
-
-                    indexed_resources.push(IndexedResource {
-                        request_index,
-                        item: resource,
-                    });
+            problems.extend(resolution_response.problems.into_iter().map(|problem| {
+                BatchResourceProblem {
+                    request_index: indexes[problem.request_index],
+                    error: problem.error,
                 }
-                Err(error) => {
-                    problems.push(BatchResourceProblem {
-                        request_index,
-                        error,
-                    });
+            }));
+
+            let ids = resolution_response
+                .id_entries
+                .iter()
+                .map(|(_, _, id)| *id)
+                .collect::<Vec<_>>();
+
+            let snapshots_by_id = self
+                .generic_resource_query_service
+                .find_snapshots_by_ids(&group.account.did, &ids)
+                .await?
+                .into_iter()
+                .map(|snapshot| (snapshot.id, snapshot))
+                .collect::<HashMap<_, _>>();
+
+            for (request_index, _, id) in resolution_response.id_entries {
+                match snapshots_by_id
+                    .get(&id)
+                    .cloned()
+                    .ok_or(ResourceLookupProblem::IDNotFound(ResourceIDNotFoundError(
+                        id,
+                    )))
+                    .and_then(|snapshot| {
+                        ensure_schema_matches::<ResourceLookupProblem>(
+                            snapshot.id,
+                            &group.schema,
+                            snapshot.schema.as_str(),
+                        )?;
+                        Ok(snapshot)
+                    }) {
+                    Ok(snapshot) => {
+                        let resource = Resource {
+                            schema: snapshot.schema,
+                            headers: kamu_resources::ResourceHeaders {
+                                account: group.account.clone(),
+                                ..snapshot.headers
+                            },
+                            spec: snapshot.spec,
+                            status: snapshot.status.unwrap_or_else(new_pending_resource_status),
+                        };
+
+                        indexed_resources.push(IndexedResource {
+                            request_index: indexes[request_index],
+                            item: resource,
+                        });
+                    }
+                    Err(error) => {
+                        problems.push(BatchResourceProblem {
+                            request_index: indexes[request_index],
+                            error,
+                        });
+                    }
                 }
             }
         }

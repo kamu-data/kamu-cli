@@ -302,10 +302,9 @@ impl From<BatchResourceError> for CLIError {
         use BatchResourceError as E;
 
         match e {
-            e @ (E::UnsupportedSelector(_)
-            | E::BadAccount(_)
-            | E::InvalidLabelFilter(_)
-            | E::NonUniformBatch(_)) => Self::failure(e),
+            e @ (E::UnsupportedSelector(_) | E::BadAccount(_) | E::InvalidLabelFilter(_)) => {
+                Self::failure(e)
+            }
             E::RemoteRequest(err) => Self::from(err),
             E::Internal(err) => Self::critical(err),
         }
