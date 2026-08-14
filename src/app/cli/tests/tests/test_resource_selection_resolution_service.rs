@@ -968,14 +968,17 @@ impl ResourceSelectionResolutionHarness {
     fn expect_list_all_handles(
         &mut self,
         handles: Vec<ResourceHandle>,
-        requests: Arc<Mutex<Vec<kamu_resources_facade::ListAllResourceHandlesRequest>>>,
+        requests: Arc<Mutex<Vec<kamu_resources_facade::SearchResourceHandlesRequest>>>,
     ) {
         self.facade
-            .expect_list_all_handles()
+            .expect_search_handles()
             .times(1)
             .returning(move |request| {
                 requests.lock().unwrap().push(request);
-                Ok(handles.clone())
+                Ok(kamu_resources_facade::SearchResourceHandlesResponse {
+                    total_count: handles.len(),
+                    items: handles.clone(),
+                })
             });
     }
 

@@ -29,15 +29,13 @@ use kamu_resources_facade::{
     BatchResourceError,
     DeleteResourceError,
     GetResourceError,
-    ListAllResourcesError,
-    ListAllResourcesRequest,
     ListResourcesError,
-    ListResourcesRequest,
     RenderResourceManifestError,
     ResourceLookupProblem,
     ResourceManifestFormat,
     ResourcesSummaryError,
     ResourcesSummaryRequest,
+    SearchResourcesRequest,
     SpecViewMode,
 };
 use pretty_assertions::assert_matches;
@@ -461,7 +459,7 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
 
     // --- list ---
     let result = facade
-        .list(ListResourcesRequest {
+        .search(SearchResourcesRequest {
             account: Some(unknown_account.clone()),
             selectors: vec![ResourceSelector::of_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
@@ -478,7 +476,7 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
 
     // --- list_all ---
     let result = facade
-        .list_all(ListAllResourcesRequest {
+        .search(SearchResourcesRequest {
             account: Some(unknown_account.clone()),
             label_filter: None,
             pagination: PaginationOpts::from_max_results(1),
@@ -487,7 +485,7 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
         .await;
     assert_matches!(
         result,
-        Err(ListAllResourcesError::BadAccount(_)),
+        Err(ListResourcesError::BadAccount(_)),
         "list_all: expected BadAccount"
     );
 

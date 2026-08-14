@@ -22,12 +22,7 @@ use crate::{
     BatchResourceResponse,
     DeleteResourceError,
     GetResourceError,
-    ListAllResourceHandlesRequest,
-    ListAllResourcesError,
-    ListAllResourcesRequest,
-    ListResourceHandlesRequest,
     ListResourcesError,
-    ListResourcesRequest,
     ListSupportedResourceTypesError,
     RenderResourceManifestError,
     RenderResourceManifestResult,
@@ -38,6 +33,8 @@ use crate::{
     ResourcesSummaryRequest,
     SearchResourceHandlesRequest,
     SearchResourceHandlesResponse,
+    SearchResourcesRequest,
+    SearchResourcesResponse,
     SpecViewMode,
 };
 
@@ -220,50 +217,21 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
         )
     }
 
-    async fn list(
+    async fn search(
         &self,
-        request: ListResourcesRequest,
-    ) -> Result<Vec<domain::ResourceSummaryView>, ListResourcesError> {
-        use cynic_api::operations::list as Operation;
+        request: SearchResourcesRequest,
+    ) -> Result<SearchResourcesResponse, ListResourcesError> {
+        use cynic_api::operations::search_summaries as Operation;
 
-        let variables = cynic_api::variables::ListByResourceTypeVariables::new(
-            &request.selectors,
-            request.account.as_ref(),
-            request.label_filter.as_ref(),
-            request.pagination,
-        )
-        .map_err(ListResourcesError::Internal)?;
+        let variables =
+            Operation::SearchVariables::new(&request).map_err(ListResourcesError::Internal)?;
 
-        let response: Operation::ListByResourceTypeQuery = self
+        let response: Operation::SearchQuery = self
             .graphql_client
-            .execute_operation(Operation::build_list_by_resource_type_operation(variables))
+            .execute_operation(Operation::build_operation(variables))
             .await?;
 
-        outcome_mapper::map_list_outcome(response.resources.list_by_resource_type)
-    }
-
-    async fn list_handles(
-        &self,
-        request: ListResourceHandlesRequest,
-    ) -> Result<Vec<domain::ResourceHandle>, ListResourcesError> {
-        use cynic_api::operations::list as Operation;
-
-        let variables = cynic_api::variables::ListByResourceTypeVariables::new(
-            &request.selectors,
-            request.account.as_ref(),
-            request.label_filter.as_ref(),
-            request.pagination,
-        )
-        .map_err(ListResourcesError::Internal)?;
-
-        let response: Operation::ListHandlesByResourceTypeQuery = self
-            .graphql_client
-            .execute_operation(Operation::build_list_handles_by_resource_type_operation(
-                variables,
-            ))
-            .await?;
-
-        outcome_mapper::map_list_handles_outcome(response.resources.list_handles_by_resource_type)
+        outcome_mapper::map_search_outcome(response.resources.search)
     }
 
     async fn search_handles(
@@ -281,51 +249,6 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
             .await?;
 
         outcome_mapper::map_search_handles_outcome(response.resources.search_handles)
-    }
-
-    async fn list_all(
-        &self,
-        request: ListAllResourcesRequest,
-    ) -> Result<Vec<domain::ResourceSummaryView>, ListAllResourcesError> {
-        use cynic_api::operations::list as Operation;
-
-        let variables = cynic_api::variables::ListAllVariables::new(
-            request.account.as_ref(),
-            request.label_filter.as_ref(),
-            request.pagination,
-            &request.selectors,
-        )
-        .map_err(ListAllResourcesError::Internal)?;
-
-        let response: Operation::ListAllQuery = self
-            .graphql_client
-            .execute_operation(Operation::build_list_all_operation(variables))
-            .await?;
-
-        outcome_mapper::map_list_all_outcome(response.resources.list_all)
-    }
-
-    async fn list_all_handles(
-        &self,
-        request: ListAllResourceHandlesRequest,
-    ) -> Result<Vec<domain::ResourceHandle>, ListAllResourcesError> {
-        use cynic_api::operations::list as Operation;
-
-        let variables = cynic_api::variables::ListAllVariables::new(
-            request.account.as_ref(),
-            request.label_filter.as_ref(),
-            request.pagination,
-            // `list_all_handles` has no scope of its own: it spans every type.
-            &[],
-        )
-        .map_err(ListAllResourcesError::Internal)?;
-
-        let response: Operation::ListAllHandlesQuery = self
-            .graphql_client
-            .execute_operation(Operation::build_list_all_handles_operation(variables))
-            .await?;
-
-        outcome_mapper::map_list_all_handles_outcome(response.resources.list_all_handles)
     }
 
     async fn plan_apply_manifest(

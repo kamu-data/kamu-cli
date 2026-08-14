@@ -816,7 +816,8 @@ pub trait ResourceFacade: Send + Sync {
     async fn summary(&self, request: ResourcesSummaryRequest) -> Result<ResourcesSummary, ...>;
 
     // Point lookups and batches take ODF `ResourceRef`s: each ref carries its
-    // own account and type, so one batch can span both.
+    // own account and type, so one batch can span both. The scalar forms are
+    // *provided* methods delegating to their batch form with a one-element vec.
     async fn get(&self, resource_ref: ResourceRef, spec_view_mode: SpecViewMode) -> Result<Resource, ...>;
     async fn get_many(&self, resource_refs: Vec<ResourceRef>, spec_view_mode: SpecViewMode)
         -> Result<BatchResourceResponse<Resource, ResourceLookupProblem>, ...>;
@@ -827,11 +828,10 @@ pub trait ResourceFacade: Send + Sync {
     async fn render_manifests(&self, resource_refs: Vec<ResourceRef>, format: ResourceManifestFormat, spec_view_mode)
         -> Result<BatchResourceResponse<RenderResourceManifestResult, ResourceLookupProblem>, ...>;
 
-    async fn list(&self, request: ListResourcesRequest) -> Result<Vec<ResourceSummaryView>, ...>;
-    async fn list_handles(&self, request: ListResourceHandlesRequest) -> ...;
-    async fn search_handles(&self, request: SearchResourceHandlesRequest) -> ...; // request.selectors: Vec<ResourceSelector>
-    async fn list_all(&self, request: ListAllResourcesRequest) -> ...;
-    async fn list_all_handles(&self, request: ListAllResourceHandlesRequest) -> ...;
+    // Listing is two methods, both taking `selectors: Vec<ResourceSelector>`
+    // and returning `{ items, total_count }`.
+    async fn search(&self, request: SearchResourcesRequest) -> Result<SearchResourcesResponse, ...>;
+    async fn search_handles(&self, request: SearchResourceHandlesRequest) -> Result<SearchResourceHandlesResponse, ...>;
 
     async fn plan_apply_manifest(&self, request: ApplyManifestRequest) -> Result<ApplyManifestPlanningDecision, ...>;
     async fn apply_manifest(&self, request: ApplyManifestRequest) -> Result<ApplyManifestApplicationDecision, ...>;
@@ -847,13 +847,21 @@ pub trait ResourceFacade: Send + Sync {
 **Selectors & view modes:**
 
 ```rust
-pub struct ResourceSelector { pub account: Option<ResourceAccountRef>,
-                              pub resource_type: ResourceTypeSelectorRaw,
-                              pub resource_ref: ResourceRef }
-pub enum   ResourceRef { ById(ResourceID), ByName(ResourceName) }
+// Both mirror the ODF types. A `ResourceRef` is exact and names one resource;
+// a `ResourceSelector` carries a SQL LIKE pattern and matches zero or many.
+pub struct ResourceRef      { pub account: Option<ResourceAccountRef>, pub r#type: TypeRef,
+                              pub id: Option<ResourceID>, pub did: Option<...>,
+                              pub name: Option<ResourceName> }
+pub struct ResourceSelector { pub account: Option<ResourceAccountRef>, pub r#type: Option<TypeRef>,
+                              pub id: Option<ResourceID>, pub name: Option<String> /* LIKE pattern */,
+                              pub labels: Option<...> }
 pub enum   ResourceManifestFormat { Json, Yaml }
 pub enum   SpecViewMode { Encrypted /* default */, Revealed }
 ```
+
+Every `ResourceSelector` field is optional, so one selector can span every type
+and account. Several selectors act as a logical **OR**; an empty list matches
+nothing.
 
 Batch operations return `BatchResourceResponse<T, E>` with positional `successes` / `problems`
 (each tagged by `request_index`) — so a partial batch reports per-item outcomes.
@@ -903,7 +911,7 @@ permanently unused.
 
 Filtering covers `get` and `delete` as well as `list` because the CLI resolves
 those in **two phases**: it first expands name patterns and the `%` all-types
-token into identifiers via `search_handles`/`list_handles`, then operates on the
+token into identifiers via `search_handles`, then operates on the
 resulting `ResourceRef::ById` set. A label filter is a *narrowing of the candidate
 identifier set* — structurally the same job as a name pattern — so it belongs to
 that phase-1 expansion. The
@@ -925,7 +933,7 @@ price of filtering.
 set exactly one. The enum makes "exactly one selection mode" a type-level invariant
 instead of a runtime convention.
 
-It is shared by search *and* listing: `search_handles`, `list` and `list_all` all
+It is shared by both listing methods: `search` and `search_handles` both
 narrow through the same type, so the two paths cannot drift apart on pattern or ID
 semantics. `ResourceScope` pairs each type with its own optional `ResourceQuery`,
 which is what lets one call express `vs/a-% ss/b-%`.
@@ -1060,8 +1068,7 @@ and [`adapter/graphql/src/mutations/resources_mut/`](/src/adapter/graphql/src/mu
 Every resolver delegates to `ResourceFacade`.
 
 **Queries (`Resources`):** `supported_resource_types`, `summary`, `resource` / `resources`,
-`resource_handle` / `resource_handles`, `list_by_resource_type` /
-`list_handles_by_resource_type`, `search_handles`, `list_all` / `list_all_handles`,
+`resource_handle` / `resource_handles`, `search` / `search_handles`,
 `render_manifest` / `render_manifests`. The `revealed: bool` argument maps to `SpecViewMode`.
 
 **Mutations (`ResourcesMut`):** `apply_manifest(manifest, format, dry_run?)`, `delete(selector)`,
@@ -1090,7 +1097,7 @@ These map directly from the domain views in
 
 **Label-filter transport.** `ResourceLabelFilterInput { entries: [ResourceLabelFilterEntryInput!]! }`
 carries the filter, where each entry is `{ key: String!, value: JSON! }`. It is accepted by
-`listByResourceType`, `listHandlesByResourceType`, `listAll`, and `searchHandles`. The batch
+`search` and `searchHandles`. The batch
 `resources`/`renderManifests` queries and the `deleteMany` mutation take `[ResourceRefInput!]!` and
 carry no `labelFilter` field at all.
 

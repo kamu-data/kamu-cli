@@ -4070,8 +4070,6 @@ type ResourceHandleEdge {
 	node: ResourceHandle!
 }
 
-union ResourceHandleListAllOutcome = ResourceHandleConnection | ResourceBadAccountProblem | ResourceInvalidLabelFilterProblem
-
 union ResourceHandleListOutcome = ResourceHandleConnection | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem | ResourceInvalidLabelFilterProblem
 
 enum ResourceHeaderValidationProblemCode {
@@ -4193,8 +4191,6 @@ enum ResourceLabelFilterProblemCode {
 }
 
 scalar ResourceLabels
-
-union ResourceListAllOutcome = ResourceConnection | ResourceBadAccountProblem | ResourceInvalidLabelFilterProblem
 
 enum ResourceListColumnDataType {
 	STRING
@@ -4444,25 +4440,14 @@ type Resources {
 	"""
 	resourceHandles(resourceRefs: [ResourceRefInput!]!): BatchResourceHandlesOutcome!
 	"""
-	Returns resources of the specified resource type
+	Searches resources matching the given selectors, which act as a logical
+	OR and may span several resource types and accounts
 	"""
-	listByResourceType(selectors: [ResourceSelectorInput!]!, account: AccountRefInput, labelFilter: ResourceLabelFilterInput, page: Int, perPage: Int): ResourceListOutcome!
+	search(query: SearchResourcesInput!, page: Int, perPage: Int): ResourceListOutcome!
 	"""
-	Returns resource handles of the specified resource type
-	"""
-	listHandlesByResourceType(selectors: [ResourceSelectorInput!]!, account: AccountRefInput, labelFilter: ResourceLabelFilterInput, page: Int, perPage: Int): ResourceHandleListOutcome!
-	"""
-	Searches resource handles across the specified exact resource types
+	Searches resource handles matching the given selectors
 	"""
 	searchHandles(query: SearchResourceHandlesInput!, page: Int, perPage: Int): ResourceHandleListOutcome!
-	"""
-	Returns resources across all resource types
-	"""
-	listAll(account: AccountRefInput, labelFilter: ResourceLabelFilterInput, selectors: [ResourceSelectorInput!], page: Int, perPage: Int): ResourceListAllOutcome!
-	"""
-	Returns resource handles across all resource types
-	"""
-	listAllHandles(account: AccountRefInput, labelFilter: ResourceLabelFilterInput, page: Int, perPage: Int): ResourceHandleListAllOutcome!
 	"""
 	Renders a canonical manifest representation from a stored resource
 	"""
@@ -4562,6 +4547,19 @@ enum SearchEntityName {
 
 input SearchResourceHandlesInput {
 	selectors: [ResourceSelectorInput!]!
+	account: AccountRefInput
+	labelFilter: ResourceLabelFilterInput
+}
+
+"""
+Selects resources to list, with typed columns rendered.
+
+Omitting `selectors` spans every type, which is what the retired `listAll`
+field did implicitly. Passing an empty list matches nothing — an explicit
+"no selectors" is a narrowing to zero, not a widening to everything.
+"""
+input SearchResourcesInput {
+	selectors: [ResourceSelectorInput!]
 	account: AccountRefInput
 	labelFilter: ResourceLabelFilterInput
 }

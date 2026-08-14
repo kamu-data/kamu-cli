@@ -274,97 +274,59 @@ impl ListResourcesCommand {
         }
     }
 
-    async fn list_resources_by_selector(
-        &self,
-        schema: &kamu_resources::TypeUri,
-        query: Option<&ResourceQuery>,
-    ) -> Result<Vec<ResourceSummaryView>, CLIError> {
-        if let Some(max_results) = self.max_results {
-            self.resource_facade
-                .list(kamu_resources_facade::ListResourcesRequest {
-                    selectors: selectors_for_type(schema, query),
-                    account: None,
-                    pagination: PaginationOpts::from_max_results(max_results.get()),
-                    label_filter: self.label_filter.clone(),
-                })
-                .await
-                .map_err(Into::into)
-        } else {
-            collect_all_pages(RESOURCE_PAGE_SIZE, |pagination| async move {
-                self.resource_facade
-                    .list(kamu_resources_facade::ListResourcesRequest {
-                        selectors: selectors_for_type(schema, query),
-                        account: None,
-                        pagination,
-                        label_filter: self.label_filter.clone(),
-                    })
-                    .await
-                    .map_err(Into::into)
-            })
-            .await
-        }
-    }
-
-    async fn list_all_resources(
+    async fn search_resources(
         &self,
         selectors: &[kamu_resources::ResourceSelector],
     ) -> Result<Vec<ResourceSummaryView>, CLIError> {
         if let Some(max_results) = self.max_results {
-            self.resource_facade
-                .list_all(kamu_resources_facade::ListAllResourcesRequest {
-                    account: None,
-                    label_filter: self.label_filter.clone(),
-                    pagination: PaginationOpts::from_max_results(max_results.get()),
+            let response = self
+                .resource_facade
+                .search(kamu_resources_facade::SearchResourcesRequest {
                     selectors: selectors.to_vec(),
+                    account: None,
+                    label_filter: self.label_filter.clone(),
+                    pagination: PaginationOpts::from_max_results(max_results.get()),
                 })
-                .await
-                .map_err(Into::into)
+                .await?;
+            Ok(response.items)
         } else {
             collect_all_pages(RESOURCE_PAGE_SIZE, |pagination| async move {
-                self.resource_facade
-                    .list_all(kamu_resources_facade::ListAllResourcesRequest {
+                let response = self
+                    .resource_facade
+                    .search(kamu_resources_facade::SearchResourcesRequest {
+                        selectors: selectors.to_vec(),
                         account: None,
                         label_filter: self.label_filter.clone(),
                         pagination,
-                        selectors: selectors.to_vec(),
                     })
-                    .await
-                    .map_err(Into::into)
+                    .await?;
+                Ok(response.items)
             })
             .await
         }
     }
 
+    /// One listing path for every scope: `search` spans types, so a single-type
+    /// scope is just a one-selector case rather than a separate operation.
     async fn load_resources(&self) -> Result<Vec<ResourceSummaryView>, CLIError> {
-        match &self.scope {
+        let selectors = match &self.scope {
             ListResourcesScope::ByType(type_descriptor, query) => {
-                let mut resources = self
-                    .list_resources_by_selector(&type_descriptor.schema, query.as_ref())
-                    .await?;
-                resources.sort_by(|lhs, rhs| lhs.name.cmp(&rhs.name));
-                Ok(resources)
+                selectors_for_type(&type_descriptor.schema, query.as_ref())
             }
-            ListResourcesScope::Types(type_queries) => {
-                let selectors = type_queries
-                    .iter()
-                    .flat_map(|(type_descriptor, query)| {
-                        selectors_for_type(&type_descriptor.schema, query.as_ref())
-                    })
-                    .collect::<Vec<_>>();
-                self.load_generic_resources(&selectors).await
-            }
-            ListResourcesScope::All(query) => {
-                self.load_generic_resources(&any_type_selectors(query.as_ref()))
-                    .await
-            }
-        }
-    }
+            ListResourcesScope::Types(type_queries) => type_queries
+                .iter()
+                .flat_map(|(type_descriptor, query)| {
+                    selectors_for_type(&type_descriptor.schema, query.as_ref())
+                })
+                .collect::<Vec<_>>(),
+            ListResourcesScope::All(query) => any_type_selectors(query.as_ref()),
+        };
 
-    async fn load_generic_resources(
-        &self,
-        selectors: &[kamu_resources::ResourceSelector],
-    ) -> Result<Vec<ResourceSummaryView>, CLIError> {
-        let mut resources = self.list_all_resources(selectors).await?;
+        let mut resources = self.search_resources(&selectors).await?;
+
+        // A single-type listing has one schema throughout, so the extra keys are
+        // inert there and the ordering matches what `list` produced before the
+        // merge.
         resources.sort_by(|lhs, rhs| {
             lhs.name
                 .cmp(&rhs.name)

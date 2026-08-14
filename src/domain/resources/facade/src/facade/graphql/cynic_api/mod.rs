@@ -15,4 +15,3 @@ pub(crate) mod fragments;
 pub(crate) mod inputs;
 pub(crate) mod operations;
 pub(crate) mod scalars;
-pub(crate) mod variables;

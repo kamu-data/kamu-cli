@@ -14,6 +14,7 @@ use kamu_resources::{
     Resource,
     ResourceHandle,
     ResourceID,
+    ResourceListColumnValue,
     ResourceSummaryView,
     TypeUri,
 };
@@ -139,6 +140,26 @@ pub fn assert_batch_indexes<T, E>(
 /// Normalizes a slice of `ResourceSummaryView` by sorting by `(schema, name)`.
 pub fn normalize_summary_views(views: &mut [ResourceSummaryView]) {
     views.sort_by(|a, b| (&a.schema, &a.name).cmp(&(&b.schema, &b.name)));
+}
+
+/// Renders a view's typed list columns as sorted `key=value` pairs.
+///
+/// Typed columns are what the CLI's `list` table shows beyond the generic
+/// columns, and they are schema-specific — a `VariableSet` reports
+/// `variables`, a `SecretSet` reports `secrets`. Stringified so one assertion
+/// can span several types.
+pub fn summary_column_pairs(view: &ResourceSummaryView) -> Vec<String> {
+    let mut pairs = view
+        .list_values
+        .iter()
+        .map(|column| match &column.value {
+            ResourceListColumnValue::String(value) => format!("{}={value}", column.key),
+            ResourceListColumnValue::UInt64(value) => format!("{}={value}", column.key),
+            ResourceListColumnValue::Bool(value) => format!("{}={value}", column.key),
+        })
+        .collect::<Vec<_>>();
+    pairs.sort();
+    pairs
 }
 
 /// Normalizes a slice of `ResourceHandle` by sorting by `(schema, name)`.

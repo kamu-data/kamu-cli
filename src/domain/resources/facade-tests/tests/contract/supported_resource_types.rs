@@ -19,9 +19,9 @@ use kamu_resources::{
 use kamu_resources_facade::{
     DeleteResourceError,
     GetResourceError,
-    ListResourceHandlesRequest,
     ListResourcesError,
-    ListResourcesRequest,
+    SearchResourceHandlesRequest,
+    SearchResourcesRequest,
     SpecViewMode,
 };
 
@@ -126,7 +126,7 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
 
     // Canonical selector name works for list, list_handles, and get
     let summaries = facade
-        .list(ListResourcesRequest {
+        .search(SearchResourcesRequest {
             selectors: vec![ResourceSelector::of_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             )],
@@ -136,7 +136,7 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
         })
         .await
         .expect("list with canonical selector must succeed");
-    for s in &summaries {
+    for s in &summaries.items {
         assert_eq!(
             s.schema,
             *VariableSetResource::schema(),
@@ -145,7 +145,7 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
     }
 
     let handles = facade
-        .list_handles(ListResourceHandlesRequest {
+        .search_handles(SearchResourceHandlesRequest {
             selectors: vec![ResourceSelector::of_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             )],
@@ -155,7 +155,7 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
         })
         .await
         .expect("list_handles with canonical selector must succeed");
-    for i in &handles {
+    for i in &handles.items {
         assert_eq!(
             i.r#type,
             *VariableSetResource::schema(),
@@ -182,7 +182,7 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
 
     // Short name "vs" resolves to the canonical VariableSet schema.
     let short_name_summaries = facade
-        .list(ListResourcesRequest {
+        .search(SearchResourcesRequest {
             selectors: vec![ResourceSelector::of_type("vs".parse().unwrap())],
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
@@ -190,7 +190,7 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
         })
         .await
         .expect("short name 'vs' must resolve for list");
-    for s in &short_name_summaries {
+    for s in &short_name_summaries.items {
         assert_eq!(
             s.schema,
             *VariableSetResource::schema(),
@@ -202,7 +202,7 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
     // (see VARIABLE_SET_CANONICAL_SELECTOR), so it resolves like any other
     // canonical/alias selector.
     let type_name_summaries = facade
-        .list(ListResourcesRequest {
+        .search(SearchResourcesRequest {
             selectors: vec![ResourceSelector::of_type("VariableSet".parse().unwrap())],
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
@@ -210,7 +210,7 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
         })
         .await
         .expect("schema TypeName 'VariableSet' must resolve for list");
-    for s in &type_name_summaries {
+    for s in &type_name_summaries.items {
         assert_eq!(
             s.schema,
             *VariableSetResource::schema(),
@@ -221,7 +221,7 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
     // An unregistered singular-of-plural-only spelling still does not resolve
     // (selectors are exact registered strings, not inflected).
     let bad_result = facade
-        .list(ListResourcesRequest {
+        .search(SearchResourcesRequest {
             selectors: vec![ResourceSelector::of_type(
                 "NoSuchResourceTypeXYZ".parse().unwrap(),
             )],
@@ -316,7 +316,7 @@ pub async fn test_unsupported_schema_rejected_consistently(h: &impl FacadeContra
 
     // list — UnsupportedSelector (type validated before DB query)
     let list_result = facade
-        .list(ListResourcesRequest {
+        .search(SearchResourcesRequest {
             selectors: vec![ResourceSelector::of_type(bad_type.parse().unwrap())],
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
@@ -334,7 +334,7 @@ pub async fn test_unsupported_schema_rejected_consistently(h: &impl FacadeContra
 
     // list_handles — UnsupportedSelector
     let li_result = facade
-        .list_handles(ListResourceHandlesRequest {
+        .search_handles(SearchResourceHandlesRequest {
             selectors: vec![ResourceSelector::of_type(bad_type.parse().unwrap())],
             account: None,
             label_filter: None,

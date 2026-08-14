@@ -15,8 +15,6 @@ use internal_error::InternalError;
 use kamu_resources::{ResourceHandle, ResourceTypeDescriptor};
 use kamu_resources_facade::{
     GetResourceError,
-    ListAllResourceHandlesRequest,
-    ListResourceHandlesRequest,
     ResourceFacade,
     ResourceLookupProblem,
     SearchResourceHandlesRequest,
@@ -572,14 +570,17 @@ impl ResourceSelectionResolutionServiceImpl {
             |pagination| {
                 let request_label_filter = options.label_filter.clone();
                 async move {
-                    resource_facade
-                        .list_all_handles(ListAllResourceHandlesRequest {
+                    let response = resource_facade
+                        .search_handles(SearchResourceHandlesRequest {
+                            // A lone type-less unnarrowed selector spans every
+                            // type, which is what `list_all_handles` did.
+                            selectors: vec![kamu_resources::ResourceSelector::default()],
                             account: None,
                             label_filter: request_label_filter,
                             pagination,
                         })
-                        .await
-                        .map_err(Into::into)
+                        .await?;
+                    Ok(response.items)
                 }
             },
         )
@@ -636,8 +637,8 @@ impl ResourceSelectionResolutionServiceImpl {
             |pagination| {
                 let request_label_filter = options.label_filter.clone();
                 async move {
-                    resource_facade
-                        .list_handles(ListResourceHandlesRequest {
+                    let response = resource_facade
+                        .search_handles(SearchResourceHandlesRequest {
                             selectors: vec![kamu_resources::ResourceSelector::of_type(
                                 type_descriptor.schema.clone().into(),
                             )],
@@ -645,8 +646,8 @@ impl ResourceSelectionResolutionServiceImpl {
                             label_filter: request_label_filter,
                             pagination,
                         })
-                        .await
-                        .map_err(Into::into)
+                        .await?;
+                    Ok(response.items)
                 }
             },
         )

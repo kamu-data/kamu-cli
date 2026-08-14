@@ -209,6 +209,36 @@ impl SearchResourceHandlesInput {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Selects resources to list, with typed columns rendered.
+///
+/// Omitting `selectors` spans every type, which is what the retired `listAll`
+/// field did implicitly. Passing an empty list matches nothing — an explicit
+/// "no selectors" is a narrowing to zero, not a widening to everything.
+#[derive(InputObject, Debug, Clone)]
+pub struct SearchResourcesInput {
+    pub selectors: Option<Vec<ResourceSelectorInput>>,
+    pub account: Option<AccountRefInput>,
+    pub label_filter: Option<ResourceLabelFilterInput>,
+}
+
+impl SearchResourcesInput {
+    pub fn into_facade_request(
+        self,
+        pagination: PaginationOpts,
+    ) -> Result<kamu_resources_facade::SearchResourcesRequest, GqlError> {
+        Ok(kamu_resources_facade::SearchResourcesRequest {
+            selectors: self
+                .selectors
+                .map_or_else(|| vec![any_resource_selector()], into_resource_selectors),
+            account: self.account.map(AccountRefInput::into_manifest_account),
+            label_filter: into_facade_filter(self.label_filter)?,
+            pagination,
+        })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Reference to exactly one resource, mirroring the ODF `ResourceRef`.
 ///
 /// Not a `oneOf`: ODF allows `id` and `name` together as a consistency

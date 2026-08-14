@@ -23,27 +23,6 @@ use crate::{ResourceInvalidLabelFilterError, ResourceLabelFilterProblemCode};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Resolves an authored label filter against a single schema.
-///
-/// The `n = 1` case of [`resolve_label_filter_for_schemas`]: with one
-/// candidate, a schema that rejects a label key is the only candidate, so it
-/// surfaces as an error rather than being dropped.
-pub(crate) fn resolve_label_filter(
-    resolver: &ResourceExtensionSchemaResolver,
-    label_filter: Option<ResourceLabelFilterInput>,
-    resource_schema: &ResourceSchemaId,
-) -> Result<ResolvedResourceLabelFilter, ResourceInvalidLabelFilterError> {
-    let (_, resolved) = resolve_label_filter_for_schemas(
-        resolver,
-        label_filter,
-        std::slice::from_ref(resource_schema),
-    )?;
-
-    Ok(resolved)
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 /// Rejects a resolved filter that no repository backend can evaluate yet.
 fn ensure_executable(
     resolved: &ResolvedResourceLabelFilter,
@@ -414,38 +393,32 @@ mod tests {
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    // `resolve_label_filter` delegates to the multi-schema form, so these pin
-    // the `n = 1` contract it relies on: the sole candidate cannot be silently
-    // dropped the way one of several can.
+    // The `n = 1` contract of `resolve_label_filter_for_schemas`: with a single
+    // candidate schema, one that rejects a label key is the *only* candidate,
+    // so it surfaces as an error rather than being dropped the way one of
+    // several can.
     #[test]
-    fn single_schema_resolves_the_same_as_a_one_element_list() {
-        let resolved = resolve_label_filter(
-            &resolver(),
-            Some(filter_of(&[("environment", "production")])),
-            &schema("Widget"),
-        )
-        .unwrap();
-
-        let (applicable, expected) = resolve_label_filter_for_schemas(
+    fn single_schema_resolves_the_filter() {
+        let (applicable, resolved) = resolve_label_filter_for_schemas(
             &resolver(),
             Some(filter_of(&[("environment", "production")])),
             &[schema("Widget")],
         )
         .unwrap();
 
-        assert_eq!(resolved, expected);
+        assert_ne!(resolved, ResolvedResourceLabelFilter::True);
         assert_eq!(applicable, vec![schema("Widget")]);
     }
 
     #[test]
     fn single_schema_rejecting_the_filter_is_an_error_not_an_empty_match() {
-        let err = resolve_label_filter(
+        let err = resolve_label_filter_for_schemas(
             &resolver(),
             Some(filter_of(&[(
                 "https://example.com/schemas/labels/v1alpha1/NotRegistered",
                 "x",
             )])),
-            &schema("Widget"),
+            &[schema("Widget")],
         )
         .unwrap_err();
 
@@ -457,7 +430,8 @@ mod tests {
 
     #[test]
     fn single_schema_without_a_filter_resolves_to_true() {
-        let resolved = resolve_label_filter(&resolver(), None, &schema("Widget")).unwrap();
+        let (_, resolved) =
+            resolve_label_filter_for_schemas(&resolver(), None, &[schema("Widget")]).unwrap();
 
         assert_eq!(resolved, ResolvedResourceLabelFilter::True);
     }
