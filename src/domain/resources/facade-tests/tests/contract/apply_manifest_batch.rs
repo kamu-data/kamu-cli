@@ -94,10 +94,12 @@ fn variable_set_manifest_json_with_id(id: kamu_resources::ResourceID, name: &str
 fn by_name(name: &str) -> ResourceRef {
     ResourceRef {
         account: None,
-        r#type: VARIABLE_SET_CANONICAL_SELECTOR
-            .parse::<TypeName>()
-            .unwrap()
-            .into(),
+        r#type: Some(
+            VARIABLE_SET_CANONICAL_SELECTOR
+                .parse::<TypeName>()
+                .unwrap()
+                .into(),
+        ),
         id: None,
         did: None,
         name: Some(name.parse().unwrap()),

@@ -560,7 +560,7 @@ fn test_flatbuffers_resource_selectors() {
     // ResourceRef — exercises `ResourceID::as_bytes` / `from_bytes`
     let expected = ResourceRef {
         account: Some(account_ref()),
-        r#type: TypeName::new_unchecked("SecretSet").into(),
+        r#type: Some(TypeName::new_unchecked("SecretSet").into()),
         id: Some(ResourceID::new(uuid::Uuid::new_v4())),
         did: None,
         name: Some("my-secrets".parse().unwrap()),
@@ -577,8 +577,9 @@ fn test_flatbuffers_resource_selectors() {
     // ResourceSelector — every field populated
     let expected = ResourceSelector {
         account: Some(account_ref()),
-        r#type: TypeName::new_unchecked("SecretSet").into(),
         id: Some(ResourceID::new(uuid::Uuid::new_v4())),
+        did: None,
+        r#type: Some(TypeName::new_unchecked("SecretSet").into()),
         name: Some("app-%".to_string()),
         labels: Some(LabelFilter {
             entries: BTreeMap::from_iter([("environment".to_string(), json!("production"))]),
@@ -594,15 +595,30 @@ fn test_flatbuffers_resource_selectors() {
         ResourceSelector::deserialize(::flatbuffers::root::<fb::ResourceSelector>(data).unwrap());
     pretty_assertions::assert_eq!(expected, actual);
 
-    // ResourceSelector — only the required `type`, so every optional field must
-    // survive as `None` rather than materializing a default
+    // ResourceSelector — a type-scoped selector and nothing else, so every
+    // optional field must survive as `None` rather than materializing a default
     let expected = ResourceSelector {
         account: None,
-        r#type: TypeName::new_unchecked("VariableSet").into(),
         id: None,
+        did: None,
+        r#type: Some(TypeName::new_unchecked("VariableSet").into()),
         name: None,
         labels: None,
     };
+
+    let mut fb = ::flatbuffers::FlatBufferBuilder::new();
+    let offset = expected.serialize(&mut fb);
+    fb.finish(offset, None);
+    let data = fb.finished_data();
+
+    let actual =
+        ResourceSelector::deserialize(::flatbuffers::root::<fb::ResourceSelector>(data).unwrap());
+    pretty_assertions::assert_eq!(expected, actual);
+
+    // ResourceSelector — wholly empty, the "every resource of every type" form.
+    // `type` is optional since ODF adopted the type-less selector, so an absent
+    // one must round-trip as `None` instead of panicking on deserialize.
+    let expected = ResourceSelector::default();
 
     let mut fb = ::flatbuffers::FlatBufferBuilder::new();
     let offset = expected.serialize(&mut fb);

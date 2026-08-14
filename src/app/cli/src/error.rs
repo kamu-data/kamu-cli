@@ -443,6 +443,15 @@ pub enum ResourceLookupCliError {
     #[error("Resource '{name}' was not found in any resource type")]
     AnyTypeNameNotFound { name: kamu_resources::ResourceName },
 
+    /// The `%/<name>` form again, but the name exists in several types. A
+    /// reference names exactly one resource, so the caller has to disambiguate
+    /// rather than the CLI picking a winner.
+    #[error("Resource '{name}' is ambiguous: it exists in types {}. Specify a type to disambiguate", type_names.join(", "))]
+    AmbiguousType {
+        name: kamu_resources::ResourceName,
+        type_names: Vec<String>,
+    },
+
     #[error("Resource id {id} refers to schema '{actual_schema}', expected '{expected_schema}'")]
     SchemaMismatch {
         id: kamu_resources::ResourceID,
@@ -473,6 +482,13 @@ impl From<ResourceLookupProblem> for ResourceLookupCliError {
             ResourceLookupProblem::NameNotFound(err) => Self::NameNotFound {
                 resource_type: err.type_name.to_string(),
                 name: err.name.to_string(),
+            },
+            ResourceLookupProblem::AnyTypeNameNotFound(err) => {
+                Self::AnyTypeNameNotFound { name: err.name }
+            }
+            ResourceLookupProblem::AmbiguousType(err) => Self::AmbiguousType {
+                name: err.name,
+                type_names: err.type_names.iter().map(ToString::to_string).collect(),
             },
             ResourceLookupProblem::SchemaMismatch(err) => Self::SchemaMismatch {
                 id: err.id,

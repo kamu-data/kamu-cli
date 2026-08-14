@@ -44,6 +44,36 @@ pub struct ResourceNameNotFoundError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// A type-less reference whose name matched nothing in any registered type.
+///
+/// Distinct from [`ResourceNameNotFoundError`] because no single type can be
+/// named in the message — every one was searched.
+#[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
+#[error("Resource '{name}' was not found in any resource type")]
+pub struct ResourceAnyTypeNameNotFoundError {
+    pub name: ResourceName,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A type-less reference whose name matched in more than one type.
+///
+/// A reference names exactly one resource, so this is an addressing failure
+/// rather than a multi-match: the caller must say which type they meant. A
+/// type-less *selector* has no equivalent — several matches are its expected
+/// outcome.
+#[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
+#[error(
+    "Resource '{name}' is ambiguous: it exists in types {}. Specify a type to disambiguate",
+    type_names.iter().map(TypeName::to_string).collect::<Vec<_>>().join(", ")
+)]
+pub struct ResourceAmbiguousTypeError {
+    pub name: ResourceName,
+    pub type_names: Vec<TypeName>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
 #[error("Invalid spec for resource {schema}: {message}")]
 pub struct ResourceInvalidSpecError {

@@ -3909,7 +3909,27 @@ type Resource {
 	status: ResourceStatus!
 }
 
+"""
+A type-less reference whose name matched in several types. A reference names
+exactly one resource, so this is an addressing failure rather than a
+multi-match — the caller must say which type they meant.
+"""
+type ResourceAmbiguousTypeProblem {
+	name: ResourceName!
+	typeNames: [TypeName!]!
+	message: String!
+}
+
 scalar ResourceAnnotations
+
+"""
+A type-less reference whose name matched nothing in any type. Distinct from
+`ResourceNameNotFoundProblem`, which can name the single type it searched.
+"""
+type ResourceAnyTypeNameNotFoundProblem {
+	name: ResourceName!
+	message: String!
+}
 
 type ResourceApplyChange {
 	kind: ResourceApplyChangeKind!
@@ -4219,7 +4239,7 @@ enum ResourceListColumnVisibility {
 
 union ResourceListOutcome = ResourceConnection | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem | ResourceInvalidLabelFilterProblem
 
-union ResourceLookupProblem = ResourceIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceSchemaMismatchProblem | ResourceNameMismatchProblem | ResourceEmptyRefProblem
+union ResourceLookupProblem = ResourceIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceAnyTypeNameNotFoundProblem | ResourceAmbiguousTypeProblem | ResourceSchemaMismatchProblem | ResourceNameMismatchProblem | ResourceEmptyRefProblem
 
 enum ResourceManifestFormat {
 	JSON
@@ -4278,8 +4298,12 @@ input ResourceRefInput {
 	"""
 	Canonical selector (`variablesets`), alias (`vs`), ODF type name
 	(`VariableSet`), or full schema URI — all resolve to the same type.
+	
+	`null` spans every type: the resource is looked up across all of them.
+	Since a ref names exactly one resource, a name matching in several types
+	is an ambiguity error rather than a multi-match.
 	"""
-	type: ResourceTypeSelectorInput!
+	type: ResourceTypeSelectorInput
 	id: ResourceID
 	"""
 	Exact name. Never a pattern; use a selector for pattern matching.
@@ -4331,7 +4355,7 @@ input ResourceSelectorInput {
 
 scalar ResourceSelectorName
 
-union ResourceSelectorProblem = ResourceIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceSchemaMismatchProblem | ResourceNameMismatchProblem | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem | ResourceEmptyRefProblem
+union ResourceSelectorProblem = ResourceIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceAnyTypeNameNotFoundProblem | ResourceAmbiguousTypeProblem | ResourceSchemaMismatchProblem | ResourceNameMismatchProblem | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem | ResourceEmptyRefProblem
 
 type ResourceSelectorProblemResult {
 	problem: ResourceSelectorProblem!

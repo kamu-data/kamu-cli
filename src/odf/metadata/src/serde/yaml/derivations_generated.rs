@@ -864,10 +864,12 @@ pub mod config {
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
         pub account: Option<StructOrString<auth::AccountRef>>,
-        pub r#type: TypeRef,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
         pub id: Option<ResourceID>,
+        #[serde(default)]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub r#type: Option<TypeRef>,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
         pub name: Option<ResourceName>,
@@ -908,8 +910,8 @@ pub mod config {
         fn from(v: dtos::config::ValueRef) -> Self {
             Self {
                 account: v.account.map(|v| v.into()),
-                r#type: v.r#type,
                 id: v.id,
+                r#type: v.r#type,
                 name: v.name,
                 path: v.path,
             }
@@ -924,8 +926,8 @@ pub mod config {
                     .account
                     .map(|v| dtos::auth::AccountRef::try_from(v))
                     .transpose()?,
-                r#type: v.r#type,
                 id: v.id,
+                r#type: v.r#type,
                 name: v.name,
                 path: v.path,
             })
@@ -6349,13 +6351,15 @@ pub mod resource {
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
         pub account: Option<StructOrString<auth::AccountRef>>,
-        pub r#type: TypeRef,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
         pub id: Option<ResourceID>,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
         pub did: Option<Did>,
+        #[serde(default)]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub r#type: Option<TypeRef>,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
         pub name: Option<ResourceName>,
@@ -6393,9 +6397,9 @@ pub mod resource {
         fn from(v: dtos::resource::ResourceRef) -> Self {
             Self {
                 account: v.account.map(|v| v.into()),
-                r#type: v.r#type,
                 id: v.id,
                 did: v.did,
+                r#type: v.r#type,
                 name: v.name,
             }
         }
@@ -6409,9 +6413,9 @@ pub mod resource {
                     .account
                     .map(|v| dtos::auth::AccountRef::try_from(v))
                     .transpose()?,
-                r#type: v.r#type,
                 id: v.id,
                 did: v.did,
+                r#type: v.r#type,
                 name: v.name,
             })
         }
@@ -6427,10 +6431,15 @@ pub mod resource {
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
         pub account: Option<StructOrString<auth::AccountRef>>,
-        pub r#type: TypeRef,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
         pub id: Option<ResourceID>,
+        #[serde(default)]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub did: Option<Did>,
+        #[serde(default)]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub r#type: Option<TypeRef>,
         #[serde(default)]
         #[serde(skip_serializing_if = "Option::is_none")]
         pub name: Option<String>,

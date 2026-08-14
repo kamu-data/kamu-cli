@@ -415,7 +415,7 @@ impl ResourceSelectionResolutionServiceImpl {
                         .iter()
                         .map(|(_, name)| kamu_resources::ResourceRef {
                             account: None,
-                            r#type: schema.clone().into(),
+                            r#type: Some(schema.clone().into()),
                             id: None,
                             did: None,
                             name: Some(name.clone()),

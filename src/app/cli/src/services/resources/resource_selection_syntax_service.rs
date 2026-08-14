@@ -37,7 +37,7 @@ impl ExactResourceRef {
 
         kamu_resources::ResourceRef {
             account: None,
-            r#type,
+            r#type: Some(r#type),
             id,
             // Reserved in ODF; the facade rejects a populated one.
             did: None,

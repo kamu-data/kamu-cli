@@ -35,10 +35,12 @@ use crate::helpers::{
 fn secret_selector(name: &str) -> ResourceRef {
     ResourceRef {
         account: None,
-        r#type: SECRET_SET_CANONICAL_SELECTOR
-            .parse::<TypeName>()
-            .unwrap()
-            .into(),
+        r#type: Some(
+            SECRET_SET_CANONICAL_SELECTOR
+                .parse::<TypeName>()
+                .unwrap()
+                .into(),
+        ),
         id: None,
         did: None,
         name: Some(name.parse().unwrap()),
@@ -145,20 +147,24 @@ pub async fn test_spec_view_mode_applies_to_batch_get(h: &impl FacadeContractHar
     let batch_selector = vec![
         ResourceRef {
             account: None,
-            r#type: SECRET_SET_CANONICAL_SELECTOR
-                .parse::<TypeName>()
-                .unwrap()
-                .into(),
+            r#type: Some(
+                SECRET_SET_CANONICAL_SELECTOR
+                    .parse::<TypeName>()
+                    .unwrap()
+                    .into(),
+            ),
             id: Some(id_a),
             did: None,
             name: None,
         },
         ResourceRef {
             account: None,
-            r#type: SECRET_SET_CANONICAL_SELECTOR
-                .parse::<TypeName>()
-                .unwrap()
-                .into(),
+            r#type: Some(
+                SECRET_SET_CANONICAL_SELECTOR
+                    .parse::<TypeName>()
+                    .unwrap()
+                    .into(),
+            ),
             id: Some(id_b),
             did: None,
             name: None,

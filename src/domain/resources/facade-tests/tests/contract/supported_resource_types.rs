@@ -167,10 +167,12 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
         .get(
             ResourceRef {
                 account: None,
-                r#type: VARIABLE_SET_CANONICAL_SELECTOR
-                    .parse::<TypeName>()
-                    .unwrap()
-                    .into(),
+                r#type: Some(
+                    VARIABLE_SET_CANONICAL_SELECTOR
+                        .parse::<TypeName>()
+                        .unwrap()
+                        .into(),
+                ),
                 id: None,
                 did: None,
                 name: Some("alias-check".parse().unwrap()),
@@ -277,7 +279,7 @@ pub async fn test_unsupported_schema_rejected_consistently(h: &impl FacadeContra
         .get(
             ResourceRef {
                 account: None,
-                r#type: bad_type.parse::<TypeName>().unwrap().into(),
+                r#type: Some(bad_type.parse::<TypeName>().unwrap().into()),
                 id: None,
                 did: None,
                 name: Some("unsupported-type-base".parse().unwrap()),
@@ -298,7 +300,7 @@ pub async fn test_unsupported_schema_rejected_consistently(h: &impl FacadeContra
     let gi_by_name = facade
         .get_handle(ResourceRef {
             account: None,
-            r#type: bad_type.parse::<TypeName>().unwrap().into(),
+            r#type: Some(bad_type.parse::<TypeName>().unwrap().into()),
             id: None,
             did: None,
             name: Some("unsupported-type-base".parse().unwrap()),
@@ -371,7 +373,7 @@ pub async fn test_unsupported_schema_rejected_consistently(h: &impl FacadeContra
     let delete_result = facade
         .delete(ResourceRef {
             account: None,
-            r#type: bad_type.parse::<TypeName>().unwrap().into(),
+            r#type: Some(bad_type.parse::<TypeName>().unwrap().into()),
             id: Some(id),
             did: None,
             name: None,

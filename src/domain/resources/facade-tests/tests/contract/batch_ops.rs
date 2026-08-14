@@ -62,20 +62,24 @@ pub async fn test_get_many_all_successes(h: &impl FacadeContractHarness) {
     let selector = vec![
         ResourceRef {
             account: None,
-            r#type: VARIABLE_SET_CANONICAL_SELECTOR
-                .parse::<TypeName>()
-                .unwrap()
-                .into(),
+            r#type: Some(
+                VARIABLE_SET_CANONICAL_SELECTOR
+                    .parse::<TypeName>()
+                    .unwrap()
+                    .into(),
+            ),
             id: None,
             did: None,
             name: Some("batch-a".parse().unwrap()),
         },
         ResourceRef {
             account: None,
-            r#type: VARIABLE_SET_CANONICAL_SELECTOR
-                .parse::<TypeName>()
-                .unwrap()
-                .into(),
+            r#type: Some(
+                VARIABLE_SET_CANONICAL_SELECTOR
+                    .parse::<TypeName>()
+                    .unwrap()
+                    .into(),
+            ),
             id: Some(id_b),
             did: None,
             name: None,
@@ -124,40 +128,48 @@ pub async fn test_get_many_mixed_successes_problems(h: &impl FacadeContractHarne
             vec![
                 ResourceRef {
                     account: None,
-                    r#type: VARIABLE_SET_CANONICAL_SELECTOR
-                        .parse::<TypeName>()
-                        .unwrap()
-                        .into(),
+                    r#type: Some(
+                        VARIABLE_SET_CANONICAL_SELECTOR
+                            .parse::<TypeName>()
+                            .unwrap()
+                            .into(),
+                    ),
                     id: None,
                     did: None,
                     name: Some("mixed-a".parse().unwrap()),
                 }, // idx 0 — exists
                 ResourceRef {
                     account: None,
-                    r#type: VARIABLE_SET_CANONICAL_SELECTOR
-                        .parse::<TypeName>()
-                        .unwrap()
-                        .into(),
+                    r#type: Some(
+                        VARIABLE_SET_CANONICAL_SELECTOR
+                            .parse::<TypeName>()
+                            .unwrap()
+                            .into(),
+                    ),
                     id: None,
                     did: None,
                     name: Some("no-such-name".parse().unwrap()),
                 }, // idx 1 — missing name
                 ResourceRef {
                     account: None,
-                    r#type: VARIABLE_SET_CANONICAL_SELECTOR
-                        .parse::<TypeName>()
-                        .unwrap()
-                        .into(),
+                    r#type: Some(
+                        VARIABLE_SET_CANONICAL_SELECTOR
+                            .parse::<TypeName>()
+                            .unwrap()
+                            .into(),
+                    ),
                     id: Some(id_existing),
                     did: None,
                     name: None,
                 }, // idx 2 — exists by id
                 ResourceRef {
                     account: None,
-                    r#type: VARIABLE_SET_CANONICAL_SELECTOR
-                        .parse::<TypeName>()
-                        .unwrap()
-                        .into(),
+                    r#type: Some(
+                        VARIABLE_SET_CANONICAL_SELECTOR
+                            .parse::<TypeName>()
+                            .unwrap()
+                            .into(),
+                    ),
                     id: Some(absent_id),
                     did: None,
                     name: None,
@@ -203,20 +215,24 @@ pub async fn test_get_many_duplicate_refs(h: &impl FacadeContractHarness) {
             vec![
                 ResourceRef {
                     account: None,
-                    r#type: VARIABLE_SET_CANONICAL_SELECTOR
-                        .parse::<TypeName>()
-                        .unwrap()
-                        .into(),
+                    r#type: Some(
+                        VARIABLE_SET_CANONICAL_SELECTOR
+                            .parse::<TypeName>()
+                            .unwrap()
+                            .into(),
+                    ),
                     id: None,
                     did: None,
                     name: Some("dup-ref".parse().unwrap()),
                 }, // idx 0
                 ResourceRef {
                     account: None,
-                    r#type: VARIABLE_SET_CANONICAL_SELECTOR
-                        .parse::<TypeName>()
-                        .unwrap()
-                        .into(),
+                    r#type: Some(
+                        VARIABLE_SET_CANONICAL_SELECTOR
+                            .parse::<TypeName>()
+                            .unwrap()
+                            .into(),
+                    ),
                     id: None,
                     did: None,
                     name: Some("dup-ref".parse().unwrap()),
@@ -314,10 +330,12 @@ pub async fn test_get_many_wrong_schema(h: &impl FacadeContractHarness) {
             vec![
                 ResourceRef {
                     account: None,
-                    r#type: SECRET_SET_CANONICAL_SELECTOR
-                        .parse::<TypeName>()
-                        .unwrap()
-                        .into(),
+                    r#type: Some(
+                        SECRET_SET_CANONICAL_SELECTOR
+                            .parse::<TypeName>()
+                            .unwrap()
+                            .into(),
+                    ),
                     id: Some(id),
                     did: None,
                     name: None,
@@ -356,30 +374,36 @@ pub async fn test_get_handles_mirrors_get_many(h: &impl FacadeContractHarness) {
         .get_handles(vec![
             ResourceRef {
                 account: None,
-                r#type: VARIABLE_SET_CANONICAL_SELECTOR
-                    .parse::<TypeName>()
-                    .unwrap()
-                    .into(),
+                r#type: Some(
+                    VARIABLE_SET_CANONICAL_SELECTOR
+                        .parse::<TypeName>()
+                        .unwrap()
+                        .into(),
+                ),
                 id: None,
                 did: None,
                 name: Some("idents-a".parse().unwrap()),
             }, // idx 0 — exists
             ResourceRef {
                 account: None,
-                r#type: VARIABLE_SET_CANONICAL_SELECTOR
-                    .parse::<TypeName>()
-                    .unwrap()
-                    .into(),
+                r#type: Some(
+                    VARIABLE_SET_CANONICAL_SELECTOR
+                        .parse::<TypeName>()
+                        .unwrap()
+                        .into(),
+                ),
                 id: None,
                 did: None,
                 name: Some("no-such-ident".parse().unwrap()),
             }, // idx 1 — missing
             ResourceRef {
                 account: None,
-                r#type: VARIABLE_SET_CANONICAL_SELECTOR
-                    .parse::<TypeName>()
-                    .unwrap()
-                    .into(),
+                r#type: Some(
+                    VARIABLE_SET_CANONICAL_SELECTOR
+                        .parse::<TypeName>()
+                        .unwrap()
+                        .into(),
+                ),
                 id: Some(absent_uid),
                 did: None,
                 name: None,
@@ -426,20 +450,24 @@ pub async fn test_render_manifests_all_successes(h: &impl FacadeContractHarness)
                 vec![
                     ResourceRef {
                         account: None,
-                        r#type: VARIABLE_SET_CANONICAL_SELECTOR
-                            .parse::<TypeName>()
-                            .unwrap()
-                            .into(),
+                        r#type: Some(
+                            VARIABLE_SET_CANONICAL_SELECTOR
+                                .parse::<TypeName>()
+                                .unwrap()
+                                .into(),
+                        ),
                         id: Some(id_a),
                         did: None,
                         name: None,
                     }, // idx 0
                     ResourceRef {
                         account: None,
-                        r#type: VARIABLE_SET_CANONICAL_SELECTOR
-                            .parse::<TypeName>()
-                            .unwrap()
-                            .into(),
+                        r#type: Some(
+                            VARIABLE_SET_CANONICAL_SELECTOR
+                                .parse::<TypeName>()
+                                .unwrap()
+                                .into(),
+                        ),
                         id: Some(id_b),
                         did: None,
                         name: None,
@@ -498,30 +526,36 @@ pub async fn test_render_manifests_mixed_successes_problems(h: &impl FacadeContr
             vec![
                 ResourceRef {
                     account: None,
-                    r#type: VARIABLE_SET_CANONICAL_SELECTOR
-                        .parse::<TypeName>()
-                        .unwrap()
-                        .into(),
+                    r#type: Some(
+                        VARIABLE_SET_CANONICAL_SELECTOR
+                            .parse::<TypeName>()
+                            .unwrap()
+                            .into(),
+                    ),
                     id: Some(uid_existing),
                     did: None,
                     name: None,
                 }, // idx 0 — exists
                 ResourceRef {
                     account: None,
-                    r#type: VARIABLE_SET_CANONICAL_SELECTOR
-                        .parse::<TypeName>()
-                        .unwrap()
-                        .into(),
+                    r#type: Some(
+                        VARIABLE_SET_CANONICAL_SELECTOR
+                            .parse::<TypeName>()
+                            .unwrap()
+                            .into(),
+                    ),
                     id: None,
                     did: None,
                     name: Some("render-missing".parse().unwrap()),
                 }, // idx 1 — missing
                 ResourceRef {
                     account: None,
-                    r#type: VARIABLE_SET_CANONICAL_SELECTOR
-                        .parse::<TypeName>()
-                        .unwrap()
-                        .into(),
+                    r#type: Some(
+                        VARIABLE_SET_CANONICAL_SELECTOR
+                            .parse::<TypeName>()
+                            .unwrap()
+                            .into(),
+                    ),
                     id: Some(absent_uid),
                     did: None,
                     name: None,
@@ -567,30 +601,36 @@ pub async fn test_delete_many_all_successes(h: &impl FacadeContractHarness) {
         .delete_many(vec![
             ResourceRef {
                 account: None,
-                r#type: VARIABLE_SET_CANONICAL_SELECTOR
-                    .parse::<TypeName>()
-                    .unwrap()
-                    .into(),
+                r#type: Some(
+                    VARIABLE_SET_CANONICAL_SELECTOR
+                        .parse::<TypeName>()
+                        .unwrap()
+                        .into(),
+                ),
                 id: None,
                 did: None,
                 name: Some("del-many-a".parse().unwrap()),
             }, // idx 0
             ResourceRef {
                 account: None,
-                r#type: VARIABLE_SET_CANONICAL_SELECTOR
-                    .parse::<TypeName>()
-                    .unwrap()
-                    .into(),
+                r#type: Some(
+                    VARIABLE_SET_CANONICAL_SELECTOR
+                        .parse::<TypeName>()
+                        .unwrap()
+                        .into(),
+                ),
                 id: Some(id_b),
                 did: None,
                 name: None,
             }, // idx 1
             ResourceRef {
                 account: None,
-                r#type: VARIABLE_SET_CANONICAL_SELECTOR
-                    .parse::<TypeName>()
-                    .unwrap()
-                    .into(),
+                r#type: Some(
+                    VARIABLE_SET_CANONICAL_SELECTOR
+                        .parse::<TypeName>()
+                        .unwrap()
+                        .into(),
+                ),
                 id: None,
                 did: None,
                 name: Some("del-many-c".parse().unwrap()),
@@ -621,10 +661,12 @@ pub async fn test_delete_many_all_successes(h: &impl FacadeContractHarness) {
             .get(
                 ResourceRef {
                     account: None,
-                    r#type: VARIABLE_SET_CANONICAL_SELECTOR
-                        .parse::<TypeName>()
-                        .unwrap()
-                        .into(),
+                    r#type: Some(
+                        VARIABLE_SET_CANONICAL_SELECTOR
+                            .parse::<TypeName>()
+                            .unwrap()
+                            .into(),
+                    ),
                     id: None,
                     did: None,
                     name: Some(name.parse().unwrap()),
@@ -656,20 +698,24 @@ pub async fn test_delete_many_mixed_successes_problems(h: &impl FacadeContractHa
         .delete_many(vec![
             ResourceRef {
                 account: None,
-                r#type: VARIABLE_SET_CANONICAL_SELECTOR
-                    .parse::<TypeName>()
-                    .unwrap()
-                    .into(),
+                r#type: Some(
+                    VARIABLE_SET_CANONICAL_SELECTOR
+                        .parse::<TypeName>()
+                        .unwrap()
+                        .into(),
+                ),
                 id: None,
                 did: None,
                 name: Some("del-mix-exists".parse().unwrap()),
             }, // idx 0 — exists
             ResourceRef {
                 account: None,
-                r#type: VARIABLE_SET_CANONICAL_SELECTOR
-                    .parse::<TypeName>()
-                    .unwrap()
-                    .into(),
+                r#type: Some(
+                    VARIABLE_SET_CANONICAL_SELECTOR
+                        .parse::<TypeName>()
+                        .unwrap()
+                        .into(),
+                ),
                 id: None,
                 did: None,
                 name: Some("del-mix-missing".parse().unwrap()),
@@ -677,10 +723,12 @@ pub async fn test_delete_many_mixed_successes_problems(h: &impl FacadeContractHa
                 * name */
             ResourceRef {
                 account: None,
-                r#type: VARIABLE_SET_CANONICAL_SELECTOR
-                    .parse::<TypeName>()
-                    .unwrap()
-                    .into(),
+                r#type: Some(
+                    VARIABLE_SET_CANONICAL_SELECTOR
+                        .parse::<TypeName>()
+                        .unwrap()
+                        .into(),
+                ),
                 id: Some(absent_uid),
                 did: None,
                 name: None,
@@ -735,20 +783,24 @@ pub async fn test_delete_many_duplicate_refs_is_deterministic(h: &impl FacadeCon
         .delete_many(vec![
             ResourceRef {
                 account: None,
-                r#type: VARIABLE_SET_CANONICAL_SELECTOR
-                    .parse::<TypeName>()
-                    .unwrap()
-                    .into(),
+                r#type: Some(
+                    VARIABLE_SET_CANONICAL_SELECTOR
+                        .parse::<TypeName>()
+                        .unwrap()
+                        .into(),
+                ),
                 id: None,
                 did: None,
                 name: Some("del-dup-ref".parse().unwrap()),
             }, // idx 0
             ResourceRef {
                 account: None,
-                r#type: VARIABLE_SET_CANONICAL_SELECTOR
-                    .parse::<TypeName>()
-                    .unwrap()
-                    .into(),
+                r#type: Some(
+                    VARIABLE_SET_CANONICAL_SELECTOR
+                        .parse::<TypeName>()
+                        .unwrap()
+                        .into(),
+                ),
                 id: None,
                 did: None,
                 name: Some("del-dup-ref".parse().unwrap()),
@@ -807,7 +859,7 @@ pub async fn test_batch_apis_reject_unsupported_type(h: &impl FacadeContractHarn
 
     let selector = vec![ResourceRef {
         account: None,
-        r#type: bad_type.parse::<TypeName>().unwrap().into(),
+        r#type: Some(bad_type.parse::<TypeName>().unwrap().into()),
         id: Some(id),
         did: None,
         name: None,
@@ -881,20 +933,24 @@ pub async fn test_batch_spans_types_and_accounts(h: &impl FacadeContractHarness)
         vec![
             ResourceRef {
                 account: None,
-                r#type: VARIABLE_SET_CANONICAL_SELECTOR
-                    .parse::<TypeName>()
-                    .unwrap()
-                    .into(),
+                r#type: Some(
+                    VARIABLE_SET_CANONICAL_SELECTOR
+                        .parse::<TypeName>()
+                        .unwrap()
+                        .into(),
+                ),
                 id: None,
                 did: None,
                 name: Some("span-vars".parse().unwrap()),
             },
             ResourceRef {
                 account: None,
-                r#type: SECRET_SET_CANONICAL_SELECTOR
-                    .parse::<TypeName>()
-                    .unwrap()
-                    .into(),
+                r#type: Some(
+                    SECRET_SET_CANONICAL_SELECTOR
+                        .parse::<TypeName>()
+                        .unwrap()
+                        .into(),
+                ),
                 id: None,
                 did: None,
                 name: Some("span-secrets".parse().unwrap()),
@@ -938,20 +994,24 @@ pub async fn test_batch_spans_types_and_accounts(h: &impl FacadeContractHarness)
                 did: None,
                 name: Some(h.account_name(TestAccount::Alice)),
             }),
-            r#type: VARIABLE_SET_CANONICAL_SELECTOR
-                .parse::<TypeName>()
-                .unwrap()
-                .into(),
+            r#type: Some(
+                VARIABLE_SET_CANONICAL_SELECTOR
+                    .parse::<TypeName>()
+                    .unwrap()
+                    .into(),
+            ),
             id: None,
             did: None,
             name: Some("span-vars".parse().unwrap()),
         },
         ResourceRef {
             account: None,
-            r#type: SECRET_SET_CANONICAL_SELECTOR
-                .parse::<TypeName>()
-                .unwrap()
-                .into(),
+            r#type: Some(
+                SECRET_SET_CANONICAL_SELECTOR
+                    .parse::<TypeName>()
+                    .unwrap()
+                    .into(),
+            ),
             id: None,
             did: None,
             name: Some("span-secrets".parse().unwrap()),
@@ -1001,20 +1061,24 @@ pub async fn test_ref_id_and_name_must_agree(h: &impl FacadeContractHarness) {
         vec![
             ResourceRef {
                 account: None,
-                r#type: VARIABLE_SET_CANONICAL_SELECTOR
-                    .parse::<TypeName>()
-                    .unwrap()
-                    .into(),
+                r#type: Some(
+                    VARIABLE_SET_CANONICAL_SELECTOR
+                        .parse::<TypeName>()
+                        .unwrap()
+                        .into(),
+                ),
                 id: Some(alpha_id),
                 did: None,
                 name: Some("agree-beta".parse().unwrap()),
             },
             ResourceRef {
                 account: None,
-                r#type: VARIABLE_SET_CANONICAL_SELECTOR
-                    .parse::<TypeName>()
-                    .unwrap()
-                    .into(),
+                r#type: Some(
+                    VARIABLE_SET_CANONICAL_SELECTOR
+                        .parse::<TypeName>()
+                        .unwrap()
+                        .into(),
+                ),
                 id: None,
                 did: None,
                 name: Some("agree-beta".parse().unwrap()),
@@ -1045,10 +1109,12 @@ pub async fn test_ref_id_and_name_must_agree(h: &impl FacadeContractHarness) {
     let survivors = facade
         .get_handles(vec![ResourceRef {
             account: None,
-            r#type: VARIABLE_SET_CANONICAL_SELECTOR
-                .parse::<TypeName>()
-                .unwrap()
-                .into(),
+            r#type: Some(
+                VARIABLE_SET_CANONICAL_SELECTOR
+                    .parse::<TypeName>()
+                    .unwrap()
+                    .into(),
+            ),
             id: Some(alpha_id),
             did: None,
             name: None,
@@ -1065,10 +1131,12 @@ pub async fn test_ref_id_and_name_must_agree(h: &impl FacadeContractHarness) {
     let case_variant = || {
         vec![ResourceRef {
             account: None,
-            r#type: VARIABLE_SET_CANONICAL_SELECTOR
-                .parse::<TypeName>()
-                .unwrap()
-                .into(),
+            r#type: Some(
+                VARIABLE_SET_CANONICAL_SELECTOR
+                    .parse::<TypeName>()
+                    .unwrap()
+                    .into(),
+            ),
             id: Some(alpha_id),
             did: None,
             name: Some("AGREE-ALPHA".parse().unwrap()),
@@ -1096,6 +1164,160 @@ pub async fn test_ref_id_and_name_must_agree(h: &impl FacadeContractHarness) {
         .await
         .expect("render_manifests must accept a case-only name variant");
     assert_batch_indexes(&manifests, &[0], &[]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-171
+contract_test!(
+    type_less_ref_resolves_across_types,
+    super::test_type_less_ref_resolves_across_types
+);
+
+/// A ref that names no type resolves by searching every registered type.
+///
+/// ODF made `type` optional on `ResourceRef`, so a caller may address a
+/// resource by name alone. Resolution happens in the batch pipelines' shared
+/// front half, which is why all three paths are asserted: a fix applied to one
+/// of them and not the others would leave the paths disagreeing about an
+/// identical ref.
+///
+/// A miss is asserted alongside the hit, since a type-less ref that resolves
+/// nothing must be a per-item problem rather than a whole-batch failure.
+pub async fn test_type_less_ref_resolves_across_types(h: &impl FacadeContractHarness) {
+    create_resource(h, "typeless-vars").await;
+
+    let facade = h.facade_for(TestAccount::Alice);
+
+    // Index 0 names a resource that exists in exactly one type; index 1 names
+    // nothing at all.
+    let refs = || {
+        vec![
+            ResourceRef {
+                account: None,
+                r#type: None,
+                id: None,
+                did: None,
+                name: Some("typeless-vars".parse().unwrap()),
+            },
+            ResourceRef {
+                account: None,
+                r#type: None,
+                id: None,
+                did: None,
+                name: Some("typeless-absent".parse().unwrap()),
+            },
+        ]
+    };
+
+    let response = facade
+        .get_many(refs(), SpecViewMode::Encrypted)
+        .await
+        .expect("a type-less ref must resolve without naming a type");
+    assert_batch_indexes(&response, &[0], &[1]);
+
+    let handles = facade
+        .get_handles(refs())
+        .await
+        .expect("get_handles must resolve a type-less ref");
+    assert_batch_indexes(&handles, &[0], &[1]);
+
+    let manifests = facade
+        .render_manifests(
+            refs(),
+            ResourceManifestFormat::Json,
+            SpecViewMode::Encrypted,
+        )
+        .await
+        .expect("render_manifests must resolve a type-less ref");
+    assert_batch_indexes(&manifests, &[0], &[1]);
+
+    // The write path last, since it consumes the fixture.
+    let deleted = facade
+        .delete_many(refs())
+        .await
+        .expect("delete_many must resolve a type-less ref");
+    assert_batch_indexes(&deleted, &[0], &[1]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-172
+contract_test!(
+    type_less_ref_matching_several_types_is_ambiguous,
+    super::test_type_less_ref_matching_several_types_is_ambiguous
+);
+
+/// A type-less ref whose name exists in several types is an addressing error.
+///
+/// A `ResourceRef` names *exactly one* resource, so matching in two types is
+/// not a multi-match to be returned — it is a question the caller has to
+/// answer. Picking a winner would make `kamu get <name>` silently resolve to
+/// whichever type happened to sort first.
+///
+/// Contrast a type-less `ResourceSelector`, for which several matches are the
+/// expected outcome; that asymmetry is the whole ref/selector distinction.
+pub async fn test_type_less_ref_matching_several_types_is_ambiguous(
+    h: &impl FacadeContractHarness,
+) {
+    // The same name in two different types.
+    create_resource(h, "ambiguous-name").await;
+    apply_manifest_and_get_id(
+        h,
+        TestAccount::Alice,
+        secret_set_manifest_json("ambiguous-name", None, &[("TOKEN", "t")]),
+    )
+    .await;
+
+    let facade = h.facade_for(TestAccount::Alice);
+
+    let refs = || {
+        vec![ResourceRef {
+            account: None,
+            r#type: None,
+            id: None,
+            did: None,
+            name: Some("ambiguous-name".parse().unwrap()),
+        }]
+    };
+
+    let response = facade
+        .get_many(refs(), SpecViewMode::Encrypted)
+        .await
+        .expect("an ambiguous ref is a per-item problem, not a batch failure");
+    assert_batch_indexes(&response, &[], &[0]);
+
+    let handles = facade
+        .get_handles(refs())
+        .await
+        .expect("get_handles must report the ambiguity per item");
+    assert_batch_indexes(&handles, &[], &[0]);
+
+    // The one that would otherwise delete an arbitrary one of the two.
+    let deleted = facade
+        .delete_many(refs())
+        .await
+        .expect("delete_many must report the ambiguity per item");
+    assert_batch_indexes(&deleted, &[], &[0]);
+
+    // Naming the type disambiguates, and both resources must still exist —
+    // the ambiguous delete above must not have removed either.
+    let disambiguated = facade
+        .get_handles(vec![ResourceRef {
+            account: None,
+            r#type: Some(
+                VARIABLE_SET_CANONICAL_SELECTOR
+                    .parse::<TypeName>()
+                    .unwrap()
+                    .into(),
+            ),
+            id: None,
+            did: None,
+            name: Some("ambiguous-name".parse().unwrap()),
+        }])
+        .await
+        .expect("naming the type must resolve what the type-less ref could not");
+    assert_batch_indexes(&disambiguated, &[0], &[]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

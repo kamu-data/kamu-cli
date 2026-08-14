@@ -123,7 +123,13 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .resolve_target_account(resource_ref.account.as_ref())
             .await?;
 
-        let schema = self.resolve_schema_for_selector::<GetResourceError>(&resource_ref.r#type)?;
+        let schema = self
+            .resolve_ref_schema(
+                &self.list_resource_type_descriptors(),
+                &target_account.did,
+                &resource_ref,
+            )
+            .await??;
 
         let id = resolve_resource_id::<GetResourceError>(
             self.generic_resource_query_service.as_ref(),
@@ -147,9 +153,9 @@ impl ResourceFacade for LocalResourceFacadeImpl {
     {
         // An empty batch names nothing, so it yields an empty response.
         let mut successes = Vec::new();
-        let mut problems = Vec::new();
+        let (groups, mut problems) = self.group_refs_by_target(resource_refs).await?;
 
-        for group in self.group_refs_by_target(resource_refs).await? {
+        for group in groups {
             let (indexes, refs): (Vec<_>, Vec<_>) = group.entries.into_iter().unzip();
 
             let grouped = group_batch_resource_refs(refs);
@@ -453,7 +459,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
     ) -> Result<BatchResourceResponse<ResourceID, ResourceLookupProblem>, BatchResourceError> {
         // An empty batch names nothing, so it yields an empty response.
         let mut successes = Vec::new();
-        let mut problems = Vec::new();
+        let (groups, mut problems) = self.group_refs_by_target(resource_refs).await?;
 
         // One dispatcher call per `(account, schema)` group. The whole request
         // runs inside a single database transaction — opened by the
@@ -461,7 +467,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         // `DatabaseTransactionRunner` — so a failure in a later group rolls back
         // the deletes an earlier one performed. Fanning out therefore does not
         // introduce partial-delete semantics.
-        for group in self.group_refs_by_target(resource_refs).await? {
+        for group in groups {
             let (indexes, refs): (Vec<_>, Vec<_>) = group.entries.into_iter().unzip();
 
             let grouped = group_batch_resource_refs(refs);
@@ -567,8 +573,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 ///
 /// Building that list constructs every registered dispatcher, so callers
 /// resolving more than one selector must build it once and reuse it here rather
-/// than going through
-/// [`LocalResourceFacadeImpl::resolve_schema_for_selector`] per selector.
+/// than rebuilding it per selector.
 ///
 /// Accepts anything spelling a type — a raw CLI selector (`vs`), an ODF
 /// `TypeRef` (`VariableSet`), or a schema URI — since descriptors match all
@@ -630,11 +635,84 @@ impl LocalResourceFacadeImpl {
         descriptors
     }
 
-    fn resolve_schema_for_selector<E>(&self, selector: impl AsRef<str>) -> Result<TypeUri, E>
-    where
-        E: From<UnsupportedResourceSelectorError>,
-    {
-        resolve_schema_in_descriptors(&self.list_resource_type_descriptors(), selector)
+    /// Resolves the one schema a ref addresses, searching every registered type
+    /// when the ref names none.
+    ///
+    /// A [`ResourceRef`] names *exactly one* resource, so a type-less ref that
+    /// matches in several types is ambiguous rather than a multi-match: it is
+    /// reported as [`ResourceLookupProblem::AmbiguousType`] instead of picking
+    /// a winner. Contrast a type-less `ResourceSelector`, for which several
+    /// matches are the expected outcome.
+    async fn resolve_ref_schema(
+        &self,
+        descriptors: &[ResourceTypeDescriptor],
+        account_id: &odf::AccountID,
+        resource_ref: &ResourceRef,
+    ) -> Result<Result<TypeUri, ResourceLookupProblem>, BatchResourceError> {
+        let Some(r#type) = resource_ref.r#type.as_ref() else {
+            return self
+                .search_ref_schema(descriptors, account_id, resource_ref)
+                .await;
+        };
+
+        Ok(Ok(resolve_schema_in_descriptors::<BatchResourceError>(
+            descriptors,
+            r#type,
+        )?))
+    }
+
+    /// Finds which registered type holds the resource a type-less ref names.
+    async fn search_ref_schema(
+        &self,
+        descriptors: &[ResourceTypeDescriptor],
+        account_id: &odf::AccountID,
+        resource_ref: &ResourceRef,
+    ) -> Result<Result<TypeUri, ResourceLookupProblem>, BatchResourceError> {
+        // An id is globally unique, so the stored row already carries the
+        // schema — no per-type search needed.
+        if let Some(id) = resource_ref.id {
+            let rows = self
+                .generic_resource_query_service
+                .find_resource_handles_by_ids(account_id, &[id])
+                .await?;
+
+            return Ok(match rows.into_iter().next() {
+                Some(row) => Ok(TypeUri::new_unchecked(row.schema)),
+                None => Err(id_not_found(id)),
+            });
+        }
+
+        let Some(name) = resource_ref.name.as_ref() else {
+            return Ok(Err(ResourceLookupProblem::EmptyRef));
+        };
+
+        let mut matched = Vec::new();
+        for descriptor in descriptors {
+            if self
+                .generic_resource_query_service
+                .find_resource_id_by_name(account_id, &descriptor.schema, name)
+                .await?
+                .is_some()
+            {
+                matched.push(descriptor.schema.clone());
+            }
+        }
+
+        Ok(match matched.len() {
+            1 => Ok(matched.into_iter().next().unwrap()),
+            0 => Err(ResourceLookupProblem::AnyTypeNameNotFound(
+                ResourceAnyTypeNameNotFoundError { name: name.clone() },
+            )),
+            _ => Err(ResourceLookupProblem::AmbiguousType(
+                ResourceAmbiguousTypeError {
+                    name: name.clone(),
+                    type_names: matched
+                        .iter()
+                        .map(resource_type_name)
+                        .collect::<Result<Vec<_>, _>>()?,
+                },
+            )),
+        })
     }
 
     /// Resolves every ref's account and schema, then splits the batch into
@@ -645,14 +723,25 @@ impl LocalResourceFacadeImpl {
     /// built once, so a batch costs one account lookup per distinct spelling
     /// and no per-ref catalog work.
     ///
-    /// An unresolvable account or unknown type fails the **whole** call rather
-    /// than becoming a per-item problem: both are addressing errors in the
-    /// request rather than facts about stored data, and the pre-fan-out code
-    /// rejected them the same way.
+    /// An unresolvable account or an *unknown named* type fails the **whole**
+    /// call rather than becoming a per-item problem: both are addressing errors
+    /// in the request rather than facts about stored data.
+    ///
+    /// A **type-less** ref is different: resolving it is a lookup against
+    /// stored data, so a miss or an ambiguity is that one ref's problem and is
+    /// returned alongside the groups for the caller to merge by request index.
+    /// Because all three pipelines share this function, they inherit type-less
+    /// refs together rather than one at a time.
     async fn group_refs_by_target(
         &self,
         resource_refs: Vec<ResourceRef>,
-    ) -> Result<Vec<BatchTargetGroup>, BatchResourceError> {
+    ) -> Result<
+        (
+            Vec<BatchTargetGroup>,
+            Vec<BatchResourceProblem<ResourceLookupProblem>>,
+        ),
+        BatchResourceError,
+    > {
         let account_refs = distinct_account_refs(&resource_refs);
         let resolved_accounts = self
             .resource_account_resolver
@@ -661,26 +750,29 @@ impl LocalResourceFacadeImpl {
 
         let descriptors = self.list_resource_type_descriptors();
 
-        let entries = resource_refs
-            .into_iter()
-            .enumerate()
-            .map(|(request_index, resource_ref)| {
-                let account_position = account_refs
-                    .iter()
-                    .position(|account| account == &resource_ref.account)
-                    .expect("every ref's account is in the deduplicated list");
-                let account = resolved_accounts[account_position].clone();
+        let mut entries = Vec::new();
+        let mut problems = Vec::new();
 
-                let schema = resolve_schema_in_descriptors::<BatchResourceError>(
-                    &descriptors,
-                    &resource_ref.r#type,
-                )?;
+        for (request_index, resource_ref) in resource_refs.into_iter().enumerate() {
+            let account_position = account_refs
+                .iter()
+                .position(|account| account == &resource_ref.account)
+                .expect("every ref's account is in the deduplicated list");
+            let account = resolved_accounts[account_position].clone();
 
-                Ok((request_index, resource_ref, account, schema))
-            })
-            .collect::<Result<Vec<_>, BatchResourceError>>()?;
+            match self
+                .resolve_ref_schema(&descriptors, &account.did, &resource_ref)
+                .await?
+            {
+                Ok(schema) => entries.push((request_index, resource_ref, account, schema)),
+                Err(error) => problems.push(BatchResourceProblem {
+                    request_index,
+                    error,
+                }),
+            }
+        }
 
-        Ok(group_by_account_and_schema(entries))
+        Ok((group_by_account_and_schema(entries), problems))
     }
 
     /// Converts snapshots into summary views, rendering each one's typed list
@@ -855,6 +947,7 @@ impl LocalResourceFacadeImpl {
             + From<ResourceLookupProblem>
             + From<UnsupportedResourceSelectorError>
             + From<InternalError>
+            + From<BatchResourceError>
             + From<GetResourceCrudDispatcherError>,
     {
         let target_account = self
@@ -862,7 +955,13 @@ impl LocalResourceFacadeImpl {
             .resolve_target_account(resource_ref.account.as_ref())
             .await?;
 
-        let schema = self.resolve_schema_for_selector::<E>(&resource_ref.r#type)?;
+        let schema = self
+            .resolve_ref_schema(
+                &self.list_resource_type_descriptors(),
+                &target_account.did,
+                &resource_ref,
+            )
+            .await??;
 
         let id = resolve_resource_id::<E>(
             self.generic_resource_query_service.as_ref(),
@@ -911,9 +1010,9 @@ impl LocalResourceFacadeImpl {
     > {
         // An empty batch names nothing, so it yields an empty result.
         let mut indexed_resources = Vec::new();
-        let mut problems = Vec::new();
+        let (groups, mut problems) = self.group_refs_by_target(resource_refs).await?;
 
-        for group in self.group_refs_by_target(resource_refs).await? {
+        for group in groups {
             let (indexes, refs): (Vec<_>, Vec<_>) = group.entries.into_iter().unzip();
 
             // Batch refs name their targets explicitly.

@@ -50,7 +50,7 @@ use crate::helpers::{
 fn make_selector(resource_type: &str, _schema: &str, name: &str) -> ResourceRef {
     ResourceRef {
         account: None,
-        r#type: resource_type.parse::<TypeName>().unwrap().into(),
+        r#type: Some(resource_type.parse::<TypeName>().unwrap().into()),
         id: None,
         did: None,
         name: Some(name.parse().unwrap()),

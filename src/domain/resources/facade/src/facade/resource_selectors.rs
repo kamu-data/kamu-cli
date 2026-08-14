@@ -54,14 +54,26 @@ pub enum UnsupportedSelectorFieldError {
 /// Rejects a ref the facade cannot resolve: one carrying a `did`, or one
 /// naming nothing at all.
 ///
-/// A [`ResourceSelector`] needs no equivalent: it carries no `did`, and one
-/// narrowing by nothing is meaningful — it matches every resource of its type.
+/// A type-less ref is *not* rejected — it resolves across every registered
+/// type, the same way a type-less selector does.
 pub fn validate_ref(value: &ResourceRef) -> Result<(), UnsupportedSelectorFieldError> {
     if value.did.is_some() {
         return Err(UnsupportedSelectorFieldError::Did);
     }
     if value.id.is_none() && value.name.is_none() {
         return Err(UnsupportedSelectorFieldError::EmptyRef);
+    }
+    Ok(())
+}
+
+/// Rejects a selector carrying a `did` the facade cannot resolve.
+///
+/// The selector gained `did` when ODF made the type optional. Unlike a ref, a
+/// selector narrowing by nothing is meaningful — it matches every resource of
+/// its type — so there is no `EmptyRef` equivalent here.
+pub fn validate_selector(value: &ResourceSelector) -> Result<(), UnsupportedSelectorFieldError> {
+    if value.did.is_some() {
+        return Err(UnsupportedSelectorFieldError::Did);
     }
     Ok(())
 }
@@ -74,8 +86,11 @@ pub fn validate_ref(value: &ResourceRef) -> Result<(), UnsupportedSelectorFieldE
 pub fn ref_to_selector(value: ResourceRef) -> ResourceSelector {
     ResourceSelector {
         account: value.account,
-        r#type: Some(value.r#type),
         id: value.id,
+        // A ref carrying a `did` is rejected by `validate_ref` before it can
+        // reach here, so there is nothing to carry across.
+        did: None,
+        r#type: value.r#type,
         name: value
             .name
             .map(|name| sql_like_escape_literal(name.as_str())),
@@ -749,7 +764,7 @@ mod tests {
     fn a_ref(name: Option<ResourceName>) -> ResourceRef {
         ResourceRef {
             account: None,
-            r#type: type_ref("SecretSet"),
+            r#type: Some(type_ref("SecretSet")),
             id: None,
             did: None,
             name,
@@ -803,23 +818,42 @@ mod tests {
         assert_eq!(selector.r#type, Some(type_ref("SecretSet")));
     }
 
-    // The facade's only difference from the ODF selector is the optional type,
-    // so widening must preserve every other field verbatim.
+    // A type-less ref is resolved by searching every type, so it is accepted
+    // here rather than rejected the way a `did` is.
     #[test]
-    fn test_odf_selector_widens_with_its_type_preserved() {
-        let odf_selector = odf::metadata::resource::ResourceSelector {
-            account: None,
-            r#type: type_ref("SecretSet"),
-            id: None,
-            name: Some("app-%".to_string()),
-            labels: None,
+    fn test_ref_without_a_type_is_accepted() {
+        let resource_ref = ResourceRef {
+            r#type: None,
+            ..a_ref(Some(name("my-secrets")))
         };
 
-        let converted = ResourceSelector::from(odf_selector);
+        assert_matches!(validate_ref(&resource_ref), Ok(()));
+        assert_eq!(ref_to_selector(resource_ref).r#type, None);
+    }
 
-        assert_eq!(converted.r#type, Some(type_ref("SecretSet")));
-        // The pattern stays a pattern — re-escaping here would break `app-%`.
-        assert_eq!(converted.name, Some("app-%".to_string()));
+    // The selector gained `did` when ODF made the type optional. Nothing can
+    // resolve by it, so it must fail loudly rather than be silently ignored —
+    // dropping it would return a *wider* result set than was asked for.
+    #[test]
+    fn test_selector_carrying_a_did_is_rejected() {
+        let selector = ResourceSelector {
+            did: Some(odf::metadata::Did::Odf(
+                odf::metadata::DidOdf::new_seeded_ed25519(b"test"),
+            )),
+            ..ResourceSelector::of_type(type_ref("SecretSet"))
+        };
+
+        assert_matches!(
+            validate_selector(&selector),
+            Err(UnsupportedSelectorFieldError::Did)
+        );
+    }
+
+    // Unlike a ref, a selector narrowing by nothing is meaningful: it matches
+    // every resource of every type.
+    #[test]
+    fn test_selector_narrowing_by_nothing_is_accepted() {
+        assert_matches!(validate_selector(&ResourceSelector::default()), Ok(()));
     }
 }
 
