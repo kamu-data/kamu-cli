@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use cynic::QueryBuilder;
-use internal_error::InternalError;
+use kamu_resources::ResourceRef;
 
 use crate::facade::graphql::cynic_api::fragments::{
     BatchResourceProblem,
@@ -17,12 +17,8 @@ use crate::facade::graphql::cynic_api::fragments::{
     ResourceSelectorProblemResult,
     ResourceUnsupportedSelectorProblem,
 };
-use crate::facade::graphql::cynic_api::inputs::{
-    ResourceBatchSelectorInput,
-    ResourceSelectorInput,
-};
+use crate::facade::graphql::cynic_api::inputs::{ResourceRefInput, resource_ref_inputs};
 use crate::facade::graphql::cynic_api::schema;
-use crate::{ResourceBatchSelector, ResourceSelector};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -38,7 +34,7 @@ pub(crate) struct GetResourceHandleQuery {
     variables = "ResourceHandleSelectorVariables"
 )]
 pub(crate) struct ResourceHandleResources {
-    #[arguments(selector: $selector)]
+    #[arguments(resourceRef: $resource_ref)]
     pub resource_handle: ResourceGetHandleOutcome,
 }
 
@@ -69,7 +65,7 @@ pub(crate) struct GetResourceHandlesQuery {
     variables = "ResourceHandleBatchSelectorVariables"
 )]
 pub(crate) struct ResourceHandlesResources {
-    #[arguments(selector: $selector)]
+    #[arguments(resourceRefs: $resource_refs)]
     pub resource_handles: BatchResourceHandlesOutcome,
 }
 
@@ -98,14 +94,14 @@ pub(crate) struct BatchResourceHandleSuccess {
 
 #[derive(cynic::QueryVariables, Debug, Clone)]
 pub(crate) struct ResourceHandleSelectorVariables {
-    pub selector: ResourceSelectorInput,
+    pub resource_ref: ResourceRefInput,
 }
 
 impl ResourceHandleSelectorVariables {
-    pub(crate) fn new(selector: &ResourceSelector) -> Result<Self, InternalError> {
-        Ok(Self {
-            selector: selector.try_into()?,
-        })
+    pub(crate) fn new(resource_ref: &ResourceRef) -> Self {
+        Self {
+            resource_ref: resource_ref.into(),
+        }
     }
 }
 
@@ -113,14 +109,14 @@ impl ResourceHandleSelectorVariables {
 
 #[derive(cynic::QueryVariables, Debug, Clone)]
 pub(crate) struct ResourceHandleBatchSelectorVariables {
-    pub selector: ResourceBatchSelectorInput,
+    pub resource_refs: Vec<ResourceRefInput>,
 }
 
 impl ResourceHandleBatchSelectorVariables {
-    pub(crate) fn new(selector: &ResourceBatchSelector) -> Result<Self, InternalError> {
-        Ok(Self {
-            selector: selector.try_into()?,
-        })
+    pub(crate) fn new(resource_refs: &[ResourceRef]) -> Self {
+        Self {
+            resource_refs: resource_ref_inputs(resource_refs),
+        }
     }
 }
 

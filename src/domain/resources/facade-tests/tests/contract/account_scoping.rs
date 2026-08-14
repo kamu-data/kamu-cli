@@ -9,7 +9,14 @@
 
 use database_common::PaginationOpts;
 use kamu_configuration::VariableSetResource;
-use kamu_resources::{ResourceAccountRef, ResourceID, ResourceQuery, ResourceSchemaProvider};
+use kamu_resources::{
+    ResourceAccountRef,
+    ResourceID,
+    ResourceQuery,
+    ResourceRef,
+    ResourceSchemaProvider,
+    TypeName,
+};
 use kamu_resources_facade::{
     ApplyManifestError,
     ApplyManifestRequest,
@@ -22,10 +29,7 @@ use kamu_resources_facade::{
     ListResourcesRequest,
     RawResourceScope,
     ResolveManifestAccountError,
-    ResourceBatchSelector,
     ResourceManifestFormat,
-    ResourceRef,
-    ResourceSelector,
     ResourcesSummaryRequest,
     SearchResourceHandlesRequest,
     SpecViewMode,
@@ -140,23 +144,21 @@ fn unknown_account_by_id() -> ResourceAccountRef {
     }
 }
 
-fn selector_by_name(name: &str, account: Option<ResourceAccountRef>) -> ResourceSelector {
-    ResourceSelector {
+fn selector_by_name(name: &str, account: Option<ResourceAccountRef>) -> ResourceRef {
+    ResourceRef {
         account,
-        resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-        resource_ref: ResourceRef::ByName(name.parse().unwrap()),
+        r#type: VARIABLE_SET_CANONICAL_SELECTOR
+            .parse::<TypeName>()
+            .unwrap()
+            .into(),
+        id: None,
+        did: None,
+        name: Some(name.parse().unwrap()),
     }
 }
 
-fn batch_selector_by_name(
-    name: &str,
-    account: Option<ResourceAccountRef>,
-) -> ResourceBatchSelector {
-    ResourceBatchSelector {
-        account,
-        resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-        resource_refs: vec![ResourceRef::ByName(name.parse().unwrap())],
-    }
+fn batch_selector_by_name(name: &str, account: Option<ResourceAccountRef>) -> Vec<ResourceRef> {
+    vec![selector_by_name(name, account)]
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

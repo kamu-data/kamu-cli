@@ -7,196 +7,119 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-//! ODF-shaped selector types for the resource facade.
+//! Resolving [`ResourceRef`] / [`ResourceSelector`] into a repository scope.
 //!
-//! These mirror the ODF spec's split: a [`ResourceRef`] names exactly one
-//! resource with an exact name, while a [`ResourceSelector`] matches zero or
-//! many using a SQL `LIKE` pattern and label filters. Multiple selectors act as
-//! a logical OR, which is what lets one call span several types and — from
-//! stage 5 onwards — several accounts.
+//! Both types are ODF's, defined in the domain crate — a ref names exactly one
+//! resource by exact name, a selector matches zero or many by SQL `LIKE`
+//! pattern and labels. Several selectors in one call act as a logical OR, which
+//! is what lets one call span several types and — from stage 5 onwards —
+//! several accounts.
 //!
-//! Both are *structural twins* of the ODF types rather than the ODF types
-//! themselves. They differ in exactly two ways:
-//!
-//! - the type position is a [`ResourceTypeSelectorRaw`] (`vs`, `variablesets`)
-//!   rather than an ODF `TypeRef` (`VariableSet`). Those are different
-//!   vocabularies: [`ResourceTypeDescriptor::matches_selector`] deliberately
-//!   rejects the ODF type name, so a signature taking `TypeRef` would claim to
-//!   accept `VariableSet` and then fail at resolution.
-//! - `did` is absent. It is forward-reserved in ODF for the dataset/account
-//!   conversion, and no repository can resolve by it today. The `TryFrom`
-//!   conversions below reject a populated `did` as unsupported rather than
-//!   dropping it silently.
+//! Type resolution accepts one vocabulary throughout: canonical selectors
+//! (`variablesets`), aliases (`vs`), the ODF type name (`VariableSet`), and the
+//! full schema URI. That is what lets an ODF [`TypeRef`] resolve directly
+//! rather than needing a facade-local twin. See
+//! [`ResourceTypeDescriptor::matches_selector`].
 //!
 //! [`ResourceTypeDescriptor::matches_selector`]: kamu_resources::ResourceTypeDescriptor::matches_selector
 
 use std::collections::BTreeMap;
 
 use kamu_resources::{
-    ResourceAccountRef,
     ResourceID,
-    ResourceLabelFilterInput,
     ResourceName,
     ResourceQuery,
+    ResourceRef,
     ResourceScope,
+    ResourceSelector,
     ResourceTypeQuery,
-    ResourceTypeSelectorRaw,
     TypeUri,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Names exactly one resource by an exact name or an ID.
-///
-/// The ODF `ResourceRef` analogue. Use [`ResourceSelector`] for anything that
-/// may match more than one resource.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ResourceRef {
-    pub account: Option<ResourceAccountRef>,
-    /// Required for a ref — an exact name is only unique within a type.
-    pub resource_type: ResourceTypeSelectorRaw,
-    pub id: Option<ResourceID>,
-    /// Exact — never a pattern.
-    pub name: Option<ResourceName>,
-}
-
-impl ResourceRef {
-    /// Rejects a ref that names nothing, mirroring how an empty account
-    /// selector is rejected at the manifest boundary.
-    pub fn validate(&self) -> Result<(), EmptyResourceRefError> {
-        if self.id.is_none() && self.name.is_none() {
-            return Err(EmptyResourceRefError);
-        }
-        Ok(())
-    }
-}
-
-#[derive(Debug, thiserror::Error)]
-#[error("Resource reference must specify at least one of `id` or `name`")]
-pub struct EmptyResourceRefError;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Matches zero or many resources using identity and label filters.
-///
-/// The ODF `ResourceSelector` analogue, with one documented superset: a `None`
-/// `resource_type` means *any type*. The spec requires `type`, but the API
-/// already supports type-less listing, and encoding that as `None` avoids a
-/// magic `%` token on the wire.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct ResourceSelector {
-    pub account: Option<ResourceAccountRef>,
-    /// `None` matches every registered resource type.
-    pub resource_type: Option<ResourceTypeSelectorRaw>,
-    pub id: Option<ResourceID>,
-    /// Exact name. Kept separate from `name_pattern` because the two resolve to
-    /// different repository queries and carry different not-found semantics.
-    pub name: Option<ResourceName>,
-    /// SQL `LIKE` pattern. A `String`, not a [`ResourceName`], since wildcards
-    /// are not valid in a name.
-    pub name_pattern: Option<String>,
-    pub labels: Option<ResourceLabelFilterInput>,
-}
-
-impl From<ResourceRef> for ResourceSelector {
-    fn from(value: ResourceRef) -> Self {
-        Self {
-            account: value.account,
-            resource_type: Some(value.resource_type),
-            id: value.id,
-            name: value.name,
-            name_pattern: None,
-            labels: None,
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// ODF conversions
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// A field that ODF defines but the facade cannot honour yet.
-#[derive(Debug, thiserror::Error)]
-pub enum UnsupportedOdfSelectorFieldError {
-    /// `did` is forward-reserved in ODF for when datasets and accounts become
-    /// resources. Rejected rather than ignored so a caller who sets it learns
-    /// it had no effect.
+/// A field ODF defines that the facade cannot honour, rejected rather than
+/// ignored so a caller who sets it learns it had no effect.
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+pub enum UnsupportedSelectorFieldError {
+    /// Forward-reserved in ODF for when datasets and accounts become
+    /// resources; no repository can resolve by it today.
     #[error("Resource `did` is reserved for future use and cannot be resolved yet")]
     Did,
+
+    #[error("Resource reference must specify at least one of `id` or `name`")]
+    EmptyRef,
 }
 
-impl TryFrom<odf::metadata::resource::ResourceRef> for ResourceRef {
-    type Error = UnsupportedOdfSelectorFieldError;
+/// Rejects a ref the facade cannot resolve: one carrying a `did`, or one
+/// naming nothing at all.
+///
+/// A [`ResourceSelector`] needs no equivalent: it carries no `did`, and one
+/// narrowing by nothing is meaningful — it matches every resource of its type.
+pub fn validate_ref(value: &ResourceRef) -> Result<(), UnsupportedSelectorFieldError> {
+    if value.did.is_some() {
+        return Err(UnsupportedSelectorFieldError::Did);
+    }
+    if value.id.is_none() && value.name.is_none() {
+        return Err(UnsupportedSelectorFieldError::EmptyRef);
+    }
+    Ok(())
+}
 
-    fn try_from(value: odf::metadata::resource::ResourceRef) -> Result<Self, Self::Error> {
-        let odf::metadata::resource::ResourceRef {
-            account,
-            r#type,
-            id,
-            did,
-            name,
-        } = value;
+/// Widens a ref into the selector that matches exactly it.
+///
+/// Not a `From` impl: the exact name has to be escaped into a wildcard-free
+/// `LIKE` pattern, so this can silently widen the match if skipped. Naming it
+/// keeps that visible at call sites.
+pub fn ref_to_selector(value: ResourceRef) -> ResourceSelector {
+    ResourceSelector {
+        account: value.account,
+        r#type: Some(value.r#type),
+        id: value.id,
+        name: value
+            .name
+            .map(|name| sql_like_escape_literal(name.as_str())),
+        labels: None,
+    }
+}
 
-        if did.is_some() {
-            return Err(UnsupportedOdfSelectorFieldError::Did);
+/// Escapes a literal so it matches only itself when used as a `LIKE` pattern.
+///
+/// Mirrors the escaping the repository applies to authored patterns, so
+/// widening a ref into a selector cannot change which resources match.
+fn sql_like_escape_literal(literal: &str) -> String {
+    let mut escaped = String::with_capacity(literal.len());
+    for ch in literal.chars() {
+        if matches!(ch, '%' | '_' | '\\') {
+            escaped.push('\\');
         }
-
-        Ok(Self {
-            account,
-            resource_type: type_ref_to_raw_selector(&r#type),
-            id,
-            name,
-        })
+        escaped.push(ch);
     }
-}
-
-impl TryFrom<odf::metadata::resource::ResourceSelector> for ResourceSelector {
-    type Error = UnsupportedOdfSelectorFieldError;
-
-    fn try_from(value: odf::metadata::resource::ResourceSelector) -> Result<Self, Self::Error> {
-        let odf::metadata::resource::ResourceSelector {
-            account,
-            r#type,
-            id,
-            name,
-            labels,
-        } = value;
-
-        Ok(Self {
-            account,
-            resource_type: Some(type_ref_to_raw_selector(&r#type)),
-            id,
-            // ODF's `name` is always a `LIKE` pattern, even when it happens to
-            // contain no wildcard.
-            name: None,
-            name_pattern: name,
-            labels,
-        })
-    }
-}
-
-/// ODF spells a type as `VariableSet`; the facade resolves whatever the user
-/// typed against canonical selectors and aliases. Passing the name through
-/// unchanged is correct only because [`ResourceTypeSelectorRaw`] accepts any
-/// non-empty trimmed string — resolution happens later, against descriptors.
-fn type_ref_to_raw_selector(
-    type_ref: &odf::metadata::resource::TypeRef,
-) -> ResourceTypeSelectorRaw {
-    ResourceTypeSelectorRaw::new_unchecked(type_ref.as_str())
+    escaped
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Coalescing
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// One selector after its type has been resolved to a concrete schema.
+/// One [`ResourceRef`] or [`ResourceSelector`] after its type has been resolved
+/// to a concrete schema.
+///
+/// This is where the two converge, and it is deliberately *not* ODF-shaped: it
+/// keeps `name` and `name_pattern` apart because the repository does. An exact
+/// name becomes `ResourceQuery::ExactNames`, which several exact names share as
+/// one row; a pattern becomes `ResourceQuery::NamePattern`, which cannot merge
+/// with anything. A `ResourceRef` resolves into `name`, an authored selector
+/// pattern into `name_pattern`.
 ///
 /// `None` schema means the selector spans every type.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResolvedSelector {
     pub schema: Option<TypeUri>,
     pub id: Option<ResourceID>,
+    /// Exact name, from a [`ResourceRef`].
     pub name: Option<ResourceName>,
+    /// SQL `LIKE` pattern, from a [`ResourceSelector`].
     pub name_pattern: Option<String>,
 }
 
@@ -705,55 +628,74 @@ mod tests {
     }
 
     ////////////////////////////////////////////////////////////////////////////
-    // ODF conversions
+    // Refs and selectors
     ////////////////////////////////////////////////////////////////////////////
 
-    fn type_ref(s: &str) -> odf::metadata::resource::TypeRef {
-        odf::metadata::resource::TypeName::new_unchecked(s).into()
+    fn type_ref(s: &str) -> kamu_resources::TypeRef {
+        kamu_resources::TypeName::new_unchecked(s).into()
     }
 
-    #[test]
-    fn test_odf_ref_converts_with_exact_name() {
-        let odf_ref = odf::metadata::resource::ResourceRef {
+    fn a_ref(name: Option<ResourceName>) -> ResourceRef {
+        ResourceRef {
             account: None,
             r#type: type_ref("SecretSet"),
             id: None,
             did: None,
-            name: Some(name("my-secrets")),
-        };
-
-        let converted = ResourceRef::try_from(odf_ref).unwrap();
-
-        assert_eq!(converted.resource_type.as_str(), "SecretSet");
-        assert_eq!(converted.name, Some(name("my-secrets")));
-        assert_eq!(converted.id, None);
+            name,
+        }
     }
 
     // `did` must fail loudly rather than be dropped — a caller who sets it
     // would otherwise get results for a filter that was never applied.
     #[test]
-    fn test_odf_ref_rejects_populated_did() {
-        let odf_ref = odf::metadata::resource::ResourceRef {
-            account: None,
-            r#type: type_ref("SecretSet"),
-            id: None,
+    fn test_ref_carrying_a_did_is_rejected() {
+        let resource_ref = ResourceRef {
             did: Some(odf::metadata::Did::Odf(
                 odf::metadata::DidOdf::new_seeded_ed25519(b"test"),
             )),
-            name: Some(name("my-secrets")),
+            ..a_ref(Some(name("my-secrets")))
         };
 
         assert_matches!(
-            ResourceRef::try_from(odf_ref),
-            Err(UnsupportedOdfSelectorFieldError::Did)
+            validate_ref(&resource_ref),
+            Err(UnsupportedSelectorFieldError::Did)
         );
     }
 
-    // ODF's selector `name` is a LIKE pattern by definition, so it must land in
-    // `name_pattern` — putting it in `name` would turn a pattern into an exact
-    // lookup and silently return nothing.
     #[test]
-    fn test_odf_selector_name_becomes_a_pattern_not_an_exact_name() {
+    fn test_ref_naming_nothing_is_rejected() {
+        assert_matches!(
+            validate_ref(&a_ref(None)),
+            Err(UnsupportedSelectorFieldError::EmptyRef)
+        );
+    }
+
+    #[test]
+    fn test_ref_naming_something_is_accepted() {
+        assert_matches!(validate_ref(&a_ref(Some(name("my-secrets")))), Ok(()));
+    }
+
+    // A ref's name is exact, but a selector's is a `LIKE` pattern — so widening
+    // must escape, or a name containing `%` would start matching its neighbours.
+    #[test]
+    fn test_widening_a_ref_escapes_wildcards_in_the_exact_name() {
+        let selector = ref_to_selector(a_ref(Some(name("100%-done"))));
+
+        assert_eq!(selector.name, Some(r"100\%-done".to_string()));
+    }
+
+    #[test]
+    fn test_widening_a_ref_leaves_an_ordinary_name_alone() {
+        let selector = ref_to_selector(a_ref(Some(name("my-secrets"))));
+
+        assert_eq!(selector.name, Some("my-secrets".to_string()));
+        assert_eq!(selector.r#type, Some(type_ref("SecretSet")));
+    }
+
+    // The facade's only difference from the ODF selector is the optional type,
+    // so widening must preserve every other field verbatim.
+    #[test]
+    fn test_odf_selector_widens_with_its_type_preserved() {
         let odf_selector = odf::metadata::resource::ResourceSelector {
             account: None,
             r#type: type_ref("SecretSet"),
@@ -762,42 +704,11 @@ mod tests {
             labels: None,
         };
 
-        let converted = ResourceSelector::try_from(odf_selector).unwrap();
+        let converted = ResourceSelector::from(odf_selector);
 
-        assert_eq!(converted.name_pattern, Some("app-%".to_string()));
-        assert_eq!(converted.name, None);
-        assert_eq!(
-            converted.resource_type.map(|t| t.as_str().to_string()),
-            Some("SecretSet".to_string())
-        );
-    }
-
-    #[test]
-    fn test_facade_ref_widens_into_a_selector() {
-        let resource_ref = ResourceRef {
-            account: None,
-            resource_type: ResourceTypeSelectorRaw::new_unchecked("vs"),
-            id: None,
-            name: Some(name("my-vars")),
-        };
-
-        let selector = ResourceSelector::from(resource_ref);
-
-        // The exact name must stay exact when widening.
-        assert_eq!(selector.name, Some(name("my-vars")));
-        assert_eq!(selector.name_pattern, None);
-    }
-
-    #[test]
-    fn test_ref_naming_nothing_is_rejected() {
-        let resource_ref = ResourceRef {
-            account: None,
-            resource_type: ResourceTypeSelectorRaw::new_unchecked("vs"),
-            id: None,
-            name: None,
-        };
-
-        assert_matches!(resource_ref.validate(), Err(EmptyResourceRefError));
+        assert_eq!(converted.r#type, Some(type_ref("SecretSet")));
+        // The pattern stays a pattern — re-escaping here would break `app-%`.
+        assert_eq!(converted.name, Some("app-%".to_string()));
     }
 }
 

@@ -98,7 +98,7 @@ impl<'fb> FlatbuffersSerializable<'fb> for ResourceSelector {
     fn serialize(&self, fb: &mut FlatBufferBuilder<'fb>) -> Self::OffsetT {
         let account_offset = self.account.as_ref().map(|v| v.serialize(fb));
         let labels_offset = self.labels.as_ref().map(|v| v.serialize(fb));
-        let type_offset = fb.create_string(&self.r#type.to_string());
+        let type_offset = fb.create_string(self.r#type.as_str());
         let id_offset = self.id.as_ref().map(|v| fb.create_vector(v.as_bytes()));
         let name_offset = self.name.as_ref().map(|v| fb.create_string(v));
 

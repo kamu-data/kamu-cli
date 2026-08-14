@@ -8,17 +8,17 @@
 // by the Apache License, Version 2.0.
 
 use cynic::QueryBuilder;
-use internal_error::InternalError;
+use kamu_resources::ResourceRef;
 
+use crate::SpecViewMode;
 use crate::facade::graphql::cynic_api::fragments::{
     BatchResourceProblem,
     Resource,
     ResourceBadAccountProblem,
     ResourceUnsupportedSelectorProblem,
 };
-use crate::facade::graphql::cynic_api::inputs::ResourceBatchSelectorInput;
+use crate::facade::graphql::cynic_api::inputs::{ResourceRefInput, resource_ref_inputs};
 use crate::facade::graphql::cynic_api::schema;
-use crate::{ResourceBatchSelector, SpecViewMode};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -34,7 +34,7 @@ pub(crate) struct GetResourcesQuery {
     variables = "ResourceBatchSelectorVariables"
 )]
 pub(crate) struct GetResourcesResources {
-    #[arguments(selector: $selector, revealed: $revealed)]
+    #[arguments(resourceRefs: $resource_refs, revealed: $revealed)]
     pub resources: BatchResourcesOutcome,
 }
 
@@ -63,19 +63,16 @@ pub(crate) struct BatchResourceSuccess {
 
 #[derive(cynic::QueryVariables, Debug, Clone)]
 pub(crate) struct ResourceBatchSelectorVariables {
-    pub selector: ResourceBatchSelectorInput,
+    pub resource_refs: Vec<ResourceRefInput>,
     pub revealed: bool,
 }
 
 impl ResourceBatchSelectorVariables {
-    pub(crate) fn new(
-        selector: &ResourceBatchSelector,
-        spec_view_mode: SpecViewMode,
-    ) -> Result<Self, InternalError> {
-        Ok(Self {
-            selector: selector.try_into()?,
+    pub(crate) fn new(resource_refs: &[ResourceRef], spec_view_mode: SpecViewMode) -> Self {
+        Self {
+            resource_refs: resource_ref_inputs(resource_refs),
             revealed: spec_view_mode == SpecViewMode::Revealed,
-        })
+        }
     }
 }
 

@@ -18,7 +18,6 @@ use crate::queries::{
     BatchResourcesOutcome,
     Resource,
     ResourceBadAccountProblem,
-    ResourceBatchSelectorInput,
     ResourceConnection,
     ResourceHandle,
     ResourceHandleConnection,
@@ -26,9 +25,9 @@ use crate::queries::{
     ResourceLabelFilterInput,
     ResourceManifestFormat,
     ResourceQueryInput,
+    ResourceRefInput,
     ResourceRenderManifestResult,
     ResourceScopeInput,
-    ResourceSelectorInput,
     ResourceSelectorProblem,
     ResourceSelectorProblemResult,
     ResourceSummary,
@@ -38,6 +37,7 @@ use crate::queries::{
     ResourcesSummary,
     SearchResourceHandlesInput,
     into_facade_filter,
+    into_resource_refs,
     map_unsupported_selector_problem,
 };
 
@@ -107,19 +107,22 @@ impl Resources {
     }
 
     /// Returns a resource by selector, if found
-    #[tracing::instrument(level = "info", name = Resources_resource, skip_all, fields(?selector))]
+    #[tracing::instrument(level = "info", name = Resources_resource, skip_all, fields(?resource_ref))]
     #[graphql(guard = "LoggedInGuard::new()")]
     async fn resource(
         &self,
         ctx: &Context<'_>,
-        selector: ResourceSelectorInput,
+        resource_ref: ResourceRefInput,
         #[graphql(default)] revealed: bool,
     ) -> Result<ResourceGetOutcome> {
         let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
 
         let spec_view_mode = Self::spec_view_mode_from_revealed(revealed);
 
-        match resource_facade.get(selector.into(), spec_view_mode).await {
+        match resource_facade
+            .get(resource_ref.try_into()?, spec_view_mode)
+            .await
+        {
             Ok(resource) => Ok(ResourceGetOutcome::Success(resource.into())),
             Err(kamu_resources_facade::GetResourceError::LookupProblem(problem)) => {
                 Ok(ResourceGetOutcome::Problem(problem.into()))
@@ -137,12 +140,12 @@ impl Resources {
     }
 
     /// Returns resources by selectors
-    #[tracing::instrument(level = "info", name = Resources_resources, skip_all, fields(selector_count = selector.resource_refs.len()))]
+    #[tracing::instrument(level = "info", name = Resources_resources, skip_all, fields(selector_count = resource_refs.len()))]
     #[graphql(guard = "LoggedInGuard::new()")]
     async fn resources(
         &self,
         ctx: &Context<'_>,
-        selector: ResourceBatchSelectorInput,
+        resource_refs: Vec<ResourceRefInput>,
         #[graphql(default)] revealed: bool,
     ) -> Result<BatchResourcesOutcome> {
         let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
@@ -150,7 +153,7 @@ impl Resources {
         let spec_view_mode = Self::spec_view_mode_from_revealed(revealed);
 
         match resource_facade
-            .get_many(selector.try_into()?, spec_view_mode)
+            .get_many(into_resource_refs(resource_refs)?, spec_view_mode)
             .await
         {
             Ok(response) => Ok(BatchResourcesOutcome::Success(response.into())),
@@ -165,16 +168,16 @@ impl Resources {
     }
 
     /// Returns resource handle by selector, if found
-    #[tracing::instrument(level = "info", name = Resources_resource_handle, skip_all, fields(?selector))]
+    #[tracing::instrument(level = "info", name = Resources_resource_handle, skip_all, fields(?resource_ref))]
     #[graphql(guard = "LoggedInGuard::new()")]
     async fn resource_handle(
         &self,
         ctx: &Context<'_>,
-        selector: ResourceSelectorInput,
+        resource_ref: ResourceRefInput,
     ) -> Result<ResourceGetHandleOutcome> {
         let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
 
-        match resource_facade.get_handle(selector.into()).await {
+        match resource_facade.get_handle(resource_ref.try_into()?).await {
             Ok(handle) => Ok(ResourceGetHandleOutcome::Success(handle.into())),
             Err(kamu_resources_facade::GetResourceError::LookupProblem(problem)) => {
                 Ok(ResourceGetHandleOutcome::Problem(problem.into()))
@@ -192,16 +195,19 @@ impl Resources {
     }
 
     /// Returns resource handles by selectors
-    #[tracing::instrument(level = "info", name = Resources_resource_handles, skip_all, fields(selector_count = selector.resource_refs.len()))]
+    #[tracing::instrument(level = "info", name = Resources_resource_handles, skip_all, fields(selector_count = resource_refs.len()))]
     #[graphql(guard = "LoggedInGuard::new()")]
     async fn resource_handles(
         &self,
         ctx: &Context<'_>,
-        selector: ResourceBatchSelectorInput,
+        resource_refs: Vec<ResourceRefInput>,
     ) -> Result<BatchResourceHandlesOutcome> {
         let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
 
-        match resource_facade.get_handles(selector.try_into()?).await {
+        match resource_facade
+            .get_handles(into_resource_refs(resource_refs)?)
+            .await
+        {
             Ok(response) => Ok(BatchResourceHandlesOutcome::Success(response.into())),
             Err(kamu_resources_facade::BatchResourceError::UnsupportedSelector(e)) => {
                 Ok(BatchResourceHandlesOutcome::UnsupportedSelector(
@@ -450,7 +456,7 @@ impl Resources {
     async fn render_manifest(
         &self,
         ctx: &Context<'_>,
-        selector: ResourceSelectorInput,
+        resource_ref: ResourceRefInput,
         format: ResourceManifestFormat,
         #[graphql(default)] revealed: bool,
     ) -> Result<ResourceRenderManifestOutcome> {
@@ -459,7 +465,7 @@ impl Resources {
         let spec_view_mode = Self::spec_view_mode_from_revealed(revealed);
 
         match resource_facade
-            .render_manifest(selector.into(), format.into(), spec_view_mode)
+            .render_manifest(resource_ref.try_into()?, format.into(), spec_view_mode)
             .await
         {
             Ok(rendered) => Ok(ResourceRenderManifestOutcome::Success(
@@ -484,12 +490,12 @@ impl Resources {
     }
 
     /// Renders canonical manifest representations from stored resources
-    #[tracing::instrument(level = "info", name = Resources_render_manifests, skip_all, fields(selector_count = selector.resource_refs.len()))]
+    #[tracing::instrument(level = "info", name = Resources_render_manifests, skip_all, fields(selector_count = resource_refs.len()))]
     #[graphql(guard = "LoggedInGuard::new()")]
     async fn render_manifests(
         &self,
         ctx: &Context<'_>,
-        selector: ResourceBatchSelectorInput,
+        resource_refs: Vec<ResourceRefInput>,
         format: ResourceManifestFormat,
         #[graphql(default)] revealed: bool,
     ) -> Result<BatchResourceManifestsOutcome> {
@@ -498,7 +504,11 @@ impl Resources {
         let spec_view_mode = Self::spec_view_mode_from_revealed(revealed);
 
         match resource_facade
-            .render_manifests(selector.try_into()?, format.into(), spec_view_mode)
+            .render_manifests(
+                into_resource_refs(resource_refs)?,
+                format.into(),
+                spec_view_mode,
+            )
             .await
         {
             Ok(response) => Ok(BatchResourceManifestsOutcome::Success(response.into())),
@@ -636,6 +646,7 @@ fn map_batch_resource_error(error: kamu_resources_facade::BatchResourceError) ->
         E::UnsupportedSelector(_) => GqlError::gql("Unsupported resource type selector"),
         E::BadAccount(error) => map_resolve_manifest_account_error(error),
         E::InvalidLabelFilter(error) => GqlError::gql(error.to_string()),
+        E::NonUniformBatch(error) => GqlError::gql(error.to_string()),
         E::RemoteRequest(error) => error.int_err().into(),
         E::Internal(error) => error.into(),
     }

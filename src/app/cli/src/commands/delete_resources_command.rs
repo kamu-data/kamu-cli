@@ -12,13 +12,7 @@ use std::sync::Arc;
 
 use internal_error::{BoxedError, InternalError};
 use kamu_resources::{ResourceID, TypeUri};
-use kamu_resources_facade::{
-    BatchResourceError,
-    ResourceBatchSelector,
-    ResourceFacade,
-    ResourceLookupProblem,
-    ResourceRef,
-};
+use kamu_resources_facade::{BatchResourceError, ResourceFacade, ResourceLookupProblem};
 
 use super::{BatchError, CLIError, Command};
 use crate::Interact;
@@ -224,21 +218,7 @@ impl DeleteResourcesCommand {
         for (_schema, entries) in Self::group_targets_by_schema(targets) {
             match self
                 .resource_facade
-                .delete_many(ResourceBatchSelector {
-                    account: None,
-                    resource_type: entries
-                        .first()
-                        .map(|(_, target)| {
-                            kamu_resources::ResourceTypeSelectorRaw::from(
-                                &target.canonical_selector,
-                            )
-                        })
-                        .expect("non-empty entries"),
-                    resource_refs: entries
-                        .iter()
-                        .map(|(_, target)| ResourceRef::ById(target.id))
-                        .collect(),
-                })
+                .delete_many(Self::entry_resource_refs(&entries))
                 .await
             {
                 Ok(response) => {
@@ -265,6 +245,23 @@ impl DeleteResourcesCommand {
                 break;
             }
         }
+    }
+
+    /// Builds one ref per already-resolved target, naming the type by its
+    /// resolved schema rather than by the selector the user typed.
+    fn entry_resource_refs(
+        entries: &[(usize, DeleteResourceTarget)],
+    ) -> Vec<kamu_resources::ResourceRef> {
+        entries
+            .iter()
+            .map(|(_, target)| kamu_resources::ResourceRef {
+                account: None,
+                r#type: target.schema.clone().into(),
+                id: Some(target.id),
+                did: None,
+                name: None,
+            })
+            .collect()
     }
 
     fn group_targets_by_schema(

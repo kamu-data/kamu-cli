@@ -14,7 +14,9 @@ use kamu_resources::{
     ApplyManifestRejection,
     ApplyResourceOutcome,
     ApplyResourceRejectionCategory,
+    ResourceRef,
     ResourceSchemaProvider,
+    TypeName,
 };
 use kamu_resources_facade::{
     ApplyManifestBatchRequest,
@@ -23,8 +25,6 @@ use kamu_resources_facade::{
     ApplyManifestRequest,
     GetResourceError,
     ResourceManifestFormat,
-    ResourceRef,
-    ResourceSelector,
     SpecViewMode,
 };
 use pretty_assertions::{assert_eq, assert_matches};
@@ -91,11 +91,16 @@ fn variable_set_manifest_json_with_id(id: kamu_resources::ResourceID, name: &str
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn by_name(name: &str) -> ResourceSelector {
-    ResourceSelector {
+fn by_name(name: &str) -> ResourceRef {
+    ResourceRef {
         account: None,
-        resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-        resource_ref: ResourceRef::ByName(name.parse().unwrap()),
+        r#type: VARIABLE_SET_CANONICAL_SELECTOR
+            .parse::<TypeName>()
+            .unwrap()
+            .into(),
+        id: None,
+        did: None,
+        name: Some(name.parse().unwrap()),
     }
 }
 

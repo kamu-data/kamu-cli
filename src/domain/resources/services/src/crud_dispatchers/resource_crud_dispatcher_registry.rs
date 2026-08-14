@@ -92,6 +92,7 @@ where
             resource_selector_parts_match(
                 meta.canonical_selector,
                 meta.selector_aliases.iter().copied(),
+                meta.schema,
                 raw_selector,
             )
         },

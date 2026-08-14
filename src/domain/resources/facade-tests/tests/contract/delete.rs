@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use database_common::PaginationOpts;
-use kamu_resources::ApplyResourceOutcome;
+use kamu_resources::{ApplyResourceOutcome, ResourceRef, TypeName};
 use kamu_resources_facade::{
     ApplyManifestRequest,
     DeleteResourceError,
@@ -16,8 +16,6 @@ use kamu_resources_facade::{
     ListResourcesRequest,
     ResourceLookupProblem,
     ResourceManifestFormat,
-    ResourceRef,
-    ResourceSelector,
     SpecViewMode,
 };
 use pretty_assertions::assert_eq;
@@ -47,19 +45,29 @@ async fn create_resource(h: &impl FacadeContractHarness, name: &str) -> kamu_res
     result.headers.id
 }
 
-fn by_name(name: &str) -> ResourceSelector {
-    ResourceSelector {
+fn by_name(name: &str) -> ResourceRef {
+    ResourceRef {
         account: None,
-        resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-        resource_ref: ResourceRef::ByName(name.parse().unwrap()),
+        r#type: VARIABLE_SET_CANONICAL_SELECTOR
+            .parse::<TypeName>()
+            .unwrap()
+            .into(),
+        id: None,
+        did: None,
+        name: Some(name.parse().unwrap()),
     }
 }
 
-fn by_id(id: &kamu_resources::ResourceID) -> ResourceSelector {
-    ResourceSelector {
+fn by_id(id: &kamu_resources::ResourceID) -> ResourceRef {
+    ResourceRef {
         account: None,
-        resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-        resource_ref: ResourceRef::ById(*id),
+        r#type: VARIABLE_SET_CANONICAL_SELECTOR
+            .parse::<TypeName>()
+            .unwrap()
+            .into(),
+        id: Some(*id),
+        did: None,
+        name: None,
     }
 }
 
@@ -193,10 +201,15 @@ pub async fn test_delete_wrong_schema_returns_mismatch(h: &impl FacadeContractHa
     let id = create_resource(h, "del-api-ver").await;
     let facade = h.facade_for(TestAccount::Alice);
 
-    let wrong_schema_selector = ResourceSelector {
+    let wrong_schema_selector = ResourceRef {
         account: None,
-        resource_type: SECRET_SET_CANONICAL_SELECTOR.parse().unwrap(),
-        resource_ref: ResourceRef::ById(id),
+        r#type: SECRET_SET_CANONICAL_SELECTOR
+            .parse::<TypeName>()
+            .unwrap()
+            .into(),
+        id: Some(id),
+        did: None,
+        name: None,
     };
     let result = facade.delete(wrong_schema_selector).await;
     assert!(
@@ -209,10 +222,15 @@ pub async fn test_delete_wrong_schema_returns_mismatch(h: &impl FacadeContractHa
         "expected SchemaMismatch, got: {result:?}"
     );
 
-    let wrong_kind = ResourceSelector {
+    let wrong_kind = ResourceRef {
         account: None,
-        resource_type: SECRET_SET_CANONICAL_SELECTOR.parse().unwrap(),
-        resource_ref: ResourceRef::ById(id),
+        r#type: SECRET_SET_CANONICAL_SELECTOR
+            .parse::<TypeName>()
+            .unwrap()
+            .into(),
+        id: Some(id),
+        did: None,
+        name: None,
     };
     let result = facade.delete(wrong_kind).await;
     assert!(

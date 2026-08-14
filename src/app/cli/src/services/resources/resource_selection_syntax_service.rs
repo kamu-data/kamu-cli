@@ -7,10 +7,44 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources::ResourceTypeDescriptor;
-use kamu_resources_facade::ResourceRef;
+use kamu_resources::{ResourceID, ResourceName, ResourceTypeDescriptor};
 
 use crate::CLIError;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// How the user spelled one exact resource: as a `UUIDv4`, or as a name.
+///
+/// Deliberately either/or, and deliberately CLI-owned. The wire-level
+/// [`kamu_resources::ResourceRef`] has independently optional `id` and `name`
+/// because ODF allows both together as a consistency assertion — but a CLI
+/// argument is one token, so it is always exactly one of the two. Keeping that
+/// distinction is what lets `kamu get vs/nope` report "not found" while
+/// `kamu get vs/nope-%` reports "pattern matched nothing".
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ExactResourceRef {
+    ById(ResourceID),
+    ByName(ResourceName),
+}
+
+impl ExactResourceRef {
+    /// Builds the wire-level ref this spelling denotes, under `resource_type`.
+    pub fn to_resource_ref(&self, r#type: kamu_resources::TypeRef) -> kamu_resources::ResourceRef {
+        let (id, name) = match self {
+            Self::ById(id) => (Some(*id), None),
+            Self::ByName(name) => (None, Some(name.clone())),
+        };
+
+        kamu_resources::ResourceRef {
+            account: None,
+            r#type,
+            id,
+            // Reserved in ODF; the facade rejects a populated one.
+            did: None,
+            name,
+        }
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -83,7 +117,7 @@ pub enum ResourceSelectionItem {
     /// `kamu get 3d8d6d1c-6f7c-4c62-9f4e-7d8295e8fb69`
     ExactAnyType {
         selector_input: String,
-        resource_ref: ResourceRef,
+        resource_ref: ExactResourceRef,
     },
 
     /// Resources of one type whose names match a `%` pattern.
@@ -101,7 +135,7 @@ pub enum ResourceSelectionItem {
     /// `kamu get %/my-vars`, `kamu get %/3d8d6d1c-6f7c-4c62-9f4e-7d8295e8fb69`
     AnyTypeExactRef {
         selector_input: String,
-        resource_ref: ResourceRef,
+        resource_ref: ExactResourceRef,
     },
 
     /// A `%` name pattern applied across all supported types.
@@ -123,7 +157,7 @@ pub enum ResourceSelectionItem {
 pub struct ResourceExactSelector {
     pub type_descriptor: ResourceTypeDescriptor,
     pub selector_input: String,
-    pub resource_ref: ResourceRef,
+    pub resource_ref: ExactResourceRef,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

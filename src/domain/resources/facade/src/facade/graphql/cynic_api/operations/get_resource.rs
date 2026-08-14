@@ -8,12 +8,12 @@
 // by the Apache License, Version 2.0.
 
 use cynic::QueryBuilder;
-use internal_error::InternalError;
+use kamu_resources::ResourceRef;
 
+use crate::SpecViewMode;
 use crate::facade::graphql::cynic_api::fragments::{Resource, ResourceSelectorProblemResult};
-use crate::facade::graphql::cynic_api::inputs::ResourceSelectorInput;
+use crate::facade::graphql::cynic_api::inputs::ResourceRefInput;
 use crate::facade::graphql::cynic_api::schema;
-use crate::{ResourceSelector, SpecViewMode};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -26,7 +26,7 @@ pub(crate) struct GetResourceQuery {
 #[derive(cynic::QueryFragment, Debug, Clone)]
 #[cynic(graphql_type = "Resources", variables = "ResourceSelectorVariables")]
 pub(crate) struct GetResourceResources {
-    #[arguments(selector: $selector, revealed: $revealed)]
+    #[arguments(resourceRef: $resource_ref, revealed: $revealed)]
     pub resource: ResourceGetOutcome,
 }
 
@@ -44,19 +44,16 @@ pub(crate) enum ResourceGetOutcome {
 
 #[derive(cynic::QueryVariables, Debug, Clone)]
 pub(crate) struct ResourceSelectorVariables {
-    pub selector: ResourceSelectorInput,
+    pub resource_ref: ResourceRefInput,
     pub revealed: bool,
 }
 
 impl ResourceSelectorVariables {
-    pub(crate) fn new(
-        selector: &ResourceSelector,
-        spec_view_mode: SpecViewMode,
-    ) -> Result<Self, InternalError> {
-        Ok(Self {
-            selector: selector.try_into()?,
+    pub(crate) fn new(resource_ref: &ResourceRef, spec_view_mode: SpecViewMode) -> Self {
+        Self {
+            resource_ref: resource_ref.into(),
             revealed: spec_view_mode == SpecViewMode::Revealed,
-        })
+        }
     }
 }
 

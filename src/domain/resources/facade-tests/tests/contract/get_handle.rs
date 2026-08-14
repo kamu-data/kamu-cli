@@ -8,15 +8,13 @@
 // by the Apache License, Version 2.0.
 
 use kamu_configuration::VariableSetResource;
-use kamu_resources::{ApplyResourceOutcome, ResourceSchemaProvider};
+use kamu_resources::{ApplyResourceOutcome, ResourceRef, ResourceSchemaProvider, TypeName};
 use kamu_resources_facade::{
     ApplyManifestRequest,
     GetResourceError,
     ResourceLookupProblem,
     ResourceManifestFormat,
-    ResourceRef,
     ResourceSchemaMismatchError,
-    ResourceSelector,
     SpecViewMode,
 };
 use pretty_assertions::assert_eq;
@@ -35,19 +33,29 @@ use crate::helpers::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn by_name_selector(name: &str) -> ResourceSelector {
-    ResourceSelector {
+fn by_name_selector(name: &str) -> ResourceRef {
+    ResourceRef {
         account: None,
-        resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-        resource_ref: ResourceRef::ByName(name.parse().unwrap()),
+        r#type: VARIABLE_SET_CANONICAL_SELECTOR
+            .parse::<TypeName>()
+            .unwrap()
+            .into(),
+        id: None,
+        did: None,
+        name: Some(name.parse().unwrap()),
     }
 }
 
-fn by_id_selector(id: &kamu_resources::ResourceID) -> ResourceSelector {
-    ResourceSelector {
+fn by_id_selector(id: &kamu_resources::ResourceID) -> ResourceRef {
+    ResourceRef {
         account: None,
-        resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-        resource_ref: ResourceRef::ById(*id),
+        r#type: VARIABLE_SET_CANONICAL_SELECTOR
+            .parse::<TypeName>()
+            .unwrap()
+            .into(),
+        id: Some(*id),
+        did: None,
+        name: None,
     }
 }
 
@@ -248,10 +256,15 @@ pub async fn test_get_wrong_schema_returns_mismatch(h: &impl FacadeContractHarne
     let id = create_test_resource(h, "api-ver-mismatch-test").await;
     let facade = h.facade_for(TestAccount::Alice);
 
-    let wrong_schema_selector = ResourceSelector {
+    let wrong_schema_selector = ResourceRef {
         account: None,
-        resource_type: SECRET_SET_CANONICAL_SELECTOR.parse().unwrap(),
-        resource_ref: ResourceRef::ById(id),
+        r#type: SECRET_SET_CANONICAL_SELECTOR
+            .parse::<TypeName>()
+            .unwrap()
+            .into(),
+        id: Some(id),
+        did: None,
+        name: None,
     };
 
     let result = facade
@@ -293,10 +306,15 @@ pub async fn test_get_wrong_schema_returns_schema_mismatch(h: &impl FacadeContra
     let id = create_test_resource(h, "schema-mismatch-test").await;
     let facade = h.facade_for(TestAccount::Alice);
 
-    let wrong_schema_selector = ResourceSelector {
+    let wrong_schema_selector = ResourceRef {
         account: None,
-        resource_type: SECRET_SET_CANONICAL_SELECTOR.parse().unwrap(),
-        resource_ref: ResourceRef::ById(id),
+        r#type: SECRET_SET_CANONICAL_SELECTOR
+            .parse::<TypeName>()
+            .unwrap()
+            .into(),
+        id: Some(id),
+        did: None,
+        name: None,
     };
 
     let result = facade

@@ -24,6 +24,7 @@ use kamu_resources_facade::{
 
 use crate::CLIError;
 use crate::resources::{
+    ExactResourceRef,
     ResourceIgnoredSelector,
     ResourceSelectionItem,
     ResourceSelectionResolution,
@@ -315,8 +316,10 @@ impl ResourceSelectionResolutionServiceImpl {
             let mut by_name = Vec::new();
             for (exact_index, resource_ref) in &entries {
                 match resource_ref {
-                    kamu_resources_facade::ResourceRef::ById(id) => by_id.push((*exact_index, *id)),
-                    kamu_resources_facade::ResourceRef::ByName(name) => {
+                    ExactResourceRef::ById(id) => {
+                        by_id.push((*exact_index, *id));
+                    }
+                    ExactResourceRef::ByName(name) => {
                         by_name.push((*exact_index, name.clone()));
                     }
                 }
@@ -415,8 +418,8 @@ impl ResourceSelectionResolutionServiceImpl {
             .iter()
             .filter_map(|item| match item {
                 ResourceSelectionItem::ExactAnyType { resource_ref, .. } => match resource_ref {
-                    kamu_resources_facade::ResourceRef::ById(id) => Some(*id),
-                    kamu_resources_facade::ResourceRef::ByName(_) => None,
+                    ExactResourceRef::ById(id) => Some(*id),
+                    ExactResourceRef::ByName(_) => None,
                 },
                 _ => None,
             })
@@ -683,16 +686,14 @@ impl ResourceSelectionResolutionServiceImpl {
         supported_resource_types: &[ResourceTypeDescriptor],
         seen_target_keys: &HashSet<ResourceTargetKey>,
         selector_input: String,
-        resource_ref: kamu_resources_facade::ResourceRef,
+        resource_ref: ExactResourceRef,
         expanded_results: usize,
         ignored_selectors: &mut Vec<ResourceIgnoredSelector>,
         options: &ResourceSelectionResolutionOptions,
     ) -> Result<Vec<ResourceTarget>, CLIError> {
         let query = match &resource_ref {
-            kamu_resources_facade::ResourceRef::ById(id) => {
-                kamu_resources::ResourceQuery::ExactIds(vec![*id])
-            }
-            kamu_resources_facade::ResourceRef::ByName(name) => {
+            ExactResourceRef::ById(id) => kamu_resources::ResourceQuery::ExactIds(vec![*id]),
+            ExactResourceRef::ByName(name) => {
                 kamu_resources::ResourceQuery::ExactNames(vec![name.clone()])
             }
         };
@@ -969,12 +970,10 @@ impl ResourceSelectionResolutionServiceImpl {
         ))
     }
 
-    fn any_type_exact_selector_not_found_error(
-        resource_ref: &kamu_resources_facade::ResourceRef,
-    ) -> CLIError {
+    fn any_type_exact_selector_not_found_error(resource_ref: &ExactResourceRef) -> CLIError {
         let selector = match resource_ref {
-            kamu_resources_facade::ResourceRef::ById(id) => id.to_string(),
-            kamu_resources_facade::ResourceRef::ByName(name) => name.to_string(),
+            ExactResourceRef::ById(id) => id.to_string(),
+            ExactResourceRef::ByName(name) => name.to_string(),
         };
 
         CLIError::usage_error(format!(

@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use cynic::QueryBuilder;
-use internal_error::InternalError;
+use kamu_resources::ResourceRef;
 
 use crate::facade::graphql::cynic_api::fragments::{
     BatchResourceProblem,
@@ -18,17 +18,9 @@ use crate::facade::graphql::cynic_api::fragments::{
     ResourceSelectorProblemResult,
     ResourceUnsupportedSelectorProblem,
 };
-use crate::facade::graphql::cynic_api::inputs::{
-    ResourceBatchSelectorInput,
-    ResourceSelectorInput,
-};
+use crate::facade::graphql::cynic_api::inputs::{ResourceRefInput, resource_ref_inputs};
 use crate::facade::graphql::cynic_api::schema;
-use crate::{
-    ResourceBatchSelector,
-    ResourceManifestFormat as DomainFormat,
-    ResourceSelector,
-    SpecViewMode,
-};
+use crate::{ResourceManifestFormat as DomainFormat, SpecViewMode};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -44,7 +36,7 @@ pub(crate) struct RenderManifestQuery {
     variables = "RenderResourceManifestVariables"
 )]
 pub(crate) struct RenderManifestResources {
-    #[arguments(selector: $selector, format: $format, revealed: $revealed)]
+    #[arguments(resourceRef: $resource_ref, format: $format, revealed: $revealed)]
     pub render_manifest: ResourceRenderManifestOutcome,
 }
 
@@ -72,7 +64,7 @@ pub(crate) struct RenderManifestsQuery {
     variables = "RenderResourceManifestsVariables"
 )]
 pub(crate) struct RenderManifestsResources {
-    #[arguments(selector: $selector, format: $format, revealed: $revealed)]
+    #[arguments(resourceRefs: $resource_refs, format: $format, revealed: $revealed)]
     pub render_manifests: BatchResourceManifestsOutcome,
 }
 
@@ -101,22 +93,22 @@ pub(crate) struct BatchResourceManifestSuccess {
 
 #[derive(cynic::QueryVariables, Debug, Clone)]
 pub(crate) struct RenderResourceManifestVariables {
-    pub selector: ResourceSelectorInput,
+    pub resource_ref: ResourceRefInput,
     pub format: ResourceManifestFormat,
     pub revealed: bool,
 }
 
 impl RenderResourceManifestVariables {
     pub(crate) fn new(
-        selector: &ResourceSelector,
+        resource_ref: &ResourceRef,
         format: DomainFormat,
         spec_view_mode: SpecViewMode,
-    ) -> Result<Self, InternalError> {
-        Ok(Self {
-            selector: selector.try_into()?,
+    ) -> Self {
+        Self {
+            resource_ref: resource_ref.into(),
             format: format.into(),
             revealed: spec_view_mode == SpecViewMode::Revealed,
-        })
+        }
     }
 }
 
@@ -124,22 +116,22 @@ impl RenderResourceManifestVariables {
 
 #[derive(cynic::QueryVariables, Debug, Clone)]
 pub(crate) struct RenderResourceManifestsVariables {
-    pub selector: ResourceBatchSelectorInput,
+    pub resource_refs: Vec<ResourceRefInput>,
     pub format: ResourceManifestFormat,
     pub revealed: bool,
 }
 
 impl RenderResourceManifestsVariables {
     pub(crate) fn new(
-        selector: &ResourceBatchSelector,
+        resource_refs: &[ResourceRef],
         format: DomainFormat,
         spec_view_mode: SpecViewMode,
-    ) -> Result<Self, InternalError> {
-        Ok(Self {
-            selector: selector.try_into()?,
+    ) -> Self {
+        Self {
+            resource_refs: resource_ref_inputs(resource_refs),
             format: format.into(),
             revealed: spec_view_mode == SpecViewMode::Revealed,
-        })
+        }
     }
 }
 

@@ -10,15 +10,14 @@
 use crate::mutations::{ResourceApplyOutcome, ResourceApplyParseManifestProblem};
 use crate::prelude::*;
 use crate::queries::{
-    AccountRefInput,
     BatchResourceProblem,
     ResourceBadAccountProblem,
-    ResourceBatchSelectorInput,
     ResourceManifestFormat,
-    ResourceSelectorInput,
+    ResourceRefInput,
     ResourceSelectorProblem,
     ResourceSelectorProblemResult,
     ResourceUnsupportedSelectorProblem,
+    into_resource_refs,
     map_bad_account_problem,
     map_resolve_manifest_account_error,
     map_unsupported_descriptor_problem,
@@ -135,30 +134,16 @@ impl ResourcesMut {
         }
     }
 
-    #[tracing::instrument(level = "info", name = ResourcesMut_delete, skip_all, fields(?selector))]
+    #[tracing::instrument(level = "info", name = ResourcesMut_delete, skip_all, fields(?resource_ref))]
     #[graphql(guard = "LoggedInGuard::new()")]
     async fn delete(
         &self,
         ctx: &Context<'_>,
-        selector: ResourceSelectorInput,
+        resource_ref: ResourceRefInput,
     ) -> Result<ResourceDeleteOutcome> {
         let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
 
-        let ResourceSelectorInput {
-            resource_type,
-            resource_ref,
-            account,
-        } = selector;
-        let resource_type = resource_type.selector.into();
-
-        match resource_facade
-            .delete(kamu_resources_facade::ResourceSelector {
-                resource_type,
-                account: account.map(AccountRefInput::into_manifest_account),
-                resource_ref: resource_ref.into(),
-            })
-            .await
-        {
+        match resource_facade.delete(resource_ref.try_into()?).await {
             Ok(resource_id) => Ok(ResourceDeleteOutcome::Success(ResourceDeleteSuccess {
                 resource_id: resource_id.into(),
             })),
@@ -177,28 +162,17 @@ impl ResourcesMut {
         }
     }
 
-    #[tracing::instrument(level = "info", name = ResourcesMut_delete_many, skip_all, fields(selector_count = selector.resource_refs.len()))]
+    #[tracing::instrument(level = "info", name = ResourcesMut_delete_many, skip_all, fields(selector_count = resource_refs.len()))]
     #[graphql(guard = "LoggedInGuard::new()")]
     async fn delete_many(
         &self,
         ctx: &Context<'_>,
-        selector: ResourceBatchSelectorInput,
+        resource_refs: Vec<ResourceRefInput>,
     ) -> Result<ResourceDeleteManyOutcome> {
         let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
 
-        let ResourceBatchSelectorInput {
-            resource_type,
-            resource_refs,
-            account,
-        } = selector;
-        let resource_type_selector = resource_type.into_resource_type_selector();
-
         match resource_facade
-            .delete_many(kamu_resources_facade::ResourceBatchSelector {
-                account: account.map(AccountRefInput::into_manifest_account),
-                resource_type: resource_type_selector,
-                resource_refs: resource_refs.into_iter().map(Into::into).collect(),
-            })
+            .delete_many(into_resource_refs(resource_refs)?)
             .await
         {
             Ok(response) => Ok(ResourceDeleteManyOutcome::Success(response.into())),
@@ -587,6 +561,7 @@ fn map_batch_delete_resource_error(error: kamu_resources_facade::BatchResourceEr
         E::UnsupportedSelector(_) => GqlError::gql("Unsupported resource type selector"),
         E::BadAccount(error) => map_resolve_manifest_account_error(error),
         E::InvalidLabelFilter(error) => GqlError::gql(error.to_string()),
+        E::NonUniformBatch(error) => GqlError::gql(error.to_string()),
         E::RemoteRequest(error) => error.int_err().into(),
         E::Internal(error) => error.into(),
     }
@@ -601,6 +576,7 @@ fn map_batch_apply_resource_error(error: kamu_resources_facade::BatchResourceErr
         E::UnsupportedSelector(_) => GqlError::gql("Unsupported resource type selector"),
         E::BadAccount(error) => map_resolve_manifest_account_error(error),
         E::InvalidLabelFilter(error) => GqlError::gql(error.to_string()),
+        E::NonUniformBatch(error) => GqlError::gql(error.to_string()),
         E::RemoteRequest(error) => error.int_err().into(),
         E::Internal(error) => error.into(),
     }

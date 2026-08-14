@@ -23,14 +23,17 @@
 //! `LocalResourceFacadeImpl` that shares the same in-memory store.
 
 use kamu_configuration::VariableSetResource;
-use kamu_resources::{ApplyManifestPlanningDecision, ApplyResourceOutcome, ResourceSchemaProvider};
+use kamu_resources::{
+    ApplyManifestPlanningDecision,
+    ApplyResourceOutcome,
+    ResourceRef,
+    ResourceSchemaProvider,
+    TypeName,
+};
 use kamu_resources_facade::{
     ApplyManifestRequest,
-    ResourceBatchSelector,
     ResourceLookupProblem,
     ResourceManifestFormat,
-    ResourceRef,
-    ResourceSelector,
     SpecViewMode,
 };
 use pretty_assertions::{assert_eq, assert_matches};
@@ -48,11 +51,16 @@ use crate::helpers::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn by_name(name: &str) -> ResourceSelector {
-    ResourceSelector {
+fn by_name(name: &str) -> ResourceRef {
+    ResourceRef {
         account: None,
-        resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-        resource_ref: ResourceRef::ByName(name.parse().unwrap()),
+        r#type: VARIABLE_SET_CANONICAL_SELECTOR
+            .parse::<TypeName>()
+            .unwrap()
+            .into(),
+        id: None,
+        did: None,
+        name: Some(name.parse().unwrap()),
     }
 }
 
@@ -268,15 +276,38 @@ pub async fn test_batch_equivalence(h: &impl FacadeContractHarness) {
     };
     let absent_uid = kamu_resources::ResourceID::new(uuid::Uuid::new_v4());
 
-    let batch_selector = ResourceBatchSelector {
-        account: None,
-        resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-        resource_refs: vec![
-            ResourceRef::ByName("cross-batch-a".parse().unwrap()), // idx 0 — exists
-            ResourceRef::ByName("cross-batch-missing".parse().unwrap()), // idx 1 — missing name
-            ResourceRef::ById(absent_uid),                         // idx 2 — missing id
-        ],
-    };
+    let batch_selector = vec![
+        ResourceRef {
+            account: None,
+            r#type: VARIABLE_SET_CANONICAL_SELECTOR
+                .parse::<TypeName>()
+                .unwrap()
+                .into(),
+            id: None,
+            did: None,
+            name: Some("cross-batch-a".parse().unwrap()),
+        }, // idx 0 — exists
+        ResourceRef {
+            account: None,
+            r#type: VARIABLE_SET_CANONICAL_SELECTOR
+                .parse::<TypeName>()
+                .unwrap()
+                .into(),
+            id: None,
+            did: None,
+            name: Some("cross-batch-missing".parse().unwrap()),
+        }, /* idx 1 — missing name */
+        ResourceRef {
+            account: None,
+            r#type: VARIABLE_SET_CANONICAL_SELECTOR
+                .parse::<TypeName>()
+                .unwrap()
+                .into(),
+            id: Some(absent_uid),
+            did: None,
+            name: None,
+        }, // idx 2 — missing id
+    ];
 
     // get_many: both facades must return the same structure
     let local_get = local

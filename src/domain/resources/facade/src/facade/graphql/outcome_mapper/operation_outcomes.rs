@@ -30,7 +30,6 @@ use crate::{
     ListResourcesError,
     RenderResourceManifestError,
     RenderResourceManifestResult,
-    ResourceBatchSelector,
     ResourceLookupProblem,
     ResourcesSummaryError,
     SearchResourceHandlesResponse,
@@ -261,30 +260,25 @@ pub(crate) fn map_delete_outcome(
 
 pub(crate) fn map_batch_get_resources_outcome(
     outcome: cynic_api::operations::get_resources::BatchResourcesOutcome,
-    selector: &ResourceBatchSelector,
+    resource_refs: &[domain::ResourceRef],
 ) -> Result<BatchResourceResponse<domain::Resource, ResourceLookupProblem>, BatchResourceError> {
     use cynic_api::operations::get_resources::BatchResourcesOutcome as O;
     match outcome {
         O::BatchResourcesResult(batch) => {
-            let successes = collect_batch_successes(
-                selector.resource_refs.len(),
-                batch.resources,
-                "resource",
-                |s| {
+            let successes =
+                collect_batch_successes(resource_refs.len(), batch.resources, "resource", |s| {
                     Ok((
                         s.request_index,
                         s.resource
                             .try_into()
                             .map_err(BatchResourceError::Internal)?,
                     ))
-                },
-            )?;
-            let problems =
-                collect_batch_problems(batch.problems, selector.resource_refs.len(), "resource")?;
+                })?;
+            let problems = collect_batch_problems(batch.problems, resource_refs.len(), "resource")?;
             validate_batch_response_indexes(
                 &successes,
                 &problems,
-                selector.resource_refs.len(),
+                resource_refs.len(),
                 "resource",
             )?;
             Ok(BatchResourceResponse {
@@ -308,26 +302,18 @@ pub(crate) fn map_batch_get_resources_outcome(
 
 pub(crate) fn map_batch_get_handles_outcome(
     outcome: cynic_api::operations::handle::BatchResourceHandlesOutcome,
-    selector: &ResourceBatchSelector,
+    resource_refs: &[domain::ResourceRef],
 ) -> Result<BatchResourceResponse<domain::ResourceHandle, ResourceLookupProblem>, BatchResourceError>
 {
     use cynic_api::operations::handle::BatchResourceHandlesOutcome as O;
     match outcome {
         O::BatchResourceHandlesResult(batch) => {
-            let successes = collect_batch_successes(
-                selector.resource_refs.len(),
-                batch.handles,
-                "handle",
-                |s| Ok((s.request_index, s.handle.into())),
-            )?;
-            let problems =
-                collect_batch_problems(batch.problems, selector.resource_refs.len(), "handle")?;
-            validate_batch_response_indexes(
-                &successes,
-                &problems,
-                selector.resource_refs.len(),
-                "handle",
-            )?;
+            let successes =
+                collect_batch_successes(resource_refs.len(), batch.handles, "handle", |s| {
+                    Ok((s.request_index, s.handle.into()))
+                })?;
+            let problems = collect_batch_problems(batch.problems, resource_refs.len(), "handle")?;
+            validate_batch_response_indexes(&successes, &problems, resource_refs.len(), "handle")?;
             Ok(BatchResourceResponse {
                 successes,
                 problems,
@@ -349,7 +335,7 @@ pub(crate) fn map_batch_get_handles_outcome(
 
 pub(crate) fn map_batch_render_manifests_outcome(
     outcome: cynic_api::operations::render_manifest::BatchResourceManifestsOutcome,
-    selector: &ResourceBatchSelector,
+    resource_refs: &[domain::ResourceRef],
 ) -> Result<
     BatchResourceResponse<RenderResourceManifestResult, ResourceLookupProblem>,
     BatchResourceError,
@@ -357,18 +343,15 @@ pub(crate) fn map_batch_render_manifests_outcome(
     use cynic_api::operations::render_manifest::BatchResourceManifestsOutcome as O;
     match outcome {
         O::BatchResourceManifestsResult(batch) => {
-            let successes = collect_batch_successes(
-                selector.resource_refs.len(),
-                batch.manifests,
-                "manifest",
-                |s| Ok((s.request_index, s.manifest.into())),
-            )?;
-            let problems =
-                collect_batch_problems(batch.problems, selector.resource_refs.len(), "manifest")?;
+            let successes =
+                collect_batch_successes(resource_refs.len(), batch.manifests, "manifest", |s| {
+                    Ok((s.request_index, s.manifest.into()))
+                })?;
+            let problems = collect_batch_problems(batch.problems, resource_refs.len(), "manifest")?;
             validate_batch_response_indexes(
                 &successes,
                 &problems,
-                selector.resource_refs.len(),
+                resource_refs.len(),
                 "manifest",
             )?;
             Ok(BatchResourceResponse {
@@ -393,25 +376,17 @@ pub(crate) fn map_batch_render_manifests_outcome(
 
 pub(crate) fn map_batch_delete_many_outcome(
     outcome: cynic_api::operations::delete::ResourceDeleteManyOutcome,
-    selector: &ResourceBatchSelector,
+    resource_refs: &[domain::ResourceRef],
 ) -> Result<BatchResourceResponse<domain::ResourceID, ResourceLookupProblem>, BatchResourceError> {
     use cynic_api::operations::delete::ResourceDeleteManyOutcome as O;
     match outcome {
         O::ResourceDeleteManyResult(batch) => {
-            let successes = collect_batch_successes(
-                selector.resource_refs.len(),
-                batch.resources,
-                "delete",
-                |s| Ok((s.request_index, s.resource_id)),
-            )?;
-            let problems =
-                collect_batch_problems(batch.problems, selector.resource_refs.len(), "delete")?;
-            validate_batch_response_indexes(
-                &successes,
-                &problems,
-                selector.resource_refs.len(),
-                "delete",
-            )?;
+            let successes =
+                collect_batch_successes(resource_refs.len(), batch.resources, "delete", |s| {
+                    Ok((s.request_index, s.resource_id))
+                })?;
+            let problems = collect_batch_problems(batch.problems, resource_refs.len(), "delete")?;
+            validate_batch_response_indexes(&successes, &problems, resource_refs.len(), "delete")?;
             Ok(BatchResourceResponse {
                 successes,
                 problems,
