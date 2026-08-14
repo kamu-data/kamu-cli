@@ -433,12 +433,17 @@ pub struct MultiTenantRefUnexpectedError {
 pub struct CommandInterpretationFailed;
 
 #[derive(Debug, Error)]
-enum ResourceLookupCliError {
+pub enum ResourceLookupCliError {
     #[error("Resource with id {0} was not found")]
     IDNotFound(kamu_resources::ResourceID),
 
     #[error("Resource '{name}' of type '{resource_type}' was not found")]
     NameNotFound { resource_type: String, name: String },
+
+    /// The `%/<name>` form: an exact name searched across every type. No single
+    /// type can be named in the message, because every one was tried.
+    #[error("Resource '{name}' was not found in any resource type")]
+    AnyTypeNameNotFound { name: kamu_resources::ResourceName },
 
     #[error("Resource id {id} refers to schema '{actual_schema}', expected '{expected_schema}'")]
     SchemaMismatch {

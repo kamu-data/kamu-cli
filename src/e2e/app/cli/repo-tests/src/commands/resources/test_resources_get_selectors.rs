@@ -183,6 +183,42 @@ pub async fn test_resources_get_selectors(ctx: ResourceCtx) {
         Some(&[r#"Resource 'all' of type 'VariableSet' was not found"#]),
     )
     .await;
+
+    // ── 11. A miss reports not-found or no-match, by what was asked ───────────
+    //
+    // An *exact* reference names one resource, so a miss is "was not found" —
+    // whether or not a type was named. A *pattern* names none, so a miss is
+    // "did not match any". `%/db-creds` used to report pattern phrasing despite
+    // being an exact ref; these pin the two shapes apart.
+
+    // Exact name, no type: not-found, with no type named because every type was
+    // searched.
+    ctx.assert_failure(
+        ["get", "%/missing-resource"],
+        Some(&[r#"Resource 'missing-resource' was not found in any resource type"#]),
+    )
+    .await;
+
+    // Exact name, typed: not-found, naming the type.
+    ctx.assert_failure(
+        ["get", "vs/missing-resource"],
+        Some(&[r#"Resource 'missing-resource' of type 'VariableSet' was not found"#]),
+    )
+    .await;
+
+    // Pattern, typed: no-match.
+    ctx.assert_failure(
+        ["get", "vs/missing-%"],
+        Some(&[r"Pattern `missing-%` did not match any VariableSet"]),
+    )
+    .await;
+
+    // Pattern, no type: no-match across every type.
+    ctx.assert_failure(
+        ["get", "%/missing-%"],
+        Some(&[r"Pattern `missing-%` did not match any resource of any type"]),
+    )
+    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
