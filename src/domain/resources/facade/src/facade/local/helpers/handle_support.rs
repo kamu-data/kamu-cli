@@ -74,16 +74,21 @@ where
 {
     ensure_schema_matches(ResourceID::new(row.id), expected_schema, &row.schema)?;
 
-    if let Some(expected_name) = expected_name
-        && expected_name.as_str() != row.name
-    {
-        return Err(ResourceLookupProblem::NameMismatch(
-            ResourceNameMismatchError {
-                id: ResourceID::new(row.id),
-                expected_name: expected_name.clone(),
-                actual_name: ResourceName::new_unchecked(&row.name),
-            },
-        ));
+    // Compared as `ResourceName`, not as raw strings: the type's equality is
+    // deliberately case-insensitive, and the repository resolves names the same
+    // way. Comparing `&str` here would reject a ref whose name differs from the
+    // stored one only by case — a name the lookup itself treats as a match.
+    if let Some(expected_name) = expected_name {
+        let actual_name = ResourceName::new_unchecked(&row.name);
+        if *expected_name != actual_name {
+            return Err(ResourceLookupProblem::NameMismatch(
+                ResourceNameMismatchError {
+                    id: ResourceID::new(row.id),
+                    expected_name: expected_name.clone(),
+                    actual_name,
+                },
+            ));
+        }
     }
 
     Ok(row)

@@ -1056,6 +1056,46 @@ pub async fn test_ref_id_and_name_must_agree(h: &impl FacadeContractHarness) {
         .await
         .expect("alpha must survive a delete that named it by a mismatched pair");
     assert_batch_indexes(&survivors, &[0], &[]);
+
+    // A case-only variant is the *same* name: `ResourceName` equality is
+    // deliberately case-insensitive and the repository resolves names that way,
+    // so this pair agrees and must not be reported as a mismatch. Asserted on
+    // every path, because a raw-string comparison in one of them would make the
+    // paths disagree about the same ref.
+    let case_variant = || {
+        vec![ResourceRef {
+            account: None,
+            r#type: VARIABLE_SET_CANONICAL_SELECTOR
+                .parse::<TypeName>()
+                .unwrap()
+                .into(),
+            id: Some(alpha_id),
+            did: None,
+            name: Some("AGREE-ALPHA".parse().unwrap()),
+        }]
+    };
+
+    let response = facade
+        .get_many(case_variant(), SpecViewMode::Encrypted)
+        .await
+        .expect("a case-only name variant must resolve");
+    assert_batch_indexes(&response, &[0], &[]);
+
+    let handles = facade
+        .get_handles(case_variant())
+        .await
+        .expect("get_handles must accept a case-only name variant");
+    assert_batch_indexes(&handles, &[0], &[]);
+
+    let manifests = facade
+        .render_manifests(
+            case_variant(),
+            ResourceManifestFormat::Json,
+            SpecViewMode::Encrypted,
+        )
+        .await
+        .expect("render_manifests must accept a case-only name variant");
+    assert_batch_indexes(&manifests, &[0], &[]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
