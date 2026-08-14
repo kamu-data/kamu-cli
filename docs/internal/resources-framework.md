@@ -1620,6 +1620,14 @@ Otherwise the behavior is already guaranteed for both implementations by the con
   `UnsupportedResourceDescriptorError::NotFound`; two matching registrations yield `Duplicate`.
   Selector-based lookup (`variablesets`, `vs`, etc.) is a separate metadata path and yields
   selector-specific not-found/duplicate errors.
+- **A miss reports not-found or no-match, by what was asked — not by whether a type was named.**
+  An *exact* reference names one resource, so a miss is "was not found": `vs/my-vars` names the
+  type, `%/my-vars` cannot (every type was searched) but is still a not-found. A *pattern* names
+  no resource, so a miss is "did not match any". `%/my-vars` once reported pattern phrasing
+  despite being an exact ref — three spellings of "one exact thing was missing". The two shapes
+  are pinned apart by unit tests and by `test_resources_get_selectors` E2E on both backends.
+  Note the canonical selector in these messages is the ODF type name (`VariableSet`); `variablesets`
+  and `vs` are aliases.
 - **Extension-schema dispatch is also by schema URI.** Built-in extension dispatchers are registered
   for `description`, `environment`, and the three status conditions. Registry construction is an
   explicit catalog-assembly step and fails on duplicate extension schema IDs, invalid `https://`

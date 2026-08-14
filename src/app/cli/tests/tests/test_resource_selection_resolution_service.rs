@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::assert_matches;
 use std::sync::{Arc, LazyLock, Mutex};
 
 use dill::CatalogBuilder;
@@ -516,46 +515,73 @@ async fn ignores_unmatched_any_type_selectors_when_requested() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Resolves one unmatched any-type item and returns the error message.
+async fn any_type_miss_message(item: ResourceSelectionItem) -> String {
+    let mut harness = ResourceSelectionResolutionHarness::new();
+    harness.expect_list_supported_resource_types(vec![harness.variableset_type_descriptor()]);
+    harness.expect_search_handles(1, Vec::new(), Arc::new(Mutex::new(Vec::new())));
+
+    harness
+        .service
+        .resolve(
+            ResourceSelectionSyntax {
+                items: vec![item],
+                shadowed_selectors: Vec::new(),
+            },
+            &harness.facade,
+            &ResourceSelectionResolutionOptions {
+                ignore_not_found: false,
+                max_expanded_results: Some(10),
+                label_filter: None,
+            },
+        )
+        .await
+        .expect_err("an unmatched any-type selector must error by default")
+        .to_string()
+}
+
+/// `%/<name>` names exactly one resource, so a miss is a *not-found* — the same
+/// shape `vs/<name>` reports, minus the type, because every type was searched.
+///
+/// This and the pattern case below used to be one loop asserting the *same*
+/// wording for both, which encoded the quirk that an exact ref reported pattern
+/// phrasing. They are split so the two forms are asserted to differ.
 #[test_log::test(tokio::test)]
-async fn errors_on_unmatched_any_type_selectors_by_default() {
-    for item in [
-        ResourceSelectionItem::AnyTypeExactRef {
-            selector_input: format!("%/{RESOURCE_DB_CREDS}"),
-            resource_ref: ExactResourceRef::ByName(RESOURCE_DB_CREDS.parse().unwrap()),
-        },
-        ResourceSelectionItem::AnyTypeNamePattern {
-            selector_input: format!("%/{NAME_MISSING_PATTERN}"),
-            name_pattern: NAME_MISSING_PATTERN.to_string(),
-        },
-    ] {
-        let mut harness = ResourceSelectionResolutionHarness::new();
-        harness.expect_list_supported_resource_types(vec![harness.variableset_type_descriptor()]);
+async fn unmatched_any_type_exact_ref_reports_not_found() {
+    let message = any_type_miss_message(ResourceSelectionItem::AnyTypeExactRef {
+        selector_input: format!("%/{RESOURCE_DB_CREDS}"),
+        resource_ref: ExactResourceRef::ByName(RESOURCE_DB_CREDS.parse().unwrap()),
+    })
+    .await;
 
-        let search_requests = Arc::new(Mutex::new(Vec::new()));
-        harness.expect_search_handles(1, Vec::new(), Arc::clone(&search_requests));
+    assert_eq!(
+        message,
+        format!("Resource '{RESOURCE_DB_CREDS}' was not found in any resource type")
+    );
+    assert!(
+        !message.contains("did not match any"),
+        "an exact ref must not report pattern phrasing: {message}"
+    );
+}
 
-        let result = harness
-            .service
-            .resolve(
-                ResourceSelectionSyntax {
-                    items: vec![item.clone()],
-                    shadowed_selectors: Vec::new(),
-                },
-                &harness.facade,
-                &ResourceSelectionResolutionOptions {
-                    ignore_not_found: false,
-                    max_expanded_results: Some(10),
-                    label_filter: None,
-                },
-            )
-            .await;
+/// A genuine pattern keeps "did not match any" — nothing was named, so nothing
+/// can be "not found".
+#[test_log::test(tokio::test)]
+async fn unmatched_any_type_name_pattern_reports_no_match() {
+    let message = any_type_miss_message(ResourceSelectionItem::AnyTypeNamePattern {
+        selector_input: format!("%/{NAME_MISSING_PATTERN}"),
+        name_pattern: NAME_MISSING_PATTERN.to_string(),
+    })
+    .await;
 
-        assert_matches!(
-            result,
-            Err(ref e) if e.to_string().contains("did not match any resource of any type"),
-            "expected a not-found error for {item:?}",
-        );
-    }
+    assert_eq!(
+        message,
+        format!("Pattern `{NAME_MISSING_PATTERN}` did not match any resource of any type")
+    );
+    assert!(
+        !message.contains("was not found"),
+        "a pattern must not report not-found phrasing: {message}"
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

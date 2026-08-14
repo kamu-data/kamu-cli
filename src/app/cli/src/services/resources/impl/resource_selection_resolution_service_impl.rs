@@ -22,7 +22,6 @@ use kamu_resources_facade::{
     SearchResourceHandlesRequest,
 };
 
-use crate::CLIError;
 use crate::resources::{
     ExactResourceRef,
     ResourceIgnoredSelector,
@@ -33,6 +32,7 @@ use crate::resources::{
     ResourceSelectionSyntax,
     ResourceTarget,
 };
+use crate::{CLIError, ResourceLookupCliError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1025,15 +1025,20 @@ impl ResourceSelectionResolutionServiceImpl {
         ))
     }
 
+    /// An exact ref that matched nothing is a *not-found*, not a pattern miss —
+    /// even when no type was named. `%/my-vars` and `vs/my-vars` both name one
+    /// resource, so they report the same shape; only a genuine pattern reports
+    /// "did not match any".
+    ///
+    /// The type is deliberately absent from the message: an any-type ref
+    /// searched every type, so there is no single type to blame.
     fn any_type_exact_selector_not_found_error(resource_ref: &ExactResourceRef) -> CLIError {
-        let selector = match resource_ref {
-            ExactResourceRef::ById(id) => id.to_string(),
-            ExactResourceRef::ByName(name) => name.to_string(),
-        };
-
-        CLIError::usage_error(format!(
-            "Selector `{selector}` did not match any resource of any type"
-        ))
+        CLIError::failure(match resource_ref {
+            ExactResourceRef::ById(id) => ResourceLookupCliError::IDNotFound(*id),
+            ExactResourceRef::ByName(name) => {
+                ResourceLookupCliError::AnyTypeNameNotFound { name: name.clone() }
+            }
+        })
     }
 
     fn any_type_name_pattern_not_found_error(name_pattern: &str) -> CLIError {
