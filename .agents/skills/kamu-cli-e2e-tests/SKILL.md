@@ -263,6 +263,15 @@ SQLite e2e tests run without a DB container. Postgres/MySQL tests are tagged
 `#[test_group::group(e2e, database, postgres|mysql, …)]` and require the
 corresponding DB available per repo convention.
 
+### Instant failures that pass in isolation
+
+Failures that take near-zero time (`FAIL [ 0.003s]`), vary between runs, and pass
+when run alone are almost never your change — the container runtime has run out of
+capacity. Check with
+`podman ps -a --format '{{.Status}}' | awk '{print $1}' | sort | uniq -c` and clear
+leftovers via `podman rm $(podman ps -aq --filter status=created)` before
+investigating further. See DEVELOPER.md for details.
+
 ---
 
 ## Checklist for adding a CLI e2e test

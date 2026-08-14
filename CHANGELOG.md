@@ -17,6 +17,7 @@ Recommendation: for ease of reading, use the following format:
 ### Fixed
 - Return JSON responses for authentication policy errors (#1675)
 - Restored decimal type support in DDL schema (#1670)
+- Container runtime no longer leaks containers that are killed before they finish starting - `run --rm` does not reap those, so they accumulated in `Created` state until the runtime could no longer start new ones
 
 ## [0.265.0] - 2026-07-27
 ### Fixed
