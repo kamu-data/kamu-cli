@@ -101,6 +101,21 @@ jobs:
       - run: cargo binstall cargo-udeps -y
       - run: cargo udeps --all-targets
 
+  lint_cargo_toml:
+    name: Lint / Cargo.toml
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions-rs/toolchain@v1
+      - uses: cargo-bins/cargo-binstall@main
+      - run: cargo binstall cargo-sort -y
+      - run: cargo sort -g -w -n -c
+      - run: |
+          curl -fsSL "https://github.com/tamasfe/taplo/releases/download/0.10.0/taplo-linux-x86_64.gz" \
+            | gzip -d \
+            | install -m 755 /dev/stdin "$CARGO_HOME/bin/taplo"
+      - run: taplo fmt --check
+
   test:
     strategy:
       fail-fast: false

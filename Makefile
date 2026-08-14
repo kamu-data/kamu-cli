@@ -99,8 +99,8 @@ lint-udeps:
 
 .PHONY: lint-udeps
 lint-cargo-toml:
-	taplo fmt --check
 	cargo sort -g -w -n -c
+	taplo fmt --check
 
 ###############################################################################
 # Lint (with fixes)
