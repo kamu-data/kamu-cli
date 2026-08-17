@@ -561,7 +561,7 @@ mod tests {
         }
     }
 
-    // The `get_many` path: N exact names of one type must stay ONE row, since
+    // The `get` path: N exact names of one type must stay ONE row, since
     // `FlatScope` arity is per-type and the repo suite pins that pairing.
     #[test]
     fn test_many_names_of_one_type_fold_into_one_row() {

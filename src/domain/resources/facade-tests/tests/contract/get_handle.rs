@@ -8,16 +8,9 @@
 // by the Apache License, Version 2.0.
 
 use kamu_configuration::VariableSetResource;
-use kamu_resources::{ApplyResourceOutcome, ResourceRef, ResourceSchemaProvider, TypeName};
-use kamu_resources_facade::{
-    ApplyManifestRequest,
-    GetResourceError,
-    ResourceLookupProblem,
-    ResourceManifestFormat,
-    ResourceSchemaMismatchError,
-    SpecViewMode,
-};
-use pretty_assertions::assert_eq;
+use kamu_resources::{ResourceRef, ResourceSchemaProvider, TypeName};
+use kamu_resources_facade::{ResourceLookupProblem, ResourceSchemaMismatchError, SpecViewMode};
+use pretty_assertions::{assert_eq, assert_matches};
 
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
@@ -25,10 +18,11 @@ use crate::helpers::{
     SECRET_SET_CANONICAL_SELECTOR,
     VARIABLE_SET_CANONICAL_SELECTOR,
     VARIABLE_SET_SCHEMA_STR,
-    assert_applied_outcome,
     assert_handle_fields,
     assert_resource_view_fields,
-    variable_set_manifest_json,
+    assert_single_batch_problem,
+    assert_single_batch_success,
+    create_variable_set,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -65,36 +59,24 @@ fn by_id_selector(id: &kamu_resources::ResourceID) -> ResourceRef {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn create_test_resource(
-    h: &impl FacadeContractHarness,
-    name: &str,
-) -> kamu_resources::ResourceID {
-    let facade = h.facade_for(TestAccount::Alice);
-    let manifest = variable_set_manifest_json(name, None, &[("K", "v")]);
-    let decision = facade
-        .apply_manifest(ApplyManifestRequest {
-            format: ResourceManifestFormat::Json,
-            manifest,
-        })
-        .await
-        .unwrap();
-    let result = assert_applied_outcome(&decision, ApplyResourceOutcome::Created);
-    result.headers.id
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // RF-030
 contract_test!(get_by_name, super::test_get_by_name);
 
 pub async fn test_get_by_name(h: &impl FacadeContractHarness) {
-    let id = create_test_resource(h, "get-name-test").await;
+    let id = create_variable_set(h, TestAccount::Alice, "get-name-test").await;
     let facade = h.facade_for(TestAccount::Alice);
 
-    let view = facade
-        .get(by_name_selector("get-name-test"), SpecViewMode::Encrypted)
-        .await
-        .unwrap();
+    let view = assert_single_batch_success(
+        facade
+            .get(
+                vec![by_name_selector("get-name-test")],
+                SpecViewMode::Encrypted,
+            )
+            .await
+            .unwrap(),
+    );
 
     assert_resource_view_fields(&view, VariableSetResource::schema(), "get-name-test");
     assert_eq!(view.headers.id, id, "id must match");
@@ -107,13 +89,15 @@ pub async fn test_get_by_name(h: &impl FacadeContractHarness) {
 contract_test!(get_by_uid, super::test_get_by_uid);
 
 pub async fn test_get_by_uid(h: &impl FacadeContractHarness) {
-    let id = create_test_resource(h, "get-id-test").await;
+    let id = create_variable_set(h, TestAccount::Alice, "get-id-test").await;
     let facade = h.facade_for(TestAccount::Alice);
 
-    let view_by_uid = facade
-        .get(by_id_selector(&id), SpecViewMode::Encrypted)
-        .await
-        .unwrap();
+    let view_by_uid = assert_single_batch_success(
+        facade
+            .get(vec![by_id_selector(&id)], SpecViewMode::Encrypted)
+            .await
+            .unwrap(),
+    );
 
     assert_resource_view_fields(&view_by_uid, VariableSetResource::schema(), "get-id-test");
     assert_eq!(view_by_uid.headers.id, id);
@@ -125,13 +109,15 @@ pub async fn test_get_by_uid(h: &impl FacadeContractHarness) {
 contract_test!(get_handle_by_name, super::test_get_handle_by_name);
 
 pub async fn test_get_handle_by_name(h: &impl FacadeContractHarness) {
-    let id = create_test_resource(h, "ident-name-test").await;
+    let id = create_variable_set(h, TestAccount::Alice, "ident-name-test").await;
     let facade = h.facade_for(TestAccount::Alice);
 
-    let handle = facade
-        .get_handle(by_name_selector("ident-name-test"))
-        .await
-        .unwrap();
+    let handle = assert_single_batch_success(
+        facade
+            .get_handles(vec![by_name_selector("ident-name-test")])
+            .await
+            .unwrap(),
+    );
 
     assert_handle_fields(
         &handle,
@@ -153,14 +139,17 @@ pub async fn test_get_handle_by_name(h: &impl FacadeContractHarness) {
 contract_test!(get_handle_by_uid, super::test_get_handle_by_uid);
 
 pub async fn test_get_handle_by_uid(h: &impl FacadeContractHarness) {
-    let id = create_test_resource(h, "ident-id-test").await;
+    let id = create_variable_set(h, TestAccount::Alice, "ident-id-test").await;
     let facade = h.facade_for(TestAccount::Alice);
 
-    let handle_by_name = facade
-        .get_handle(by_name_selector("ident-id-test"))
-        .await
-        .unwrap();
-    let handle_by_uid = facade.get_handle(by_id_selector(&id)).await.unwrap();
+    let handle_by_name = assert_single_batch_success(
+        facade
+            .get_handles(vec![by_name_selector("ident-id-test")])
+            .await
+            .unwrap(),
+    );
+    let handle_by_uid =
+        assert_single_batch_success(facade.get_handles(vec![by_id_selector(&id)]).await.unwrap());
 
     assert_eq!(
         handle_by_name.id, handle_by_uid.id,
@@ -183,31 +172,25 @@ pub async fn test_get_missing_name_returns_not_found(h: &impl FacadeContractHarn
 
     let get_result = facade
         .get(
-            by_name_selector("no-such-resource"),
+            vec![by_name_selector("no-such-resource")],
             SpecViewMode::Encrypted,
         )
-        .await;
-    assert!(
-        matches!(
-            get_result,
-            Err(GetResourceError::LookupProblem(
-                ResourceLookupProblem::NameNotFound(_)
-            ))
-        ),
-        "expected NameNotFound, got: {get_result:?}"
+        .await
+        .unwrap();
+    assert_matches!(
+        assert_single_batch_problem(get_result),
+        ResourceLookupProblem::NameNotFound(_),
+        "expected NameNotFound"
     );
 
     let handle_result = facade
-        .get_handle(by_name_selector("no-such-resource"))
-        .await;
-    assert!(
-        matches!(
-            handle_result,
-            Err(GetResourceError::LookupProblem(
-                ResourceLookupProblem::NameNotFound(_)
-            ))
-        ),
-        "expected NameNotFound from get_handle, got: {handle_result:?}"
+        .get_handles(vec![by_name_selector("no-such-resource")])
+        .await
+        .unwrap();
+    assert_matches!(
+        assert_single_batch_problem(handle_result),
+        ResourceLookupProblem::NameNotFound(_),
+        "expected NameNotFound from get_handles"
     );
 }
 
@@ -224,27 +207,23 @@ pub async fn test_get_missing_uid_returns_not_found(h: &impl FacadeContractHarne
     let absent_uid = kamu_resources::ResourceID::new(uuid::Uuid::new_v4());
 
     let get_result = facade
-        .get(by_id_selector(&absent_uid), SpecViewMode::Encrypted)
-        .await;
-    assert!(
-        matches!(
-            get_result,
-            Err(GetResourceError::LookupProblem(
-                ResourceLookupProblem::IDNotFound(_)
-            ))
-        ),
-        "expected IDNotFound, got: {get_result:?}"
+        .get(vec![by_id_selector(&absent_uid)], SpecViewMode::Encrypted)
+        .await
+        .unwrap();
+    assert_matches!(
+        assert_single_batch_problem(get_result),
+        ResourceLookupProblem::IDNotFound(_),
+        "expected IDNotFound"
     );
 
-    let handle_result = facade.get_handle(by_id_selector(&absent_uid)).await;
-    assert!(
-        matches!(
-            handle_result,
-            Err(GetResourceError::LookupProblem(
-                ResourceLookupProblem::IDNotFound(_)
-            ))
-        ),
-        "expected IDNotFound from get_handle, got: {handle_result:?}"
+    let handle_result = facade
+        .get_handles(vec![by_id_selector(&absent_uid)])
+        .await
+        .unwrap();
+    assert_matches!(
+        assert_single_batch_problem(handle_result),
+        ResourceLookupProblem::IDNotFound(_),
+        "expected IDNotFound from get_handles"
     );
 }
 
@@ -257,7 +236,7 @@ contract_test!(
 );
 
 pub async fn test_get_wrong_schema_returns_mismatch(h: &impl FacadeContractHarness) {
-    let id = create_test_resource(h, "api-ver-mismatch-test").await;
+    let id = create_variable_set(h, TestAccount::Alice, "api-ver-mismatch-test").await;
     let facade = h.facade_for(TestAccount::Alice);
 
     let wrong_schema_selector = ResourceRef {
@@ -274,27 +253,23 @@ pub async fn test_get_wrong_schema_returns_mismatch(h: &impl FacadeContractHarne
     };
 
     let result = facade
-        .get(wrong_schema_selector.clone(), SpecViewMode::Encrypted)
-        .await;
-    assert!(
-        matches!(
-            result,
-            Err(GetResourceError::LookupProblem(
-                ResourceLookupProblem::SchemaMismatch(_)
-            ))
-        ),
-        "expected SchemaMismatch, got: {result:?}"
+        .get(vec![wrong_schema_selector.clone()], SpecViewMode::Encrypted)
+        .await
+        .unwrap();
+    assert_matches!(
+        assert_single_batch_problem(result),
+        ResourceLookupProblem::SchemaMismatch(_),
+        "expected SchemaMismatch"
     );
 
-    let handle_result = facade.get_handle(wrong_schema_selector).await;
-    assert!(
-        matches!(
-            handle_result,
-            Err(GetResourceError::LookupProblem(
-                ResourceLookupProblem::SchemaMismatch(_)
-            ))
-        ),
-        "expected SchemaMismatch from get_handle, got: {handle_result:?}"
+    let handle_result = facade
+        .get_handles(vec![wrong_schema_selector])
+        .await
+        .unwrap();
+    assert_matches!(
+        assert_single_batch_problem(handle_result),
+        ResourceLookupProblem::SchemaMismatch(_),
+        "expected SchemaMismatch from get_handles"
     );
 }
 
@@ -309,7 +284,7 @@ contract_test!(
 pub async fn test_get_wrong_schema_returns_schema_mismatch(h: &impl FacadeContractHarness) {
     use crate::helpers::SECRET_SET_SCHEMA_STR;
 
-    let id = create_test_resource(h, "schema-mismatch-test").await;
+    let id = create_variable_set(h, TestAccount::Alice, "schema-mismatch-test").await;
     let facade = h.facade_for(TestAccount::Alice);
 
     let wrong_schema_selector = ResourceRef {
@@ -326,16 +301,15 @@ pub async fn test_get_wrong_schema_returns_schema_mismatch(h: &impl FacadeContra
     };
 
     let result = facade
-        .get(wrong_schema_selector.clone(), SpecViewMode::Encrypted)
-        .await;
-    match &result {
-        Err(GetResourceError::LookupProblem(ResourceLookupProblem::SchemaMismatch(
-            ResourceSchemaMismatchError {
-                expected_schema,
-                actual_schema,
-                ..
-            },
-        ))) => {
+        .get(vec![wrong_schema_selector.clone()], SpecViewMode::Encrypted)
+        .await
+        .unwrap();
+    match assert_single_batch_problem(result) {
+        ResourceLookupProblem::SchemaMismatch(ResourceSchemaMismatchError {
+            expected_schema,
+            actual_schema,
+            ..
+        }) => {
             assert_eq!(
                 expected_schema.as_str(),
                 SECRET_SET_SCHEMA_STR,
@@ -350,15 +324,14 @@ pub async fn test_get_wrong_schema_returns_schema_mismatch(h: &impl FacadeContra
         other => panic!("expected SchemaMismatch, got: {other:?}"),
     }
 
-    let handle_result = facade.get_handle(wrong_schema_selector).await;
-    assert!(
-        matches!(
-            handle_result,
-            Err(GetResourceError::LookupProblem(
-                ResourceLookupProblem::SchemaMismatch(_)
-            ))
-        ),
-        "expected SchemaMismatch from get_handle, got: {handle_result:?}"
+    let handle_result = facade
+        .get_handles(vec![wrong_schema_selector])
+        .await
+        .unwrap();
+    assert_matches!(
+        assert_single_batch_problem(handle_result),
+        ResourceLookupProblem::SchemaMismatch(_),
+        "expected SchemaMismatch from get_handles"
     );
 }
 

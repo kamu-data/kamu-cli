@@ -126,6 +126,37 @@ pub fn total_schema_count(summary: kamu_resources::ResourcesSummary, schema: &Ty
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Creates a default `VariableSet` (one `K=v` variable) and returns its id.
+///
+/// The default fixture for tests that need *a* resource to exist and do not
+/// care what is in it.
+pub async fn create_variable_set(
+    h: &impl FacadeContractHarness,
+    account: TestAccount,
+    name: &str,
+) -> ResourceID {
+    apply_manifest_and_get_id(
+        h,
+        account,
+        variable_set_manifest_json(name, None, &[("K", "v")]),
+    )
+    .await
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Creates a `SecretSet` with the given secret entries and returns its id.
+pub async fn create_secret_set(
+    h: &impl FacadeContractHarness,
+    account: TestAccount,
+    name: &str,
+    secrets: &[(&str, &str)],
+) -> ResourceID {
+    apply_manifest_and_get_id(h, account, secret_set_manifest_json(name, None, secrets)).await
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Applies a labeled `VariableSet` manifest and returns its id.
 pub async fn create_variable_set_with_labels(
     h: &impl FacadeContractHarness,

@@ -173,33 +173,4 @@ pub(crate) fn map_ambiguous_type(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn map_selector_problem_result<E, FLookup, FUnsupported, FBadAccount>(
-    result: cynic_api::fragments::ResourceSelectorProblemResult,
-    map_lookup: FLookup,
-    map_unsupported: FUnsupported,
-    map_bad_account: FBadAccount,
-) -> Result<E, InternalError>
-where
-    FLookup: FnOnce(ResourceLookupProblem) -> E,
-    FUnsupported: FnOnce(domain::UnsupportedResourceSelectorError) -> E,
-    FBadAccount: FnOnce(crate::ResolveManifestAccountError) -> E,
-{
-    use cynic_api::fragments::ResourceSelectorProblem as P;
-    match result.problem {
-        P::ResourceIDNotFoundProblem(p) => Ok(map_lookup(map_id_not_found(p))),
-        P::ResourceNameNotFoundProblem(p) => Ok(map_lookup(map_name_not_found(p))),
-        P::ResourceAnyTypeNameNotFoundProblem(p) => Ok(map_lookup(map_any_type_name_not_found(p))),
-        P::ResourceAmbiguousTypeProblem(p) => Ok(map_lookup(map_ambiguous_type(p))),
-        P::ResourceSchemaMismatchProblem(p) => Ok(map_lookup(map_schema_mismatch(p))),
-        P::ResourceNameMismatchProblem(p) => Ok(map_lookup(map_name_mismatch(p))),
-        P::ResourceUnsupportedSelectorProblem(p) => {
-            Ok(map_unsupported(unsupported_selector_problem_error(p)))
-        }
-        P::ResourceBadAccountProblem(p) => Ok(map_bad_account(bad_account_problem_error(p)?)),
-        P::Unknown => Err(InternalError::new(
-            "Remote returned an unrecognized ResourceSelectorProblem variant",
-        )),
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

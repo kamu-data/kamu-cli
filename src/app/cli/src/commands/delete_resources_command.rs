@@ -214,15 +214,15 @@ impl DeleteResourcesCommand {
         }
 
         // The facade batches by descriptor, so cross-type selections are split into one
-        // `delete_many(...)` call per resolved schema.
+        // `delete(...)` call per resolved schema.
         for (_schema, entries) in Self::group_targets_by_schema(targets) {
             match self
                 .resource_facade
-                .delete_many(Self::entry_resource_refs(&entries))
+                .delete(Self::entry_resource_refs(&entries))
                 .await
             {
                 Ok(response) => {
-                    self.handle_delete_many_result(
+                    self.handle_delete_result(
                         &entries,
                         response,
                         summary,
@@ -231,7 +231,7 @@ impl DeleteResourcesCommand {
                     );
                 }
                 Err(error) => {
-                    Self::record_delete_many_batch_error(
+                    Self::record_delete_batch_error(
                         &entries,
                         &error,
                         summary,
@@ -279,7 +279,7 @@ impl DeleteResourcesCommand {
         groups
     }
 
-    fn handle_delete_many_result(
+    fn handle_delete_result(
         &self,
         entries: &[(usize, DeleteResourceTarget)],
         response: kamu_resources_facade::BatchResourceResponse<ResourceID, ResourceLookupProblem>,
@@ -322,7 +322,7 @@ impl DeleteResourcesCommand {
         }
     }
 
-    fn record_delete_many_batch_error(
+    fn record_delete_batch_error(
         entries: &[(usize, DeleteResourceTarget)],
         error: &BatchResourceError,
         summary: &mut DeleteResourcesSummary,

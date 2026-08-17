@@ -89,7 +89,6 @@ pub fn assert_applied_outcome(
 
 /// Returns the single success item from a batch response, panicking if the
 /// batch contains anything other than exactly one success and zero problems.
-#[expect(dead_code)]
 #[track_caller]
 pub fn assert_single_batch_success<T: std::fmt::Debug, E: std::fmt::Debug>(
     response: BatchResourceResponse<T, E>,
@@ -106,6 +105,32 @@ pub fn assert_single_batch_success<T: std::fmt::Debug, E: std::fmt::Debug>(
         response.successes
     );
     response.successes.into_iter().next().unwrap().item
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Returns the single problem from a batch response, panicking if the batch
+/// contains anything other than exactly one problem and zero successes.
+///
+/// The mirror of [`assert_single_batch_success`] for the lookup-failure
+/// assertions: a one-element batch reports a bad ref as a per-item problem,
+/// not as a call-level `Err`.
+#[track_caller]
+pub fn assert_single_batch_problem<T: std::fmt::Debug, E: std::fmt::Debug>(
+    response: BatchResourceResponse<T, E>,
+) -> E {
+    assert!(
+        response.successes.is_empty(),
+        "expected no batch successes, got: {:#?}",
+        response.successes
+    );
+    assert_eq!(
+        response.problems.len(),
+        1,
+        "expected exactly one problem, got: {:#?}",
+        response.problems
+    );
+    response.problems.into_iter().next().unwrap().error
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

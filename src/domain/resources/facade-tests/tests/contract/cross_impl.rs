@@ -46,6 +46,7 @@ use crate::helpers::{
     assert_applied_outcome,
     assert_batch_indexes,
     assert_resource_view_fields,
+    assert_single_batch_success,
     variable_set_manifest_json,
 };
 
@@ -119,10 +120,15 @@ pub async fn test_local_created_readable_remotely(h: &impl FacadeContractHarness
             .id
     };
 
-    let view = remote
-        .get(by_name("cross-local-to-remote"), SpecViewMode::Encrypted)
-        .await
-        .unwrap();
+    let view = assert_single_batch_success(
+        remote
+            .get(
+                vec![by_name("cross-local-to-remote")],
+                SpecViewMode::Encrypted,
+            )
+            .await
+            .unwrap(),
+    );
 
     assert_resource_view_fields(
         &view,
@@ -160,10 +166,15 @@ pub async fn test_remote_created_readable_locally(h: &impl FacadeContractHarness
             .id
     };
 
-    let view = local
-        .get(by_name("cross-remote-to-local"), SpecViewMode::Encrypted)
-        .await
-        .unwrap();
+    let view = assert_single_batch_success(
+        local
+            .get(
+                vec![by_name("cross-remote-to-local")],
+                SpecViewMode::Encrypted,
+            )
+            .await
+            .unwrap(),
+    );
 
     assert_resource_view_fields(
         &view,
@@ -199,24 +210,28 @@ pub async fn test_render_manifest_equivalence(h: &impl FacadeContractHarness) {
     let selector = by_name("cross-render-eq");
 
     // JSON equivalence
-    let local_json = local
-        .render_manifest(
-            selector.clone(),
-            ResourceManifestFormat::Json,
-            SpecViewMode::Encrypted,
-        )
-        .await
-        .unwrap()
-        .manifest;
-    let remote_json = remote
-        .render_manifest(
-            selector.clone(),
-            ResourceManifestFormat::Json,
-            SpecViewMode::Encrypted,
-        )
-        .await
-        .unwrap()
-        .manifest;
+    let local_json = assert_single_batch_success(
+        local
+            .render_manifests(
+                vec![selector.clone()],
+                ResourceManifestFormat::Json,
+                SpecViewMode::Encrypted,
+            )
+            .await
+            .unwrap(),
+    )
+    .manifest;
+    let remote_json = assert_single_batch_success(
+        remote
+            .render_manifests(
+                vec![selector.clone()],
+                ResourceManifestFormat::Json,
+                SpecViewMode::Encrypted,
+            )
+            .await
+            .unwrap(),
+    )
+    .manifest;
     let local_json_val: serde_json::Value = serde_json::from_str(&local_json).unwrap();
     let remote_json_val: serde_json::Value = serde_json::from_str(&remote_json).unwrap();
     assert_eq!(
@@ -225,24 +240,28 @@ pub async fn test_render_manifest_equivalence(h: &impl FacadeContractHarness) {
     );
 
     // YAML equivalence — re-parse via serde_yaml and compare as JSON values
-    let local_yaml = local
-        .render_manifest(
-            selector.clone(),
-            ResourceManifestFormat::Yaml,
-            SpecViewMode::Encrypted,
-        )
-        .await
-        .unwrap()
-        .manifest;
-    let remote_yaml = remote
-        .render_manifest(
-            selector.clone(),
-            ResourceManifestFormat::Yaml,
-            SpecViewMode::Encrypted,
-        )
-        .await
-        .unwrap()
-        .manifest;
+    let local_yaml = assert_single_batch_success(
+        local
+            .render_manifests(
+                vec![selector.clone()],
+                ResourceManifestFormat::Yaml,
+                SpecViewMode::Encrypted,
+            )
+            .await
+            .unwrap(),
+    )
+    .manifest;
+    let remote_yaml = assert_single_batch_success(
+        remote
+            .render_manifests(
+                vec![selector.clone()],
+                ResourceManifestFormat::Yaml,
+                SpecViewMode::Encrypted,
+            )
+            .await
+            .unwrap(),
+    )
+    .manifest;
     let local_yaml_val: serde_json::Value = serde_yaml::from_str(&local_yaml).unwrap();
     let remote_yaml_val: serde_json::Value = serde_yaml::from_str(&remote_yaml).unwrap();
     assert_eq!(
@@ -319,11 +338,11 @@ pub async fn test_batch_equivalence(h: &impl FacadeContractHarness) {
 
     // get_many: both facades must return the same structure
     let local_get = local
-        .get_many(batch_selector.clone(), SpecViewMode::Encrypted)
+        .get(batch_selector.clone(), SpecViewMode::Encrypted)
         .await
         .unwrap();
     let remote_get = remote
-        .get_many(batch_selector.clone(), SpecViewMode::Encrypted)
+        .get(batch_selector.clone(), SpecViewMode::Encrypted)
         .await
         .unwrap();
     assert_batch_indexes(&local_get, &[0], &[1, 2]);

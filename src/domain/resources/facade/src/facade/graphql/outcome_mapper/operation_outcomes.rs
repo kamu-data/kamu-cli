@@ -15,19 +15,12 @@ use super::batch_helpers::{
     collect_batch_successes,
     validate_batch_response_indexes,
 };
-use super::problem_mappers::{
-    bad_account_problem_error,
-    map_selector_problem_result,
-    unsupported_selector_problem_error,
-};
+use super::problem_mappers::{bad_account_problem_error, unsupported_selector_problem_error};
 use crate::facade::graphql::cynic_api;
 use crate::{
     BatchResourceError,
     BatchResourceResponse,
-    DeleteResourceError,
-    GetResourceError,
     ListResourcesError,
-    RenderResourceManifestError,
     RenderResourceManifestResult,
     ResourceLookupProblem,
     ResourcesSummaryError,
@@ -132,74 +125,11 @@ pub(crate) fn map_search_handles_outcome(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn map_get_resource_outcome(
-    outcome: cynic_api::operations::get_resource::ResourceGetOutcome,
-) -> Result<domain::Resource, GetResourceError> {
-    use cynic_api::operations::get_resource::ResourceGetOutcome as O;
-    match outcome {
-        O::Resource(r) => r.try_into().map_err(GetResourceError::Internal),
-        O::ResourceSelectorProblemResult(p) => Err(map_selector_problem_result(
-            p,
-            GetResourceError::LookupProblem,
-            Into::into,
-            GetResourceError::BadAccount,
-        )
-        .map_err(GetResourceError::Internal)?),
-        O::Unknown => Err(GetResourceError::Internal(InternalError::new(
-            "Remote get returned an unrecognized ResourceGetOutcome variant",
-        ))),
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) fn map_get_handle_outcome(
-    outcome: cynic_api::operations::handle::ResourceGetHandleOutcome,
-) -> Result<domain::ResourceHandle, GetResourceError> {
-    use cynic_api::operations::handle::ResourceGetHandleOutcome as O;
-    match outcome {
-        O::ResourceHandle(h) => Ok(h.into()),
-        O::ResourceSelectorProblemResult(p) => Err(map_selector_problem_result(
-            p,
-            GetResourceError::LookupProblem,
-            Into::into,
-            GetResourceError::BadAccount,
-        )
-        .map_err(GetResourceError::Internal)?),
-        O::Unknown => Err(GetResourceError::Internal(InternalError::new(
-            "Remote get_handle returned an unrecognized ResourceGetHandleOutcome variant",
-        ))),
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) fn map_delete_outcome(
-    outcome: cynic_api::operations::delete::ResourceDeleteOutcome,
-) -> Result<domain::ResourceID, DeleteResourceError> {
-    use cynic_api::operations::delete::ResourceDeleteOutcome as O;
-    match outcome {
-        O::ResourceDeleteSuccess(s) => Ok(s.resource_id),
-        O::ResourceSelectorProblemResult(p) => Err(map_selector_problem_result(
-            p,
-            DeleteResourceError::LookupProblem,
-            Into::into,
-            Into::into,
-        )
-        .map_err(DeleteResourceError::Internal)?),
-        O::Unknown => Err(DeleteResourceError::Internal(InternalError::new(
-            "Remote delete returned an unrecognized ResourceDeleteOutcome variant",
-        ))),
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 pub(crate) fn map_batch_get_resources_outcome(
-    outcome: cynic_api::operations::get_resources::BatchResourcesOutcome,
+    outcome: cynic_api::operations::get::BatchResourcesOutcome,
     resource_refs: &[domain::ResourceRef],
 ) -> Result<BatchResourceResponse<domain::Resource, ResourceLookupProblem>, BatchResourceError> {
-    use cynic_api::operations::get_resources::BatchResourcesOutcome as O;
+    use cynic_api::operations::get::BatchResourcesOutcome as O;
     match outcome {
         O::BatchResourcesResult(batch) => {
             let successes =
@@ -230,7 +160,7 @@ pub(crate) fn map_batch_get_resources_outcome(
             bad_account_problem_error(problem).map_err(BatchResourceError::Internal)?,
         )),
         O::Unknown => Err(BatchResourceError::Internal(InternalError::new(
-            "Remote get_many returned an unrecognized BatchResourcesOutcome variant",
+            "Remote get returned an unrecognized BatchResourcesOutcome variant",
         ))),
     }
 }
@@ -311,13 +241,13 @@ pub(crate) fn map_batch_render_manifests_outcome(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn map_batch_delete_many_outcome(
-    outcome: cynic_api::operations::delete::ResourceDeleteManyOutcome,
+pub(crate) fn map_batch_delete_outcome(
+    outcome: cynic_api::operations::delete::ResourceDeleteOutcome,
     resource_refs: &[domain::ResourceRef],
 ) -> Result<BatchResourceResponse<domain::ResourceID, ResourceLookupProblem>, BatchResourceError> {
-    use cynic_api::operations::delete::ResourceDeleteManyOutcome as O;
+    use cynic_api::operations::delete::ResourceDeleteOutcome as O;
     match outcome {
-        O::ResourceDeleteManyResult(batch) => {
+        O::ResourceDeleteResult(batch) => {
             let successes =
                 collect_batch_successes(resource_refs.len(), batch.resources, "delete", |s| {
                     Ok((s.request_index, s.resource_id))
@@ -336,28 +266,7 @@ pub(crate) fn map_batch_delete_many_outcome(
             bad_account_problem_error(problem).map_err(BatchResourceError::Internal)?,
         )),
         O::Unknown => Err(BatchResourceError::Internal(InternalError::new(
-            "Remote delete_many returned an unrecognized ResourceDeleteManyOutcome variant",
-        ))),
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) fn map_render_manifest_outcome(
-    outcome: cynic_api::operations::render_manifest::ResourceRenderManifestOutcome,
-) -> Result<RenderResourceManifestResult, RenderResourceManifestError> {
-    use cynic_api::operations::render_manifest::ResourceRenderManifestOutcome as O;
-    match outcome {
-        O::ResourceRenderManifestResult(r) => Ok(r.into()),
-        O::ResourceSelectorProblemResult(p) => Err(map_selector_problem_result(
-            p,
-            RenderResourceManifestError::LookupProblem,
-            Into::into,
-            RenderResourceManifestError::BadAccount,
-        )
-        .map_err(RenderResourceManifestError::Internal)?),
-        O::Unknown => Err(RenderResourceManifestError::Internal(InternalError::new(
-            "Remote render_manifest returned an unrecognized ResourceRenderManifestOutcome variant",
+            "Remote delete returned an unrecognized ResourceDeleteOutcome variant",
         ))),
     }
 }

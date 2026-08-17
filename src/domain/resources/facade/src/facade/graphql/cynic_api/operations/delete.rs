@@ -12,7 +12,6 @@ use cynic::MutationBuilder;
 use crate::facade::graphql::cynic_api::fragments::{
     BatchResourceProblem,
     ResourceBadAccountProblem,
-    ResourceSelectorProblemResult,
     ResourceUnsupportedSelectorProblem,
 };
 use crate::facade::graphql::cynic_api::inputs::ResourceRefInput;
@@ -29,59 +28,31 @@ pub(crate) struct DeleteMutation {
 #[derive(cynic::QueryFragment, Debug, Clone)]
 #[cynic(graphql_type = "ResourcesMut", variables = "DeleteVariables")]
 pub(crate) struct ResourcesMutDelete {
-    #[arguments(resourceRef: $resource_ref)]
+    #[arguments(resourceRefs: $resource_refs)]
     pub delete: ResourceDeleteOutcome,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(cynic::QueryFragment, Debug, Clone)]
-#[cynic(graphql_type = "Mutation", variables = "DeleteManyVariables")]
-pub(crate) struct DeleteManyMutation {
-    pub resources: ResourcesMutDeleteMany,
-}
-
-#[derive(cynic::QueryFragment, Debug, Clone)]
-#[cynic(graphql_type = "ResourcesMut", variables = "DeleteManyVariables")]
-pub(crate) struct ResourcesMutDeleteMany {
-    #[arguments(resourceRefs: $resource_refs)]
-    pub delete_many: ResourceDeleteManyOutcome,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #[derive(cynic::InlineFragments, Debug, Clone)]
-pub(crate) enum ResourceDeleteManyOutcome {
-    ResourceDeleteManyResult(ResourceDeleteManyResult),
+pub(crate) enum ResourceDeleteOutcome {
+    ResourceDeleteResult(ResourceDeleteResult),
     ResourceUnsupportedSelectorProblem(ResourceUnsupportedSelectorProblem),
     ResourceBadAccountProblem(ResourceBadAccountProblem),
     #[cynic(fallback)]
     Unknown,
 }
 
-#[derive(cynic::InlineFragments, Debug, Clone)]
-pub(crate) enum ResourceDeleteOutcome {
-    ResourceDeleteSuccess(ResourceDeleteSuccess),
-    ResourceSelectorProblemResult(ResourceSelectorProblemResult),
-    #[cynic(fallback)]
-    Unknown,
-}
-
-#[derive(cynic::QueryFragment, Debug, Clone)]
-pub(crate) struct ResourceDeleteSuccess {
-    pub resource_id: kamu_resources::ResourceID,
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
-pub(crate) struct ResourceDeleteManyResult {
-    pub resources: Vec<ResourceDeleteManySuccess>,
+pub(crate) struct ResourceDeleteResult {
+    pub resources: Vec<ResourceDeleteSuccess>,
     pub problems: Vec<BatchResourceProblem>,
 }
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
-pub(crate) struct ResourceDeleteManySuccess {
+pub(crate) struct ResourceDeleteSuccess {
     pub request_index: i32,
     pub resource_id: kamu_resources::ResourceID,
 }
@@ -90,11 +61,6 @@ pub(crate) struct ResourceDeleteManySuccess {
 
 #[derive(cynic::QueryVariables, Debug, Clone)]
 pub(crate) struct DeleteVariables {
-    pub resource_ref: ResourceRefInput,
-}
-
-#[derive(cynic::QueryVariables, Debug, Clone)]
-pub(crate) struct DeleteManyVariables {
     pub resource_refs: Vec<ResourceRefInput>,
 }
 
@@ -104,12 +70,6 @@ pub(crate) fn build_delete_operation(
     variables: DeleteVariables,
 ) -> cynic::Operation<DeleteMutation, DeleteVariables> {
     DeleteMutation::build(variables)
-}
-
-pub(crate) fn build_delete_many_operation(
-    variables: DeleteManyVariables,
-) -> cynic::Operation<DeleteManyMutation, DeleteManyVariables> {
-    DeleteManyMutation::build(variables)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

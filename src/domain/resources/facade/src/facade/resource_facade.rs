@@ -21,23 +21,34 @@ use domain::{
     ResourceTypeDescriptor,
     ResourcesSummary,
 };
-use internal_error::InternalError;
 use kamu_resources as domain;
 
 use crate::{
     ApplyManifestError,
     BatchResourceError,
-    DeleteResourceError,
-    GetResourceError,
     ListResourcesError,
     ListSupportedResourceTypesError,
-    RenderResourceManifestError,
     ResourceLookupProblem,
     ResourcesSummaryError,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// The two families here are deliberately asymmetric about which form is the
+/// primitive.
+///
+/// Ref-keyed reads and deletes (`get`, `get_handles`,
+/// `render_manifests`, `delete`) exist *only* in batch form: the batch
+/// pipeline — group refs by `(account, schema)`, resolve ids per group, merge
+/// back by `request_index` — is the primitive, and a single-resource call is
+/// simply a one-element batch. A scalar form would be a second implementation
+/// of the same contract, which is what this trait used to carry.
+///
+/// Apply keeps its scalar form because there the scalar *is* the primitive:
+/// `plan_apply_manifests`/`apply_manifests` are loops over
+/// `plan_apply_manifest`/`apply_manifest`, and the per-item transaction
+/// boundary belongs to the caller (the CLI's `--continue-on-error` path opens
+/// one transaction per manifest), not to the facade.
 #[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait ResourceFacade: Send + Sync {
@@ -50,51 +61,16 @@ pub trait ResourceFacade: Send + Sync {
         request: ResourcesSummaryRequest,
     ) -> Result<ResourcesSummary, ResourcesSummaryError>;
 
-    /// Fetches one resource. Provided: delegates to
-    /// [`ResourceFacade::get_many`] with a one-element batch.
     async fn get(
-        &self,
-        resource_ref: ResourceRef,
-        spec_view_mode: SpecViewMode,
-    ) -> Result<Resource, GetResourceError> {
-        single_from_batch(
-            self.get_many(vec![resource_ref], spec_view_mode).await?,
-            "Get",
-        )
-    }
-
-    async fn get_many(
         &self,
         resource_refs: Vec<ResourceRef>,
         spec_view_mode: SpecViewMode,
     ) -> Result<BatchResourceResponse<Resource, ResourceLookupProblem>, BatchResourceError>;
 
-    /// Provided: delegates to [`ResourceFacade::get_handles`].
-    async fn get_handle(
-        &self,
-        resource_ref: ResourceRef,
-    ) -> Result<ResourceHandle, GetResourceError> {
-        single_from_batch(self.get_handles(vec![resource_ref]).await?, "Get handle")
-    }
-
     async fn get_handles(
         &self,
         resource_refs: Vec<ResourceRef>,
     ) -> Result<BatchResourceResponse<ResourceHandle, ResourceLookupProblem>, BatchResourceError>;
-
-    /// Provided: delegates to [`ResourceFacade::render_manifests`].
-    async fn render_manifest(
-        &self,
-        resource_ref: ResourceRef,
-        format: ResourceManifestFormat,
-        spec_view_mode: SpecViewMode,
-    ) -> Result<RenderResourceManifestResult, RenderResourceManifestError> {
-        single_from_batch(
-            self.render_manifests(vec![resource_ref], format, spec_view_mode)
-                .await?,
-            "Render manifest",
-        )
-    }
 
     async fn render_manifests(
         &self,
@@ -107,10 +83,11 @@ pub trait ResourceFacade: Send + Sync {
     >;
 
     /// Lists resources matching the selectors, with typed columns rendered.
+    /// Spans several resource types *and* renders columns for every result.
     ///
-    /// Replaces the former `list`/`list_all` pair: `list` could render typed
-    /// columns but only for one type, `list_all` could span types but rendered
-    /// none. This spans types *and* renders columns for every result.
+    /// Unlike the ref-keyed operations above, this is not a batch form of
+    /// anything: [`ResourceFacade::search_handles`] answers the same request
+    /// with a cheaper response, it is not a scalar counterpart.
     async fn search(
         &self,
         request: SearchResourcesRequest,
@@ -144,40 +121,10 @@ pub trait ResourceFacade: Send + Sync {
         request: ApplyManifestBatchRequest,
     ) -> Result<ApplyManifestBatchResponse<ApplyManifestApplicationDecision>, BatchResourceError>;
 
-    /// Provided: delegates to [`ResourceFacade::delete_many`].
-    async fn delete(&self, resource_ref: ResourceRef) -> Result<ResourceID, DeleteResourceError> {
-        single_from_batch(self.delete_many(vec![resource_ref]).await?, "Delete")
-    }
-
-    async fn delete_many(
+    async fn delete(
         &self,
         resource_refs: Vec<ResourceRef>,
     ) -> Result<BatchResourceResponse<ResourceID, ResourceLookupProblem>, BatchResourceError>;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Unwraps a one-element batch response into a scalar result.
-///
-/// The scalar operations are provided methods delegating to their batch form,
-/// so this is where a batch of one becomes an `Ok(item)` or the item's own
-/// error. An empty response means the batch neither succeeded nor reported a
-/// problem, which is a bug in the batch implementation rather than a user
-/// error — hence the internal error naming the operation.
-fn single_from_batch<T, E, Err>(
-    response: BatchResourceResponse<T, E>,
-    operation: &str,
-) -> Result<T, Err>
-where
-    Err: From<E> + From<InternalError>,
-{
-    if let Some(success) = response.successes.into_iter().next() {
-        Ok(success.item)
-    } else if let Some(problem) = response.problems.into_iter().next() {
-        Err(problem.error.into())
-    } else {
-        Err(InternalError::new(format!("{operation} response did not contain an item")).into())
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

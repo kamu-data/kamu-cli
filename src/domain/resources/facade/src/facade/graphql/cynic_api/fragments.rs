@@ -183,25 +183,6 @@ pub(crate) enum ResourceLookupProblem {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(cynic::InlineFragments, Debug, Clone)]
-pub(crate) enum ResourceSelectorProblem {
-    ResourceIDNotFoundProblem(ResourceIDNotFoundProblem),
-    ResourceNameNotFoundProblem(ResourceNameNotFoundProblem),
-    ResourceAnyTypeNameNotFoundProblem(ResourceAnyTypeNameNotFoundProblem),
-    ResourceAmbiguousTypeProblem(ResourceAmbiguousTypeProblem),
-    ResourceSchemaMismatchProblem(ResourceSchemaMismatchProblem),
-    ResourceNameMismatchProblem(ResourceNameMismatchProblem),
-    ResourceUnsupportedSelectorProblem(ResourceUnsupportedSelectorProblem),
-    ResourceBadAccountProblem(ResourceBadAccountProblem),
-    #[cynic(fallback)]
-    Unknown,
-}
-
-#[derive(cynic::QueryFragment, Debug, Clone)]
-pub(crate) struct ResourceSelectorProblemResult {
-    pub problem: ResourceSelectorProblem,
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::QueryFragment, Debug, Clone)]

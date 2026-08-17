@@ -24,6 +24,7 @@ use crate::helpers::{
     VARIABLE_SET_CANONICAL_SELECTOR,
     VARIABLE_SET_SCHEMA_STR,
     apply_manifest_and_get_id,
+    create_variable_set,
     create_variable_set_with_labels,
     label_filter,
     normalize_handles,
@@ -37,15 +38,6 @@ use crate::helpers::{
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn create_resource(h: &impl FacadeContractHarness, account: TestAccount, name: &str) {
-    apply_manifest_and_get_id(
-        h,
-        account,
-        variable_set_manifest_json(name, None, &[("K", "v")]),
-    )
-    .await;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // RF-087
@@ -58,9 +50,9 @@ contract_test!(
 /// remote must agree, since selectors travel over GraphQL.
 pub async fn test_search_narrowed_by_query(h: &impl FacadeContractHarness) {
     for name in ["query-app-one", "query-app-two", "query-db-one"] {
-        create_resource(h, TestAccount::Alice, name).await;
+        create_variable_set(h, TestAccount::Alice, name).await;
     }
-    create_resource(h, TestAccount::Bob, "query-app-bob").await;
+    create_variable_set(h, TestAccount::Bob, "query-app-bob").await;
 
     let facade = h.facade_for(TestAccount::Alice);
 
@@ -158,7 +150,7 @@ contract_test!(
 /// not mistaken for an accident and quietly reverted.
 pub async fn test_search_handles_honours_selectors(h: &impl FacadeContractHarness) {
     for name in ["handles-app-one", "handles-app-two", "handles-db-one"] {
-        create_resource(h, TestAccount::Alice, name).await;
+        create_variable_set(h, TestAccount::Alice, name).await;
     }
 
     let facade = h.facade_for(TestAccount::Alice);
@@ -213,7 +205,7 @@ contract_test!(
 /// selector: a partial result would narrow the caller's request without saying
 /// so, which is the same class of bug as ignoring the field entirely.
 pub async fn test_per_selector_account_is_authorized(h: &impl FacadeContractHarness) {
-    create_resource(h, TestAccount::Bob, "bob-secret").await;
+    create_variable_set(h, TestAccount::Bob, "bob-secret").await;
 
     let facade = h.facade_for(TestAccount::Alice);
 
@@ -247,7 +239,7 @@ pub async fn test_per_selector_account_is_authorized(h: &impl FacadeContractHarn
 
     // Pairing it with a selector the caller *is* allowed to read must still fail
     // the whole call — no partial results.
-    create_resource(h, TestAccount::Alice, "alice-own").await;
+    create_variable_set(h, TestAccount::Alice, "alice-own").await;
     facade
         .search_handles(SearchResourcesRequest {
             selectors: vec![
@@ -383,9 +375,9 @@ contract_test!(
 
 pub async fn test_list_summaries_for_account(h: &impl FacadeContractHarness) {
     // Create resources in each account
-    create_resource(h, TestAccount::Alice, "list-alice-1").await;
-    create_resource(h, TestAccount::Alice, "list-alice-2").await;
-    create_resource(h, TestAccount::Bob, "list-bob-1").await;
+    create_variable_set(h, TestAccount::Alice, "list-alice-1").await;
+    create_variable_set(h, TestAccount::Alice, "list-alice-2").await;
+    create_variable_set(h, TestAccount::Bob, "list-bob-1").await;
 
     let facade = h.facade_for(TestAccount::Alice);
 
@@ -436,9 +428,9 @@ contract_test!(
 );
 
 pub async fn test_list_handles_for_account(h: &impl FacadeContractHarness) {
-    create_resource(h, TestAccount::Alice, "idlist-alice-1").await;
-    create_resource(h, TestAccount::Alice, "idlist-alice-2").await;
-    create_resource(h, TestAccount::Bob, "idlist-bob-1").await;
+    create_variable_set(h, TestAccount::Alice, "idlist-alice-1").await;
+    create_variable_set(h, TestAccount::Alice, "idlist-alice-2").await;
+    create_variable_set(h, TestAccount::Bob, "idlist-bob-1").await;
 
     let facade = h.facade_for(TestAccount::Alice);
 
@@ -482,7 +474,7 @@ contract_test!(
 
 pub async fn test_list_supports_pagination_limit(h: &impl FacadeContractHarness) {
     for name in ["list-limit-1", "list-limit-2", "list-limit-3"] {
-        create_resource(h, TestAccount::Alice, name).await;
+        create_variable_set(h, TestAccount::Alice, name).await;
     }
 
     let facade = h.facade_for(TestAccount::Alice);
@@ -516,7 +508,7 @@ contract_test!(
 
 pub async fn test_list_supports_pagination_offset(h: &impl FacadeContractHarness) {
     for name in ["list-offset-1", "list-offset-2", "list-offset-3"] {
-        create_resource(h, TestAccount::Alice, name).await;
+        create_variable_set(h, TestAccount::Alice, name).await;
     }
 
     let facade = h.facade_for(TestAccount::Alice);
@@ -564,7 +556,7 @@ contract_test!(
 
 pub async fn test_list_handles_pagination_mirrors_list(h: &impl FacadeContractHarness) {
     for name in ["id-page-1", "id-page-2", "id-page-3"] {
-        create_resource(h, TestAccount::Alice, name).await;
+        create_variable_set(h, TestAccount::Alice, name).await;
     }
 
     let facade = h.facade_for(TestAccount::Alice);
@@ -609,7 +601,7 @@ contract_test!(
 );
 
 pub async fn test_list_empty_account_returns_empty(h: &impl FacadeContractHarness) {
-    create_resource(h, TestAccount::Alice, "list-empty-alice").await;
+    create_variable_set(h, TestAccount::Alice, "list-empty-alice").await;
     let facade = h.facade_for(TestAccount::Bob);
 
     let summaries = facade
@@ -692,9 +684,9 @@ pub async fn test_list_unsupported_kind_returns_error(h: &impl FacadeContractHar
 contract_test!(search_by_exact_names, super::test_search_by_exact_names);
 
 pub async fn test_search_by_exact_names(h: &impl FacadeContractHarness) {
-    create_resource(h, TestAccount::Alice, "search-exact-alpha").await;
-    create_resource(h, TestAccount::Alice, "search-exact-beta").await;
-    create_resource(h, TestAccount::Bob, "search-exact-alpha").await;
+    create_variable_set(h, TestAccount::Alice, "search-exact-alpha").await;
+    create_variable_set(h, TestAccount::Alice, "search-exact-beta").await;
+    create_variable_set(h, TestAccount::Bob, "search-exact-alpha").await;
 
     let facade = h.facade_for(TestAccount::Alice);
     let response = facade
@@ -731,7 +723,7 @@ contract_test!(
 );
 
 pub async fn test_search_exact_names_ignores_missing(h: &impl FacadeContractHarness) {
-    create_resource(h, TestAccount::Alice, "search-missing-present").await;
+    create_variable_set(h, TestAccount::Alice, "search-missing-present").await;
 
     let facade = h.facade_for(TestAccount::Alice);
     let response = facade
@@ -876,9 +868,9 @@ pub async fn test_search_exact_ids_account_scoping(h: &impl FacadeContractHarnes
 contract_test!(search_by_name_pattern, super::test_search_by_name_pattern);
 
 pub async fn test_search_by_name_pattern(h: &impl FacadeContractHarness) {
-    create_resource(h, TestAccount::Alice, "search-pattern-alpha").await;
-    create_resource(h, TestAccount::Alice, "search-pattern-beta").await;
-    create_resource(h, TestAccount::Alice, "search-other-alpha").await;
+    create_variable_set(h, TestAccount::Alice, "search-pattern-alpha").await;
+    create_variable_set(h, TestAccount::Alice, "search-pattern-beta").await;
+    create_variable_set(h, TestAccount::Alice, "search-other-alpha").await;
 
     let facade = h.facade_for(TestAccount::Alice);
     let response = facade
@@ -1072,7 +1064,7 @@ contract_test!(
 
 pub async fn test_search_pagination_and_total_count(h: &impl FacadeContractHarness) {
     for name in ["search-page-1", "search-page-2", "search-page-3"] {
-        create_resource(h, TestAccount::Alice, name).await;
+        create_variable_set(h, TestAccount::Alice, name).await;
     }
 
     let facade = h.facade_for(TestAccount::Alice);
@@ -1098,10 +1090,10 @@ pub async fn test_search_pagination_and_total_count(h: &impl FacadeContractHarne
 contract_test!(search_account_scoping, super::test_search_account_scoping);
 
 pub async fn test_search_account_scoping(h: &impl FacadeContractHarness) {
-    create_resource(h, TestAccount::Alice, "search-scope-shared").await;
-    create_resource(h, TestAccount::Alice, "search-scope-alice").await;
-    create_resource(h, TestAccount::Bob, "search-scope-shared").await;
-    create_resource(h, TestAccount::Bob, "search-scope-bob").await;
+    create_variable_set(h, TestAccount::Alice, "search-scope-shared").await;
+    create_variable_set(h, TestAccount::Alice, "search-scope-alice").await;
+    create_variable_set(h, TestAccount::Bob, "search-scope-shared").await;
+    create_variable_set(h, TestAccount::Bob, "search-scope-bob").await;
 
     let alice_response = h
         .facade_for(TestAccount::Alice)

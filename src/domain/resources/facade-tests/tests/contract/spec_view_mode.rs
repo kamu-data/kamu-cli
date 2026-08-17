@@ -16,7 +16,7 @@
 //! back to the `Literal` plaintext.
 
 use kamu_configuration::SecretSetResource;
-use kamu_resources::{ApplyResourceOutcome, ResourceRef, ResourceSchemaProvider, TypeName};
+use kamu_resources::{ResourceRef, ResourceSchemaProvider, TypeName};
 use kamu_resources_facade::{ApplyManifestRequest, ResourceManifestFormat, SpecViewMode};
 use pretty_assertions::assert_eq;
 
@@ -26,9 +26,9 @@ use crate::helpers::{
     SECRET_SET_CANONICAL_SELECTOR,
     SECRET_SET_SCHEMA_STR,
     VARIABLE_SET_CANONICAL_SELECTOR,
-    assert_applied_outcome,
     assert_batch_indexes,
-    secret_set_manifest_json,
+    assert_single_batch_success,
+    create_secret_set,
     variable_set_manifest_json,
 };
 
@@ -49,24 +49,6 @@ fn secret_selector(name: &str) -> ResourceRef {
     }
 }
 
-async fn create_secret_resource(
-    h: &impl FacadeContractHarness,
-    name: &str,
-    secrets: &[(&str, &str)],
-) -> kamu_resources::ResourceID {
-    let facade = h.facade_for(TestAccount::Alice);
-    let decision = facade
-        .apply_manifest(ApplyManifestRequest {
-            format: ResourceManifestFormat::Json,
-            manifest: secret_set_manifest_json(name, None, secrets),
-        })
-        .await
-        .unwrap();
-    assert_applied_outcome(&decision, ApplyResourceOutcome::Created)
-        .headers
-        .id
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // RF-040
@@ -76,13 +58,24 @@ contract_test!(
 );
 
 pub async fn test_encrypted_spec_view_hides_secret_material(h: &impl FacadeContractHarness) {
-    create_secret_resource(h, "sv-encrypted", &[("API_TOKEN", "my-plaintext-secret")]).await;
+    create_secret_set(
+        h,
+        TestAccount::Alice,
+        "sv-encrypted",
+        &[("API_TOKEN", "my-plaintext-secret")],
+    )
+    .await;
     let facade = h.facade_for(TestAccount::Alice);
 
-    let view = facade
-        .get(secret_selector("sv-encrypted"), SpecViewMode::Encrypted)
-        .await
-        .unwrap();
+    let view = assert_single_batch_success(
+        facade
+            .get(
+                vec![secret_selector("sv-encrypted")],
+                SpecViewMode::Encrypted,
+            )
+            .await
+            .unwrap(),
+    );
 
     // The spec must NOT contain the raw plaintext
     let spec_str = serde_json::to_string(&view.spec).unwrap();
@@ -114,13 +107,21 @@ contract_test!(
 );
 
 pub async fn test_revealed_spec_view_exposes_plaintext(h: &impl FacadeContractHarness) {
-    create_secret_resource(h, "sv-revealed", &[("API_TOKEN", "reveal-me-secret")]).await;
+    create_secret_set(
+        h,
+        TestAccount::Alice,
+        "sv-revealed",
+        &[("API_TOKEN", "reveal-me-secret")],
+    )
+    .await;
     let facade = h.facade_for(TestAccount::Alice);
 
-    let view = facade
-        .get(secret_selector("sv-revealed"), SpecViewMode::Revealed)
-        .await
-        .unwrap();
+    let view = assert_single_batch_success(
+        facade
+            .get(vec![secret_selector("sv-revealed")], SpecViewMode::Revealed)
+            .await
+            .unwrap(),
+    );
 
     let spec_str = serde_json::to_string(&view.spec).unwrap();
     assert!(
@@ -142,8 +143,20 @@ contract_test!(
 );
 
 pub async fn test_spec_view_mode_applies_to_batch_get(h: &impl FacadeContractHarness) {
-    let id_a = create_secret_resource(h, "sv-batch-a", &[("TOKEN_A", "secret-a-value")]).await;
-    let id_b = create_secret_resource(h, "sv-batch-b", &[("TOKEN_B", "secret-b-value")]).await;
+    let id_a = create_secret_set(
+        h,
+        TestAccount::Alice,
+        "sv-batch-a",
+        &[("TOKEN_A", "secret-a-value")],
+    )
+    .await;
+    let id_b = create_secret_set(
+        h,
+        TestAccount::Alice,
+        "sv-batch-b",
+        &[("TOKEN_B", "secret-b-value")],
+    )
+    .await;
     let facade = h.facade_for(TestAccount::Alice);
 
     let batch_selector = vec![
@@ -175,7 +188,7 @@ pub async fn test_spec_view_mode_applies_to_batch_get(h: &impl FacadeContractHar
 
     // Encrypted view — no plaintext
     let enc_resp = facade
-        .get_many(batch_selector.clone(), SpecViewMode::Encrypted)
+        .get(batch_selector.clone(), SpecViewMode::Encrypted)
         .await
         .unwrap();
     assert_batch_indexes(&enc_resp, &[0, 1], &[]);
@@ -189,7 +202,7 @@ pub async fn test_spec_view_mode_applies_to_batch_get(h: &impl FacadeContractHar
 
     // Revealed view — plaintext visible
     let rev_resp = facade
-        .get_many(batch_selector, SpecViewMode::Revealed)
+        .get(batch_selector, SpecViewMode::Revealed)
         .await
         .unwrap();
     assert_batch_indexes(&rev_resp, &[0, 1], &[]);
@@ -213,18 +226,26 @@ contract_test!(
 );
 
 pub async fn test_spec_view_mode_applies_to_render(h: &impl FacadeContractHarness) {
-    create_secret_resource(h, "sv-render", &[("RENDER_SECRET", "render-secret-value")]).await;
+    create_secret_set(
+        h,
+        TestAccount::Alice,
+        "sv-render",
+        &[("RENDER_SECRET", "render-secret-value")],
+    )
+    .await;
     let facade = h.facade_for(TestAccount::Alice);
 
     // Encrypted render — no plaintext
-    let enc_result = facade
-        .render_manifest(
-            secret_selector("sv-render"),
-            ResourceManifestFormat::Json,
-            SpecViewMode::Encrypted,
-        )
-        .await
-        .unwrap();
+    let enc_result = assert_single_batch_success(
+        facade
+            .render_manifests(
+                vec![secret_selector("sv-render")],
+                ResourceManifestFormat::Json,
+                SpecViewMode::Encrypted,
+            )
+            .await
+            .unwrap(),
+    );
     assert!(
         !enc_result.manifest.contains("render-secret-value"),
         "Encrypted rendered manifest must not expose plaintext; manifest: {}",
@@ -232,14 +253,16 @@ pub async fn test_spec_view_mode_applies_to_render(h: &impl FacadeContractHarnes
     );
 
     // Revealed render — plaintext visible
-    let rev_result = facade
-        .render_manifest(
-            secret_selector("sv-render"),
-            ResourceManifestFormat::Json,
-            SpecViewMode::Revealed,
-        )
-        .await
-        .unwrap();
+    let rev_result = assert_single_batch_success(
+        facade
+            .render_manifests(
+                vec![secret_selector("sv-render")],
+                ResourceManifestFormat::Json,
+                SpecViewMode::Revealed,
+            )
+            .await
+            .unwrap(),
+    );
     assert!(
         rev_result.manifest.contains("render-secret-value"),
         "Revealed rendered manifest must expose plaintext; manifest: {}",
@@ -271,8 +294,9 @@ contract_test!(
 pub async fn test_spec_view_mode_applies_per_schema_in_a_mixed_batch(
     h: &impl FacadeContractHarness,
 ) {
-    create_secret_resource(
+    create_secret_set(
         h,
+        TestAccount::Alice,
         "sv-mixed-secret",
         &[("MIXED_TOKEN", "mixed-secret-value")],
     )
@@ -312,7 +336,7 @@ pub async fn test_spec_view_mode_applies_per_schema_in_a_mixed_batch(
         ),
     ] {
         let response = facade
-            .get_many(refs.clone(), SpecViewMode::Revealed)
+            .get(refs.clone(), SpecViewMode::Revealed)
             .await
             .unwrap_or_else(|e| panic!("{label}: revealed get_many must succeed, got {e:?}"));
         assert_batch_indexes(&response, &[0, 1], &[]);

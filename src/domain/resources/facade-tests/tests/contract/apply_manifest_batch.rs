@@ -23,7 +23,7 @@ use kamu_resources_facade::{
     ApplyManifestBatchResponse,
     ApplyManifestError,
     ApplyManifestRequest,
-    GetResourceError,
+    ResourceLookupProblem,
     ResourceManifestFormat,
     SpecViewMode,
 };
@@ -36,6 +36,8 @@ use crate::helpers::{
     VARIABLE_SET_CANONICAL_SELECTOR,
     VARIABLE_SET_SCHEMA_STR,
     assert_resource_view_fields,
+    assert_single_batch_problem,
+    assert_single_batch_success,
     secret_set_manifest_json,
     variable_set_manifest_json,
 };
@@ -111,12 +113,14 @@ fn by_name(name: &str) -> ResourceRef {
 async fn assert_absent(h: &impl FacadeContractHarness, name: &str) {
     let result = h
         .facade_for(TestAccount::Alice)
-        .get(by_name(name), SpecViewMode::Encrypted)
-        .await;
+        .get(vec![by_name(name)], SpecViewMode::Encrypted)
+        .await
+        .unwrap();
 
-    assert!(
-        matches!(result, Err(GetResourceError::LookupProblem(_))),
-        "resource '{name}' must not exist, got: {result:?}"
+    assert_matches!(
+        assert_single_batch_problem(result),
+        ResourceLookupProblem::NameNotFound(_) | ResourceLookupProblem::AnyTypeNameNotFound(_),
+        "resource '{name}' must not exist"
     );
 }
 
@@ -270,10 +274,12 @@ pub async fn test_batch_apply_all_successes_preserves_order(h: &impl FacadeContr
         "batch-contract-b",
     );
 
-    let fetched = facade
-        .get(by_name("batch-contract-b"), SpecViewMode::Encrypted)
-        .await
-        .unwrap();
+    let fetched = assert_single_batch_success(
+        facade
+            .get(vec![by_name("batch-contract-b")], SpecViewMode::Encrypted)
+            .await
+            .unwrap(),
+    );
     assert_resource_view_fields(&fetched, VariableSetResource::schema(), "batch-contract-b");
 }
 

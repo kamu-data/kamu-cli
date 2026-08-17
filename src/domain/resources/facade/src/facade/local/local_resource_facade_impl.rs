@@ -75,20 +75,6 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 
     async fn get(
         &self,
-        resource_ref: ResourceRef,
-        spec_view_mode: SpecViewMode,
-    ) -> Result<Resource, GetResourceError> {
-        let mut view = self
-            .resolve_resource_view::<GetResourceError>(resource_ref)
-            .await?;
-
-        self.apply_spec_view_mode::<GetResourceError>(&mut view, spec_view_mode)?;
-
-        Ok(view)
-    }
-
-    async fn get_many(
-        &self,
         resource_refs: Vec<ResourceRef>,
         spec_view_mode: SpecViewMode,
     ) -> Result<BatchResourceResponse<Resource, ResourceLookupProblem>, BatchResourceError> {
@@ -112,38 +98,6 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             successes,
             problems,
         })
-    }
-
-    async fn get_handle(
-        &self,
-        resource_ref: ResourceRef,
-    ) -> Result<ResourceHandle, GetResourceError> {
-        let target_account = self
-            .resource_account_resolver
-            .resolve_target_account(resource_ref.account.as_ref())
-            .await?;
-
-        let schema = self
-            .resolve_ref_schema(
-                &self.list_resource_type_descriptors(),
-                &target_account.did,
-                &resource_ref,
-            )
-            .await??;
-
-        let id = resolve_resource_id::<GetResourceError>(
-            self.generic_resource_query_service.as_ref(),
-            &schema,
-            &target_account.did,
-            &resource_ref,
-        )
-        .await?;
-
-        let snapshot = self
-            .resolve_snapshot_for_schema::<GetResourceError>(&schema, &target_account.did, id)
-            .await?;
-
-        Ok(resource_handle_from_snapshot(snapshot))
     }
 
     async fn get_handles(
@@ -199,25 +153,6 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             successes,
             problems,
         })
-    }
-
-    async fn render_manifest(
-        &self,
-        resource_ref: ResourceRef,
-        format: ResourceManifestFormat,
-        spec_view_mode: SpecViewMode,
-    ) -> Result<RenderResourceManifestResult, RenderResourceManifestError> {
-        let mut view = self
-            .resolve_resource_view::<RenderResourceManifestError>(resource_ref)
-            .await?;
-
-        self.apply_spec_view_mode::<RenderResourceManifestError>(&mut view, spec_view_mode)?;
-
-        let manifest = resource_to_manifest(view).map_err(RenderResourceManifestError::Internal)?;
-        let manifest =
-            serialize_manifest(&manifest, format).map_err(RenderResourceManifestError::Internal)?;
-
-        Ok(RenderResourceManifestResult { manifest, format })
     }
 
     async fn render_manifests(
@@ -439,7 +374,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         })
     }
 
-    async fn delete_many(
+    async fn delete(
         &self,
         resource_refs: Vec<ResourceRef>,
     ) -> Result<BatchResourceResponse<ResourceID, ResourceLookupProblem>, BatchResourceError> {
@@ -935,63 +870,6 @@ impl LocalResourceFacadeImpl {
         Ok(scope)
     }
 
-    async fn resolve_resource_view<E>(&self, resource_ref: ResourceRef) -> Result<Resource, E>
-    where
-        E: From<ResolveManifestAccountError>
-            + From<ResourceLookupProblem>
-            + From<UnsupportedResourceSelectorError>
-            + From<InternalError>
-            + From<BatchResourceError>
-            + From<GetResourceCrudDispatcherError>,
-    {
-        let target_account = self
-            .resource_account_resolver
-            .resolve_target_account(resource_ref.account.as_ref())
-            .await?;
-
-        let schema = self
-            .resolve_ref_schema(
-                &self.list_resource_type_descriptors(),
-                &target_account.did,
-                &resource_ref,
-            )
-            .await??;
-
-        let id = resolve_resource_id::<E>(
-            self.generic_resource_query_service.as_ref(),
-            &schema,
-            &target_account.did,
-            &resource_ref,
-        )
-        .await?;
-
-        // Not redundant with the dispatcher read below: a `ById` selector is
-        // taken on trust, so this is what turns an unknown or wrong-typed ID
-        // into `IDNotFound` / a schema mismatch rather than a dispatcher error.
-        self.resolve_snapshot_for_schema::<E>(&schema, &target_account.did, id)
-            .await?;
-
-        // Registered selector schemas must have a dispatcher, and the snapshot
-        // was just checked to carry this exact schema.
-        let dispatcher =
-            get_resource_crud_dispatcher_for_trusted_schema(&self.catalog, schema.as_str())?;
-
-        let view = dispatcher
-            .get(ResourceCrudDispatcherGetRequest {
-                account_id: target_account.did.clone(),
-                id,
-            })
-            .await?;
-
-        Ok(Resource {
-            headers: kamu_resources::ResourceHeaders {
-                account: target_account,
-                ..view.headers
-            },
-            ..view
-        })
-    }
-
     async fn resolve_multiple_resource_views(
         &self,
         resource_refs: Vec<ResourceRef>,
@@ -1186,24 +1064,6 @@ impl LocalResourceFacadeImpl {
         Ok((handles, problems))
     }
 
-    async fn resolve_snapshot_for_schema<E>(
-        &self,
-        schema: &TypeUri,
-        account_id: &odf::AccountID,
-        id: ResourceID,
-    ) -> Result<ResourceSnapshot, E>
-    where
-        E: From<InternalError> + From<ResourceLookupProblem>,
-    {
-        let Some(snapshot) = self.find_account_snapshot(account_id, id).await? else {
-            return Err(ResourceLookupProblem::IDNotFound(ResourceIDNotFoundError(id)).into());
-        };
-
-        ensure_schema_matches::<E>(id, schema, snapshot.schema.as_str())?;
-
-        Ok(snapshot)
-    }
-
     async fn find_account_snapshot(
         &self,
         account_id: &odf::AccountID,
@@ -1242,21 +1102,6 @@ impl LocalResourceFacadeImpl {
             return Err(ResourceTypeMismatchError::new(id, schema.clone(), snapshot.schema).into());
         }
 
-        Ok(())
-    }
-
-    fn apply_spec_view_mode<E>(
-        &self,
-        view: &mut Resource,
-        spec_view_mode: SpecViewMode,
-    ) -> Result<(), E>
-    where
-        E: From<InternalError>,
-    {
-        if let Some(d) = self.try_resolve_spec_view_dispatcher(&view.schema, spec_view_mode) {
-            let spec = std::mem::replace(&mut view.spec, serde_json::Value::Null);
-            view.spec = d.reveal_spec(spec).map_err(E::from)?;
-        }
         Ok(())
     }
 

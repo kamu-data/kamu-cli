@@ -24,7 +24,6 @@ use kamu_datasets::{
 use kamu_resources_facade::{
     ApplyManifestError,
     BatchResourceError,
-    DeleteResourceError,
     GetResourceError,
     ListResourcesError,
     ListSupportedResourceTypesError,
@@ -306,19 +305,6 @@ impl From<BatchResourceError> for CLIError {
             e @ (E::UnsupportedSelector(_) | E::BadAccount(_) | E::InvalidLabelFilter(_)) => {
                 Self::failure(e)
             }
-            E::RemoteRequest(err) => Self::from(err),
-            E::Internal(err) => Self::critical(err),
-        }
-    }
-}
-
-impl From<DeleteResourceError> for CLIError {
-    fn from(e: DeleteResourceError) -> Self {
-        use DeleteResourceError as E;
-
-        match e {
-            E::LookupProblem(problem) => Self::failure(ResourceLookupCliError::from(problem)),
-            e @ (E::UnsupportedSelector(_) | E::BadAccount(_)) => Self::failure(e),
             E::RemoteRequest(err) => Self::from(err),
             E::Internal(err) => Self::critical(err),
         }

@@ -16,7 +16,6 @@ use crate::queries::{
     BatchResourceHandlesOutcome,
     BatchResourceManifestsOutcome,
     BatchResourcesOutcome,
-    Resource,
     ResourceBadAccountProblem,
     ResourceConnection,
     ResourceHandle,
@@ -24,9 +23,6 @@ use crate::queries::{
     ResourceInvalidLabelFilterProblem,
     ResourceManifestFormat,
     ResourceRefInput,
-    ResourceRenderManifestResult,
-    ResourceSelectorProblem,
-    ResourceSelectorProblemResult,
     ResourceSummary,
     ResourceTypeDescriptor,
     ResourceUnsupportedSelectorProblem,
@@ -101,39 +97,6 @@ impl Resources {
         }
     }
 
-    /// Returns a resource by selector, if found
-    #[tracing::instrument(level = "info", name = Resources_resource, skip_all, fields(?resource_ref))]
-    #[graphql(guard = "LoggedInGuard::new()")]
-    async fn resource(
-        &self,
-        ctx: &Context<'_>,
-        resource_ref: ResourceRefInput,
-        #[graphql(default)] revealed: bool,
-    ) -> Result<ResourceGetOutcome> {
-        let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
-
-        let spec_view_mode = Self::spec_view_mode_from_revealed(revealed);
-
-        match resource_facade
-            .get(resource_ref.try_into()?, spec_view_mode)
-            .await
-        {
-            Ok(resource) => Ok(ResourceGetOutcome::Success(resource.into())),
-            Err(kamu_resources_facade::GetResourceError::LookupProblem(problem)) => {
-                Ok(ResourceGetOutcome::Problem(problem.into()))
-            }
-            Err(kamu_resources_facade::GetResourceError::UnsupportedSelector(error)) => {
-                Ok(ResourceGetOutcome::Problem(error.try_into()?))
-            }
-            Err(kamu_resources_facade::GetResourceError::BadAccount(error)) => {
-                Ok(ResourceGetOutcome::Problem(ResourceSelectorProblemResult {
-                    problem: ResourceSelectorProblem::BadAccount(map_bad_account_problem(error)?),
-                }))
-            }
-            Err(error) => Err(map_get_resource_non_lookup_error(error)),
-        }
-    }
-
     /// Returns resources by selectors
     #[tracing::instrument(level = "info", name = Resources_resources, skip_all, fields(selector_count = resource_refs.len()))]
     #[graphql(guard = "LoggedInGuard::new()")]
@@ -148,7 +111,7 @@ impl Resources {
         let spec_view_mode = Self::spec_view_mode_from_revealed(revealed);
 
         match resource_facade
-            .get_many(into_resource_refs(resource_refs)?, spec_view_mode)
+            .get(into_resource_refs(resource_refs)?, spec_view_mode)
             .await
         {
             Ok(response) => Ok(BatchResourcesOutcome::Success(response.into())),
@@ -159,33 +122,6 @@ impl Resources {
                 BatchResourcesOutcome::BadAccount(map_bad_account_problem(e)?),
             ),
             Err(e) => Err(map_batch_resource_error(e)),
-        }
-    }
-
-    /// Returns resource handle by selector, if found
-    #[tracing::instrument(level = "info", name = Resources_resource_handle, skip_all, fields(?resource_ref))]
-    #[graphql(guard = "LoggedInGuard::new()")]
-    async fn resource_handle(
-        &self,
-        ctx: &Context<'_>,
-        resource_ref: ResourceRefInput,
-    ) -> Result<ResourceGetHandleOutcome> {
-        let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
-
-        match resource_facade.get_handle(resource_ref.try_into()?).await {
-            Ok(handle) => Ok(ResourceGetHandleOutcome::Success(handle.into())),
-            Err(kamu_resources_facade::GetResourceError::LookupProblem(problem)) => {
-                Ok(ResourceGetHandleOutcome::Problem(problem.into()))
-            }
-            Err(kamu_resources_facade::GetResourceError::UnsupportedSelector(error)) => {
-                Ok(ResourceGetHandleOutcome::Problem(error.try_into()?))
-            }
-            Err(kamu_resources_facade::GetResourceError::BadAccount(error)) => Ok(
-                ResourceGetHandleOutcome::Problem(ResourceSelectorProblemResult {
-                    problem: ResourceSelectorProblem::BadAccount(map_bad_account_problem(error)?),
-                }),
-            ),
-            Err(error) => Err(map_get_resource_non_lookup_error(error)),
         }
     }
 
@@ -306,45 +242,6 @@ impl Resources {
         }
     }
 
-    /// Renders a canonical manifest representation from a stored resource
-    #[tracing::instrument(level = "info", name = Resources_render_manifest, skip_all)]
-    #[graphql(guard = "LoggedInGuard::new()")]
-    async fn render_manifest(
-        &self,
-        ctx: &Context<'_>,
-        resource_ref: ResourceRefInput,
-        format: ResourceManifestFormat,
-        #[graphql(default)] revealed: bool,
-    ) -> Result<ResourceRenderManifestOutcome> {
-        let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
-
-        let spec_view_mode = Self::spec_view_mode_from_revealed(revealed);
-
-        match resource_facade
-            .render_manifest(resource_ref.try_into()?, format.into(), spec_view_mode)
-            .await
-        {
-            Ok(rendered) => Ok(ResourceRenderManifestOutcome::Success(
-                ResourceRenderManifestResult {
-                    manifest: rendered.manifest,
-                    format: rendered.format.into(),
-                },
-            )),
-            Err(kamu_resources_facade::RenderResourceManifestError::LookupProblem(problem)) => {
-                Ok(ResourceRenderManifestOutcome::Problem(problem.into()))
-            }
-            Err(kamu_resources_facade::RenderResourceManifestError::UnsupportedSelector(error)) => {
-                Ok(ResourceRenderManifestOutcome::Problem(error.try_into()?))
-            }
-            Err(kamu_resources_facade::RenderResourceManifestError::BadAccount(error)) => Ok(
-                ResourceRenderManifestOutcome::Problem(ResourceSelectorProblemResult {
-                    problem: ResourceSelectorProblem::BadAccount(map_bad_account_problem(error)?),
-                }),
-            ),
-            Err(error) => Err(map_render_resource_manifest_error(error)),
-        }
-    }
-
     /// Renders canonical manifest representations from stored resources
     #[tracing::instrument(level = "info", name = Resources_render_manifests, skip_all, fields(selector_count = resource_refs.len()))]
     #[graphql(guard = "LoggedInGuard::new()")]
@@ -395,20 +292,6 @@ impl Resources {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn map_get_resource_non_lookup_error(error: kamu_resources_facade::GetResourceError) -> GqlError {
-    use kamu_resources_facade::GetResourceError as E;
-
-    match error {
-        E::LookupProblem(_) | E::UnsupportedSelector(_) | E::BadAccount(_) => {
-            unreachable!("handled as union arm")
-        }
-        E::RemoteRequest(error) => error.int_err().into(),
-        E::Internal(error) => error.into(),
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #[derive(Union, Debug, Clone)]
 pub enum ResourcesSummaryOutcome {
     Success(ResourcesSummary),
@@ -433,46 +316,6 @@ pub enum ResourceHandleListOutcome {
     UnsupportedSelector(ResourceUnsupportedSelectorProblem),
     BadAccount(ResourceBadAccountProblem),
     InvalidLabelFilter(ResourceInvalidLabelFilterProblem),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Union, Debug, Clone)]
-pub enum ResourceGetOutcome {
-    Success(Resource),
-    Problem(ResourceSelectorProblemResult),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Union, Debug, Clone)]
-pub enum ResourceGetHandleOutcome {
-    Success(ResourceHandle),
-    Problem(ResourceSelectorProblemResult),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-fn map_render_resource_manifest_error(
-    error: kamu_resources_facade::RenderResourceManifestError,
-) -> GqlError {
-    use kamu_resources_facade::RenderResourceManifestError as E;
-
-    match error {
-        E::UnsupportedSelector(_) | E::BadAccount(_) | E::LookupProblem(_) => {
-            unreachable!("handled as union arm")
-        }
-        E::RemoteRequest(error) => error.int_err().into(),
-        E::Internal(error) => error.into(),
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Union, Debug, Clone)]
-pub enum ResourceRenderManifestOutcome {
-    Success(ResourceRenderManifestResult),
-    Problem(ResourceSelectorProblemResult),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
