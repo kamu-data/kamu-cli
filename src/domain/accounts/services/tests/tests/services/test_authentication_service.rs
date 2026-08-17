@@ -104,86 +104,125 @@ async fn test_login_generate_busy_account_name() {
         .build();
 
     // 1. Used vacant account name
-    assert_matches!(
-         harness.authentication_service
-            .login(DummyAuthenticationProviderA {}.provider_name(), "dummy".to_string(), None)
-            .await,
-        Ok(LoginResponse {
-            ref account_name,
-            ..
-        }) if *account_name == odf::AccountName::new_unchecked("kamu")
-    );
-    assert_matches!(
-        harness
-            .authentication_service
-            .login(
-                DummyAuthenticationProviderA {}.provider_name(),
-                "dummy".to_string(),
-                None
-            )
-            .await,
-        Err(LoginError::DuplicateCredentials)
-    );
+    {
+        let expected_first_account_name = odf::AccountName::new_unchecked("kamu");
+
+        assert_matches!(
+             harness.authentication_service
+                .login(DummyAuthenticationProviderA {}.provider_name(), "dummy".to_string(), None)
+                .await,
+            Ok(LoginResponse {
+                ref account_name,
+                ..
+            }) if *account_name == expected_first_account_name
+        );
+        // Re-login when the first account is created
+        assert_matches!(
+            harness
+                .authentication_service
+                .login(
+                    DummyAuthenticationProviderA {}.provider_name(),
+                    "dummy".to_string(),
+                    None
+                )
+                .await,
+            Ok(LoginResponse {
+                ref account_name,
+                ..
+            }) if *account_name == expected_first_account_name
+        );
+    }
 
     // 2. Used account name + provider
-    assert_matches!(
-        harness.authentication_service
-            .login(
-                DummyAuthenticationProviderB {}.provider_name(),
-                "dummy".to_string(),
-                None
-            )
-            .await,
-        Ok(LoginResponse {
-            ref account_name,
-            ..
-        }) if *account_name == odf::AccountName::new_unchecked("kamu-method-b") );
-    assert_matches!(
-        harness
-            .authentication_service
-            .login(
-                DummyAuthenticationProviderB {}.provider_name(),
-                "dummy".to_string(),
-                None
-            )
-            .await,
-        Err(LoginError::DuplicateCredentials)
-    );
+    {
+        let expected_second_account_name = odf::AccountName::new_unchecked("kamu-method-b");
+
+        assert_matches!(
+            harness.authentication_service
+                .login(
+                    DummyAuthenticationProviderB {}.provider_name(),
+                    "dummy".to_string(),
+                    None
+                )
+                .await,
+            Ok(LoginResponse {
+                ref account_name,
+                ..
+            }) if *account_name == expected_second_account_name
+        );
+        // Re-login when the second account is created
+        assert_matches!(
+            harness
+                .authentication_service
+                .login(
+                    DummyAuthenticationProviderB {}.provider_name(),
+                    "dummy".to_string(),
+                    None
+                )
+                .await,
+            Ok(LoginResponse {
+                ref account_name,
+                ..
+            }) if *account_name == expected_second_account_name
+        );
+    }
 
     // 3. Used account name + provider + random letters
+    {
+        // DummyAuthenticationProviderC takes the name (/w the provider one)
+        // of DummyAuthenticationProviderD:
+        assert_matches!(
+            harness.authentication_service
+                .login(
+                    DummyAuthenticationProviderC {}.provider_name(),
+                    "dummy".to_string(),
+                    None
+                )
+                .await,
+            Ok(LoginResponse {
+                ref account_name,
+                ..
+            }) if *account_name == odf::AccountName::new_unchecked("kamu-method-d")
+        );
 
-    // DummyAuthenticationProviderC takes the name (/w the provider one)
-    // of DummyAuthenticationProviderD:
-    assert_matches!(
-        harness.authentication_service
-            .login(
-                DummyAuthenticationProviderC {}.provider_name(),
-                "dummy".to_string(),
-                None
-            )
-            .await,
-        Ok(LoginResponse {
-            ref account_name,
-            ..
-        }) if *account_name == odf::AccountName::new_unchecked("kamu-method-d")
-    );
-    assert_matches!(
-        harness.authentication_service
-            .login(
-                DummyAuthenticationProviderD {}.provider_name(),
-                "dummy".to_string(),
-                None
-            )
-            .await,
-        Ok(LoginResponse {
-            ref account_name,
-            ..
-        }) if {
-            // Account name isn't known yet, but the format is it
-            let re = regex::Regex::new(r"^kamu-method-d-[A-Za-z0-9]{4}$").unwrap();
-            re.is_match(account_name.as_str())
-        }
-    );
+        // NOTE: сlippy doesn't recognize value assignments within assert_matches!()
+        #[expect(unused_assignments)]
+        let mut expected_third_account_name = None;
+
+        assert_matches!(
+            harness.authentication_service
+                .login(
+                    DummyAuthenticationProviderD {}.provider_name(),
+                    "dummy".to_string(),
+                    None
+                )
+                .await,
+            Ok(LoginResponse {
+                ref account_name,
+                ..
+            }) if {
+                expected_third_account_name = Some(account_name.clone());
+
+                // Account name isn't known yet, but the format is it
+                let re = regex::Regex::new(r"^kamu-method-d-[A-Za-z0-9]{4}$").unwrap();
+                re.is_match(account_name.as_str())
+            }
+        );
+        // Re-login when the third account is created
+        assert_matches!(
+            harness.authentication_service
+                .login(
+                    DummyAuthenticationProviderD {}.provider_name(),
+                    "dummy".to_string(),
+                    None
+                )
+                .await,
+            Ok(LoginResponse {
+                ref account_name,
+                ..
+            }) if expected_third_account_name == Some(account_name.clone())
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

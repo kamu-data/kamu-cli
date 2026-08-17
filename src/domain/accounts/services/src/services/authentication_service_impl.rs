@@ -347,7 +347,15 @@ impl AuthenticationService for AuthenticationServiceImpl {
 
         let (account_id, account_name) = match maybe_account_id {
             // Account already exists
-            Some(account_id) => (account_id, provider_response.account_name.clone()),
+            Some(account_id) => {
+                let account_name = self
+                    .account_service
+                    .find_account_name_by_id(&account_id)
+                    .await?
+                    .expect("Account should exist");
+
+                (account_id, account_name)
+            }
 
             // Account does not exist and needs to be created
             None => {
