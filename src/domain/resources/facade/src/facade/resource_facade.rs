@@ -42,7 +42,7 @@ use crate::{
 /// pipeline — group refs by `(account, schema)`, resolve ids per group, merge
 /// back by `request_index` — is the primitive, and a single-resource call is
 /// simply a one-element batch. A scalar form would be a second implementation
-/// of the same contract, which is what this trait used to carry.
+/// of the same contract, kept honest only by tests.
 ///
 /// Apply keeps its scalar form because there the scalar *is* the primitive:
 /// `plan_apply_manifests`/`apply_manifests` are loops over

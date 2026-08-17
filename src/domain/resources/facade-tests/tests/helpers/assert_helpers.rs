@@ -194,20 +194,4 @@ pub fn normalize_handles(views: &mut [ResourceHandle]) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Parses a JSON manifest string into a `serde_json::Value` for semantic
-/// comparison.
-#[expect(dead_code)]
-pub fn parse_manifest_json(s: &str) -> serde_json::Value {
-    serde_json::from_str(s).expect("manifest is not valid JSON")
-}
-
-/// Parses a YAML manifest string into a `serde_json::Value` via
-/// YAML→JSON round-trip for semantic comparison.
-#[expect(dead_code)]
-pub fn parse_manifest_yaml(s: &str) -> serde_json::Value {
-    let yaml_value: serde_yaml::Value =
-        serde_yaml::from_str(s).expect("manifest is not valid YAML");
-    serde_json::to_value(yaml_value).expect("YAML→JSON conversion failed")
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

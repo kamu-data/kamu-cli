@@ -13,7 +13,6 @@ use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_resources::{
     ApplyResourceCrudDispatcherError,
     DeleteResourcesCrudDispatcherError,
-    GetResourceCrudDispatcherError,
     ResourceAmbiguousTypeError,
     ResourceAnyTypeNameNotFoundError,
     ResourceExtensionResolutionError,
@@ -160,46 +159,19 @@ pub enum ListSupportedResourceTypesError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// A single ref failed to resolve. No longer produced by [`ResourceFacade`]
-/// itself — the ref-keyed operations are batch-only and report per-item
-/// failures as [`ResourceLookupProblem`] inside a `BatchResourceResponse`.
-/// This is the CLI-side currency for "one ref, one outcome", built from a
-/// batch response by callers that resolved a single name.
+/// A single ref failed to resolve.
+///
+/// Not produced by [`ResourceFacade`] itself: the ref-keyed operations are
+/// batch-only and report per-item failures as [`ResourceLookupProblem`] inside
+/// a `BatchResourceResponse`. This is the CLI-side currency for "one ref, one
+/// outcome", built by callers that resolved a single name out of a batch — so
+/// the only failure it can carry is that ref's lookup problem.
 ///
 /// [`ResourceFacade`]: crate::ResourceFacade
 #[derive(Debug, Error)]
 pub enum GetResourceError {
     #[error(transparent)]
-    UnsupportedSelector(#[from] UnsupportedResourceSelectorError),
-
-    #[error(transparent)]
-    BadAccount(#[from] ResolveManifestAccountError),
-
-    #[error(transparent)]
     LookupProblem(#[from] ResourceLookupProblem),
-
-    #[error(transparent)]
-    RemoteRequest(#[from] GraphqlHttpRequestError),
-
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
-
-impl From<GetResourceCrudDispatcherError> for GetResourceError {
-    fn from(err: GetResourceCrudDispatcherError) -> Self {
-        use GetResourceCrudDispatcherError as E;
-        match err {
-            E::NotFound(err) => Self::LookupProblem(ResourceLookupProblem::IDNotFound(err)),
-            E::TypeMismatch(err) => Self::LookupProblem(ResourceLookupProblem::SchemaMismatch(
-                ResourceSchemaMismatchError {
-                    id: err.id,
-                    expected_schema: err.expected_schema,
-                    actual_schema: err.actual_schema,
-                },
-            )),
-            E::Internal(err) => Self::Internal(err),
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -256,45 +228,6 @@ pub enum BatchResourceError {
 
     #[error(transparent)]
     Internal(#[from] InternalError),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// The render counterpart of [`GetResourceError`] — see its note on why a
-/// single-ref error type outlives the singular facade methods.
-#[derive(Debug, Error)]
-pub enum RenderResourceManifestError {
-    #[error(transparent)]
-    UnsupportedSelector(#[from] UnsupportedResourceSelectorError),
-
-    #[error(transparent)]
-    BadAccount(#[from] ResolveManifestAccountError),
-
-    #[error(transparent)]
-    LookupProblem(#[from] ResourceLookupProblem),
-
-    #[error(transparent)]
-    RemoteRequest(#[from] GraphqlHttpRequestError),
-
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
-
-impl From<GetResourceCrudDispatcherError> for RenderResourceManifestError {
-    fn from(err: GetResourceCrudDispatcherError) -> Self {
-        use GetResourceCrudDispatcherError as E;
-        match err {
-            E::NotFound(err) => Self::LookupProblem(ResourceLookupProblem::IDNotFound(err)),
-            E::TypeMismatch(err) => Self::LookupProblem(ResourceLookupProblem::SchemaMismatch(
-                ResourceSchemaMismatchError {
-                    id: err.id,
-                    expected_schema: err.expected_schema,
-                    actual_schema: err.actual_schema,
-                },
-            )),
-            E::Internal(err) => Self::Internal(err),
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

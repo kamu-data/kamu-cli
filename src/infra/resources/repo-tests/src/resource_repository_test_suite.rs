@@ -1180,9 +1180,8 @@ async fn seed_labelled_resource(
 /// Per-row label pairs: two scope rows filtering by **different** labels.
 ///
 /// The capability the per-row `label_pairs` exist for. A backend that hoisted
-/// the pairs out of the row — evaluating one filter for the whole scope, as the
-/// call-wide predicate used to — returns the wrong set here while still passing
-/// every single-row label test.
+/// the pairs out of the row, evaluating one filter for the whole scope, returns
+/// the wrong set here while still passing every single-row label test.
 ///
 /// Like `test_search_resource_handles_per_row_account`, this is the only safety
 /// net for `SQLite`, whose scope predicate is built with a runtime
@@ -1546,8 +1545,7 @@ pub async fn test_search_resource_handles_per_row_account(catalog: &Catalog) {
         vec!["app-other-account"]
     );
 
-    // A row with no account falls back to the call-level one, unchanged from
-    // before this stage.
+    // A row with no account falls back to the call-level one.
     assert_eq!(
         search(ResourceScope::Types(vec![ResourceTypeQuery {
             schema: TEST_KIND.clone(),

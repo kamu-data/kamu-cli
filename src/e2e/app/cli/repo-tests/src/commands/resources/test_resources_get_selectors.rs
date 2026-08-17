@@ -188,8 +188,8 @@ pub async fn test_resources_get_selectors(ctx: ResourceCtx) {
     //
     // An *exact* reference names one resource, so a miss is "was not found" —
     // whether or not a type was named. A *pattern* names none, so a miss is
-    // "did not match any". `%/db-creds` used to report pattern phrasing despite
-    // being an exact ref; these pin the two shapes apart.
+    // "did not match any". The type-less forms are the easy ones to get wrong,
+    // since `%/db-creds` looks like a pattern but is an exact ref.
 
     // Exact name, no type: not-found, with no type named because every type was
     // searched.

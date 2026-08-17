@@ -545,8 +545,9 @@ fn serde_execute_transform_response() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // `ResourceSelector`'s flatbuffers conversions are hand-written
-// (`rust.dtoType`) and were `todo!()`. `ResourceRef` is generated, but its
-// round-trip goes through `ResourceID::as_bytes`/`from_bytes` — stubbed too.
+// (`rust.dtoType`), so nothing but these round-trips checks them.
+// `ResourceRef`'s are generated, but its round-trip still runs through the
+// hand-written `ResourceID::as_bytes`/`from_bytes`.
 #[test]
 fn test_flatbuffers_resource_selectors() {
     fn account_ref() -> opendatafabric_metadata::auth::AccountRef {

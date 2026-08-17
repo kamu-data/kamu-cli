@@ -117,8 +117,7 @@ impl AccountRefInput {
 
 /// Converts a batch of authored refs, validating each.
 ///
-/// Replaces the former `ResourceBatchSelectorInput`, which pinned one type and
-/// one account for the whole call — every ref now carries its own.
+/// Every ref carries its own type and account, so one call may span both.
 pub(crate) fn into_resource_refs(
     resource_refs: Vec<ResourceRefInput>,
 ) -> Result<Vec<kamu_resources::ResourceRef>, GqlError> {

@@ -7,7 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use database_common::PaginationOpts;
 use event_sourcing::ConcurrentModificationError;
 use internal_error::{ErrorIntoInternal, InternalError};
 use thiserror::Error;
@@ -18,14 +17,9 @@ use crate::{
     ApplyManifestRejection,
     ApplyResourceUseCaseError,
     DeleteResourcesError,
-    GetResourceByIdError,
-    ResolvedResourceLabelFilter,
-    Resource,
     ResourceHeadersInput,
     ResourceID,
     ResourceIDNotFoundError,
-    ResourceQuery,
-    ResourceSummaryView,
     ResourceTypeMismatchError,
     ResourceTypeSelectorRaw,
     TypeUri,
@@ -47,16 +41,6 @@ pub trait ResourceCrudDispatcher: Send + Sync {
         request: ResourceCrudDispatcherApplyRequest,
     ) -> Result<ApplyManifestApplicationDecision, ApplyResourceCrudDispatcherError>;
 
-    async fn get(
-        &self,
-        request: ResourceCrudDispatcherGetRequest,
-    ) -> Result<Resource, GetResourceCrudDispatcherError>;
-
-    async fn list(
-        &self,
-        request: ResourceCrudDispatcherListRequest,
-    ) -> Result<Vec<ResourceSummaryView>, InternalError>;
-
     async fn delete(
         &self,
         request: ResourceCrudDispatcherDeleteRequest,
@@ -70,25 +54,6 @@ pub struct ResourceCrudDispatcherApplyRequest {
     pub id: Option<ResourceID>,
     pub headers: ResourceHeadersInput,
     pub spec: serde_json::Value,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone)]
-pub struct ResourceCrudDispatcherGetRequest {
-    pub account_id: odf::AccountID,
-    pub id: ResourceID,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone)]
-pub struct ResourceCrudDispatcherListRequest {
-    pub account_id: odf::AccountID,
-    pub pagination: PaginationOpts,
-    pub label_filter: ResolvedResourceLabelFilter,
-    /// Narrows the listing within the dispatcher's own type.
-    pub query: Option<ResourceQuery>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -114,20 +79,6 @@ pub enum ApplyResourceCrudDispatcherError {
 
     #[error(transparent)]
     ConcurrentModification(#[from] ConcurrentModificationError),
-
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Error)]
-pub enum GetResourceCrudDispatcherError {
-    #[error(transparent)]
-    NotFound(#[from] ResourceIDNotFoundError),
-
-    #[error(transparent)]
-    TypeMismatch(#[from] ResourceTypeMismatchError),
 
     #[error(transparent)]
     Internal(#[from] InternalError),
@@ -201,18 +152,6 @@ impl From<crate::ApplyResourceRejection> for ApplyManifestRejection {
         Self {
             category: value.category,
             message: value.message,
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl From<GetResourceByIdError> for GetResourceCrudDispatcherError {
-    fn from(err: GetResourceByIdError) -> Self {
-        match err {
-            GetResourceByIdError::NotFound(err) => Self::NotFound(err),
-            GetResourceByIdError::TypeMismatch(err) => Self::TypeMismatch(err),
-            GetResourceByIdError::Internal(err) => Self::Internal(err),
         }
     }
 }

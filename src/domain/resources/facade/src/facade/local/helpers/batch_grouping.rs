@@ -35,14 +35,9 @@ pub(crate) struct BatchTargetGroup {
 /// internally, so an N-name group stays a single query; only the number of
 /// distinct `(account, schema)` pairs multiplies the round trips.
 ///
-/// This replaces the former `uniform_batch_target`, which rejected mixed
-/// batches outright because account resolution was singular. Lifting it is the
-/// point of the ODF-shaped `ResourceRef`: the wire has carried a per-ref
-/// account and type since those types were adopted.
-///
 /// Accounts are compared **after** resolution, so the same account spelled by
-/// id in one ref and by name in another lands in one group. The old check
-/// compared unresolved refs structurally and rejected that case.
+/// id in one ref and by name in another lands in one group. Comparing the
+/// unresolved refs structurally would split it into two.
 ///
 /// Groups come back in first-appearance order, which keeps the emitted query
 /// order stable for a given input — worth having when reading logs, and it

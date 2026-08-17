@@ -338,7 +338,7 @@ pub async fn test_spec_view_mode_applies_per_schema_in_a_mixed_batch(
         let response = facade
             .get(refs.clone(), SpecViewMode::Revealed)
             .await
-            .unwrap_or_else(|e| panic!("{label}: revealed get_many must succeed, got {e:?}"));
+            .unwrap_or_else(|e| panic!("{label}: revealed get must succeed, got {e:?}"));
         assert_batch_indexes(&response, &[0, 1], &[]);
 
         let specs: String = response

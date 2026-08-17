@@ -27,7 +27,6 @@ use kamu_resources_facade::{
     GetResourceError,
     ListResourcesError,
     ListSupportedResourceTypesError,
-    RenderResourceManifestError,
     ResourceLookupProblem,
     ResourcesSummaryError,
 };
@@ -313,27 +312,8 @@ impl From<BatchResourceError> for CLIError {
 
 impl From<GetResourceError> for CLIError {
     fn from(e: GetResourceError) -> Self {
-        use GetResourceError as E;
-
-        match e {
-            E::LookupProblem(problem) => Self::failure(ResourceLookupCliError::from(problem)),
-            e @ (E::UnsupportedSelector(_) | E::BadAccount(_)) => Self::failure(e),
-            E::RemoteRequest(err) => Self::from(err),
-            E::Internal(err) => Self::critical(err),
-        }
-    }
-}
-
-impl From<RenderResourceManifestError> for CLIError {
-    fn from(e: RenderResourceManifestError) -> Self {
-        use RenderResourceManifestError as E;
-
-        match e {
-            E::LookupProblem(problem) => Self::failure(ResourceLookupCliError::from(problem)),
-            e @ (E::UnsupportedSelector(_) | E::BadAccount(_)) => Self::failure(e),
-            E::RemoteRequest(err) => Self::from(err),
-            E::Internal(err) => Self::critical(err),
-        }
+        let GetResourceError::LookupProblem(problem) = e;
+        Self::failure(ResourceLookupCliError::from(problem))
     }
 }
 
