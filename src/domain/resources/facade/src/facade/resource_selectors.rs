@@ -25,7 +25,6 @@
 
 use std::collections::BTreeMap;
 
-use database_common::sql_like_escape_literal;
 use kamu_resources::{
     ResourceID,
     ResourceName,
@@ -77,29 +76,6 @@ pub fn validate_selector(value: &ResourceSelector) -> Result<(), UnsupportedSele
         return Err(UnsupportedSelectorFieldError::Did);
     }
     Ok(())
-}
-
-/// Widens a ref into the selector that matches exactly it.
-///
-/// Not a `From` impl: the exact name has to be escaped into a wildcard-free
-/// `LIKE` pattern, so this can silently widen the match if skipped. Naming it
-/// keeps that visible at call sites.
-///
-/// The escaping mirrors what the repository applies to authored patterns, so
-/// widening a ref into a selector cannot change which resources match.
-pub fn ref_to_selector(value: ResourceRef) -> ResourceSelector {
-    ResourceSelector {
-        account: value.account,
-        id: value.id,
-        // A ref carrying a `did` is rejected by `validate_ref` before it can
-        // reach here, so there is nothing to carry across.
-        did: None,
-        r#type: value.r#type,
-        name: value
-            .name
-            .map(|name| sql_like_escape_literal(name.as_str())),
-        labels: None,
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -790,23 +766,6 @@ mod tests {
         assert_matches!(validate_ref(&a_ref(Some(name("my-secrets")))), Ok(()));
     }
 
-    // A ref's name is exact, but a selector's is a `LIKE` pattern — so widening
-    // must escape, or a name containing `%` would start matching its neighbours.
-    #[test]
-    fn test_widening_a_ref_escapes_wildcards_in_the_exact_name() {
-        let selector = ref_to_selector(a_ref(Some(name("100%-done"))));
-
-        assert_eq!(selector.name, Some(r"100\%-done".to_string()));
-    }
-
-    #[test]
-    fn test_widening_a_ref_leaves_an_ordinary_name_alone() {
-        let selector = ref_to_selector(a_ref(Some(name("my-secrets"))));
-
-        assert_eq!(selector.name, Some("my-secrets".to_string()));
-        assert_eq!(selector.r#type, Some(type_ref("SecretSet")));
-    }
-
     // A type-less ref is resolved by searching every type, so it is accepted
     // here rather than rejected the way a `did` is.
     #[test]
@@ -817,7 +776,6 @@ mod tests {
         };
 
         assert_matches!(validate_ref(&resource_ref), Ok(()));
-        assert_eq!(ref_to_selector(resource_ref).r#type, None);
     }
 
     // The selector gained `did` when ODF made the type optional. Nothing can

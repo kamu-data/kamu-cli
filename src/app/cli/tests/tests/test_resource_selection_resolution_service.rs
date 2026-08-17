@@ -7,6 +7,7 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use std::assert_matches;
 use std::sync::{Arc, LazyLock, Mutex};
 
 use dill::CatalogBuilder;
@@ -396,6 +397,34 @@ async fn resolves_any_type_exact_ref_across_every_supported_type() {
         selectors_name_pattern(&requests[0].selectors),
         RESOURCE_DB_CREDS
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Why the escaping above can never be exercised with a real wildcard.
+///
+/// `ResourceName` is a hostname (`Grammar::match_resource_name` →
+/// `match_hostname`), so every SQL `LIKE` metacharacter is *unrepresentable* in
+/// one: only patterns carry `%`. `sql_like_escape_literal` on an exact name is
+/// therefore identity on every input it can receive —
+/// unreachable-by-construction defence that only starts mattering if the
+/// grammar ever widens.
+///
+/// Pinned here so the escape calls are not mistaken for a live filter (they
+/// guard nothing today) nor for dead code (they guard the grammar changing).
+#[test]
+fn resource_names_cannot_contain_like_metacharacters() {
+    for candidate in ["100%-done", "a_b", r"a\b"] {
+        assert_matches!(
+            candidate.parse::<kamu_resources::ResourceName>(),
+            Err(_),
+            "`{candidate}` must not parse as a ResourceName"
+        );
+    }
+
+    // A neighbouring name a hostname *does* allow, so the assertion above is
+    // about the metacharacters rather than about strictness generally.
+    assert_matches!("100-done".parse::<kamu_resources::ResourceName>(), Ok(_));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
