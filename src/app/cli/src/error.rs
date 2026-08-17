@@ -290,7 +290,8 @@ impl From<ListResourcesError> for CLIError {
             e @ (E::UnsupportedSelector(_)
             | E::BadAccount(_)
             | E::InvalidLabelFilter(_)
-            | E::UnrepresentableScope(_)) => Self::failure(e),
+            | E::UnrepresentableScope(_)
+            | E::UnsupportedSelectorField(_)) => Self::failure(e),
             E::RemoteRequest(err) => Self::from(err),
             E::Internal(err) => Self::critical(err),
         }

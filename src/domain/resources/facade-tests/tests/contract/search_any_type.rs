@@ -48,11 +48,11 @@ fn handle_keys(mut items: Vec<kamu_resources::ResourceHandle>) -> Vec<(String, S
 
 // RF-100
 contract_test!(
-    list_all_summaries_across_supported_resource_types,
-    super::list_all_summaries_across_supported_resource_types
+    search_summaries_across_supported_resource_types,
+    super::search_summaries_across_supported_resource_types
 );
 
-pub async fn list_all_summaries_across_supported_resource_types(h: &impl FacadeContractHarness) {
+pub async fn search_summaries_across_supported_resource_types(h: &impl FacadeContractHarness) {
     apply_manifest_and_get_id(
         h,
         TestAccount::Alice,
@@ -103,14 +103,14 @@ pub async fn list_all_summaries_across_supported_resource_types(h: &impl FacadeC
 
 // RF-104
 contract_test!(
-    list_all_narrowed_by_scope_query,
-    super::list_all_narrowed_by_scope_query
+    search_narrowed_by_selectors,
+    super::search_narrowed_by_selectors
 );
 
-/// `list_all` takes selectors: it can span a subset of types, each with its own
+/// `search` takes selectors: it can span a subset of types, each with its own
 /// name pattern. Local and remote must agree, since selectors travel over
 /// GraphQL.
-pub async fn list_all_narrowed_by_scope_query(h: &impl FacadeContractHarness) {
+pub async fn search_narrowed_by_selectors(h: &impl FacadeContractHarness) {
     for name in ["scoped-app-var", "scoped-db-var"] {
         apply_manifest_and_get_id(
             h,
@@ -126,7 +126,7 @@ pub async fn list_all_narrowed_by_scope_query(h: &impl FacadeContractHarness) {
     )
     .await;
 
-    let list_all = async |selectors: Vec<ResourceSelector>| {
+    let search = async |selectors: Vec<ResourceSelector>| {
         h.facade_for(TestAccount::Alice)
             .search(SearchResourcesRequest {
                 account: None,
@@ -140,7 +140,7 @@ pub async fn list_all_narrowed_by_scope_query(h: &impl FacadeContractHarness) {
     };
 
     // A type-less selector spans every type.
-    let any_type = list_all(vec![ResourceSelector::any_type_name_pattern(
+    let any_type = search(vec![ResourceSelector::any_type_name_pattern(
         "scoped-app-%",
     )])
     .await;
@@ -159,7 +159,7 @@ pub async fn list_all_narrowed_by_scope_query(h: &impl FacadeContractHarness) {
     );
 
     // Restricting to one type drops the other, even unnarrowed.
-    let one_type = list_all(vec![ResourceSelector::of_type(
+    let one_type = search(vec![ResourceSelector::of_type(
         VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
     )])
     .await;
@@ -180,7 +180,7 @@ pub async fn list_all_narrowed_by_scope_query(h: &impl FacadeContractHarness) {
     // Each selector carries its own pattern: swapping them must change the
     // result, proving the pairing is per-selector rather than "any pattern,
     // any type".
-    let per_type = list_all(vec![
+    let per_type = search(vec![
         ResourceSelector::name_pattern(
             VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             "scoped-db-%",
@@ -206,7 +206,7 @@ pub async fn list_all_narrowed_by_scope_query(h: &impl FacadeContractHarness) {
     );
 
     // A pattern that matches nothing yields an empty listing, not an error.
-    let no_match = list_all(vec![ResourceSelector::any_type_name_pattern("nomatch-%")]).await;
+    let no_match = search(vec![ResourceSelector::any_type_name_pattern("nomatch-%")]).await;
     assert!(summary_keys(no_match).is_empty());
 }
 
@@ -214,11 +214,11 @@ pub async fn list_all_narrowed_by_scope_query(h: &impl FacadeContractHarness) {
 
 // RF-101
 contract_test!(
-    list_all_handles_across_supported_resource_types,
-    super::test_list_all_handles_across_supported_resource_types
+    search_handles_across_supported_resource_types,
+    super::test_search_handles_across_supported_resource_types
 );
 
-pub async fn test_list_all_handles_across_supported_resource_types(h: &impl FacadeContractHarness) {
+pub async fn test_search_handles_across_supported_resource_types(h: &impl FacadeContractHarness) {
     apply_manifest_and_get_id(
         h,
         TestAccount::Alice,
@@ -241,7 +241,7 @@ pub async fn test_list_all_handles_across_supported_resource_types(h: &impl Faca
     let handles = h
         .facade_for(TestAccount::Alice)
         .search_handles(SearchResourceHandlesRequest {
-            // Spans every type, as `list_all_handles` did.
+            // Spans every type.
             selectors: vec![ResourceSelector::default()],
             account: None,
             label_filter: None,
@@ -270,11 +270,11 @@ pub async fn test_list_all_handles_across_supported_resource_types(h: &impl Faca
 
 // RF-102
 contract_test!(
-    list_all_supports_pagination,
-    super::test_list_all_supports_pagination
+    search_supports_pagination,
+    super::test_search_supports_pagination
 );
 
-pub async fn test_list_all_supports_pagination(h: &impl FacadeContractHarness) {
+pub async fn test_search_supports_pagination(h: &impl FacadeContractHarness) {
     apply_manifest_and_get_id(
         h,
         TestAccount::Alice,
@@ -317,7 +317,7 @@ pub async fn test_list_all_supports_pagination(h: &impl FacadeContractHarness) {
         .items;
     let handle_second_page = facade
         .search_handles(SearchResourceHandlesRequest {
-            // Spans every type, as `list_all_handles` did.
+            // Spans every type.
             selectors: vec![ResourceSelector::default()],
             account: None,
             label_filter: None,
@@ -345,11 +345,11 @@ pub async fn test_list_all_supports_pagination(h: &impl FacadeContractHarness) {
 
 // RF-103
 contract_test!(
-    list_all_empty_account_returns_empty,
-    super::test_list_all_empty_account_returns_empty
+    search_empty_account_returns_empty,
+    super::test_search_empty_account_returns_empty
 );
 
-pub async fn test_list_all_empty_account_returns_empty(h: &impl FacadeContractHarness) {
+pub async fn test_search_empty_account_returns_empty(h: &impl FacadeContractHarness) {
     apply_manifest_and_get_id(
         h,
         TestAccount::Alice,
@@ -370,7 +370,7 @@ pub async fn test_list_all_empty_account_returns_empty(h: &impl FacadeContractHa
         .items;
     let handles = facade
         .search_handles(SearchResourceHandlesRequest {
-            // Spans every type, as `list_all_handles` did.
+            // Spans every type.
             selectors: vec![ResourceSelector::default()],
             account: None,
             label_filter: None,

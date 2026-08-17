@@ -4334,9 +4334,9 @@ single call span resource types. Every field is optional: a selector with no
 """
 input ResourceSelectorInput {
 	"""
-	Not supported yet — setting it is an error, not a silent no-op. Listing
-	resolves one account per call, so use the call-level `account` instead;
-	every selector in one call spans the same account.
+	The account this selector spans. Defaults to the call-level `account`
+	when unset, so one call can span several accounts — subject to the
+	caller being authorized for each; any denial fails the whole call.
 	"""
 	account: AccountRefInput
 	"""
@@ -4346,8 +4346,9 @@ input ResourceSelectorInput {
 	type: ResourceTypeSelectorInput
 	id: ResourceID
 	"""
-	Name pattern in SQL `LIKE` format, per the ODF schema — `%` and `_` are
-	wildcards. A pattern with no wildcards matches that name exactly.
+	Name pattern in SQL `LIKE` format, per the ODF schema. Only `%` acts as
+	a wildcard — `_` is escaped to a literal underscore. A pattern with no
+	`%` matches that name exactly.
 	"""
 	name: String
 	labels: ResourceLabelFilterInput

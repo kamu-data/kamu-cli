@@ -828,6 +828,14 @@ impl LocalResourceFacadeImpl {
         selectors: Vec<ResourceSelector>,
         label_filter: Option<ResourceLabelFilterInput>,
     ) -> Result<(ResourceScope, ResolvedResourceLabelFilter), ListResourcesError> {
+        // Before the fast path below: a selector narrowed *only* by a field the
+        // facade cannot resolve reads as unnarrowed there and would widen into
+        // "every resource". The trait is public, so this is the boundary that
+        // has to hold — not the GraphQL adapter alone.
+        for selector in &selectors {
+            validate_selector(selector)?;
+        }
+
         // A lone type-less, unnarrowed, account-less selector needs no schemas
         // at all, so without a label filter it can answer before touching the
         // catalog or resolving any account.
@@ -1274,13 +1282,24 @@ impl LocalResourceFacadeImpl {
     where
         E: From<InternalError>,
     {
-        // All batch items share one schema, so one dispatcher lookup is enough.
-        let maybe_dispatcher = resources
-            .first()
-            .and_then(|r| self.try_resolve_spec_view_dispatcher(&r.item.schema, spec_view_mode));
+        // A batch can span several schemas, and the dispatcher is schema-specific
+        // — a schema may register one or none. Resolving from the first item
+        // alone would apply its answer to every other schema, either skipping a
+        // transformation the item needs or handing a dispatcher a spec it cannot
+        // parse.
+        //
+        // Cached per schema so a single-schema batch still costs one lookup.
+        let mut dispatchers: HashMap<TypeUri, Option<Arc<dyn ResourceSpecViewDispatcher>>> =
+            HashMap::new();
 
-        if let Some(d) = maybe_dispatcher {
-            for resource in resources.iter_mut() {
+        for resource in resources.iter_mut() {
+            let maybe_dispatcher = dispatchers
+                .entry(resource.item.schema.clone())
+                .or_insert_with(|| {
+                    self.try_resolve_spec_view_dispatcher(&resource.item.schema, spec_view_mode)
+                });
+
+            if let Some(d) = maybe_dispatcher {
                 let spec = std::mem::replace(&mut resource.item.spec, serde_json::Value::Null);
                 resource.item.spec = d.reveal_spec(spec).map_err(E::from)?;
             }

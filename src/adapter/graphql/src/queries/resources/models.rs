@@ -144,16 +144,17 @@ pub(crate) fn into_resource_refs(
 /// `type` spans every type, and one narrowing by nothing matches all of them.
 #[derive(InputObject, Debug, Clone)]
 pub struct ResourceSelectorInput {
-    /// Not supported yet — setting it is an error, not a silent no-op. Listing
-    /// resolves one account per call, so use the call-level `account` instead;
-    /// every selector in one call spans the same account.
+    /// The account this selector spans. Defaults to the call-level `account`
+    /// when unset, so one call can span several accounts — subject to the
+    /// caller being authorized for each; any denial fails the whole call.
     pub account: Option<AccountRefInput>,
     /// Canonical selector (`variablesets`), alias (`vs`), ODF type name
     /// (`VariableSet`), or full schema URI. `null` spans every type.
     pub r#type: Option<ResourceTypeSelectorInput>,
     pub id: Option<ResourceID<'static>>,
-    /// Name pattern in SQL `LIKE` format, per the ODF schema — `%` and `_` are
-    /// wildcards. A pattern with no wildcards matches that name exactly.
+    /// Name pattern in SQL `LIKE` format, per the ODF schema. Only `%` acts as
+    /// a wildcard — `_` is escaped to a literal underscore. A pattern with no
+    /// `%` matches that name exactly.
     pub name: Option<String>,
     pub labels: Option<ResourceLabelFilterInput>,
 }

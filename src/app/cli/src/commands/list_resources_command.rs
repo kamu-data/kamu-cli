@@ -570,9 +570,10 @@ enum ResourceGenericColumn {
 
 /// A selector for one type, carrying whatever narrows it.
 ///
-/// `ResourceQuery`'s exact-name and exact-id list forms cannot appear here: the
-/// CLI only reaches this path for `all`-style and pattern selectors, exact refs
-/// having gone through the ref API instead.
+/// Every `ResourceQuery` form reaches this path, exact-id lists included — a
+/// bare UUID or `vs/<uuid>` arrives as `ExactIds`. Since a selector carries a
+/// single `id` and a single `name` pattern, the list forms fan out into one
+/// selector each rather than collapsing into one.
 fn selectors_for_type(
     schema: &kamu_resources::TypeUri,
     query: Option<&kamu_resources::ResourceQuery>,

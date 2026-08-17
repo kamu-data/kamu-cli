@@ -1639,3 +1639,64 @@ pub async fn test_search_renders_typed_columns_across_types(h: &impl FacadeContr
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-174
+contract_test!(
+    selector_field_the_facade_cannot_resolve_is_rejected,
+    super::test_selector_field_the_facade_cannot_resolve_is_rejected
+);
+
+/// A selector narrowed *only* by a field the facade cannot resolve must fail,
+/// not widen.
+///
+/// Dropping the field leaves a selector that reads as unnarrowed, which matches
+/// every resource in the account — the caller asks for a subset and silently
+/// receives everything. The trait is public, so the rejection has to live at
+/// the facade rather than only in the GraphQL adapter.
+pub async fn test_selector_field_the_facade_cannot_resolve_is_rejected(
+    h: &impl FacadeContractHarness,
+) {
+    apply_manifest_and_get_id(
+        h,
+        TestAccount::Alice,
+        variable_set_manifest_json("unresolvable-field-probe", None, &[("A", "1")]),
+    )
+    .await;
+
+    let facade = h.facade_for(TestAccount::Alice);
+
+    // Narrowed by nothing the facade can act on: were the `did` dropped, this
+    // would come back as the whole account.
+    let did_only = ResourceSelector {
+        did: Some(odf::AccountID::new_seeded_ed25519(b"probe").into()),
+        ..ResourceSelector::default()
+    };
+
+    assert_matches!(
+        facade
+            .search_handles(SearchResourceHandlesRequest {
+                selectors: vec![did_only.clone()],
+                account: None,
+                label_filter: None,
+                pagination: PaginationOpts::from_max_results(1000),
+            })
+            .await,
+        Err(_),
+        "a selector narrowed only by an unresolvable field must be rejected, not widened"
+    );
+
+    assert_matches!(
+        facade
+            .search(SearchResourcesRequest {
+                selectors: vec![did_only],
+                account: None,
+                label_filter: None,
+                pagination: PaginationOpts::from_max_results(1000),
+            })
+            .await,
+        Err(_),
+        "`search` must reject it too, not only `search_handles`"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

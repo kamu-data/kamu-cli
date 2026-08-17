@@ -25,9 +25,11 @@ use crate::harness::{FacadeContractHarness, TestAccount};
 use crate::helpers::{
     SECRET_SET_CANONICAL_SELECTOR,
     SECRET_SET_SCHEMA_STR,
+    VARIABLE_SET_CANONICAL_SELECTOR,
     assert_applied_outcome,
     assert_batch_indexes,
     secret_set_manifest_json,
+    variable_set_manifest_json,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -252,6 +254,97 @@ pub async fn test_spec_view_mode_applies_to_render(h: &impl FacadeContractHarnes
         parsed["headers"]["id"].is_null(),
         "rendered manifest must not include id"
     );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-173
+contract_test!(
+    spec_view_mode_applies_per_schema_in_a_mixed_batch,
+    super::test_spec_view_mode_applies_per_schema_in_a_mixed_batch
+);
+
+/// Both orders are asserted because the two directions fail differently: with
+/// the `VariableSet` first the secret stays encrypted, and with the `SecretSet`
+/// first the secret dispatcher is handed a `VariableSet` spec it cannot parse.
+/// A per-schema lookup is the only thing that satisfies both.
+pub async fn test_spec_view_mode_applies_per_schema_in_a_mixed_batch(
+    h: &impl FacadeContractHarness,
+) {
+    create_secret_resource(
+        h,
+        "sv-mixed-secret",
+        &[("MIXED_TOKEN", "mixed-secret-value")],
+    )
+    .await;
+
+    let facade = h.facade_for(TestAccount::Alice);
+    facade
+        .apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: variable_set_manifest_json("sv-mixed-vars", None, &[("MIXED_VAR", "plain")]),
+        })
+        .await
+        .unwrap();
+
+    let secret_ref = secret_selector("sv-mixed-secret");
+    let variable_ref = ResourceRef {
+        account: None,
+        r#type: Some(
+            VARIABLE_SET_CANONICAL_SELECTOR
+                .parse::<TypeName>()
+                .unwrap()
+                .into(),
+        ),
+        id: None,
+        did: None,
+        name: Some("sv-mixed-vars".parse().unwrap()),
+    };
+
+    for (label, refs) in [
+        (
+            "variable set first",
+            vec![variable_ref.clone(), secret_ref.clone()],
+        ),
+        (
+            "secret set first",
+            vec![secret_ref.clone(), variable_ref.clone()],
+        ),
+    ] {
+        let response = facade
+            .get_many(refs.clone(), SpecViewMode::Revealed)
+            .await
+            .unwrap_or_else(|e| panic!("{label}: revealed get_many must succeed, got {e:?}"));
+        assert_batch_indexes(&response, &[0, 1], &[]);
+
+        let specs: String = response
+            .successes
+            .iter()
+            .map(|s| serde_json::to_string(&s.item.spec).unwrap())
+            .collect();
+        assert!(
+            specs.contains("mixed-secret-value"),
+            "{label}: the secret must be revealed even beside another type; specs: {specs}"
+        );
+
+        let rendered = facade
+            .render_manifests(refs, ResourceManifestFormat::Json, SpecViewMode::Revealed)
+            .await
+            .unwrap_or_else(|e| {
+                panic!("{label}: revealed render_manifests must succeed, got {e:?}")
+            });
+        assert_batch_indexes(&rendered, &[0, 1], &[]);
+
+        let manifests: String = rendered
+            .successes
+            .iter()
+            .map(|s| s.item.manifest.clone())
+            .collect();
+        assert!(
+            manifests.contains("mixed-secret-value"),
+            "{label}: rendering must reveal the secret beside another type; manifests: {manifests}"
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

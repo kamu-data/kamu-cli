@@ -36,6 +36,7 @@ use crate::{
     SearchResourcesRequest,
     SearchResourcesResponse,
     SpecViewMode,
+    validate_selector,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -222,6 +223,12 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
     ) -> Result<SearchResourcesResponse, ListResourcesError> {
         use cynic_api::operations::search_summaries as Operation;
 
+        // The wire conversion cannot carry these fields, so it would drop them.
+        // Rejecting here keeps the remote surface agreeing with the local one.
+        for selector in &request.selectors {
+            validate_selector(selector)?;
+        }
+
         let variables =
             Operation::SearchVariables::new(&request).map_err(ListResourcesError::Internal)?;
 
@@ -238,6 +245,10 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
         request: SearchResourceHandlesRequest,
     ) -> Result<SearchResourceHandlesResponse, ListResourcesError> {
         use cynic_api::operations::search as SearchOperation;
+
+        for selector in &request.selectors {
+            validate_selector(selector)?;
+        }
 
         let variables = SearchOperation::SearchHandlesVariables::new(&request)
             .map_err(ListResourcesError::Internal)?;
