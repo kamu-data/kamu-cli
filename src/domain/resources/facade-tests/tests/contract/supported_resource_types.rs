@@ -243,20 +243,21 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // RF-003
-// Unsupported selector rejection behavior by API:
+// Unsupported type rejection behaviour, which is uniform across the API except
+// for `apply_manifest`:
 //
-// - list / list_handles: UnsupportedSelector (validated before DB query)
-// - apply_manifest: UnsupportedDescriptor (validated from manifest)
-// - delete (by UID): UnsupportedSelector (validated before UID lookup)
+// - get / get_handle by name: UnsupportedSelector (type resolved against the
+//   descriptor list before any lookup)
+// - search / search_handles: UnsupportedSelector (validated before DB query)
+// - delete by id: UnsupportedSelector (type validated when the CRUD dispatcher
+//   is resolved, after the id is known)
+// - apply_manifest: UnsupportedDescriptor — the odd one out, since the type
+//   arrives inside the manifest rather than as a selector
 //
-// Known gap — get / get_handle by ByName with an unknown resource_type:
-//   The facade resolves the UID via a DB name lookup first, passing the raw
-//   type string as a filter column.  For an unknown type, nothing matches →
-//   LookupProblem(NameNotFound) is returned instead of UnsupportedSelector.
-//   This is an implementation detail of the current ByName resolution path.
-//   get / get_handle by ById does return UnsupportedSelector because the
-// type is validated when the CRUD dispatcher is resolved after the UID is
-// known.
+// The name path used to be a gap: it resolved the id via a DB name lookup
+// first, so an unknown type matched nothing and surfaced as
+// LookupProblem(NameNotFound). Resolving the type against the descriptor list
+// up front closed it, which is what the first two assertions below pin.
 contract_test!(
     unsupported_schema_rejected_consistently,
     super::test_unsupported_schema_rejected_consistently
