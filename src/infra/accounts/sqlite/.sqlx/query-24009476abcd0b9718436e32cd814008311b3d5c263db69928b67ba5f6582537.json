@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT DISTINCT\n                id AS \"id: odf::AccountID\"\n            FROM accounts\n            WHERE provider = $1\n              AND (\n                  lower(account_name) = lower($2)\n                  OR email = $3\n                  OR provider_identity_key = $4\n              );\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: odf::AccountID",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "24009476abcd0b9718436e32cd814008311b3d5c263db69928b67ba5f6582537"
+}
