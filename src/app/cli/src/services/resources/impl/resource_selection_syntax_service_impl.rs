@@ -12,11 +12,8 @@ use std::sync::Arc;
 
 use kamu_resources::ResourceTypeDescriptor;
 
-use super::resource_selection_syntax_parser::{
-    ANY_SELECTOR,
-    ParsedSyntax,
-    ResourceSelectionSyntaxParser,
-};
+use super::resource_selection_scanner::ANY_SELECTOR;
+use super::resource_selection_syntax_parser::{ParsedSyntax, ResourceSelectionSyntaxParser};
 use crate::CLIError;
 use crate::resources::{
     ResolvedResourceSelector,

@@ -7,13 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use super::resource_selection_scanner::{BareTypePolicy, ResourceSelectionScanner};
+use super::selector_error::usage_error_at;
 use crate::CLIError;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// In the type position this is the sole accepted wildcard, meaning all types;
-/// in the name position it is an ordinary `%` pattern matching every name.
-pub const ANY_SELECTOR: &str = "%";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -74,10 +70,11 @@ impl ResourceSelectionSyntaxParser {
                     });
                 }
 
-                return Err(CLIError::usage_error(format!(
-                    "Invalid resource reference `{}`. Expected `type/name`",
-                    args[0]
-                )));
+                // A lone plain arg is a bare type, which this grammar rejects.
+                // Reporting it through the scanner keeps the caret and the
+                // wording identical to every other bare-type rejection.
+                return Err(Self::parse_ref_arg(&args[0])
+                    .expect_err("a slash-free arg cannot satisfy `BareTypePolicy::Reject`"));
             }
             let type_str = args[0].as_str();
             let selector_inputs = args[1..].iter().map(String::as_str).collect();
@@ -93,18 +90,14 @@ impl ResourceSelectionSyntaxParser {
     }
 
     fn parse_ref_arg(arg: &str) -> Result<(&str, &str), CLIError> {
-        let parts: Vec<&str> = arg.splitn(2, '/').collect();
-        if parts.len() == 2
-            && !parts[0].is_empty()
-            && !parts[1].is_empty()
-            && !parts[1].contains('/')
-        {
-            Ok((parts[0], parts[1]))
-        } else {
-            Err(CLIError::usage_error(format!(
-                "Invalid resource reference `{arg}`. Expected `type/name`"
-            )))
-        }
+        let selector = ResourceSelectionScanner::scan_selector_arg(arg, BareTypePolicy::Reject)
+            .map_err(|err| usage_error_at("resource reference", arg, err.offset, &err.message))?;
+
+        let name_half = selector
+            .name_half
+            .expect("`BareTypePolicy::Reject` guarantees a name half");
+
+        Ok((selector.type_half, name_half))
     }
 }
 
