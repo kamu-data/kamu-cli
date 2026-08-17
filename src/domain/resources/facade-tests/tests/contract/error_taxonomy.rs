@@ -251,7 +251,7 @@ pub async fn test_batch_lookup_taxonomy(h: &impl FacadeContractHarness) {
     let absent_uid = kamu_resources::ResourceID::new(uuid::Uuid::new_v4());
     let facade = h.facade_for(TestAccount::Alice);
 
-    // --- NameNotFound in get_many ---
+    // --- NameNotFound in get ---
     let resp = facade
         .get(
             batch_by_name("taxonomy-batch-missing"),
@@ -263,10 +263,10 @@ pub async fn test_batch_lookup_taxonomy(h: &impl FacadeContractHarness) {
     assert_matches!(
         &resp.problems[0].error,
         ResourceLookupProblem::NameNotFound(_),
-        "get_many: expected NameNotFound problem"
+        "get: expected NameNotFound problem"
     );
 
-    // --- IDNotFound in get_many ---
+    // --- IDNotFound in get ---
     let resp = facade
         .get(batch_by_id(absent_uid), SpecViewMode::Encrypted)
         .await
@@ -275,7 +275,7 @@ pub async fn test_batch_lookup_taxonomy(h: &impl FacadeContractHarness) {
     assert_matches!(
         &resp.problems[0].error,
         ResourceLookupProblem::IDNotFound(_),
-        "get_many: expected IDNotFound problem"
+        "get: expected IDNotFound problem"
     );
 
     // --- NameNotFound in get_handles ---
@@ -306,7 +306,7 @@ pub async fn test_batch_lookup_taxonomy(h: &impl FacadeContractHarness) {
         "render_manifests: expected NameNotFound problem"
     );
 
-    // --- NameNotFound in delete_many ---
+    // --- NameNotFound in delete ---
     let resp = facade
         .delete(batch_by_name("taxonomy-batch-missing-del"))
         .await
@@ -315,7 +315,7 @@ pub async fn test_batch_lookup_taxonomy(h: &impl FacadeContractHarness) {
     assert_matches!(
         &resp.problems[0].error,
         ResourceLookupProblem::NameNotFound(_),
-        "delete_many: expected NameNotFound problem"
+        "delete: expected NameNotFound problem"
     );
 }
 
@@ -431,10 +431,10 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
     assert_matches!(
         result,
         Err(BatchResourceError::BadAccount(_)),
-        "delete_many: expected BadAccount"
+        "delete: expected BadAccount"
     );
 
-    // --- list ---
+    // --- search ---
     let result = facade
         .search(SearchResourcesRequest {
             account: Some(unknown_account.clone()),
@@ -447,10 +447,10 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
     assert_matches!(
         result,
         Err(ListResourcesError::BadAccount(_)),
-        "list: expected BadAccount"
+        "search: expected BadAccount"
     );
 
-    // --- list_all ---
+    // --- search_handles ---
     let result = facade
         .search(SearchResourcesRequest {
             account: Some(unknown_account.clone()),
@@ -461,7 +461,7 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
     assert_matches!(
         result,
         Err(ListResourcesError::BadAccount(_)),
-        "list_all: expected BadAccount"
+        "search_handles: expected BadAccount"
     );
 
     // --- summary ---

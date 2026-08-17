@@ -9,6 +9,18 @@ Small project-specific guidance for coding agents working in this repository.
   asks for it in that specific instance. Leave finished work staged or unstaged in
   the working tree and let the user review and commit it themselves.
 - Approval to commit once is not standing approval for later commits; ask again.
+- **Never discard uncommitted work.** `git checkout <path>`, `git restore <path>`,
+  `git reset --hard`, `git stash` and `git clean` destroy working-tree changes
+  irreversibly. Do not run them on a file with uncommitted changes unless the user
+  explicitly asked to throw those changes away — and say which changes will be lost
+  before you do.
+- A bad edit is fixed forward (`Edit`, or rewrite with `Write`), never by resetting
+  the file: a reset also reverts every unrelated edit already made to it. To compare
+  against the committed version, read it without touching the working tree:
+  `git show HEAD:<path> > /tmp/orig`.
+- In scripted multi-edit passes, anchor on exact strings and assert every anchor
+  matches before writing. Line numbers go stale as soon as an earlier edit lands —
+  re-read the file to recompute them; never reset it to make stale offsets valid.
 
 ## Validation
 

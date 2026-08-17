@@ -588,9 +588,9 @@ async fn any_type_miss_message(item: ResourceSelectionItem) -> String {
 /// `%/<name>` names exactly one resource, so a miss is a *not-found* — the same
 /// shape `vs/<name>` reports, minus the type, because every type was searched.
 ///
-/// This and the pattern case below used to be one loop asserting the *same*
-/// wording for both, which encoded the quirk that an exact ref reported pattern
-/// phrasing. They are split so the two forms are asserted to differ.
+/// Kept apart from the pattern case below so the two wordings are asserted to
+/// *differ*: a single assertion covering both would pass just as well if an
+/// exact ref reported pattern phrasing.
 #[test_log::test(tokio::test)]
 async fn unmatched_any_type_exact_ref_reports_not_found() {
     let message = any_type_miss_message(ResourceSelectionItem::AnyTypeExactRef {

@@ -117,14 +117,10 @@ pub async fn test_search_narrowed_by_query(h: &impl FacadeContractHarness) {
         vec!["query-by-id"]
     );
 
-    // An empty selector list matches nothing and is **not** an error.
-    //
-    // This changed with the listing collapse. The former `list` rendered typed
-    // columns through one type's dispatcher, so it required exactly one typed
-    // selector and rejected an empty list with `SingleTypeRequired` — a variant
-    // that no longer exists. `search` computes columns per result instead, so
-    // it has no reason to demand a type, and an explicit "no selectors" now
-    // narrows to zero the same way it always did for `search_handles` (RF-094).
+    // An empty selector list matches nothing and is **not** an error: `search`
+    // computes columns per result rather than through one type's dispatcher, so
+    // it has no reason to demand a type. An explicit "no selectors" is a
+    // narrowing to zero, matching `search_handles` (RF-094).
     assert_eq!(list(Vec::new()).await, Vec::<String>::new());
 
     // An unnarrowed selector still lists the whole type.
@@ -144,10 +140,9 @@ contract_test!(
     super::test_search_handles_honours_selectors
 );
 
-/// `list_handles` used to hardcode an unnarrowed scope while its sibling `list`
-/// accepted a query. Unifying on selectors removed that asymmetry, and the
-/// collapse into `search_handles` kept it — this pins the behaviour so it is
-/// not mistaken for an accident and quietly reverted.
+/// `search_handles` honours selectors exactly as `search` does — the two take
+/// the same request and only their response shape differs. Pinned so the
+/// handle form cannot quietly regress to an unnarrowed scope.
 pub async fn test_search_handles_honours_selectors(h: &impl FacadeContractHarness) {
     for name in ["handles-app-one", "handles-app-two", "handles-db-one"] {
         create_variable_set(h, TestAccount::Alice, name).await;
@@ -155,7 +150,7 @@ pub async fn test_search_handles_honours_selectors(h: &impl FacadeContractHarnes
 
     let facade = h.facade_for(TestAccount::Alice);
 
-    let list_handles = async |selectors: Vec<ResourceSelector>| {
+    let search_handles = async |selectors: Vec<ResourceSelector>| {
         let mut handles = facade
             .search_handles(SearchResourcesRequest {
                 selectors,
@@ -173,7 +168,7 @@ pub async fn test_search_handles_honours_selectors(h: &impl FacadeContractHarnes
 
     // A name pattern narrows…
     assert_eq!(
-        list_handles(vec![ResourceSelector::name_pattern(
+        search_handles(vec![ResourceSelector::name_pattern(
             variable_set(),
             "handles-app-%"
         )])
@@ -183,7 +178,7 @@ pub async fn test_search_handles_honours_selectors(h: &impl FacadeContractHarnes
 
     // …and an unnarrowed selector still returns the whole type, so the
     // narrowing above is the selector's doing rather than an empty result.
-    let all = list_handles(vec![ResourceSelector::of_type(variable_set())]).await;
+    let all = search_handles(vec![ResourceSelector::of_type(variable_set())]).await;
     assert!(
         all.len() >= 3,
         "an unnarrowed selector must span the whole type, got {all:?}"
@@ -252,11 +247,11 @@ pub async fn test_per_selector_account_is_authorized(h: &impl FacadeContractHarn
         .await
         .expect_err("one denied selector must fail the whole call");
 
-    // The summary-returning form must honour the field too. Before the listing
-    // collapse this went through `list`, which resolved its own account instead
-    // of going through the scope resolver and so silently answered against the
-    // *caller's* account — returning Alice's resources for a request naming
-    // Bob's. That hole closed when `list` folded into `search`.
+    // The summary-returning form must honour the field too, and asserting it
+    // separately is the point: a path resolving its own account instead of
+    // going through the scope resolver would silently answer against the
+    // *caller's* account, returning Alice's resources for a request naming
+    // Bob's.
     let denied = facade
         .search(SearchResourcesRequest {
             selectors: vec![bobs_selector],
@@ -369,11 +364,11 @@ pub async fn test_any_type_selector_scope_limits(h: &impl FacadeContractHarness)
 
 // RF-080
 contract_test!(
-    list_summaries_for_account,
-    super::test_list_summaries_for_account
+    search_summaries_for_account,
+    super::test_search_summaries_for_account
 );
 
-pub async fn test_list_summaries_for_account(h: &impl FacadeContractHarness) {
+pub async fn test_search_summaries_for_account(h: &impl FacadeContractHarness) {
     // Create resources in each account
     create_variable_set(h, TestAccount::Alice, "list-alice-1").await;
     create_variable_set(h, TestAccount::Alice, "list-alice-2").await;
@@ -423,11 +418,11 @@ pub async fn test_list_summaries_for_account(h: &impl FacadeContractHarness) {
 
 // RF-081
 contract_test!(
-    list_handles_for_account,
-    super::test_list_handles_for_account
+    search_handles_for_account,
+    super::test_search_handles_for_account
 );
 
-pub async fn test_list_handles_for_account(h: &impl FacadeContractHarness) {
+pub async fn test_search_handles_for_account(h: &impl FacadeContractHarness) {
     create_variable_set(h, TestAccount::Alice, "idlist-alice-1").await;
     create_variable_set(h, TestAccount::Alice, "idlist-alice-2").await;
     create_variable_set(h, TestAccount::Bob, "idlist-bob-1").await;
@@ -468,11 +463,11 @@ pub async fn test_list_handles_for_account(h: &impl FacadeContractHarness) {
 
 // RF-082
 contract_test!(
-    list_supports_pagination_limit,
-    super::test_list_supports_pagination_limit
+    search_supports_pagination_limit,
+    super::test_search_supports_pagination_limit
 );
 
-pub async fn test_list_supports_pagination_limit(h: &impl FacadeContractHarness) {
+pub async fn test_search_supports_pagination_limit(h: &impl FacadeContractHarness) {
     for name in ["list-limit-1", "list-limit-2", "list-limit-3"] {
         create_variable_set(h, TestAccount::Alice, name).await;
     }
@@ -502,11 +497,11 @@ pub async fn test_list_supports_pagination_limit(h: &impl FacadeContractHarness)
 
 // RF-083
 contract_test!(
-    list_supports_pagination_offset,
-    super::test_list_supports_pagination_offset
+    search_supports_pagination_offset,
+    super::test_search_supports_pagination_offset
 );
 
-pub async fn test_list_supports_pagination_offset(h: &impl FacadeContractHarness) {
+pub async fn test_search_supports_pagination_offset(h: &impl FacadeContractHarness) {
     for name in ["list-offset-1", "list-offset-2", "list-offset-3"] {
         create_variable_set(h, TestAccount::Alice, name).await;
     }
@@ -550,11 +545,11 @@ pub async fn test_list_supports_pagination_offset(h: &impl FacadeContractHarness
 
 // RF-084
 contract_test!(
-    list_handles_pagination_mirrors_list,
-    super::test_list_handles_pagination_mirrors_list
+    search_handles_pagination_mirrors_search,
+    super::test_search_handles_pagination_mirrors_search
 );
 
-pub async fn test_list_handles_pagination_mirrors_list(h: &impl FacadeContractHarness) {
+pub async fn test_search_handles_pagination_mirrors_search(h: &impl FacadeContractHarness) {
     for name in ["id-page-1", "id-page-2", "id-page-3"] {
         create_variable_set(h, TestAccount::Alice, name).await;
     }
@@ -596,11 +591,11 @@ pub async fn test_list_handles_pagination_mirrors_list(h: &impl FacadeContractHa
 
 // RF-085
 contract_test!(
-    list_empty_account_returns_empty,
-    super::test_list_empty_account_returns_empty
+    search_empty_account_returns_empty,
+    super::test_search_empty_account_returns_empty
 );
 
-pub async fn test_list_empty_account_returns_empty(h: &impl FacadeContractHarness) {
+pub async fn test_search_empty_account_returns_empty(h: &impl FacadeContractHarness) {
     create_variable_set(h, TestAccount::Alice, "list-empty-alice").await;
     let facade = h.facade_for(TestAccount::Bob);
 
@@ -635,11 +630,11 @@ pub async fn test_list_empty_account_returns_empty(h: &impl FacadeContractHarnes
 
 // RF-086
 contract_test!(
-    list_unsupported_kind_returns_error,
-    super::test_list_unsupported_kind_returns_error
+    search_unsupported_kind_returns_error,
+    super::test_search_unsupported_kind_returns_error
 );
 
-pub async fn test_list_unsupported_kind_returns_error(h: &impl FacadeContractHarness) {
+pub async fn test_search_unsupported_kind_returns_error(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
     let unsupported_selector = "NoSuchResourceKind";
 
@@ -1133,11 +1128,11 @@ pub async fn test_search_account_scoping(h: &impl FacadeContractHarness) {
 
 // RF-097
 contract_test!(
-    list_filter_by_canonical_label_uri,
-    super::test_list_filter_by_canonical_label_uri
+    search_filter_by_canonical_label_uri,
+    super::test_search_filter_by_canonical_label_uri
 );
 
-pub async fn test_list_filter_by_canonical_label_uri(h: &impl FacadeContractHarness) {
+pub async fn test_search_filter_by_canonical_label_uri(h: &impl FacadeContractHarness) {
     create_variable_set_with_labels(
         h,
         TestAccount::Alice,
@@ -1182,18 +1177,18 @@ pub async fn test_list_filter_by_canonical_label_uri(h: &impl FacadeContractHarn
 
 // RF-175
 contract_test!(
-    list_filter_differs_per_selector,
-    super::test_list_filter_differs_per_selector
+    search_filter_differs_per_selector,
+    super::test_search_filter_differs_per_selector
 );
 
 /// The capability per-selector labels exist for: one call, two selectors, each
 /// filtering by a *different* label.
 ///
-/// This is not expressible with a single call-level filter, which is why the
-/// label pairs had to move inside the repository's per-row scope. The whole
-/// result must be the union of the two independently-filtered selectors, and
-/// `total_count` must span both.
-pub async fn test_list_filter_differs_per_selector(h: &impl FacadeContractHarness) {
+/// Not expressible with a single call-level filter, which is why the label
+/// pairs live inside the repository's per-row scope. The whole result must be
+/// the union of the two independently-filtered selectors, and `total_count`
+/// must span both.
+pub async fn test_search_filter_differs_per_selector(h: &impl FacadeContractHarness) {
     for (name, environment) in [
         ("per-sel-alpha-prod", "prod"),
         ("per-sel-alpha-staging", "staging"),
@@ -1244,8 +1239,8 @@ pub async fn test_list_filter_differs_per_selector(h: &impl FacadeContractHarnes
 
 // RF-176
 contract_test!(
-    list_filter_one_selector_unfiltered,
-    super::test_list_filter_one_selector_unfiltered
+    search_filter_one_selector_unfiltered,
+    super::test_search_filter_one_selector_unfiltered
 );
 
 /// A labelled selector beside an unlabelled one: the filter must not leak onto
@@ -1254,7 +1249,7 @@ contract_test!(
 /// This is the failure mode the coalescer's grouping key guards. Merging the
 /// two rows would make the unfiltered selector inherit the other's labels,
 /// silently narrowing it.
-pub async fn test_list_filter_one_selector_unfiltered(h: &impl FacadeContractHarness) {
+pub async fn test_search_filter_one_selector_unfiltered(h: &impl FacadeContractHarness) {
     for (name, environment) in [
         ("mixed-alpha-prod", "prod"),
         ("mixed-alpha-staging", "staging"),
@@ -1300,8 +1295,8 @@ pub async fn test_list_filter_one_selector_unfiltered(h: &impl FacadeContractHar
 
 // RF-177
 contract_test!(
-    list_filter_non_string_value_fails_whole_call,
-    super::test_list_filter_non_string_value_fails_whole_call
+    search_filter_non_string_value_fails_whole_call,
+    super::test_search_filter_non_string_value_fails_whole_call
 );
 
 /// A bad label value on **one** selector fails the whole call, rather than
@@ -1310,7 +1305,7 @@ contract_test!(
 /// Only top-level string-valued labels are indexed, so a complex-JSON predicate
 /// is unsatisfiable by construction. Silently returning the *other* selector's
 /// rows would hide the authoring mistake behind a plausible-looking result.
-pub async fn test_list_filter_non_string_value_fails_whole_call(h: &impl FacadeContractHarness) {
+pub async fn test_search_filter_non_string_value_fails_whole_call(h: &impl FacadeContractHarness) {
     create_variable_set_with_labels(
         h,
         TestAccount::Alice,
@@ -1356,11 +1351,11 @@ pub async fn test_list_filter_non_string_value_fails_whole_call(h: &impl FacadeC
 
 // RF-098
 contract_test!(
-    list_filter_by_short_label_name,
-    super::test_list_filter_by_short_label_name
+    search_filter_by_short_label_name,
+    super::test_search_filter_by_short_label_name
 );
 
-pub async fn test_list_filter_by_short_label_name(h: &impl FacadeContractHarness) {
+pub async fn test_search_filter_by_short_label_name(h: &impl FacadeContractHarness) {
     create_variable_set_with_labels(
         h,
         TestAccount::Alice,
@@ -1391,11 +1386,11 @@ pub async fn test_list_filter_by_short_label_name(h: &impl FacadeContractHarness
 
 // RF-099
 contract_test!(
-    list_filter_by_free_form_label,
-    super::test_list_filter_by_free_form_label
+    search_filter_by_free_form_label,
+    super::test_search_filter_by_free_form_label
 );
 
-pub async fn test_list_filter_by_free_form_label(h: &impl FacadeContractHarness) {
+pub async fn test_search_filter_by_free_form_label(h: &impl FacadeContractHarness) {
     create_variable_set_with_labels(
         h,
         TestAccount::Alice,
@@ -1433,11 +1428,11 @@ pub async fn test_list_filter_by_free_form_label(h: &impl FacadeContractHarness)
 
 // RF-099A
 contract_test!(
-    list_filter_invalid_key_is_rejected,
-    super::test_list_filter_invalid_key_is_rejected
+    search_filter_invalid_key_is_rejected,
+    super::test_search_filter_invalid_key_is_rejected
 );
 
-pub async fn test_list_filter_invalid_key_is_rejected(h: &impl FacadeContractHarness) {
+pub async fn test_search_filter_invalid_key_is_rejected(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
     let result = facade
@@ -1461,11 +1456,11 @@ pub async fn test_list_filter_invalid_key_is_rejected(h: &impl FacadeContractHar
 
 // RF-099B
 contract_test!(
-    list_filter_unknown_uri_is_rejected,
-    super::test_list_filter_unknown_uri_is_rejected
+    search_filter_unknown_uri_is_rejected,
+    super::test_search_filter_unknown_uri_is_rejected
 );
 
-pub async fn test_list_filter_unknown_uri_is_rejected(h: &impl FacadeContractHarness) {
+pub async fn test_search_filter_unknown_uri_is_rejected(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
     let result = facade
@@ -1495,11 +1490,11 @@ pub async fn test_list_filter_unknown_uri_is_rejected(h: &impl FacadeContractHar
 
 // RF-099C
 contract_test!(
-    list_filter_non_string_value_is_rejected,
-    super::test_list_filter_non_string_value_is_rejected
+    search_filter_non_string_value_is_rejected,
+    super::test_search_filter_non_string_value_is_rejected
 );
 
-pub async fn test_list_filter_non_string_value_is_rejected(h: &impl FacadeContractHarness) {
+pub async fn test_search_filter_non_string_value_is_rejected(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
     let result = facade
@@ -1528,11 +1523,11 @@ pub async fn test_list_filter_non_string_value_is_rejected(h: &impl FacadeContra
 
 // RF-099D
 contract_test!(
-    list_filter_duplicate_after_canonicalization_is_rejected,
-    super::test_list_filter_duplicate_after_canonicalization_is_rejected
+    search_filter_duplicate_after_canonicalization_is_rejected,
+    super::test_search_filter_duplicate_after_canonicalization_is_rejected
 );
 
-pub async fn test_list_filter_duplicate_after_canonicalization_is_rejected(
+pub async fn test_search_filter_duplicate_after_canonicalization_is_rejected(
     h: &impl FacadeContractHarness,
 ) {
     let facade = h.facade_for(TestAccount::Alice);
@@ -1564,11 +1559,11 @@ pub async fn test_list_filter_duplicate_after_canonicalization_is_rejected(
 
 // RF-099E
 contract_test!(
-    list_filter_not_operator_is_rejected,
-    super::test_list_filter_not_operator_is_rejected
+    search_filter_not_operator_is_rejected,
+    super::test_search_filter_not_operator_is_rejected
 );
 
-pub async fn test_list_filter_not_operator_is_rejected(h: &impl FacadeContractHarness) {
+pub async fn test_search_filter_not_operator_is_rejected(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
     let result = facade
@@ -1600,11 +1595,11 @@ pub async fn test_list_filter_not_operator_is_rejected(h: &impl FacadeContractHa
 
 // RF-099F
 contract_test!(
-    list_filter_or_operator_is_rejected,
-    super::test_list_filter_or_operator_is_rejected
+    search_filter_or_operator_is_rejected,
+    super::test_search_filter_or_operator_is_rejected
 );
 
-pub async fn test_list_filter_or_operator_is_rejected(h: &impl FacadeContractHarness) {
+pub async fn test_search_filter_or_operator_is_rejected(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
     let result = facade
@@ -1636,11 +1631,11 @@ pub async fn test_list_filter_or_operator_is_rejected(h: &impl FacadeContractHar
 
 // RF-099G
 contract_test!(
-    list_filter_malformed_not_operator_is_rejected,
-    super::test_list_filter_malformed_not_operator_is_rejected
+    search_filter_malformed_not_operator_is_rejected,
+    super::test_search_filter_malformed_not_operator_is_rejected
 );
 
-pub async fn test_list_filter_malformed_not_operator_is_rejected(h: &impl FacadeContractHarness) {
+pub async fn test_search_filter_malformed_not_operator_is_rejected(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
     let result = facade
@@ -1728,14 +1723,11 @@ contract_test!(
 /// shows beyond the generic columns — `variables` for a `VariableSet`,
 /// `secrets` for a `SecretSet`.
 ///
-/// Nothing pinned them before this test: no contract test and no E2E test read
-/// `list_values`, so the columns `kamu list` prints were free to vanish
-/// silently. They are the one thing the listing collapse must not lose, since
-/// `search` replaces the dispatcher path that used to produce them.
-///
-/// Rendering them for a **multi-type** result is new: the retired `list_all`
-/// returned an empty `list_values` for every row, so `kamu list` across types
-/// showed no typed columns at all.
+/// This is the only assertion on `list_values` anywhere in the contract or E2E
+/// suites, so without it the columns `kamu list` prints could vanish silently.
+/// The multi-type case is the interesting half: each result renders through its
+/// own schema's presentation dispatcher, so a single-type assertion would not
+/// catch a listing that spans types but renders columns for none of them.
 pub async fn test_search_renders_typed_columns_across_types(h: &impl FacadeContractHarness) {
     apply_manifest_and_get_id(
         h,

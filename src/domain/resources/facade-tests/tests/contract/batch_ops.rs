@@ -239,22 +239,14 @@ contract_test!(get_empty_refs, super::test_get_empty_refs);
 /// An empty batch names nothing, so every batch operation answers with an
 /// empty result rather than an error — batch calls stay idempotent.
 ///
-/// This once had three companions (RF-053A/B/C) asserting that an empty batch
-/// still validated the type and account. Both used to live on the batch
-/// wrapper; they now live on each ref, so an empty batch carries neither and
-/// there is nothing left to validate.
+/// There is nothing else to assert about an empty batch: the type and account
+/// live on each ref, so a batch with no refs carries neither.
 pub async fn test_get_empty_refs(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
     let response = facade.get(vec![], SpecViewMode::Encrypted).await.unwrap();
-    assert!(
-        response.successes.is_empty(),
-        "get_many successes must be empty"
-    );
-    assert!(
-        response.problems.is_empty(),
-        "get_many problems must be empty"
-    );
+    assert!(response.successes.is_empty(), "get successes must be empty");
+    assert!(response.problems.is_empty(), "get problems must be empty");
 
     let response = facade.get_handles(vec![]).await.unwrap();
     assert!(
@@ -286,11 +278,11 @@ pub async fn test_get_empty_refs(h: &impl FacadeContractHarness) {
     let response = facade.delete(vec![]).await.unwrap();
     assert!(
         response.successes.is_empty(),
-        "delete_many successes must be empty"
+        "delete successes must be empty"
     );
     assert!(
         response.problems.is_empty(),
-        "delete_many problems must be empty"
+        "delete problems must be empty"
     );
 }
 
@@ -739,7 +731,7 @@ pub async fn test_delete_mixed_successes_problems(h: &impl FacadeContractHarness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // RF-060
-// delete_many with duplicate refs: document the current behavior.
+// delete with duplicate refs: document the current behavior.
 // The contract is that both occurrences succeed if the resource is resolved
 // before deletion (pre-resolution deduplication), OR the first succeeds and
 // the second returns NameNotFound.  We assert whichever branch fires and verify
@@ -793,10 +785,7 @@ pub async fn test_delete_duplicate_refs_is_deterministic(h: &impl FacadeContract
     if response.successes.len() == 2 {
         // Contract A: both succeed, same UID
         for s in &response.successes {
-            assert_eq!(
-                s.item, id,
-                "duplicate delete_many success must refer to same id"
-            );
+            assert_eq!(s.item, id, "duplicate delete success must refer to same id");
         }
     } else {
         // Contract B: first succeeds, second fails
@@ -842,7 +831,7 @@ pub async fn test_batch_apis_reject_unsupported_type(h: &impl FacadeContractHarn
     let gm = facade.get(selector.clone(), SpecViewMode::Encrypted).await;
     assert!(
         matches!(gm, Err(BatchResourceError::UnsupportedSelector(_))),
-        "get_many: unsupported type must be a batch-level UnsupportedSelector, got: {gm:?}"
+        "get: unsupported type must be a batch-level UnsupportedSelector, got: {gm:?}"
     );
 
     let gi = facade.get_handles(selector.clone()).await;
@@ -866,7 +855,7 @@ pub async fn test_batch_apis_reject_unsupported_type(h: &impl FacadeContractHarn
     let dm = facade.delete(selector.clone()).await;
     assert!(
         matches!(dm, Err(BatchResourceError::UnsupportedSelector(_))),
-        "delete_many: unsupported type must be a batch-level UnsupportedSelector, got: {dm:?}"
+        "delete: unsupported type must be a batch-level UnsupportedSelector, got: {dm:?}"
     );
 }
 
@@ -882,10 +871,8 @@ contract_test!(
 /// **different accounts** — the capability the ODF-shaped `ResourceRef` was
 /// adopted for, since each ref carries its own `account` and `type`.
 ///
-/// Until the batch pipelines fanned out by `(account, schema)` this was
-/// rejected at runtime by `uniform_batch_target`, even though the wire format
-/// had permitted it since the refs became ODF-shaped. Nothing pinned that
-/// rejection, so nothing would have caught it silently coming back either.
+/// Pinned because the wire format permits a mixed batch structurally, so a
+/// pipeline that quietly required a uniform target would still typecheck.
 ///
 /// Alice is used for both halves: a *cross-account* batch is separately
 /// governed by authorization (RF-105 covers the denial), so naming Bob here
@@ -956,9 +943,9 @@ pub async fn test_batch_spans_types_and_accounts(h: &impl FacadeContractHarness)
     assert_batch_indexes(&manifests, &[0, 1], &[]);
 
     // Naming the account explicitly must behave the same as leaving it unset,
-    // since both resolve to the caller. This is the path that used to compare
-    // account refs *structurally* and reject a batch that spelled the same
-    // account two different ways.
+    // since both resolve to the caller. Grouping compares accounts *after*
+    // resolution for exactly this reason: a structural comparison would split
+    // one account spelled two ways into two groups.
     let spelled_out = vec![
         ResourceRef {
             account: Some(kamu_resources::ResourceAccountRef {
@@ -999,7 +986,7 @@ pub async fn test_batch_spans_types_and_accounts(h: &impl FacadeContractHarness)
     let deleted = facade
         .delete(mixed_types())
         .await
-        .expect("delete_many must span two types");
+        .expect("delete must span two types");
     assert_batch_indexes(&deleted, &[0, 1], &[]);
 }
 
@@ -1074,7 +1061,7 @@ pub async fn test_ref_id_and_name_must_agree(h: &impl FacadeContractHarness) {
     let deleted = facade
         .delete(mismatched())
         .await
-        .expect("delete_many must report the mismatch per item");
+        .expect("delete must report the mismatch per item");
     assert_batch_indexes(&deleted, &[1], &[0]);
 
     // Alpha must still be there: its id was named, but under the wrong name.
@@ -1208,7 +1195,7 @@ pub async fn test_type_less_ref_resolves_across_types(h: &impl FacadeContractHar
     let deleted = facade
         .delete(refs())
         .await
-        .expect("delete_many must resolve a type-less ref");
+        .expect("delete must resolve a type-less ref");
     assert_batch_indexes(&deleted, &[0], &[1]);
 }
 
@@ -1269,7 +1256,7 @@ pub async fn test_type_less_ref_matching_several_types_is_ambiguous(
     let deleted = facade
         .delete(refs())
         .await
-        .expect("delete_many must report the ambiguity per item");
+        .expect("delete must report the ambiguity per item");
     assert_batch_indexes(&deleted, &[], &[0]);
 
     // Naming the type disambiguates, and both resources must still exist —

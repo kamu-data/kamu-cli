@@ -75,8 +75,8 @@ pub fn validate_ref(value: &ResourceRef) -> Result<(), UnsupportedSelectorFieldE
 /// That is exactly why an unresolvable field must be rejected: a selector
 /// narrowed *only* by one would otherwise look unnarrowed and match everything.
 ///
-/// `labels` used to be rejected here for the same reason. It is now resolved
-/// per selector and carried into the scope, so it no longer widens anything.
+/// `labels` is not rejected: it is resolved per selector and carried into the
+/// scope, so it narrows rather than being dropped.
 pub fn validate_selector(value: &ResourceSelector) -> Result<(), UnsupportedSelectorFieldError> {
     if value.did.is_some() {
         return Err(UnsupportedSelectorFieldError::Did);
@@ -773,8 +773,8 @@ mod tests {
         assert_eq!(types[1].label_pairs, vec![label("env", "staging")]);
     }
 
-    // The converse: identical labels are the old call-wide case, and must still
-    // fold into one row so an N-name batch stays one query.
+    // The converse: identical labels must still fold into one row, so a
+    // uniformly-filtered N-name batch stays one query.
     #[test]
     fn test_same_type_with_identical_labels_merges() {
         let types = types_of(coalesce(vec![

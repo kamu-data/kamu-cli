@@ -20,12 +20,9 @@ pub use kamu_resources::{
     ApplyManifestRejection,
     ApplyResourceCrudDispatcherError,
     DeleteResourcesCrudDispatcherError,
-    GetResourceCrudDispatcherError,
     ResourceCrudDispatcher,
     ResourceCrudDispatcherApplyRequest,
     ResourceCrudDispatcherDeleteRequest,
-    ResourceCrudDispatcherGetRequest,
-    ResourceCrudDispatcherListRequest,
     UnsupportedResourceDescriptorError,
 };
 pub use resource_crud_dispatcher_diff_helpers::*;

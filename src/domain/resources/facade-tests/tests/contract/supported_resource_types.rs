@@ -123,7 +123,7 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
 
     let facade = h.facade_for(TestAccount::Alice);
 
-    // Canonical selector name works for list, list_handles, and get
+    // Canonical selector name works for search, search_handles, and get
     let summaries = facade
         .search(SearchResourcesRequest {
             selectors: vec![ResourceSelector::of_type(
@@ -133,12 +133,12 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
-        .expect("list with canonical selector must succeed");
+        .expect("search with canonical selector must succeed");
     for s in &summaries.items {
         assert_eq!(
             s.schema,
             *VariableSetResource::schema(),
-            "list schema must be canonical"
+            "search schema must be canonical"
         );
     }
 
@@ -151,12 +151,12 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
-        .expect("list_handles with canonical selector must succeed");
+        .expect("search_handles with canonical selector must succeed");
     for i in &handles.items {
         assert_eq!(
             i.r#type,
             *VariableSetResource::schema(),
-            "list_handles schema must be canonical"
+            "search_handles schema must be canonical"
         );
     }
 
@@ -189,12 +189,12 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
-        .expect("short name 'vs' must resolve for list");
+        .expect("short name 'vs' must resolve for search");
     for s in &short_name_summaries.items {
         assert_eq!(
             s.schema,
             *VariableSetResource::schema(),
-            "short name list schema must be canonical"
+            "short name search schema must be canonical"
         );
     }
 
@@ -208,12 +208,12 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
-        .expect("schema TypeName 'VariableSet' must resolve for list");
+        .expect("schema TypeName 'VariableSet' must resolve for search");
     for s in &type_name_summaries.items {
         assert_eq!(
             s.schema,
             *VariableSetResource::schema(),
-            "TypeName selector list schema must be canonical"
+            "TypeName selector search schema must be canonical"
         );
     }
 
@@ -242,7 +242,7 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
 // Unsupported type rejection behaviour, which is uniform across the API except
 // for `apply_manifest`:
 //
-// - get / get_handle by name: UnsupportedSelector (type resolved against the
+// - get / get_handles by name: UnsupportedSelector (type resolved against the
 //   descriptor list before any lookup)
 // - search / search_handles: UnsupportedSelector (validated before DB query)
 // - delete by id: UnsupportedSelector (type validated when the CRUD dispatcher
@@ -250,10 +250,9 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
 // - apply_manifest: UnsupportedDescriptor — the odd one out, since the type
 //   arrives inside the manifest rather than as a selector
 //
-// The name path used to be a gap: it resolved the id via a DB name lookup
-// first, so an unknown type matched nothing and surfaced as
-// LookupProblem(NameNotFound). Resolving the type against the descriptor list
-// up front closed it, which is what the first two assertions below pin.
+// The name paths resolve the type up front rather than via a DB name lookup:
+// otherwise an unknown type would match nothing and report the miss as
+// LookupProblem(NameNotFound), which is what the first two assertions pin.
 contract_test!(
     unsupported_schema_rejected_consistently,
     super::test_unsupported_schema_rejected_consistently
@@ -313,7 +312,7 @@ pub async fn test_unsupported_schema_rejected_consistently(h: &impl FacadeContra
         ),
     }
 
-    // list — UnsupportedSelector (type validated before DB query)
+    // search — UnsupportedSelector (type validated before DB query)
     let list_result = facade
         .search(SearchResourcesRequest {
             selectors: vec![ResourceSelector::of_type(bad_type.parse().unwrap())],
@@ -326,11 +325,11 @@ pub async fn test_unsupported_schema_rejected_consistently(h: &impl FacadeContra
             assert_unsupported_selector(&err, bad_type);
         }
         other => {
-            panic!("list: unsupported selector must return UnsupportedSelector, got: {other:?}")
+            panic!("search: unsupported selector must return UnsupportedSelector, got: {other:?}")
         }
     }
 
-    // list_handles — UnsupportedSelector
+    // search_handles — UnsupportedSelector
     let li_result = facade
         .search_handles(SearchResourcesRequest {
             selectors: vec![ResourceSelector::of_type(bad_type.parse().unwrap())],
@@ -343,7 +342,7 @@ pub async fn test_unsupported_schema_rejected_consistently(h: &impl FacadeContra
             assert_unsupported_selector(&err, bad_type);
         }
         other => panic!(
-            "list_handles: unsupported selector must return UnsupportedSelector, got: {other:?}"
+            "search_handles: unsupported selector must return UnsupportedSelector, got: {other:?}"
         ),
     }
 

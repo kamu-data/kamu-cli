@@ -495,7 +495,7 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
 
     let alice_all = alice
         .search_handles(SearchResourcesRequest {
-            // Spans every type, as `list_all_handles` did.
+            // A default selector narrows by nothing, so it spans every type.
             selectors: vec![ResourceSelector::default()],
             account: None,
             pagination: PaginationOpts::from_max_results(1000),

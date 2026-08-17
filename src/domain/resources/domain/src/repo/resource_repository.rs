@@ -200,8 +200,7 @@ pub struct ResourceTypeQuery {
     pub schema: TypeUri,
     pub query: Option<ResourceQuery>,
     /// Which account this row spans. `None` means the call-level account, which
-    /// every row used to share — the scoped reads still take that as a scalar
-    /// argument and it remains the default.
+    /// the scoped reads take as a scalar argument and use as the default.
     ///
     /// Set only when a caller names an account per selector. Rows naming
     /// different accounts cannot merge, so the coalescer groups by

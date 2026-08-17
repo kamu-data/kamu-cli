@@ -1572,8 +1572,9 @@ fn test_serde_account_ref() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// `struct-or-string` means a bare string deserializes through `FromStr`, which
-// used to be `todo!()` — so short-form selectors in YAML panicked.
+// `struct-or-string` routes a bare string through `FromStr`, so the short form
+// is only reachable in YAML if that impl is real — a stub would panic rather
+// than fail to compile.
 #[test]
 fn test_serde_resource_selector_short_form() {
     let selector: ResourceSelector = serde_yaml::from_str::<
@@ -1605,8 +1606,9 @@ fn test_serde_resource_selector_short_form() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Proxy conversions are hand-written (`rust.dtoType`), and every field but
-// `account` used to be silently discarded.
+// Proxy conversions are hand-written (`rust.dtoType`) rather than generated, so
+// every field is asserted individually: a dropped one is silently discarded
+// instead of failing to compile.
 #[test]
 fn test_serde_resource_selector() {
     let selector = ResourceSelector {

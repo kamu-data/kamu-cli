@@ -561,7 +561,7 @@ impl ResourceSelectionResolutionServiceImpl {
                     let response = resource_facade
                         .search_handles(SearchResourcesRequest {
                             // A lone type-less unnarrowed selector spans every
-                            // type, which is what `list_all_handles` did.
+                            // type.
                             selectors: with_labels(
                                 vec![kamu_resources::ResourceSelector::default()],
                                 request_label_filter.as_ref(),

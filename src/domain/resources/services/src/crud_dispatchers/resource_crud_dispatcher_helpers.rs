@@ -21,16 +21,9 @@ use kamu_resources::{
     GenericResourceQueryService,
     ReconcilableEventSourcedResource,
     Resource,
-    ResourceConditionStatus,
-    ResourcePresentation,
     ResourceSchemaProvider,
     ResourceSnapshot,
-    ResourceStatus,
-    ResourceStatusExt,
-    ResourceStatusSummaryView,
-    ResourceSummaryView,
     TypeUri,
-    get_description,
     new_pending_resource_status,
 };
 use serde::Serialize;
@@ -147,25 +140,6 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub fn typed_resource_state_to_summary_view<R>(state: &R::ResourceState) -> ResourceSummaryView
-where
-    R: ResourceSchemaProvider + DeclarativeResource + ResourcePresentation,
-{
-    ResourceSummaryView {
-        schema: R::schema().clone(),
-        id: *state.id(),
-        name: state.headers().name.clone(),
-        description: get_description(&state.headers().annotations.entries).map(str::to_string),
-        generation: state.headers().generation,
-        created_at: state.headers().created_at,
-        updated_at: state.headers().updated_at,
-        status: Some(resource_status_summary_view(state.status())),
-        list_values: R::list_column_values(state),
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 pub(crate) fn resource_snapshot_to_resource(snapshot: ResourceSnapshot) -> Resource {
     let ResourceSnapshot {
         schema,
@@ -180,20 +154,5 @@ pub(crate) fn resource_snapshot_to_resource(snapshot: ResourceSnapshot) -> Resou
         headers,
         spec,
         status: status.unwrap_or_else(new_pending_resource_status),
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-fn resource_status_summary_view(status: &ResourceStatus) -> ResourceStatusSummaryView {
-    let ready = status.ready_condition_status().map(|status| match status {
-        ResourceConditionStatus::True => true,
-        ResourceConditionStatus::False | ResourceConditionStatus::Unknown => false,
-    });
-
-    ResourceStatusSummaryView {
-        phase: Some(status.phase),
-        observed_generation: status.observed_generation,
-        ready,
     }
 }

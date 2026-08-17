@@ -336,7 +336,7 @@ pub async fn test_batch_equivalence(h: &impl FacadeContractHarness) {
         }, // idx 2 — missing id
     ];
 
-    // get_many: both facades must return the same structure
+    // get: both facades must return the same structure
     let local_get = local
         .get(batch_selector.clone(), SpecViewMode::Encrypted)
         .await

@@ -17,7 +17,7 @@ use internal_error::ResultIntoInternal;
 use kamu_resources::TypeUri;
 use kamu_resources_facade::{
     BatchResourceProblem,
-    RenderResourceManifestError,
+    GetResourceError,
     ResourceFacade,
     ResourceLookupProblem,
     ResourceManifestFormat as FacadeResourceManifestFormat,
@@ -227,7 +227,7 @@ impl GetResourceCommand {
                     )
                     .await?;
 
-                self.handle_render_manifest_problems(result.problems)?;
+                self.handle_lookup_problems(result.problems)?;
 
                 for success in result.successes {
                     let (original_index, _) = chunk[success.request_index];
@@ -253,7 +253,7 @@ impl GetResourceCommand {
                     .get(Self::chunk_resource_refs(chunk), self.spec_view_mode())
                     .await?;
 
-                self.handle_get_resource_problems(result.problems)?;
+                self.handle_lookup_problems(result.problems)?;
 
                 for success in result.successes {
                     let (original_index, _) = chunk[success.request_index];
@@ -297,7 +297,11 @@ impl GetResourceCommand {
         groups
     }
 
-    fn handle_get_resource_problems(
+    /// Fails on the first problem that `--ignore-not-found` does not excuse.
+    ///
+    /// Shared by the view and render paths: both address resources the same
+    /// way, so a ref that fails one fails the other identically.
+    fn handle_lookup_problems(
         &self,
         problems: Vec<BatchResourceProblem<ResourceLookupProblem>>,
     ) -> Result<(), CLIError> {
@@ -305,26 +309,7 @@ impl GetResourceCommand {
             match problem.error {
                 ResourceLookupProblem::NameNotFound(_) | ResourceLookupProblem::IDNotFound(_)
                     if self.ignore_not_found => {}
-                error => {
-                    return Err(
-                        kamu_resources_facade::GetResourceError::LookupProblem(error).into(),
-                    );
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    fn handle_render_manifest_problems(
-        &self,
-        problems: Vec<BatchResourceProblem<ResourceLookupProblem>>,
-    ) -> Result<(), CLIError> {
-        for problem in problems {
-            match problem.error {
-                ResourceLookupProblem::NameNotFound(_) | ResourceLookupProblem::IDNotFound(_)
-                    if self.ignore_not_found => {}
-                error => return Err(RenderResourceManifestError::LookupProblem(error).into()),
+                error => return Err(GetResourceError::LookupProblem(error).into()),
             }
         }
 

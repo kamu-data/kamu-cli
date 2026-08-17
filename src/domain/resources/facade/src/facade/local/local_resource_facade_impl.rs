@@ -210,9 +210,9 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             });
         }
 
-        // One scoped query for every type in the scope, so pagination is global
-        // rather than per type. The former `list` ran a separate paginated query
-        // through one type's dispatcher, which is why it could not span types.
+        // One scoped query covering every type in the scope, so pagination is
+        // global rather than per type. Querying each type separately cannot
+        // produce this: page 2 of a merged result is not page 2 of each type.
         let snapshots = self
             .generic_resource_query_service
             .list_snapshots(&target_account.did, &scope, request.pagination)
