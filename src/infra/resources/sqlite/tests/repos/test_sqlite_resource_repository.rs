@@ -100,6 +100,22 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
+    fixture = resource_repo_suite::test_search_resource_handles_per_row_labels,
+    harness = SqliteResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = resource_repo_suite::test_search_resource_handles_any_type_labels,
+    harness = SqliteResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
     fixture = resource_repo_suite::test_search_resource_handles_pattern_special_characters,
     harness = SqliteResourceRepositoryHarness
 );

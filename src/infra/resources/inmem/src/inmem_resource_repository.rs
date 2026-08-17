@@ -14,16 +14,15 @@ use database_common::PaginationOpts;
 use dill::*;
 use event_sourcing::EventID;
 use futures::StreamExt;
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::InternalError;
 use kamu_accounts::AccountRepository;
 use kamu_resources::{
     CreateResourceError,
-    ResolvedResourceLabelFilter,
     ResourceDuplicateError,
     ResourceHandleRow,
     ResourceID,
     ResourceIDStream,
-    ResourceLabelFilterPredicate,
+    ResourceLabelPair,
     ResourceName,
     ResourcePhase,
     ResourcePhaseCounts,
@@ -35,7 +34,6 @@ use kamu_resources::{
     ResourceSnapshotStream,
     ResourceSnapshotUpdate,
     ResourceSummaryRow,
-    TypeRef,
     TypeUri,
     UpdateResourceError,
     deleted_account_name_sentinel,
@@ -347,19 +345,15 @@ impl ResourceRepository for InMemoryResourceRepository {
         &self,
         account_id: &odf::AccountID,
         scope: &ResourceScope,
-        label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceHandleRow>, InternalError> {
         if scope.is_vacuous() {
             return Ok(Vec::new());
         }
 
-        let label_pairs =
-            ResourceLabelFilterPredicate::flatten_conjunction(label_filter).int_err()?;
-
         let mut snapshots = {
             let guard = self.state.lock().unwrap();
-            filter_scoped_snapshots(&guard, account_id, scope, &label_pairs)
+            filter_scoped_snapshots(&guard, account_id, scope)
                 .into_iter()
                 .cloned()
                 .collect::<Vec<_>>()
@@ -391,18 +385,14 @@ impl ResourceRepository for InMemoryResourceRepository {
         &self,
         account_id: &odf::AccountID,
         scope: &ResourceScope,
-        label_filter: &ResolvedResourceLabelFilter,
     ) -> Result<usize, InternalError> {
         if scope.is_vacuous() {
             return Ok(0);
         }
 
-        let label_pairs =
-            ResourceLabelFilterPredicate::flatten_conjunction(label_filter).int_err()?;
-
         let guard = self.state.lock().unwrap();
 
-        Ok(filter_scoped_snapshots(&guard, account_id, scope, &label_pairs).len())
+        Ok(filter_scoped_snapshots(&guard, account_id, scope).len())
     }
 
     async fn find_resource_snapshot(
@@ -523,20 +513,15 @@ impl ResourceRepository for InMemoryResourceRepository {
         &self,
         account_id: &odf::AccountID,
         scope: &ResourceScope,
-        label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
     ) -> ResourceSnapshotStream<'_> {
         let account_id = account_id.clone();
-        let label_filter = label_filter.clone();
         let scope = scope.clone();
 
         let stream = futures::stream::once(async move {
-            let label_pairs =
-                ResourceLabelFilterPredicate::flatten_conjunction(&label_filter).int_err()?;
-
             let mut snapshots_page: Vec<_> = {
                 let guard = self.state.lock().unwrap();
-                filter_scoped_snapshots(&guard, &account_id, &scope, &label_pairs)
+                filter_scoped_snapshots(&guard, &account_id, &scope)
                     .into_iter()
                     .cloned()
                     .collect()
@@ -642,17 +627,21 @@ fn snapshot_matches_query(snapshot: &ResourceSnapshot, query: &ResourceQuery) ->
 /// Mirrors the SQL backends: the account is matched *inside* the scope, per
 /// row, so a row naming its own account is checked against that one and every
 /// other row against the call-level default.
+/// Mirrors the SQL backends: the label pairs are evaluated *inside* each scope
+/// row, so rows carrying different pairs filter independently and the whole is
+/// still a disjunction over rows.
 fn snapshot_matches_scope(
     snapshot: &ResourceSnapshot,
     scope: &ResourceScope,
     default_account_id: &odf::AccountID,
 ) -> bool {
     match scope {
-        ResourceScope::AnyType(query) => {
+        ResourceScope::AnyType(query, label_pairs) => {
             snapshot.headers.account.did == *default_account_id
                 && query
                     .as_ref()
                     .is_none_or(|query| snapshot_matches_query(snapshot, query))
+                && snapshot_matches_label_pairs(snapshot, label_pairs)
         }
         ResourceScope::Types(types) => types.iter().any(|entry| {
             snapshot.schema == entry.schema
@@ -661,6 +650,7 @@ fn snapshot_matches_scope(
                     .query
                     .as_ref()
                     .is_none_or(|query| snapshot_matches_query(snapshot, query))
+                && snapshot_matches_label_pairs(snapshot, &entry.label_pairs)
         }),
     }
 }
@@ -715,16 +705,15 @@ fn filter_scoped_snapshots<'a>(
     guard: &'a State,
     account_id: &odf::AccountID,
     scope: &ResourceScope,
-    label_pairs: &[(&TypeRef, &str)],
 ) -> Vec<&'a ResourceSnapshot> {
     guard
         .snapshots_by_id
         .values()
         .filter(|snapshot| snapshot.headers.deleted_at.is_none())
-        // Account is matched inside the scope, not here: a row may name its own
-        // account, and `account_id` is only the default for rows that do not.
+        // Account and labels are both matched inside the scope, not here: a row
+        // may name its own account and carry its own label pairs, and
+        // `account_id` is only the default for rows that do not.
         .filter(|snapshot| snapshot_matches_scope(snapshot, scope, account_id))
-        .filter(|snapshot| snapshot_matches_label_pairs(snapshot, label_pairs))
         .collect()
 }
 
@@ -740,7 +729,7 @@ fn filter_scoped_snapshots<'a>(
 /// maintains that index, so the two cannot disagree.
 fn snapshot_matches_label_pairs(
     snapshot: &ResourceSnapshot,
-    label_pairs: &[(&TypeRef, &str)],
+    label_pairs: &[ResourceLabelPair],
 ) -> bool {
     if label_pairs.is_empty() {
         return true;

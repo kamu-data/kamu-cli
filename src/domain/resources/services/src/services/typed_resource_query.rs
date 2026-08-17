@@ -8,7 +8,7 @@
 // by the Apache License, Version 2.0.
 
 use database_common::PaginationOpts;
-use internal_error::{ErrorIntoInternal, InternalError};
+use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use tokio_stream::StreamExt;
 
 use crate::domain::{
@@ -16,6 +16,7 @@ use crate::domain::{
     ResolvedResourceLabelFilter,
     ResourceID,
     ResourceIDNotFoundError,
+    ResourceLabelFilterPredicate,
     ResourceQuery,
     ResourceRawEventQuery,
     ResourceRepository,
@@ -23,6 +24,7 @@ use crate::domain::{
     ResourceScope,
     ResourceSnapshot,
     ResourceTypeMismatchError,
+    ResourceTypeQuery,
     TypedResourceQueryError,
 };
 
@@ -112,12 +114,24 @@ where
         label_filter: ResolvedResourceLabelFilter,
         query: Option<ResourceQuery>,
     ) -> Result<Vec<R::ResourceState>, InternalError> {
-        let mut resource_snapshots_stream = self.resource_repository.list_resource_snapshots(
-            &account_id,
-            &ResourceScope::one_type(R::schema().clone(), query),
-            &label_filter,
-            pagination,
-        );
+        // The filter rides inside the scope now, so flatten it onto the single
+        // row this builds.
+        let label_pairs = ResourceLabelFilterPredicate::flatten_conjunction(&label_filter)
+            .int_err()?
+            .into_iter()
+            .map(|(key, value)| (key.clone(), value.to_owned()))
+            .collect::<Vec<_>>();
+
+        let scope = ResourceScope::Types(vec![ResourceTypeQuery {
+            schema: R::schema().clone(),
+            query,
+            account_id: None,
+            label_pairs,
+        }]);
+
+        let mut resource_snapshots_stream =
+            self.resource_repository
+                .list_resource_snapshots(&account_id, &scope, pagination);
 
         let mut resource_states = Vec::new();
         while let Some(resource_snapshot) = resource_snapshots_stream.next().await {

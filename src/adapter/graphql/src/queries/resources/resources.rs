@@ -31,7 +31,6 @@ use crate::queries::{
     ResourceTypeDescriptor,
     ResourceUnsupportedSelectorProblem,
     ResourcesSummary,
-    SearchResourceHandlesInput,
     SearchResourcesInput,
     into_resource_refs,
     map_unsupported_selector_problem,
@@ -269,7 +268,7 @@ impl Resources {
     async fn search_handles(
         &self,
         ctx: &Context<'_>,
-        query: SearchResourceHandlesInput,
+        query: SearchResourcesInput,
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<ResourceHandleListOutcome> {

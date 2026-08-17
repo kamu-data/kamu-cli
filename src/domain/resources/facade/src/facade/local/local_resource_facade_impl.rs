@@ -266,9 +266,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .resolve_target_account(request.account.as_ref())
             .await?;
 
-        let (scope, label_filter) = self
-            .resolve_scope(request.selectors, request.label_filter)
-            .await?;
+        let scope = self.resolve_scope(request.selectors).await?;
 
         if scope.is_vacuous() {
             return Ok(SearchResourcesResponse {
@@ -282,16 +280,11 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         // through one type's dispatcher, which is why it could not span types.
         let snapshots = self
             .generic_resource_query_service
-            .list_snapshots(
-                &target_account.did,
-                &scope,
-                &label_filter,
-                request.pagination,
-            )
+            .list_snapshots(&target_account.did, &scope, request.pagination)
             .await?;
         let total_count = self
             .generic_resource_query_service
-            .count_search_resource_handles(&target_account.did, &scope, &label_filter)
+            .count_search_resource_handles(&target_account.did, &scope)
             .await?;
 
         let items = self.summary_views_with_columns(snapshots)?;
@@ -301,16 +294,14 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 
     async fn search_handles(
         &self,
-        request: SearchResourceHandlesRequest,
+        request: SearchResourcesRequest,
     ) -> Result<SearchResourceHandlesResponse, ListResourcesError> {
         let target_account = self
             .resource_account_resolver
             .resolve_target_account(request.account.as_ref())
             .await?;
 
-        let (scope, label_filter) = self
-            .resolve_scope(request.selectors, request.label_filter)
-            .await?;
+        let scope = self.resolve_scope(request.selectors).await?;
 
         // Empty exact-name/id queries are vacuous.
         if scope.is_vacuous() {
@@ -322,16 +313,11 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 
         let rows = self
             .generic_resource_query_service
-            .search_resource_handles(
-                &target_account.did,
-                &scope,
-                &label_filter,
-                request.pagination,
-            )
+            .search_resource_handles(&target_account.did, &scope, request.pagination)
             .await?;
         let total_count = self
             .generic_resource_query_service
-            .count_search_resource_handles(&target_account.did, &scope, &label_filter)
+            .count_search_resource_handles(&target_account.did, &scope)
             .await?;
 
         let items = rows
@@ -818,16 +804,16 @@ impl LocalResourceFacadeImpl {
             .collect()
     }
 
-    /// Resolves a request's scope and label filter together, since narrowing to
-    /// applicable schemas requires resolving the filter.
+    /// Resolves a request's selectors into a repository scope, each carrying
+    /// its own resolved label pairs.
     ///
-    /// Each type keeps its own query through resolution, so a multi-type scope
-    /// like `vs/a-% ss/b-%` stays intact.
+    /// Each type keeps its own query *and* its own filter through resolution,
+    /// so a multi-type scope like `vs/a-% ss/b-%` stays intact and two
+    /// selectors filtering by different labels stay apart.
     async fn resolve_scope(
         &self,
         selectors: Vec<ResourceSelector>,
-        label_filter: Option<ResourceLabelFilterInput>,
-    ) -> Result<(ResourceScope, ResolvedResourceLabelFilter), ListResourcesError> {
+    ) -> Result<ResourceScope, ListResourcesError> {
         // Before the fast path below: a selector narrowed *only* by a field the
         // facade cannot resolve reads as unnarrowed there and would widen into
         // "every resource". The trait is public, so this is the boundary that
@@ -836,20 +822,17 @@ impl LocalResourceFacadeImpl {
             validate_selector(selector)?;
         }
 
-        // A lone type-less, unnarrowed, account-less selector needs no schemas
-        // at all, so without a label filter it can answer before touching the
-        // catalog or resolving any account.
-        if label_filter.is_none()
-            && let [selector] = selectors.as_slice()
+        // A lone type-less, unnarrowed, account-less, unlabelled selector needs
+        // no schemas at all, so it can answer before touching the catalog or
+        // resolving any account.
+        if let [selector] = selectors.as_slice()
             && selector.r#type.is_none()
             && selector.id.is_none()
             && selector.name.is_none()
             && selector.account.is_none()
+            && selector.labels.is_none()
         {
-            return Ok((
-                ResourceScope::AnyType(None),
-                ResolvedResourceLabelFilter::default(),
-            ));
+            return Ok(ResourceScope::any_type());
         }
 
         // Resolved in one batch, deduplicated by spelling, with the permission
@@ -879,74 +862,77 @@ impl LocalResourceFacadeImpl {
         // so every selector resolves against this one list.
         let descriptors = self.list_resource_type_descriptors();
 
-        let resolved = selectors
-            .into_iter()
-            .zip(account_ids)
-            .map(|(selector, account_id)| {
-                let schema = selector
-                    .r#type
-                    .as_ref()
-                    .map(|r#type| {
-                        resolve_schema_in_descriptors::<ListResourcesError>(&descriptors, r#type)
-                    })
-                    .transpose()?;
-
-                Ok(ResolvedSelector {
-                    schema,
-                    id: selector.id,
-                    // Authored selector names are `LIKE` patterns by definition;
-                    // an exact name arrives as a `ResourceRef`, not here.
-                    name: None,
-                    name_pattern: selector.name,
-                    account_id,
-                })
-            })
-            .collect::<Result<Vec<_>, ListResourcesError>>()?;
-
-        // A label filter needs concrete schemas to resolve its keys against, so
-        // any-type selectors fall back to every registered schema here.
-        let schemas = if resolved.iter().any(|selector| selector.schema.is_none()) {
-            descriptors
-                .iter()
-                .map(|descriptor| descriptor.schema.clone())
-                .collect::<Vec<_>>()
-        } else {
-            resolved
-                .iter()
-                .filter_map(|selector| selector.schema.clone())
-                .collect::<Vec<_>>()
-        };
-
-        let resource_schema_ids = schemas
+        // Every registered schema, the fallback a type-less selector resolves
+        // its labels against.
+        let all_schema_ids = descriptors
             .iter()
-            .map(|schema| ResourceSchemaId::try_from(schema).int_err())
+            .map(|descriptor| ResourceSchemaId::try_from(&descriptor.schema).int_err())
             .collect::<Result<Vec<_>, _>>()?;
 
-        // Resolution can drop schemas that cannot carry the requested labels.
-        let (applicable_schema_ids, resolved_label_filter) = resolve_label_filter_for_schemas(
-            &self.resource_extension_schema_resolver,
-            label_filter,
-            &resource_schema_ids,
-        )?;
+        let mut applicable = Vec::with_capacity(selectors.len());
 
-        // Drop selectors whose schema cannot carry the requested labels. An
-        // any-type selector survives: it spans the applicable schemas by
-        // definition.
-        let applicable = resolved
-            .into_iter()
-            .filter(|selector| {
-                selector.schema.as_ref().is_none_or(|schema| {
-                    ResourceSchemaId::try_from(schema)
-                        .is_ok_and(|id| applicable_schema_ids.contains(&id))
+        for (selector, account_id) in selectors.into_iter().zip(account_ids) {
+            let schema = selector
+                .r#type
+                .as_ref()
+                .map(|r#type| {
+                    resolve_schema_in_descriptors::<ListResourcesError>(&descriptors, r#type)
                 })
-            })
-            .collect::<Vec<_>>();
+                .transpose()?;
+
+            // A typed selector resolves its labels against its own schema; a
+            // type-less one against every registered schema.
+            let candidate_schema_ids = match &schema {
+                Some(schema) => vec![ResourceSchemaId::try_from(schema).int_err()?],
+                None => all_schema_ids.clone(),
+            };
+
+            // Resolution can drop schemas that cannot carry this selector's
+            // labels. With a single candidate that is an error rather than a
+            // silent miss — the `n = 1` contract of
+            // `resolve_label_filter_for_schemas`.
+            let (applicable_schema_ids, resolved_label_filter) = resolve_label_filter_for_schemas(
+                &self.resource_extension_schema_resolver,
+                selector.labels.clone(),
+                &candidate_schema_ids,
+            )?;
+
+            // This selector's schema cannot carry its labels, so it can never
+            // match. Drop it rather than widening the scope.
+            if applicable_schema_ids.is_empty() {
+                continue;
+            }
+
+            // Flattening is what rejects `$not`/`$or`: the repository evaluates
+            // a conjunction of pairs, nothing richer.
+            let label_pairs =
+                ResourceLabelFilterPredicate::flatten_conjunction(&resolved_label_filter)
+                    .map_err(|err| {
+                        ListResourcesError::InvalidLabelFilter(
+                            ResourceInvalidLabelFilterError::unsupported_expression(err),
+                        )
+                    })?
+                    .into_iter()
+                    .map(|(key, value)| (key.clone(), value.to_owned()))
+                    .collect::<Vec<_>>();
+
+            applicable.push(ResolvedSelector {
+                schema,
+                id: selector.id,
+                // Authored selector names are `LIKE` patterns by definition;
+                // an exact name arrives as a `ResourceRef`, not here.
+                name: None,
+                name_pattern: selector.name,
+                account_id,
+                label_pairs,
+            });
+        }
 
         // `None` means nothing can match, which the repository expresses as an
         // empty type list.
         let scope = coalesce_selectors(applicable)?.unwrap_or(ResourceScope::Types(Vec::new()));
 
-        Ok((scope, resolved_label_filter))
+        Ok(scope)
     }
 
     async fn resolve_resource_view<E>(&self, resource_ref: ResourceRef) -> Result<Resource, E>

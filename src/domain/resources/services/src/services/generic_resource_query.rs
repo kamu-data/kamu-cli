@@ -17,7 +17,6 @@ use crate::domain::{
     FindOwnedResourceError,
     FindOwnedSnapshotsOutcome,
     GenericResourceQueryService,
-    ResolvedResourceLabelFilter,
     ResourceHandleRow,
     ResourceID,
     ResourceName,
@@ -83,11 +82,10 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
         &self,
         account_id: &odf::AccountID,
         scope: &ResourceScope,
-        label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceHandleRow>, InternalError> {
         self.resource_repository
-            .search_resource_handles(account_id, scope, label_filter, pagination)
+            .search_resource_handles(account_id, scope, pagination)
             .await
     }
 
@@ -95,10 +93,9 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
         &self,
         account_id: &odf::AccountID,
         scope: &ResourceScope,
-        label_filter: &ResolvedResourceLabelFilter,
     ) -> Result<usize, InternalError> {
         self.resource_repository
-            .count_search_resource_handles(account_id, scope, label_filter)
+            .count_search_resource_handles(account_id, scope)
             .await
     }
 
@@ -220,15 +217,11 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
         &self,
         account_id: &odf::AccountID,
         scope: &ResourceScope,
-        label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceSnapshot>, InternalError> {
-        let mut resource_snapshots_stream = self.resource_repository.list_resource_snapshots(
-            account_id,
-            scope,
-            label_filter,
-            pagination,
-        );
+        let mut resource_snapshots_stream = self
+            .resource_repository
+            .list_resource_snapshots(account_id, scope, pagination);
 
         use tokio_stream::StreamExt;
 

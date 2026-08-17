@@ -284,7 +284,6 @@ impl ListResourcesCommand {
                 .search(kamu_resources_facade::SearchResourcesRequest {
                     selectors: selectors.to_vec(),
                     account: None,
-                    label_filter: self.label_filter.clone(),
                     pagination: PaginationOpts::from_max_results(max_results.get()),
                 })
                 .await?;
@@ -296,7 +295,6 @@ impl ListResourcesCommand {
                     .search(kamu_resources_facade::SearchResourcesRequest {
                         selectors: selectors.to_vec(),
                         account: None,
-                        label_filter: self.label_filter.clone(),
                         pagination,
                     })
                     .await?;
@@ -309,17 +307,19 @@ impl ListResourcesCommand {
     /// One listing path for every scope: `search` spans types, so a single-type
     /// scope is just a one-selector case rather than a separate operation.
     async fn load_resources(&self) -> Result<Vec<ResourceSummaryView>, CLIError> {
+        let label_filter = self.label_filter.as_ref();
+
         let selectors = match &self.scope {
             ListResourcesScope::ByType(type_descriptor, query) => {
-                selectors_for_type(&type_descriptor.schema, query.as_ref())
+                selectors_for_type(&type_descriptor.schema, query.as_ref(), label_filter)
             }
             ListResourcesScope::Types(type_queries) => type_queries
                 .iter()
                 .flat_map(|(type_descriptor, query)| {
-                    selectors_for_type(&type_descriptor.schema, query.as_ref())
+                    selectors_for_type(&type_descriptor.schema, query.as_ref(), label_filter)
                 })
                 .collect::<Vec<_>>(),
-            ListResourcesScope::All(query) => any_type_selectors(query.as_ref()),
+            ListResourcesScope::All(query) => any_type_selectors(query.as_ref(), label_filter),
         };
 
         let mut resources = self.search_resources(&selectors).await?;
@@ -577,15 +577,17 @@ enum ResourceGenericColumn {
 fn selectors_for_type(
     schema: &kamu_resources::TypeUri,
     query: Option<&kamu_resources::ResourceQuery>,
+    label_filter: Option<&kamu_resources::ResourceLabelFilterInput>,
 ) -> Vec<kamu_resources::ResourceSelector> {
-    selectors_for_query(Some(schema), query)
+    selectors_for_query(Some(schema), query, label_filter)
 }
 
 /// The same, spanning every type.
 fn any_type_selectors(
     query: Option<&kamu_resources::ResourceQuery>,
+    label_filter: Option<&kamu_resources::ResourceLabelFilterInput>,
 ) -> Vec<kamu_resources::ResourceSelector> {
-    selectors_for_query(None, query)
+    selectors_for_query(None, query, label_filter)
 }
 
 /// Fans a query out into scalar, ODF-shaped selectors — one per exact id or
@@ -597,9 +599,14 @@ fn any_type_selectors(
 fn selectors_for_query(
     schema: Option<&kamu_resources::TypeUri>,
     query: Option<&kamu_resources::ResourceQuery>,
+    label_filter: Option<&kamu_resources::ResourceLabelFilterInput>,
 ) -> Vec<kamu_resources::ResourceSelector> {
+    // `-l` narrows the whole invocation, which the facade expresses as the same
+    // filter on every selector. See `with_labels` in the selection-resolution
+    // service for why that is equivalent rather than merely close.
     let base = || kamu_resources::ResourceSelector {
         r#type: schema.map(|schema| schema.clone().into()),
+        labels: label_filter.cloned(),
         ..Default::default()
     };
 

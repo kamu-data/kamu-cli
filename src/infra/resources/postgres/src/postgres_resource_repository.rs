@@ -16,13 +16,12 @@ use futures::TryStreamExt;
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_resources::{
     CreateResourceError,
-    ResolvedResourceLabelFilter,
     ResourceDuplicateError,
     ResourceHandleRow,
     ResourceHeaders,
     ResourceID,
     ResourceIDStream,
-    ResourceLabelFilterPredicate,
+    ResourceLabelPair,
     ResourceName,
     ResourcePhaseCounts,
     ResourceQuery,
@@ -391,15 +390,12 @@ impl ResourceRepository for PostgresResourceRepository {
         &self,
         account_id: &odf::AccountID,
         scope: &ResourceScope,
-        label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceHandleRow>, InternalError> {
         let flat = FlatScope::new(scope, account_id);
         if flat.vacuous {
             return Ok(Vec::new());
         }
-
-        let (label_keys, label_values) = split_label_filter_pairs(label_filter)?;
 
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
@@ -417,14 +413,15 @@ impl ResourceRepository for PostgresResourceRepository {
                 r.account_id as "account_id: odf::AccountID",
                 -- Account row may be missing during async cleanup.
                 COALESCE(a.resource_id, '00000000-0000-0000-0000-000000000000'::uuid) as "account_resource_id!: uuid::Uuid",
-                COALESCE(a.account_name, $9) as "account_name!"
+                COALESCE(a.account_name, $10) as "account_name!"
             FROM resources r
             LEFT JOIN accounts a ON a.id = r.account_id
             WHERE r.deleted_at IS NULL
-              -- Each type carries its own query and account, re-paired here.
-              -- A NULL schema array means "every type", in which case the
-              -- single row of query columns applies uniformly. The account is
-              -- inside the EXISTS so a row may span an account of its own.
+              -- Each type carries its own query, account and label pairs,
+              -- re-paired here. A NULL schema array means "every type", in
+              -- which case the single row of query columns applies uniformly.
+              -- The account is inside the EXISTS so a row may span an account
+              -- of its own.
               AND EXISTS (
                   SELECT 1
                   FROM UNNEST(
@@ -433,7 +430,8 @@ impl ResourceRepository for PostgresResourceRepository {
                            $4::text[],
                            $5::text[],
                            $1::text[]
-                       ) AS f(schema, name_pattern, exact_names, exact_ids, account_id)
+                       ) WITH ORDINALITY
+                         AS f(schema, name_pattern, exact_names, exact_ids, account_id, rn)
                   WHERE r.account_id = f.account_id
                     AND (f.schema IS NULL OR r.resource_schema = f.schema)
                     AND (f.name_pattern IS NULL
@@ -442,29 +440,33 @@ impl ResourceRepository for PostgresResourceRepository {
                          OR LOWER(r.resource_name) = ANY(STRING_TO_ARRAY(f.exact_names, ',')))
                     AND (f.exact_ids IS NULL
                          OR r.resource_id = ANY(CAST(STRING_TO_ARRAY(f.exact_ids, ',') AS uuid[])))
-              )
-              -- Every requested label pair must be present.
-              AND NOT EXISTS (
-                  SELECT 1
-                  FROM UNNEST($6::text[], $7::text[]) AS f(k, v)
-                  WHERE NOT EXISTS (
-                      SELECT 1
-                      FROM resource_labels_projection rl
-                      WHERE rl.resource_id = r.resource_id
-                        AND rl.label_key = f.k
-                        AND rl.label_value = f.v
-                  )
+                    -- Every label pair belonging to THIS row must be present.
+                    -- Pairs are matched to their row by number rather than
+                    -- delimiter-joined, since label text is free-form.
+                    AND NOT EXISTS (
+                        SELECT 1
+                        FROM UNNEST($6::int[], $7::text[], $8::text[]) AS l(rn, k, v)
+                        WHERE l.rn = f.rn
+                          AND NOT EXISTS (
+                              SELECT 1
+                              FROM resource_labels_projection rl
+                              WHERE rl.resource_id = r.resource_id
+                                AND rl.label_key = l.k
+                                AND rl.label_value = l.v
+                          )
+                    )
               )
             ORDER BY r.updated_at DESC, r.resource_id DESC
-            LIMIT $8 OFFSET $10
+            LIMIT $9 OFFSET $11
             "#,
             flat.account_ids(),
             flat.schemas() as _,
             flat.name_patterns() as _,
             flat.exact_names() as _,
             flat.exact_ids() as _,
-            &label_keys,
-            &label_values,
+            flat.label_row_numbers(),
+            flat.label_keys(),
+            flat.label_values(),
             limit,
             kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL,
             offset,
@@ -478,14 +480,11 @@ impl ResourceRepository for PostgresResourceRepository {
         &self,
         account_id: &odf::AccountID,
         scope: &ResourceScope,
-        label_filter: &ResolvedResourceLabelFilter,
     ) -> Result<usize, InternalError> {
         let flat = FlatScope::new(scope, account_id);
         if flat.vacuous {
             return Ok(0);
         }
-
-        let (label_keys, label_values) = split_label_filter_pairs(label_filter)?;
 
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
@@ -495,10 +494,8 @@ impl ResourceRepository for PostgresResourceRepository {
             SELECT COUNT(*) AS "count!: i64"
             FROM resources r
             WHERE r.deleted_at IS NULL
-              -- Each type carries its own query and account, re-paired here.
-              -- A NULL schema array means "every type", in which case the
-              -- single row of query columns applies uniformly. The account is
-              -- inside the EXISTS so a row may span an account of its own.
+              -- Each type carries its own query, account and label pairs,
+              -- re-paired here. See `search_resource_handles` for the shape.
               AND EXISTS (
                   SELECT 1
                   FROM UNNEST(
@@ -507,7 +504,8 @@ impl ResourceRepository for PostgresResourceRepository {
                            $4::text[],
                            $5::text[],
                            $1::text[]
-                       ) AS f(schema, name_pattern, exact_names, exact_ids, account_id)
+                       ) WITH ORDINALITY
+                         AS f(schema, name_pattern, exact_names, exact_ids, account_id, rn)
                   WHERE r.account_id = f.account_id
                     AND (f.schema IS NULL OR r.resource_schema = f.schema)
                     AND (f.name_pattern IS NULL
@@ -516,17 +514,18 @@ impl ResourceRepository for PostgresResourceRepository {
                          OR LOWER(r.resource_name) = ANY(STRING_TO_ARRAY(f.exact_names, ',')))
                     AND (f.exact_ids IS NULL
                          OR r.resource_id = ANY(CAST(STRING_TO_ARRAY(f.exact_ids, ',') AS uuid[])))
-              )
-              AND NOT EXISTS (
-                  SELECT 1
-                  FROM UNNEST($6::text[], $7::text[]) AS f(k, v)
-                  WHERE NOT EXISTS (
-                      SELECT 1
-                      FROM resource_labels_projection rl
-                      WHERE rl.resource_id = r.resource_id
-                        AND rl.label_key = f.k
-                        AND rl.label_value = f.v
-                  )
+                    AND NOT EXISTS (
+                        SELECT 1
+                        FROM UNNEST($6::int[], $7::text[], $8::text[]) AS l(rn, k, v)
+                        WHERE l.rn = f.rn
+                          AND NOT EXISTS (
+                              SELECT 1
+                              FROM resource_labels_projection rl
+                              WHERE rl.resource_id = r.resource_id
+                                AND rl.label_key = l.k
+                                AND rl.label_value = l.v
+                          )
+                    )
               )
             "#,
             flat.account_ids(),
@@ -534,8 +533,9 @@ impl ResourceRepository for PostgresResourceRepository {
             flat.name_patterns() as _,
             flat.exact_names() as _,
             flat.exact_ids() as _,
-            &label_keys,
-            &label_values,
+            flat.label_row_numbers(),
+            flat.label_keys(),
+            flat.label_values(),
         )
         .fetch_one(connection_mut)
         .await
@@ -862,18 +862,14 @@ impl ResourceRepository for PostgresResourceRepository {
         &self,
         account_id: &odf::AccountID,
         scope: &ResourceScope,
-        label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
     ) -> ResourceSnapshotStream<'_> {
-        let label_filter = label_filter.clone();
         let flat = FlatScope::new(scope, account_id);
 
         Box::pin(async_stream::stream! {
             if flat.vacuous {
                 return;
             }
-
-            let (label_keys, label_values) = split_label_filter_pairs(&label_filter)?;
 
             let mut tr = self.transaction.lock().await;
             let connection_mut = tr.connection_mut().await?;
@@ -892,7 +888,7 @@ impl ResourceRepository for PostgresResourceRepository {
                 -- row is gone (deletion racing async cleanup), same case the
                 -- account_name sentinel covers. Substitute the nil resource id.
                 COALESCE(a.resource_id, '00000000-0000-0000-0000-000000000000'::uuid) as "account_resource_id!: uuid::Uuid",
-                    COALESCE(a.account_name, $9) as "account_name!",
+                    COALESCE(a.account_name, $10) as "account_name!",
                     r.resource_schema,
                     r.resource_name,
                     r.labels,
@@ -907,10 +903,8 @@ impl ResourceRepository for PostgresResourceRepository {
                 FROM resources r
                 LEFT JOIN accounts a ON a.id = r.account_id
                 WHERE r.deleted_at IS NULL
-                  -- Each type carries its own query and account, re-paired
-                  -- here. A NULL schema array means "every type", in which case
-                  -- the single row of query columns applies uniformly. The
-                  -- account is inside the EXISTS so a row may span its own.
+                  -- Each type carries its own query, account and label pairs,
+                  -- re-paired here. See `search_resource_handles` for the shape.
                   AND EXISTS (
                       SELECT 1
                       FROM UNNEST(
@@ -919,7 +913,8 @@ impl ResourceRepository for PostgresResourceRepository {
                                $4::text[],
                                $5::text[],
                                $1::text[]
-                           ) AS f(schema, name_pattern, exact_names, exact_ids, account_id)
+                           ) WITH ORDINALITY
+                             AS f(schema, name_pattern, exact_names, exact_ids, account_id, rn)
                       WHERE r.account_id = f.account_id
                         AND (f.schema IS NULL OR r.resource_schema = f.schema)
                         AND (f.name_pattern IS NULL
@@ -928,28 +923,30 @@ impl ResourceRepository for PostgresResourceRepository {
                              OR LOWER(r.resource_name) = ANY(STRING_TO_ARRAY(f.exact_names, ',')))
                         AND (f.exact_ids IS NULL
                              OR r.resource_id = ANY(CAST(STRING_TO_ARRAY(f.exact_ids, ',') AS uuid[])))
-                  )
-                  AND NOT EXISTS (
-                      SELECT 1
-                      FROM UNNEST($6::text[], $7::text[]) AS f(k, v)
-                      WHERE NOT EXISTS (
-                          SELECT 1
-                          FROM resource_labels_projection rl
-                          WHERE rl.resource_id = r.resource_id
-                            AND rl.label_key = f.k
-                            AND rl.label_value = f.v
-                      )
+                        AND NOT EXISTS (
+                            SELECT 1
+                            FROM UNNEST($6::int[], $7::text[], $8::text[]) AS l(rn, k, v)
+                            WHERE l.rn = f.rn
+                              AND NOT EXISTS (
+                                  SELECT 1
+                                  FROM resource_labels_projection rl
+                                  WHERE rl.resource_id = r.resource_id
+                                    AND rl.label_key = l.k
+                                    AND rl.label_value = l.v
+                              )
+                        )
                   )
                 ORDER BY r.updated_at DESC, r.resource_id DESC
-                LIMIT $8 OFFSET $10
+                LIMIT $9 OFFSET $11
                 "#,
                 flat.account_ids(),
                 flat.schemas() as _,
                 flat.name_patterns() as _,
                 flat.exact_names() as _,
                 flat.exact_ids() as _,
-                &label_keys,
-                &label_values,
+                flat.label_row_numbers(),
+                flat.label_keys(),
+                flat.label_values(),
                 limit,
                 kamu_resources::DELETED_ACCOUNT_NAME_SENTINEL,
                 offset,
@@ -1065,31 +1062,24 @@ impl ResourceRepository for PostgresResourceRepository {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Splits a resolved label filter into `UNNEST`-bound key/value arrays.
-fn split_label_filter_pairs(
-    label_filter: &ResolvedResourceLabelFilter,
-) -> Result<(Vec<String>, Vec<String>), InternalError> {
-    let pairs = ResourceLabelFilterPredicate::flatten_conjunction(label_filter).int_err()?;
-
-    Ok(pairs
-        .into_iter()
-        .map(|(key, value)| (key.to_string(), value.to_owned()))
-        .unzip())
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 /// A [`ResourceScope`] flattened into the bind parameters one fixed-arity
 /// query needs, so these queries stay inside `sqlx::query_as!` and therefore
 /// compile-time checked against the schema.
 ///
 /// Row `i` of the arrays describes one type: `schemas[i]` pairs with
 /// `name_patterns[i]`, `exact_names[i]` and `exact_ids[i]`. `UNNEST` re-pairs
-/// them inside the SQL — the same idiom the label filter already uses.
+/// them inside the SQL.
 ///
 /// The per-row exact lists are encoded as delimited strings because Postgres
 /// cannot `UNNEST` a ragged array-of-arrays in parallel with flat columns. The
 /// SQL splits them back apart, so each type keeps its own list.
+///
+/// Label pairs cannot use that trick: names and `UUID`s are guaranteed free of
+/// [`Self::LIST_SEPARATOR`], but label keys and values are free-form `TEXT` and
+/// may contain anything, so joining them would corrupt a value containing a
+/// comma. They are instead kept in three *flat* arrays carrying an explicit row
+/// number, unnested separately and re-joined to the scope row by that number.
+/// One entry per `(row, pair)`, not per row.
 #[derive(Default)]
 struct FlatScope {
     /// `NULL` means "no type filter" — see the `$N::text[] IS NULL OR …`
@@ -1108,6 +1098,12 @@ struct FlatScope {
     /// call-level default. Never `NULL`, so the predicate needs no `IS NULL`
     /// branch.
     account_ids: Vec<String>,
+    /// Which scope row each label pair belongs to, 1-based to match
+    /// `WITH ORDINALITY`. Parallel to [`Self::label_keys`] and
+    /// [`Self::label_values`].
+    label_row_numbers: Vec<i32>,
+    label_keys: Vec<String>,
+    label_values: Vec<String>,
     /// Set when the scope cannot match anything, letting callers skip the
     /// round-trip entirely.
     vacuous: bool,
@@ -1115,7 +1111,10 @@ struct FlatScope {
 
 impl FlatScope {
     /// Neither resource names nor `UUID`s may contain this, so it cannot
-    /// collide with list contents.
+    /// collide with the exact-name and exact-id lists it joins.
+    ///
+    /// That guarantee does **not** extend to label keys and values, which is
+    /// why those are passed as flat row-numbered arrays instead.
     const LIST_SEPARATOR: char = ',';
 
     fn new(scope: &ResourceScope, default_account_id: &odf::AccountID) -> Self {
@@ -1127,8 +1126,8 @@ impl FlatScope {
         match scope {
             // `AnyType` carries no per-row account, so the one row takes the
             // call-level default.
-            ResourceScope::AnyType(query) => {
-                flat.push_row(query.as_ref(), default_account_id.to_string());
+            ResourceScope::AnyType(query, label_pairs) => {
+                flat.push_row(query.as_ref(), default_account_id.to_string(), label_pairs);
             }
             ResourceScope::Types(types) => {
                 let mut schemas = Vec::with_capacity(types.len());
@@ -1137,6 +1136,7 @@ impl FlatScope {
                     flat.push_row(
                         entry.query.as_ref(),
                         entry.effective_account_id(default_account_id).to_string(),
+                        &entry.label_pairs,
                     );
                 }
                 flat.schemas = Some(schemas);
@@ -1147,8 +1147,13 @@ impl FlatScope {
     }
 
     /// Appends one row's worth of query columns, at most one of which is
-    /// non-`NULL`.
-    fn push_row(&mut self, query: Option<&ResourceQuery>, account_id: String) {
+    /// non-`NULL`, plus that row's label pairs.
+    fn push_row(
+        &mut self,
+        query: Option<&ResourceQuery>,
+        account_id: String,
+        label_pairs: &[ResourceLabelPair],
+    ) {
         let (name_pattern, exact_names, exact_ids) = match query {
             None => (None, None, None),
             // An ID is matched exactly; only a pattern is `LIKE`-escaped.
@@ -1182,6 +1187,15 @@ impl FlatScope {
         self.exact_names.push(exact_names);
         self.exact_ids.push(exact_ids);
         self.account_ids.push(account_id);
+
+        // `UNNEST ... WITH ORDINALITY` numbers rows from 1, so this row's index
+        // is the count *after* pushing it.
+        let row_number = i32::try_from(self.account_ids.len()).unwrap_or(i32::MAX);
+        for (key, value) in label_pairs {
+            self.label_row_numbers.push(row_number);
+            self.label_keys.push(key.to_string());
+            self.label_values.push(value.clone());
+        }
     }
 
     fn schemas(&self) -> Option<&[String]> {
@@ -1202,6 +1216,18 @@ impl FlatScope {
 
     fn exact_ids(&self) -> &[Option<String>] {
         &self.exact_ids
+    }
+
+    fn label_row_numbers(&self) -> &[i32] {
+        &self.label_row_numbers
+    }
+
+    fn label_keys(&self) -> &[String] {
+        &self.label_keys
+    }
+
+    fn label_values(&self) -> &[String] {
+        &self.label_values
     }
 }
 

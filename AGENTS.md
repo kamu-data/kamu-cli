@@ -24,9 +24,25 @@ Small project-specific guidance for coding agents working in this repository.
 Do not assume edited migrations are already applied externally just because they exist in git history.
 
 Default assumption for uncommitted migration edits:
-- Treat them as branch-local development unless there is evidence they were released, shared, or applied outside this workspace.
+- Treat them as branch-local and not yet released, shared, or applied externally. Review their
+  contents for correctness only.
 - Do not flag checksum drift or “already migrated database” risk based only on the migration timestamp or prior commits.
-- If external application status matters and is unclear, ask instead of making it a review finding.
+- Reconsider external-application risk only when the user says the migration was released, shared,
+  or applied, or when something in the workspace shows it was. If that status is genuinely unclear
+  and would change your answer, ask — do not turn the uncertainty into a review finding.
+
+### Changelog Review Context
+
+Do not require or suggest `CHANGELOG.md` updates while reviewing uncommitted work on an
+in-progress feature branch, regardless of branch size. The changelog is intentionally
+consolidated into one compact entry when the feature is finalized, so per-slice entries would
+have to be merged back together.
+
+- Check for a changelog entry only when the user explicitly asks for PR finalization, release
+  preparation, or changelog work.
+- This applies to breaking API changes too. A schema or interface change is only "breaking" for
+  consumers if it was previously released — verify against the release tags (`git show
+  <tag>:path`) before treating it as one.
 
 ## Tests
 
@@ -49,7 +65,8 @@ cargo nextest run -E 'test(test_name_here)'
 - Keep comments concise — one or two lines, never prose poems.
 - Never explain what the code plainly says. If a reader can see it, do not restate it.
 - Comment the WHY: a constraint, a non-obvious invariant, a reason a choice was made. Not the how, and not the history of how the code got here ("used to be X", "after removing Y") — that belongs in commit messages, not in the source.
-- Never cite plan/spec/issue identifiers (e.g. "plan 7 item 3") in code comments — plans are not part of the codebase and the reference rots.
+- Never cite ephemeral plan/spec references or external issue identifiers (e.g. "plan 7 item 3", "see JIRA-123") in code comments — they are not part of the codebase and the reference rots.
+- Stable test-slice identifiers defined by a version-controlled coverage map in the same repo (e.g. `RF-*`, indexed by `contract/COVERAGE.md`) are allowed in test code and comments: the referent is checked in beside the test, so it cannot rot without the map rotting too. Keep the map in sync when adding or renumbering.
 - Keep macros declarative. Put algorithmic logic into ordinary helper functions or services.
 - When logic becomes conceptually distinct, split it into its own module early.
 - Organize model files top-down: highest-level result/union type first, then referenced structs/enums, with impl blocks immediately after the type.

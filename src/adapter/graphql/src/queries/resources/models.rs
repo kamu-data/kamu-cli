@@ -96,16 +96,6 @@ impl ResourceLabelFilterInput {
     }
 }
 
-pub(crate) fn into_facade_filter(
-    label_filter: Option<ResourceLabelFilterInput>,
-) -> Result<Option<kamu_resources::ResourceLabelFilterInput>, GqlError> {
-    label_filter
-        .map(ResourceLabelFilterInput::into_facade_filter)
-        .transpose()
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #[derive(InputObject, Debug, Clone, Default)]
 pub struct AccountRefInput {
     pub id: Option<ResourceID<'static>>,
@@ -156,6 +146,9 @@ pub struct ResourceSelectorInput {
     /// a wildcard — `_` is escaped to a literal underscore. A pattern with no
     /// `%` matches that name exactly.
     pub name: Option<String>,
+    /// Labels this selector requires, all of which must be present. Applies to
+    /// this selector alone, so one call may filter differently per type.
+    /// Values must be strings — only string-valued labels are indexed.
     pub labels: Option<ResourceLabelFilterInput>,
 }
 
@@ -163,16 +156,6 @@ impl TryFrom<ResourceSelectorInput> for kamu_resources::ResourceSelector {
     type Error = GqlError;
 
     fn try_from(value: ResourceSelectorInput) -> Result<Self, GqlError> {
-        // Per-selector labels are not resolved yet — only the call-level
-        // `labelFilter` is. Rejected rather than dropped: silently ignoring the
-        // constraint would return a *wider* result set than was asked for, and
-        // the caller would have no way to tell.
-        if value.labels.is_some() {
-            return Err(GqlError::gql(
-                "Per-selector `labels` are not supported yet; use the call-level `labelFilter`",
-            ));
-        }
-
         let selector = Self {
             account: value.account.map(AccountRefInput::into_manifest_account),
             r#type: value.r#type.map(ResourceTypeSelectorInput::into_type_ref),
@@ -181,7 +164,10 @@ impl TryFrom<ResourceSelectorInput> for kamu_resources::ResourceSelector {
             // the facade rejects a populated `did`, so it is not accepted here.
             did: None,
             name: value.name,
-            labels: None,
+            labels: value
+                .labels
+                .map(ResourceLabelFilterInput::into_facade_filter)
+                .transpose()?,
         };
 
         kamu_resources_facade::validate_selector(&selector)
@@ -205,39 +191,21 @@ pub(crate) fn any_resource_selector() -> kamu_resources::ResourceSelector {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(InputObject, Debug, Clone)]
-pub struct SearchResourceHandlesInput {
-    pub selectors: Vec<ResourceSelectorInput>,
-    pub account: Option<AccountRefInput>,
-    pub label_filter: Option<ResourceLabelFilterInput>,
-}
-
-impl SearchResourceHandlesInput {
-    pub fn into_facade_request(
-        self,
-        pagination: PaginationOpts,
-    ) -> Result<kamu_resources_facade::SearchResourceHandlesRequest, GqlError> {
-        Ok(kamu_resources_facade::SearchResourceHandlesRequest {
-            selectors: into_resource_selectors(self.selectors)?,
-            account: self.account.map(AccountRefInput::into_manifest_account),
-            label_filter: into_facade_filter(self.label_filter)?,
-            pagination,
-        })
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Selects resources to list, with typed columns rendered.
+/// Selects resources to search, for both `search` and `searchHandles` — only
+/// the response shape differs.
 ///
 /// Omitting `selectors` spans every type, which is what the retired `listAll`
 /// field did implicitly. Passing an empty list matches nothing — an explicit
 /// "no selectors" is a narrowing to zero, not a widening to everything.
+///
+/// Label filtering lives on each selector's `labels`, so one call may filter
+/// differently per type. There is deliberately no call-level `labelFilter`: one
+/// uniform filter is the special case where every selector carries the same
+/// labels, and selectors being OR'd makes that exactly equivalent.
 #[derive(InputObject, Debug, Clone)]
 pub struct SearchResourcesInput {
     pub selectors: Option<Vec<ResourceSelectorInput>>,
     pub account: Option<AccountRefInput>,
-    pub label_filter: Option<ResourceLabelFilterInput>,
 }
 
 impl SearchResourcesInput {
@@ -251,7 +219,6 @@ impl SearchResourcesInput {
                 None => vec![any_resource_selector()],
             },
             account: self.account.map(AccountRefInput::into_manifest_account),
-            label_filter: into_facade_filter(self.label_filter)?,
             pagination,
         })
     }
@@ -651,7 +618,7 @@ impl TryFrom<kamu_resources::UnsupportedResourceSelectorError> for ResourceSelec
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// The `labelFilter` argument could not be resolved into a matchable filter.
+/// A selector's `labels` could not be resolved into a matchable filter.
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceInvalidLabelFilterProblem {
     pub code: ResourceLabelFilterProblemCode,

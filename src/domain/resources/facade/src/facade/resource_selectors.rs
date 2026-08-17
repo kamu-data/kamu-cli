@@ -12,7 +12,8 @@
 //! Both types are ODF's, defined in the domain crate — a ref names exactly one
 //! resource by exact name, a selector matches zero or many by SQL `LIKE`
 //! pattern and labels. Several selectors in one call act as a logical OR, which
-//! is what lets one call span several types and several accounts.
+//! is what lets one call span several types, several accounts, and several
+//! label filters.
 //!
 //! Type resolution accepts one vocabulary throughout: canonical selectors
 //! (`variablesets`), aliases (`vs`), the ODF type name (`VariableSet`), and the
@@ -26,6 +27,7 @@ use std::collections::BTreeMap;
 
 use kamu_resources::{
     ResourceID,
+    ResourceLabelPair,
     ResourceName,
     ResourceQuery,
     ResourceRef,
@@ -48,11 +50,6 @@ pub enum UnsupportedSelectorFieldError {
 
     #[error("Resource reference must specify at least one of `id` or `name`")]
     EmptyRef,
-
-    /// Only the call-level label filter is resolved. A per-selector one would
-    /// have to be dropped, which widens the match rather than narrowing it.
-    #[error("Per-selector `labels` are not supported yet; use the call-level label filter")]
-    PerSelectorLabels,
 }
 
 /// Rejects a ref the facade cannot resolve: one carrying a `did`, or one
@@ -70,20 +67,19 @@ pub fn validate_ref(value: &ResourceRef) -> Result<(), UnsupportedSelectorFieldE
     Ok(())
 }
 
-/// Rejects a selector carrying fields the facade cannot resolve — a `did`, or
-/// a per-selector label filter.
+/// Rejects a selector carrying a field the facade cannot resolve — today only
+/// `did`.
 ///
 /// Unlike a ref, a selector narrowing by nothing is meaningful — it matches
 /// every resource of its type — so there is no `EmptyRef` equivalent here.
-/// That is exactly why the unresolvable fields must be rejected: a selector
-/// narrowed *only* by one of them would otherwise look unnarrowed and match
-/// everything.
+/// That is exactly why an unresolvable field must be rejected: a selector
+/// narrowed *only* by one would otherwise look unnarrowed and match everything.
+///
+/// `labels` used to be rejected here for the same reason. It is now resolved
+/// per selector and carried into the scope, so it no longer widens anything.
 pub fn validate_selector(value: &ResourceSelector) -> Result<(), UnsupportedSelectorFieldError> {
     if value.did.is_some() {
         return Err(UnsupportedSelectorFieldError::Did);
-    }
-    if value.labels.is_some() {
-        return Err(UnsupportedSelectorFieldError::PerSelectorLabels);
     }
     Ok(())
 }
@@ -92,11 +88,27 @@ pub fn validate_selector(value: &ResourceSelector) -> Result<(), UnsupportedSele
 // Coalescing
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// `(schema, account)` — what makes two selectors mergeable.
-type GroupKey = (Option<TypeUri>, Option<odf::AccountID>);
+/// `(schema, account, labels)` — what makes two selectors mergeable.
+///
+/// Label pairs are canonically ordered by [`canonical_label_pairs`], so two
+/// selectors authoring the same labels in a different order still group
+/// together.
+type GroupKey = (
+    Option<TypeUri>,
+    Option<odf::AccountID>,
+    Vec<ResourceLabelPair>,
+);
 
 /// The same, as owned strings, so groups sort deterministically.
-type GroupSortKey = (Option<String>, Option<String>);
+type GroupSortKey = (Option<String>, Option<String>, Vec<(String, String)>);
+
+/// Sorts and deduplicates label pairs so equal filters compare equal
+/// regardless of authoring order.
+fn canonical_label_pairs(mut pairs: Vec<ResourceLabelPair>) -> Vec<ResourceLabelPair> {
+    pairs.sort();
+    pairs.dedup();
+    pairs
+}
 
 /// One [`ResourceRef`] or [`ResourceSelector`] after its type has been resolved
 /// to a concrete schema.
@@ -120,6 +132,11 @@ pub struct ResolvedSelector {
     /// `None` means the call-level account. Two selectors differing only by
     /// account must **not** merge, so this is part of the grouping key.
     pub account_id: Option<odf::AccountID>,
+    /// Resolved label pairs this selector requires. Like `account_id`, two
+    /// selectors differing only by labels describe different resources, so this
+    /// is part of the grouping key too — merging them would let one inherit the
+    /// other's filter.
+    pub label_pairs: Vec<ResourceLabelPair>,
 }
 
 /// Folds scalar, ODF-shaped selectors into the list-carrying per-type queries
@@ -136,12 +153,16 @@ pub struct ResolvedSelector {
 /// `Option<ResourceQuery>`, so `vs` with both an ID and a pattern cannot fold
 /// into one row without changing meaning.
 ///
+/// Label pairs are part of the grouping key alongside the account, so two
+/// selectors of one type filtering by different labels stay in separate rows.
+/// Merging them would let each inherit the other's filter.
+///
 /// Returns `Ok(None)` when the input cannot match anything, so callers can skip
 /// the query entirely. An empty input is vacuous, *not* "match everything" —
-/// that is [`ResourceScope::AnyType(None)`], which a caller must ask for
-/// explicitly with an unnarrowed type-less selector.
+/// that is [`ResourceScope::AnyType`] unnarrowed and unlabelled, which a caller
+/// must ask for explicitly with an unnarrowed type-less selector.
 ///
-/// [`ResourceScope::AnyType(None)`]: kamu_resources::ResourceScope::AnyType
+/// [`ResourceScope::AnyType`]: kamu_resources::ResourceScope::AnyType
 pub fn coalesce_selectors(
     selectors: Vec<ResolvedSelector>,
 ) -> Result<Option<ResourceScope>, UnrepresentableScopeError> {
@@ -172,11 +193,21 @@ pub fn coalesce_selectors(
     let mut order: Vec<GroupKey> = Vec::new();
     let mut groups: BTreeMap<GroupSortKey, SelectorGroup> = BTreeMap::new();
 
-    for selector in selectors {
-        let key = (selector.schema.clone(), selector.account_id.clone());
+    for mut selector in selectors {
+        selector.label_pairs = canonical_label_pairs(std::mem::take(&mut selector.label_pairs));
+
+        let key = (
+            selector.schema.clone(),
+            selector.account_id.clone(),
+            selector.label_pairs.clone(),
+        );
         let sort_key = (
             key.0.as_ref().map(|s| s.as_str().to_owned()),
             key.1.as_ref().map(ToString::to_string),
+            key.2
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.clone()))
+                .collect::<Vec<_>>(),
         );
         let group = groups.entry(sort_key).or_insert_with(|| {
             order.push(key);
@@ -185,28 +216,39 @@ pub fn coalesce_selectors(
         group.push(selector);
     }
 
-    // The any-type groups, across every account.
+    // The any-type groups, across every account and label set.
     let any_type_keys = order
         .iter()
-        .filter(|(schema, _)| schema.is_none())
+        .filter(|(schema, _, _)| schema.is_none())
         .cloned()
         .collect::<Vec<_>>();
 
     if !any_type_keys.is_empty() {
-        // Checked before anything else: an unnarrowed, account-less type-less
-        // selector matches every resource under the call-level account, so it
-        // subsumes every other selector rather than conflicting with them.
+        // Checked before anything else: an unnarrowed, account-less, unlabelled
+        // type-less selector matches every resource under the call-level
+        // account, so it subsumes every other selector rather than conflicting
+        // with them. Those three conditions describe the *subsuming* selector;
+        // the peers it swallows are constrained only by account, below.
         //
         // Only selectors that *also* use the call-level account are subsumed.
         // `AnyType` carries no per-row account, so it cannot stand in for a
         // group naming a different one — swallowing such a group would drop an
         // authorized request for another account's resources and answer with
         // the caller's own instead.
+        //
+        // Labels do *not* bind the same way. The subsuming selector is itself
+        // unlabelled, so it already matches every row a labelled peer could
+        // match — a label filter only ever narrows. Absorbing the peer widens
+        // the result to exactly what the bare selector asked for, which is what
+        // the caller wrote. Requiring the peers to be unlabelled instead would
+        // reject `% vs/x -l env=prod`, a request with an obvious answer.
+        let unnarrowed_sort_key = (None, None, Vec::new());
         let unnarrowed_default_account = groups
-            .get(&(None, None))
+            .get(&unnarrowed_sort_key)
             .is_some_and(|group| group.unnarrowed);
-        if unnarrowed_default_account && order.iter().all(|(_, account_id)| account_id.is_none()) {
-            return Ok(Some(ResourceScope::AnyType(None)));
+        if unnarrowed_default_account && order.iter().all(|(_, account_id, _)| account_id.is_none())
+        {
+            return Ok(Some(ResourceScope::AnyType(None, Vec::new())));
         }
 
         // A type-less selector already spans every type, so pairing it with any
@@ -215,7 +257,7 @@ pub fn coalesce_selectors(
             return Err(UnrepresentableScopeError::AnyTypeMixedWithTypedSelectors);
         }
 
-        let (_, account_id) = &any_type_keys[0];
+        let (_, account_id, label_pairs) = &any_type_keys[0];
 
         // `AnyType` carries no per-row account, so one naming its own account
         // cannot be represented.
@@ -223,21 +265,35 @@ pub fn coalesce_selectors(
             return Err(UnrepresentableScopeError::AnyTypeWithAccount);
         }
 
-        return groups[&(None, None)]
+        let label_pairs = label_pairs.clone();
+        let sort_key = (
+            None,
+            None,
+            label_pairs
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.clone()))
+                .collect::<Vec<_>>(),
+        );
+
+        return groups[&sort_key]
             .single_any_type_query()
-            .map(|query| Some(ResourceScope::AnyType(Some(query))));
+            .map(|query| Some(ResourceScope::AnyType(query, label_pairs)));
     }
 
     let mut type_queries = Vec::new();
-    for (schema, account_id) in order {
+    for (schema, account_id, label_pairs) in order {
         let sort_key = (
             schema.as_ref().map(|s| s.as_str().to_owned()),
             account_id.as_ref().map(ToString::to_string),
+            label_pairs
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.clone()))
+                .collect::<Vec<_>>(),
         );
         let Some(group) = groups.remove(&sort_key) else {
             continue;
         };
-        group.emit_into(schema, account_id, &mut type_queries);
+        group.emit_into(schema, account_id, label_pairs, &mut type_queries);
     }
 
     if type_queries.is_empty() {
@@ -249,9 +305,10 @@ pub fn coalesce_selectors(
 
 /// A selector combination the repository's scope shape cannot express.
 ///
-/// Every variant is a limit of [`ResourceScope::AnyType`] carrying exactly one
-/// query rather than a per-type list. They disappear once `AnyType` gives each
-/// row its own type and account.
+/// Every `AnyType*` variant is a limit of [`ResourceScope::AnyType`] carrying
+/// exactly one query, one account and one label set for the whole scope, rather
+/// than a per-type list. They disappear once `AnyType` gives each row its own
+/// type, account and labels.
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum UnrepresentableScopeError {
     #[error(
@@ -296,10 +353,11 @@ struct SelectorGroup {
 impl SelectorGroup {
     fn push(&mut self, selector: ResolvedSelector) {
         let ResolvedSelector {
-            // Both are part of the group key, so every selector reaching one
-            // group already agrees on them.
+            // All three are part of the group key, so every selector reaching
+            // one group already agrees on them.
             schema: _,
             account_id: _,
+            label_pairs: _,
             id,
             name,
             name_pattern,
@@ -331,7 +389,12 @@ impl SelectorGroup {
 
     /// The single query an `AnyType` scope can carry, or an error if this group
     /// needs more than one mode.
-    fn single_any_type_query(&self) -> Result<ResourceQuery, UnrepresentableScopeError> {
+    ///
+    /// `None` means the group narrows by nothing, which is a real case now that
+    /// labels exist: an unnarrowed *labelled* type-less selector is not
+    /// subsumed into a bare `AnyType(None, [])`, so it reaches here with its
+    /// pairs and no query.
+    fn single_any_type_query(&self) -> Result<Option<ResourceQuery>, UnrepresentableScopeError> {
         let modes = usize::from(!self.ids.is_empty())
             + usize::from(!self.names.is_empty())
             + self.patterns.len();
@@ -340,20 +403,24 @@ impl SelectorGroup {
         }
 
         if !self.ids.is_empty() {
-            return Ok(ResourceQuery::ExactIds(self.ids.clone()));
+            return Ok(Some(ResourceQuery::ExactIds(self.ids.clone())));
         }
         if !self.names.is_empty() {
-            return Ok(ResourceQuery::ExactNames(self.names.clone()));
+            return Ok(Some(ResourceQuery::ExactNames(self.names.clone())));
         }
-        // `modes <= 1` and the group is narrowed, so exactly one pattern is
-        // left; `unnarrowed` groups never reach here.
-        Ok(ResourceQuery::NamePattern(self.patterns[0].clone()))
+        // `modes <= 1`, so at most one pattern is left. An unnarrowed group has
+        // none, and spans every resource of every type under its labels.
+        Ok(self
+            .patterns
+            .first()
+            .map(|pattern| ResourceQuery::NamePattern(pattern.clone())))
     }
 
     fn emit_into(
         self,
         schema: Option<TypeUri>,
         account_id: Option<odf::AccountID>,
+        label_pairs: Vec<ResourceLabelPair>,
         out: &mut Vec<ResourceTypeQuery>,
     ) {
         // Only reached for a concrete schema — any-type groups are resolved by
@@ -363,12 +430,13 @@ impl SelectorGroup {
         };
 
         // An unnarrowed selector matches the whole type, subsuming every other
-        // mode in the group.
+        // mode in the group. Its labels still apply.
         if self.unnarrowed {
             out.push(ResourceTypeQuery {
                 schema,
                 query: None,
                 account_id,
+                label_pairs,
             });
             return;
         }
@@ -378,6 +446,7 @@ impl SelectorGroup {
                 schema: schema.clone(),
                 query: Some(ResourceQuery::ExactIds(self.ids)),
                 account_id: account_id.clone(),
+                label_pairs: label_pairs.clone(),
             });
         }
         if !self.names.is_empty() {
@@ -385,6 +454,7 @@ impl SelectorGroup {
                 schema: schema.clone(),
                 query: Some(ResourceQuery::ExactNames(self.names)),
                 account_id: account_id.clone(),
+                label_pairs: label_pairs.clone(),
             });
         }
         for pattern in self.patterns {
@@ -392,6 +462,7 @@ impl SelectorGroup {
                 schema: schema.clone(),
                 query: Some(ResourceQuery::NamePattern(pattern)),
                 account_id: account_id.clone(),
+                label_pairs: label_pairs.clone(),
             });
         }
     }
@@ -434,6 +505,27 @@ mod tests {
             name: None,
             name_pattern: None,
             account_id: None,
+            label_pairs: Vec::new(),
+        }
+    }
+
+    /// A resolved label pair, as the facade would produce it.
+    fn label(key: &str, value: &str) -> ResourceLabelPair {
+        (
+            kamu_resources::TypeRef::Name(key.parse().unwrap()),
+            value.to_string(),
+        )
+    }
+
+    /// A type-less selector narrowed by nothing.
+    fn any_type() -> ResolvedSelector {
+        ResolvedSelector {
+            schema: None,
+            id: None,
+            name: None,
+            name_pattern: None,
+            account_id: None,
+            label_pairs: Vec::new(),
         }
     }
 
@@ -634,51 +726,204 @@ mod tests {
 
     #[test]
     fn test_type_less_unnarrowed_selector_is_any_type() {
-        let scope = coalesce(vec![ResolvedSelector {
-            schema: None,
-            id: None,
-            name: None,
-            name_pattern: None,
-            account_id: None,
-        }]);
+        let scope = coalesce(vec![any_type()]);
 
-        assert_eq!(scope, Some(ResourceScope::AnyType(None)));
+        assert_eq!(scope, Some(ResourceScope::AnyType(None, Vec::new())));
     }
 
     #[test]
     fn test_type_less_narrowed_selector_is_any_type_with_query() {
         let scope = coalesce(vec![ResolvedSelector {
-            schema: None,
-            id: None,
             name: Some(name("a")),
-            name_pattern: None,
-            account_id: None,
+            ..any_type()
         }]);
 
         assert_eq!(
             scope,
-            Some(ResourceScope::AnyType(Some(ResourceQuery::ExactNames(
-                vec![name("a")]
-            ))))
+            Some(ResourceScope::AnyType(
+                Some(ResourceQuery::ExactNames(vec![name("a")])),
+                Vec::new()
+            ))
         );
     }
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Per-selector labels
+    ////////////////////////////////////////////////////////////////////////////
+
+    // The headline correctness property: labels are part of the grouping key,
+    // so two selectors of the same type filtering by *different* labels must
+    // emit separate rows. Merging them would let each inherit the other's
+    // filter, widening both.
+    #[test]
+    fn test_same_type_with_different_labels_does_not_merge() {
+        let types = types_of(coalesce(vec![
+            ResolvedSelector {
+                label_pairs: vec![label("env", "prod")],
+                ..any_of(SCHEMA_A)
+            },
+            ResolvedSelector {
+                label_pairs: vec![label("env", "staging")],
+                ..any_of(SCHEMA_A)
+            },
+        ]));
+
+        assert_eq!(types.len(), 2);
+        assert_eq!(types[0].label_pairs, vec![label("env", "prod")]);
+        assert_eq!(types[1].label_pairs, vec![label("env", "staging")]);
+    }
+
+    // The converse: identical labels are the old call-wide case, and must still
+    // fold into one row so an N-name batch stays one query.
+    #[test]
+    fn test_same_type_with_identical_labels_merges() {
+        let types = types_of(coalesce(vec![
+            ResolvedSelector {
+                name: Some(name("a")),
+                label_pairs: vec![label("env", "prod")],
+                ..any_of(SCHEMA_A)
+            },
+            ResolvedSelector {
+                name: Some(name("b")),
+                label_pairs: vec![label("env", "prod")],
+                ..any_of(SCHEMA_A)
+            },
+        ]));
+
+        assert_eq!(types.len(), 1);
+        assert_eq!(
+            types[0].query,
+            Some(ResourceQuery::ExactNames(vec![name("a"), name("b")]))
+        );
+        assert_eq!(types[0].label_pairs, vec![label("env", "prod")]);
+    }
+
+    // Authoring order must not decide whether two filters are "the same".
+    #[test]
+    fn test_label_pair_order_does_not_prevent_merging() {
+        let types = types_of(coalesce(vec![
+            ResolvedSelector {
+                name: Some(name("a")),
+                label_pairs: vec![label("env", "prod"), label("team", "core")],
+                ..any_of(SCHEMA_A)
+            },
+            ResolvedSelector {
+                name: Some(name("b")),
+                label_pairs: vec![label("team", "core"), label("env", "prod")],
+                ..any_of(SCHEMA_A)
+            },
+        ]));
+
+        assert_eq!(types.len(), 1);
+        assert_eq!(
+            types[0].query,
+            Some(ResourceQuery::ExactNames(vec![name("a"), name("b")]))
+        );
+    }
+
+    // Labels ride along every mode a group emits, not just the first row.
+    #[test]
+    fn test_labels_apply_to_every_emitted_mode() {
+        let types = types_of(coalesce(vec![
+            ResolvedSelector {
+                id: Some(id(1)),
+                label_pairs: vec![label("env", "prod")],
+                ..any_of(SCHEMA_A)
+            },
+            ResolvedSelector {
+                name_pattern: Some("app-%".to_string()),
+                label_pairs: vec![label("env", "prod")],
+                ..any_of(SCHEMA_A)
+            },
+        ]));
+
+        assert_eq!(types.len(), 2);
+        assert!(
+            types
+                .iter()
+                .all(|t| t.label_pairs == vec![label("env", "prod")])
+        );
+    }
+
+    // A labelled type-less selector carries its pairs into the `AnyType` scope.
+    #[test]
+    fn test_any_type_carries_its_label_pairs() {
+        let scope = coalesce(vec![ResolvedSelector {
+            label_pairs: vec![label("env", "prod")],
+            ..any_type()
+        }]);
+
+        assert_eq!(
+            scope,
+            Some(ResourceScope::AnyType(None, vec![label("env", "prod")]))
+        );
+    }
+
+    // The mirror of the test below: subsumption looks at the *subsuming*
+    // selector's labels, not its peers'. A bare type-less selector already
+    // matches every row a labelled peer could match — a filter only narrows —
+    // so absorbing the peer yields exactly what the caller wrote. Rejecting
+    // this would make `kamu list % vs/x -l env=prod` an error.
+    #[test]
+    fn test_bare_any_type_subsumes_labelled_typed_selectors() {
+        let scope = coalesce(vec![
+            any_type(),
+            ResolvedSelector {
+                label_pairs: vec![label("env", "prod")],
+                ..any_of(SCHEMA_A)
+            },
+        ]);
+
+        assert_eq!(scope, Some(ResourceScope::AnyType(None, Vec::new())));
+    }
+
+    // …and the labelled peer must not survive as a separate row either: the
+    // scope is the bare `AnyType`, so nothing is left filtering by `env`.
+    #[test]
+    fn test_bare_any_type_subsumes_several_differently_labelled_peers() {
+        let scope = coalesce(vec![
+            ResolvedSelector {
+                label_pairs: vec![label("env", "prod")],
+                ..any_of(SCHEMA_A)
+            },
+            any_type(),
+            ResolvedSelector {
+                label_pairs: vec![label("env", "staging")],
+                ..any_of(SCHEMA_B)
+            },
+        ]);
+
+        assert_eq!(scope, Some(ResourceScope::AnyType(None, Vec::new())));
+    }
+
+    // Subsumption is a *widening*, so it may only happen when the type-less
+    // selector filters by nothing. A labelled one narrows, and swallowing its
+    // typed neighbour would silently apply the label filter to it too.
+    #[test]
+    fn test_labelled_any_type_does_not_subsume_unlabelled_typed_selector() {
+        let result = coalesce_selectors(vec![
+            by_pattern(SCHEMA_A, "app-%"),
+            ResolvedSelector {
+                label_pairs: vec![label("env", "prod")],
+                ..any_type()
+            },
+        ]);
+
+        assert_matches!(
+            result,
+            Err(UnrepresentableScopeError::AnyTypeMixedWithTypedSelectors)
+        );
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
 
     // An unnarrowed any-type selector spans everything, so it wins outright
     // rather than erroring against its typed neighbours.
     #[test]
     fn test_unnarrowed_any_type_subsumes_typed_selectors() {
-        let scope = coalesce(vec![
-            by_pattern(SCHEMA_A, "app-%"),
-            ResolvedSelector {
-                schema: None,
-                id: None,
-                name: None,
-                name_pattern: None,
-                account_id: None,
-            },
-        ]);
+        let scope = coalesce(vec![by_pattern(SCHEMA_A, "app-%"), any_type()]);
 
-        assert_eq!(scope, Some(ResourceScope::AnyType(None)));
+        assert_eq!(scope, Some(ResourceScope::AnyType(None, Vec::new())));
     }
 
     // ...but only over the call-level account. `AnyType` restricts every row to
@@ -692,13 +937,7 @@ mod tests {
                 account_id: Some(odf::AccountID::new_seeded_ed25519(b"bob")),
                 ..by_pattern(SCHEMA_A, "app-%")
             },
-            ResolvedSelector {
-                schema: None,
-                id: None,
-                name: None,
-                name_pattern: None,
-                account_id: None,
-            },
+            any_type(),
         ]);
 
         assert_matches!(
@@ -715,11 +954,8 @@ mod tests {
         let result = coalesce_selectors(vec![
             by_pattern(SCHEMA_A, "app-%"),
             ResolvedSelector {
-                schema: None,
-                id: None,
                 name: Some(name("a")),
-                name_pattern: None,
-                account_id: None,
+                ..any_type()
             },
         ]);
 
@@ -733,18 +969,12 @@ mod tests {
     fn test_narrowed_any_type_with_multiple_query_modes_is_rejected() {
         let result = coalesce_selectors(vec![
             ResolvedSelector {
-                schema: None,
-                id: None,
                 name: Some(name("a")),
-                name_pattern: None,
-                account_id: None,
+                ..any_type()
             },
             ResolvedSelector {
-                schema: None,
-                id: None,
-                name: None,
                 name_pattern: Some("app-%".to_string()),
-                account_id: None,
+                ..any_type()
             },
         ]);
 

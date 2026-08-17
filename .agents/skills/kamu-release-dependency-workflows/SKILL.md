@@ -16,7 +16,10 @@ For a full PR, update `CHANGELOG.md` under `[Unreleased]`:
 - `### Fixed` for bug fixes.
 - Write an end-user-facing summary.
 
-Do not require changelog updates for incremental IDE/local work (small exploratory edits, refactoring in progress, or work-in-progress changes not yet ready for PR submission).
+Do not require changelog updates for in-progress work on a feature branch, regardless of the size of
+the change (exploratory edits, refactoring in progress, or any work not yet ready for PR
+submission). The entry is written once, at finalization, so intermediate entries would only have to
+be consolidated later.
 
 ## Branches
 

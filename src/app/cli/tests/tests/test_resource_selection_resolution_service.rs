@@ -23,8 +23,8 @@ use kamu_cli::services::resources::{
 use kamu_resources::{ResourceHandle, ResourceID, ResourceTypeDescriptor, TypeUri};
 use kamu_resources_facade::{
     MockResourceFacade,
-    SearchResourceHandlesRequest,
     SearchResourceHandlesResponse,
+    SearchResourcesRequest,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -84,6 +84,25 @@ fn selector_type_strings(selectors: &[kamu_resources::ResourceSelector]) -> Vec<
                 .as_ref()
         })
         .collect()
+}
+
+/// Asserts the invocation's `-l` filter reached **every** selector.
+///
+/// The CLI stamps one filter onto each selector rather than passing it
+/// alongside them, so a filter that reached only some would silently widen the
+/// unfiltered ones.
+fn assert_every_selector_has_labels(
+    selectors: &[kamu_resources::ResourceSelector],
+    expected: &kamu_resources::ResourceLabelFilterInput,
+) {
+    assert!(!selectors.is_empty(), "expected at least one selector");
+    for selector in selectors {
+        assert_eq!(
+            selector.labels.as_ref(),
+            Some(expected),
+            "every selector must carry the invocation's label filter, got {selectors:?}"
+        );
+    }
 }
 
 /// Asserts every selector spans all types.
@@ -496,10 +515,7 @@ async fn resolves_any_type_name_pattern_via_a_single_search() {
         selectors_name_pattern(&requests[0].selectors),
         NAME_APP_PATTERN
     );
-    assert_eq!(
-        requests[0].label_filter.as_ref(),
-        Some(&environment_label_filter()),
-    );
+    assert_every_selector_has_labels(&requests[0].selectors, &environment_label_filter());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -778,10 +794,7 @@ async fn passes_the_label_filter_to_pattern_expansion() {
 
     let requests = search_requests.lock().unwrap();
     assert_eq!(requests.len(), 1);
-    assert_eq!(
-        requests[0].label_filter.as_ref(),
-        Some(&environment_label_filter())
-    );
+    assert_every_selector_has_labels(&requests[0].selectors, &environment_label_filter());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -825,10 +838,7 @@ async fn passes_the_label_filter_to_the_all_selector() {
 
     let requests = search_requests.lock().unwrap();
     assert_eq!(requests.len(), 1);
-    assert_eq!(
-        requests[0].label_filter.as_ref(),
-        Some(&environment_label_filter())
-    );
+    assert_every_selector_has_labels(&requests[0].selectors, &environment_label_filter());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -878,10 +888,7 @@ async fn narrows_exact_selectors_by_the_label_filter() {
     // filter would be silently dropped and non-matching resources returned.
     let requests = search_requests.lock().unwrap();
     assert_eq!(requests.len(), 1);
-    assert_eq!(
-        requests[0].label_filter.as_ref(),
-        Some(&environment_label_filter())
-    );
+    assert_every_selector_has_labels(&requests[0].selectors, &environment_label_filter());
     assert_eq!(
         selectors_name_pattern_each(&requests[0].selectors),
         vec!["vars-a", "vars-b"]
@@ -1028,7 +1035,7 @@ impl ResourceSelectionResolutionHarness {
         &mut self,
         times: usize,
         search_results: Vec<ResourceHandle>,
-        search_requests: Arc<Mutex<Vec<SearchResourceHandlesRequest>>>,
+        search_requests: Arc<Mutex<Vec<SearchResourcesRequest>>>,
     ) {
         self.facade
             .expect_search_handles()

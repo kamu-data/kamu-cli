@@ -40,10 +40,22 @@ Review generated schema changes for intentional API surface only.
 
 ### Handling Breaking Changes
 
-If a schema change introduces breaking changes (removes fields, changes types, renames operations):
+A schema change is breaking only if it removes fields, changes types, or renames operations **that
+were previously released**. Verify before treating it as one — an unreleased field has no consumers
+to break:
+
+```sh
+git show <last-release-tag>:resources/schema.gql | grep -c '<FieldOrInputName>'
+```
+
+While the work is uncommitted on a feature branch, review such changes for correctness and
+intentionality only. Do not require or suggest a `CHANGELOG.md` entry — see the Changelog Review
+Context in `AGENTS.md`.
+
+During PR or release finalization:
 
 - Document the breaking changes in the PR description.
-- Update `CHANGELOG.md` under `### Changed` with the API change.
+- Add the consolidated `CHANGELOG.md` entry under `### Changed`.
 - Consider whether a deprecation period is needed before removal.
 
 ## Remote GraphQL Facade (Backend-to-Backend)

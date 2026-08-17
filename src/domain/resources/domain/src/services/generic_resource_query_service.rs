@@ -11,7 +11,6 @@ use database_common::PaginationOpts;
 use internal_error::InternalError;
 
 use crate::{
-    ResolvedResourceLabelFilter,
     ResourceHandleRow,
     ResourceID,
     ResourceName,
@@ -27,8 +26,9 @@ use crate::{
 /// Read-side access to resources for use cases and higher layers, which never
 /// reach for [`crate::ResourceRepository`] directly.
 ///
-/// See [`crate::ResourceRepository`] for the rule governing which methods take
-/// a `label_filter`.
+/// See [`crate::ResourceRepository`] for the rule governing which methods
+/// filter by label — the scoped searches carry the pairs inside
+/// [`ResourceScope`].
 #[async_trait::async_trait]
 pub trait GenericResourceQueryService: Send + Sync {
     async fn allocate_id(&self) -> Result<ResourceID, InternalError>;
@@ -59,7 +59,6 @@ pub trait GenericResourceQueryService: Send + Sync {
         &self,
         account_id: &odf::AccountID,
         scope: &ResourceScope,
-        label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceHandleRow>, InternalError>;
 
@@ -67,7 +66,6 @@ pub trait GenericResourceQueryService: Send + Sync {
         &self,
         account_id: &odf::AccountID,
         scope: &ResourceScope,
-        label_filter: &ResolvedResourceLabelFilter,
     ) -> Result<usize, InternalError>;
 
     async fn find_owned_snapshot(
@@ -99,7 +97,6 @@ pub trait GenericResourceQueryService: Send + Sync {
         &self,
         account_id: &odf::AccountID,
         scope: &ResourceScope,
-        label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceSnapshot>, InternalError>;
 
