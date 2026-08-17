@@ -335,22 +335,8 @@ impl AuthApi<'_> {
     }
 
     pub async fn login_as_e2e_user(&mut self) -> AccessToken {
-        // We are using DummyOAuthGithub, so the loginCredentialsJson can be arbitrary
-        self.login(indoc::indoc!(
-            r#"
-            mutation {
-              auth {
-                login(loginMethod: OAUTH_GITHUB, loginCredentialsJson: "") {
-                  accessToken
-                  account {
-                    id
-                  }
-                }
-              }
-            }
-            "#,
-        ))
-        .await
+        self.login_with_password("e2e-user", "kamu.dev:e2e-user")
+            .await
     }
 
     pub async fn login_as_e2e_user_with_device_code(&mut self) -> AccessToken {
