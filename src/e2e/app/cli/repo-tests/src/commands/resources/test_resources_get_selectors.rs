@@ -219,6 +219,59 @@ pub async fn test_resources_get_selectors(ctx: ResourceCtx) {
         Some(&[r"Pattern `missing-%` did not match any resource of any type"]),
     )
     .await;
+
+    // ── 12. Malformed selectors report the offending column ───────────────────
+    //
+    // The selector grammar shares its scanner with `--label`, so failures echo
+    // the argument and point a caret at the character that broke it. These pin
+    // the rendering end-to-end: the caret is produced deep in the scanner and
+    // could regress to a bare message without any unit test noticing.
+    //
+    // Regexes match in output order, so the input line precedes the caret line.
+
+    // A bare type is rejected here — `get` requires a name half. The message
+    // names the fix, since this is the most common way to reach it.
+    //
+    // The caret line is anchored with `^…$` so its indentation is part of the
+    // assertion: an unanchored regex would still match if the column drifted.
+    ctx.assert_failure(
+        ["get", "vs"],
+        Some(&[
+            r"Invalid resource reference:",
+            r"(?m)^  vs$",
+            r"(?m)^    \^$",
+            r"expected `/` after the resource type",
+            r"write `vs/%` to select every one",
+        ]),
+    )
+    .await;
+
+    // A second `/` makes the argument ambiguous; the caret sits on it, not at
+    // the end of the input.
+    ctx.assert_failure(
+        ["get", "vs/foo/extra"],
+        Some(&[
+            r"Invalid resource reference:",
+            r"(?m)^  vs/foo/extra$",
+            r"(?m)^        \^$",
+            r"unexpected second `/`",
+        ]),
+    )
+    .await;
+
+    // An empty name half.
+    ctx.assert_failure(
+        ["get", "vs/"],
+        Some(&[r"Invalid resource reference:", r"expected a resource name"]),
+    )
+    .await;
+
+    // An empty type half.
+    ctx.assert_failure(
+        ["get", "/my-vars"],
+        Some(&[r"Invalid resource reference:", r"expected a resource type"]),
+    )
+    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

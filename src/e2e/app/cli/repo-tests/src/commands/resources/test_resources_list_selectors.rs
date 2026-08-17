@@ -144,6 +144,45 @@ pub async fn test_resources_list_selectors(ctx: ResourceCtx) {
     ] {
         ctx.assert_failure(args.clone(), None).await;
     }
+
+    // -- 10. A bare type is legal here, and only here --------------------------
+    //
+    // `list` and `get`/`delete` share one selector scanner but supply opposite
+    // acceptance policies for a bare `type`. This is the only difference between
+    // the two grammars, so it is pinned from both sides: unifying them would
+    // silently change one command's contract.
+
+    // `list vs` enumerates the type — the same rows as the explicit `vs/%`.
+    assert_eq!(
+        ctx.list_names("vs").await,
+        ctx.list_names("vs/%").await,
+        "`list vs` must enumerate the type, exactly as `list vs/%` does"
+    );
+
+    // The same argument is a usage error for `get`, which requires a name half.
+    ctx.assert_failure(
+        ["get", "vs"],
+        Some(&[r"expected `/` after the resource type"]),
+    )
+    .await;
+
+    // -- 11. Malformed selectors report the offending column -------------------
+    //
+    // Shared with the `--label` grammar; the caret is rendered by the scanner,
+    // so it can regress without any `list`-level unit test noticing.
+    // Regexes match in output order, so the input line precedes the caret line.
+    // The caret line is anchored with `^…$` so its indentation is part of the
+    // assertion: an unanchored regex would still match if the column drifted.
+    ctx.assert_failure(
+        ["list", "vs/a/b"],
+        Some(&[
+            r"Invalid resource selector:",
+            r"(?m)^  vs/a/b$",
+            r"(?m)^      \^$",
+            r"unexpected second `/`",
+        ]),
+    )
+    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -18,7 +18,14 @@ mod resource_summary_service;
 mod resource_type_lookup_service;
 
 use dill::CatalogBuilder;
-pub use r#impl::{ANY_SELECTOR, ResourceLabelSelectorParser, is_resource_id};
+pub use r#impl::{
+    ANY_SELECTOR,
+    BareTypePolicy,
+    ResourceLabelSelectorParser,
+    ResourceSelectionScanner,
+    is_resource_id,
+    usage_error_at,
+};
 pub use resource_facade_factory::*;
 pub use resource_manifest_discovery_service::*;
 pub use resource_manifest_execution_service::*;

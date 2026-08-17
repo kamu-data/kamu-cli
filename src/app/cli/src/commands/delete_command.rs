@@ -20,9 +20,11 @@ use crate::output::OutputConfig;
 use crate::resource_context::{ResourceContextReporter, ResourceContextResolver};
 use crate::resources::{
     ANY_SELECTOR,
+    BareTypePolicy,
     ResourceFacadeFactory,
     ResourceLabelSelectorParser,
     ResourceSelectionResolutionService,
+    ResourceSelectionScanner,
     ResourceSelectionSyntax,
     ResourceSelectionSyntaxService,
     ResourceTypeLookupService,
@@ -33,6 +35,22 @@ use crate::{ConfirmDeleteService, Interact, WorkspaceService, cli_value_parser a
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 const DATASETS_TARGET: &str = "datasets";
+
+const DATASET_TARGET: &str = "dataset";
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Strips the `dataset/` or `datasets/` pseudo-type prefix, yielding the
+/// dataset alias it guards.
+///
+/// The remainder is deliberately not validated here: it is a dataset reference,
+/// not a resource selector, and the dataset layer owns its own grammar.
+fn strip_dataset_pseudo_type_prefix(arg: &str) -> Option<&str> {
+    let (prefix, alias) = arg.split_once('/')?;
+
+    (prefix.eq_ignore_ascii_case(DATASET_TARGET) || prefix.eq_ignore_ascii_case(DATASETS_TARGET))
+        .then_some(alias)
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -379,6 +397,9 @@ impl<'a> DeleteRequestResolver<'a> {
             return self.resolve_resource_request(raw_args).await;
         }
 
+        // Routing guard, not grammar: this decides dataset-vs-resource before
+        // the selector grammar is involved. The resource path's own mixing
+        // error is raised later by `ResourceSelectionSyntaxParser`.
         let contains_slash = raw_args.iter().any(|arg| arg.contains('/'));
         let contains_plain = raw_args.iter().any(|arg| !arg.contains('/'));
 
@@ -515,18 +536,31 @@ impl<'a> DeleteRequestResolver<'a> {
         let mut resource_args = Vec::new();
 
         for arg in raw_args {
-            let Some((prefix, suffix)) = arg.split_once('/') else {
+            // `dataset/...` and `datasets/...` are an explicit escape hatch that forces
+            // legacy dataset interpretation even if the prefix collides with a resource
+            // type. Stripped before scanning: the remainder is a dataset alias, which
+            // may itself be account-qualified (`dataset/alice/foo`) and so carry more
+            // separators than the selector grammar permits.
+            if let Some(alias) = strip_dataset_pseudo_type_prefix(&arg) {
+                dataset_args.push(alias.to_owned());
+                continue;
+            }
+
+            let Ok(selector) =
+                ResourceSelectionScanner::scan_selector_arg(&arg, BareTypePolicy::Allow)
+            else {
+                // Malformed args stay on the resource path so the selector
+                // grammar reports them with a caret, rather than being silently
+                // reinterpreted as a dataset name here.
+                resource_args.push(arg);
+                continue;
+            };
+
+            let (prefix, Some(_)) = (selector.type_half, selector.name_half) else {
                 unreachable!("slash-only classifier received a plain selector");
             };
 
-            // `dataset/...` and `datasets/...` are an explicit escape hatch that forces
-            // legacy dataset interpretation even if the prefix collides with a resource
-            // type.
-            if prefix.eq_ignore_ascii_case("dataset")
-                || prefix.eq_ignore_ascii_case(DATASETS_TARGET)
-            {
-                dataset_args.push(suffix.to_owned());
-            } else if is_supported_resource_prefix(prefix) {
+            if is_supported_resource_prefix(prefix) {
                 resource_args.push(arg);
             } else {
                 dataset_args.push(arg);
@@ -643,6 +677,27 @@ mod tests {
         );
     }
 
+    // A dataset alias may itself be account-qualified (`AccountName "/"
+    // DatasetName`), so the escape hatch has to survive a second `/`. The
+    // selector grammar allows only one, which is why the prefix is stripped
+    // before the argument is scanned.
+    #[test]
+    fn test_classify_slash_request_strips_prefix_from_account_qualified_datasets() {
+        let request = DeleteRequestResolver::classify_slash_request_with(
+            vec![
+                "dataset/alice/foo".to_owned(),
+                "datasets/bob/bar".to_owned(),
+            ],
+            |_| false,
+        );
+
+        assert_matches!(
+            request,
+            ClassifiedSlashDeleteRequest::Datasets(args)
+                if args == vec!["alice/foo".to_owned(), "bob/bar".to_owned()]
+        );
+    }
+
     #[test]
     fn test_classify_slash_request_marks_mixed_requests() {
         let request = DeleteRequestResolver::classify_slash_request_with(
@@ -654,6 +709,24 @@ mod tests {
             request,
             ClassifiedSlashDeleteRequest::Mixed { dataset_args, resource_args }
                 if dataset_args == vec!["foo".to_owned()]
+                    && resource_args == vec!["vs/bar".to_owned()]
+        );
+    }
+
+    // The account-qualified alias carries a second `/`, which the resource
+    // selector grammar rejects; it must still be routed as a dataset rather than
+    // dragging the whole mixed request onto the resource path.
+    #[test]
+    fn test_classify_slash_request_marks_mixed_requests_with_account_qualified_datasets() {
+        let request = DeleteRequestResolver::classify_slash_request_with(
+            vec!["dataset/alice/foo".to_owned(), "vs/bar".to_owned()],
+            |prefix| prefix == "vs",
+        );
+
+        assert_matches!(
+            request,
+            ClassifiedSlashDeleteRequest::Mixed { dataset_args, resource_args }
+                if dataset_args == vec!["alice/foo".to_owned()]
                     && resource_args == vec!["vs/bar".to_owned()]
         );
     }

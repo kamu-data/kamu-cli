@@ -1270,14 +1270,23 @@ themselves are agnostic. Selector grammar is specified below, after the semantic
 > would make the output schema depend on the data, so the same command could emit different columns
 > on different days. A name pattern never changes the column shape.
 
-**`list` has its own, smaller grammar.** It never invokes `ResourceSelectionSyntaxParser`; it splits
-each target on the first `/` in
+**`list` has its own, smaller grammar**, but it shares the *lexer*. It does not invoke
+`ResourceSelectionSyntaxParser` (which imposes the same-type/ref-form arg shapes); it splits each
+target with `ResourceSelectionScanner::scan_selector_arg` in
 [`list_command.rs`](/src/app/cli/src/commands/list_command.rs). Accepted: `datasets` (alone), one or
 more `type[/name]` targets, bare `%` or `%/pattern`, and a bare `UUIDv4` spanning every type. The
 name half is classified by the same `UUIDv4` rule the other commands use (shared as
 `is_resource_id`), so an ID is matched exactly and everything else is a `%` pattern. Rejected:
 mixing `datasets` with resource types, `datasets/<name>`, combining `%` with narrower selectors,
 more than one `/` in a target, and the bare same-type form (`list vs a b`) that belongs to `get`.
+
+**The one grammar difference is a named parameter, not a duplicated splitter.** `BareTypePolicy`
+decides whether a bare `type` carrying no `/` is legal: `list vs` enumerates the type
+(`Allow`), while `get vs` / `delete vs` are usage errors directing the user to `vs/%` (`Reject`).
+Everything else about splitting a `type[/name]` argument — rejecting empty halves and a second `/`,
+and where the caret points — is decided once, in the scanner. Both sides of the divergence are
+pinned by tests at the unit and E2E levels, because unifying them would silently change one
+command's contract: loosening `get` would widen `delete`'s blast radius.
 
 **Selector grammar — accepted forms** (parsed by `ResourceSelectionSyntaxParser`,
 [`resource_selection_syntax_parser.rs`](/src/app/cli/src/services/resources/impl/resource_selection_syntax_parser.rs)):
@@ -1323,6 +1332,19 @@ half is validated later, when `ResourceSelectionSyntaxServiceImpl::classify_type
 
 (`kamu get %/%` *is* accepted, bounded by `--max-results`/`--unbounded`; prefer `kamu list %` for
 unbounded enumeration — a guidance boundary, not a parser rejection.)
+
+**Both CLI grammars use the same scanner/parser split.** A `winnow` scanner turns the input into
+`Spanned` tokens carrying byte offsets, a parser consumes those tokens, and failures render through
+one shared `usage_error_at`
+([`selector_error.rs`](/src/app/cli/src/services/resources/impl/selector_error.rs)) that echoes the
+input and points a caret at the offending column. The offset is a byte index but the caret is padded
+in *characters*, so a multi-byte prefix still lands the caret on the right column.
+
+The two scanners differ in exactly one respect, and it is a consequence of the charset rather than a
+style choice: the selector scanner has **no escape production**. Both halves of a `type/name` are
+hostname-charset (`Grammar::match_resource_name`), so `/`, `,`, `=` and `\` can never occur inside a
+word — there is nothing to escape, and adding an escape layer would create a code path no valid
+input can reach. The label scanner needs one because label keys and values are free-form text.
 
 **Label selector grammar (`--label`/`-l`)** — parsed by `ResourceLabelSelectorParser`
 ([`resource_label_selector_parser.rs`](/src/app/cli/src/services/resources/impl/resource_label_selector_parser.rs)),

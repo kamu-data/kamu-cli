@@ -12,6 +12,7 @@ use std::collections::BTreeMap;
 use kamu_resources::ResourceLabelFilterInput;
 
 use super::resource_label_selector_scanner::{ResourceLabelSelectorScanner, Spanned, Token};
+use super::selector_error::usage_error_at;
 use crate::CLIError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -178,11 +179,7 @@ impl ResourceLabelSelectorParser {
 
     /// Renders a failure as a caret-annotated usage error.
     fn error_at(input: &str, offset: usize, message: &str) -> CLIError {
-        let caret = " ".repeat(input[..offset.min(input.len())].chars().count());
-
-        CLIError::usage_error(format!(
-            "Invalid label selector:\n  {input}\n  {caret}^\n{message}"
-        ))
+        usage_error_at("label selector", input, offset, message)
     }
 }
 

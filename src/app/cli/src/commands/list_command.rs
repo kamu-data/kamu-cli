@@ -20,11 +20,14 @@ use crate::output::OutputConfig;
 use crate::resource_context::{ResourceContextReporter, ResourceContextResolver};
 use crate::resources::{
     ANY_SELECTOR,
+    BareTypePolicy,
     ResourceFacadeFactory,
     ResourceLabelSelectorParser,
+    ResourceSelectionScanner,
     ResourceTypeLookupErrorOptions,
     ResourceTypeLookupService,
     is_resource_id,
+    usage_error_at,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -158,25 +161,26 @@ impl ListCommand {
     }
 
     /// The type half of a `type[/name]` target.
+    ///
+    /// Used before validation, to spot the `datasets` target, so a malformed
+    /// target falls back to itself and is rejected later by
+    /// [`Self::split_target`].
     fn type_half(target: &str) -> &str {
-        target
-            .split_once('/')
-            .map_or(target, |(type_half, _)| type_half)
+        ResourceSelectionScanner::scan_selector_arg(target, BareTypePolicy::Allow)
+            .map_or(target, |selector| selector.type_half)
     }
 
     /// Splits `type[/name]`, classifying the name half as an ID or a pattern.
+    ///
+    /// Unlike `get`/`delete`, a bare `type` is legal here and means "enumerate
+    /// this type".
     fn split_target(target: &str) -> Result<(&str, Option<ResourceQuery>), CLIError> {
-        let Some((type_half, name_half)) = target.split_once('/') else {
-            return Ok((target, None));
-        };
+        let selector = ResourceSelectionScanner::scan_selector_arg(target, BareTypePolicy::Allow)
+            .map_err(|err| {
+            usage_error_at("resource selector", target, err.offset, &err.message)
+        })?;
 
-        if type_half.is_empty() || name_half.is_empty() || name_half.contains('/') {
-            return Err(CLIError::usage_error(format!(
-                "Invalid resource selector `{target}`. Expected `type` or `type/name`"
-            )));
-        }
-
-        Ok((type_half, Some(Self::name_query(name_half))))
+        Ok((selector.type_half, selector.name_half.map(Self::name_query)))
     }
 
     /// An ID query when the input spells a `UUIDv4`, otherwise `None`.
