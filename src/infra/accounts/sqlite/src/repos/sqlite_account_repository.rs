@@ -370,6 +370,7 @@ impl AccountRepository for SqliteAccountRepository {
 
     async fn find_account_id_by_email(
         &self,
+        provider: &str,
         email: &Email,
     ) -> Result<Option<odf::AccountID>, FindAccountIdByEmailError> {
         let mut tr = self.transaction.lock().await;
@@ -382,8 +383,10 @@ impl AccountRepository for SqliteAccountRepository {
             r#"
             SELECT id as "id: odf::AccountID"
             FROM accounts
-            WHERE lower(email) = lower($1)
+            WHERE provider = $1
+              AND lower(email) = lower($2)
             "#,
+            provider,
             email_str,
         )
         .fetch_optional(connection_mut)

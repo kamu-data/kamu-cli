@@ -48,6 +48,7 @@ pub trait AccountRepository: Send + Sync {
 
     async fn find_account_id_by_email(
         &self,
+        provider: &str,
         email: &Email,
     ) -> Result<Option<odf::AccountID>, FindAccountIdByEmailError>;
 

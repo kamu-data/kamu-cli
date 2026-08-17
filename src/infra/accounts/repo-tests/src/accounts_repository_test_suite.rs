@@ -60,7 +60,9 @@ pub async fn test_missing_account_not_found(catalog: &dill::Catalog) {
         Ok(None)
     );
     assert_matches!(
-        account_repo.find_account_id_by_email(&email).await,
+        account_repo
+            .find_account_id_by_email(provider, &email)
+            .await,
         Ok(None)
     );
     assert_matches!(
@@ -594,12 +596,8 @@ pub async fn test_search_accounts_by_name_pattern(catalog: &dill::Catalog) {
 pub async fn test_update_email_success(catalog: &dill::Catalog) {
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
 
-    let account = make_test_account(
-        "wasya",
-        "wasya@example.com",
-        AccountProvider::Password.into(),
-        "wasya",
-    );
+    let provider: &str = AccountProvider::Password.into();
+    let account = make_test_account("wasya", "wasya@example.com", provider, "wasya");
 
     account_repo.save_account(&account).await.unwrap();
 
@@ -622,13 +620,15 @@ pub async fn test_update_email_success(catalog: &dill::Catalog) {
 
     assert_matches!(
         account_repo
-            .find_account_id_by_email(&updated_email)
+            .find_account_id_by_email(provider, &updated_email)
             .await,
         Ok(Some(account_id)) if updated_account.id == account_id
     );
 
     assert_matches!(
-        account_repo.find_account_id_by_email(&account.email).await,
+        account_repo
+            .find_account_id_by_email(provider, &account.email)
+            .await,
         Ok(None)
     );
 
@@ -691,12 +691,8 @@ pub async fn test_update_email_errors(catalog: &dill::Catalog) {
 pub async fn test_update_account_success(catalog: &dill::Catalog) {
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
 
-    let account = make_test_account(
-        "wasya",
-        "wasya@example.com",
-        AccountProvider::Password.into(),
-        "wasya",
-    );
+    let provider: &str = AccountProvider::Password.into();
+    let account = make_test_account("wasya", "wasya@example.com", provider, "wasya");
 
     account_repo.save_account(&account).await.unwrap();
 
@@ -732,13 +728,15 @@ pub async fn test_update_account_success(catalog: &dill::Catalog) {
 
     assert_matches!(
         account_repo
-            .find_account_id_by_email(&updated_email)
+            .find_account_id_by_email(provider, &updated_email)
             .await,
         Ok(Some(account_id)) if updated_account.id == account_id
     );
 
     assert_matches!(
-        account_repo.find_account_id_by_email(&account.email).await,
+        account_repo
+            .find_account_id_by_email(provider, &account.email)
+            .await,
         Ok(None)
     );
 
@@ -1291,7 +1289,7 @@ async fn test_locale_account(
         "Tag: {tag}"
     );
     assert_matches!(
-        account_repo.find_account_id_by_email(&account.email).await,
+        account_repo.find_account_id_by_email(&account.provider, &account.email).await,
         Ok(Some(found_id))
             if found_id == account.id,
         "Tag: {tag}"

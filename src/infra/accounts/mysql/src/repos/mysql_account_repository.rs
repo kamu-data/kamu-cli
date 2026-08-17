@@ -410,6 +410,7 @@ impl AccountRepository for MySqlAccountRepository {
 
     async fn find_account_id_by_email(
         &self,
+        provider: &str,
         email: &Email,
     ) -> Result<Option<odf::AccountID>, FindAccountIdByEmailError> {
         let mut tr = self.transaction.lock().await;
@@ -420,8 +421,10 @@ impl AccountRepository for MySqlAccountRepository {
             r#"
             SELECT id as "id: odf::AccountID"
             FROM accounts
-            WHERE email = ?
+            WHERE provider = ?
+              AND lower(email) = lower(?)
             "#,
+            provider,
             email.as_ref()
         )
         .fetch_optional(connection_mut)

@@ -311,15 +311,20 @@ impl AccountRepository for InMemoryAccountRepository {
 
     async fn find_account_id_by_email(
         &self,
+        provider: &str,
         email: &Email,
     ) -> Result<Option<odf::AccountID>, FindAccountIdByEmailError> {
         let guard = self.state.lock().unwrap();
-        for account in guard.accounts_by_id.values() {
-            if account.email.as_ref().eq_ignore_ascii_case(email.as_ref()) {
-                return Ok(Some(account.id.clone()));
-            }
-        }
-        Ok(None)
+
+        let maybe_account_id = guard
+            .accounts_by_id
+            .values()
+            .find(|a| {
+                a.provider == provider && a.email.as_ref().eq_ignore_ascii_case(email.as_ref())
+            })
+            .map(|a| a.id.clone());
+
+        Ok(maybe_account_id)
     }
 
     async fn find_account_id_by_name(
