@@ -25,6 +25,7 @@
 
 use std::collections::BTreeMap;
 
+use database_common::sql_like_escape_literal;
 use kamu_resources::{
     ResourceID,
     ResourceName,
@@ -83,6 +84,9 @@ pub fn validate_selector(value: &ResourceSelector) -> Result<(), UnsupportedSele
 /// Not a `From` impl: the exact name has to be escaped into a wildcard-free
 /// `LIKE` pattern, so this can silently widen the match if skipped. Naming it
 /// keeps that visible at call sites.
+///
+/// The escaping mirrors what the repository applies to authored patterns, so
+/// widening a ref into a selector cannot change which resources match.
 pub fn ref_to_selector(value: ResourceRef) -> ResourceSelector {
     ResourceSelector {
         account: value.account,
@@ -96,21 +100,6 @@ pub fn ref_to_selector(value: ResourceRef) -> ResourceSelector {
             .map(|name| sql_like_escape_literal(name.as_str())),
         labels: None,
     }
-}
-
-/// Escapes a literal so it matches only itself when used as a `LIKE` pattern.
-///
-/// Mirrors the escaping the repository applies to authored patterns, so
-/// widening a ref into a selector cannot change which resources match.
-fn sql_like_escape_literal(literal: &str) -> String {
-    let mut escaped = String::with_capacity(literal.len());
-    for ch in literal.chars() {
-        if matches!(ch, '%' | '_' | '\\') {
-            escaped.push('\\');
-        }
-        escaped.push(ch);
-    }
-    escaped
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
