@@ -35,7 +35,9 @@ impl SqliteAccountRepository {
             AccountDuplicateField::Id
         } else if sqlite_error_message.contains("idx_accounts_name") {
             AccountDuplicateField::Name
-        } else if sqlite_error_message.contains("idx_accounts_email") {
+        } else if sqlite_error_message.contains("accounts.provider, accounts.email") {
+            // NOTE: For indexes on two or more columns,
+            //       SQLite does not show the index name in the error message.
             AccountDuplicateField::Email
         } else if sqlite_error_message.contains("accounts.provider_identity_key") {
             AccountDuplicateField::ProviderIdentityKey

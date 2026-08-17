@@ -416,6 +416,31 @@ pub async fn test_same_provider_identity_key_different_providers_allowed(catalog
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+pub async fn test_same_email_different_providers_allowed(catalog: &dill::Catalog) {
+    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
+
+    const SHARED_EMAIL: &str = "wasya@example.com";
+    const GITHUB_ACCOUNT_ID: &str = "8875909";
+
+    let password_account = make_test_account(
+        "petya",
+        SHARED_EMAIL,
+        AccountProvider::Password.into(),
+        "petya",
+    );
+    let github_account = make_test_account(
+        "petya-github",
+        SHARED_EMAIL,
+        AccountProvider::OAuthGitHub.into(),
+        GITHUB_ACCOUNT_ID,
+    );
+
+    assert_matches!(account_repo.save_account(&password_account).await, Ok(_));
+    assert_matches!(account_repo.save_account(&github_account).await, Ok(_));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_duplicate_github_account_email(catalog: &dill::Catalog) {
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
 
@@ -433,12 +458,18 @@ pub async fn test_duplicate_github_account_email(catalog: &dill::Catalog) {
 
     account_repo.save_account(&account).await.unwrap();
 
+    let duplicate_email_account = Account {
+        id: odf::AccountID::new_generated_ed25519().1,
+        account_name: odf::AccountName::new_unchecked("petya"),
+        provider_identity_key: "petya".to_string(),
+        ..account
+    };
+
     assert_matches!(
-        account_repo.save_account(&Account {
-            id: odf::AccountID::new_generated_ed25519().1,
-            ..make_test_account("petya", "wasya@example.com", AccountProvider::OAuthGitHub.into(), "12345")
-        }).await,
-        Err(CreateAccountError::Duplicate(AccountErrorDuplicate{ account_field: field })) if field == AccountDuplicateField::Email
+        account_repo.save_account(&duplicate_email_account).await,
+        Err(CreateAccountError::Duplicate(AccountErrorDuplicate {
+            account_field: AccountDuplicateField::Email
+        }))
     );
 }
 

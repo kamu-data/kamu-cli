@@ -73,17 +73,21 @@ impl State {
         Ok(())
     }
 
-    fn check_unique_email(&self, email: &Email) -> Result<(), AccountErrorDuplicate> {
-        for other_account in self.accounts_by_id.values() {
-            if other_account
-                .email
-                .as_ref()
-                .eq_ignore_ascii_case(email.as_ref())
-            {
-                return Err(AccountErrorDuplicate {
-                    account_field: AccountDuplicateField::Email,
-                });
-            }
+    fn check_unique_email(
+        &self,
+        provider: &str,
+        email: &Email,
+    ) -> Result<(), AccountErrorDuplicate> {
+        let duplicate = self
+            .accounts_by_id
+            .values()
+            .find(|a| a.provider_identity_key == provider && a.email == *email)
+            .is_some();
+
+        if duplicate {
+            return Err(AccountErrorDuplicate {
+                account_field: AccountDuplicateField::Email,
+            });
         }
 
         Ok(())
@@ -124,7 +128,7 @@ impl AccountRepository for InMemoryAccountRepository {
             .check_unique_provider_identity_key(&account.provider, &account.provider_identity_key)
             .map_err(CreateAccountError::Duplicate)?;
         guard
-            .check_unique_email(&account.email)
+            .check_unique_email(&account.provider, &account.email)
             .map_err(CreateAccountError::Duplicate)?;
 
         guard
@@ -173,7 +177,7 @@ impl AccountRepository for InMemoryAccountRepository {
         }
         if updated_account.email != account.email {
             guard
-                .check_unique_email(&updated_account.email)
+                .check_unique_email(&updated_account.provider, &updated_account.email)
                 .map_err(UpdateAccountError::Duplicate)?;
         }
 
@@ -223,7 +227,7 @@ impl AccountRepository for InMemoryAccountRepository {
 
             if new_email != account.email {
                 guard
-                    .check_unique_email(&new_email)
+                    .check_unique_email(&account.provider, &new_email)
                     .map_err(UpdateAccountError::Duplicate)?;
             }
 

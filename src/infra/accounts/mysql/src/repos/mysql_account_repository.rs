@@ -35,7 +35,7 @@ impl MySqlAccountRepository {
             AccountDuplicateField::Id
         } else if mysql_error_message.contains("for key 'idx_accounts_name'") {
             AccountDuplicateField::Name
-        } else if mysql_error_message.contains("for key 'idx_accounts_email'") {
+        } else if mysql_error_message.contains("for key 'idx_uniq_accounts_provider_email'") {
             AccountDuplicateField::Email
         } else if mysql_error_message
             .contains("for key 'idx_uniq_accounts_provider_provider_identity_key'")
