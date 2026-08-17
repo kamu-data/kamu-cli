@@ -81,7 +81,7 @@ impl State {
         let duplicate = self
             .accounts_by_id
             .values()
-            .find(|a| a.provider_identity_key == provider && a.email == *email)
+            .find(|a| a.provider == provider && a.email == *email)
             .is_some();
 
         if duplicate {
@@ -175,7 +175,7 @@ impl AccountRepository for InMemoryAccountRepository {
                 )
                 .map_err(UpdateAccountError::Duplicate)?;
         }
-        if updated_account.email != account.email {
+        if updated_account.provider != account.provider || updated_account.email != account.email {
             guard
                 .check_unique_email(&updated_account.provider, &updated_account.email)
                 .map_err(UpdateAccountError::Duplicate)?;
