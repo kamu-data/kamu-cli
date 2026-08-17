@@ -296,6 +296,7 @@ impl AuthenticationServiceImpl {
             display_name: Some(provider_response.display_name),
             account_type: AccountType::User,
             provider,
+            provider_identity_key: Some(provider_response.provider_identity_key),
             avatar_url: provider_response.avatar_url,
             registered_at: None,
             properties: vec![],
