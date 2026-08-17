@@ -10,7 +10,7 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::future::Future;
 
-use database_common::PaginationOpts;
+use database_common::{PaginationOpts, sql_like_escape_literal};
 use internal_error::InternalError;
 use kamu_resources::{ResourceHandle, ResourceTypeDescriptor};
 use kamu_resources_facade::{
@@ -41,24 +41,6 @@ pub struct ResourceSelectionResolutionServiceImpl;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 const RESOURCE_PAGE_SIZE: usize = 100;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Escapes a literal so it matches only itself when used as a `LIKE` pattern.
-///
-/// Needed because a selector's `name` is a pattern by ODF definition, so an
-/// exact name spelled by the user has to be neutralised before it travels as
-/// one.
-fn sql_like_escape_literal(literal: &str) -> String {
-    let mut escaped = String::with_capacity(literal.len());
-    for ch in literal.chars() {
-        if matches!(ch, '%' | '_' | '\\') {
-            escaped.push('\\');
-        }
-        escaped.push(ch);
-    }
-    escaped
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

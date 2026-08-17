@@ -10,7 +10,7 @@
 use std::num::NonZeroUsize;
 use std::sync::Arc;
 
-use database_common::{PaginationOpts, collect_all_pages};
+use database_common::{PaginationOpts, collect_all_pages, sql_like_escape_literal};
 use datafusion::arrow::array::{
     ArrayRef,
     BooleanArray,
@@ -631,18 +631,6 @@ fn selectors_for_query(
             })
             .collect(),
     }
-}
-
-/// Escapes a literal so it matches only itself when used as a `LIKE` pattern.
-fn sql_like_escape_literal(literal: &str) -> String {
-    let mut escaped = String::with_capacity(literal.len());
-    for ch in literal.chars() {
-        if matches!(ch, '%' | '_' | '\\') {
-            escaped.push('\\');
-        }
-        escaped.push(ch);
-    }
-    escaped
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
