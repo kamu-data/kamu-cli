@@ -326,6 +326,10 @@ impl ResourceRepository for PostgresResourceRepository {
             WHERE r.account_id = $1
               AND r.resource_id = ANY($2)
               AND r.deleted_at IS NULL
+            -- Request order, matching the in-memory backend: callers pair the
+            -- result back to the IDs they asked for. Without this the row order
+            -- is whatever the scan happens to produce.
+            ORDER BY array_position($2, r.resource_id)
             "#,
             account_id_stack.as_str(),
             &ids,
@@ -363,6 +367,10 @@ impl ResourceRepository for PostgresResourceRepository {
               AND r.resource_schema = $2
               AND LOWER(r.resource_name) = ANY($3)
               AND r.deleted_at IS NULL
+            -- Request order, matching the in-memory backend: callers pair the
+            -- result back to the names they asked for. Without this the row
+            -- order is whatever the scan happens to produce.
+            ORDER BY array_position($3, LOWER(r.resource_name))
             "#,
             account_id_stack.as_str(),
             schema.as_str(),
@@ -779,6 +787,10 @@ impl ResourceRepository for PostgresResourceRepository {
             WHERE r.account_id = $1
               AND r.resource_id = ANY($2)
               AND r.deleted_at IS NULL
+            -- Request order, matching the in-memory backend: callers pair the
+            -- result back to the IDs they asked for. Without this the row order
+            -- is whatever the scan happens to produce.
+            ORDER BY array_position($2, r.resource_id)
             "#,
             account_id_stack.as_str(),
             &ids,

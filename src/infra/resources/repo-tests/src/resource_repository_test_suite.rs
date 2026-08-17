@@ -272,6 +272,23 @@ pub async fn test_find_resource_snapshots_by_ids(catalog: &Catalog) {
         .map(|snapshot| snapshot.id)
         .collect::<Vec<_>>();
     assert_eq!(found_ids, vec![second.id, first.id]);
+
+    // Request order is the contract, so reversing the request must reverse the
+    // result. Asserting only the forward case would pass against a backend that
+    // returns an arbitrary-but-stable scan order.
+    let reversed = repo
+        .find_resource_snapshots_by_ids(
+            &account_handle.did,
+            &[other_account.id, first.id, missing_id, second.id],
+        )
+        .await
+        .unwrap();
+
+    let reversed_ids = reversed
+        .into_iter()
+        .map(|snapshot| snapshot.id)
+        .collect::<Vec<_>>();
+    assert_eq!(reversed_ids, vec![first.id, second.id]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -334,11 +351,28 @@ pub async fn test_find_resource_handles_by_ids(catalog: &Catalog) {
         )
         .await
         .unwrap();
-    let mut found_ids = found.into_iter().map(|row| row.id).collect::<Vec<_>>();
-    found_ids.sort();
-    let mut expected_ids = vec![*first.id.as_ref(), *second.id.as_ref()];
-    expected_ids.sort();
-    assert_eq!(found_ids, expected_ids);
+    // Request order is the contract: the survivors keep the relative order they
+    // were asked in, with misses simply absent.
+    let found_ids = found.into_iter().map(|row| row.id).collect::<Vec<_>>();
+    assert_eq!(found_ids, vec![*first.id.as_ref(), *second.id.as_ref()]);
+
+    // Reversing the request must reverse the result, which an arbitrary-but-
+    // stable scan order would not do.
+    let reversed = repo
+        .find_resource_handles_by_ids(
+            &account_handle.did,
+            &[
+                to_delete.id,
+                other_account.id,
+                missing_id,
+                second.id,
+                first.id,
+            ],
+        )
+        .await
+        .unwrap();
+    let reversed_ids = reversed.into_iter().map(|row| row.id).collect::<Vec<_>>();
+    assert_eq!(reversed_ids, vec![*second.id.as_ref(), *first.id.as_ref()]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -369,11 +403,27 @@ pub async fn test_find_resource_snapshots_by_schema_and_ids(catalog: &Catalog) {
         .await
         .unwrap();
 
+    // Request order is the contract. `third` belongs to another account: this
+    // lookup is by schema, not by account, so it is expected in the result.
     let found_ids = found
         .into_iter()
         .map(|snapshot| snapshot.id)
         .collect::<Vec<_>>();
     assert_eq!(found_ids, vec![third.id, first.id]);
+
+    // Reversing the request must reverse the result.
+    let reversed = repo
+        .find_resource_snapshots_by_schema_and_ids(
+            &TEST_KIND,
+            &[first.id, third.id, missing_id, second.id],
+        )
+        .await
+        .unwrap();
+    let reversed_ids = reversed
+        .into_iter()
+        .map(|snapshot| snapshot.id)
+        .collect::<Vec<_>>();
+    assert_eq!(reversed_ids, vec![first.id, third.id]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -633,6 +683,73 @@ pub async fn test_search_resource_handles_exact_ids(catalog: &Catalog) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// A scope where only *some* rows are vacuous.
+///
+/// `ResourceScope::is_vacuous` folds with `.all()`, so this scope is not
+/// vacuous and no short-circuit fires — the empty list reaches the query
+/// builder. The single-row cases above never exercise that path, because one
+/// empty row makes the whole scope vacuous and returns before any SQL is built.
+///
+/// Both SQL backends happen to render the empty list correctly today (`SQLite`
+/// accepts `IN ()` as an extension, and Postgres' `STRING_TO_ARRAY('', ',')`
+/// yields an empty array, so both match nothing). That is load-bearing but
+/// unobvious, and neither is required by the SQL standard — this test pins it
+/// so a future rewrite of the predicate builder cannot regress it silently.
+///
+/// A vacuous row matches nothing, so the result is exactly what the non-vacuous
+/// row alone would return.
+pub async fn test_search_resource_handles_partially_vacuous_scope(catalog: &Catalog) {
+    let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+
+    let account_handle = odf::AccountHandle::new_test("test-account");
+    seed_search_resource_handles(repo.as_ref(), &account_handle).await;
+
+    for empty_query in [
+        ResourceQuery::ExactIds(vec![]),
+        ResourceQuery::ExactNames(vec![]),
+    ] {
+        let scope = ResourceScope::types(vec![
+            ResourceTypeQuery {
+                schema: TEST_KIND.clone(),
+                query: Some(empty_query.clone()),
+                account_id: None,
+                label_pairs: vec![],
+            },
+            ResourceTypeQuery {
+                schema: OTHER_KIND.clone(),
+                query: Some(ResourceQuery::NamePattern("app-%".to_string())),
+                account_id: None,
+                label_pairs: vec![],
+            },
+        ]);
+
+        let rows = repo
+            .search_resource_handles(
+                &account_handle.did,
+                &scope,
+                PaginationOpts::from_max_results(10),
+            )
+            .await
+            .unwrap();
+        let mut names = rows.into_iter().map(|row| row.name).collect::<Vec<_>>();
+        names.sort();
+        assert_eq!(
+            names,
+            vec!["app-delta", "app-gamma"],
+            "the vacuous row must contribute nothing, not widen or break the query"
+        );
+
+        // The count shares the scope predicate, so it must agree.
+        let count = repo
+            .count_search_resource_handles(&account_handle.did, &scope)
+            .await
+            .unwrap();
+        assert_eq!(count, 2);
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 pub async fn test_search_resource_handles_any_type(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
 
@@ -794,6 +911,19 @@ pub async fn test_search_resource_handles_pattern_special_characters(catalog: &C
         .unwrap();
     let names = rows.into_iter().map(|row| row.name).collect::<Vec<_>>();
     assert_eq!(names, vec!["a-b-plain"]);
+
+    // A `%` is deliberately NOT tested as a literal here: `NamePattern` is a
+    // `LIKE` pattern by ODF definition, and the repository escapes it with
+    // `sql_like_escape_pattern`, which passes `%` through as a wildcard. A
+    // caller cannot pre-escape a literal `%` into this field — the two escapes
+    // would compound into `\\%` ("a backslash, then a wildcard").
+    //
+    // That is sound because a `ResourceName` is a hostname, so `%` is
+    // unrepresentable in a stored name in the first place. Both halves are
+    // already pinned where they belong: `test_sql_like_escape_literal` in
+    // `database-common`, and
+    // `resource_names_cannot_contain_like_metacharacters` in the CLI
+    // resolution-service tests.
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -924,12 +1054,30 @@ pub async fn test_resource_name_case_insensitive(catalog: &Catalog) {
         )
         .await
         .unwrap();
-    let mut names = rows
+    // Request order is the contract, and it holds even though the requested
+    // spelling differs in case from the stored one.
+    let names = rows
         .into_iter()
         .map(|(name, _)| name.to_string())
         .collect::<Vec<_>>();
-    names.sort();
     assert_eq!(names, vec!["my-resource", "other-resource"]);
+
+    let rows = repo
+        .resolve_resource_ids_by_names(
+            &account_handle.did,
+            &TEST_KIND,
+            &[
+                "OTHER-RESOURCE".parse().unwrap(),
+                "My-Resource".parse().unwrap(),
+            ],
+        )
+        .await
+        .unwrap();
+    let names = rows
+        .into_iter()
+        .map(|(name, _)| name.to_string())
+        .collect::<Vec<_>>();
+    assert_eq!(names, vec!["other-resource", "my-resource"]);
 
     let rows = repo
         .search_resource_handles(
@@ -1472,16 +1620,30 @@ async fn seed_search_resource_handles(
     let other_account_handle = odf::AccountHandle::new_test("other-account");
 
     let mut ids = std::collections::HashMap::new();
-    for (kind, name, account) in [
+    // Results are ordered `updated_at DESC, resource_id DESC`. Seeding with a
+    // bare `Utc::now()` per row lets two rows share a timestamp, which drops
+    // the tiebreak onto a random v4 UUID and makes order assertions flip. Stagger
+    // the timestamps so `updated_at` alone decides, newest last in this list.
+    let base = Utc::now() - chrono::Duration::seconds(60);
+    for (index, (kind, name, account)) in [
         (&*TEST_KIND, "app-alpha", account_handle.clone()),
         (&*TEST_KIND, "app-beta", account_handle.clone()),
         (&*TEST_KIND, "db-alpha", account_handle.clone()),
         (&*OTHER_KIND, "app-gamma", account_handle.clone()),
         (&*OTHER_KIND, "app-delta", account_handle.clone()),
         (&*TEST_KIND, "app-other-account", other_account_handle),
-    ] {
+    ]
+    .into_iter()
+    .enumerate()
+    {
         let mut snapshot = make_test_snapshot(&account, kind, name);
         snapshot.id = repo.new_resource_id().await.unwrap();
+        snapshot.headers = ResourceHeaders::simple(
+            base + chrono::Duration::seconds(i64::try_from(index).unwrap()),
+            snapshot.id,
+            account.clone(),
+            name,
+        );
         ids.insert(name, snapshot.id);
         repo.create_resource(&snapshot).await.unwrap();
     }
