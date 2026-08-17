@@ -54,7 +54,7 @@ macro_rules! dummy_auth_provider {
                         account_id: None,
                         account_name: odf::AccountName::new_unchecked($name),
                         email: Email::parse(&format!("method-{letter}@example.com")).unwrap(),
-                        display_name: String::from(DEFAULT_ACCOUNT_NAME_STR),
+                        display_name: String::from($name),
                         avatar_url: None,
                         provider_identity_key: format!("method-{letter}-identity"),
                     })

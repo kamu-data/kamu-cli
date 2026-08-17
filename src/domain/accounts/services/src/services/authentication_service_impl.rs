@@ -91,7 +91,7 @@ impl AuthenticationServiceImpl {
     ) -> Result<Arc<dyn AuthenticationProvider>, UnsupportedLoginMethodError> {
         match self
             .authentication_providers_by_method
-            .get(&login_method_lowercase.to_lowercase())
+            .get(login_method_lowercase)
         {
             Some(provider) => Ok(provider.clone()),
             None => Err(UnsupportedLoginMethodError {
