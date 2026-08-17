@@ -300,6 +300,16 @@ Optional ed25519 private key. When set, `id` is derived from it
 <td></td>
 </tr>
 <tr>
+<td><code>providerIdentityKey</code></td>
+<td><code>string</code></td>
+<td><code class="language-json">null</code></td>
+<td>
+
+Auto-derived from `account_name` if omitted
+
+</td>
+</tr>
+<tr>
 <td><code>registeredAt</code></td>
 <td><code>string</code></td>
 <td><code class="language-json">null</code></td>

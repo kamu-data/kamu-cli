@@ -72,6 +72,14 @@
           "default": "password",
           "type": "string"
         },
+        "providerIdentityKey": {
+          "combine": "replace",
+          "description": "Auto-derived from `account_name` if omitted",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "registeredAt": {
           "combine": "replace",
           "format": "date-time",
