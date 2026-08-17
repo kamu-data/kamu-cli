@@ -75,13 +75,13 @@ Each RF scenario from the original plan is listed with its status.
 | RF-094  | list_search.rs      | Active   | Search with an empty selector list is vacuous, not rejected           | Empty is "match nothing", *not* "match everything" — the latter needs an explicit type-less, unnarrowed selector |
 | RF-095  | list_search.rs      | Active   | Search pagination and total_count                                     |                                                                        |
 | RF-096  | list_search.rs      | Active   | Search account scoping                                                |                                                                        |
-| RF-097  | list_search.rs      | Active   | List filter by canonical label URI is accepted                        | Local-only: repo matching is Phase 9, remote transport is Phase 10   |
-| RF-098  | list_search.rs      | Active   | List filter by short label name is accepted                           | Local-only, same reason as RF-097                                     |
-| RF-099  | list_search.rs      | Active   | List filter by free-form label is accepted                            | Local-only, same reason as RF-097                                     |
-| RF-099A | list_search.rs      | Active   | List filter invalid key is rejected                                   | Local-only, same reason as RF-097                                     |
-| RF-099B | list_search.rs      | Active   | List filter unknown URI is rejected                                   | Local-only, same reason as RF-097                                     |
-| RF-099C | list_search.rs      | Active   | List filter non-string value is rejected                              | Local-only, same reason as RF-097                                     |
-| RF-099D | list_search.rs      | Active   | List filter duplicate-after-canonicalization is rejected              | Local-only, same reason as RF-097                                     |
+| RF-097  | list_search.rs      | Active   | List filter by canonical label URI is accepted                        | Runs local and remote; the transport carries labels per selector      |
+| RF-098  | list_search.rs      | Active   | List filter by short label name is accepted                           | Runs local and remote, same as RF-097                                 |
+| RF-099  | list_search.rs      | Active   | List filter by free-form label is accepted                            | Runs local and remote, same as RF-097                                 |
+| RF-099A | list_search.rs      | Active   | List filter invalid key is rejected                                   | Runs local and remote, same as RF-097                                 |
+| RF-099B | list_search.rs      | Active   | List filter unknown URI is rejected                                   | Runs local and remote, same as RF-097                                 |
+| RF-099C | list_search.rs      | Active   | List filter non-string value is rejected                              | Runs local and remote, same as RF-097                                 |
+| RF-099D | list_search.rs      | Active   | List filter duplicate-after-canonicalization is rejected              | Runs local and remote, same as RF-097                                 |
 | RF-099E | list_search.rs      | Active   | List filter `$not` operator is rejected                               | Recognized (ODF `LabelFilter` schema shape) but not evaluated yet     |
 | RF-099F | list_search.rs      | Active   | List filter `$or` operator is rejected                                | Recognized but not evaluated yet, same reason as RF-099E              |
 | RF-099G | list_search.rs      | Active   | List filter malformed `$not` operator is rejected                     | Parse failure shares the same code as a well-formed but unevaluated `$not` |

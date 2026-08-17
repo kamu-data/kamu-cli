@@ -287,7 +287,8 @@ impl ResourceRepository for SqliteResourceRepository {
             query = query.bind(*id.as_ref());
         }
 
-        let rows = query.fetch_all(connection_mut).await.int_err()?;
+        let mut rows = query.fetch_all(connection_mut).await.int_err()?;
+        sort_into_requested_order(&mut rows, ids.iter().map(|id| *id.as_ref()), |row| row.id);
 
         Ok(rows)
     }
@@ -332,7 +333,14 @@ impl ResourceRepository for SqliteResourceRepository {
             query = query.bind(name.to_string());
         }
 
-        let rows = query.fetch_all(connection_mut).await.int_err()?;
+        let mut rows = query.fetch_all(connection_mut).await.int_err()?;
+        // Matching is case-insensitive, so the sort key must be too — the
+        // stored spelling need not equal the requested one.
+        sort_into_requested_order(
+            &mut rows,
+            names.iter().map(|name| name.to_ascii_lowercase()),
+            |(_, name)| name.to_ascii_lowercase(),
+        );
 
         Ok(rows
             .into_iter()
@@ -662,7 +670,8 @@ impl ResourceRepository for SqliteResourceRepository {
             query = query.bind(*id.as_ref());
         }
 
-        let rows = query.fetch_all(connection_mut).await.int_err()?;
+        let mut rows = query.fetch_all(connection_mut).await.int_err()?;
+        sort_into_requested_order(&mut rows, ids.iter().map(|id| *id.as_ref()), |row| row.id);
 
         Ok(rows
             .into_iter()
@@ -864,6 +873,33 @@ impl ResourceRepository for SqliteResourceRepository {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Reorders `rows` to follow the order of `requested`, keyed by `key_of`.
+///
+/// A bare `IN (...)` makes no ordering promise, so the row order would
+/// otherwise be whatever the scan produced. Postgres pins this in SQL with
+/// `array_position`, which `SQLite` has no equivalent of; sorting here keeps
+/// the two backends — and the in-memory one, which iterates the request slice —
+/// answering identically.
+///
+/// Rows whose key is not in `requested` cannot occur (every row matched the
+/// `IN` list), but are sorted last rather than dropped, so a future caller
+/// widening the predicate does not lose data silently.
+fn sort_into_requested_order<Row, Key: std::hash::Hash + Eq>(
+    rows: &mut [Row],
+    requested: impl IntoIterator<Item = Key>,
+    key_of: impl Fn(&Row) -> Key,
+) {
+    let position: HashMap<Key, usize> = requested
+        .into_iter()
+        .enumerate()
+        .map(|(index, key)| (key, index))
+        .collect();
+
+    rows.sort_by_key(|row| position.get(&key_of(row)).copied().unwrap_or(usize::MAX));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Appends the bare predicate matching `query`'s one active mode, with no
 /// leading connective so it can be combined either way.
 fn push_query_predicate(
@@ -898,9 +934,8 @@ fn push_query_predicate(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Appends the scope predicate: one `OR` group per type, each pairing the
-/// schema with that type's own query.
-/// Appends the scope predicate, **including the account**.
+/// Appends the scope predicate, **including the account**: one `OR` group per
+/// type, each pairing the schema with that type's own query.
 ///
 /// The account lives inside each OR-group rather than as one outer
 /// `r.account_id = ?`, because a row may name its own account; rows that do not

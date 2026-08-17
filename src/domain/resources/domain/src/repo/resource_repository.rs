@@ -69,6 +69,9 @@ pub trait ResourceRepository: Send + Sync {
         name: &ResourceName,
     ) -> Result<Option<ResourceID>, InternalError>;
 
+    /// Returns rows in the order their IDs appear in `ids`. IDs that do not
+    /// exist, are deleted, or belong to another account are absent, so the
+    /// result may be shorter than the request but never reordered.
     async fn find_resource_handles_by_ids(
         &self,
         account_id: &odf::AccountID,
@@ -77,6 +80,8 @@ pub trait ResourceRepository: Send + Sync {
 
     /// Matches names case-insensitively. Names that do not exist are absent
     /// from the result.
+    ///
+    /// Returns pairs in the order their names appear in `names`.
     async fn resolve_resource_ids_by_names(
         &self,
         account_id: &odf::AccountID,
@@ -104,6 +109,8 @@ pub trait ResourceRepository: Send + Sync {
         query: &ResourceRawEventQuery,
     ) -> Result<Option<ResourceSnapshot>, InternalError>;
 
+    /// Returns snapshots in the order their IDs appear in `ids`. This lookup is
+    /// by schema, not by account, so it spans accounts.
     async fn find_resource_snapshots_by_schema_and_ids(
         &self,
         schema: &TypeUri,
@@ -115,6 +122,9 @@ pub trait ResourceRepository: Send + Sync {
         id: &ResourceID,
     ) -> Result<Option<ResourceSnapshot>, InternalError>;
 
+    /// Returns snapshots in the order their IDs appear in `ids`. IDs that do
+    /// not exist, are deleted, or belong to another account are absent, so the
+    /// result may be shorter than the request but never reordered.
     async fn find_resource_snapshots_by_ids(
         &self,
         account_id: &odf::AccountID,

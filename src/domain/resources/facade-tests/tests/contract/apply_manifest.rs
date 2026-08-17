@@ -686,7 +686,7 @@ pub async fn test_apply_rejects_duplicate_header_key(h: &impl FacadeContractHarn
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// RF-026 (extension): an invalid label/annotation key is now rejected at
+// RF-026A (extension): an invalid label/annotation key is now rejected at
 // manifest-parse time (via `TypeRef`'s own `FromStr`), not by
 // `ResourceHeadersInput` validation — confirms this is a compile-time-style
 // rejection (`ParseManifest`), not a semantic `InvalidHeaders` problem.
@@ -730,7 +730,7 @@ pub async fn test_apply_rejects_invalid_header_key(h: &impl FacadeContractHarnes
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// RF-026 (extension): a successful apply carrying free-form label keys and a
+// RF-026B (extension): a successful apply carrying free-form label keys and a
 // free-form annotation preserves them under their authored short names.
 contract_test!(
     apply_round_trips_populated_labels_annotations,
@@ -791,6 +791,7 @@ pub async fn test_apply_round_trips_populated_labels_annotations(h: &impl Facade
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// RF-026C
 contract_test!(
     apply_header_extension_warnings_are_reported,
     super::test_apply_header_extension_warnings_are_reported
@@ -860,6 +861,7 @@ pub async fn test_apply_header_extension_warnings_are_reported(h: &impl FacadeCo
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// RF-026D
 contract_test!(
     apply_header_extension_canonicalization_precedes_diffing,
     super::test_apply_header_extension_canonicalization_precedes_diffing
@@ -931,6 +933,7 @@ pub async fn test_apply_header_extension_canonicalization_precedes_diffing(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// RF-026E
 contract_test!(
     apply_rejects_invalid_registered_header_extension_value,
     super::test_apply_rejects_invalid_registered_header_extension_value
@@ -978,6 +981,7 @@ pub async fn test_apply_rejects_invalid_registered_header_extension_value(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// RF-026F
 contract_test!(
     apply_rejects_overlong_description_via_annotation_schema,
     super::test_apply_rejects_overlong_description_via_annotation_schema
