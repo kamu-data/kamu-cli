@@ -58,6 +58,7 @@ pub trait AccountRepository: Send + Sync {
 
     async fn find_account_ids_by_unique_fields(
         &self,
+        provider: &str,
         account_name: &odf::AccountName,
         email: &Email,
         provider_identity_key: &str,

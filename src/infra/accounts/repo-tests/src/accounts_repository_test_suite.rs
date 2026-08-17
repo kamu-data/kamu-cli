@@ -1085,6 +1085,8 @@ pub async fn test_delete_account(catalog: &dill::Catalog) {
 pub async fn test_find_account_ids_by_unique_fields(catalog: &dill::Catalog) {
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
 
+    let password_provider = <&'static str>::from(AccountProvider::Password);
+
     let not_found_name = odf::AccountName::new_unchecked("not-found");
     let not_found_email = Email::parse("not-found@example.com").unwrap();
     let not_found_provider_identity_key = "not-found";
@@ -1093,6 +1095,7 @@ pub async fn test_find_account_ids_by_unique_fields(catalog: &dill::Catalog) {
     assert_matches!(
         account_repo
             .find_account_ids_by_unique_fields(
+                password_provider,
                 &not_found_name,
                 &not_found_email,
                 not_found_provider_identity_key,
@@ -1100,6 +1103,9 @@ pub async fn test_find_account_ids_by_unique_fields(catalog: &dill::Catalog) {
             .await,
         Ok(ids) if ids.is_empty()
     );
+
+    const SHARED_BOB_EMAIL: &str = "bob@example.com";
+    const SHARED_CAROL_PROVIDER_IDENTITY_KEY: &str = "carol";
 
     let account_by_name = make_test_account(
         "alice",
@@ -1109,7 +1115,7 @@ pub async fn test_find_account_ids_by_unique_fields(catalog: &dill::Catalog) {
     );
     let account_by_email = make_test_account(
         "bob",
-        "bob@example.com",
+        SHARED_BOB_EMAIL,
         AccountProvider::Password.into(),
         "bob",
     );
@@ -1117,20 +1123,41 @@ pub async fn test_find_account_ids_by_unique_fields(catalog: &dill::Catalog) {
         "carol",
         "carol@example.com",
         AccountProvider::Password.into(),
-        "carol",
+        SHARED_CAROL_PROVIDER_IDENTITY_KEY,
+    );
+    let account_by_email_but_another_email = make_test_account(
+        "bob-github",
+        SHARED_BOB_EMAIL,
+        AccountProvider::OAuthGitHub.into(),
+        "bob-github",
+    );
+    let account_by_provider_but_another_provider_identity_key = make_test_account(
+        "carol-github",
+        "carol-github@example.com",
+        AccountProvider::OAuthGitHub.into(),
+        SHARED_CAROL_PROVIDER_IDENTITY_KEY,
     );
 
-    account_repo.save_account(&account_by_name).await.unwrap();
-    account_repo.save_account(&account_by_email).await.unwrap();
-    account_repo
-        .save_account(&account_by_provider)
-        .await
-        .unwrap();
+    for account in [
+        &account_by_name,
+        &account_by_email,
+        &account_by_provider,
+        &account_by_email_but_another_email,
+        &account_by_provider_but_another_provider_identity_key,
+    ] {
+        assert_matches!(
+            account_repo.save_account(account).await,
+            Ok(_),
+            "Account: {:?}",
+            account
+        );
+    }
 
     // 2. Match only by name
     assert_matches!(
         account_repo
             .find_account_ids_by_unique_fields(
+                password_provider,
                 &account_by_name.account_name,
                 &not_found_email,
                 not_found_provider_identity_key,
@@ -1143,6 +1170,7 @@ pub async fn test_find_account_ids_by_unique_fields(catalog: &dill::Catalog) {
     assert_matches!(
         account_repo
             .find_account_ids_by_unique_fields(
+                password_provider,
                 &not_found_name,
                 &account_by_email.email,
                 not_found_provider_identity_key,
@@ -1155,6 +1183,7 @@ pub async fn test_find_account_ids_by_unique_fields(catalog: &dill::Catalog) {
     assert_matches!(
         account_repo
             .find_account_ids_by_unique_fields(
+                password_provider,
                 &not_found_name,
                 &not_found_email,
                 &account_by_provider.provider_identity_key,
@@ -1167,6 +1196,7 @@ pub async fn test_find_account_ids_by_unique_fields(catalog: &dill::Catalog) {
     assert_matches!(
         account_repo
             .find_account_ids_by_unique_fields(
+                password_provider,
                 &account_by_name.account_name,
                 &account_by_name.email,
                 &account_by_name.provider_identity_key,
@@ -1178,6 +1208,7 @@ pub async fn test_find_account_ids_by_unique_fields(catalog: &dill::Catalog) {
     // 6. Three different accounts, each by its own field
     let mut actual_ids = account_repo
         .find_account_ids_by_unique_fields(
+            password_provider,
             &account_by_name.account_name,
             &account_by_email.email,
             &account_by_provider.provider_identity_key,

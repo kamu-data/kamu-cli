@@ -333,6 +333,7 @@ impl AccountRepository for InMemoryAccountRepository {
 
     async fn find_account_ids_by_unique_fields(
         &self,
+        provider: &str,
         account_name: &odf::AccountName,
         email: &Email,
         provider_identity_key: &str,
@@ -341,6 +342,10 @@ impl AccountRepository for InMemoryAccountRepository {
         let mut account_ids = Vec::new();
 
         for account in guard.accounts_by_id.values() {
+            if account.provider != provider {
+                continue;
+            }
+
             let matches_name = account
                 .account_name
                 .as_str()

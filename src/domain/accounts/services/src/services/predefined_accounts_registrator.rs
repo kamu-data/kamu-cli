@@ -91,6 +91,7 @@ impl PredefinedAccountsRegistrator {
                     let mut account_ids = self
                         .account_service
                         .find_account_ids_by_one_of_unique_fields(
+                            &account_config.provider,
                             &account_config.account_name,
                             &account_config.email,
                             &account_config.provider_identity_key(),

@@ -420,6 +420,7 @@ impl AccountRepository for SqliteAccountRepository {
 
     async fn find_account_ids_by_unique_fields(
         &self,
+        provider: &str,
         account_name: &odf::AccountName,
         email: &Email,
         provider_identity_key: &str,
@@ -433,12 +434,17 @@ impl AccountRepository for SqliteAccountRepository {
 
         let account_rows = sqlx::query!(
             r#"
-            SELECT DISTINCT id as "id: odf::AccountID"
+            SELECT DISTINCT
+                id AS "id: odf::AccountID"
             FROM accounts
-            WHERE lower(account_name) = lower($1)
-               OR lower(email) = lower($2)
-               OR provider_identity_key = $3
+            WHERE provider = $1
+              AND (
+                  lower(account_name) = lower($2)
+                  OR email = $3
+                  OR provider_identity_key = $4
+              );
             "#,
+            provider,
             account_name_str,
             email_str,
             provider_identity_key

@@ -456,6 +456,7 @@ impl AccountRepository for MySqlAccountRepository {
 
     async fn find_account_ids_by_unique_fields(
         &self,
+        provider: &str,
         account_name: &odf::AccountName,
         email: &Email,
         provider_identity_key: &str,
@@ -466,12 +467,17 @@ impl AccountRepository for MySqlAccountRepository {
 
         let account_rows = sqlx::query!(
             r#"
-            SELECT DISTINCT id as "id: odf::AccountID"
+            SELECT DISTINCT
+                id AS "id: odf::AccountID"
             FROM accounts
-            WHERE lower(account_name) = lower(?)
-               OR email = ?
-               OR provider_identity_key = ?
+            WHERE provider = ?
+              AND (
+                  lower(account_name) = lower(?)
+                  OR email = ?
+                  OR provider_identity_key = ?
+              );
             "#,
+            provider,
             account_name.as_str(),
             email.as_ref(),
             provider_identity_key
