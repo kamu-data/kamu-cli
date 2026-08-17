@@ -17,8 +17,7 @@ use kamu_resources::{
     UnsupportedResourceSelectorError,
 };
 use kamu_resources_facade::{
-    DeleteResourceError,
-    GetResourceError,
+    BatchResourceError,
     ListResourcesError,
     SearchResourcesRequest,
     SpecViewMode,
@@ -29,6 +28,7 @@ use crate::harness::{FacadeContractHarness, TestAccount};
 use crate::helpers::{
     VARIABLE_SET_CANONICAL_SELECTOR,
     apply_manifest_and_get_id,
+    assert_single_batch_success,
     variable_set_manifest_json,
 };
 
@@ -160,24 +160,26 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
         );
     }
 
-    facade
-        .get(
-            ResourceRef {
-                account: None,
-                r#type: Some(
-                    VARIABLE_SET_CANONICAL_SELECTOR
-                        .parse::<TypeName>()
-                        .unwrap()
-                        .into(),
-                ),
-                id: None,
-                did: None,
-                name: Some("alias-check".parse().unwrap()),
-            },
-            SpecViewMode::Encrypted,
-        )
-        .await
-        .expect("get with canonical selector must succeed");
+    assert_single_batch_success(
+        facade
+            .get(
+                vec![ResourceRef {
+                    account: None,
+                    r#type: Some(
+                        VARIABLE_SET_CANONICAL_SELECTOR
+                            .parse::<TypeName>()
+                            .unwrap()
+                            .into(),
+                    ),
+                    id: None,
+                    did: None,
+                    name: Some("alias-check".parse().unwrap()),
+                }],
+                SpecViewMode::Encrypted,
+            )
+            .await
+            .expect("get with canonical selector must succeed"),
+    );
 
     // Short name "vs" resolves to the canonical VariableSet schema.
     let short_name_summaries = facade
@@ -272,18 +274,18 @@ pub async fn test_unsupported_schema_rejected_consistently(h: &impl FacadeContra
     // get by ByName — unsupported selector is rejected before lookup
     let get_by_name = facade
         .get(
-            ResourceRef {
+            vec![ResourceRef {
                 account: None,
                 r#type: Some(bad_type.parse::<TypeName>().unwrap().into()),
                 id: None,
                 did: None,
                 name: Some("unsupported-type-base".parse().unwrap()),
-            },
+            }],
             SpecViewMode::Encrypted,
         )
         .await;
     match get_by_name {
-        Err(GetResourceError::UnsupportedSelector(err)) => {
+        Err(BatchResourceError::UnsupportedSelector(err)) => {
             assert_unsupported_selector(&err, bad_type);
         }
         other => panic!(
@@ -293,16 +295,16 @@ pub async fn test_unsupported_schema_rejected_consistently(h: &impl FacadeContra
 
     // get_handle by ByName — same UnsupportedSelector behavior
     let gi_by_name = facade
-        .get_handle(ResourceRef {
+        .get_handles(vec![ResourceRef {
             account: None,
             r#type: Some(bad_type.parse::<TypeName>().unwrap().into()),
             id: None,
             did: None,
             name: Some("unsupported-type-base".parse().unwrap()),
-        })
+        }])
         .await;
     match gi_by_name {
-        Err(GetResourceError::UnsupportedSelector(err)) => {
+        Err(BatchResourceError::UnsupportedSelector(err)) => {
             assert_unsupported_selector(&err, bad_type);
         }
         other => panic!(
@@ -364,16 +366,16 @@ pub async fn test_unsupported_schema_rejected_consistently(h: &impl FacadeContra
 
     // delete by ById — UnsupportedSelector (type validated after UID is known)
     let delete_result = facade
-        .delete(ResourceRef {
+        .delete(vec![ResourceRef {
             account: None,
             r#type: Some(bad_type.parse::<TypeName>().unwrap().into()),
             id: Some(id),
             did: None,
             name: None,
-        })
+        }])
         .await;
     match delete_result {
-        Err(DeleteResourceError::UnsupportedSelector(err)) => {
+        Err(BatchResourceError::UnsupportedSelector(err)) => {
             assert_unsupported_selector(&err, bad_type);
         }
         other => panic!(

@@ -14,36 +14,10 @@ use crate::facade::graphql::cynic_api::fragments::{
     BatchResourceProblem,
     ResourceBadAccountProblem,
     ResourceHandle,
-    ResourceSelectorProblemResult,
     ResourceUnsupportedSelectorProblem,
 };
 use crate::facade::graphql::cynic_api::inputs::{ResourceRefInput, resource_ref_inputs};
 use crate::facade::graphql::cynic_api::schema;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(cynic::QueryFragment, Debug, Clone)]
-#[cynic(graphql_type = "Query", variables = "ResourceHandleRefVariables")]
-pub(crate) struct GetResourceHandleQuery {
-    pub resources: ResourceHandleResources,
-}
-
-#[derive(cynic::QueryFragment, Debug, Clone)]
-#[cynic(graphql_type = "Resources", variables = "ResourceHandleRefVariables")]
-pub(crate) struct ResourceHandleResources {
-    #[arguments(resourceRef: $resource_ref)]
-    pub resource_handle: ResourceGetHandleOutcome,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(cynic::InlineFragments, Debug, Clone)]
-pub(crate) enum ResourceGetHandleOutcome {
-    ResourceHandle(ResourceHandle),
-    ResourceSelectorProblemResult(ResourceSelectorProblemResult),
-    #[cynic(fallback)]
-    Unknown,
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -84,21 +58,6 @@ pub(crate) struct BatchResourceHandleSuccess {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::QueryVariables, Debug, Clone)]
-pub(crate) struct ResourceHandleRefVariables {
-    pub resource_ref: ResourceRefInput,
-}
-
-impl ResourceHandleRefVariables {
-    pub(crate) fn new(resource_ref: &ResourceRef) -> Self {
-        Self {
-            resource_ref: resource_ref.into(),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(cynic::QueryVariables, Debug, Clone)]
 pub(crate) struct ResourceHandleRefsVariables {
     pub resource_refs: Vec<ResourceRefInput>,
 }
@@ -112,12 +71,6 @@ impl ResourceHandleRefsVariables {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) fn build_handle_operation(
-    variables: ResourceHandleRefVariables,
-) -> cynic::Operation<GetResourceHandleQuery, ResourceHandleRefVariables> {
-    GetResourceHandleQuery::build(variables)
-}
 
 pub(crate) fn build_handles_operation(
     variables: ResourceHandleRefsVariables,

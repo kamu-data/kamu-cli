@@ -127,44 +127,6 @@ pub(crate) async fn resolve_batch_ids(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Scalar name→ID resolution. Returns `None`-as-`NameNotFound` converted to
-/// the caller's error type so it can be used in both batch and scalar paths.
-pub(crate) async fn resolve_resource_id<E>(
-    query_service: &dyn GenericResourceQueryService,
-    schema: &TypeUri,
-    account_id: &odf::AccountID,
-    resource_ref: &ResourceRef,
-) -> Result<ResourceID, E>
-where
-    E: From<internal_error::InternalError> + From<ResourceLookupProblem>,
-{
-    // An id wins over a name when both are present: ODF treats the pair as a
-    // consistency assertion, and the id is the authoritative half.
-    if let Some(id) = resource_ref.id {
-        return Ok(id);
-    }
-
-    let Some(name) = resource_ref.name.as_ref() else {
-        return Err(ResourceLookupProblem::EmptyRef.into());
-    };
-
-    match query_service
-        .find_resource_id_by_name(account_id, schema, name)
-        .await?
-    {
-        Some(id) => Ok(id),
-        None => Err(
-            ResourceLookupProblem::NameNotFound(ResourceNameNotFoundError {
-                type_name: resource_type_name(schema)?,
-                name: name.clone(),
-            })
-            .into(),
-        ),
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 /// UID not-found error for use after a batch UID fetch misses an entry.
 pub(crate) fn id_not_found(id: ResourceID) -> ResourceLookupProblem {
     ResourceLookupProblem::IDNotFound(ResourceIDNotFoundError(id))

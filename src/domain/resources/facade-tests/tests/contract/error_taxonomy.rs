@@ -16,21 +16,12 @@
 //! account-accepting API (not demoted to internal errors).
 
 use database_common::PaginationOpts;
-use kamu_resources::{
-    ApplyResourceOutcome,
-    ResourceAccountRef,
-    ResourceRef,
-    ResourceSelector,
-    TypeName,
-};
+use kamu_resources::{ResourceAccountRef, ResourceRef, ResourceSelector, TypeName};
 use kamu_resources_facade::{
     ApplyManifestError,
     ApplyManifestRequest,
     BatchResourceError,
-    DeleteResourceError,
-    GetResourceError,
     ListResourcesError,
-    RenderResourceManifestError,
     ResourceLookupProblem,
     ResourceManifestFormat,
     ResourcesSummaryError,
@@ -46,8 +37,8 @@ use crate::helpers::{
     SECRET_SET_CANONICAL_SELECTOR,
     VARIABLE_SET_CANONICAL_SELECTOR,
     VARIABLE_SET_SCHEMA_STR,
-    assert_applied_outcome,
-    variable_set_manifest_json,
+    assert_single_batch_problem,
+    create_variable_set,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -98,20 +89,6 @@ fn batch_by_id(id: kamu_resources::ResourceID) -> Vec<ResourceRef> {
     vec![by_id(&id)]
 }
 
-async fn create_resource(h: &impl FacadeContractHarness, name: &str) -> kamu_resources::ResourceID {
-    let facade = h.facade_for(TestAccount::Alice);
-    let decision = facade
-        .apply_manifest(ApplyManifestRequest {
-            format: ResourceManifestFormat::Json,
-            manifest: variable_set_manifest_json(name, None, &[("K", "v")]),
-        })
-        .await
-        .unwrap();
-    assert_applied_outcome(&decision, ApplyResourceOutcome::Created)
-        .headers
-        .id
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // RF-140: single-resource lookup error taxonomy is consistent across get,
@@ -122,7 +99,7 @@ contract_test!(
 );
 
 pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness) {
-    let id = create_resource(h, "taxonomy-single").await;
+    let id = create_variable_set(h, TestAccount::Alice, "taxonomy-single").await;
     let absent_uid = kamu_resources::ResourceID::new(uuid::Uuid::new_v4());
     let facade = h.facade_for(TestAccount::Alice);
 
@@ -130,91 +107,82 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
     let missing_name = "taxonomy-missing";
 
     let get = facade
-        .get(by_name(missing_name), SpecViewMode::Encrypted)
-        .await;
+        .get(vec![by_name(missing_name)], SpecViewMode::Encrypted)
+        .await
+        .unwrap();
     assert_matches!(
-        get,
-        Err(GetResourceError::LookupProblem(
-            ResourceLookupProblem::NameNotFound(_)
-        )),
+        assert_single_batch_problem(get),
+        ResourceLookupProblem::NameNotFound(_),
         "get: expected NameNotFound"
     );
 
-    let get_id = facade.get_handle(by_name(missing_name)).await;
+    let get_id = facade
+        .get_handles(vec![by_name(missing_name)])
+        .await
+        .unwrap();
     assert_matches!(
-        get_id,
-        Err(GetResourceError::LookupProblem(
-            ResourceLookupProblem::NameNotFound(_)
-        )),
+        assert_single_batch_problem(get_id),
+        ResourceLookupProblem::NameNotFound(_),
         "get_handle: expected NameNotFound"
     );
 
     let render = facade
-        .render_manifest(
-            by_name(missing_name),
+        .render_manifests(
+            vec![by_name(missing_name)],
             ResourceManifestFormat::Json,
             SpecViewMode::Encrypted,
         )
-        .await;
+        .await
+        .unwrap();
     assert_matches!(
-        render,
-        Err(RenderResourceManifestError::LookupProblem(
-            ResourceLookupProblem::NameNotFound(_)
-        )),
+        assert_single_batch_problem(render),
+        ResourceLookupProblem::NameNotFound(_),
         "render_manifest: expected NameNotFound"
     );
 
-    let del = facade.delete(by_name(missing_name)).await;
+    let del = facade.delete(vec![by_name(missing_name)]).await.unwrap();
     assert_matches!(
-        del,
-        Err(DeleteResourceError::LookupProblem(
-            ResourceLookupProblem::NameNotFound(_)
-        )),
+        assert_single_batch_problem(del),
+        ResourceLookupProblem::NameNotFound(_),
         "delete: expected NameNotFound"
     );
 
     // --- IDNotFound ---
     let get = facade
-        .get(by_id(&absent_uid), SpecViewMode::Encrypted)
-        .await;
+        .get(vec![by_id(&absent_uid)], SpecViewMode::Encrypted)
+        .await
+        .unwrap();
     assert_matches!(
-        get,
-        Err(GetResourceError::LookupProblem(
-            ResourceLookupProblem::IDNotFound(_)
-        )),
+        assert_single_batch_problem(get),
+        ResourceLookupProblem::IDNotFound(_),
         "get: expected IDNotFound"
     );
 
-    let get_id = facade.get_handle(by_id(&absent_uid)).await;
+    let get_id = facade.get_handles(vec![by_id(&absent_uid)]).await.unwrap();
     assert_matches!(
-        get_id,
-        Err(GetResourceError::LookupProblem(
-            ResourceLookupProblem::IDNotFound(_)
-        )),
+        assert_single_batch_problem(get_id),
+        ResourceLookupProblem::IDNotFound(_),
         "get_handle: expected IDNotFound"
     );
 
     let render = facade
-        .render_manifest(
-            by_id(&absent_uid),
+        .render_manifests(
+            vec![by_id(&absent_uid)],
             ResourceManifestFormat::Json,
             SpecViewMode::Encrypted,
         )
-        .await;
+        .await
+        .unwrap();
     assert_matches!(
-        render,
-        Err(RenderResourceManifestError::LookupProblem(
-            ResourceLookupProblem::IDNotFound(_)
-        )),
+        assert_single_batch_problem(render),
+        ResourceLookupProblem::IDNotFound(_),
         "render_manifest: expected IDNotFound"
     );
 
-    let del = facade.delete(by_id(&absent_uid)).await;
+    let del = facade.delete(vec![by_id(&absent_uid)]).await.unwrap();
     assert_matches!(
-        del,
-        Err(DeleteResourceError::LookupProblem(
-            ResourceLookupProblem::IDNotFound(_)
-        )),
+        assert_single_batch_problem(del),
+        ResourceLookupProblem::IDNotFound(_),
         "delete: expected IDNotFound"
     );
 
@@ -233,46 +201,43 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
     };
 
     let get = facade
-        .get(wrong_schema_selector.clone(), SpecViewMode::Encrypted)
-        .await;
+        .get(vec![wrong_schema_selector.clone()], SpecViewMode::Encrypted)
+        .await
+        .unwrap();
     assert_matches!(
-        get,
-        Err(GetResourceError::LookupProblem(
-            ResourceLookupProblem::SchemaMismatch(_)
-        )),
+        assert_single_batch_problem(get),
+        ResourceLookupProblem::SchemaMismatch(_),
         "get: expected SchemaMismatch"
     );
 
-    let get_id = facade.get_handle(wrong_schema_selector.clone()).await;
+    let get_id = facade
+        .get_handles(vec![wrong_schema_selector.clone()])
+        .await
+        .unwrap();
     assert_matches!(
-        get_id,
-        Err(GetResourceError::LookupProblem(
-            ResourceLookupProblem::SchemaMismatch(_)
-        )),
+        assert_single_batch_problem(get_id),
+        ResourceLookupProblem::SchemaMismatch(_),
         "get_handle: expected SchemaMismatch"
     );
 
     let render = facade
-        .render_manifest(
-            wrong_schema_selector.clone(),
+        .render_manifests(
+            vec![wrong_schema_selector.clone()],
             ResourceManifestFormat::Json,
             SpecViewMode::Encrypted,
         )
-        .await;
+        .await
+        .unwrap();
     assert_matches!(
-        render,
-        Err(RenderResourceManifestError::LookupProblem(
-            ResourceLookupProblem::SchemaMismatch(_)
-        )),
+        assert_single_batch_problem(render),
+        ResourceLookupProblem::SchemaMismatch(_),
         "render_manifest: expected SchemaMismatch"
     );
 
-    let del = facade.delete(wrong_schema_selector).await;
+    let del = facade.delete(vec![wrong_schema_selector]).await.unwrap();
     assert_matches!(
-        del,
-        Err(DeleteResourceError::LookupProblem(
-            ResourceLookupProblem::SchemaMismatch(_)
-        )),
+        assert_single_batch_problem(del),
+        ResourceLookupProblem::SchemaMismatch(_),
         "delete: expected SchemaMismatch"
     );
 }
@@ -288,7 +253,7 @@ pub async fn test_batch_lookup_taxonomy(h: &impl FacadeContractHarness) {
 
     // --- NameNotFound in get_many ---
     let resp = facade
-        .get_many(
+        .get(
             batch_by_name("taxonomy-batch-missing"),
             SpecViewMode::Encrypted,
         )
@@ -303,7 +268,7 @@ pub async fn test_batch_lookup_taxonomy(h: &impl FacadeContractHarness) {
 
     // --- IDNotFound in get_many ---
     let resp = facade
-        .get_many(batch_by_id(absent_uid), SpecViewMode::Encrypted)
+        .get(batch_by_id(absent_uid), SpecViewMode::Encrypted)
         .await
         .unwrap();
     assert_eq!(resp.problems.len(), 1);
@@ -343,7 +308,7 @@ pub async fn test_batch_lookup_taxonomy(h: &impl FacadeContractHarness) {
 
     // --- NameNotFound in delete_many ---
     let resp = facade
-        .delete_many(batch_by_name("taxonomy-batch-missing-del"))
+        .delete(batch_by_name("taxonomy-batch-missing-del"))
         .await
         .unwrap();
     assert_eq!(resp.problems.len(), 1);
@@ -376,7 +341,7 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
     // --- get ---
     let result = facade
         .get(
-            ResourceRef {
+            vec![ResourceRef {
                 account: Some(unknown_account.clone()),
                 r#type: Some(
                     VARIABLE_SET_CANONICAL_SELECTOR
@@ -387,19 +352,19 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
                 id: None,
                 did: None,
                 name: Some("bad-acct-get".parse().unwrap()),
-            },
+            }],
             SpecViewMode::Encrypted,
         )
         .await;
     assert_matches!(
         result,
-        Err(GetResourceError::BadAccount(_)),
+        Err(BatchResourceError::BadAccount(_)),
         "get: expected BadAccount"
     );
 
-    // --- get_many ---
+    // --- get, multi-ref ---
     let result = facade
-        .get_many(
+        .get(
             batch_by_name_for_account("bad-acct-get-many", unknown_account.clone()),
             SpecViewMode::Encrypted,
         )
@@ -407,13 +372,13 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
     assert_matches!(
         result,
         Err(BatchResourceError::BadAccount(_)),
-        "get_many: expected BadAccount"
+        "get with several refs: expected BadAccount"
     );
 
-    // --- render_manifest ---
+    // --- render_manifests ---
     let result = facade
-        .render_manifest(
-            ResourceRef {
+        .render_manifests(
+            vec![ResourceRef {
                 account: Some(unknown_account.clone()),
                 r#type: Some(
                     VARIABLE_SET_CANONICAL_SELECTOR
@@ -424,20 +389,20 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
                 id: None,
                 did: None,
                 name: Some("bad-acct-render".parse().unwrap()),
-            },
+            }],
             ResourceManifestFormat::Json,
             SpecViewMode::Encrypted,
         )
         .await;
     assert_matches!(
         result,
-        Err(RenderResourceManifestError::BadAccount(_)),
-        "render_manifest: expected BadAccount"
+        Err(BatchResourceError::BadAccount(_)),
+        "render_manifests: expected BadAccount"
     );
 
     // --- delete ---
     let result = facade
-        .delete(ResourceRef {
+        .delete(vec![ResourceRef {
             account: Some(unknown_account.clone()),
             r#type: Some(
                 VARIABLE_SET_CANONICAL_SELECTOR
@@ -448,17 +413,17 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
             id: None,
             did: None,
             name: Some("bad-acct-delete".parse().unwrap()),
-        })
+        }])
         .await;
     assert_matches!(
         result,
-        Err(DeleteResourceError::BadAccount(_)),
+        Err(BatchResourceError::BadAccount(_)),
         "delete: expected BadAccount"
     );
 
-    // --- delete_many ---
+    // --- delete, multi-ref ---
     let result = facade
-        .delete_many(batch_by_name_for_account(
+        .delete(batch_by_name_for_account(
             "bad-acct-delete-many",
             unknown_account.clone(),
         ))

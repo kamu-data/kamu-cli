@@ -176,6 +176,8 @@ not break; most are enforced in code and exercised by tests — pointers given w
 - **Local and remote facade behavior must match for all contract-tested cases.** The `contract_test!`
   suite runs each case against both implementations; new facade behavior must be added there
   ([§15](#15-tests)).
+- **Ref-keyed operations exist only in batch form**; a single-resource call is a one-element batch.
+  A scalar method would be a second implementation of the batch pipeline's contract ([§10](#10-facade-layer)).
 - **Batch operations preserve the positional `request_index`.** `BatchResourceResponse` reports each
   success/problem tagged with the originating request index, so partial results map back to inputs.
 - **A resource is always scoped to exactly one account**, fixed by the persistence key; cross-account
@@ -815,16 +817,13 @@ pub trait ResourceFacade: Send + Sync {
     async fn list_supported_resource_types(&self) -> Result<Vec<ResourceTypeDescriptor>, ...>;
     async fn summary(&self, request: ResourcesSummaryRequest) -> Result<ResourcesSummary, ...>;
 
-    // Point lookups and batches take ODF `ResourceRef`s: each ref carries its
-    // own account and type, so one batch can span both. The scalar forms are
-    // *provided* methods delegating to their batch form with a one-element vec.
-    async fn get(&self, resource_ref: ResourceRef, spec_view_mode: SpecViewMode) -> Result<Resource, ...>;
-    async fn get_many(&self, resource_refs: Vec<ResourceRef>, spec_view_mode: SpecViewMode)
+    // Ref-keyed reads and deletes take ODF `ResourceRef`s: each ref carries its
+    // own account and type, so one batch can span both. These exist ONLY in
+    // batch form — a single-resource call is a one-element vec.
+    async fn get(&self, resource_refs: Vec<ResourceRef>, spec_view_mode: SpecViewMode)
         -> Result<BatchResourceResponse<Resource, ResourceLookupProblem>, ...>;
-    async fn get_handle(&self, resource_ref: ResourceRef) -> Result<ResourceHandle, ...>;
     async fn get_handles(&self, resource_refs: Vec<ResourceRef>)
         -> Result<BatchResourceResponse<ResourceHandle, ResourceLookupProblem>, ...>;
-    async fn render_manifest(&self, resource_ref, format: ResourceManifestFormat, spec_view_mode) -> ...;
     async fn render_manifests(&self, resource_refs: Vec<ResourceRef>, format: ResourceManifestFormat, spec_view_mode)
         -> Result<BatchResourceResponse<RenderResourceManifestResult, ResourceLookupProblem>, ...>;
 
@@ -833,16 +832,36 @@ pub trait ResourceFacade: Send + Sync {
     async fn search(&self, request: SearchResourcesRequest) -> Result<SearchResourcesResponse, ...>;
     async fn search_handles(&self, request: SearchResourcesRequest) -> Result<SearchResourceHandlesResponse, ...>;
 
+    // Apply is the one family that KEEPS a scalar form, because there the
+    // scalar is the primitive and the batch is a loop over it — see below.
     async fn plan_apply_manifest(&self, request: ApplyManifestRequest) -> Result<ApplyManifestPlanningDecision, ...>;
     async fn apply_manifest(&self, request: ApplyManifestRequest) -> Result<ApplyManifestApplicationDecision, ...>;
     async fn plan_apply_manifests(&self, request: ApplyManifestBatchRequest)
         -> Result<ApplyManifestBatchResponse<ApplyManifestPlanningDecision>, BatchResourceError>;
     async fn apply_manifests(&self, request: ApplyManifestBatchRequest)
         -> Result<ApplyManifestBatchResponse<ApplyManifestApplicationDecision>, BatchResourceError>;
-    async fn delete(&self, resource_ref: ResourceRef) -> Result<ResourceID, ...>;
-    async fn delete_many(&self, resource_refs: Vec<ResourceRef>) -> ...;
+
+    async fn delete(&self, resource_refs: Vec<ResourceRef>)
+        -> Result<BatchResourceResponse<ResourceID, ResourceLookupProblem>, ...>;
 }
 ```
+
+**The two families are deliberately asymmetric about which form is the
+primitive.** Ref-keyed reads and deletes (`get`, `get_handles`,
+`render_manifests`, `delete`) exist only in batch form: the batch pipeline —
+group refs by `(account, schema)`, resolve ids per group, merge back by
+`request_index` — *is* the primitive, so a scalar method would be a second
+implementation of the same contract. It used to be exactly that: the local
+impl overrode the "provided" scalar methods with an independent
+`resolve_ref_schema` → `resolve_resource_id` → `resolve_snapshot_for_schema`
+path, and a contract test existed purely to prove the two paths agreed on
+error taxonomy.
+
+Apply keeps its scalar form because there the scalar *is* the primitive:
+`plan_apply_manifests`/`apply_manifests` are loops over
+`plan_apply_manifest`/`apply_manifest`, and the per-item transaction boundary
+belongs to the caller — the CLI's `--continue-on-error` path opens one
+transaction per manifest — not to the facade.
 
 **Selectors & view modes:**
 
@@ -881,8 +900,8 @@ was asked for, with no way for the caller to tell.
 
 A **type-less** `ResourceRef` (`type: None`) is resolved by searching every registered type. That
 resolution lives in `group_refs_by_target`, the shared front half of all three batch pipelines
-(`get_handles`, `resolve_multiple_resource_views` — which serves both `get_many` and
-`render_manifests` — and `delete_many`), so the three inherit it together rather than one at a time.
+(`get_handles`, `resolve_multiple_resource_views` — which serves both `get` and
+`render_manifests` — and `delete`), so the three inherit it together rather than one at a time.
 Because a ref names *exactly one* resource, a name matching in several types is an **ambiguity**
 error (`AmbiguousType`, RF-172), not a multi-match: picking a winner would make `kamu get <name>`
 silently resolve to whichever type sorted first. A name matching in none is `AnyTypeNameNotFound`
@@ -974,7 +993,7 @@ token into identifiers via `search_handles`, then operates on the
 resulting `ResourceRef::ById` set. A label filter is a *narrowing of the candidate
 identifier set* — structurally the same job as a name pattern — so it belongs to
 that phase-1 expansion. The
-phase-2 batch calls (`get_many`, `delete_many`, `render_manifests`) structurally
+phase-2 batch calls (`get`, `delete`, `render_manifests`) structurally
 **cannot** carry a filter — they take a bare `Vec<ResourceRef>` — so the old
 "pass `label_filter: None` by convention" precondition is now enforced by the type
 system instead of by discipline.
@@ -1132,12 +1151,14 @@ Files: [`adapter/graphql/src/queries/resources/`](/src/adapter/graphql/src/queri
 and [`adapter/graphql/src/mutations/resources_mut/`](/src/adapter/graphql/src/mutations/resources_mut).
 Every resolver delegates to `ResourceFacade`.
 
-**Queries (`Resources`):** `supported_resource_types`, `summary`, `resource` / `resources`,
-`resource_handle` / `resource_handles`, `search` / `search_handles`,
-`render_manifest` / `render_manifests`. The `revealed: bool` argument maps to `SpecViewMode`.
+**Queries (`Resources`):** `supported_resource_types`, `summary`, `resources`,
+`resourceHandles`, `search` / `search_handles`, `renderManifests`. Each ref-keyed query takes
+`[ResourceRefInput!]!` — there are no single-ref variants, matching the facade. The
+`revealed: bool` argument maps to `SpecViewMode`.
 
-**Mutations (`ResourcesMut`):** `apply_manifest(manifest, format, dry_run?)`, `delete(selector)`,
-`delete_many(selector)`. `dry_run` routes to `plan_apply_manifest`, otherwise `apply_manifest`.
+**Mutations (`ResourcesMut`):** `apply_manifest(manifest, format, dry_run?)`,
+`apply_manifests(manifests, dry_run?)`, `delete(resourceRefs)`. `dry_run` routes to
+`plan_apply_manifest`, otherwise `apply_manifest`.
 
 **Outcome-union pattern.** *Domain/application outcomes* are modeled as unions: a resolver returns a
 union of `Success` + typed `Problem` variants (bad account, unsupported descriptor, validation
@@ -1163,8 +1184,8 @@ These map directly from the domain views in
 **Label-filter transport.** `ResourceLabelFilterInput { entries: [ResourceLabelFilterEntryInput!]! }`
 carries the filter, where each entry is `{ key: String!, value: JSON! }`. It appears **only** as
 `ResourceSelectorInput.labels` — there is no call-level `labelFilter` argument on `search` or
-`searchHandles`. The batch `resources`/`renderManifests` queries and the `deleteMany` mutation take
-`[ResourceRefInput!]!` and carry no filter at all.
+`searchHandles`. The ref-keyed `resources`/`resourceHandles`/`renderManifests` queries and the
+`delete` mutation take `[ResourceRefInput!]!` and carry no filter at all.
 
 Both `search` and `searchHandles` take the **same** `SearchResourcesInput`; only the response shape
 differs (`ResourceListOutcome` vs `ResourceHandleListOutcome`). They were separate inputs whose
@@ -1686,7 +1707,9 @@ reconcilers (incl. the `SecretSet` spec sanitizer, encrypted projection, and `re
 `RemoteGraphqlFacadeHarness`, so the suite **enforces local/remote symmetry for the behavior it
 covers** (it doesn't guarantee parity for untested paths). Suites cover apply, batch ops, account scoping,
 list/search, supported resource types, get-identity, error taxonomy, delete, render-manifest,
-list-all, summary, and spec view modes.
+list-all, summary, and spec view modes. Since the ref-keyed operations are batch-only, the
+single-resource cases call them with a one-element vec and unwrap via the
+`assert_single_batch_success` / `assert_single_batch_problem` helpers.
 
 **E2E (CLI)** —
 [`src/e2e/app/cli/repo-tests/src/commands/resources`](/src/e2e/app/cli/repo-tests/src/commands/resources/).
@@ -1776,7 +1799,7 @@ Otherwise the behavior is already guaranteed for both implementations by the con
   behavior, extend that suite so both implementations stay in lockstep.
 - **Phase-1 expansion is where label filters apply — phase-2 has no filter to misuse.** `get` and
   `delete` first expand selectors into identifiers (filtered), then act on those ids by
-  `ResourceRef::ById`. The phase-2 batch calls — `get_many`, `delete_many`, `render_manifests` —
+  `ResourceRef::ById`. The phase-2 batch calls — `get`, `delete`, `render_manifests` —
   take a bare `Vec<ResourceRef>`, which has no `label_filter` field at all, so a future caller
   cannot reach those methods with an unfiltered id set and a forgotten filter: there is nothing to
   forget. If a new batch shape ever needs filtering, filter during expansion (phase 1)

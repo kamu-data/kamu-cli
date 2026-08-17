@@ -26,8 +26,8 @@ use kamu_resources::{
 use kamu_resources_facade::{
     ApplyManifestError,
     ApplyManifestRequest,
-    GetResourceError,
     ResourceHeadersValidationProblemCode,
+    ResourceLookupProblem,
     ResourceManifestFormat,
     SpecViewMode,
 };
@@ -41,6 +41,8 @@ use crate::helpers::{
     assert_applied_outcome,
     assert_planning_outcome,
     assert_resource_view_fields,
+    assert_single_batch_problem,
+    assert_single_batch_success,
     variable_set_manifest_json,
     variable_set_manifest_yaml,
 };
@@ -113,16 +115,18 @@ pub async fn test_plan_create_json(h: &impl FacadeContractHarness) {
     // Verify no side effect - resource must not exist yet
     let get_result = facade
         .get(
-            make_selector(
+            vec![make_selector(
                 VARIABLE_SET_CANONICAL_SELECTOR,
                 VARIABLE_SET_SCHEMA_STR,
                 "my-vars",
-            ),
+            )],
             SpecViewMode::Encrypted,
         )
-        .await;
-    assert!(
-        matches!(get_result, Err(GetResourceError::LookupProblem(_))),
+        .await
+        .unwrap();
+    assert_matches!(
+        assert_single_batch_problem(get_result),
+        ResourceLookupProblem::NameNotFound(_) | ResourceLookupProblem::AnyTypeNameNotFound(_),
         "resource must not exist after planning"
     );
 }
@@ -159,16 +163,18 @@ pub async fn test_plan_create_yaml(h: &impl FacadeContractHarness) {
     // Verify no side effect - resource must not exist yet
     let get_result = facade
         .get(
-            make_selector(
+            vec![make_selector(
                 VARIABLE_SET_CANONICAL_SELECTOR,
                 VARIABLE_SET_SCHEMA_STR,
                 "my-yaml-vars",
-            ),
+            )],
             SpecViewMode::Encrypted,
         )
-        .await;
-    assert!(
-        matches!(get_result, Err(GetResourceError::LookupProblem(_))),
+        .await
+        .unwrap();
+    assert_matches!(
+        assert_single_batch_problem(get_result),
+        ResourceLookupProblem::NameNotFound(_) | ResourceLookupProblem::AnyTypeNameNotFound(_),
         "resource must not exist after planning"
     );
 }
@@ -212,17 +218,19 @@ pub async fn test_plan_update(h: &impl FacadeContractHarness) {
         "plan must report a spec change"
     );
     // Resource in store must remain unchanged (no side effect)
-    let stored = facade
-        .get(
-            make_selector(
-                VARIABLE_SET_CANONICAL_SELECTOR,
-                VARIABLE_SET_SCHEMA_STR,
-                "plan-upd-vars",
-            ),
-            SpecViewMode::Encrypted,
-        )
-        .await
-        .unwrap();
+    let stored = assert_single_batch_success(
+        facade
+            .get(
+                vec![make_selector(
+                    VARIABLE_SET_CANONICAL_SELECTOR,
+                    VARIABLE_SET_SCHEMA_STR,
+                    "plan-upd-vars",
+                )],
+                SpecViewMode::Encrypted,
+            )
+            .await
+            .unwrap(),
+    );
     let stored_spec: serde_json::Value = stored.spec;
     assert!(
         stored_spec["variables"]["B"].is_null(),
@@ -333,16 +341,18 @@ pub async fn test_plan_rejects_schema_invalid_manifest(h: &impl FacadeContractHa
     // No resource should have been persisted
     let get = facade
         .get(
-            make_selector(
+            vec![make_selector(
                 VARIABLE_SET_CANONICAL_SELECTOR,
                 VARIABLE_SET_SCHEMA_STR,
                 "schema-invalid-vars",
-            ),
+            )],
             SpecViewMode::Encrypted,
         )
-        .await;
-    assert!(
-        matches!(get, Err(GetResourceError::LookupProblem(_))),
+        .await
+        .unwrap();
+    assert_matches!(
+        assert_single_batch_problem(get),
+        ResourceLookupProblem::NameNotFound(_) | ResourceLookupProblem::AnyTypeNameNotFound(_),
         "resource must not exist after schema-invalid plan"
     );
 }
@@ -417,16 +427,18 @@ pub async fn test_apply_rejects_business_invalid_spec(h: &impl FacadeContractHar
     // Resource must not have been created
     let get = facade
         .get(
-            make_selector(
+            vec![make_selector(
                 VARIABLE_SET_CANONICAL_SELECTOR,
                 VARIABLE_SET_SCHEMA_STR,
                 "biz-invalid-vars",
-            ),
+            )],
             SpecViewMode::Encrypted,
         )
-        .await;
-    assert!(
-        matches!(get, Err(GetResourceError::LookupProblem(_))),
+        .await
+        .unwrap();
+    assert_matches!(
+        assert_single_batch_problem(get),
+        ResourceLookupProblem::NameNotFound(_) | ResourceLookupProblem::AnyTypeNameNotFound(_),
         "resource must not exist after rejected apply"
     );
 }
@@ -455,17 +467,19 @@ pub async fn test_apply_create_json(h: &impl FacadeContractHarness) {
     let id = view.headers.id;
 
     // Verify resource is readable via get
-    let fetched = facade
-        .get(
-            make_selector(
-                VARIABLE_SET_CANONICAL_SELECTOR,
-                VARIABLE_SET_SCHEMA_STR,
-                "alpha",
-            ),
-            SpecViewMode::Encrypted,
-        )
-        .await
-        .unwrap();
+    let fetched = assert_single_batch_success(
+        facade
+            .get(
+                vec![make_selector(
+                    VARIABLE_SET_CANONICAL_SELECTOR,
+                    VARIABLE_SET_SCHEMA_STR,
+                    "alpha",
+                )],
+                SpecViewMode::Encrypted,
+            )
+            .await
+            .unwrap(),
+    );
     assert_eq!(fetched.headers.id, id, "id must match after apply");
     assert_resource_view_fields(&fetched, VariableSetResource::schema(), "alpha");
 }
@@ -492,17 +506,19 @@ pub async fn test_apply_create_yaml(h: &impl FacadeContractHarness) {
     assert_eq!(view.headers.generation, 1, "initial generation must be 1");
 
     // Semantic equivalence: same resource via get, just like after JSON apply
-    let fetched = facade
-        .get(
-            make_selector(
-                VARIABLE_SET_CANONICAL_SELECTOR,
-                VARIABLE_SET_SCHEMA_STR,
-                "yaml-vars",
-            ),
-            SpecViewMode::Encrypted,
-        )
-        .await
-        .unwrap();
+    let fetched = assert_single_batch_success(
+        facade
+            .get(
+                vec![make_selector(
+                    VARIABLE_SET_CANONICAL_SELECTOR,
+                    VARIABLE_SET_SCHEMA_STR,
+                    "yaml-vars",
+                )],
+                SpecViewMode::Encrypted,
+            )
+            .await
+            .unwrap(),
+    );
     assert_eq!(fetched.headers.id, view.headers.id);
     assert_resource_view_fields(&fetched, VariableSetResource::schema(), "yaml-vars");
 }
@@ -553,17 +569,19 @@ pub async fn test_apply_update(h: &impl FacadeContractHarness) {
     );
 
     // Verify via get
-    let fetched = facade
-        .get(
-            make_selector(
-                VARIABLE_SET_CANONICAL_SELECTOR,
-                VARIABLE_SET_SCHEMA_STR,
-                "upd-vars",
-            ),
-            SpecViewMode::Encrypted,
-        )
-        .await
-        .unwrap();
+    let fetched = assert_single_batch_success(
+        facade
+            .get(
+                vec![make_selector(
+                    VARIABLE_SET_CANONICAL_SELECTOR,
+                    VARIABLE_SET_SCHEMA_STR,
+                    "upd-vars",
+                )],
+                SpecViewMode::Encrypted,
+            )
+            .await
+            .unwrap(),
+    );
     assert_eq!(fetched.headers.id, original_id);
 }
 

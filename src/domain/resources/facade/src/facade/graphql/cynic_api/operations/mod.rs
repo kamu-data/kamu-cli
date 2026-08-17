@@ -10,8 +10,7 @@
 pub(crate) mod apply;
 pub(crate) mod apply_batch;
 pub(crate) mod delete;
-pub(crate) mod get_resource;
-pub(crate) mod get_resources;
+pub(crate) mod get;
 pub(crate) mod handle;
 pub(crate) mod render_manifest;
 pub(crate) mod search;

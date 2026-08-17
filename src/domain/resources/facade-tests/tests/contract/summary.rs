@@ -23,22 +23,9 @@ use pretty_assertions::assert_eq;
 
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
-use crate::helpers::{assert_applied_outcome, variable_set_manifest_json};
+use crate::helpers::{assert_applied_outcome, create_variable_set, variable_set_manifest_json};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-async fn create_resource(h: &impl FacadeContractHarness, account: TestAccount, name: &str) {
-    let facade = h.facade_for(account);
-    let manifest = variable_set_manifest_json(name, None, &[("K", "v")]);
-    let decision = facade
-        .apply_manifest(ApplyManifestRequest {
-            format: ResourceManifestFormat::Json,
-            manifest,
-        })
-        .await
-        .unwrap();
-    assert_applied_outcome(&decision, ApplyResourceOutcome::Created);
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -75,9 +62,9 @@ contract_test!(
 );
 
 pub async fn test_summary_counts_resources(h: &impl FacadeContractHarness) {
-    create_resource(h, TestAccount::Alice, "sum-alice-1").await;
-    create_resource(h, TestAccount::Alice, "sum-alice-2").await;
-    create_resource(h, TestAccount::Bob, "sum-bob-1").await;
+    create_variable_set(h, TestAccount::Alice, "sum-alice-1").await;
+    create_variable_set(h, TestAccount::Alice, "sum-alice-2").await;
+    create_variable_set(h, TestAccount::Bob, "sum-bob-1").await;
 
     let alice_facade = h.facade_for(TestAccount::Alice);
     let alice_summary = alice_facade
@@ -186,8 +173,8 @@ fn vs_phase_counts(summary: &ResourcesSummary) -> ResourcePhaseCounts {
 contract_test!(summary_account_scoping, super::test_summary_account_scoping);
 
 pub async fn test_summary_account_scoping(h: &impl FacadeContractHarness) {
-    create_resource(h, TestAccount::Alice, "sum-scope-alice").await;
-    create_resource(h, TestAccount::Bob, "sum-scope-bob").await;
+    create_variable_set(h, TestAccount::Alice, "sum-scope-alice").await;
+    create_variable_set(h, TestAccount::Bob, "sum-scope-bob").await;
 
     let alice_facade = h.facade_for(TestAccount::Alice);
     let alice_summary = alice_facade

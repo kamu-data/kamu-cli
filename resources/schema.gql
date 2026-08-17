@@ -4029,21 +4029,15 @@ type ResourceConnection {
 	edges: [ResourceEdge!]!
 }
 
-union ResourceDeleteManyOutcome = ResourceDeleteManyResult | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem
+union ResourceDeleteOutcome = ResourceDeleteResult | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem
 
-type ResourceDeleteManyResult {
-	resources: [ResourceDeleteManySuccess!]!
+type ResourceDeleteResult {
+	resources: [ResourceDeleteSuccess!]!
 	problems: [BatchResourceProblem!]!
 }
 
-type ResourceDeleteManySuccess {
-	requestIndex: Int!
-	resourceId: ResourceID!
-}
-
-union ResourceDeleteOutcome = ResourceDeleteSuccess | ResourceSelectorProblemResult
-
 type ResourceDeleteSuccess {
+	requestIndex: Int!
 	resourceId: ResourceID!
 }
 
@@ -4057,10 +4051,6 @@ A reference that named neither an id nor a name.
 type ResourceEmptyRefProblem {
 	message: String!
 }
-
-union ResourceGetHandleOutcome = ResourceHandle | ResourceSelectorProblemResult
-
-union ResourceGetOutcome = Resource | ResourceSelectorProblemResult
 
 type ResourceHandle {
 	id: ResourceID!
@@ -4311,8 +4301,6 @@ input ResourceRefInput {
 	name: ResourceName
 }
 
-union ResourceRenderManifestOutcome = ResourceRenderManifestResult | ResourceSelectorProblemResult
-
 type ResourceRenderManifestResult {
 	manifest: String!
 	format: ResourceManifestFormat!
@@ -4360,12 +4348,6 @@ input ResourceSelectorInput {
 }
 
 scalar ResourceSelectorName
-
-union ResourceSelectorProblem = ResourceIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceAnyTypeNameNotFoundProblem | ResourceAmbiguousTypeProblem | ResourceSchemaMismatchProblem | ResourceNameMismatchProblem | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem | ResourceEmptyRefProblem
-
-type ResourceSelectorProblemResult {
-	problem: ResourceSelectorProblem!
-}
 
 """
 Resource lifecycle and reconciliation information.
@@ -4466,17 +4448,9 @@ type Resources {
 	"""
 	summary(account: AccountRefInput): ResourcesSummaryOutcome!
 	"""
-	Returns a resource by selector, if found
-	"""
-	resource(resourceRef: ResourceRefInput!, revealed: Boolean! = false): ResourceGetOutcome!
-	"""
 	Returns resources by selectors
 	"""
 	resources(resourceRefs: [ResourceRefInput!]!, revealed: Boolean! = false): BatchResourcesOutcome!
-	"""
-	Returns resource handle by selector, if found
-	"""
-	resourceHandle(resourceRef: ResourceRefInput!): ResourceGetHandleOutcome!
 	"""
 	Returns resource handles by selectors
 	"""
@@ -4491,10 +4465,6 @@ type Resources {
 	"""
 	searchHandles(query: SearchResourcesInput!, page: Int, perPage: Int): ResourceHandleListOutcome!
 	"""
-	Renders a canonical manifest representation from a stored resource
-	"""
-	renderManifest(resourceRef: ResourceRefInput!, format: ResourceManifestFormat!, revealed: Boolean! = false): ResourceRenderManifestOutcome!
-	"""
 	Renders canonical manifest representations from stored resources
 	"""
 	renderManifests(resourceRefs: [ResourceRefInput!]!, format: ResourceManifestFormat!, revealed: Boolean! = false): BatchResourceManifestsOutcome!
@@ -4503,8 +4473,7 @@ type Resources {
 type ResourcesMut {
 	applyManifest(manifest: String!, format: ResourceManifestFormat!, dryRun: Boolean): ResourceApplyOutcome!
 	applyManifests(manifests: [ApplyManifestInput!]!, dryRun: Boolean): ResourceApplyManifestsResult!
-	delete(resourceRef: ResourceRefInput!): ResourceDeleteOutcome!
-	deleteMany(resourceRefs: [ResourceRefInput!]!): ResourceDeleteManyOutcome!
+	delete(resourceRefs: [ResourceRefInput!]!): ResourceDeleteOutcome!
 }
 
 type ResourcesSummary {

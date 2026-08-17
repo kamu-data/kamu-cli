@@ -250,7 +250,7 @@ impl GetResourceCommand {
         for (_schema, entries) in Self::group_targets_by_schema(targets) {
             for chunk in entries.chunks(Self::MATERIALIZATION_BATCH_SIZE) {
                 let result = resource_facade
-                    .get_many(Self::chunk_resource_refs(chunk), self.spec_view_mode())
+                    .get(Self::chunk_resource_refs(chunk), self.spec_view_mode())
                     .await?;
 
                 self.handle_get_resource_problems(result.problems)?;

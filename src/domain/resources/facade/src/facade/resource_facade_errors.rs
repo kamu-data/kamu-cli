@@ -160,6 +160,13 @@ pub enum ListSupportedResourceTypesError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// A single ref failed to resolve. No longer produced by [`ResourceFacade`]
+/// itself — the ref-keyed operations are batch-only and report per-item
+/// failures as [`ResourceLookupProblem`] inside a `BatchResourceResponse`.
+/// This is the CLI-side currency for "one ref, one outcome", built from a
+/// batch response by callers that resolved a single name.
+///
+/// [`ResourceFacade`]: crate::ResourceFacade
 #[derive(Debug, Error)]
 pub enum GetResourceError {
     #[error(transparent)]
@@ -253,6 +260,8 @@ pub enum BatchResourceError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// The render counterpart of [`GetResourceError`] — see its note on why a
+/// single-ref error type outlives the singular facade methods.
 #[derive(Debug, Error)]
 pub enum RenderResourceManifestError {
     #[error(transparent)]
@@ -332,76 +341,6 @@ pub enum ResourcesSummaryError {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Error)]
-pub enum DeleteResourceError {
-    #[error(transparent)]
-    UnsupportedSelector(#[from] UnsupportedResourceSelectorError),
-
-    #[error(transparent)]
-    BadAccount(#[from] ResolveManifestAccountError),
-
-    #[error(transparent)]
-    LookupProblem(#[from] ResourceLookupProblem),
-
-    #[error(transparent)]
-    RemoteRequest(#[from] GraphqlHttpRequestError),
-
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
-
-impl From<DeleteResourcesCrudDispatcherError> for DeleteResourceError {
-    fn from(err: DeleteResourcesCrudDispatcherError) -> Self {
-        use DeleteResourcesCrudDispatcherError as E;
-        match err {
-            E::Access(err) => Self::Internal(err.int_err()),
-            E::ConcurrentModification(err) => Self::Internal(err.int_err()),
-            E::Internal(err) => Self::Internal(err),
-        }
-    }
-}
-
-impl From<BatchResourceError> for DeleteResourceError {
-    fn from(err: BatchResourceError) -> Self {
-        match err {
-            BatchResourceError::UnsupportedSelector(err) => Self::UnsupportedSelector(err),
-            BatchResourceError::BadAccount(err) => Self::BadAccount(err),
-            // `delete` resolves a single pre-selected ref, so it never carries
-            // a label filter for this to surface from.
-            BatchResourceError::InvalidLabelFilter(err) => Self::Internal(err.int_err()),
-            BatchResourceError::RemoteRequest(err) => Self::RemoteRequest(err),
-            BatchResourceError::Internal(err) => Self::Internal(err),
-        }
-    }
-}
-
-impl From<BatchResourceError> for GetResourceError {
-    fn from(err: BatchResourceError) -> Self {
-        match err {
-            BatchResourceError::UnsupportedSelector(err) => Self::UnsupportedSelector(err),
-            BatchResourceError::BadAccount(err) => Self::BadAccount(err),
-            // A scalar get carries no label filter, and a one-element batch is
-            // uniform by construction, so neither can surface here.
-            BatchResourceError::InvalidLabelFilter(err) => Self::Internal(err.int_err()),
-            BatchResourceError::RemoteRequest(err) => Self::RemoteRequest(err),
-            BatchResourceError::Internal(err) => Self::Internal(err),
-        }
-    }
-}
-
-impl From<BatchResourceError> for RenderResourceManifestError {
-    fn from(err: BatchResourceError) -> Self {
-        match err {
-            BatchResourceError::UnsupportedSelector(err) => Self::UnsupportedSelector(err),
-            BatchResourceError::BadAccount(err) => Self::BadAccount(err),
-            // See the note on the `GetResourceError` conversion above.
-            BatchResourceError::InvalidLabelFilter(err) => Self::Internal(err.int_err()),
-            BatchResourceError::RemoteRequest(err) => Self::RemoteRequest(err),
-            BatchResourceError::Internal(err) => Self::Internal(err),
-        }
-    }
-}
 
 impl From<DeleteResourcesCrudDispatcherError> for BatchResourceError {
     fn from(err: DeleteResourcesCrudDispatcherError) -> Self {

@@ -14,8 +14,6 @@ use crate::queries::{
     ResourceBadAccountProblem,
     ResourceManifestFormat,
     ResourceRefInput,
-    ResourceSelectorProblem,
-    ResourceSelectorProblemResult,
     ResourceUnsupportedSelectorProblem,
     into_resource_refs,
     map_bad_account_problem,
@@ -134,72 +132,29 @@ impl ResourcesMut {
         }
     }
 
-    #[tracing::instrument(level = "info", name = ResourcesMut_delete, skip_all, fields(?resource_ref))]
+    #[tracing::instrument(level = "info", name = ResourcesMut_delete, skip_all, fields(selector_count = resource_refs.len()))]
     #[graphql(guard = "LoggedInGuard::new()")]
     async fn delete(
         &self,
         ctx: &Context<'_>,
-        resource_ref: ResourceRefInput,
+        resource_refs: Vec<ResourceRefInput>,
     ) -> Result<ResourceDeleteOutcome> {
         let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
 
-        match resource_facade.delete(resource_ref.try_into()?).await {
-            Ok(resource_id) => Ok(ResourceDeleteOutcome::Success(ResourceDeleteSuccess {
-                resource_id: resource_id.into(),
-            })),
-            Err(kamu_resources_facade::DeleteResourceError::LookupProblem(problem)) => {
-                Ok(ResourceDeleteOutcome::Problem(problem.into()))
-            }
-            Err(kamu_resources_facade::DeleteResourceError::UnsupportedSelector(e)) => {
-                Ok(ResourceDeleteOutcome::Problem(e.try_into()?))
-            }
-            Err(kamu_resources_facade::DeleteResourceError::BadAccount(e)) => Ok(
-                ResourceDeleteOutcome::Problem(ResourceSelectorProblemResult {
-                    problem: ResourceSelectorProblem::BadAccount(map_bad_account_problem(e)?),
-                }),
-            ),
-            Err(error) => Err(map_delete_resource_error(error)),
-        }
-    }
-
-    #[tracing::instrument(level = "info", name = ResourcesMut_delete_many, skip_all, fields(selector_count = resource_refs.len()))]
-    #[graphql(guard = "LoggedInGuard::new()")]
-    async fn delete_many(
-        &self,
-        ctx: &Context<'_>,
-        resource_refs: Vec<ResourceRefInput>,
-    ) -> Result<ResourceDeleteManyOutcome> {
-        let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
-
         match resource_facade
-            .delete_many(into_resource_refs(resource_refs)?)
+            .delete(into_resource_refs(resource_refs)?)
             .await
         {
-            Ok(response) => Ok(ResourceDeleteManyOutcome::Success(response.into())),
+            Ok(response) => Ok(ResourceDeleteOutcome::Success(response.into())),
             Err(kamu_resources_facade::BatchResourceError::UnsupportedSelector(e)) => Ok(
-                ResourceDeleteManyOutcome::UnsupportedSelector(map_unsupported_selector_problem(e)),
+                ResourceDeleteOutcome::UnsupportedSelector(map_unsupported_selector_problem(e)),
             ),
             Err(kamu_resources_facade::BatchResourceError::BadAccount(e)) => Ok(
-                ResourceDeleteManyOutcome::BadAccount(map_bad_account_problem(e)?),
+                ResourceDeleteOutcome::BadAccount(map_bad_account_problem(e)?),
             ),
             Err(e) => Err(map_batch_delete_resource_error(e)),
         }
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Union, Debug, Clone)]
-pub enum ResourceDeleteOutcome {
-    Success(ResourceDeleteSuccess),
-    Problem(ResourceSelectorProblemResult),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject, Debug, Clone)]
-pub struct ResourceDeleteSuccess {
-    pub resource_id: ResourceID<'static>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -481,15 +436,15 @@ where
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Union, Debug, Clone)]
-pub enum ResourceDeleteManyOutcome {
-    Success(ResourceDeleteManyResult),
+pub enum ResourceDeleteOutcome {
+    Success(ResourceDeleteResult),
     UnsupportedSelector(ResourceUnsupportedSelectorProblem),
     BadAccount(ResourceBadAccountProblem),
 }
 
 #[derive(SimpleObject, Debug, Clone)]
-pub struct ResourceDeleteManyResult {
-    pub resources: Vec<ResourceDeleteManySuccess>,
+pub struct ResourceDeleteResult {
+    pub resources: Vec<ResourceDeleteSuccess>,
     pub problems: Vec<BatchResourceProblem>,
 }
 
@@ -498,13 +453,13 @@ type BatchDeleteResourcesResponse = kamu_resources_facade::BatchResourceResponse
     kamu_resources_facade::ResourceLookupProblem,
 >;
 
-impl From<BatchDeleteResourcesResponse> for ResourceDeleteManyResult {
+impl From<BatchDeleteResourcesResponse> for ResourceDeleteResult {
     fn from(value: BatchDeleteResourcesResponse) -> Self {
         Self {
             resources: value
                 .successes
                 .into_iter()
-                .map(|success| ResourceDeleteManySuccess {
+                .map(|success| ResourceDeleteSuccess {
                     request_index: success.request_index,
                     resource_id: success.item.into(),
                 })
@@ -517,7 +472,7 @@ impl From<BatchDeleteResourcesResponse> for ResourceDeleteManyResult {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject, Debug, Clone)]
-pub struct ResourceDeleteManySuccess {
+pub struct ResourceDeleteSuccess {
     pub request_index: usize,
     pub resource_id: ResourceID<'static>,
 }
@@ -575,22 +530,6 @@ fn map_batch_apply_resource_error(error: kamu_resources_facade::BatchResourceErr
         E::UnsupportedSelector(_) => GqlError::gql("Unsupported resource type selector"),
         E::BadAccount(error) => map_resolve_manifest_account_error(error),
         E::InvalidLabelFilter(error) => GqlError::gql(error.to_string()),
-        E::RemoteRequest(error) => error.int_err().into(),
-        E::Internal(error) => error.into(),
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-fn map_delete_resource_error(error: kamu_resources_facade::DeleteResourceError) -> GqlError {
-    use kamu_resources_facade::DeleteResourceError as E;
-
-    match error {
-        E::UnsupportedSelector(_) => {
-            unreachable!("UnsupportedSelector is handled as a union arm")
-        }
-        E::BadAccount(_) => unreachable!("BadAccount is handled as a union arm"),
-        E::LookupProblem(_) => unreachable!("LookupProblem is handled as a union arm"),
         E::RemoteRequest(error) => error.int_err().into(),
         E::Internal(error) => error.into(),
     }

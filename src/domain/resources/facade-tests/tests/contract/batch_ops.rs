@@ -8,11 +8,9 @@
 // by the Apache License, Version 2.0.
 
 use kamu_configuration::VariableSetResource;
-use kamu_resources::{ApplyResourceOutcome, ResourceRef, ResourceSchemaProvider, TypeName};
+use kamu_resources::{ResourceRef, ResourceSchemaProvider, TypeName};
 use kamu_resources_facade::{
-    ApplyManifestRequest,
     BatchResourceError,
-    GetResourceError,
     ResourceLookupProblem,
     ResourceManifestFormat,
     SpecViewMode,
@@ -26,37 +24,23 @@ use crate::helpers::{
     VARIABLE_SET_CANONICAL_SELECTOR,
     VARIABLE_SET_SCHEMA_STR,
     apply_manifest_and_get_id,
-    assert_applied_outcome,
     assert_batch_indexes,
     assert_resource_view_fields,
+    assert_single_batch_problem,
+    create_variable_set,
     secret_set_manifest_json,
-    variable_set_manifest_json,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn create_resource(h: &impl FacadeContractHarness, name: &str) -> kamu_resources::ResourceID {
-    let facade = h.facade_for(TestAccount::Alice);
-    let manifest = variable_set_manifest_json(name, None, &[("K", "v")]);
-    let decision = facade
-        .apply_manifest(ApplyManifestRequest {
-            format: ResourceManifestFormat::Json,
-            manifest,
-        })
-        .await
-        .unwrap();
-    let result = assert_applied_outcome(&decision, ApplyResourceOutcome::Created);
-    result.headers.id
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // RF-050
-contract_test!(get_many_all_successes, super::test_get_many_all_successes);
+contract_test!(get_all_successes, super::test_get_all_successes);
 
-pub async fn test_get_many_all_successes(h: &impl FacadeContractHarness) {
-    let id_a = create_resource(h, "batch-a").await;
-    let id_b = create_resource(h, "batch-b").await;
+pub async fn test_get_all_successes(h: &impl FacadeContractHarness) {
+    let id_a = create_variable_set(h, TestAccount::Alice, "batch-a").await;
+    let id_b = create_variable_set(h, TestAccount::Alice, "batch-b").await;
     let facade = h.facade_for(TestAccount::Alice);
 
     let selector = vec![
@@ -86,10 +70,7 @@ pub async fn test_get_many_all_successes(h: &impl FacadeContractHarness) {
         },
     ];
 
-    let response = facade
-        .get_many(selector, SpecViewMode::Encrypted)
-        .await
-        .unwrap();
+    let response = facade.get(selector, SpecViewMode::Encrypted).await.unwrap();
 
     assert_batch_indexes(&response, &[0, 1], &[]);
     assert_eq!(response.successes.len(), 2);
@@ -114,17 +95,17 @@ pub async fn test_get_many_all_successes(h: &impl FacadeContractHarness) {
 
 // RF-051
 contract_test!(
-    get_many_mixed_successes_problems,
-    super::test_get_many_mixed_successes_problems
+    get_mixed_successes_problems,
+    super::test_get_mixed_successes_problems
 );
 
-pub async fn test_get_many_mixed_successes_problems(h: &impl FacadeContractHarness) {
-    let id_existing = create_resource(h, "mixed-a").await;
+pub async fn test_get_mixed_successes_problems(h: &impl FacadeContractHarness) {
+    let id_existing = create_variable_set(h, TestAccount::Alice, "mixed-a").await;
     let absent_id = kamu_resources::ResourceID::new(uuid::Uuid::new_v4());
     let facade = h.facade_for(TestAccount::Alice);
 
     let response = facade
-        .get_many(
+        .get(
             vec![
                 ResourceRef {
                     account: None,
@@ -204,14 +185,14 @@ pub async fn test_get_many_mixed_successes_problems(h: &impl FacadeContractHarne
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // RF-052
-contract_test!(get_many_duplicate_refs, super::test_get_many_duplicate_refs);
+contract_test!(get_duplicate_refs, super::test_get_duplicate_refs);
 
-pub async fn test_get_many_duplicate_refs(h: &impl FacadeContractHarness) {
-    let id = create_resource(h, "dup-ref").await;
+pub async fn test_get_duplicate_refs(h: &impl FacadeContractHarness) {
+    let id = create_variable_set(h, TestAccount::Alice, "dup-ref").await;
     let facade = h.facade_for(TestAccount::Alice);
 
     let response = facade
-        .get_many(
+        .get(
             vec![
                 ResourceRef {
                     account: None,
@@ -253,7 +234,7 @@ pub async fn test_get_many_duplicate_refs(h: &impl FacadeContractHarness) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // RF-053
-contract_test!(get_many_empty_refs, super::test_get_many_empty_refs);
+contract_test!(get_empty_refs, super::test_get_empty_refs);
 
 /// An empty batch names nothing, so every batch operation answers with an
 /// empty result rather than an error — batch calls stay idempotent.
@@ -262,13 +243,10 @@ contract_test!(get_many_empty_refs, super::test_get_many_empty_refs);
 /// still validated the type and account. Both used to live on the batch
 /// wrapper; they now live on each ref, so an empty batch carries neither and
 /// there is nothing left to validate.
-pub async fn test_get_many_empty_refs(h: &impl FacadeContractHarness) {
+pub async fn test_get_empty_refs(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
-    let response = facade
-        .get_many(vec![], SpecViewMode::Encrypted)
-        .await
-        .unwrap();
+    let response = facade.get(vec![], SpecViewMode::Encrypted).await.unwrap();
     assert!(
         response.successes.is_empty(),
         "get_many successes must be empty"
@@ -305,7 +283,7 @@ pub async fn test_get_many_empty_refs(h: &impl FacadeContractHarness) {
         "render_manifests problems must be empty"
     );
 
-    let response = facade.delete_many(vec![]).await.unwrap();
+    let response = facade.delete(vec![]).await.unwrap();
     assert!(
         response.successes.is_empty(),
         "delete_many successes must be empty"
@@ -319,14 +297,14 @@ pub async fn test_get_many_empty_refs(h: &impl FacadeContractHarness) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // RF-054
-contract_test!(get_many_wrong_schema, super::test_get_many_wrong_schema);
+contract_test!(get_wrong_schema, super::test_get_wrong_schema);
 
-pub async fn test_get_many_wrong_schema(h: &impl FacadeContractHarness) {
-    let id = create_resource(h, "api-ver-batch").await;
+pub async fn test_get_wrong_schema(h: &impl FacadeContractHarness) {
+    let id = create_variable_set(h, TestAccount::Alice, "api-ver-batch").await;
     let facade = h.facade_for(TestAccount::Alice);
 
     let response = facade
-        .get_many(
+        .get(
             vec![
                 ResourceRef {
                     account: None,
@@ -360,13 +338,10 @@ pub async fn test_get_many_wrong_schema(h: &impl FacadeContractHarness) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // RF-055
-contract_test!(
-    get_handles_mirrors_get_many,
-    super::test_get_handles_mirrors_get_many
-);
+contract_test!(get_handles_mirrors_get, super::test_get_handles_mirrors_get);
 
-pub async fn test_get_handles_mirrors_get_many(h: &impl FacadeContractHarness) {
-    let uid_a = create_resource(h, "idents-a").await;
+pub async fn test_get_handles_mirrors_get(h: &impl FacadeContractHarness) {
+    let uid_a = create_variable_set(h, TestAccount::Alice, "idents-a").await;
     let absent_uid = kamu_resources::ResourceID::new(uuid::Uuid::new_v4());
     let facade = h.facade_for(TestAccount::Alice);
 
@@ -437,8 +412,8 @@ contract_test!(
 );
 
 pub async fn test_render_manifests_all_successes(h: &impl FacadeContractHarness) {
-    let id_a = create_resource(h, "render-a").await;
-    let id_b = create_resource(h, "render-b").await;
+    let id_a = create_variable_set(h, TestAccount::Alice, "render-a").await;
+    let id_b = create_variable_set(h, TestAccount::Alice, "render-b").await;
     let facade = h.facade_for(TestAccount::Alice);
 
     for format in [
@@ -517,7 +492,7 @@ contract_test!(
 );
 
 pub async fn test_render_manifests_mixed_successes_problems(h: &impl FacadeContractHarness) {
-    let uid_existing = create_resource(h, "render-mix").await;
+    let uid_existing = create_variable_set(h, TestAccount::Alice, "render-mix").await;
     let absent_uid = kamu_resources::ResourceID::new(uuid::Uuid::new_v4());
     let facade = h.facade_for(TestAccount::Alice);
 
@@ -586,19 +561,16 @@ pub async fn test_render_manifests_mixed_successes_problems(h: &impl FacadeContr
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // RF-058
-contract_test!(
-    delete_many_all_successes,
-    super::test_delete_many_all_successes
-);
+contract_test!(delete_all_successes, super::test_delete_all_successes);
 
-pub async fn test_delete_many_all_successes(h: &impl FacadeContractHarness) {
-    let id_a = create_resource(h, "del-many-a").await;
-    let id_b = create_resource(h, "del-many-b").await;
-    let id_c = create_resource(h, "del-many-c").await;
+pub async fn test_delete_all_successes(h: &impl FacadeContractHarness) {
+    let id_a = create_variable_set(h, TestAccount::Alice, "del-many-a").await;
+    let id_b = create_variable_set(h, TestAccount::Alice, "del-many-b").await;
+    let id_c = create_variable_set(h, TestAccount::Alice, "del-many-c").await;
     let facade = h.facade_for(TestAccount::Alice);
 
     let response = facade
-        .delete_many(vec![
+        .delete(vec![
             ResourceRef {
                 account: None,
                 r#type: Some(
@@ -659,7 +631,7 @@ pub async fn test_delete_many_all_successes(h: &impl FacadeContractHarness) {
     ] {
         let get = facade
             .get(
-                ResourceRef {
+                vec![ResourceRef {
                     account: None,
                     r#type: Some(
                         VARIABLE_SET_CANONICAL_SELECTOR
@@ -670,13 +642,15 @@ pub async fn test_delete_many_all_successes(h: &impl FacadeContractHarness) {
                     id: None,
                     did: None,
                     name: Some(name.parse().unwrap()),
-                },
+                }],
                 SpecViewMode::Encrypted,
             )
-            .await;
-        assert!(
-            matches!(get, Err(GetResourceError::LookupProblem(_))),
-            "deleted resource '{name}' (id={id}) must not be found after delete_many"
+            .await
+            .unwrap();
+        assert_matches!(
+            assert_single_batch_problem(get),
+            ResourceLookupProblem::NameNotFound(_),
+            "deleted resource '{name}' (id={id}) must not be found after delete"
         );
     }
 }
@@ -685,17 +659,17 @@ pub async fn test_delete_many_all_successes(h: &impl FacadeContractHarness) {
 
 // RF-059
 contract_test!(
-    delete_many_mixed_successes_problems,
-    super::test_delete_many_mixed_successes_problems
+    delete_mixed_successes_problems,
+    super::test_delete_mixed_successes_problems
 );
 
-pub async fn test_delete_many_mixed_successes_problems(h: &impl FacadeContractHarness) {
-    let uid_existing = create_resource(h, "del-mix-exists").await;
+pub async fn test_delete_mixed_successes_problems(h: &impl FacadeContractHarness) {
+    let uid_existing = create_variable_set(h, TestAccount::Alice, "del-mix-exists").await;
     let absent_uid = kamu_resources::ResourceID::new(uuid::Uuid::new_v4());
     let facade = h.facade_for(TestAccount::Alice);
 
     let response = facade
-        .delete_many(vec![
+        .delete(vec![
             ResourceRef {
                 account: None,
                 r#type: Some(
@@ -771,16 +745,16 @@ pub async fn test_delete_many_mixed_successes_problems(h: &impl FacadeContractHa
 // the second returns NameNotFound.  We assert whichever branch fires and verify
 // it is identical for local and remote.
 contract_test!(
-    delete_many_duplicate_refs_is_deterministic,
-    super::test_delete_many_duplicate_refs_is_deterministic
+    delete_duplicate_refs_is_deterministic,
+    super::test_delete_duplicate_refs_is_deterministic
 );
 
-pub async fn test_delete_many_duplicate_refs_is_deterministic(h: &impl FacadeContractHarness) {
-    let id = create_resource(h, "del-dup-ref").await;
+pub async fn test_delete_duplicate_refs_is_deterministic(h: &impl FacadeContractHarness) {
+    let id = create_variable_set(h, TestAccount::Alice, "del-dup-ref").await;
     let facade = h.facade_for(TestAccount::Alice);
 
     let response = facade
-        .delete_many(vec![
+        .delete(vec![
             ResourceRef {
                 account: None,
                 r#type: Some(
@@ -853,7 +827,7 @@ contract_test!(
 );
 
 pub async fn test_batch_apis_reject_unsupported_type(h: &impl FacadeContractHarness) {
-    let id = create_resource(h, "batch-bad-type-base").await;
+    let id = create_variable_set(h, TestAccount::Alice, "batch-bad-type-base").await;
     let facade = h.facade_for(TestAccount::Alice);
     let bad_type = "NoSuchResourceTypeXYZ";
 
@@ -865,9 +839,7 @@ pub async fn test_batch_apis_reject_unsupported_type(h: &impl FacadeContractHarn
         name: None,
     }];
 
-    let gm = facade
-        .get_many(selector.clone(), SpecViewMode::Encrypted)
-        .await;
+    let gm = facade.get(selector.clone(), SpecViewMode::Encrypted).await;
     assert!(
         matches!(gm, Err(BatchResourceError::UnsupportedSelector(_))),
         "get_many: unsupported type must be a batch-level UnsupportedSelector, got: {gm:?}"
@@ -891,7 +863,7 @@ pub async fn test_batch_apis_reject_unsupported_type(h: &impl FacadeContractHarn
         "render_manifests: unsupported type must be a batch-level UnsupportedSelector, got: {rm:?}"
     );
 
-    let dm = facade.delete_many(selector.clone()).await;
+    let dm = facade.delete(selector.clone()).await;
     assert!(
         matches!(dm, Err(BatchResourceError::UnsupportedSelector(_))),
         "delete_many: unsupported type must be a batch-level UnsupportedSelector, got: {dm:?}"
@@ -919,7 +891,7 @@ contract_test!(
 /// governed by authorization (RF-105 covers the denial), so naming Bob here
 /// would test permissions rather than fan-out.
 pub async fn test_batch_spans_types_and_accounts(h: &impl FacadeContractHarness) {
-    create_resource(h, "span-vars").await;
+    create_variable_set(h, TestAccount::Alice, "span-vars").await;
     apply_manifest_and_get_id(
         h,
         TestAccount::Alice,
@@ -962,7 +934,7 @@ pub async fn test_batch_spans_types_and_accounts(h: &impl FacadeContractHarness)
     // the grouping — a fan-out that lost order would still "succeed" here, so
     // the indexes are the real assertion.
     let response = facade
-        .get_many(mixed_types(), SpecViewMode::Encrypted)
+        .get(mixed_types(), SpecViewMode::Encrypted)
         .await
         .expect("a batch spanning two types must resolve");
     assert_batch_indexes(&response, &[0, 1], &[]);
@@ -1025,7 +997,7 @@ pub async fn test_batch_spans_types_and_accounts(h: &impl FacadeContractHarness)
 
     // The write path last, since it consumes the fixtures.
     let deleted = facade
-        .delete_many(mixed_types())
+        .delete(mixed_types())
         .await
         .expect("delete_many must span two types");
     assert_batch_indexes(&deleted, &[0, 1], &[]);
@@ -1051,8 +1023,8 @@ contract_test!(
 /// The surviving entry is asserted alongside the failing one: this must be a
 /// per-item problem, not a whole-batch rejection.
 pub async fn test_ref_id_and_name_must_agree(h: &impl FacadeContractHarness) {
-    let alpha_id = create_resource(h, "agree-alpha").await;
-    create_resource(h, "agree-beta").await;
+    let alpha_id = create_variable_set(h, TestAccount::Alice, "agree-alpha").await;
+    create_variable_set(h, TestAccount::Alice, "agree-beta").await;
 
     let facade = h.facade_for(TestAccount::Alice);
 
@@ -1087,7 +1059,7 @@ pub async fn test_ref_id_and_name_must_agree(h: &impl FacadeContractHarness) {
     };
 
     let response = facade
-        .get_many(mismatched(), SpecViewMode::Encrypted)
+        .get(mismatched(), SpecViewMode::Encrypted)
         .await
         .expect("a mismatched ref is a per-item problem, not a batch failure");
     assert_batch_indexes(&response, &[1], &[0]);
@@ -1100,7 +1072,7 @@ pub async fn test_ref_id_and_name_must_agree(h: &impl FacadeContractHarness) {
 
     // The one that would silently destroy the wrong resource.
     let deleted = facade
-        .delete_many(mismatched())
+        .delete(mismatched())
         .await
         .expect("delete_many must report the mismatch per item");
     assert_batch_indexes(&deleted, &[1], &[0]);
@@ -1144,7 +1116,7 @@ pub async fn test_ref_id_and_name_must_agree(h: &impl FacadeContractHarness) {
     };
 
     let response = facade
-        .get_many(case_variant(), SpecViewMode::Encrypted)
+        .get(case_variant(), SpecViewMode::Encrypted)
         .await
         .expect("a case-only name variant must resolve");
     assert_batch_indexes(&response, &[0], &[]);
@@ -1185,7 +1157,7 @@ contract_test!(
 /// A miss is asserted alongside the hit, since a type-less ref that resolves
 /// nothing must be a per-item problem rather than a whole-batch failure.
 pub async fn test_type_less_ref_resolves_across_types(h: &impl FacadeContractHarness) {
-    create_resource(h, "typeless-vars").await;
+    create_variable_set(h, TestAccount::Alice, "typeless-vars").await;
 
     let facade = h.facade_for(TestAccount::Alice);
 
@@ -1211,7 +1183,7 @@ pub async fn test_type_less_ref_resolves_across_types(h: &impl FacadeContractHar
     };
 
     let response = facade
-        .get_many(refs(), SpecViewMode::Encrypted)
+        .get(refs(), SpecViewMode::Encrypted)
         .await
         .expect("a type-less ref must resolve without naming a type");
     assert_batch_indexes(&response, &[0], &[1]);
@@ -1234,7 +1206,7 @@ pub async fn test_type_less_ref_resolves_across_types(h: &impl FacadeContractHar
 
     // The write path last, since it consumes the fixture.
     let deleted = facade
-        .delete_many(refs())
+        .delete(refs())
         .await
         .expect("delete_many must resolve a type-less ref");
     assert_batch_indexes(&deleted, &[0], &[1]);
@@ -1261,7 +1233,7 @@ pub async fn test_type_less_ref_matching_several_types_is_ambiguous(
     h: &impl FacadeContractHarness,
 ) {
     // The same name in two different types.
-    create_resource(h, "ambiguous-name").await;
+    create_variable_set(h, TestAccount::Alice, "ambiguous-name").await;
     apply_manifest_and_get_id(
         h,
         TestAccount::Alice,
@@ -1282,7 +1254,7 @@ pub async fn test_type_less_ref_matching_several_types_is_ambiguous(
     };
 
     let response = facade
-        .get_many(refs(), SpecViewMode::Encrypted)
+        .get(refs(), SpecViewMode::Encrypted)
         .await
         .expect("an ambiguous ref is a per-item problem, not a batch failure");
     assert_batch_indexes(&response, &[], &[0]);
@@ -1295,7 +1267,7 @@ pub async fn test_type_less_ref_matching_several_types_is_ambiguous(
 
     // The one that would otherwise delete an arbitrary one of the two.
     let deleted = facade
-        .delete_many(refs())
+        .delete(refs())
         .await
         .expect("delete_many must report the ambiguity per item");
     assert_batch_indexes(&deleted, &[], &[0]);

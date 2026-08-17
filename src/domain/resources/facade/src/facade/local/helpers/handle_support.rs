@@ -7,31 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_resources::{
-    ResourceHandle,
-    ResourceHandleRow,
-    ResourceID,
-    ResourceName,
-    ResourceSnapshot,
-    TypeUri,
-};
+use kamu_resources::{ResourceHandle, ResourceHandleRow, ResourceID, ResourceName, TypeUri};
 
 use crate::{ResourceLookupProblem, ResourceNameMismatchError};
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Builds a handle from a stored snapshot.
-pub(crate) fn resource_handle_from_snapshot(snapshot: ResourceSnapshot) -> ResourceHandle {
-    ResourceHandle {
-        r#type: snapshot.schema,
-        // TODO: temporary until we support DID-aware resource types; once we do,
-        // this must be populated instead of always `None`.
-        did: None,
-        account: snapshot.headers.account,
-        id: snapshot.id,
-        name: snapshot.headers.name,
-    }
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
