@@ -500,6 +500,7 @@ fn map_list_resources_error(error: kamu_resources_facade::ListResourcesError) ->
         E::BadAccount(error) => map_resolve_manifest_account_error(error),
         E::InvalidLabelFilter(error) => GqlError::gql(error.to_string()),
         E::UnrepresentableScope(error) => GqlError::gql(error.to_string()),
+        E::UnsupportedSelectorField(error) => GqlError::gql(error.to_string()),
         E::RemoteRequest(error) => error.int_err().into(),
         E::Internal(error) => error.into(),
     }

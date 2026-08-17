@@ -31,6 +31,8 @@ use kamu_resources::{
 };
 use thiserror::Error;
 
+use crate::UnsupportedSelectorFieldError;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -301,6 +303,12 @@ pub enum ListResourcesError {
 
     #[error(transparent)]
     UnrepresentableScope(#[from] UnrepresentableScopeError),
+
+    /// A selector set an ODF field the facade cannot honour. Rejected rather
+    /// than ignored: a dropped narrowing constraint widens the result set
+    /// without the caller being able to tell.
+    #[error(transparent)]
+    UnsupportedSelectorField(#[from] UnsupportedSelectorFieldError),
 
     #[error(transparent)]
     RemoteRequest(#[from] GraphqlHttpRequestError),

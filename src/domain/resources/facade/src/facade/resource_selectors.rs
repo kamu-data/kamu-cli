@@ -12,8 +12,7 @@
 //! Both types are ODF's, defined in the domain crate — a ref names exactly one
 //! resource by exact name, a selector matches zero or many by SQL `LIKE`
 //! pattern and labels. Several selectors in one call act as a logical OR, which
-//! is what lets one call span several types and — from stage 5 onwards —
-//! several accounts.
+//! is what lets one call span several types and several accounts.
 //!
 //! Type resolution accepts one vocabulary throughout: canonical selectors
 //! (`variablesets`), aliases (`vs`), the ODF type name (`VariableSet`), and the
@@ -49,6 +48,11 @@ pub enum UnsupportedSelectorFieldError {
 
     #[error("Resource reference must specify at least one of `id` or `name`")]
     EmptyRef,
+
+    /// Only the call-level label filter is resolved. A per-selector one would
+    /// have to be dropped, which widens the match rather than narrowing it.
+    #[error("Per-selector `labels` are not supported yet; use the call-level label filter")]
+    PerSelectorLabels,
 }
 
 /// Rejects a ref the facade cannot resolve: one carrying a `did`, or one
@@ -66,14 +70,20 @@ pub fn validate_ref(value: &ResourceRef) -> Result<(), UnsupportedSelectorFieldE
     Ok(())
 }
 
-/// Rejects a selector carrying a `did` the facade cannot resolve.
+/// Rejects a selector carrying fields the facade cannot resolve — a `did`, or
+/// a per-selector label filter.
 ///
-/// The selector gained `did` when ODF made the type optional. Unlike a ref, a
-/// selector narrowing by nothing is meaningful — it matches every resource of
-/// its type — so there is no `EmptyRef` equivalent here.
+/// Unlike a ref, a selector narrowing by nothing is meaningful — it matches
+/// every resource of its type — so there is no `EmptyRef` equivalent here.
+/// That is exactly why the unresolvable fields must be rejected: a selector
+/// narrowed *only* by one of them would otherwise look unnarrowed and match
+/// everything.
 pub fn validate_selector(value: &ResourceSelector) -> Result<(), UnsupportedSelectorFieldError> {
     if value.did.is_some() {
         return Err(UnsupportedSelectorFieldError::Did);
+    }
+    if value.labels.is_some() {
+        return Err(UnsupportedSelectorFieldError::PerSelectorLabels);
     }
     Ok(())
 }
@@ -186,13 +196,16 @@ pub fn coalesce_selectors(
         // Checked before anything else: an unnarrowed, account-less type-less
         // selector matches every resource under the call-level account, so it
         // subsumes every other selector rather than conflicting with them.
-        let unnarrowed_any_account = any_type_keys.iter().any(|(_, account_id)| {
-            account_id.is_none()
-                && groups
-                    .get(&(None, None))
-                    .is_some_and(|group| group.unnarrowed)
-        });
-        if unnarrowed_any_account {
+        //
+        // Only selectors that *also* use the call-level account are subsumed.
+        // `AnyType` carries no per-row account, so it cannot stand in for a
+        // group naming a different one — swallowing such a group would drop an
+        // authorized request for another account's resources and answer with
+        // the caller's own instead.
+        let unnarrowed_default_account = groups
+            .get(&(None, None))
+            .is_some_and(|group| group.unnarrowed);
+        if unnarrowed_default_account && order.iter().all(|(_, account_id)| account_id.is_none()) {
             return Ok(Some(ResourceScope::AnyType(None)));
         }
 
@@ -239,9 +252,6 @@ pub fn coalesce_selectors(
 /// Every variant is a limit of [`ResourceScope::AnyType`] carrying exactly one
 /// query rather than a per-type list. They disappear once `AnyType` gives each
 /// row its own type and account.
-///
-/// A fourth variant, `SingleTypeRequired`, was retired when `list` became the
-/// multi-type `search`: rendering typed columns no longer forces one type.
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum UnrepresentableScopeError {
     #[error(
@@ -671,9 +681,35 @@ mod tests {
         assert_eq!(scope, Some(ResourceScope::AnyType(None)));
     }
 
-    // `ResourceScope::AnyType` carries a single query, so these two shapes are
-    // genuinely unrepresentable today. Erroring beats silently dropping a
-    // selector; stage 5 lifts the limitation.
+    // ...but only over the call-level account. `AnyType` restricts every row to
+    // that one account, so subsuming a selector that names a *different* one
+    // would answer an authorized cross-account request with the caller's own
+    // resources — a silent drop, not a narrowing the caller can see.
+    #[test]
+    fn test_unnarrowed_any_type_does_not_subsume_another_account() {
+        let result = coalesce_selectors(vec![
+            ResolvedSelector {
+                account_id: Some(odf::AccountID::new_seeded_ed25519(b"bob")),
+                ..by_pattern(SCHEMA_A, "app-%")
+            },
+            ResolvedSelector {
+                schema: None,
+                id: None,
+                name: None,
+                name_pattern: None,
+                account_id: None,
+            },
+        ]);
+
+        assert_matches!(
+            result,
+            Err(UnrepresentableScopeError::AnyTypeMixedWithTypedSelectors)
+        );
+    }
+
+    // `ResourceScope::AnyType` carries a single query, so a narrowed any-type
+    // selector cannot coexist with typed ones. Erroring beats silently dropping
+    // a selector.
     #[test]
     fn test_narrowed_any_type_mixed_with_typed_selectors_is_rejected() {
         let result = coalesce_selectors(vec![
