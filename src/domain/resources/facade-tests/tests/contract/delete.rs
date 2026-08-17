@@ -115,7 +115,6 @@ pub async fn test_delete_by_name(h: &impl FacadeContractHarness) {
                 limit: 1000,
                 offset: 0,
             },
-            label_filter: None,
         })
         .await
         .unwrap();

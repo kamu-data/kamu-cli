@@ -17,7 +17,7 @@ use kamu_resources_facade::{
     GetResourceError,
     ResourceFacade,
     ResourceLookupProblem,
-    SearchResourceHandlesRequest,
+    SearchResourcesRequest,
 };
 
 use crate::resources::{
@@ -326,13 +326,15 @@ impl ResourceSelectionResolutionServiceImpl {
             if !by_id.is_empty() {
                 let ids = by_id.iter().map(|(_, id)| *id).collect::<Vec<_>>();
                 let found = resource_facade
-                    .search_handles(SearchResourceHandlesRequest {
-                        selectors: kamu_resources::ResourceSelector::ids_of_type(
-                            &schema.clone().into(),
-                            ids,
+                    .search_handles(SearchResourcesRequest {
+                        selectors: with_labels(
+                            kamu_resources::ResourceSelector::ids_of_type(
+                                &schema.clone().into(),
+                                ids,
+                            ),
+                            label_filter,
                         ),
                         account: None,
-                        label_filter: label_filter.cloned(),
                         pagination: PaginationOpts {
                             limit: by_id.len(),
                             offset: 0,
@@ -370,18 +372,20 @@ impl ResourceSelectionResolutionServiceImpl {
                 // filtering; correctness wins over the batching.
                 let found = if let Some(label_filter) = label_filter {
                     resource_facade
-                        .search_handles(SearchResourceHandlesRequest {
-                            selectors: by_name
-                                .iter()
-                                .map(|(_, name)| {
-                                    kamu_resources::ResourceSelector::name_pattern(
-                                        schema.clone().into(),
-                                        sql_like_escape_literal(name.as_str()),
-                                    )
-                                })
-                                .collect(),
+                        .search_handles(SearchResourcesRequest {
+                            selectors: with_labels(
+                                by_name
+                                    .iter()
+                                    .map(|(_, name)| {
+                                        kamu_resources::ResourceSelector::name_pattern(
+                                            schema.clone().into(),
+                                            sql_like_escape_literal(name.as_str()),
+                                        )
+                                    })
+                                    .collect(),
+                                Some(label_filter),
+                            ),
                             account: None,
-                            label_filter: Some(label_filter.clone()),
                             pagination: PaginationOpts {
                                 limit: by_name.len(),
                                 offset: 0,
@@ -462,10 +466,12 @@ impl ResourceSelectionResolutionServiceImpl {
         }
 
         let found = resource_facade
-            .search_handles(SearchResourceHandlesRequest {
-                selectors: kamu_resources::ResourceSelector::any_type_ids(ids.clone()),
+            .search_handles(SearchResourcesRequest {
+                selectors: with_labels(
+                    kamu_resources::ResourceSelector::any_type_ids(ids.clone()),
+                    label_filter,
+                ),
                 account: None,
-                label_filter: label_filter.cloned(),
                 pagination: PaginationOpts {
                     limit: ids.len(),
                     offset: 0,
@@ -553,12 +559,14 @@ impl ResourceSelectionResolutionServiceImpl {
                 let request_label_filter = options.label_filter.clone();
                 async move {
                     let response = resource_facade
-                        .search_handles(SearchResourceHandlesRequest {
+                        .search_handles(SearchResourcesRequest {
                             // A lone type-less unnarrowed selector spans every
                             // type, which is what `list_all_handles` did.
-                            selectors: vec![kamu_resources::ResourceSelector::default()],
+                            selectors: with_labels(
+                                vec![kamu_resources::ResourceSelector::default()],
+                                request_label_filter.as_ref(),
+                            ),
                             account: None,
-                            label_filter: request_label_filter,
                             pagination,
                         })
                         .await?;
@@ -620,12 +628,14 @@ impl ResourceSelectionResolutionServiceImpl {
                 let request_label_filter = options.label_filter.clone();
                 async move {
                     let response = resource_facade
-                        .search_handles(SearchResourceHandlesRequest {
-                            selectors: vec![kamu_resources::ResourceSelector::of_type(
-                                type_descriptor.schema.clone().into(),
-                            )],
+                        .search_handles(SearchResourcesRequest {
+                            selectors: with_labels(
+                                vec![kamu_resources::ResourceSelector::of_type(
+                                    type_descriptor.schema.clone().into(),
+                                )],
+                                request_label_filter.as_ref(),
+                            ),
                             account: None,
-                            label_filter: request_label_filter,
                             pagination,
                         })
                         .await?;
@@ -667,13 +677,15 @@ impl ResourceSelectionResolutionServiceImpl {
                 let request_label_filter = options.label_filter.clone();
                 async move {
                     resource_facade
-                        .search_handles(SearchResourceHandlesRequest {
-                            selectors: vec![kamu_resources::ResourceSelector::name_pattern(
-                                type_descriptor.schema.clone().into(),
-                                request_name_pattern,
-                            )],
+                        .search_handles(SearchResourcesRequest {
+                            selectors: with_labels(
+                                vec![kamu_resources::ResourceSelector::name_pattern(
+                                    type_descriptor.schema.clone().into(),
+                                    request_name_pattern,
+                                )],
+                                request_label_filter.as_ref(),
+                            ),
                             account: None,
-                            label_filter: request_label_filter,
                             pagination,
                         })
                         .await
@@ -745,10 +757,12 @@ impl ResourceSelectionResolutionServiceImpl {
                 let request_label_filter = options.label_filter.clone();
                 async move {
                     resource_facade
-                        .search_handles(SearchResourceHandlesRequest {
-                            selectors: vec![request_selector],
+                        .search_handles(SearchResourcesRequest {
+                            selectors: with_labels(
+                                vec![request_selector],
+                                request_label_filter.as_ref(),
+                            ),
                             account: None,
-                            label_filter: request_label_filter,
                             pagination,
                         })
                         .await
@@ -799,14 +813,14 @@ impl ResourceSelectionResolutionServiceImpl {
                 let request_label_filter = options.label_filter.clone();
                 async move {
                     resource_facade
-                        .search_handles(SearchResourceHandlesRequest {
-                            selectors: vec![
-                                kamu_resources::ResourceSelector::any_type_name_pattern(
+                        .search_handles(SearchResourcesRequest {
+                            selectors: with_labels(
+                                vec![kamu_resources::ResourceSelector::any_type_name_pattern(
                                     request_name_pattern,
-                                ),
-                            ],
+                                )],
+                                request_label_filter.as_ref(),
+                            ),
                             account: None,
-                            label_filter: request_label_filter,
                             pagination,
                         })
                         .await
@@ -1059,6 +1073,31 @@ type CanonicalSelectorsBySchema<'a> =
 struct CollectedUniqueIdentities {
     identities: Vec<ResourceHandle>,
     had_any_match: bool,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Stamps the invocation's `-l` filter onto every selector.
+///
+/// The CLI's label filter narrows the whole invocation, which the facade
+/// expresses as the same filter on each selector. Selectors are OR'd and one
+/// selector's fields are a conjunction, so `(A ∧ L) ∨ (B ∧ L)` is exactly
+/// `(A ∨ B) ∧ L` — the same query the retired call-level filter ran.
+fn with_labels(
+    selectors: Vec<kamu_resources::ResourceSelector>,
+    label_filter: Option<&kamu_resources::ResourceLabelFilterInput>,
+) -> Vec<kamu_resources::ResourceSelector> {
+    let Some(label_filter) = label_filter else {
+        return selectors;
+    };
+
+    selectors
+        .into_iter()
+        .map(|selector| kamu_resources::ResourceSelector {
+            labels: Some(label_filter.clone()),
+            ..selector
+        })
+        .collect()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

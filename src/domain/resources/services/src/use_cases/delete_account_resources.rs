@@ -46,7 +46,6 @@ impl DeleteAccountResourcesUsecaseImpl {
                 .list_snapshots(
                     account_id,
                     &kamu_resources::ResourceScope::default(),
-                    &kamu_resources::ResolvedResourceLabelFilter::True,
                     pagination,
                 )
                 .await

@@ -477,7 +477,6 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             )],
             pagination: PaginationOpts::from_max_results(1),
-            label_filter: None,
         })
         .await;
     assert_matches!(
@@ -490,7 +489,6 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
     let result = facade
         .search(SearchResourcesRequest {
             account: Some(unknown_account.clone()),
-            label_filter: None,
             pagination: PaginationOpts::from_max_results(1),
             selectors: vec![ResourceSelector::default()],
         })

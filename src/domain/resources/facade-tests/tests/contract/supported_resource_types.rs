@@ -20,7 +20,6 @@ use kamu_resources_facade::{
     DeleteResourceError,
     GetResourceError,
     ListResourcesError,
-    SearchResourceHandlesRequest,
     SearchResourcesRequest,
     SpecViewMode,
 };
@@ -132,7 +131,6 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
             )],
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
-            label_filter: None,
         })
         .await
         .expect("list with canonical selector must succeed");
@@ -145,12 +143,11 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
     }
 
     let handles = facade
-        .search_handles(SearchResourceHandlesRequest {
+        .search_handles(SearchResourcesRequest {
             selectors: vec![ResourceSelector::of_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             )],
             account: None,
-            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -188,7 +185,6 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
             selectors: vec![ResourceSelector::of_type("vs".parse().unwrap())],
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
-            label_filter: None,
         })
         .await
         .expect("short name 'vs' must resolve for list");
@@ -208,7 +204,6 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
             selectors: vec![ResourceSelector::of_type("VariableSet".parse().unwrap())],
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
-            label_filter: None,
         })
         .await
         .expect("schema TypeName 'VariableSet' must resolve for list");
@@ -229,7 +224,6 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
             )],
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
-            label_filter: None,
         })
         .await;
     match bad_result {
@@ -323,7 +317,6 @@ pub async fn test_unsupported_schema_rejected_consistently(h: &impl FacadeContra
             selectors: vec![ResourceSelector::of_type(bad_type.parse().unwrap())],
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
-            label_filter: None,
         })
         .await;
     match list_result {
@@ -337,10 +330,9 @@ pub async fn test_unsupported_schema_rejected_consistently(h: &impl FacadeContra
 
     // list_handles — UnsupportedSelector
     let li_result = facade
-        .search_handles(SearchResourceHandlesRequest {
+        .search_handles(SearchResourcesRequest {
             selectors: vec![ResourceSelector::of_type(bad_type.parse().unwrap())],
             account: None,
-            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await;

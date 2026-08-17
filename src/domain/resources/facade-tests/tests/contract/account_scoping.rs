@@ -25,7 +25,6 @@ use kamu_resources_facade::{
     ResolveManifestAccountError,
     ResourceManifestFormat,
     ResourcesSummaryRequest,
-    SearchResourceHandlesRequest,
     SearchResourcesRequest,
     SpecViewMode,
 };
@@ -327,7 +326,6 @@ pub async fn test_account_name_id_mismatch_is_rejected(h: &impl FacadeContractHa
             )],
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
-            label_filter: None,
         })
         .await
         .unwrap()
@@ -353,13 +351,11 @@ pub async fn test_unknown_account_is_rejected(h: &impl FacadeContractHarness) {
             )],
             account: Some(unknown_account_by_name()),
             pagination: PaginationOpts::from_max_results(1000),
-            label_filter: None,
         })
         .await;
     let by_id = facade
         .search(SearchResourcesRequest {
             account: Some(unknown_account_by_id()),
-            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
             selectors: vec![ResourceSelector::default()],
         })
@@ -435,24 +431,22 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
     assert_eq!(bob_batch.successes[0].item.headers.id, bob_id);
 
     let alice_list = alice
-        .search_handles(SearchResourceHandlesRequest {
+        .search_handles(SearchResourcesRequest {
             selectors: vec![ResourceSelector::of_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             )],
             account: None,
-            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
         .unwrap()
         .items;
     let bob_list = bob
-        .search_handles(SearchResourceHandlesRequest {
+        .search_handles(SearchResourcesRequest {
             selectors: vec![ResourceSelector::of_type(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
             )],
             account: None,
-            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -468,26 +462,24 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
     );
 
     let alice_search = alice
-        .search_handles(SearchResourceHandlesRequest {
+        .search_handles(SearchResourcesRequest {
             selectors: vec![ResourceSelector::name_pattern(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
                 "acct-%".to_string(),
             )],
             account: None,
-            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
         .unwrap()
         .items;
     let bob_search = bob
-        .search_handles(SearchResourceHandlesRequest {
+        .search_handles(SearchResourcesRequest {
             selectors: vec![ResourceSelector::name_pattern(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
                 "acct-%".to_string(),
             )],
             account: None,
-            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -503,11 +495,10 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
     );
 
     let alice_all = alice
-        .search_handles(SearchResourceHandlesRequest {
+        .search_handles(SearchResourcesRequest {
             // Spans every type, as `list_all_handles` did.
             selectors: vec![ResourceSelector::default()],
             account: None,
-            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -516,7 +507,6 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
     let bob_all = bob
         .search(SearchResourcesRequest {
             account: None,
-            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
             selectors: vec![ResourceSelector::default()],
         })

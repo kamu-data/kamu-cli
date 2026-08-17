@@ -15,7 +15,6 @@ use domain::{
     ResourceAccountRef,
     ResourceHandle,
     ResourceID,
-    ResourceLabelFilterInput,
     ResourceRef,
     ResourceSelector,
     ResourceSummaryView,
@@ -118,10 +117,11 @@ pub trait ResourceFacade: Send + Sync {
     ) -> Result<SearchResourcesResponse, ListResourcesError>;
 
     /// The handle-only form of [`ResourceFacade::search`], for callers that
-    /// need identity rather than presentation.
+    /// need identity rather than presentation. Takes the same request — only
+    /// the response shape differs.
     async fn search_handles(
         &self,
-        request: SearchResourceHandlesRequest,
+        request: SearchResourcesRequest,
     ) -> Result<SearchResourceHandlesResponse, ListResourcesError>;
 
     async fn plan_apply_manifest(
@@ -253,15 +253,21 @@ pub enum ResourceManifestFormat {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// What to search for, shared by [`ResourceFacade::search`] and
+/// [`ResourceFacade::search_handles`] — only the response shape differs.
 #[derive(Debug, Clone)]
 pub struct SearchResourcesRequest {
     /// Which resources to span. Several selectors act as a logical OR; an empty
     /// list matches nothing, and a single type-less unnarrowed selector spans
     /// every type.
+    ///
+    /// Label filtering rides here too: each selector carries its own `labels`,
+    /// so one call may filter differently per type. There is deliberately no
+    /// call-level filter — one uniform filter is the special case where every
+    /// selector carries the same labels.
     pub selectors: Vec<ResourceSelector>,
     /// The account rows fall back to when a selector names none.
     pub account: Option<ResourceAccountRef>,
-    pub label_filter: Option<ResourceLabelFilterInput>,
     pub pagination: PaginationOpts,
 }
 
@@ -272,17 +278,6 @@ pub struct SearchResourcesResponse {
     pub items: Vec<ResourceSummaryView>,
     /// Total matching the selectors, ignoring pagination.
     pub total_count: usize,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone)]
-pub struct SearchResourceHandlesRequest {
-    /// See [`SearchResourcesRequest::selectors`].
-    pub selectors: Vec<ResourceSelector>,
-    pub account: Option<ResourceAccountRef>,
-    pub label_filter: Option<ResourceLabelFilterInput>,
-    pub pagination: PaginationOpts,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

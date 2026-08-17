@@ -24,13 +24,12 @@ use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_resources::{
     CreateResourceError,
     DELETED_ACCOUNT_NAME_SENTINEL,
-    ResolvedResourceLabelFilter,
     ResourceDuplicateError,
     ResourceHandleRow,
     ResourceHeaders,
     ResourceID,
     ResourceIDStream,
-    ResourceLabelFilterPredicate,
+    ResourceLabelPair,
     ResourceName,
     ResourcePhaseCounts,
     ResourceQuery,
@@ -41,7 +40,6 @@ use kamu_resources::{
     ResourceSnapshotRow,
     ResourceSnapshotStream,
     ResourceSummaryRow,
-    TypeRef,
     TypeUri,
     UpdateResourceError,
 };
@@ -346,15 +344,11 @@ impl ResourceRepository for SqliteResourceRepository {
         &self,
         account_id: &odf::AccountID,
         scope: &ResourceScope,
-        label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceHandleRow>, InternalError> {
         if scope.is_vacuous() {
             return Ok(Vec::new());
         }
-
-        let label_pairs =
-            ResourceLabelFilterPredicate::flatten_conjunction(label_filter).int_err()?;
 
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
@@ -381,7 +375,6 @@ impl ResourceRepository for SqliteResourceRepository {
         );
 
         push_scope_predicate(&mut query_builder, scope, account_id);
-        push_label_filter_predicates(&mut query_builder, &label_pairs);
 
         query_builder
             .push(" ORDER BY r.updated_at DESC, r.resource_id DESC LIMIT ")
@@ -400,14 +393,10 @@ impl ResourceRepository for SqliteResourceRepository {
         &self,
         account_id: &odf::AccountID,
         scope: &ResourceScope,
-        label_filter: &ResolvedResourceLabelFilter,
     ) -> Result<usize, InternalError> {
         if scope.is_vacuous() {
             return Ok(0);
         }
-
-        let label_pairs =
-            ResourceLabelFilterPredicate::flatten_conjunction(label_filter).int_err()?;
 
         let mut tr = self.transaction.lock().await;
         let connection_mut = tr.connection_mut().await?;
@@ -420,7 +409,6 @@ impl ResourceRepository for SqliteResourceRepository {
         );
 
         push_scope_predicate(&mut query_builder, scope, account_id);
-        push_label_filter_predicates(&mut query_builder, &label_pairs);
 
         let row = query_builder
             .build_query_scalar::<i64>()
@@ -727,17 +715,12 @@ impl ResourceRepository for SqliteResourceRepository {
         &self,
         account_id: &odf::AccountID,
         scope: &ResourceScope,
-        label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
     ) -> ResourceSnapshotStream<'_> {
         let account_id = account_id.clone();
-        let label_filter = label_filter.clone();
         let scope = scope.clone();
 
         Box::pin(async_stream::stream! {
-            let label_pairs =
-                ResourceLabelFilterPredicate::flatten_conjunction(&label_filter).int_err()?;
-
             let mut tr = self.transaction.lock().await;
             let connection_mut = tr.connection_mut().await?;
 
@@ -772,7 +755,6 @@ impl ResourceRepository for SqliteResourceRepository {
             );
 
             push_scope_predicate(&mut query_builder, &scope, &account_id);
-            push_label_filter_predicates(&mut query_builder, &label_pairs);
 
             query_builder
                 .push(" ORDER BY r.updated_at DESC, r.resource_id DESC LIMIT ")
@@ -936,13 +918,14 @@ fn push_scope_predicate(
     };
 
     match scope {
-        ResourceScope::AnyType(query) => {
+        ResourceScope::AnyType(query, label_pairs) => {
             query_builder.push(" AND ");
             push_account(query_builder, default_account_id);
             if let Some(query) = query {
                 query_builder.push(" AND ");
                 push_query_predicate(query_builder, query);
             }
+            push_label_filter_predicates(query_builder, label_pairs);
         }
         ResourceScope::Types(types) => {
             // An empty scope matches nothing; without this the `OR` chain would
@@ -968,6 +951,9 @@ fn push_scope_predicate(
                     query_builder.push(" AND ");
                     push_query_predicate(query_builder, query);
                 }
+                // Inside the branch, so each row filters by its own labels and
+                // the rows stay a disjunction.
+                push_label_filter_predicates(query_builder, &entry.label_pairs);
                 query_builder.push(")");
             }
             query_builder.push(")");
@@ -980,7 +966,7 @@ fn push_scope_predicate(
 /// Appends one label-projection predicate per `(key, value)` pair.
 fn push_label_filter_predicates(
     query_builder: &mut sqlx::QueryBuilder<'_, sqlx::Sqlite>,
-    label_pairs: &[(&TypeRef, &str)],
+    label_pairs: &[ResourceLabelPair],
 ) {
     for (key, value) in label_pairs {
         query_builder.push(
@@ -989,7 +975,7 @@ fn push_label_filter_predicates(
         );
         query_builder.push_bind(key.to_string());
         query_builder.push(" AND rl.label_value = ");
-        query_builder.push_bind((*value).to_string());
+        query_builder.push_bind(value.clone());
         query_builder.push(")");
     }
 }

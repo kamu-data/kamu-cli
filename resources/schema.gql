@@ -4171,7 +4171,7 @@ type ResourceInvalidHeaderProblem {
 }
 
 """
-The `labelFilter` argument could not be resolved into a matchable filter.
+A selector's `labels` could not be resolved into a matchable filter.
 """
 type ResourceInvalidLabelFilterProblem {
 	code: ResourceLabelFilterProblemCode!
@@ -4351,6 +4351,11 @@ input ResourceSelectorInput {
 	`%` matches that name exactly.
 	"""
 	name: String
+	"""
+	Labels this selector requires, all of which must be present. Applies to
+	this selector alone, so one call may filter differently per type.
+	Values must be strings — only string-valued labels are indexed.
+	"""
 	labels: ResourceLabelFilterInput
 }
 
@@ -4484,7 +4489,7 @@ type Resources {
 	"""
 	Searches resource handles matching the given selectors
 	"""
-	searchHandles(query: SearchResourceHandlesInput!, page: Int, perPage: Int): ResourceHandleListOutcome!
+	searchHandles(query: SearchResourcesInput!, page: Int, perPage: Int): ResourceHandleListOutcome!
 	"""
 	Renders a canonical manifest representation from a stored resource
 	"""
@@ -4582,23 +4587,22 @@ enum SearchEntityName {
 	ACCOUNTS
 }
 
-input SearchResourceHandlesInput {
-	selectors: [ResourceSelectorInput!]!
-	account: AccountRefInput
-	labelFilter: ResourceLabelFilterInput
-}
-
 """
-Selects resources to list, with typed columns rendered.
+Selects resources to search, for both `search` and `searchHandles` — only
+the response shape differs.
 
 Omitting `selectors` spans every type, which is what the retired `listAll`
 field did implicitly. Passing an empty list matches nothing — an explicit
 "no selectors" is a narrowing to zero, not a widening to everything.
+
+Label filtering lives on each selector's `labels`, so one call may filter
+differently per type. There is deliberately no call-level `labelFilter`: one
+uniform filter is the special case where every selector carries the same
+labels, and selectors being OR'd makes that exactly equivalent.
 """
 input SearchResourcesInput {
 	selectors: [ResourceSelectorInput!]
 	account: AccountRefInput
-	labelFilter: ResourceLabelFilterInput
 }
 
 union SearchResult = Dataset

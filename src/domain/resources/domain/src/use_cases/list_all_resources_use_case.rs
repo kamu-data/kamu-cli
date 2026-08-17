@@ -10,17 +10,17 @@
 use database_common::PaginationOpts;
 use internal_error::InternalError;
 
-use crate::{ResolvedResourceLabelFilter, ResourceScope, ResourceSnapshot};
+use crate::{ResourceScope, ResourceSnapshot};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
 pub trait ListAllResourcesUseCase: Send + Sync {
+    /// Label filtering rides inside `scope`, per row.
     async fn execute(
         &self,
         account_id: &odf::AccountID,
         scope: &ResourceScope,
-        label_filter: &ResolvedResourceLabelFilter,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceSnapshot>, InternalError>;
 }

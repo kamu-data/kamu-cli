@@ -828,10 +828,10 @@ pub trait ResourceFacade: Send + Sync {
     async fn render_manifests(&self, resource_refs: Vec<ResourceRef>, format: ResourceManifestFormat, spec_view_mode)
         -> Result<BatchResourceResponse<RenderResourceManifestResult, ResourceLookupProblem>, ...>;
 
-    // Listing is two methods, both taking `selectors: Vec<ResourceSelector>`
-    // and returning `{ items, total_count }`.
+    // Listing is two methods sharing ONE request type (`selectors`, `account`,
+    // `pagination`); only the response differs. Both return `{ items, total_count }`.
     async fn search(&self, request: SearchResourcesRequest) -> Result<SearchResourcesResponse, ...>;
-    async fn search_handles(&self, request: SearchResourceHandlesRequest) -> Result<SearchResourceHandlesResponse, ...>;
+    async fn search_handles(&self, request: SearchResourcesRequest) -> Result<SearchResourceHandlesResponse, ...>;
 
     async fn plan_apply_manifest(&self, request: ApplyManifestRequest) -> Result<ApplyManifestPlanningDecision, ...>;
     async fn apply_manifest(&self, request: ApplyManifestRequest) -> Result<ApplyManifestApplicationDecision, ...>;
@@ -939,14 +939,34 @@ the normal per-item `data` is unavailable (see `GqlError::gql_extended` /
 `ResourceAccountResolverImpl` and `LocalResourceFacadeImpl`. (The remote impl is constructed
 on demand by the CLI for remote contexts — see [§12](#12-cli).)
 
-**Label filtering on `list`, `get` and `delete`.** `ListResourcesRequest`,
-`ListResourceHandlesRequest`, and `SearchResourceHandlesRequest` each carry an
-optional `label_filter: Option<ResourceLabelFilterInput>` (`ResourceLabelFilterInput`
-is a `kamu_resources` type alias to `odf::metadata::resource::LabelFilter`, raw
-`String`-keyed entries). The batch calls take a bare `Vec<ResourceRef>` and carry
-no filter at all — the wrapper that once did never did anything but forward the
-field to `get_handles`/`delete_many`, so it was removed rather than left
-permanently unused.
+**Label filtering on `list`, `get` and `delete`.** Filtering rides on the
+selectors themselves: each `ResourceSelector` carries an optional
+`labels: Option<LabelFilter>` (`ResourceLabelFilterInput` is a `kamu_resources`
+type alias to `odf::metadata::resource::LabelFilter`, raw `String`-keyed
+entries). There is **no** call-level `label_filter` — the search requests carry
+only `selectors`, `account` and `pagination`. The batch ref calls take a bare
+`Vec<ResourceRef>` and carry no filter at all, since `ResourceRef` has no
+`labels` field.
+
+One uniform filter is the special case where every selector carries the same
+labels. Selectors are a logical OR and one selector's fields are a conjunction,
+so `(A ∧ L) ∨ (B ∧ L)` is exactly `(A ∨ B) ∧ L` — which is why collapsing the
+former call-level filter onto each selector was lossless, and why the CLI needs
+no new syntax. What per-selector labels *add* is the case that identity cannot
+express: two selectors filtering by **different** labels in one call.
+
+The filter is resolved per selector — a typed selector against its own schema, a
+type-less one against every registered schema — then flattened to
+`Vec<ResourceLabelPair>` and carried into the scope row. A selector whose schema
+cannot carry its labels is dropped; if it is the only candidate, the filter
+itself is at fault and the error surfaces instead.
+
+**A bad filter fails the whole call.** Non-string label values (objects, arrays,
+numbers, bools) are rejected as `NonStringValue` — only top-level string-valued
+labels are indexed in `resource_labels_projection`, so a complex-JSON predicate
+is unsatisfiable by construction. A bad value on *one* selector must not degrade
+into "that selector matched nothing", which would hide the authoring mistake
+behind the other selectors' rows. Pinned by RF-177.
 
 Filtering covers `get` and `delete` as well as `list` because the CLI resolves
 those in **two phases**: it first expands name patterns and the `%` all-types
@@ -989,12 +1009,16 @@ single row. Two consequences worth remembering:
   second field. Exact-name *lookups* therefore go through the ref API
   (`get_handles`), which preserves one batched `ExactNames` row instead of one
   `ILIKE` row per name.
-- **`ResourceSelector::account` is per-row.** `ResourceTypeQuery` carries an
-  optional `account_id`; `None` means the call-level account, which the scoped
-  reads still take as a scalar and use as the default. That is what lets one
-  call span several accounts, and it is why the coalescer groups by
-  `(schema, account)` rather than by schema alone — two selectors differing only
-  by account describe different resources and must not merge.
+- **`ResourceSelector::account` and `labels` are per-row.** `ResourceTypeQuery`
+  carries an optional `account_id` and a `label_pairs: Vec<ResourceLabelPair>`;
+  a `None` account means the call-level one, which the scoped reads still take
+  as a scalar and use as the default, and empty pairs mean unfiltered. That is
+  what lets one call span several accounts and several filters, and it is why
+  the coalescer groups by `(schema, account, labels)` rather than by schema
+  alone — two selectors differing only by account or by labels describe
+  different resources and must not merge. Label pairs are canonically sorted
+  before they enter the key, so authoring order does not decide whether two
+  filters are "the same".
 
   Accounts are resolved in one batch, deduplicated by spelling, with the
   permission check applied per **distinct** account. **Any denial fails the whole
@@ -1016,18 +1040,20 @@ with another key after canonicalization is rejected as
 receive only the resolved predicate and never resolve aliases or touch the
 extension-schema registry.
 
-**Multi-type queries resolve the filter per schema and collapse.** `search_handles`
-may span several schemas — via a type-less selector (what the CLI's `%` all-types
-token produces, coalescing to `ResourceScope::AnyType`), or via several typed
-selectors, which the CLI also uses for multi-type listings
-(`kamu list vs/a-% ss/b-%`). The filter is resolved once per candidate schema and the
-resolved trees compared: today they are always equal — the built-in `environment`
-label applies to every resource type and unregistered short names resolve to
-free-form identity — so the uniform single-predicate path is taken. The divergent
-case is *reserved, not implemented*: it is guarded by an assertion and a comment
-rather than by OR-across-types SQL that no test could exercise. A schema whose
-`applications` list excludes the filtered label is dropped from the candidate set
-(no resource of that type can match); only if **every** schema fails to resolve is
+**Multi-type queries resolve the filter per schema and collapse.** One selector
+may span several schemas — a type-less selector (what the CLI's `%` all-types
+token produces, coalescing to `ResourceScope::AnyType`) resolves its labels
+against every registered schema. Within that one selector the resolved trees are
+compared: today they are always equal — the built-in `environment` label applies
+to every resource type and unregistered short names resolve to free-form
+identity — so the uniform single-predicate path is taken. Per-*schema* divergence
+remains *reserved, not implemented*: it is guarded by an assertion and a comment
+rather than by OR-across-types SQL that no test could exercise. Note this is a
+different axis from per-*selector* filtering, which **is** implemented: several
+typed selectors (`kamu list vs/a-% ss/b-%`) each resolve their own filter and
+each carry it into their own scope row. A schema whose `applications` list
+excludes the filtered label is dropped from that selector's candidate set (no
+resource of that type can match); only if **every** candidate fails to resolve is
 the resolution error surfaced.
 
 **Resolved shape is a tree; evaluation is AND-only.** The raw entries are parsed by
@@ -1135,10 +1161,14 @@ These map directly from the domain views in
 `ApplyManifestChange` / `ApplyManifestChangeKind`).
 
 **Label-filter transport.** `ResourceLabelFilterInput { entries: [ResourceLabelFilterEntryInput!]! }`
-carries the filter, where each entry is `{ key: String!, value: JSON! }`. It is accepted by
-`search` and `searchHandles`. The batch
-`resources`/`renderManifests` queries and the `deleteMany` mutation take `[ResourceRefInput!]!` and
-carry no `labelFilter` field at all.
+carries the filter, where each entry is `{ key: String!, value: JSON! }`. It appears **only** as
+`ResourceSelectorInput.labels` — there is no call-level `labelFilter` argument on `search` or
+`searchHandles`. The batch `resources`/`renderManifests` queries and the `deleteMany` mutation take
+`[ResourceRefInput!]!` and carry no filter at all.
+
+Both `search` and `searchHandles` take the **same** `SearchResourcesInput`; only the response shape
+differs (`ResourceListOutcome` vs `ResourceHandleListOutcome`). They were separate inputs whose
+fields were identical, so keeping two was pure duplication.
 
 **Listing takes a selector list.** `ResourceSelectorInput` mirrors the ODF `ResourceSelector`
 (`account`, `type`, `id`, `name`, `labels`) and replaced four earlier inputs — `ResourceQueryInput`,
@@ -1150,11 +1180,10 @@ A selector with no `type` spans every type.
 benefit of the ODF-shaped API. Naming an account you are not allowed to read denies the **whole**
 call rather than dropping that selector (RF-105).
 
-One field exists on the wire but is **not honoured yet**, and is rejected rather than ignored so a
-caller learns their request was not what they asked for:
-
-- `labels` — the call-level `labelFilter` applies to every selector. Dropping it silently would
-  return a *wider* result set than was asked for, which the caller has no way to detect.
+`labels` is honoured per selector, so one call can filter differently per type — the third headline
+benefit of the ODF-shaped API, and the reason the repository's label pairs moved inside the per-row
+scope predicate. `did` remains the one field that exists on the wire but cannot be resolved; it is
+rejected rather than ignored, so a caller learns their request was not what they asked for.
 
 The wire is scalar where the repository is list-carrying: a batch of N ids arrives as N selectors and
 `coalesce_selectors` folds them into one row. Two type-less selectors that narrow differently, or a
@@ -1320,6 +1349,15 @@ than being silently misparsed.
 `-l` applies to resources only. `list datasets -l …` and `delete datasets -l …` (including the
 mixed dataset+resource form) are rejected — datasets carry no labels, and filtering only the
 resource half of a mixed delete would still delete every named dataset unfiltered.
+
+**`-l` narrows the whole invocation, which the CLI expresses per selector.** The facade has no
+call-level filter, so the CLI stamps the parsed filter onto *every* selector it builds — in
+`selectors_for_query` for `list`, and via `with_labels` in the selection-resolution service for
+`get`/`delete`. Because selectors are OR'd, `(A ∧ L) ∨ (B ∧ L)` is exactly `(A ∨ B) ∧ L`, so
+`kamu list vs/a-% ss/b-% -l env=prod` runs the identical query it did when the filter was
+call-level. The CLI has **no syntax** for per-selector labels; that capability is reachable through
+GraphQL and the facade API. Adding one would be a grammar extension, not a reinterpretation of
+input that parses today.
 
 ---
 
@@ -1722,7 +1760,9 @@ Otherwise the behavior is already guaranteed for both implementations by the con
   forget. If a new batch shape ever needs filtering, filter during expansion (phase 1)
   rather than adding a filter field to the batch call.
 - **The label-filter capability boundary is `flatten_conjunction`, in one place.** The resolved
-  filter is a full boolean tree, but evaluation is AND-only. Every backend routes through that one
-  domain helper, which rejects `Not`/`Or`. Widening support means changing it and the backends —
-  never a signature, and never the resolver.
+  filter is a full boolean tree, but evaluation is AND-only. The **facade** routes through that one
+  domain helper, which rejects `Not`/`Or`, and hands backends a flat `Vec<ResourceLabelPair>` inside
+  the scope. Backends therefore never see an expression tree and cannot call the helper at all, so
+  widening support means changing it, the scope's pair representation, and the backends — never a
+  repository signature, and never the resolver.
 - **Test convention:** use `assert_matches!` directly (never `assert!(matches!(...))`).

@@ -363,3 +363,74 @@ pub async fn test_resources_label_filter_any_type_multitype(ctx: ResourceCtx) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// `-l` narrows **every** selector when several are given at once.
+///
+/// The facade has no call-level filter, so the CLI stamps the parsed filter
+/// onto each selector it builds. Every other test here passes a single
+/// selector, which cannot distinguish "applied to all" from "applied to the
+/// first".
+///
+/// The `list` half is mutation-verified: dropping the labels from all but the
+/// first selector in `load_resources` fails it on both backends. The `get` half
+/// is *not* equivalently sharp — `ResourceSelectionResolutionService` issues
+/// one search per selection item, so `with_labels` only ever receives a
+/// single-element list there and a "first selector only" mutation is invisible
+/// to it. It is kept because it still pins that `get` filters both items, which
+/// is the user-visible contract; the per-selector stamping itself is pinned by
+/// `assert_every_selector_has_labels` in the resolution-service unit tests.
+pub async fn test_resources_label_filter_multiple_selectors(ctx: ResourceCtx) {
+    seed_labeled_cross_type_resources(&ctx).await;
+
+    // Two explicit type selectors in one `list`. Both must be filtered: a
+    // filter reaching only the first would leak `stage-creds` into the result.
+    let names = ctx
+        .stdout_json([
+            "list",
+            "vs",
+            "ss",
+            "-l",
+            "environment=production",
+            "-o",
+            "json",
+        ])
+        .await;
+    let mut names = names
+        .as_array()
+        .unwrap_or_else(|| panic!("expected a JSON array:\n{names}"))
+        .iter()
+        .map(|row| {
+            row.get("Name")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or_default()
+                .to_string()
+        })
+        .collect::<Vec<_>>();
+    names.sort();
+    assert_eq!(
+        names,
+        ["prod-creds", "prod-vars"],
+        "`list vs ss -l environment=production` must filter both selectors"
+    );
+
+    // The same for `get`, which resolves selectors through a different service.
+    let idents = ctx
+        .get_idents(["get", "vs/%", "ss/%", "-l", "environment=production"])
+        .await;
+    assert_eq!(
+        idents,
+        [
+            (
+                fixtures::SECRET_SET_SCHEMA.to_string(),
+                "prod-creds".to_string()
+            ),
+            (
+                fixtures::VARIABLE_SET_SCHEMA.to_string(),
+                "prod-vars".to_string()
+            ),
+        ],
+        "`get vs/% ss/% -l environment=production` must filter both selectors"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
