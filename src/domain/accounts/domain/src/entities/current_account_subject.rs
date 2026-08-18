@@ -7,8 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use crate::DEFAULT_ACCOUNT_NAME;
 #[cfg(any(feature = "testing", test))]
-use crate::{DEFAULT_ACCOUNT_NAME, TEST_ACCOUNT_ID};
+use crate::TEST_ACCOUNT_ID;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
