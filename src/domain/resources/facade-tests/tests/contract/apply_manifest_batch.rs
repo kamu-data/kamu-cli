@@ -25,7 +25,7 @@ use kamu_resources_facade::{
     ApplyManifestRequest,
     ResourceLookupProblem,
     ResourceManifestFormat,
-    SpecViewMode,
+    SpecViewOpts,
 };
 use pretty_assertions::{assert_eq, assert_matches};
 
@@ -113,7 +113,7 @@ fn by_name(name: &str) -> ResourceRef {
 async fn assert_absent(h: &impl FacadeContractHarness, name: &str) {
     let result = h
         .facade_for(TestAccount::Alice)
-        .get(vec![by_name(name)], SpecViewMode::Encrypted)
+        .get(vec![by_name(name)], SpecViewOpts::ENCRYPTED)
         .await
         .unwrap();
 
@@ -276,7 +276,7 @@ pub async fn test_batch_apply_all_successes_preserves_order(h: &impl FacadeContr
 
     let fetched = assert_single_batch_success(
         facade
-            .get(vec![by_name("batch-contract-b")], SpecViewMode::Encrypted)
+            .get(vec![by_name("batch-contract-b")], SpecViewOpts::ENCRYPTED)
             .await
             .unwrap(),
     );

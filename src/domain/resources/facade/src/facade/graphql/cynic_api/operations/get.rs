@@ -10,14 +10,18 @@
 use cynic::QueryBuilder;
 use kamu_resources::ResourceRef;
 
-use crate::SpecViewMode;
+use crate::SpecViewOpts;
 use crate::facade::graphql::cynic_api::fragments::{
     BatchResourceProblem,
     Resource,
     ResourceBadAccountProblem,
     ResourceUnsupportedSelectorProblem,
 };
-use crate::facade::graphql::cynic_api::inputs::{ResourceRefInput, resource_ref_inputs};
+use crate::facade::graphql::cynic_api::inputs::{
+    ResourceRefInput,
+    SpecViewOptsInput,
+    resource_ref_inputs,
+};
 use crate::facade::graphql::cynic_api::schema;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -31,7 +35,7 @@ pub(crate) struct GetResourcesQuery {
 #[derive(cynic::QueryFragment, Debug, Clone)]
 #[cynic(graphql_type = "Resources", variables = "ResourceRefsVariables")]
 pub(crate) struct GetResourcesResources {
-    #[arguments(resourceRefs: $resource_refs, revealed: $revealed)]
+    #[arguments(resourceRefs: $resource_refs, opts: $opts)]
     pub by_refs: BatchResourcesOutcome,
 }
 
@@ -61,14 +65,14 @@ pub(crate) struct BatchResourceSuccess {
 #[derive(cynic::QueryVariables, Debug, Clone)]
 pub(crate) struct ResourceRefsVariables {
     pub resource_refs: Vec<ResourceRefInput>,
-    pub revealed: bool,
+    pub opts: SpecViewOptsInput,
 }
 
 impl ResourceRefsVariables {
-    pub(crate) fn new(resource_refs: &[ResourceRef], spec_view_mode: SpecViewMode) -> Self {
+    pub(crate) fn new(resource_refs: &[ResourceRef], spec_view: SpecViewOpts) -> Self {
         Self {
             resource_refs: resource_ref_inputs(resource_refs),
-            revealed: spec_view_mode == SpecViewMode::Revealed,
+            opts: spec_view.into(),
         }
     }
 }

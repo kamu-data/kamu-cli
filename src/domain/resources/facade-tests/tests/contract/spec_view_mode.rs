@@ -10,14 +10,14 @@
 //! Spec view mode contract tests (RF-040..043).
 //!
 //! `SecretSetResource` is used because its spec has secret fields affected by
-//! `SpecViewMode::Encrypted` vs `SpecViewMode::Revealed`.  After `apply`, the
+//! `SpecViewOpts::ENCRYPTED` vs `SpecViewOpts::REVEALED`.  After `apply`, the
 //! `Value` variant is automatically encrypted and stored as `Encrypted`.
 //! `Encrypted` (default) returns the ciphertext blob; `Revealed` decrypts it
 //! back to the `Literal` plaintext.
 
 use kamu_configuration::SecretSetResource;
 use kamu_resources::{ResourceRef, ResourceSchemaProvider, TypeName};
-use kamu_resources_facade::{ApplyManifestRequest, ResourceManifestFormat, SpecViewMode};
+use kamu_resources_facade::{ApplyManifestRequest, ResourceManifestFormat, SpecViewOpts};
 use pretty_assertions::assert_eq;
 
 use crate::contract_test;
@@ -71,7 +71,7 @@ pub async fn test_encrypted_spec_view_hides_secret_material(h: &impl FacadeContr
         facade
             .get(
                 vec![secret_selector("sv-encrypted")],
-                SpecViewMode::Encrypted,
+                SpecViewOpts::ENCRYPTED,
             )
             .await
             .unwrap(),
@@ -118,7 +118,7 @@ pub async fn test_revealed_spec_view_exposes_plaintext(h: &impl FacadeContractHa
 
     let view = assert_single_batch_success(
         facade
-            .get(vec![secret_selector("sv-revealed")], SpecViewMode::Revealed)
+            .get(vec![secret_selector("sv-revealed")], SpecViewOpts::REVEALED)
             .await
             .unwrap(),
     );
@@ -188,7 +188,7 @@ pub async fn test_spec_view_mode_applies_to_batch_get(h: &impl FacadeContractHar
 
     // Encrypted view — no plaintext
     let enc_resp = facade
-        .get(batch_selector.clone(), SpecViewMode::Encrypted)
+        .get(batch_selector.clone(), SpecViewOpts::ENCRYPTED)
         .await
         .unwrap();
     assert_batch_indexes(&enc_resp, &[0, 1], &[]);
@@ -202,7 +202,7 @@ pub async fn test_spec_view_mode_applies_to_batch_get(h: &impl FacadeContractHar
 
     // Revealed view — plaintext visible
     let rev_resp = facade
-        .get(batch_selector, SpecViewMode::Revealed)
+        .get(batch_selector, SpecViewOpts::REVEALED)
         .await
         .unwrap();
     assert_batch_indexes(&rev_resp, &[0, 1], &[]);
@@ -241,7 +241,7 @@ pub async fn test_spec_view_mode_applies_to_render(h: &impl FacadeContractHarnes
             .render_manifests(
                 vec![secret_selector("sv-render")],
                 ResourceManifestFormat::Json,
-                SpecViewMode::Encrypted,
+                SpecViewOpts::ENCRYPTED,
             )
             .await
             .unwrap(),
@@ -258,7 +258,7 @@ pub async fn test_spec_view_mode_applies_to_render(h: &impl FacadeContractHarnes
             .render_manifests(
                 vec![secret_selector("sv-render")],
                 ResourceManifestFormat::Json,
-                SpecViewMode::Revealed,
+                SpecViewOpts::REVEALED,
             )
             .await
             .unwrap(),
@@ -336,7 +336,7 @@ pub async fn test_spec_view_mode_applies_per_schema_in_a_mixed_batch(
         ),
     ] {
         let response = facade
-            .get(refs.clone(), SpecViewMode::Revealed)
+            .get(refs.clone(), SpecViewOpts::REVEALED)
             .await
             .unwrap_or_else(|e| panic!("{label}: revealed get must succeed, got {e:?}"));
         assert_batch_indexes(&response, &[0, 1], &[]);
@@ -352,7 +352,7 @@ pub async fn test_spec_view_mode_applies_per_schema_in_a_mixed_batch(
         );
 
         let rendered = facade
-            .render_manifests(refs, ResourceManifestFormat::Json, SpecViewMode::Revealed)
+            .render_manifests(refs, ResourceManifestFormat::Json, SpecViewOpts::REVEALED)
             .await
             .unwrap_or_else(|e| {
                 panic!("{label}: revealed render_manifests must succeed, got {e:?}")

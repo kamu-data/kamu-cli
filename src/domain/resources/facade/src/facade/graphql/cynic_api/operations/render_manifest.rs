@@ -17,9 +17,13 @@ use crate::facade::graphql::cynic_api::fragments::{
     ResourceRenderManifestResult,
     ResourceUnsupportedSelectorProblem,
 };
-use crate::facade::graphql::cynic_api::inputs::{ResourceRefInput, resource_ref_inputs};
+use crate::facade::graphql::cynic_api::inputs::{
+    ResourceRefInput,
+    SpecViewOptsInput,
+    resource_ref_inputs,
+};
 use crate::facade::graphql::cynic_api::schema;
-use crate::{ResourceManifestFormat as DomainFormat, SpecViewMode};
+use crate::{ResourceManifestFormat as DomainFormat, SpecViewOpts};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -35,7 +39,7 @@ pub(crate) struct RenderManifestsQuery {
     variables = "RenderResourceManifestsVariables"
 )]
 pub(crate) struct RenderManifestsResources {
-    #[arguments(resourceRefs: $resource_refs, format: $format, revealed: $revealed)]
+    #[arguments(resourceRefs: $resource_refs, format: $format, opts: $opts)]
     pub render_manifests: BatchResourceManifestsOutcome,
 }
 
@@ -66,19 +70,19 @@ pub(crate) struct BatchResourceManifestSuccess {
 pub(crate) struct RenderResourceManifestsVariables {
     pub resource_refs: Vec<ResourceRefInput>,
     pub format: ResourceManifestFormat,
-    pub revealed: bool,
+    pub opts: SpecViewOptsInput,
 }
 
 impl RenderResourceManifestsVariables {
     pub(crate) fn new(
         resource_refs: &[ResourceRef],
         format: DomainFormat,
-        spec_view_mode: SpecViewMode,
+        spec_view: SpecViewOpts,
     ) -> Self {
         Self {
             resource_refs: resource_ref_inputs(resource_refs),
             format: format.into(),
-            revealed: spec_view_mode == SpecViewMode::Revealed,
+            opts: spec_view.into(),
         }
     }
 }

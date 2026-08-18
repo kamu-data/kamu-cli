@@ -4450,11 +4450,11 @@ type Resources {
 	"""
 	Returns resources by refs
 	"""
-	byRefs(resourceRefs: [ResourceRefInput!]!, revealed: Boolean! = false): BatchResourcesOutcome!
+	byRefs(resourceRefs: [ResourceRefInput!]!, opts: SpecViewOptsInput! = {revealed: false}): BatchResourcesOutcome!
 	"""
 	Returns resource handles by refs
 	"""
-	resourceHandlesByRefs(resourceRefs: [ResourceRefInput!]!): BatchResourceHandlesOutcome!
+	handlesByRefs(resourceRefs: [ResourceRefInput!]!): BatchResourceHandlesOutcome!
 	"""
 	Returns resources matching the given selectors, which act as a logical
 	OR and may span several resource types and accounts
@@ -4467,7 +4467,7 @@ type Resources {
 	"""
 	Renders canonical manifest representations from stored resources
 	"""
-	renderManifests(resourceRefs: [ResourceRefInput!]!, format: ResourceManifestFormat!, revealed: Boolean! = false): BatchResourceManifestsOutcome!
+	renderManifests(resourceRefs: [ResourceRefInput!]!, format: ResourceManifestFormat!, opts: SpecViewOptsInput! = {revealed: false}): BatchResourceManifestsOutcome!
 }
 
 type ResourcesMut {
@@ -4883,6 +4883,19 @@ type SourceState {
 	Opaque value representing the state.
 	"""
 	value: String!
+}
+
+"""
+Options controlling how a resource's spec is rendered. A struct rather than
+a bare `revealed: bool` argument, so future spec-view options can be added
+here without growing the resolver's argument list.
+"""
+input SpecViewOptsInput {
+	"""
+	Show actual (decrypted) secret values instead of ciphertext
+	placeholders.
+	"""
+	revealed: Boolean! = false
 }
 
 """

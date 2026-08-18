@@ -64,7 +64,7 @@ pub trait ResourceFacade: Send + Sync {
     async fn get(
         &self,
         resource_refs: Vec<ResourceRef>,
-        spec_view_mode: SpecViewMode,
+        spec_view: SpecViewOpts,
     ) -> Result<BatchResourceResponse<Resource, ResourceLookupProblem>, BatchResourceError>;
 
     async fn get_handles(
@@ -76,7 +76,7 @@ pub trait ResourceFacade: Send + Sync {
         &self,
         resource_refs: Vec<ResourceRef>,
         format: ResourceManifestFormat,
-        spec_view_mode: SpecViewMode,
+        spec_view: SpecViewOpts,
     ) -> Result<
         BatchResourceResponse<RenderResourceManifestResult, ResourceLookupProblem>,
         BatchResourceError,
@@ -253,10 +253,13 @@ pub struct RenderResourceManifestResult {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum SpecViewMode {
-    #[default]
-    Encrypted,
-    Revealed,
+pub struct SpecViewOpts {
+    pub revealed: bool,
+}
+
+impl SpecViewOpts {
+    pub const ENCRYPTED: Self = Self { revealed: false };
+    pub const REVEALED: Self = Self { revealed: true };
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

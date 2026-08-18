@@ -26,7 +26,7 @@ use kamu_resources_facade::{
     ResourceManifestFormat,
     ResourcesSummaryRequest,
     SearchResourcesRequest,
-    SpecViewMode,
+    SpecViewOpts,
 };
 use pretty_assertions::{assert_eq, assert_matches};
 
@@ -162,7 +162,7 @@ pub async fn test_default_account_selector_resolves_current_account(
         h.facade_for(TestAccount::Alice)
             .get(
                 vec![selector_by_name("acct-default", None)],
-                SpecViewMode::Encrypted,
+                SpecViewOpts::ENCRYPTED,
             )
             .await
             .unwrap(),
@@ -200,7 +200,7 @@ pub async fn test_account_by_name_resolves_correctly(h: &impl FacadeContractHarn
                     "acct-by-name",
                     Some(account_by_name(&h.account_name(TestAccount::Alice))),
                 )],
-                SpecViewMode::Encrypted,
+                SpecViewOpts::ENCRYPTED,
             )
             .await
             .unwrap(),
@@ -233,7 +233,7 @@ pub async fn test_account_by_id_resolves_correctly(h: &impl FacadeContractHarnes
                     "acct-by-id",
                     Some(account_by_id(h.account_id(TestAccount::Alice))),
                 )],
-                SpecViewMode::Encrypted,
+                SpecViewOpts::ENCRYPTED,
             )
             .await
             .unwrap(),
@@ -262,7 +262,7 @@ pub async fn test_account_by_name_and_id_agree_resolves_correctly(h: &impl Facad
         h.facade_for(TestAccount::Alice)
             .get(
                 vec![selector_by_name("acct-both-agree", Some(agreeing))],
-                SpecViewMode::Encrypted,
+                SpecViewOpts::ENCRYPTED,
             )
             .await
             .unwrap(),
@@ -302,7 +302,7 @@ pub async fn test_account_name_id_mismatch_is_rejected(h: &impl FacadeContractHa
         .facade_for(TestAccount::Alice)
         .get(
             vec![selector_by_name("acct-mismatch", Some(mismatch))],
-            SpecViewMode::Encrypted,
+            SpecViewOpts::ENCRYPTED,
         )
         .await;
     assert_matches!(
@@ -385,7 +385,7 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
         alice
             .get(
                 vec![selector_by_name("acct-isolated", None)],
-                SpecViewMode::Encrypted,
+                SpecViewOpts::ENCRYPTED,
             )
             .await
             .unwrap(),
@@ -393,7 +393,7 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
     let bob_view = assert_single_batch_success(
         bob.get(
             vec![selector_by_name("acct-isolated", None)],
-            SpecViewMode::Encrypted,
+            SpecViewOpts::ENCRYPTED,
         )
         .await
         .unwrap(),
@@ -422,7 +422,7 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
     let bob_batch = bob
         .get(
             batch_selector_by_name("acct-isolated", None),
-            SpecViewMode::Encrypted,
+            SpecViewOpts::ENCRYPTED,
         )
         .await
         .unwrap();

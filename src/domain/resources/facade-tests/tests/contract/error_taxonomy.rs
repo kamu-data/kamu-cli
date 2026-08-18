@@ -27,7 +27,7 @@ use kamu_resources_facade::{
     ResourcesSummaryError,
     ResourcesSummaryRequest,
     SearchResourcesRequest,
-    SpecViewMode,
+    SpecViewOpts,
 };
 use pretty_assertions::assert_matches;
 
@@ -107,7 +107,7 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
     let missing_name = "taxonomy-missing";
 
     let get = facade
-        .get(vec![by_name(missing_name)], SpecViewMode::Encrypted)
+        .get(vec![by_name(missing_name)], SpecViewOpts::ENCRYPTED)
         .await
         .unwrap();
     assert_matches!(
@@ -130,7 +130,7 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
         .render_manifests(
             vec![by_name(missing_name)],
             ResourceManifestFormat::Json,
-            SpecViewMode::Encrypted,
+            SpecViewOpts::ENCRYPTED,
         )
         .await
         .unwrap();
@@ -149,7 +149,7 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
 
     // --- IDNotFound ---
     let get = facade
-        .get(vec![by_id(&absent_uid)], SpecViewMode::Encrypted)
+        .get(vec![by_id(&absent_uid)], SpecViewOpts::ENCRYPTED)
         .await
         .unwrap();
     assert_matches!(
@@ -169,7 +169,7 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
         .render_manifests(
             vec![by_id(&absent_uid)],
             ResourceManifestFormat::Json,
-            SpecViewMode::Encrypted,
+            SpecViewOpts::ENCRYPTED,
         )
         .await
         .unwrap();
@@ -201,7 +201,7 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
     };
 
     let get = facade
-        .get(vec![wrong_schema_selector.clone()], SpecViewMode::Encrypted)
+        .get(vec![wrong_schema_selector.clone()], SpecViewOpts::ENCRYPTED)
         .await
         .unwrap();
     assert_matches!(
@@ -224,7 +224,7 @@ pub async fn test_single_resource_lookup_taxonomy(h: &impl FacadeContractHarness
         .render_manifests(
             vec![wrong_schema_selector.clone()],
             ResourceManifestFormat::Json,
-            SpecViewMode::Encrypted,
+            SpecViewOpts::ENCRYPTED,
         )
         .await
         .unwrap();
@@ -255,7 +255,7 @@ pub async fn test_batch_lookup_taxonomy(h: &impl FacadeContractHarness) {
     let resp = facade
         .get(
             batch_by_name("taxonomy-batch-missing"),
-            SpecViewMode::Encrypted,
+            SpecViewOpts::ENCRYPTED,
         )
         .await
         .unwrap();
@@ -268,7 +268,7 @@ pub async fn test_batch_lookup_taxonomy(h: &impl FacadeContractHarness) {
 
     // --- IDNotFound in get ---
     let resp = facade
-        .get(batch_by_id(absent_uid), SpecViewMode::Encrypted)
+        .get(batch_by_id(absent_uid), SpecViewOpts::ENCRYPTED)
         .await
         .unwrap();
     assert_eq!(resp.problems.len(), 1);
@@ -295,7 +295,7 @@ pub async fn test_batch_lookup_taxonomy(h: &impl FacadeContractHarness) {
         .render_manifests(
             batch_by_name("taxonomy-batch-missing-render"),
             ResourceManifestFormat::Json,
-            SpecViewMode::Encrypted,
+            SpecViewOpts::ENCRYPTED,
         )
         .await
         .unwrap();
@@ -353,7 +353,7 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
                 did: None,
                 name: Some("bad-acct-get".parse().unwrap()),
             }],
-            SpecViewMode::Encrypted,
+            SpecViewOpts::ENCRYPTED,
         )
         .await;
     assert_matches!(
@@ -366,7 +366,7 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
     let result = facade
         .get(
             batch_by_name_for_account("bad-acct-get-many", unknown_account.clone()),
-            SpecViewMode::Encrypted,
+            SpecViewOpts::ENCRYPTED,
         )
         .await;
     assert_matches!(
@@ -391,7 +391,7 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
                 name: Some("bad-acct-render".parse().unwrap()),
             }],
             ResourceManifestFormat::Json,
-            SpecViewMode::Encrypted,
+            SpecViewOpts::ENCRYPTED,
         )
         .await;
     assert_matches!(

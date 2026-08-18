@@ -14,7 +14,7 @@ use kamu_resources_facade::{
     ResourceLookupProblem,
     ResourceManifestFormat,
     SearchResourcesRequest,
-    SpecViewMode,
+    SpecViewOpts,
 };
 use pretty_assertions::{assert_eq, assert_matches};
 
@@ -78,7 +78,7 @@ pub async fn test_delete_by_name(h: &impl FacadeContractHarness) {
 
     // Resource must not be found by name
     let get_by_name = facade
-        .get(vec![by_name("del-name-test")], SpecViewMode::Encrypted)
+        .get(vec![by_name("del-name-test")], SpecViewOpts::ENCRYPTED)
         .await
         .unwrap();
     let get_err = assert_single_batch_problem(get_by_name);
@@ -90,7 +90,7 @@ pub async fn test_delete_by_name(h: &impl FacadeContractHarness) {
 
     // Resource must not be found by id
     let get_by_uid = facade
-        .get(vec![by_id(&id)], SpecViewMode::Encrypted)
+        .get(vec![by_id(&id)], SpecViewOpts::ENCRYPTED)
         .await
         .unwrap();
     let get_err = assert_single_batch_problem(get_by_uid);
@@ -134,7 +134,7 @@ pub async fn test_delete_by_uid(h: &impl FacadeContractHarness) {
     assert_eq!(deleted_uid, id, "deleted id must match created id");
 
     let get_by_name = facade
-        .get(vec![by_name("del-id-test")], SpecViewMode::Encrypted)
+        .get(vec![by_name("del-id-test")], SpecViewOpts::ENCRYPTED)
         .await
         .unwrap();
     let get_err = assert_single_batch_problem(get_by_name);
@@ -274,7 +274,7 @@ pub async fn test_delete_is_account_scoped(h: &impl FacadeContractHarness) {
 
     // Alice's resource must be gone.
     let alice_get = alice_facade
-        .get(vec![by_name("scoped-del")], SpecViewMode::Encrypted)
+        .get(vec![by_name("scoped-del")], SpecViewOpts::ENCRYPTED)
         .await
         .unwrap();
     let alice_err = assert_single_batch_problem(alice_get);
@@ -288,7 +288,7 @@ pub async fn test_delete_is_account_scoped(h: &impl FacadeContractHarness) {
     let bob_facade = h.facade_for(TestAccount::Bob);
     let bob_view = assert_single_batch_success(
         bob_facade
-            .get(vec![by_name("scoped-del")], SpecViewMode::Encrypted)
+            .get(vec![by_name("scoped-del")], SpecViewOpts::ENCRYPTED)
             .await
             .unwrap(),
     );

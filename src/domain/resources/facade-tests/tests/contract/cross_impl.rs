@@ -34,7 +34,7 @@ use kamu_resources_facade::{
     ApplyManifestRequest,
     ResourceLookupProblem,
     ResourceManifestFormat,
-    SpecViewMode,
+    SpecViewOpts,
 };
 use pretty_assertions::{assert_eq, assert_matches};
 
@@ -124,7 +124,7 @@ pub async fn test_local_created_readable_remotely(h: &impl FacadeContractHarness
         remote
             .get(
                 vec![by_name("cross-local-to-remote")],
-                SpecViewMode::Encrypted,
+                SpecViewOpts::ENCRYPTED,
             )
             .await
             .unwrap(),
@@ -170,7 +170,7 @@ pub async fn test_remote_created_readable_locally(h: &impl FacadeContractHarness
         local
             .get(
                 vec![by_name("cross-remote-to-local")],
-                SpecViewMode::Encrypted,
+                SpecViewOpts::ENCRYPTED,
             )
             .await
             .unwrap(),
@@ -215,7 +215,7 @@ pub async fn test_render_manifest_equivalence(h: &impl FacadeContractHarness) {
             .render_manifests(
                 vec![selector.clone()],
                 ResourceManifestFormat::Json,
-                SpecViewMode::Encrypted,
+                SpecViewOpts::ENCRYPTED,
             )
             .await
             .unwrap(),
@@ -226,7 +226,7 @@ pub async fn test_render_manifest_equivalence(h: &impl FacadeContractHarness) {
             .render_manifests(
                 vec![selector.clone()],
                 ResourceManifestFormat::Json,
-                SpecViewMode::Encrypted,
+                SpecViewOpts::ENCRYPTED,
             )
             .await
             .unwrap(),
@@ -245,7 +245,7 @@ pub async fn test_render_manifest_equivalence(h: &impl FacadeContractHarness) {
             .render_manifests(
                 vec![selector.clone()],
                 ResourceManifestFormat::Yaml,
-                SpecViewMode::Encrypted,
+                SpecViewOpts::ENCRYPTED,
             )
             .await
             .unwrap(),
@@ -256,7 +256,7 @@ pub async fn test_render_manifest_equivalence(h: &impl FacadeContractHarness) {
             .render_manifests(
                 vec![selector.clone()],
                 ResourceManifestFormat::Yaml,
-                SpecViewMode::Encrypted,
+                SpecViewOpts::ENCRYPTED,
             )
             .await
             .unwrap(),
@@ -338,11 +338,11 @@ pub async fn test_batch_equivalence(h: &impl FacadeContractHarness) {
 
     // get: both facades must return the same structure
     let local_get = local
-        .get(batch_selector.clone(), SpecViewMode::Encrypted)
+        .get(batch_selector.clone(), SpecViewOpts::ENCRYPTED)
         .await
         .unwrap();
     let remote_get = remote
-        .get(batch_selector.clone(), SpecViewMode::Encrypted)
+        .get(batch_selector.clone(), SpecViewOpts::ENCRYPTED)
         .await
         .unwrap();
     assert_batch_indexes(&local_get, &[0], &[1, 2]);
@@ -400,7 +400,7 @@ pub async fn test_batch_equivalence(h: &impl FacadeContractHarness) {
         .render_manifests(
             batch_selector.clone(),
             ResourceManifestFormat::Json,
-            SpecViewMode::Encrypted,
+            SpecViewOpts::ENCRYPTED,
         )
         .await
         .unwrap();
@@ -408,7 +408,7 @@ pub async fn test_batch_equivalence(h: &impl FacadeContractHarness) {
         .render_manifests(
             batch_selector.clone(),
             ResourceManifestFormat::Json,
-            SpecViewMode::Encrypted,
+            SpecViewOpts::ENCRYPTED,
         )
         .await
         .unwrap();

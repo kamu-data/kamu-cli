@@ -17,7 +17,7 @@ use kamu_resources_facade::{
     ApplyManifestRequest,
     ResourceLookupProblem,
     ResourceManifestFormat,
-    SpecViewMode,
+    SpecViewOpts,
 };
 use pretty_assertions::{assert_eq, assert_matches};
 
@@ -77,7 +77,7 @@ pub async fn test_render_json_by_name(h: &impl FacadeContractHarness) {
             .render_manifests(
                 vec![by_name("render-json-name")],
                 ResourceManifestFormat::Json,
-                SpecViewMode::Encrypted,
+                SpecViewOpts::ENCRYPTED,
             )
             .await
             .unwrap(),
@@ -120,7 +120,7 @@ pub async fn test_render_yaml_by_uid(h: &impl FacadeContractHarness) {
             .render_manifests(
                 vec![by_id(&id)],
                 ResourceManifestFormat::Yaml,
-                SpecViewMode::Encrypted,
+                SpecViewOpts::ENCRYPTED,
             )
             .await
             .unwrap(),
@@ -159,7 +159,7 @@ pub async fn test_rendered_manifest_can_be_reapplied(h: &impl FacadeContractHarn
             .render_manifests(
                 vec![by_id(&id)],
                 ResourceManifestFormat::Json,
-                SpecViewMode::Encrypted,
+                SpecViewOpts::ENCRYPTED,
             )
             .await
             .unwrap(),
@@ -216,7 +216,7 @@ pub async fn test_render_missing_resource_returns_not_found(h: &impl FacadeContr
         .render_manifests(
             vec![by_name("render-no-such")],
             ResourceManifestFormat::Json,
-            SpecViewMode::Encrypted,
+            SpecViewOpts::ENCRYPTED,
         )
         .await
         .unwrap();
@@ -230,7 +230,7 @@ pub async fn test_render_missing_resource_returns_not_found(h: &impl FacadeContr
         .render_manifests(
             vec![by_id(&absent_uid)],
             ResourceManifestFormat::Json,
-            SpecViewMode::Encrypted,
+            SpecViewOpts::ENCRYPTED,
         )
         .await
         .unwrap();
@@ -271,7 +271,7 @@ pub async fn test_render_wrong_schema_returns_mismatch(h: &impl FacadeContractHa
         .render_manifests(
             vec![wrong_schema_selector],
             ResourceManifestFormat::Json,
-            SpecViewMode::Encrypted,
+            SpecViewOpts::ENCRYPTED,
         )
         .await
         .unwrap();
@@ -297,7 +297,7 @@ pub async fn test_render_wrong_schema_returns_mismatch(h: &impl FacadeContractHa
         .render_manifests(
             vec![wrong_kind],
             ResourceManifestFormat::Json,
-            SpecViewMode::Encrypted,
+            SpecViewOpts::ENCRYPTED,
         )
         .await
         .unwrap();

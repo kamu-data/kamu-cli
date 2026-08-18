@@ -20,7 +20,7 @@ use kamu_resources_facade::{
     BatchResourceError,
     ListResourcesError,
     SearchResourcesRequest,
-    SpecViewMode,
+    SpecViewOpts,
 };
 
 use crate::contract_test;
@@ -175,7 +175,7 @@ pub async fn test_selector_aliases_resolve_consistently(h: &impl FacadeContractH
                     did: None,
                     name: Some("alias-check".parse().unwrap()),
                 }],
-                SpecViewMode::Encrypted,
+                SpecViewOpts::ENCRYPTED,
             )
             .await
             .expect("get with canonical selector must succeed"),
@@ -280,7 +280,7 @@ pub async fn test_unsupported_schema_rejected_consistently(h: &impl FacadeContra
                 did: None,
                 name: Some("unsupported-type-base".parse().unwrap()),
             }],
-            SpecViewMode::Encrypted,
+            SpecViewOpts::ENCRYPTED,
         )
         .await;
     match get_by_name {

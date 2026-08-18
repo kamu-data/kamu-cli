@@ -31,7 +31,7 @@ pub(crate) struct GetResourceHandlesQuery {
 #[cynic(graphql_type = "Resources", variables = "ResourceHandleRefsVariables")]
 pub(crate) struct ResourceHandlesResources {
     #[arguments(resourceRefs: $resource_refs)]
-    pub resource_handles_by_refs: BatchResourceHandlesOutcome,
+    pub handles_by_refs: BatchResourceHandlesOutcome,
 }
 
 #[derive(cynic::InlineFragments, Debug, Clone)]

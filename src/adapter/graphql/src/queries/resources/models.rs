@@ -115,6 +115,27 @@ impl AccountRefInput {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Options controlling how a resource's spec is rendered. A struct rather than
+/// a bare `revealed: bool` argument, so future spec-view options can be added
+/// here without growing the resolver's argument list.
+#[derive(InputObject, Debug, Clone, Copy, Default)]
+pub struct SpecViewOptsInput {
+    /// Show actual (decrypted) secret values instead of ciphertext
+    /// placeholders.
+    #[graphql(default)]
+    pub revealed: bool,
+}
+
+impl SpecViewOptsInput {
+    pub fn into_spec_view_opts(self) -> kamu_resources_facade::SpecViewOpts {
+        kamu_resources_facade::SpecViewOpts {
+            revealed: self.revealed,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 /// Converts a batch of authored refs, validating each.
 ///
 /// Every ref carries its own type and account, so one call may span both.

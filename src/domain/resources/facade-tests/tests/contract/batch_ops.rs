@@ -13,7 +13,7 @@ use kamu_resources_facade::{
     BatchResourceError,
     ResourceLookupProblem,
     ResourceManifestFormat,
-    SpecViewMode,
+    SpecViewOpts,
 };
 use pretty_assertions::{assert_eq, assert_matches};
 
@@ -70,7 +70,7 @@ pub async fn test_get_all_successes(h: &impl FacadeContractHarness) {
         },
     ];
 
-    let response = facade.get(selector, SpecViewMode::Encrypted).await.unwrap();
+    let response = facade.get(selector, SpecViewOpts::ENCRYPTED).await.unwrap();
 
     assert_batch_indexes(&response, &[0, 1], &[]);
     assert_eq!(response.successes.len(), 2);
@@ -156,7 +156,7 @@ pub async fn test_get_mixed_successes_problems(h: &impl FacadeContractHarness) {
                     name: None,
                 }, // idx 3 — missing id
             ],
-            SpecViewMode::Encrypted,
+            SpecViewOpts::ENCRYPTED,
         )
         .await
         .unwrap();
@@ -219,7 +219,7 @@ pub async fn test_get_duplicate_refs(h: &impl FacadeContractHarness) {
                     name: Some("dup-ref".parse().unwrap()),
                 }, // idx 1 — same ref
             ],
-            SpecViewMode::Encrypted,
+            SpecViewOpts::ENCRYPTED,
         )
         .await
         .unwrap();
@@ -244,7 +244,7 @@ contract_test!(get_empty_refs, super::test_get_empty_refs);
 pub async fn test_get_empty_refs(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
-    let response = facade.get(vec![], SpecViewMode::Encrypted).await.unwrap();
+    let response = facade.get(vec![], SpecViewOpts::ENCRYPTED).await.unwrap();
     assert!(response.successes.is_empty(), "get successes must be empty");
     assert!(response.problems.is_empty(), "get problems must be empty");
 
@@ -262,7 +262,7 @@ pub async fn test_get_empty_refs(h: &impl FacadeContractHarness) {
         .render_manifests(
             vec![],
             ResourceManifestFormat::Json,
-            SpecViewMode::Encrypted,
+            SpecViewOpts::ENCRYPTED,
         )
         .await
         .unwrap();
@@ -311,7 +311,7 @@ pub async fn test_get_wrong_schema(h: &impl FacadeContractHarness) {
                     name: None,
                 }, // idx 0 — exists but wrong schema
             ],
-            SpecViewMode::Encrypted,
+            SpecViewOpts::ENCRYPTED,
         )
         .await
         .unwrap();
@@ -441,7 +441,7 @@ pub async fn test_render_manifests_all_successes(h: &impl FacadeContractHarness)
                     }, // idx 1
                 ],
                 format,
-                SpecViewMode::Encrypted,
+                SpecViewOpts::ENCRYPTED,
             )
             .await
             .unwrap();
@@ -529,7 +529,7 @@ pub async fn test_render_manifests_mixed_successes_problems(h: &impl FacadeContr
                 }, // idx 2 — missing id
             ],
             kamu_resources_facade::ResourceManifestFormat::Json,
-            SpecViewMode::Encrypted,
+            SpecViewOpts::ENCRYPTED,
         )
         .await
         .unwrap();
@@ -635,7 +635,7 @@ pub async fn test_delete_all_successes(h: &impl FacadeContractHarness) {
                     did: None,
                     name: Some(name.parse().unwrap()),
                 }],
-                SpecViewMode::Encrypted,
+                SpecViewOpts::ENCRYPTED,
             )
             .await
             .unwrap();
@@ -828,7 +828,7 @@ pub async fn test_batch_apis_reject_unsupported_type(h: &impl FacadeContractHarn
         name: None,
     }];
 
-    let gm = facade.get(selector.clone(), SpecViewMode::Encrypted).await;
+    let gm = facade.get(selector.clone(), SpecViewOpts::ENCRYPTED).await;
     assert!(
         matches!(gm, Err(BatchResourceError::UnsupportedSelector(_))),
         "get: unsupported type must be a batch-level UnsupportedSelector, got: {gm:?}"
@@ -844,7 +844,7 @@ pub async fn test_batch_apis_reject_unsupported_type(h: &impl FacadeContractHarn
         .render_manifests(
             selector.clone(),
             ResourceManifestFormat::Json,
-            SpecViewMode::Encrypted,
+            SpecViewOpts::ENCRYPTED,
         )
         .await;
     assert!(
@@ -921,7 +921,7 @@ pub async fn test_batch_spans_types_and_accounts(h: &impl FacadeContractHarness)
     // the grouping — a fan-out that lost order would still "succeed" here, so
     // the indexes are the real assertion.
     let response = facade
-        .get(mixed_types(), SpecViewMode::Encrypted)
+        .get(mixed_types(), SpecViewOpts::ENCRYPTED)
         .await
         .expect("a batch spanning two types must resolve");
     assert_batch_indexes(&response, &[0, 1], &[]);
@@ -936,7 +936,7 @@ pub async fn test_batch_spans_types_and_accounts(h: &impl FacadeContractHarness)
         .render_manifests(
             mixed_types(),
             ResourceManifestFormat::Json,
-            SpecViewMode::Encrypted,
+            SpecViewOpts::ENCRYPTED,
         )
         .await
         .expect("render_manifests must span two types");
@@ -1046,7 +1046,7 @@ pub async fn test_ref_id_and_name_must_agree(h: &impl FacadeContractHarness) {
     };
 
     let response = facade
-        .get(mismatched(), SpecViewMode::Encrypted)
+        .get(mismatched(), SpecViewOpts::ENCRYPTED)
         .await
         .expect("a mismatched ref is a per-item problem, not a batch failure");
     assert_batch_indexes(&response, &[1], &[0]);
@@ -1103,7 +1103,7 @@ pub async fn test_ref_id_and_name_must_agree(h: &impl FacadeContractHarness) {
     };
 
     let response = facade
-        .get(case_variant(), SpecViewMode::Encrypted)
+        .get(case_variant(), SpecViewOpts::ENCRYPTED)
         .await
         .expect("a case-only name variant must resolve");
     assert_batch_indexes(&response, &[0], &[]);
@@ -1118,7 +1118,7 @@ pub async fn test_ref_id_and_name_must_agree(h: &impl FacadeContractHarness) {
         .render_manifests(
             case_variant(),
             ResourceManifestFormat::Json,
-            SpecViewMode::Encrypted,
+            SpecViewOpts::ENCRYPTED,
         )
         .await
         .expect("render_manifests must accept a case-only name variant");
@@ -1170,7 +1170,7 @@ pub async fn test_type_less_ref_resolves_across_types(h: &impl FacadeContractHar
     };
 
     let response = facade
-        .get(refs(), SpecViewMode::Encrypted)
+        .get(refs(), SpecViewOpts::ENCRYPTED)
         .await
         .expect("a type-less ref must resolve without naming a type");
     assert_batch_indexes(&response, &[0], &[1]);
@@ -1185,7 +1185,7 @@ pub async fn test_type_less_ref_resolves_across_types(h: &impl FacadeContractHar
         .render_manifests(
             refs(),
             ResourceManifestFormat::Json,
-            SpecViewMode::Encrypted,
+            SpecViewOpts::ENCRYPTED,
         )
         .await
         .expect("render_manifests must resolve a type-less ref");
@@ -1241,7 +1241,7 @@ pub async fn test_type_less_ref_matching_several_types_is_ambiguous(
     };
 
     let response = facade
-        .get(refs(), SpecViewMode::Encrypted)
+        .get(refs(), SpecViewOpts::ENCRYPTED)
         .await
         .expect("an ambiguous ref is a per-item problem, not a batch failure");
     assert_batch_indexes(&response, &[], &[0]);

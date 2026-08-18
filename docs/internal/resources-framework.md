@@ -144,7 +144,7 @@ long-term goal. This page documents what exists now.
 | **Reconciliation** | Driving actual state toward the spec (e.g. `SecretSet` materializes its encrypted read-side projection). |
 | **Ref** | Identifies exactly one resource *instance* (`ResourceRef`), by exact name or UID, optionally account- and type-scoped. A batch is `Vec<ResourceRef>`. |
 | **Selector** | Matches zero or many resource *instances* (`ResourceSelector`), by SQL `LIKE` name pattern and/or UID. Several selectors act as a logical OR. |
-| **SpecViewMode** | How sensitive spec fields render. Two modes: `Encrypted` (default — stored ciphertext as-is) and `Revealed` (decrypted). No "redacted" mode today. |
+| **SpecViewOpts** | Options controlling how sensitive spec fields render, `{ revealed: bool }` today. `revealed: false` (default) returns stored ciphertext as-is; `revealed: true` decrypts. A struct, not an enum, so future spec-view options can be added without growing every call site's argument list. No "redacted" mode today. |
 | **Dispatcher** | Per-type adapter (`ResourceCrudDispatcher`, …) registered in `dill`, looked up by schema or selector metadata. |
 | **Facade** | The single API seam (`ResourceFacade`); local or remote-GraphQL impl. |
 | **TypeRef** | A label/annotation *key*: a short `TypeName` (e.g. registered `environment`, or free-form `env`) or a full schema URI, per ODF RFC-018 (`odf::metadata::resource::TypeRef` = `Uri \| Name`). `Ord`, so a `BTreeMap` key; serializes as a plain string. |
@@ -632,11 +632,11 @@ pub trait ResourceFacade: Send + Sync {
     // Ref-keyed reads and deletes take ODF `ResourceRef`s: each ref carries its
     // own account and type, so one batch can span both. These exist ONLY in
     // batch form — a single-resource call is a one-element vec.
-    async fn get(&self, resource_refs: Vec<ResourceRef>, spec_view_mode: SpecViewMode)
+    async fn get(&self, resource_refs: Vec<ResourceRef>, spec_view: SpecViewOpts)
         -> Result<BatchResourceResponse<Resource, ResourceLookupProblem>, ...>;
     async fn get_handles(&self, resource_refs: Vec<ResourceRef>)
         -> Result<BatchResourceResponse<ResourceHandle, ResourceLookupProblem>, ...>;
-    async fn render_manifests(&self, resource_refs: Vec<ResourceRef>, format: ResourceManifestFormat, spec_view_mode)
+    async fn render_manifests(&self, resource_refs: Vec<ResourceRef>, format: ResourceManifestFormat, spec_view: SpecViewOpts)
         -> Result<BatchResourceResponse<RenderResourceManifestResult, ResourceLookupProblem>, ...>;
 
     // Listing is two methods sharing ONE request type (`selectors`, `account`,
@@ -688,7 +688,7 @@ pub struct ResourceSelector { pub account: Option<ResourceAccountRef>, pub id: O
                               pub name: Option<String> /* LIKE pattern */,
                               pub labels: Option<...> }
 pub enum   ResourceManifestFormat { Json, Yaml }
-pub enum   SpecViewMode { Encrypted /* default */, Revealed }
+pub struct SpecViewOpts { pub revealed: bool /* default: false */ }
 ```
 
 Every field of both types is optional, so one selector can span every type and
@@ -798,9 +798,9 @@ and [`adapter/graphql/src/mutations/resources_mut/`](/src/adapter/graphql/src/mu
 Every resolver delegates to `ResourceFacade`.
 
 **Queries (`Resources`):** `supported_resource_types`, `summary`, `byRefs`,
-`resourceHandlesByRefs`, `bySelectors` / `handlesBySelectors`, `renderManifests`. Each ref-keyed
+`handlesByRefs`, `bySelectors` / `handlesBySelectors`, `renderManifests`. Each ref-keyed
 query takes `[ResourceRefInput!]!` — there are no single-ref variants, matching the facade. The
-`revealed: bool` argument maps to `SpecViewMode`.
+`opts: SpecViewOptsInput` argument (`{ revealed: bool }`) maps to the facade's `SpecViewOpts`.
 
 **Mutations (`ResourcesMut`):** `apply_manifest(manifest, format, dry_run?)`,
 `apply_manifests(manifests, dry_run?)`, `delete(resourceRefs)`. `dry_run` routes to
@@ -830,7 +830,7 @@ These map directly from the domain views in
 **Label-filter transport.** `ResourceLabelFilterInput { entries: [ResourceLabelFilterEntryInput!]! }`
 carries the filter, where each entry is `{ key: String!, value: JSON! }`. It appears **only** as
 `ResourceSelectorInput.labels` — there is no call-level `labelFilter` argument on `bySelectors` or
-`handlesBySelectors`. The ref-keyed `byRefs`/`resourceHandlesByRefs`/`renderManifests` queries and
+`handlesBySelectors`. The ref-keyed `byRefs`/`handlesByRefs`/`renderManifests` queries and
 the `delete` mutation take `[ResourceRefInput!]!` and carry no filter at all.
 
 Both `bySelectors` and `handlesBySelectors` take the **same** `SearchResourcesInput`; only the

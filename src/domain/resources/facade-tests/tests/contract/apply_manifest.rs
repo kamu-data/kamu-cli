@@ -29,7 +29,7 @@ use kamu_resources_facade::{
     ResourceHeadersValidationProblemCode,
     ResourceLookupProblem,
     ResourceManifestFormat,
-    SpecViewMode,
+    SpecViewOpts,
 };
 use pretty_assertions::{assert_eq, assert_matches};
 
@@ -120,7 +120,7 @@ pub async fn test_plan_create_json(h: &impl FacadeContractHarness) {
                 VARIABLE_SET_SCHEMA_STR,
                 "my-vars",
             )],
-            SpecViewMode::Encrypted,
+            SpecViewOpts::ENCRYPTED,
         )
         .await
         .unwrap();
@@ -168,7 +168,7 @@ pub async fn test_plan_create_yaml(h: &impl FacadeContractHarness) {
                 VARIABLE_SET_SCHEMA_STR,
                 "my-yaml-vars",
             )],
-            SpecViewMode::Encrypted,
+            SpecViewOpts::ENCRYPTED,
         )
         .await
         .unwrap();
@@ -226,7 +226,7 @@ pub async fn test_plan_update(h: &impl FacadeContractHarness) {
                     VARIABLE_SET_SCHEMA_STR,
                     "plan-upd-vars",
                 )],
-                SpecViewMode::Encrypted,
+                SpecViewOpts::ENCRYPTED,
             )
             .await
             .unwrap(),
@@ -346,7 +346,7 @@ pub async fn test_plan_rejects_schema_invalid_manifest(h: &impl FacadeContractHa
                 VARIABLE_SET_SCHEMA_STR,
                 "schema-invalid-vars",
             )],
-            SpecViewMode::Encrypted,
+            SpecViewOpts::ENCRYPTED,
         )
         .await
         .unwrap();
@@ -432,7 +432,7 @@ pub async fn test_apply_rejects_business_invalid_spec(h: &impl FacadeContractHar
                 VARIABLE_SET_SCHEMA_STR,
                 "biz-invalid-vars",
             )],
-            SpecViewMode::Encrypted,
+            SpecViewOpts::ENCRYPTED,
         )
         .await
         .unwrap();
@@ -475,7 +475,7 @@ pub async fn test_apply_create_json(h: &impl FacadeContractHarness) {
                     VARIABLE_SET_SCHEMA_STR,
                     "alpha",
                 )],
-                SpecViewMode::Encrypted,
+                SpecViewOpts::ENCRYPTED,
             )
             .await
             .unwrap(),
@@ -514,7 +514,7 @@ pub async fn test_apply_create_yaml(h: &impl FacadeContractHarness) {
                     VARIABLE_SET_SCHEMA_STR,
                     "yaml-vars",
                 )],
-                SpecViewMode::Encrypted,
+                SpecViewOpts::ENCRYPTED,
             )
             .await
             .unwrap(),
@@ -577,7 +577,7 @@ pub async fn test_apply_update(h: &impl FacadeContractHarness) {
                     VARIABLE_SET_SCHEMA_STR,
                     "upd-vars",
                 )],
-                SpecViewMode::Encrypted,
+                SpecViewOpts::ENCRYPTED,
             )
             .await
             .unwrap(),

@@ -88,11 +88,9 @@ impl GetResourceCommand {
         })
     }
 
-    fn spec_view_mode(&self) -> kamu_resources_facade::SpecViewMode {
-        if self.revealed {
-            kamu_resources_facade::SpecViewMode::Revealed
-        } else {
-            kamu_resources_facade::SpecViewMode::Encrypted
+    fn spec_view(&self) -> kamu_resources_facade::SpecViewOpts {
+        kamu_resources_facade::SpecViewOpts {
+            revealed: self.revealed,
         }
     }
 
@@ -220,11 +218,7 @@ impl GetResourceCommand {
         for (_schema, entries) in Self::group_targets_by_schema(targets) {
             for chunk in entries.chunks(Self::MATERIALIZATION_BATCH_SIZE) {
                 let result = resource_facade
-                    .render_manifests(
-                        Self::chunk_resource_refs(chunk),
-                        format,
-                        self.spec_view_mode(),
-                    )
+                    .render_manifests(Self::chunk_resource_refs(chunk), format, self.spec_view())
                     .await?;
 
                 self.handle_lookup_problems(result.problems)?;
@@ -250,7 +244,7 @@ impl GetResourceCommand {
         for (_schema, entries) in Self::group_targets_by_schema(targets) {
             for chunk in entries.chunks(Self::MATERIALIZATION_BATCH_SIZE) {
                 let result = resource_facade
-                    .get(Self::chunk_resource_refs(chunk), self.spec_view_mode())
+                    .get(Self::chunk_resource_refs(chunk), self.spec_view())
                     .await?;
 
                 self.handle_lookup_problems(result.problems)?;

@@ -76,15 +76,12 @@ impl ResourceFacade for LocalResourceFacadeImpl {
     async fn get(
         &self,
         resource_refs: Vec<ResourceRef>,
-        spec_view_mode: SpecViewMode,
+        spec_view: SpecViewOpts,
     ) -> Result<BatchResourceResponse<Resource, ResourceLookupProblem>, BatchResourceError> {
         let (mut indexed_resources, problems) =
             self.resolve_multiple_resource_views(resource_refs).await?;
 
-        self.apply_spec_view_mode_batch::<BatchResourceError>(
-            &mut indexed_resources,
-            spec_view_mode,
-        )?;
+        self.apply_spec_view_mode_batch::<BatchResourceError>(&mut indexed_resources, spec_view)?;
 
         let successes = indexed_resources
             .into_iter()
@@ -159,7 +156,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         &self,
         resource_refs: Vec<ResourceRef>,
         format: ResourceManifestFormat,
-        spec_view_mode: SpecViewMode,
+        spec_view: SpecViewOpts,
     ) -> Result<
         BatchResourceResponse<RenderResourceManifestResult, ResourceLookupProblem>,
         BatchResourceError,
@@ -167,10 +164,7 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         let (mut indexed_resources, problems) =
             self.resolve_multiple_resource_views(resource_refs).await?;
 
-        self.apply_spec_view_mode_batch::<BatchResourceError>(
-            &mut indexed_resources,
-            spec_view_mode,
-        )?;
+        self.apply_spec_view_mode_batch::<BatchResourceError>(&mut indexed_resources, spec_view)?;
 
         let successes = indexed_resources
             .into_iter()
@@ -1108,7 +1102,7 @@ impl LocalResourceFacadeImpl {
     fn apply_spec_view_mode_batch<E>(
         &self,
         resources: &mut [IndexedResource<Resource>],
-        spec_view_mode: SpecViewMode,
+        spec_view: SpecViewOpts,
     ) -> Result<(), E>
     where
         E: From<InternalError>,
@@ -1127,7 +1121,7 @@ impl LocalResourceFacadeImpl {
             let maybe_dispatcher = dispatchers
                 .entry(resource.item.schema.clone())
                 .or_insert_with(|| {
-                    self.try_resolve_spec_view_dispatcher(&resource.item.schema, spec_view_mode)
+                    self.try_resolve_spec_view_dispatcher(&resource.item.schema, spec_view)
                 });
 
             if let Some(d) = maybe_dispatcher {
@@ -1204,9 +1198,9 @@ impl LocalResourceFacadeImpl {
     fn try_resolve_spec_view_dispatcher(
         &self,
         schema: &TypeUri,
-        spec_view_mode: SpecViewMode,
+        spec_view: SpecViewOpts,
     ) -> Option<Arc<dyn ResourceSpecViewDispatcher>> {
-        if spec_view_mode == SpecViewMode::Revealed {
+        if spec_view.revealed {
             get_resource_spec_view_dispatcher_from_catalog(&self.catalog, schema)
         } else {
             None

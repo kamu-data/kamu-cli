@@ -9,10 +9,10 @@
 
 use kamu_resources as domain;
 
-use crate::SearchResourcesRequest;
 use crate::facade::graphql::cynic_api::fragments::ResourceManifestFormat;
 use crate::facade::graphql::cynic_api::scalars::AccountName;
 use crate::facade::graphql::cynic_api::schema;
+use crate::{SearchResourcesRequest, SpecViewOpts};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -198,6 +198,22 @@ impl TryFrom<&SearchResourcesRequest> for SearchResourcesInput {
             selectors: Some(resource_selector_inputs(&value.selectors)),
             account: value.account.as_ref().map(Into::into),
         })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::InputObject, Debug, Clone, Copy)]
+#[cynic(graphql_type = "SpecViewOptsInput")]
+pub(crate) struct SpecViewOptsInput {
+    pub revealed: bool,
+}
+
+impl From<SpecViewOpts> for SpecViewOptsInput {
+    fn from(value: SpecViewOpts) -> Self {
+        Self {
+            revealed: value.revealed,
+        }
     }
 }
 

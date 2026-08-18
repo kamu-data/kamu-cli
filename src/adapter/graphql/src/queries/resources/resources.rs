@@ -28,6 +28,7 @@ use crate::queries::{
     ResourceUnsupportedSelectorProblem,
     ResourcesSummary,
     SearchResourcesInput,
+    SpecViewOptsInput,
     into_resource_refs,
     map_unsupported_selector_problem,
 };
@@ -104,14 +105,15 @@ impl Resources {
         &self,
         ctx: &Context<'_>,
         resource_refs: Vec<ResourceRefInput>,
-        #[graphql(default)] revealed: bool,
+        #[graphql(default)] opts: SpecViewOptsInput,
     ) -> Result<BatchResourcesOutcome> {
         let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
 
-        let spec_view_mode = Self::spec_view_mode_from_revealed(revealed);
-
         match resource_facade
-            .get(into_resource_refs(resource_refs)?, spec_view_mode)
+            .get(
+                into_resource_refs(resource_refs)?,
+                opts.into_spec_view_opts(),
+            )
             .await
         {
             Ok(response) => Ok(BatchResourcesOutcome::Success(response.into())),
@@ -126,9 +128,9 @@ impl Resources {
     }
 
     /// Returns resource handles by refs
-    #[tracing::instrument(level = "info", name = Resources_resource_handles_by_refs, skip_all, fields(selector_count = resource_refs.len()))]
+    #[tracing::instrument(level = "info", name = Resources_handles_by_refs, skip_all, fields(selector_count = resource_refs.len()))]
     #[graphql(guard = "LoggedInGuard::new()")]
-    async fn resource_handles_by_refs(
+    async fn handles_by_refs(
         &self,
         ctx: &Context<'_>,
         resource_refs: Vec<ResourceRefInput>,
@@ -250,17 +252,15 @@ impl Resources {
         ctx: &Context<'_>,
         resource_refs: Vec<ResourceRefInput>,
         format: ResourceManifestFormat,
-        #[graphql(default)] revealed: bool,
+        #[graphql(default)] opts: SpecViewOptsInput,
     ) -> Result<BatchResourceManifestsOutcome> {
         let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
-
-        let spec_view_mode = Self::spec_view_mode_from_revealed(revealed);
 
         match resource_facade
             .render_manifests(
                 into_resource_refs(resource_refs)?,
                 format.into(),
-                spec_view_mode,
+                opts.into_spec_view_opts(),
             )
             .await
         {
@@ -274,18 +274,6 @@ impl Resources {
                 BatchResourceManifestsOutcome::BadAccount(map_bad_account_problem(e)?),
             ),
             Err(e) => Err(map_batch_resource_error(e)),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl Resources {
-    fn spec_view_mode_from_revealed(revealed: bool) -> kamu_resources_facade::SpecViewMode {
-        if revealed {
-            kamu_resources_facade::SpecViewMode::Revealed
-        } else {
-            kamu_resources_facade::SpecViewMode::Encrypted
         }
     }
 }

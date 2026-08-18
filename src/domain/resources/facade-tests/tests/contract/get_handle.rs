@@ -9,7 +9,7 @@
 
 use kamu_configuration::VariableSetResource;
 use kamu_resources::{ResourceRef, ResourceSchemaProvider, TypeName};
-use kamu_resources_facade::{ResourceLookupProblem, ResourceSchemaMismatchError, SpecViewMode};
+use kamu_resources_facade::{ResourceLookupProblem, ResourceSchemaMismatchError, SpecViewOpts};
 use pretty_assertions::{assert_eq, assert_matches};
 
 use crate::contract_test;
@@ -72,7 +72,7 @@ pub async fn test_get_by_name(h: &impl FacadeContractHarness) {
         facade
             .get(
                 vec![by_name_selector("get-name-test")],
-                SpecViewMode::Encrypted,
+                SpecViewOpts::ENCRYPTED,
             )
             .await
             .unwrap(),
@@ -94,7 +94,7 @@ pub async fn test_get_by_uid(h: &impl FacadeContractHarness) {
 
     let view_by_uid = assert_single_batch_success(
         facade
-            .get(vec![by_id_selector(&id)], SpecViewMode::Encrypted)
+            .get(vec![by_id_selector(&id)], SpecViewOpts::ENCRYPTED)
             .await
             .unwrap(),
     );
@@ -173,7 +173,7 @@ pub async fn test_get_missing_name_returns_not_found(h: &impl FacadeContractHarn
     let get_result = facade
         .get(
             vec![by_name_selector("no-such-resource")],
-            SpecViewMode::Encrypted,
+            SpecViewOpts::ENCRYPTED,
         )
         .await
         .unwrap();
@@ -207,7 +207,7 @@ pub async fn test_get_missing_uid_returns_not_found(h: &impl FacadeContractHarne
     let absent_uid = kamu_resources::ResourceID::new(uuid::Uuid::new_v4());
 
     let get_result = facade
-        .get(vec![by_id_selector(&absent_uid)], SpecViewMode::Encrypted)
+        .get(vec![by_id_selector(&absent_uid)], SpecViewOpts::ENCRYPTED)
         .await
         .unwrap();
     assert_matches!(
@@ -253,7 +253,7 @@ pub async fn test_get_wrong_schema_returns_mismatch(h: &impl FacadeContractHarne
     };
 
     let result = facade
-        .get(vec![wrong_schema_selector.clone()], SpecViewMode::Encrypted)
+        .get(vec![wrong_schema_selector.clone()], SpecViewOpts::ENCRYPTED)
         .await
         .unwrap();
     assert_matches!(
@@ -301,7 +301,7 @@ pub async fn test_get_wrong_schema_returns_schema_mismatch(h: &impl FacadeContra
     };
 
     let result = facade
-        .get(vec![wrong_schema_selector.clone()], SpecViewMode::Encrypted)
+        .get(vec![wrong_schema_selector.clone()], SpecViewOpts::ENCRYPTED)
         .await
         .unwrap();
     match assert_single_batch_problem(result) {

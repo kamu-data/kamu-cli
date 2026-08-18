@@ -31,7 +31,7 @@ use crate::{
     SearchResourceHandlesResponse,
     SearchResourcesRequest,
     SearchResourcesResponse,
-    SpecViewMode,
+    SpecViewOpts,
     validate_selector,
 };
 
@@ -93,12 +93,12 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
     async fn get(
         &self,
         resource_refs: Vec<ResourceRef>,
-        spec_view_mode: SpecViewMode,
+        spec_view: SpecViewOpts,
     ) -> Result<BatchResourceResponse<domain::Resource, ResourceLookupProblem>, BatchResourceError>
     {
         use cynic_api::operations::get as Operation;
 
-        let variables = Operation::ResourceRefsVariables::new(&resource_refs, spec_view_mode);
+        let variables = Operation::ResourceRefsVariables::new(&resource_refs, spec_view);
 
         let response: Operation::GetResourcesQuery = self
             .graphql_client
@@ -125,7 +125,7 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
             .await?;
 
         outcome_mapper::map_batch_get_handles_outcome(
-            response.resources.resource_handles_by_refs,
+            response.resources.handles_by_refs,
             &resource_refs,
         )
     }
@@ -134,18 +134,15 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
         &self,
         resource_refs: Vec<ResourceRef>,
         format: ResourceManifestFormat,
-        spec_view_mode: SpecViewMode,
+        spec_view: SpecViewOpts,
     ) -> Result<
         BatchResourceResponse<RenderResourceManifestResult, ResourceLookupProblem>,
         BatchResourceError,
     > {
         use cynic_api::operations::render_manifest as Operation;
 
-        let variables = Operation::RenderResourceManifestsVariables::new(
-            &resource_refs,
-            format,
-            spec_view_mode,
-        );
+        let variables =
+            Operation::RenderResourceManifestsVariables::new(&resource_refs, format, spec_view);
 
         let response: Operation::RenderManifestsQuery = self
             .graphql_client
