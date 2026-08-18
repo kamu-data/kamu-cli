@@ -264,7 +264,7 @@ impl From<ResourcesSummaryError> for CLIError {
     fn from(e: ResourcesSummaryError) -> Self {
         use ResourcesSummaryError as E;
         match e {
-            e @ E::BadAccount(_) => Self::failure(e),
+            e @ (E::AccountResolution(_) | E::AccountAccess(_)) => Self::failure(e),
             E::RemoteRequest(err) => Self::from(err),
             E::Internal(err) => Self::critical(err),
         }
@@ -286,7 +286,8 @@ impl From<ListResourcesError> for CLIError {
 
         match e {
             e @ (E::UnsupportedSelector(_)
-            | E::BadAccount(_)
+            | E::AccountResolution(_)
+            | E::AccountAccess(_)
             | E::InvalidLabelFilter(_)
             | E::UnrepresentableScope(_)
             | E::UnsupportedSelectorField(_)) => Self::failure(e),
@@ -301,9 +302,10 @@ impl From<BatchResourceError> for CLIError {
         use BatchResourceError as E;
 
         match e {
-            e @ (E::UnsupportedSelector(_) | E::BadAccount(_) | E::InvalidLabelFilter(_)) => {
-                Self::failure(e)
-            }
+            e @ (E::UnsupportedSelector(_)
+            | E::AccountResolution(_)
+            | E::AccountAccess(_)
+            | E::InvalidLabelFilter(_)) => Self::failure(e),
             E::RemoteRequest(err) => Self::from(err),
             E::Internal(err) => Self::critical(err),
         }
@@ -323,7 +325,8 @@ impl From<ApplyManifestError> for CLIError {
         match e {
             e @ (E::ParseManifest(_)
             | E::UnsupportedDescriptor(_)
-            | E::BadAccount(_)
+            | E::AccountResolution(_)
+            | E::AccountAccess(_)
             | E::InvalidHeaders(_)
             | E::InvalidSpec(_)
             | E::IDNotFound(_)

@@ -10,7 +10,10 @@
 use cynic::QueryBuilder;
 
 use crate::ResourcesSummaryRequest;
-use crate::facade::graphql::cynic_api::fragments::{ResourceBadAccountProblem, ResourcesSummary};
+use crate::facade::graphql::cynic_api::fragments::{
+    ResourceAccountResolutionProblem,
+    ResourcesSummary,
+};
 use crate::facade::graphql::cynic_api::inputs::AccountRefInput;
 use crate::facade::graphql::cynic_api::schema;
 
@@ -34,7 +37,7 @@ pub(crate) struct SummaryResources {
 #[derive(cynic::InlineFragments, Debug, Clone)]
 pub(crate) enum ResourcesSummaryOutcome {
     ResourcesSummary(ResourcesSummary),
-    ResourceBadAccountProblem(ResourceBadAccountProblem),
+    ResourceAccountResolutionProblem(ResourceAccountResolutionProblem),
     #[cynic(fallback)]
     Unknown,
 }

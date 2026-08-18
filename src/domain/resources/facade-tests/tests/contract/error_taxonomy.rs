@@ -321,13 +321,17 @@ pub async fn test_batch_lookup_taxonomy(h: &impl FacadeContractHarness) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// RF-142: bad-account errors surface as typed `BadAccount` outcomes from every
-// account-accepting API — not as internal errors. This test is specifically
-// designed to catch GraphQL schema gaps like the single-delete case where
-// `ResourceBadAccountProblem` was missing from `ResourceDeleteOutcome`.
-contract_test!(bad_account_taxonomy, super::test_bad_account_taxonomy);
+// RF-142: account-resolution errors surface as typed `AccountResolution`
+// outcomes from every account-accepting API — not as internal errors. This test
+// is specifically designed to catch GraphQL schema gaps like the single-delete
+// case where `ResourceAccountResolutionProblem` was missing from
+// `ResourceDeleteOutcome`.
+contract_test!(
+    account_resolution_taxonomy,
+    super::test_account_resolution_taxonomy
+);
 
-pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
+pub async fn test_account_resolution_taxonomy(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
     let unknown_account = ResourceAccountRef {
@@ -358,8 +362,8 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
         .await;
     assert_matches!(
         result,
-        Err(BatchResourceError::BadAccount(_)),
-        "get: expected BadAccount"
+        Err(BatchResourceError::AccountResolution(_)),
+        "get: expected AccountResolution"
     );
 
     // --- get, multi-ref ---
@@ -371,8 +375,8 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
         .await;
     assert_matches!(
         result,
-        Err(BatchResourceError::BadAccount(_)),
-        "get with several refs: expected BadAccount"
+        Err(BatchResourceError::AccountResolution(_)),
+        "get with several refs: expected AccountResolution"
     );
 
     // --- render_manifests ---
@@ -396,8 +400,8 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
         .await;
     assert_matches!(
         result,
-        Err(BatchResourceError::BadAccount(_)),
-        "render_manifests: expected BadAccount"
+        Err(BatchResourceError::AccountResolution(_)),
+        "render_manifests: expected AccountResolution"
     );
 
     // --- delete ---
@@ -417,8 +421,8 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
         .await;
     assert_matches!(
         result,
-        Err(BatchResourceError::BadAccount(_)),
-        "delete: expected BadAccount"
+        Err(BatchResourceError::AccountResolution(_)),
+        "delete: expected AccountResolution"
     );
 
     // --- delete, multi-ref ---
@@ -430,8 +434,8 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
         .await;
     assert_matches!(
         result,
-        Err(BatchResourceError::BadAccount(_)),
-        "delete: expected BadAccount"
+        Err(BatchResourceError::AccountResolution(_)),
+        "delete: expected AccountResolution"
     );
 
     // --- search ---
@@ -446,8 +450,8 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
         .await;
     assert_matches!(
         result,
-        Err(ListResourcesError::BadAccount(_)),
-        "search: expected BadAccount"
+        Err(ListResourcesError::AccountResolution(_)),
+        "search: expected AccountResolution"
     );
 
     // --- search_handles ---
@@ -460,8 +464,8 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
         .await;
     assert_matches!(
         result,
-        Err(ListResourcesError::BadAccount(_)),
-        "search_handles: expected BadAccount"
+        Err(ListResourcesError::AccountResolution(_)),
+        "search_handles: expected AccountResolution"
     );
 
     // --- summary ---
@@ -472,8 +476,8 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
         .await;
     assert_matches!(
         result,
-        Err(ResourcesSummaryError::BadAccount(_)),
-        "summary: expected BadAccount"
+        Err(ResourcesSummaryError::AccountResolution(_)),
+        "summary: expected AccountResolution"
     );
 
     // --- apply_manifest ---
@@ -493,8 +497,8 @@ pub async fn test_bad_account_taxonomy(h: &impl FacadeContractHarness) {
         .await;
     assert_matches!(
         result,
-        Err(ApplyManifestError::BadAccount(_)),
-        "apply_manifest: expected BadAccount"
+        Err(ApplyManifestError::AccountResolution(_)),
+        "apply_manifest: expected AccountResolution"
     );
 }
 

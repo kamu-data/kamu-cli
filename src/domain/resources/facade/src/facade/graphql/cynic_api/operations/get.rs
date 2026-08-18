@@ -14,7 +14,7 @@ use crate::SpecViewOpts;
 use crate::facade::graphql::cynic_api::fragments::{
     BatchResourceProblem,
     Resource,
-    ResourceBadAccountProblem,
+    ResourceAccountResolutionProblem,
     ResourceUnsupportedSelectorProblem,
 };
 use crate::facade::graphql::cynic_api::inputs::{
@@ -43,7 +43,7 @@ pub(crate) struct GetResourcesResources {
 pub(crate) enum BatchResourcesOutcome {
     BatchResourcesResult(BatchResourcesResult),
     ResourceUnsupportedSelectorProblem(ResourceUnsupportedSelectorProblem),
-    ResourceBadAccountProblem(ResourceBadAccountProblem),
+    ResourceAccountResolutionProblem(ResourceAccountResolutionProblem),
     #[cynic(fallback)]
     Unknown,
 }

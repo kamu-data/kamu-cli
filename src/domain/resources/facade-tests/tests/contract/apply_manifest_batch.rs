@@ -23,6 +23,7 @@ use kamu_resources_facade::{
     ApplyManifestBatchResponse,
     ApplyManifestError,
     ApplyManifestRequest,
+    ResourceAccountResolutionProblemCode,
     ResourceLookupProblem,
     ResourceManifestFormat,
     SpecViewOpts,
@@ -71,6 +72,24 @@ fn business_invalid_manifest(name: &str) -> String {
 
 fn malformed_manifest() -> String {
     "not valid json {{{".to_string()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+fn variable_set_manifest_json_with_unknown_account(name: &str) -> String {
+    serde_json::json!({
+        "$schema": VARIABLE_SET_SCHEMA_STR,
+        "headers": {
+            "name": name,
+            "account": {"name": "unknown-resource-contract-account"}
+        },
+        "spec": {
+            "variables": {
+                "K": {"value": "v"}
+            }
+        }
+    })
+    .to_string()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -379,6 +398,52 @@ pub async fn test_batch_apply_rollback_reconstructs_id_not_found(h: &impl Facade
         );
     }
     assert_absent(h, "batch-id-not-found-after").await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-178
+// The rollback summary is a hand-maintained serde contract carried through
+// GraphQL error extensions, with no compile-time link between the server that
+// serializes it and the remote facade that decodes it — and a decode failure
+// degrades silently to an opaque transport error. This pins the
+// account-resolution arm of that contract so a drift between the two sides
+// fails here rather than going unnoticed.
+contract_test!(
+    batch_apply_rollback_reconstructs_account_resolution,
+    super::test_batch_apply_rollback_reconstructs_account_resolution
+);
+
+pub async fn test_batch_apply_rollback_reconstructs_account_resolution(
+    h: &impl FacadeContractHarness,
+) {
+    let response = h
+        .facade_for(TestAccount::Alice)
+        .apply_manifests(batch_request(vec![
+            variable_set_manifest_json("batch-acct-resolution-before", None, &[("K", "1")]),
+            variable_set_manifest_json_with_unknown_account("batch-acct-resolution-unknown"),
+            variable_set_manifest_json("batch-acct-resolution-after", None, &[("K", "2")]),
+        ]))
+        .await
+        .unwrap();
+
+    let failed_outcome = if response.rolled_back_successes.is_empty() {
+        assert_batch_indexes(&response, &[0, 1], &[]);
+        assert!(response.items[0].outcome.is_ok());
+        &response.items[1].outcome
+    } else {
+        assert_batch_indexes(&response, &[1], &[0]);
+        &response.items[0].outcome
+    };
+
+    assert_matches!(
+        failed_outcome,
+        Err(ApplyManifestError::AccountResolution(err))
+            if err.code == ResourceAccountResolutionProblemCode::AccountNotFoundByName,
+        "unknown account in a batch must survive the rollback round-trip as a typed \
+         AccountResolution error, got: {failed_outcome:?}"
+    );
+    assert_absent(h, "batch-acct-resolution-after").await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

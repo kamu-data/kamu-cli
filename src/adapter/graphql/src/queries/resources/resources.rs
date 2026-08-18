@@ -16,7 +16,7 @@ use crate::queries::{
     BatchResourceHandlesOutcome,
     BatchResourceManifestsOutcome,
     BatchResourcesOutcome,
-    ResourceBadAccountProblem,
+    ResourceAccountResolutionProblem,
     ResourceConnection,
     ResourceHandle,
     ResourceHandleConnection,
@@ -88,9 +88,12 @@ impl Resources {
             .await
         {
             Ok(summary) => Ok(ResourcesSummaryOutcome::Success(summary.into())),
-            Err(kamu_resources_facade::ResourcesSummaryError::BadAccount(error)) => Ok(
-                ResourcesSummaryOutcome::BadAccount(map_bad_account_problem(error)?),
-            ),
+            Err(kamu_resources_facade::ResourcesSummaryError::AccountResolution(error)) => {
+                Ok(ResourcesSummaryOutcome::AccountResolution(error.into()))
+            }
+            Err(kamu_resources_facade::ResourcesSummaryError::AccountAccess(error)) => {
+                Err(map_account_access_error(error))
+            }
             Err(kamu_resources_facade::ResourcesSummaryError::RemoteRequest(error)) => {
                 Err(error.int_err().into())
             }
@@ -120,9 +123,9 @@ impl Resources {
             Err(kamu_resources_facade::BatchResourceError::UnsupportedSelector(e)) => Ok(
                 BatchResourcesOutcome::UnsupportedSelector(map_unsupported_selector_problem(e)),
             ),
-            Err(kamu_resources_facade::BatchResourceError::BadAccount(e)) => Ok(
-                BatchResourcesOutcome::BadAccount(map_bad_account_problem(e)?),
-            ),
+            Err(kamu_resources_facade::BatchResourceError::AccountResolution(e)) => {
+                Ok(BatchResourcesOutcome::AccountResolution(e.into()))
+            }
             Err(e) => Err(map_batch_resource_error(e)),
         }
     }
@@ -147,9 +150,9 @@ impl Resources {
                     map_unsupported_selector_problem(e),
                 ))
             }
-            Err(kamu_resources_facade::BatchResourceError::BadAccount(e)) => Ok(
-                BatchResourceHandlesOutcome::BadAccount(map_bad_account_problem(e)?),
-            ),
+            Err(kamu_resources_facade::BatchResourceError::AccountResolution(e)) => {
+                Ok(BatchResourceHandlesOutcome::AccountResolution(e.into()))
+            }
             Err(e) => Err(map_batch_resource_error(e)),
         }
     }
@@ -190,9 +193,9 @@ impl Resources {
             Err(kamu_resources_facade::ListResourcesError::UnsupportedSelector(error)) => Ok(
                 ResourceListOutcome::UnsupportedSelector(map_unsupported_selector_problem(error)),
             ),
-            Err(kamu_resources_facade::ListResourcesError::BadAccount(error)) => Ok(
-                ResourceListOutcome::BadAccount(map_bad_account_problem(error)?),
-            ),
+            Err(kamu_resources_facade::ListResourcesError::AccountResolution(error)) => {
+                Ok(ResourceListOutcome::AccountResolution(error.into()))
+            }
             Err(kamu_resources_facade::ListResourcesError::InvalidLabelFilter(error)) => {
                 Ok(ResourceListOutcome::InvalidLabelFilter(error.into()))
             }
@@ -234,9 +237,9 @@ impl Resources {
                     map_unsupported_selector_problem(error),
                 ))
             }
-            Err(kamu_resources_facade::ListResourcesError::BadAccount(error)) => Ok(
-                ResourceHandleListOutcome::BadAccount(map_bad_account_problem(error)?),
-            ),
+            Err(kamu_resources_facade::ListResourcesError::AccountResolution(error)) => {
+                Ok(ResourceHandleListOutcome::AccountResolution(error.into()))
+            }
             Err(kamu_resources_facade::ListResourcesError::InvalidLabelFilter(error)) => {
                 Ok(ResourceHandleListOutcome::InvalidLabelFilter(error.into()))
             }
@@ -270,9 +273,9 @@ impl Resources {
                     map_unsupported_selector_problem(e),
                 ))
             }
-            Err(kamu_resources_facade::BatchResourceError::BadAccount(e)) => Ok(
-                BatchResourceManifestsOutcome::BadAccount(map_bad_account_problem(e)?),
-            ),
+            Err(kamu_resources_facade::BatchResourceError::AccountResolution(e)) => {
+                Ok(BatchResourceManifestsOutcome::AccountResolution(e.into()))
+            }
             Err(e) => Err(map_batch_resource_error(e)),
         }
     }
@@ -283,7 +286,7 @@ impl Resources {
 #[derive(Union, Debug, Clone)]
 pub enum ResourcesSummaryOutcome {
     Success(ResourcesSummary),
-    BadAccount(ResourceBadAccountProblem),
+    AccountResolution(ResourceAccountResolutionProblem),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -292,7 +295,7 @@ pub enum ResourcesSummaryOutcome {
 pub enum ResourceListOutcome {
     Success(ResourceConnection),
     UnsupportedSelector(ResourceUnsupportedSelectorProblem),
-    BadAccount(ResourceBadAccountProblem),
+    AccountResolution(ResourceAccountResolutionProblem),
     InvalidLabelFilter(ResourceInvalidLabelFilterProblem),
 }
 
@@ -302,7 +305,7 @@ pub enum ResourceListOutcome {
 pub enum ResourceHandleListOutcome {
     Success(ResourceHandleConnection),
     UnsupportedSelector(ResourceUnsupportedSelectorProblem),
-    BadAccount(ResourceBadAccountProblem),
+    AccountResolution(ResourceAccountResolutionProblem),
     InvalidLabelFilter(ResourceInvalidLabelFilterProblem),
 }
 
@@ -313,7 +316,8 @@ fn map_batch_resource_error(error: kamu_resources_facade::BatchResourceError) ->
 
     match error {
         E::UnsupportedSelector(_) => GqlError::gql("Unsupported resource type selector"),
-        E::BadAccount(error) => map_resolve_manifest_account_error(error),
+        E::AccountResolution(error) => GqlError::gql(error.to_string()),
+        E::AccountAccess(error) => map_account_access_error(error),
         E::InvalidLabelFilter(error) => GqlError::gql(error.to_string()),
         E::RemoteRequest(error) => error.int_err().into(),
         E::Internal(error) => error.into(),
@@ -327,7 +331,8 @@ fn map_list_resources_error(error: kamu_resources_facade::ListResourcesError) ->
 
     match error {
         E::UnsupportedSelector(_) => GqlError::gql("Unsupported resource type selector"),
-        E::BadAccount(error) => map_resolve_manifest_account_error(error),
+        E::AccountResolution(error) => GqlError::gql(error.to_string()),
+        E::AccountAccess(error) => map_account_access_error(error),
         E::InvalidLabelFilter(error) => GqlError::gql(error.to_string()),
         E::UnrepresentableScope(error) => GqlError::gql(error.to_string()),
         E::UnsupportedSelectorField(error) => GqlError::gql(error.to_string()),
@@ -338,39 +343,20 @@ fn map_list_resources_error(error: kamu_resources_facade::ListResourcesError) ->
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn map_resolve_manifest_account_error(
-    error: kamu_resources_facade::ResolveManifestAccountError,
+/// Renders an account-access failure as an ordinary GraphQL error.
+///
+/// Authorization outcomes never become typed problems — see
+/// [`ResourceAccountResolutionProblem`] for the input-validation counterpart.
+pub(crate) fn map_account_access_error(
+    error: kamu_resources_facade::ResourceAccountAccessError,
 ) -> GqlError {
-    use kamu_resources_facade::ResolveManifestAccountError as E;
+    use kamu_resources_facade::ResourceAccountAccessError as E;
 
     match error {
         E::AnonymousSubject => GqlError::Access(odf::AccessError::Unauthenticated(
             "Anonymous subject cannot resolve a target account".into(),
         )),
-        E::EmptySelector
-        | E::SelectorMismatch { .. }
-        | E::AccountNotFoundById(_)
-        | E::AccountNotFoundByName(_) => GqlError::gql(error.to_string()),
         E::Access(error) => error.into(),
-        E::Internal(error) => error.into(),
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) fn map_bad_account_problem(
-    error: kamu_resources_facade::ResolveManifestAccountError,
-) -> Result<ResourceBadAccountProblem> {
-    use kamu_resources_facade::ResolveManifestAccountError as E;
-
-    match error {
-        E::EmptySelector
-        | E::SelectorMismatch { .. }
-        | E::AccountNotFoundById(_)
-        | E::AccountNotFoundByName(_) => Ok(error.into()),
-        E::AnonymousSubject | E::Access(_) | E::Internal(_) => {
-            Err(map_resolve_manifest_account_error(error))
-        }
     }
 }
 

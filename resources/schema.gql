@@ -603,7 +603,7 @@ type BatchResourceHandleSuccess {
 	handle: ResourceHandle!
 }
 
-union BatchResourceHandlesOutcome = BatchResourceHandlesResult | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem
+union BatchResourceHandlesOutcome = BatchResourceHandlesResult | ResourceUnsupportedSelectorProblem | ResourceAccountResolutionProblem
 
 type BatchResourceHandlesResult {
 	handles: [BatchResourceHandleSuccess!]!
@@ -615,7 +615,7 @@ type BatchResourceManifestSuccess {
 	manifest: ResourceRenderManifestResult!
 }
 
-union BatchResourceManifestsOutcome = BatchResourceManifestsResult | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem
+union BatchResourceManifestsOutcome = BatchResourceManifestsResult | ResourceUnsupportedSelectorProblem | ResourceAccountResolutionProblem
 
 type BatchResourceManifestsResult {
 	manifests: [BatchResourceManifestSuccess!]!
@@ -632,7 +632,7 @@ type BatchResourceSuccess {
 	resource: Resource!
 }
 
-union BatchResourcesOutcome = BatchResourcesResult | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem
+union BatchResourcesOutcome = BatchResourcesResult | ResourceUnsupportedSelectorProblem | ResourceAccountResolutionProblem
 
 type BatchResourcesResult {
 	resources: [BatchResourceSuccess!]!
@@ -3910,6 +3910,25 @@ type Resource {
 }
 
 """
+The account selector supplied for this operation could not be resolved to a
+concrete account (empty selector, unknown id/name, or a selector whose
+fields disagree with each other). This is an input-validation problem, not
+an authorization outcome — a caller denied access to another account's
+resources gets a top-level GraphQL error, never this type.
+"""
+type ResourceAccountResolutionProblem {
+	code: ResourceAccountResolutionProblemCode!
+	message: String!
+}
+
+enum ResourceAccountResolutionProblemCode {
+	EMPTY_SELECTOR
+	ACCOUNT_NOT_FOUND_BY_ID
+	ACCOUNT_NOT_FOUND_BY_NAME
+	SELECTOR_MISMATCH
+}
+
+"""
 A type-less reference whose name matched in several types. A reference names
 exactly one resource, so this is an addressing failure rather than a
 multi-match — the caller must say which type they meant.
@@ -3959,7 +3978,7 @@ enum ResourceApplyOperation {
 	UNTOUCHED
 }
 
-union ResourceApplyOutcome = ResourceApplySuccess | ResourceApplyRejection | ResourceApplyParseManifestProblem | ResourceUnsupportedDescriptorProblem | ResourceBadAccountProblem | ResourceInvalidHeaderProblem | ResourceInvalidSpecProblem
+union ResourceApplyOutcome = ResourceApplySuccess | ResourceApplyRejection | ResourceApplyParseManifestProblem | ResourceUnsupportedDescriptorProblem | ResourceAccountResolutionProblem | ResourceInvalidHeaderProblem | ResourceInvalidSpecProblem
 
 """
 The manifest text could not be parsed (malformed JSON/YAML).
@@ -3993,24 +4012,6 @@ type ResourceApplyWarning {
 	message: String!
 }
 
-type ResourceBadAccountProblem {
-	code: ResourceBadAccountProblemCode!
-	accountId: AccountID
-	accountName: AccountName
-	expectedResourceId: ResourceID
-	expectedDid: AccountID
-	expectedName: AccountName
-	actualName: AccountName
-	message: String!
-}
-
-enum ResourceBadAccountProblemCode {
-	EMPTY_SELECTOR
-	ACCOUNT_NOT_FOUND_BY_ID
-	ACCOUNT_NOT_FOUND_BY_NAME
-	SELECTOR_MISMATCH
-}
-
 scalar ResourceConditions
 
 type ResourceConnection {
@@ -4029,7 +4030,7 @@ type ResourceConnection {
 	edges: [ResourceEdge!]!
 }
 
-union ResourceDeleteOutcome = ResourceDeleteResult | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem
+union ResourceDeleteOutcome = ResourceDeleteResult | ResourceUnsupportedSelectorProblem | ResourceAccountResolutionProblem
 
 type ResourceDeleteResult {
 	resources: [ResourceDeleteSuccess!]!
@@ -4080,7 +4081,7 @@ type ResourceHandleEdge {
 	node: ResourceHandle!
 }
 
-union ResourceHandleListOutcome = ResourceHandleConnection | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem | ResourceInvalidLabelFilterProblem
+union ResourceHandleListOutcome = ResourceHandleConnection | ResourceUnsupportedSelectorProblem | ResourceAccountResolutionProblem | ResourceInvalidLabelFilterProblem
 
 enum ResourceHeaderValidationProblemCode {
 	EMPTY_NAME
@@ -4227,7 +4228,7 @@ enum ResourceListColumnVisibility {
 	WIDE_ONLY
 }
 
-union ResourceListOutcome = ResourceConnection | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem | ResourceInvalidLabelFilterProblem
+union ResourceListOutcome = ResourceConnection | ResourceUnsupportedSelectorProblem | ResourceAccountResolutionProblem | ResourceInvalidLabelFilterProblem
 
 union ResourceLookupProblem = ResourceIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceAnyTypeNameNotFoundProblem | ResourceAmbiguousTypeProblem | ResourceSchemaMismatchProblem | ResourceNameMismatchProblem | ResourceEmptyRefProblem
 
@@ -4480,7 +4481,7 @@ type ResourcesSummary {
 	resourceCounts: [ResourceTypeCountSummary!]!
 }
 
-union ResourcesSummaryOutcome = ResourcesSummary | ResourceBadAccountProblem
+union ResourcesSummaryOutcome = ResourcesSummary | ResourceAccountResolutionProblem
 
 type RestProtocolDesc {
 	tailUrl: String!

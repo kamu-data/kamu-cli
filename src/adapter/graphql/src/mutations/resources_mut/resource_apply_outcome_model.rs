@@ -8,7 +8,11 @@
 // by the Apache License, Version 2.0.
 
 use crate::prelude::*;
-use crate::queries::{Resource, ResourceBadAccountProblem, ResourceUnsupportedDescriptorProblem};
+use crate::queries::{
+    Resource,
+    ResourceAccountResolutionProblem,
+    ResourceUnsupportedDescriptorProblem,
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -18,7 +22,7 @@ pub enum ResourceApplyOutcome {
     Rejection(ResourceApplyRejection),
     ParseManifest(ResourceApplyParseManifestProblem),
     UnsupportedDescriptor(ResourceUnsupportedDescriptorProblem),
-    BadAccount(ResourceBadAccountProblem),
+    AccountResolution(ResourceAccountResolutionProblem),
     InvalidHeader(ResourceInvalidHeaderProblem),
     InvalidSpec(ResourceInvalidSpecProblem),
 }

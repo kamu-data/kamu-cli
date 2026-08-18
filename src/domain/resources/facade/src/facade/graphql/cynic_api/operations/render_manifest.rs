@@ -12,7 +12,7 @@ use kamu_resources::ResourceRef;
 
 use crate::facade::graphql::cynic_api::fragments::{
     BatchResourceProblem,
-    ResourceBadAccountProblem,
+    ResourceAccountResolutionProblem,
     ResourceManifestFormat,
     ResourceRenderManifestResult,
     ResourceUnsupportedSelectorProblem,
@@ -47,7 +47,7 @@ pub(crate) struct RenderManifestsResources {
 pub(crate) enum BatchResourceManifestsOutcome {
     BatchResourceManifestsResult(BatchResourceManifestsResult),
     ResourceUnsupportedSelectorProblem(ResourceUnsupportedSelectorProblem),
-    ResourceBadAccountProblem(ResourceBadAccountProblem),
+    ResourceAccountResolutionProblem(ResourceAccountResolutionProblem),
     #[cynic(fallback)]
     Unknown,
 }

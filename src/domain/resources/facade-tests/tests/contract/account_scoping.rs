@@ -22,7 +22,8 @@ use kamu_resources_facade::{
     ApplyManifestRequest,
     BatchResourceError,
     ListResourcesError,
-    ResolveManifestAccountError,
+    ResourceAccountResolutionError,
+    ResourceAccountResolutionProblemCode,
     ResourceManifestFormat,
     ResourcesSummaryRequest,
     SearchResourcesRequest,
@@ -294,8 +295,8 @@ pub async fn test_account_name_id_mismatch_is_rejected(h: &impl FacadeContractHa
         })
         .await;
     assert!(
-        matches!(apply_result, Err(ApplyManifestError::BadAccount(_))),
-        "mismatched account must be rejected with BadAccount, got: {apply_result:?}"
+        matches!(apply_result, Err(ApplyManifestError::AccountResolution(_))),
+        "mismatched account must be rejected with AccountResolution, got: {apply_result:?}"
     );
 
     let get_result = h
@@ -307,7 +308,7 @@ pub async fn test_account_name_id_mismatch_is_rejected(h: &impl FacadeContractHa
         .await;
     assert_matches!(
         get_result,
-        Err(BatchResourceError::BadAccount(_)),
+        Err(BatchResourceError::AccountResolution(_)),
         "mismatched account selector must be rejected"
     );
 
@@ -355,12 +356,12 @@ pub async fn test_unknown_account_is_rejected(h: &impl FacadeContractHarness) {
         .await;
 
     assert!(
-        matches!(by_name, Err(ListResourcesError::BadAccount(_))),
-        "unknown account name must be rejected with BadAccount, got: {by_name:?}"
+        matches!(by_name, Err(ListResourcesError::AccountResolution(_))),
+        "unknown account name must be rejected with AccountResolution, got: {by_name:?}"
     );
     assert!(
-        matches!(by_id, Err(ListResourcesError::BadAccount(_))),
-        "unknown account id must be rejected with BadAccount, got: {by_id:?}"
+        matches!(by_id, Err(ListResourcesError::AccountResolution(_))),
+        "unknown account id must be rejected with AccountResolution, got: {by_id:?}"
     );
 }
 
@@ -585,8 +586,11 @@ pub async fn test_empty_account_selector_is_rejected(h: &impl FacadeContractHarn
 
     assert_matches!(
         result,
-        Err(ApplyManifestError::BadAccount(
-            ResolveManifestAccountError::EmptySelector
+        Err(ApplyManifestError::AccountResolution(
+            ResourceAccountResolutionError {
+                code: ResourceAccountResolutionProblemCode::EmptySelector,
+                ..
+            }
         )),
         "an empty account selector `{{}}` must be rejected during account resolution, got: \
          {result:?}"

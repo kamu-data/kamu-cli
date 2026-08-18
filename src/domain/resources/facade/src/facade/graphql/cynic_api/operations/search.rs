@@ -12,7 +12,7 @@ use internal_error::InternalError;
 
 use crate::SearchResourcesRequest;
 use crate::facade::graphql::cynic_api::fragments::{
-    ResourceBadAccountProblem,
+    ResourceAccountResolutionProblem,
     ResourceHandleConnection,
     ResourceInvalidLabelFilterProblem,
     ResourceUnsupportedSelectorProblem,
@@ -41,7 +41,7 @@ pub(crate) struct SearchHandlesResources {
 pub(crate) enum ResourceHandleListOutcome {
     ResourceHandleConnection(ResourceHandleConnection),
     ResourceUnsupportedSelectorProblem(ResourceUnsupportedSelectorProblem),
-    ResourceBadAccountProblem(ResourceBadAccountProblem),
+    ResourceAccountResolutionProblem(ResourceAccountResolutionProblem),
     ResourceInvalidLabelFilterProblem(ResourceInvalidLabelFilterProblem),
     #[cynic(fallback)]
     Unknown,

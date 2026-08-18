@@ -807,7 +807,7 @@ query takes `[ResourceRefInput!]!` — there are no single-ref variants, matchin
 `plan_apply_manifest`, otherwise `apply_manifest`.
 
 **Outcome-union pattern.** *Domain/application outcomes* are modeled as unions: a resolver returns a
-union of `Success` + typed `Problem` variants (bad account, unsupported descriptor, validation
+union of `Success` + typed `Problem` variants (account resolution, unsupported descriptor, validation
 failures, …) so clients handle each expected case structurally rather than by parsing error strings.
 This does **not** cover everything — authentication failures, authorization failures, server bugs,
 and infrastructure failures still surface as ordinary GraphQL `errors`. Clients must handle both: the
@@ -818,7 +818,7 @@ typed `Problem` variants *and* transport-level GraphQL errors. The apply outcome
   `Generation`/`Headers`/`Spec`, JSON path, `before`/`after`) + `warnings`.
 - `Rejection` → category (`ImmutableFieldChanged`, `BusinessValidationFailed`,
   `ReferencedObjectMissing`, `LifecycleRuleConflict`) + message.
-- `ParseManifest`, `UnsupportedDescriptor`, `BadAccount`, `InvalidHeaders`, `InvalidSpec` →
+- `ParseManifest`, `UnsupportedDescriptor`, `AccountResolution`, `InvalidHeaders`, `InvalidSpec` →
   structured validation/parse problems. Extension-schema resolution failures are reported as
   `InvalidHeaders` with `ResourceHeaderValidationProblemCode::ResourceExtensionSchema`.
 
@@ -868,6 +868,16 @@ Filter failures surface as a `ResourceInvalidLabelFilterError` union variant car
 `DuplicateAfterCanonicalization`, `UnsupportedExpression`). The typed code — rather than a message
 string — is what lets the remote facade **rebuild the same error the local facade raises**, which
 is what makes the `contract_test!` local/remote pairs assert identical behavior on both transports.
+
+The same `{code, message}` shape is used by `ResourceInvalidHeadersError`
+(`ResourceHeadersValidationProblemCode`) and `ResourceAccountResolutionError`
+(`ResourceAccountResolutionProblemCode`: `EmptySelector`, `AccountNotFoundById`,
+`AccountNotFoundByName`, `SelectorMismatch`). Account resolution is worth calling out: it reports
+only *selector* problems, never authorization. A caller denied access to another account's resources
+is carried separately as `ResourceAccountAccessError` (`AnonymousSubject`, `Access`) and surfaces as
+an ordinary GraphQL error, so "this selector does not resolve" and "you may not use this account"
+stay distinguishable to clients. `ResolveManifestAccountError` composes these two rather than
+listing their cases inline, which keeps the split in one place instead of re-derived per consumer.
 The remote (cynic) client does mechanical mapping only: no alias resolution, validation, or
 canonicalization happens client-side.
 

@@ -111,18 +111,13 @@ pub(crate) struct ResourceUnsupportedSelectorProblem {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
-pub(crate) struct ResourceBadAccountProblem {
-    pub code: ResourceBadAccountProblemCode,
-    pub account_id: Option<odf::AccountID>,
-    pub account_name: Option<AccountName>,
-    pub expected_resource_id: Option<kamu_resources::ResourceID>,
-    pub expected_did: Option<odf::AccountID>,
-    pub expected_name: Option<AccountName>,
-    pub actual_name: Option<AccountName>,
+pub(crate) struct ResourceAccountResolutionProblem {
+    pub code: ResourceAccountResolutionProblemCode,
+    pub message: String,
 }
 
 #[derive(cynic::Enum, Debug, Clone, Copy)]
-pub(crate) enum ResourceBadAccountProblemCode {
+pub(crate) enum ResourceAccountResolutionProblemCode {
     EmptySelector,
     AccountNotFoundById,
     AccountNotFoundByName,

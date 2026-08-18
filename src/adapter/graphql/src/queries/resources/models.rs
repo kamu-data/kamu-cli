@@ -368,81 +368,39 @@ pub(crate) fn map_unsupported_selector_problem(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// The account selector supplied for this operation could not be resolved to a
+/// concrete account (empty selector, unknown id/name, or a selector whose
+/// fields disagree with each other). This is an input-validation problem, not
+/// an authorization outcome — a caller denied access to another account's
+/// resources gets a top-level GraphQL error, never this type.
 #[derive(SimpleObject, Debug, Clone)]
-pub struct ResourceBadAccountProblem {
-    pub code: ResourceBadAccountProblemCode,
-    pub account_id: Option<AccountID<'static>>,
-    pub account_name: Option<AccountName<'static>>,
-    pub expected_resource_id: Option<ResourceID<'static>>,
-    pub expected_did: Option<AccountID<'static>>,
-    pub expected_name: Option<AccountName<'static>>,
-    pub actual_name: Option<AccountName<'static>>,
+pub struct ResourceAccountResolutionProblem {
+    pub code: ResourceAccountResolutionProblemCode,
     pub message: String,
 }
 
-impl From<kamu_resources_facade::ResolveManifestAccountError> for ResourceBadAccountProblem {
-    fn from(value: kamu_resources_facade::ResolveManifestAccountError) -> Self {
-        use kamu_resources_facade::ResolveManifestAccountError as E;
+impl From<kamu_resources_facade::ResourceAccountResolutionError>
+    for ResourceAccountResolutionProblem
+{
+    fn from(value: kamu_resources_facade::ResourceAccountResolutionError) -> Self {
+        use kamu_resources_facade::ResourceAccountResolutionProblemCode as C;
 
-        let message = value.to_string();
-        match value {
-            E::EmptySelector => Self {
-                code: ResourceBadAccountProblemCode::EmptySelector,
-                account_id: None,
-                account_name: None,
-                expected_resource_id: None,
-                expected_did: None,
-                expected_name: None,
-                actual_name: None,
-                message,
-            },
-            E::AccountNotFoundById(error) => Self {
-                code: ResourceBadAccountProblemCode::AccountNotFoundById,
-                account_id: Some(error.account_id.into()),
-                account_name: None,
-                expected_resource_id: None,
-                expected_did: None,
-                expected_name: None,
-                actual_name: None,
-                message,
-            },
-            E::AccountNotFoundByName(error) => Self {
-                code: ResourceBadAccountProblemCode::AccountNotFoundByName,
-                account_id: None,
-                account_name: Some(error.account_name.into()),
-                expected_resource_id: None,
-                expected_did: None,
-                expected_name: None,
-                actual_name: None,
-                message,
-            },
-            E::SelectorMismatch {
-                did,
-                actual_name,
-                expected_resource_id,
-                expected_did,
-                expected_name,
-            } => Self {
-                code: ResourceBadAccountProblemCode::SelectorMismatch,
-                account_id: Some(did.into()),
-                account_name: None,
-                expected_resource_id: expected_resource_id.map(Into::into),
-                expected_did: expected_did.map(Into::into),
-                expected_name: expected_name.map(Into::into),
-                actual_name: Some(actual_name.into()),
-                message,
-            },
-            // These are non-user-facing failures: map_bad_account_problem promotes them to
-            // GqlError before this From impl is ever called.
-            E::AnonymousSubject | E::Access(_) | E::Internal(_) => {
-                unreachable!("non-user account error must not reach ResourceBadAccountProblem")
-            }
+        let code = match value.code {
+            C::EmptySelector => ResourceAccountResolutionProblemCode::EmptySelector,
+            C::AccountNotFoundById => ResourceAccountResolutionProblemCode::AccountNotFoundById,
+            C::AccountNotFoundByName => ResourceAccountResolutionProblemCode::AccountNotFoundByName,
+            C::SelectorMismatch => ResourceAccountResolutionProblemCode::SelectorMismatch,
+        };
+
+        Self {
+            code,
+            message: value.message,
         }
     }
 }
 
 #[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ResourceBadAccountProblemCode {
+pub enum ResourceAccountResolutionProblemCode {
     EmptySelector,
     AccountNotFoundById,
     AccountNotFoundByName,
@@ -640,7 +598,7 @@ pub use crate::scalars::Resource;
 pub enum BatchResourcesOutcome {
     Success(BatchResourcesResult),
     UnsupportedSelector(ResourceUnsupportedSelectorProblem),
-    BadAccount(ResourceBadAccountProblem),
+    AccountResolution(ResourceAccountResolutionProblem),
 }
 
 #[derive(SimpleObject, Debug, Clone)]
@@ -679,7 +637,7 @@ pub struct BatchResourceSuccess {
 pub enum BatchResourceManifestsOutcome {
     Success(BatchResourceManifestsResult),
     UnsupportedSelector(ResourceUnsupportedSelectorProblem),
-    BadAccount(ResourceBadAccountProblem),
+    AccountResolution(ResourceAccountResolutionProblem),
 }
 
 #[derive(SimpleObject, Debug, Clone)]
@@ -747,7 +705,7 @@ impl From<kamu_resources::ResourceHandle> for ResourceHandle {
 pub enum BatchResourceHandlesOutcome {
     Success(BatchResourceHandlesResult),
     UnsupportedSelector(ResourceUnsupportedSelectorProblem),
-    BadAccount(ResourceBadAccountProblem),
+    AccountResolution(ResourceAccountResolutionProblem),
 }
 
 #[derive(SimpleObject, Debug, Clone)]

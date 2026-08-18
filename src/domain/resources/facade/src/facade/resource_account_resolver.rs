@@ -11,6 +11,8 @@ use internal_error::InternalError;
 use kamu_resources::ResourceAccountRef;
 use thiserror::Error;
 
+use crate::{ResourceAccountResolutionError, ResourceAccountResolutionProblemCode};
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[async_trait::async_trait]
@@ -54,38 +56,64 @@ pub trait ResourceAccountResolver: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Why an account selector could not be resolved to a concrete account.
+///
+/// Split along the line that matters to callers: [`Self::Resolution`] carries
+/// the user-facing selector problems, which are reported to clients as a typed
+/// problem, while the remaining variants are authentication, authorization, and
+/// infrastructure failures, which are not. Composing
+/// [`ResourceAccountResolutionError`] rather than listing its cases inline
+/// means that split is made once, here, instead of being re-derived by every
+/// consumer.
 #[derive(Debug, Error)]
 pub enum ResolveManifestAccountError {
-    #[error("Anonymous subject cannot resolve a target account")]
-    AnonymousSubject,
-
-    #[error("Account selector must specify at least one of `id`, `did`, or `name`")]
-    EmptySelector,
+    #[error(transparent)]
+    Resolution(#[from] ResourceAccountResolutionError),
 
     #[error(transparent)]
-    AccountNotFoundById(kamu_accounts::AccountNotFoundByIdError),
-
-    #[error(transparent)]
-    AccountNotFoundByName(kamu_accounts::AccountNotFoundByNameError),
-
-    #[error(
-        "Account selector mismatch: resolved account '{did}' ({actual_name}) does not match the \
-         provided selector (expected resource id: {expected_resource_id:?}, expected did: \
-         {expected_did:?}, expected name: {expected_name:?})"
-    )]
-    SelectorMismatch {
-        did: odf::AccountID,
-        actual_name: odf::AccountName,
-        expected_resource_id: Option<odf::ResourceID>,
-        expected_did: Option<odf::AccountID>,
-        expected_name: Option<odf::AccountName>,
-    },
-
-    #[error(transparent)]
-    Access(#[from] odf::AccessError),
+    AccountAccess(#[from] ResourceAccountAccessError),
 
     #[error(transparent)]
     Internal(#[from] InternalError),
+}
+
+/// The caller may not act on the target account at all — distinct from the
+/// selector being unresolvable, and never reported to clients as a typed
+/// problem.
+#[derive(Debug, Error)]
+pub enum ResourceAccountAccessError {
+    #[error("Anonymous subject cannot resolve a target account")]
+    AnonymousSubject,
+
+    #[error(transparent)]
+    Access(#[from] odf::AccessError),
+}
+
+impl ResolveManifestAccountError {
+    pub fn empty_selector() -> Self {
+        Self::Resolution(ResourceAccountResolutionError {
+            code: ResourceAccountResolutionProblemCode::EmptySelector,
+            message: "Account selector must specify at least one of `id`, `did`, or `name`"
+                .to_string(),
+        })
+    }
+
+    pub fn selector_mismatch(
+        did: &odf::AccountID,
+        actual_name: &odf::AccountName,
+        expected_resource_id: Option<odf::ResourceID>,
+        expected_did: Option<&odf::AccountID>,
+        expected_name: Option<&odf::AccountName>,
+    ) -> Self {
+        Self::Resolution(ResourceAccountResolutionError {
+            code: ResourceAccountResolutionProblemCode::SelectorMismatch,
+            message: format!(
+                "Account selector mismatch: resolved account '{did}' ({actual_name}) does not \
+                 match the provided selector (expected resource id: {expected_resource_id:?}, \
+                 expected did: {expected_did:?}, expected name: {expected_name:?})"
+            ),
+        })
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -93,7 +121,12 @@ pub enum ResolveManifestAccountError {
 impl From<kamu_accounts::GetAccountByIdError> for ResolveManifestAccountError {
     fn from(value: kamu_accounts::GetAccountByIdError) -> Self {
         match value {
-            kamu_accounts::GetAccountByIdError::NotFound(err) => Self::AccountNotFoundById(err),
+            kamu_accounts::GetAccountByIdError::NotFound(err) => {
+                Self::Resolution(ResourceAccountResolutionError {
+                    code: ResourceAccountResolutionProblemCode::AccountNotFoundById,
+                    message: err.to_string(),
+                })
+            }
             kamu_accounts::GetAccountByIdError::Internal(err) => Self::Internal(err),
         }
     }
@@ -104,7 +137,12 @@ impl From<kamu_accounts::GetAccountByIdError> for ResolveManifestAccountError {
 impl From<kamu_accounts::GetAccountByNameError> for ResolveManifestAccountError {
     fn from(value: kamu_accounts::GetAccountByNameError) -> Self {
         match value {
-            kamu_accounts::GetAccountByNameError::NotFound(err) => Self::AccountNotFoundByName(err),
+            kamu_accounts::GetAccountByNameError::NotFound(err) => {
+                Self::Resolution(ResourceAccountResolutionError {
+                    code: ResourceAccountResolutionProblemCode::AccountNotFoundByName,
+                    message: err.to_string(),
+                })
+            }
             kamu_accounts::GetAccountByNameError::Internal(err) => Self::Internal(err),
         }
     }

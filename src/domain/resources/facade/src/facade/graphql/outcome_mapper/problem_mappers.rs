@@ -13,6 +13,8 @@ use kamu_resources as domain;
 use crate::facade::graphql::cynic_api;
 use crate::{
     BatchResourceError,
+    ResourceAccountResolutionError,
+    ResourceAccountResolutionProblemCode,
     ResourceLookupProblem,
     ResourceNameMismatchError,
     ResourceSchemaMismatchError,
@@ -59,52 +61,27 @@ pub(crate) fn unsupported_selector_problem_error(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) fn bad_account_problem_error(
-    problem: cynic_api::fragments::ResourceBadAccountProblem,
-) -> Result<crate::ResolveManifestAccountError, InternalError> {
-    use cynic_api::fragments::ResourceBadAccountProblemCode as C;
+/// Rebuilds the account-resolution problem the remote facade reported.
+///
+/// Infallible: the wire type carries only a stable code and a rendered message,
+/// so there is nothing to validate — which is the point of the `{code,
+/// message}` shape shared with the header and label-filter problems.
+pub(crate) fn account_resolution_problem_error(
+    problem: cynic_api::fragments::ResourceAccountResolutionProblem,
+) -> ResourceAccountResolutionError {
+    use cynic_api::fragments::ResourceAccountResolutionProblemCode as C;
 
-    Ok(match problem.code {
-        C::EmptySelector => crate::ResolveManifestAccountError::EmptySelector,
-        C::AccountNotFoundById => crate::ResolveManifestAccountError::AccountNotFoundById(
-            kamu_accounts::AccountNotFoundByIdError {
-                account_id: problem.account_id.ok_or_else(|| {
-                    InternalError::new("Malformed remote bad account problem: missing account_id")
-                })?,
-            },
-        ),
-        C::AccountNotFoundByName => crate::ResolveManifestAccountError::AccountNotFoundByName(
-            kamu_accounts::AccountNotFoundByNameError {
-                account_name: account_name_from_problem(problem.account_name, "account_name")?,
-            },
-        ),
-        C::SelectorMismatch => crate::ResolveManifestAccountError::SelectorMismatch {
-            did: problem.account_id.ok_or_else(|| {
-                InternalError::new("Malformed remote bad account problem: missing account_id")
-            })?,
-            actual_name: account_name_from_problem(problem.actual_name, "actual_name")?,
-            expected_resource_id: problem.expected_resource_id,
-            expected_did: problem.expected_did,
-            expected_name: problem
-                .expected_name
-                .map(|name| odf::AccountName::new_unchecked(&name.0)),
-        },
-    })
-}
+    let code = match problem.code {
+        C::EmptySelector => ResourceAccountResolutionProblemCode::EmptySelector,
+        C::AccountNotFoundById => ResourceAccountResolutionProblemCode::AccountNotFoundById,
+        C::AccountNotFoundByName => ResourceAccountResolutionProblemCode::AccountNotFoundByName,
+        C::SelectorMismatch => ResourceAccountResolutionProblemCode::SelectorMismatch,
+    };
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-fn account_name_from_problem(
-    value: Option<cynic_api::scalars::AccountName>,
-    field: &str,
-) -> Result<odf::AccountName, InternalError> {
-    value
-        .map(|name| odf::AccountName::new_unchecked(&name.0))
-        .ok_or_else(|| {
-            InternalError::new(format!(
-                "Malformed remote bad account problem: missing {field}"
-            ))
-        })
+    ResourceAccountResolutionError {
+        code,
+        message: problem.message,
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

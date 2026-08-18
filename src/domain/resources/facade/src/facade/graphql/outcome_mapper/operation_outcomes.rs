@@ -15,7 +15,10 @@ use super::batch_helpers::{
     collect_batch_successes,
     validate_batch_response_indexes,
 };
-use super::problem_mappers::{bad_account_problem_error, unsupported_selector_problem_error};
+use super::problem_mappers::{
+    account_resolution_problem_error,
+    unsupported_selector_problem_error,
+};
 use crate::facade::graphql::cynic_api;
 use crate::{
     BatchResourceError,
@@ -37,9 +40,9 @@ pub(crate) fn map_summary_outcome(
 
     match outcome {
         O::ResourcesSummary(summary) => summary.try_into().map_err(ResourcesSummaryError::Internal),
-        O::ResourceBadAccountProblem(problem) => Err(ResourcesSummaryError::BadAccount(
-            bad_account_problem_error(problem).map_err(ResourcesSummaryError::Internal)?,
-        )),
+        O::ResourceAccountResolutionProblem(problem) => Err(
+            ResourcesSummaryError::AccountResolution(account_resolution_problem_error(problem)),
+        ),
         O::Unknown => Err(ResourcesSummaryError::Internal(InternalError::new(
             "Remote summary returned an unrecognized ResourcesSummaryOutcome variant",
         ))),
@@ -75,8 +78,8 @@ pub(crate) fn map_search_outcome(
         O::ResourceUnsupportedSelectorProblem(problem) => {
             Err(unsupported_selector_problem_error(problem).into())
         }
-        O::ResourceBadAccountProblem(problem) => Err(ListResourcesError::BadAccount(
-            bad_account_problem_error(problem).map_err(ListResourcesError::Internal)?,
+        O::ResourceAccountResolutionProblem(problem) => Err(ListResourcesError::AccountResolution(
+            account_resolution_problem_error(problem),
         )),
         O::ResourceInvalidLabelFilterProblem(problem) => {
             Err(ListResourcesError::InvalidLabelFilter(problem.into()))
@@ -111,8 +114,8 @@ pub(crate) fn map_search_handles_outcome(
         O::ResourceUnsupportedSelectorProblem(problem) => {
             Err(unsupported_selector_problem_error(problem).into())
         }
-        O::ResourceBadAccountProblem(problem) => Err(ListResourcesError::BadAccount(
-            bad_account_problem_error(problem).map_err(ListResourcesError::Internal)?,
+        O::ResourceAccountResolutionProblem(problem) => Err(ListResourcesError::AccountResolution(
+            account_resolution_problem_error(problem),
         )),
         O::ResourceInvalidLabelFilterProblem(problem) => {
             Err(ListResourcesError::InvalidLabelFilter(problem.into()))
@@ -156,8 +159,8 @@ pub(crate) fn map_batch_get_resources_outcome(
         O::ResourceUnsupportedSelectorProblem(problem) => {
             Err(unsupported_selector_problem_error(problem).into())
         }
-        O::ResourceBadAccountProblem(problem) => Err(BatchResourceError::BadAccount(
-            bad_account_problem_error(problem).map_err(BatchResourceError::Internal)?,
+        O::ResourceAccountResolutionProblem(problem) => Err(BatchResourceError::AccountResolution(
+            account_resolution_problem_error(problem),
         )),
         O::Unknown => Err(BatchResourceError::Internal(InternalError::new(
             "Remote get returned an unrecognized BatchResourcesOutcome variant",
@@ -189,8 +192,8 @@ pub(crate) fn map_batch_get_handles_outcome(
         O::ResourceUnsupportedSelectorProblem(problem) => {
             Err(unsupported_selector_problem_error(problem).into())
         }
-        O::ResourceBadAccountProblem(problem) => Err(BatchResourceError::BadAccount(
-            bad_account_problem_error(problem).map_err(BatchResourceError::Internal)?,
+        O::ResourceAccountResolutionProblem(problem) => Err(BatchResourceError::AccountResolution(
+            account_resolution_problem_error(problem),
         )),
         O::Unknown => Err(BatchResourceError::Internal(InternalError::new(
             "Remote get_handles returned an unrecognized BatchResourceHandlesOutcome variant",
@@ -229,8 +232,8 @@ pub(crate) fn map_batch_render_manifests_outcome(
         O::ResourceUnsupportedSelectorProblem(problem) => {
             Err(unsupported_selector_problem_error(problem).into())
         }
-        O::ResourceBadAccountProblem(problem) => Err(BatchResourceError::BadAccount(
-            bad_account_problem_error(problem).map_err(BatchResourceError::Internal)?,
+        O::ResourceAccountResolutionProblem(problem) => Err(BatchResourceError::AccountResolution(
+            account_resolution_problem_error(problem),
         )),
         O::Unknown => Err(BatchResourceError::Internal(InternalError::new(
             "Remote render_manifests returned an unrecognized BatchResourceManifestsOutcome \
@@ -262,8 +265,8 @@ pub(crate) fn map_batch_delete_outcome(
         O::ResourceUnsupportedSelectorProblem(problem) => {
             Err(unsupported_selector_problem_error(problem).into())
         }
-        O::ResourceBadAccountProblem(problem) => Err(BatchResourceError::BadAccount(
-            bad_account_problem_error(problem).map_err(BatchResourceError::Internal)?,
+        O::ResourceAccountResolutionProblem(problem) => Err(BatchResourceError::AccountResolution(
+            account_resolution_problem_error(problem),
         )),
         O::Unknown => Err(BatchResourceError::Internal(InternalError::new(
             "Remote delete returned an unrecognized ResourceDeleteOutcome variant",

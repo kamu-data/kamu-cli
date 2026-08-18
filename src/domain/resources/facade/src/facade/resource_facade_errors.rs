@@ -144,7 +144,68 @@ impl From<ResourceLabelFilterExprParseError> for ResourceInvalidLabelFilterError
     }
 }
 
-use crate::{ResolveManifestAccountError, UnrepresentableScopeError};
+use crate::{ResolveManifestAccountError, ResourceAccountAccessError, UnrepresentableScopeError};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum ResourceAccountResolutionProblemCode {
+    EmptySelector,
+    AccountNotFoundById,
+    AccountNotFoundByName,
+    SelectorMismatch,
+}
+
+/// The account selector supplied for an operation could not be resolved to a
+/// concrete account. This is an input-validation problem, not an authorization
+/// outcome — a caller denied access to another account's resources is reported
+/// through [`odf::AccessError`], never through this type.
+///
+/// Carries a stable `code` plus a rendered `message` rather than the resolver's
+/// own field-carrying variants: the code is what lets the remote facade rebuild
+/// the same error the local facade raises, which is what makes the
+/// `contract_test!` local/remote pairs assert identical behavior on both
+/// transports. Matches [`ResourceInvalidHeadersError`] and
+/// [`ResourceInvalidLabelFilterError`] in shape.
+#[derive(Debug, Error)]
+#[error("{message}")]
+pub struct ResourceAccountResolutionError {
+    pub code: ResourceAccountResolutionProblemCode,
+    pub message: String,
+}
+
+/// Routes a [`ResolveManifestAccountError`] into one of the facade error enums.
+///
+/// The user-facing/infrastructure split is already structural — see
+/// [`ResolveManifestAccountError::Resolution`] — so this just forwards each
+/// case to its counterpart, keeping authorization denials out of
+/// `AccountResolution`.
+///
+/// One macro rather than four hand-written impls, so the routing cannot drift
+/// between the operations that share it.
+macro_rules! impl_from_resolve_manifest_account_error {
+    ($($error_type:ty),+ $(,)?) => {
+        $(
+            impl From<ResolveManifestAccountError> for $error_type {
+                fn from(err: ResolveManifestAccountError) -> Self {
+                    use ResolveManifestAccountError as E;
+                    match err {
+                        E::Resolution(problem) => Self::AccountResolution(problem),
+                        E::AccountAccess(err) => Self::AccountAccess(err),
+                        E::Internal(err) => Self::Internal(err),
+                    }
+                }
+            }
+        )+
+    };
+}
+
+impl_from_resolve_manifest_account_error!(
+    BatchResourceError,
+    ListResourcesError,
+    ResourcesSummaryError,
+    ApplyManifestError,
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -218,7 +279,13 @@ pub enum BatchResourceError {
     UnsupportedSelector(#[from] UnsupportedResourceSelectorError),
 
     #[error(transparent)]
-    BadAccount(#[from] ResolveManifestAccountError),
+    AccountResolution(ResourceAccountResolutionError),
+
+    /// The caller is not authenticated, or is denied access to the target
+    /// account. Its own variant rather than an `AccountResolution`: an
+    /// authorization denial must not be reported to clients as bad input.
+    #[error(transparent)]
+    AccountAccess(ResourceAccountAccessError),
 
     #[error(transparent)]
     InvalidLabelFilter(#[from] ResourceInvalidLabelFilterError),
@@ -238,7 +305,13 @@ pub enum ListResourcesError {
     UnsupportedSelector(#[from] UnsupportedResourceSelectorError),
 
     #[error(transparent)]
-    BadAccount(#[from] ResolveManifestAccountError),
+    AccountResolution(ResourceAccountResolutionError),
+
+    /// The caller is not authenticated, or is denied access to the target
+    /// account. Its own variant rather than an `AccountResolution`: an
+    /// authorization denial must not be reported to clients as bad input.
+    #[error(transparent)]
+    AccountAccess(ResourceAccountAccessError),
 
     #[error(transparent)]
     InvalidLabelFilter(#[from] ResourceInvalidLabelFilterError),
@@ -264,7 +337,13 @@ pub enum ListResourcesError {
 #[derive(Debug, Error)]
 pub enum ResourcesSummaryError {
     #[error(transparent)]
-    BadAccount(#[from] ResolveManifestAccountError),
+    AccountResolution(ResourceAccountResolutionError),
+
+    /// The caller is not authenticated, or is denied access to the target
+    /// account. Its own variant rather than an `AccountResolution`: an
+    /// authorization denial must not be reported to clients as bad input.
+    #[error(transparent)]
+    AccountAccess(ResourceAccountAccessError),
 
     #[error(transparent)]
     RemoteRequest(#[from] GraphqlHttpRequestError),
@@ -297,7 +376,13 @@ pub enum ApplyManifestError {
     UnsupportedDescriptor(#[from] UnsupportedResourceDescriptorError),
 
     #[error(transparent)]
-    BadAccount(#[from] ResolveManifestAccountError),
+    AccountResolution(ResourceAccountResolutionError),
+
+    /// The caller is not authenticated, or is denied access to the target
+    /// account. Its own variant rather than an `AccountResolution`: an
+    /// authorization denial must not be reported to clients as bad input.
+    #[error(transparent)]
+    AccountAccess(ResourceAccountAccessError),
 
     #[error(transparent)]
     InvalidHeaders(#[from] ResourceInvalidHeadersError),

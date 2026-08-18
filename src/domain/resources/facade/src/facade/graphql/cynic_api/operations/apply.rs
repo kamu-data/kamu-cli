@@ -14,7 +14,7 @@ use kamu_resources as domain;
 use crate::ApplyManifestRequest;
 use crate::facade::graphql::cynic_api::fragments::{
     Resource,
-    ResourceBadAccountProblem,
+    ResourceAccountResolutionProblem,
     ResourceManifestFormat,
     ResourceUnsupportedDescriptorProblem,
 };
@@ -44,7 +44,7 @@ pub(crate) enum ResourceApplyOutcome {
     ResourceApplyRejection(ResourceApplyRejection),
     ResourceApplyParseManifestProblem(ResourceApplyParseManifestProblem),
     ResourceUnsupportedDescriptorProblem(ResourceUnsupportedDescriptorProblem),
-    ResourceBadAccountProblem(ResourceBadAccountProblem),
+    ResourceAccountResolutionProblem(ResourceAccountResolutionProblem),
     ResourceInvalidHeaderProblem(ResourceInvalidHeaderProblem),
     ResourceInvalidSpecProblem(ResourceInvalidSpecProblem),
     #[cynic(fallback)]
@@ -320,9 +320,11 @@ fn map_apply_problem(
                 outcome_mapper::unsupported_descriptor_problem_error(p),
             ))
         }
-        ResourceApplyOutcome::ResourceBadAccountProblem(p) => Ok(
-            crate::ApplyManifestError::BadAccount(outcome_mapper::bad_account_problem_error(p)?),
-        ),
+        ResourceApplyOutcome::ResourceAccountResolutionProblem(p) => {
+            Ok(crate::ApplyManifestError::AccountResolution(
+                outcome_mapper::account_resolution_problem_error(p),
+            ))
+        }
         ResourceApplyOutcome::ResourceInvalidHeaderProblem(p) => Ok(p.into()),
         ResourceApplyOutcome::ResourceInvalidSpecProblem(p) => Ok(p.into()),
         ResourceApplyOutcome::Unknown => Err(InternalError::new(

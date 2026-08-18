@@ -11,13 +11,12 @@ use crate::mutations::{ResourceApplyOutcome, ResourceApplyParseManifestProblem};
 use crate::prelude::*;
 use crate::queries::{
     BatchResourceProblem,
-    ResourceBadAccountProblem,
+    ResourceAccountResolutionProblem,
     ResourceManifestFormat,
     ResourceRefInput,
     ResourceUnsupportedSelectorProblem,
     into_resource_refs,
-    map_bad_account_problem,
-    map_resolve_manifest_account_error,
+    map_account_access_error,
     map_unsupported_descriptor_problem,
     map_unsupported_selector_problem,
 };
@@ -149,9 +148,9 @@ impl ResourcesMut {
             Err(kamu_resources_facade::BatchResourceError::UnsupportedSelector(e)) => Ok(
                 ResourceDeleteOutcome::UnsupportedSelector(map_unsupported_selector_problem(e)),
             ),
-            Err(kamu_resources_facade::BatchResourceError::BadAccount(e)) => Ok(
-                ResourceDeleteOutcome::BadAccount(map_bad_account_problem(e)?),
-            ),
+            Err(kamu_resources_facade::BatchResourceError::AccountResolution(e)) => {
+                Ok(ResourceDeleteOutcome::AccountResolution(e.into()))
+            }
             Err(e) => Err(map_batch_delete_resource_error(e)),
         }
     }
@@ -220,8 +219,9 @@ pub(crate) enum ApplyManifestItemOutcomeSummary {
     UnsupportedDescriptor {
         schema: kamu_resources::TypeUri,
     },
-    BadAccount {
-        error: ApplyManifestBadAccountSummary,
+    AccountResolution {
+        code: kamu_resources_facade::ResourceAccountResolutionProblemCode,
+        message: String,
     },
     InvalidHeaders {
         code: kamu_resources_facade::ResourceHeadersValidationProblemCode,
@@ -240,29 +240,6 @@ pub(crate) enum ApplyManifestItemOutcomeSummary {
         actual_schema: kamu_resources::TypeUri,
     },
     ConcurrentModification,
-    Failed {
-        message: String,
-    },
-}
-
-#[derive(Debug, Clone, serde::Serialize)]
-#[serde(tag = "kind")]
-pub(crate) enum ApplyManifestBadAccountSummary {
-    AnonymousSubject,
-    EmptySelector,
-    AccountNotFoundById {
-        account_id: odf::AccountID,
-    },
-    AccountNotFoundByName {
-        account_name: odf::AccountName,
-    },
-    SelectorMismatch {
-        did: odf::AccountID,
-        actual_name: odf::AccountName,
-        expected_resource_id: Option<odf::ResourceID>,
-        expected_did: Option<odf::AccountID>,
-        expected_name: Option<odf::AccountName>,
-    },
     Failed {
         message: String,
     },
@@ -288,8 +265,9 @@ fn summarize_apply_error(
                 }
             }
         },
-        E::BadAccount(error) => ApplyManifestItemOutcomeSummary::BadAccount {
-            error: summarize_bad_account_error(error),
+        E::AccountResolution(error) => ApplyManifestItemOutcomeSummary::AccountResolution {
+            code: error.code,
+            message: error.message.clone(),
         },
         E::InvalidHeaders(error) => ApplyManifestItemOutcomeSummary::InvalidHeaders {
             code: error.code,
@@ -306,42 +284,13 @@ fn summarize_apply_error(
             actual_schema: error.actual_schema.clone(),
         },
         E::ConcurrentModification(_) => ApplyManifestItemOutcomeSummary::ConcurrentModification,
-        E::RemoteRequest(_) | E::Internal(_) => ApplyManifestItemOutcomeSummary::Failed {
-            message: error.to_string(),
-        },
-    }
-}
-
-fn summarize_bad_account_error(
-    error: &kamu_resources_facade::ResolveManifestAccountError,
-) -> ApplyManifestBadAccountSummary {
-    use kamu_resources_facade::ResolveManifestAccountError as E;
-
-    match error {
-        E::AnonymousSubject => ApplyManifestBadAccountSummary::AnonymousSubject,
-        E::EmptySelector => ApplyManifestBadAccountSummary::EmptySelector,
-        E::AccountNotFoundById(error) => ApplyManifestBadAccountSummary::AccountNotFoundById {
-            account_id: error.account_id.clone(),
-        },
-        E::AccountNotFoundByName(error) => ApplyManifestBadAccountSummary::AccountNotFoundByName {
-            account_name: error.account_name.clone(),
-        },
-        E::SelectorMismatch {
-            did,
-            actual_name,
-            expected_resource_id,
-            expected_did,
-            expected_name,
-        } => ApplyManifestBadAccountSummary::SelectorMismatch {
-            did: did.clone(),
-            actual_name: actual_name.clone(),
-            expected_resource_id: *expected_resource_id,
-            expected_did: expected_did.clone(),
-            expected_name: expected_name.clone(),
-        },
-        E::Access(_) | E::Internal(_) => ApplyManifestBadAccountSummary::Failed {
-            message: error.to_string(),
-        },
+        // Account-access denials join the opaque failures here: the rollback
+        // summary carries codes only for the user-facing problems.
+        E::AccountAccess(_) | E::RemoteRequest(_) | E::Internal(_) => {
+            ApplyManifestItemOutcomeSummary::Failed {
+                message: error.to_string(),
+            }
+        }
     }
 }
 
@@ -439,7 +388,7 @@ where
 pub enum ResourceDeleteOutcome {
     Success(ResourceDeleteResult),
     UnsupportedSelector(ResourceUnsupportedSelectorProblem),
-    BadAccount(ResourceBadAccountProblem),
+    AccountResolution(ResourceAccountResolutionProblem),
 }
 
 #[derive(SimpleObject, Debug, Clone)]
@@ -493,7 +442,8 @@ fn map_apply_resource_error(
         E::UnsupportedDescriptor(e) => Ok(ResourceApplyOutcome::UnsupportedDescriptor(
             map_unsupported_descriptor_problem(e),
         )),
-        E::BadAccount(e) => map_bad_account_problem(e).map(ResourceApplyOutcome::BadAccount),
+        E::AccountResolution(e) => Ok(ResourceApplyOutcome::AccountResolution(e.into())),
+        E::AccountAccess(e) => Err(map_account_access_error(e)),
         E::InvalidHeaders(e) => Ok(ResourceApplyOutcome::InvalidHeader(e.into())),
         E::InvalidSpec(e) => Ok(ResourceApplyOutcome::InvalidSpec(e.into())),
         E::IDNotFound(error) => Err(GqlError::gql(error.to_string())),
@@ -514,7 +464,8 @@ fn map_batch_delete_resource_error(error: kamu_resources_facade::BatchResourceEr
 
     match error {
         E::UnsupportedSelector(_) => GqlError::gql("Unsupported resource type selector"),
-        E::BadAccount(error) => map_resolve_manifest_account_error(error),
+        E::AccountResolution(error) => GqlError::gql(error.to_string()),
+        E::AccountAccess(error) => map_account_access_error(error),
         E::InvalidLabelFilter(error) => GqlError::gql(error.to_string()),
         E::RemoteRequest(error) => error.int_err().into(),
         E::Internal(error) => error.into(),
@@ -528,7 +479,8 @@ fn map_batch_apply_resource_error(error: kamu_resources_facade::BatchResourceErr
 
     match error {
         E::UnsupportedSelector(_) => GqlError::gql("Unsupported resource type selector"),
-        E::BadAccount(error) => map_resolve_manifest_account_error(error),
+        E::AccountResolution(error) => GqlError::gql(error.to_string()),
+        E::AccountAccess(error) => map_account_access_error(error),
         E::InvalidLabelFilter(error) => GqlError::gql(error.to_string()),
         E::RemoteRequest(error) => error.int_err().into(),
         E::Internal(error) => error.into(),
