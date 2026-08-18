@@ -338,17 +338,13 @@ impl AccountRepository for InMemoryAccountRepository {
         let mut account_ids = Vec::new();
 
         for account in guard.accounts_by_id.values() {
-            if account.provider != provider {
-                continue;
-            }
-
             let matches_name = account
                 .account_name
                 .as_str()
                 .eq_ignore_ascii_case(account_name.as_ref());
             let matches_email = account.email.as_ref().eq_ignore_ascii_case(email.as_ref());
-            let matches_provider_identity_key =
-                account.provider_identity_key == provider_identity_key;
+            let matches_provider_identity_key = provider == account.provider
+                && account.provider_identity_key == provider_identity_key;
 
             if matches_name || matches_email || matches_provider_identity_key {
                 account_ids.push(account.id.clone());

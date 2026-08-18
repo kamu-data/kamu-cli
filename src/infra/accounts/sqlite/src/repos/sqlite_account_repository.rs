@@ -432,19 +432,15 @@ impl AccountRepository for SqliteAccountRepository {
 
         let account_rows = sqlx::query!(
             r#"
-            SELECT DISTINCT
-                id AS "id: odf::AccountID"
+            SELECT DISTINCT id AS "id: odf::AccountID"
             FROM accounts
-            WHERE provider = $1
-              AND (
-                  lower(account_name) = lower($2)
-                  OR email = $3
-                  OR provider_identity_key = $4
-              );
+            WHERE lower(account_name) = lower($1)
+               OR lower(email) = lower($2)
+               OR (provider = $3 AND provider_identity_key = $4)
             "#,
-            provider,
             account_name_str,
             email_str,
+            provider,
             provider_identity_key
         )
         .fetch_all(connection_mut)

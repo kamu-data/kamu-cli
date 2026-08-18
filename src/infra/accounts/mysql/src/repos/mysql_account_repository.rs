@@ -465,23 +465,17 @@ impl AccountRepository for MySqlAccountRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        // todo
-
         let account_rows = sqlx::query!(
             r#"
-            SELECT DISTINCT
-                id AS "id: odf::AccountID"
+            SELECT DISTINCT id AS "id: odf::AccountID"
             FROM accounts
-            WHERE provider = ?
-              AND (
-                  lower(account_name) = lower(?)
-                  OR email = ?
-                  OR provider_identity_key = ?
-              );
+            WHERE lower(account_name) = lower(?)
+               OR lower(email) = lower(?)
+               OR (provider = ? AND provider_identity_key = ?)
             "#,
-            provider,
             account_name.as_str(),
             email.as_ref(),
+            provider,
             provider_identity_key
         )
         .fetch_all(connection_mut)
