@@ -97,10 +97,10 @@ impl Resources {
         }
     }
 
-    /// Returns resources by selectors
-    #[tracing::instrument(level = "info", name = Resources_resources, skip_all, fields(selector_count = resource_refs.len()))]
+    /// Returns resources by refs
+    #[tracing::instrument(level = "info", name = Resources_by_refs, skip_all, fields(selector_count = resource_refs.len()))]
     #[graphql(guard = "LoggedInGuard::new()")]
-    async fn resources(
+    async fn by_refs(
         &self,
         ctx: &Context<'_>,
         resource_refs: Vec<ResourceRefInput>,
@@ -125,10 +125,10 @@ impl Resources {
         }
     }
 
-    /// Returns resource handles by selectors
-    #[tracing::instrument(level = "info", name = Resources_resource_handles, skip_all, fields(selector_count = resource_refs.len()))]
+    /// Returns resource handles by refs
+    #[tracing::instrument(level = "info", name = Resources_resource_handles_by_refs, skip_all, fields(selector_count = resource_refs.len()))]
     #[graphql(guard = "LoggedInGuard::new()")]
-    async fn resource_handles(
+    async fn resource_handles_by_refs(
         &self,
         ctx: &Context<'_>,
         resource_refs: Vec<ResourceRefInput>,
@@ -152,11 +152,11 @@ impl Resources {
         }
     }
 
-    /// Searches resources matching the given selectors, which act as a logical
+    /// Returns resources matching the given selectors, which act as a logical
     /// OR and may span several resource types and accounts
-    #[tracing::instrument(level = "info", name = Resources_search, skip_all, fields(?page, ?per_page))]
+    #[tracing::instrument(level = "info", name = Resources_by_selectors, skip_all, fields(?page, ?per_page))]
     #[graphql(guard = "LoggedInGuard::new()")]
-    async fn search(
+    async fn by_selectors(
         &self,
         ctx: &Context<'_>,
         query: SearchResourcesInput,
@@ -198,10 +198,10 @@ impl Resources {
         }
     }
 
-    /// Searches resource handles matching the given selectors
-    #[tracing::instrument(level = "info", name = Resources_search_handles, skip_all, fields(?page, ?per_page))]
+    /// Returns resource handles matching the given selectors
+    #[tracing::instrument(level = "info", name = Resources_handles_by_selectors, skip_all, fields(?page, ?per_page))]
     #[graphql(guard = "LoggedInGuard::new()")]
-    async fn search_handles(
+    async fn handles_by_selectors(
         &self,
         ctx: &Context<'_>,
         query: SearchResourcesInput,

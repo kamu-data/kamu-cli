@@ -797,9 +797,9 @@ Files: [`adapter/graphql/src/queries/resources/`](/src/adapter/graphql/src/queri
 and [`adapter/graphql/src/mutations/resources_mut/`](/src/adapter/graphql/src/mutations/resources_mut).
 Every resolver delegates to `ResourceFacade`.
 
-**Queries (`Resources`):** `supported_resource_types`, `summary`, `resources`,
-`resourceHandles`, `search` / `search_handles`, `renderManifests`. Each ref-keyed query takes
-`[ResourceRefInput!]!` — there are no single-ref variants, matching the facade. The
+**Queries (`Resources`):** `supported_resource_types`, `summary`, `byRefs`,
+`resourceHandlesByRefs`, `bySelectors` / `handlesBySelectors`, `renderManifests`. Each ref-keyed
+query takes `[ResourceRefInput!]!` — there are no single-ref variants, matching the facade. The
 `revealed: bool` argument maps to `SpecViewMode`.
 
 **Mutations (`ResourcesMut`):** `apply_manifest(manifest, format, dry_run?)`,
@@ -829,13 +829,13 @@ These map directly from the domain views in
 
 **Label-filter transport.** `ResourceLabelFilterInput { entries: [ResourceLabelFilterEntryInput!]! }`
 carries the filter, where each entry is `{ key: String!, value: JSON! }`. It appears **only** as
-`ResourceSelectorInput.labels` — there is no call-level `labelFilter` argument on `search` or
-`searchHandles`. The ref-keyed `resources`/`resourceHandles`/`renderManifests` queries and the
-`delete` mutation take `[ResourceRefInput!]!` and carry no filter at all.
+`ResourceSelectorInput.labels` — there is no call-level `labelFilter` argument on `bySelectors` or
+`handlesBySelectors`. The ref-keyed `byRefs`/`resourceHandlesByRefs`/`renderManifests` queries and
+the `delete` mutation take `[ResourceRefInput!]!` and carry no filter at all.
 
-Both `search` and `searchHandles` take the **same** `SearchResourcesInput`; only the response shape
-differs (`ResourceListOutcome` vs `ResourceHandleListOutcome`). They were separate inputs whose
-fields were identical, so keeping two was pure duplication.
+Both `bySelectors` and `handlesBySelectors` take the **same** `SearchResourcesInput`; only the
+response shape differs (`ResourceListOutcome` vs `ResourceHandleListOutcome`). They were separate
+inputs whose fields were identical, so keeping two was pure duplication.
 
 **Listing takes a selector list.** `ResourceSelectorInput` mirrors the ODF `ResourceSelector`
 (`account`, `type`, `id`, `name`, `labels`) and replaced four earlier inputs — `ResourceQueryInput`,

@@ -4448,22 +4448,22 @@ type Resources {
 	"""
 	summary(account: AccountRefInput): ResourcesSummaryOutcome!
 	"""
-	Returns resources by selectors
+	Returns resources by refs
 	"""
-	resources(resourceRefs: [ResourceRefInput!]!, revealed: Boolean! = false): BatchResourcesOutcome!
+	byRefs(resourceRefs: [ResourceRefInput!]!, revealed: Boolean! = false): BatchResourcesOutcome!
 	"""
-	Returns resource handles by selectors
+	Returns resource handles by refs
 	"""
-	resourceHandles(resourceRefs: [ResourceRefInput!]!): BatchResourceHandlesOutcome!
+	resourceHandlesByRefs(resourceRefs: [ResourceRefInput!]!): BatchResourceHandlesOutcome!
 	"""
-	Searches resources matching the given selectors, which act as a logical
+	Returns resources matching the given selectors, which act as a logical
 	OR and may span several resource types and accounts
 	"""
-	search(query: SearchResourcesInput!, page: Int, perPage: Int): ResourceListOutcome!
+	bySelectors(query: SearchResourcesInput!, page: Int, perPage: Int): ResourceListOutcome!
 	"""
-	Searches resource handles matching the given selectors
+	Returns resource handles matching the given selectors
 	"""
-	searchHandles(query: SearchResourcesInput!, page: Int, perPage: Int): ResourceHandleListOutcome!
+	handlesBySelectors(query: SearchResourcesInput!, page: Int, perPage: Int): ResourceHandleListOutcome!
 	"""
 	Renders canonical manifest representations from stored resources
 	"""

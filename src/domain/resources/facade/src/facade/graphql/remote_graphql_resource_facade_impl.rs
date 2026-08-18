@@ -105,10 +105,7 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
             .execute_operation(Operation::build_operation(variables))
             .await?;
 
-        outcome_mapper::map_batch_get_resources_outcome(
-            response.resources.resources,
-            &resource_refs,
-        )
+        outcome_mapper::map_batch_get_resources_outcome(response.resources.by_refs, &resource_refs)
     }
 
     async fn get_handles(
@@ -128,7 +125,7 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
             .await?;
 
         outcome_mapper::map_batch_get_handles_outcome(
-            response.resources.resource_handles,
+            response.resources.resource_handles_by_refs,
             &resource_refs,
         )
     }
@@ -182,7 +179,7 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
             .execute_operation(Operation::build_operation(variables))
             .await?;
 
-        outcome_mapper::map_search_outcome(response.resources.search)
+        outcome_mapper::map_search_outcome(response.resources.by_selectors)
     }
 
     async fn search_handles(
@@ -203,7 +200,7 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
             .execute_operation(SearchOperation::build_operation(variables))
             .await?;
 
-        outcome_mapper::map_search_handles_outcome(response.resources.search_handles)
+        outcome_mapper::map_search_handles_outcome(response.resources.handles_by_selectors)
     }
 
     async fn plan_apply_manifest(

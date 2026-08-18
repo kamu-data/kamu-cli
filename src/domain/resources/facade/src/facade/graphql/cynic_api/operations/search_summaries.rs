@@ -32,7 +32,7 @@ pub(crate) struct SearchQuery {
 #[cynic(graphql_type = "Resources", variables = "SearchVariables")]
 pub(crate) struct SearchResources {
     #[arguments(query: $query, page: $page, perPage: $per_page)]
-    pub search: ResourceListOutcome,
+    pub by_selectors: ResourceListOutcome,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
