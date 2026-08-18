@@ -60,9 +60,7 @@ pub async fn test_missing_account_not_found(catalog: &dill::Catalog) {
         Ok(None)
     );
     assert_matches!(
-        account_repo
-            .find_account_id_by_email(provider, &email)
-            .await,
+        account_repo.find_account_id_by_email(&email).await,
         Ok(None)
     );
     assert_matches!(
@@ -418,31 +416,6 @@ pub async fn test_same_provider_identity_key_different_providers_allowed(catalog
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn test_same_email_different_providers_allowed(catalog: &dill::Catalog) {
-    let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
-
-    const SHARED_EMAIL: &str = "wasya@example.com";
-    const GITHUB_ACCOUNT_ID: &str = "8875909";
-
-    let password_account = make_test_account(
-        "petya",
-        SHARED_EMAIL,
-        AccountProvider::Password.into(),
-        "petya",
-    );
-    let github_account = make_test_account(
-        "petya-github",
-        SHARED_EMAIL,
-        AccountProvider::OAuthGitHub.into(),
-        GITHUB_ACCOUNT_ID,
-    );
-
-    assert_matches!(account_repo.save_account(&password_account).await, Ok(_));
-    assert_matches!(account_repo.save_account(&github_account).await, Ok(_));
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 pub async fn test_duplicate_github_account_email(catalog: &dill::Catalog) {
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
 
@@ -620,15 +593,13 @@ pub async fn test_update_email_success(catalog: &dill::Catalog) {
 
     assert_matches!(
         account_repo
-            .find_account_id_by_email(provider, &updated_email)
+            .find_account_id_by_email(&updated_email)
             .await,
         Ok(Some(account_id)) if updated_account.id == account_id
     );
 
     assert_matches!(
-        account_repo
-            .find_account_id_by_email(provider, &account.email)
-            .await,
+        account_repo.find_account_id_by_email(&account.email).await,
         Ok(None)
     );
 
@@ -728,15 +699,13 @@ pub async fn test_update_account_success(catalog: &dill::Catalog) {
 
     assert_matches!(
         account_repo
-            .find_account_id_by_email(provider, &updated_email)
+            .find_account_id_by_email(&updated_email)
             .await,
         Ok(Some(account_id)) if updated_account.id == account_id
     );
 
     assert_matches!(
-        account_repo
-            .find_account_id_by_email(provider, &account.email)
-            .await,
+        account_repo.find_account_id_by_email(&account.email).await,
         Ok(None)
     );
 
@@ -1289,7 +1258,7 @@ async fn test_locale_account(
         "Tag: {tag}"
     );
     assert_matches!(
-        account_repo.find_account_id_by_email(&account.provider, &account.email).await,
+        account_repo.find_account_id_by_email(&account.email).await,
         Ok(Some(found_id))
             if found_id == account.id,
         "Tag: {tag}"

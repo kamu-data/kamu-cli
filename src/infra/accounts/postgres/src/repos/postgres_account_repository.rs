@@ -29,7 +29,7 @@ impl PostgresAccountRepository {
     fn convert_unique_constraint_violation(&self, e: &dyn DatabaseError) -> AccountErrorDuplicate {
         let account_field: AccountDuplicateField = match e.constraint() {
             Some("accounts_pkey") => AccountDuplicateField::Id,
-            Some("idx_uniq_accounts_provider_email") => AccountDuplicateField::Email,
+            Some("idx_accounts_email") => AccountDuplicateField::Email,
             Some("idx_accounts_name") => AccountDuplicateField::Name,
             Some("idx_uniq_accounts_provider_provider_identity_key") => {
                 AccountDuplicateField::ProviderIdentityKey
@@ -343,7 +343,6 @@ impl AccountRepository for PostgresAccountRepository {
 
     async fn find_account_id_by_email(
         &self,
-        provider: &str,
         email: &Email,
     ) -> Result<Option<odf::AccountID>, FindAccountIdByEmailError> {
         let mut tr = self.transaction.lock().await;
@@ -354,10 +353,8 @@ impl AccountRepository for PostgresAccountRepository {
             r#"
             SELECT id as "id: odf::AccountID"
             FROM accounts
-            WHERE provider = $1
-              AND lower(email) = lower($2)
+            WHERE lower(email) = lower($1)
             "#,
-            provider,
             email.as_ref()
         )
         .fetch_optional(connection_mut)

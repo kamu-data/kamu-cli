@@ -35,9 +35,7 @@ impl SqliteAccountRepository {
             AccountDuplicateField::Id
         } else if sqlite_error_message.contains("idx_accounts_name") {
             AccountDuplicateField::Name
-        } else if sqlite_error_message.contains("accounts.provider, accounts.email") {
-            // NOTE: For indexes on two or more columns,
-            //       SQLite does not show the index name in the error message.
+        } else if sqlite_error_message.contains("idx_accounts_email") {
             AccountDuplicateField::Email
         } else if sqlite_error_message.contains("accounts.provider_identity_key") {
             AccountDuplicateField::ProviderIdentityKey
@@ -370,7 +368,6 @@ impl AccountRepository for SqliteAccountRepository {
 
     async fn find_account_id_by_email(
         &self,
-        provider: &str,
         email: &Email,
     ) -> Result<Option<odf::AccountID>, FindAccountIdByEmailError> {
         let mut tr = self.transaction.lock().await;
@@ -383,10 +380,8 @@ impl AccountRepository for SqliteAccountRepository {
             r#"
             SELECT id as "id: odf::AccountID"
             FROM accounts
-            WHERE provider = $1
-              AND lower(email) = lower($2)
+            WHERE lower(email) = lower($1)
             "#,
-            provider,
             email_str,
         )
         .fetch_optional(connection_mut)

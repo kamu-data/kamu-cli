@@ -35,7 +35,7 @@ impl MySqlAccountRepository {
             AccountDuplicateField::Id
         } else if mysql_error_message.contains("for key 'idx_accounts_name'") {
             AccountDuplicateField::Name
-        } else if mysql_error_message.contains("for key 'idx_uniq_accounts_provider_email'") {
+        } else if mysql_error_message.contains("for key 'idx_accounts_email'") {
             AccountDuplicateField::Email
         } else if mysql_error_message
             .contains("for key 'idx_uniq_accounts_provider_provider_identity_key'")
@@ -410,7 +410,6 @@ impl AccountRepository for MySqlAccountRepository {
 
     async fn find_account_id_by_email(
         &self,
-        provider: &str,
         email: &Email,
     ) -> Result<Option<odf::AccountID>, FindAccountIdByEmailError> {
         let mut tr = self.transaction.lock().await;
@@ -421,10 +420,8 @@ impl AccountRepository for MySqlAccountRepository {
             r#"
             SELECT id as "id: odf::AccountID"
             FROM accounts
-            WHERE provider = ?
-              AND lower(email) = lower(?)
+            WHERE email = ?
             "#,
-            provider,
             email.as_ref()
         )
         .fetch_optional(connection_mut)
