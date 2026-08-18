@@ -1052,26 +1052,31 @@ pub async fn test_delete_account(catalog: &dill::Catalog) {
 pub async fn test_find_account_ids_by_unique_fields(catalog: &dill::Catalog) {
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
 
-    let password_provider = <&'static str>::from(AccountProvider::Password);
-
+    let providers = [
+        AccountProvider::Password,
+        AccountProvider::OAuthGitHub,
+        AccountProvider::Web3Wallet,
+    ];
     let not_found_name = odf::AccountName::new_unchecked("not-found");
     let not_found_email = Email::parse("not-found@example.com").unwrap();
     let not_found_provider_identity_key = "not-found";
 
     // 1. Empty repository — no matches
-    assert_matches!(
-        account_repo
-            .find_account_ids_by_unique_fields(
-                password_provider,
-                &not_found_name,
-                &not_found_email,
-                not_found_provider_identity_key,
-            )
-            .await,
-        Ok(ids) if ids.is_empty()
-    );
+    for provider in providers {
+        assert_matches!(
+            account_repo
+                .find_account_ids_by_unique_fields(
+                    provider.into(),
+                    &not_found_name,
+                    &not_found_email,
+                    not_found_provider_identity_key,
+                )
+                .await,
+            Ok(ids) if ids.is_empty(),
+            "Provider: {provider}"
+        );
+    }
 
-    const SHARED_BOB_EMAIL: &str = "bob@example.com";
     const SHARED_CAROL_PROVIDER_IDENTITY_KEY: &str = "carol";
 
     let account_by_name = make_test_account(
@@ -1082,23 +1087,17 @@ pub async fn test_find_account_ids_by_unique_fields(catalog: &dill::Catalog) {
     );
     let account_by_email = make_test_account(
         "bob",
-        SHARED_BOB_EMAIL,
-        AccountProvider::Password.into(),
+        "bob@example.com",
+        AccountProvider::OAuthGitHub.into(),
         "bob",
     );
-    let account_by_provider = make_test_account(
+    let account_by_provider_identity_key = make_test_account(
         "carol",
         "carol@example.com",
-        AccountProvider::Password.into(),
+        AccountProvider::Web3Wallet.into(),
         SHARED_CAROL_PROVIDER_IDENTITY_KEY,
     );
-    let account_by_email_but_another_email = make_test_account(
-        "bob-github",
-        SHARED_BOB_EMAIL,
-        AccountProvider::OAuthGitHub.into(),
-        "bob-github",
-    );
-    let account_by_provider_but_another_provider_identity_key = make_test_account(
+    let account_by_provider_identity_key_but_another_provider = make_test_account(
         "carol-github",
         "carol-github@example.com",
         AccountProvider::OAuthGitHub.into(),
@@ -1108,9 +1107,8 @@ pub async fn test_find_account_ids_by_unique_fields(catalog: &dill::Catalog) {
     for account in [
         &account_by_name,
         &account_by_email,
-        &account_by_provider,
-        &account_by_email_but_another_email,
-        &account_by_provider_but_another_provider_identity_key,
+        &account_by_provider_identity_key,
+        &account_by_provider_identity_key_but_another_provider,
     ] {
         assert_matches!(
             account_repo.save_account(account).await,
@@ -1121,78 +1119,126 @@ pub async fn test_find_account_ids_by_unique_fields(catalog: &dill::Catalog) {
     }
 
     // 2. Match only by name
-    assert_matches!(
-        account_repo
-            .find_account_ids_by_unique_fields(
-                password_provider,
-                &account_by_name.account_name,
-                &not_found_email,
-                not_found_provider_identity_key,
-            )
-            .await,
-        Ok(ids) if ids == vec![account_by_name.id.clone()]
-    );
+    for provider in providers {
+        assert_matches!(
+            account_repo
+                .find_account_ids_by_unique_fields(
+                    provider.into(),
+                    &account_by_name.account_name,
+                    &not_found_email,
+                    not_found_provider_identity_key,
+                )
+                .await,
+            Ok(ids) if ids == vec![account_by_name.id.clone()],
+            "Provider: {provider}"
+        );
+    }
 
     // 3. Match only by email
-    assert_matches!(
-        account_repo
-            .find_account_ids_by_unique_fields(
-                password_provider,
-                &not_found_name,
-                &account_by_email.email,
-                not_found_provider_identity_key,
-            )
-            .await,
-        Ok(ids) if ids == vec![account_by_email.id.clone()]
-    );
+    for provider in providers {
+        assert_matches!(
+            account_repo
+                .find_account_ids_by_unique_fields(
+                    provider.into(),
+                    &not_found_name,
+                    &account_by_email.email,
+                    not_found_provider_identity_key,
+                )
+                .await,
+            Ok(ids) if ids == vec![account_by_email.id.clone()],
+            "Provider: {provider}"
+        );
+    }
 
     // 4. Match only by provider_identity_key
-    assert_matches!(
-        account_repo
-            .find_account_ids_by_unique_fields(
-                password_provider,
-                &not_found_name,
-                &not_found_email,
-                &account_by_provider.provider_identity_key,
-            )
-            .await,
-        Ok(ids) if ids == vec![account_by_provider.id.clone()]
-    );
+    for (provider, expected_account_ids) in [
+        (AccountProvider::Password, vec![]),
+        (
+            AccountProvider::OAuthGitHub,
+            vec![
+                account_by_provider_identity_key_but_another_provider
+                    .id
+                    .clone(),
+            ],
+        ),
+        (
+            AccountProvider::Web3Wallet,
+            vec![account_by_provider_identity_key.id.clone()],
+        ),
+    ] {
+        assert_matches!(
+            account_repo
+                .find_account_ids_by_unique_fields(
+                    provider.into(),
+                    &not_found_name,
+                    &not_found_email,
+                    &account_by_provider_identity_key.provider_identity_key,
+                )
+                .await,
+            Ok(ids) if ids == expected_account_ids,
+            "Provider: {provider}"
+        );
+    }
 
     // 5. The same account matches multiple fields -- single distinct id
-    assert_matches!(
-        account_repo
+    for provider in providers {
+        assert_matches!(
+            account_repo
+                .find_account_ids_by_unique_fields(
+                    provider.into(),
+                    &account_by_name.account_name,
+                    &account_by_name.email,
+                    &account_by_name.provider_identity_key,
+                )
+                .await,
+            Ok(ids) if ids == vec![account_by_name.id.clone()],
+            "Provider: {provider}"
+        );
+    }
+
+    // 6. Four different accounts, each by its own field
+    for (provider, mut expected_account_ids) in [
+        (
+            AccountProvider::Password,
+            vec![account_by_name.id.clone(), account_by_email.id.clone()],
+        ),
+        (
+            AccountProvider::OAuthGitHub,
+            vec![
+                account_by_name.id.clone(),
+                account_by_email.id.clone(),
+                account_by_provider_identity_key_but_another_provider
+                    .id
+                    .clone(),
+            ],
+        ),
+        (
+            AccountProvider::Web3Wallet,
+            vec![
+                account_by_name.id.clone(),
+                account_by_email.id.clone(),
+                account_by_provider_identity_key.id.clone(),
+            ],
+        ),
+    ] {
+        let mut actual_account_ids = account_repo
             .find_account_ids_by_unique_fields(
-                password_provider,
+                provider.into(),
                 &account_by_name.account_name,
-                &account_by_name.email,
-                &account_by_name.provider_identity_key,
+                &account_by_email.email,
+                &account_by_provider_identity_key.provider_identity_key,
             )
-            .await,
-        Ok(ids) if ids == vec![account_by_name.id.clone()]
-    );
+            .await
+            .unwrap();
 
-    // 6. Three different accounts, each by its own field
-    let mut actual_ids = account_repo
-        .find_account_ids_by_unique_fields(
-            password_provider,
-            &account_by_name.account_name,
-            &account_by_email.email,
-            &account_by_provider.provider_identity_key,
-        )
-        .await
-        .unwrap();
+        actual_account_ids.sort();
+        expected_account_ids.sort();
 
-    let mut expected_ids = vec![
-        account_by_name.id,
-        account_by_email.id,
-        account_by_provider.id,
-    ];
-
-    actual_ids.sort();
-    expected_ids.sort();
-
-    assert_eq!(expected_ids, actual_ids);
+        assert_eq!(
+            expected_account_ids, actual_account_ids,
+            "Provider: {provider}"
+        );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
