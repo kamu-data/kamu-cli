@@ -420,7 +420,7 @@ impl AccountRepository for MySqlAccountRepository {
             r#"
             SELECT id as "id: odf::AccountID"
             FROM accounts
-            WHERE email = ?
+            WHERE lower(email) = lower(?)
             "#,
             email.as_ref()
         )
@@ -464,6 +464,8 @@ impl AccountRepository for MySqlAccountRepository {
         let mut tr = self.transaction.lock().await;
 
         let connection_mut = tr.connection_mut().await?;
+
+        // todo
 
         let account_rows = sqlx::query!(
             r#"
