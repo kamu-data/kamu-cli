@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT DISTINCT id AS \"id: odf::AccountID\"\n            FROM accounts\n            WHERE lower(account_name) = lower($1)\n               OR lower(email) = lower($2)\n               OR (provider = $3 AND provider_identity_key = $4)\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: odf::AccountID",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "bfbc7501424bc96cc03a1fa8824e1643ea2fce28f7269df49e8299f750cb48ac"
+}
