@@ -38,11 +38,21 @@ MIGRATION_DIRS := ./migrations/mysql ./migrations/postgres ./migrations/sqlite
 KAMU_CONTAINER_RUNTIME_TYPE ?= podman
 
 ###############################################################################
+# Formatting
+###############################################################################
+
+.PHONY: fmt
+fmt:
+	cargo fmt
+	cargo sort -g -w -n
+	taplo fmt
+
+###############################################################################
 # Lint
 ###############################################################################
 
 .PHONY: lint
-lint: lint-rustfmt lint-repo lint-deps clippy lint-openapi lint-sqlx
+lint: lint-rustfmt lint-cargo-toml lint-repo lint-deps lint-udeps clippy lint-openapi lint-sqlx
 
 
 .PHONY: lint-rustfmt
@@ -86,15 +96,23 @@ lint-openapi:
 lint-udeps:
 	cargo udeps --all-targets
 
+
+.PHONY: lint-udeps
+lint-cargo-toml:
+	cargo sort -g -w -n -c
+	taplo fmt --check
+
 ###############################################################################
 # Lint (with fixes)
 ###############################################################################
 
-.PHONY: lint-fix
-lint-fix:
+.PHONY: lint-fix-сlippy
+lint-fix-сlippy:
 	cargo clippy --workspace --all-targets --fix --allow-dirty --allow-staged --broken-code
-	cargo fmt --all
 
+
+.PHONY: lint-fix
+lint-fix: lint-fix-сlippy fmt
 
 ###############################################################################
 # Sqlx Local Setup (create databases for local work)

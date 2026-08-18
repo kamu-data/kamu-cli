@@ -22,11 +22,19 @@ doctest = false
 
 
 [features]
-default = []
+default = [
+]
 
-schemars = ["dep:schemars"]
-serde = ["dep:serde", "nutype/serde"]
-utoipa = ["dep:utoipa"]
+schemars = [
+    "dep:schemars",
+]
+serde = [
+    "dep:serde",
+    "nutype/serde",
+]
+utoipa = [
+    "dep:utoipa",
+]
 
 [dependencies]
 internal-error = { workspace = true }
@@ -35,21 +43,28 @@ internal-error = { workspace = true }
 #       that get included anyway due to an old known issue:
 #       Details: https://github.com/rust-lang/cargo/issues/10801
 alloy-core = { version = "1", default-features = false, features = [
-    "std",
     "dyn-abi",
     "eip712",
+    "std",
 ] }
 alloy-signer = { version = "1", default-features = false }
 alloy-signer-local = { version = "1", default-features = false }
-const-hex = { version = "1", default-features = true, features = [] }
-nutype = { version = "0.7", default-features = false, features = [] }
+const-hex = { version = "1", default-features = true, features = [
+] }
+nutype = { version = "0.7", default-features = false, features = [
+] }
 serde_json = { version = "1", default-features = false }
-zeroize = { version = "1", default-features = false, features = [] }
+zeroize = { version = "1", default-features = false, features = [
+] }
 
 # Optional
-schemars = { optional = true, version = "1", default-features = false, features = [] }
-serde = { optional = true, version = "1", features = ["derive"], default-features = false }
-utoipa = { optional = true, version = "5", default-features = false, features = [] }
+schemars = { optional = true, version = "1", default-features = false, features = [
+] }
+serde = { optional = true, version = "1", features = [
+    "derive",
+], default-features = false }
+utoipa = { optional = true, version = "5", default-features = false, features = [
+] }
 
 [dev-dependencies]
 eyre = { version = "0", default-features = false, features = [

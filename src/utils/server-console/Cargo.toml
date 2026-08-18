@@ -22,8 +22,8 @@ doctest = false
 
 
 [dependencies]
-axum = { version = "0.8", default-features = false }
 async-graphql = { version = "7", default-features = false, features = [
     "graphiql",
     "playground",
 ] }
+axum = { version = "0.8", default-features = false }

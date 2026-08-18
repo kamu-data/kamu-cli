@@ -38,10 +38,10 @@ chrono = { version = "0.4", default-features = false }
 dill = { version = "0.15", default-features = false }
 futures = { version = "0.3", default-features = false }
 sqlx = { version = "0.8", default-features = false, features = [
-    "runtime-tokio",
+    "chrono",
     "macros",
     "mysql",
-    "chrono",
+    "runtime-tokio",
 ] }
 tracing = { version = "0.1", default-features = false }
 url = { version = "2", default-features = false }
@@ -52,7 +52,7 @@ uuid = "1"
 database-common-macros = { workspace = true }
 kamu-accounts-repo-tests = { workspace = true }
 
+test-group = { version = "1" }
 test-log = { version = "0.2", features = [
     "trace",
 ] }
-test-group = { version = "1" }

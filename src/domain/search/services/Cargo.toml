@@ -22,7 +22,8 @@ doctest = false
 
 
 [features]
-default = []
+default = [
+]
 
 
 [dependencies]
@@ -34,17 +35,22 @@ kamu-search = { workspace = true }
 odf = { workspace = true }
 time-source = { workspace = true }
 
+async-trait = { version = "0.1", default-features = false }
 chrono = { version = "0.4", default-features = false }
 dill = { version = "0.15", default-features = false }
-async-trait = { version = "0.1", default-features = false }
 serde_json = { version = "1", default-features = false }
 sha2 = { version = "0.11", default-features = false }
-tracing = { version = "0.1", default-features = false }
 tokio = { version = "1", default-features = false }
+tracing = { version = "0.1", default-features = false }
 
 [dev-dependencies]
 kamu-search-cache-inmem = { workspace = true }
 time-source = { workspace = true }
 
-test-log = { version = "0.2", features = ["trace"] }
-tokio = { version = "1", default-features = false, features = ["rt", "macros"] }
+test-log = { version = "0.2", features = [
+    "trace",
+] }
+tokio = { version = "1", default-features = false, features = [
+    "macros",
+    "rt",
+] }

@@ -29,10 +29,13 @@ internal-error = { workspace = true }
 kamu-auth-rebac = { workspace = true, default-features = false }
 kamu-core = { workspace = true }
 kamu-datasets = { workspace = true, default-features = false }
-odf = { workspace = true, default-features = false, features = ["arrow"] }
+odf = { workspace = true, default-features = false, features = [
+    "arrow",
+] }
 
 async-trait = { version = "0.1", default-features = false }
-axum = { version = "0.8", default-features = false, features = [] }
+axum = { version = "0.8", default-features = false, features = [
+] }
 chrono = { version = "0.4", default-features = false }
 datafusion = { version = "54", default-features = false }
 datafusion-odata = { version = "54", default-features = false }
@@ -40,13 +43,17 @@ dill = { version = "0.15", default-features = false }
 futures = { version = "0.3", default-features = false }
 http = "1"
 tracing = "0.1"
-utoipa = { version = "5", default-features = false, features = [] }
-utoipa-axum = { version = "0.2", default-features = false, features = [] }
+utoipa = { version = "5", default-features = false, features = [
+] }
+utoipa-axum = { version = "0.2", default-features = false, features = [
+] }
 
 
 [dev-dependencies]
 init-on-startup = { workspace = true }
-kamu = { workspace = true, features = ["testing"] }
+kamu = { workspace = true, features = [
+    "testing",
+] }
 kamu-accounts = { workspace = true }
 kamu-accounts-inmem = { workspace = true }
 kamu-accounts-services = { workspace = true }
@@ -63,7 +70,13 @@ pretty_assertions = { version = "1" }
 reqwest = { version = "0.12", default-features = false }
 tempfile = { version = "3" }
 test-group = { version = "1" }
-test-log = { version = "0.2", features = ["trace"] }
-tokio = { version = "1", default-features = false, features = [] }
-tower-http = { version = "0.6", features = ["trace", "cors"] }
+test-log = { version = "0.2", features = [
+    "trace",
+] }
+tokio = { version = "1", default-features = false, features = [
+] }
+tower-http = { version = "0.6", features = [
+    "cors",
+    "trace",
+] }
 url = { version = "2", default-features = false }

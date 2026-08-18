@@ -22,17 +22,43 @@ doctest = false
 
 
 [features]
-default = []
+default = [
+]
 
-arrow = ["dep:arrow"]
-engine-rpc = ["dep:prost", "dep:tonic", "dep:tonic-prost"]
-sqlx = ["dep:sqlx"]
-sqlx-mysql = ["sqlx", "sqlx/mysql"]
-sqlx-postgres = ["sqlx", "sqlx/postgres"]
-sqlx-sqlite = ["sqlx", "sqlx/sqlite"]
-testing = ["dep:rand"]
-schemars = ["multiformats/schemars", "dep:schemars"]
-utoipa = ["multiformats/utoipa", "dep:utoipa"]
+arrow = [
+    "dep:arrow",
+]
+engine-rpc = [
+    "dep:prost",
+    "dep:tonic",
+    "dep:tonic-prost",
+]
+sqlx = [
+    "dep:sqlx",
+]
+sqlx-mysql = [
+    "sqlx",
+    "sqlx/mysql",
+]
+sqlx-postgres = [
+    "sqlx",
+    "sqlx/postgres",
+]
+sqlx-sqlite = [
+    "sqlx",
+    "sqlx/sqlite",
+]
+testing = [
+    "dep:rand",
+]
+schemars = [
+    "dep:schemars",
+    "multiformats/schemars",
+]
+utoipa = [
+    "dep:utoipa",
+    "multiformats/utoipa",
+]
 
 
 [dependencies]
@@ -40,38 +66,54 @@ enum-variants = { workspace = true }
 internal-error = { workspace = true }
 multiformats = { workspace = true }
 
-bitflags = { version = "2", default-features = false, features = ["serde"] }
+bitflags = { version = "2", default-features = false, features = [
+    "serde",
+] }
 bytes = { version = "1", default-features = false }
-chrono = { version = "0.4", features = ["serde"] }
+chrono = { version = "0.4", features = [
+    "serde",
+] }
 digest = "0.10"
-thiserror = { version = "2", default-features = false, features = ["std"] }
 setty = { version = "1", default-features = false, features = [
     "types-bytesize",
     "types-duration-string",
 ] }
-strum = { version = "0.28", default-features = false, features = ["derive"] }
+strum = { version = "0.28", default-features = false, features = [
+    "derive",
+] }
+thiserror = { version = "2", default-features = false, features = [
+    "std",
+] }
 
 like = { version = "0.3", default-features = false }
 sha3 = "0.10"
-ssi-caips = { version = "0.3", default-features = false, features = ["eip"] }
+ssi-caips = { version = "0.3", default-features = false, features = [
+    "eip",
+] }
 url = "2"
 
 # Crypto
 ed25519-dalek = { version = "2", default-features = false, features = [
-    "std",
     "fast",
-    "zeroize",
     "rand_core",
+    "std",
+    "zeroize",
 ] }
 
 # Serialization
-base64 = { version = "0.22", default-features = false, features = ["std"] }
-flatbuffers = "25"
-serde = { version = "1", features = ["derive"] }
-serde_json = { version = "1", default-features = false, features = ["std"] }
-serde_with = { version = "3", default-features = false, features = [
+base64 = { version = "0.22", default-features = false, features = [
     "std",
+] }
+flatbuffers = "25"
+serde = { version = "1", features = [
+    "derive",
+] }
+serde_json = { version = "1", default-features = false, features = [
+    "std",
+] }
+serde_with = { version = "3", default-features = false, features = [
     "macros",
+    "std",
 ] }
 serde_yaml = { package = "serde_yaml_ng", version = "0.10", default-features = false }
 
@@ -80,19 +122,19 @@ arrow = { optional = true, version = "58", default-features = false, features = 
     "ipc",
 ] }
 prost = { optional = true, version = "0.14", default-features = false, features = [
-    "std",
     "derive",
+    "std",
 ] }
-tonic = { optional = true, version = "0.14", default-features = false, features = [
-    "transport",
-    "codegen",
-] }
-tonic-prost = { optional = true, version = "0.14", default-features = false }
 rand = { optional = true, version = "0.9", default-features = false }
 schemars = { optional = true, version = "1", default-features = false, features = [
     "derive",
 ] }
 sqlx = { optional = true, version = "0.8", default-features = false }
+tonic = { optional = true, version = "0.14", default-features = false, features = [
+    "codegen",
+    "transport",
+] }
+tonic-prost = { optional = true, version = "0.14", default-features = false }
 utoipa = { optional = true, version = "5", default-features = false, features = [
     "macros",
 ] }

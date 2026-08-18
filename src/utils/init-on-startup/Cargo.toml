@@ -31,12 +31,22 @@ dill = { version = "0.15", default-features = false }
 petgraph = { version = "0.8", default-features = false, features = [
     "stable_graph",
 ] }
-thiserror = { version = "2", default-features = false, features = ["std"] }
+thiserror = { version = "2", default-features = false, features = [
+    "std",
+] }
 tracing = "0.1"
 
 
 [dev-dependencies]
 paste = "1"
-pretty_assertions = { version = "1", default-features = false, features = ["std", "unstable"] }
-test-log = { version = "0.2", features = ["trace"] }
-tokio = { version = "1", default-features = false, features = ["rt", "macros"] }
+pretty_assertions = { version = "1", default-features = false, features = [
+    "std",
+    "unstable",
+] }
+test-log = { version = "0.2", features = [
+    "trace",
+] }
+tokio = { version = "1", default-features = false, features = [
+    "macros",
+    "rt",
+] }

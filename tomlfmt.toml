@@ -1,0 +1,12 @@
+# NOTE: only sorting -- formating via taplo
+table_order = [
+    "package",
+    "lints",
+    "lib",
+    "bin",
+    "features",
+    "workspace",
+    "dependencies",
+    "dev-dependencies",
+    "build-dependencies",
+]

@@ -22,7 +22,9 @@ doctest = false
 
 
 [dependencies]
-kamu-auth-web3 = { workspace = true, default-features = false, features = ["getrandom"] }
+kamu-auth-web3 = { workspace = true, default-features = false, features = [
+    "getrandom",
+] }
 
 chrono = { version = "0.4", default-features = false }
 dill = { version = "0.15", default-features = false }
