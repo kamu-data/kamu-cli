@@ -161,6 +161,34 @@ async fn test_resources_variableset_apply_warning(ctx: &ResourceCtx) {
     // Cleanup so the scenario is self-contained.
     ctx.assert_success(["delete", "vs", resource_name, "--force"], None)
         .await;
+
+    test_resources_variableset_apply_secret_material_warning(ctx).await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A credential filed into a `VariableSet` applies, but warns: variable values
+/// are stored unencrypted and returned by `get`, unlike `SecretSet` values.
+async fn test_resources_variableset_apply_secret_material_warning(ctx: &ResourceCtx) {
+    let resource_name = "secret-material-vars";
+
+    ctx.assert_resource_absent("vs", resource_name).await;
+
+    let manifest = fixtures::variable_set_manifest_secret_material(resource_name);
+    ctx.assert_success_with_stdin(
+        ["apply", "--stdin"],
+        &manifest,
+        // The manifest carries a description, so this is the only warning.
+        Some(&[
+            r#"Created: STDIN -> VariableSet/secret-material-vars"#,
+            r#"warning \[secret_material_in_variable\] STDIN spec\.variables\.DB_PASSWORD"#,
+            r#"Summary 1 item\(s\): 1 created, 0 updated, 0 unchanged, 0 rejected, 0 failed, 1 warning\(s\)"#,
+        ]),
+    )
+    .await;
+
+    ctx.assert_success(["delete", "vs", resource_name, "--force"], None)
+        .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

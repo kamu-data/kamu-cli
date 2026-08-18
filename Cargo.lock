@@ -8284,6 +8284,7 @@ dependencies = [
  "internal-error",
  "kamu-resources",
  "opendatafabric",
+ "pretty_assertions",
  "serde",
  "serde_json",
  "sqlx",

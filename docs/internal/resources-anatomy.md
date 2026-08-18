@@ -198,7 +198,20 @@ The behaviorally-significant consequences of adopting these shapes:
   [`values/resource_warning.rs`](/src/domain/resources/domain/src/values/resource_warning.rs): missing
   description, non-indexable labels, and free-form label/annotation warnings. Configuration-specific
   spec warnings stay on their spec input types (`VariableSetSpecInput`, `SecretSetSpecInput`) because
-  those are configuration-domain lints.
+  those are configuration-domain lints. The *detection* half of the lints shared by both types lives
+  in [`resources/spec_lints.rs`](/src/domain/configuration/domain/src/resources/spec_lints.rs) as small
+  classifier structs (`CredentialShape`, `ValueShape`, `CaseCollisions`); the codes and messages stay
+  on the spec input types.
+- **A lint must describe a consequence, not a style preference.** A warning earns its place when the
+  spec is legal and storable but the author probably did not mean it, and the system's later behavior
+  will surprise them — a credential in a `VariableSet` is stored unencrypted and returned by `get`
+  (`secret_material_in_variable`, deliberately *not* mirrored onto `SecretSet`, where a credential is
+  the point); names differing only by case are stored as distinct entries and collide wherever names
+  are folded (`case_colliding_names`); values keep whatever whitespace was authored
+  (`suspicious_value_whitespace`) and are never templated (`unexpanded_interpolation`). A rule that
+  only restates a convention the validator does not enforce is noise: a `lowercase_variable_name`
+  lint was removed for this reason, since `is_valid_variable_name` accepts mixed case by design and
+  nothing downstream depends on it.
 
 Also generated: `id` (allocated if the manifest omitted it). Reconciliation time is represented
 inside the status object as `status.reconciledAt`; there is no separate top-level timestamp.

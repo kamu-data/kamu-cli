@@ -8,6 +8,7 @@
 // by the Apache License, Version 2.0.
 
 mod secret_set;
+pub(crate) mod spec_lints;
 mod variable_set;
 
 pub use secret_set::*;

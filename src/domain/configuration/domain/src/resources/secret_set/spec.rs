@@ -11,6 +11,8 @@ use crypto_utils::{SecretCryptor, jwe};
 use internal_error::InternalError;
 use kamu_resources::{ResourceLinterSpec, ResourceValidateSpec, ResourceWarning};
 
+use crate::resources::spec_lints;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// RFC-18-shaped secret: either a bare string (plaintext shorthand, accepted
@@ -176,7 +178,9 @@ impl SecretSetSpecInput {
 
     pub const WARNING_CODE_RESERVED_SECRET_PREFIX: &str = "reserved_secret_prefix";
     pub const WARNING_CODE_LONG_SECRET_VALUE: &str = "long_secret_value";
-    pub const WARNING_CODE_LOWERCASE_SECRET_NAME: &str = "lowercase_secret_name";
+    pub const WARNING_CODE_CASE_COLLIDING_NAMES: &str = "case_colliding_names";
+    pub const WARNING_CODE_SUSPICIOUS_VALUE_WHITESPACE: &str = "suspicious_value_whitespace";
+    pub const WARNING_CODE_UNEXPANDED_INTERPOLATION: &str = "unexpanded_interpolation";
 
     fn is_valid_secret_name(name: &str) -> bool {
         let mut chars = name.chars();
@@ -287,6 +291,10 @@ impl ResourceLinterSpec for SecretSetSpecInput {
     fn lint_warnings(&self) -> Vec<ResourceWarning> {
         let mut warnings = Vec::new();
 
+        // A collision spans two entries, so it is resolved once up front
+        // rather than per entry.
+        let collisions = spec_lints::CaseCollisions::scan(&self.secrets.entries);
+
         for (name, secret) in &self.secrets.entries {
             if name.starts_with(Self::RESERVED_SECRET_PREFIX) {
                 warnings.push(ResourceWarning {
@@ -299,19 +307,48 @@ impl ResourceLinterSpec for SecretSetSpecInput {
                 });
             }
 
-            if name.chars().any(|c| c.is_ascii_lowercase()) {
+            // No credential-material lint here: a secret named `API_TOKEN`
+            // holding a token is correct, not suspicious.
+
+            if let Some(other) = collisions.other(name) {
                 warnings.push(ResourceWarning {
-                    code: Self::WARNING_CODE_LOWERCASE_SECRET_NAME.to_string(),
+                    code: Self::WARNING_CODE_CASE_COLLIDING_NAMES.to_string(),
                     path: Some(format!("spec.secrets.{name}")),
                     message: format!(
-                        "Secret '{name}' uses lowercase letters; prefer uppercase names like '{}'",
-                        name.to_uppercase()
+                        "Secret '{name}' differs only by case from '{other}'; they are stored as \
+                         distinct secrets and may collide wherever names are compared \
+                         case-insensitively"
                     ),
                 });
             }
 
+            // Skipped for an encrypted secret: its bytes are ciphertext, not
+            // author-written text.
             if !secret.is_encrypted() {
                 let value = secret.literal_value();
+                let value_shape = spec_lints::ValueShape::new(value);
+
+                if value_shape.has_suspicious_whitespace() {
+                    warnings.push(ResourceWarning {
+                        code: Self::WARNING_CODE_SUSPICIOUS_VALUE_WHITESPACE.to_string(),
+                        path: Some(format!("spec.secrets.{name}.value")),
+                        message: format!(
+                            "Secret '{name}' value has leading, trailing, or embedded whitespace; \
+                             it is stored verbatim"
+                        ),
+                    });
+                }
+
+                if value_shape.has_unexpanded_interpolation() {
+                    warnings.push(ResourceWarning {
+                        code: Self::WARNING_CODE_UNEXPANDED_INTERPOLATION.to_string(),
+                        path: Some(format!("spec.secrets.{name}.value")),
+                        message: format!(
+                            "Secret '{name}' value contains interpolation syntax; specs are not \
+                             templated and the value is stored literally"
+                        ),
+                    });
+                }
 
                 if value.len() > Self::WARNING_SECRET_VALUE_LEN {
                     warnings.push(ResourceWarning {
@@ -363,9 +400,6 @@ pub enum SecretSetSpecValidationError {
         name: String,
         content_encoding: String,
     },
-
-    #[error("description is too long: got {actual}, max is {max}")]
-    DescriptionTooLong { actual: usize, max: usize },
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -502,19 +536,89 @@ mod tests {
     }
 
     #[test]
-    fn lints_lowercase_name_warning() {
+    fn lints_case_colliding_names() {
         use kamu_resources::ResourceLinterSpec;
 
-        let spec = make_spec_input([("my_secret", plaintext_value("value"))]);
+        let spec = make_spec_input([
+            ("DB_HOST", plaintext_value("a")),
+            ("db_host", plaintext_value("b")),
+        ]);
 
         let warnings = spec.lint_warnings();
         assert_eq!(warnings.len(), 1);
         assert_eq!(
             warnings[0].code,
-            SecretSetSpecInput::WARNING_CODE_LOWERCASE_SECRET_NAME
+            SecretSetSpecInput::WARNING_CODE_CASE_COLLIDING_NAMES
         );
-        assert_eq!(warnings[0].path, Some("spec.secrets.my_secret".to_string()));
-        assert!(warnings[0].message.contains("MY_SECRET"));
+        assert_eq!(warnings[0].path, Some("spec.secrets.db_host".to_string()));
+        assert!(warnings[0].message.contains("DB_HOST"));
+    }
+
+    #[test]
+    fn lints_suspicious_value_whitespace() {
+        use kamu_resources::ResourceLinterSpec;
+
+        let spec = make_spec_input([("API_TOKEN", plaintext_value("token-value\n"))]);
+
+        let warnings = spec.lint_warnings();
+        assert_eq!(warnings.len(), 1);
+        assert_eq!(
+            warnings[0].code,
+            SecretSetSpecInput::WARNING_CODE_SUSPICIOUS_VALUE_WHITESPACE
+        );
+        assert_eq!(
+            warnings[0].path,
+            Some("spec.secrets.API_TOKEN.value".to_string())
+        );
+    }
+
+    #[test]
+    fn lints_no_whitespace_warning_for_a_plaintext_pem_key() {
+        use kamu_resources::ResourceLinterSpec;
+
+        // A PEM-armored key is legitimately multiline plaintext secret
+        // material — it must not trip `suspicious_value_whitespace` on every
+        // apply.
+        let pem = "-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKC\n-----END RSA PRIVATE KEY-----";
+        let spec = make_spec_input([("TLS_PRIVATE_KEY", plaintext_value(pem))]);
+
+        let warnings = spec.lint_warnings();
+        assert!(
+            warnings
+                .iter()
+                .all(|w| w.code != SecretSetSpecInput::WARNING_CODE_SUSPICIOUS_VALUE_WHITESPACE),
+            "unexpected suspicious_value_whitespace warning: {warnings:?}"
+        );
+    }
+
+    #[test]
+    fn lints_unexpanded_interpolation() {
+        use kamu_resources::ResourceLinterSpec;
+
+        let spec = make_spec_input([("API_TOKEN", plaintext_value("${VAULT_TOKEN}"))]);
+
+        let warnings = spec.lint_warnings();
+        assert_eq!(warnings.len(), 1);
+        assert_eq!(
+            warnings[0].code,
+            SecretSetSpecInput::WARNING_CODE_UNEXPANDED_INTERPOLATION
+        );
+        assert_eq!(
+            warnings[0].path,
+            Some("spec.secrets.API_TOKEN.value".to_string())
+        );
+    }
+
+    #[test]
+    fn lints_no_value_shape_warnings_for_encrypted_secret() {
+        use kamu_resources::ResourceLinterSpec;
+
+        // A JWE token is ciphertext: its bytes say nothing about what the
+        // author wrote, so the value-shape lints must skip it.
+        let spec = make_spec_input([("API_TOKEN", jwe_secret("token-value\n"))]);
+
+        let warnings = spec.lint_warnings();
+        assert_eq!(warnings.len(), 0);
     }
 
     #[test]
@@ -547,18 +651,11 @@ mod tests {
         ]);
 
         let warnings = spec.lint_warnings();
-        assert_eq!(warnings.len(), 3);
+        assert_eq!(warnings.len(), 2);
         assert_eq!(
             warnings
                 .iter()
                 .filter(|w| w.code == SecretSetSpecInput::WARNING_CODE_RESERVED_SECRET_PREFIX)
-                .count(),
-            1
-        );
-        assert_eq!(
-            warnings
-                .iter()
-                .filter(|w| w.code == SecretSetSpecInput::WARNING_CODE_LOWERCASE_SECRET_NAME)
                 .count(),
             1
         );
@@ -575,6 +672,9 @@ mod tests {
     fn lints_no_warnings_for_valid_secret() {
         use kamu_resources::ResourceLinterSpec;
 
+        // `API_TOKEN` is a credential-shaped name, but a credential in a
+        // `SecretSet` is exactly right — the `secret_material_in_variable`
+        // lint is deliberately not mirrored here.
         let spec = make_spec_input([("API_TOKEN", plaintext_value("secret-value"))]);
 
         let warnings = spec.lint_warnings();

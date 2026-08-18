@@ -126,6 +126,24 @@ pub fn variable_set_manifest_no_description(name: &str, value: &str) -> String {
     )
 }
 
+/// A `VariableSet` manifest that is otherwise warning-free but files a
+/// credential-shaped variable, tripping the `secret_material_in_variable`
+/// lint. Applies successfully — the warning is advisory.
+pub fn variable_set_manifest_secret_material(name: &str) -> String {
+    indoc::formatdoc!(
+        r#"
+        $schema: {VARIABLE_SET_SCHEMA}
+        headers:
+          name: {name}
+          annotations:
+            description: {DEFAULT_DESCRIPTION}
+        spec:
+          variables:
+            DB_PASSWORD: hunter2
+        "#
+    )
+}
+
 /// A well-formed `SecretSet` manifest in YAML.
 pub fn secret_set_manifest_yaml(name: &str, token: &str, password: &str) -> String {
     indoc::formatdoc!(
