@@ -97,6 +97,14 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = mysql,
+    fixture = kamu_accounts_repo_tests::test_same_provider_identity_key_different_providers_allowed,
+    harness = MySqlAccountRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = mysql,
     fixture = kamu_accounts_repo_tests::test_duplicate_github_account_email,
     harness = MySqlAccountRepositoryHarness
 );

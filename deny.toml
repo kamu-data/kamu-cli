@@ -146,4 +146,7 @@ ignore = [
     # Dependency of the unmaintained `im` crate
     # https://rustsec.org/advisories/RUSTSEC-2026-0251
     "RUSTSEC-2026-0251",
+    # h2 (0.3.27): unbounded empty DATA frames
+    # https://rustsec.org/advisories/RUSTSEC-2026-0258
+    "RUSTSEC-2026-0258",
 ]

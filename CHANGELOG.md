@@ -13,6 +13,10 @@ Recommendation: for ease of reading, use the following format:
 ### Fixed
 -->
 
+## [0.266.1] - 2026-08-19
+### Fixed
+- Login, OAuth: login error if system (local) username matches GitHub username (#1684)
+
 ## [Molecule-specific]
 ### Added
 - GQL: `BigInt` scalar

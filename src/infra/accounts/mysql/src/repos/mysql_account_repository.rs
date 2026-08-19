@@ -37,7 +37,9 @@ impl MySqlAccountRepository {
             AccountDuplicateField::Name
         } else if mysql_error_message.contains("for key 'idx_accounts_email'") {
             AccountDuplicateField::Email
-        } else if mysql_error_message.contains("for key 'idx_accounts_provider_identity_key'") {
+        } else if mysql_error_message
+            .contains("for key 'idx_uniq_accounts_provider_provider_identity_key'")
+        {
             AccountDuplicateField::ProviderIdentityKey
         } else {
             tracing::error!(
@@ -382,6 +384,7 @@ impl AccountRepository for MySqlAccountRepository {
 
     async fn find_account_id_by_provider_identity_key(
         &self,
+        provider: &str,
         provider_identity_key: &str,
     ) -> Result<Option<odf::AccountID>, FindAccountIdByProviderIdentityKeyError> {
         let mut tr = self.transaction.lock().await;
@@ -392,8 +395,10 @@ impl AccountRepository for MySqlAccountRepository {
             r#"
             SELECT id as "id: odf::AccountID"
             FROM accounts
-            WHERE provider_identity_key = ?
+            WHERE provider = ?
+              AND provider_identity_key = ?
             "#,
+            provider,
             provider_identity_key
         )
         .fetch_optional(connection_mut)
@@ -415,7 +420,7 @@ impl AccountRepository for MySqlAccountRepository {
             r#"
             SELECT id as "id: odf::AccountID"
             FROM accounts
-            WHERE email = ?
+            WHERE lower(email) = lower(?)
             "#,
             email.as_ref()
         )
@@ -451,6 +456,7 @@ impl AccountRepository for MySqlAccountRepository {
 
     async fn find_account_ids_by_unique_fields(
         &self,
+        provider: &str,
         account_name: &odf::AccountName,
         email: &Email,
         provider_identity_key: &str,
@@ -461,14 +467,15 @@ impl AccountRepository for MySqlAccountRepository {
 
         let account_rows = sqlx::query!(
             r#"
-            SELECT DISTINCT id as "id: odf::AccountID"
+            SELECT DISTINCT id AS "id: odf::AccountID"
             FROM accounts
             WHERE lower(account_name) = lower(?)
-               OR email = ?
-               OR provider_identity_key = ?
+               OR lower(email) = lower(?)
+               OR (provider = ? AND provider_identity_key = ?)
             "#,
             account_name.as_str(),
             email.as_ref(),
+            provider,
             provider_identity_key
         )
         .fetch_all(connection_mut)

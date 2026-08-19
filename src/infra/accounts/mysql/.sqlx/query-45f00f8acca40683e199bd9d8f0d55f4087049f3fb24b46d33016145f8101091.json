@@ -1,0 +1,24 @@
+{
+  "db_name": "MySQL",
+  "query": "\n            SELECT DISTINCT id AS \"id: odf::AccountID\"\n            FROM accounts\n            WHERE lower(account_name) = lower(?)\n               OR lower(email) = lower(?)\n               OR (provider = ? AND provider_identity_key = ?)\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: odf::AccountID",
+        "type_info": {
+          "type": "VarString",
+          "flags": "NOT_NULL | PRIMARY_KEY | NO_DEFAULT_VALUE",
+          "max_size": 400
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "45f00f8acca40683e199bd9d8f0d55f4087049f3fb24b46d33016145f8101091"
+}

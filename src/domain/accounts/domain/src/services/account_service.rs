@@ -71,6 +71,7 @@ pub trait AccountService: Sync + Send {
 
     async fn find_account_id_by_provider_identity_key(
         &self,
+        provider: &str,
         provider_identity_key: &str,
     ) -> Result<Option<odf::AccountID>, FindAccountIdByProviderIdentityKeyError>;
 
@@ -78,6 +79,7 @@ pub trait AccountService: Sync + Send {
     //             Input: Vec<(account_name, email, provider_identity_key)>
     async fn find_account_ids_by_one_of_unique_fields(
         &self,
+        provider: &str,
         account_name: &odf::AccountName,
         email: &email_utils::Email,
         provider_identity_key: &ProviderIdentityKey,

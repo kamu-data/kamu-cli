@@ -26,6 +26,7 @@ impl TryFrom<proxies::resource::ResourceSelector> for dtos::resource::ResourceSe
             account,
             r#type: _,
             id: _,
+            did: _,
             name: _,
             labels: _,
         } = v;

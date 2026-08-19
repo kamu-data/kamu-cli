@@ -1075,16 +1075,16 @@ table Attribute {
 table ResourceRef {
   // Reference to an account that owns the target resource.
   account: AccountRef;
+  // ID of the resource within a node.
+  id: [ubyte];
+  // DID of the resource.
+  did: [ubyte];
   // Short type name or full type URI of the target resource.
   //
   // Examples:
   // - "SecretSet"
   // - "https://opendatafabric.org/config/v1/SecretSet"
   type: string;
-  // ID of the resource within a node.
-  id: [ubyte];
-  // DID of the resource.
-  did: [ubyte];
   // Name of a resource.
   name: string;
 }
@@ -1153,6 +1153,8 @@ table AwsCredentials {
 table ValueRef {
   // Reference to an account that owns the `VariableSet` or the `SecretSet`.
   account: AccountRef;
+  // ID of a resource.
+  id: [ubyte];
   // Short type name or full type URI of the target resource.
   //
   // Examples:
@@ -1160,8 +1162,6 @@ table ValueRef {
   // - "VariableSet"
   // - "https://opendatafabric.org/config/v1/SecretSet"
   type: string;
-  // ID of a resource.
-  id: [ubyte];
   // Name of a resource.
   name: string;
   // JSON path to a value within a `VariableSet` or a `SecretSet`.
@@ -1908,10 +1908,12 @@ table EventFilter {
 table ResourceSelector {
   // Reference to an account that owns the target resources.
   account: AccountRef;
-  // Short type name of the target resource e.g. `SecretSet` or a full schema URI e.g. `https://opendatafabric.org/config/v1/SecretSet.json`.
-  type: string;
   // ID of the singular resource.
   id: [ubyte];
+  // DID of the resource.
+  did: [ubyte];
+  // Short type name of the target resource e.g. `SecretSet` or a full schema URI e.g. `https://opendatafabric.org/config/v1/SecretSet.json`.
+  type: string;
   // Name pattern in SQL `LIKE` format.
   //
   // Examples:

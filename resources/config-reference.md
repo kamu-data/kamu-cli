@@ -185,7 +185,7 @@
   &quot;http&quot;: {
     &quot;connectTimeout&quot;: &quot;30s&quot;,
     &quot;maxRedirects&quot;: 10,
-    &quot;userAgent&quot;: &quot;kamu-cli&#x2F;0.266.0&quot;
+    &quot;userAgent&quot;: &quot;kamu-cli&#x2F;0.266.1&quot;
   },
   &quot;mqtt&quot;: {
     &quot;brokerIdleTimeout&quot;: &quot;1s&quot;
@@ -298,6 +298,16 @@ Optional ed25519 private key. When set, `id` is derived from it
 <td><code>string</code></td>
 <td><code class="language-json">&quot;password&quot;</code></td>
 <td></td>
+</tr>
+<tr>
+<td><code>providerIdentityKey</code></td>
+<td><code>string</code></td>
+<td><code class="language-json">null</code></td>
+<td>
+
+Auto-derived from `account_name` if omitted
+
+</td>
 </tr>
 <tr>
 <td><code>registeredAt</code></td>
@@ -1296,7 +1306,7 @@ the resources (for authenticated clients)
 <tr>
 <td><code>userAgent</code></td>
 <td><code>string</code></td>
-<td><code class="language-json">&quot;kamu-cli&#x2F;0.266.0&quot;</code></td>
+<td><code class="language-json">&quot;kamu-cli&#x2F;0.266.1&quot;</code></td>
 <td>Value to use for User-Agent header</td>
 </tr>
 </tbody>
@@ -1781,7 +1791,7 @@ Base type: `string`
 <td><pre><code class="language-json">{
   &quot;connectTimeout&quot;: &quot;30s&quot;,
   &quot;maxRedirects&quot;: 10,
-  &quot;userAgent&quot;: &quot;kamu-cli&#x2F;0.266.0&quot;
+  &quot;userAgent&quot;: &quot;kamu-cli&#x2F;0.266.1&quot;
 }</code></pre></td>
 <td>HTTP-specific configuration</td>
 </tr>
