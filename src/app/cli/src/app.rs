@@ -571,6 +571,15 @@ pub fn configure_base_catalog(
 
     kamu_signing_services::register_dependencies(&mut b);
 
+    kamu_molecule_services::register_dependencies(
+        &mut b,
+        kamu_molecule_services::MoleculeDomainDependenciesOptions {
+            incremental_search_indexing,
+        },
+    );
+
+    b.add_value(kamu_molecule_services::domain::MoleculeConfig::default());
+
     explore::register_dependencies(&mut b);
 
     register_message_dispatcher::<AccountLifecycleMessage>(

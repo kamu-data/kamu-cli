@@ -17,6 +17,15 @@ Recommendation: for ease of reading, use the following format:
 ### Fixed
 - Login, OAuth: login error if system (local) username matches GitHub username (#1684)
 
+## [Molecule-specific]
+### Added
+- GQL: `BigInt` scalar
+- GQL: Added new methods to remove/restore project: `MoleculeMut:disable_project()` and `MoleculeMut:enable_project()
+### Changed
+- GQL: `molecule` area: use `BigInt` for `ipnft_token_id` 
+- Allow `molecule` and `molecule.dev` accounts separation
+- GQL: `MoleculeMut::create_project()`: generate lowercase project account name.
+
 ## [0.266.0] - 2026-08-13
 ### Added:
 - `MySqlDatasetEntryRepository` has been implemented:

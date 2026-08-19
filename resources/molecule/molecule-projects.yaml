@@ -1,0 +1,87 @@
+kind: DatasetSnapshot
+version: 1
+content:
+  name: projects
+  kind: Root
+  metadata:
+  - kind: SetDataSchema
+    schema:
+      fields:
+      - name: offset
+        type:
+          kind: Int64
+      - name: op
+        type:
+          kind: Int32
+      - name: system_time
+        type:
+          kind: Timestamp
+      - name: event_time
+        type:
+          kind: Timestamp
+      - name: ocl_id
+        type:
+          kind: String
+      - name: symbol
+        type:
+          kind: String
+      - name: odf_account_id
+        type:
+          kind: String
+      - name: odf_data_room_dataset_id
+        type:
+          kind: String
+      - name: odf_announcements_dataset_id
+        type:
+          kind: String
+  - kind: AddPushSource
+    sourceName: default
+    read:
+      kind: NdJson
+      schema:
+        fields:
+        - name: op
+          type:
+            kind: Int32
+        - name: ocl_id
+          type:
+            kind: String
+        - name: symbol
+          type:
+            kind: String
+        - name: odf_account_id
+          type:
+            kind: String
+        - name: odf_data_room_dataset_id
+          type:
+            kind: String
+        - name: odf_announcements_dataset_id
+          type:
+            kind: String
+    merge:
+      kind: ChangelogStream
+      primaryKey:
+      - ocl_id
+  - kind: SetInfo
+    description: List of projects tracked by Molecule.xyz
+    keywords:
+    - DeSci
+    - BioTech
+    - Funding
+    - Crypto
+  - kind: SetAttachments
+    attachments:
+      kind: Embedded
+      items:
+      - path: README.md
+        content: |
+          # Projects tracked by Molecule.xyz
+
+          Molecule is a decentralized biotech protocol,
+          building a web3 marketplace for research-related IP.
+          Our platform and scalable framework for biotech DAOs
+          connects academics and biotech companies with quick and
+          easy funding, while enabling patient, researcher, and funder
+          communities to directly govern and own research-related IP.
+
+          Find out more at https://molecule.xyz/

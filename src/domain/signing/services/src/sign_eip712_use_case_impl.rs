@@ -23,6 +23,7 @@ use kamu_accounts::{
 };
 use kamu_accounts_services::utils::AccountAuthorizationHelper;
 use kamu_datasets::DatasetActionAuthorizer;
+use kamu_molecule_domain::{MOLECULE_DEV_ORG_ACCOUNT_NAME, MOLECULE_ORG_ACCOUNT_NAME};
 use kamu_signing::common::ProofType;
 use kamu_signing::entities::IdentityConfig;
 use kamu_signing::use_cases::{
@@ -57,8 +58,43 @@ impl SignEip712UseCaseImpl {
         if subject_account_name == target_account_name {
             return true;
         }
+        // TODO: HACK: SEC: subject account has permissions to target account
+        //                  Currently only allowing cross-account access
+        //                  for and `molecule` / `molecule.dev`.
+        //
+        //                  See: https://github.com/kamu-data/kamu-node/issues/233
 
-        false
+        // 2. Molecule account can access to any own project accounts
+
+        // NOTE: Dragons here... You'd better take a look at the tests.
+        match subject_account_name {
+            MOLECULE_ORG_ACCOUNT_NAME => {
+                let Some(s) = target_account_name.strip_prefix(subject_account_name) else {
+                    return false;
+                };
+
+                let Some(s) = s.strip_prefix(".dev") else {
+                    return true;
+                };
+
+                if s.is_empty() {
+                    // Edge-case: molecule.dev is not a project account
+                    return false;
+                }
+
+                s.strip_prefix(".").is_none()
+            }
+
+            MOLECULE_DEV_ORG_ACCOUNT_NAME => {
+                let Some(s) = target_account_name.strip_prefix(subject_account_name) else {
+                    return false;
+                };
+
+                s.strip_prefix(".").is_some()
+            }
+
+            _ => false,
+        }
     }
 
     async fn get_secret_key_for_dataset(

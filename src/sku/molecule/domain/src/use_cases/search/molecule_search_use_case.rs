@@ -1,0 +1,105 @@
+// Copyright Kamu Data, Inc. and contributors. All rights reserved.
+//
+// Use of this software is governed by the Business Source License
+// included in the LICENSE file.
+//
+// As of the Change Date specified in that file, in accordance with
+// the Business Source License, use of this software will be governed
+// by the Apache License, Version 2.0.
+
+use chrono::{DateTime, Utc};
+use database_common::{EntityPageListing, PaginationOpts};
+use internal_error::InternalError;
+
+use crate::{
+    MoleculeAccessLevelRule,
+    MoleculeDataRoomActivity,
+    MoleculeGlobalAnnouncement,
+    MoleculeSearchEntityKind,
+    OclId,
+};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[async_trait::async_trait]
+pub trait MoleculeSearchUseCase: Send + Sync {
+    async fn execute(
+        &self,
+        molecule_subject: &kamu_accounts::LoggedAccount,
+        mode: MoleculeSearchMode,
+        prompt: &str,
+        filters: Option<MoleculeSearchFilters>,
+        pagination: PaginationOpts,
+        enable_explain: bool,
+    ) -> Result<MoleculeSearchHitsListing, MoleculeSearchError>;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Copy)]
+pub enum MoleculeSearchMode {
+    ViaSearchIndex,
+    ViaChangelog,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, Debug)]
+pub struct MoleculeSearchFilters {
+    pub by_ocl_ids: Option<Vec<String>>,
+    pub by_tags: Option<Vec<String>>,
+    pub by_categories: Option<Vec<String>>,
+    pub by_access_levels: Option<Vec<String>>,
+    pub by_access_level_rules: Option<Vec<MoleculeAccessLevelRule>>,
+    pub by_kinds: Option<Vec<MoleculeSearchEntityKind>>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub type MoleculeSearchHitsListing = EntityPageListing<MoleculeSearchHit>;
+
+#[derive(Debug)]
+pub struct MoleculeSearchHit {
+    pub entity: MoleculeSearchHitEntity,
+    pub score: Option<f64>,
+    pub explanation: Option<serde_json::Value>,
+}
+
+#[derive(Debug)]
+pub enum MoleculeSearchHitEntity {
+    DataRoomActivity(MoleculeDataRoomActivity),
+    Announcement(MoleculeGlobalAnnouncement),
+}
+
+impl MoleculeSearchHitEntity {
+    pub fn event_time(&self) -> DateTime<Utc> {
+        match self {
+            Self::DataRoomActivity(entity) => entity.event_time,
+            Self::Announcement(entity) => entity.announcement.event_time,
+        }
+    }
+
+    pub fn ocl_id(&self) -> &OclId {
+        match self {
+            Self::DataRoomActivity(entity) => &entity.ocl_id,
+            Self::Announcement(entity) => &entity.ocl_id,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(thiserror::Error, Debug)]
+pub enum MoleculeSearchError {
+    #[error(transparent)]
+    Access(
+        #[from]
+        #[backtrace]
+        odf::AccessError,
+    ),
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

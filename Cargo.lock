@@ -7636,7 +7636,13 @@ dependencies = [
  "kamu-flow-system",
  "kamu-flow-system-inmem",
  "kamu-flow-system-services",
+ "kamu-messaging-outbox-inmem",
+ "kamu-molecule-domain",
+ "kamu-molecule-services",
  "kamu-search",
+ "kamu-search-cache-inmem",
+ "kamu-search-elasticsearch",
+ "kamu-search-services",
  "kamu-task-system",
  "kamu-task-system-inmem",
  "kamu-task-system-services",
@@ -8114,6 +8120,7 @@ dependencies = [
  "kamu-messaging-outbox-inmem",
  "kamu-messaging-outbox-postgres",
  "kamu-messaging-outbox-sqlite",
+ "kamu-molecule-services",
  "kamu-search",
  "kamu-search-cache-inmem",
  "kamu-search-cache-postgres",
@@ -8265,6 +8272,7 @@ name = "kamu-cli-e2e-repo-tests"
 version = "0.266.1"
 dependencies = [
  "async-graphql",
+ "base64",
  "chrono",
  "database-common",
  "datafusion",
@@ -8280,12 +8288,15 @@ dependencies = [
  "opendatafabric",
  "paste",
  "pretty_assertions",
+ "random-strings",
  "regex",
  "reqwest",
  "serde_json",
+ "serde_yaml_ng",
  "tempfile",
  "test-utils",
  "tokio",
+ "tokio-retry",
  "url",
 ]
 
@@ -8887,6 +8898,71 @@ dependencies = [
 ]
 
 [[package]]
+name = "kamu-molecule-domain"
+version = "0.266.1"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "chrono",
+ "database-common",
+ "file-utils",
+ "format-utils",
+ "indoc 2.0.7",
+ "internal-error",
+ "kamu-accounts",
+ "kamu-auth-rebac",
+ "kamu-core",
+ "kamu-datasets",
+ "kamu-search",
+ "messaging-outbox",
+ "nonempty",
+ "nutype",
+ "opendatafabric",
+ "regex",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "thiserror 2.0.20",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "kamu-molecule-services"
+version = "0.266.1"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "chrono",
+ "common-macros",
+ "database-common",
+ "datafusion",
+ "dill",
+ "file-utils",
+ "format-utils",
+ "futures",
+ "indoc 2.0.7",
+ "internal-error",
+ "kamu-accounts",
+ "kamu-auth-rebac",
+ "kamu-core",
+ "kamu-datasets",
+ "kamu-datasets-services",
+ "kamu-molecule-domain",
+ "kamu-search",
+ "messaging-outbox",
+ "nonempty",
+ "opendatafabric",
+ "serde_json",
+ "thiserror 2.0.20",
+ "time-source",
+ "tokio",
+ "tracing",
+ "url",
+ "uuid",
+]
+
+[[package]]
 name = "kamu-repo-tools"
 version = "0.266.1"
 dependencies = [
@@ -9101,6 +9177,7 @@ dependencies = [
  "kamu-auth-rebac-services",
  "kamu-datasets",
  "kamu-datasets-services",
+ "kamu-molecule-domain",
  "kamu-signing",
  "messaging-outbox",
  "opendatafabric",

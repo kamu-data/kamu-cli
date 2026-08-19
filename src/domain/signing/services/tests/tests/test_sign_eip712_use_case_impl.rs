@@ -80,20 +80,18 @@ fn test_has_access_by_name_matrix() {
     for (subject_account_name, target_account_name, expected) in [
         // molecule
         (MOLECULE, MOLECULE, true),
-        // TODO: Uncomment after sku/molecule merging
-        // (MOLECULE, MOLECULE_PROJECT, true),
-        // (MOLECULE, MOLECULE_DEV, false),
-        // (MOLECULE, MOLECULE_DEV_PROJECT, false),
-        // (MOLECULE, "molecule.devops", true),
-        // (MOLECULE, "molecule.dev.probe8503325863", false),
+        (MOLECULE, MOLECULE_PROJECT, true),
+        (MOLECULE, MOLECULE_DEV, false),
+        (MOLECULE, MOLECULE_DEV_PROJECT, false),
+        (MOLECULE, "molecule.devops", true),
+        (MOLECULE, "molecule.dev.probe8503325863", false),
         // molecule.dev
         (MOLECULE_DEV, MOLECULE_DEV, true),
-        // TODO: Uncomment after sku/molecule merging
-        // (MOLECULE_DEV, MOLECULE_DEV_PROJECT, true),
-        // (MOLECULE_DEV, MOLECULE, false),
-        // (MOLECULE_DEV, MOLECULE_PROJECT, false),
-        // (MOLECULE_DEV, "molecule.devops", false),
-        // (MOLECULE_DEV, "molecule.dev.probe8503325863", true),
+        (MOLECULE_DEV, MOLECULE_DEV_PROJECT, true),
+        (MOLECULE_DEV, MOLECULE, false),
+        (MOLECULE_DEV, MOLECULE_PROJECT, false),
+        (MOLECULE_DEV, "molecule.devops", false),
+        (MOLECULE_DEV, "molecule.dev.probe8503325863", true),
     ] {
         let actual = SignEip712UseCaseImpl::has_access_by_account_name(
             subject_account_name,
@@ -188,23 +186,21 @@ async fn test_execute_matrix() {
                     to_odf_did(&molecule_account_id()),
                     expected_ok_response_for_molecule_account_id(),
                 ),
-                // TODO: Uncomment after sku/molecule merging
-                // (
-                //     "1) Test 8",
-                //     to_odf_did(&molecule_project_account_id()),
-                //     expected_ok_response_for_molecule_project_account_id(),
-                // ),
+                (
+                    "1) Test 8",
+                    to_odf_did(&molecule_project_account_id()),
+                    expected_ok_response_for_molecule_project_account_id(),
+                ),
                 (
                     "1) Test 9",
                     to_odf_did(&molecule_dev_account_id()),
                     expected_ok_response_for_molecule_dev_account_id(),
                 ),
-                // TODO: Uncomment after sku/molecule merging
-                // (
-                //     "1) Test 10",
-                //     to_odf_did(&molecule_dev_project_account_id()),
-                //     expected_ok_response_for_molecule_dev_project_account_id(),
-                // ),
+                (
+                    "1) Test 10",
+                    to_odf_did(&molecule_dev_project_account_id()),
+                    expected_ok_response_for_molecule_dev_project_account_id(),
+                ),
                 (
                     "1) Test 11",
                     to_odf_did(&user_account_id()),
@@ -268,23 +264,21 @@ async fn test_execute_matrix() {
                     to_odf_did(&molecule_account_id()),
                     expected_ok_response_for_molecule_account_id(),
                 ),
-                // TODO: Uncomment after sku/molecule merging
-                // (
-                //     "2) Test 8",
-                //     to_odf_did(&molecule_project_account_id()),
-                //     expected_ok_response_for_molecule_project_account_id(),
-                // ),
+                (
+                    "2) Test 8",
+                    to_odf_did(&molecule_project_account_id()),
+                    expected_ok_response_for_molecule_project_account_id(),
+                ),
                 (
                     "2) Test 9",
                     to_odf_did(&molecule_dev_account_id()),
                     expected_not_found(to_odf_did(&molecule_dev_account_id())),
                 ),
-                // TODO: Uncomment after sku/molecule merging
-                // (
-                //     "2) Test 10",
-                //     to_odf_did(&molecule_dev_project_account_id()),
-                //     expected_not_found(to_odf_did(&molecule_dev_project_account_id())),
-                // ),
+                (
+                    "2) Test 10",
+                    to_odf_did(&molecule_dev_project_account_id()),
+                    expected_not_found(to_odf_did(&molecule_dev_project_account_id())),
+                ),
                 (
                     "2) Test 11",
                     to_odf_did(&user_account_id()),
@@ -348,23 +342,21 @@ async fn test_execute_matrix() {
                     to_odf_did(&molecule_account_id()),
                     expected_not_found(to_odf_did(&molecule_account_id())),
                 ),
-                // TODO: Uncomment after sku/molecule merging
-                // (
-                //     "3) Test 8",
-                //     to_odf_did(&molecule_project_account_id()),
-                //     expected_not_found(to_odf_did(&molecule_project_account_id())),
-                // ),
+                (
+                    "3) Test 8",
+                    to_odf_did(&molecule_project_account_id()),
+                    expected_not_found(to_odf_did(&molecule_project_account_id())),
+                ),
                 (
                     "3) Test 9",
                     to_odf_did(&molecule_dev_account_id()),
                     expected_ok_response_for_molecule_dev_account_id(),
                 ),
-                // TODO: Uncomment after sku/molecule merging
-                // (
-                //     "3) Test 10",
-                //     to_odf_did(&molecule_dev_project_account_id()),
-                //     expected_ok_response_for_molecule_dev_project_account_id(),
-                // ),
+                (
+                    "3) Test 10",
+                    to_odf_did(&molecule_dev_project_account_id()),
+                    expected_ok_response_for_molecule_dev_project_account_id(),
+                ),
                 (
                     "3) Test 11",
                     to_odf_did(&user_account_id()),
@@ -425,23 +417,21 @@ async fn test_execute_matrix() {
                     to_odf_did(&molecule_account_id()),
                     expected_not_found(to_odf_did(&molecule_account_id())),
                 ),
-                // TODO: Uncomment after sku/molecule merging
-                // (
-                //     "4) Test 8",
-                //     to_odf_did(&molecule_project_account_id()),
-                //     expected_not_found(to_odf_did(&molecule_project_account_id())),
-                // ),
+                (
+                    "4) Test 8",
+                    to_odf_did(&molecule_project_account_id()),
+                    expected_not_found(to_odf_did(&molecule_project_account_id())),
+                ),
                 (
                     "4) Test 9",
                     to_odf_did(&molecule_dev_account_id()),
                     expected_not_found(to_odf_did(&molecule_dev_account_id())),
                 ),
-                // TODO: Uncomment after sku/molecule merging
-                // (
-                //     "4) Test 10",
-                //     to_odf_did(&molecule_dev_project_account_id()),
-                //     expected_not_found(to_odf_did(&molecule_dev_project_account_id())),
-                // ),
+                (
+                    "4) Test 10",
+                    to_odf_did(&molecule_dev_project_account_id()),
+                    expected_not_found(to_odf_did(&molecule_dev_project_account_id())),
+                ),
                 (
                     "4) Test 11",
                     to_odf_did(&user_account_id()),
@@ -502,23 +492,21 @@ async fn test_execute_matrix() {
                     to_odf_did(&molecule_account_id()),
                     expected_not_found(to_odf_did(&molecule_account_id())),
                 ),
-                // TODO: Uncomment after sku/molecule merging
-                // (
-                //     "5) Test 8",
-                //     to_odf_did(&molecule_project_account_id()),
-                //     expected_not_found(to_odf_did(&molecule_project_account_id())),
-                // ),
+                (
+                    "5) Test 8",
+                    to_odf_did(&molecule_project_account_id()),
+                    expected_not_found(to_odf_did(&molecule_project_account_id())),
+                ),
                 (
                     "5) Test 9",
                     to_odf_did(&molecule_dev_account_id()),
                     expected_not_found(to_odf_did(&molecule_dev_account_id())),
                 ),
-                // TODO: Uncomment after sku/molecule merging
-                // (
-                //     "5) Test 10",
-                //     to_odf_did(&molecule_dev_project_account_id()),
-                //     expected_not_found(to_odf_did(&molecule_dev_project_account_id())),
-                // ),
+                (
+                    "5) Test 10",
+                    to_odf_did(&molecule_dev_project_account_id()),
+                    expected_not_found(to_odf_did(&molecule_dev_project_account_id())),
+                ),
                 (
                     "5) Test 11",
                     to_odf_did(&user_account_id()),
@@ -719,7 +707,6 @@ fn molecule_account_id() -> odf::AccountID {
     odf::AccountID::from_signing_key(&odf::metadata::PrivateKey::from_bytes(&MOLECULE_KEY))
 }
 
-#[expect(unused)]
 fn molecule_project_account_id() -> odf::AccountID {
     odf::AccountID::from_signing_key(&odf::metadata::PrivateKey::from_bytes(
         &MOLECULE_PROJECT_KEY,
@@ -730,7 +717,6 @@ fn molecule_dev_account_id() -> odf::AccountID {
     odf::AccountID::from_signing_key(&odf::metadata::PrivateKey::from_bytes(&MOLECULE_DEV_KEY))
 }
 
-#[expect(unused)]
 fn molecule_dev_project_account_id() -> odf::AccountID {
     odf::AccountID::from_signing_key(&odf::metadata::PrivateKey::from_bytes(
         &MOLECULE_DEV_PROJECT_KEY,
@@ -840,11 +826,9 @@ fn mock_dataset_action_authorizer() -> MockDatasetActionAuthorizer {
         // NOTE: At the time of the request, we don't know what the DID is, so we can check it
         //       for the account as well
         .expect_check_read_dataset(&to_dataset_id(&molecule_account_id()), 1, false)
-        // TODO: Uncomment after sku/molecule merging
-        // .expect_check_read_dataset(&to_dataset_id(&molecule_project_account_id()), 1, false)
+        .expect_check_read_dataset(&to_dataset_id(&molecule_project_account_id()), 1, false)
         .expect_check_read_dataset(&to_dataset_id(&molecule_dev_account_id()), 1, false)
-        // TODO: Uncomment after sku/molecule merging
-        // .expect_check_read_dataset(&to_dataset_id(&molecule_dev_project_account_id()), 1, false)
+        .expect_check_read_dataset(&to_dataset_id(&molecule_dev_project_account_id()), 1, false)
         .expect_check_read_dataset(&to_dataset_id(&user_account_id()), 1, false)
         .expect_check_read_dataset(&to_dataset_id(&not_found_account_id()), 1, false)
 }
@@ -869,17 +853,16 @@ fn expected_ok_response_for_molecule_account_id() -> Result<serde_json::Value, S
     }))
 }
 
-#[expect(unused)]
 #[expect(clippy::unnecessary_wraps)]
 fn expected_ok_response_for_molecule_project_account_id() -> Result<serde_json::Value, String> {
     Ok(json!({
         "type": "Ed25519Signature2020",
-        "verificationMethod": "did:key:z6MkvDqGT54cXesYGvABpF1UapVNwjCqRcafi4Px6Thv5T3Z",
-        "signature": "uDvYYfeTTyCHDN7yiejdz2FBBQeugEb5XeYSAQn7Dtu4zW1N1c1c20r5PHRXXSKgnQrhZIbF3eqPQHh5JJQZBAg",
+        "verificationMethod": "did:key:z6Mko9hTggMwjSTEaJaPUfE6tqcy2xvU6BnNq3e3o8qVBiyH",
+        "signature": "uNMrt0vM--o3MG4Oz39lBtSVSJ9gZYAY5a-kM6IJqCEAyrHXlqkrvV4Jo4V0NwbXssrL9QkN-nWwG83kkk7mbAw",
         "proof": {
             "type": "EcdsaSecp256k1Signature2019",
             "verificationMethod": "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31",
-            "signature": "0xaeeb5aa5680969eccfc1ccc71cb3eb17873eaef29dcda27d7c5e8ebdbf4a43c53ca5879367481281d50eaa766bd8ffd7510f50c2d3f4813161894862942ed8281b"
+            "signature": "0xc5058b3334b01617293815af7fb8d8db17cba8b8140f497bc0adaf3e71d570777e7b55ac818898114ad1eeb4ad9a2afd2a653b3ab208141ce223c788ec0f9e6a1c"
         }
     }))
 }
@@ -898,17 +881,16 @@ fn expected_ok_response_for_molecule_dev_account_id() -> Result<serde_json::Valu
     }))
 }
 
-#[expect(unused)]
 #[expect(clippy::unnecessary_wraps)]
 fn expected_ok_response_for_molecule_dev_project_account_id() -> Result<serde_json::Value, String> {
     Ok(json!({
         "type": "Ed25519Signature2020",
-        "verificationMethod": "did:key:z6MkwVDfCg9LbbY6xjH3EZk8YSFQZujV5Y4y1ZWeER9tDiN3",
-        "signature": "uFTIojN2XAPslAtHYHGEhlkIp_LyK8IcJZgsPn9B2yII-VDkAHNTnYKrM7ejpwwEEZN3JL88yFAOAyJ6TDcoLAQ",
+        "verificationMethod": "did:key:z6Mkt6316e2PN3mZdB6N9CrzomJYUd1s5yBZi1XYHmwT9TUP",
+        "signature": "ulIf24QdmjFyuBJMopZpTZ6Ehjpk8z1i0Am8rxBP6_9S23YNsnVCnHIhtjrbIuR76mACCFQfE1gjW75pKgjaSAw",
         "proof": {
             "type": "EcdsaSecp256k1Signature2019",
             "verificationMethod": "0x03993fbdd2f7a840b78202496af7e699dc9fcd1667f16dcce73887d563f448cc31",
-            "signature": "0x37e23c26b4383f38225269bd3a38724952fb24b2c20f3f022540a9b62ef6c369652b00ec6a98a15902334cbc992dc5bca6c11f8e615a376e6e1d809499d07a2a1c"
+            "signature": "0xe47b0b9f0017e32fd0de8f3378b2252f29fec678725e8937df5d3d07801d3cc749012a21722b96b53a46f1c64dab0cad3340aa18fc93965eab056740198155331b"
         }
     }))
 }
