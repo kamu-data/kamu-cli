@@ -42,6 +42,7 @@ pub trait AccountRepository: Send + Sync {
 
     async fn find_account_id_by_provider_identity_key(
         &self,
+        provider: &str,
         provider_identity_key: &str,
     ) -> Result<Option<odf::AccountID>, FindAccountIdByProviderIdentityKeyError>;
 
@@ -57,6 +58,7 @@ pub trait AccountRepository: Send + Sync {
 
     async fn find_account_ids_by_unique_fields(
         &self,
+        provider: &str,
         account_name: &odf::AccountName,
         email: &Email,
         provider_identity_key: &str,

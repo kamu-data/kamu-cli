@@ -59,6 +59,7 @@ impl PredefinedAccountsConfig {
                 avatar_url: Some(DEFAULT_AVATAR_URL.clone()),
                 properties: vec![AccountPropertyName::IsAdmin],
                 registered_at: None,
+                provider_identity_key: None,
                 provider: AccountProvider::Password.to_string(),
                 email: DUMMY_EMAIL_ADDRESS.clone(),
                 treat_datasets_as_public: true,
@@ -164,6 +165,10 @@ pub struct AccountConfig {
     #[config(default = AccountProvider::Password.to_string())]
     pub provider: String,
 
+    /// Auto-derived from `account_name` if omitted
+    #[config(combine(replace))]
+    pub provider_identity_key: Option<ProviderIdentityKey>,
+
     #[config(combine(replace))]
     pub avatar_url: Option<Url>,
 
@@ -195,6 +200,7 @@ impl AccountConfig {
             display_name: None,
             account_type: Self::default_account_type(),
             provider: Self::default_provider(),
+            provider_identity_key: None,
             avatar_url: None,
             registered_at: None,
             properties: Vec::new(),
@@ -224,6 +230,7 @@ impl AccountConfig {
             display_name: None,
             account_type: Self::default_account_type(),
             provider: Self::default_provider(),
+            provider_identity_key: None,
             avatar_url: None,
             registered_at: None,
             properties: Vec::new(),
@@ -297,7 +304,11 @@ impl AccountConfig {
     }
 
     pub fn provider_identity_key(&self) -> ProviderIdentityKey {
-        self.account_name.to_string()
+        if let Some(provider_identity_key) = &self.provider_identity_key {
+            provider_identity_key.clone()
+        } else {
+            self.account_name.to_string()
+        }
     }
 
     pub fn get_display_name(&self) -> AccountDisplayName {

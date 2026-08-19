@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            SELECT id as \"id: odf::AccountID\"\n            FROM accounts\n            WHERE provider = $1\n              AND provider_identity_key = $2\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id: odf::AccountID",
+        "ordinal": 0,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "b2f9d31e2b6c005cc068fb982839fef13ee232e116673d1f47f161ebab89022f"
+}

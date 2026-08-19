@@ -301,7 +301,7 @@ impl AuthenticationProvider for DummyOAuthGithub {
         Ok(ProviderLoginResponse {
             account_id: None,
             account_name: odf::AccountName::new_unchecked(&account),
-            email: Email::parse("e2e-user@example.com").unwrap(),
+            email: Email::parse("e2e-user-github@example.com").unwrap(),
             display_name: account.clone(),
             avatar_url: None,
             provider_identity_key: account,

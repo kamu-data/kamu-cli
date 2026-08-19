@@ -188,6 +188,7 @@ fn test_config() -> AccountConfig {
         display_name: None,
         account_type: AccountType::User,
         provider: AccountProvider::Password.to_string(),
+        provider_identity_key: None,
         avatar_url: None,
         registered_at: None,
         properties: Vec::new(),

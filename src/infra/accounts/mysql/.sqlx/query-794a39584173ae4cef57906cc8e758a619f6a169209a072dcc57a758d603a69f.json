@@ -80,7 +80,7 @@
         "name": "provider",
         "type_info": {
           "type": "VarString",
-          "flags": "NOT_NULL | NO_DEFAULT_VALUE",
+          "flags": "NOT_NULL | MULTIPLE_KEY | NO_DEFAULT_VALUE",
           "max_size": 100
         }
       },
@@ -89,7 +89,7 @@
         "name": "provider_identity_key",
         "type_info": {
           "type": "VarString",
-          "flags": "NOT_NULL | UNIQUE_KEY | NO_DEFAULT_VALUE",
+          "flags": "NOT_NULL | NO_DEFAULT_VALUE",
           "max_size": 400
         }
       }

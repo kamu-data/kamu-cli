@@ -87,15 +87,15 @@ impl AuthenticationServiceImpl {
 
     fn resolve_authentication_provider(
         &self,
-        login_method: &str,
+        login_method_lowercase: &str,
     ) -> Result<Arc<dyn AuthenticationProvider>, UnsupportedLoginMethodError> {
         match self
             .authentication_providers_by_method
-            .get(&login_method.to_lowercase())
+            .get(login_method_lowercase)
         {
             Some(provider) => Ok(provider.clone()),
             None => Err(UnsupportedLoginMethodError {
-                method: login_method.into(),
+                method: login_method_lowercase.into(),
             }),
         }
     }
@@ -211,17 +211,80 @@ impl AuthenticationServiceImpl {
         }
     }
 
+    async fn is_account_name_available(
+        &self,
+        account_name: &odf::AccountName,
+    ) -> Result<bool, InternalError> {
+        Ok(self
+            .account_service
+            .find_account_id_by_name(account_name)
+            .await?
+            .is_none())
+    }
+
+    async fn resolve_unique_account_name(
+        &self,
+        account_name: &odf::AccountName,
+        provider: &str,
+    ) -> Result<odf::AccountName, CreateAccountError> {
+        // 1. Simple case: just use provided account_name
+        if self.is_account_name_available(account_name).await? {
+            return Ok(account_name.clone());
+        }
+
+        // 2. Add provider suffix
+        let account_name_with_provider = {
+            // Sanitize provider name
+            let provider_suffix = provider.replace('_', "-");
+            odf::AccountName::try_from(format!("{account_name}-{provider_suffix}")).int_err()?
+        };
+
+        if self
+            .is_account_name_available(&account_name_with_provider)
+            .await?
+        {
+            return Ok(account_name_with_provider);
+        }
+
+        // 3. Add provider suffix and provider suffix
+        let account_name_with_provider_and_random = {
+            let random_suffix = {
+                let mut s = random_strings::get_random_name(None, 4);
+                s.make_ascii_lowercase();
+                s
+            };
+            odf::AccountName::try_from(format!("{account_name_with_provider}-{random_suffix}"))
+                .int_err()?
+        };
+
+        if self
+            .is_account_name_available(&account_name_with_provider_and_random)
+            .await?
+        {
+            return Ok(account_name_with_provider_and_random);
+        }
+
+        // It's unlikely, but it's still possible
+        Err(CreateAccountError::Duplicate(AccountErrorDuplicate {
+            account_field: AccountDuplicateField::Name,
+        }))
+    }
+
     async fn create_account(
         &self,
-        login_method: &str,
+        login_method_lowercase: &str,
         provider_response: ProviderLoginResponse,
-    ) -> Result<odf::AccountID, CreateAccountError> {
-        let provider = login_method.to_lowercase();
+    ) -> Result<Account, CreateAccountError> {
+        let provider = login_method_lowercase.to_string();
+
+        let account_name = self
+            .resolve_unique_account_name(&provider_response.account_name, &provider)
+            .await?;
 
         let new_account_config = AccountConfig {
             id: provider_response.account_id,
             private_key: None,
-            account_name: provider_response.account_name,
+            account_name,
             password: {
                 // NOTE: Tricky code:
                 //       1) A password account cannot be created via login
@@ -233,18 +296,16 @@ impl AuthenticationServiceImpl {
             display_name: Some(provider_response.display_name),
             account_type: AccountType::User,
             provider,
+            provider_identity_key: Some(provider_response.provider_identity_key),
             avatar_url: provider_response.avatar_url,
             registered_at: None,
             properties: vec![],
             treat_datasets_as_public: false,
         };
 
-        let new_account = self
-            .create_account_use_case
+        self.create_account_use_case
             .execute(&new_account_config)
-            .await?;
-
-        Ok(new_account.id)
+            .await
     }
 }
 
@@ -269,7 +330,8 @@ impl AuthenticationService for AuthenticationServiceImpl {
         device_code: Option<DeviceCode>,
     ) -> Result<LoginResponse, LoginError> {
         // Resolve provider via a specified login method
-        let provider = self.resolve_authentication_provider(login_method)?;
+        let login_method_lowercase = login_method.to_lowercase();
+        let provider = self.resolve_authentication_provider(&login_method_lowercase)?;
 
         // Attempt to login via provider
         let provider_response = provider.login(login_credentials_json).await?;
@@ -277,13 +339,23 @@ impl AuthenticationService for AuthenticationServiceImpl {
         // Try to resolve an existing account via the provider's identity key
         let maybe_account_id = self
             .account_service
-            .find_account_id_by_provider_identity_key(&provider_response.provider_identity_key)
+            .find_account_id_by_provider_identity_key(
+                &login_method_lowercase,
+                &provider_response.provider_identity_key,
+            )
             .await?;
 
-        let account_name = provider_response.account_name.clone();
-        let account_id = match maybe_account_id {
+        let (account_id, account_name) = match maybe_account_id {
             // Account already exists
-            Some(account_id) => account_id,
+            Some(account_id) => {
+                let account_name = self
+                    .account_service
+                    .find_account_name_by_id(&account_id)
+                    .await?
+                    .expect("Account should exist");
+
+                (account_id, account_name)
+            }
 
             // Account does not exist and needs to be created
             None => {
@@ -291,7 +363,8 @@ impl AuthenticationService for AuthenticationServiceImpl {
                     return Err(LoginError::RestrictedLogin);
                 }
 
-                self.create_account(login_method, provider_response)
+                let new_account = self
+                    .create_account(&login_method_lowercase, provider_response)
                     .await
                     .map_err(|e| {
                         use CreateAccountError as E;
@@ -299,7 +372,9 @@ impl AuthenticationService for AuthenticationServiceImpl {
                             E::Duplicate(_) => LoginError::DuplicateCredentials,
                             E::Internal(_) => LoginError::Internal(e.int_err()),
                         }
-                    })?
+                    })?;
+
+                (new_account.id, new_account.account_name)
             }
         };
 

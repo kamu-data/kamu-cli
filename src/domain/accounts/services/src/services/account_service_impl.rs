@@ -177,21 +177,23 @@ impl AccountService for AccountServiceImpl {
 
     async fn find_account_id_by_provider_identity_key(
         &self,
+        provider: &str,
         provider_identity_key: &str,
     ) -> Result<Option<odf::AccountID>, FindAccountIdByProviderIdentityKeyError> {
         self.account_repo
-            .find_account_id_by_provider_identity_key(provider_identity_key)
+            .find_account_id_by_provider_identity_key(provider, provider_identity_key)
             .await
     }
 
     async fn find_account_ids_by_one_of_unique_fields(
         &self,
+        provider: &str,
         account_name: &odf::AccountName,
         email: &email_utils::Email,
         provider_identity_key: &ProviderIdentityKey,
     ) -> Result<Vec<odf::AccountID>, FindAccountIdsByUniqueFieldsError> {
         self.account_repo
-            .find_account_ids_by_unique_fields(account_name, email, provider_identity_key)
+            .find_account_ids_by_unique_fields(provider, account_name, email, provider_identity_key)
             .await
     }
 

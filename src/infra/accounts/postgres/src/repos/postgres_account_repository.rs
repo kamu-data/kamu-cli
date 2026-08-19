@@ -31,7 +31,7 @@ impl PostgresAccountRepository {
             Some("accounts_pkey") => AccountDuplicateField::Id,
             Some("idx_accounts_email") => AccountDuplicateField::Email,
             Some("idx_accounts_name") => AccountDuplicateField::Name,
-            Some("idx_accounts_provider_identity_key") => {
+            Some("idx_uniq_accounts_provider_provider_identity_key") => {
                 AccountDuplicateField::ProviderIdentityKey
             }
             _ => {
@@ -317,6 +317,7 @@ impl AccountRepository for PostgresAccountRepository {
 
     async fn find_account_id_by_provider_identity_key(
         &self,
+        provider: &str,
         provider_identity_key: &str,
     ) -> Result<Option<odf::AccountID>, FindAccountIdByProviderIdentityKeyError> {
         let mut tr = self.transaction.lock().await;
@@ -327,8 +328,10 @@ impl AccountRepository for PostgresAccountRepository {
             r#"
             SELECT id as "id: odf::AccountID"
             FROM accounts
-            WHERE provider_identity_key = $1
+            WHERE provider = $1
+              AND provider_identity_key = $2
             "#,
+            provider,
             provider_identity_key
         )
         .fetch_optional(connection_mut)
@@ -386,6 +389,7 @@ impl AccountRepository for PostgresAccountRepository {
 
     async fn find_account_ids_by_unique_fields(
         &self,
+        provider: &str,
         account_name: &odf::AccountName,
         email: &Email,
         provider_identity_key: &str,
@@ -396,14 +400,15 @@ impl AccountRepository for PostgresAccountRepository {
 
         let account_rows = sqlx::query!(
             r#"
-            SELECT DISTINCT id as "id: odf::AccountID"
+            SELECT DISTINCT id AS "id: odf::AccountID"
             FROM accounts
             WHERE lower(account_name) = lower($1)
                OR lower(email) = lower($2)
-               OR provider_identity_key = $3
+               OR (provider = $3 AND provider_identity_key = $4)
             "#,
             account_name.as_str(),
             email.as_ref(),
+            provider,
             provider_identity_key
         )
         .fetch_all(connection_mut)

@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "\n            SELECT DISTINCT id as \"id: odf::AccountID\"\n            FROM accounts\n            WHERE lower(account_name) = lower(?)\n               OR email = ?\n               OR provider_identity_key = ?\n            ",
+  "query": "\n            SELECT id as \"id: odf::AccountID\"\n            FROM accounts\n            WHERE provider = ?\n              AND provider_identity_key = ?\n            ",
   "describe": {
     "columns": [
       {
@@ -14,11 +14,11 @@
       }
     ],
     "parameters": {
-      "Right": 3
+      "Right": 2
     },
     "nullable": [
       false
     ]
   },
-  "hash": "7ad38cecc6f3f9239058c029d584f93aa52d564f0df46bc2a8407715a5714dac"
+  "hash": "75f322a7d8556857eb343e51f39372d92712997aad40ee2393ce05d1f58f1de7"
 }
