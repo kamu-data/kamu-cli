@@ -13,6 +13,10 @@ Recommendation: for ease of reading, use the following format:
 ### Fixed
 -->
 
+## Unreleased
+### Fixed
+- CLI: `kamu completions` no longer panics when the output pipe is closed early, e.g. `source <(kamu completions bash)` (#1068)
+
 ## [0.266.1] - 2026-08-19
 ### Fixed
 - Login, OAuth: login error if system (local) username matches GitHub username (#1684)
