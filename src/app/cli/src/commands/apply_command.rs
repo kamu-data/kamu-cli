@@ -15,7 +15,6 @@ use chrono::{DateTime, Utc};
 use database_common_macros::{transactional_method1, transactional_method2};
 use internal_error::{BoxedError, ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_resources::{
-    ApplyManifestChange,
     ApplyManifestRejection,
     ApplyResourceOutcome,
     Resource,
@@ -31,6 +30,7 @@ use kamu_resources_facade::{
 };
 use thiserror::Error;
 
+use super::resource_manifest_diff::{ManifestDiffOptions, render_manifest_diff};
 use super::{BatchError, CLIError, Command, common};
 use crate::cli::ResourceManifestFormat;
 use crate::output::{ApplyMultiProgress, OutputConfig};
@@ -217,7 +217,7 @@ impl ApplyCommand {
             match outcome {
                 Ok(ExecuteResourceManifestOutcome::Accepted(result)) => {
                     summary.record_accepted(&result);
-                    printer.print_accepted(item_progress, &source, &result, self.dry_run)?;
+                    printer.print_accepted(item_progress, &source, &result)?;
                 }
                 Ok(ExecuteResourceManifestOutcome::Rejected(rejection)) => {
                     summary.record_rejected();
@@ -288,13 +288,13 @@ impl ApplyCommand {
                 .plan_apply_manifests(request)
                 .await
                 .map_err(ExecuteBatchError::Batch)?;
-            map_batch_response(response)
+            map_batch_response(response)?
         } else {
             let response = resource_facade
                 .apply_manifests(request)
                 .await
                 .map_err(ExecuteBatchError::Batch)?;
-            map_batch_response(response)
+            map_batch_response(response)?
         };
 
         let fully_succeeded = response.items.len() == manifests.len()
@@ -370,7 +370,7 @@ impl ApplyCommand {
                 Some(Ok(ExecuteResourceManifestOutcome::Accepted(result))) => {
                     if committed {
                         summary.record_accepted(&result);
-                        printer.print_accepted(item_progress, &source, &result, self.dry_run)?;
+                        printer.print_accepted(item_progress, &source, &result)?;
                     } else {
                         summary.record_rolled_back();
                         printer.print_rolled_back(
@@ -601,21 +601,33 @@ impl From<InternalError> for ExecuteBatchError {
 
 fn map_batch_response<D>(
     response: ApplyManifestBatchResponse<D>,
-) -> ApplyManifestBatchResponse<ExecuteResourceManifestOutcome>
+) -> Result<ApplyManifestBatchResponse<ExecuteResourceManifestOutcome>, InternalError>
 where
-    ExecuteResourceManifestOutcome: From<D>,
+    ExecuteResourceManifestOutcome: TryFrom<D, Error = InternalError>,
 {
-    ApplyManifestBatchResponse {
-        items: response
-            .items
-            .into_iter()
-            .map(|item| ApplyManifestBatchItemResult {
+    let items = response
+        .items
+        .into_iter()
+        .map(|item| {
+            // Only the per-item *outcome* is fallible; a failure to canonicalize
+            // is internal and aborts the whole mapping rather than being
+            // reported as that item's apply error.
+            let outcome = match item.outcome {
+                Ok(decision) => Ok(ExecuteResourceManifestOutcome::try_from(decision)?),
+                Err(err) => Err(err),
+            };
+
+            Ok(ApplyManifestBatchItemResult {
                 request_index: item.request_index,
-                outcome: item.outcome.map(ExecuteResourceManifestOutcome::from),
+                outcome,
             })
-            .collect(),
+        })
+        .collect::<Result<Vec<_>, InternalError>>()?;
+
+    Ok(ApplyManifestBatchResponse {
+        items,
         rolled_back_successes: response.rolled_back_successes,
-    }
+    })
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -705,7 +717,6 @@ impl<'a> ApplyPrinter<'a> {
         item_progress: ApplyItemProgress<'_>,
         source: &str,
         result: &ExecutedResourceManifestResult,
-        dry_run: bool,
     ) -> Result<(), CLIError> {
         let progress = self.finish_item(
             item_progress,
@@ -718,9 +729,7 @@ impl<'a> ApplyPrinter<'a> {
             self.print_warning_lines(progress, source, &result.warnings);
         }
 
-        if dry_run && !result.changes.is_empty() {
-            self.print_change_lines(progress, source, &result.changes);
-        }
+        self.print_diff(progress, result)?;
 
         if self.should_print_verbose_resource() {
             self.print_verbose_resource(progress, &result.resource)?;
@@ -889,59 +898,41 @@ impl ApplyPrinter<'_> {
         }
     }
 
-    fn print_change_lines(
+    /// Prints the canonical before/after diff of an accepted apply.
+    ///
+    /// Shown for a live apply as well as a dry run: what an apply *did* is at
+    /// least as interesting as what it *would* do. Nothing is printed when the
+    /// documents are identical, so an `Untouched` apply stays quiet.
+    fn print_diff(
         &self,
         progress: Option<&ApplyMultiProgress>,
-        source: &str,
-        changes: &[ApplyManifestChange],
-    ) {
-        for change in changes {
-            if Self::should_render_change_as_block(change.before.as_ref(), change.after.as_ref()) {
-                self.print_line(
-                    progress,
-                    format!(
-                        "  {} {} {}:",
-                        console::style("change").cyan().bold(),
-                        change.kind,
-                        Self::change_target(source, change),
-                    ),
-                );
-                self.print_line(
-                    progress,
-                    format!(
-                        "    {}:\n{}",
-                        console::style("before").dim(),
-                        Self::indent_block(
-                            &Self::format_json_value_for_block(change.before.as_ref()),
-                            "      "
-                        )
-                    ),
-                );
-                self.print_line(
-                    progress,
-                    format!(
-                        "    {}:\n{}",
-                        console::style("after").dim(),
-                        Self::indent_block(
-                            &Self::format_json_value_for_block(change.after.as_ref()),
-                            "      "
-                        )
-                    ),
-                );
-            } else {
-                self.print_line(
-                    progress,
-                    format!(
-                        "  {} {} {}: {} -> {}",
-                        console::style("change").cyan().bold(),
-                        change.kind,
-                        Self::change_target(source, change),
-                        Self::format_optional_json_value(change.before.as_ref()),
-                        Self::format_optional_json_value(change.after.as_ref()),
-                    ),
-                );
-            }
+        result: &ExecutedResourceManifestResult,
+    ) -> Result<(), CLIError> {
+        if !result.documents.has_changes() {
+            return Ok(());
         }
+
+        let opts = ManifestDiffOptions {
+            colors_enabled: !self.output_config.quiet,
+            ..Default::default()
+        };
+
+        let rendered = render_manifest_diff(
+            result.documents.before.as_ref(),
+            &result.documents.after,
+            &opts,
+        )
+        .map_err(CLIError::critical)?;
+
+        if rendered.is_empty() {
+            return Ok(());
+        }
+
+        // Emitted as a single call so `indicatif` cannot interleave a redraw
+        // between the lines of one diff in the batch path.
+        self.print_line(progress, rendered);
+
+        Ok(())
     }
 
     fn print_verbose_resource(
@@ -1094,38 +1085,6 @@ impl ApplyPrinter<'_> {
         }
     }
 
-    fn format_optional_json_value(value: Option<&serde_json::Value>) -> String {
-        match value {
-            Some(value) => {
-                serde_json::to_string(value).unwrap_or_else(|_| "<unprintable>".to_string())
-            }
-            None => "null".to_string(),
-        }
-    }
-
-    fn format_json_value_for_block(value: Option<&serde_json::Value>) -> String {
-        match value {
-            Some(value) => {
-                serde_json::to_string_pretty(value).unwrap_or_else(|_| "<unprintable>".to_string())
-            }
-            None => "null".to_string(),
-        }
-    }
-
-    fn should_render_change_as_block(
-        before: Option<&serde_json::Value>,
-        after: Option<&serde_json::Value>,
-    ) -> bool {
-        Self::is_structured_json_value(before) || Self::is_structured_json_value(after)
-    }
-
-    fn is_structured_json_value(value: Option<&serde_json::Value>) -> bool {
-        matches!(
-            value,
-            Some(serde_json::Value::Array(_) | serde_json::Value::Object(_))
-        )
-    }
-
     fn indent_block(value: &str, prefix: &str) -> String {
         value
             .lines()
@@ -1139,10 +1098,6 @@ impl ApplyPrinter<'_> {
             Some(path) => format!("{source} {path}"),
             None => source.to_string(),
         }
-    }
-
-    fn change_target(source: &str, change: &ApplyManifestChange) -> String {
-        format!("{source} {}", change.path)
     }
 }
 

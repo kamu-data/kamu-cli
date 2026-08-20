@@ -9,6 +9,7 @@
 
 mod test_resources_api_resources;
 mod test_resources_apply_batch;
+mod test_resources_apply_diff;
 mod test_resources_apply_input_modes;
 mod test_resources_baseline;
 mod test_resources_context_management;

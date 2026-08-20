@@ -65,16 +65,16 @@ impl ResourcesMut {
             resource_facade
                 .plan_apply_manifest(request)
                 .await
-                .map(ResourceApplyOutcome::from)
+                .map(ResourceApplyOutcome::try_from)
         } else {
             resource_facade
                 .apply_manifest(request)
                 .await
-                .map(ResourceApplyOutcome::from)
+                .map(ResourceApplyOutcome::try_from)
         };
 
         match outcome_result {
-            Ok(outcome) => Ok(outcome),
+            Ok(outcome) => Ok(outcome?),
             Err(err) => map_apply_resource_error(err),
         }
     }
@@ -363,13 +363,13 @@ fn build_apply_manifests_data<D>(
     items: Vec<kamu_resources_facade::ApplyManifestBatchItemResult<D>>,
 ) -> Result<ResourceApplyManifestsResult, GqlError>
 where
-    ResourceApplyOutcome: From<D>,
+    ResourceApplyOutcome: TryFrom<D, Error = InternalError>,
 {
     let items = items
         .into_iter()
         .map(|item| {
             let outcome = match item.outcome {
-                Ok(decision) => ResourceApplyOutcome::from(decision),
+                Ok(decision) => ResourceApplyOutcome::try_from(decision)?,
                 Err(err) => map_apply_resource_error(err)?,
             };
             Ok(ResourceApplyManifestItemResult {

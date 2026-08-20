@@ -79,6 +79,41 @@ pub fn variable_set_manifest_yaml_with_labels(name: &str, value: &str) -> String
     )
 }
 
+/// A `VariableSet` manifest with several labels and variables, for exercising
+/// apply-diff rendering across multiple independent regions.
+///
+/// Every field is caller-controlled so a test can change exactly one of them
+/// and assert that the rendered diff stays proportional to that change.
+pub fn variable_set_manifest_yaml_rich(
+    name: &str,
+    team: &str,
+    tier: &str,
+    variables: &[(&str, &str)],
+) -> String {
+    // Quoted so numeric-looking values stay strings in YAML.
+    let variables = variables.iter().fold(String::new(), |mut acc, (k, v)| {
+        use std::fmt::Write;
+        writeln!(acc, "    {k}: \"{v}\"").unwrap();
+        acc
+    });
+
+    indoc::formatdoc!(
+        r#"
+        $schema: {VARIABLE_SET_SCHEMA}
+        headers:
+          name: {name}
+          labels:
+            env: prod
+            team: {team}
+            tier: {tier}
+          annotations:
+            description: {DEFAULT_DESCRIPTION}
+        spec:
+          variables:
+        {variables}"#
+    )
+}
+
 /// The same `VariableSet` manifest as [`variable_set_manifest_yaml`] but in
 /// JSON.
 pub fn variable_set_manifest_json(name: &str, value: &str) -> String {

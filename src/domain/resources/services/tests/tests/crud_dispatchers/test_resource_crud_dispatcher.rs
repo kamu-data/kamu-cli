@@ -11,6 +11,7 @@ use std::assert_matches;
 use std::sync::Arc;
 
 use kamu_resources::{
+    ApplyManifestDocumentSource,
     ApplyResourceCrudDispatcherError,
     ApplyResourceOutcome,
     ResourceCrudDispatcher,
@@ -177,10 +178,13 @@ async fn test_plan_apply_returns_planned_create() {
     let plan = decision.expect_planned();
 
     assert_eq!(plan.outcome, ApplyResourceOutcome::Created);
-    // Generation change is always included in the diff for a create
-    assert!(
-        !plan.changes.is_empty(),
-        "create plan must have at least the generation change"
+    // A create has no prior state to canonicalize as the `before` document.
+    // The documents themselves are filled in by the facade, after it finalizes
+    // `headers.account` — the dispatcher only supplies the resource pair.
+    assert_matches!(
+        plan.documents,
+        ApplyManifestDocumentSource::Pair { previous: None },
+        "a create must canonicalize from a resource pair with no previous side"
     );
     assert!(plan.warnings.is_empty());
 }

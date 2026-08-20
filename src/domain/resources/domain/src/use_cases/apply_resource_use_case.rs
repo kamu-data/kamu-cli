@@ -100,6 +100,11 @@ pub struct ApplyResourcePlan<R: DeclarativeResource> {
     pub reconciliation_required: bool,
     pub executable: bool,
     pub warnings: Vec<ResourceWarning>,
+
+    /// State as it was before this apply, i.e. the `before` side of the apply
+    /// documents. `None` for a create. Captured from the aggregate the planner
+    /// already loaded, so it costs no additional read.
+    pub previous_state: Option<R::ResourceState>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -119,6 +124,9 @@ pub struct ApplyResourceResult<R: DeclarativeResource> {
     pub state: R::ResourceState,
     pub outcome: ApplyResourceOutcome,
     pub warnings: Vec<ResourceWarning>,
+
+    /// See [`ApplyResourcePlan::previous_state`].
+    pub previous_state: Option<R::ResourceState>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

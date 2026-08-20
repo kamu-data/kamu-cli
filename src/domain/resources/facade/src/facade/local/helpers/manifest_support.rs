@@ -9,7 +9,6 @@
 
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_resources::{
-    Resource,
     ResourceHeadersInput,
     ResourceHeadersInputExt,
     ResourceManifest,
@@ -91,40 +90,6 @@ pub(crate) fn collect_non_indexable_label_warnings(
         .filter(|(_, value)| !value.is_string())
         .map(|(key, _)| resource_label_not_indexed_warning(key))
         .collect()
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) fn resource_to_manifest(view: Resource) -> Result<ResourceManifest, InternalError> {
-    let Resource {
-        schema,
-        headers,
-        spec,
-        ..
-    } = view;
-
-    // `schema` originates from a stored, already-canonical resource, so parsing it
-    // back into a `ResourceSchema` is infallible in practice; treat a failure as a
-    // store-integrity bug.
-    let schema = kamu_resources::ResourceSchemaId::parse(schema.as_str()).int_err()?;
-
-    let account = Some(kamu_resources::ResourceAccountRef {
-        id: Some(headers.account.id),
-        did: Some(headers.account.did),
-        name: Some(headers.account.name),
-    });
-
-    Ok(ResourceManifest {
-        schema,
-        headers: kamu_resources::ResourceManifestHeaders {
-            id: None,
-            account,
-            name: headers.name.to_string(),
-            labels: headers.labels.entries.into_iter().collect(),
-            annotations: headers.annotations.entries.into_iter().collect(),
-        },
-        spec,
-    })
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

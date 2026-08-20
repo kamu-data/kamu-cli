@@ -59,6 +59,12 @@ pub async fn test_resources_dry_run_safety(ctx: ResourceCtx) {
         &updated_manifest,
         Some(&[
             r#"Updated \(dry-run\): STDIN -> VariableSet/dry-run-vars"#,
+            // The diff must be anchored on the changed leaf and show both
+            // values — i.e. the canonical-document rendering is actually wired
+            // end to end, not just unit-tested.
+            r#"spec\.variables\.MESSAGE\.value:"#,
+            &format!(r#"- {initial_value}"#),
+            &format!(r#"\+ {updated_value}"#),
             r#"Summary 1 item\(s\): 0 created, 1 updated, 0 unchanged, 0 rejected, 0 failed, 0 warning\(s\)"#,
         ]),
     )

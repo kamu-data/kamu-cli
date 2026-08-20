@@ -10,6 +10,7 @@
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_resources::{
     ApplyManifestApplicationDecision,
+    ApplyManifestDocumentSource,
     ApplyManifestPlan,
     ApplyManifestPlanningDecision,
     ApplyManifestResult,
@@ -18,18 +19,13 @@ use kamu_resources::{
     ApplyResourcePlanningDecision,
     DeclarativeResource,
     DeclarativeResourceState,
-    GenericResourceQueryService,
     ReconcilableEventSourcedResource,
     Resource,
     ResourceSchemaProvider,
-    ResourceSnapshot,
     TypeUri,
-    new_pending_resource_status,
 };
 use serde::Serialize;
 use serde::de::DeserializeOwned;
-
-use crate::{load_previous_resource, make_apply_manifest_changes};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -49,9 +45,8 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub async fn map_apply_resource_planning_decision<R>(
+pub fn map_apply_resource_planning_decision<R>(
     decision: ApplyResourcePlanningDecision<R>,
-    generic_resource_query_service: &dyn GenericResourceQueryService,
 ) -> Result<ApplyManifestPlanningDecision, InternalError>
 where
     R: ResourceSchemaProvider + DeclarativeResource,
@@ -60,26 +55,33 @@ where
     Ok(match decision {
         ApplyResourcePlanningDecision::Planned(plan) => {
             let kamu_resources::ApplyResourcePlan {
-                id,
                 state,
                 action,
                 reconciliation_required,
                 executable,
                 warnings,
+                previous_state,
+                ..
             } = plan;
 
             let resource = typed_resource_state_to_resource::<R>(state)?;
-            let previous_resource =
-                load_previous_resource(action, id, generic_resource_query_service).await?;
-            let changes = make_apply_manifest_changes(previous_resource.as_ref(), &resource)?;
+            // Comes from the aggregate the planner already loaded — no extra read.
+            let previous_resource = previous_state
+                .map(typed_resource_state_to_resource::<R>)
+                .transpose()?;
 
             ApplyManifestPlanningDecision::Planned(ApplyManifestPlan {
                 resource,
                 outcome: action.into(),
                 reconciliation_required,
                 executable,
-                changes,
                 warnings,
+                // Deliberately not canonicalized here: the facade corrects
+                // `headers.account` after this dispatcher returns, and the
+                // account is part of the canonical manifest.
+                documents: ApplyManifestDocumentSource::Pair {
+                    previous: previous_resource,
+                },
             })
         }
         ApplyResourcePlanningDecision::Rejected(rejection) => {
@@ -103,14 +105,24 @@ where
                 state,
                 outcome,
                 warnings,
+                previous_state,
                 ..
             } = result;
             let resource = typed_resource_state_to_resource::<R>(state)?;
+            // Captured by the planner before the write — see `previous_state`.
+            let previous_resource = previous_state
+                .map(typed_resource_state_to_resource::<R>)
+                .transpose()?;
 
             ApplyManifestApplicationDecision::Applied(ApplyManifestResult {
                 resource,
                 outcome,
                 warnings,
+                // See the planning path: canonicalized only after the facade's
+                // `headers.account` fixup.
+                documents: ApplyManifestDocumentSource::Pair {
+                    previous: previous_resource,
+                },
             })
         }
         ApplyResourceApplicationDecision::Rejected(rejection) => {
@@ -136,23 +148,4 @@ where
         spec: serde_json::to_value(spec).int_err()?,
         status,
     })
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) fn resource_snapshot_to_resource(snapshot: ResourceSnapshot) -> Resource {
-    let ResourceSnapshot {
-        schema,
-        headers,
-        spec,
-        status,
-        ..
-    } = snapshot;
-
-    Resource {
-        schema,
-        headers,
-        spec,
-        status: status.unwrap_or_else(new_pending_resource_status),
-    }
 }

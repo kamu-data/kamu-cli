@@ -104,49 +104,73 @@ impl From<kamu_resources::ResourceInvalidSpecError> for ResourceInvalidSpecProbl
     }
 }
 
-impl From<kamu_resources::ApplyManifestPlanningDecision> for ResourceApplyOutcome {
-    fn from(value: kamu_resources::ApplyManifestPlanningDecision) -> Self {
-        match value {
+// Fallible rather than `From`: canonicalizing the documents can fail, and a
+// failure there is an internal error, not an apply outcome to report.
+impl TryFrom<kamu_resources::ApplyManifestPlanningDecision> for ResourceApplyOutcome {
+    type Error = InternalError;
+
+    fn try_from(value: kamu_resources::ApplyManifestPlanningDecision) -> Result<Self, Self::Error> {
+        Ok(match value {
             kamu_resources::ApplyManifestPlanningDecision::Planned(plan) => {
+                let documents = plan.documents()?;
+
                 Self::Success(ResourceApplySuccess {
                     operation: plan.outcome.into(),
                     resource: plan.resource.into(),
-                    changes: plan.changes.into_iter().map(Into::into).collect(),
+                    before: documents.before,
+                    after: documents.after,
                     warnings: plan.warnings.into_iter().map(Into::into).collect(),
                 })
             }
             kamu_resources::ApplyManifestPlanningDecision::Rejected(rejection) => {
                 Self::Rejection(rejection.into())
             }
-        }
+        })
     }
 }
 
-impl From<kamu_resources::ApplyManifestApplicationDecision> for ResourceApplyOutcome {
-    fn from(value: kamu_resources::ApplyManifestApplicationDecision) -> Self {
-        match value {
+impl TryFrom<kamu_resources::ApplyManifestApplicationDecision> for ResourceApplyOutcome {
+    type Error = InternalError;
+
+    fn try_from(
+        value: kamu_resources::ApplyManifestApplicationDecision,
+    ) -> Result<Self, Self::Error> {
+        Ok(match value {
             kamu_resources::ApplyManifestApplicationDecision::Applied(result) => {
+                let documents = result.documents()?;
+
                 Self::Success(ResourceApplySuccess {
                     operation: result.outcome.into(),
                     resource: result.resource.into(),
-                    changes: Vec::new(),
+                    before: documents.before,
+                    after: documents.after,
                     warnings: result.warnings.into_iter().map(Into::into).collect(),
                 })
             }
             kamu_resources::ApplyManifestApplicationDecision::Rejected(rejection) => {
                 Self::Rejection(rejection.into())
             }
-        }
+        })
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// An accepted apply, reported as the canonical manifest on each side rather
+/// than a pre-computed change list: clients decide how to diff and display it.
 #[derive(SimpleObject, Debug, Clone)]
 pub struct ResourceApplySuccess {
     pub operation: ResourceApplyOperation,
     pub resource: Resource,
-    pub changes: Vec<ResourceApplyChange>,
+
+    /// Canonical manifest before the apply. Null **iff** the resource is being
+    /// created.
+    pub before: Option<serde_json::Value>,
+
+    /// Canonical manifest the apply produced (or would produce). Always present
+    /// on an accepted apply.
+    pub after: serde_json::Value,
+
     pub warnings: Vec<ResourceApplyWarning>,
 }
 
@@ -158,37 +182,6 @@ pub enum ResourceApplyOperation {
     Created,
     Updated,
     Untouched,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject, Debug, Clone)]
-pub struct ResourceApplyChange {
-    pub kind: ResourceApplyChangeKind,
-    pub path: String,
-    pub before: Option<serde_json::Value>,
-    pub after: Option<serde_json::Value>,
-}
-
-impl From<kamu_resources::ApplyManifestChange> for ResourceApplyChange {
-    fn from(value: kamu_resources::ApplyManifestChange) -> Self {
-        Self {
-            kind: value.kind.into(),
-            path: value.path,
-            before: value.before,
-            after: value.after,
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Enum, Debug, Clone, Copy, PartialEq, Eq)]
-#[graphql(remote = "kamu_resources::ApplyManifestChangeKind")]
-pub enum ResourceApplyChangeKind {
-    Generation,
-    Headers,
-    Spec,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

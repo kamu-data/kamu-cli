@@ -251,6 +251,25 @@ impl ResourceCtx {
             .await;
     }
 
+    /// Run a command with stdin, assert success, and return its stderr.
+    ///
+    /// For scenarios that must assert something is **absent** from the output —
+    /// the regex list only expresses what must be present.
+    pub async fn stderr_with_stdin<I, S>(&self, args: I, stdin: &str) -> String
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        let full = self.args(args);
+        let result = self
+            .kamu()
+            .execute_with_input(full, stdin.to_string())
+            .await
+            .success();
+
+        String::from_utf8_lossy(&result.get_output().stderr).into_owned()
+    }
+
     /// Run a command with stdin, asserting failure and optional stderr regexes.
     pub async fn assert_failure_with_stdin<I, S>(
         &self,

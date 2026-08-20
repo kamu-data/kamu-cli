@@ -27,6 +27,9 @@ Each RF scenario from the original plan is listed with its status.
 | RF-026D | apply_manifest.rs   | Active   | Extension header canonicalization precedes diffing                    | Short-name after URI reapply reports `Untouched`                       |
 | RF-026E | apply_manifest.rs   | Active   | Plan/apply reject invalid registered extension values as headers       | Surfaces as `InvalidHeaders` locally and remotely                      |
 | RF-026F | apply_manifest.rs   | Active   | Plan/apply reject over-long description via annotation schema          | Uses `ResourceExtensionSchema`, not legacy `DescriptionTooLong`        |
+| RF-027  | apply_manifest.rs   | Active   | Apply documents never expose SecretSet plaintext                      | Sanitizer runs before planning, so `before`/`after` carry ciphertext   |
+| RF-028  | apply_manifest.rs   | Active   | Apply documents match the rendered manifest                           | Shared canonicalization with `render_manifests`                        |
+| RF-029  | apply_manifest.rs   | Active   | Apply document `before` is absent only for creates                    | Unchanged apply still carries `before`; guards placeholder regressions |
 | RF-030  | get_handle.rs     | Active   | Get by name returns full resource view                                |                                                                        |
 | RF-031  | get_handle.rs     | Active   | Get by UID returns same full resource view                            |                                                                        |
 | RF-032  | get_handle.rs     | Active   | Get handle by name returns lightweight handle                     |                                                                        |

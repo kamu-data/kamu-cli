@@ -68,12 +68,8 @@ macro_rules! declare_resource_crud_dispatcher {
                     .await
                     .map_err(kamu_resources::ApplyResourceCrudDispatcherError::from)?;
 
-                $crate::map_apply_resource_planning_decision::<$resource>(
-                    plan,
-                    self.generic_resource_query_service.as_ref(),
-                )
-                .await
-                .map_err(Into::into)
+                $crate::map_apply_resource_planning_decision::<$resource>(plan)
+                    .map_err(Into::into)
             }
 
             async fn apply(

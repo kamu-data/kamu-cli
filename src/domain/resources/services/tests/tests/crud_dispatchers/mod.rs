@@ -8,4 +8,3 @@
 // by the Apache License, Version 2.0.
 
 mod test_resource_crud_dispatcher;
-mod test_resource_crud_dispatcher_diff_helpers;

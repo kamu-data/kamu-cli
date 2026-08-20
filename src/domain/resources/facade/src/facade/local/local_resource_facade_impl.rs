@@ -169,8 +169,8 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         let successes = indexed_resources
             .into_iter()
             .map(|resource| {
-                let manifest =
-                    resource_to_manifest(resource.item).map_err(BatchResourceError::Internal)?;
+                let manifest = kamu_resources::ResourceManifest::from_resource(&resource.item)
+                    .map_err(BatchResourceError::Internal)?;
                 let manifest =
                     serialize_manifest(&manifest, format).map_err(BatchResourceError::Internal)?;
                 Ok(BatchResourceSuccess {

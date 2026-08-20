@@ -181,6 +181,7 @@ where
                 executable: true,
                 planned_at: now,
                 warnings,
+                previous_state: None,
             },
         ))
     }
@@ -191,6 +192,11 @@ where
         params: ApplyResourceParams<R>,
         now: DateTime<Utc>,
     ) -> Result<PlannedApplyResourceDecision<R>, ApplyResourceUseCaseError<R>> {
+        // Snapshot the pre-apply state before any mutation. This is the `before`
+        // side of the apply documents and it is free here — the aggregate is
+        // already loaded, so nothing has to be re-read from storage.
+        let previous_state = resource.as_ref().clone();
+
         if let Err(err) =
             <R as ReconcilableResource>::try_update_headers(&mut resource, now, params.headers)
         {
@@ -223,6 +229,7 @@ where
                 executable: true,
                 planned_at: now,
                 warnings,
+                previous_state: Some(previous_state),
             },
         ))
     }
@@ -256,6 +263,11 @@ pub struct PlannedApplyResource<R: ReconcilableEventSourcedResource> {
     pub(crate) executable: bool,
     pub(crate) planned_at: DateTime<Utc>,
     pub(crate) warnings: Vec<ResourceWarning>,
+
+    /// State captured before the plan mutated the aggregate, i.e. the `before`
+    /// side of the apply documents. `None` for a create. Taken straight from
+    /// the already-loaded aggregate, so it costs no additional read.
+    pub(crate) previous_state: Option<R::ResourceState>,
 }
 
 impl<R> PlannedApplyResource<R>
@@ -274,6 +286,7 @@ where
             reconciliation_required: self.reconciliation_required,
             executable: self.executable,
             warnings: self.warnings,
+            previous_state: self.previous_state,
         }
     }
 }

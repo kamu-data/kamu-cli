@@ -52,6 +52,7 @@ mod repository_add_command;
 mod repository_delete_command;
 mod repository_list_command;
 mod reset_command;
+mod resource_manifest_diff;
 mod search_command;
 mod set_watermark_command;
 mod sql_server_command;

@@ -170,6 +170,7 @@ humansize = "2"                                                   # Human readab
 indicatif = "0.18"                                                # Progress bars and spinners
 minus = { version = "5", features = ["static_output", "search"] }
 num-format = "0.4"                                                # Human-readable number formatting
+similar = "3"                                                     # Text diffing (apply manifest diffs)
 prettytable-rs = "0.10"                                           # ASCII table formatting
 read_input = "0.8"                                                # Basic user input
 webbrowser = "1"                                                  # For opening URLs in default system browser

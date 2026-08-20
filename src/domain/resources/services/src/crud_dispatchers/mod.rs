@@ -9,7 +9,6 @@
 
 mod declare_resource_crud_dispatcher;
 mod declare_resource_presentation_dispatcher;
-mod resource_crud_dispatcher_diff_helpers;
 mod resource_crud_dispatcher_helpers;
 mod resource_crud_dispatcher_registry;
 
@@ -25,6 +24,5 @@ pub use kamu_resources::{
     ResourceCrudDispatcherDeleteRequest,
     UnsupportedResourceDescriptorError,
 };
-pub use resource_crud_dispatcher_diff_helpers::*;
 pub use resource_crud_dispatcher_helpers::*;
 pub use resource_crud_dispatcher_registry::*;

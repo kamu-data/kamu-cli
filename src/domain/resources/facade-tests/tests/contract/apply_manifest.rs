@@ -10,7 +10,6 @@
 use kamu_configuration::VariableSetResource;
 use kamu_resources::{
     ApplyManifestApplicationDecision,
-    ApplyManifestChangeKind,
     ApplyManifestPlanningDecision,
     ApplyResourceOutcome,
     RESOURCE_ANNOTATION_DESCRIPTION_SCHEMA_URI,
@@ -43,6 +42,7 @@ use crate::helpers::{
     assert_resource_view_fields,
     assert_single_batch_problem,
     assert_single_batch_success,
+    secret_set_manifest_json,
     variable_set_manifest_json,
     variable_set_manifest_yaml,
 };
@@ -210,12 +210,21 @@ pub async fn test_plan_update(h: &impl FacadeContractHarness) {
     let ApplyManifestPlanningDecision::Planned(plan) = &decision else {
         unreachable!()
     };
-    // The spec change must appear among the reported changes
+    // The canonical documents must reflect the pending spec change: an existing
+    // resource has a `before`, and the new variable is present only in `after`.
+    let documents = plan.documents().unwrap();
     assert!(
-        plan.changes
-            .iter()
-            .any(|c| matches!(c.kind, kamu_resources::ApplyManifestChangeKind::Spec)),
-        "plan must report a spec change"
+        documents.before.is_some(),
+        "an update must carry the pre-apply canonical manifest"
+    );
+    assert!(
+        documents.has_changes(),
+        "plan must report a difference between before and after"
+    );
+    assert_eq!(documents.after["spec"]["variables"]["B"]["value"], "2");
+    assert!(
+        documents.before.as_ref().unwrap()["spec"]["variables"]["B"].is_null(),
+        "the new variable must not appear on the `before` side"
     );
     // Resource in store must remain unchanged (no side effect)
     let stored = assert_single_batch_success(
@@ -940,12 +949,14 @@ pub async fn test_apply_header_extension_canonicalization_precedes_diffing(
         panic!("expected Planned decision, got Rejected");
     };
     assert_eq!(plan.outcome, ApplyResourceOutcome::Untouched);
-    assert!(
-        !plan
-            .changes
-            .iter()
-            .any(|change| matches!(change.kind, ApplyManifestChangeKind::Headers)),
-        "spelling-only label/annotation key changes must not produce header changes"
+    // Canonicalization happens before the documents are built, so re-spelling a
+    // registered label/annotation key produces byte-identical documents rather
+    // than a header difference.
+    let documents = plan.documents().unwrap();
+    assert_eq!(
+        documents.before.as_ref(),
+        Some(&documents.after),
+        "spelling-only label/annotation key changes must not alter the canonical manifest"
     );
 }
 
@@ -1189,5 +1200,228 @@ pub async fn test_apply_invalid_spec_carries_schema(h: &impl FacadeContractHarne
 // (or empty secrets) — see apply_rejects_business_invalid_spec above. The
 // remaining three are deferred until a resource type is added that can trigger
 // them.
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-027
+contract_test!(
+    apply_documents_never_expose_secret_plaintext,
+    super::test_apply_documents_never_expose_secret_plaintext
+);
+
+/// The framework invariant lists "diffs" among the places `SecretSet` plaintext
+/// must never appear. The canonical documents are the diff's raw material and
+/// travel over the wire, so they are exactly such a place.
+///
+/// The spec sanitizer encrypts before the planner runs, so this holds by
+/// construction today — the test exists because that ordering is easy to break
+/// from a distance, and nothing else would catch it.
+pub async fn test_apply_documents_never_expose_secret_plaintext(h: &impl FacadeContractHarness) {
+    const SENTINEL: &str = "SUPER-SECRET-SENTINEL-VALUE";
+
+    let facade = h.facade_for(TestAccount::Alice);
+
+    // Plan a create: `before` is absent, `after` must already be ciphertext.
+    let decision = facade
+        .plan_apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: secret_set_manifest_json("diff-secrets", None, &[("API_TOKEN", SENTINEL)]),
+        })
+        .await
+        .unwrap();
+
+    let ApplyManifestPlanningDecision::Planned(plan) = &decision else {
+        panic!("expected Planned decision, got {decision:?}");
+    };
+    assert_documents_free_of(&plan.documents().unwrap(), SENTINEL, "plan of a create");
+
+    // Apply it for real, then plan an update, so the `before` side is populated
+    // from stored state — the other way plaintext could reach a document.
+    facade
+        .apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: secret_set_manifest_json("diff-secrets", None, &[("API_TOKEN", SENTINEL)]),
+        })
+        .await
+        .unwrap();
+
+    let decision = facade
+        .plan_apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: secret_set_manifest_json(
+                "diff-secrets",
+                None,
+                &[("API_TOKEN", SENTINEL), ("OTHER", "second-value")],
+            ),
+        })
+        .await
+        .unwrap();
+
+    let ApplyManifestPlanningDecision::Planned(plan) = &decision else {
+        panic!("expected Planned decision, got {decision:?}");
+    };
+    assert!(
+        plan.documents().unwrap().before.is_some(),
+        "an update must carry the pre-apply canonical manifest"
+    );
+    assert_documents_free_of(&plan.documents().unwrap(), SENTINEL, "plan of an update");
+}
+
+fn assert_documents_free_of(
+    documents: &kamu_resources::ApplyManifestDocuments,
+    sentinel: &str,
+    context: &str,
+) {
+    if let Some(before) = &documents.before {
+        let before = serde_json::to_string(before).unwrap();
+        assert!(
+            !before.contains(sentinel),
+            "{context}: plaintext leaked into the `before` document"
+        );
+    }
+
+    let after = serde_json::to_string(&documents.after).unwrap();
+    assert!(
+        !after.contains(sentinel),
+        "{context}: plaintext leaked into the `after` document"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-028
+contract_test!(
+    apply_documents_match_rendered_manifest,
+    super::test_apply_documents_match_rendered_manifest
+);
+
+/// The apply diff and `render_manifests` must agree on what a resource "is".
+///
+/// Both go through the same canonicalization, so a user who reads a diff and
+/// then runs `kamu get -o yaml` sees the same document. This pins that shared
+/// path so a future divergence fails here rather than confusing a user.
+pub async fn test_apply_documents_match_rendered_manifest(h: &impl FacadeContractHarness) {
+    let facade = h.facade_for(TestAccount::Alice);
+
+    facade
+        .apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: variable_set_manifest_json("parity-vars", None, &[("A", "1")]),
+        })
+        .await
+        .unwrap();
+
+    // Re-planning the same manifest is `Untouched`, so `before` is exactly the
+    // stored resource's canonical form.
+    let decision = facade
+        .plan_apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: variable_set_manifest_json("parity-vars", None, &[("A", "1")]),
+        })
+        .await
+        .unwrap();
+
+    let ApplyManifestPlanningDecision::Planned(plan) = &decision else {
+        panic!("expected Planned decision, got {decision:?}");
+    };
+    assert_eq!(plan.outcome, ApplyResourceOutcome::Untouched);
+
+    let rendered = assert_single_batch_success(
+        facade
+            .render_manifests(
+                vec![make_selector(
+                    VARIABLE_SET_CANONICAL_SELECTOR,
+                    VARIABLE_SET_SCHEMA_STR,
+                    "parity-vars",
+                )],
+                ResourceManifestFormat::Json,
+                SpecViewOpts::default(),
+            )
+            .await
+            .unwrap(),
+    );
+
+    let rendered: serde_json::Value = serde_json::from_str(&rendered.manifest).unwrap();
+
+    assert_eq!(
+        plan.documents().unwrap().before.as_ref(),
+        Some(&rendered),
+        "the apply `before` document must equal the rendered manifest"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-029
+contract_test!(
+    apply_documents_before_is_absent_only_for_creates,
+    super::test_apply_documents_before_is_absent_only_for_creates
+);
+
+/// `before == None` must mean "this resource did not exist", and nothing else.
+///
+/// Both facades are covered because they build the documents by different
+/// routes — the local one canonicalizes a resource pair, the remote one decodes
+/// what the server sent — and a regression in either would silently report an
+/// update as a create.
+pub async fn test_apply_documents_before_is_absent_only_for_creates(
+    h: &impl FacadeContractHarness,
+) {
+    let facade = h.facade_for(TestAccount::Alice);
+
+    // Create: no prior state, so `before` is absent and there is a difference.
+    let decision = facade
+        .plan_apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: variable_set_manifest_json("before-semantics", None, &[("A", "1")]),
+        })
+        .await
+        .unwrap();
+    let documents = decision.expect_planned().documents().unwrap();
+    assert!(documents.before.is_none(), "a create must have no `before`");
+    assert!(documents.has_changes());
+
+    facade
+        .apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: variable_set_manifest_json("before-semantics", None, &[("A", "1")]),
+        })
+        .await
+        .unwrap();
+
+    // Unchanged re-apply: `before` is present and equal, so there is no
+    // difference. This is the case a placeholder document would get wrong.
+    let decision = facade
+        .apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: variable_set_manifest_json("before-semantics", None, &[("A", "1")]),
+        })
+        .await
+        .unwrap();
+    let result = decision.expect_applied();
+    assert_eq!(result.outcome, ApplyResourceOutcome::Untouched);
+
+    let documents = result.documents().unwrap();
+    assert!(
+        documents.before.is_some(),
+        "an unchanged apply must still carry `before`"
+    );
+    assert!(
+        !documents.has_changes(),
+        "an unchanged apply must report no difference"
+    );
+
+    // Update: `before` present, and the two sides differ.
+    let decision = facade
+        .apply_manifest(ApplyManifestRequest {
+            format: ResourceManifestFormat::Json,
+            manifest: variable_set_manifest_json("before-semantics", None, &[("A", "2")]),
+        })
+        .await
+        .unwrap();
+    let documents = decision.expect_applied().documents().unwrap();
+    assert!(documents.before.is_some(), "an update must carry `before`");
+    assert!(documents.has_changes());
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

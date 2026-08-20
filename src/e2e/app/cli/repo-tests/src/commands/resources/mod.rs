@@ -9,6 +9,7 @@
 
 mod test_resources_api_resources;
 mod test_resources_apply_batch;
+mod test_resources_apply_diff;
 mod test_resources_apply_input_modes;
 mod test_resources_baseline;
 mod test_resources_context_management;
@@ -29,6 +30,7 @@ mod test_resources_variableset;
 
 pub use test_resources_api_resources::*;
 pub use test_resources_apply_batch::*;
+pub use test_resources_apply_diff::*;
 pub use test_resources_apply_input_modes::*;
 pub use test_resources_baseline::*;
 pub use test_resources_context_management::*;

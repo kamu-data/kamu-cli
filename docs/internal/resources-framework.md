@@ -82,6 +82,7 @@ make clippy
     - [CLI semantics matrix](#cli-semantics-matrix)
   - [13. Data flow walkthroughs](#13-data-flow-walkthroughs)
     - [(a) `kamu apply -f manifest.yaml`](#a-kamu-apply--f-manifestyaml)
+    - [Canonical manifest documents](#canonical-manifest-documents)
     - [(b) Reconciliation](#b-reconciliation)
     - [Outbox connections](#outbox-connections)
     - [How reconciliation is scheduled](#how-reconciliation-is-scheduled)
@@ -814,8 +815,9 @@ and infrastructure failures still surface as ordinary GraphQL `errors`. Clients 
 typed `Problem` variants *and* transport-level GraphQL errors. The apply outcome
 (`resource_apply_outcome_model.rs`) is the richest example of the union:
 
-- `Success` → operation (`Created`/`Updated`/`Untouched`) + `changes` (each: kind
-  `Generation`/`Headers`/`Spec`, JSON path, `before`/`after`) + `warnings`.
+- `Success` → operation (`Created`/`Updated`/`Untouched`) + `before`/`after` (canonical manifest
+  documents as JSON; `after` is non-null, `before` is null **iff** creating) + `warnings`. Sent for a live apply as well as a
+  dry run — see [Canonical manifest documents](#canonical-manifest-documents).
 - `Rejection` → category (`ImmutableFieldChanged`, `BusinessValidationFailed`,
   `ReferencedObjectMissing`, `LifecycleRuleConflict`) + message.
 - `ParseManifest`, `UnsupportedDescriptor`, `AccountResolution`, `InvalidHeaders`, `InvalidSpec` →
@@ -824,8 +826,8 @@ typed `Problem` variants *and* transport-level GraphQL errors. The apply outcome
 
 These map directly from the domain views in
 [`views/apply_manifest_views.rs`](/src/domain/resources/domain/src/views/apply_manifest_views.rs)
-(`ApplyManifestPlan` / `ApplyManifestResult` / `ApplyManifestRejection` /
-`ApplyManifestChange` / `ApplyManifestChangeKind`).
+(`ApplyManifestPlan` / `ApplyManifestResult` / `ApplyManifestDocuments` /
+`ApplyManifestDocumentSource` / `ApplyManifestRejection`).
 
 **Label-filter transport.** `ResourceLabelFilterInput { entries: [ResourceLabelFilterEntryInput!]! }`
 carries the filter, where each entry is `{ key: String!, value: JSON! }`. It appears **only** as
@@ -928,7 +930,7 @@ themselves are agnostic. Selector grammar is specified below, after the semantic
 | `%` name patterns | n/a | **yes** | **yes** (`vs/my-%`); an exact name is a degenerate pattern, a `UUIDv4` is matched as an ID | **yes** |
 | `%` type wildcards | n/a | **only bare `%`** (= all types); `%set`/`s%` rejected | **only bare `%`**; cannot be combined with narrower selectors | **only bare `%`**; `%set`/`s%` rejected |
 | May return / act on multiple | yes (per manifest) | **yes, but bounded** — selector-driven, capped by `max_results`, `--unbounded` to lift | yes (bounded by `--max-results`/`--unbounded`) | yes |
-| Output modes | summary + changes (`--dry-run`)/warnings; verbose | `-o name` \| `-o json` \| `-o yaml`; `--spec` for apply-compatible spec | Table/CSV/JSON/Parquet (via `OutputConfig`), `-w` for wider detail | summary / dry-run preview |
+| Output modes | summary + canonical diff (dry-run *and* live apply)/warnings; verbose | `-o name` \| `-o json` \| `-o yaml`; `--spec` for apply-compatible spec | Table/CSV/JSON/Parquet (via `OutputConfig`), `-w` for wider detail | summary / dry-run preview |
 | Default secret visibility | n/a | **`Encrypted`** (ciphertext); `--revealed` to decrypt | secrets not expanded in list columns | n/a |
 | Relevant flags | `--dry-run`, `--recursive`, `--stdin`, `--continue-on-error` | `--ignore-not-found`, `--spec`, `--revealed`, `--max-results`/`--unbounded`, `--label`/`-l` | `--max-results`/`--unbounded`, `-w`, `-o`, `--label`/`-l` | `--force`, `--ignore-not-found`, `--dry-run`, `--label`/`-l` |
 | Label filtering | n/a | `-l` narrows the selector expansion | `-l` narrows the listing (incl. `list %`) | `-l` narrows what `--all`/patterns resolve to |
@@ -1082,7 +1084,7 @@ sequenceDiagram
     R-->>F: ResourceCrudDispatcher<R>
     F->>X: canonicalize + validate labels/annotations
     X-->>F: canonical headers + warnings (or InvalidHeaders)
-    F->>UC: plan(params)  %% validate + diff (create/update/untouched)
+    F->>UC: plan(params)  %% validate + decide (create/update/untouched)
     alt dry-run
         UC-->>F: ApplyResourcePlanningDecision (Planned | Rejected)
     else live apply
@@ -1090,8 +1092,61 @@ sequenceDiagram
         UC->>OB: produce ResourceLifecycleMessage::Applied
         UC-->>F: ApplyResourceApplicationDecision (Applied | Rejected)
     end
-    F-->>U: outcome + changes + warnings
+    F-->>U: outcome + before/after documents + warnings
 ```
+
+### Canonical manifest documents
+
+An accepted apply reports **what the resource looks like on each side** — `before` and `after`, as
+canonical manifest documents — rather than a precomputed list of field-level changes.
+
+Both are produced by `ResourceManifest::from_resource`
+([`manifests/resource_manifest.rs`](/src/domain/resources/domain/src/manifests/resource_manifest.rs)),
+the *same* function that backs `render_manifests`. So the diff a user sees on apply and the document
+they get from `kamu get -o yaml` provably agree, and the parity is pinned by the contract test
+`apply_documents_match_rendered_manifest`.
+
+The canonical form is the authored subset — `$schema` + `headers.{account, name, labels,
+annotations}` + `spec` — deliberately excluding `headers.id`, `generation`, the timestamps, and
+`status`. Two consequences follow directly:
+
+- **An unchanged apply yields byte-identical documents** (`before == Some(after)`, which
+  `ApplyManifestDocuments::has_changes()` reports). There are no spurious differences to normalize:
+  the earlier mechanism had to truncate timestamps to microseconds to suppress Postgres-precision
+  noise, and that whole bug class is now structurally absent rather than papered over.
+- **`generation` never appears in a diff.** It changed on every non-`Untouched` apply, so it was
+  pure noise.
+
+**Ordering constraint.** The documents are *computed on demand*, via `ApplyManifestPlan::documents()`,
+never stored mid-construction. `headers.account` is part of the canonical manifest and the facade
+finalizes it only *after* the dispatcher returns
+(`plan.resource.headers.account = prepared.target_account`), so canonicalizing earlier would bake in
+a stale account and surface it as a spurious difference.
+
+The two facades reach the documents by different routes, which `ApplyManifestDocumentSource` makes
+explicit rather than papering over:
+
+- `Pair { previous }` — the **local** facade carries the raw pre-apply resource and canonicalizes on
+  demand, once the account is final.
+- `Canonical(documents)` — the **remote** facade receives already-canonicalized documents and has no
+  resource pair to rebuild them from.
+
+Modeling this as an enum keeps `before == None` meaning *exactly* "the resource is being created".
+An earlier revision instead stored a placeholder (`before: None, after: null`) between dispatcher and
+facade; that is indistinguishable from a real create, and `has_changes()` read it as "changed" even
+for an untouched apply. Pinned by `apply_documents_before_is_absent_only_for_creates`.
+
+**The `before` side costs no extra read.** It comes from `previous_state`, captured by
+`ApplyResourcePlanner::plan_update_resource` from the aggregate it has already loaded, before it
+mutates it. A live apply cannot simply re-read the snapshot afterwards — by then it holds the *new*
+state.
+
+**Diffing is a front-end concern.** The backend never decides granularity; the CLI does, in
+[`commands/resource_manifest_diff.rs`](/src/app/cli/src/commands/resource_manifest_diff.rs): it walks
+both documents to find the narrowest changed paths, then renders just those subtrees as colored YAML
+text diffs (via `similar`). A one-label change in a large manifest therefore renders as a couple of
+lines rather than two whole-object dumps — the property that motivated this design, pinned by
+`one_label_change_produces_a_small_diff`.
 
 ### (b) Reconciliation
 
@@ -1246,6 +1301,12 @@ assumption:
    **JWE** token (`dir` + `A256GCM`, via `crypto_utils::SecretCryptor` / `crypto_utils::jwe`) and
    stores it as `Secret { value: <jwe>, contentEncoding: Some("jwe") }`, so the persisted `spec`
    **already holds ciphertext.**
+
+   > This ordering is what makes the apply `before`/`after` documents safe: they are built from the
+   > sanitized state, carry the **stored (unrevealed)** spec, and never invoke
+   > `ResourceSpecViewDispatcher::reveal_spec`. Pinned by the contract test
+   > `apply_documents_never_expose_secret_plaintext`, which runs against both facades. "diffs" in
+   > the invariant above means exactly these documents.
 
    The sanitizer also handles three edge cases:
    - If new plaintext decrypts-equal to the stored JWE token, it reuses that token to avoid a

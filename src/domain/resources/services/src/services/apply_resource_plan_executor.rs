@@ -236,6 +236,7 @@ where
             state: plan.resource.into(),
             outcome: plan.action.into(),
             warnings: plan.warnings,
+            previous_state: plan.previous_state,
         }
     }
 
