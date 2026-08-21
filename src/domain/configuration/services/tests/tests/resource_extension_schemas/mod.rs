@@ -7,6 +7,4 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod message_handlers;
-mod resource_extension_schemas;
-mod services;
+mod test_legacy_config_target_dataset_label;

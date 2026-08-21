@@ -31,6 +31,8 @@ pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
     catalog_builder.add::<SecretSetSpecSanitizer>();
     catalog_builder.add::<SecretSetSpecViewDispatcher>();
 
+    register_configuration_label_schema_dispatchers(catalog_builder);
+
     catalog_builder.add::<DatasetEnvVarResolverImpl>();
     catalog_builder.add::<DatasetEnvVarMutationAdapterImpl>();
 }
