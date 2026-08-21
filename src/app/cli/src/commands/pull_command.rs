@@ -124,6 +124,9 @@ impl PullCommand {
             ingest_options: PollingIngestOptions {
                 fetch_uncacheable: self.fetch_uncacheable,
                 exhaust_sources: true,
+                // Left empty deliberately: env vars are per-dataset, and one
+                // `PullOptions` may cover many. `PullDatasetUseCaseImpl`
+                // resolves them per dataset at the ingest fan-out.
                 dataset_env_vars: HashMap::new(),
                 schema_inference: SchemaInferenceOpts::default(),
             },
