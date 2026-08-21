@@ -12,10 +12,11 @@ use std::sync::Arc;
 
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_configuration::{
-    DatasetSecretSetBindingRepository,
-    DatasetVariableSetBindingRepository,
+    RESOURCE_LABEL_LEGACY_CONFIG_TARGET_DATASET_SCHEMA_URI,
     SecretSetProjectionRepository,
+    SecretSetResource,
     VariableSetProjectionRepository,
+    VariableSetResource,
 };
 use kamu_datasets::{
     DatasetEnvVar,
@@ -23,16 +24,41 @@ use kamu_datasets::{
     DatasetEnvVarResolver,
     GetDatasetEnvVarError,
 };
+use kamu_resources::{ResourceID, ResourceRepository, ResourceSchemaProvider, TypeUri};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component(pub)]
 #[dill::interface(dyn DatasetEnvVarResolver)]
 pub struct DatasetEnvVarResolverImpl {
-    variable_set_binding_repo: Arc<dyn DatasetVariableSetBindingRepository>,
-    secret_set_binding_repo: Arc<dyn DatasetSecretSetBindingRepository>,
+    resource_repo: Arc<dyn ResourceRepository>,
     variable_set_projection_repo: Arc<dyn VariableSetProjectionRepository>,
     secret_set_projection_repo: Arc<dyn SecretSetProjectionRepository>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl DatasetEnvVarResolverImpl {
+    /// Resources of `schema` associated with `dataset_id` by the temporary
+    /// `legacy-config-target-dataset` label, oldest first.
+    ///
+    /// Ordering is by creation time rather than an explicit ordering column,
+    /// so editing a set never reshuffles precedence among its peers.
+    async fn find_target_resource_ids(
+        &self,
+        schema: &TypeUri,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<Vec<ResourceID>, InternalError> {
+        self.resource_repo
+            .find_resource_ids_by_schema_and_label(
+                schema,
+                // Registered labels are stored under their canonical URI, not
+                // the short name the user authors.
+                RESOURCE_LABEL_LEGACY_CONFIG_TARGET_DATASET_SCHEMA_URI,
+                &dataset_id.as_did_str().to_string(),
+            )
+            .await
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -45,16 +71,15 @@ impl DatasetEnvVarResolver for DatasetEnvVarResolverImpl {
     ) -> Result<HashMap<String, DatasetEnvVar>, InternalError> {
         let mut env_map: HashMap<String, DatasetEnvVar> = HashMap::new();
 
-        // Apply variable-set bindings in order; first binding wins per key
-        let var_bindings = self
-            .variable_set_binding_repo
-            .list_bindings(dataset_id)
+        // Apply labelled variable sets oldest-first; first one wins per key
+        let variable_set_ids = self
+            .find_target_resource_ids(VariableSetResource::schema(), dataset_id)
             .await?;
 
-        for binding in &var_bindings {
+        for resource_id in &variable_set_ids {
             let entries = self
                 .variable_set_projection_repo
-                .get_latest_entries(&binding.resource_id)
+                .get_latest_entries(resource_id)
                 .await?;
 
             for entry in entries {
@@ -70,17 +95,17 @@ impl DatasetEnvVarResolver for DatasetEnvVarResolverImpl {
             }
         }
 
-        // Apply secret-set bindings; secrets override all variables on key collision
-        let secret_bindings = self
-            .secret_set_binding_repo
-            .list_bindings(dataset_id)
+        // Apply labelled secret sets; secrets override all variables on key
+        // collision
+        let secret_set_ids = self
+            .find_target_resource_ids(SecretSetResource::schema(), dataset_id)
             .await?;
 
         let mut secret_map: HashMap<String, DatasetEnvVar> = HashMap::new();
-        for binding in &secret_bindings {
+        for resource_id in &secret_set_ids {
             let entries = self
                 .secret_set_projection_repo
-                .get_latest_entries(&binding.resource_id)
+                .get_latest_entries(resource_id)
                 .await?;
 
             for entry in entries {
@@ -113,17 +138,16 @@ impl DatasetEnvVarResolver for DatasetEnvVarResolverImpl {
             })
         };
 
-        // Search variable-set resources bound to this dataset
-        let var_bindings = self
-            .variable_set_binding_repo
-            .list_bindings(dataset_id)
+        // Search variable-set resources labelled for this dataset
+        let variable_set_ids = self
+            .find_target_resource_ids(VariableSetResource::schema(), dataset_id)
             .await
             .int_err()?;
 
-        for binding in &var_bindings {
+        for resource_id in &variable_set_ids {
             let entries = self
                 .variable_set_projection_repo
-                .get_latest_entries(&binding.resource_id)
+                .get_latest_entries(resource_id)
                 .await
                 .int_err()?;
 
@@ -138,17 +162,16 @@ impl DatasetEnvVarResolver for DatasetEnvVarResolverImpl {
             }
         }
 
-        // Search secret-set resources bound to this dataset
-        let secret_bindings = self
-            .secret_set_binding_repo
-            .list_bindings(dataset_id)
+        // Search secret-set resources labelled for this dataset
+        let secret_set_ids = self
+            .find_target_resource_ids(SecretSetResource::schema(), dataset_id)
             .await
             .int_err()?;
 
-        for binding in &secret_bindings {
+        for resource_id in &secret_set_ids {
             let entries = self
                 .secret_set_projection_repo
-                .get_latest_entries(&binding.resource_id)
+                .get_latest_entries(resource_id)
                 .await
                 .int_err()?;
 

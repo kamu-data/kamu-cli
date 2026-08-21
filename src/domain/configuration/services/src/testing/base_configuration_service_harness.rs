@@ -9,23 +9,30 @@
 
 use std::sync::Arc;
 
+use chrono::{DateTime, Utc};
 use kamu_configuration::{
-    DatasetConfigurationSetBinding,
-    DatasetSecretSetBindingRepository,
-    DatasetVariableSetBindingRepository,
+    RESOURCE_LABEL_LEGACY_CONFIG_TARGET_DATASET_SCHEMA_URI,
     SecretSetProjectionRepository,
     SecretSetResource,
     VariableSetProjectionRepository,
     VariableSetResource,
 };
 use kamu_configuration_inmem::{
-    InMemoryDatasetSecretSetBindingRepository,
-    InMemoryDatasetVariableSetBindingRepository,
     InMemorySecretSetProjectionRepository,
     InMemoryVariableSetProjectionRepository,
 };
 use kamu_datasets::SecretsEncryptionConfig;
-use kamu_resources::ApplyResourceUseCase;
+use kamu_resources::{
+    ApplyResourceUseCase,
+    ResourceHeaders,
+    ResourceHeadersExt,
+    ResourceID,
+    ResourceLabelProjectionRepository,
+    ResourceRepository,
+    ResourceSchemaProvider,
+    ResourceSnapshot,
+    TypeUri,
+};
 use kamu_resources_services::testing::BaseResourceServiceHarness;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -45,9 +52,7 @@ impl BaseConfigurationServiceHarness {
         let base = BaseResourceServiceHarness::new_with_additional_dependencies(|b| {
             b.add_value(SecretsEncryptionConfig::sample())
                 .add::<InMemoryVariableSetProjectionRepository>()
-                .add::<InMemorySecretSetProjectionRepository>()
-                .add::<InMemoryDatasetVariableSetBindingRepository>()
-                .add::<InMemoryDatasetSecretSetBindingRepository>();
+                .add::<InMemorySecretSetProjectionRepository>();
 
             crate::register_dependencies(b);
         });
@@ -58,14 +63,6 @@ impl BaseConfigurationServiceHarness {
 
     pub fn catalog(&self) -> &dill::Catalog {
         &self.catalog
-    }
-
-    pub fn variable_set_binding_repo(&self) -> Arc<dyn DatasetVariableSetBindingRepository> {
-        self.catalog.get_one().unwrap()
-    }
-
-    pub fn secret_set_binding_repo(&self) -> Arc<dyn DatasetSecretSetBindingRepository> {
-        self.catalog.get_one().unwrap()
     }
 
     pub fn variable_set_projection_repo(&self) -> Arc<dyn VariableSetProjectionRepository> {
@@ -84,24 +81,124 @@ impl BaseConfigurationServiceHarness {
         self.catalog.get_one().unwrap()
     }
 
-    pub async fn variable_bindings(
+    pub fn resource_repo(&self) -> Arc<dyn ResourceRepository> {
+        self.catalog.get_one().unwrap()
+    }
+
+    pub fn resource_label_projection_repo(&self) -> Arc<dyn ResourceLabelProjectionRepository> {
+        self.catalog.get_one().unwrap()
+    }
+
+    /// IDs of `VariableSet` resources labelled as targeting `dataset_id`,
+    /// oldest first — exactly what the resolver sees.
+    pub async fn variable_sets_targeting(&self, dataset_id: &odf::DatasetID) -> Vec<ResourceID> {
+        self.resources_targeting(VariableSetResource::schema(), dataset_id)
+            .await
+    }
+
+    /// IDs of `SecretSet` resources labelled as targeting `dataset_id`.
+    pub async fn secret_sets_targeting(&self, dataset_id: &odf::DatasetID) -> Vec<ResourceID> {
+        self.resources_targeting(SecretSetResource::schema(), dataset_id)
+            .await
+    }
+
+    async fn resources_targeting(
         &self,
+        schema: &TypeUri,
         dataset_id: &odf::DatasetID,
-    ) -> Vec<DatasetConfigurationSetBinding> {
-        self.variable_set_binding_repo()
-            .list_bindings(dataset_id)
+    ) -> Vec<ResourceID> {
+        self.resource_repo()
+            .find_resource_ids_by_schema_and_label(
+                schema,
+                RESOURCE_LABEL_LEGACY_CONFIG_TARGET_DATASET_SCHEMA_URI,
+                &dataset_id.as_did_str().to_string(),
+            )
             .await
             .unwrap()
     }
 
-    pub async fn secret_bindings(
+    /// Creates a `VariableSet` resource labelled as targeting `dataset_id`.
+    pub async fn seed_variable_set_targeting(
         &self,
+        account: &odf::AccountHandle,
         dataset_id: &odf::DatasetID,
-    ) -> Vec<DatasetConfigurationSetBinding> {
-        self.secret_set_binding_repo()
-            .list_bindings(dataset_id)
+        name: &str,
+        created_at: DateTime<Utc>,
+    ) -> ResourceID {
+        self.seed_resource_targeting(
+            VariableSetResource::schema(),
+            account,
+            dataset_id,
+            name,
+            created_at,
+        )
+        .await
+    }
+
+    /// Creates a `SecretSet` resource labelled as targeting `dataset_id`.
+    pub async fn seed_secret_set_targeting(
+        &self,
+        account: &odf::AccountHandle,
+        dataset_id: &odf::DatasetID,
+        name: &str,
+        created_at: DateTime<Utc>,
+    ) -> ResourceID {
+        self.seed_resource_targeting(
+            SecretSetResource::schema(),
+            account,
+            dataset_id,
+            name,
+            created_at,
+        )
+        .await
+    }
+
+    /// Creates a resource carrying the `legacy-config-target-dataset` label,
+    /// writing both the snapshot and its label projection row the way
+    /// `sync_snapshots` does in production.
+    ///
+    /// `created_at` is explicit because it decides resolution precedence.
+    async fn seed_resource_targeting(
+        &self,
+        schema: &TypeUri,
+        account: &odf::AccountHandle,
+        dataset_id: &odf::DatasetID,
+        name: &str,
+        created_at: DateTime<Utc>,
+    ) -> ResourceID {
+        let repo = self.resource_repo();
+        let id = repo.new_resource_id().await.unwrap();
+
+        let label_key = RESOURCE_LABEL_LEGACY_CONFIG_TARGET_DATASET_SCHEMA_URI;
+        let label_value = dataset_id.as_did_str().to_string();
+
+        let mut headers = ResourceHeaders::simple(created_at, id, account.clone(), name);
+        headers.created_at = created_at;
+        headers.updated_at = created_at;
+        headers.labels.entries = [(
+            label_key.parse().unwrap(),
+            serde_json::Value::String(label_value.clone()),
+        )]
+        .into_iter()
+        .collect();
+
+        repo.create_resource(&ResourceSnapshot {
+            id,
+            schema: schema.clone(),
+            headers,
+            spec: serde_json::json!({}),
+            status: None,
+            last_event_id: None,
+        })
+        .await
+        .unwrap();
+
+        self.resource_label_projection_repo()
+            .replace_entries(&id, &[(label_key.to_string(), label_value)])
             .await
-            .unwrap()
+            .unwrap();
+
+        id
     }
 }
 
