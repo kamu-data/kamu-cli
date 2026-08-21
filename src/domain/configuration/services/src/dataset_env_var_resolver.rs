@@ -138,31 +138,11 @@ impl DatasetEnvVarResolver for DatasetEnvVarResolverImpl {
             })
         };
 
-        // Search variable-set resources labelled for this dataset
-        let variable_set_ids = self
-            .find_target_resource_ids(VariableSetResource::schema(), dataset_id)
-            .await
-            .int_err()?;
-
-        for resource_id in &variable_set_ids {
-            let entries = self
-                .variable_set_projection_repo
-                .get_latest_entries(resource_id)
-                .await
-                .int_err()?;
-
-            if let Some(entry) = entries.into_iter().find(|e| e.key == entry_key) {
-                return Ok(DatasetEnvVar {
-                    key: entry.key,
-                    value: entry.value.into_bytes(),
-                    secret_nonce: None,
-                    created_at: entry.created_at,
-                    dataset_id: dataset_id.clone(),
-                });
-            }
-        }
-
-        // Search secret-set resources labelled for this dataset
+        // Secret sets are searched first: a key carried by both a secret set and
+        // a variable set must resolve to the secret, matching the overlay in
+        // `resolve_effective_env_vars`. Returning the variable here would hand
+        // back plaintext for a key the user believes they have shadowed with a
+        // secret.
         let secret_set_ids = self
             .find_target_resource_ids(SecretSetResource::schema(), dataset_id)
             .await
@@ -180,6 +160,30 @@ impl DatasetEnvVarResolver for DatasetEnvVarResolverImpl {
                     key: entry.key,
                     value: entry.value,
                     secret_nonce: Some(entry.secret_nonce),
+                    created_at: entry.created_at,
+                    dataset_id: dataset_id.clone(),
+                });
+            }
+        }
+
+        // Only then variable sets, oldest-first within the kind.
+        let variable_set_ids = self
+            .find_target_resource_ids(VariableSetResource::schema(), dataset_id)
+            .await
+            .int_err()?;
+
+        for resource_id in &variable_set_ids {
+            let entries = self
+                .variable_set_projection_repo
+                .get_latest_entries(resource_id)
+                .await
+                .int_err()?;
+
+            if let Some(entry) = entries.into_iter().find(|e| e.key == entry_key) {
+                return Ok(DatasetEnvVar {
+                    key: entry.key,
+                    value: entry.value.into_bytes(),
+                    secret_nonce: None,
                     created_at: entry.created_at,
                     dataset_id: dataset_id.clone(),
                 });
