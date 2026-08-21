@@ -118,8 +118,8 @@ compared: today they are always equal — the built-in `environment` label appli
 to every resource type, unregistered short names resolve to free-form identity,
 and the one *scoped* registered label
 ([`legacy-config-target-dataset`](resources-framework.md#legacy-dataset-association--the-legacy-config-target-dataset-label),
-which applies to `VariableSet`/`SecretSet` only) drops the schemas it cannot
-apply to from the candidate set rather than resolving differently on them — so
+applicable to `VariableSet`/`SecretSet` only) narrows the candidate set rather
+than resolving differently across it (see the `applications` rule below) — so
 the uniform single-predicate path is taken. Per-*schema* divergence
 remains *reserved, not implemented*: it is guarded by an assertion and a comment
 rather than by OR-across-types SQL that no test could exercise. Note this is a
