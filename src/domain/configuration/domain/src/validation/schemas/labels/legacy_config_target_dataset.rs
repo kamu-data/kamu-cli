@@ -16,7 +16,7 @@ pub const RESOURCE_LABEL_LEGACY_CONFIG_TARGET_DATASET_SCHEMA_URI: &str =
 pub const RESOURCE_LABEL_LEGACY_CONFIG_TARGET_DATASET_SHORT_NAME: &str =
     "legacy-config-target-dataset";
 pub const RESOURCE_LABEL_LEGACY_CONFIG_TARGET_DATASET_SCHEMA_DOC: &str =
-    include_str!("../../../../schemas/config/v1alpha1/labels/LegacyConfigTargetDataset.json");
+    include_str!("../../../../../schemas/config/v1alpha1/labels/LegacyConfigTargetDataset.json");
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

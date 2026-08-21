@@ -415,7 +415,10 @@ impl PullDatasetUseCaseImpl {
         // with an empty map while the server task path resolved correctly.
         //
         // A caller that already resolved them (the update task planner) keeps
-        // its own map: only an empty one is filled in.
+        // its own map, but only when it is non-empty: an empty map is
+        // indistinguishable from an unresolved one, so it is re-resolved. That
+        // costs a redundant lookup for a dataset that genuinely has no env
+        // vars, and yields the same empty result.
         let ingest_options = if ingest_options.dataset_env_vars.is_empty() {
             let dataset_id = pii.target.get_handle().id.clone();
             let dataset_env_vars =
@@ -470,7 +473,7 @@ impl PullDatasetUseCaseImpl {
         let feature_enabled = catalog
             .get_one::<SecretsEncryptionConfig>()
             .ok()
-            .is_some_and(|config| config.enabled && config.encryption_key.is_some());
+            .is_some_and(|config| config.is_enabled());
 
         if !feature_enabled {
             return Ok(HashMap::new());

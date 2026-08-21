@@ -20,7 +20,6 @@ async fn test_oldest_labelled_variable_set_wins() {
     let harness = DatasetEnvVarServiceHarness::new();
 
     let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
-    let (_, account_id) = odf::AccountID::new_generated_ed25519();
     let account = odf::AccountHandle::new_test("test-account");
 
     let now = Utc::now();
@@ -50,7 +49,7 @@ async fn test_oldest_labelled_variable_set_wins() {
             &[
                 VariableSetEntry {
                     entry_id: Uuid::new_v4(),
-                    account_id: account_id.clone(),
+                    account_id: account.did.clone(),
                     key: "X".to_string(),
                     value: "from-a".to_string(),
                     created_at: now,
@@ -58,7 +57,7 @@ async fn test_oldest_labelled_variable_set_wins() {
                 },
                 VariableSetEntry {
                     entry_id: Uuid::new_v4(),
-                    account_id: account_id.clone(),
+                    account_id: account.did.clone(),
                     key: "Y".to_string(),
                     value: "common".to_string(),
                     created_at: now,
@@ -76,7 +75,7 @@ async fn test_oldest_labelled_variable_set_wins() {
             &[
                 VariableSetEntry {
                     entry_id: Uuid::new_v4(),
-                    account_id: account_id.clone(),
+                    account_id: account.did.clone(),
                     key: "X".to_string(),
                     value: "from-b".to_string(),
                     created_at: now,
@@ -84,7 +83,7 @@ async fn test_oldest_labelled_variable_set_wins() {
                 },
                 VariableSetEntry {
                     entry_id: Uuid::new_v4(),
-                    account_id: account_id.clone(),
+                    account_id: account.did.clone(),
                     key: "Z".to_string(),
                     value: "extra".to_string(),
                     created_at: now,
@@ -119,7 +118,6 @@ async fn test_secret_overrides_variable_on_same_key() {
     let harness = DatasetEnvVarServiceHarness::new();
 
     let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
-    let (_, account_id) = odf::AccountID::new_generated_ed25519();
 
     let account = odf::AccountHandle::new_test("test-account");
     let now = Utc::now();
@@ -141,7 +139,7 @@ async fn test_secret_overrides_variable_on_same_key() {
             &[
                 VariableSetEntry {
                     entry_id: Uuid::new_v4(),
-                    account_id: account_id.clone(),
+                    account_id: account.did.clone(),
                     key: "X".to_string(),
                     value: "var-value".to_string(),
                     created_at: now,
@@ -149,7 +147,7 @@ async fn test_secret_overrides_variable_on_same_key() {
                 },
                 VariableSetEntry {
                     entry_id: Uuid::new_v4(),
-                    account_id: account_id.clone(),
+                    account_id: account.did.clone(),
                     key: "Y".to_string(),
                     value: "var-only".to_string(),
                     created_at: now,
@@ -168,7 +166,7 @@ async fn test_secret_overrides_variable_on_same_key() {
             1,
             &[SecretSetEntry {
                 entry_id: Uuid::new_v4(),
-                account_id: account_id.clone(),
+                account_id: account.did.clone(),
                 key: "X".to_string(),
                 value: b"encrypted-value".to_vec(),
                 secret_nonce: b"nonce".to_vec(),
@@ -213,7 +211,6 @@ async fn test_single_key_lookup_prefers_the_secret_like_the_merged_map() {
     let harness = DatasetEnvVarServiceHarness::new();
 
     let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
-    let (_, account_id) = odf::AccountID::new_generated_ed25519();
 
     let account = odf::AccountHandle::new_test("test-account");
     let now = Utc::now();
@@ -242,7 +239,7 @@ async fn test_single_key_lookup_prefers_the_secret_like_the_merged_map() {
             &[
                 VariableSetEntry {
                     entry_id: Uuid::new_v4(),
-                    account_id: account_id.clone(),
+                    account_id: account.did.clone(),
                     key: "SHADOWED".to_string(),
                     value: "plaintext-must-not-win".to_string(),
                     created_at: now,
@@ -250,7 +247,7 @@ async fn test_single_key_lookup_prefers_the_secret_like_the_merged_map() {
                 },
                 VariableSetEntry {
                     entry_id: Uuid::new_v4(),
-                    account_id: account_id.clone(),
+                    account_id: account.did.clone(),
                     key: "VAR_ONLY".to_string(),
                     value: "var-only".to_string(),
                     created_at: now,
@@ -268,7 +265,7 @@ async fn test_single_key_lookup_prefers_the_secret_like_the_merged_map() {
             1,
             &[SecretSetEntry {
                 entry_id: Uuid::new_v4(),
-                account_id: account_id.clone(),
+                account_id: account.did.clone(),
                 key: "SHADOWED".to_string(),
                 value: b"encrypted-value".to_vec(),
                 secret_nonce: b"nonce".to_vec(),
@@ -321,7 +318,6 @@ async fn test_variable_sets_labelled_for_other_datasets_are_ignored() {
 
     let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
     let (_, other_dataset_id) = odf::DatasetID::new_generated_ed25519();
-    let (_, account_id) = odf::AccountID::new_generated_ed25519();
     let account = odf::AccountHandle::new_test("test-account");
 
     let now = Utc::now();
@@ -350,7 +346,7 @@ async fn test_variable_sets_labelled_for_other_datasets_are_ignored() {
                 1,
                 &[VariableSetEntry {
                     entry_id: Uuid::new_v4(),
-                    account_id: account_id.clone(),
+                    account_id: account.did.clone(),
                     key: "X".to_string(),
                     value: value.to_string(),
                     created_at: now,
@@ -386,8 +382,6 @@ async fn test_sets_owned_by_another_account_are_ignored() {
     let harness = DatasetEnvVarServiceHarness::new();
 
     let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
-    let (_, owner_account_id) = odf::AccountID::new_generated_ed25519();
-    let (_, attacker_account_id) = odf::AccountID::new_generated_ed25519();
 
     let owner = odf::AccountHandle::new_test("dataset-owner");
     let attacker = odf::AccountHandle::new_test("attacker");
@@ -412,7 +406,7 @@ async fn test_sets_owned_by_another_account_are_ignored() {
             1,
             &[VariableSetEntry {
                 entry_id: Uuid::new_v4(),
-                account_id: owner_account_id.clone(),
+                account_id: owner.did.clone(),
                 key: "TOKEN".to_string(),
                 value: "legitimate".to_string(),
                 created_at: now,
@@ -429,7 +423,7 @@ async fn test_sets_owned_by_another_account_are_ignored() {
             1,
             &[SecretSetEntry {
                 entry_id: Uuid::new_v4(),
-                account_id: attacker_account_id.clone(),
+                account_id: attacker.did.clone(),
                 key: "TOKEN".to_string(),
                 value: b"injected".to_vec(),
                 secret_nonce: b"nonce".to_vec(),
