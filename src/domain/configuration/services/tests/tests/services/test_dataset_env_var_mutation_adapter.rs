@@ -7,7 +7,11 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use kamu_configuration::{SecretSetResource, VariableSetResource};
+use kamu_configuration::{
+    RESOURCE_LABEL_LEGACY_CONFIG_TARGET_DATASET_SCHEMA_URI,
+    SecretSetResource,
+    VariableSetResource,
+};
 use kamu_configuration_services::DatasetEnvVarMutationAdapterImpl;
 use kamu_datasets::{DatasetEnvVarValue, DeleteDatasetEnvVarError};
 use kamu_resources::ResourceSchemaProvider;
@@ -40,10 +44,14 @@ async fn test_lazy_creation_of_variable_resource_on_first_upsert() {
     DatasetEnvVarServiceHarness::assert_upsert_created(&result);
 
     // A managed VariableSet resource must have been created
-    let bindings = harness.variable_bindings(&dataset_id).await;
-    assert_eq!(bindings.len(), 1, "exactly one variable binding must exist");
+    let targeting = harness.variable_sets_targeting(&dataset_id).await;
+    assert_eq!(
+        targeting.len(),
+        1,
+        "exactly one labelled variable set must exist"
+    );
 
-    let resource_id = bindings[0].resource_id;
+    let resource_id = targeting[0];
     let resource_name =
         DatasetEnvVarMutationAdapterImpl::legacy_variable_set_resource_name(&dataset_id);
 
@@ -59,7 +67,7 @@ async fn test_lazy_creation_of_variable_resource_on_first_upsert() {
         .unwrap();
     assert_eq!(std::str::from_utf8(&env_map["FOO"].value).unwrap(), "bar");
 
-    // Second upsert for the same key → Updated status, still one binding
+    // Second upsert for the same key → Updated status, still one resource
     let result2 = harness
         .mutation_adapter()
         .upsert_env_var(
@@ -72,9 +80,9 @@ async fn test_lazy_creation_of_variable_resource_on_first_upsert() {
 
     DatasetEnvVarServiceHarness::assert_upsert_updated(&result2);
     assert_eq!(
-        harness.variable_bindings(&dataset_id).await.len(),
+        harness.variable_sets_targeting(&dataset_id).await.len(),
         1,
-        "still exactly one binding after update"
+        "still exactly one labelled variable set after update"
     );
 
     let env_map2 = harness
@@ -109,11 +117,11 @@ async fn test_lazy_creation_of_secret_resource_on_first_upsert() {
     DatasetEnvVarServiceHarness::assert_upsert_created(&result);
     assert!(result.dataset_env_var.secret_nonce.is_some());
 
-    let sec_bindings = harness.secret_bindings(&dataset_id).await;
+    let sec_targeting = harness.secret_sets_targeting(&dataset_id).await;
     assert_eq!(
-        sec_bindings.len(),
+        sec_targeting.len(),
         1,
-        "exactly one secret binding must exist"
+        "exactly one labelled secret set must exist"
     );
 
     let resource_name =
@@ -122,7 +130,7 @@ async fn test_lazy_creation_of_secret_resource_on_first_upsert() {
     let found = harness
         .resource_id_by_name(&account_id, SecretSetResource::schema(), &resource_name)
         .await;
-    assert_eq!(found, Some(sec_bindings[0].resource_id));
+    assert_eq!(found, Some(sec_targeting[0]));
 
     let env_map = harness
         .resolver()
@@ -138,7 +146,7 @@ async fn test_lazy_creation_of_secret_resource_on_first_upsert() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_delete_last_variable_removes_resource_and_binding() {
+async fn test_delete_last_variable_removes_resource() {
     let harness = DatasetEnvVarServiceHarness::new();
 
     let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
@@ -161,10 +169,10 @@ async fn test_delete_last_variable_removes_resource_and_binding() {
         .unwrap();
     DatasetEnvVarServiceHarness::assert_upsert_created(&r_b);
 
-    // Binding and resource must exist at this point
-    assert_eq!(harness.variable_bindings(&dataset_id).await.len(), 1);
+    // The labelled resource must exist at this point
+    assert_eq!(harness.variable_sets_targeting(&dataset_id).await.len(), 1);
 
-    // Delete A — resource stays, binding stays, B is still visible
+    // Delete A — the resource stays and B is still visible
     harness
         .mutation_adapter()
         .delete_env_var(&dataset_id, "A")
@@ -172,9 +180,9 @@ async fn test_delete_last_variable_removes_resource_and_binding() {
         .unwrap();
 
     assert_eq!(
-        harness.variable_bindings(&dataset_id).await.len(),
+        harness.variable_sets_targeting(&dataset_id).await.len(),
         1,
-        "binding must still exist after partial deletion"
+        "the labelled resource must survive a partial deletion"
     );
     let env_after_a = harness
         .resolver()
@@ -184,7 +192,7 @@ async fn test_delete_last_variable_removes_resource_and_binding() {
     assert!(!env_after_a.contains_key("A"));
     assert!(env_after_a.contains_key("B"));
 
-    // Delete B — last entry, resource and binding must be removed
+    // Delete B — last entry, the resource itself must be removed
     harness
         .mutation_adapter()
         .delete_env_var(&dataset_id, "B")
@@ -192,9 +200,9 @@ async fn test_delete_last_variable_removes_resource_and_binding() {
         .unwrap();
 
     assert_eq!(
-        harness.variable_bindings(&dataset_id).await.len(),
+        harness.variable_sets_targeting(&dataset_id).await.len(),
         0,
-        "binding must be removed when last entry is deleted"
+        "deleting the last entry must remove the labelled resource"
     );
 
     let resource_name =
@@ -216,7 +224,7 @@ async fn test_delete_last_variable_removes_resource_and_binding() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_delete_last_secret_removes_resource_and_binding() {
+async fn test_delete_last_secret_removes_resource() {
     let harness = DatasetEnvVarServiceHarness::new();
 
     let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
@@ -247,9 +255,9 @@ async fn test_delete_last_secret_removes_resource_and_binding() {
         .unwrap();
     DatasetEnvVarServiceHarness::assert_upsert_created(&r_b);
 
-    assert_eq!(harness.secret_bindings(&dataset_id).await.len(), 1);
+    assert_eq!(harness.secret_sets_targeting(&dataset_id).await.len(), 1);
 
-    // Delete SEC_A — resource and binding must still exist
+    // Delete SEC_A — the labelled resource must still exist
     harness
         .mutation_adapter()
         .delete_env_var(&dataset_id, "SEC_A")
@@ -257,9 +265,9 @@ async fn test_delete_last_secret_removes_resource_and_binding() {
         .unwrap();
 
     assert_eq!(
-        harness.secret_bindings(&dataset_id).await.len(),
+        harness.secret_sets_targeting(&dataset_id).await.len(),
         1,
-        "binding must still exist after partial deletion"
+        "the labelled resource must survive a partial deletion"
     );
     let env_after_a = harness
         .resolver()
@@ -269,7 +277,7 @@ async fn test_delete_last_secret_removes_resource_and_binding() {
     assert!(!env_after_a.contains_key("SEC_A"));
     assert!(env_after_a.contains_key("SEC_B"));
 
-    // Delete SEC_B — last secret; resource and binding must be removed
+    // Delete SEC_B — last secret; the resource must be removed
     harness
         .mutation_adapter()
         .delete_env_var(&dataset_id, "SEC_B")
@@ -277,9 +285,9 @@ async fn test_delete_last_secret_removes_resource_and_binding() {
         .unwrap();
 
     assert_eq!(
-        harness.secret_bindings(&dataset_id).await.len(),
+        harness.secret_sets_targeting(&dataset_id).await.len(),
         0,
-        "binding must be removed when last secret is deleted"
+        "deleting the last secret must remove the labelled resource"
     );
 
     let resource_name =
@@ -319,8 +327,8 @@ async fn test_upsert_converts_variable_to_secret() {
         .await
         .unwrap();
     DatasetEnvVarServiceHarness::assert_upsert_created(&r1);
-    assert_eq!(harness.variable_bindings(&dataset_id).await.len(), 1);
-    assert_eq!(harness.secret_bindings(&dataset_id).await.len(), 0);
+    assert_eq!(harness.variable_sets_targeting(&dataset_id).await.len(), 1);
+    assert_eq!(harness.secret_sets_targeting(&dataset_id).await.len(), 0);
 
     // Re-upsert the same key as a secret — must convert
     let r2 = harness
@@ -341,9 +349,9 @@ async fn test_upsert_converts_variable_to_secret() {
 
     // Variable resource must be gone (or at least not hold FOO anymore)
     assert_eq!(
-        harness.secret_bindings(&dataset_id).await.len(),
+        harness.secret_sets_targeting(&dataset_id).await.len(),
         1,
-        "secret binding must exist after conversion"
+        "a labelled secret set must exist after conversion"
     );
 
     let env_map = harness
@@ -381,8 +389,8 @@ async fn test_upsert_converts_secret_to_variable() {
         .await
         .unwrap();
     DatasetEnvVarServiceHarness::assert_upsert_created(&r1);
-    assert_eq!(harness.secret_bindings(&dataset_id).await.len(), 1);
-    assert_eq!(harness.variable_bindings(&dataset_id).await.len(), 0);
+    assert_eq!(harness.secret_sets_targeting(&dataset_id).await.len(), 1);
+    assert_eq!(harness.variable_sets_targeting(&dataset_id).await.len(), 0);
 
     // Re-upsert the same key as a regular variable — must convert
     let r2 = harness
@@ -402,9 +410,9 @@ async fn test_upsert_converts_secret_to_variable() {
     );
 
     assert_eq!(
-        harness.variable_bindings(&dataset_id).await.len(),
+        harness.variable_sets_targeting(&dataset_id).await.len(),
         1,
-        "variable binding must exist after conversion"
+        "a labelled variable set must exist after conversion"
     );
 
     let env_map = harness
@@ -441,6 +449,87 @@ async fn test_delete_nonexistent_key_returns_not_found() {
     assert!(
         matches!(err, DeleteDatasetEnvVarError::NotFound(_)),
         "expected NotFound error, got: {err:?}"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_managed_resources_are_stamped_with_the_target_dataset_label() {
+    let harness = DatasetEnvVarServiceHarness::new();
+
+    let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
+    let account_handle = harness.ensure_test_account("test-owner").await;
+    harness
+        .seed_dataset_entry(&dataset_id, &account_handle.did)
+        .await;
+
+    harness
+        .mutation_adapter()
+        .upsert_env_var(&dataset_id, "FOO", &DatasetEnvVarValue::Regular("bar".into()))
+        .await
+        .unwrap();
+    harness
+        .mutation_adapter()
+        .upsert_env_var(
+            &dataset_id,
+            "SEC",
+            &DatasetEnvVarValue::Secret(SecretString::from("s3cret")),
+        )
+        .await
+        .unwrap();
+
+    let expected_key: kamu_resources::TypeRef =
+        RESOURCE_LABEL_LEGACY_CONFIG_TARGET_DATASET_SCHEMA_URI
+            .parse()
+            .unwrap();
+    let expected_value = serde_json::Value::String(dataset_id.as_did_str().to_string());
+
+    for ids in [
+        harness.variable_sets_targeting(&dataset_id).await,
+        harness.secret_sets_targeting(&dataset_id).await,
+    ] {
+        assert_eq!(ids.len(), 1);
+
+        let snapshot = harness.get_snapshot_by_id(&ids[0]).await.unwrap();
+        assert_eq!(
+            snapshot.headers.labels.entries.get(&expected_key),
+            Some(&expected_value),
+            "the managed resource must carry the target-dataset label"
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_target_dataset_label_survives_an_update() {
+    let harness = DatasetEnvVarServiceHarness::new();
+
+    let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
+    let account_handle = harness.ensure_test_account("test-owner").await;
+    harness
+        .seed_dataset_entry(&dataset_id, &account_handle.did)
+        .await;
+
+    for value in ["first", "second"] {
+        harness
+            .mutation_adapter()
+            .upsert_env_var(
+                &dataset_id,
+                "FOO",
+                &DatasetEnvVarValue::Regular(value.into()),
+            )
+            .await
+            .unwrap();
+    }
+
+    // A re-apply that dropped the label would leave the resource in place but
+    // silently unresolvable, so assert through the label-driven lookup.
+    assert_eq!(
+        harness.variable_sets_targeting(&dataset_id).await.len(),
+        1,
+        "the label must survive an update"
     );
 }
 
