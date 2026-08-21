@@ -453,6 +453,21 @@ There is a precedent for data backfill into resources —
 resources; new types that supersede existing data should follow that pattern (additive migration +
 backfill, never rewriting the event log in place).
 
+A backfill that synthesizes an event log must satisfy two invariants that are easy to miss in SQL,
+because both produce resources that load fine at the SQL level yet are unreadable and unwritable
+through the API:
+
+- **`event_id` must increase in causal order per resource.** The store replays strictly
+  `ORDER BY event_id` and the projection can only initialize from `Created`; if
+  `ReconciliationSucceeded` gets a lower id, loading fails with
+  `Cannot initialize ... from event ReconciliationSucceeded`. Emit the events from one ordered
+  `INSERT ... ORDER BY` rather than from sibling data-modifying CTEs — Postgres does not define
+  the execution order of those, so `nextval` may number them backwards.
+- **`headers.account` must be a full `AccountRef` object** (`{id, did, name}`), matching what the
+  runtime writes. A bare DID string deserializes into a partial ref, and the subsequent apply
+  fails to load the resource. The `id` is the account *resource* UUID, so the migration adding
+  `accounts.resource_id` has to run before any backfill that emits `Created` events.
+
 **Schema/version upgrades.** The schema URL is part of resource identity, including its version
 segment. Supporting a new schema version therefore requires an explicit compatibility/migration
 story for that resource type: update manifests, projections, dispatcher registration, and any

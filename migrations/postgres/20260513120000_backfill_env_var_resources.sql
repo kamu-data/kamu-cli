@@ -235,142 +235,93 @@ WHERE dev.secret_nonce IS NOT NULL
 ON CONFLICT (resource_id, resource_generation, secret_key) DO NOTHING;
 
 /* ------------------------------ */
-/* Resource events: VariableSet   */
+/* Resource events                */
 /* ------------------------------ */
 
-WITH
-var_resources AS (
-    SELECT resource_id, resource_schema, account_id, resource_name, labels, created_at, spec, status
-    FROM resources
-    WHERE resource_schema = 'https://opendatafabric.org/schemas/config/v1alpha1/VariableSet'
-      AND resource_name LIKE 'legacy-vars-%'
-      AND last_event_id IS NULL
-),
-ins_created AS (
-    INSERT INTO resource_events (resource_id, resource_schema, event_time, event_type, event_payload)
-    SELECT
-        r.resource_id,
-        r.resource_schema,
-        r.created_at,
-        'Created',
-        jsonb_build_object('Created', jsonb_build_object(
+/*
+ * The three lifecycle events per resource must receive `event_id`s in causal
+ * order: the event store replays strictly `ORDER BY event_id`, and the state
+ * projection can only be initialized from `Created`. If `ReconciliationSucceeded`
+ * lands on a lower id, loading the resource fails with
+ * "Cannot initialize ... from event ReconciliationSucceeded", making every
+ * backfilled resource unreadable and unwritable.
+ *
+ * An earlier version emitted the three events from sibling data-modifying CTEs.
+ * Postgres does not guarantee the execution order of such CTEs, so `nextval` was
+ * free to number them in any order -- and in practice numbered them backwards.
+ * They are emitted here as a single INSERT whose ORDER BY fixes the sequence
+ * assignment explicitly, which is both deterministic and cheaper than three
+ * separate statements.
+ */
+
+INSERT INTO resource_events (resource_id, resource_schema, event_time, event_type, event_payload)
+SELECT
+    r.resource_id,
+    r.resource_schema,
+    r.created_at,
+    e.event_type,
+    CASE e.ord
+        WHEN 1 THEN jsonb_build_object('Created', jsonb_build_object(
             'event_time', r.created_at,
             'id',         r.resource_id::text,
             'headers',    jsonb_build_object(
-                               'account',     r.account_id,
+                               -- `AccountRef` is an object, not a bare DID. A
+                               -- string here deserializes into a ref carrying
+                               -- only `did`, and applying a manifest over such
+                               -- a resource then fails to load it. Mirror what
+                               -- the runtime writes: id (account resource UUID),
+                               -- did and name.
+                               'account',     jsonb_build_object(
+                                                  'id',   acc.resource_id::text,
+                                                  'did',  acc.id,
+                                                  'name', acc.account_name
+                                              ),
                                'name',        r.resource_name,
                                'labels',      r.labels,
                                'annotations', '{}'::jsonb
                            ),
-            'spec',        r.spec
+            'spec',       r.spec
         ))
-    FROM var_resources r
-    RETURNING resource_id, event_id
-),
-ins_started AS (
-    INSERT INTO resource_events (resource_id, resource_schema, event_time, event_type, event_payload)
-    SELECT
-        r.resource_id,
-        r.resource_schema,
-        r.created_at,
-        'ReconciliationStarted',
-        jsonb_build_object('ReconciliationStarted', jsonb_build_object(
-            'event_time', r.created_at,
-            'id',        r.resource_id::text,
-            'generation', 1
-        ))
-    FROM var_resources r
-    RETURNING resource_id, event_id
-),
-ins_succeeded AS (
-    INSERT INTO resource_events (resource_id, resource_schema, event_time, event_type, event_payload)
-    SELECT
-        r.resource_id,
-        r.resource_schema,
-        r.created_at,
-        'ReconciliationSucceeded',
-        jsonb_build_object('ReconciliationSucceeded', jsonb_build_object(
-            'event_time', r.created_at,
-            'id',        r.resource_id::text,
-            'generation', 1,
-            'success',    jsonb_build_object()
-        ))
-    FROM var_resources r
-    RETURNING resource_id, event_id
-)
-UPDATE resources
-SET last_event_id = ins_succeeded.event_id
-FROM ins_succeeded
-WHERE resources.resource_id = ins_succeeded.resource_id;
-
-/* ------------------------------ */
-/* Resource events: SecretSet     */
-/* ------------------------------ */
-
-WITH
-secret_resources AS (
-    SELECT resource_id, resource_schema, account_id, resource_name, labels, created_at, spec, status
-    FROM resources
-    WHERE resource_schema = 'https://opendatafabric.org/schemas/config/v1alpha1/SecretSet'
-      AND resource_name LIKE 'legacy-secrets-%'
-      AND last_event_id IS NULL
-),
-ins_created AS (
-    INSERT INTO resource_events (resource_id, resource_schema, event_time, event_type, event_payload)
-    SELECT
-        r.resource_id,
-        r.resource_schema,
-        r.created_at,
-        'Created',
-        jsonb_build_object('Created', jsonb_build_object(
+        WHEN 2 THEN jsonb_build_object('ReconciliationStarted', jsonb_build_object(
             'event_time', r.created_at,
             'id',         r.resource_id::text,
-            'headers',    jsonb_build_object(
-                               'account',     r.account_id,
-                               'name',        r.resource_name,
-                               'labels',      r.labels,
-                               'annotations', '{}'::jsonb
-                           ),
-            'spec',        r.spec
-        ))
-    FROM secret_resources r
-    RETURNING resource_id, event_id
-),
-ins_started AS (
-    INSERT INTO resource_events (resource_id, resource_schema, event_time, event_type, event_payload)
-    SELECT
-        r.resource_id,
-        r.resource_schema,
-        r.created_at,
-        'ReconciliationStarted',
-        jsonb_build_object('ReconciliationStarted', jsonb_build_object(
-            'event_time', r.created_at,
-            'id',        r.resource_id::text,
             'generation', 1
         ))
-    FROM secret_resources r
-    RETURNING resource_id, event_id
-),
-ins_succeeded AS (
-    INSERT INTO resource_events (resource_id, resource_schema, event_time, event_type, event_payload)
-    SELECT
-        r.resource_id,
-        r.resource_schema,
-        r.created_at,
-        'ReconciliationSucceeded',
-        jsonb_build_object('ReconciliationSucceeded', jsonb_build_object(
+        ELSE jsonb_build_object('ReconciliationSucceeded', jsonb_build_object(
             'event_time', r.created_at,
-            'id',        r.resource_id::text,
+            'id',         r.resource_id::text,
             'generation', 1,
             'success',    jsonb_build_object()
         ))
-    FROM secret_resources r
-    RETURNING resource_id, event_id
-)
+    END
+FROM resources r
+JOIN accounts acc ON acc.id = r.account_id
+CROSS JOIN (VALUES
+    (1, 'Created'),
+    (2, 'ReconciliationStarted'),
+    (3, 'ReconciliationSucceeded')
+) AS e(ord, event_type)
+WHERE r.resource_schema IN (
+        'https://opendatafabric.org/schemas/config/v1alpha1/VariableSet',
+        'https://opendatafabric.org/schemas/config/v1alpha1/SecretSet')
+  AND (r.resource_name LIKE 'legacy-vars-%' OR r.resource_name LIKE 'legacy-secrets-%')
+  AND r.last_event_id IS NULL
+ORDER BY r.resource_id, e.ord;
+
+/* ------------------------------ */
+
+/* Point each resource at its terminal (ReconciliationSucceeded) event. */
 UPDATE resources
-SET last_event_id = ins_succeeded.event_id
-FROM ins_succeeded
-WHERE resources.resource_id = ins_succeeded.resource_id;
+SET last_event_id = last_events.event_id
+FROM (
+    SELECT resource_id, MAX(event_id) AS event_id
+    FROM resource_events
+    GROUP BY resource_id
+) AS last_events
+WHERE resources.resource_id = last_events.resource_id
+  AND resources.last_event_id IS NULL
+  AND (resources.resource_name LIKE 'legacy-vars-%'
+    OR resources.resource_name LIKE 'legacy-secrets-%');
 
 /* ------------------------------ */
 

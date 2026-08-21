@@ -250,11 +250,19 @@ SELECT
     r.resource_schema,
     r.created_at,
     'Created',
+    -- `AccountRef` is an object, not a bare DID. A string here deserializes
+    -- into a ref carrying only `did`, and applying a manifest over such a
+    -- resource then fails to load it. Mirror what the runtime writes:
+    -- id (account resource UUID), did and name.
     '{"Created":{"event_time":"' || r.created_at || '","id":"' || r.resource_id
-        || '","headers":{"account":"' || r.account_id
-        || '","name":"' || r.resource_name
+        || '","headers":{"account":' || json_object(
+                 'id',   acc.resource_id,
+                 'did',  acc.id,
+                 'name', acc.account_name)
+        || ',"name":"' || r.resource_name
         || '","labels":' || r.labels || ',"annotations":{}},"spec":' || r.spec || '}}'
 FROM resources r
+JOIN accounts acc ON acc.id = r.account_id
 WHERE r.resource_schema = 'https://opendatafabric.org/schemas/config/v1alpha1/VariableSet'
   AND r.resource_name LIKE 'legacy-vars-%'
   AND r.last_event_id IS NULL;
@@ -312,11 +320,16 @@ SELECT
     r.resource_schema,
     r.created_at,
     'Created',
+    -- See the VariableSet block above: `account` must be an AccountRef object.
     '{"Created":{"event_time":"' || r.created_at || '","id":"' || r.resource_id
-        || '","headers":{"account":"' || r.account_id
-        || '","name":"' || r.resource_name
+        || '","headers":{"account":' || json_object(
+                 'id',   acc.resource_id,
+                 'did',  acc.id,
+                 'name', acc.account_name)
+        || ',"name":"' || r.resource_name
         || '","labels":' || r.labels || ',"annotations":{}},"spec":' || r.spec || '}}'
 FROM resources r
+JOIN accounts acc ON acc.id = r.account_id
 WHERE r.resource_schema = 'https://opendatafabric.org/schemas/config/v1alpha1/SecretSet'
   AND r.resource_name LIKE 'legacy-secrets-%'
   AND r.last_event_id IS NULL;
