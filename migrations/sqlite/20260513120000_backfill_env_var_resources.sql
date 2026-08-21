@@ -5,7 +5,8 @@
 -- SQLite variant – uses lower(hex(randomblob(N))) for UUID generation and
 -- json_object / json_group_object for JSON construction.
 --
--- The migration is idempotent: ON CONFLICT DO NOTHING guards every INSERT.
+-- The migration is idempotent: `INSERT OR IGNORE` guards every INSERT (the
+-- Postgres variant uses `ON CONFLICT DO NOTHING` for the same purpose).
 
 /* ------------------------------ */
 /* VariableSet resources          */

@@ -1322,9 +1322,10 @@ Three things about it are easy to get wrong:
 - **It has no `maxLength`.** The `environment` label caps values at 63 characters; a `did:odf:` DID
   is **77**. Copying that cap would reject every legitimate value. Pinned by
   `test_accepts_a_dataset_did_longer_than_the_environment_label_limit`.
-- **It is scoped, so it is not free-form anywhere else.** Its `ResourceContext` scope is the only
-  use of that variant in the codebase. Authored on a resource outside the `config` context, the
-  short name stays free-form (with the usual warning) while the full URI is a hard `Inapplicable`
+- **It is scoped, so it is not free-form anywhere else.** It is the only *dispatcher* using the
+  `ResourceContext` scope variant — every built-in extension is `AnyResource` — so it is also the
+  only exercise of that code path. Authored on a resource outside the `config` context, the short
+  name stays free-form (with the usual warning) while the full URI is a hard `Inapplicable`
   rejection — the standard registered-extension asymmetry.
 
 **Read path.** [`DatasetEnvVarResolverImpl`](/src/domain/configuration/services/src/dataset_env_var_resolver.rs)
