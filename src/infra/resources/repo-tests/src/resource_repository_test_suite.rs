@@ -2630,3 +2630,272 @@ pub async fn test_deleted_account_falls_back_to_sentinel_name(catalog: &Catalog)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Seeds one labelled resource with an explicit `created_at`, so ordering
+/// assertions do not depend on wall-clock spacing between inserts.
+async fn seed_labelled_resource_created_at(
+    repo: &dyn ResourceRepository,
+    projection_repo: &dyn ResourceLabelProjectionRepository,
+    account_handle: &odf::AccountHandle,
+    schema: &TypeUri,
+    name: &str,
+    created_at: chrono::DateTime<Utc>,
+    labels: &[(&str, &str)],
+) -> ResourceID {
+    let mut snapshot = make_test_snapshot(account_handle, schema, name);
+    snapshot.id = repo.new_resource_id().await.unwrap();
+    snapshot.headers.id = snapshot.id;
+    snapshot.headers.created_at = created_at;
+    snapshot.headers.updated_at = created_at;
+    snapshot.headers.labels.entries = labels
+        .iter()
+        .map(|(k, v)| ((*k).parse().unwrap(), serde_json::json!(v)))
+        .collect();
+
+    repo.create_resource(&snapshot).await.unwrap();
+
+    let entries = labels
+        .iter()
+        .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
+        .collect::<Vec<_>>();
+    projection_repo
+        .replace_entries(&snapshot.id, &entries)
+        .await
+        .unwrap();
+
+    snapshot.id
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_find_resource_ids_by_schema_and_label_returns_nothing_initially(
+    catalog: &Catalog,
+) {
+    let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+
+    let ids = repo
+        .find_resource_ids_by_schema_and_label(&TEST_KIND, "environment", "prod")
+        .await
+        .unwrap();
+
+    assert!(ids.is_empty());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Ordering is by `created_at`, ascending — the property that replaces an
+/// explicit ordering column. Seeded out of chronological order so a backend
+/// that returns insertion order fails.
+pub async fn test_find_resource_ids_by_schema_and_label_orders_by_created_at(catalog: &Catalog) {
+    let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+    let projection_repo = catalog
+        .get_one::<dyn ResourceLabelProjectionRepository>()
+        .unwrap();
+
+    let account_handle = odf::AccountHandle::new_test("test-account");
+    let base = Utc::now() - chrono::Duration::days(3);
+
+    let middle = seed_labelled_resource_created_at(
+        repo.as_ref(),
+        projection_repo.as_ref(),
+        &account_handle,
+        &TEST_KIND,
+        "middle",
+        base + chrono::Duration::hours(2),
+        &[("environment", "prod")],
+    )
+    .await;
+    let oldest = seed_labelled_resource_created_at(
+        repo.as_ref(),
+        projection_repo.as_ref(),
+        &account_handle,
+        &TEST_KIND,
+        "oldest",
+        base,
+        &[("environment", "prod")],
+    )
+    .await;
+    let newest = seed_labelled_resource_created_at(
+        repo.as_ref(),
+        projection_repo.as_ref(),
+        &account_handle,
+        &TEST_KIND,
+        "newest",
+        base + chrono::Duration::hours(4),
+        &[("environment", "prod")],
+    )
+    .await;
+
+    let ids = repo
+        .find_resource_ids_by_schema_and_label(&TEST_KIND, "environment", "prod")
+        .await
+        .unwrap();
+
+    assert_eq!(
+        ids,
+        vec![oldest, middle, newest],
+        "expected oldest-first ordering by created_at"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// The label pair must match on both halves, and the schema must match too:
+/// an identical label on another type is a different association entirely.
+pub async fn test_find_resource_ids_by_schema_and_label_discriminates_schema_and_value(
+    catalog: &Catalog,
+) {
+    let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+    let projection_repo = catalog
+        .get_one::<dyn ResourceLabelProjectionRepository>()
+        .unwrap();
+
+    let account_handle = odf::AccountHandle::new_test("test-account");
+    let now = Utc::now();
+
+    let wanted = seed_labelled_resource_created_at(
+        repo.as_ref(),
+        projection_repo.as_ref(),
+        &account_handle,
+        &KIND_A,
+        "wanted",
+        now,
+        &[("environment", "prod")],
+    )
+    .await;
+    // Same label, different schema.
+    seed_labelled_resource_created_at(
+        repo.as_ref(),
+        projection_repo.as_ref(),
+        &account_handle,
+        &KIND_B,
+        "other-schema",
+        now,
+        &[("environment", "prod")],
+    )
+    .await;
+    // Same schema and key, different value.
+    seed_labelled_resource_created_at(
+        repo.as_ref(),
+        projection_repo.as_ref(),
+        &account_handle,
+        &KIND_A,
+        "other-value",
+        now,
+        &[("environment", "staging")],
+    )
+    .await;
+    // Same schema and value, different key.
+    seed_labelled_resource_created_at(
+        repo.as_ref(),
+        projection_repo.as_ref(),
+        &account_handle,
+        &KIND_A,
+        "other-key",
+        now,
+        &[("team", "prod")],
+    )
+    .await;
+
+    let ids = repo
+        .find_resource_ids_by_schema_and_label(&KIND_A, "environment", "prod")
+        .await
+        .unwrap();
+
+    assert_eq!(ids, vec![wanted]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Deleting a resource must retract the association, even though the caller
+/// never passes a "live only" flag.
+pub async fn test_find_resource_ids_by_schema_and_label_excludes_deleted(catalog: &Catalog) {
+    let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+    let projection_repo = catalog
+        .get_one::<dyn ResourceLabelProjectionRepository>()
+        .unwrap();
+
+    let account_handle = odf::AccountHandle::new_test("test-account");
+    let now = Utc::now();
+
+    let live = seed_labelled_resource_created_at(
+        repo.as_ref(),
+        projection_repo.as_ref(),
+        &account_handle,
+        &TEST_KIND,
+        "live",
+        now,
+        &[("environment", "prod")],
+    )
+    .await;
+    let doomed = seed_labelled_resource_created_at(
+        repo.as_ref(),
+        projection_repo.as_ref(),
+        &account_handle,
+        &TEST_KIND,
+        "doomed",
+        now + chrono::Duration::hours(1),
+        &[("environment", "prod")],
+    )
+    .await;
+
+    let mut snapshot = repo.find_resource_snapshot_by_id(&doomed).await.unwrap().unwrap();
+    snapshot.headers.deleted_at = Some(Utc::now());
+    repo.update_resource(&snapshot, snapshot.last_event_id)
+        .await
+        .unwrap();
+
+    let ids = repo
+        .find_resource_ids_by_schema_and_label(&TEST_KIND, "environment", "prod")
+        .await
+        .unwrap();
+
+    assert_eq!(ids, vec![live], "a deleted resource must drop out");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Deliberately account-agnostic: callers resolving a label-carried
+/// association do not know which account owns the labelled resource.
+pub async fn test_find_resource_ids_by_schema_and_label_spans_accounts(catalog: &Catalog) {
+    let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
+    let projection_repo = catalog
+        .get_one::<dyn ResourceLabelProjectionRepository>()
+        .unwrap();
+
+    let now = Utc::now();
+
+    let first = seed_labelled_resource_created_at(
+        repo.as_ref(),
+        projection_repo.as_ref(),
+        &odf::AccountHandle::new_test("account-one"),
+        &TEST_KIND,
+        "owned-by-one",
+        now,
+        &[("environment", "prod")],
+    )
+    .await;
+    let second = seed_labelled_resource_created_at(
+        repo.as_ref(),
+        projection_repo.as_ref(),
+        &odf::AccountHandle::new_test("account-two"),
+        &TEST_KIND,
+        "owned-by-two",
+        now + chrono::Duration::hours(1),
+        &[("environment", "prod")],
+    )
+    .await;
+
+    let ids = repo
+        .find_resource_ids_by_schema_and_label(&TEST_KIND, "environment", "prod")
+        .await
+        .unwrap();
+
+    assert_eq!(
+        ids,
+        vec![first, second],
+        "the lookup must span accounts, not filter to one"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

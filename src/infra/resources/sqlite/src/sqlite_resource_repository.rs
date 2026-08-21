@@ -495,6 +495,39 @@ impl ResourceRepository for SqliteResourceRepository {
         }))
     }
 
+    async fn find_resource_ids_by_schema_and_label(
+        &self,
+        schema: &TypeUri,
+        label_key: &str,
+        label_value: &str,
+    ) -> Result<Vec<ResourceID>, InternalError> {
+        let mut tr = self.transaction.lock().await;
+        let connection_mut = tr.connection_mut().await?;
+
+        let resource_schema = schema.as_str();
+
+        let rows = sqlx::query!(
+            r#"
+            SELECT r.resource_id as "id: uuid::Uuid"
+            FROM resources r
+            JOIN resource_labels_projection rl ON rl.resource_id = r.resource_id
+            WHERE r.resource_schema = $1
+              AND rl.label_key = $2
+              AND rl.label_value = $3
+              AND r.deleted_at IS NULL
+            ORDER BY r.created_at ASC, r.resource_id ASC
+            "#,
+            resource_schema,
+            label_key,
+            label_value,
+        )
+        .fetch_all(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(rows.into_iter().map(|row| ResourceID::new(row.id)).collect())
+    }
+
     async fn find_resource_snapshots_by_schema_and_ids(
         &self,
         schema: &TypeUri,
