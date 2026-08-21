@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 use database_common_macros::{
     transactional_method1,
+    transactional_static_method,
     transactional_static_method1,
     transactional_static_method2,
 };
@@ -23,7 +24,9 @@ use kamu_datasets::{
     ClassifyByAllowanceResponse,
     DatasetAction,
     DatasetActionAuthorizer,
+    DatasetEnvVarResolver,
     DatasetRegistry,
+    SecretsEncryptionConfig,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -404,6 +407,27 @@ impl PullDatasetUseCaseImpl {
         let local_target = pii.target.get_handle().as_local_ref();
         let original_request = pii.maybe_original_request.clone();
 
+        // Env vars are per-dataset, but `PollingIngestOptions` is call-level:
+        // one `PullOptions` may cover many datasets, and `execute_all_owned`
+        // has no dataset list at all for a caller to pre-resolve from. So they
+        // are resolved here, at the per-dataset fan-out, rather than being
+        // filled in by each caller -- which is how `kamu pull` came to ingest
+        // with an empty map while the server task path resolved correctly.
+        //
+        // A caller that already resolved them (the update task planner) keeps
+        // its own map: only an empty one is filled in.
+        let ingest_options = if ingest_options.dataset_env_vars.is_empty() {
+            let dataset_id = pii.target.get_handle().id.clone();
+            let dataset_env_vars =
+                Self::resolve_dataset_env_vars(catalog.clone(), &dataset_id).await?;
+            PollingIngestOptions {
+                dataset_env_vars,
+                ..ingest_options
+            }
+        } else {
+            ingest_options
+        };
+
         let ingest_response = Self::ingest_loop(
             pii,
             ingest_options,
@@ -422,6 +446,53 @@ impl PullDatasetUseCaseImpl {
                 Err(e) => Err(e.into()),
             },
         })
+    }
+
+    /// Resolves the dataset's effective env vars, honoring the same feature
+    /// gate the CLI applies when registering env-var services: the feature is
+    /// on only when secrets encryption is both configured and enabled. With it
+    /// off this returns an empty map without touching the database, so a plain
+    /// `kamu pull` in a workspace with no encryption key does no extra lookups.
+    ///
+    /// Both dependencies are resolved leniently rather than injected: this use
+    /// case is embedded in contexts that never register them (tests, and any
+    /// embedder not wiring the configuration domain), and an absent dependency
+    /// means exactly the same thing as a disabled feature. Requiring them would
+    /// turn an optional feature into a hard wiring obligation for every caller.
+    ///
+    /// Deliberately goes through `DatasetEnvVarResolver` and not
+    /// `DatasetEnvVarService`, whose null implementation has `unreachable!()`
+    /// bodies.
+    async fn resolve_dataset_env_vars(
+        catalog: dill::Catalog,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<HashMap<String, kamu_datasets::DatasetEnvVar>, InternalError> {
+        let feature_enabled = catalog
+            .get_one::<SecretsEncryptionConfig>()
+            .ok()
+            .is_some_and(|config| config.enabled && config.encryption_key.is_some());
+
+        if !feature_enabled {
+            return Ok(HashMap::new());
+        }
+
+        Self::resolve_dataset_env_vars_transactionally(catalog, dataset_id).await
+    }
+
+    /// Split from [`Self::resolve_dataset_env_vars`] so the transaction is only
+    /// opened once the feature is known to be on. The resolver is fetched from
+    /// the *transaction* catalog, since it depends on transaction-scoped
+    /// repositories.
+    #[transactional_static_method()]
+    async fn resolve_dataset_env_vars_transactionally(
+        catalog: dill::Catalog,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<HashMap<String, kamu_datasets::DatasetEnvVar>, InternalError> {
+        let Ok(resolver) = transaction_catalog.get_one::<dyn DatasetEnvVarResolver>() else {
+            return Ok(HashMap::new());
+        };
+
+        resolver.resolve_effective_env_vars(dataset_id).await
     }
 
     #[transactional_static_method1(dataset_registry: Arc<dyn DatasetRegistry>)]
