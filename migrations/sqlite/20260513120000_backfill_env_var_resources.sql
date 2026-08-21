@@ -1,5 +1,6 @@
 -- Backfill: promote legacy dataset_env_vars rows into managed VariableSet / SecretSet
--- resources so the new DatasetEnvVarResolver can serve them through bindings.
+-- resources so the new DatasetEnvVarResolver can serve them through the
+-- `legacy-config-target-dataset` label.
 --
 -- SQLite variant – uses lower(hex(randomblob(N))) for UUID generation and
 -- json_object / json_group_object for JSON construction.
@@ -34,7 +35,10 @@ SELECT
     de.owner_id                                                                 AS account_id,
     'https://opendatafabric.org/schemas/config/v1alpha1/VariableSet' AS resource_schema,                                                          
     'legacy-vars-' || substr(dev.dataset_id, 9)                                 AS resource_name,
-    '{}'                                                                        AS labels,
+    json_object(
+        'https://kamu.dev/schemas/resource/v1alpha1/labels/LegacyConfigTargetDataset',
+        dev.dataset_id
+    )                                                                           AS labels,
     '{}'                                                                        AS annotations,
     json_object(
         'variables',
@@ -114,25 +118,6 @@ JOIN resources r
 WHERE dev.secret_nonce IS NULL;
 
 /* ------------------------------ */
-
-INSERT OR IGNORE INTO config_dataset_variable_set_bindings (
-    dataset_id,
-    resource_id,
-    binding_order
-)
-SELECT DISTINCT
-    dev.dataset_id,
-    r.resource_id,
-    0                                                                           AS binding_order
-FROM dataset_env_vars dev
-JOIN dataset_entries de ON de.dataset_id = dev.dataset_id
-JOIN resources r
-    ON r.account_id = de.owner_id
-   AND r.resource_schema = 'https://opendatafabric.org/schemas/config/v1alpha1/VariableSet'
-   AND r.resource_name = 'legacy-vars-' || substr(dev.dataset_id, 9)
-WHERE dev.secret_nonce IS NULL;
-
-/* ------------------------------ */
 /* SecretSet resources            */
 /* ------------------------------ */
 
@@ -160,7 +145,10 @@ SELECT
     de.owner_id                                                                 AS account_id,
     'https://opendatafabric.org/schemas/config/v1alpha1/SecretSet' AS resource_schema,                                                          
     'legacy-secrets-' || substr(dev.dataset_id, 9)                              AS resource_name,
-    '{}'                                                                        AS labels,
+    json_object(
+        'https://kamu.dev/schemas/resource/v1alpha1/labels/LegacyConfigTargetDataset',
+        dev.dataset_id
+    )                                                                           AS labels,
     '{}'                                                                        AS annotations,
     json_object(
         'secrets',
@@ -252,25 +240,6 @@ JOIN resources r
 WHERE dev.secret_nonce IS NOT NULL;
 
 /* ------------------------------ */
-
-INSERT OR IGNORE INTO config_dataset_secret_set_bindings (
-    dataset_id,
-    resource_id,
-    binding_order
-)
-SELECT DISTINCT
-    dev.dataset_id,
-    r.resource_id,
-    0                                                                           AS binding_order
-FROM dataset_env_vars dev
-JOIN dataset_entries de ON de.dataset_id = dev.dataset_id
-JOIN resources r
-    ON r.account_id = de.owner_id
-   AND r.resource_schema = 'https://opendatafabric.org/schemas/config/v1alpha1/SecretSet'
-   AND r.resource_name = 'legacy-secrets-' || substr(dev.dataset_id, 9)
-WHERE dev.secret_nonce IS NOT NULL;
-
-/* ------------------------------ */
 /* Resource events: VariableSet   */
 /* ------------------------------ */
 
@@ -283,7 +252,7 @@ SELECT
     '{"Created":{"event_time":"' || r.created_at || '","id":"' || r.resource_id
         || '","headers":{"account":"' || r.account_id
         || '","name":"' || r.resource_name
-        || '","labels":{},"annotations":{}},"spec":' || r.spec || '}}'
+        || '","labels":' || r.labels || ',"annotations":{}},"spec":' || r.spec || '}}'
 FROM resources r
 WHERE r.resource_schema = 'https://opendatafabric.org/schemas/config/v1alpha1/VariableSet'
   AND r.resource_name LIKE 'legacy-vars-%'
@@ -345,7 +314,7 @@ SELECT
     '{"Created":{"event_time":"' || r.created_at || '","id":"' || r.resource_id
         || '","headers":{"account":"' || r.account_id
         || '","name":"' || r.resource_name
-        || '","labels":{},"annotations":{}},"spec":' || r.spec || '}}'
+        || '","labels":' || r.labels || ',"annotations":{}},"spec":' || r.spec || '}}'
 FROM resources r
 WHERE r.resource_schema = 'https://opendatafabric.org/schemas/config/v1alpha1/SecretSet'
   AND r.resource_name LIKE 'legacy-secrets-%'

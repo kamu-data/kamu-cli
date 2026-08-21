@@ -1,5 +1,6 @@
 -- Backfill: promote legacy dataset_env_vars rows into managed VariableSet / SecretSet
--- resources so the new DatasetEnvVarResolver can serve them through bindings.
+-- resources so the new DatasetEnvVarResolver can serve them through the
+-- `legacy-config-target-dataset` label.
 --
 -- Each dataset that has at least one plaintext env var gets exactly one VariableSet
 -- resource named  "legacy-vars-<dataset_id>" owned by the dataset owner.
@@ -8,7 +9,8 @@
 --
 -- For both resource types we also create:
 --   * A generation-1 projection entry row per variable / secret.
---   * A binding row connecting the dataset to the resource at order 0.
+--   * A `legacy-config-target-dataset` label carrying the dataset DID, which
+--     is what associates the resource with its dataset.
 --
 -- The migration is idempotent: ON CONFLICT DO NOTHING guards every INSERT.
 
@@ -36,7 +38,10 @@ SELECT
     de.owner_id                                                                 AS account_id,
     'https://opendatafabric.org/schemas/config/v1alpha1/VariableSet'                 AS resource_schema,
     'legacy-vars-' || substring(dev.dataset_id, 9)                              AS resource_name,
-    '{}'::jsonb                                                                 AS labels,
+    jsonb_build_object(
+        'https://kamu.dev/schemas/resource/v1alpha1/labels/LegacyConfigTargetDataset',
+        dev.dataset_id
+    )                                                                           AS labels,
     '{}'::jsonb                                                                 AS annotations,
     jsonb_build_object(
         'variables',
@@ -114,26 +119,6 @@ WHERE dev.secret_nonce IS NULL
 ON CONFLICT (resource_id, resource_generation, variable_key) DO NOTHING;
 
 /* ------------------------------ */
-
-INSERT INTO config_dataset_variable_set_bindings (
-    dataset_id,
-    resource_id,
-    binding_order
-)
-SELECT DISTINCT
-    dev.dataset_id,
-    r.resource_id,
-    0                                                                           AS binding_order
-FROM dataset_env_vars dev
-JOIN dataset_entries de ON de.dataset_id = dev.dataset_id
-JOIN resources r
-    ON r.account_id = de.owner_id
-   AND r.resource_schema = 'https://opendatafabric.org/schemas/config/v1alpha1/VariableSet'
-   AND r.resource_name = 'legacy-vars-' || substring(dev.dataset_id, 9)
-WHERE dev.secret_nonce IS NULL
-ON CONFLICT DO NOTHING;
-
-/* ------------------------------ */
 /* SecretSet resources            */
 /* ------------------------------ */
 
@@ -157,7 +142,10 @@ SELECT
     de.owner_id                                                                 AS account_id,
     'https://opendatafabric.org/schemas/config/v1alpha1/SecretSet'                   AS resource_schema,
     'legacy-secrets-' || substring(dev.dataset_id, 9)                           AS resource_name,
-    '{}'::jsonb                                                                 AS labels,
+    jsonb_build_object(
+        'https://kamu.dev/schemas/resource/v1alpha1/labels/LegacyConfigTargetDataset',
+        dev.dataset_id
+    )                                                                           AS labels,
     '{}'::jsonb                                                                 AS annotations,
     jsonb_build_object(
         'secrets',
@@ -247,32 +235,12 @@ WHERE dev.secret_nonce IS NOT NULL
 ON CONFLICT (resource_id, resource_generation, secret_key) DO NOTHING;
 
 /* ------------------------------ */
-
-INSERT INTO config_dataset_secret_set_bindings (
-    dataset_id,
-    resource_id,
-    binding_order
-)
-SELECT DISTINCT
-    dev.dataset_id,
-    r.resource_id,
-    0                                                                           AS binding_order
-FROM dataset_env_vars dev
-JOIN dataset_entries de ON de.dataset_id = dev.dataset_id
-JOIN resources r
-    ON r.account_id = de.owner_id
-   AND r.resource_schema = 'https://opendatafabric.org/schemas/config/v1alpha1/SecretSet'
-   AND r.resource_name = 'legacy-secrets-' || substring(dev.dataset_id, 9)
-WHERE dev.secret_nonce IS NOT NULL
-ON CONFLICT DO NOTHING;
-
-/* ------------------------------ */
 /* Resource events: VariableSet   */
 /* ------------------------------ */
 
 WITH
 var_resources AS (
-    SELECT resource_id, resource_schema, account_id, resource_name, created_at, spec, status
+    SELECT resource_id, resource_schema, account_id, resource_name, labels, created_at, spec, status
     FROM resources
     WHERE resource_schema = 'https://opendatafabric.org/schemas/config/v1alpha1/VariableSet'
       AND resource_name LIKE 'legacy-vars-%'
@@ -291,7 +259,7 @@ ins_created AS (
             'headers',    jsonb_build_object(
                                'account',     r.account_id,
                                'name',        r.resource_name,
-                               'labels',      '{}'::jsonb,
+                               'labels',      r.labels,
                                'annotations', '{}'::jsonb
                            ),
             'spec',        r.spec
@@ -341,7 +309,7 @@ WHERE resources.resource_id = ins_succeeded.resource_id;
 
 WITH
 secret_resources AS (
-    SELECT resource_id, resource_schema, account_id, resource_name, created_at, spec, status
+    SELECT resource_id, resource_schema, account_id, resource_name, labels, created_at, spec, status
     FROM resources
     WHERE resource_schema = 'https://opendatafabric.org/schemas/config/v1alpha1/SecretSet'
       AND resource_name LIKE 'legacy-secrets-%'
@@ -360,7 +328,7 @@ ins_created AS (
             'headers',    jsonb_build_object(
                                'account',     r.account_id,
                                'name',        r.resource_name,
-                               'labels',      '{}'::jsonb,
+                               'labels',      r.labels,
                                'annotations', '{}'::jsonb
                            ),
             'spec',        r.spec
