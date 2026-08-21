@@ -15,9 +15,10 @@ use crate::{DatasetEnvVar, GetDatasetEnvVarError};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Resolves the effective flat env-var map for a dataset by merging all
-/// ordered variable-set and secret-set bindings. Secrets override variables on
-/// key collision. Used by update planning, not the legacy UI path.
+/// Resolves the effective flat env-var map for a dataset by merging every
+/// variable set and secret set labelled as targeting it. Within each kind the
+/// oldest set wins on key collision; secrets then override variables. Used by
+/// update planning, not the legacy UI path.
 #[async_trait::async_trait]
 pub trait DatasetEnvVarResolver: Send + Sync {
     async fn resolve_effective_env_vars(
