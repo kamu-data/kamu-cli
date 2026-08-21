@@ -353,7 +353,8 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
-    fixture = resource_repo_suite::test_find_resource_ids_by_schema_and_label_spans_accounts,
+    fixture =
+        resource_repo_suite::test_find_resource_ids_by_schema_and_label_excludes_other_accounts,
     harness = SqliteResourceRepositoryHarness
 );
 

@@ -1331,8 +1331,11 @@ Three things about it are easy to get wrong:
 **Read path.** [`DatasetEnvVarResolverImpl`](/src/domain/configuration/services/src/dataset_env_var_resolver.rs)
 resolves a dataset's effective env vars by calling
 `ResourceRepository::find_resource_ids_by_schema_and_label` once per kind, filtering on the
-canonical URI and the dataset DID. That query is account-agnostic by design — the legacy
-association is not account-scoped — and is served by the `resource_labels_projection` covering index
+canonical URI and the dataset DID, **scoped to the dataset's owner**. Ownership scoping is a
+security boundary: nothing validates the label value on write, so any account may stamp any dataset
+DID on a resource it owns, and an unscoped lookup would let a stranger inject variables into someone
+else's ingest — or shadow them with a `SecretSet`, which overrides variables regardless of age. The
+query is served by the `resource_labels_projection` covering index
 ([label filtering](resources-label-filtering.md#resource_labels_projection-index)), so it is as cheap
 as the association table it replaced.
 

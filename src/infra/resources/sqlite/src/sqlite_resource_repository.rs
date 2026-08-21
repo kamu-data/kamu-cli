@@ -497,6 +497,7 @@ impl ResourceRepository for SqliteResourceRepository {
 
     async fn find_resource_ids_by_schema_and_label(
         &self,
+        account_id: &odf::AccountID,
         schema: &TypeUri,
         label_key: &str,
         label_value: &str,
@@ -505,18 +506,22 @@ impl ResourceRepository for SqliteResourceRepository {
         let connection_mut = tr.connection_mut().await?;
 
         let resource_schema = schema.as_str();
+        let account_id_stack = account_id.as_stack_string();
+        let account_id_str = account_id_stack.as_str();
 
         let rows = sqlx::query!(
             r#"
             SELECT r.resource_id as "id: uuid::Uuid"
             FROM resources r
             JOIN resource_labels_projection rl ON rl.resource_id = r.resource_id
-            WHERE r.resource_schema = $1
-              AND rl.label_key = $2
-              AND rl.label_value = $3
+            WHERE r.account_id = $1
+              AND r.resource_schema = $2
+              AND rl.label_key = $3
+              AND rl.label_value = $4
               AND r.deleted_at IS NULL
             ORDER BY r.created_at ASC, r.resource_id ASC
             "#,
+            account_id_str,
             resource_schema,
             label_key,
             label_value,
