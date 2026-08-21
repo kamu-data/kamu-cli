@@ -125,8 +125,6 @@ pub fn configure_database_components(
 
             b.add::<kamu_configuration_postgres::PostgresVariableSetProjectionRepository>();
             b.add::<kamu_configuration_postgres::PostgresSecretSetProjectionRepository>();
-            b.add::<kamu_configuration_postgres::PostgresDatasetVariableSetBindingRepository>();
-            b.add::<kamu_configuration_postgres::PostgresDatasetSecretSetBindingRepository>();
 
             b.add::<kamu_flow_system_postgres::PostgresFlowConfigurationEventStore>();
             b.add::<kamu_flow_system_postgres::PostgresFlowTriggerEventStore>();
@@ -173,8 +171,6 @@ pub fn configure_database_components(
 
             b.add::<kamu_configuration_inmem::InMemoryVariableSetProjectionRepository>();
             b.add::<kamu_configuration_inmem::InMemorySecretSetProjectionRepository>();
-            b.add::<kamu_configuration_inmem::InMemoryDatasetVariableSetBindingRepository>();
-            b.add::<kamu_configuration_inmem::InMemoryDatasetSecretSetBindingRepository>();
 
             b.add::<kamu_flow_system_inmem::InMemoryFlowConfigurationEventStore>();
             b.add::<kamu_flow_system_inmem::InMemoryFlowTriggerEventStore>();
@@ -217,8 +213,6 @@ pub fn configure_database_components(
 
             b.add::<kamu_configuration_sqlite::SqliteVariableSetProjectionRepository>();
             b.add::<kamu_configuration_sqlite::SqliteSecretSetProjectionRepository>();
-            b.add::<kamu_configuration_sqlite::SqliteDatasetVariableSetBindingRepository>();
-            b.add::<kamu_configuration_sqlite::SqliteDatasetSecretSetBindingRepository>();
 
             b.add::<kamu_flow_system_sqlite::SqliteFlowConfigurationEventStore>();
             b.add::<kamu_flow_system_sqlite::SqliteFlowTriggerEventStore>();
@@ -280,8 +274,6 @@ pub fn configure_in_memory_components(b: &mut CatalogBuilder) {
 
     b.add::<kamu_configuration_inmem::InMemoryVariableSetProjectionRepository>();
     b.add::<kamu_configuration_inmem::InMemorySecretSetProjectionRepository>();
-    b.add::<kamu_configuration_inmem::InMemoryDatasetVariableSetBindingRepository>();
-    b.add::<kamu_configuration_inmem::InMemoryDatasetSecretSetBindingRepository>();
 
     b.add::<kamu_auth_rebac_inmem::InMemoryRebacRepository>();
 

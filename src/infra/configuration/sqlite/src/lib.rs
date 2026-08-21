@@ -10,12 +10,8 @@
 // Re-exports
 pub use kamu_configuration as domain;
 
-mod sqlite_dataset_secret_set_binding_repository;
-mod sqlite_dataset_variable_set_binding_repository;
 mod sqlite_secret_set_projection_repository;
 mod sqlite_variable_set_projection_repository;
 
-pub use sqlite_dataset_secret_set_binding_repository::*;
-pub use sqlite_dataset_variable_set_binding_repository::*;
 pub use sqlite_secret_set_projection_repository::*;
 pub use sqlite_variable_set_projection_repository::*;

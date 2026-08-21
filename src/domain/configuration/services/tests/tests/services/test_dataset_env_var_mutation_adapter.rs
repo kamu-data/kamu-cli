@@ -466,7 +466,11 @@ async fn test_managed_resources_are_stamped_with_the_target_dataset_label() {
 
     harness
         .mutation_adapter()
-        .upsert_env_var(&dataset_id, "FOO", &DatasetEnvVarValue::Regular("bar".into()))
+        .upsert_env_var(
+            &dataset_id,
+            "FOO",
+            &DatasetEnvVarValue::Regular("bar".into()),
+        )
         .await
         .unwrap();
     harness

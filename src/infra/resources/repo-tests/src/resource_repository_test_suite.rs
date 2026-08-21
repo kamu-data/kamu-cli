@@ -2839,7 +2839,11 @@ pub async fn test_find_resource_ids_by_schema_and_label_excludes_deleted(catalog
     )
     .await;
 
-    let mut snapshot = repo.find_resource_snapshot_by_id(&doomed).await.unwrap().unwrap();
+    let mut snapshot = repo
+        .find_resource_snapshot_by_id(&doomed)
+        .await
+        .unwrap()
+        .unwrap();
     snapshot.headers.deleted_at = Some(Utc::now());
     repo.update_resource(&snapshot, snapshot.last_event_id)
         .await
