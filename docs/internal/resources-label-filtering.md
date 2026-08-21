@@ -115,8 +115,12 @@ may span several schemas — a type-less selector (what the CLI's `%` all-types
 token produces, coalescing to `ResourceScope::AnyType`) resolves its labels
 against every registered schema. Within that one selector the resolved trees are
 compared: today they are always equal — the built-in `environment` label applies
-to every resource type and unregistered short names resolve to free-form
-identity — so the uniform single-predicate path is taken. Per-*schema* divergence
+to every resource type, unregistered short names resolve to free-form identity,
+and the one *scoped* registered label
+([`legacy-config-target-dataset`](resources-framework.md#legacy-dataset-association--the-legacy-config-target-dataset-label),
+which applies to `VariableSet`/`SecretSet` only) drops the schemas it cannot
+apply to from the candidate set rather than resolving differently on them — so
+the uniform single-predicate path is taken. Per-*schema* divergence
 remains *reserved, not implemented*: it is guarded by an assertion and a comment
 rather than by OR-across-types SQL that no test could exercise. Note this is a
 different axis from per-*selector* filtering, which **is** implemented: several
@@ -153,6 +157,7 @@ walks `True`/`Eq`/`And` into a flat key/value pair list and returns
 check applies **per conjunction level** — two `Or` branches may legitimately test
 the same key.
 
+<a id="resource_labels_projection-index"></a>
 **`resource_labels_projection` index.** A normalized Postgres/SQLite table
 (`resource_id, label_key, label_value`, `PK(resource_id, label_key)`, `FK →
 resources ON DELETE CASCADE`, covering index on `(label_key, label_value,

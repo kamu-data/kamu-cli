@@ -88,6 +88,7 @@ make clippy
     - [How reconciliation is scheduled](#how-reconciliation-is-scheduled)
     - [Lifecycle state machine](#lifecycle-state-machine)
   - [14. Concrete resource types (`kamu-configuration`)](#14-concrete-resource-types-kamu-configuration)
+    - [Legacy dataset association — the `legacy-config-target-dataset` label](#legacy-dataset-association--the-legacy-config-target-dataset-label)
     - [Secret handling invariant](#secret-handling-invariant)
     - [Recipe: how to add a new resource type](#recipe-how-to-add-a-new-resource-type)
   - [15. Tests](#15-tests)
@@ -1285,6 +1286,72 @@ list of literals per type, so the two representations cannot drift.)
 | --- | --- | --- | --- | --- |
 | `https://opendatafabric.org/schemas/config/v1alpha1/VariableSet` | `VariableSet` | `variablesets`, `vs` | `spec.variables` (name → `{ value }`; accepts scalar shorthand on input via ODF's `StructOrString`, but always round-trips as the structured `{ value }` form once parsed — RFC-adopted, see [`VariableSetSpec`](/src/domain/configuration/domain/src/resources/variable_set/spec.rs)) | Projects variable entries; status uses the standard ODF resource status. |
 | `https://opendatafabric.org/schemas/config/v1alpha1/SecretSet` | `SecretSet` | `secretsets`, `ss` | `spec.secrets` (name → plaintext / `{ value }` / `{ value, contentEncoding: jwe }`) | Materializes an **encrypted** read-side projection (`SecretSetEntry`) for consumers (see [Secret handling](#secret-handling-invariant) for where encryption actually happens). |
+
+### Legacy dataset association — the `legacy-config-target-dataset` label
+
+> **Temporary.** This label exists only to keep pre-resources ingest flows working, and is expected
+> to be removed once `Source` can reference a `VariableSet` directly. Deleting it will need no DB
+> migration — that is the main reason it is a label and not a table.
+
+In the old env-var system every value lived in the context of a dataset. Config resources are
+top-level and account-scoped, so something has to carry that association until resource references
+land. That something is a registered label whose value is the target dataset's DID:
+
+```yaml
+headers:
+  labels:
+    legacy-config-target-dataset: did:odf:fed012126262…
+```
+
+| | |
+| --- | --- |
+| Canonical URI | `https://kamu.dev/schemas/resource/v1alpha1/labels/LegacyConfigTargetDataset` |
+| Short name | `legacy-config-target-dataset` |
+| Value | A full `did:odf:…` DID, validated with `odf::DatasetID::from_did_str` |
+| Scope | `ResourceExtensionScopeMeta::ResourceContext` over the ODF `config` context — `VariableSet` and `SecretSet` only |
+| Registered by | **`kamu-configuration-services`**, not `kamu-resources-services` |
+
+Three things about it are easy to get wrong:
+
+- **It lives in the configuration domain.** Unlike `environment` and `description`, which are
+  built-in and registered by `register_built_in_label_schema_dispatchers`, this label is declared in
+  [`validation/labels/legacy_config_target_dataset.rs`](/src/domain/configuration/domain/src/validation/labels/legacy_config_target_dataset.rs)
+  and registered by `register_configuration_label_schema_dispatchers`. A label that only means
+  something to config resources has no business in the generic resources domain — and putting it
+  there would have made the eventual deletion a cross-domain change.
+- **It has no `maxLength`.** The `environment` label caps values at 63 characters; a `did:odf:` DID
+  is **77**. Copying that cap would reject every legitimate value. Pinned by
+  `test_accepts_a_dataset_did_longer_than_the_environment_label_limit`.
+- **It is scoped, so it is not free-form anywhere else.** Its `ResourceContext` scope is the only
+  use of that variant in the codebase. Authored on a resource outside the `config` context, the
+  short name stays free-form (with the usual warning) while the full URI is a hard `Inapplicable`
+  rejection — the standard registered-extension asymmetry.
+
+**Read path.** [`DatasetEnvVarResolverImpl`](/src/domain/configuration/services/src/dataset_env_var_resolver.rs)
+resolves a dataset's effective env vars by calling
+`ResourceRepository::find_resource_ids_by_schema_and_label` once per kind, filtering on the
+canonical URI and the dataset DID. That query is account-agnostic by design — the legacy
+association is not account-scoped — and is served by the `resource_labels_projection` covering index
+([label filtering](resources-label-filtering.md#resource_labels_projection-index)), so it is as cheap
+as the association table it replaced.
+
+**Ordering.** The binding table had an explicit `binding_order` column. The label has no such field,
+so ties are broken by `created_at ASC, resource_id ASC` — oldest wins within each kind, and secrets
+still override variables wholesale. `created_at` is deliberate: `updated_at` would let editing an
+older set silently flip precedence.
+
+**Write path.** [`DatasetEnvVarMutationAdapterImpl`](/src/domain/configuration/services/src/dataset_env_var_mutation_adapter.rs)
+stamps the label on the resources it auto-manages. Note that it still *finds* those resources by
+their well-known name (`legacy-vars-<did>` / `legacy-secrets-<did>`), not by the label: the legacy
+read-modify-write path owns exactly one resource per dataset per kind, whereas the label may
+legitimately match several user-authored sets that this path must not touch.
+
+**Dataset deletion leaves the label behind, deliberately.** There is no consumer that strips the
+label when a dataset is deleted. The label is inert once the dataset is gone — nothing resolves env
+vars for a nonexistent dataset — and the resource remains a legitimate user-owned top-level
+resource that the user may still want. The bindings system did have such a consumer, but it was
+also strictly worse: neither Postgres nor SQLite had an FK on `dataset_id`, so a lost lifecycle
+message already orphaned binding rows.
 
 ### Secret handling invariant
 
