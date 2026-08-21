@@ -81,7 +81,10 @@ impl InMemoryResourceRepository {
     /// Resolves the account repository from the current (possibly
     /// transaction-scoped) catalog. See the note on [`Self::catalog`].
     fn account_repository(&self) -> Option<Arc<dyn AccountRepository>> {
-        self.catalog.upgrade().get_one::<dyn AccountRepository>().ok()
+        self.catalog
+            .upgrade()
+            .get_one::<dyn AccountRepository>()
+            .ok()
     }
 
     /// Re-resolves the owning account's current resource id + name, live on
@@ -123,14 +126,15 @@ impl InMemoryResourceRepository {
             None => Ok(Vec::new()),
         };
 
-        let identity_by_did: HashMap<odf::AccountID, (odf::ResourceID, odf::AccountName)> = accounts
-            .map(|accounts| {
-                accounts
-                    .into_iter()
-                    .map(|account| (account.id, (account.resource_id, account.account_name)))
-                    .collect()
-            })
-            .unwrap_or_default();
+        let identity_by_did: HashMap<odf::AccountID, (odf::ResourceID, odf::AccountName)> =
+            accounts
+                .map(|accounts| {
+                    accounts
+                        .into_iter()
+                        .map(|account| (account.id, (account.resource_id, account.account_name)))
+                        .collect()
+                })
+                .unwrap_or_default();
 
         snapshots
             .into_iter()
@@ -160,7 +164,9 @@ impl InMemoryResourceRepository {
         account_did: &odf::AccountID,
     ) -> (odf::ResourceID, odf::AccountName) {
         let account = match self.account_repository() {
-            Some(account_repository) => account_repository.get_account_by_id(account_did).await.ok(),
+            Some(account_repository) => {
+                account_repository.get_account_by_id(account_did).await.ok()
+            }
             None => None,
         };
 
