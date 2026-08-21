@@ -1315,7 +1315,7 @@ Three things about it are easy to get wrong:
 
 - **It lives in the configuration domain.** Unlike `environment` and `description`, which are
   built-in and registered by `register_built_in_label_schema_dispatchers`, this label is declared in
-  [`validation/labels/legacy_config_target_dataset.rs`](/src/domain/configuration/domain/src/validation/labels/legacy_config_target_dataset.rs)
+  [`validation/schemas/labels/legacy_config_target_dataset.rs`](/src/domain/configuration/domain/src/validation/schemas/labels/legacy_config_target_dataset.rs)
   and registered by `register_configuration_label_schema_dispatchers`. A label that only means
   something to config resources has no business in the generic resources domain — and putting it
   there would have made the eventual deletion a cross-domain change.

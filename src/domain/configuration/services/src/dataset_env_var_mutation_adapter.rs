@@ -27,6 +27,7 @@ use kamu_configuration::{
     VariableSetSpecInput,
 };
 use kamu_datasets::{
+    DatasetEntry,
     DatasetEntryRepository,
     DatasetEnvVar,
     DatasetEnvVarMutationAdapter,
@@ -95,14 +96,7 @@ impl DatasetEnvVarMutationAdapter for DatasetEnvVarMutationAdapterImpl {
         key: &str,
         value: &DatasetEnvVarValue,
     ) -> Result<DatasetEnvVarUpsertResult, InternalError> {
-        let dataset_entry = self
-            .dataset_entry_repository
-            .get_dataset_entry(dataset_id)
-            .await
-            .map_err(|e| match e {
-                GetDatasetEntryError::NotFound(nf) => nf.int_err(),
-                GetDatasetEntryError::Internal(e) => e,
-            })?;
+        let dataset_entry = self.get_dataset_entry(dataset_id).await?;
 
         match value {
             DatasetEnvVarValue::Regular(plaintext) => {
@@ -133,9 +127,14 @@ impl DatasetEnvVarMutationAdapter for DatasetEnvVarMutationAdapterImpl {
         dataset_id: &odf::DatasetID,
         dataset_env_var_key: &str,
     ) -> Result<(), DeleteDatasetEnvVarError> {
+        // Resolved once and threaded down: every lookup below is scoped to the
+        // dataset owner, and re-fetching the entry per lookup would query the
+        // same row up to three times in one call.
+        let owner_id = self.get_dataset_entry(dataset_id).await?.owner_id;
+
         // Try deleting as a variable
         let was_variable = self
-            .delete_if_variable(dataset_id, dataset_env_var_key)
+            .delete_if_variable(dataset_id, &owner_id, dataset_env_var_key)
             .await?;
         if was_variable {
             return Ok(());
@@ -143,7 +142,7 @@ impl DatasetEnvVarMutationAdapter for DatasetEnvVarMutationAdapterImpl {
 
         // Maybe it's a secret then?
         let was_secret = self
-            .delete_if_secret(dataset_id, dataset_env_var_key)
+            .delete_if_secret(dataset_id, &owner_id, dataset_env_var_key)
             .await?;
         if was_secret {
             return Ok(());
@@ -214,7 +213,7 @@ impl DatasetEnvVarMutationAdapterImpl {
         // If key is new to variables, it may be a class conversion from secret →
         // variable
         let existed_as_secret = if !exists_as_variable {
-            self.delete_if_secret(dataset_id, key).await?
+            self.delete_if_secret(dataset_id, account_did, key).await?
         } else {
             false
         };
@@ -292,7 +291,8 @@ impl DatasetEnvVarMutationAdapterImpl {
 
         // If key is new to secrets, it may be a class conversion from variable → secret
         let existed_as_variable = if !exists_as_secret {
-            self.delete_if_variable(dataset_id, key).await?
+            self.delete_if_variable(dataset_id, account_did, key)
+                .await?
         } else {
             false
         };
@@ -501,9 +501,10 @@ impl DatasetEnvVarMutationAdapterImpl {
     async fn delete_if_secret(
         &self,
         dataset_id: &odf::DatasetID,
+        owner_id: &odf::AccountID,
         key: &str,
     ) -> Result<bool, InternalError> {
-        match self.find_secret(dataset_id, key).await? {
+        match self.find_secret(dataset_id, owner_id, key).await? {
             Some((resource_id, key)) => self
                 .delete_secret(resource_id, &key)
                 .await
@@ -521,9 +522,10 @@ impl DatasetEnvVarMutationAdapterImpl {
     async fn delete_if_variable(
         &self,
         dataset_id: &odf::DatasetID,
+        owner_id: &odf::AccountID,
         key: &str,
     ) -> Result<bool, InternalError> {
-        match self.find_variable(dataset_id, key).await? {
+        match self.find_variable(dataset_id, owner_id, key).await? {
             Some((resource_id, key)) => self
                 .delete_variable(resource_id, &key)
                 .await
@@ -539,11 +541,12 @@ impl DatasetEnvVarMutationAdapterImpl {
     async fn find_secret(
         &self,
         dataset_id: &odf::DatasetID,
+        owner_id: &odf::AccountID,
         key: &str,
     ) -> Result<Option<(ResourceID, String)>, InternalError> {
         let Some(resource_id) = self
             .find_legacy_resource_id(
-                dataset_id,
+                owner_id,
                 SecretSetResource::schema(),
                 &Self::legacy_secret_set_resource_name(dataset_id),
             )
@@ -567,11 +570,12 @@ impl DatasetEnvVarMutationAdapterImpl {
     async fn find_variable(
         &self,
         dataset_id: &odf::DatasetID,
+        owner_id: &odf::AccountID,
         key: &str,
     ) -> Result<Option<(ResourceID, String)>, InternalError> {
         let Some(resource_id) = self
             .find_legacy_resource_id(
-                dataset_id,
+                owner_id,
                 VariableSetResource::schema(),
                 &Self::legacy_variable_set_resource_name(dataset_id),
             )
@@ -592,7 +596,24 @@ impl DatasetEnvVarMutationAdapterImpl {
         Ok(None)
     }
 
-    /// Locates the single auto-managed legacy resource for a dataset.
+    /// Loads the dataset entry, whose `owner_id` scopes every resource lookup
+    /// this adapter makes. Resolved once per public entry point and threaded
+    /// down, rather than re-fetched by each lookup.
+    async fn get_dataset_entry(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<DatasetEntry, InternalError> {
+        self.dataset_entry_repository
+            .get_dataset_entry(dataset_id)
+            .await
+            .map_err(|e| match e {
+                GetDatasetEntryError::NotFound(nf) => nf.int_err(),
+                GetDatasetEntryError::Internal(e) => e,
+            })
+    }
+
+    /// Locates the single auto-managed legacy resource for a dataset, among
+    /// `owner_id`'s resources.
     ///
     /// Deliberately by well-known name rather than by the target label: the
     /// legacy read-modify-write path owns exactly one resource per dataset per
@@ -600,21 +621,12 @@ impl DatasetEnvVarMutationAdapterImpl {
     /// sets that this path must not touch.
     async fn find_legacy_resource_id(
         &self,
-        dataset_id: &odf::DatasetID,
+        owner_id: &odf::AccountID,
         schema: &TypeUri,
         resource_name: &ResourceName,
     ) -> Result<Option<ResourceID>, InternalError> {
-        let dataset_entry = self
-            .dataset_entry_repository
-            .get_dataset_entry(dataset_id)
-            .await
-            .map_err(|e| match e {
-                GetDatasetEntryError::NotFound(nf) => nf.int_err(),
-                GetDatasetEntryError::Internal(e) => e,
-            })?;
-
         self.generic_resource_query_service
-            .find_resource_id_by_name(&dataset_entry.owner_id, schema, resource_name)
+            .find_resource_id_by_name(owner_id, schema, resource_name)
             .await
     }
 
