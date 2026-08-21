@@ -31,7 +31,12 @@ async fn test_oldest_labelled_variable_set_wins() {
         .seed_variable_set_targeting(&account, &dataset_id, "newer-vars", now)
         .await;
     let id_a = harness
-        .seed_variable_set_targeting(&account, &dataset_id, "older-vars", now - Duration::hours(1))
+        .seed_variable_set_targeting(
+            &account,
+            &dataset_id,
+            "older-vars",
+            now - Duration::hours(1),
+        )
         .await;
 
     let var_repo = harness.variable_set_projection_repo();

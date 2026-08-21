@@ -346,7 +346,7 @@ async fn test_deleted_for_variable_set_with_multiple_ids_removes_all() {
 #[test_log::test(tokio::test)]
 async fn test_deleted_for_variable_set_removes_only_targeted_id() {
     // Only the UID(s) named in the Deleted message lose their entries;
-    // unrelated UIDs (e.g. from a different dataset's binding) are untouched.
+    // unrelated UIDs (e.g. belonging to a different resource) are untouched.
     let harness = ConfigurationResourceLifecycleConsumerHarness::new();
     let id_deleted = harness.alloc_id();
     let id_other = harness.alloc_id();

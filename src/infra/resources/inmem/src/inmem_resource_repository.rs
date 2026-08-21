@@ -58,18 +58,30 @@ struct State {
 
 pub struct InMemoryResourceRepository {
     state: Arc<Mutex<State>>,
-    account_repository: Arc<dyn AccountRepository>,
+    // Resolved lazily per call rather than injected: this repository is a
+    // singleton, while `AccountRepository` may be a transaction-scoped
+    // component (it is under the MySQL prototype, where only the accounts
+    // domain has a real backend and the rest fall back to in-memory). Holding
+    // an `Arc` to it here would pin a transaction reference for the lifetime
+    // of the process and trip the leaked-transaction guard.
+    catalog: CatalogWeakRef,
 }
 
 #[component(pub)]
 #[interface(dyn ResourceRepository)]
 #[scope(Singleton)]
 impl InMemoryResourceRepository {
-    pub fn new(account_repository: Arc<dyn AccountRepository>) -> Self {
+    pub fn new(catalog: CatalogWeakRef) -> Self {
         Self {
             state: Arc::new(Mutex::new(State::default())),
-            account_repository,
+            catalog,
         }
+    }
+
+    /// Resolves the account repository from the current (possibly
+    /// transaction-scoped) catalog. See the note on [`Self::catalog`].
+    fn account_repository(&self) -> Option<Arc<dyn AccountRepository>> {
+        self.catalog.upgrade().get_one::<dyn AccountRepository>().ok()
     }
 
     /// Re-resolves the owning account's current resource id + name, live on
@@ -106,10 +118,12 @@ impl InMemoryResourceRepository {
             .map(|snapshot| &snapshot.headers.account.did)
             .collect();
 
-        let identity_by_did: HashMap<odf::AccountID, (odf::ResourceID, odf::AccountName)> = self
-            .account_repository
-            .get_accounts_by_ids(&account_ids)
-            .await
+        let accounts = match self.account_repository() {
+            Some(account_repository) => account_repository.get_accounts_by_ids(&account_ids).await,
+            None => Ok(Vec::new()),
+        };
+
+        let identity_by_did: HashMap<odf::AccountID, (odf::ResourceID, odf::AccountName)> = accounts
             .map(|accounts| {
                 accounts
                     .into_iter()
@@ -145,11 +159,14 @@ impl InMemoryResourceRepository {
         &self,
         account_did: &odf::AccountID,
     ) -> (odf::ResourceID, odf::AccountName) {
-        self.account_repository
-            .get_account_by_id(account_did)
-            .await
+        let account = match self.account_repository() {
+            Some(account_repository) => account_repository.get_account_by_id(account_did).await.ok(),
+            None => None,
+        };
+
+        account
             .map(|account| (account.resource_id, account.account_name))
-            .unwrap_or_else(|_| {
+            .unwrap_or_else(|| {
                 (
                     deleted_account_resource_id_sentinel(),
                     deleted_account_name_sentinel(),

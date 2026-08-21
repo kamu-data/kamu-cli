@@ -391,7 +391,8 @@ impl DatasetEnvVarMutationAdapterImpl {
                     ids: vec![resource_id],
                 })
                 .await
-                .int_err()?;        } else {
+                .int_err()?;
+        } else {
             let headers = ResourceHeadersInput {
                 id: Some(snapshot.headers.id),
                 account: Some(odf::metadata::auth::AccountRef {
@@ -450,7 +451,8 @@ impl DatasetEnvVarMutationAdapterImpl {
                     ids: vec![resource_id],
                 })
                 .await
-                .int_err()?;        } else {
+                .int_err()?;
+        } else {
             let new_spec = SecretSetSpecInput::new(odf::metadata::config::SecretSetSpecInput {
                 secrets: odf::metadata::config::Secrets {
                     entries: decrypted

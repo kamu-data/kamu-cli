@@ -41,10 +41,8 @@ fn test_label_resolves_on_config_resources() {
     ] {
         let harness = LabelScopeHarness::new(schema);
 
-        let resolved = harness.canonicalize_labels(vec![(
-            SHORT_NAME,
-            serde_json::json!(SAMPLE_DATASET_DID),
-        )]);
+        let resolved =
+            harness.canonicalize_labels(vec![(SHORT_NAME, serde_json::json!(SAMPLE_DATASET_DID))]);
 
         assert_eq!(
             resolved.entries,

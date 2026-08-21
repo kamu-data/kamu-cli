@@ -316,7 +316,8 @@ impl InMemoryResourceRepositoryHarness {
 
 database_transactional_test!(
     storage = inmem,
-    fixture = resource_repo_suite::test_find_resource_ids_by_schema_and_label_returns_nothing_initially,
+    fixture =
+        resource_repo_suite::test_find_resource_ids_by_schema_and_label_returns_nothing_initially,
     harness = InMemoryResourceRepositoryHarness
 );
 

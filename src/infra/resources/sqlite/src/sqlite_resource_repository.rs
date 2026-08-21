@@ -525,7 +525,10 @@ impl ResourceRepository for SqliteResourceRepository {
         .await
         .int_err()?;
 
-        Ok(rows.into_iter().map(|row| ResourceID::new(row.id)).collect())
+        Ok(rows
+            .into_iter()
+            .map(|row| ResourceID::new(row.id))
+            .collect())
     }
 
     async fn find_resource_snapshots_by_schema_and_ids(
