@@ -23,7 +23,7 @@ doctest = false
 
 [features]
 default = []
-testing = ["dep:kamu-configuration-inmem", "dep:kamu-resources-inmem", "dep:oop", "kamu-resources-services/testing"]
+testing = ["dep:kamu-configuration-inmem", "dep:kamu-datasets-inmem", "dep:kamu-resources-inmem", "dep:oop", "kamu-resources-services/testing"]
 
 
 [dependencies]
@@ -36,12 +36,16 @@ messaging-outbox = { workspace = true }
 time-source = { workspace = true }
 kamu-accounts = { workspace = true }
 kamu-configuration = { workspace = true }
-kamu-configuration-inmem = { workspace = true, optional = true }
 kamu-datasets = { workspace = true }
 kamu-resources = { workspace = true }
-kamu-resources-inmem = { workspace = true, optional = true }
 kamu-resources-services = { workspace = true }
 odf = { workspace = true }
+
+# Used only by `src/testing/`, which is a library module gated behind the
+# `testing` feature -- so these cannot be dev-dependencies.
+kamu-configuration-inmem = { workspace = true, optional = true }
+kamu-datasets-inmem = { workspace = true, optional = true }
+kamu-resources-inmem = { workspace = true, optional = true }
 
 async-trait = { version = "0.1", default-features = false }
 base64 = { version = "0.22", default-features = false, features = ["std"] }
@@ -61,7 +65,6 @@ oop = { version = "0.0.2", optional = true }
 kamu-accounts-services = { workspace = true }
 kamu-configuration-services = { workspace = true, features = ["testing"] }
 kamu-datasets = { workspace = true, features = ["testing"] }
-kamu-datasets-inmem = { workspace = true }
 odf = { workspace = true, features = ["testing"] }
 
 hex = { version = "0.4", default-features = false, features = ["std"] }

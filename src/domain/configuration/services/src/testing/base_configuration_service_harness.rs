@@ -52,7 +52,8 @@ impl BaseConfigurationServiceHarness {
         let base = BaseResourceServiceHarness::new_with_additional_dependencies(|b| {
             b.add_value(SecretsEncryptionConfig::sample())
                 .add::<InMemoryVariableSetProjectionRepository>()
-                .add::<InMemorySecretSetProjectionRepository>();
+                .add::<InMemorySecretSetProjectionRepository>()
+                .add::<kamu_datasets_inmem::InMemoryDatasetEntryRepository>();
 
             crate::register_dependencies(b);
         });
@@ -89,26 +90,37 @@ impl BaseConfigurationServiceHarness {
         self.catalog.get_one().unwrap()
     }
 
-    /// IDs of `VariableSet` resources labelled as targeting `dataset_id`,
-    /// oldest first — exactly what the resolver sees.
-    pub async fn variable_sets_targeting(&self, dataset_id: &odf::DatasetID) -> Vec<ResourceID> {
-        self.resources_targeting(VariableSetResource::schema(), dataset_id)
+    /// IDs of `owner`'s `VariableSet` resources labelled as targeting
+    /// `dataset_id`, oldest first — exactly what the resolver sees.
+    pub async fn variable_sets_targeting(
+        &self,
+        owner: &odf::AccountHandle,
+        dataset_id: &odf::DatasetID,
+    ) -> Vec<ResourceID> {
+        self.resources_targeting(owner, VariableSetResource::schema(), dataset_id)
             .await
     }
 
-    /// IDs of `SecretSet` resources labelled as targeting `dataset_id`.
-    pub async fn secret_sets_targeting(&self, dataset_id: &odf::DatasetID) -> Vec<ResourceID> {
-        self.resources_targeting(SecretSetResource::schema(), dataset_id)
+    /// IDs of `owner`'s `SecretSet` resources labelled as targeting
+    /// `dataset_id`.
+    pub async fn secret_sets_targeting(
+        &self,
+        owner: &odf::AccountHandle,
+        dataset_id: &odf::DatasetID,
+    ) -> Vec<ResourceID> {
+        self.resources_targeting(owner, SecretSetResource::schema(), dataset_id)
             .await
     }
 
     async fn resources_targeting(
         &self,
+        owner: &odf::AccountHandle,
         schema: &TypeUri,
         dataset_id: &odf::DatasetID,
     ) -> Vec<ResourceID> {
         self.resource_repo()
             .find_resource_ids_by_schema_and_label(
+                &owner.did,
                 schema,
                 RESOURCE_LABEL_LEGACY_CONFIG_TARGET_DATASET_SCHEMA_URI,
                 &dataset_id.as_did_str().to_string(),

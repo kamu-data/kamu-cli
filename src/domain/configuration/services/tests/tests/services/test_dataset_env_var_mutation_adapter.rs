@@ -44,7 +44,9 @@ async fn test_lazy_creation_of_variable_resource_on_first_upsert() {
     DatasetEnvVarServiceHarness::assert_upsert_created(&result);
 
     // A managed VariableSet resource must have been created
-    let targeting = harness.variable_sets_targeting(&dataset_id).await;
+    let targeting = harness
+        .variable_sets_targeting(&account_handle, &dataset_id)
+        .await;
     assert_eq!(
         targeting.len(),
         1,
@@ -80,7 +82,10 @@ async fn test_lazy_creation_of_variable_resource_on_first_upsert() {
 
     DatasetEnvVarServiceHarness::assert_upsert_updated(&result2);
     assert_eq!(
-        harness.variable_sets_targeting(&dataset_id).await.len(),
+        harness
+            .variable_sets_targeting(&account_handle, &dataset_id)
+            .await
+            .len(),
         1,
         "still exactly one labelled variable set after update"
     );
@@ -117,7 +122,9 @@ async fn test_lazy_creation_of_secret_resource_on_first_upsert() {
     DatasetEnvVarServiceHarness::assert_upsert_created(&result);
     assert!(result.dataset_env_var.secret_nonce.is_some());
 
-    let sec_targeting = harness.secret_sets_targeting(&dataset_id).await;
+    let sec_targeting = harness
+        .secret_sets_targeting(&account_handle, &dataset_id)
+        .await;
     assert_eq!(
         sec_targeting.len(),
         1,
@@ -170,7 +177,13 @@ async fn test_delete_last_variable_removes_resource() {
     DatasetEnvVarServiceHarness::assert_upsert_created(&r_b);
 
     // The labelled resource must exist at this point
-    assert_eq!(harness.variable_sets_targeting(&dataset_id).await.len(), 1);
+    assert_eq!(
+        harness
+            .variable_sets_targeting(&account_handle, &dataset_id)
+            .await
+            .len(),
+        1
+    );
 
     // Delete A — the resource stays and B is still visible
     harness
@@ -180,7 +193,10 @@ async fn test_delete_last_variable_removes_resource() {
         .unwrap();
 
     assert_eq!(
-        harness.variable_sets_targeting(&dataset_id).await.len(),
+        harness
+            .variable_sets_targeting(&account_handle, &dataset_id)
+            .await
+            .len(),
         1,
         "the labelled resource must survive a partial deletion"
     );
@@ -200,7 +216,10 @@ async fn test_delete_last_variable_removes_resource() {
         .unwrap();
 
     assert_eq!(
-        harness.variable_sets_targeting(&dataset_id).await.len(),
+        harness
+            .variable_sets_targeting(&account_handle, &dataset_id)
+            .await
+            .len(),
         0,
         "deleting the last entry must remove the labelled resource"
     );
@@ -255,7 +274,13 @@ async fn test_delete_last_secret_removes_resource() {
         .unwrap();
     DatasetEnvVarServiceHarness::assert_upsert_created(&r_b);
 
-    assert_eq!(harness.secret_sets_targeting(&dataset_id).await.len(), 1);
+    assert_eq!(
+        harness
+            .secret_sets_targeting(&account_handle, &dataset_id)
+            .await
+            .len(),
+        1
+    );
 
     // Delete SEC_A — the labelled resource must still exist
     harness
@@ -265,7 +290,10 @@ async fn test_delete_last_secret_removes_resource() {
         .unwrap();
 
     assert_eq!(
-        harness.secret_sets_targeting(&dataset_id).await.len(),
+        harness
+            .secret_sets_targeting(&account_handle, &dataset_id)
+            .await
+            .len(),
         1,
         "the labelled resource must survive a partial deletion"
     );
@@ -285,7 +313,10 @@ async fn test_delete_last_secret_removes_resource() {
         .unwrap();
 
     assert_eq!(
-        harness.secret_sets_targeting(&dataset_id).await.len(),
+        harness
+            .secret_sets_targeting(&account_handle, &dataset_id)
+            .await
+            .len(),
         0,
         "deleting the last secret must remove the labelled resource"
     );
@@ -327,8 +358,20 @@ async fn test_upsert_converts_variable_to_secret() {
         .await
         .unwrap();
     DatasetEnvVarServiceHarness::assert_upsert_created(&r1);
-    assert_eq!(harness.variable_sets_targeting(&dataset_id).await.len(), 1);
-    assert_eq!(harness.secret_sets_targeting(&dataset_id).await.len(), 0);
+    assert_eq!(
+        harness
+            .variable_sets_targeting(&account_handle, &dataset_id)
+            .await
+            .len(),
+        1
+    );
+    assert_eq!(
+        harness
+            .secret_sets_targeting(&account_handle, &dataset_id)
+            .await
+            .len(),
+        0
+    );
 
     // Re-upsert the same key as a secret — must convert
     let r2 = harness
@@ -349,7 +392,10 @@ async fn test_upsert_converts_variable_to_secret() {
 
     // Variable resource must be gone (or at least not hold FOO anymore)
     assert_eq!(
-        harness.secret_sets_targeting(&dataset_id).await.len(),
+        harness
+            .secret_sets_targeting(&account_handle, &dataset_id)
+            .await
+            .len(),
         1,
         "a labelled secret set must exist after conversion"
     );
@@ -389,8 +435,20 @@ async fn test_upsert_converts_secret_to_variable() {
         .await
         .unwrap();
     DatasetEnvVarServiceHarness::assert_upsert_created(&r1);
-    assert_eq!(harness.secret_sets_targeting(&dataset_id).await.len(), 1);
-    assert_eq!(harness.variable_sets_targeting(&dataset_id).await.len(), 0);
+    assert_eq!(
+        harness
+            .secret_sets_targeting(&account_handle, &dataset_id)
+            .await
+            .len(),
+        1
+    );
+    assert_eq!(
+        harness
+            .variable_sets_targeting(&account_handle, &dataset_id)
+            .await
+            .len(),
+        0
+    );
 
     // Re-upsert the same key as a regular variable — must convert
     let r2 = harness
@@ -410,7 +468,10 @@ async fn test_upsert_converts_secret_to_variable() {
     );
 
     assert_eq!(
-        harness.variable_sets_targeting(&dataset_id).await.len(),
+        harness
+            .variable_sets_targeting(&account_handle, &dataset_id)
+            .await
+            .len(),
         1,
         "a labelled variable set must exist after conversion"
     );
@@ -490,8 +551,12 @@ async fn test_managed_resources_are_stamped_with_the_target_dataset_label() {
     let expected_value = serde_json::Value::String(dataset_id.as_did_str().to_string());
 
     for ids in [
-        harness.variable_sets_targeting(&dataset_id).await,
-        harness.secret_sets_targeting(&dataset_id).await,
+        harness
+            .variable_sets_targeting(&account_handle, &dataset_id)
+            .await,
+        harness
+            .secret_sets_targeting(&account_handle, &dataset_id)
+            .await,
     ] {
         assert_eq!(ids.len(), 1);
 
@@ -531,7 +596,10 @@ async fn test_target_dataset_label_survives_an_update() {
     // A re-apply that dropped the label would leave the resource in place but
     // silently unresolvable, so assert through the label-driven lookup.
     assert_eq!(
-        harness.variable_sets_targeting(&dataset_id).await.len(),
+        harness
+            .variable_sets_targeting(&account_handle, &dataset_id)
+            .await
+            .len(),
         1,
         "the label must survive an update"
     );

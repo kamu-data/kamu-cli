@@ -2674,7 +2674,12 @@ pub async fn test_find_resource_ids_by_schema_and_label_returns_nothing_initiall
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
 
     let ids = repo
-        .find_resource_ids_by_schema_and_label(&TEST_KIND, "environment", "prod")
+        .find_resource_ids_by_schema_and_label(
+            &odf::AccountHandle::new_test("test-account").did,
+            &TEST_KIND,
+            "environment",
+            "prod",
+        )
         .await
         .unwrap();
 
@@ -2727,7 +2732,12 @@ pub async fn test_find_resource_ids_by_schema_and_label_orders_by_created_at(cat
     .await;
 
     let ids = repo
-        .find_resource_ids_by_schema_and_label(&TEST_KIND, "environment", "prod")
+        .find_resource_ids_by_schema_and_label(
+            &account_handle.did,
+            &TEST_KIND,
+            "environment",
+            "prod",
+        )
         .await
         .unwrap();
 
@@ -2798,7 +2808,7 @@ pub async fn test_find_resource_ids_by_schema_and_label_discriminates_schema_and
     .await;
 
     let ids = repo
-        .find_resource_ids_by_schema_and_label(&KIND_A, "environment", "prod")
+        .find_resource_ids_by_schema_and_label(&account_handle.did, &KIND_A, "environment", "prod")
         .await
         .unwrap();
 
@@ -2850,7 +2860,12 @@ pub async fn test_find_resource_ids_by_schema_and_label_excludes_deleted(catalog
         .unwrap();
 
     let ids = repo
-        .find_resource_ids_by_schema_and_label(&TEST_KIND, "environment", "prod")
+        .find_resource_ids_by_schema_and_label(
+            &account_handle.did,
+            &TEST_KIND,
+            "environment",
+            "prod",
+        )
         .await
         .unwrap();
 
@@ -2859,9 +2874,10 @@ pub async fn test_find_resource_ids_by_schema_and_label_excludes_deleted(catalog
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Deliberately account-agnostic: callers resolving a label-carried
-/// association do not know which account owns the labelled resource.
-pub async fn test_find_resource_ids_by_schema_and_label_spans_accounts(catalog: &Catalog) {
+/// The account filter is a security boundary: label values are unvalidated
+/// caller data, so without it one account's resource would be picked up by
+/// another account's lookup purely by carrying the same label value.
+pub async fn test_find_resource_ids_by_schema_and_label_excludes_other_accounts(catalog: &Catalog) {
     let repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
     let projection_repo = catalog
         .get_one::<dyn ResourceLabelProjectionRepository>()
@@ -2891,15 +2907,35 @@ pub async fn test_find_resource_ids_by_schema_and_label_spans_accounts(catalog: 
     .await;
 
     let ids = repo
-        .find_resource_ids_by_schema_and_label(&TEST_KIND, "environment", "prod")
+        .find_resource_ids_by_schema_and_label(
+            &odf::AccountHandle::new_test("account-one").did,
+            &TEST_KIND,
+            "environment",
+            "prod",
+        )
         .await
         .unwrap();
 
     assert_eq!(
         ids,
-        vec![first, second],
-        "the lookup must span accounts, not filter to one"
+        vec![first],
+        "only the querying account's resource may match; `second` carries the same label but \
+         belongs to another account"
     );
+
+    // And the other account sees only its own, so this is a filter rather than
+    // a blanket restriction to one privileged account.
+    let ids = repo
+        .find_resource_ids_by_schema_and_label(
+            &odf::AccountHandle::new_test("account-two").did,
+            &TEST_KIND,
+            "environment",
+            "prod",
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(ids, vec![second]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

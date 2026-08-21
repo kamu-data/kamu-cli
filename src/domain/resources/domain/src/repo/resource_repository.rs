@@ -89,16 +89,19 @@ pub trait ResourceRepository: Send + Sync {
         names: &[ResourceName],
     ) -> Result<Vec<(ResourceName, ResourceID)>, InternalError>;
 
-    /// Returns IDs of live resources of `schema` carrying the exact label
-    /// pair, oldest first.
+    /// Returns IDs of live resources of `schema` owned by `account_id` and
+    /// carrying the exact label pair, oldest first.
     ///
-    /// Unlike the scoped searches this spans accounts, because the callers
-    /// that resolve a label-carried association do not know, and must not
-    /// depend on, which account owns the labelled resource. Ordering is by
-    /// `created_at` rather than `updated_at` so that editing a resource never
-    /// reshuffles precedence among equally-labelled peers.
+    /// `account_id` is a security boundary, not an optimization: label values
+    /// are caller-supplied and unvalidated, so matching across accounts would
+    /// let one account's resource be picked up by another's lookup purely by
+    /// carrying the same value.
+    ///
+    /// Ordering is by `created_at` rather than `updated_at` so that editing a
+    /// resource never reshuffles precedence among equally-labelled peers.
     async fn find_resource_ids_by_schema_and_label(
         &self,
+        account_id: &odf::AccountID,
         schema: &TypeUri,
         label_key: &str,
         label_value: &str,

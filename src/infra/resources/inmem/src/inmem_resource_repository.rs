@@ -440,6 +440,7 @@ impl ResourceRepository for InMemoryResourceRepository {
 
     async fn find_resource_ids_by_schema_and_label(
         &self,
+        account_id: &odf::AccountID,
         schema: &TypeUri,
         label_key: &str,
         label_value: &str,
@@ -449,6 +450,7 @@ impl ResourceRepository for InMemoryResourceRepository {
         let mut matched = guard
             .snapshots_by_id
             .values()
+            .filter(|snapshot| snapshot.headers.account.did == *account_id)
             .filter(|snapshot| snapshot.schema == *schema)
             .filter(|snapshot| snapshot.headers.deleted_at.is_none())
             .filter(|snapshot| {

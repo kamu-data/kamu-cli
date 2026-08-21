@@ -19,9 +19,11 @@ use kamu_configuration::{
     VariableSetResource,
 };
 use kamu_datasets::{
+    DatasetEntryRepository,
     DatasetEnvVar,
     DatasetEnvVarNotFoundError,
     DatasetEnvVarResolver,
+    GetDatasetEntryError,
     GetDatasetEnvVarError,
 };
 use kamu_resources::{ResourceID, ResourceRepository, ResourceSchemaProvider, TypeUri};
@@ -32,6 +34,7 @@ use kamu_resources::{ResourceID, ResourceRepository, ResourceSchemaProvider, Typ
 #[dill::interface(dyn DatasetEnvVarResolver)]
 pub struct DatasetEnvVarResolverImpl {
     resource_repo: Arc<dyn ResourceRepository>,
+    dataset_entry_repository: Arc<dyn DatasetEntryRepository>,
     variable_set_projection_repo: Arc<dyn VariableSetProjectionRepository>,
     secret_set_projection_repo: Arc<dyn SecretSetProjectionRepository>,
 }
@@ -42,6 +45,12 @@ impl DatasetEnvVarResolverImpl {
     /// Resources of `schema` associated with `dataset_id` by the temporary
     /// `legacy-config-target-dataset` label, oldest first.
     ///
+    /// Restricted to the dataset owner's resources: nothing validates the
+    /// label value on write, so any account may stamp any dataset DID on a
+    /// resource it owns. Matching across accounts would let a stranger inject
+    /// variables into someone else's ingest, or override them with a
+    /// `SecretSet`.
+    ///
     /// Ordering is by creation time rather than an explicit ordering column,
     /// so editing a set never reshuffles precedence among its peers.
     async fn find_target_resource_ids(
@@ -49,8 +58,13 @@ impl DatasetEnvVarResolverImpl {
         schema: &TypeUri,
         dataset_id: &odf::DatasetID,
     ) -> Result<Vec<ResourceID>, InternalError> {
+        let Some(owner_id) = self.find_dataset_owner(dataset_id).await? else {
+            return Ok(Vec::new());
+        };
+
         self.resource_repo
             .find_resource_ids_by_schema_and_label(
+                &owner_id,
                 schema,
                 // Registered labels are stored under their canonical URI, not
                 // the short name the user authors.
@@ -58,6 +72,21 @@ impl DatasetEnvVarResolverImpl {
                 &dataset_id.as_did_str().to_string(),
             )
             .await
+    }
+
+    async fn find_dataset_owner(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<Option<odf::AccountID>, InternalError> {
+        match self
+            .dataset_entry_repository
+            .get_dataset_entry(dataset_id)
+            .await
+        {
+            Ok(entry) => Ok(Some(entry.owner_id)),
+            Err(GetDatasetEntryError::NotFound(_)) => Ok(None),
+            Err(GetDatasetEntryError::Internal(e)) => Err(e),
+        }
     }
 }
 
