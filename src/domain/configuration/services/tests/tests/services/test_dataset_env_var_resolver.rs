@@ -199,6 +199,116 @@ async fn test_secret_overrides_variable_on_same_key() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// Both read methods must agree on precedence. `get_env_var_by_entry_key` used
+// to scan variable sets first and return on the first hit, so a key shadowed by
+// a secret came back as plaintext through `exposedValue` while
+// `listEnvVariables` showed the secret — two sibling GraphQL fields disagreeing
+// about the same key.
+#[test_log::test(tokio::test)]
+async fn test_single_key_lookup_prefers_the_secret_like_the_merged_map() {
+    let harness = DatasetEnvVarServiceHarness::new();
+
+    let (_, dataset_id) = odf::DatasetID::new_generated_ed25519();
+    let (_, account_id) = odf::AccountID::new_generated_ed25519();
+
+    let account = odf::AccountHandle::new_test("test-account");
+    let now = Utc::now();
+
+    // Seed the variable set first so it is also the *older* of the two: the
+    // secret must win on kind, not merely on ordering.
+    let uid_var = harness
+        .seed_variable_set_targeting(&account, &dataset_id, "vars", now)
+        .await;
+    let uid_sec = harness
+        .seed_secret_set_targeting(
+            &account,
+            &dataset_id,
+            "secrets",
+            now + chrono::Duration::seconds(10),
+        )
+        .await;
+
+    harness
+        .variable_set_projection_repo()
+        .replace_entries(
+            &uid_var,
+            1,
+            &[
+                VariableSetEntry {
+                    entry_id: Uuid::new_v4(),
+                    account_id: account_id.clone(),
+                    key: "SHADOWED".to_string(),
+                    value: "plaintext-must-not-win".to_string(),
+                    created_at: now,
+                    updated_at: now,
+                },
+                VariableSetEntry {
+                    entry_id: Uuid::new_v4(),
+                    account_id: account_id.clone(),
+                    key: "VAR_ONLY".to_string(),
+                    value: "var-only".to_string(),
+                    created_at: now,
+                    updated_at: now,
+                },
+            ],
+        )
+        .await
+        .unwrap();
+
+    harness
+        .secret_set_projection_repo()
+        .replace_entries(
+            &uid_sec,
+            1,
+            &[SecretSetEntry {
+                entry_id: Uuid::new_v4(),
+                account_id: account_id.clone(),
+                key: "SHADOWED".to_string(),
+                value: b"encrypted-value".to_vec(),
+                secret_nonce: b"nonce".to_vec(),
+                created_at: now,
+                updated_at: now,
+            }],
+        )
+        .await
+        .unwrap();
+
+    // The single-key path must return the secret, not the variable.
+    let shadowed = harness
+        .resolver()
+        .get_env_var_by_entry_key(&dataset_id, "SHADOWED")
+        .await
+        .unwrap();
+    assert!(
+        shadowed.secret_nonce.is_some(),
+        "a key carried by both kinds must resolve to the secret"
+    );
+    assert_eq!(shadowed.value, b"encrypted-value".to_vec());
+
+    // And it must agree with the merged map for the same key.
+    let env_map = harness
+        .resolver()
+        .resolve_effective_env_vars(&dataset_id)
+        .await
+        .unwrap();
+    assert_eq!(env_map["SHADOWED"].value, shadowed.value);
+    assert_eq!(
+        env_map["SHADOWED"].secret_nonce, shadowed.secret_nonce,
+        "both read paths must agree on the same key"
+    );
+
+    // A variable-only key is still reachable through the single-key path.
+    let var_only = harness
+        .resolver()
+        .get_env_var_by_entry_key(&dataset_id, "VAR_ONLY")
+        .await
+        .unwrap();
+    assert!(var_only.secret_nonce.is_none());
+    assert_eq!(std::str::from_utf8(&var_only.value).unwrap(), "var-only");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[test_log::test(tokio::test)]
 async fn test_variable_sets_labelled_for_other_datasets_are_ignored() {
     let harness = DatasetEnvVarServiceHarness::new();
