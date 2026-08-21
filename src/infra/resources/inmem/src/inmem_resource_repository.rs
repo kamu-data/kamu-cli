@@ -415,6 +415,35 @@ impl ResourceRepository for InMemoryResourceRepository {
         }
     }
 
+    async fn find_resource_ids_by_schema_and_label(
+        &self,
+        schema: &TypeUri,
+        label_key: &str,
+        label_value: &str,
+    ) -> Result<Vec<ResourceID>, InternalError> {
+        let guard = self.state.lock().unwrap();
+
+        let mut matched = guard
+            .snapshots_by_id
+            .values()
+            .filter(|snapshot| snapshot.schema == *schema)
+            .filter(|snapshot| snapshot.headers.deleted_at.is_none())
+            .filter(|snapshot| {
+                // Reads labels off the snapshot rather than a projection, the
+                // same way `snapshot_matches_label_pairs` does, so the two
+                // cannot disagree about what is indexed.
+                string_label_entries(&snapshot.headers.labels)
+                    .iter()
+                    .any(|(key, value)| key == label_key && value == label_value)
+            })
+            .map(|snapshot| (snapshot.headers.created_at, snapshot.headers.id))
+            .collect::<Vec<_>>();
+
+        matched.sort();
+
+        Ok(matched.into_iter().map(|(_, id)| id).collect())
+    }
+
     async fn find_resource_snapshots_by_schema_and_ids(
         &self,
         schema: &TypeUri,

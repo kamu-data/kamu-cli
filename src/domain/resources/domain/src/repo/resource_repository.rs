@@ -89,6 +89,21 @@ pub trait ResourceRepository: Send + Sync {
         names: &[ResourceName],
     ) -> Result<Vec<(ResourceName, ResourceID)>, InternalError>;
 
+    /// Returns IDs of live resources of `schema` carrying the exact label
+    /// pair, oldest first.
+    ///
+    /// Unlike the scoped searches this spans accounts, because the callers
+    /// that resolve a label-carried association do not know, and must not
+    /// depend on, which account owns the labelled resource. Ordering is by
+    /// `created_at` rather than `updated_at` so that editing a resource never
+    /// reshuffles precedence among equally-labelled peers.
+    async fn find_resource_ids_by_schema_and_label(
+        &self,
+        schema: &TypeUri,
+        label_key: &str,
+        label_value: &str,
+    ) -> Result<Vec<ResourceID>, InternalError>;
+
     /// Label filtering rides on `scope`: each row carries the pairs it must
     /// satisfy, so one call may filter differently per type.
     async fn search_resource_handles(
