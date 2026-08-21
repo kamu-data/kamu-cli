@@ -156,3 +156,111 @@ pub async fn test_resources_extension_schema_behavior(ctx: ResourceCtx) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Scenario: the temporary `legacy-config-target-dataset` label
+//
+// The label that replaced the dataset-resource bindings table. It is registered
+// by the *configuration* domain (not the resources domain) and scoped to the
+// ODF `config` context, so it applies to `VariableSet` and `SecretSet` and to
+// nothing else. Applying it through the real CLI proves the registration is
+// actually wired into the running binary — a resolver-level unit test cannot
+// catch a missing `register_dependencies` call.
+//
+// Applies a `SecretSet`, so it is registered with
+// `Options::with_kamu_config(fixtures::SECRETS_ENCRYPTION_KAMU_CONFIG)`.
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+pub async fn test_resources_legacy_config_target_dataset_label(ctx: ResourceCtx) {
+    // A real dataset DID: 77 characters, comfortably longer than the 63-char
+    // cap the `environment` label carries. Pins that the cap was deliberately
+    // not copied onto this label.
+    let dataset_did =
+        "did:odf:fed012126262ba49e1ba8392c26f7a39e1ba8d756c7469786d3365200c68402ff65dc";
+
+    // ── Applies to VariableSet, canonicalizing the short name ────────────────
+    let vars_manifest = fixtures::variable_set_manifest_with_environment_label(
+        "targeted-vars",
+        dataset_did,
+        fixtures::LEGACY_CONFIG_TARGET_DATASET_LABEL_NAME,
+    );
+    ctx.assert_success_with_stdin(
+        ["apply", "--stdin"],
+        &vars_manifest,
+        Some(&[r#"Created: STDIN -> VariableSet/targeted-vars"#]),
+    )
+    .await;
+
+    let view = ctx.get_one(["get", "vs", "targeted-vars"]).await;
+    assert_eq!(
+        view.label_str(fixtures::LEGACY_CONFIG_TARGET_DATASET_LABEL_SCHEMA),
+        Some(dataset_did),
+        "the label must be stored under its canonical URI, which is the key the env-var resolver \
+         looks up"
+    );
+    assert_eq!(
+        view.label(fixtures::LEGACY_CONFIG_TARGET_DATASET_LABEL_NAME),
+        None,
+        "the authored short name must not survive as a separate stored key"
+    );
+
+    // ── Applies to SecretSet too — both config types are in scope ────────────
+    let secrets_manifest = fixtures::secret_set_manifest_with_environment_label(
+        "targeted-secrets",
+        dataset_did,
+        fixtures::LEGACY_CONFIG_TARGET_DATASET_LABEL_NAME,
+    );
+    ctx.assert_success_with_stdin(
+        ["apply", "--stdin"],
+        &secrets_manifest,
+        Some(&[r#"Created: STDIN -> SecretSet/targeted-secrets"#]),
+    )
+    .await;
+
+    // ── Indexed, so it is queryable by the same filter the resolver uses ─────
+    // This is the property that makes the label a viable replacement for the
+    // bindings table: the lookup is index-backed, not a scan.
+    assert_eq!(
+        ctx.list_names_with_labels(
+            "vs",
+            &[&format!(
+                "{}={dataset_did}",
+                fixtures::LEGACY_CONFIG_TARGET_DATASET_LABEL_NAME
+            )],
+        )
+        .await,
+        ["targeted-vars"],
+        "the label must be filterable by its short name"
+    );
+    assert_eq!(
+        ctx.list_names_with_labels(
+            "ss",
+            &[&format!(
+                "{}={dataset_did}",
+                fixtures::LEGACY_CONFIG_TARGET_DATASET_LABEL_SCHEMA
+            )],
+        )
+        .await,
+        ["targeted-secrets"],
+        "and by its canonical URI"
+    );
+
+    // ── A non-DID value is rejected by the label's validator ─────────────────
+    let bad_manifest = fixtures::variable_set_manifest_with_environment_label(
+        "bad-target-vars",
+        "not-a-dataset-did",
+        fixtures::LEGACY_CONFIG_TARGET_DATASET_LABEL_NAME,
+    );
+    ctx.assert_failure_with_stdin(
+        ["apply", "--stdin"],
+        &bad_manifest,
+        Some(&[
+            r#"Failed: STDIN"#,
+            r#"Label extension 'legacy-config-target-dataset' value is invalid"#,
+        ]),
+    )
+    .await;
+    ctx.assert_resource_absent("vs", "bad-target-vars").await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
