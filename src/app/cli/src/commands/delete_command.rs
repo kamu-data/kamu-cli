@@ -28,15 +28,10 @@ use crate::resources::{
     ResourceSelectionSyntax,
     ResourceSelectionSyntaxService,
     ResourceTypeLookupService,
+    is_dataset_target,
     is_resource_id,
 };
 use crate::{ConfirmDeleteService, Interact, WorkspaceService, cli_value_parser as parsers};
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-const DATASETS_TARGET: &str = "datasets";
-
-const DATASET_TARGET: &str = "dataset";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -48,8 +43,7 @@ const DATASET_TARGET: &str = "dataset";
 fn strip_dataset_pseudo_type_prefix(arg: &str) -> Option<&str> {
     let (prefix, alias) = arg.split_once('/')?;
 
-    (prefix.eq_ignore_ascii_case(DATASET_TARGET) || prefix.eq_ignore_ascii_case(DATASETS_TARGET))
-        .then_some(alias)
+    is_dataset_target(prefix).then_some(alias)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -376,7 +370,7 @@ impl<'a> DeleteRequestResolver<'a> {
                     dataset_args: self.params.args.to_vec(),
                 });
             }
-            Some(target) if target.eq_ignore_ascii_case(DATASETS_TARGET) => {
+            Some(target) if is_dataset_target(target) => {
                 return Ok(ResolvedDeleteRequest::Datasets {
                     dataset_args: self.params.args.to_vec(),
                 });

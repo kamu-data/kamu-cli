@@ -28,7 +28,14 @@ pub use resource_manifest_discovery_service_impl::*;
 pub use resource_manifest_execution_service_impl::*;
 pub use resource_ref_classifier::is_resource_id;
 pub use resource_selection_resolution_service_impl::*;
-pub use resource_selection_scanner::{ANY_SELECTOR, BareTypePolicy, ResourceSelectionScanner};
+pub use resource_selection_scanner::{
+    ANY_SELECTOR,
+    BareTypePolicy,
+    DATASET_TARGET,
+    DATASETS_TARGET,
+    ResourceSelectionScanner,
+    is_dataset_target,
+};
 pub use resource_selection_syntax_service_impl::*;
 pub use resource_selector_resolution_service_impl::*;
 pub use resource_summary_service_impl::*;

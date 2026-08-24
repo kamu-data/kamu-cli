@@ -21,8 +21,11 @@ use dill::CatalogBuilder;
 pub use r#impl::{
     ANY_SELECTOR,
     BareTypePolicy,
+    DATASET_TARGET,
+    DATASETS_TARGET,
     ResourceLabelSelectorParser,
     ResourceSelectionScanner,
+    is_dataset_target,
     is_resource_id,
     usage_error_at,
 };
