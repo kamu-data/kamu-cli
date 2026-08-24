@@ -65,6 +65,61 @@ Singletons are scoped to the catalog in which the component is registered. Child
 
 Singletons are expected when a global shared state is needed.
 
+### Singletons must not depend on repositories
+
+**A `Singleton` component must never instantiate a repository — neither directly
+nor indirectly through an intermediate component.** Repository components are
+transaction-scoped: they hold a `TransactionRefT` and may only be instantiated
+in transactional catalogs.
+
+A singleton outlives every transaction, so capturing an `Arc<dyn SomeRepository>`
+pins that transaction for the lifetime of the process and trips the runtime's
+leak guard:
+
+```
+Attempting to extract inner transaction while more than one strong reference is
+present. This may be an indication that transaction reference is leaked, i.e.
+held by some component whose lifetime exceeds the intended span of the
+transaction scope.
+```
+
+The crash surfaces far from its cause — typically as a panicking background
+agent task rather than an error at startup — so it is worth avoiding by
+construction.
+
+Inject `dill::CatalogWeakRef` instead and resolve the repository per call:
+
+```rust
+pub struct InMemoryResourceRepository {
+    state: Arc<Mutex<State>>,
+    catalog: CatalogWeakRef,
+}
+
+#[component(pub)]
+#[interface(dyn ResourceRepository)]
+#[scope(Singleton)]
+impl InMemoryResourceRepository {
+    pub fn new(catalog: CatalogWeakRef) -> Self { /* ... */ }
+
+    fn account_repository(&self) -> Option<Arc<dyn AccountRepository>> {
+        self.catalog.upgrade().get_one::<dyn AccountRepository>().ok()
+    }
+}
+```
+
+`FlowAgentImpl` and `FlowSystemEventAgentImpl` use the same idiom.
+
+Note that in-memory repositories are themselves singletons, so this applies to
+them too. A violation may stay dormant for a long time: it only fires in a
+configuration that pairs the singleton with a *real* transactional
+implementation of its dependency. The MySQL/MariaDB prototype is the usual
+trigger, because only the accounts domain has a real backend there while
+everything else falls back to in-memory (see `configure_database_components`).
+
+To audit, parse `#[component]` / `#[interface(dyn ...)]` / `#[scope(Singleton)]`,
+treat any component whose body mentions `TransactionRef` as transaction-scoped,
+and walk singleton dependencies transitively through the trait -> impl map.
+
 ## Registration
 
 ```rust

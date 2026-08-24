@@ -12,12 +12,7 @@ use std::sync::Arc;
 
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_resources::*;
-use kamu_resources_services::{
-    ResourceExtensionSchemaResolver,
-    get_resource_crud_dispatcher,
-    get_resource_crud_dispatcher_by_raw_selector,
-    get_resource_crud_dispatcher_for_trusted_schema,
-};
+use kamu_resources_services::{ResourceDispatcherFactory, ResourceExtensionSchemaResolver};
 
 use super::helpers::*;
 use crate::*;
@@ -27,7 +22,7 @@ use crate::*;
 #[dill::component(pub)]
 #[dill::interface(dyn ResourceFacade)]
 pub struct LocalResourceFacadeImpl {
-    catalog: dill::Catalog,
+    dispatcher_factory: Arc<ResourceDispatcherFactory>,
     resource_account_resolver: Arc<dyn ResourceAccountResolver>,
     generic_resource_query_service: Arc<dyn GenericResourceQueryService>,
     resource_extension_schema_resolver: Arc<ResourceExtensionSchemaResolver>,
@@ -76,30 +71,13 @@ impl ResourceFacade for LocalResourceFacadeImpl {
 
     async fn get(
         &self,
-        selector: ResourceSelector,
-        spec_view_mode: SpecViewMode,
-    ) -> Result<Resource, GetResourceError> {
-        let mut view = self
-            .resolve_resource_view::<GetResourceError>(selector)
-            .await?;
-
-        self.apply_spec_view_mode::<GetResourceError>(&mut view, spec_view_mode)?;
-
-        Ok(view)
-    }
-
-    async fn get_many(
-        &self,
-        selector: ResourceBatchSelector,
-        spec_view_mode: SpecViewMode,
+        resource_refs: Vec<ResourceRef>,
+        spec_view: SpecViewOpts,
     ) -> Result<BatchResourceResponse<Resource, ResourceLookupProblem>, BatchResourceError> {
         let (mut indexed_resources, problems) =
-            self.resolve_multiple_resource_views(selector).await?;
+            self.resolve_multiple_resource_views(resource_refs).await?;
 
-        self.apply_spec_view_mode_batch::<BatchResourceError>(
-            &mut indexed_resources,
-            spec_view_mode,
-        )?;
+        self.apply_spec_view_mode_batch::<BatchResourceError>(&mut indexed_resources, spec_view)?;
 
         let successes = indexed_resources
             .into_iter()
@@ -115,117 +93,80 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         })
     }
 
-    async fn get_handle(
-        &self,
-        selector: ResourceSelector,
-    ) -> Result<ResourceHandle, GetResourceError> {
-        let target_account = self
-            .resource_account_resolver
-            .resolve_target_account(selector.account.as_ref())
-            .await?;
-
-        let schema =
-            self.resolve_schema_for_selector::<GetResourceError>(&selector.resource_type)?;
-
-        let id = resolve_resource_id::<GetResourceError>(
-            self.generic_resource_query_service.as_ref(),
-            &schema,
-            &target_account.did,
-            &selector.resource_ref,
-        )
-        .await?;
-
-        let snapshot = self
-            .resolve_snapshot_for_schema::<GetResourceError>(&schema, &target_account.did, id)
-            .await?;
-
-        Ok(resource_handle_from_snapshot(snapshot))
-    }
-
     async fn get_handles(
         &self,
-        selector: ResourceBatchSelector,
+        resource_refs: Vec<ResourceRef>,
     ) -> Result<BatchResourceResponse<ResourceHandle, ResourceLookupProblem>, BatchResourceError>
     {
-        let target_account = self
-            .resource_account_resolver
-            .resolve_target_account(selector.account.as_ref())
-            .await?;
+        // An empty batch names nothing, so it yields an empty response.
+        let mut successes = Vec::new();
+        let (groups, mut problems) = self.group_refs_by_target(resource_refs).await?;
 
-        let schema =
-            self.resolve_schema_for_selector::<BatchResourceError>(&selector.resource_type)?;
+        for group in groups {
+            let (indexes, refs): (Vec<_>, Vec<_>) = group.entries.into_iter().unzip();
 
-        let groups = group_batch_resource_refs(selector);
-        let resolution_response = resolve_batch_ids(
-            self.generic_resource_query_service.as_ref(),
-            &target_account.did,
-            &schema,
-            groups,
-        )
-        .await?;
-
-        let (handles, problems) = self
-            .resolve_id_handle_groups(
-                &target_account.did,
-                &schema,
-                resolution_response.id_entries,
-                resolution_response.problems,
+            let grouped = group_batch_resource_refs(refs);
+            let resolution_response = resolve_batch_ids(
+                self.generic_resource_query_service.as_ref(),
+                &group.account.did,
+                &group.schema,
+                grouped,
             )
             .await?;
 
+            let (handles, group_problems) = self
+                .resolve_id_handle_groups(
+                    &group.account.did,
+                    &group.schema,
+                    resolution_response.id_entries,
+                    resolution_response.problems,
+                )
+                .await?;
+
+            // `group_batch_resource_refs` re-indexes from zero within the
+            // group, so map back to the caller's positions before merging.
+            successes.extend(handles.into_iter().map(|handle| BatchResourceSuccess {
+                request_index: indexes[handle.request_index],
+                item: handle.item,
+            }));
+            problems.extend(
+                group_problems
+                    .into_iter()
+                    .map(|problem| BatchResourceProblem {
+                        request_index: indexes[problem.request_index],
+                        error: problem.error,
+                    }),
+            );
+        }
+
+        successes.sort_by_key(|success| success.request_index);
+        problems.sort_by_key(|problem| problem.request_index);
+
         Ok(BatchResourceResponse {
-            successes: handles
-                .into_iter()
-                .map(|handle| BatchResourceSuccess {
-                    request_index: handle.request_index,
-                    item: handle.item,
-                })
-                .collect(),
+            successes,
             problems,
         })
     }
 
-    async fn render_manifest(
-        &self,
-        selector: ResourceSelector,
-        format: ResourceManifestFormat,
-        spec_view_mode: SpecViewMode,
-    ) -> Result<RenderResourceManifestResult, RenderResourceManifestError> {
-        let mut view = self
-            .resolve_resource_view::<RenderResourceManifestError>(selector)
-            .await?;
-
-        self.apply_spec_view_mode::<RenderResourceManifestError>(&mut view, spec_view_mode)?;
-
-        let manifest = resource_to_manifest(view).map_err(RenderResourceManifestError::Internal)?;
-        let manifest =
-            serialize_manifest(&manifest, format).map_err(RenderResourceManifestError::Internal)?;
-
-        Ok(RenderResourceManifestResult { manifest, format })
-    }
-
     async fn render_manifests(
         &self,
-        selector: ResourceBatchSelector,
+        resource_refs: Vec<ResourceRef>,
         format: ResourceManifestFormat,
-        spec_view_mode: SpecViewMode,
+        spec_view: SpecViewOpts,
     ) -> Result<
         BatchResourceResponse<RenderResourceManifestResult, ResourceLookupProblem>,
         BatchResourceError,
     > {
         let (mut indexed_resources, problems) =
-            self.resolve_multiple_resource_views(selector).await?;
+            self.resolve_multiple_resource_views(resource_refs).await?;
 
-        self.apply_spec_view_mode_batch::<BatchResourceError>(
-            &mut indexed_resources,
-            spec_view_mode,
-        )?;
+        self.apply_spec_view_mode_batch::<BatchResourceError>(&mut indexed_resources, spec_view)?;
 
         let successes = indexed_resources
             .into_iter()
             .map(|resource| {
-                let manifest =
-                    resource_to_manifest(resource.item).map_err(BatchResourceError::Internal)?;
+                let manifest = kamu_resources::ResourceManifest::from_resource(&resource.item)
+                    .map_err(BatchResourceError::Internal)?;
                 let manifest =
                     serialize_manifest(&manifest, format).map_err(BatchResourceError::Internal)?;
                 Ok(BatchResourceSuccess {
@@ -241,109 +182,67 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         })
     }
 
-    async fn list(
+    async fn search(
         &self,
-        request: ListResourcesRequest,
-    ) -> Result<Vec<ResourceSummaryView>, ListResourcesError> {
+        request: SearchResourcesRequest,
+    ) -> Result<SearchResourcesResponse, ListResourcesError> {
         let target_account = self
             .resource_account_resolver
             .resolve_target_account(request.account.as_ref())
             .await?;
 
-        let dispatcher = get_resource_crud_dispatcher_by_raw_selector::<ListResourcesError>(
-            &self.catalog,
-            &request.raw_type_selector,
-        )?;
+        let scope = self.resolve_scope(request.selectors).await?;
 
-        let resource_schema = ResourceSchemaId::try_from(dispatcher.schema()).int_err()?;
+        if scope.is_vacuous() {
+            return Ok(SearchResourcesResponse {
+                items: Vec::new(),
+                total_count: 0,
+            });
+        }
 
-        let label_filter = resolve_label_filter(
-            &self.resource_extension_schema_resolver,
-            request.label_filter,
-            &resource_schema,
-        )?;
-
-        dispatcher
-            .list(ResourceCrudDispatcherListRequest {
-                account_id: target_account.did,
-                pagination: request.pagination,
-                label_filter,
-            })
-            .await
-            .map_err(Into::into)
-    }
-
-    async fn list_handles(
-        &self,
-        request: ListResourceHandlesRequest,
-    ) -> Result<Vec<ResourceHandle>, ListResourcesError> {
-        let target_account = self
-            .resource_account_resolver
-            .resolve_target_account(request.account.as_ref())
-            .await?;
-
-        let schema =
-            self.resolve_schema_for_selector::<ListResourcesError>(&request.raw_type_selector)?;
-
-        let resource_schema = ResourceSchemaId::try_from(&schema).int_err()?;
-
-        let label_filter = resolve_label_filter(
-            &self.resource_extension_schema_resolver,
-            request.label_filter,
-            &resource_schema,
-        )?;
-
+        // One scoped query covering every type in the scope, so pagination is
+        // global rather than per type. Querying each type separately cannot
+        // produce this: page 2 of a merged result is not page 2 of each type.
         let snapshots = self
             .generic_resource_query_service
-            .list_snapshots_by_schema(
-                target_account.did,
-                &schema,
-                &label_filter,
-                request.pagination,
-            )
+            .list_snapshots(&target_account.did, &scope, request.pagination)
+            .await?;
+        let total_count = self
+            .generic_resource_query_service
+            .count_search_resource_handles(&target_account.did, &scope)
             .await?;
 
-        Ok(map_snapshots_to_handles(snapshots))
+        let items = self.summary_views_with_columns(snapshots)?;
+
+        Ok(SearchResourcesResponse { items, total_count })
     }
 
     async fn search_handles(
         &self,
-        request: SearchResourceHandlesRequest,
+        request: SearchResourcesRequest,
     ) -> Result<SearchResourceHandlesResponse, ListResourcesError> {
+        let target_account = self
+            .resource_account_resolver
+            .resolve_target_account(request.account.as_ref())
+            .await?;
+
+        let scope = self.resolve_scope(request.selectors).await?;
+
         // Empty exact-name/id queries are vacuous.
-        if request.query.is_vacuous() {
+        if scope.is_vacuous() {
             return Ok(SearchResourceHandlesResponse {
                 items: Vec::new(),
                 total_count: 0,
             });
         }
 
-        let target_account = self
-            .resource_account_resolver
-            .resolve_target_account(request.account.as_ref())
-            .await?;
-
-        let (scope, label_filter) =
-            self.resolve_search_type_scope(request.type_scope, request.label_filter)?;
-
         let rows = self
             .generic_resource_query_service
-            .search_resource_handles(
-                &target_account.did,
-                &scope,
-                &request.query,
-                &label_filter,
-                request.pagination,
-            )
+            .search_resource_handles(&target_account.did, &scope, request.pagination)
             .await?;
         let total_count = self
             .generic_resource_query_service
-            .count_search_resource_handles(
-                &target_account.did,
-                &scope,
-                &request.query,
-                &label_filter,
-            )
+            .count_search_resource_handles(&target_account.did, &scope)
             .await?;
 
         let items = rows
@@ -352,44 +251,6 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             .collect::<Vec<_>>();
 
         Ok(SearchResourceHandlesResponse { items, total_count })
-    }
-
-    async fn list_all(
-        &self,
-        request: ListAllResourcesRequest,
-    ) -> Result<Vec<ResourceSummaryView>, ListAllResourcesError> {
-        let target_account = self
-            .resource_account_resolver
-            .resolve_target_account(request.account.as_ref())
-            .await?;
-
-        let label_filter = self.resolve_label_filter_for_all_schemas(request.label_filter)?;
-
-        let snapshots = self
-            .generic_resource_query_service
-            .list_all_snapshots(target_account.did, &label_filter, request.pagination)
-            .await?;
-
-        Ok(snapshots.into_iter().map(Into::into).collect())
-    }
-
-    async fn list_all_handles(
-        &self,
-        request: ListAllResourceHandlesRequest,
-    ) -> Result<Vec<ResourceHandle>, ListAllResourcesError> {
-        let target_account = self
-            .resource_account_resolver
-            .resolve_target_account(request.account.as_ref())
-            .await?;
-
-        let label_filter = self.resolve_label_filter_for_all_schemas(request.label_filter)?;
-
-        let snapshots = self
-            .generic_resource_query_service
-            .list_all_snapshots(target_account.did, &label_filter, request.pagination)
-            .await?;
-
-        Ok(map_snapshots_to_handles(snapshots))
     }
 
     async fn plan_apply_manifest(
@@ -503,82 +364,107 @@ impl ResourceFacade for LocalResourceFacadeImpl {
         })
     }
 
-    async fn delete_many(
+    async fn delete(
         &self,
-        selector: ResourceBatchSelector,
+        resource_refs: Vec<ResourceRef>,
     ) -> Result<BatchResourceResponse<ResourceID, ResourceLookupProblem>, BatchResourceError> {
-        let target_account = self
-            .resource_account_resolver
-            .resolve_target_account(selector.account.as_ref())
+        // An empty batch names nothing, so it yields an empty response.
+        let mut successes = Vec::new();
+        let (groups, mut problems) = self.group_refs_by_target(resource_refs).await?;
+
+        // One dispatcher call per `(account, schema)` group. The whole request
+        // runs inside a single database transaction — opened by the
+        // `#[transactional_handler]` GraphQL handler, or by the CLI's
+        // `DatabaseTransactionRunner` — so a failure in a later group rolls back
+        // the deletes an earlier one performed. Fanning out therefore does not
+        // introduce partial-delete semantics.
+        for group in groups {
+            let (indexes, refs): (Vec<_>, Vec<_>) = group.entries.into_iter().unzip();
+
+            let grouped = group_batch_resource_refs(refs);
+            let resolution_response = resolve_batch_ids(
+                self.generic_resource_query_service.as_ref(),
+                &group.account.did,
+                &group.schema,
+                grouped,
+            )
             .await?;
 
-        let schema =
-            self.resolve_schema_for_selector::<BatchResourceError>(&selector.resource_type)?;
-
-        let groups = group_batch_resource_refs(selector);
-        let resolution_response = resolve_batch_ids(
-            self.generic_resource_query_service.as_ref(),
-            &target_account.did,
-            &schema,
-            groups,
-        )
-        .await?;
-
-        let mut problems = resolution_response.problems;
-        let mut successes = Vec::new();
-        let mut seen_valid_ids = HashSet::new();
-        let mut ids_to_delete = Vec::<ResourceID>::new();
-
-        let ids = resolution_response
-            .id_entries
-            .iter()
-            .map(|(_, _, id)| *id)
-            .collect::<Vec<_>>();
-
-        let rows_by_id = self
-            .generic_resource_query_service
-            .find_resource_handles_by_ids(&target_account.did, &ids)
-            .await?
-            .into_iter()
-            .map(|row| (row.id, row))
-            .collect::<HashMap<_, _>>();
-
-        for (request_index, _, id) in resolution_response.id_entries {
-            let row_result = rows_by_id
-                .get(id.as_ref())
-                .cloned()
-                .ok_or_else(|| id_not_found(id));
-
-            match row_result.and_then(|row| {
-                validate_handle_row(row, &schema, ensure_schema_matches::<ResourceLookupProblem>)
-            }) {
-                Ok(_) => {
-                    successes.push(BatchResourceSuccess {
-                        request_index,
-                        item: id,
-                    });
-
-                    if seen_valid_ids.insert(id) {
-                        ids_to_delete.push(id);
-                    }
+            problems.extend(resolution_response.problems.into_iter().map(|problem| {
+                BatchResourceProblem {
+                    request_index: indexes[problem.request_index],
+                    error: problem.error,
                 }
-                Err(error) => problems.push(BatchResourceProblem {
-                    request_index,
-                    error,
-                }),
-            }
-        }
+            }));
 
-        if !ids_to_delete.is_empty() {
-            // Registered selector schemas must have a dispatcher.
-            let dispatcher =
-                get_resource_crud_dispatcher_for_trusted_schema(&self.catalog, schema.as_str())?;
-            dispatcher
-                .delete(ResourceCrudDispatcherDeleteRequest {
-                    account_id: target_account.did.clone(),
-                    ids: ids_to_delete,
-                })
-                .await?;
+            let mut seen_valid_ids = HashSet::new();
+            let mut ids_to_delete = Vec::<ResourceID>::new();
+
+            let ids = resolution_response
+                .id_entries
+                .iter()
+                .map(|(_, _, id)| *id)
+                .collect::<Vec<_>>();
+
+            let rows_by_id = self
+                .generic_resource_query_service
+                .find_resource_handles_by_ids(&group.account.did, &ids)
+                .await?
+                .into_iter()
+                .map(|row| (row.id, row))
+                .collect::<HashMap<_, _>>();
+
+            for (request_index, resource_ref, id) in resolution_response.id_entries {
+                let row_result = rows_by_id
+                    .get(id.as_ref())
+                    .cloned()
+                    .ok_or_else(|| id_not_found(id));
+
+                // Only a ref that supplied its own id asserts a name to verify:
+                // for a name-keyed ref the name *is* how the id was found.
+                let expected_name = if resource_ref.id.is_some() {
+                    resource_ref.name.as_ref()
+                } else {
+                    None
+                };
+
+                match row_result.and_then(|row| {
+                    validate_handle_row(
+                        row,
+                        &group.schema,
+                        expected_name,
+                        ensure_schema_matches::<ResourceLookupProblem>,
+                    )
+                }) {
+                    Ok(_) => {
+                        successes.push(BatchResourceSuccess {
+                            request_index: indexes[request_index],
+                            item: id,
+                        });
+
+                        if seen_valid_ids.insert(id) {
+                            ids_to_delete.push(id);
+                        }
+                    }
+                    Err(error) => problems.push(BatchResourceProblem {
+                        request_index: indexes[request_index],
+                        error,
+                    }),
+                }
+            }
+
+            if !ids_to_delete.is_empty() {
+                // Registered selector schemas must have a dispatcher.
+                let dispatcher = self
+                    .dispatcher_factory
+                    .crud_dispatcher_for_trusted_schema(group.schema.as_str())?;
+                dispatcher
+                    .delete(ResourceCrudDispatcherDeleteRequest {
+                        account_id: group.account.did.clone(),
+                        ids: ids_to_delete,
+                    })
+                    .await?;
+            }
         }
 
         successes.sort_by_key(|success| success.request_index);
@@ -589,61 +475,50 @@ impl ResourceFacade for LocalResourceFacadeImpl {
             problems,
         })
     }
+}
 
-    async fn delete(&self, selector: ResourceSelector) -> Result<ResourceID, DeleteResourceError> {
-        let response = self
-            .delete_many(ResourceBatchSelector {
-                account: selector.account,
-                resource_type: selector.resource_type,
-                resource_refs: vec![selector.resource_ref],
-            })
-            .await?;
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-        if let Some(success) = response.successes.into_iter().next() {
-            Ok(success.item)
-        } else if let Some(problem) = response.problems.into_iter().next() {
-            Err(problem.error.into())
-        } else {
-            Err(InternalError::new("Delete response did not contain an item").into())
-        }
-    }
+/// Resolves one raw type selector against an already-built descriptor list.
+///
+/// Building that list constructs every registered dispatcher, so callers
+/// resolving more than one selector must build it once and reuse it here rather
+/// than rebuilding it per selector.
+///
+/// Accepts anything spelling a type — a raw CLI selector (`vs`), an ODF
+/// `TypeRef` (`VariableSet`), or a schema URI — since descriptors match all
+/// four forms.
+fn resolve_schema_in_descriptors<E>(
+    descriptors: &[ResourceTypeDescriptor],
+    selector: impl AsRef<str>,
+) -> Result<TypeUri, E>
+where
+    E: From<UnsupportedResourceSelectorError>,
+{
+    let selector = selector.as_ref();
+
+    descriptors
+        .iter()
+        .find(|descriptor| descriptor.matches_selector(selector))
+        .map(|descriptor| descriptor.schema.clone())
+        .ok_or_else(|| UnsupportedResourceSelectorError::NotFound {
+            raw_selector: ResourceTypeSelectorRaw::new_unchecked(selector),
+        })
+        .map_err(Into::into)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl LocalResourceFacadeImpl {
-    /// Resolves an authored filter for the `all` scope.
-    fn resolve_label_filter_for_all_schemas(
-        &self,
-        label_filter: Option<ResourceLabelFilterInput>,
-    ) -> Result<ResolvedResourceLabelFilter, ResourceInvalidLabelFilterError> {
-        let resource_schema_ids = self
-            .list_resource_type_descriptors()
-            .iter()
-            .map(|descriptor| ResourceSchemaId::try_from(&descriptor.schema))
-            .collect::<Result<Vec<_>, _>>()
-            .expect("registered descriptors always carry canonical schema URIs");
-
-        let (_, resolved) = resolve_label_filter_for_schemas(
-            &self.resource_extension_schema_resolver,
-            label_filter,
-            &resource_schema_ids,
-        )?;
-
-        Ok(resolved)
-    }
     fn list_resource_type_descriptors(&self) -> Vec<ResourceTypeDescriptor> {
         let mut seen = HashSet::new();
         let mut descriptors = Vec::new();
 
-        for builder in self
-            .catalog
-            .builders_for::<dyn ResourcePresentationDispatcher>()
+        for dispatcher in self
+            .dispatcher_factory
+            .presentation_dispatchers()
+            .expect("Resource presentation dispatcher construction failed")
         {
-            let dispatcher = builder
-                .get(&self.catalog)
-                .expect("Resource presentation dispatcher construction failed");
-
             let schema = dispatcher.schema();
             let presentation = dispatcher.presentation();
 
@@ -667,134 +542,319 @@ impl LocalResourceFacadeImpl {
         descriptors
     }
 
-    fn resolve_schema_for_selector<E>(
+    /// Resolves the one schema a ref addresses, searching every registered type
+    /// when the ref names none.
+    ///
+    /// A [`ResourceRef`] names *exactly one* resource, so a type-less ref that
+    /// matches in several types is ambiguous rather than a multi-match: it is
+    /// reported as [`ResourceLookupProblem::AmbiguousType`] instead of picking
+    /// a winner. Contrast a type-less `ResourceSelector`, for which several
+    /// matches are the expected outcome.
+    async fn resolve_ref_schema(
         &self,
-        selector: &ResourceTypeSelectorRaw,
-    ) -> Result<TypeUri, E>
-    where
-        E: From<UnsupportedResourceSelectorError>,
-    {
-        self.list_resource_type_descriptors()
-            .into_iter()
-            .find(|descriptor| descriptor.matches_selector(selector))
-            .map(|descriptor| descriptor.schema)
-            .ok_or_else(|| UnsupportedResourceSelectorError::NotFound {
-                raw_selector: selector.clone(),
-            })
-            .map_err(Into::into)
+        descriptors: &[ResourceTypeDescriptor],
+        account_id: &odf::AccountID,
+        resource_ref: &ResourceRef,
+    ) -> Result<Result<TypeUri, ResourceLookupProblem>, BatchResourceError> {
+        let Some(r#type) = resource_ref.r#type.as_ref() else {
+            return self
+                .search_ref_schema(descriptors, account_id, resource_ref)
+                .await;
+        };
+
+        Ok(Ok(resolve_schema_in_descriptors::<BatchResourceError>(
+            descriptors,
+            r#type,
+        )?))
     }
 
-    /// Resolves a search request's type scope and label filter together,
-    /// since narrowing to applicable schemas requires resolving the filter.
-    fn resolve_search_type_scope(
+    /// Finds which registered type holds the resource a type-less ref names.
+    async fn search_ref_schema(
         &self,
-        type_scope: SearchResourceTypeScope,
-        label_filter: Option<ResourceLabelFilterInput>,
-    ) -> Result<(ResourceTypeScope, ResolvedResourceLabelFilter), ListResourcesError> {
-        let raw_type_selectors = match type_scope {
-            SearchResourceTypeScope::AnyType if label_filter.is_none() => {
-                return Ok((
-                    ResourceTypeScope::AnyType,
-                    ResolvedResourceLabelFilter::default(),
-                ));
+        descriptors: &[ResourceTypeDescriptor],
+        account_id: &odf::AccountID,
+        resource_ref: &ResourceRef,
+    ) -> Result<Result<TypeUri, ResourceLookupProblem>, BatchResourceError> {
+        // An id is globally unique, so the stored row already carries the
+        // schema — no per-type search needed.
+        if let Some(id) = resource_ref.id {
+            let rows = self
+                .generic_resource_query_service
+                .find_resource_handles_by_ids(account_id, &[id])
+                .await?;
+
+            return Ok(match rows.into_iter().next() {
+                Some(row) => Ok(TypeUri::new_unchecked(row.schema)),
+                None => Err(id_not_found(id)),
+            });
+        }
+
+        let Some(name) = resource_ref.name.as_ref() else {
+            return Ok(Err(ResourceLookupProblem::EmptyRef));
+        };
+
+        let mut matched = Vec::new();
+        for descriptor in descriptors {
+            if self
+                .generic_resource_query_service
+                .find_resource_id_by_name(account_id, &descriptor.schema, name)
+                .await?
+                .is_some()
+            {
+                matched.push(descriptor.schema.clone());
             }
-            // A label filter still needs a concrete schema to resolve label keys
-            // against, so `AnyType` falls back to every registered schema here.
-            SearchResourceTypeScope::AnyType => self
-                .list_resource_type_descriptors()
-                .into_iter()
-                .map(|descriptor| descriptor.canonical_selector.into())
-                .collect(),
-            SearchResourceTypeScope::Types(raw_type_selectors) => raw_type_selectors,
-        };
+        }
 
-        let schemas = raw_type_selectors
-            .iter()
-            .map(|resource_type| {
-                self.resolve_schema_for_selector::<ListResourcesError>(resource_type)
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-
-        let resource_schema_ids = schemas
-            .iter()
-            .map(|schema| ResourceSchemaId::try_from(schema).int_err())
-            .collect::<Result<Vec<_>, _>>()?;
-
-        // Resolution can drop schemas that cannot carry the requested labels.
-        let (applicable_schema_ids, resolved_label_filter) = resolve_label_filter_for_schemas(
-            &self.resource_extension_schema_resolver,
-            label_filter,
-            &resource_schema_ids,
-        )?;
-
-        let schemas = schemas
-            .into_iter()
-            .zip(&resource_schema_ids)
-            .filter(|(_, schema_id)| applicable_schema_ids.contains(schema_id))
-            .map(|(schema, _)| schema)
-            .collect::<Vec<_>>();
-
-        let scope = if schemas.is_empty() {
-            ResourceTypeScope::Types(Vec::new())
-        } else {
-            ResourceTypeScope::types(schemas)
-        };
-
-        Ok((scope, resolved_label_filter))
+        Ok(match matched.len() {
+            1 => Ok(matched.into_iter().next().unwrap()),
+            0 => Err(ResourceLookupProblem::AnyTypeNameNotFound(
+                ResourceAnyTypeNameNotFoundError { name: name.clone() },
+            )),
+            _ => Err(ResourceLookupProblem::AmbiguousType(
+                ResourceAmbiguousTypeError {
+                    name: name.clone(),
+                    type_names: matched
+                        .iter()
+                        .map(resource_type_name)
+                        .collect::<Result<Vec<_>, _>>()?,
+                },
+            )),
+        })
     }
 
-    async fn resolve_resource_view<E>(&self, selector: ResourceSelector) -> Result<Resource, E>
-    where
-        E: From<ResolveManifestAccountError>
-            + From<ResourceLookupProblem>
-            + From<UnsupportedResourceSelectorError>
-            + From<InternalError>
-            + From<GetResourceCrudDispatcherError>,
-    {
-        let target_account = self
+    /// Resolves every ref's account and schema, then splits the batch into
+    /// `(account, schema)` groups.
+    ///
+    /// The shared front half of all three batch-ref pipelines. Accounts are
+    /// resolved in one deduplicated pass and schemas against a descriptor list
+    /// built once, so a batch costs one account lookup per distinct spelling
+    /// and no per-ref catalog work.
+    ///
+    /// An unresolvable account or an *unknown named* type fails the **whole**
+    /// call rather than becoming a per-item problem: both are addressing errors
+    /// in the request rather than facts about stored data.
+    ///
+    /// A **type-less** ref is different: resolving it is a lookup against
+    /// stored data, so a miss or an ambiguity is that one ref's problem and is
+    /// returned alongside the groups for the caller to merge by request index.
+    /// Because all three pipelines share this function, they inherit type-less
+    /// refs together rather than one at a time.
+    async fn group_refs_by_target(
+        &self,
+        resource_refs: Vec<ResourceRef>,
+    ) -> Result<
+        (
+            Vec<BatchTargetGroup>,
+            Vec<BatchResourceProblem<ResourceLookupProblem>>,
+        ),
+        BatchResourceError,
+    > {
+        let account_refs = distinct_account_refs(&resource_refs);
+        let resolved_accounts = self
             .resource_account_resolver
-            .resolve_target_account(selector.account.as_ref())
+            .resolve_target_accounts(&account_refs)
             .await?;
 
-        let schema = self.resolve_schema_for_selector::<E>(&selector.resource_type)?;
+        let descriptors = self.list_resource_type_descriptors();
 
-        let id = resolve_resource_id::<E>(
-            self.generic_resource_query_service.as_ref(),
-            &schema,
-            &target_account.did,
-            &selector.resource_ref,
-        )
-        .await?;
+        let mut entries = Vec::new();
+        let mut problems = Vec::new();
 
-        let snapshot = self
-            .resolve_snapshot_for_schema::<E>(&schema, &target_account.did, id)
-            .await?;
+        for (request_index, resource_ref) in resource_refs.into_iter().enumerate() {
+            let account_position = account_refs
+                .iter()
+                .position(|account| account == &resource_ref.account)
+                .expect("every ref's account is in the deduplicated list");
+            let account = resolved_accounts[account_position].clone();
 
-        // Registered selector schemas must have a dispatcher.
-        let dispatcher = get_resource_crud_dispatcher_for_trusted_schema(
-            &self.catalog,
-            snapshot.schema.as_str(),
-        )?;
+            match self
+                .resolve_ref_schema(&descriptors, &account.did, &resource_ref)
+                .await?
+            {
+                Ok(schema) => entries.push((request_index, resource_ref, account, schema)),
+                Err(error) => problems.push(BatchResourceProblem {
+                    request_index,
+                    error,
+                }),
+            }
+        }
 
-        let view = dispatcher
-            .get(ResourceCrudDispatcherGetRequest {
-                account_id: target_account.did.clone(),
-                id,
+        Ok((group_by_account_and_schema(entries), problems))
+    }
+
+    /// Converts snapshots into summary views, rendering each one's typed list
+    /// columns.
+    ///
+    /// The results may span several types, so presentation dispatchers are
+    /// looked up **once per distinct schema** rather than per row — otherwise a
+    /// page of N results would construct N dispatchers.
+    fn summary_views_with_columns(
+        &self,
+        snapshots: Vec<ResourceSnapshot>,
+    ) -> Result<Vec<ResourceSummaryView>, InternalError> {
+        let mut dispatchers: HashMap<TypeUri, Arc<dyn ResourcePresentationDispatcher>> =
+            HashMap::new();
+
+        for dispatcher in self.dispatcher_factory.presentation_dispatchers()? {
+            dispatchers
+                .entry(dispatcher.schema().clone())
+                .or_insert(dispatcher);
+        }
+
+        snapshots
+            .into_iter()
+            .map(|snapshot| {
+                // A schema with no presentation dispatcher is not selectable in
+                // the first place — the descriptor list this scope was resolved
+                // against is built from exactly this registry — so a miss means
+                // stored data of a type that is no longer registered. Render it
+                // without typed columns rather than failing the whole listing.
+                let list_values = match dispatchers.get(&snapshot.schema) {
+                    Some(dispatcher) => dispatcher.list_column_values_for_snapshot(&snapshot)?,
+                    None => Vec::new(),
+                };
+
+                let mut view = ResourceSummaryView::from(snapshot);
+                view.list_values = list_values;
+                Ok(view)
             })
-            .await?;
+            .collect()
+    }
 
-        Ok(Resource {
-            headers: kamu_resources::ResourceHeaders {
-                account: target_account,
-                ..view.headers
-            },
-            ..view
-        })
+    /// Resolves a request's selectors into a repository scope, each carrying
+    /// its own resolved label pairs.
+    ///
+    /// Each type keeps its own query *and* its own filter through resolution,
+    /// so a multi-type scope like `vs/a-% ss/b-%` stays intact and two
+    /// selectors filtering by different labels stay apart.
+    async fn resolve_scope(
+        &self,
+        selectors: Vec<ResourceSelector>,
+    ) -> Result<ResourceScope, ListResourcesError> {
+        // Before the fast path below: a selector narrowed *only* by a field the
+        // facade cannot resolve reads as unnarrowed there and would widen into
+        // "every resource". The trait is public, so this is the boundary that
+        // has to hold — not the GraphQL adapter alone.
+        for selector in &selectors {
+            validate_selector(selector)?;
+        }
+
+        // A lone type-less, unnarrowed, account-less, unlabelled selector needs
+        // no schemas at all, so it can answer before touching the catalog or
+        // resolving any account.
+        if let [selector] = selectors.as_slice()
+            && selector.r#type.is_none()
+            && selector.id.is_none()
+            && selector.name.is_none()
+            && selector.account.is_none()
+            && selector.labels.is_none()
+        {
+            return Ok(ResourceScope::any_type());
+        }
+
+        // Resolved in one batch, deduplicated by spelling, with the permission
+        // check applied per distinct account. Any denial fails the whole call.
+        //
+        // `None` stays `None` rather than resolving to the caller's own
+        // account: the repository takes the call-level account as the default
+        // for exactly those rows, so resolving here would be redundant work and
+        // would lose the "unset" distinction the scope relies on.
+        let account_refs = selectors
+            .iter()
+            .map(|selector| selector.account.clone())
+            .collect::<Vec<_>>();
+        let account_ids = if account_refs.iter().all(Option::is_none) {
+            vec![None; account_refs.len()]
+        } else {
+            self.resource_account_resolver
+                .resolve_target_accounts(&account_refs)
+                .await?
+                .into_iter()
+                .zip(account_refs.iter())
+                .map(|(handle, requested)| requested.as_ref().map(|_| handle.did))
+                .collect()
+        };
+
+        // Built once: constructing it instantiates every registered dispatcher,
+        // so every selector resolves against this one list.
+        let descriptors = self.list_resource_type_descriptors();
+
+        // Every registered schema, the fallback a type-less selector resolves
+        // its labels against.
+        let all_schema_ids = descriptors
+            .iter()
+            .map(|descriptor| ResourceSchemaId::try_from(&descriptor.schema).int_err())
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let mut applicable = Vec::with_capacity(selectors.len());
+
+        for (selector, account_id) in selectors.into_iter().zip(account_ids) {
+            let schema = selector
+                .r#type
+                .as_ref()
+                .map(|r#type| {
+                    resolve_schema_in_descriptors::<ListResourcesError>(&descriptors, r#type)
+                })
+                .transpose()?;
+
+            // A typed selector resolves its labels against its own schema; a
+            // type-less one against every registered schema.
+            let candidate_schema_ids = match &schema {
+                Some(schema) => vec![ResourceSchemaId::try_from(schema).int_err()?],
+                None => all_schema_ids.clone(),
+            };
+
+            // Resolution can drop schemas that cannot carry this selector's
+            // labels. With a single candidate that is an error rather than a
+            // silent miss — the `n = 1` contract of
+            // `resolve_label_filter_for_schemas`.
+            let (applicable_schema_ids, resolved_label_filter) = resolve_label_filter_for_schemas(
+                &self.resource_extension_schema_resolver,
+                selector.labels.clone(),
+                &candidate_schema_ids,
+            )?;
+
+            // This selector's schema cannot carry its labels, so it can never
+            // match. Drop it rather than widening the scope.
+            if applicable_schema_ids.is_empty() {
+                continue;
+            }
+
+            // Flattening is what rejects `$not`/`$or`: the repository evaluates
+            // a conjunction of pairs, nothing richer.
+            let label_pairs =
+                ResourceLabelFilterPredicate::flatten_conjunction(&resolved_label_filter)
+                    .map_err(|err| {
+                        ListResourcesError::InvalidLabelFilter(
+                            ResourceInvalidLabelFilterError::unsupported_expression(err),
+                        )
+                    })?
+                    .into_iter()
+                    .map(|(key, value)| (key.clone(), value.to_owned()))
+                    .collect::<Vec<_>>();
+
+            applicable.push(ResolvedSelector {
+                schema,
+                id: selector.id,
+                // Authored selector names are `LIKE` patterns by definition;
+                // an exact name arrives as a `ResourceRef`, not here.
+                name: None,
+                name_pattern: selector.name,
+                account_id,
+                label_pairs,
+            });
+        }
+
+        // `None` means nothing can match, which the repository expresses as an
+        // empty type list.
+        let scope = coalesce_selectors(applicable)?.unwrap_or(ResourceScope::Types(Vec::new()));
+
+        Ok(scope)
     }
 
     async fn resolve_multiple_resource_views(
         &self,
-        selector: ResourceBatchSelector,
+        resource_refs: Vec<ResourceRef>,
     ) -> Result<
         (
             Vec<IndexedResource<Resource>>,
@@ -802,78 +862,104 @@ impl LocalResourceFacadeImpl {
         ),
         BatchResourceError,
     > {
-        let target_account = self
-            .resource_account_resolver
-            .resolve_target_account(selector.account.as_ref())
+        // An empty batch names nothing, so it yields an empty result.
+        let mut indexed_resources = Vec::new();
+        let (groups, mut problems) = self.group_refs_by_target(resource_refs).await?;
+
+        for group in groups {
+            let (indexes, refs): (Vec<_>, Vec<_>) = group.entries.into_iter().unzip();
+
+            // Batch refs name their targets explicitly.
+            let grouped = group_batch_resource_refs(refs);
+
+            let resolution_response = resolve_batch_ids(
+                self.generic_resource_query_service.as_ref(),
+                &group.account.did,
+                &group.schema,
+                grouped,
+            )
             .await?;
 
-        let schema =
-            self.resolve_schema_for_selector::<BatchResourceError>(&selector.resource_type)?;
-
-        // Batch selectors name their targets explicitly.
-        let groups = group_batch_resource_refs(selector);
-
-        let resolution_response = resolve_batch_ids(
-            self.generic_resource_query_service.as_ref(),
-            &target_account.did,
-            &schema,
-            groups,
-        )
-        .await?;
-
-        let mut indexed_resources = Vec::new();
-        let mut problems = resolution_response.problems;
-
-        let ids = resolution_response
-            .id_entries
-            .iter()
-            .map(|(_, _, id)| *id)
-            .collect::<Vec<_>>();
-
-        let snapshots_by_id = self
-            .generic_resource_query_service
-            .find_snapshots_by_ids(&target_account.did, &ids)
-            .await?
-            .into_iter()
-            .map(|snapshot| (snapshot.id, snapshot))
-            .collect::<HashMap<_, _>>();
-
-        for (request_index, _, id) in resolution_response.id_entries {
-            match snapshots_by_id
-                .get(&id)
-                .cloned()
-                .ok_or(ResourceLookupProblem::IDNotFound(ResourceIDNotFoundError(
-                    id,
-                )))
-                .and_then(|snapshot| {
-                    ensure_schema_matches::<ResourceLookupProblem>(
-                        snapshot.id,
-                        &schema,
-                        snapshot.schema.as_str(),
-                    )?;
-                    Ok(snapshot)
-                }) {
-                Ok(snapshot) => {
-                    let resource = Resource {
-                        schema: snapshot.schema,
-                        headers: kamu_resources::ResourceHeaders {
-                            account: target_account.clone(),
-                            ..snapshot.headers
-                        },
-                        spec: snapshot.spec,
-                        status: snapshot.status.unwrap_or_else(new_pending_resource_status),
-                    };
-
-                    indexed_resources.push(IndexedResource {
-                        request_index,
-                        item: resource,
-                    });
+            problems.extend(resolution_response.problems.into_iter().map(|problem| {
+                BatchResourceProblem {
+                    request_index: indexes[problem.request_index],
+                    error: problem.error,
                 }
-                Err(error) => {
-                    problems.push(BatchResourceProblem {
-                        request_index,
-                        error,
-                    });
+            }));
+
+            let ids = resolution_response
+                .id_entries
+                .iter()
+                .map(|(_, _, id)| *id)
+                .collect::<Vec<_>>();
+
+            let snapshots_by_id = self
+                .generic_resource_query_service
+                .find_snapshots_by_ids(&group.account.did, &ids)
+                .await?
+                .into_iter()
+                .map(|snapshot| (snapshot.id, snapshot))
+                .collect::<HashMap<_, _>>();
+
+            for (request_index, resource_ref, id) in resolution_response.id_entries {
+                // Only a ref that supplied its own id asserts a name to verify:
+                // for a name-keyed ref the name *is* how the id was found.
+                let expected_name = if resource_ref.id.is_some() {
+                    resource_ref.name.clone()
+                } else {
+                    None
+                };
+
+                match snapshots_by_id
+                    .get(&id)
+                    .cloned()
+                    .ok_or(ResourceLookupProblem::IDNotFound(ResourceIDNotFoundError(
+                        id,
+                    )))
+                    .and_then(|snapshot| {
+                        ensure_schema_matches::<ResourceLookupProblem>(
+                            snapshot.id,
+                            &group.schema,
+                            snapshot.schema.as_str(),
+                        )?;
+                        // The other half of the `id` + `name` consistency
+                        // assertion; without it the id silently wins and the
+                        // caller reads a resource they did not name.
+                        if let Some(expected_name) = expected_name
+                            && expected_name != snapshot.headers.name
+                        {
+                            return Err(ResourceLookupProblem::NameMismatch(
+                                ResourceNameMismatchError {
+                                    id: snapshot.id,
+                                    expected_name,
+                                    actual_name: snapshot.headers.name.clone(),
+                                },
+                            ));
+                        }
+                        Ok(snapshot)
+                    }) {
+                    Ok(snapshot) => {
+                        let resource = Resource {
+                            schema: snapshot.schema,
+                            headers: kamu_resources::ResourceHeaders {
+                                account: group.account.clone(),
+                                ..snapshot.headers
+                            },
+                            spec: snapshot.spec,
+                            status: snapshot.status.unwrap_or_else(new_pending_resource_status),
+                        };
+
+                        indexed_resources.push(IndexedResource {
+                            request_index: indexes[request_index],
+                            item: resource,
+                        });
+                    }
+                    Err(error) => {
+                        problems.push(BatchResourceProblem {
+                            request_index: indexes[request_index],
+                            error,
+                        });
+                    }
                 }
             }
         }
@@ -909,9 +995,10 @@ impl LocalResourceFacadeImpl {
 
         let mut handles = Vec::new();
         for (request_index, resource_ref, id) in id_entries {
-            // Report misses in the terms the caller selected by.
-            let not_found = || match &resource_ref {
-                ResourceRef::ByName(name) => resource_type_name(schema)
+            // Report misses in the terms the caller selected by. A ref carrying
+            // both is resolved by its id, so it reports as an id miss.
+            let not_found = || match (&resource_ref.id, &resource_ref.name) {
+                (None, Some(name)) => resource_type_name(schema)
                     .map(|type_name| {
                         ResourceLookupProblem::NameNotFound(ResourceNameNotFoundError {
                             type_name,
@@ -919,12 +1006,25 @@ impl LocalResourceFacadeImpl {
                         })
                     })
                     .unwrap_or_else(|_| id_not_found(id)),
-                ResourceRef::ById(_) => id_not_found(id),
+                _ => id_not_found(id),
+            };
+
+            // Only a ref that supplied its own id asserts a name to verify: for
+            // a name-keyed ref the name *is* how the id was found.
+            let expected_name = if resource_ref.id.is_some() {
+                resource_ref.name.as_ref()
+            } else {
+                None
             };
 
             let row_result = rows_by_id.get(id.as_ref()).cloned().ok_or_else(not_found);
             match row_result.and_then(|row| {
-                validate_handle_row(row, schema, ensure_schema_matches::<ResourceLookupProblem>)
+                validate_handle_row(
+                    row,
+                    schema,
+                    expected_name,
+                    ensure_schema_matches::<ResourceLookupProblem>,
+                )
             }) {
                 Ok(row) => {
                     let handle = resource_handle_from_row(row);
@@ -944,24 +1044,6 @@ impl LocalResourceFacadeImpl {
         problems.sort_by_key(|problem| problem.request_index);
 
         Ok((handles, problems))
-    }
-
-    async fn resolve_snapshot_for_schema<E>(
-        &self,
-        schema: &TypeUri,
-        account_id: &odf::AccountID,
-        id: ResourceID,
-    ) -> Result<ResourceSnapshot, E>
-    where
-        E: From<InternalError> + From<ResourceLookupProblem>,
-    {
-        let Some(snapshot) = self.find_account_snapshot(account_id, id).await? else {
-            return Err(ResourceLookupProblem::IDNotFound(ResourceIDNotFoundError(id)).into());
-        };
-
-        ensure_schema_matches::<E>(id, schema, snapshot.schema.as_str())?;
-
-        Ok(snapshot)
     }
 
     async fn find_account_snapshot(
@@ -1005,36 +1087,32 @@ impl LocalResourceFacadeImpl {
         Ok(())
     }
 
-    fn apply_spec_view_mode<E>(
-        &self,
-        view: &mut Resource,
-        spec_view_mode: SpecViewMode,
-    ) -> Result<(), E>
-    where
-        E: From<InternalError>,
-    {
-        if let Some(d) = self.try_resolve_spec_view_dispatcher(&view.schema, spec_view_mode) {
-            let spec = std::mem::replace(&mut view.spec, serde_json::Value::Null);
-            view.spec = d.reveal_spec(spec).map_err(E::from)?;
-        }
-        Ok(())
-    }
-
     fn apply_spec_view_mode_batch<E>(
         &self,
         resources: &mut [IndexedResource<Resource>],
-        spec_view_mode: SpecViewMode,
+        spec_view: SpecViewOpts,
     ) -> Result<(), E>
     where
         E: From<InternalError>,
     {
-        // All batch items share one schema, so one dispatcher lookup is enough.
-        let maybe_dispatcher = resources
-            .first()
-            .and_then(|r| self.try_resolve_spec_view_dispatcher(&r.item.schema, spec_view_mode));
+        // A batch can span several schemas, and the dispatcher is schema-specific
+        // — a schema may register one or none. Resolving from the first item
+        // alone would apply its answer to every other schema, either skipping a
+        // transformation the item needs or handing a dispatcher a spec it cannot
+        // parse.
+        //
+        // Cached per schema so a single-schema batch still costs one lookup.
+        let mut dispatchers: HashMap<TypeUri, Option<Arc<dyn ResourceSpecViewDispatcher>>> =
+            HashMap::new();
 
-        if let Some(d) = maybe_dispatcher {
-            for resource in resources.iter_mut() {
+        for resource in resources.iter_mut() {
+            let maybe_dispatcher = dispatchers
+                .entry(resource.item.schema.clone())
+                .or_insert_with(|| {
+                    self.try_resolve_spec_view_dispatcher(&resource.item.schema, spec_view)
+                });
+
+            if let Some(d) = maybe_dispatcher {
                 let spec = std::mem::replace(&mut resource.item.spec, serde_json::Value::Null);
                 resource.item.spec = d.reveal_spec(spec).map_err(E::from)?;
             }
@@ -1054,10 +1132,9 @@ impl LocalResourceFacadeImpl {
             .resolve_target_account(manifest.headers.account.as_ref())
             .await?;
 
-        let dispatcher = get_resource_crud_dispatcher::<ApplyManifestError>(
-            &self.catalog,
-            manifest.schema.as_str(),
-        )?;
+        let dispatcher = self
+            .dispatcher_factory
+            .crud_dispatcher(manifest.schema.as_str())?;
 
         let canonical_labels = self
             .resource_extension_schema_resolver
@@ -1108,10 +1185,10 @@ impl LocalResourceFacadeImpl {
     fn try_resolve_spec_view_dispatcher(
         &self,
         schema: &TypeUri,
-        spec_view_mode: SpecViewMode,
+        spec_view: SpecViewOpts,
     ) -> Option<Arc<dyn ResourceSpecViewDispatcher>> {
-        if spec_view_mode == SpecViewMode::Revealed {
-            get_resource_spec_view_dispatcher_from_catalog(&self.catalog, schema)
+        if spec_view.revealed {
+            self.dispatcher_factory.spec_view_dispatcher(schema)
         } else {
             None
         }

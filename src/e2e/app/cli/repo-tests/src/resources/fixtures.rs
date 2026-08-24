@@ -22,6 +22,13 @@ pub const DESCRIPTION_ANNOTATION_SCHEMA: &str =
 /// Canonical schema URI for the built-in `environment` label.
 pub const ENVIRONMENT_LABEL_SCHEMA: &str =
     "https://kamu.dev/schemas/resource/v1alpha1/labels/Environment";
+/// Canonical schema URI for the temporary `legacy-config-target-dataset` label,
+/// which associates a config resource with the dataset whose legacy env vars it
+/// carries. Registered by the configuration domain, not the resources domain.
+pub const LEGACY_CONFIG_TARGET_DATASET_LABEL_SCHEMA: &str =
+    "https://kamu.dev/schemas/resource/v1alpha1/labels/LegacyConfigTargetDataset";
+/// Short name of the label above, as authored in manifests and `-l` filters.
+pub const LEGACY_CONFIG_TARGET_DATASET_LABEL_NAME: &str = "legacy-config-target-dataset";
 
 /// Kamu config required by scenarios that apply `SecretSet` manifests.
 pub const SECRETS_ENCRYPTION_KAMU_CONFIG: &str = indoc::indoc!(
@@ -79,6 +86,41 @@ pub fn variable_set_manifest_yaml_with_labels(name: &str, value: &str) -> String
     )
 }
 
+/// A `VariableSet` manifest with several labels and variables, for exercising
+/// apply-diff rendering across multiple independent regions.
+///
+/// Every field is caller-controlled so a test can change exactly one of them
+/// and assert that the rendered diff stays proportional to that change.
+pub fn variable_set_manifest_yaml_rich(
+    name: &str,
+    team: &str,
+    tier: &str,
+    variables: &[(&str, &str)],
+) -> String {
+    // Quoted so numeric-looking values stay strings in YAML.
+    let variables = variables.iter().fold(String::new(), |mut acc, (k, v)| {
+        use std::fmt::Write;
+        writeln!(acc, "    {k}: \"{v}\"").unwrap();
+        acc
+    });
+
+    indoc::formatdoc!(
+        r#"
+        $schema: {VARIABLE_SET_SCHEMA}
+        headers:
+          name: {name}
+          labels:
+            env: prod
+            team: {team}
+            tier: {tier}
+          annotations:
+            description: {DEFAULT_DESCRIPTION}
+        spec:
+          variables:
+        {variables}"#
+    )
+}
+
 /// The same `VariableSet` manifest as [`variable_set_manifest_yaml`] but in
 /// JSON.
 pub fn variable_set_manifest_json(name: &str, value: &str) -> String {
@@ -122,6 +164,24 @@ pub fn variable_set_manifest_no_description(name: &str, value: &str) -> String {
         spec:
           variables:
             MESSAGE: {value}
+        "#
+    )
+}
+
+/// A `VariableSet` manifest that is otherwise warning-free but files a
+/// credential-shaped variable, tripping the `secret_material_in_variable`
+/// lint. Applies successfully — the warning is advisory.
+pub fn variable_set_manifest_secret_material(name: &str) -> String {
+    indoc::formatdoc!(
+        r#"
+        $schema: {VARIABLE_SET_SCHEMA}
+        headers:
+          name: {name}
+          annotations:
+            description: {DEFAULT_DESCRIPTION}
+        spec:
+          variables:
+            DB_PASSWORD: hunter2
         "#
     )
 }

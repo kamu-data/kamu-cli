@@ -114,8 +114,15 @@ pub fn sql_like_escape_pattern(pattern: &str) -> String {
 /// Escapes all special SQL `LIKE` characters (`%`, `_`, and `\`) so the input
 /// is treated as a literal search term.
 ///
-/// Use this for substring searches where the surrounding `%` wildcards are
-/// added by the SQL itself (e.g. `LIKE '%' || $1 || '%'`).
+/// Two uses, both of which need the literal neutralised before it travels as a
+/// pattern:
+///
+/// - **Substring search**, where the surrounding `%` wildcards are added by the
+///   SQL itself (e.g. `LIKE '%' || $1 || '%'`).
+/// - **Exact match through a pattern-typed field**, where the escaped literal
+///   *is* the whole pattern. A resource selector's `name` is a `LIKE` pattern
+///   by ODF definition, so an exact name spelled by the user has to be escaped
+///   or it silently widens: `100%-done` would start matching its neighbours.
 ///
 /// The resulting string should be paired with `ESCAPE '\'` in the SQL query.
 pub fn sql_like_escape_literal(pattern: &str) -> String {

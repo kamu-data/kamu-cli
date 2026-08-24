@@ -14,7 +14,6 @@ use internal_error::InternalError;
 use thiserror::Error;
 
 use crate::{
-    ResolvedResourceLabelFilter,
     ResourceID,
     ResourceIDStream,
     ResourceName,
@@ -22,13 +21,17 @@ use crate::{
     ResourceRawEventQuery,
     ResourceSnapshot,
     ResourceSnapshotStream,
+    TypeRef,
     TypeUri,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Storage for resources and the queries over them.
-/// Label filters apply only to unknown result sets, not direct identity reads.
+///
+/// Label filters apply only to unknown result sets, not direct identity reads —
+/// the scoped searches carry them per row inside [`ResourceScope`], while the
+/// by-id/by-name reads take none at all.
 #[async_trait::async_trait]
 pub trait ResourceRepository: Send + Sync {
     async fn new_resource_id(&self) -> Result<ResourceID, InternalError>;
@@ -66,6 +69,9 @@ pub trait ResourceRepository: Send + Sync {
         name: &ResourceName,
     ) -> Result<Option<ResourceID>, InternalError>;
 
+    /// Returns rows in the order their IDs appear in `ids`. IDs that do not
+    /// exist, are deleted, or belong to another account are absent, so the
+    /// result may be shorter than the request but never reordered.
     async fn find_resource_handles_by_ids(
         &self,
         account_id: &odf::AccountID,
@@ -74,6 +80,8 @@ pub trait ResourceRepository: Send + Sync {
 
     /// Matches names case-insensitively. Names that do not exist are absent
     /// from the result.
+    ///
+    /// Returns pairs in the order their names appear in `names`.
     async fn resolve_resource_ids_by_names(
         &self,
         account_id: &odf::AccountID,
@@ -81,23 +89,37 @@ pub trait ResourceRepository: Send + Sync {
         names: &[ResourceName],
     ) -> Result<Vec<(ResourceName, ResourceID)>, InternalError>;
 
-    /// `label_filter` must be one that resolves identically for every schema
-    /// in `scope`.
+    /// Returns IDs of live resources of `schema` owned by `account_id` and
+    /// carrying the exact label pair, oldest first.
+    ///
+    /// `account_id` is a security boundary, not an optimization: label values
+    /// are caller-supplied and unvalidated, so matching across accounts would
+    /// let one account's resource be picked up by another's lookup purely by
+    /// carrying the same value.
+    ///
+    /// Ordering is by `created_at` rather than `updated_at` so that editing a
+    /// resource never reshuffles precedence among equally-labelled peers.
+    async fn find_resource_ids_by_schema_and_label(
+        &self,
+        account_id: &odf::AccountID,
+        schema: &TypeUri,
+        label_key: &str,
+        label_value: &str,
+    ) -> Result<Vec<ResourceID>, InternalError>;
+
+    /// Label filtering rides on `scope`: each row carries the pairs it must
+    /// satisfy, so one call may filter differently per type.
     async fn search_resource_handles(
         &self,
         account_id: &odf::AccountID,
-        scope: &ResourceTypeScope,
-        query: &ResourceSearchQuery,
-        label_filter: &ResolvedResourceLabelFilter,
+        scope: &ResourceScope,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceHandleRow>, InternalError>;
 
     async fn count_search_resource_handles(
         &self,
         account_id: &odf::AccountID,
-        scope: &ResourceTypeScope,
-        query: &ResourceSearchQuery,
-        label_filter: &ResolvedResourceLabelFilter,
+        scope: &ResourceScope,
     ) -> Result<usize, InternalError>;
 
     async fn find_resource_snapshot(
@@ -105,6 +127,8 @@ pub trait ResourceRepository: Send + Sync {
         query: &ResourceRawEventQuery,
     ) -> Result<Option<ResourceSnapshot>, InternalError>;
 
+    /// Returns snapshots in the order their IDs appear in `ids`. This lookup is
+    /// by schema, not by account, so it spans accounts.
     async fn find_resource_snapshots_by_schema_and_ids(
         &self,
         schema: &TypeUri,
@@ -116,6 +140,9 @@ pub trait ResourceRepository: Send + Sync {
         id: &ResourceID,
     ) -> Result<Option<ResourceSnapshot>, InternalError>;
 
+    /// Returns snapshots in the order their IDs appear in `ids`. IDs that do
+    /// not exist, are deleted, or belong to another account are absent, so the
+    /// result may be shorter than the request but never reordered.
     async fn find_resource_snapshots_by_ids(
         &self,
         account_id: &odf::AccountID,
@@ -129,20 +156,12 @@ pub trait ResourceRepository: Send + Sync {
         pagination: PaginationOpts,
     ) -> ResourceIDStream<'_>;
 
-    fn list_resource_snapshots_by_schema(
+    /// Spans the schemas named by `scope`, each with its own query and label
+    /// pairs.
+    fn list_resource_snapshots(
         &self,
-        account_id: odf::AccountID,
-        schema: &TypeUri,
-        pagination: PaginationOpts,
-        label_filter: &ResolvedResourceLabelFilter,
-    ) -> ResourceSnapshotStream<'_>;
-
-    /// Spans every schema the account owns, so `label_filter` must be one that
-    /// resolves identically for all of them.
-    fn list_all_resource_snapshots(
-        &self,
-        account_id: odf::AccountID,
-        label_filter: &ResolvedResourceLabelFilter,
+        account_id: &odf::AccountID,
+        scope: &ResourceScope,
         pagination: PaginationOpts,
     ) -> ResourceSnapshotStream<'_>;
 
@@ -160,37 +179,27 @@ pub trait ResourceRepository: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Which schemas a `search_resource_handles` call is scoped to.
-#[derive(Debug, Clone)]
-pub enum ResourceTypeScope {
-    /// No schema filter — matches every registered resource type.
-    AnyType,
-    /// Non-empty by construction: use `AnyType` instead of an empty list.
-    Types(Vec<TypeUri>),
-}
-
-impl ResourceTypeScope {
-    /// Panics if `schemas` is empty — callers must use `AnyType` for that.
-    pub fn types(schemas: Vec<TypeUri>) -> Self {
-        assert!(
-            !schemas.is_empty(),
-            "ResourceTypeScope::Types must not be empty; use AnyType instead"
-        );
-        Self::Types(schemas)
-    }
-}
+/// One resolved label predicate: a canonical key and the string value it must
+/// equal.
+///
+/// Flattened from a [`ResolvedResourceLabelFilter`] conjunction by the facade,
+/// so a backend never has to interpret an expression tree.
+///
+/// [`ResolvedResourceLabelFilter`]: crate::ResolvedResourceLabelFilter
+pub type ResourceLabelPair = (TypeRef, String);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Exactly one way to narrow a `search_resource_handles` call.
-#[derive(Debug, Clone)]
-pub enum ResourceSearchQuery {
+/// Exactly one way to narrow a resource search or listing to specific
+/// resources within a type.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ResourceQuery {
     ExactNames(Vec<ResourceName>),
     ExactIds(Vec<ResourceID>),
     NamePattern(String),
 }
 
-impl ResourceSearchQuery {
+impl ResourceQuery {
     /// An empty `ExactNames`/`ExactIds` list can never match anything.
     pub fn is_vacuous(&self) -> bool {
         match self {
@@ -198,6 +207,108 @@ impl ResourceSearchQuery {
             Self::ExactIds(ids) => ids.is_empty(),
             Self::NamePattern(_) => false,
         }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// One resource type in a scope, with the query that narrows it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResourceTypeQuery {
+    pub schema: TypeUri,
+    pub query: Option<ResourceQuery>,
+    /// Which account this row spans. `None` means the call-level account, which
+    /// the scoped reads take as a scalar argument and use as the default.
+    ///
+    /// Set only when a caller names an account per selector. Rows naming
+    /// different accounts cannot merge, so the coalescer groups by
+    /// `(schema, account, labels)` rather than by schema alone.
+    pub account_id: Option<odf::AccountID>,
+    /// Label pairs this row must satisfy, all of which must be present on a
+    /// resource for it to match. Empty means unfiltered.
+    ///
+    /// Already resolved and flattened by the facade, so backends only ever see
+    /// `(canonical key, string value)` pairs — `$not`/`$or` are rejected before
+    /// reaching here. Part of the coalescer's grouping key: two rows differing
+    /// only by labels describe different resources and must not merge.
+    pub label_pairs: Vec<ResourceLabelPair>,
+}
+
+impl ResourceTypeQuery {
+    /// The account this row applies to, falling back to the call-level one.
+    pub fn effective_account_id<'a>(&'a self, default: &'a odf::AccountID) -> &'a odf::AccountID {
+        self.account_id.as_ref().unwrap_or(default)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Which resources a search or listing spans: the types, plus the query and
+/// label pairs narrowing each one.
+///
+/// A per-type query is what lets one call express `vs/a-% ss/b-%`, where each
+/// type carries a different query. Per-type label pairs extend that to
+/// filtering: one call may require different labels of each type.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ResourceScope {
+    /// Every registered resource type, optionally narrowed by one query and one
+    /// set of label pairs, both applying uniformly.
+    AnyType(Option<ResourceQuery>, Vec<ResourceLabelPair>),
+    /// Non-empty by construction: use `AnyType` instead of an empty list.
+    Types(Vec<ResourceTypeQuery>),
+}
+
+impl ResourceScope {
+    /// Panics if `types` is empty — callers must use `AnyType` for that.
+    pub fn types(types: Vec<ResourceTypeQuery>) -> Self {
+        assert!(
+            !types.is_empty(),
+            "ResourceScope::Types must not be empty; use AnyType instead"
+        );
+        Self::Types(types)
+    }
+
+    /// Every type, unnarrowed and unfiltered.
+    pub fn any_type() -> Self {
+        Self::AnyType(None, Vec::new())
+    }
+
+    /// The common single-type case, with or without a query, spanning the
+    /// call-level account and carrying no label filter.
+    pub fn one_type(schema: TypeUri, query: Option<ResourceQuery>) -> Self {
+        Self::Types(vec![ResourceTypeQuery {
+            schema,
+            query,
+            account_id: None,
+            label_pairs: Vec::new(),
+        }])
+    }
+
+    /// Every type, narrowed by one query applying to all of them and carrying
+    /// no label filter.
+    pub fn any_type_with_query(query: ResourceQuery) -> Self {
+        Self::AnyType(Some(query), Vec::new())
+    }
+
+    /// Whether no resource can possibly match, so callers can skip the query
+    /// entirely.
+    ///
+    /// Label pairs are deliberately not consulted: they narrow a row, but no
+    /// set of pairs makes one unmatchable a priori the way an empty
+    /// `ExactNames`/`ExactIds` list does.
+    pub fn is_vacuous(&self) -> bool {
+        match self {
+            Self::AnyType(query, _) => query.as_ref().is_some_and(ResourceQuery::is_vacuous),
+            Self::Types(types) => types
+                .iter()
+                .all(|entry| entry.query.as_ref().is_some_and(ResourceQuery::is_vacuous)),
+        }
+    }
+}
+
+impl Default for ResourceScope {
+    fn default() -> Self {
+        Self::any_type()
     }
 }
 

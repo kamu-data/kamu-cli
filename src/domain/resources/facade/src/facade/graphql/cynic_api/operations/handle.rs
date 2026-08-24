@@ -8,76 +8,37 @@
 // by the Apache License, Version 2.0.
 
 use cynic::QueryBuilder;
-use internal_error::InternalError;
+use kamu_resources::ResourceRef;
 
 use crate::facade::graphql::cynic_api::fragments::{
     BatchResourceProblem,
-    ResourceBadAccountProblem,
+    ResourceAccountResolutionProblem,
     ResourceHandle,
-    ResourceSelectorProblemResult,
     ResourceUnsupportedSelectorProblem,
 };
-use crate::facade::graphql::cynic_api::inputs::{
-    ResourceBatchSelectorInput,
-    ResourceSelectorInput,
-};
+use crate::facade::graphql::cynic_api::inputs::{ResourceRefInput, resource_ref_inputs};
 use crate::facade::graphql::cynic_api::schema;
-use crate::{ResourceBatchSelector, ResourceSelector};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
-#[cynic(graphql_type = "Query", variables = "ResourceHandleSelectorVariables")]
-pub(crate) struct GetResourceHandleQuery {
-    pub resources: ResourceHandleResources,
-}
-
-#[derive(cynic::QueryFragment, Debug, Clone)]
-#[cynic(
-    graphql_type = "Resources",
-    variables = "ResourceHandleSelectorVariables"
-)]
-pub(crate) struct ResourceHandleResources {
-    #[arguments(selector: $selector)]
-    pub resource_handle: ResourceGetHandleOutcome,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(cynic::InlineFragments, Debug, Clone)]
-pub(crate) enum ResourceGetHandleOutcome {
-    ResourceHandle(ResourceHandle),
-    ResourceSelectorProblemResult(ResourceSelectorProblemResult),
-    #[cynic(fallback)]
-    Unknown,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(cynic::QueryFragment, Debug, Clone)]
-#[cynic(
-    graphql_type = "Query",
-    variables = "ResourceHandleBatchSelectorVariables"
-)]
+#[cynic(graphql_type = "Query", variables = "ResourceHandleRefsVariables")]
 pub(crate) struct GetResourceHandlesQuery {
     pub resources: ResourceHandlesResources,
 }
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
-#[cynic(
-    graphql_type = "Resources",
-    variables = "ResourceHandleBatchSelectorVariables"
-)]
+#[cynic(graphql_type = "Resources", variables = "ResourceHandleRefsVariables")]
 pub(crate) struct ResourceHandlesResources {
-    #[arguments(selector: $selector)]
-    pub resource_handles: BatchResourceHandlesOutcome,
+    #[arguments(resourceRefs: $resource_refs)]
+    pub handles_by_refs: BatchResourceHandlesOutcome,
 }
 
 #[derive(cynic::InlineFragments, Debug, Clone)]
 pub(crate) enum BatchResourceHandlesOutcome {
     BatchResourceHandlesResult(BatchResourceHandlesResult),
     ResourceUnsupportedSelectorProblem(ResourceUnsupportedSelectorProblem),
-    ResourceBadAccountProblem(ResourceBadAccountProblem),
+    ResourceAccountResolutionProblem(ResourceAccountResolutionProblem),
     #[cynic(fallback)]
     Unknown,
 }
@@ -97,44 +58,23 @@ pub(crate) struct BatchResourceHandleSuccess {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::QueryVariables, Debug, Clone)]
-pub(crate) struct ResourceHandleSelectorVariables {
-    pub selector: ResourceSelectorInput,
+pub(crate) struct ResourceHandleRefsVariables {
+    pub resource_refs: Vec<ResourceRefInput>,
 }
 
-impl ResourceHandleSelectorVariables {
-    pub(crate) fn new(selector: &ResourceSelector) -> Result<Self, InternalError> {
-        Ok(Self {
-            selector: selector.try_into()?,
-        })
+impl ResourceHandleRefsVariables {
+    pub(crate) fn new(resource_refs: &[ResourceRef]) -> Self {
+        Self {
+            resource_refs: resource_ref_inputs(resource_refs),
+        }
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(cynic::QueryVariables, Debug, Clone)]
-pub(crate) struct ResourceHandleBatchSelectorVariables {
-    pub selector: ResourceBatchSelectorInput,
-}
-
-impl ResourceHandleBatchSelectorVariables {
-    pub(crate) fn new(selector: &ResourceBatchSelector) -> Result<Self, InternalError> {
-        Ok(Self {
-            selector: selector.try_into()?,
-        })
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) fn build_handle_operation(
-    variables: ResourceHandleSelectorVariables,
-) -> cynic::Operation<GetResourceHandleQuery, ResourceHandleSelectorVariables> {
-    GetResourceHandleQuery::build(variables)
-}
 
 pub(crate) fn build_handles_operation(
-    variables: ResourceHandleBatchSelectorVariables,
-) -> cynic::Operation<GetResourceHandlesQuery, ResourceHandleBatchSelectorVariables> {
+    variables: ResourceHandleRefsVariables,
+) -> cynic::Operation<GetResourceHandlesQuery, ResourceHandleRefsVariables> {
     GetResourceHandlesQuery::build(variables)
 }
 

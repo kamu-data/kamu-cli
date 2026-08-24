@@ -13,21 +13,21 @@ use database_common::{
     mysql_generate_placeholders_list,
     sql_like_escape_literal,
 };
-use dill::{component, interface};
 use email_utils::Email;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use sqlx::Row;
 use sqlx::error::DatabaseError;
 use sqlx::mysql::MySqlRow;
+use url::Url;
 
 use crate::domain::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component]
-#[interface(dyn AccountRepository)]
-#[interface(dyn ExpensiveAccountRepository)]
-#[interface(dyn PasswordHashRepository)]
+#[dill::component]
+#[dill::interface(dyn AccountRepository)]
+#[dill::interface(dyn ExpensiveAccountRepository)]
+#[dill::interface(dyn PasswordHashRepository)]
 pub struct MySqlAccountRepository {
     transaction: TransactionRefT<sqlx::MySql>,
 }
@@ -42,7 +42,9 @@ impl MySqlAccountRepository {
             AccountDuplicateField::Name
         } else if mysql_error_message.contains("for key 'idx_accounts_email'") {
             AccountDuplicateField::Email
-        } else if mysql_error_message.contains("for key 'idx_accounts_provider_identity_key'") {
+        } else if mysql_error_message
+            .contains("for key 'idx_uniq_accounts_provider_provider_identity_key'")
+        {
             AccountDuplicateField::ProviderIdentityKey
         } else {
             tracing::error!(
@@ -65,7 +67,9 @@ impl MySqlAccountRepository {
             email: Email::parse(account_row.get(2)).unwrap(),
             display_name: account_row.get(3),
             account_type: account_row.get_unchecked(4),
-            avatar_url: account_row.get(5),
+            avatar_url: account_row
+                .get::<Option<&str>, _>(5)
+                .map(|url| Url::parse(url).unwrap()),
             registered_at: account_row.get(6),
             provider: account_row.get(7),
             provider_identity_key: account_row.get(8),
@@ -94,7 +98,7 @@ impl AccountRepository for MySqlAccountRepository {
             account.email.as_ref().to_ascii_lowercase(),
             account.display_name,
             account.account_type,
-            account.avatar_url,
+            account.avatar_url.as_ref().map(Url::as_str),
             account.registered_at,
             account.provider.clone(),
             account.provider_identity_key.clone(),
@@ -137,7 +141,7 @@ impl AccountRepository for MySqlAccountRepository {
             updated_account.email.as_ref().to_ascii_lowercase(),
             updated_account.display_name,
             updated_account.account_type as AccountType,
-            updated_account.avatar_url,
+            updated_account.avatar_url.as_ref().map(Url::as_str),
             updated_account.registered_at,
             updated_account.provider.clone(),
             updated_account.provider_identity_key.clone(),
@@ -389,6 +393,7 @@ impl AccountRepository for MySqlAccountRepository {
 
     async fn find_account_id_by_provider_identity_key(
         &self,
+        provider: &str,
         provider_identity_key: &str,
     ) -> Result<Option<odf::AccountID>, FindAccountIdByProviderIdentityKeyError> {
         let mut tr = self.transaction.lock().await;
@@ -399,8 +404,10 @@ impl AccountRepository for MySqlAccountRepository {
             r#"
             SELECT id as "id: odf::AccountID"
             FROM accounts
-            WHERE provider_identity_key = ?
+            WHERE provider = ?
+              AND provider_identity_key = ?
             "#,
+            provider,
             provider_identity_key
         )
         .fetch_optional(connection_mut)
@@ -422,7 +429,7 @@ impl AccountRepository for MySqlAccountRepository {
             r#"
             SELECT id as "id: odf::AccountID"
             FROM accounts
-            WHERE email = ?
+            WHERE lower(email) = lower(?)
             "#,
             email.as_ref()
         )
@@ -454,6 +461,37 @@ impl AccountRepository for MySqlAccountRepository {
         .int_err()?;
 
         Ok(maybe_account_row.map(|account_row| account_row.id))
+    }
+
+    async fn find_account_ids_by_unique_fields(
+        &self,
+        provider: &str,
+        account_name: &odf::AccountName,
+        email: &Email,
+        provider_identity_key: &str,
+    ) -> Result<Vec<odf::AccountID>, FindAccountIdsByUniqueFieldsError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let account_rows = sqlx::query!(
+            r#"
+            SELECT DISTINCT id AS "id: odf::AccountID"
+            FROM accounts
+            WHERE lower(account_name) = lower(?)
+               OR lower(email) = lower(?)
+               OR (provider = ? AND provider_identity_key = ?)
+            "#,
+            account_name.as_str(),
+            email.as_ref(),
+            provider,
+            provider_identity_key
+        )
+        .fetch_all(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(account_rows.into_iter().map(|row| row.id).collect())
     }
 
     fn search_accounts_by_name_pattern<'a>(
@@ -699,6 +737,33 @@ impl PasswordHashRepository for MySqlAccountRepository {
             WHERE lower(account_name) = lower(?)
             "#,
             account_name.as_str(),
+        )
+        .fetch_optional(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(maybe_password_row.map(|password_row| password_row.password_hash))
+    }
+
+    async fn find_password_hash_by_account_id(
+        &self,
+        account_id: &odf::AccountID,
+    ) -> Result<Option<String>, FindPasswordHashError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        use odf::metadata::AsStackString;
+
+        let account_id_stack = account_id.as_stack_string();
+
+        let maybe_password_row = sqlx::query!(
+            r#"
+            SELECT password_hash
+            FROM accounts_passwords
+            WHERE account_id = ?
+            "#,
+            account_id_stack.as_str(),
         )
         .fetch_optional(connection_mut)
         .await

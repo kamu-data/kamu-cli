@@ -78,6 +78,7 @@ pub(crate) struct ResourceListColumnValueView {
 #[derive(cynic::QueryFragment, Debug, Clone)]
 pub(crate) struct ResourceConnection {
     pub nodes: Vec<ResourceSummary>,
+    pub total_count: i32,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -110,18 +111,13 @@ pub(crate) struct ResourceUnsupportedSelectorProblem {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::QueryFragment, Debug, Clone)]
-pub(crate) struct ResourceBadAccountProblem {
-    pub code: ResourceBadAccountProblemCode,
-    pub account_id: Option<odf::AccountID>,
-    pub account_name: Option<AccountName>,
-    pub expected_resource_id: Option<kamu_resources::ResourceID>,
-    pub expected_did: Option<odf::AccountID>,
-    pub expected_name: Option<AccountName>,
-    pub actual_name: Option<AccountName>,
+pub(crate) struct ResourceAccountResolutionProblem {
+    pub code: ResourceAccountResolutionProblemCode,
+    pub message: String,
 }
 
 #[derive(cynic::Enum, Debug, Clone, Copy)]
-pub(crate) enum ResourceBadAccountProblemCode {
+pub(crate) enum ResourceAccountResolutionProblemCode {
     EmptySelector,
     AccountNotFoundById,
     AccountNotFoundByName,
@@ -148,34 +144,39 @@ pub(crate) struct ResourceSchemaMismatchProblem {
     pub actual_schema: kamu_resources::TypeUri,
 }
 
+#[derive(cynic::QueryFragment, Debug, Clone)]
+pub(crate) struct ResourceNameMismatchProblem {
+    pub id: kamu_resources::ResourceID,
+    pub expected_name: kamu_resources::ResourceName,
+    pub actual_name: kamu_resources::ResourceName,
+}
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
+pub(crate) struct ResourceAnyTypeNameNotFoundProblem {
+    pub name: kamu_resources::ResourceName,
+}
+
+#[derive(cynic::QueryFragment, Debug, Clone)]
+pub(crate) struct ResourceAmbiguousTypeProblem {
+    pub name: kamu_resources::ResourceName,
+    pub type_names: Vec<kamu_resources::TypeName>,
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(cynic::InlineFragments, Debug, Clone)]
 pub(crate) enum ResourceLookupProblem {
     ResourceIDNotFoundProblem(ResourceIDNotFoundProblem),
     ResourceNameNotFoundProblem(ResourceNameNotFoundProblem),
+    ResourceAnyTypeNameNotFoundProblem(ResourceAnyTypeNameNotFoundProblem),
+    ResourceAmbiguousTypeProblem(ResourceAmbiguousTypeProblem),
     ResourceSchemaMismatchProblem(ResourceSchemaMismatchProblem),
+    ResourceNameMismatchProblem(ResourceNameMismatchProblem),
     #[cynic(fallback)]
     Unknown,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(cynic::InlineFragments, Debug, Clone)]
-pub(crate) enum ResourceSelectorProblem {
-    ResourceIDNotFoundProblem(ResourceIDNotFoundProblem),
-    ResourceNameNotFoundProblem(ResourceNameNotFoundProblem),
-    ResourceSchemaMismatchProblem(ResourceSchemaMismatchProblem),
-    ResourceUnsupportedSelectorProblem(ResourceUnsupportedSelectorProblem),
-    ResourceBadAccountProblem(ResourceBadAccountProblem),
-    #[cynic(fallback)]
-    Unknown,
-}
-
-#[derive(cynic::QueryFragment, Debug, Clone)]
-pub(crate) struct ResourceSelectorProblemResult {
-    pub problem: ResourceSelectorProblem,
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

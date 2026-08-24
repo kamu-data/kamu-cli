@@ -18,7 +18,6 @@ use kamu_datasets::{
     DatasetEnvVarResolver,
     UpsertDatasetEnvVarStatus,
 };
-use kamu_datasets_inmem::InMemoryDatasetEntryRepository;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -37,7 +36,6 @@ impl DatasetEnvVarServiceHarness {
         let base = BaseConfigurationServiceHarness::new();
 
         let mut b = CatalogBuilder::new_chained(base.catalog());
-        b.add::<InMemoryDatasetEntryRepository>();
         b.add::<AccountServiceImpl>();
 
         let catalog = b.build();

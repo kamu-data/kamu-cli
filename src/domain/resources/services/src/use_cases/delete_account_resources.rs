@@ -20,7 +20,7 @@ use kamu_resources::{
     ResourceSnapshot,
 };
 
-use crate::get_resource_crud_dispatcher_for_trusted_schema;
+use crate::ResourceDispatcherFactory;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -31,7 +31,7 @@ const PAGE_SIZE: usize = 100;
 #[dill::component(pub)]
 #[dill::interface(dyn DeleteAccountResourcesUseCase)]
 pub struct DeleteAccountResourcesUsecaseImpl {
-    catalog: dill::Catalog,
+    dispatcher_factory: Arc<ResourceDispatcherFactory>,
     generic_resource_query_service: Arc<dyn GenericResourceQueryService>,
 }
 
@@ -43,9 +43,9 @@ impl DeleteAccountResourcesUsecaseImpl {
         collect_all_pages(PAGE_SIZE, |pagination| async move {
             self.generic_resource_query_service
                 // Account teardown sweeps every resource, never a subset.
-                .list_all_snapshots(
-                    account_id.clone(),
-                    &kamu_resources::ResolvedResourceLabelFilter::True,
+                .list_snapshots(
+                    account_id,
+                    &kamu_resources::ResourceScope::default(),
                     pagination,
                 )
                 .await
@@ -85,10 +85,9 @@ impl DeleteAccountResourcesUseCase for DeleteAccountResourcesUsecaseImpl {
         for (resource_snapshot, ids) in self.group_resource_ids_by_descriptor(resource_snapshots) {
             // The schema comes from a stored snapshot, so a missing dispatcher is
             // a data-integrity catastrophe, not a user error.
-            let dispatcher = get_resource_crud_dispatcher_for_trusted_schema(
-                &self.catalog,
-                resource_snapshot.schema.as_str(),
-            )?;
+            let dispatcher = self
+                .dispatcher_factory
+                .crud_dispatcher_for_trusted_schema(resource_snapshot.schema.as_str())?;
 
             dispatcher
                 .delete(ResourceCrudDispatcherDeleteRequest {

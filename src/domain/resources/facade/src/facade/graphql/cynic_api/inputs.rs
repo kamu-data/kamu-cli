@@ -12,7 +12,7 @@ use kamu_resources as domain;
 use crate::facade::graphql::cynic_api::fragments::ResourceManifestFormat;
 use crate::facade::graphql::cynic_api::scalars::AccountName;
 use crate::facade::graphql::cynic_api::schema;
-use crate::{ResourceBatchSelector, ResourceRef, ResourceSelector, SearchResourceHandlesRequest};
+use crate::{SearchResourcesRequest, SpecViewOpts};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -23,9 +23,11 @@ pub(crate) struct ResourceTypeSelectorInput {
 }
 
 impl ResourceTypeSelectorInput {
-    pub(crate) fn from_resource_type(resource_type: &domain::ResourceTypeSelectorRaw) -> Self {
+    /// The server resolves canonical selectors, aliases, ODF type names, and
+    /// schema URIs through one lookup, so a `TypeRef` passes through as-is.
+    pub(crate) fn from_type_ref(type_ref: &domain::TypeRef) -> Self {
         Self {
-            selector: resource_type.clone(),
+            selector: domain::ResourceTypeSelectorRaw::new_unchecked(type_ref.as_str()),
         }
     }
 }
@@ -55,77 +57,45 @@ impl From<&domain::ResourceAccountRef> for AccountRefInput {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[derive(cynic::InputObject, Debug, Clone)]
-#[cynic(graphql_type = "ResourceByNameSelectorInput")]
-pub(crate) struct ResourceByNameSelectorInput {
-    pub name: domain::ResourceName,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+/// Mirrors the server's `ResourceRefInput`: a plain input object, not a
+/// `oneOf`, so `id` and `name` can travel together as ODF's consistency
+/// assertion.
 #[derive(cynic::InputObject, Debug, Clone)]
 #[cynic(graphql_type = "ResourceRefInput")]
-pub(crate) enum ResourceRefInput {
-    ById(domain::ResourceID),
-    ByName(ResourceByNameSelectorInput),
+pub(crate) struct ResourceRefInput {
+    pub account: Option<AccountRefInput>,
+
+    /// `None` spans every type — the server resolves which one holds the named
+    /// resource, and reports an ambiguity if several do.
+    #[cynic(rename = "type")]
+    pub type_: Option<ResourceTypeSelectorInput>,
+
+    pub id: Option<domain::ResourceID>,
+    pub name: Option<domain::ResourceName>,
 }
 
-impl From<&ResourceRef> for ResourceRefInput {
-    fn from(value: &ResourceRef) -> Self {
-        match value {
-            ResourceRef::ById(id) => Self::ById(*id),
-            ResourceRef::ByName(name) => {
-                Self::ByName(ResourceByNameSelectorInput { name: name.clone() })
-            }
+impl From<&domain::ResourceRef> for ResourceRefInput {
+    fn from(value: &domain::ResourceRef) -> Self {
+        Self {
+            account: value.account.as_ref().map(Into::into),
+            type_: value
+                .r#type
+                .as_ref()
+                .map(ResourceTypeSelectorInput::from_type_ref),
+            id: value.id,
+            name: value.name.clone(),
+            // `did` is deliberately absent: it has no wire representation, and
+            // no caller can populate one today — the GraphQL adapter rejects it
+            // via `validate_ref`, and every CLI construction site hardcodes
+            // `None`. Should a ref ever carry one, it would be dropped here
+            // rather than rejected, so a new producer must validate at its own
+            // entry point.
         }
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(cynic::InputObject, Debug, Clone)]
-#[cynic(graphql_type = "ResourceSelectorInput")]
-pub(crate) struct ResourceSelectorInput {
-    pub resource_type: ResourceTypeSelectorInput,
-
-    #[cynic(rename = "ref")]
-    pub ref_: ResourceRefInput,
-
-    pub account: Option<AccountRefInput>,
-}
-
-impl TryFrom<&ResourceSelector> for ResourceSelectorInput {
-    type Error = internal_error::InternalError;
-
-    fn try_from(value: &ResourceSelector) -> Result<Self, Self::Error> {
-        Ok(Self {
-            resource_type: ResourceTypeSelectorInput::from_resource_type(&value.resource_type),
-            ref_: (&value.resource_ref).into(),
-            account: value.account.as_ref().map(Into::into),
-        })
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(cynic::InputObject, Debug, Clone)]
-#[cynic(graphql_type = "ResourceBatchSelectorInput")]
-pub(crate) struct ResourceBatchSelectorInput {
-    pub resource_type: ResourceTypeSelectorInput,
-    pub refs: Vec<ResourceRefInput>,
-    pub account: Option<AccountRefInput>,
-}
-
-impl TryFrom<&ResourceBatchSelector> for ResourceBatchSelectorInput {
-    type Error = internal_error::InternalError;
-
-    fn try_from(value: &ResourceBatchSelector) -> Result<Self, Self::Error> {
-        Ok(Self {
-            resource_type: ResourceTypeSelectorInput::from_resource_type(&value.resource_type),
-            refs: value.resource_refs.iter().map(Into::into).collect(),
-            account: value.account.as_ref().map(Into::into),
-        })
-    }
+pub(crate) fn resource_ref_inputs(resource_refs: &[domain::ResourceRef]) -> Vec<ResourceRefInput> {
+    resource_refs.iter().map(Into::into).collect()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -169,86 +139,81 @@ pub(crate) struct ApplyManifestInput {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Mirrors the server's `ResourceSelectorInput`: the ODF selector shape, with
+/// every field optional so one selector can span every type.
 #[derive(cynic::InputObject, Debug, Clone)]
-#[cynic(graphql_type = "ResourceSearchQueryInput")]
-pub(crate) struct ResourceSearchQueryInput {
-    pub exact_names: Option<Vec<domain::ResourceName>>,
-    pub exact_ids: Option<Vec<domain::ResourceID>>,
-    pub name_pattern: Option<String>,
-}
-
-impl From<&domain::ResourceSearchQuery> for ResourceSearchQueryInput {
-    fn from(value: &domain::ResourceSearchQuery) -> Self {
-        match value {
-            domain::ResourceSearchQuery::ExactNames(names) => Self {
-                exact_names: Some(names.clone()),
-                exact_ids: None,
-                name_pattern: None,
-            },
-            domain::ResourceSearchQuery::ExactIds(ids) => Self {
-                exact_names: None,
-                exact_ids: Some(ids.clone()),
-                name_pattern: None,
-            },
-            domain::ResourceSearchQuery::NamePattern(pattern) => Self {
-                exact_names: None,
-                exact_ids: None,
-                name_pattern: Some(pattern.clone()),
-            },
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(cynic::InputObject, Debug, Clone)]
-#[cynic(graphql_type = "ResourceTypeScopeInput")]
-pub(crate) struct ResourceTypeScopeInput {
-    pub any_type: Option<bool>,
-    pub types: Option<Vec<ResourceTypeSelectorInput>>,
-}
-
-impl From<&crate::SearchResourceTypeScope> for ResourceTypeScopeInput {
-    fn from(value: &crate::SearchResourceTypeScope) -> Self {
-        match value {
-            crate::SearchResourceTypeScope::AnyType => Self {
-                any_type: Some(true),
-                types: None,
-            },
-            crate::SearchResourceTypeScope::Types(raw_type_selectors) => Self {
-                any_type: None,
-                types: Some(
-                    raw_type_selectors
-                        .iter()
-                        .map(ResourceTypeSelectorInput::from_resource_type)
-                        .collect(),
-                ),
-            },
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(cynic::InputObject, Debug, Clone)]
-#[cynic(graphql_type = "SearchResourceHandlesInput")]
-pub(crate) struct SearchResourceHandlesInput {
-    pub scope: ResourceTypeScopeInput,
-    pub query: ResourceSearchQueryInput,
+#[cynic(graphql_type = "ResourceSelectorInput")]
+pub(crate) struct ResourceSelectorInput {
     pub account: Option<AccountRefInput>,
-    pub label_filter: Option<ResourceLabelFilterInput>,
+
+    #[cynic(rename = "type")]
+    pub type_: Option<ResourceTypeSelectorInput>,
+
+    pub id: Option<domain::ResourceID>,
+    pub name: Option<String>,
+    pub labels: Option<ResourceLabelFilterInput>,
 }
 
-impl TryFrom<&SearchResourceHandlesRequest> for SearchResourceHandlesInput {
+impl From<&domain::ResourceSelector> for ResourceSelectorInput {
+    fn from(value: &domain::ResourceSelector) -> Self {
+        Self {
+            account: value.account.as_ref().map(Into::into),
+            type_: value
+                .r#type
+                .as_ref()
+                .map(ResourceTypeSelectorInput::from_type_ref),
+            id: value.id,
+            name: value.name.clone(),
+            // Carried, not dropped: the label filter is per selector, so the
+            // remote surface must send it or the server would answer a wider
+            // question than was asked.
+            labels: value.labels.as_ref().map(Into::into),
+        }
+    }
+}
+
+pub(crate) fn resource_selector_inputs(
+    selectors: &[domain::ResourceSelector],
+) -> Vec<ResourceSelectorInput> {
+    selectors.iter().map(Into::into).collect()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::InputObject, Debug, Clone)]
+#[cynic(graphql_type = "SearchResourcesInput")]
+pub(crate) struct SearchResourcesInput {
+    pub selectors: Option<Vec<ResourceSelectorInput>>,
+    pub account: Option<AccountRefInput>,
+}
+
+impl TryFrom<&SearchResourcesRequest> for SearchResourcesInput {
     type Error = internal_error::InternalError;
 
-    fn try_from(value: &SearchResourceHandlesRequest) -> Result<Self, Self::Error> {
+    fn try_from(value: &SearchResourcesRequest) -> Result<Self, Self::Error> {
         Ok(Self {
-            scope: (&value.type_scope).into(),
-            query: (&value.query).into(),
+            // Always sent explicitly. The field is nullable so that omitting it
+            // spans every type, but the facade has already resolved that to a
+            // concrete selector list by this point.
+            selectors: Some(resource_selector_inputs(&value.selectors)),
             account: value.account.as_ref().map(Into::into),
-            label_filter: value.label_filter.as_ref().map(Into::into),
         })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(cynic::InputObject, Debug, Clone, Copy)]
+#[cynic(graphql_type = "SpecViewOptsInput")]
+pub(crate) struct SpecViewOptsInput {
+    pub revealed: bool,
+}
+
+impl From<SpecViewOpts> for SpecViewOptsInput {
+    fn from(value: SpecViewOpts) -> Self {
+        Self {
+            revealed: value.revealed,
+        }
     }
 }
 

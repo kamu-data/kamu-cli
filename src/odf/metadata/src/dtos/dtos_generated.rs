@@ -408,20 +408,20 @@ pub mod config {
     /// Reference to a value within a `VariableSet` or a `SecretSet`.
     ///
     /// Schema: https://opendatafabric.org/schemas/config/v1alpha1/ValueRef
-    #[derive(Clone, Debug, Eq, PartialEq)]
+    #[derive(Clone, Debug, Eq, PartialEq, Default)]
     pub struct ValueRef {
         /// Reference to an account that owns the `VariableSet` or the
         /// `SecretSet`.
         pub account: Option<auth::AccountRef>,
+        /// ID of a resource.
+        pub id: Option<ResourceID>,
         /// Short type name or full type URI of the target resource.
         ///
         /// Examples:
         /// - "SecretSet"
         /// - "VariableSet"
         /// - "https://opendatafabric.org/config/v1/SecretSet"
-        pub r#type: TypeRef,
-        /// ID of a resource.
-        pub id: Option<ResourceID>,
+        pub r#type: Option<TypeRef>,
         /// Name of a resource.
         pub name: Option<ResourceName>,
         /// JSON path to a value within a `VariableSet` or a `SecretSet`.
@@ -2469,20 +2469,20 @@ pub mod resource {
     /// Reference to another resource.
     ///
     /// Schema: https://opendatafabric.org/schemas/resource/v1alpha1/ResourceRef
-    #[derive(Clone, Debug, Eq, PartialEq)]
+    #[derive(Clone, Debug, Eq, PartialEq, Default)]
     pub struct ResourceRef {
         /// Reference to an account that owns the target resource.
         pub account: Option<auth::AccountRef>,
+        /// ID of the resource within a node.
+        pub id: Option<ResourceID>,
+        /// DID of the resource.
+        pub did: Option<Did>,
         /// Short type name or full type URI of the target resource.
         ///
         /// Examples:
         /// - "SecretSet"
         /// - "https://opendatafabric.org/config/v1/SecretSet"
-        pub r#type: TypeRef,
-        /// ID of the resource within a node.
-        pub id: Option<ResourceID>,
-        /// DID of the resource.
-        pub did: Option<Did>,
+        pub r#type: Option<TypeRef>,
         /// Name of a resource.
         pub name: Option<ResourceName>,
     }

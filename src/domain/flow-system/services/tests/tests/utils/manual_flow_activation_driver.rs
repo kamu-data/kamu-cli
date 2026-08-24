@@ -11,15 +11,14 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Duration, Utc};
 use database_common_macros::transactional_method1;
-use dill::Catalog;
-use kamu_accounts::DEFAULT_ACCOUNT_ID;
+use kamu_accounts::TEST_ACCOUNT_ID;
 use kamu_flow_system::{FlowBinding, FlowConfigurationRule, FlowRunService, RunFlowError};
 use time_source::SystemTimeSource;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) struct ManualFlowActivationDriver {
-    catalog: Catalog,
+    catalog: dill::Catalog,
     time_source: Arc<dyn SystemTimeSource>,
     args: ManualFlowActivationArgs,
 }
@@ -33,7 +32,7 @@ pub(crate) struct ManualFlowActivationArgs {
 
 impl ManualFlowActivationDriver {
     pub(crate) fn new(
-        catalog: Catalog,
+        catalog: dill::Catalog,
         time_source: Arc<dyn SystemTimeSource>,
         args: ManualFlowActivationArgs,
     ) -> Self {
@@ -64,7 +63,7 @@ impl ManualFlowActivationDriver {
                 self.args
                     .initiator_id
                     .clone()
-                    .unwrap_or(DEFAULT_ACCOUNT_ID.clone()),
+                    .unwrap_or(TEST_ACCOUNT_ID.clone()),
                 self.args.maybe_forced_flow_config_rule.clone(),
             )
             .await?;

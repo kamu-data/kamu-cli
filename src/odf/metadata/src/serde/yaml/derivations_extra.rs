@@ -14,8 +14,23 @@ use crate::serde::yaml as proxies;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl From<dtos::resource::ResourceSelector> for proxies::resource::ResourceSelector {
-    fn from(_v: dtos::resource::ResourceSelector) -> Self {
-        todo!()
+    fn from(v: dtos::resource::ResourceSelector) -> Self {
+        let dtos::resource::ResourceSelector {
+            account,
+            id,
+            did,
+            r#type,
+            name,
+            labels,
+        } = v;
+        Self {
+            account: account.map(Into::into),
+            id,
+            did,
+            r#type,
+            name,
+            labels: labels.map(Into::into),
+        }
     }
 }
 
@@ -24,13 +39,19 @@ impl TryFrom<proxies::resource::ResourceSelector> for dtos::resource::ResourceSe
     fn try_from(v: proxies::resource::ResourceSelector) -> Result<Self, Self::Error> {
         let proxies::resource::ResourceSelector {
             account,
-            r#type: _,
-            id: _,
-            name: _,
-            labels: _,
+            id,
+            did,
+            r#type,
+            name,
+            labels,
         } = v;
         Ok(Self {
             account: account.map(TryInto::try_into).transpose()?,
+            id,
+            did,
+            r#type,
+            name,
+            labels: labels.map(TryInto::try_into).transpose()?,
         })
     }
 }

@@ -28,10 +28,6 @@ macro_rules! declare_resource_crud_dispatcher {
                 std::sync::Arc<dyn kamu_resources::ApplyResourceUseCase<$resource>>,
             generic_resource_query_service:
                 std::sync::Arc<dyn kamu_resources::GenericResourceQueryService>,
-            get_resource_by_id_use_case:
-                std::sync::Arc<dyn kamu_resources::GetResourceByIdUseCase<$resource>>,
-            list_resources_by_type_use_case:
-                std::sync::Arc<dyn kamu_resources::ListResourcesByTypeUseCase<$resource>>,
             delete_resources_use_case:
                 std::sync::Arc<dyn kamu_resources::DeleteResourcesUseCase<$resource>>,
         }
@@ -72,12 +68,8 @@ macro_rules! declare_resource_crud_dispatcher {
                     .await
                     .map_err(kamu_resources::ApplyResourceCrudDispatcherError::from)?;
 
-                $crate::map_apply_resource_planning_decision::<$resource>(
-                    plan,
-                    self.generic_resource_query_service.as_ref(),
-                )
-                .await
-                .map_err(Into::into)
+                $crate::map_apply_resource_planning_decision::<$resource>(plan)
+                    .map_err(Into::into)
             }
 
             async fn apply(
@@ -102,34 +94,6 @@ macro_rules! declare_resource_crud_dispatcher {
 
                 $crate::map_apply_resource_application_decision::<$resource>(result)
                     .map_err(Into::into)
-            }
-
-            async fn get(
-                &self,
-                request: $crate::ResourceCrudDispatcherGetRequest,
-            ) -> Result<kamu_resources::Resource, $crate::GetResourceCrudDispatcherError> {
-                let state = self
-                    .get_resource_by_id_use_case
-                    .execute(request.account_id, &request.id)
-                    .await
-                    .map_err(kamu_resources::GetResourceCrudDispatcherError::from)?;
-
-                $crate::typed_resource_state_to_resource::<$resource>(state).map_err(Into::into)
-            }
-
-            async fn list(
-                &self,
-                request: $crate::ResourceCrudDispatcherListRequest,
-            ) -> Result<Vec<kamu_resources::ResourceSummaryView>, internal_error::InternalError> {
-                let states = self
-                    .list_resources_by_type_use_case
-                    .execute(request.account_id, request.pagination, request.label_filter)
-                    .await?;
-
-                Ok(states
-                    .iter()
-                    .map($crate::typed_resource_state_to_summary_view::<$resource>)
-                    .collect::<Vec<_>>())
             }
 
             async fn delete(

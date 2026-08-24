@@ -16,6 +16,7 @@ mod dependencies;
 mod message_handlers;
 mod reconcilers;
 mod resource_crud_dispatchers;
+mod resource_extension_schemas;
 mod resources;
 pub mod sanitizers;
 
@@ -25,5 +26,6 @@ pub use dependencies::*;
 pub use message_handlers::*;
 pub use reconcilers::*;
 pub use resource_crud_dispatchers::*;
+pub use resource_extension_schemas::*;
 pub use resources::*;
 pub use sanitizers::*;

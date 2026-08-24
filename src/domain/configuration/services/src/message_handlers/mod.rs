@@ -7,10 +7,8 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-mod configuration_dataset_lifecycle_message_consumer;
 mod configuration_resource_lifecycle_message_consumer;
 
-pub use configuration_dataset_lifecycle_message_consumer::*;
 pub use configuration_resource_lifecycle_message_consumer::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

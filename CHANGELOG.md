@@ -15,8 +15,32 @@ Recommendation: for ease of reading, use the following format:
 
 # [Unreleased]
 ### Fixed
+- Container runtime no longer leaks containers that are killed before they finish starting - `run --rm` does not reap those, so they accumulated in `Created` state until the runtime could no longer start new ones
+
+## [0.266.1] - 2026-08-19
+### Fixed
+- Login, OAuth: login error if system (local) username matches GitHub username (#1684)
+
+## [0.266.0] - 2026-08-13
+### Added:
+- `MySqlDatasetEntryRepository` has been implemented:
+  - To fix a previously masked error w/ dataset searching in E2E tests
+### Changed
+- Revised approaches for handling predefined accounts (mostly `PredefinedAccountsRegistrator`) (#1674):
+  - Now, every predefined password account has its own unique key, even for single-tenant workspaces
+  - Stricter validation of predefined accounts
+- New account IDs are derived from DID secret keys, not from names (#1674):
+  - `DEFAULT_ACCOUNT_ID` has been removed; now we only use `TEST_ACCOUNT_ID` for testing, 
+    which does not exist in the production code paths (affects new single-tenant workspaces)
+- More strict typing in some places (using `Url` and `Email` instead of `String`) (#1674)
+- The uniqueness of the DID secret for accounts and datasets is guaranteed (#1674)
+### Fixed
 - Return JSON responses for authentication policy errors (#1675)
 - Restored decimal type support in DDL schema (#1670)
+- Fixed the tests failing on Fedora (MQTT, ODFEngine) (#1674):
+  - MQTT: `localhost` replaced w/ direct container host
+  - ODFEngine: improved handling of the initial connection: due to the nature of proxying, 
+               there is a very brief initial window during which the connection may be reset
 
 ## [0.265.0] - 2026-07-27
 ### Fixed

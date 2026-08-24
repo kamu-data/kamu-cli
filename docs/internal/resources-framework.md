@@ -25,12 +25,13 @@ a remote server.
 | --- | --- |
 | Know the rules I must not break | [§3 Invariants](#3-invariants) |
 | Understand the core abstractions | [§5 Domain model](#5-domain-model-kamu-resources) |
-| Know what a user types vs what the server generates | [§5a Resource anatomy](#5a-resource-anatomy--input-vs-auto-generated) |
+| Know what a user types vs what the server generates | [Resource anatomy](resources-anatomy.md) |
 | Understand storage, uniqueness, soft-delete | [§6 Persistence model](#6-persistence-model) |
 | Understand account scoping & permissions | [§7 Account resolution & authorization](#7-account-resolution--authorization) |
 | Trace an `apply` / reconcile end-to-end | [§13 Data flow](#13-data-flow-walkthroughs) |
 | Add a new resource type | [§14 Concrete types + recipe](#14-concrete-resource-types-kamu-configuration) |
 | Find the file for X | [§16 Reference map](#16-filecrate-reference-map) |
+| Filter by label (`-l`, wire, storage) | [Resource label filtering](resources-label-filtering.md) |
 | Avoid common traps | [§17 Gotchas](#17-extension-points--gotchas) |
 
 **Build & test:**
@@ -41,13 +42,21 @@ cargo nextest run -E 'test(test_apply_resource_use_case)'
 make clippy
 ```
 
-> `SQLX_OFFLINE=true` is needed only when there's no reachable Postgres — e.g. agents running with
-> limited permissions. Human developers with the local Docker Postgres/Elasticsearch containers up
-> can omit it (SQLx validates against the live DB instead of the offline cache).
+> SQLx query-checking mode comes from `.env` files, not from your shell — don't set `SQLX_OFFLINE`
+> by hand. The root `.env` sets it `true` repo-wide so CI (which has no database) compiles from the
+> committed `.sqlx` cache; `make sqlx-local-setup` starts the DB containers and writes per-crate
+> `.env` files that turn it off, so queries are checked against the real schema. After changing SQL,
+> `make sqlx-prepare` and commit the regenerated `.sqlx`. See
+> [`DEVELOPER.md`](/DEVELOPER.md#build-with-databases).
+>
+> Build/check/lint the **whole workspace** — do not scope these commands with `-p <crate>`.
 
 ---
 
 ## Table of contents
+
+**Companion pages:** [Resource anatomy](resources-anatomy.md) ·
+[Resource label filtering](resources-label-filtering.md)
 
 - [Resources Framework — Architecture](#resources-framework--architecture)
   - [Agent / newcomer quick-start](#agent--newcomer-quick-start)
@@ -73,11 +82,13 @@ make clippy
     - [CLI semantics matrix](#cli-semantics-matrix)
   - [13. Data flow walkthroughs](#13-data-flow-walkthroughs)
     - [(a) `kamu apply -f manifest.yaml`](#a-kamu-apply--f-manifestyaml)
+    - [Canonical manifest documents](#canonical-manifest-documents)
     - [(b) Reconciliation](#b-reconciliation)
     - [Outbox connections](#outbox-connections)
     - [How reconciliation is scheduled](#how-reconciliation-is-scheduled)
     - [Lifecycle state machine](#lifecycle-state-machine)
   - [14. Concrete resource types (`kamu-configuration`)](#14-concrete-resource-types-kamu-configuration)
+    - [Legacy dataset association — the `legacy-config-target-dataset` label](#legacy-dataset-association--the-legacy-config-target-dataset-label)
     - [Secret handling invariant](#secret-handling-invariant)
     - [Recipe: how to add a new resource type](#recipe-how-to-add-a-new-resource-type)
   - [15. Tests](#15-tests)
@@ -133,9 +144,10 @@ long-term goal. This page documents what exists now.
 | **Condition** | A status signal keyed by a condition schema URI. Built-ins: `Accepted`, `Ready`, `Reconciling`; each value has `value`, `reason`, optional `message`, `lastTransitionTime`. |
 | **generation / observedGeneration** | `generation` bumps on each spec/headers change; `observedGeneration` records the last one reconciliation processed. Absent or lower → reconcile. |
 | **Reconciliation** | Driving actual state toward the spec (e.g. `SecretSet` materializes its encrypted read-side projection). |
-| **Selector** | Identifies one (`ResourceSelector`) or many (`ResourceBatchSelector`) resource *instances*, by name or UID, optionally account-scoped. |
-| **SpecViewMode** | How sensitive spec fields render. Two modes: `Encrypted` (default — stored ciphertext as-is) and `Revealed` (decrypted). No "redacted" mode today. |
-| **Dispatcher** | Per-type adapter (`ResourceCrudDispatcher`, …) registered in `dill`, looked up by schema or selector metadata. |
+| **Ref** | Identifies exactly one resource *instance* (`ResourceRef`), by exact name or UID, optionally account- and type-scoped. A batch is `Vec<ResourceRef>`. |
+| **Selector** | Matches zero or many resource *instances* (`ResourceSelector`), by SQL `LIKE` name pattern and/or UID. Several selectors act as a logical OR. |
+| **SpecViewOpts** | Options controlling how sensitive spec fields render, `{ revealed: bool }` today. `revealed: false` (default) returns stored ciphertext as-is; `revealed: true` decrypts. A struct, not an enum, so future spec-view options can be added without growing every call site's argument list. No "redacted" mode today. |
+| **Dispatcher** | Per-type adapter (`ResourceCrudDispatcher`, …) registered in `dill`, resolved by schema metadata through `ResourceDispatcherFactory`. |
 | **Facade** | The single API seam (`ResourceFacade`); local or remote-GraphQL impl. |
 | **TypeRef** | A label/annotation *key*: a short `TypeName` (e.g. registered `environment`, or free-form `env`) or a full schema URI, per ODF RFC-018 (`odf::metadata::resource::TypeRef` = `Uri \| Name`). `Ord`, so a `BTreeMap` key; serializes as a plain string. |
 | **Labels / Annotations** | `headers.{labels,annotations}`: `BTreeMap<TypeRef, serde_json::Value>` (arbitrary JSON keyed by `TypeRef`, not flat `String → String`). Manifest input starts as ordered `Vec<(TypeRef, Value)>` so duplicate keys can be rejected before map construction; registered extension keys are canonicalized to schema URI and typed-value validated during facade apply preparation. Per RFC-018, labels are meant to be indexed/queryable and annotations not: **string-valued** labels are indexed via `resource_labels_projection` and selectable with `--label`/`-l`; non-string values are stored but not indexed, so they can never be matched by an equality filter. Annotations are never indexed. |
@@ -175,6 +187,9 @@ not break; most are enforced in code and exercised by tests — pointers given w
 - **Local and remote facade behavior must match for all contract-tested cases.** The `contract_test!`
   suite runs each case against both implementations; new facade behavior must be added there
   ([§15](#15-tests)).
+- **Ref-keyed operations exist only in batch form**; a single-resource call is a one-element batch.
+  A scalar method would be a second implementation of the batch pipeline's contract
+  ([§10](#10-facade-kamu-resources-facade)).
 - **Batch operations preserve the positional `request_index`.** `BatchResourceResponse` reports each
   success/problem tagged with the originating request index, so partial results map back to inputs.
 - **A resource is always scoped to exactly one account**, fixed by the persistence key; cross-account
@@ -200,7 +215,7 @@ flowchart TD
     REMOTE["RemoteGraphqlResourceFacadeImpl<br/>(cynic GraphQL client)"]
 
     subgraph domain["Domain + services"]
-      REG["Dispatcher registry<br/>lookup by schema<br/>or selector metadata"]
+      REG["ResourceDispatcherFactory<br/>lookup by schema metadata"]
       DISP["ResourceCrudDispatcher&lt;R&gt;<br/>per-type"]
       UC["Use cases&lt;R&gt;<br/>apply / reconcile / get / list / delete"]
     end
@@ -330,9 +345,24 @@ projection folds these into current state, converting `SpecInput` -> `Spec` (and
 
 ### Repository
 
-`ResourceRepository` (`repo/`) is the persistence seam: allocate UID, create/update snapshot
-(with optimistic `expected_last_event_id`), find by name/id, search identities, and stream UIDs /
-snapshots by schema.
+`ResourceRepository` (`repo/`) is the persistence seam: allocate an id, create/update snapshots
+(with optimistic `expected_last_event_id`), read by id or name (singly and in batch), and run
+scoped searches — `search_resource_handles` / `list_resource_snapshots` plus their `count_*`
+siblings, which share the scope predicate and must agree with it.
+
+**Batch reads return rows in request order.** `resolve_resource_ids_by_names`,
+`find_resource_handles_by_ids`, `find_resource_snapshots_by_ids` and
+`find_resource_snapshots_by_schema_and_ids` return rows ordered to match the input slice; rows that
+do not exist, are deleted, or belong to another account are simply absent, so a result may be
+*shorter* than the request but never reordered. Callers rely on this to zip results back onto
+positional `request_index` values. Postgres pins the order in SQL with `array_position`; SQLite has
+no equivalent, so its repository re-sorts in Rust after the query (`IN (...)` makes no ordering
+promise); the in-memory backend iterates the request slice directly. Pinned by the shared repository
+suite, which asserts the *reversed* request too — an arbitrary-but-stable scan order would pass a
+forward-only assertion.
+
+**Label filters apply only to scoped searches**, never to direct identity reads: the scoped calls
+carry their pairs per row inside `ResourceScope`, while the by-id/by-name reads take none at all.
 
 ### Dispatchers
 
@@ -346,241 +376,28 @@ schema plus presentation metadata as `dill` metadata for registry lookup
 ### Use-case traits
 
 Generic, `R`-parameterized contracts in `use_cases/`: `ApplyResourceUseCase<R>` (two-phase, below),
-`ReconcileResourceUseCase<R>`, `GetResourceByUidUseCase<R>`, `ListResourcesByTypeUseCase<R>`,
-`DeleteResourcesUseCase<R>`, plus the non-generic `ListAllResourcesUseCase` and
-`DeleteAccountResourcesUseCase`.
+`ReconcileResourceUseCase<R>`, `DeleteResourcesUseCase<R>`, plus the non-generic
+`ListAllResourcesUseCase` and `DeleteAccountResourcesUseCase`.
+
+Reads are deliberately absent from this list. Typed per-type read use cases would each run their own
+paginated query, which cannot paginate correctly across types — page 2 of a merged result is not
+page 2 of each type. All reads instead go through the schema-agnostic `GenericResourceQueryService`,
+which takes a `ResourceScope` and answers a multi-type request in one query.
 
 ### 5a. Resource anatomy — input vs auto-generated
 
-> **This is the part to get right when authoring or generating manifests.** Only a subset of a
-> resource is user-authored; everything else is owned and produced by the framework.
+Only a subset of a resource is user-authored: a manifest carries `$schema`,
+`headers.{id?, account?, name, labels, annotations}` and `spec`, and nothing else —
+`deny_unknown_fields` rejects `status`, timestamps and `generation`, which are server-owned. The
+framework generates the remaining headers (`id`, resolved `account`, `generation`,
+`created_at`/`updated_at`/`deleted_at`) and the whole `status`. `SecretSet` goes further: authored
+plaintext is encrypted *before the first durable write*, so its persisted `spec` is server-derived
+too (see [Secret handling](#secret-handling-invariant)).
 
-**(1) User-authored — the manifest.** `ResourceManifest`
-([`manifests/resource_manifest.rs`](/src/domain/resources/domain/src/manifests/resource_manifest.rs)):
-
-```rust
-pub struct ResourceManifest {
-    #[serde(rename = "$schema")]
-    pub schema: ResourceSchemaId,            // required — canonical schema URL
-    pub headers: ResourceManifestHeaders,
-    pub spec: serde_json::Value,             // desired state; type-specific shape
-}
-
-#[serde(deny_unknown_fields)]                // ← unknown fields (e.g. `status`) are rejected
-pub struct ResourceManifestHeaders {
-    pub id: Option<ResourceID>,              // optional — NOT assignable; an exact pointer to an
-                                             // existing resource for updates (e.g. when renaming)
-    pub account: Option<ResourceAccountRef>, // optional — id/did/name selector; defaults to caller
-    pub name: ResourceName,                  // required
-    pub labels: Vec<(TypeRef, serde_json::Value)>,
-    pub annotations: Vec<(TypeRef, serde_json::Value)>,
-}
-```
-
-A user may write **only**: `$schema`, `headers.{id?, account?, name, labels, annotations}`, and
-`spec`. `deny_unknown_fields` means a manifest **cannot** carry `status`, timestamps, or
-`generation` — those are server-owned.
-
-> **Well-known annotations.** `description` is not a dedicated header field — it is the *first*
-> well-known entry in `headers.annotations`, establishing the pattern future well-known annotations
-> (e.g. an icon or docs link) will follow. A well-known annotation is declared as a schema URI,
-> embedded JSON Schema doc, and typed validator in
-> [`validation/schemas/annotations/description.rs`](/src/domain/resources/domain/src/validation/schemas/annotations/description.rs),
-> mirroring the category-specific schema files used for labels and conditions. A DI-registered
-> extension-schema dispatcher validates the value and the facade apply preparation canonicalizes
-> authored short names (for example `description`) to the stable schema URI
-> (`https://kamu.dev/schemas/resource/v1alpha1/annotations/Description`) before diffing and storage.
-> Runtime description lookup and the missing-description warning therefore read the canonical URI
-> key only; the short name is an input spelling, not stored identity.
-> A manifest author writes it as, e.g.:
-> ```yaml
-> headers:
->   name: my-resource
->   annotations:
->     description: "..."
-> ```
-
-> **`TypeUri` vs `ResourceSchemaId`.** Both model the same `$schema` at two levels. `TypeUri` is the
-> opaque identity value carried through fields, storage, and the wire (`ResourceSnapshot.schema`,
-> dispatcher lookup, outbox). `ResourceSchemaId` is a parsed *lens* wrapping a `TypeUri` that exposes
-> decomposed `base`/`context`/`version`/`name` segments for validation and display. The manifest
-> deserializes `$schema` as `ResourceSchemaId` (malformed URLs rejected at parse time); everything
-> downstream carries the plain `TypeUri`. Both serialize byte-identically, so there's no wire/storage
-> difference.
-
-> **`ResourceAccountRef`** is ODF's generated `auth::AccountRef` struct — `{ id: Option<ResourceID>,
-> did: Option<AccountID>, name: Option<AccountName> }`, all fields optional — shared by the manifest
-> `account` field and every facade selector's `account`. See [§7](#7-account-resolution--authorization)
-> for how a selector resolves to an account and how an empty one (`{}`) is rejected.
-
-The `id` is **not** something the user assigns — a new resource's UID is always allocated by the
-server. It may only be *supplied* on a manifest to point at an already-existing resource for an
-update; this is what lets a resource be renamed (the `id` keeps the identity stable while `name`
-changes). Omit it for normal create/update-by-name.
-
-**(2) Framework-generated — the rest of headers + all of status.**
-`ResourceHeaders` ([`values/resource_headers.rs`](/src/domain/resources/domain/src/values/resource_headers.rs))
-and `ResourceStatus` ([`state/resource_status.rs`](/src/domain/resources/domain/src/state/resource_status.rs)):
-
-```rust
-pub struct ResourceHeaders {
-    pub id: ResourceID,                      // generated — stable identity, assigned once
-    pub account: auth::AccountHandle,        // resolved owning account: resource id (`id`) + DID (`did`) + name
-    pub name: ResourceName,                  // (authored)
-    pub labels: ResourceLabels,              // (authored) BTreeMap<TypeRef, serde_json::Value>
-    pub annotations: ResourceAnnotations,    // (authored) BTreeMap<TypeRef, serde_json::Value>
-    pub generation: u64,                     // generated — bumps on spec/headers change
-    pub created_at: DateTime<Utc>,           // generated
-    pub updated_at: DateTime<Utc>,           // generated
-    pub deleted_at: Option<DateTime<Utc>>,   // generated (soft-delete tombstone)
-}
-
-pub struct ResourceStatus {                  // ODF-generated; entirely server-owned
-    pub phase: ResourcePhase,                // Pending|Reconciling|Ready|Failed
-    pub observed_generation: Option<u64>,
-    pub reconciled_at: Option<DateTime<Utc>>,
-    pub conditions: Option<ResourceConditions>,
-}
-```
-
-> **Codegen-alias convention.** `ResourceHeaders`, `ResourceHeadersInput`, `ResourcePhase`,
-> `ResourceConditions`, `ResourceLabels`, `ResourceAnnotations`, `ResourceHandle` (and `ResourceID`/
-> `TypeUri`/`ResourceAccountRef` seen earlier) are all `pub type` aliases adopting ODF's generated types
-> verbatim rather than hand-rolled structs. The generated DTOs have no direct `Serialize`/`Deserialize`
-> — serde goes through ODF's YAML "shadow proxy", so fields of these types carry a
-> `#[serde_as(as = "odf::metadata::serde::yaml::resource::…")]` annotation instead of deriving serde
-> for free. Postgres/SQLite repos round-trip labels/annotations through the
-> `resource_labels_{from,to}_json` helpers; the Cynic remote client binds its own scalar newtypes.
-> This is a deliberate per-field cost of reusing the codegen shape, not a bug.
->
-> The whole-resource envelope follows the same convention: domain `Resource`
-> ([`values/resource.rs`](/src/domain/resources/domain/src/values/resource.rs)) is a `pub type` alias of
-> `odf::metadata::resource::Resource<serde_json::Value>`, and the GraphQL `Resource` re-exports the
-> matching generated `SimpleObject`. Both live in `values/`, not `views/` — `views/` is reserved for
-> query-shaped results (`ResourceSummaryView`, list/apply-manifest outcomes), whereas `Resource` is the
-> canonical per-instance DTO. Its identity/lookup counterpart, domain `ResourceHandle`
-> ([`values/resource_handle.rs`](/src/domain/resources/domain/src/values/resource_handle.rs)), is also a
-> `pub type` alias — of `odf::metadata::resource::ResourceHandle` (RFC-18 shape: `account:
-> auth::AccountHandle`, `r#type: TypeUri`, `id: ResourceID`, `did: Option<Did>`, `name: ResourceName`).
-> `did` is always `None` today — populating it needs DID-aware resource types, which don't exist yet
-> (see [`handle_support.rs`](/src/domain/resources/facade/src/facade/local/helpers/handle_support.rs)).
-> A short display name is derived on demand from `r#type` via `resource_type_name()` (see
-> [`resource_schema_id.rs`](/src/domain/resources/domain/src/values/resource_schema_id.rs)) rather
-> than carried on the handle. The GraphQL-facing type is also `ResourceHandle`; it mirrors the same
-> fields, exposing `r#type` under the wire name `type`. Handles do not carry CLI selector names.
->
-> Per-kind `Spec`/`SpecInput` types follow the same convention where the RFC shape and the domain's
-> existing behavior (validation, linting) are compatible. `kamu_configuration::VariableSetSpec` /
-> `VariableSetSpecInput`
-> ([`variable_set/spec.rs`](/src/domain/configuration/domain/src/resources/variable_set/spec.rs)) and
-> `kamu_configuration::SecretSetSpec` / `SecretSetSpecInput`
-> ([`secret_set/spec.rs`](/src/domain/configuration/domain/src/resources/secret_set/spec.rs)) are thin
-> newtypes around the corresponding `odf::metadata::config::*Spec` / `*SpecInput` DTOs — a bare
-> `pub type` alias isn't legal here because the generated DTOs have no native
-> `Serialize`/`Deserialize` (only via the YAML shadow proxy), and implementing those foreign traits
-> directly on a foreign type through an alias would violate the orphan rule. Both resources' newtypes
-> are declared via the shared `kamu_resources::declare_rfc_spec_newtype!` macro
-> ([`values/rfc_spec_newtype.rs`](/src/domain/resources/domain/src/values/rfc_spec_newtype.rs)), which
-> derives `Serialize`/`Deserialize` via `#[serde(try_from = "…", into = "…")]` delegating through the
-> proxy — reusable for any future RFC spec adoption. The domain's `ResourceValidateSpec`/
-> `ResourceLinterSpec` impls attach to `VariableSetSpecInput`/`SecretSetSpecInput` (the write-path
-> types the framework validates/lints), not `VariableSetSpec`/`SecretSetSpec`. The individual secret
-> DTO (`odf::metadata::config::Secret`, aliased as `kamu_configuration::Secret`) is a bare `type`
-> alias like `Variable` — it sits at a leaf inside a codegen-owned `BTreeMap`, so it cannot be a
-> newtype; its `literal_value`/`is_encrypted`/`content_encoding`/`as_encrypted`/
-> `decrypt_plaintext_bytes` helpers attach via the `SecretExt` extension trait instead.
-> `content_encoding` returns the parsed `kamu_configuration::ContentEncoding` (`Jwe`/`Aes256Gcm`)
-> rather than a raw string, so encoding-specific code matches on the enum and must be revisited when
-> a new encoding is added. A plaintext secret written with the scalar shorthand (`API_TOKEN: hunter2`)
-> does not round-trip as a scalar — `get ss --revealed` renders it as `{ value: hunter2 }`, matching
-> `VariableSet`'s behavior (there is no retained "was this shorthand" flag once parsed).
-
-The behaviorally-significant consequences of adopting these shapes:
-
-- **`headers.account` is a mandatory `auth::AccountHandle`** carrying the RFC-18 shape — the account
-  *resource* id (`id: ResourceID`, an artificial UUID stored on `accounts.resource_id`), the account
-  DID (`did: AccountID`), and the account `name`. The `resources` table stores only `account_id` (the
-  DID), so repositories resolve **both the name and the account resource id** on every read
-  (Postgres/SQLite via `JOIN accounts`, selecting `accounts.resource_id`; in-memory via a batched
-  `AccountRepository` lookup — no N+1). Neither is persisted on the resource row, so an account rename
-  (or a future resource-id change) shows up immediately on the next read
-  ([`test_account_rename_reflected_immediately_in_headers`](/src/infra/resources/repo-tests/src/resource_repository_test_suite.rs)).
-  If the owning account can't be found (e.g. deletion racing async cleanup), repos substitute the
-  sentinels `deleted-account` (`DELETED_ACCOUNT_NAME_SENTINEL`) and the nil resource id
-  (`deleted_account_resource_id_sentinel()`) rather than failing the read. `Account` is **not** itself
-  a resource yet; `resource_id` is an artificial, stable id assigned per account
-  (`kamu_accounts::Account::resource_id`) in preparation for `Account` eventually becoming a
-  projection of an account resource — no account-resource events/history exist today.
-- **Account is a precondition, not resolved, at the use-case boundary.**
-  `ResourceHeadersInput.account` is an `Option<auth::AccountRef>` selector — `{id, did, name}`, all
-  optional — but by the time headers reach `ApplyResourceUseCase::plan`/`apply` it must already be a
-  fully-resolved `AccountRef` (all three fields `Some`); `ResourceHeaders::from_input` panics
-  otherwise. Resolution is the caller's job — via the facade's `ResourceAccountResolver` (which also
-  authorizes), or by resolving the account directly when only a DID/name is in hand (e.g.
-  `DatasetEnvVarMutationAdapterImpl` looks up the resource id via `AccountService` from
-  `DatasetEntry.owner_id`/`owner_name` before building headers). The use case enforces this
-  defensively because the downstream event-sourced projector is pure/sync and cannot resolve
-  accounts.
-- **Built-in conditions** are Kamu extensions keyed by stable URIs under
-  `https://kamu.dev/schemas/resource/v1alpha1/conditions/{Accepted,Ready,Reconciling}`; each value
-  carries `value` (the `True`/`False`/`Unknown` signal, matching the ODF `ResourceCondition`
-  meta-schema's required `value` property), `reason`, optional `message`, and `lastTransitionTime`.
-  `conditions` is optional (absent → `None`, not empty map): new resources have none, and a spec
-  update clears them. The schema docs under `src/domain/resources/schemas/…/conditions/` are embedded
-  from the corresponding `validation/schemas/conditions/*` files into DI-registered extension
-  dispatchers; value validation is strict serde over `ResourceConditionValue` (unknown fields are
-  rejected).
-- **Manifest labels/annotations reject duplicate keys.** The ODF proxy deserializes into a `BTreeMap`
-  that silently drops duplicates (last-write-wins), so `ResourceManifestHeaders.{labels,annotations}`
-  stay `Vec<(TypeRef, serde_json::Value)>` with a custom visitor that errors on a repeated key. An
-  invalid key fails at manifest *parse* time (`ParseManifest`), not headers validation — so the
-  `InvalidLabelKey`/`InvalidAnnotationKey` and per-value-size problem codes were removed as
-  unreachable; only entry *counts* (`MAX_LABELS`/`MAX_ANNOTATIONS`) are enforced.
-- **Registered label/annotation keys are canonicalized before diffing.** Facade apply preparation
-  resolves `headers.labels` and `headers.annotations` with `ResourceExtensionSchemaResolver` before
-  constructing `ResourceHeadersInput`. Short names and aliases that resolve to a registered extension
-  are rewritten to the canonical schema URI, so re-applying `description` after a stored URI form (or
-  vice versa) is `Untouched` rather than a headers update. Duplicate keys that only become duplicates
-  after canonicalization are rejected as `InvalidHeaders`. Unknown short names remain free-form and
-  are preserved, with a warning; unknown full URIs are strict and are rejected.
-- **Resource warning codes live with `ResourceWarning`.** Core resource-header warnings are defined in
-  [`values/resource_warning.rs`](/src/domain/resources/domain/src/values/resource_warning.rs): missing
-  description, non-indexable labels, and free-form label/annotation warnings. Configuration-specific
-  spec warnings stay on their spec input types (`VariableSetSpecInput`, `SecretSetSpecInput`) because
-  those are configuration-domain lints.
-
-Also generated: `id` (allocated if the manifest omitted it). Reconciliation time is represented
-inside the status object as `status.reconciledAt`; there is no separate top-level timestamp.
-
-**(3) Persisted form — the snapshot.** `ResourceSnapshot`
-([`core/resource_snapshot.rs`](/src/domain/resources/domain/src/core/resource_snapshot.rs))
-combines authored + generated + event-sourcing bookkeeping:
-
-```rust
-pub struct ResourceSnapshot {
-    pub id: ResourceID,
-    pub schema: TypeUri,                      // canonical schema URL (identity value)
-    pub headers: ResourceHeaders,            // authored fields + generated fields
-    pub spec: serde_json::Value,             // authored (may be transformed — see SecretSet)
-    pub status: Option<ResourceStatus>,      // generated ODF status
-    pub last_event_id: Option<EventID>,      // event-sourcing cursor (optimistic concurrency)
-}
-```
-
-```mermaid
-flowchart LR
-    M["Manifest (authored)<br/>$schema<br/>headers: name, account?, id?,<br/>labels, annotations<br/>spec"]
-    A["apply use case<br/>(resolve account, allocate id,<br/>bump generation, set timestamps)"]
-    S["Snapshot / State<br/>= authored fields<br/>+ <b>generated</b>: account(ID), id,<br/>generation, created/updated/deleted_at,<br/>status{phase, observedGeneration, reconciledAt, conditions}"]
-    M --> A --> S
-```
-
-**Worked example — `VariableSet`:** the user authors `spec.variables`; the framework generates the
-entire `status` after reconciliation.
-
-**`SecretSet` goes further — and its security invariant is documented separately below.** Authored
-plaintext secrets are converted to an encrypted canonical form *before the first durable write*, so
-the persisted `spec` is itself server-derived. See [Secret handling](#secret-handling-invariant).
+**→ [Resource anatomy — authored vs generated](resources-anatomy.md)** — the field-by-field
+breakdown: manifest/headers/status structs, the codegen-alias convention and why these are ODF
+aliases rather than hand-rolled types, well-known annotations, label/annotation canonicalization,
+and the persisted `ResourceSnapshot`.
 
 ---
 
@@ -635,6 +452,21 @@ There is a precedent for data backfill into resources —
 `20260513120000_backfill_env_var_resources.sql` migrates legacy dataset env-vars into `VariableSet`
 resources; new types that supersede existing data should follow that pattern (additive migration +
 backfill, never rewriting the event log in place).
+
+A backfill that synthesizes an event log must satisfy two invariants that are easy to miss in SQL,
+because both produce resources that load fine at the SQL level yet are unreadable and unwritable
+through the API:
+
+- **`event_id` must increase in causal order per resource.** The store replays strictly
+  `ORDER BY event_id` and the projection can only initialize from `Created`; if
+  `ReconciliationSucceeded` gets a lower id, loading fails with
+  `Cannot initialize ... from event ReconciliationSucceeded`. Emit the events from one ordered
+  `INSERT ... ORDER BY` rather than from sibling data-modifying CTEs — Postgres does not define
+  the execution order of those, so `nextval` may number them backwards.
+- **`headers.account` must be a full `AccountRef` object** (`{id, did, name}`), matching what the
+  runtime writes. A bare DID string deserializes into a partial ref, and the subsequent apply
+  fails to load the resource. The `id` is the account *resource* UUID, so the migration adding
+  `accounts.resource_id` has to run before any backfill that emits `Created` events.
 
 **Schema/version upgrades.** The schema URL is part of resource identity, including its version
 segment. Supporting a new schema version therefore requires an explicit compatibility/migration
@@ -741,30 +573,52 @@ The `--dry-run` path uses `plan`; a live apply uses `apply`. Use-case implementa
 by **`declare_*_use_case!`** macros so each type gets a fully-wired instance without boilerplate.
 
 **Dispatchers + registry.** Each type registers a `ResourceCrudDispatcher` via
-`declare_resource_crud_dispatcher!` (and a presentation dispatcher). Lookup is by schema or selector
-metadata through `dill` — the registry key is `ResourceDispatcherMeta` (schema `&'static str` +
-selector name/aliases). There are **three** lookup entry points, differing only in how a missing
-dispatcher is reported
-([`crud_dispatchers/resource_crud_dispatcher_registry.rs`](/src/domain/resources/services/src/crud_dispatchers/resource_crud_dispatcher_registry.rs)):
+`declare_resource_crud_dispatcher!` (and a presentation dispatcher). Lookup is by schema metadata
+through `dill` — the registry key is `ResourceDispatcherMeta` (schema `&'static str` + selector
+name/aliases). Services do **not** hold a `dill::Catalog` to do this: they inject
+**`ResourceDispatcherFactory`**, which encapsulates all catalog/builder interaction
+([`crud_dispatchers/resource_dispatcher_factory.rs`](/src/domain/resources/services/src/crud_dispatchers/resource_dispatcher_factory.rs)):
 
 ```rust
-// (1) By schema (from a parsed manifest `$schema`) — a miss is a user error.
-pub fn get_resource_crud_dispatcher<E>(target_catalog, schema: &str) -> Result<Arc<dyn …>, E>
-    where E: From<UnsupportedResourceDescriptorError> + From<InternalError>;
+pub struct ResourceDispatcherFactory { /* holds the catalog it was resolved from */ }
 
-// (2) By selector name/alias (from a CLI/GraphQL selector) — a miss is a user error.
-pub fn get_resource_crud_dispatcher_by_raw_selector<E>(target_catalog, raw_selector: &ResourceTypeSelectorRaw) -> Result<…, E>
-    where E: From<UnsupportedResourceSelectorError> + From<InternalError>;
+impl ResourceDispatcherFactory {
+    // (1) By schema (from a parsed manifest `$schema`) — a miss is a user error.
+    pub fn crud_dispatcher(&self, schema: &str)
+        -> Result<Arc<dyn ResourceCrudDispatcher>, GetResourceCrudDispatcherError>;
 
-// (3) By a schema already known valid (stored snapshot, or an already-resolved selector) —
-//     a miss is a data-integrity catastrophe, so it is an InternalError (→ 500), never a user error.
-pub fn get_resource_crud_dispatcher_for_trusted_schema(target_catalog, schema: &str)
-    -> Result<Arc<dyn …>, InternalError>;
+    // (2) By a schema already known valid (stored snapshot, or an already-resolved selector) —
+    //     a miss is a data-integrity catastrophe, so it is an InternalError (→ 500), never a user error.
+    pub fn crud_dispatcher_for_trusted_schema(&self, schema: &str)
+        -> Result<Arc<dyn ResourceCrudDispatcher>, InternalError>;
+
+    // (3) Spec view — absence is normal (types with no sensitive fields).
+    pub fn spec_view_dispatcher(&self, schema: &TypeUri)
+        -> Option<Arc<dyn ResourceSpecViewDispatcher>>;
+
+    // (4) Every registered presentation dispatcher (callers index by schema).
+    pub fn presentation_dispatchers(&self)
+        -> Result<Vec<Arc<dyn ResourcePresentationDispatcher>>, InternalError>;
+}
 ```
 
-Each finds exactly one dispatcher; zero → `NotFound`, more than one → `Duplicate`. The distinction
-between (1)/(2) (fresh, unvalidated input → user error) and (3) (schema the system itself produced →
-a miss means corrupt storage/registration, i.e. `InternalError`) is the point of having three.
+The CRUD lookups find exactly one dispatcher; zero → `NotFound`, more than one → `Duplicate`. The
+distinction between (1) (fresh, unvalidated input → user error) and (2) (schema the system itself
+produced → a miss means corrupt storage/registration, i.e. `InternalError`) is the point of having
+both.
+
+**Why a factory, and why it caches nothing.** Dispatchers are `Transient` and their dependencies
+(use cases, query services) are transaction-scoped, so a dispatcher must be constructed against the
+*current* catalog — caching one in a longer-lived scope would pin stale transaction-bound services.
+The factory is therefore `Transient` and injects the catalog **by value**, which is the only scope
+`dill` permits for that. This works because `dill` resolves builders against the catalog the
+resolution *started from*: a factory injected into a component built from a transaction-chained
+catalog carries that chained catalog, so the dispatchers it builds see the transaction.
+
+The one place that still passes a catalog explicitly is `ResourceLifecycleMessageConsumer`, which
+receives the per-message transaction catalog as a *method argument* — a component-held catalog would
+be the wrong one there, so it keeps using
+[`get_resource_lifecycle_dispatcher_from_catalog`](/src/domain/resources/domain/src/dispatchers/resource_lifecycle_event_dispatcher.rs).
 
 **Message handlers** (outbox consumers — see [§13](#13-data-flow-walkthroughs)):
 `ResourceLifecycleMessageConsumer` and `AccountLifecycleMessageConsumer`.
@@ -814,43 +668,118 @@ pub trait ResourceFacade: Send + Sync {
     async fn list_supported_resource_types(&self) -> Result<Vec<ResourceTypeDescriptor>, ...>;
     async fn summary(&self, request: ResourcesSummaryRequest) -> Result<ResourcesSummary, ...>;
 
-    async fn get(&self, selector: ResourceSelector, spec_view_mode: SpecViewMode) -> Result<Resource, ...>;
-    async fn get_many(&self, selector: ResourceBatchSelector, spec_view_mode: SpecViewMode)
+    // Ref-keyed reads and deletes take ODF `ResourceRef`s: each ref carries its
+    // own account and type, so one batch can span both. These exist ONLY in
+    // batch form — a single-resource call is a one-element vec.
+    async fn get(&self, resource_refs: Vec<ResourceRef>, spec_view: SpecViewOpts)
         -> Result<BatchResourceResponse<Resource, ResourceLookupProblem>, ...>;
-    async fn get_handle(&self, selector: ResourceSelector) -> Result<ResourceHandle, ...>;
-    async fn get_handles(&self, selector: ResourceBatchSelector)
+    async fn get_handles(&self, resource_refs: Vec<ResourceRef>)
         -> Result<BatchResourceResponse<ResourceHandle, ResourceLookupProblem>, ...>;
-    async fn render_manifest(&self, selector, format: ResourceManifestFormat, spec_view_mode) -> ...;
-    async fn render_manifests(&self, selector: ResourceBatchSelector, format: ResourceManifestFormat, spec_view_mode)
+    async fn render_manifests(&self, resource_refs: Vec<ResourceRef>, format: ResourceManifestFormat, spec_view: SpecViewOpts)
         -> Result<BatchResourceResponse<RenderResourceManifestResult, ResourceLookupProblem>, ...>;
 
-    async fn list(&self, request: ListResourcesRequest) -> Result<Vec<ResourceSummaryView>, ...>;
-    async fn list_handles(&self, request: ListResourceHandlesRequest) -> ...;
-    async fn search_handles(&self, request: SearchResourceHandlesRequest) -> ...; // request.query: ResourceSearchQuery
-    async fn list_all(&self, request: ListAllResourcesRequest) -> ...;
-    async fn list_all_handles(&self, request: ListAllResourceHandlesRequest) -> ...;
+    // Listing is two methods sharing ONE request type (`selectors`, `account`,
+    // `pagination`); only the response differs. Both return `{ items, total_count }`.
+    async fn search(&self, request: SearchResourcesRequest) -> Result<SearchResourcesResponse, ...>;
+    async fn search_handles(&self, request: SearchResourcesRequest) -> Result<SearchResourceHandlesResponse, ...>;
 
+    // Apply is the one family that KEEPS a scalar form, because there the
+    // scalar is the primitive and the batch is a loop over it — see below.
     async fn plan_apply_manifest(&self, request: ApplyManifestRequest) -> Result<ApplyManifestPlanningDecision, ...>;
     async fn apply_manifest(&self, request: ApplyManifestRequest) -> Result<ApplyManifestApplicationDecision, ...>;
     async fn plan_apply_manifests(&self, request: ApplyManifestBatchRequest)
         -> Result<ApplyManifestBatchResponse<ApplyManifestPlanningDecision>, BatchResourceError>;
     async fn apply_manifests(&self, request: ApplyManifestBatchRequest)
         -> Result<ApplyManifestBatchResponse<ApplyManifestApplicationDecision>, BatchResourceError>;
-    async fn delete(&self, selector: ResourceSelector) -> Result<ResourceID, ...>;
-    async fn delete_many(&self, selector: ResourceBatchSelector) -> ...;
+
+    async fn delete(&self, resource_refs: Vec<ResourceRef>)
+        -> Result<BatchResourceResponse<ResourceID, ResourceLookupProblem>, ...>;
 }
 ```
+
+**The two families are deliberately asymmetric about which form is the
+primitive.** Ref-keyed reads and deletes (`get`, `get_handles`,
+`render_manifests`, `delete`) exist only in batch form: the batch pipeline —
+group refs by `(account, schema)`, resolve ids per group, merge back by
+`request_index` — *is* the primitive, so a scalar method would be a second
+implementation of the same contract, kept honest only by tests.
+
+Apply keeps its scalar form because there the scalar *is* the primitive:
+`plan_apply_manifests`/`apply_manifests` are loops over
+`plan_apply_manifest`/`apply_manifest`, and the per-item transaction boundary
+belongs to the caller — the CLI's `--continue-on-error` path opens one
+transaction per manifest — not to the facade.
 
 **Selectors & view modes:**
 
 ```rust
-pub struct ResourceSelector { pub account: Option<ResourceAccountRef>,
-                              pub resource_type: ResourceTypeSelectorRaw,
-                              pub resource_ref: ResourceRef }
-pub enum   ResourceRef { ById(ResourceID), ByName(ResourceName) }
+// Both *are* the ODF types — plain re-exports, not local twins. A `ResourceRef`
+// is exact and names one resource; a `ResourceSelector` carries a SQL LIKE
+// pattern and matches zero or many.
+pub type ResourceRef      = odf::metadata::resource::ResourceRef;
+pub type ResourceSelector = odf::metadata::resource::ResourceSelector;
+
+pub struct ResourceRef      { pub account: Option<ResourceAccountRef>, pub id: Option<ResourceID>,
+                              pub did: Option<Did>, pub r#type: Option<TypeRef>,
+                              pub name: Option<ResourceName> }
+pub struct ResourceSelector { pub account: Option<ResourceAccountRef>, pub id: Option<ResourceID>,
+                              pub did: Option<Did>, pub r#type: Option<TypeRef>,
+                              pub name: Option<String> /* LIKE pattern */,
+                              pub labels: Option<...> }
 pub enum   ResourceManifestFormat { Json, Yaml }
-pub enum   SpecViewMode { Encrypted /* default */, Revealed }
+pub struct SpecViewOpts { pub revealed: bool /* default: false */ }
 ```
+
+Every field of both types is optional, so one selector can span every type and
+account. Several selectors act as a logical **OR**; an empty list matches
+nothing.
+
+Field order follows ODF (`account, id, did, type, name`), which the generated serde proxy and
+flatbuffers table also follow.
+
+`did` is forward-reserved in ODF for when datasets and accounts become resources. No repository can
+resolve by it, so it is **rejected rather than ignored** on both types — `validate_ref` for a ref
+and `validate_selector` for a selector. Silently dropping it would return a *wider* result set than
+was asked for, with no way for the caller to tell.
+
+**The batch pipeline: group, resolve, merge.** Every ref-keyed call runs the same three-stage
+shape. `group_refs_by_target` — the shared front half of all three pipelines (`get_handles`,
+`resolve_multiple_resource_views`, which serves both `get` and `render_manifests`, and `delete`) —
+resolves each ref's account and schema, then splits the batch into `(account, schema)` groups
+(`local/helpers/batch_grouping.rs`). The services underneath are scalar in both dimensions, so a
+batch spanning either must be issued as one call per combination; each group is still *batched*
+internally, so an N-name group stays a single query and only the number of distinct pairs
+multiplies round trips. Accounts are compared **after** resolution, so one account spelled by id in
+one ref and by name in another lands in a single group. Groups come back in first-appearance order,
+and each carries the originating `request_index` values so results merge back into the caller's
+ordering.
+
+The stage also fixes where a failure lands. An unresolvable account or an **unknown named** type
+fails the *whole* call — both are addressing errors in the request. A **type-less** ref is
+different: resolving it is a lookup against stored data, so a miss or an ambiguity is that one
+ref's per-item problem, returned alongside the groups.
+
+A type-less `ResourceRef` (`type: None`) is resolved by searching every registered type. Because
+all three pipelines share this front half, they inherit that resolution together rather than one at
+a time.
+Because a ref names *exactly one* resource, a name matching in several types is an **ambiguity**
+error (`AmbiguousType`, RF-172), not a multi-match: picking a winner would make `kamu get <name>`
+silently resolve to whichever type sorted first. A name matching in none is `AnyTypeNameNotFound`
+(RF-171). Contrast a type-less *selector*, for which several matches are the expected outcome —
+that asymmetry is the whole ref/selector distinction.
+
+A `ResourceRef` may carry **both** an `id` and a `name`. ODF treats the pair as a *consistency
+assertion* rather than two lookups: the `id` is the authoritative half the lookup uses, and the
+`name` is verified against the resolved resource. If they disagree the entry fails with a
+`NameMismatch` problem (RF-170) — otherwise pairing one resource's id with another's name would
+read, render, or delete the resource the `id` names while the caller believes they addressed the
+one they spelled out.
+
+The fields *within* one selector are a **conjunction**, but the repository's per-type rows are
+OR'd — so a selector narrowing by more than one of `id` / `name` cannot be expressed as rows
+without widening the match, and is rejected as `SelectorNarrowsBySeveralModes`. Unlike the
+`AnyType*` limits, this one is not a property of `ResourceScope::AnyType` and survives the
+per-row-type stage.
 
 Batch operations return `BatchResourceResponse<T, E>` with positional `successes` / `problems`
 (each tagged by `request_index`) — so a partial batch reports per-item outcomes.
@@ -873,8 +802,8 @@ the normal per-item `data` is unavailable (see `GqlError::gql_extended` /
 **Implementations:**
 
 - **`LocalResourceFacadeImpl`** — resolves account → resolves selector name/alias to a
-  schema and UID/snapshot → looks up the per-type dispatcher via `get_resource_crud_dispatcher` →
-  calls it. Holds the `dill::Catalog`,
+  schema and UID/snapshot → looks up the per-type dispatcher via `ResourceDispatcherFactory` →
+  calls it. Holds a `ResourceDispatcherFactory`,
   a `ResourceAccountResolver`, `GenericResourceQueryService`, and
   `ResourceExtensionSchemaResolver`. For `plan_apply_manifest` / `apply_manifest`, the shared
   preparation step parses the manifest, resolves the account, resolves the CRUD dispatcher,
@@ -889,118 +818,15 @@ the normal per-item `data` is unavailable (see `GqlError::gql_extended` /
 `ResourceAccountResolverImpl` and `LocalResourceFacadeImpl`. (The remote impl is constructed
 on demand by the CLI for remote contexts — see [§12](#12-cli).)
 
-**Label filtering on `list`, `get` and `delete`.** `ListResourcesRequest`,
-`ListResourceHandlesRequest`, and `SearchResourceHandlesRequest` each carry an
-optional `label_filter: Option<ResourceLabelFilterInput>` (`ResourceLabelFilterInput`
-is a `kamu_resources` type alias to `odf::metadata::resource::LabelFilter`, raw
-`String`-keyed entries). `ResourceBatchSelector` does **not** — it never did
-anything but forward the field to `get_handles`/`delete_many`, and the last
-producer of a non-`None` value (`Exact` selector resolution) has since moved to
-`search_handles`, so the field was removed rather than left permanently unused.
+**Label filtering** rides on the selectors themselves: each `ResourceSelector` carries an optional
+`labels`, and there is **no** call-level filter — search requests carry only `selectors`, `account`
+and `pagination`, while the batch ref calls take a bare `Vec<ResourceRef>`, which has no `labels`
+field at all. A uniform filter is just the case where every selector carries the same labels; what
+per-selector labels add is two selectors filtering *differently* in one call.
 
-Filtering covers `get` and `delete` as well as `list` because the CLI resolves
-those in **two phases**: it first expands type/name patterns into identifiers via
-`search_handles`/`list_handles`, then operates on the resulting `ResourceRef::ById`
-set. A label filter is a *narrowing of the candidate identifier set* — structurally
-the same job as a name pattern — so it belongs to that phase-1 expansion. The
-phase-2 batch calls (`get_many`, `delete_many`, `render_manifests`) structurally
-**cannot** carry a filter — `ResourceBatchSelector` has no such field — so the old
-"pass `label_filter: None` by convention" precondition is now enforced by the type
-system instead of by discipline.
-
-`search_handles`'s `query: ResourceSearchQuery` field (`ExactNames(Vec<ResourceName>)`
-/ `ExactIds(Vec<ResourceID>)` / `NamePattern(String)`) replaces what used to be two
-independently-optional fields (`exact_names`, `name_pattern`) that were never
-legitimately combined — every caller set exactly one. The enum makes "exactly one
-selection mode" a type-level invariant instead of a runtime convention.
-
-Resolution happens in the local facade, strictly before dispatch, through the same
-`ResourceExtensionSchemaResolver` used by manifest apply (`ResourceExtensionKind::Label`).
-A raw filter key that fails `TypeRef::from_str`, resolves to a non-label schema,
-resolves to an inapplicable/unknown URI, carries a non-string value, or collides
-with another key after canonicalization is rejected as
-`ResourceInvalidLabelFilterError` before any repository access. Repositories
-receive only the resolved predicate and never resolve aliases or touch the
-extension-schema registry.
-
-**Multi-type queries resolve the filter per schema and collapse.** `search_handles`
-may span several schemas. The filter is resolved once per candidate schema and the
-resolved trees compared: today they are always equal — the built-in `environment`
-label applies to every resource type and unregistered short names resolve to
-free-form identity — so the uniform single-predicate path is taken. The divergent
-case is *reserved, not implemented*: it is guarded by an assertion and a comment
-rather than by OR-across-types SQL that no test could exercise. A schema whose
-`applications` list excludes the filtered label is dropped from the candidate set
-(no resource of that type can match); only if **every** schema fails to resolve is
-the resolution error surfaced.
-
-**Resolved shape is a tree; evaluation is AND-only.** The raw entries are parsed by
-`ResourceLabelFilterExprParser::parse` (domain,
-`values/resource_label_filter_parser.rs`, separate from the model types in
-`values/resource_label_filter.rs`) into a `ResourceLabelFilterExpr` tree, and
-resolution produces the mirrored `ResolvedResourceLabelFilter`:
-
-```rust
-pub enum ResolvedResourceLabelFilter {
-    True,                                    // resolved form of "no filter"
-    Eq { key: TypeRef, value: String },
-    And(Vec<ResolvedResourceLabelFilter>),
-    Not(Box<ResolvedResourceLabelFilter>),
-    Or(Vec<ResolvedResourceLabelFilter>),
-}
-```
-
-The tree shape is deliberate: `$not`/`$or` are fully *representable and resolvable*,
-so adding support for them later is a backend-local change that touches no
-signature. The **capability boundary lives in the repository layer**, not the
-resolver: every backend calls the single shared helper `flatten_conjunction`, which
-walks `True`/`Eq`/`And` into a flat key/value pair list and returns
-`UnsupportedOperator` for `Not`/`Or`. That is mapped to
-`ResourceLabelFilterProblemCode::UnsupportedExpression` at the facade edge, so
-"what is supported" is defined in exactly one place. The duplicate-after-canonicalization
-check applies **per conjunction level** — two `Or` branches may legitimately test
-the same key.
-
-**`resource_labels_projection` index.** A normalized Postgres/SQLite table
-(`resource_id, label_key, label_value`, `PK(resource_id, label_key)`, `FK →
-resources ON DELETE CASCADE`, covering index on `(label_key, label_value,
-resource_id)`) mirroring the top-level **string-valued** entries of
-`resources.labels` — non-string values (numbers, objects, arrays, booleans, null)
-are not indexed. The `_projection` suffix signals it carries no independent
-state of its own — every row is derived from `resources.labels`.
-
-It is maintained by a dedicated sibling trait, `ResourceLabelProjectionRepository`
-(`domain/src/repo/resource_label_projection_repository.rs`:
-`replace_entries(resource_id, &[(String,String)])` /
-`find_entries(resource_id)`), **not** inline inside `ResourceRepository`'s
-`create_resource`/`update_resource(s)`. It is invoked from
-`ResourcePersistenceServiceHelper::sync_snapshots` — the single choke point behind
-`create`/`save`/`delete(_many)` — immediately after
-`resource_repository.update_resources(...)` succeeds, with both repositories
-resolved from the same transactional DI scope so the snapshot write and the
-projection write commit or roll back together. This keeps `ResourceRepository`
-scoped to `resources`/`resource_events` and gives the projection's read side room
-to grow into real filtered queries (Phase 9) without touching `ResourceRepository`'s
-surface. Implemented per backend (`Postgres…`/`Sqlite…`/`InMemoryResourceLabelProjectionRepository`,
-registered alongside `ResourceRepository` at every composition root and test
-harness); Postgres's `replace_entries` insert uses a compile-time checked static
-query via `UNNEST($2::text[], $3::text[])` over paired key/value arrays rather than
-a dynamic `QueryBuilder`. Resources are only ever soft-deleted in practice, so
-`ON DELETE CASCADE` exists for maintenance safety but has no dedicated test (same
-as other cascade FKs in this codebase).
-
-**Rebuilding projections — known gap.** If `resource_labels_projection` ever drifts
-from `resources.labels` (manual DB surgery, a bug, a skipped migration step), there
-is **no rebuild tooling** — no admin command, no maintenance job, nothing. In
-principle a rebuild only needs a single-table scan (`SELECT resource_id, labels
-FROM resources` → re-derive string entries → `replace_entries`), since
-`resources.labels` is already the trusted materialized value; no `resource_events`
-replay is required for *this* projection. This gap isn't unique to this table: no
-projection anywhere in the resources framework has rebuild tooling today, including
-`resources` itself relative to `resource_events` (which *would* need event replay,
-a materially bigger problem). Building either is out of scope for this feature —
-flagged here as a pre-existing operational gap for a future theme, not something
-introduced by label filtering.
+**→ [Resource label filtering](resources-label-filtering.md)** — the full path: resolution through
+`ResourceExtensionSchemaResolver`, the AND-only evaluation boundary in `flatten_conjunction`,
+per-row scope pairs, the `resource_labels_projection` table, and the known rebuild gap.
 
 ---
 
@@ -1010,48 +836,67 @@ Files: [`adapter/graphql/src/queries/resources/`](/src/adapter/graphql/src/queri
 and [`adapter/graphql/src/mutations/resources_mut/`](/src/adapter/graphql/src/mutations/resources_mut).
 Every resolver delegates to `ResourceFacade`.
 
-**Queries (`Resources`):** `supported_resource_types`, `summary`, `resource` / `resources`,
-`resource_handle` / `resource_handles`, `list_by_resource_type` /
-`list_handles_by_resource_type`, `search_handles`, `list_all` / `list_all_handles`,
-`render_manifest` / `render_manifests`. The `revealed: bool` argument maps to `SpecViewMode`.
+**Queries (`Resources`):** `supported_resource_types`, `summary`, `byRefs`,
+`handlesByRefs`, `bySelectors` / `handlesBySelectors`, `renderManifests`. Each ref-keyed
+query takes `[ResourceRefInput!]!` — there are no single-ref variants, matching the facade. The
+`opts: SpecViewOptsInput` argument (`{ revealed: bool }`) maps to the facade's `SpecViewOpts`.
 
-**Mutations (`ResourcesMut`):** `apply_manifest(manifest, format, dry_run?)`, `delete(selector)`,
-`delete_many(selector)`. `dry_run` routes to `plan_apply_manifest`, otherwise `apply_manifest`.
+**Mutations (`ResourcesMut`):** `apply_manifest(manifest, format, dry_run?)`,
+`apply_manifests(manifests, dry_run?)`, `delete(resourceRefs)`. `dry_run` routes to
+`plan_apply_manifest`, otherwise `apply_manifest`.
 
 **Outcome-union pattern.** *Domain/application outcomes* are modeled as unions: a resolver returns a
-union of `Success` + typed `Problem` variants (bad account, unsupported descriptor, validation
+union of `Success` + typed `Problem` variants (account resolution, unsupported descriptor, validation
 failures, …) so clients handle each expected case structurally rather than by parsing error strings.
 This does **not** cover everything — authentication failures, authorization failures, server bugs,
 and infrastructure failures still surface as ordinary GraphQL `errors`. Clients must handle both: the
 typed `Problem` variants *and* transport-level GraphQL errors. The apply outcome
 (`resource_apply_outcome_model.rs`) is the richest example of the union:
 
-- `Success` → operation (`Created`/`Updated`/`Untouched`) + `changes` (each: kind
-  `Generation`/`Headers`/`Spec`, JSON path, `before`/`after`) + `warnings`.
+- `Success` → operation (`Created`/`Updated`/`Untouched`) + `before`/`after` (canonical manifest
+  documents as JSON; `after` is non-null, `before` is null **iff** creating) + `warnings`. Sent for a live apply as well as a
+  dry run — see [Canonical manifest documents](#canonical-manifest-documents).
 - `Rejection` → category (`ImmutableFieldChanged`, `BusinessValidationFailed`,
   `ReferencedObjectMissing`, `LifecycleRuleConflict`) + message.
-- `ParseManifest`, `UnsupportedDescriptor`, `BadAccount`, `InvalidHeaders`, `InvalidSpec` →
+- `ParseManifest`, `UnsupportedDescriptor`, `AccountResolution`, `InvalidHeaders`, `InvalidSpec` →
   structured validation/parse problems. Extension-schema resolution failures are reported as
   `InvalidHeaders` with `ResourceHeaderValidationProblemCode::ResourceExtensionSchema`.
 
 These map directly from the domain views in
 [`views/apply_manifest_views.rs`](/src/domain/resources/domain/src/views/apply_manifest_views.rs)
-(`ApplyManifestPlan` / `ApplyManifestResult` / `ApplyManifestRejection` /
-`ApplyManifestChange` / `ApplyManifestChangeKind`).
+(`ApplyManifestPlan` / `ApplyManifestResult` / `ApplyManifestDocuments` /
+`ApplyManifestDocumentSource` / `ApplyManifestRejection`).
 
 **Label-filter transport.** `ResourceLabelFilterInput { entries: [ResourceLabelFilterEntryInput!]! }`
-carries the filter, where each entry is `{ key: String!, value: JSON! }`. It is accepted by
-`list_by_resource_type`, `list_handles_by_resource_type`, and `search_handles`.
-`ResourceBatchSelectorInput` — used by the batch `resources`/`render_manifests` queries and the
-`delete_many` mutation — does not carry a `labelFilter` field at all.
+carries the filter, where each entry is `{ key: String!, value: JSON! }`. It appears **only** as
+`ResourceSelectorInput.labels` — there is no call-level `labelFilter` argument on `bySelectors` or
+`handlesBySelectors`. The ref-keyed `byRefs`/`handlesByRefs`/`renderManifests` queries and
+the `delete` mutation take `[ResourceRefInput!]!` and carry no filter at all.
 
-**`search_handles`'s query is a `oneOf` input.** `SearchResourceHandlesInput.query:
-ResourceSearchQueryInput!` replaces the old independently-optional `names`/`namePattern`
-fields. `ResourceSearchQueryInput` is declared `@oneOf` with three single-field
-variants (`exactNames: [ResourceName!]`, `exactIds: [ResourceID!]`, `namePattern: String`) —
-exactly one may be set, enforced by the GraphQL layer itself before the resolver runs. On the
-Rust side this is `#[derive(async_graphql::OneofObject)]`; the `cynic` client side has matching
-`oneOf`-input codegen.
+Both `bySelectors` and `handlesBySelectors` take the **same** `SearchResourcesInput`; only the
+response shape differs (`ResourceListOutcome` vs `ResourceHandleListOutcome`). They were separate
+inputs whose fields were identical, so keeping two was pure duplication.
+
+**Listing takes a selector list.** `ResourceSelectorInput` mirrors the ODF `ResourceSelector`
+(`account`, `type`, `id`, `name`, `labels`) and replaced four earlier inputs — `ResourceQueryInput`,
+`ResourceTypeQueryInput`, `ResourceAnyTypeScopeInput`, and `ResourceScopeInput`. Every field is
+optional; several selectors act as a logical OR, which is what lets one call span resource types.
+A selector with no `type` spans every type.
+
+`account` is honoured per selector, so one call can span several accounts — the second headline
+benefit of the ODF-shaped API. Naming an account you are not allowed to read denies the **whole**
+call rather than dropping that selector (RF-105).
+
+`labels` is honoured per selector, so one call can filter differently per type — the third headline
+benefit of the ODF-shaped API, and the reason the repository's label pairs moved inside the per-row
+scope predicate. `did` remains the one field that exists on the wire but cannot be resolved; it is
+rejected rather than ignored, so a caller learns their request was not what they asked for.
+
+The wire is scalar where the repository is list-carrying: a batch of N ids arrives as N selectors and
+`coalesce_selectors` folds them into one row. Two type-less selectors that narrow differently, or a
+type-less selector mixed with typed ones, cannot be expressed as per-type rows and surface as
+`UnrepresentableScopeError` (RF-106) — a limit of `ResourceScope::AnyType` carrying a single query,
+which disappears once every row carries its own type.
 
 Entries are a **list, not a map**, so a key repeated by the caller reaches the server intact and is
 reported as a duplicate rather than one spelling silently winning — a map would collapse it in the
@@ -1063,6 +908,16 @@ Filter failures surface as a `ResourceInvalidLabelFilterError` union variant car
 `DuplicateAfterCanonicalization`, `UnsupportedExpression`). The typed code — rather than a message
 string — is what lets the remote facade **rebuild the same error the local facade raises**, which
 is what makes the `contract_test!` local/remote pairs assert identical behavior on both transports.
+
+The same `{code, message}` shape is used by `ResourceInvalidHeadersError`
+(`ResourceHeadersValidationProblemCode`) and `ResourceAccountResolutionError`
+(`ResourceAccountResolutionProblemCode`: `EmptySelector`, `AccountNotFoundById`,
+`AccountNotFoundByName`, `SelectorMismatch`). Account resolution is worth calling out: it reports
+only *selector* problems, never authorization. A caller denied access to another account's resources
+is carried separately as `ResourceAccountAccessError` (`AnonymousSubject`, `Access`) and surfaces as
+an ordinary GraphQL error, so "this selector does not resolve" and "you may not use this account"
+stay distinguishable to clients. `ResolveManifestAccountError` composes these two rather than
+listing their cases inline, which keeps the split in one place instead of re-derived per consumer.
 The remote (cynic) client does mechanical mapping only: no alias resolution, validation, or
 canonicalization happens client-side.
 
@@ -1078,7 +933,7 @@ implementation files carry `_resource(s)_` names:
 | Subcommand | Implementation file | Purpose |
 | --- | --- | --- |
 | `kamu apply` | `apply_command.rs` | Discover manifests (files/dir/stdin) and apply/plan them as a single all-or-nothing batch by default; `--dry-run`, `--recursive`, `--stdin`, `--continue-on-error`. |
-| `kamu list` | `list_resources_command.rs` | List resources by type or all; renders Table/CSV/JSON/Parquet. |
+| `kamu list` | `list_resources_command.rs` | List resources by type or `%` for all; renders Table/CSV/JSON/Parquet. |
 | `kamu get` | `get_resource_command.rs` | Get resource(s) by selector(s); names or full manifest; `--spec`, `--revealed`. |
 | `kamu delete` | `delete_resources_command.rs` | Delete by selector(s); `--force`, `--ignore-not-found`, `--dry-run`. |
 
@@ -1108,37 +963,105 @@ themselves are agnostic. Selector grammar is specified below, after the semantic
 
 | Aspect | `apply` | `get` | `list` | `delete` |
 | --- | --- | --- | --- | --- |
-| Input | manifest(s): `-f <file>`, dir + `--recursive`, or `--stdin` | selector(s) | positional `target` (a type or `all`) | selector(s) |
-| Selector / target examples | n/a (identity from manifest) | `vs my-vars`, `vs/my-vars`, `secretset/db%`, `vs all` | `kamu list variablesets` (or `vs`, `secretsets`, `ss`, `all`) | `vs my-vars`, `vs/my%`, `vs all` |
-| `%` name patterns | n/a | **yes** | n/a (lists whole type) | **yes** |
+| Input | manifest(s): `-f <file>`, dir + `--recursive`, or `--stdin` | selector(s) | one or more `type[/name]` targets, or `%` | selector(s) |
+| Selector / target examples | n/a (identity from manifest) | `vs my-vars`, `vs/my-vars`, `secretset/db%`, `vs/%`, `%/my-vars` | `kamu list vs`, `vs/my-%`, `vs/<id>`, `<id>`, `%`, `%/app-%`, `vs/a-% ss/b-%` | `vs my-vars`, `vs/my%`, `vs/%` |
+| `%` name patterns | n/a | **yes** | **yes** (`vs/my-%`); an exact name is a degenerate pattern, a `UUIDv4` is matched as an ID | **yes** |
+| `%` type wildcards | n/a | **only bare `%`** (= all types); `%set`/`s%` rejected | **only bare `%`**; cannot be combined with narrower selectors | **only bare `%`**; `%set`/`s%` rejected |
 | May return / act on multiple | yes (per manifest) | **yes, but bounded** — selector-driven, capped by `max_results`, `--unbounded` to lift | yes (bounded by `--max-results`/`--unbounded`) | yes |
-| Output modes | summary + changes (`--dry-run`)/warnings; verbose | `-o name` \| `-o json` \| `-o yaml`; `--spec` for apply-compatible spec | Table/CSV/JSON/Parquet (via `OutputConfig`), `-w` for wider detail | summary / dry-run preview |
+| Output modes | summary + canonical diff (dry-run *and* live apply)/warnings; verbose | `-o name` \| `-o json` \| `-o yaml`; `--spec` for apply-compatible spec | Table/CSV/JSON/Parquet (via `OutputConfig`), `-w` for wider detail | summary / dry-run preview |
 | Default secret visibility | n/a | **`Encrypted`** (ciphertext); `--revealed` to decrypt | secrets not expanded in list columns | n/a |
 | Relevant flags | `--dry-run`, `--recursive`, `--stdin`, `--continue-on-error` | `--ignore-not-found`, `--spec`, `--revealed`, `--max-results`/`--unbounded`, `--label`/`-l` | `--max-results`/`--unbounded`, `-w`, `-o`, `--label`/`-l` | `--force`, `--ignore-not-found`, `--dry-run`, `--label`/`-l` |
-| Label filtering | n/a | `-l` narrows the selector expansion | `-l` narrows the listing (incl. `list all`) | `-l` narrows what `--all`/patterns resolve to |
+| Label filtering | n/a | `-l` narrows the selector expansion | `-l` narrows the listing (incl. `list %`) | `-l` narrows what `--all`/patterns resolve to |
 | Flag semantics | default: whole batch is one transaction, a rejection/failure rolls back every manifest including earlier successes; `--continue-on-error`: apply each manifest independently so earlier successes survive a later failure; `--dry-run`: plan only, no writes | `--ignore-not-found`: skip missing selectors instead of erroring | — | `--force`: skip confirmation prompt; `--ignore-not-found`: exit OK if absent; `--dry-run`: preview resolved deletions |
 | Local vs remote | identical behavior; chosen by context (`--context` to override) | identical | identical | identical |
 
-> The `get` vs `list` boundary is intentional: `get` is for *named/selected* resources (bounded),
-> `list` is for *enumeration* (paginated). Keep `get` from growing into a second `list`.
+> The `get` vs `list` boundary is *bounded selection* vs *paginated enumeration* — not the presence
+> of name patterns, which both support. Keep `get` from growing into a second `list`, and keep
+> `list` from adopting what makes `get` a selection command: the bare same-type form
+> (`list vs a b` stays rejected), erroring when a selection overflows `--max-results` (`list`
+> truncates), and erroring when nothing matches (`list` prints an empty table).
+
+> **Column shape follows request arity, never results.** One named type renders that type's own
+> `list_columns`; two or more (and bare `%`) fall back to generic columns plus `Type`. A two-type
+> request keeps the generic shape even when only one type matches — letting the *results* decide
+> would make the output schema depend on the data, so the same command could emit different columns
+> on different days. A name pattern never changes the column shape.
+
+**`list` has its own, smaller grammar**, but it shares the *lexer*. It does not invoke
+`ResourceSelectionSyntaxParser` (which imposes the same-type/ref-form arg shapes); it splits each
+target with `ResourceSelectionScanner::scan_selector_arg` in
+[`list_command.rs`](/src/app/cli/src/commands/list_command.rs). Accepted: `datasets` (alone), one or
+more `type[/name]` targets, bare `%` or `%/pattern`, and a bare `UUIDv4` spanning every type. The
+name half is classified by the same `UUIDv4` rule the other commands use (shared as
+`is_resource_id`), so an ID is matched exactly and everything else is a `%` pattern. Rejected:
+mixing `datasets` with resource types, `datasets/<name>`, combining `%` with narrower selectors,
+more than one `/` in a target, and the bare same-type form (`list vs a b`) that belongs to `get`.
+
+**The one grammar difference is a named parameter, not a duplicated splitter.** `BareTypePolicy`
+decides whether a bare `type` carrying no `/` is legal: `list vs` enumerates the type
+(`Allow`), while `get vs` / `delete vs` are usage errors directing the user to `vs/%` (`Reject`).
+Everything else about splitting a `type[/name]` argument — rejecting empty halves and a second `/`,
+and where the caret points — is decided once, in the scanner. Both sides of the divergence are
+pinned by tests at the unit and E2E levels, because unifying them would silently change one
+command's contract: loosening `get` would widen `delete`'s blast radius.
 
 **Selector grammar — accepted forms** (parsed by `ResourceSelectionSyntaxParser`,
 [`resource_selection_syntax_parser.rs`](/src/app/cli/src/services/resources/impl/resource_selection_syntax_parser.rs)):
-`all`; same-type list `type name1 name2 …` (no slash); slash form `type/name …` (each arg exactly one
-`/`); `type all` or `type/all`; names may use `%` patterns.
+same-type list `type name1 name2 …` (no slash); slash form `type/name …` (each arg exactly one `/`);
+broad forms `type %` or `type/%` (one type) and `%/%` (everything).
+
+`%` is the **only** broad token — there is no `all` keyword. It was removed as redundant: every role
+it played already had a `%` spelling, and reserving a real word at argument 0 forced a dedicated
+parser variant plus an exemption to the no-mixing rule. `kamu delete --all` covers the flag form.
+
+**The `%` wildcard is asymmetric between the two halves — this is the point.**
+
+- **Names** may use `%` patterns freely: `vs app-%`, `vs/db-%`, `variablesets/%`.
+- **Types** are matched **exactly** (case-insensitively) against a canonical selector name or alias.
+  The one special token is `%` **alone**, meaning *all types*: `%/my-vars`, `%/db-%`, `%/%`.
+  Any other `%`-carrying spelling in the type position (`%set`, `s%`, `%TS`) is a **usage error**, not
+  a pattern.
+
+Matching *types* by wildcard was supported once and removed: it is hard to read back (`%set` silently
+covering `VariableSet` + `SecretSet` but not `Storage`) and outright dangerous on `delete`, where a
+mistyped pattern widens the blast radius to types the user never named. Exact-or-everything is the
+whole rule.
+
+Parsing is purely lexical — `ResourceSelectionSyntaxParser` tokenizes `%set/foo` happily; the type
+half is validated later, when `ResourceSelectionSyntaxServiceImpl::classify_type_token` resolves it.
 
 **Intentionally rejected** (documented as a contract, not just left implicit):
 
+- `kamu get %set foo` / `kamu get s%/db-creds` — **type wildcards** other than bare `%` are rejected
+  ("Unsupported get target '…'. Supported targets: …"). Use the exact type, or `%` for all types.
+  A `%`-carrying type half stays on the *resource* path in `kamu delete` even when it names no
+  supported type, so the user gets this error rather than a confusing legacy-dataset one.
 - `kamu get vs/foo bar` — **mixing** slash and same-type list forms in one command is rejected
-  ("Cannot mix positional `type name` and slash `type/name` syntax"). The one exception is a leading
-  `all` (e.g. `all vs/foo` is accepted, with the rest treated as shadowed).
+  ("Cannot mix positional `type name` and slash `type/name` syntax"), with no exceptions.
 - `kamu get vs/foo/extra` — the slash form must contain **exactly one** `/` (rejected: "Invalid
   resource reference").
 - `kamu get vs` — a bare type with **no selector** is rejected ("Expected `type/name`"); use
-  `kamu get vs all` / `kamu get vs/all`, or `kamu list vs`, to enumerate the type.
+  `kamu get vs %` / `kamu get vs/%`, or `kamu list vs`, to enumerate the type.
+- `kamu get %` / `kamu delete %` — a bare `%` is a *single plain arg*, so it hits the same rule and is
+  rejected. The all-resources spelling is `%/%`. (`kamu delete %` is still routed to the resource path
+  rather than the dataset one, so the user gets this selector error instead of a dataset glob that
+  would match every dataset — see `DeleteRequestResolver::resolve`.)
 
-(`kamu get all` *is* accepted, bounded by `--max-results`/`--unbounded`; prefer `kamu list all` for
+(`kamu get %/%` *is* accepted, bounded by `--max-results`/`--unbounded`; prefer `kamu list %` for
 unbounded enumeration — a guidance boundary, not a parser rejection.)
+
+**Both CLI grammars use the same scanner/parser split.** A `winnow` scanner turns the input into
+`Spanned` tokens carrying byte offsets, a parser consumes those tokens, and failures render through
+one shared `usage_error_at`
+([`selector_error.rs`](/src/app/cli/src/services/resources/impl/selector_error.rs)) that echoes the
+input and points a caret at the offending column. The offset is a byte index but the caret is padded
+in *characters*, so a multi-byte prefix still lands the caret on the right column.
+
+The two scanners differ in exactly one respect, and it is a consequence of the charset rather than a
+style choice: the selector scanner has **no escape production**. Both halves of a `type/name` are
+hostname-charset (`Grammar::match_resource_name`), so `/`, `,`, `=` and `\` can never occur inside a
+word — there is nothing to escape, and adding an escape layer would create a code path no valid
+input can reach. The label scanner needs one because label keys and values are free-form text.
 
 **Label selector grammar (`--label`/`-l`)** — parsed by `ResourceLabelSelectorParser`
 ([`resource_label_selector_parser.rs`](/src/app/cli/src/services/resources/impl/resource_label_selector_parser.rs)),
@@ -1166,6 +1089,15 @@ than being silently misparsed.
 mixed dataset+resource form) are rejected — datasets carry no labels, and filtering only the
 resource half of a mixed delete would still delete every named dataset unfiltered.
 
+**`-l` narrows the whole invocation, which the CLI expresses per selector.** The facade has no
+call-level filter, so the CLI stamps the parsed filter onto *every* selector it builds — in
+`selectors_for_query` for `list`, and via `with_labels` in the selection-resolution service for
+`get`/`delete`. Because selectors are OR'd, `(A ∧ L) ∨ (B ∧ L)` is exactly `(A ∨ B) ∧ L`, so
+`kamu list vs/a-% ss/b-% -l env=prod` runs the identical query it did when the filter was
+call-level. The CLI has **no syntax** for per-selector labels; that capability is reachable through
+GraphQL and the facade API. Adding one would be a grammar extension, not a reinterpretation of
+input that parses today.
+
 ---
 
 ## 13. Data flow walkthroughs
@@ -1177,7 +1109,7 @@ sequenceDiagram
     participant U as User / CLI
     participant D as ManifestDiscovery+Execution
     participant F as ResourceFacade (Local)
-    participant R as Dispatcher registry
+    participant R as ResourceDispatcherFactory
     participant X as Extension schema resolver
     participant UC as ApplyResourceUseCase<R>
     participant ST as Event store + repo
@@ -1186,11 +1118,11 @@ sequenceDiagram
     U->>D: apply -f manifest.yaml [--dry-run]
     D->>F: apply_manifest(ApplyManifestRequest) (or plan_apply_manifest)
     F->>F: resolve account, parse manifest ($schema, headers, spec)
-    F->>R: get_resource_crud_dispatcher(schema)
+    F->>R: crud_dispatcher(schema)
     R-->>F: ResourceCrudDispatcher<R>
     F->>X: canonicalize + validate labels/annotations
     X-->>F: canonical headers + warnings (or InvalidHeaders)
-    F->>UC: plan(params)  %% validate + diff (create/update/untouched)
+    F->>UC: plan(params)  %% validate + decide (create/update/untouched)
     alt dry-run
         UC-->>F: ApplyResourcePlanningDecision (Planned | Rejected)
     else live apply
@@ -1198,8 +1130,61 @@ sequenceDiagram
         UC->>OB: produce ResourceLifecycleMessage::Applied
         UC-->>F: ApplyResourceApplicationDecision (Applied | Rejected)
     end
-    F-->>U: outcome + changes + warnings
+    F-->>U: outcome + before/after documents + warnings
 ```
+
+### Canonical manifest documents
+
+An accepted apply reports **what the resource looks like on each side** — `before` and `after`, as
+canonical manifest documents — rather than a precomputed list of field-level changes.
+
+Both are produced by `ResourceManifest::from_resource`
+([`manifests/resource_manifest.rs`](/src/domain/resources/domain/src/manifests/resource_manifest.rs)),
+the *same* function that backs `render_manifests`. So the diff a user sees on apply and the document
+they get from `kamu get -o yaml` provably agree, and the parity is pinned by the contract test
+`apply_documents_match_rendered_manifest`.
+
+The canonical form is the authored subset — `$schema` + `headers.{account, name, labels,
+annotations}` + `spec` — deliberately excluding `headers.id`, `generation`, the timestamps, and
+`status`. Two consequences follow directly:
+
+- **An unchanged apply yields byte-identical documents** (`before == Some(after)`, which
+  `ApplyManifestDocuments::has_changes()` reports). There are no spurious differences to normalize:
+  the earlier mechanism had to truncate timestamps to microseconds to suppress Postgres-precision
+  noise, and that whole bug class is now structurally absent rather than papered over.
+- **`generation` never appears in a diff.** It changed on every non-`Untouched` apply, so it was
+  pure noise.
+
+**Ordering constraint.** The documents are *computed on demand*, via `ApplyManifestPlan::documents()`,
+never stored mid-construction. `headers.account` is part of the canonical manifest and the facade
+finalizes it only *after* the dispatcher returns
+(`plan.resource.headers.account = prepared.target_account`), so canonicalizing earlier would bake in
+a stale account and surface it as a spurious difference.
+
+The two facades reach the documents by different routes, which `ApplyManifestDocumentSource` makes
+explicit rather than papering over:
+
+- `Pair { previous }` — the **local** facade carries the raw pre-apply resource and canonicalizes on
+  demand, once the account is final.
+- `Canonical(documents)` — the **remote** facade receives already-canonicalized documents and has no
+  resource pair to rebuild them from.
+
+Modeling this as an enum keeps `before == None` meaning *exactly* "the resource is being created".
+An earlier revision instead stored a placeholder (`before: None, after: null`) between dispatcher and
+facade; that is indistinguishable from a real create, and `has_changes()` read it as "changed" even
+for an untouched apply. Pinned by `apply_documents_before_is_absent_only_for_creates`.
+
+**The `before` side costs no extra read.** It comes from `previous_state`, captured by
+`ApplyResourcePlanner::plan_update_resource` from the aggregate it has already loaded, before it
+mutates it. A live apply cannot simply re-read the snapshot afterwards — by then it holds the *new*
+state.
+
+**Diffing is a front-end concern.** The backend never decides granularity; the CLI does, in
+[`commands/resource_manifest_diff.rs`](/src/app/cli/src/commands/resource_manifest_diff.rs): it walks
+both documents to find the narrowest changed paths, then renders just those subtrees as colored YAML
+text diffs (via `similar`). A one-label change in a large manifest therefore renders as a couple of
+lines rather than two whole-object dumps — the property that motivated this design, pinned by
+`one_label_change_produces_a_small_diff`.
 
 ### (b) Reconciliation
 
@@ -1339,6 +1324,76 @@ list of literals per type, so the two representations cannot drift.)
 | `https://opendatafabric.org/schemas/config/v1alpha1/VariableSet` | `VariableSet` | `variablesets`, `vs` | `spec.variables` (name → `{ value }`; accepts scalar shorthand on input via ODF's `StructOrString`, but always round-trips as the structured `{ value }` form once parsed — RFC-adopted, see [`VariableSetSpec`](/src/domain/configuration/domain/src/resources/variable_set/spec.rs)) | Projects variable entries; status uses the standard ODF resource status. |
 | `https://opendatafabric.org/schemas/config/v1alpha1/SecretSet` | `SecretSet` | `secretsets`, `ss` | `spec.secrets` (name → plaintext / `{ value }` / `{ value, contentEncoding: jwe }`) | Materializes an **encrypted** read-side projection (`SecretSetEntry`) for consumers (see [Secret handling](#secret-handling-invariant) for where encryption actually happens). |
 
+### Legacy dataset association — the `legacy-config-target-dataset` label
+
+> **Temporary.** This label exists only to keep pre-resources ingest flows working, and is expected
+> to be removed once `Source` can reference a `VariableSet` directly. Deleting it will need no DB
+> migration — that is the main reason it is a label and not a table.
+
+In the old env-var system every value lived in the context of a dataset. Config resources are
+top-level and account-scoped, so something has to carry that association until resource references
+land. That something is a registered label whose value is the target dataset's DID:
+
+```yaml
+headers:
+  labels:
+    legacy-config-target-dataset: did:odf:fed012126262…
+```
+
+| | |
+| --- | --- |
+| Canonical URI | `https://kamu.dev/schemas/resource/v1alpha1/labels/LegacyConfigTargetDataset` |
+| Short name | `legacy-config-target-dataset` |
+| Value | A full `did:odf:…` DID, validated with `odf::DatasetID::from_did_str` |
+| Scope | `ResourceExtensionScopeMeta::ResourceContext` over the ODF `config` context — `VariableSet` and `SecretSet` only |
+| Registered by | **`kamu-configuration-services`**, not `kamu-resources-services` |
+
+Three things about it are easy to get wrong:
+
+- **It lives in the configuration domain.** Unlike `environment` and `description`, which are
+  built-in and registered by `register_built_in_label_schema_dispatchers`, this label is declared in
+  [`validation/schemas/labels/legacy_config_target_dataset.rs`](/src/domain/configuration/domain/src/validation/schemas/labels/legacy_config_target_dataset.rs)
+  and registered by `register_configuration_label_schema_dispatchers`. A label that only means
+  something to config resources has no business in the generic resources domain — and putting it
+  there would have made the eventual deletion a cross-domain change.
+- **It has no `maxLength`.** The `environment` label caps values at 63 characters; a `did:odf:` DID
+  is **77**. Copying that cap would reject every legitimate value. Pinned by
+  `test_accepts_a_dataset_did_longer_than_the_environment_label_limit`.
+- **It is scoped, so it is not free-form anywhere else.** It is the only *dispatcher* using the
+  `ResourceContext` scope variant — every built-in extension is `AnyResource` — so it is also the
+  only exercise of that code path. Authored on a resource outside the `config` context, the short
+  name stays free-form (with the usual warning) while the full URI is a hard `Inapplicable`
+  rejection — the standard registered-extension asymmetry.
+
+**Read path.** [`DatasetEnvVarResolverImpl`](/src/domain/configuration/services/src/dataset_env_var_resolver.rs)
+resolves a dataset's effective env vars by calling
+`ResourceRepository::find_resource_ids_by_schema_and_label` once per kind, filtering on the
+canonical URI and the dataset DID, **scoped to the dataset's owner**. Ownership scoping is a
+security boundary: nothing validates the label value on write, so any account may stamp any dataset
+DID on a resource it owns, and an unscoped lookup would let a stranger inject variables into someone
+else's ingest — or shadow them with a `SecretSet`, which overrides variables regardless of age. The
+query is served by the `resource_labels_projection` covering index
+([label filtering](resources-label-filtering.md#resource_labels_projection-index)), so it is as cheap
+as the association table it replaced.
+
+**Ordering.** The binding table had an explicit `binding_order` column. The label has no such field,
+so ties are broken by `created_at ASC, resource_id ASC` — oldest wins within each kind, and secrets
+still override variables wholesale. `created_at` is deliberate: `updated_at` would let editing an
+older set silently flip precedence.
+
+**Write path.** [`DatasetEnvVarMutationAdapterImpl`](/src/domain/configuration/services/src/dataset_env_var_mutation_adapter.rs)
+stamps the label on the resources it auto-manages. Note that it still *finds* those resources by
+their well-known name (`legacy-vars-<did>` / `legacy-secrets-<did>`), not by the label: the legacy
+read-modify-write path owns exactly one resource per dataset per kind, whereas the label may
+legitimately match several user-authored sets that this path must not touch.
+
+**Dataset deletion leaves the label behind, deliberately.** There is no consumer that strips the
+label when a dataset is deleted. The label is inert once the dataset is gone — nothing resolves env
+vars for a nonexistent dataset — and the resource remains a legitimate user-owned top-level
+resource that the user may still want. The bindings system did have such a consumer, but it was
+also strictly worse: neither Postgres nor SQLite had an FK on `dataset_id`, so a lost lifecycle
+message already orphaned binding rows.
+
 ### Secret handling invariant
 
 > **Invariant:** plaintext secret material must never be written to resource events, snapshots, the
@@ -1354,6 +1409,12 @@ assumption:
    **JWE** token (`dir` + `A256GCM`, via `crypto_utils::SecretCryptor` / `crypto_utils::jwe`) and
    stores it as `Secret { value: <jwe>, contentEncoding: Some("jwe") }`, so the persisted `spec`
    **already holds ciphertext.**
+
+   > This ordering is what makes the apply `before`/`after` documents safe: they are built from the
+   > sanitized state, carry the **stored (unrevealed)** spec, and never invoke
+   > `ResourceSpecViewDispatcher::reveal_spec`. Pinned by the contract test
+   > `apply_documents_never_expose_secret_plaintext`, which runs against both facades. "diffs" in
+   > the invariant above means exactly these documents.
 
    The sanitizer also handles three edge cases:
    - If new plaintext decrypts-equal to the stored JWE token, it reuses that token to avoid a
@@ -1445,7 +1506,7 @@ pub fn register_variable_set_resource_crud_dispatcher(catalog_builder: &mut dill
 5. **Test all three tiers** (see [§15](#15-tests)): a reconciler/service unit test, a facade contract
    case, and an E2E lifecycle test (apply → list → get → update → delete) plus a golden-view test.
 
-The registry then resolves your resource by schema or selector metadata, so the generic CRUD
+`ResourceDispatcherFactory` then resolves your resource by schema metadata, so the generic CRUD
 operations work without touching CLI or GraphQL code. **But "no changes" holds only for the generic
 path** — a complete type still needs its DI registration, presentation metadata (aliases + list
 columns), facade contract coverage, CLI golden-output test, `cynic`/schema updates if the remote
@@ -1469,9 +1530,16 @@ reconcilers (incl. the `SecretSet` spec sanitizer, encrypted projection, and `re
 [`src/domain/resources/facade-tests`](/src/domain/resources/facade-tests). The key idea: a
 `contract_test!` macro runs **each** case against **both** a `LocalFacadeHarness` and a
 `RemoteGraphqlFacadeHarness`, so the suite **enforces local/remote symmetry for the behavior it
-covers** (it doesn't guarantee parity for untested paths). Suites cover apply, batch ops, account scoping,
-list/search, supported resource types, get-identity, error taxonomy, delete, render-manifest,
-list-all, summary, and spec view modes.
+covers** (it doesn't guarantee parity for untested paths). One file per area: `apply_manifest`,
+`apply_manifest_batch`, `batch_ops`, `account_scoping`, `list_search`, `search_any_type`,
+`supported_resource_types`, `get_handle`, `error_taxonomy`, `delete`, `render_manifest`, `summary`,
+`spec_view_mode`, and `cross_impl` — the last asserting local and remote agree structurally, which
+is the property the whole suite exists to protect. Every case carries an `RF-` id tracked in
+`contract/COVERAGE.md`; retired ids keep a row there pointing at whatever absorbed them, so
+coverage history lives in that ledger rather than in test comments.
+
+Since the ref-keyed operations are batch-only, single-resource cases call them with a one-element
+vec and unwrap via the `assert_single_batch_success` / `assert_single_batch_problem` helpers.
 
 **E2E (CLI)** —
 [`src/e2e/app/cli/repo-tests/src/commands/resources`](/src/e2e/app/cli/repo-tests/src/commands/resources/).
@@ -1508,7 +1576,7 @@ Otherwise the behavior is already guaranteed for both implementations by the con
 | --- | --- | --- | --- |
 | Domain model | `kamu-resources` | `src/domain/resources/domain/src` | `core/`, `state/`, `values/`, `manifests/`, `repo/`, `dispatchers/`, `messages/`, `use_cases/`, `views/` |
 | Domain schemas | `kamu-resources` | `src/domain/resources/schemas` | Informational JSON schemas for framework-owned resource extensions: built-in labels, annotations, and status conditions. |
-| Services | `kamu-resources-services` | `src/domain/resources/services/src` | `use_cases/{apply,reconcile,delete}.rs`, `crud_dispatchers/resource_crud_dispatcher_registry.rs`, `resource_extension_schemas/`, `message_handlers/`, `event_stores/`, `dependencies.rs` |
+| Services | `kamu-resources-services` | `src/domain/resources/services/src` | `use_cases/{apply,reconcile,delete}.rs`, `crud_dispatchers/resource_dispatcher_factory.rs`, `resource_extension_schemas/`, `message_handlers/`, `event_stores/`, `dependencies.rs` |
 | Facade | `kamu-resources-facade` | `src/domain/resources/facade/src/facade` | `resource_facade.rs`, `local/`, `graphql/` |
 | GraphQL | (adapter) | `src/adapter/graphql/src` | `queries/resources/`, `mutations/resources_mut/` |
 | CLI commands | (app/cli) | `src/app/cli/src/commands` | `apply_command.rs`, `list_resources_command.rs`, `get_resource_command.rs`, `delete_resources_command.rs`, `context_*_command.rs` |
@@ -1521,12 +1589,21 @@ Otherwise the behavior is already guaranteed for both implementations by the con
 
 ## 17. Extension points & gotchas
 
-- **`SQLX_OFFLINE=true`** for `cargo` build/check/test/clippy without a reachable Postgres (see the
-  quick-start note; never needed for `fmt`/`doc`).
+- **Don't override SQLx mode on the command line.** It is set by `.env` files — repo-wide offline by
+  default, live per-crate after `make sqlx-local-setup`. Forcing `SQLX_OFFLINE=true` over a local
+  setup checks queries against the stale cache instead of the real schema (see the quick-start note).
 - **Dispatch is by schema.** A missing schema yields
   `UnsupportedResourceDescriptorError::NotFound`; two matching registrations yield `Duplicate`.
   Selector-based lookup (`variablesets`, `vs`, etc.) is a separate metadata path and yields
   selector-specific not-found/duplicate errors.
+- **A miss reports not-found or no-match, by what was asked — not by whether a type was named.**
+  An *exact* reference names one resource, so a miss is "was not found": `vs/my-vars` names the
+  type, `%/my-vars` cannot (every type was searched) but is still a not-found. A *pattern* names
+  no resource, so a miss is "did not match any". `%/my-vars` once reported pattern phrasing
+  despite being an exact ref — three spellings of "one exact thing was missing". The two shapes
+  are pinned apart by unit tests and by `test_resources_get_selectors` E2E on both backends.
+  Note the canonical selector in these messages is the ODF type name (`VariableSet`); `variablesets`
+  and `vs` are aliases.
 - **Extension-schema dispatch is also by schema URI.** Built-in extension dispatchers are registered
   for `description`, `environment`, and the three status conditions. Registry construction is an
   explicit catalog-assembly step and fails on duplicate extension schema IDs, invalid `https://`
@@ -1553,13 +1630,15 @@ Otherwise the behavior is already guaranteed for both implementations by the con
   behavior, extend that suite so both implementations stay in lockstep.
 - **Phase-1 expansion is where label filters apply — phase-2 has no filter to misuse.** `get` and
   `delete` first expand selectors into identifiers (filtered), then act on those ids by
-  `ResourceRef::ById`. The phase-2 batch calls — `get_many`, `delete_many`, `render_manifests` —
-  take a `ResourceBatchSelector`, which has no `label_filter` field at all, so a future caller
+  `ResourceRef::ById`. The phase-2 batch calls — `get`, `delete`, `render_manifests` —
+  take a bare `Vec<ResourceRef>`, which has no `label_filter` field at all, so a future caller
   cannot reach those methods with an unfiltered id set and a forgotten filter: there is nothing to
-  forget. If a new batch selector shape ever needs filtering, filter during expansion (phase 1)
+  forget. If a new batch shape ever needs filtering, filter during expansion (phase 1)
   rather than adding a filter field to the batch call.
 - **The label-filter capability boundary is `flatten_conjunction`, in one place.** The resolved
-  filter is a full boolean tree, but evaluation is AND-only. Every backend routes through that one
-  domain helper, which rejects `Not`/`Or`. Widening support means changing it and the backends —
-  never a signature, and never the resolver.
+  filter is a full boolean tree, but evaluation is AND-only. The **facade** routes through that one
+  domain helper, which rejects `Not`/`Or`, and hands backends a flat `Vec<ResourceLabelPair>` inside
+  the scope. Backends therefore never see an expression tree and cannot call the helper at all, so
+  widening support means changing it, the scope's pair representation, and the backends — never a
+  repository signature, and never the resolver.
 - **Test convention:** use `assert_matches!` directly (never `assert!(matches!(...))`).

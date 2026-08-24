@@ -12,27 +12,82 @@ use std::sync::Arc;
 
 use internal_error::{InternalError, ResultIntoInternal};
 use kamu_configuration::{
-    DatasetSecretSetBindingRepository,
-    DatasetVariableSetBindingRepository,
+    RESOURCE_LABEL_LEGACY_CONFIG_TARGET_DATASET_SCHEMA_URI,
     SecretSetProjectionRepository,
+    SecretSetResource,
     VariableSetProjectionRepository,
+    VariableSetResource,
 };
 use kamu_datasets::{
+    DatasetEntryRepository,
     DatasetEnvVar,
     DatasetEnvVarNotFoundError,
     DatasetEnvVarResolver,
+    GetDatasetEntryError,
     GetDatasetEnvVarError,
 };
+use kamu_resources::{ResourceID, ResourceRepository, ResourceSchemaProvider, TypeUri};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component(pub)]
 #[dill::interface(dyn DatasetEnvVarResolver)]
 pub struct DatasetEnvVarResolverImpl {
-    variable_set_binding_repo: Arc<dyn DatasetVariableSetBindingRepository>,
-    secret_set_binding_repo: Arc<dyn DatasetSecretSetBindingRepository>,
+    resource_repo: Arc<dyn ResourceRepository>,
+    dataset_entry_repository: Arc<dyn DatasetEntryRepository>,
     variable_set_projection_repo: Arc<dyn VariableSetProjectionRepository>,
     secret_set_projection_repo: Arc<dyn SecretSetProjectionRepository>,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+impl DatasetEnvVarResolverImpl {
+    /// Resources of `schema` associated with `dataset_id` by the temporary
+    /// `legacy-config-target-dataset` label, oldest first.
+    ///
+    /// Restricted to the dataset owner's resources: nothing validates the
+    /// label value on write, so any account may stamp any dataset DID on a
+    /// resource it owns. Matching across accounts would let a stranger inject
+    /// variables into someone else's ingest, or override them with a
+    /// `SecretSet`.
+    ///
+    /// Ordering is by creation time rather than an explicit ordering column,
+    /// so editing a set never reshuffles precedence among its peers.
+    async fn find_target_resource_ids(
+        &self,
+        schema: &TypeUri,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<Vec<ResourceID>, InternalError> {
+        let Some(owner_id) = self.find_dataset_owner(dataset_id).await? else {
+            return Ok(Vec::new());
+        };
+
+        self.resource_repo
+            .find_resource_ids_by_schema_and_label(
+                &owner_id,
+                schema,
+                // Registered labels are stored under their canonical URI, not
+                // the short name the user authors.
+                RESOURCE_LABEL_LEGACY_CONFIG_TARGET_DATASET_SCHEMA_URI,
+                &dataset_id.as_did_str().to_string(),
+            )
+            .await
+    }
+
+    async fn find_dataset_owner(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<Option<odf::AccountID>, InternalError> {
+        match self
+            .dataset_entry_repository
+            .get_dataset_entry(dataset_id)
+            .await
+        {
+            Ok(entry) => Ok(Some(entry.owner_id)),
+            Err(GetDatasetEntryError::NotFound(_)) => Ok(None),
+            Err(GetDatasetEntryError::Internal(e)) => Err(e),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -45,16 +100,15 @@ impl DatasetEnvVarResolver for DatasetEnvVarResolverImpl {
     ) -> Result<HashMap<String, DatasetEnvVar>, InternalError> {
         let mut env_map: HashMap<String, DatasetEnvVar> = HashMap::new();
 
-        // Apply variable-set bindings in order; first binding wins per key
-        let var_bindings = self
-            .variable_set_binding_repo
-            .list_bindings(dataset_id)
+        // Apply labelled variable sets oldest-first; first one wins per key
+        let variable_set_ids = self
+            .find_target_resource_ids(VariableSetResource::schema(), dataset_id)
             .await?;
 
-        for binding in &var_bindings {
+        for resource_id in &variable_set_ids {
             let entries = self
                 .variable_set_projection_repo
-                .get_latest_entries(&binding.resource_id)
+                .get_latest_entries(resource_id)
                 .await?;
 
             for entry in entries {
@@ -70,17 +124,17 @@ impl DatasetEnvVarResolver for DatasetEnvVarResolverImpl {
             }
         }
 
-        // Apply secret-set bindings; secrets override all variables on key collision
-        let secret_bindings = self
-            .secret_set_binding_repo
-            .list_bindings(dataset_id)
+        // Apply labelled secret sets; secrets override all variables on key
+        // collision
+        let secret_set_ids = self
+            .find_target_resource_ids(SecretSetResource::schema(), dataset_id)
             .await?;
 
         let mut secret_map: HashMap<String, DatasetEnvVar> = HashMap::new();
-        for binding in &secret_bindings {
+        for resource_id in &secret_set_ids {
             let entries = self
                 .secret_set_projection_repo
-                .get_latest_entries(&binding.resource_id)
+                .get_latest_entries(resource_id)
                 .await?;
 
             for entry in entries {
@@ -113,42 +167,20 @@ impl DatasetEnvVarResolver for DatasetEnvVarResolverImpl {
             })
         };
 
-        // Search variable-set resources bound to this dataset
-        let var_bindings = self
-            .variable_set_binding_repo
-            .list_bindings(dataset_id)
+        // Secret sets are searched first: a key carried by both a secret set and
+        // a variable set must resolve to the secret, matching the overlay in
+        // `resolve_effective_env_vars`. Returning the variable here would hand
+        // back plaintext for a key the user believes they have shadowed with a
+        // secret.
+        let secret_set_ids = self
+            .find_target_resource_ids(SecretSetResource::schema(), dataset_id)
             .await
             .int_err()?;
 
-        for binding in &var_bindings {
-            let entries = self
-                .variable_set_projection_repo
-                .get_latest_entries(&binding.resource_id)
-                .await
-                .int_err()?;
-
-            if let Some(entry) = entries.into_iter().find(|e| e.key == entry_key) {
-                return Ok(DatasetEnvVar {
-                    key: entry.key,
-                    value: entry.value.into_bytes(),
-                    secret_nonce: None,
-                    created_at: entry.created_at,
-                    dataset_id: dataset_id.clone(),
-                });
-            }
-        }
-
-        // Search secret-set resources bound to this dataset
-        let secret_bindings = self
-            .secret_set_binding_repo
-            .list_bindings(dataset_id)
-            .await
-            .int_err()?;
-
-        for binding in &secret_bindings {
+        for resource_id in &secret_set_ids {
             let entries = self
                 .secret_set_projection_repo
-                .get_latest_entries(&binding.resource_id)
+                .get_latest_entries(resource_id)
                 .await
                 .int_err()?;
 
@@ -157,6 +189,30 @@ impl DatasetEnvVarResolver for DatasetEnvVarResolverImpl {
                     key: entry.key,
                     value: entry.value,
                     secret_nonce: Some(entry.secret_nonce),
+                    created_at: entry.created_at,
+                    dataset_id: dataset_id.clone(),
+                });
+            }
+        }
+
+        // Only then variable sets, oldest-first within the kind.
+        let variable_set_ids = self
+            .find_target_resource_ids(VariableSetResource::schema(), dataset_id)
+            .await
+            .int_err()?;
+
+        for resource_id in &variable_set_ids {
+            let entries = self
+                .variable_set_projection_repo
+                .get_latest_entries(resource_id)
+                .await
+                .int_err()?;
+
+            if let Some(entry) = entries.into_iter().find(|e| e.key == entry_key) {
+                return Ok(DatasetEnvVar {
+                    key: entry.key,
+                    value: entry.value.into_bytes(),
+                    secret_nonce: None,
                     created_at: entry.created_at,
                     dataset_id: dataset_id.clone(),
                 });

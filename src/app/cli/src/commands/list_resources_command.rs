@@ -10,7 +10,7 @@
 use std::num::NonZeroUsize;
 use std::sync::Arc;
 
-use database_common::{PaginationOpts, collect_all_pages};
+use database_common::{PaginationOpts, collect_all_pages, sql_like_escape_literal};
 use datafusion::arrow::array::{
     ArrayRef,
     BooleanArray,
@@ -26,6 +26,7 @@ use kamu_resources::{
     ResourceListColumnDescriptor,
     ResourceListColumnValue,
     ResourceListColumnVisibility,
+    ResourceQuery,
     ResourceSummaryView,
     ResourceTypeDescriptor,
     resource_type_name,
@@ -114,8 +115,8 @@ impl ListResourcesCommand {
 
     fn selected_resource_columns(&self) -> Vec<ResourceListColumnDescriptor> {
         match &self.scope {
-            ListResourcesScope::All => Vec::new(),
-            ListResourcesScope::ByType(type_descriptor) => type_descriptor
+            ListResourcesScope::All(_) | ListResourcesScope::Types(_) => Vec::new(),
+            ListResourcesScope::ByType(type_descriptor, _) => type_descriptor
                 .list_columns
                 .iter()
                 .filter(|column| {
@@ -129,7 +130,7 @@ impl ListResourcesCommand {
     }
 
     fn is_all_scope(&self) -> bool {
-        matches!(self.scope, ListResourcesScope::All)
+        self.scope.is_generic()
     }
 
     fn resource_schema(&self, extra_columns: &[ResourceListColumnDescriptor]) -> Arc<Schema> {
@@ -273,81 +274,66 @@ impl ListResourcesCommand {
         }
     }
 
-    async fn list_resources_by_selector(
+    async fn search_resources(
         &self,
-        selector_name: &kamu_resources::ResourceSelectorName,
+        selectors: &[kamu_resources::ResourceSelector],
     ) -> Result<Vec<ResourceSummaryView>, CLIError> {
         if let Some(max_results) = self.max_results {
-            self.resource_facade
-                .list(kamu_resources_facade::ListResourcesRequest {
-                    raw_type_selector: selector_name.into(),
+            let response = self
+                .resource_facade
+                .search(kamu_resources_facade::SearchResourcesRequest {
+                    selectors: selectors.to_vec(),
                     account: None,
                     pagination: PaginationOpts::from_max_results(max_results.get()),
-                    label_filter: self.label_filter.clone(),
                 })
-                .await
-                .map_err(Into::into)
+                .await?;
+            Ok(response.items)
         } else {
             collect_all_pages(RESOURCE_PAGE_SIZE, |pagination| async move {
-                self.resource_facade
-                    .list(kamu_resources_facade::ListResourcesRequest {
-                        raw_type_selector: selector_name.into(),
+                let response = self
+                    .resource_facade
+                    .search(kamu_resources_facade::SearchResourcesRequest {
+                        selectors: selectors.to_vec(),
                         account: None,
                         pagination,
-                        label_filter: self.label_filter.clone(),
                     })
-                    .await
-                    .map_err(Into::into)
-            })
-            .await
-        }
-    }
-
-    async fn list_all_resources(&self) -> Result<Vec<ResourceSummaryView>, CLIError> {
-        if let Some(max_results) = self.max_results {
-            self.resource_facade
-                .list_all(kamu_resources_facade::ListAllResourcesRequest {
-                    account: None,
-                    label_filter: self.label_filter.clone(),
-                    pagination: PaginationOpts::from_max_results(max_results.get()),
-                })
-                .await
-                .map_err(Into::into)
-        } else {
-            collect_all_pages(RESOURCE_PAGE_SIZE, |pagination| async move {
-                self.resource_facade
-                    .list_all(kamu_resources_facade::ListAllResourcesRequest {
-                        account: None,
-                        label_filter: self.label_filter.clone(),
-                        pagination,
-                    })
-                    .await
-                    .map_err(Into::into)
-            })
-            .await
-        }
-    }
-
-    async fn load_resources(&self) -> Result<Vec<ResourceSummaryView>, CLIError> {
-        match &self.scope {
-            ListResourcesScope::ByType(type_descriptor) => {
-                let mut resources = self
-                    .list_resources_by_selector(&type_descriptor.canonical_selector)
                     .await?;
-                resources.sort_by(|lhs, rhs| lhs.name.cmp(&rhs.name));
-                Ok(resources)
-            }
-            ListResourcesScope::All => {
-                let mut resources = self.list_all_resources().await?;
-                resources.sort_by(|lhs, rhs| {
-                    lhs.name
-                        .cmp(&rhs.name)
-                        .then_with(|| lhs.schema.cmp(&rhs.schema))
-                        .then_with(|| lhs.id.to_string().cmp(&rhs.id.to_string()))
-                });
-                Ok(resources)
-            }
+                Ok(response.items)
+            })
+            .await
         }
+    }
+
+    /// One listing path for every scope: `search` spans types, so a single-type
+    /// scope is just a one-selector case rather than a separate operation.
+    async fn load_resources(&self) -> Result<Vec<ResourceSummaryView>, CLIError> {
+        let label_filter = self.label_filter.as_ref();
+
+        let selectors = match &self.scope {
+            ListResourcesScope::ByType(type_descriptor, query) => {
+                selectors_for_type(&type_descriptor.schema, query.as_ref(), label_filter)
+            }
+            ListResourcesScope::Types(type_queries) => type_queries
+                .iter()
+                .flat_map(|(type_descriptor, query)| {
+                    selectors_for_type(&type_descriptor.schema, query.as_ref(), label_filter)
+                })
+                .collect::<Vec<_>>(),
+            ListResourcesScope::All(query) => any_type_selectors(query.as_ref(), label_filter),
+        };
+
+        let mut resources = self.search_resources(&selectors).await?;
+
+        // A single-type listing has one schema throughout, so the extra keys are
+        // inert there and the ordering matches what `list` produced before the
+        // merge.
+        resources.sort_by(|lhs, rhs| {
+            lhs.name
+                .cmp(&rhs.name)
+                .then_with(|| lhs.schema.cmp(&rhs.schema))
+                .then_with(|| lhs.id.to_string().cmp(&rhs.id.to_string()))
+        });
+        Ok(resources)
     }
 
     fn make_writer(
@@ -537,10 +523,29 @@ impl Command for ListResourcesCommand {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// What `kamu list` was asked to show.
+///
+/// Column shape follows the *arity* of the request, not its results: one type
+/// keeps that type's own columns, more than one falls back to generic columns
+/// plus `Type`. Letting the results decide would make the output schema depend
+/// on the data, so the same command could emit different columns on different
+/// days.
 #[derive(Debug, Clone)]
 pub enum ListResourcesScope {
-    ByType(ResourceTypeDescriptor),
-    All,
+    /// One type, optionally narrowed by a name pattern or exact ID.
+    ByType(ResourceTypeDescriptor, Option<ResourceQuery>),
+    /// Two or more named types, each with its own query.
+    Types(Vec<(ResourceTypeDescriptor, Option<ResourceQuery>)>),
+    /// Every type, optionally narrowed by one query applying to all.
+    All(Option<ResourceQuery>),
+}
+
+impl ListResourcesScope {
+    /// Whether the generic column set applies (`Type` column, no per-type
+    /// columns).
+    pub(crate) fn is_generic(&self) -> bool {
+        !matches!(self, Self::ByType(..))
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -557,6 +562,83 @@ enum ResourceGenericColumn {
     Generation,
     ObservedGeneration,
     Age,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A selector for one type, carrying whatever narrows it.
+///
+/// Every `ResourceQuery` form reaches this path, exact-id lists included — a
+/// bare UUID or `vs/<uuid>` arrives as `ExactIds`. Since a selector carries a
+/// single `id` and a single `name` pattern, the list forms fan out into one
+/// selector each rather than collapsing into one.
+fn selectors_for_type(
+    schema: &kamu_resources::TypeUri,
+    query: Option<&kamu_resources::ResourceQuery>,
+    label_filter: Option<&kamu_resources::ResourceLabelFilterInput>,
+) -> Vec<kamu_resources::ResourceSelector> {
+    selectors_for_query(Some(schema), query, label_filter)
+}
+
+/// The same, spanning every type.
+fn any_type_selectors(
+    query: Option<&kamu_resources::ResourceQuery>,
+    label_filter: Option<&kamu_resources::ResourceLabelFilterInput>,
+) -> Vec<kamu_resources::ResourceSelector> {
+    selectors_for_query(None, query, label_filter)
+}
+
+/// Fans a query out into scalar, ODF-shaped selectors — one per exact id or
+/// name, since a selector carries a single `id` and a single `name` pattern.
+/// The facade's coalescer folds them back into one repository row per type.
+///
+/// The match is exhaustive on purpose: a variant falling through would widen
+/// the selector to the whole type rather than narrowing it.
+fn selectors_for_query(
+    schema: Option<&kamu_resources::TypeUri>,
+    query: Option<&kamu_resources::ResourceQuery>,
+    label_filter: Option<&kamu_resources::ResourceLabelFilterInput>,
+) -> Vec<kamu_resources::ResourceSelector> {
+    // `-l` narrows the whole invocation, which the facade expresses as the same
+    // filter on every selector. See `with_labels` in the selection-resolution
+    // service for why that is equivalent rather than merely close.
+    let base = || kamu_resources::ResourceSelector {
+        r#type: schema.map(|schema| schema.clone().into()),
+        labels: label_filter.cloned(),
+        ..Default::default()
+    };
+
+    let Some(query) = query else {
+        return vec![base()];
+    };
+
+    match query {
+        kamu_resources::ResourceQuery::NamePattern(pattern) => {
+            vec![kamu_resources::ResourceSelector {
+                name: Some(pattern.clone()),
+                ..base()
+            }]
+        }
+        kamu_resources::ResourceQuery::ExactIds(ids) => ids
+            .iter()
+            .map(|id| kamu_resources::ResourceSelector {
+                id: Some(*id),
+                ..base()
+            })
+            .collect(),
+        // An exact name is a wildcard-free `LIKE` pattern: a selector's `name`
+        // is a pattern by ODF definition, so the literal must be escaped rather
+        // than passed through.
+        kamu_resources::ResourceQuery::ExactNames(names) => names
+            .iter()
+            .map(|name| kamu_resources::ResourceSelector {
+                name: Some(sql_like_escape_literal(name.as_str())),
+                ..base()
+            })
+            .collect(),
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

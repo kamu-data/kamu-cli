@@ -8,4 +8,5 @@
 // by the Apache License, Version 2.0.
 
 mod message_handlers;
+mod resource_extension_schemas;
 mod services;

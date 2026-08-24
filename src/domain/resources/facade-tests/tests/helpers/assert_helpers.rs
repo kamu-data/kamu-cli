@@ -14,6 +14,7 @@ use kamu_resources::{
     Resource,
     ResourceHandle,
     ResourceID,
+    ResourceListColumnValue,
     ResourceSummaryView,
     TypeUri,
 };
@@ -88,7 +89,6 @@ pub fn assert_applied_outcome(
 
 /// Returns the single success item from a batch response, panicking if the
 /// batch contains anything other than exactly one success and zero problems.
-#[expect(dead_code)]
 #[track_caller]
 pub fn assert_single_batch_success<T: std::fmt::Debug, E: std::fmt::Debug>(
     response: BatchResourceResponse<T, E>,
@@ -105,6 +105,32 @@ pub fn assert_single_batch_success<T: std::fmt::Debug, E: std::fmt::Debug>(
         response.successes
     );
     response.successes.into_iter().next().unwrap().item
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Returns the single problem from a batch response, panicking if the batch
+/// contains anything other than exactly one problem and zero successes.
+///
+/// The mirror of [`assert_single_batch_success`] for the lookup-failure
+/// assertions: a one-element batch reports a bad ref as a per-item problem,
+/// not as a call-level `Err`.
+#[track_caller]
+pub fn assert_single_batch_problem<T: std::fmt::Debug, E: std::fmt::Debug>(
+    response: BatchResourceResponse<T, E>,
+) -> E {
+    assert!(
+        response.successes.is_empty(),
+        "expected no batch successes, got: {:#?}",
+        response.successes
+    );
+    assert_eq!(
+        response.problems.len(),
+        1,
+        "expected exactly one problem, got: {:#?}",
+        response.problems
+    );
+    response.problems.into_iter().next().unwrap().error
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -141,27 +167,31 @@ pub fn normalize_summary_views(views: &mut [ResourceSummaryView]) {
     views.sort_by(|a, b| (&a.schema, &a.name).cmp(&(&b.schema, &b.name)));
 }
 
+/// Renders a view's typed list columns as sorted `key=value` pairs.
+///
+/// Typed columns are what the CLI's `list` table shows beyond the generic
+/// columns, and they are schema-specific — a `VariableSet` reports
+/// `variables`, a `SecretSet` reports `secrets`. Stringified so one assertion
+/// can span several types.
+pub fn summary_column_pairs(view: &ResourceSummaryView) -> Vec<String> {
+    let mut pairs = view
+        .list_values
+        .iter()
+        .map(|column| match &column.value {
+            ResourceListColumnValue::String(value) => format!("{}={value}", column.key),
+            ResourceListColumnValue::UInt64(value) => format!("{}={value}", column.key),
+            ResourceListColumnValue::Bool(value) => format!("{}={value}", column.key),
+        })
+        .collect::<Vec<_>>();
+    pairs.sort();
+    pairs
+}
+
 /// Normalizes a slice of `ResourceHandle` by sorting by `(schema, name)`.
 pub fn normalize_handles(views: &mut [ResourceHandle]) {
     views.sort_by(|a, b| (&a.r#type, &a.name).cmp(&(&b.r#type, &b.name)));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Parses a JSON manifest string into a `serde_json::Value` for semantic
-/// comparison.
-#[expect(dead_code)]
-pub fn parse_manifest_json(s: &str) -> serde_json::Value {
-    serde_json::from_str(s).expect("manifest is not valid JSON")
-}
-
-/// Parses a YAML manifest string into a `serde_json::Value` via
-/// YAML→JSON round-trip for semantic comparison.
-#[expect(dead_code)]
-pub fn parse_manifest_yaml(s: &str) -> serde_json::Value {
-    let yaml_value: serde_yaml::Value =
-        serde_yaml::from_str(s).expect("manifest is not valid YAML");
-    serde_json::to_value(yaml_value).expect("YAML→JSON conversion failed")
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

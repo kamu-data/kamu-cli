@@ -12,9 +12,11 @@
 mod projections;
 mod repositories;
 mod resources;
+mod validation;
 mod values;
 
 pub use projections::*;
 pub use repositories::*;
 pub use resources::*;
+pub use validation::*;
 pub use values::*;

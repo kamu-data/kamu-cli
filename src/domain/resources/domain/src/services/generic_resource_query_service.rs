@@ -11,15 +11,13 @@ use database_common::PaginationOpts;
 use internal_error::InternalError;
 
 use crate::{
-    ResolvedResourceLabelFilter,
     ResourceHandleRow,
     ResourceID,
     ResourceName,
-    ResourceSearchQuery,
+    ResourceScope,
     ResourceSnapshot,
     ResourceSummaryRow,
     ResourceTypeMismatchError,
-    ResourceTypeScope,
     TypeUri,
 };
 
@@ -28,8 +26,9 @@ use crate::{
 /// Read-side access to resources for use cases and higher layers, which never
 /// reach for [`crate::ResourceRepository`] directly.
 ///
-/// See [`crate::ResourceRepository`] for the rule governing which methods take
-/// a `label_filter`.
+/// See [`crate::ResourceRepository`] for the rule governing which methods
+/// filter by label — the scoped searches carry the pairs inside
+/// [`ResourceScope`].
 #[async_trait::async_trait]
 pub trait GenericResourceQueryService: Send + Sync {
     async fn allocate_id(&self) -> Result<ResourceID, InternalError>;
@@ -59,18 +58,14 @@ pub trait GenericResourceQueryService: Send + Sync {
     async fn search_resource_handles(
         &self,
         account_id: &odf::AccountID,
-        scope: &ResourceTypeScope,
-        query: &ResourceSearchQuery,
-        label_filter: &ResolvedResourceLabelFilter,
+        scope: &ResourceScope,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceHandleRow>, InternalError>;
 
     async fn count_search_resource_handles(
         &self,
         account_id: &odf::AccountID,
-        scope: &ResourceTypeScope,
-        query: &ResourceSearchQuery,
-        label_filter: &ResolvedResourceLabelFilter,
+        scope: &ResourceScope,
     ) -> Result<usize, InternalError>;
 
     async fn find_owned_snapshot(
@@ -98,18 +93,10 @@ pub trait GenericResourceQueryService: Send + Sync {
         ids: &[ResourceID],
     ) -> Result<Vec<ResourceSnapshot>, InternalError>;
 
-    async fn list_snapshots_by_schema(
+    async fn list_snapshots(
         &self,
-        account_id: odf::AccountID,
-        schema: &TypeUri,
-        label_filter: &ResolvedResourceLabelFilter,
-        pagination: PaginationOpts,
-    ) -> Result<Vec<ResourceSnapshot>, InternalError>;
-
-    async fn list_all_snapshots(
-        &self,
-        account_id: odf::AccountID,
-        label_filter: &ResolvedResourceLabelFilter,
+        account_id: &odf::AccountID,
+        scope: &ResourceScope,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceSnapshot>, InternalError>;
 

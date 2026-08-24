@@ -277,6 +277,12 @@ impl ContainerRuntime {
         cmd
     }
 
+    pub(crate) fn remove_container_cmd_std(&self, container_name: &str) -> std::process::Command {
+        let mut cmd = self.new_command_std();
+        cmd.arg("rm").arg("--force").arg(container_name);
+        cmd
+    }
+
     pub async fn create_network(
         &self,
         network_name: &str,
@@ -464,6 +470,15 @@ impl ContainerRuntime {
             Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => Ok(true),
             Err(e) if e.kind() == std::io::ErrorKind::TimedOut => Ok(true),
             Err(e) if e.kind() == std::io::ErrorKind::Interrupted => Ok(false),
+            // NOTE: In some cases (so far, this has been observed with
+            //       podman and netavark (networkBackend)), due to the nature of proxying,
+            //       there is a very brief initial window during which the connection may be reset
+            Err(e)
+                if e.kind() == std::io::ErrorKind::ConnectionReset
+                    && self.config.runtime == ContainerRuntimeType::Podman =>
+            {
+                Ok(false)
+            }
             Err(e) => Err(e.into()),
         }
     }

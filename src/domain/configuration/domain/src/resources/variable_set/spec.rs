@@ -9,6 +9,8 @@
 
 use kamu_resources::{ResourceLinterSpec, ResourceValidateSpec, ResourceWarning};
 
+use crate::resources::spec_lints;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// RFC-derived variable shape (`{ value: String }`); accepts scalar-or-`{
@@ -62,7 +64,10 @@ impl VariableSetSpecInput {
 
     pub const WARNING_CODE_RESERVED_VARIABLE_PREFIX: &str = "reserved_variable_prefix";
     pub const WARNING_CODE_LONG_VARIABLE_VALUE: &str = "long_variable_value";
-    pub const WARNING_CODE_LOWERCASE_VARIABLE_NAME: &str = "lowercase_variable_name";
+    pub const WARNING_CODE_SECRET_MATERIAL_IN_VARIABLE: &str = "secret_material_in_variable";
+    pub const WARNING_CODE_CASE_COLLIDING_NAMES: &str = "case_colliding_names";
+    pub const WARNING_CODE_SUSPICIOUS_VALUE_WHITESPACE: &str = "suspicious_value_whitespace";
+    pub const WARNING_CODE_UNEXPANDED_INTERPOLATION: &str = "unexpanded_interpolation";
 
     fn is_valid_variable_name(name: &str) -> bool {
         let mut chars = name.chars();
@@ -129,6 +134,10 @@ impl ResourceLinterSpec for VariableSetSpecInput {
     fn lint_warnings(&self) -> Vec<ResourceWarning> {
         let mut warnings = Vec::new();
 
+        // A collision spans two entries, so it is resolved once up front
+        // rather than per entry.
+        let collisions = spec_lints::CaseCollisions::scan(&self.variables.entries);
+
         for (name, variable) in &self.variables.entries {
             let value = variable.value.as_str();
 
@@ -143,14 +152,51 @@ impl ResourceLinterSpec for VariableSetSpecInput {
                 });
             }
 
-            if name.chars().any(|c| c.is_ascii_lowercase()) {
+            // Unlike `SecretSet`, variable values are never encrypted, so a
+            // credential filed here applies cleanly and then leaks.
+            if spec_lints::CredentialShape::new(name, value).is_suspicious() {
                 warnings.push(ResourceWarning {
-                    code: Self::WARNING_CODE_LOWERCASE_VARIABLE_NAME.to_string(),
+                    code: Self::WARNING_CODE_SECRET_MATERIAL_IN_VARIABLE.to_string(),
                     path: Some(format!("spec.variables.{name}")),
                     message: format!(
-                        "Variable '{name}' uses lowercase letters; prefer uppercase names like \
-                         '{}'",
-                        name.to_uppercase()
+                        "Variable '{name}' looks like a credential; variable values are stored \
+                         unencrypted and are shown by 'get' — consider a SecretSet instead"
+                    ),
+                });
+            }
+
+            if let Some(other) = collisions.other(name) {
+                warnings.push(ResourceWarning {
+                    code: Self::WARNING_CODE_CASE_COLLIDING_NAMES.to_string(),
+                    path: Some(format!("spec.variables.{name}")),
+                    message: format!(
+                        "Variable '{name}' differs only by case from '{other}'; they are stored \
+                         as distinct variables and may collide wherever names are compared \
+                         case-insensitively"
+                    ),
+                });
+            }
+
+            let value_shape = spec_lints::ValueShape::new(value);
+
+            if value_shape.has_suspicious_whitespace() {
+                warnings.push(ResourceWarning {
+                    code: Self::WARNING_CODE_SUSPICIOUS_VALUE_WHITESPACE.to_string(),
+                    path: Some(format!("spec.variables.{name}.value")),
+                    message: format!(
+                        "Variable '{name}' value has leading, trailing, or embedded whitespace; \
+                         it is stored verbatim"
+                    ),
+                });
+            }
+
+            if value_shape.has_unexpanded_interpolation() {
+                warnings.push(ResourceWarning {
+                    code: Self::WARNING_CODE_UNEXPANDED_INTERPOLATION.to_string(),
+                    path: Some(format!("spec.variables.{name}.value")),
+                    message: format!(
+                        "Variable '{name}' value contains interpolation syntax; specs are not \
+                         templated and the value is stored literally"
                     ),
                 });
             }
@@ -195,9 +241,6 @@ pub enum VariableSetSpecValidationError {
         actual: usize,
         max: usize,
     },
-
-    #[error("description is too long: got {actual}, max is {max}")]
-    DescriptionTooLong { actual: usize, max: usize },
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -301,22 +344,108 @@ mod tests {
     }
 
     #[test]
-    fn lints_lowercase_name_warning() {
+    fn lints_secret_material_by_name() {
         use kamu_resources::ResourceLinterSpec;
 
-        let spec = make_spec_input([("my_variable", "value")]);
+        let spec = make_spec_input([("DB_PASSWORD", "hunter2")]);
 
         let warnings = spec.lint_warnings();
         assert_eq!(warnings.len(), 1);
         assert_eq!(
             warnings[0].code,
-            VariableSetSpecInput::WARNING_CODE_LOWERCASE_VARIABLE_NAME
+            VariableSetSpecInput::WARNING_CODE_SECRET_MATERIAL_IN_VARIABLE
         );
         assert_eq!(
             warnings[0].path,
-            Some("spec.variables.my_variable".to_string())
+            Some("spec.variables.DB_PASSWORD".to_string())
         );
-        assert!(warnings[0].message.contains("MY_VARIABLE"));
+        assert!(warnings[0].message.contains("SecretSet"));
+    }
+
+    #[test]
+    fn lints_secret_material_by_value() {
+        use kamu_resources::ResourceLinterSpec;
+
+        // An innocuous name, but the value is unmistakably an AWS key ID.
+        let spec = make_spec_input([("PIPELINE_INPUT", "AKIAIOSFODNN7EXAMPLE")]);
+
+        let warnings = spec.lint_warnings();
+        assert_eq!(warnings.len(), 1);
+        assert_eq!(
+            warnings[0].code,
+            VariableSetSpecInput::WARNING_CODE_SECRET_MATERIAL_IN_VARIABLE
+        );
+        assert_eq!(
+            warnings[0].path,
+            Some("spec.variables.PIPELINE_INPUT".to_string())
+        );
+    }
+
+    #[test]
+    fn lints_case_colliding_names() {
+        use kamu_resources::ResourceLinterSpec;
+
+        let spec = make_spec_input([("DB_HOST", "a"), ("db_host", "b")]);
+
+        let warnings = spec.lint_warnings();
+        assert_eq!(warnings.len(), 1);
+        assert_eq!(
+            warnings[0].code,
+            VariableSetSpecInput::WARNING_CODE_CASE_COLLIDING_NAMES
+        );
+        assert_eq!(warnings[0].path, Some("spec.variables.db_host".to_string()));
+        assert!(warnings[0].message.contains("DB_HOST"));
+    }
+
+    #[test]
+    fn lints_suspicious_value_whitespace() {
+        use kamu_resources::ResourceLinterSpec;
+
+        for value in [" leading", "trailing ", "embedded\nnewline"] {
+            let spec = make_spec_input([("INPUT_TOPIC", value)]);
+
+            let warnings = spec.lint_warnings();
+            assert_eq!(warnings.len(), 1, "value: {value:?}");
+            assert_eq!(
+                warnings[0].code,
+                VariableSetSpecInput::WARNING_CODE_SUSPICIOUS_VALUE_WHITESPACE
+            );
+            assert_eq!(
+                warnings[0].path,
+                Some("spec.variables.INPUT_TOPIC.value".to_string())
+            );
+        }
+    }
+
+    #[test]
+    fn lints_unexpanded_interpolation() {
+        use kamu_resources::ResourceLinterSpec;
+
+        let spec = make_spec_input([("HOME_DIR", "${HOME}/data")]);
+
+        let warnings = spec.lint_warnings();
+        assert_eq!(warnings.len(), 1);
+        assert_eq!(
+            warnings[0].code,
+            VariableSetSpecInput::WARNING_CODE_UNEXPANDED_INTERPOLATION
+        );
+        assert_eq!(
+            warnings[0].path,
+            Some("spec.variables.HOME_DIR.value".to_string())
+        );
+    }
+
+    #[test]
+    fn lints_no_warnings_for_mixed_case_name() {
+        use kamu_resources::ResourceLinterSpec;
+
+        // Mixed case is legal per `is_valid_variable_name` and carries no
+        // consequence on its own, so it must not warn — this is the guard
+        // against reintroducing a style-only casing lint.
+        let spec = make_spec_input([("Http_Port", "8080")]);
+
+        let warnings = spec.lint_warnings();
+        assert_eq!(warnings.len(), 0);
     }
 
     #[test]
@@ -349,18 +478,11 @@ mod tests {
         ]);
 
         let warnings = spec.lint_warnings();
-        assert_eq!(warnings.len(), 3);
+        assert_eq!(warnings.len(), 2);
         assert_eq!(
             warnings
                 .iter()
                 .filter(|w| w.code == VariableSetSpecInput::WARNING_CODE_RESERVED_VARIABLE_PREFIX)
-                .count(),
-            1
-        );
-        assert_eq!(
-            warnings
-                .iter()
-                .filter(|w| w.code == VariableSetSpecInput::WARNING_CODE_LOWERCASE_VARIABLE_NAME)
                 .count(),
             1
         );

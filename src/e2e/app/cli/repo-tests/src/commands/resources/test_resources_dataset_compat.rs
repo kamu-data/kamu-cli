@@ -25,7 +25,7 @@ pub async fn test_resources_dataset_compat(kamu: KamuCliPuppet) {
     // `list all` is the resource surface and succeeds, but must not leak the
     // dataset into it. With no resources present it legitimately renders empty
     // (`[]`), so we only assert the dataset is absent.
-    assert_stdout_excludes(&kamu, ["list", "all"], dataset_name).await;
+    assert_stdout_excludes(&kamu, ["list", "%"], dataset_name).await;
 
     kamu.assert_success_command_execution(
         ["delete", dataset_name, "--force"],

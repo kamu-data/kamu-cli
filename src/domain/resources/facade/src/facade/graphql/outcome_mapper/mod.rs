@@ -14,4 +14,7 @@ mod problem_mappers;
 
 pub(crate) use apply_batch_helpers::*;
 pub(crate) use operation_outcomes::*;
-pub(crate) use problem_mappers::{bad_account_problem_error, unsupported_descriptor_problem_error};
+pub(crate) use problem_mappers::{
+    account_resolution_problem_error,
+    unsupported_descriptor_problem_error,
+};

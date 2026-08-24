@@ -1,0 +1,55 @@
+[package]
+name = "kamu-datasets-mysql"
+description = "MySQL-specific implementation of datasets domain"
+version = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+authors = { workspace = true }
+readme = { workspace = true }
+license-file = { workspace = true }
+keywords = { workspace = true }
+include = { workspace = true }
+edition = { workspace = true }
+publish = { workspace = true }
+
+
+[lints]
+workspace = true
+
+
+[lib]
+doctest = false
+
+
+[dependencies]
+database-common = { workspace = true }
+kamu-datasets = { workspace = true, features = [
+    "sqlx",
+] }
+internal-error = { workspace = true }
+odf = { workspace = true, features = [
+    "sqlx-mysql",
+] }
+
+async-stream = "0.3"
+async-trait = { version = "0.1", default-features = false }
+chrono = { version = "0.4" }
+dill = { version = "0.15", default-features = false }
+futures = "0.3"
+sqlx = { version = "0.8", default-features = false, features = [
+    "runtime-tokio",
+    "macros",
+    "mysql",
+    "chrono",
+] }
+tracing = "0.1"
+
+
+[dev-dependencies]
+database-common-macros = { workspace = true }
+internal-error = { workspace = true }
+kamu-accounts-mysql = { workspace = true }
+kamu-datasets-repo-tests = { workspace = true }
+
+test-log = { version = "0.2", features = ["trace"] }
+test-group = { version = "1" }

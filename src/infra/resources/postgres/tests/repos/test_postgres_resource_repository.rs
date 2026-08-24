@@ -95,6 +95,30 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = postgres,
+    fixture = resource_repo_suite::test_search_resource_handles_per_row_account,
+    harness = PostgresResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
+    fixture = resource_repo_suite::test_search_resource_handles_per_row_labels,
+    harness = PostgresResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
+    fixture = resource_repo_suite::test_search_resource_handles_any_type_labels,
+    harness = PostgresResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
     fixture = resource_repo_suite::test_search_resource_handles_pattern_special_characters,
     harness = PostgresResourceRepositoryHarness
 );
@@ -199,7 +223,15 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = postgres,
-    fixture = resource_repo_suite::test_list_resource_snapshots_by_schema,
+    fixture = resource_repo_suite::test_list_resource_snapshots_by_scope,
+    harness = PostgresResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
+    fixture = resource_repo_suite::test_list_resource_snapshots_with_queries,
     harness = PostgresResourceRepositoryHarness
 );
 
@@ -253,6 +285,22 @@ database_transactional_test!(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+database_transactional_test!(
+    storage = postgres,
+    fixture = resource_repo_suite::test_deleted_account_falls_back_to_sentinel_name,
+    harness = PostgresResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
+    fixture = resource_repo_suite::test_search_resource_handles_partially_vacuous_scope,
+    harness = PostgresResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 struct PostgresResourceRepositoryHarness {
     catalog: Catalog,
 }
@@ -270,5 +318,47 @@ impl PostgresResourceRepositoryHarness {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
+    fixture =
+        resource_repo_suite::test_find_resource_ids_by_schema_and_label_returns_nothing_initially,
+    harness = PostgresResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
+    fixture = resource_repo_suite::test_find_resource_ids_by_schema_and_label_orders_by_created_at,
+    harness = PostgresResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
+    fixture = resource_repo_suite::test_find_resource_ids_by_schema_and_label_discriminates_schema_and_value,
+    harness = PostgresResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
+    fixture = resource_repo_suite::test_find_resource_ids_by_schema_and_label_excludes_deleted,
+    harness = PostgresResourceRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = postgres,
+    fixture =
+        resource_repo_suite::test_find_resource_ids_by_schema_and_label_excludes_other_accounts,
+    harness = PostgresResourceRepositoryHarness
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

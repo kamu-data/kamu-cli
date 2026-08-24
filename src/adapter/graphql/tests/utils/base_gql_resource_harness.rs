@@ -7,26 +7,12 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use chrono::Utc;
-use kamu_configuration::{SecretSetResource, VariableSetResource};
 use kamu_configuration_inmem::{
-    InMemoryDatasetSecretSetBindingRepository,
-    InMemoryDatasetVariableSetBindingRepository,
     InMemorySecretSetProjectionRepository,
     InMemoryVariableSetProjectionRepository,
 };
 use kamu_core::TenancyConfig;
-use kamu_resources::{
-    MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE,
-    ResourceHeaders,
-    ResourceHeadersExt,
-    ResourceID,
-    ResourceLifecycleMessage,
-    ResourceRepository,
-    ResourceSchemaProvider,
-    ResourceSnapshot,
-    TypeUri,
-};
+use kamu_resources::{MESSAGE_PRODUCER_KAMU_RESOURCE_SERVICE, ResourceLifecycleMessage};
 use kamu_resources_inmem::{
     InMemoryRawResourceEventStore,
     InMemoryResourceLabelProjectionRepository,
@@ -58,8 +44,6 @@ impl BaseGQLResourceHarness {
         b.add::<InMemoryResourceRepository>()
             .add::<InMemoryResourceLabelProjectionRepository>()
             .add::<InMemoryRawResourceEventStore>()
-            .add::<InMemoryDatasetVariableSetBindingRepository>()
-            .add::<InMemoryDatasetSecretSetBindingRepository>()
             .add::<InMemoryVariableSetProjectionRepository>()
             .add::<InMemorySecretSetProjectionRepository>();
 
@@ -83,84 +67,6 @@ impl BaseGQLResourceHarness {
         let catalog_base = Self::make_base_gql_resource_catalog(base_gql_harness.catalog());
 
         Self::new(base_gql_harness, catalog_base)
-    }
-
-    pub async fn create_resource(
-        catalog: &dill::Catalog,
-        account: &odf::AccountHandle,
-        name: &str,
-        schema: &TypeUri,
-        spec: serde_json::Value,
-    ) -> ResourceID {
-        let resource_repo = catalog.get_one::<dyn ResourceRepository>().unwrap();
-        let id = ResourceID::new(uuid::Uuid::new_v4());
-
-        resource_repo
-            .create_resource(&ResourceSnapshot {
-                id,
-                schema: schema.clone(),
-                headers: ResourceHeaders::simple(Utc::now(), id, account.clone(), name),
-                spec,
-                status: None,
-                last_event_id: None,
-            })
-            .await
-            .unwrap();
-
-        id
-    }
-
-    pub fn dummy_variable_set_spec() -> serde_json::Value {
-        serde_json::to_value(kamu_configuration::VariableSetSpec::new(
-            odf::metadata::config::VariableSetSpec {
-                variables: odf::metadata::config::Variables {
-                    entries: [(
-                        "PLACEHOLDER".to_string(),
-                        kamu_configuration::Variable {
-                            value: "placeholder".to_string(),
-                        },
-                    )]
-                    .into(),
-                },
-            },
-        ))
-        .unwrap()
-    }
-
-    pub fn dummy_secret_set_spec() -> serde_json::Value {
-        serde_json::to_value(kamu_configuration::SecretSetSpec::new(
-            odf::metadata::config::SecretSetSpec {
-                secrets: odf::metadata::config::Secrets {
-                    entries: [(
-                        "PLACEHOLDER".to_string(),
-                        kamu_configuration::Secret {
-                            value: "placeholder".to_string(),
-                            content_encoding: None,
-                        },
-                    )]
-                    .into(),
-                },
-            },
-        ))
-        .unwrap()
-    }
-
-    pub async fn create_variable_set_resource(
-        catalog: &dill::Catalog,
-        account: &odf::AccountHandle,
-        name: &str,
-        spec: serde_json::Value,
-    ) -> ResourceID {
-        Self::create_resource(catalog, account, name, VariableSetResource::schema(), spec).await
-    }
-
-    pub async fn create_secret_set_resource(
-        catalog: &dill::Catalog,
-        account: &odf::AccountHandle,
-        name: &str,
-        spec: serde_json::Value,
-    ) -> ResourceID {
-        Self::create_resource(catalog, account, name, SecretSetResource::schema(), spec).await
     }
 }
 

@@ -55,7 +55,7 @@ type Account {
 	"""
 	Avatar URL
 	"""
-	avatarUrl: String
+	avatarUrl: Url
 	"""
 	Indicates the administrator status
 	"""
@@ -603,7 +603,7 @@ type BatchResourceHandleSuccess {
 	handle: ResourceHandle!
 }
 
-union BatchResourceHandlesOutcome = BatchResourceHandlesResult | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem
+union BatchResourceHandlesOutcome = BatchResourceHandlesResult | ResourceUnsupportedSelectorProblem | ResourceAccountResolutionProblem
 
 type BatchResourceHandlesResult {
 	handles: [BatchResourceHandleSuccess!]!
@@ -615,7 +615,7 @@ type BatchResourceManifestSuccess {
 	manifest: ResourceRenderManifestResult!
 }
 
-union BatchResourceManifestsOutcome = BatchResourceManifestsResult | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem
+union BatchResourceManifestsOutcome = BatchResourceManifestsResult | ResourceUnsupportedSelectorProblem | ResourceAccountResolutionProblem
 
 type BatchResourceManifestsResult {
 	manifests: [BatchResourceManifestSuccess!]!
@@ -632,7 +632,7 @@ type BatchResourceSuccess {
 	resource: Resource!
 }
 
-union BatchResourcesOutcome = BatchResourcesResult | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem
+union BatchResourcesOutcome = BatchResourcesResult | ResourceUnsupportedSelectorProblem | ResourceAccountResolutionProblem
 
 type BatchResourcesResult {
 	resources: [BatchResourceSuccess!]!
@@ -1196,10 +1196,6 @@ type Dataset {
 	"""
 	envVars: DatasetEnvVars!
 	"""
-	Access to the explicit configuration bindings of this dataset
-	"""
-	configuration: DatasetConfiguration!
-	"""
 	Access to the flow configurations of this dataset
 	"""
 	flows: DatasetFlows!
@@ -1263,13 +1259,6 @@ enum DatasetArchetype {
 	VERSIONED_FILE
 }
 
-type DatasetBindingView {
-	resourceId: ResourceID!
-	bindingOrder: Int!
-	resourceName: String!
-	resourceSchema: TypeUri!
-}
-
 type DatasetCollaboration {
 	"""
 	Accounts (and their roles) that have access to the dataset
@@ -1289,21 +1278,6 @@ type DatasetCollaborationMut {
 }
 
 type DatasetCollaborationPermissions {
-	canView: Boolean!
-	canUpdate: Boolean!
-}
-
-type DatasetConfiguration {
-	variableSetBindings: [DatasetBindingView!]!
-	secretSetBindings: [DatasetBindingView!]!
-}
-
-type DatasetConfigurationMut {
-	replaceVariableSetBindings(resourceIds: [ResourceID!]!): ReplaceDatasetBindingsResult!
-	replaceSecretSetBindings(resourceIds: [ResourceID!]!): ReplaceDatasetBindingsResult!
-}
-
-type DatasetConfigurationPermissions {
 	canView: Boolean!
 	canUpdate: Boolean!
 }
@@ -1626,10 +1600,6 @@ type DatasetMut {
 	"""
 	envVars: DatasetEnvVarsMut!
 	"""
-	Access to the mutable configuration bindings of this dataset
-	"""
-	configuration: DatasetConfigurationMut!
-	"""
 	Access to collaboration management methods
 	"""
 	collaboration: DatasetCollaborationMut!
@@ -1667,7 +1637,6 @@ scalar DatasetName
 
 type DatasetPermissions {
 	collaboration: DatasetCollaborationPermissions!
-	configuration: DatasetConfigurationPermissions!
 	envVars: DatasetEnvVarsPermissions!
 	flows: DatasetFlowsPermissions!
 	webhooks: DatasetWebhooksPermissions!
@@ -3837,36 +3806,6 @@ type RenameResultSuccess implements RenameResult {
 	message: String!
 }
 
-type ReplaceBindingsDuplicateResources implements ReplaceDatasetBindingsResult {
-	resourceId: ResourceID!
-	message: String!
-}
-
-type ReplaceBindingsResourceAccountMismatch implements ReplaceDatasetBindingsResult {
-	resourceId: ResourceID!
-	message: String!
-}
-
-type ReplaceBindingsResourceNotFound implements ReplaceDatasetBindingsResult {
-	resourceId: ResourceID!
-	message: String!
-}
-
-type ReplaceBindingsResourceSchemaMismatch implements ReplaceDatasetBindingsResult {
-	resourceId: ResourceID!
-	expectedSchema: TypeUri!
-	actualSchema: TypeUri!
-	message: String!
-}
-
-interface ReplaceDatasetBindingsResult {
-	message: String!
-}
-
-type ReplaceDatasetBindingsSuccess implements ReplaceDatasetBindingsResult {
-	message: String!
-}
-
 """
 Defines a header (e.g. HTTP) to be passed into some request.
 
@@ -3909,19 +3848,45 @@ type Resource {
 	status: ResourceStatus!
 }
 
-scalar ResourceAnnotations
-
-type ResourceApplyChange {
-	kind: ResourceApplyChangeKind!
-	path: String!
-	before: JSON
-	after: JSON
+"""
+The account selector supplied for this operation could not be resolved to a
+concrete account (empty selector, unknown id/name, or a selector whose
+fields disagree with each other). This is an input-validation problem, not
+an authorization outcome — a caller denied access to another account's
+resources gets a top-level GraphQL error, never this type.
+"""
+type ResourceAccountResolutionProblem {
+	code: ResourceAccountResolutionProblemCode!
+	message: String!
 }
 
-enum ResourceApplyChangeKind {
-	GENERATION
-	HEADERS
-	SPEC
+enum ResourceAccountResolutionProblemCode {
+	EMPTY_SELECTOR
+	ACCOUNT_NOT_FOUND_BY_ID
+	ACCOUNT_NOT_FOUND_BY_NAME
+	SELECTOR_MISMATCH
+}
+
+"""
+A type-less reference whose name matched in several types. A reference names
+exactly one resource, so this is an addressing failure rather than a
+multi-match — the caller must say which type they meant.
+"""
+type ResourceAmbiguousTypeProblem {
+	name: ResourceName!
+	typeNames: [TypeName!]!
+	message: String!
+}
+
+scalar ResourceAnnotations
+
+"""
+A type-less reference whose name matched nothing in any type. Distinct from
+`ResourceNameNotFoundProblem`, which can name the single type it searched.
+"""
+type ResourceAnyTypeNameNotFoundProblem {
+	name: ResourceName!
+	message: String!
 }
 
 type ResourceApplyManifestItemResult {
@@ -3939,7 +3904,7 @@ enum ResourceApplyOperation {
 	UNTOUCHED
 }
 
-union ResourceApplyOutcome = ResourceApplySuccess | ResourceApplyRejection | ResourceApplyParseManifestProblem | ResourceUnsupportedDescriptorProblem | ResourceBadAccountProblem | ResourceInvalidHeaderProblem | ResourceInvalidSpecProblem
+union ResourceApplyOutcome = ResourceApplySuccess | ResourceApplyRejection | ResourceApplyParseManifestProblem | ResourceUnsupportedDescriptorProblem | ResourceAccountResolutionProblem | ResourceInvalidHeaderProblem | ResourceInvalidSpecProblem
 
 """
 The manifest text could not be parsed (malformed JSON/YAML).
@@ -3960,10 +3925,23 @@ enum ResourceApplyRejectionCategory {
 	LIFECYCLE_RULE_CONFLICT
 }
 
+"""
+An accepted apply, reported as the canonical manifest on each side rather
+than a pre-computed change list: clients decide how to diff and display it.
+"""
 type ResourceApplySuccess {
 	operation: ResourceApplyOperation!
 	resource: Resource!
-	changes: [ResourceApplyChange!]!
+	"""
+	Canonical manifest before the apply. Null **iff** the resource is being
+	created.
+	"""
+	before: JSON
+	"""
+	Canonical manifest the apply produced (or would produce). Always present
+	on an accepted apply.
+	"""
+	after: JSON!
 	warnings: [ResourceApplyWarning!]!
 }
 
@@ -3971,34 +3949,6 @@ type ResourceApplyWarning {
 	code: String!
 	path: String
 	message: String!
-}
-
-type ResourceBadAccountProblem {
-	code: ResourceBadAccountProblemCode!
-	accountId: AccountID
-	accountName: AccountName
-	expectedResourceId: ResourceID
-	expectedDid: AccountID
-	expectedName: AccountName
-	actualName: AccountName
-	message: String!
-}
-
-enum ResourceBadAccountProblemCode {
-	EMPTY_SELECTOR
-	ACCOUNT_NOT_FOUND_BY_ID
-	ACCOUNT_NOT_FOUND_BY_NAME
-	SELECTOR_MISMATCH
-}
-
-input ResourceBatchSelectorInput {
-	resourceType: ResourceTypeSelectorInput!
-	refs: [ResourceRefInput!]!
-	account: AccountRefInput
-}
-
-input ResourceByNameSelectorInput {
-	name: ResourceName!
 }
 
 scalar ResourceConditions
@@ -4019,21 +3969,15 @@ type ResourceConnection {
 	edges: [ResourceEdge!]!
 }
 
-union ResourceDeleteManyOutcome = ResourceDeleteManyResult | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem
+union ResourceDeleteOutcome = ResourceDeleteResult | ResourceUnsupportedSelectorProblem | ResourceAccountResolutionProblem
 
-type ResourceDeleteManyResult {
-	resources: [ResourceDeleteManySuccess!]!
+type ResourceDeleteResult {
+	resources: [ResourceDeleteSuccess!]!
 	problems: [BatchResourceProblem!]!
 }
 
-type ResourceDeleteManySuccess {
-	requestIndex: Int!
-	resourceId: ResourceID!
-}
-
-union ResourceDeleteOutcome = ResourceDeleteSuccess | ResourceSelectorProblemResult
-
 type ResourceDeleteSuccess {
+	requestIndex: Int!
 	resourceId: ResourceID!
 }
 
@@ -4041,9 +3985,12 @@ type ResourceEdge {
 	node: ResourceSummary!
 }
 
-union ResourceGetHandleOutcome = ResourceHandle | ResourceSelectorProblemResult
-
-union ResourceGetOutcome = Resource | ResourceSelectorProblemResult
+"""
+A reference that named neither an id nor a name.
+"""
+type ResourceEmptyRefProblem {
+	message: String!
+}
 
 type ResourceHandle {
 	id: ResourceID!
@@ -4073,9 +4020,7 @@ type ResourceHandleEdge {
 	node: ResourceHandle!
 }
 
-union ResourceHandleListAllOutcome = ResourceHandleConnection | ResourceBadAccountProblem | ResourceInvalidLabelFilterProblem
-
-union ResourceHandleListOutcome = ResourceHandleConnection | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem | ResourceInvalidLabelFilterProblem
+union ResourceHandleListOutcome = ResourceHandleConnection | ResourceUnsupportedSelectorProblem | ResourceAccountResolutionProblem | ResourceInvalidLabelFilterProblem
 
 enum ResourceHeaderValidationProblemCode {
 	EMPTY_NAME
@@ -4156,7 +4101,7 @@ type ResourceInvalidHeaderProblem {
 }
 
 """
-The `labelFilter` argument could not be resolved into a matchable filter.
+A selector's `labels` could not be resolved into a matchable filter.
 """
 type ResourceInvalidLabelFilterProblem {
 	code: ResourceLabelFilterProblemCode!
@@ -4197,8 +4142,6 @@ enum ResourceLabelFilterProblemCode {
 
 scalar ResourceLabels
 
-union ResourceListAllOutcome = ResourceConnection | ResourceBadAccountProblem | ResourceInvalidLabelFilterProblem
-
 enum ResourceListColumnDataType {
 	STRING
 	U_INT_64
@@ -4224,9 +4167,9 @@ enum ResourceListColumnVisibility {
 	WIDE_ONLY
 }
 
-union ResourceListOutcome = ResourceConnection | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem | ResourceInvalidLabelFilterProblem
+union ResourceListOutcome = ResourceConnection | ResourceUnsupportedSelectorProblem | ResourceAccountResolutionProblem | ResourceInvalidLabelFilterProblem
 
-union ResourceLookupProblem = ResourceIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceSchemaMismatchProblem
+union ResourceLookupProblem = ResourceIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceAnyTypeNameNotFoundProblem | ResourceAmbiguousTypeProblem | ResourceSchemaMismatchProblem | ResourceNameMismatchProblem | ResourceEmptyRefProblem
 
 enum ResourceManifestFormat {
 	JSON
@@ -4234,6 +4177,18 @@ enum ResourceManifestFormat {
 }
 
 scalar ResourceName
+
+"""
+A reference supplied both an `id` and a `name` that name different
+resources. The pair is a consistency assertion, so the mismatch fails the
+entry rather than letting the `id` silently win.
+"""
+type ResourceNameMismatchProblem {
+	id: ResourceID!
+	expectedName: ResourceName!
+	actualName: ResourceName!
+	message: String!
+}
 
 type ResourceNameNotFoundProblem {
 	typeName: TypeName!
@@ -4260,12 +4215,31 @@ type ResourcePhaseCounts {
 	failed: Uint64!
 }
 
-input ResourceRefInput @oneOf {
-	byId: ResourceID
-	byName: ResourceByNameSelectorInput
-}
+"""
+Reference to exactly one resource, mirroring the ODF `ResourceRef`.
 
-union ResourceRenderManifestOutcome = ResourceRenderManifestResult | ResourceSelectorProblemResult
+Not a `oneOf`: ODF allows `id` and `name` together as a consistency
+assertion, so both are accepted and at least one is required. Validation
+happens at conversion rather than in the schema, which cannot express
+"at least one of".
+"""
+input ResourceRefInput {
+	account: AccountRefInput
+	"""
+	Canonical selector (`variablesets`), alias (`vs`), ODF type name
+	(`VariableSet`), or full schema URI — all resolve to the same type.
+	
+	`null` spans every type: the resource is looked up across all of them.
+	Since a ref names exactly one resource, a name matching in several types
+	is an ambiguity error rather than a multi-match.
+	"""
+	type: ResourceTypeSelectorInput
+	id: ResourceID
+	"""
+	Exact name. Never a pattern; use a selector for pattern matching.
+	"""
+	name: ResourceName
+}
 
 type ResourceRenderManifestResult {
 	manifest: String!
@@ -4280,27 +4254,40 @@ type ResourceSchemaMismatchProblem {
 }
 
 """
-Exactly one way to narrow a search.
-"""
-input ResourceSearchQueryInput @oneOf {
-	exactNames: [ResourceName!]
-	exactIds: [ResourceID!]
-	namePattern: String
-}
+Matches zero or many resources, mirroring the ODF `ResourceSelector`.
 
+Several selectors in one call act as a logical OR, which is what lets a
+single call span resource types. Every field is optional: a selector with no
+`type` spans every type, and one narrowing by nothing matches all of them.
+"""
 input ResourceSelectorInput {
-	resourceType: ResourceTypeSelectorInput!
-	ref: ResourceRefInput!
+	"""
+	The account this selector spans. Defaults to the call-level `account`
+	when unset, so one call can span several accounts — subject to the
+	caller being authorized for each; any denial fails the whole call.
+	"""
 	account: AccountRefInput
+	"""
+	Canonical selector (`variablesets`), alias (`vs`), ODF type name
+	(`VariableSet`), or full schema URI. `null` spans every type.
+	"""
+	type: ResourceTypeSelectorInput
+	id: ResourceID
+	"""
+	Name pattern in SQL `LIKE` format, per the ODF schema. Only `%` acts as
+	a wildcard — `_` is escaped to a literal underscore. A pattern with no
+	`%` matches that name exactly.
+	"""
+	name: String
+	"""
+	Labels this selector requires, all of which must be present. Applies to
+	this selector alone, so one call may filter differently per type.
+	Values must be strings — only string-valued labels are indexed.
+	"""
+	labels: ResourceLabelFilterInput
 }
 
 scalar ResourceSelectorName
-
-union ResourceSelectorProblem = ResourceIDNotFoundProblem | ResourceNameNotFoundProblem | ResourceSchemaMismatchProblem | ResourceUnsupportedSelectorProblem | ResourceBadAccountProblem
-
-type ResourceSelectorProblemResult {
-	problem: ResourceSelectorProblem!
-}
 
 """
 Resource lifecycle and reconciliation information.
@@ -4361,14 +4348,6 @@ type ResourceTypeDescriptor {
 	listColumns: [ResourceListColumnDescriptor!]!
 }
 
-"""
-Exactly one way to scope a search by resource type.
-"""
-input ResourceTypeScopeInput @oneOf {
-	anyType: Boolean
-	types: [ResourceTypeSelectorInput!]
-}
-
 input ResourceTypeSelectorInput {
 	selector: ResourceTypeSelectorRaw!
 }
@@ -4409,63 +4388,39 @@ type Resources {
 	"""
 	summary(account: AccountRefInput): ResourcesSummaryOutcome!
 	"""
-	Returns a resource by selector, if found
+	Returns resources by refs
 	"""
-	resource(selector: ResourceSelectorInput!, revealed: Boolean! = false): ResourceGetOutcome!
+	byRefs(resourceRefs: [ResourceRefInput!]!, opts: SpecViewOptsInput! = {revealed: false}): BatchResourcesOutcome!
 	"""
-	Returns resources by selectors
+	Returns resource handles by refs
 	"""
-	resources(selector: ResourceBatchSelectorInput!, revealed: Boolean! = false): BatchResourcesOutcome!
+	handlesByRefs(resourceRefs: [ResourceRefInput!]!): BatchResourceHandlesOutcome!
 	"""
-	Returns resource handle by selector, if found
+	Returns resources matching the given selectors, which act as a logical
+	OR and may span several resource types and accounts
 	"""
-	resourceHandle(selector: ResourceSelectorInput!): ResourceGetHandleOutcome!
+	bySelectors(query: SearchResourcesInput!, page: Int, perPage: Int): ResourceListOutcome!
 	"""
-	Returns resource handles by selectors
+	Returns resource handles matching the given selectors
 	"""
-	resourceHandles(selector: ResourceBatchSelectorInput!): BatchResourceHandlesOutcome!
-	"""
-	Returns resources of the specified resource type
-	"""
-	listByResourceType(resourceType: ResourceTypeSelectorInput!, account: AccountRefInput, labelFilter: ResourceLabelFilterInput, page: Int, perPage: Int): ResourceListOutcome!
-	"""
-	Returns resource handles of the specified resource type
-	"""
-	listHandlesByResourceType(resourceType: ResourceTypeSelectorInput!, account: AccountRefInput, labelFilter: ResourceLabelFilterInput, page: Int, perPage: Int): ResourceHandleListOutcome!
-	"""
-	Searches resource handles across the specified exact resource types
-	"""
-	searchHandles(query: SearchResourceHandlesInput!, page: Int, perPage: Int): ResourceHandleListOutcome!
-	"""
-	Returns resources across all resource types
-	"""
-	listAll(account: AccountRefInput, labelFilter: ResourceLabelFilterInput, page: Int, perPage: Int): ResourceListAllOutcome!
-	"""
-	Returns resource handles across all resource types
-	"""
-	listAllHandles(account: AccountRefInput, labelFilter: ResourceLabelFilterInput, page: Int, perPage: Int): ResourceHandleListAllOutcome!
-	"""
-	Renders a canonical manifest representation from a stored resource
-	"""
-	renderManifest(selector: ResourceSelectorInput!, format: ResourceManifestFormat!, revealed: Boolean! = false): ResourceRenderManifestOutcome!
+	handlesBySelectors(query: SearchResourcesInput!, page: Int, perPage: Int): ResourceHandleListOutcome!
 	"""
 	Renders canonical manifest representations from stored resources
 	"""
-	renderManifests(selector: ResourceBatchSelectorInput!, format: ResourceManifestFormat!, revealed: Boolean! = false): BatchResourceManifestsOutcome!
+	renderManifests(resourceRefs: [ResourceRefInput!]!, format: ResourceManifestFormat!, opts: SpecViewOptsInput! = {revealed: false}): BatchResourceManifestsOutcome!
 }
 
 type ResourcesMut {
 	applyManifest(manifest: String!, format: ResourceManifestFormat!, dryRun: Boolean): ResourceApplyOutcome!
 	applyManifests(manifests: [ApplyManifestInput!]!, dryRun: Boolean): ResourceApplyManifestsResult!
-	delete(selector: ResourceSelectorInput!): ResourceDeleteOutcome!
-	deleteMany(selector: ResourceBatchSelectorInput!): ResourceDeleteManyOutcome!
+	delete(resourceRefs: [ResourceRefInput!]!): ResourceDeleteOutcome!
 }
 
 type ResourcesSummary {
 	resourceCounts: [ResourceTypeCountSummary!]!
 }
 
-union ResourcesSummaryOutcome = ResourcesSummary | ResourceBadAccountProblem
+union ResourcesSummaryOutcome = ResourcesSummary | ResourceAccountResolutionProblem
 
 type RestProtocolDesc {
 	tailUrl: String!
@@ -4541,11 +4496,22 @@ enum SearchEntityName {
 	ACCOUNTS
 }
 
-input SearchResourceHandlesInput {
-	scope: ResourceTypeScopeInput!
-	query: ResourceSearchQueryInput!
+"""
+Selects resources to search, for both `search` and `searchHandles` — only
+the response shape differs.
+
+Omitting `selectors` spans every type, which is what the retired `listAll`
+field did implicitly. Passing an empty list matches nothing — an explicit
+"no selectors" is a narrowing to zero, not a widening to everything.
+
+Label filtering lives on each selector's `labels`, so one call may filter
+differently per type. There is deliberately no call-level `labelFilter`: one
+uniform filter is the special case where every selector carries the same
+labels, and selectors being OR'd makes that exactly equivalent.
+"""
+input SearchResourcesInput {
+	selectors: [ResourceSelectorInput!]
 	account: AccountRefInput
-	labelFilter: ResourceLabelFilterInput
 }
 
 union SearchResult = Dataset
@@ -4857,6 +4823,19 @@ type SourceState {
 	Opaque value representing the state.
 	"""
 	value: String!
+}
+
+"""
+Options controlling how a resource's spec is rendered. A struct rather than
+a bare `revealed: bool` argument, so future spec-view options can be added
+here without growing the resolver's argument list.
+"""
+input SpecViewOptsInput {
+	"""
+	Show actual (decrypted) secret values instead of ciphertext
+	placeholders.
+	"""
+	revealed: Boolean! = false
 }
 
 """

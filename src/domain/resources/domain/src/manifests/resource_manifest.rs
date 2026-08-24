@@ -9,11 +9,12 @@
 
 use std::collections::BTreeSet;
 
+use internal_error::{InternalError, ResultIntoInternal};
 use serde::de::{MapAccess, SeqAccess, Visitor};
 use serde::ser::SerializeMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::{ResourceAccountRef, ResourceID, ResourceSchemaId, TypeRef};
+use crate::{Resource, ResourceAccountRef, ResourceID, ResourceSchemaId, TypeRef};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -24,6 +25,81 @@ pub struct ResourceManifest {
     pub schema: ResourceSchemaId,
     pub headers: ResourceManifestHeaders,
     pub spec: serde_json::Value,
+}
+
+impl ResourceManifest {
+    /// Reduces a stored resource to its **canonical manifest form**: the subset
+    /// of fields a user actually authors (`$schema` + `headers.{account, name,
+    /// labels, annotations}` + `spec`).
+    ///
+    /// Server-owned state is deliberately dropped — `headers.id`, `generation`,
+    /// `created_at`/`updated_at`/`deleted_at`, and the whole `status`. Two
+    /// consequences worth knowing:
+    ///
+    /// - This is the single canonicalization shared by `render_manifests` and
+    ///   the apply diff, so `kamu apply` and `kamu get -o yaml` provably agree.
+    /// - Because timestamps and `generation` are absent, re-applying an
+    ///   unchanged manifest yields a byte-identical document. There is no need
+    ///   to normalize timestamp precision to suppress spurious differences.
+    ///
+    /// The `spec` is copied **as stored** (ciphertext for `SecretSet`); this
+    /// never reveals sensitive fields.
+    pub fn from_resource(resource: &Resource) -> Result<Self, InternalError> {
+        let Resource {
+            schema,
+            headers,
+            spec,
+            ..
+        } = resource;
+
+        // `schema` originates from a stored, already-canonical resource, so parsing it
+        // back into a `ResourceSchema` is infallible in practice; treat a failure as a
+        // store-integrity bug.
+        let schema = ResourceSchemaId::parse(schema.as_str()).int_err()?;
+
+        let account = Some(ResourceAccountRef {
+            id: Some(headers.account.id),
+            did: Some(headers.account.did.clone()),
+            name: Some(headers.account.name.clone()),
+        });
+
+        Ok(Self {
+            schema,
+            headers: ResourceManifestHeaders {
+                id: None,
+                account,
+                name: headers.name.to_string(),
+                labels: headers
+                    .labels
+                    .entries
+                    .iter()
+                    .map(|(key, value)| (key.clone(), value.clone()))
+                    .collect(),
+                annotations: headers
+                    .annotations
+                    .entries
+                    .iter()
+                    .map(|(key, value)| (key.clone(), value.clone()))
+                    .collect(),
+            },
+            spec: spec.clone(),
+        })
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Canonical manifest form of a resource as a plain JSON document.
+///
+/// This is the shape carried in apply responses as the `before`/`after` pair:
+/// the backend states *what* the resource looks like on each side, and leaves
+/// "how to diff" and "how to visualize" entirely to the client.
+///
+/// See [`ResourceManifest::from_resource`] for what is included and excluded.
+pub fn resource_to_manifest_value(resource: &Resource) -> Result<serde_json::Value, InternalError> {
+    let manifest = ResourceManifest::from_resource(resource)?;
+
+    serde_json::to_value(&manifest).int_err()
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

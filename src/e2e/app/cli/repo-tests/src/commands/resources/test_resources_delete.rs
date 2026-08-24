@@ -117,7 +117,7 @@ pub async fn test_resources_delete_semantics(ctx: ResourceCtx) {
     ctx.apply_secret_set(temp_secrets, "temp-token", "temp-password")
         .await;
 
-    let all_dry_run = ctx.stderr(["delete", "all", "--dry-run"]).await;
+    let all_dry_run = ctx.stderr(["delete", "%/%", "--dry-run"]).await;
     assert_output_contains_all(
         &all_dry_run,
         &[
@@ -127,7 +127,7 @@ pub async fn test_resources_delete_semantics(ctx: ResourceCtx) {
             "Deleted (dry-run): SecretSet/temp-secrets",
             "Summary 4 item(s): 4 deleted (dry-run), 0 ignored, 0 failed",
         ],
-        "delete all --dry-run",
+        "delete %/% --dry-run",
     );
 
     ctx.assert_resource_present("vs", app_vars).await;
@@ -135,8 +135,23 @@ pub async fn test_resources_delete_semantics(ctx: ResourceCtx) {
     ctx.assert_resource_present("ss", app_secrets).await;
     ctx.assert_resource_present("ss", temp_secrets).await;
 
+    // `%` is advertised as the all-types target, so `--all` must apply to it the
+    // same way it does to a concrete type.
+    let any_type_all_flag = ctx.stderr(["delete", "%", "--all", "--dry-run"]).await;
+    assert_output_contains_all(
+        &any_type_all_flag,
+        &[
+            "Deleted (dry-run): VariableSet/app-vars",
+            "Deleted (dry-run): VariableSet/temp-vars",
+            "Deleted (dry-run): SecretSet/app-secrets",
+            "Deleted (dry-run): SecretSet/temp-secrets",
+            "Summary 4 item(s): 4 deleted (dry-run), 0 ignored, 0 failed",
+        ],
+        "delete % --all --dry-run",
+    );
+
     // -- 8. Cross-type all deletes everything ---------------------------------
-    let all_delete = ctx.stderr(["delete", "all", "--force"]).await;
+    let all_delete = ctx.stderr(["delete", "%/%", "--force"]).await;
     assert_output_contains_all(
         &all_delete,
         &[
@@ -146,7 +161,7 @@ pub async fn test_resources_delete_semantics(ctx: ResourceCtx) {
             "Deleted: SecretSet/temp-secrets",
             "Summary 4 item(s): 4 deleted, 0 ignored, 0 failed",
         ],
-        "delete all --force",
+        "delete %/% --force",
     );
 
     ctx.assert_resource_absent("vs", app_vars).await;
@@ -156,7 +171,7 @@ pub async fn test_resources_delete_semantics(ctx: ResourceCtx) {
 
     // Summary succeeds and `list all` is back to the empty JSON array.
     ctx.assert_success(["summary"], None).await;
-    let list_all = ctx.stdout(["list", "all"]).await;
+    let list_all = ctx.stdout(["list", "%"]).await;
     assert_eq!(
         list_all.trim(),
         "[]",

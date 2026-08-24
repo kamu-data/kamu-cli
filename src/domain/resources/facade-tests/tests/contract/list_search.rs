@@ -8,14 +8,11 @@
 // by the Apache License, Version 2.0.
 
 use database_common::PaginationOpts;
-use kamu_resources::{RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI, ResourceID, ResourceSearchQuery};
+use kamu_resources::{RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI, ResourceID, ResourceSelector};
 use kamu_resources_facade::{
-    ListResourceHandlesRequest,
     ListResourcesError,
-    ListResourcesRequest,
     ResourceLabelFilterProblemCode,
-    SearchResourceHandlesRequest,
-    SearchResourceTypeScope,
+    SearchResourcesRequest,
 };
 use pretty_assertions::{assert_eq, assert_matches};
 
@@ -27,6 +24,7 @@ use crate::helpers::{
     VARIABLE_SET_CANONICAL_SELECTOR,
     VARIABLE_SET_SCHEMA_STR,
     apply_manifest_and_get_id,
+    create_variable_set,
     create_variable_set_with_labels,
     label_filter,
     normalize_handles,
@@ -34,45 +32,361 @@ use crate::helpers::{
     secret_set_manifest_json,
     sorted_handle_names,
     sorted_summary_names,
+    summary_column_pairs,
     variable_set_manifest_json,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn create_resource(h: &impl FacadeContractHarness, account: TestAccount, name: &str) {
-    apply_manifest_and_get_id(
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-087
+contract_test!(
+    search_narrowed_by_query,
+    super::test_search_narrowed_by_query
+);
+
+/// `search` narrows by selector while keeping the rich summary view. Local and
+/// remote must agree, since selectors travel over GraphQL.
+pub async fn test_search_narrowed_by_query(h: &impl FacadeContractHarness) {
+    for name in ["query-app-one", "query-app-two", "query-db-one"] {
+        create_variable_set(h, TestAccount::Alice, name).await;
+    }
+    create_variable_set(h, TestAccount::Bob, "query-app-bob").await;
+
+    let facade = h.facade_for(TestAccount::Alice);
+
+    let list = async |selectors: Vec<ResourceSelector>| {
+        let mut summaries = facade
+            .search(SearchResourcesRequest {
+                selectors,
+                account: None,
+                pagination: PaginationOpts::from_max_results(1000),
+            })
+            .await
+            .unwrap()
+            .items;
+        normalize_summary_views(&mut summaries);
+        summaries
+            .into_iter()
+            .map(|summary| summary.name.to_string())
+            .collect::<Vec<_>>()
+    };
+
+    let variable_set = || VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap();
+
+    // A name pattern narrows the listing…
+    assert_eq!(
+        list(vec![ResourceSelector::name_pattern(
+            variable_set(),
+            "query-app-%"
+        )])
+        .await,
+        vec!["query-app-one", "query-app-two"]
+    );
+
+    // …and stays account-scoped: Bob's matching resource is not visible.
+    assert_eq!(
+        list(vec![ResourceSelector::name_pattern(
+            variable_set(),
+            "query-app-bob"
+        )])
+        .await,
+        Vec::<String>::new()
+    );
+
+    // A wildcard-free pattern is the exact-name case.
+    assert_eq!(
+        list(vec![ResourceSelector::name_pattern(
+            variable_set(),
+            "query-db-one"
+        )])
+        .await,
+        vec!["query-db-one"]
+    );
+
+    // By id.
+    let id = apply_manifest_and_get_id(
         h,
-        account,
-        variable_set_manifest_json(name, None, &[("K", "v")]),
+        TestAccount::Alice,
+        variable_set_manifest_json("query-by-id", None, &[("K", "v")]),
     )
     .await;
+    assert_eq!(
+        list(ResourceSelector::ids_of_type(&variable_set(), [id])).await,
+        vec!["query-by-id"]
+    );
+
+    // An empty selector list matches nothing and is **not** an error: `search`
+    // computes columns per result rather than through one type's dispatcher, so
+    // it has no reason to demand a type. An explicit "no selectors" is a
+    // narrowing to zero, matching `search_handles` (RF-094).
+    assert_eq!(list(Vec::new()).await, Vec::<String>::new());
+
+    // An unnarrowed selector still lists the whole type.
+    assert!(
+        list(vec![ResourceSelector::of_type(variable_set())])
+            .await
+            .len()
+            >= 4
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-088
+contract_test!(
+    search_handles_honours_selectors,
+    super::test_search_handles_honours_selectors
+);
+
+/// `search_handles` honours selectors exactly as `search` does — the two take
+/// the same request and only their response shape differs. Pinned so the
+/// handle form cannot quietly regress to an unnarrowed scope.
+pub async fn test_search_handles_honours_selectors(h: &impl FacadeContractHarness) {
+    for name in ["handles-app-one", "handles-app-two", "handles-db-one"] {
+        create_variable_set(h, TestAccount::Alice, name).await;
+    }
+
+    let facade = h.facade_for(TestAccount::Alice);
+
+    let search_handles = async |selectors: Vec<ResourceSelector>| {
+        let mut handles = facade
+            .search_handles(SearchResourcesRequest {
+                selectors,
+                account: None,
+                pagination: PaginationOpts::from_max_results(1000),
+            })
+            .await
+            .unwrap()
+            .items;
+        normalize_handles(&mut handles);
+        sorted_handle_names(handles)
+    };
+
+    let variable_set = || VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap();
+
+    // A name pattern narrows…
+    assert_eq!(
+        search_handles(vec![ResourceSelector::name_pattern(
+            variable_set(),
+            "handles-app-%"
+        )])
+        .await,
+        vec!["handles-app-one", "handles-app-two"]
+    );
+
+    // …and an unnarrowed selector still returns the whole type, so the
+    // narrowing above is the selector's doing rather than an empty result.
+    let all = search_handles(vec![ResourceSelector::of_type(variable_set())]).await;
+    assert!(
+        all.len() >= 3,
+        "an unnarrowed selector must span the whole type, got {all:?}"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-105
+contract_test!(
+    per_selector_account_is_authorized,
+    super::test_per_selector_account_is_authorized
+);
+
+/// A selector naming another account is **denied** for a non-admin, and the
+/// denial must not reveal whether that account or its resources exist.
+///
+/// The whole call fails rather than silently dropping the unauthorized
+/// selector: a partial result would narrow the caller's request without saying
+/// so, which is the same class of bug as ignoring the field entirely.
+pub async fn test_per_selector_account_is_authorized(h: &impl FacadeContractHarness) {
+    create_variable_set(h, TestAccount::Bob, "bob-secret").await;
+
+    let facade = h.facade_for(TestAccount::Alice);
+
+    let bobs_selector = ResourceSelector {
+        account: Some(kamu_resources::ResourceAccountRef {
+            id: None,
+            did: None,
+            name: Some(h.account_name(TestAccount::Bob)),
+        }),
+        ..ResourceSelector::of_type(VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap())
+    };
+
+    let err = facade
+        .search_handles(SearchResourcesRequest {
+            selectors: vec![ResourceSelector {
+                labels: Some(label_filter(&[(
+                    RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI,
+                    "prod",
+                )])),
+                ..bobs_selector.clone()
+            }],
+            account: None,
+            pagination: PaginationOpts::from_max_results(1000),
+        })
+        .await
+        .expect_err("a non-admin must not read another account's resources");
+    assert!(
+        !err.to_string().contains("bob-secret"),
+        "the denial must not leak resource names: {err}"
+    );
+
+    // Pairing it with a selector the caller *is* allowed to read must still fail
+    // the whole call — no partial results.
+    create_variable_set(h, TestAccount::Alice, "alice-own").await;
+    facade
+        .search_handles(SearchResourcesRequest {
+            selectors: vec![
+                ResourceSelector::of_type(VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()),
+                bobs_selector.clone(),
+            ],
+            account: None,
+            pagination: PaginationOpts::from_max_results(1000),
+        })
+        .await
+        .expect_err("one denied selector must fail the whole call");
+
+    // The summary-returning form must honour the field too, and asserting it
+    // separately is the point: a path resolving its own account instead of
+    // going through the scope resolver would silently answer against the
+    // *caller's* account, returning Alice's resources for a request naming
+    // Bob's.
+    let denied = facade
+        .search(SearchResourcesRequest {
+            selectors: vec![bobs_selector],
+            account: None,
+            pagination: PaginationOpts::from_max_results(1000),
+        })
+        .await;
+    assert_matches!(
+        denied,
+        Err(_),
+        "`search` must not ignore a per-selector account"
+    );
+
+    // The caller's own resources stay readable, so the denial above is about
+    // authorization rather than the selector shape.
+    let response = facade
+        .search_handles(SearchResourcesRequest {
+            selectors: vec![ResourceSelector::of_type(
+                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            )],
+            account: None,
+            pagination: PaginationOpts::from_max_results(1000),
+        })
+        .await
+        .expect("the caller's own resources must remain readable");
+    assert_eq!(sorted_handle_names(response.items), vec!["alice-own"]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-106
+contract_test!(
+    any_type_selector_scope_limits,
+    super::test_any_type_selector_scope_limits
+);
+
+/// The two `AnyType` limits of `ResourceScope`, which carries a single query
+/// rather than a per-type list. Both became reachable when listing started
+/// taking selectors, and both disappear once every row carries its own type.
+///
+/// Asserted on the message rather than the variant: remote surfaces these as
+/// transport-level GraphQL errors, and they are temporary.
+pub async fn test_any_type_selector_scope_limits(h: &impl FacadeContractHarness) {
+    let facade = h.facade_for(TestAccount::Alice);
+
+    let search = async |selectors: Vec<ResourceSelector>| {
+        facade
+            .search_handles(SearchResourcesRequest {
+                selectors,
+                account: None,
+                pagination: PaginationOpts::from_max_results(1000),
+            })
+            .await
+    };
+
+    // A type-less selector already spans every type, so pairing it with a typed
+    // one cannot be expressed as per-type rows.
+    let err = search(vec![
+        ResourceSelector::any_type_name_pattern("mixed-%"),
+        ResourceSelector::name_pattern(VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(), "mixed-%"),
+    ])
+    .await
+    .expect_err("a type-less selector cannot be combined with typed selectors");
+    assert!(
+        err.to_string().contains("cannot be combined with typed"),
+        "unexpected error: {err:?}"
+    );
+
+    // Two type-less selectors narrowing by different modes need two queries,
+    // but `AnyType` carries only one.
+    let err = search(vec![
+        ResourceSelector::any_type_name_pattern("modes-%"),
+        ResourceSelector::any_type_id(ResourceID::new(uuid::Uuid::new_v4())),
+    ])
+    .await
+    .expect_err("a type-less selector may narrow by only one mode");
+    assert!(
+        err.to_string().contains("only one of"),
+        "unexpected error: {err:?}"
+    );
+
+    // `AnyType` carries no per-row account, so a type-less selector naming one
+    // is rejected rather than silently scoped to the caller.
+    //
+    // Named as the *caller's own* account deliberately: authorization runs
+    // before coalescing, so naming another account would be denied there and
+    // this representability limit would never be reached.
+    let err = search(vec![ResourceSelector {
+        account: Some(kamu_resources::ResourceAccountRef {
+            id: None,
+            did: None,
+            name: Some(h.account_name(TestAccount::Alice)),
+        }),
+        ..ResourceSelector::any_type_name_pattern("account-%")
+    }])
+    .await
+    .expect_err("a type-less selector cannot name an account");
+    assert!(
+        err.to_string().contains("cannot name an account"),
+        "unexpected error: {err:?}"
+    );
+
+    // A single type-less selector with one mode stays representable.
+    search(vec![ResourceSelector::any_type_name_pattern("fine-%")])
+        .await
+        .expect("one type-less selector with one mode is representable");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // RF-080
 contract_test!(
-    list_summaries_for_account,
-    super::test_list_summaries_for_account
+    search_summaries_for_account,
+    super::test_search_summaries_for_account
 );
 
-pub async fn test_list_summaries_for_account(h: &impl FacadeContractHarness) {
+pub async fn test_search_summaries_for_account(h: &impl FacadeContractHarness) {
     // Create resources in each account
-    create_resource(h, TestAccount::Alice, "list-alice-1").await;
-    create_resource(h, TestAccount::Alice, "list-alice-2").await;
-    create_resource(h, TestAccount::Bob, "list-bob-1").await;
+    create_variable_set(h, TestAccount::Alice, "list-alice-1").await;
+    create_variable_set(h, TestAccount::Alice, "list-alice-2").await;
+    create_variable_set(h, TestAccount::Bob, "list-bob-1").await;
 
     let facade = h.facade_for(TestAccount::Alice);
 
     let mut summaries = facade
-        .list(ListResourcesRequest {
-            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+        .search(SearchResourcesRequest {
+            selectors: vec![ResourceSelector::of_type(
+                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            )],
             account: None, // default = alice
             pagination: PaginationOpts::from_max_results(1000),
-            label_filter: None,
         })
         .await
-        .unwrap();
+        .unwrap()
+        .items;
 
     normalize_summary_views(&mut summaries);
 
@@ -104,26 +418,28 @@ pub async fn test_list_summaries_for_account(h: &impl FacadeContractHarness) {
 
 // RF-081
 contract_test!(
-    list_handles_for_account,
-    super::test_list_handles_for_account
+    search_handles_for_account,
+    super::test_search_handles_for_account
 );
 
-pub async fn test_list_handles_for_account(h: &impl FacadeContractHarness) {
-    create_resource(h, TestAccount::Alice, "idlist-alice-1").await;
-    create_resource(h, TestAccount::Alice, "idlist-alice-2").await;
-    create_resource(h, TestAccount::Bob, "idlist-bob-1").await;
+pub async fn test_search_handles_for_account(h: &impl FacadeContractHarness) {
+    create_variable_set(h, TestAccount::Alice, "idlist-alice-1").await;
+    create_variable_set(h, TestAccount::Alice, "idlist-alice-2").await;
+    create_variable_set(h, TestAccount::Bob, "idlist-bob-1").await;
 
     let facade = h.facade_for(TestAccount::Alice);
 
     let mut handles = facade
-        .list_handles(ListResourceHandlesRequest {
-            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+        .search_handles(SearchResourcesRequest {
+            selectors: vec![ResourceSelector::of_type(
+                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            )],
             account: None,
-            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
-        .unwrap();
+        .unwrap()
+        .items;
 
     normalize_handles(&mut handles);
 
@@ -147,25 +463,27 @@ pub async fn test_list_handles_for_account(h: &impl FacadeContractHarness) {
 
 // RF-082
 contract_test!(
-    list_supports_pagination_limit,
-    super::test_list_supports_pagination_limit
+    search_supports_pagination_limit,
+    super::test_search_supports_pagination_limit
 );
 
-pub async fn test_list_supports_pagination_limit(h: &impl FacadeContractHarness) {
+pub async fn test_search_supports_pagination_limit(h: &impl FacadeContractHarness) {
     for name in ["list-limit-1", "list-limit-2", "list-limit-3"] {
-        create_resource(h, TestAccount::Alice, name).await;
+        create_variable_set(h, TestAccount::Alice, name).await;
     }
 
     let facade = h.facade_for(TestAccount::Alice);
     let summaries = facade
-        .list(ListResourcesRequest {
-            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+        .search(SearchResourcesRequest {
+            selectors: vec![ResourceSelector::of_type(
+                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            )],
             account: None,
             pagination: PaginationOpts::from_page(0, 2),
-            label_filter: None,
         })
         .await
-        .unwrap();
+        .unwrap()
+        .items;
 
     assert_eq!(summaries.len(), 2);
     assert!(
@@ -179,34 +497,38 @@ pub async fn test_list_supports_pagination_limit(h: &impl FacadeContractHarness)
 
 // RF-083
 contract_test!(
-    list_supports_pagination_offset,
-    super::test_list_supports_pagination_offset
+    search_supports_pagination_offset,
+    super::test_search_supports_pagination_offset
 );
 
-pub async fn test_list_supports_pagination_offset(h: &impl FacadeContractHarness) {
+pub async fn test_search_supports_pagination_offset(h: &impl FacadeContractHarness) {
     for name in ["list-offset-1", "list-offset-2", "list-offset-3"] {
-        create_resource(h, TestAccount::Alice, name).await;
+        create_variable_set(h, TestAccount::Alice, name).await;
     }
 
     let facade = h.facade_for(TestAccount::Alice);
     let first_page = facade
-        .list(ListResourcesRequest {
-            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+        .search(SearchResourcesRequest {
+            selectors: vec![ResourceSelector::of_type(
+                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            )],
             account: None,
             pagination: PaginationOpts::from_page(0, 2),
-            label_filter: None,
         })
         .await
-        .unwrap();
+        .unwrap()
+        .items;
     let second_page = facade
-        .list(ListResourcesRequest {
-            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+        .search(SearchResourcesRequest {
+            selectors: vec![ResourceSelector::of_type(
+                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            )],
             account: None,
             pagination: PaginationOpts::from_page(1, 2),
-            label_filter: None,
         })
         .await
-        .unwrap();
+        .unwrap()
+        .items;
 
     assert_eq!(first_page.len(), 2);
     assert_eq!(second_page.len(), 1);
@@ -223,34 +545,38 @@ pub async fn test_list_supports_pagination_offset(h: &impl FacadeContractHarness
 
 // RF-084
 contract_test!(
-    list_handles_pagination_mirrors_list,
-    super::test_list_handles_pagination_mirrors_list
+    search_handles_pagination_mirrors_search,
+    super::test_search_handles_pagination_mirrors_search
 );
 
-pub async fn test_list_handles_pagination_mirrors_list(h: &impl FacadeContractHarness) {
+pub async fn test_search_handles_pagination_mirrors_search(h: &impl FacadeContractHarness) {
     for name in ["id-page-1", "id-page-2", "id-page-3"] {
-        create_resource(h, TestAccount::Alice, name).await;
+        create_variable_set(h, TestAccount::Alice, name).await;
     }
 
     let facade = h.facade_for(TestAccount::Alice);
     let summaries = facade
-        .list(ListResourcesRequest {
-            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+        .search(SearchResourcesRequest {
+            selectors: vec![ResourceSelector::of_type(
+                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            )],
             account: None,
             pagination: PaginationOpts::from_page(1, 2),
-            label_filter: None,
         })
         .await
-        .unwrap();
+        .unwrap()
+        .items;
     let handles = facade
-        .list_handles(ListResourceHandlesRequest {
-            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+        .search_handles(SearchResourcesRequest {
+            selectors: vec![ResourceSelector::of_type(
+                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            )],
             account: None,
-            label_filter: None,
             pagination: PaginationOpts::from_page(1, 2),
         })
         .await
-        .unwrap();
+        .unwrap()
+        .items;
 
     assert_eq!(
         summaries
@@ -265,32 +591,36 @@ pub async fn test_list_handles_pagination_mirrors_list(h: &impl FacadeContractHa
 
 // RF-085
 contract_test!(
-    list_empty_account_returns_empty,
-    super::test_list_empty_account_returns_empty
+    search_empty_account_returns_empty,
+    super::test_search_empty_account_returns_empty
 );
 
-pub async fn test_list_empty_account_returns_empty(h: &impl FacadeContractHarness) {
-    create_resource(h, TestAccount::Alice, "list-empty-alice").await;
+pub async fn test_search_empty_account_returns_empty(h: &impl FacadeContractHarness) {
+    create_variable_set(h, TestAccount::Alice, "list-empty-alice").await;
     let facade = h.facade_for(TestAccount::Bob);
 
     let summaries = facade
-        .list(ListResourcesRequest {
-            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+        .search(SearchResourcesRequest {
+            selectors: vec![ResourceSelector::of_type(
+                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            )],
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
-            label_filter: None,
         })
         .await
-        .unwrap();
+        .unwrap()
+        .items;
     let handles = facade
-        .list_handles(ListResourceHandlesRequest {
-            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+        .search_handles(SearchResourcesRequest {
+            selectors: vec![ResourceSelector::of_type(
+                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            )],
             account: None,
-            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
-        .unwrap();
+        .unwrap()
+        .items;
 
     assert!(summaries.is_empty());
     assert!(handles.is_empty());
@@ -300,27 +630,29 @@ pub async fn test_list_empty_account_returns_empty(h: &impl FacadeContractHarnes
 
 // RF-086
 contract_test!(
-    list_unsupported_kind_returns_error,
-    super::test_list_unsupported_kind_returns_error
+    search_unsupported_kind_returns_error,
+    super::test_search_unsupported_kind_returns_error
 );
 
-pub async fn test_list_unsupported_kind_returns_error(h: &impl FacadeContractHarness) {
+pub async fn test_search_unsupported_kind_returns_error(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
     let unsupported_selector = "NoSuchResourceKind";
 
     let summaries = facade
-        .list(ListResourcesRequest {
-            raw_type_selector: unsupported_selector.parse().unwrap(),
+        .search(SearchResourcesRequest {
+            selectors: vec![ResourceSelector::of_type(
+                unsupported_selector.parse().unwrap(),
+            )],
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
-            label_filter: None,
         })
         .await;
     let handles = facade
-        .list_handles(ListResourceHandlesRequest {
-            raw_type_selector: unsupported_selector.parse().unwrap(),
+        .search_handles(SearchResourcesRequest {
+            selectors: vec![ResourceSelector::of_type(
+                unsupported_selector.parse().unwrap(),
+            )],
             account: None,
-            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await;
@@ -347,22 +679,24 @@ pub async fn test_list_unsupported_kind_returns_error(h: &impl FacadeContractHar
 contract_test!(search_by_exact_names, super::test_search_by_exact_names);
 
 pub async fn test_search_by_exact_names(h: &impl FacadeContractHarness) {
-    create_resource(h, TestAccount::Alice, "search-exact-alpha").await;
-    create_resource(h, TestAccount::Alice, "search-exact-beta").await;
-    create_resource(h, TestAccount::Bob, "search-exact-alpha").await;
+    create_variable_set(h, TestAccount::Alice, "search-exact-alpha").await;
+    create_variable_set(h, TestAccount::Alice, "search-exact-beta").await;
+    create_variable_set(h, TestAccount::Bob, "search-exact-alpha").await;
 
     let facade = h.facade_for(TestAccount::Alice);
     let response = facade
-        .search_handles(SearchResourceHandlesRequest {
-            type_scope: SearchResourceTypeScope::Types(vec![
-                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-            ]),
-            query: ResourceSearchQuery::ExactNames(vec![
-                "search-exact-alpha".parse().unwrap(),
-                "search-exact-beta".parse().unwrap(),
-            ]),
+        .search_handles(SearchResourcesRequest {
+            selectors: vec![
+                ResourceSelector::name_pattern(
+                    VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+                    "search-exact-alpha",
+                ),
+                ResourceSelector::name_pattern(
+                    VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+                    "search-exact-beta",
+                ),
+            ],
             account: None,
-            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -384,20 +718,22 @@ contract_test!(
 );
 
 pub async fn test_search_exact_names_ignores_missing(h: &impl FacadeContractHarness) {
-    create_resource(h, TestAccount::Alice, "search-missing-present").await;
+    create_variable_set(h, TestAccount::Alice, "search-missing-present").await;
 
     let facade = h.facade_for(TestAccount::Alice);
     let response = facade
-        .search_handles(SearchResourceHandlesRequest {
-            type_scope: SearchResourceTypeScope::Types(vec![
-                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-            ]),
-            query: ResourceSearchQuery::ExactNames(vec![
-                "search-missing-present".parse().unwrap(),
-                "search-missing-absent".parse().unwrap(),
-            ]),
+        .search_handles(SearchResourcesRequest {
+            selectors: vec![
+                ResourceSelector::name_pattern(
+                    VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+                    "search-missing-present",
+                ),
+                ResourceSelector::name_pattern(
+                    VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+                    "search-missing-absent",
+                ),
+            ],
             account: None,
-            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -431,13 +767,12 @@ pub async fn test_search_by_exact_ids(h: &impl FacadeContractHarness) {
 
     let facade = h.facade_for(TestAccount::Alice);
     let response = facade
-        .search_handles(SearchResourceHandlesRequest {
-            type_scope: SearchResourceTypeScope::Types(vec![
-                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-            ]),
-            query: ResourceSearchQuery::ExactIds(vec![alpha_id, beta_id]),
+        .search_handles(SearchResourcesRequest {
+            selectors: ResourceSelector::ids_of_type(
+                &VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+                [alpha_id, beta_id],
+            ),
             account: None,
-            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -469,13 +804,12 @@ pub async fn test_search_exact_ids_ignores_missing(h: &impl FacadeContractHarnes
 
     let facade = h.facade_for(TestAccount::Alice);
     let response = facade
-        .search_handles(SearchResourceHandlesRequest {
-            type_scope: SearchResourceTypeScope::Types(vec![
-                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-            ]),
-            query: ResourceSearchQuery::ExactIds(vec![present_id, missing_id]),
+        .search_handles(SearchResourcesRequest {
+            selectors: ResourceSelector::ids_of_type(
+                &VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+                [present_id, missing_id],
+            ),
             account: None,
-            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -508,13 +842,12 @@ pub async fn test_search_exact_ids_account_scoping(h: &impl FacadeContractHarnes
     // it must not leak across the account boundary.
     let facade = h.facade_for(TestAccount::Alice);
     let response = facade
-        .search_handles(SearchResourceHandlesRequest {
-            type_scope: SearchResourceTypeScope::Types(vec![
-                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-            ]),
-            query: ResourceSearchQuery::ExactIds(vec![bob_id]),
+        .search_handles(SearchResourcesRequest {
+            selectors: ResourceSelector::ids_of_type(
+                &VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+                [bob_id],
+            ),
             account: None,
-            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -530,19 +863,18 @@ pub async fn test_search_exact_ids_account_scoping(h: &impl FacadeContractHarnes
 contract_test!(search_by_name_pattern, super::test_search_by_name_pattern);
 
 pub async fn test_search_by_name_pattern(h: &impl FacadeContractHarness) {
-    create_resource(h, TestAccount::Alice, "search-pattern-alpha").await;
-    create_resource(h, TestAccount::Alice, "search-pattern-beta").await;
-    create_resource(h, TestAccount::Alice, "search-other-alpha").await;
+    create_variable_set(h, TestAccount::Alice, "search-pattern-alpha").await;
+    create_variable_set(h, TestAccount::Alice, "search-pattern-beta").await;
+    create_variable_set(h, TestAccount::Alice, "search-other-alpha").await;
 
     let facade = h.facade_for(TestAccount::Alice);
     let response = facade
-        .search_handles(SearchResourceHandlesRequest {
-            type_scope: SearchResourceTypeScope::Types(vec![
+        .search_handles(SearchResourcesRequest {
+            selectors: vec![ResourceSelector::name_pattern(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-            ]),
-            query: ResourceSearchQuery::NamePattern("search-pattern-%".to_string()),
+                "search-pattern-%".to_string(),
+            )],
             account: None,
-            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -584,14 +916,18 @@ pub async fn test_search_multi_type(h: &impl FacadeContractHarness) {
 
     let facade = h.facade_for(TestAccount::Alice);
     let response = facade
-        .search_handles(SearchResourceHandlesRequest {
-            type_scope: SearchResourceTypeScope::Types(vec![
-                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-                SECRET_SET_CANONICAL_SELECTOR.parse().unwrap(),
-            ]),
-            query: ResourceSearchQuery::NamePattern("multi-type-%".to_string()),
+        .search_handles(SearchResourcesRequest {
+            selectors: vec![
+                ResourceSelector::name_pattern(
+                    VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+                    "multi-type-%",
+                ),
+                ResourceSelector::name_pattern(
+                    SECRET_SET_CANONICAL_SELECTOR.parse().unwrap(),
+                    "multi-type-%",
+                ),
+            ],
             account: None,
-            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -653,11 +989,9 @@ pub async fn test_search_any_type(h: &impl FacadeContractHarness) {
 
     let facade = h.facade_for(TestAccount::Alice);
     let response = facade
-        .search_handles(SearchResourceHandlesRequest {
-            type_scope: SearchResourceTypeScope::AnyType,
-            query: ResourceSearchQuery::NamePattern("any-type-%".to_string()),
+        .search_handles(SearchResourcesRequest {
+            selectors: vec![ResourceSelector::any_type_name_pattern("any-type-%")],
             account: None,
-            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -696,19 +1030,16 @@ contract_test!(
     super::test_search_empty_exact_names_returns_no_matches
 );
 
-// An empty `ExactNames`/`ExactIds` list is valid but vacuous — it matches
-// nothing rather than erroring.
+// An empty selector list is valid but vacuous — it matches nothing rather than
+// erroring. Note this is *not* "match everything": that requires an explicit
+// type-less, unnarrowed selector.
 pub async fn test_search_empty_exact_names_returns_no_matches(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
     let response = facade
-        .search_handles(SearchResourceHandlesRequest {
-            type_scope: SearchResourceTypeScope::Types(vec![
-                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-            ]),
-            query: ResourceSearchQuery::ExactNames(vec![]),
+        .search_handles(SearchResourcesRequest {
+            selectors: Vec::new(),
             account: None,
-            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -728,18 +1059,17 @@ contract_test!(
 
 pub async fn test_search_pagination_and_total_count(h: &impl FacadeContractHarness) {
     for name in ["search-page-1", "search-page-2", "search-page-3"] {
-        create_resource(h, TestAccount::Alice, name).await;
+        create_variable_set(h, TestAccount::Alice, name).await;
     }
 
     let facade = h.facade_for(TestAccount::Alice);
     let response = facade
-        .search_handles(SearchResourceHandlesRequest {
-            type_scope: SearchResourceTypeScope::Types(vec![
+        .search_handles(SearchResourcesRequest {
+            selectors: vec![ResourceSelector::name_pattern(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-            ]),
-            query: ResourceSearchQuery::NamePattern("search-page-%".to_string()),
+                "search-page-%".to_string(),
+            )],
             account: None,
-            label_filter: None,
             pagination: PaginationOpts::from_page(1, 2),
         })
         .await
@@ -755,38 +1085,35 @@ pub async fn test_search_pagination_and_total_count(h: &impl FacadeContractHarne
 contract_test!(search_account_scoping, super::test_search_account_scoping);
 
 pub async fn test_search_account_scoping(h: &impl FacadeContractHarness) {
-    create_resource(h, TestAccount::Alice, "search-scope-shared").await;
-    create_resource(h, TestAccount::Alice, "search-scope-alice").await;
-    create_resource(h, TestAccount::Bob, "search-scope-shared").await;
-    create_resource(h, TestAccount::Bob, "search-scope-bob").await;
+    create_variable_set(h, TestAccount::Alice, "search-scope-shared").await;
+    create_variable_set(h, TestAccount::Alice, "search-scope-alice").await;
+    create_variable_set(h, TestAccount::Bob, "search-scope-shared").await;
+    create_variable_set(h, TestAccount::Bob, "search-scope-bob").await;
 
     let alice_response = h
         .facade_for(TestAccount::Alice)
-        .search_handles(SearchResourceHandlesRequest {
-            type_scope: SearchResourceTypeScope::Types(vec![
+        .search_handles(SearchResourcesRequest {
+            selectors: vec![ResourceSelector::name_pattern(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-            ]),
-            query: ResourceSearchQuery::NamePattern("search-scope-%".to_string()),
+                "search-scope-%".to_string(),
+            )],
             account: None,
-            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
         .unwrap();
     let bob_response = h
         .facade_for(TestAccount::Bob)
-        .search_handles(SearchResourceHandlesRequest {
-            type_scope: SearchResourceTypeScope::Types(vec![
+        .search_handles(SearchResourcesRequest {
+            selectors: vec![ResourceSelector::name_pattern(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-            ]),
-            query: ResourceSearchQuery::NamePattern("search-scope-%".to_string()),
+                "search-scope-%".to_string(),
+            )],
             account: None,
-            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
         .unwrap();
-
     assert_eq!(
         sorted_handle_names(alice_response.items),
         vec!["search-scope-alice", "search-scope-shared"]
@@ -801,11 +1128,11 @@ pub async fn test_search_account_scoping(h: &impl FacadeContractHarness) {
 
 // RF-097
 contract_test!(
-    list_filter_by_canonical_label_uri,
-    super::test_list_filter_by_canonical_label_uri
+    search_filter_by_canonical_label_uri,
+    super::test_search_filter_by_canonical_label_uri
 );
 
-pub async fn test_list_filter_by_canonical_label_uri(h: &impl FacadeContractHarness) {
+pub async fn test_search_filter_by_canonical_label_uri(h: &impl FacadeContractHarness) {
     create_variable_set_with_labels(
         h,
         TestAccount::Alice,
@@ -824,17 +1151,20 @@ pub async fn test_list_filter_by_canonical_label_uri(h: &impl FacadeContractHarn
     let facade = h.facade_for(TestAccount::Alice);
 
     let items = facade
-        .list(ListResourcesRequest {
-            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+        .search(SearchResourcesRequest {
+            selectors: vec![ResourceSelector {
+                labels: Some(label_filter(&[(
+                    RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI,
+                    "prod",
+                )])),
+                ..ResourceSelector::of_type(VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap())
+            }],
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
-            label_filter: Some(label_filter(&[(
-                RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI,
-                "prod",
-            )])),
         })
         .await
-        .unwrap();
+        .unwrap()
+        .items;
 
     assert_eq!(
         sorted_summary_names(items),
@@ -845,13 +1175,187 @@ pub async fn test_list_filter_by_canonical_label_uri(h: &impl FacadeContractHarn
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// RF-098
+// RF-175
 contract_test!(
-    list_filter_by_short_label_name,
-    super::test_list_filter_by_short_label_name
+    search_filter_differs_per_selector,
+    super::test_search_filter_differs_per_selector
 );
 
-pub async fn test_list_filter_by_short_label_name(h: &impl FacadeContractHarness) {
+/// The capability per-selector labels exist for: one call, two selectors, each
+/// filtering by a *different* label.
+///
+/// Not expressible with a single call-level filter, which is why the label
+/// pairs live inside the repository's per-row scope. The whole result must be
+/// the union of the two independently-filtered selectors, and `total_count`
+/// must span both.
+pub async fn test_search_filter_differs_per_selector(h: &impl FacadeContractHarness) {
+    for (name, environment) in [
+        ("per-sel-alpha-prod", "prod"),
+        ("per-sel-alpha-staging", "staging"),
+        ("per-sel-beta-prod", "prod"),
+        ("per-sel-beta-staging", "staging"),
+    ] {
+        create_variable_set_with_labels(
+            h,
+            TestAccount::Alice,
+            name,
+            &[(RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI, environment.into())],
+        )
+        .await;
+    }
+
+    let facade = h.facade_for(TestAccount::Alice);
+    let variable_set = || VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap();
+
+    let response = facade
+        .search_handles(SearchResourcesRequest {
+            selectors: vec![
+                // `per-sel-alpha-%`, but only the prod one…
+                ResourceSelector {
+                    labels: Some(label_filter(&[("environment", "prod")])),
+                    ..ResourceSelector::name_pattern(variable_set(), "per-sel-alpha-%")
+                },
+                // …and `per-sel-beta-%`, but only the staging one.
+                ResourceSelector {
+                    labels: Some(label_filter(&[("environment", "staging")])),
+                    ..ResourceSelector::name_pattern(variable_set(), "per-sel-beta-%")
+                },
+            ],
+            account: None,
+            pagination: PaginationOpts::from_max_results(1000),
+        })
+        .await
+        .unwrap();
+
+    assert_eq!(
+        sorted_handle_names(response.items),
+        vec!["per-sel-alpha-prod", "per-sel-beta-staging"],
+        "each selector must apply only its own label filter"
+    );
+    assert_eq!(response.total_count, 2);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-176
+contract_test!(
+    search_filter_one_selector_unfiltered,
+    super::test_search_filter_one_selector_unfiltered
+);
+
+/// A labelled selector beside an unlabelled one: the filter must not leak onto
+/// the neighbour.
+///
+/// This is the failure mode the coalescer's grouping key guards. Merging the
+/// two rows would make the unfiltered selector inherit the other's labels,
+/// silently narrowing it.
+pub async fn test_search_filter_one_selector_unfiltered(h: &impl FacadeContractHarness) {
+    for (name, environment) in [
+        ("mixed-alpha-prod", "prod"),
+        ("mixed-alpha-staging", "staging"),
+        ("mixed-beta-prod", "prod"),
+        ("mixed-beta-staging", "staging"),
+    ] {
+        create_variable_set_with_labels(
+            h,
+            TestAccount::Alice,
+            name,
+            &[(RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI, environment.into())],
+        )
+        .await;
+    }
+
+    let facade = h.facade_for(TestAccount::Alice);
+    let variable_set = || VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap();
+
+    let response = facade
+        .search_handles(SearchResourcesRequest {
+            selectors: vec![
+                ResourceSelector {
+                    labels: Some(label_filter(&[("environment", "prod")])),
+                    ..ResourceSelector::name_pattern(variable_set(), "mixed-alpha-%")
+                },
+                // No labels: both of these must come back.
+                ResourceSelector::name_pattern(variable_set(), "mixed-beta-%"),
+            ],
+            account: None,
+            pagination: PaginationOpts::from_max_results(1000),
+        })
+        .await
+        .unwrap();
+
+    assert_eq!(
+        sorted_handle_names(response.items),
+        vec!["mixed-alpha-prod", "mixed-beta-prod", "mixed-beta-staging"],
+        "the label filter must not leak onto the unfiltered selector"
+    );
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-177
+contract_test!(
+    search_filter_non_string_value_fails_whole_call,
+    super::test_search_filter_non_string_value_fails_whole_call
+);
+
+/// A bad label value on **one** selector fails the whole call, rather than
+/// degrading into "that selector matched nothing".
+///
+/// Only top-level string-valued labels are indexed, so a complex-JSON predicate
+/// is unsatisfiable by construction. Silently returning the *other* selector's
+/// rows would hide the authoring mistake behind a plausible-looking result.
+pub async fn test_search_filter_non_string_value_fails_whole_call(h: &impl FacadeContractHarness) {
+    create_variable_set_with_labels(
+        h,
+        TestAccount::Alice,
+        "blast-radius-prod",
+        &[(RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI, "prod".into())],
+    )
+    .await;
+
+    let facade = h.facade_for(TestAccount::Alice);
+    let variable_set = || VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap();
+
+    let result = facade
+        .search(SearchResourcesRequest {
+            selectors: vec![
+                // Perfectly valid, and would match on its own.
+                ResourceSelector {
+                    labels: Some(label_filter(&[("environment", "prod")])),
+                    ..ResourceSelector::name_pattern(variable_set(), "blast-radius-%")
+                },
+                // Only this one is malformed.
+                ResourceSelector {
+                    labels: Some(kamu_resources::ResourceLabelFilterInput {
+                        entries: std::collections::BTreeMap::from([(
+                            "environment".to_string(),
+                            serde_json::json!({"not": "a string"}),
+                        )]),
+                    }),
+                    ..ResourceSelector::of_type(variable_set())
+                },
+            ],
+            account: None,
+            pagination: PaginationOpts::from_max_results(1000),
+        })
+        .await;
+
+    let Err(ListResourcesError::InvalidLabelFilter(err)) = result else {
+        panic!("expected InvalidLabelFilter, got {result:?}");
+    };
+    assert_eq!(err.code, ResourceLabelFilterProblemCode::NonStringValue);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-098
+contract_test!(
+    search_filter_by_short_label_name,
+    super::test_search_filter_by_short_label_name
+);
+
+pub async fn test_search_filter_by_short_label_name(h: &impl FacadeContractHarness) {
     create_variable_set_with_labels(
         h,
         TestAccount::Alice,
@@ -863,14 +1367,17 @@ pub async fn test_list_filter_by_short_label_name(h: &impl FacadeContractHarness
     let facade = h.facade_for(TestAccount::Alice);
 
     let items = facade
-        .list(ListResourcesRequest {
-            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+        .search(SearchResourcesRequest {
+            selectors: vec![ResourceSelector {
+                labels: Some(label_filter(&[("environment", "prod")])),
+                ..ResourceSelector::of_type(VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap())
+            }],
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
-            label_filter: Some(label_filter(&[("environment", "prod")])),
         })
         .await
-        .unwrap();
+        .unwrap()
+        .items;
 
     assert_eq!(sorted_summary_names(items), vec!["list-filter-short-prod"]);
 }
@@ -879,11 +1386,11 @@ pub async fn test_list_filter_by_short_label_name(h: &impl FacadeContractHarness
 
 // RF-099
 contract_test!(
-    list_filter_by_free_form_label,
-    super::test_list_filter_by_free_form_label
+    search_filter_by_free_form_label,
+    super::test_search_filter_by_free_form_label
 );
 
-pub async fn test_list_filter_by_free_form_label(h: &impl FacadeContractHarness) {
+pub async fn test_search_filter_by_free_form_label(h: &impl FacadeContractHarness) {
     create_variable_set_with_labels(
         h,
         TestAccount::Alice,
@@ -902,14 +1409,17 @@ pub async fn test_list_filter_by_free_form_label(h: &impl FacadeContractHarness)
     let facade = h.facade_for(TestAccount::Alice);
 
     let items = facade
-        .list(ListResourcesRequest {
-            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+        .search(SearchResourcesRequest {
+            selectors: vec![ResourceSelector {
+                labels: Some(label_filter(&[("team", "data")])),
+                ..ResourceSelector::of_type(VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap())
+            }],
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
-            label_filter: Some(label_filter(&[("team", "data")])),
         })
         .await
-        .unwrap();
+        .unwrap()
+        .items;
 
     assert_eq!(sorted_summary_names(items), vec!["list-filter-freeform-a"]);
 }
@@ -918,19 +1428,21 @@ pub async fn test_list_filter_by_free_form_label(h: &impl FacadeContractHarness)
 
 // RF-099A
 contract_test!(
-    list_filter_invalid_key_is_rejected,
-    super::test_list_filter_invalid_key_is_rejected
+    search_filter_invalid_key_is_rejected,
+    super::test_search_filter_invalid_key_is_rejected
 );
 
-pub async fn test_list_filter_invalid_key_is_rejected(h: &impl FacadeContractHarness) {
+pub async fn test_search_filter_invalid_key_is_rejected(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
     let result = facade
-        .list(ListResourcesRequest {
-            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+        .search(SearchResourcesRequest {
+            selectors: vec![ResourceSelector {
+                labels: Some(label_filter(&[("not a valid key=", "x")])),
+                ..ResourceSelector::of_type(VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap())
+            }],
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
-            label_filter: Some(label_filter(&[("not a valid key=", "x")])),
         })
         .await;
 
@@ -944,22 +1456,24 @@ pub async fn test_list_filter_invalid_key_is_rejected(h: &impl FacadeContractHar
 
 // RF-099B
 contract_test!(
-    list_filter_unknown_uri_is_rejected,
-    super::test_list_filter_unknown_uri_is_rejected
+    search_filter_unknown_uri_is_rejected,
+    super::test_search_filter_unknown_uri_is_rejected
 );
 
-pub async fn test_list_filter_unknown_uri_is_rejected(h: &impl FacadeContractHarness) {
+pub async fn test_search_filter_unknown_uri_is_rejected(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
     let result = facade
-        .list(ListResourcesRequest {
-            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+        .search(SearchResourcesRequest {
+            selectors: vec![ResourceSelector {
+                labels: Some(label_filter(&[(
+                    "https://kamu.dev/schemas/resource/v1alpha1/labels/DoesNotExist",
+                    "x",
+                )])),
+                ..ResourceSelector::of_type(VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap())
+            }],
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
-            label_filter: Some(label_filter(&[(
-                "https://kamu.dev/schemas/resource/v1alpha1/labels/DoesNotExist",
-                "x",
-            )])),
         })
         .await;
 
@@ -976,24 +1490,26 @@ pub async fn test_list_filter_unknown_uri_is_rejected(h: &impl FacadeContractHar
 
 // RF-099C
 contract_test!(
-    list_filter_non_string_value_is_rejected,
-    super::test_list_filter_non_string_value_is_rejected
+    search_filter_non_string_value_is_rejected,
+    super::test_search_filter_non_string_value_is_rejected
 );
 
-pub async fn test_list_filter_non_string_value_is_rejected(h: &impl FacadeContractHarness) {
+pub async fn test_search_filter_non_string_value_is_rejected(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
     let result = facade
-        .list(ListResourcesRequest {
-            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+        .search(SearchResourcesRequest {
+            selectors: vec![ResourceSelector {
+                labels: Some(kamu_resources::ResourceLabelFilterInput {
+                    entries: std::collections::BTreeMap::from([(
+                        "environment".to_string(),
+                        serde_json::json!({"not": "a string"}),
+                    )]),
+                }),
+                ..ResourceSelector::of_type(VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap())
+            }],
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
-            label_filter: Some(kamu_resources::ResourceLabelFilterInput {
-                entries: std::collections::BTreeMap::from([(
-                    "environment".to_string(),
-                    serde_json::json!({"not": "a string"}),
-                )]),
-            }),
         })
         .await;
 
@@ -1007,24 +1523,26 @@ pub async fn test_list_filter_non_string_value_is_rejected(h: &impl FacadeContra
 
 // RF-099D
 contract_test!(
-    list_filter_duplicate_after_canonicalization_is_rejected,
-    super::test_list_filter_duplicate_after_canonicalization_is_rejected
+    search_filter_duplicate_after_canonicalization_is_rejected,
+    super::test_search_filter_duplicate_after_canonicalization_is_rejected
 );
 
-pub async fn test_list_filter_duplicate_after_canonicalization_is_rejected(
+pub async fn test_search_filter_duplicate_after_canonicalization_is_rejected(
     h: &impl FacadeContractHarness,
 ) {
     let facade = h.facade_for(TestAccount::Alice);
 
     let result = facade
-        .list(ListResourcesRequest {
-            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+        .search(SearchResourcesRequest {
+            selectors: vec![ResourceSelector {
+                labels: Some(label_filter(&[
+                    ("environment", "prod"),
+                    (RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI, "prod"),
+                ])),
+                ..ResourceSelector::of_type(VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap())
+            }],
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
-            label_filter: Some(label_filter(&[
-                ("environment", "prod"),
-                (RESOURCE_LABEL_ENVIRONMENT_SCHEMA_URI, "prod"),
-            ])),
         })
         .await;
 
@@ -1041,24 +1559,26 @@ pub async fn test_list_filter_duplicate_after_canonicalization_is_rejected(
 
 // RF-099E
 contract_test!(
-    list_filter_not_operator_is_rejected,
-    super::test_list_filter_not_operator_is_rejected
+    search_filter_not_operator_is_rejected,
+    super::test_search_filter_not_operator_is_rejected
 );
 
-pub async fn test_list_filter_not_operator_is_rejected(h: &impl FacadeContractHarness) {
+pub async fn test_search_filter_not_operator_is_rejected(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
     let result = facade
-        .list(ListResourcesRequest {
-            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+        .search(SearchResourcesRequest {
+            selectors: vec![ResourceSelector {
+                labels: Some(kamu_resources::ResourceLabelFilterInput {
+                    entries: std::collections::BTreeMap::from([(
+                        "$not".to_string(),
+                        serde_json::json!({"environment": "prod"}),
+                    )]),
+                }),
+                ..ResourceSelector::of_type(VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap())
+            }],
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
-            label_filter: Some(kamu_resources::ResourceLabelFilterInput {
-                entries: std::collections::BTreeMap::from([(
-                    "$not".to_string(),
-                    serde_json::json!({"environment": "prod"}),
-                )]),
-            }),
         })
         .await;
 
@@ -1075,24 +1595,26 @@ pub async fn test_list_filter_not_operator_is_rejected(h: &impl FacadeContractHa
 
 // RF-099F
 contract_test!(
-    list_filter_or_operator_is_rejected,
-    super::test_list_filter_or_operator_is_rejected
+    search_filter_or_operator_is_rejected,
+    super::test_search_filter_or_operator_is_rejected
 );
 
-pub async fn test_list_filter_or_operator_is_rejected(h: &impl FacadeContractHarness) {
+pub async fn test_search_filter_or_operator_is_rejected(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
     let result = facade
-        .list(ListResourcesRequest {
-            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+        .search(SearchResourcesRequest {
+            selectors: vec![ResourceSelector {
+                labels: Some(kamu_resources::ResourceLabelFilterInput {
+                    entries: std::collections::BTreeMap::from([(
+                        "$or".to_string(),
+                        serde_json::json!([{"environment": "prod"}, {"environment": "staging"}]),
+                    )]),
+                }),
+                ..ResourceSelector::of_type(VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap())
+            }],
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
-            label_filter: Some(kamu_resources::ResourceLabelFilterInput {
-                entries: std::collections::BTreeMap::from([(
-                    "$or".to_string(),
-                    serde_json::json!([{"environment": "prod"}, {"environment": "staging"}]),
-                )]),
-            }),
         })
         .await;
 
@@ -1109,24 +1631,26 @@ pub async fn test_list_filter_or_operator_is_rejected(h: &impl FacadeContractHar
 
 // RF-099G
 contract_test!(
-    list_filter_malformed_not_operator_is_rejected,
-    super::test_list_filter_malformed_not_operator_is_rejected
+    search_filter_malformed_not_operator_is_rejected,
+    super::test_search_filter_malformed_not_operator_is_rejected
 );
 
-pub async fn test_list_filter_malformed_not_operator_is_rejected(h: &impl FacadeContractHarness) {
+pub async fn test_search_filter_malformed_not_operator_is_rejected(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
     let result = facade
-        .list(ListResourcesRequest {
-            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+        .search(SearchResourcesRequest {
+            selectors: vec![ResourceSelector {
+                labels: Some(kamu_resources::ResourceLabelFilterInput {
+                    entries: std::collections::BTreeMap::from([(
+                        "$not".to_string(),
+                        serde_json::json!("not-an-object"),
+                    )]),
+                }),
+                ..ResourceSelector::of_type(VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap())
+            }],
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
-            label_filter: Some(kamu_resources::ResourceLabelFilterInput {
-                entries: std::collections::BTreeMap::from([(
-                    "$not".to_string(),
-                    serde_json::json!("not-an-object"),
-                )]),
-            }),
         })
         .await;
 
@@ -1166,13 +1690,15 @@ pub async fn test_search_handles_filter_narrows_candidates(h: &impl FacadeContra
     let facade = h.facade_for(TestAccount::Alice);
 
     let response = facade
-        .search_handles(SearchResourceHandlesRequest {
-            type_scope: SearchResourceTypeScope::Types(vec![
-                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-            ]),
-            query: ResourceSearchQuery::NamePattern("search-filter-%".to_string()),
+        .search_handles(SearchResourcesRequest {
+            selectors: vec![ResourceSelector {
+                labels: Some(label_filter(&[("environment", "prod")])),
+                ..ResourceSelector::name_pattern(
+                    VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+                    "search-filter-%".to_string(),
+                )
+            }],
             account: None,
-            label_filter: Some(label_filter(&[("environment", "prod")])),
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
@@ -1183,6 +1709,126 @@ pub async fn test_search_handles_filter_narrows_candidates(h: &impl FacadeContra
         vec!["search-filter-prod"]
     );
     assert_eq!(response.total_count, 1);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-107
+contract_test!(
+    search_renders_typed_columns_across_types,
+    super::test_search_renders_typed_columns_across_types
+);
+
+/// Typed list columns are the schema-specific values the CLI's `list` table
+/// shows beyond the generic columns — `variables` for a `VariableSet`,
+/// `secrets` for a `SecretSet`.
+///
+/// This is the only assertion on `list_values` anywhere in the contract or E2E
+/// suites, so without it the columns `kamu list` prints could vanish silently.
+/// The multi-type case is the interesting half: each result renders through its
+/// own schema's presentation dispatcher, so a single-type assertion would not
+/// catch a listing that spans types but renders columns for none of them.
+pub async fn test_search_renders_typed_columns_across_types(h: &impl FacadeContractHarness) {
+    apply_manifest_and_get_id(
+        h,
+        TestAccount::Alice,
+        variable_set_manifest_json("columns-vars", None, &[("A", "1"), ("B", "2")]),
+    )
+    .await;
+    apply_manifest_and_get_id(
+        h,
+        TestAccount::Alice,
+        secret_set_manifest_json("columns-secrets", None, &[("TOKEN", "t")]),
+    )
+    .await;
+
+    let facade = h.facade_for(TestAccount::Alice);
+
+    let mut response = facade
+        .search(SearchResourcesRequest {
+            selectors: vec![
+                ResourceSelector::of_type(VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap()),
+                ResourceSelector::of_type(SECRET_SET_CANONICAL_SELECTOR.parse().unwrap()),
+            ],
+            account: None,
+            pagination: PaginationOpts::from_max_results(1000),
+        })
+        .await
+        .unwrap();
+    normalize_summary_views(&mut response.items);
+
+    let column_pairs = |name: &str| {
+        response
+            .items
+            .iter()
+            .find(|summary| summary.name.as_str() == name)
+            .map(summary_column_pairs)
+            .unwrap_or_else(|| panic!("{name} must be listed"))
+    };
+
+    // Each type renders its own columns, and the values are derived from the
+    // spec — two variables, one secret — rather than merely being present.
+    assert_eq!(column_pairs("columns-vars"), vec!["variables=2"]);
+    assert_eq!(column_pairs("columns-secrets"), vec!["secrets=1"]);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-174
+contract_test!(
+    selector_field_the_facade_cannot_resolve_is_rejected,
+    super::test_selector_field_the_facade_cannot_resolve_is_rejected
+);
+
+/// A selector narrowed *only* by a field the facade cannot resolve must fail,
+/// not widen.
+///
+/// Dropping the field leaves a selector that reads as unnarrowed, which matches
+/// every resource in the account — the caller asks for a subset and silently
+/// receives everything. The trait is public, so the rejection has to live at
+/// the facade rather than only in the GraphQL adapter.
+pub async fn test_selector_field_the_facade_cannot_resolve_is_rejected(
+    h: &impl FacadeContractHarness,
+) {
+    apply_manifest_and_get_id(
+        h,
+        TestAccount::Alice,
+        variable_set_manifest_json("unresolvable-field-probe", None, &[("A", "1")]),
+    )
+    .await;
+
+    let facade = h.facade_for(TestAccount::Alice);
+
+    // Narrowed by nothing the facade can act on: were the `did` dropped, this
+    // would come back as the whole account.
+    let did_only = ResourceSelector {
+        did: Some(odf::AccountID::new_seeded_ed25519(b"probe").into()),
+        ..ResourceSelector::default()
+    };
+
+    assert_matches!(
+        facade
+            .search_handles(SearchResourcesRequest {
+                selectors: vec![did_only.clone()],
+                account: None,
+                pagination: PaginationOpts::from_max_results(1000),
+            })
+            .await,
+        Err(_),
+        "a selector narrowed only by an unresolvable field must be rejected, not widened"
+    );
+
+    assert_matches!(
+        facade
+            .search(SearchResourcesRequest {
+                selectors: vec![did_only],
+                account: None,
+                pagination: PaginationOpts::from_max_results(1000),
+            })
+            .await,
+        Err(_),
+        "`search` must reject it too, not only `search_handles`"
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

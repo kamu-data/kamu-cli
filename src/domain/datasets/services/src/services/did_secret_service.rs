@@ -41,18 +41,10 @@ pub struct DidSecretService {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 impl DidSecretService {
-    async fn handle_account_lifecycle_deleted_message(
-        &self,
-        message: &AccountLifecycleMessageDeleted,
-    ) -> Result<(), InternalError> {
-        use odf::metadata::AsStackString;
-
-        let account_id = message.account_id.as_stack_string();
-        let account_entity = DidEntity::new_account(account_id.as_str());
-
+    async fn delete_did_secret(&self, did_entity: DidEntity<'_>) -> Result<(), InternalError> {
         match self
             .did_secret_key_repo
-            .delete_did_secret_key(&account_entity)
+            .delete_did_secret_key(&did_entity)
             .await
         {
             Ok(_) | Err(DeleteDidSecretKeyError::NotFound { .. }) => { /* idempotent deletion */ }
@@ -62,6 +54,18 @@ impl DidSecretService {
         Ok(())
     }
 
+    async fn handle_account_lifecycle_deleted_message(
+        &self,
+        message: &AccountLifecycleMessageDeleted,
+    ) -> Result<(), InternalError> {
+        use odf::metadata::AsStackString;
+
+        let account_id = message.account_id.as_stack_string();
+        let account_entity = DidEntity::new_account(account_id.as_str());
+
+        self.delete_did_secret(account_entity).await
+    }
+
     async fn handle_dataset_lifecycle_deleted_message(
         &self,
         message: &DatasetLifecycleMessageDeleted,
@@ -69,16 +73,7 @@ impl DidSecretService {
         let dataset_id = message.dataset_id.as_did_str().to_stack_string();
         let dataset_entity = DidEntity::new_dataset(dataset_id.as_str());
 
-        match self
-            .did_secret_key_repo
-            .delete_did_secret_key(&dataset_entity)
-            .await
-        {
-            Ok(_) | Err(DeleteDidSecretKeyError::NotFound { .. }) => { /* idempotent deletion */ }
-            e @ Err(_) => e.int_err()?,
-        }
-
-        Ok(())
+        self.delete_did_secret(dataset_entity).await
     }
 }
 

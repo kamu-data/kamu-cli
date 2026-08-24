@@ -19,19 +19,38 @@ use crate::cli_commands::validate_many_dataset_patterns_with_workspace;
 use crate::output::OutputConfig;
 use crate::resource_context::{ResourceContextReporter, ResourceContextResolver};
 use crate::resources::{
+    ANY_SELECTOR,
+    BareTypePolicy,
     ResourceFacadeFactory,
     ResourceLabelSelectorParser,
     ResourceSelectionResolutionService,
+    ResourceSelectionScanner,
     ResourceSelectionSyntax,
     ResourceSelectionSyntaxService,
     ResourceTypeLookupService,
+    is_resource_id,
 };
 use crate::{ConfirmDeleteService, Interact, WorkspaceService, cli_value_parser as parsers};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 const DATASETS_TARGET: &str = "datasets";
-const ALL_TARGET: &str = "all";
+
+const DATASET_TARGET: &str = "dataset";
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Strips the `dataset/` or `datasets/` pseudo-type prefix, yielding the
+/// dataset alias it guards.
+///
+/// The remainder is deliberately not validated here: it is a dataset reference,
+/// not a resource selector, and the dataset layer owns its own grammar.
+fn strip_dataset_pseudo_type_prefix(arg: &str) -> Option<&str> {
+    let (prefix, alias) = arg.split_once('/')?;
+
+    (prefix.eq_ignore_ascii_case(DATASET_TARGET) || prefix.eq_ignore_ascii_case(DATASETS_TARGET))
+        .then_some(alias)
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -344,7 +363,7 @@ impl<'a> DeleteRequestResolver<'a> {
     // Mirrors `list` dispatch, but with delete-specific dataset/resource
     // precedence:
     // - `kamu delete` / `kamu delete datasets ...` => datasets mode
-    // - `kamu delete all` => resource all-types mode
+    // - `kamu delete %` => resource all-types mode
     // - `kamu delete storages warehouse` => resource same-type mode
     // - `kamu delete foo.bar` => datasets mode when `foo.bar` is not a known
     //   resource type
@@ -367,13 +386,20 @@ impl<'a> DeleteRequestResolver<'a> {
 
         let raw_args = self.raw_args();
 
-        if raw_args
-            .first()
-            .is_some_and(|arg| arg.eq_ignore_ascii_case(ALL_TARGET))
-        {
+        // No descriptor matches `%`, so without this the all-types form would
+        // fall through to the dataset path and glob-delete every dataset.
+        if raw_args.first().is_some_and(|arg| arg == ANY_SELECTOR) {
+            let raw_args = if self.params.all {
+                Self::with_resource_all(raw_args)
+            } else {
+                raw_args
+            };
             return self.resolve_resource_request(raw_args).await;
         }
 
+        // Routing guard, not grammar: this decides dataset-vs-resource before
+        // the selector grammar is involved. The resource path's own mixing
+        // error is raised later by `ResourceSelectionSyntaxParser`.
         let contains_slash = raw_args.iter().any(|arg| arg.contains('/'));
         let contains_plain = raw_args.iter().any(|arg| !arg.contains('/'));
 
@@ -393,7 +419,7 @@ impl<'a> DeleteRequestResolver<'a> {
 
             // A bare ID has no type prefix but is still unambiguous (IDs are
             // globally unique), so route it as a resource, not a dataset.
-            if raw_args.len() == 1 && Self::is_resource_id(&raw_args[0]) {
+            if raw_args.len() == 1 && is_resource_id(&raw_args[0]) {
                 return self.resolve_resource_request(raw_args).await;
             }
 
@@ -438,7 +464,7 @@ impl<'a> DeleteRequestResolver<'a> {
     }
 
     fn with_resource_all(mut raw_args: Vec<String>) -> Vec<String> {
-        raw_args.push(ALL_TARGET.to_owned());
+        raw_args.push(ANY_SELECTOR.to_owned());
         raw_args
     }
 
@@ -474,7 +500,7 @@ impl<'a> DeleteRequestResolver<'a> {
             .await?;
 
         Ok(Self::classify_slash_request_with(raw_args, |prefix| {
-            Self::matches_resource_target_prefix_with(&supported_resource_types, prefix)
+            Self::matches_resource_slash_prefix_with(&supported_resource_types, prefix)
         }))
     }
 
@@ -482,13 +508,21 @@ impl<'a> DeleteRequestResolver<'a> {
         supported_resource_types: &[ResourceTypeDescriptor],
         prefix: &str,
     ) -> bool {
-        supported_resource_types.iter().any(|descriptor| {
-            if Self::is_potential_resource_type_pattern(prefix) {
-                descriptor.matches_selector_pattern(prefix)
-            } else {
-                descriptor.matches_selector(prefix)
-            }
-        })
+        supported_resource_types
+            .iter()
+            .any(|descriptor| descriptor.matches_selector(prefix))
+    }
+
+    /// A `%`-carrying type half claims the resource path even when it names no
+    /// supported type, so the user gets the resource-selector usage error
+    /// rather than a dataset error. Dataset names may contain `%` but never
+    /// appear as the type half.
+    fn matches_resource_slash_prefix_with(
+        supported_resource_types: &[ResourceTypeDescriptor],
+        prefix: &str,
+    ) -> bool {
+        prefix.contains('%')
+            || Self::matches_resource_target_prefix_with(supported_resource_types, prefix)
     }
 
     fn classify_slash_request_with<F>(
@@ -502,18 +536,31 @@ impl<'a> DeleteRequestResolver<'a> {
         let mut resource_args = Vec::new();
 
         for arg in raw_args {
-            let Some((prefix, suffix)) = arg.split_once('/') else {
+            // `dataset/...` and `datasets/...` are an explicit escape hatch that forces
+            // legacy dataset interpretation even if the prefix collides with a resource
+            // type. Stripped before scanning: the remainder is a dataset alias, which
+            // may itself be account-qualified (`dataset/alice/foo`) and so carry more
+            // separators than the selector grammar permits.
+            if let Some(alias) = strip_dataset_pseudo_type_prefix(&arg) {
+                dataset_args.push(alias.to_owned());
+                continue;
+            }
+
+            let Ok(selector) =
+                ResourceSelectionScanner::scan_selector_arg(&arg, BareTypePolicy::Allow)
+            else {
+                // Malformed args stay on the resource path so the selector
+                // grammar reports them with a caret, rather than being silently
+                // reinterpreted as a dataset name here.
+                resource_args.push(arg);
+                continue;
+            };
+
+            let (prefix, Some(_)) = (selector.type_half, selector.name_half) else {
                 unreachable!("slash-only classifier received a plain selector");
             };
 
-            // `dataset/...` and `datasets/...` are an explicit escape hatch that forces
-            // legacy dataset interpretation even if the prefix collides with a resource
-            // type.
-            if prefix.eq_ignore_ascii_case("dataset")
-                || prefix.eq_ignore_ascii_case(DATASETS_TARGET)
-            {
-                dataset_args.push(suffix.to_owned());
-            } else if is_supported_resource_prefix(prefix) {
+            if is_supported_resource_prefix(prefix) {
                 resource_args.push(arg);
             } else {
                 dataset_args.push(arg);
@@ -566,17 +613,9 @@ impl<'a> DeleteRequestResolver<'a> {
 
         Ok(syntax)
     }
-
-    fn is_potential_resource_type_pattern(prefix: &str) -> bool {
-        prefix.contains('%')
-    }
-
-    /// Mirrors the `UUIDv4` check in `ResourceSelectionSyntaxParser`.
-    fn is_resource_id(arg: &str) -> bool {
-        uuid::Uuid::parse_str(arg).is_ok_and(|id| id.get_version() == Some(uuid::Version::Random))
-    }
 }
 
+#[derive(Debug)]
 enum ClassifiedSlashDeleteRequest {
     Datasets(Vec<String>),
     Resources(Vec<String>),
@@ -590,23 +629,11 @@ enum ClassifiedSlashDeleteRequest {
 
 #[cfg(test)]
 mod tests {
+    use std::assert_matches;
+
     use kamu_resources::{ResourceTypeDescriptor, TypeUri};
 
-    use super::{ClassifiedSlashDeleteRequest, DeleteRequestResolver};
-
-    #[test]
-    fn test_is_resource_id_accepts_uuid_v4() {
-        let uuid = uuid::Uuid::new_v4().to_string();
-        assert!(DeleteRequestResolver::is_resource_id(&uuid));
-    }
-
-    #[test]
-    fn test_is_resource_id_rejects_non_v4_uuid_and_plain_names() {
-        assert!(!DeleteRequestResolver::is_resource_id(
-            "00000000-0000-0000-0000-000000000000"
-        ));
-        assert!(!DeleteRequestResolver::is_resource_id("my-dataset"));
-    }
+    use super::{ANY_SELECTOR, ClassifiedSlashDeleteRequest, DeleteRequestResolver};
 
     #[test]
     fn test_classify_slash_request_routes_resource_prefixes_to_resources() {
@@ -615,11 +642,11 @@ mod tests {
             |prefix| matches!(prefix, "vs" | "ss"),
         );
 
-        assert!(matches!(
+        assert_matches!(
             request,
             ClassifiedSlashDeleteRequest::Resources(args)
                 if args == vec!["vs/foo".to_owned(), "ss/bar".to_owned()]
-        ));
+        );
     }
 
     #[test]
@@ -629,11 +656,11 @@ mod tests {
             |_| false,
         );
 
-        assert!(matches!(
+        assert_matches!(
             request,
             ClassifiedSlashDeleteRequest::Datasets(args)
                 if args == vec!["account/foo".to_owned()]
-        ));
+        );
     }
 
     #[test]
@@ -643,11 +670,32 @@ mod tests {
             |_| false,
         );
 
-        assert!(matches!(
+        assert_matches!(
             request,
             ClassifiedSlashDeleteRequest::Datasets(args)
                 if args == vec!["foo".to_owned(), "bar".to_owned()]
-        ));
+        );
+    }
+
+    // A dataset alias may itself be account-qualified (`AccountName "/"
+    // DatasetName`), so the escape hatch has to survive a second `/`. The
+    // selector grammar allows only one, which is why the prefix is stripped
+    // before the argument is scanned.
+    #[test]
+    fn test_classify_slash_request_strips_prefix_from_account_qualified_datasets() {
+        let request = DeleteRequestResolver::classify_slash_request_with(
+            vec![
+                "dataset/alice/foo".to_owned(),
+                "datasets/bob/bar".to_owned(),
+            ],
+            |_| false,
+        );
+
+        assert_matches!(
+            request,
+            ClassifiedSlashDeleteRequest::Datasets(args)
+                if args == vec!["alice/foo".to_owned(), "bob/bar".to_owned()]
+        );
     }
 
     #[test]
@@ -657,40 +705,44 @@ mod tests {
             |prefix| prefix == "vs",
         );
 
-        assert!(matches!(
+        assert_matches!(
             request,
             ClassifiedSlashDeleteRequest::Mixed { dataset_args, resource_args }
                 if dataset_args == vec!["foo".to_owned()]
                     && resource_args == vec!["vs/bar".to_owned()]
-        ));
+        );
+    }
+
+    // The account-qualified alias carries a second `/`, which the resource
+    // selector grammar rejects; it must still be routed as a dataset rather than
+    // dragging the whole mixed request onto the resource path.
+    #[test]
+    fn test_classify_slash_request_marks_mixed_requests_with_account_qualified_datasets() {
+        let request = DeleteRequestResolver::classify_slash_request_with(
+            vec!["dataset/alice/foo".to_owned(), "vs/bar".to_owned()],
+            |prefix| prefix == "vs",
+        );
+
+        assert_matches!(
+            request,
+            ClassifiedSlashDeleteRequest::Mixed { dataset_args, resource_args }
+                if dataset_args == vec!["alice/foo".to_owned()]
+                    && resource_args == vec!["vs/bar".to_owned()]
+        );
     }
 
     #[test]
-    fn test_classify_slash_request_routes_matching_type_patterns_to_resources() {
+    fn test_classify_slash_request_routes_any_type_wildcard_to_resources() {
         let request = DeleteRequestResolver::classify_slash_request_with(
-            vec!["s%/db-creds".to_owned()],
-            |prefix| prefix.eq_ignore_ascii_case("s%"),
+            vec!["%/db-creds".to_owned()],
+            |prefix| prefix == "%",
         );
 
-        assert!(matches!(
+        assert_matches!(
             request,
             ClassifiedSlashDeleteRequest::Resources(args)
-                if args == vec!["s%/db-creds".to_owned()]
-        ));
-    }
-
-    #[test]
-    fn test_classify_slash_request_keeps_unknown_type_patterns_on_dataset_path() {
-        let request = DeleteRequestResolver::classify_slash_request_with(
-            vec!["unknown%/db-creds".to_owned()],
-            |_| false,
+                if args == vec!["%/db-creds".to_owned()]
         );
-
-        assert!(matches!(
-            request,
-            ClassifiedSlashDeleteRequest::Datasets(args)
-                if args == vec!["unknown%/db-creds".to_owned()]
-        ));
     }
 
     #[test]
@@ -700,16 +752,15 @@ mod tests {
             |_| true,
         );
 
-        assert!(matches!(
+        assert_matches!(
             request,
             ClassifiedSlashDeleteRequest::Datasets(args)
                 if args == vec!["foo".to_owned()]
-        ));
+        );
     }
 
-    #[test]
-    fn test_matches_resource_target_prefix_with_type_patterns_case_insensitively() {
-        let supported_resource_types = vec![
+    fn test_resource_types() -> Vec<ResourceTypeDescriptor> {
+        vec![
             ResourceTypeDescriptor {
                 canonical_selector: kamu_resources::ResourceSelectorName::new("variablesets")
                     .unwrap(),
@@ -724,19 +775,62 @@ mod tests {
                 schema: TypeUri::new_unchecked("dev.kamu/secretset/v1"),
                 list_columns: Vec::new(),
             },
-        ];
+        ]
+    }
+
+    #[test]
+    fn test_matches_resource_target_prefix_matches_exact_names_case_insensitively() {
+        let supported_resource_types = test_resource_types();
 
         assert!(DeleteRequestResolver::matches_resource_target_prefix_with(
             &supported_resource_types,
             "VS",
         ));
-        assert!(DeleteRequestResolver::matches_resource_target_prefix_with(
+        // A dataset name may contain `%`; only the type half is wildcard-aware.
+        assert!(!DeleteRequestResolver::matches_resource_target_prefix_with(
             &supported_resource_types,
-            "S%",
+            "my.dataset.%",
         ));
         assert!(!DeleteRequestResolver::matches_resource_target_prefix_with(
             &supported_resource_types,
-            "X%",
+            "S%",
+        ));
+    }
+
+    // No descriptor matches a bare `%`, which is why `resolve` short-circuits on
+    // it before the dataset fallback: otherwise `kamu delete %` would reach the
+    // dataset path and glob-delete every dataset.
+    #[test]
+    fn test_matches_resource_target_prefix_does_not_match_bare_any_selector() {
+        let supported_resource_types = test_resource_types();
+
+        assert!(!DeleteRequestResolver::matches_resource_target_prefix_with(
+            &supported_resource_types,
+            ANY_SELECTOR,
+        ));
+    }
+
+    #[test]
+    fn test_matches_resource_slash_prefix_claims_every_wildcard_type_half() {
+        let supported_resource_types = test_resource_types();
+
+        assert!(DeleteRequestResolver::matches_resource_slash_prefix_with(
+            &supported_resource_types,
+            "%",
+        ));
+        // Rejected type wildcards stay on the resource path so the user gets the
+        // resource-selector usage error rather than a dataset error.
+        assert!(DeleteRequestResolver::matches_resource_slash_prefix_with(
+            &supported_resource_types,
+            "S%",
+        ));
+        assert!(DeleteRequestResolver::matches_resource_slash_prefix_with(
+            &supported_resource_types,
+            "unknown%",
+        ));
+        assert!(!DeleteRequestResolver::matches_resource_slash_prefix_with(
+            &supported_resource_types,
+            "unknown",
         ));
     }
 }

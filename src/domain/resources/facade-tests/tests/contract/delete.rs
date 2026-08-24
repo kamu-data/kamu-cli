@@ -8,19 +8,15 @@
 // by the Apache License, Version 2.0.
 
 use database_common::PaginationOpts;
-use kamu_resources::ApplyResourceOutcome;
+use kamu_resources::{ApplyResourceOutcome, ResourceRef, ResourceSelector, TypeName};
 use kamu_resources_facade::{
     ApplyManifestRequest,
-    DeleteResourceError,
-    GetResourceError,
-    ListResourcesRequest,
     ResourceLookupProblem,
     ResourceManifestFormat,
-    ResourceRef,
-    ResourceSelector,
-    SpecViewMode,
+    SearchResourcesRequest,
+    SpecViewOpts,
 };
-use pretty_assertions::assert_eq;
+use pretty_assertions::{assert_eq, assert_matches};
 
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
@@ -28,38 +24,41 @@ use crate::helpers::{
     SECRET_SET_CANONICAL_SELECTOR,
     VARIABLE_SET_CANONICAL_SELECTOR,
     assert_applied_outcome,
+    assert_single_batch_problem,
+    assert_single_batch_success,
+    create_variable_set,
     variable_set_manifest_json,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-async fn create_resource(h: &impl FacadeContractHarness, name: &str) -> kamu_resources::ResourceID {
-    let facade = h.facade_for(TestAccount::Alice);
-    let manifest = variable_set_manifest_json(name, None, &[("K", "v")]);
-    let decision = facade
-        .apply_manifest(ApplyManifestRequest {
-            format: ResourceManifestFormat::Json,
-            manifest,
-        })
-        .await
-        .unwrap();
-    let result = assert_applied_outcome(&decision, ApplyResourceOutcome::Created);
-    result.headers.id
-}
-
-fn by_name(name: &str) -> ResourceSelector {
-    ResourceSelector {
+fn by_name(name: &str) -> ResourceRef {
+    ResourceRef {
         account: None,
-        resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-        resource_ref: ResourceRef::ByName(name.parse().unwrap()),
+        r#type: Some(
+            VARIABLE_SET_CANONICAL_SELECTOR
+                .parse::<TypeName>()
+                .unwrap()
+                .into(),
+        ),
+        id: None,
+        did: None,
+        name: Some(name.parse().unwrap()),
     }
 }
 
-fn by_id(id: &kamu_resources::ResourceID) -> ResourceSelector {
-    ResourceSelector {
+fn by_id(id: &kamu_resources::ResourceID) -> ResourceRef {
+    ResourceRef {
         account: None,
-        resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-        resource_ref: ResourceRef::ById(*id),
+        r#type: Some(
+            VARIABLE_SET_CANONICAL_SELECTOR
+                .parse::<TypeName>()
+                .unwrap()
+                .into(),
+        ),
+        id: Some(*id),
+        did: None,
+        name: None,
     }
 }
 
@@ -69,44 +68,54 @@ fn by_id(id: &kamu_resources::ResourceID) -> ResourceSelector {
 contract_test!(delete_by_name, super::test_delete_by_name);
 
 pub async fn test_delete_by_name(h: &impl FacadeContractHarness) {
-    let id = create_resource(h, "del-name-test").await;
+    let id = create_variable_set(h, TestAccount::Alice, "del-name-test").await;
     let facade = h.facade_for(TestAccount::Alice);
 
-    let deleted_uid = facade.delete(by_name("del-name-test")).await.unwrap();
+    let deleted_uid =
+        assert_single_batch_success(facade.delete(vec![by_name("del-name-test")]).await.unwrap());
 
     assert_eq!(deleted_uid, id, "deleted id must match created id");
 
     // Resource must not be found by name
     let get_by_name = facade
-        .get(by_name("del-name-test"), SpecViewMode::Encrypted)
-        .await;
-    assert!(
-        matches!(get_by_name, Err(GetResourceError::LookupProblem(_))),
+        .get(vec![by_name("del-name-test")], SpecViewOpts::ENCRYPTED)
+        .await
+        .unwrap();
+    let get_err = assert_single_batch_problem(get_by_name);
+    assert_matches!(
+        get_err,
+        ResourceLookupProblem::NameNotFound(_),
         "deleted resource must not be found by name"
     );
 
     // Resource must not be found by id
-    let get_by_uid = facade.get(by_id(&id), SpecViewMode::Encrypted).await;
-    assert!(
-        matches!(get_by_uid, Err(GetResourceError::LookupProblem(_))),
+    let get_by_uid = facade
+        .get(vec![by_id(&id)], SpecViewOpts::ENCRYPTED)
+        .await
+        .unwrap();
+    let get_err = assert_single_batch_problem(get_by_uid);
+    assert_matches!(
+        get_err,
+        ResourceLookupProblem::IDNotFound(_),
         "deleted resource must not be found by id"
     );
 
     // Resource must not appear in list
     let list = facade
-        .list(ListResourcesRequest {
-            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+        .search(SearchResourcesRequest {
+            selectors: vec![ResourceSelector::of_type(
+                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            )],
             account: None,
             pagination: PaginationOpts {
                 limit: 1000,
                 offset: 0,
             },
-            label_filter: None,
         })
         .await
         .unwrap();
     assert!(
-        !list.iter().any(|s| s.id == id),
+        !list.items.iter().any(|s| s.id == id),
         "deleted resource must not appear in list"
     );
 }
@@ -117,18 +126,21 @@ pub async fn test_delete_by_name(h: &impl FacadeContractHarness) {
 contract_test!(delete_by_uid, super::test_delete_by_uid);
 
 pub async fn test_delete_by_uid(h: &impl FacadeContractHarness) {
-    let id = create_resource(h, "del-id-test").await;
+    let id = create_variable_set(h, TestAccount::Alice, "del-id-test").await;
     let facade = h.facade_for(TestAccount::Alice);
 
-    let deleted_uid = facade.delete(by_id(&id)).await.unwrap();
+    let deleted_uid = assert_single_batch_success(facade.delete(vec![by_id(&id)]).await.unwrap());
 
     assert_eq!(deleted_uid, id, "deleted id must match created id");
 
     let get_by_name = facade
-        .get(by_name("del-id-test"), SpecViewMode::Encrypted)
-        .await;
-    assert!(
-        matches!(get_by_name, Err(GetResourceError::LookupProblem(_))),
+        .get(vec![by_name("del-id-test")], SpecViewOpts::ENCRYPTED)
+        .await
+        .unwrap();
+    let get_err = assert_single_batch_problem(get_by_name);
+    assert_matches!(
+        get_err,
+        ResourceLookupProblem::NameNotFound(_),
         "resource must not be found by name after delete by id"
     );
 }
@@ -144,15 +156,15 @@ contract_test!(
 pub async fn test_delete_missing_name_returns_not_found(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
-    let result = facade.delete(by_name("no-such-delete")).await;
-    assert!(
-        matches!(
-            result,
-            Err(DeleteResourceError::LookupProblem(
-                ResourceLookupProblem::NameNotFound(_)
-            ))
-        ),
-        "expected NameNotFound, got: {result:?}"
+    let result = facade
+        .delete(vec![by_name("no-such-delete")])
+        .await
+        .unwrap();
+    let err = assert_single_batch_problem(result);
+    assert_matches!(
+        err,
+        ResourceLookupProblem::NameNotFound(_),
+        "expected NameNotFound"
     );
 }
 
@@ -168,15 +180,12 @@ pub async fn test_delete_missing_uid_returns_not_found(h: &impl FacadeContractHa
     let facade = h.facade_for(TestAccount::Alice);
     let absent_uid = kamu_resources::ResourceID::new(uuid::Uuid::new_v4());
 
-    let result = facade.delete(by_id(&absent_uid)).await;
-    assert!(
-        matches!(
-            result,
-            Err(DeleteResourceError::LookupProblem(
-                ResourceLookupProblem::IDNotFound(_)
-            ))
-        ),
-        "expected IDNotFound, got: {result:?}"
+    let result = facade.delete(vec![by_id(&absent_uid)]).await.unwrap();
+    let err = assert_single_batch_problem(result);
+    assert_matches!(
+        err,
+        ResourceLookupProblem::IDNotFound(_),
+        "expected IDNotFound"
     );
 }
 
@@ -189,39 +198,38 @@ contract_test!(
 );
 
 pub async fn test_delete_wrong_schema_returns_mismatch(h: &impl FacadeContractHarness) {
-    let id = create_resource(h, "del-api-ver").await;
+    let id = create_variable_set(h, TestAccount::Alice, "del-api-ver").await;
     let facade = h.facade_for(TestAccount::Alice);
 
-    let wrong_schema_selector = ResourceSelector {
+    let wrong_schema_selector = ResourceRef {
         account: None,
-        resource_type: SECRET_SET_CANONICAL_SELECTOR.parse().unwrap(),
-        resource_ref: ResourceRef::ById(id),
-    };
-    let result = facade.delete(wrong_schema_selector).await;
-    assert!(
-        matches!(
-            result,
-            Err(DeleteResourceError::LookupProblem(
-                ResourceLookupProblem::SchemaMismatch(_)
-            ))
+        r#type: Some(
+            SECRET_SET_CANONICAL_SELECTOR
+                .parse::<TypeName>()
+                .unwrap()
+                .into(),
         ),
-        "expected SchemaMismatch, got: {result:?}"
+        id: Some(id),
+        did: None,
+        name: None,
+    };
+    let result = facade
+        .delete(vec![wrong_schema_selector.clone()])
+        .await
+        .unwrap();
+    let err = assert_single_batch_problem(result);
+    assert_matches!(
+        err,
+        ResourceLookupProblem::SchemaMismatch(_),
+        "expected SchemaMismatch"
     );
 
-    let wrong_kind = ResourceSelector {
-        account: None,
-        resource_type: SECRET_SET_CANONICAL_SELECTOR.parse().unwrap(),
-        resource_ref: ResourceRef::ById(id),
-    };
-    let result = facade.delete(wrong_kind).await;
-    assert!(
-        matches!(
-            result,
-            Err(DeleteResourceError::LookupProblem(
-                ResourceLookupProblem::SchemaMismatch(_)
-            ))
-        ),
-        "expected SchemaMismatch, got: {result:?}"
+    let result = facade.delete(vec![wrong_schema_selector]).await.unwrap();
+    let err = assert_single_batch_problem(result);
+    assert_matches!(
+        err,
+        ResourceLookupProblem::SchemaMismatch(_),
+        "expected SchemaMismatch"
     );
 }
 
@@ -236,7 +244,7 @@ contract_test!(
 );
 
 pub async fn test_delete_is_account_scoped(h: &impl FacadeContractHarness) {
-    let alice_uid = create_resource(h, "scoped-del").await;
+    let alice_uid = create_variable_set(h, TestAccount::Alice, "scoped-del").await;
 
     // Create same-named resource for Bob.
     let bob_uid = {
@@ -256,24 +264,34 @@ pub async fn test_delete_is_account_scoped(h: &impl FacadeContractHarness) {
 
     // Delete Alice's resource.
     let alice_facade = h.facade_for(TestAccount::Alice);
-    let deleted_uid = alice_facade.delete(by_name("scoped-del")).await.unwrap();
+    let deleted_uid = assert_single_batch_success(
+        alice_facade
+            .delete(vec![by_name("scoped-del")])
+            .await
+            .unwrap(),
+    );
     assert_eq!(deleted_uid, alice_uid);
 
     // Alice's resource must be gone.
     let alice_get = alice_facade
-        .get(by_name("scoped-del"), SpecViewMode::Encrypted)
-        .await;
-    assert!(
-        matches!(alice_get, Err(GetResourceError::LookupProblem(_))),
+        .get(vec![by_name("scoped-del")], SpecViewOpts::ENCRYPTED)
+        .await
+        .unwrap();
+    let alice_err = assert_single_batch_problem(alice_get);
+    assert_matches!(
+        alice_err,
+        ResourceLookupProblem::NameNotFound(_),
         "Alice's resource must be gone after delete"
     );
 
     // Bob's resource must still exist.
     let bob_facade = h.facade_for(TestAccount::Bob);
-    let bob_view = bob_facade
-        .get(by_name("scoped-del"), SpecViewMode::Encrypted)
-        .await
-        .expect("Bob's resource must survive Alice's delete");
+    let bob_view = assert_single_batch_success(
+        bob_facade
+            .get(vec![by_name("scoped-del")], SpecViewOpts::ENCRYPTED)
+            .await
+            .unwrap(),
+    );
     assert_eq!(bob_view.headers.id, bob_uid);
 }
 
@@ -287,23 +305,20 @@ contract_test!(
 );
 
 pub async fn test_repeated_delete_is_deterministic(h: &impl FacadeContractHarness) {
-    let id = create_resource(h, "repeat-del").await;
+    let id = create_variable_set(h, TestAccount::Alice, "repeat-del").await;
     let facade = h.facade_for(TestAccount::Alice);
 
     // First delete succeeds.
-    let deleted = facade.delete(by_id(&id)).await.unwrap();
+    let deleted = assert_single_batch_success(facade.delete(vec![by_id(&id)]).await.unwrap());
     assert_eq!(deleted, id);
 
     // Second delete must return not-found.
-    let result = facade.delete(by_id(&id)).await;
-    assert!(
-        matches!(
-            result,
-            Err(DeleteResourceError::LookupProblem(
-                ResourceLookupProblem::IDNotFound(_)
-            ))
-        ),
-        "second delete must return IDNotFound, got: {result:?}"
+    let result = facade.delete(vec![by_id(&id)]).await.unwrap();
+    let err = assert_single_batch_problem(result);
+    assert_matches!(
+        err,
+        ResourceLookupProblem::IDNotFound(_),
+        "second delete must return IDNotFound"
     );
 }
 

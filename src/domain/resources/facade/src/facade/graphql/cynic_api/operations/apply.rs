@@ -14,7 +14,7 @@ use kamu_resources as domain;
 use crate::ApplyManifestRequest;
 use crate::facade::graphql::cynic_api::fragments::{
     Resource,
-    ResourceBadAccountProblem,
+    ResourceAccountResolutionProblem,
     ResourceManifestFormat,
     ResourceUnsupportedDescriptorProblem,
 };
@@ -44,7 +44,7 @@ pub(crate) enum ResourceApplyOutcome {
     ResourceApplyRejection(ResourceApplyRejection),
     ResourceApplyParseManifestProblem(ResourceApplyParseManifestProblem),
     ResourceUnsupportedDescriptorProblem(ResourceUnsupportedDescriptorProblem),
-    ResourceBadAccountProblem(ResourceBadAccountProblem),
+    ResourceAccountResolutionProblem(ResourceAccountResolutionProblem),
     ResourceInvalidHeaderProblem(ResourceInvalidHeaderProblem),
     ResourceInvalidSpecProblem(ResourceInvalidSpecProblem),
     #[cynic(fallback)]
@@ -57,7 +57,8 @@ pub(crate) enum ResourceApplyOutcome {
 pub(crate) struct ResourceApplySuccess {
     pub operation: ResourceApplyOperation,
     pub resource: Resource,
-    pub changes: Vec<ResourceApplyChange>,
+    pub before: Option<serde_json::Value>,
+    pub after: serde_json::Value,
     pub warnings: Vec<ResourceApplyWarning>,
 }
 
@@ -79,42 +80,6 @@ impl From<ResourceApplyOperation> for domain::ApplyResourceOutcome {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(cynic::QueryFragment, Debug, Clone)]
-pub(crate) struct ResourceApplyChange {
-    pub kind: ResourceApplyChangeKind,
-    pub path: String,
-    pub before: Option<serde_json::Value>,
-    pub after: Option<serde_json::Value>,
-}
-
-impl From<ResourceApplyChange> for domain::ApplyManifestChange {
-    fn from(value: ResourceApplyChange) -> Self {
-        Self {
-            kind: value.kind.into(),
-            path: value.path,
-            before: value.before,
-            after: value.after,
-        }
-    }
-}
-
-#[derive(cynic::Enum, Debug, Clone, Copy)]
-pub(crate) enum ResourceApplyChangeKind {
-    Generation,
-    Headers,
-    Spec,
-}
-
-impl From<ResourceApplyChangeKind> for domain::ApplyManifestChangeKind {
-    fn from(value: ResourceApplyChangeKind) -> Self {
-        match value {
-            ResourceApplyChangeKind::Generation => Self::Generation,
-            ResourceApplyChangeKind::Headers => Self::Headers,
-            ResourceApplyChangeKind::Spec => Self::Spec,
-        }
-    }
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -244,8 +209,6 @@ impl From<ResourceInvalidSpecProblem> for crate::ApplyManifestError {
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 impl ResourceApplyOutcome {
     pub(crate) fn try_into_planning_decision(
         self,
@@ -257,7 +220,10 @@ impl ResourceApplyOutcome {
                     .try_into()
                     .map_err(crate::ApplyManifestError::Internal)?;
                 let outcome = success.operation.into();
-                let changes = success.changes.into_iter().map(Into::into).collect();
+                let documents = domain::ApplyManifestDocuments {
+                    before: success.before,
+                    after: success.after,
+                };
                 let warnings = success.warnings.into_iter().map(Into::into).collect();
 
                 domain::ApplyManifestPlanningDecision::Planned(domain::ApplyManifestPlan {
@@ -266,8 +232,10 @@ impl ResourceApplyOutcome {
                     // TODO: Expose these plan-only fields in GraphQL when the CLI needs them.
                     reconciliation_required: false,
                     executable: true,
-                    changes,
                     warnings,
+                    // The server already canonicalized; there is no resource
+                    // pair on this side to rebuild the documents from.
+                    documents: domain::ApplyManifestDocumentSource::Canonical(documents),
                 })
             }
             Self::ResourceApplyRejection(rejection) => {
@@ -287,12 +255,17 @@ impl ResourceApplyOutcome {
                     .try_into()
                     .map_err(crate::ApplyManifestError::Internal)?;
                 let outcome = success.operation.into();
+                let documents = domain::ApplyManifestDocuments {
+                    before: success.before,
+                    after: success.after,
+                };
                 let warnings = success.warnings.into_iter().map(Into::into).collect();
 
                 domain::ApplyManifestApplicationDecision::Applied(domain::ApplyManifestResult {
                     resource,
                     outcome,
                     warnings,
+                    documents: domain::ApplyManifestDocumentSource::Canonical(documents),
                 })
             }
             Self::ResourceApplyRejection(rejection) => {
@@ -320,9 +293,11 @@ fn map_apply_problem(
                 outcome_mapper::unsupported_descriptor_problem_error(p),
             ))
         }
-        ResourceApplyOutcome::ResourceBadAccountProblem(p) => Ok(
-            crate::ApplyManifestError::BadAccount(outcome_mapper::bad_account_problem_error(p)?),
-        ),
+        ResourceApplyOutcome::ResourceAccountResolutionProblem(p) => {
+            Ok(crate::ApplyManifestError::AccountResolution(
+                outcome_mapper::account_resolution_problem_error(p),
+            ))
+        }
         ResourceApplyOutcome::ResourceInvalidHeaderProblem(p) => Ok(p.into()),
         ResourceApplyOutcome::ResourceInvalidSpecProblem(p) => Ok(p.into()),
         ResourceApplyOutcome::Unknown => Err(InternalError::new(

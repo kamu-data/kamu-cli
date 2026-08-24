@@ -696,9 +696,10 @@ impl DatasetAuthorizerHarness {
             if is_admin {
                 account_properties.push(AccountPropertyName::IsAdmin);
             }
-            let account_config =
-                AccountConfig::test_config_from_name(logged_account.account_handle.name.clone())
-                    .set_properties(account_properties);
+            let account_config = AccountConfig::test_config_from_name_with_id(
+                logged_account.account_handle.name.clone(),
+            )
+            .set_properties(account_properties);
 
             predefined_accounts_config.predefined.push(account_config);
         }
@@ -817,7 +818,7 @@ impl DatasetAuthorizerHarness {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 fn account_id(alias: &odf::DatasetAlias) -> odf::AccountID {
-    odf::AccountID::new_seeded_ed25519(alias.account_name.as_ref().unwrap().as_bytes())
+    odf::metadata::testing::account_id(&alias.account_name.as_ref().unwrap())
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

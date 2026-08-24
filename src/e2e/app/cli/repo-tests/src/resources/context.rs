@@ -251,6 +251,25 @@ impl ResourceCtx {
             .await;
     }
 
+    /// Run a command with stdin, assert success, and return its stderr.
+    ///
+    /// For scenarios that must assert something is **absent** from the output —
+    /// the regex list only expresses what must be present.
+    pub async fn stderr_with_stdin<I, S>(&self, args: I, stdin: &str) -> String
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        let full = self.args(args);
+        let result = self
+            .kamu()
+            .execute_with_input(full, stdin.to_string())
+            .await
+            .success();
+
+        String::from_utf8_lossy(&result.get_output().stderr).into_owned()
+    }
+
     /// Run a command with stdin, asserting failure and optional stderr regexes.
     pub async fn assert_failure_with_stdin<I, S>(
         &self,
@@ -488,6 +507,60 @@ impl ResourceCtx {
             .collect();
         names.sort();
         names
+    }
+
+    /// Run `list <target>… -o json` and return the sorted resource names.
+    ///
+    /// Unlike [`Self::list_names`], accepts several targets so multi-type
+    /// listings can be exercised.
+    pub async fn list_names_of(&self, targets: &[&str]) -> Vec<String> {
+        let doc = self.list_json(targets).await;
+        let label = format!("list {} -o json", targets.join(" "));
+
+        let mut names: Vec<String> = doc
+            .as_array()
+            .unwrap_or_else(|| panic!("`{label}` should be a JSON array:\n{doc}"))
+            .iter()
+            .map(|row| {
+                row.get("Name")
+                    .and_then(serde_json::Value::as_str)
+                    .unwrap_or_else(|| panic!("`{label}` row has no Name:\n{row}"))
+                    .to_string()
+            })
+            .collect();
+        names.sort();
+        names
+    }
+
+    /// Run `list <target>… -o json` and return the parsed document, which must
+    /// be a single JSON array regardless of how many targets were given.
+    pub async fn list_json(&self, targets: &[&str]) -> serde_json::Value {
+        let mut args = vec!["list".to_string()];
+        args.extend(targets.iter().map(ToString::to_string));
+        args.push("-o".to_string());
+        args.push("json".to_string());
+
+        self.stdout_json(args).await
+    }
+
+    /// The column names a `list` invocation renders, in order.
+    pub async fn list_columns(&self, targets: &[&str]) -> Vec<String> {
+        let doc = self.list_json(targets).await;
+        let label = format!("list {} -o json", targets.join(" "));
+
+        let rows = doc
+            .as_array()
+            .unwrap_or_else(|| panic!("`{label}` should be a JSON array:\n{doc}"));
+        let first = rows
+            .first()
+            .unwrap_or_else(|| panic!("`{label}` returned no rows, so it has no columns"));
+
+        first
+            .as_object()
+            .unwrap_or_else(|| panic!("`{label}` row should be an object:\n{first}"))
+            .keys()
+            .cloned()
+            .collect()
     }
 
     /// Return the `summary -o json` total count for a resource type.

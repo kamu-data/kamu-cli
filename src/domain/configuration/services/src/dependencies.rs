@@ -9,16 +9,12 @@
 
 use dill::CatalogBuilder;
 
-use crate::message_handlers::{
-    ConfigurationDatasetLifecycleMessageConsumer,
-    ConfigurationResourceLifecycleMessageConsumer,
-};
+use crate::message_handlers::ConfigurationResourceLifecycleMessageConsumer;
 use crate::*;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
-    catalog_builder.add::<ConfigurationDatasetLifecycleMessageConsumer>();
     catalog_builder.add::<ConfigurationResourceLifecycleMessageConsumer>();
 
     register_variable_set_resource_service_layer(catalog_builder);
@@ -30,6 +26,8 @@ pub fn register_dependencies(catalog_builder: &mut CatalogBuilder) {
     catalog_builder.add::<SecretSetReconcilerImpl>();
     catalog_builder.add::<SecretSetSpecSanitizer>();
     catalog_builder.add::<SecretSetSpecViewDispatcher>();
+
+    register_configuration_label_schema_dispatchers(catalog_builder);
 
     catalog_builder.add::<DatasetEnvVarResolverImpl>();
     catalog_builder.add::<DatasetEnvVarMutationAdapterImpl>();

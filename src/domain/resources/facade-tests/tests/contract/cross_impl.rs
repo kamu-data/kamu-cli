@@ -23,15 +23,18 @@
 //! `LocalResourceFacadeImpl` that shares the same in-memory store.
 
 use kamu_configuration::VariableSetResource;
-use kamu_resources::{ApplyManifestPlanningDecision, ApplyResourceOutcome, ResourceSchemaProvider};
+use kamu_resources::{
+    ApplyManifestPlanningDecision,
+    ApplyResourceOutcome,
+    ResourceRef,
+    ResourceSchemaProvider,
+    TypeName,
+};
 use kamu_resources_facade::{
     ApplyManifestRequest,
-    ResourceBatchSelector,
     ResourceLookupProblem,
     ResourceManifestFormat,
-    ResourceRef,
-    ResourceSelector,
-    SpecViewMode,
+    SpecViewOpts,
 };
 use pretty_assertions::{assert_eq, assert_matches};
 
@@ -43,16 +46,24 @@ use crate::helpers::{
     assert_applied_outcome,
     assert_batch_indexes,
     assert_resource_view_fields,
+    assert_single_batch_success,
     variable_set_manifest_json,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn by_name(name: &str) -> ResourceSelector {
-    ResourceSelector {
+fn by_name(name: &str) -> ResourceRef {
+    ResourceRef {
         account: None,
-        resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-        resource_ref: ResourceRef::ByName(name.parse().unwrap()),
+        r#type: Some(
+            VARIABLE_SET_CANONICAL_SELECTOR
+                .parse::<TypeName>()
+                .unwrap()
+                .into(),
+        ),
+        id: None,
+        did: None,
+        name: Some(name.parse().unwrap()),
     }
 }
 
@@ -109,10 +120,15 @@ pub async fn test_local_created_readable_remotely(h: &impl FacadeContractHarness
             .id
     };
 
-    let view = remote
-        .get(by_name("cross-local-to-remote"), SpecViewMode::Encrypted)
-        .await
-        .unwrap();
+    let view = assert_single_batch_success(
+        remote
+            .get(
+                vec![by_name("cross-local-to-remote")],
+                SpecViewOpts::ENCRYPTED,
+            )
+            .await
+            .unwrap(),
+    );
 
     assert_resource_view_fields(
         &view,
@@ -150,10 +166,15 @@ pub async fn test_remote_created_readable_locally(h: &impl FacadeContractHarness
             .id
     };
 
-    let view = local
-        .get(by_name("cross-remote-to-local"), SpecViewMode::Encrypted)
-        .await
-        .unwrap();
+    let view = assert_single_batch_success(
+        local
+            .get(
+                vec![by_name("cross-remote-to-local")],
+                SpecViewOpts::ENCRYPTED,
+            )
+            .await
+            .unwrap(),
+    );
 
     assert_resource_view_fields(
         &view,
@@ -189,24 +210,28 @@ pub async fn test_render_manifest_equivalence(h: &impl FacadeContractHarness) {
     let selector = by_name("cross-render-eq");
 
     // JSON equivalence
-    let local_json = local
-        .render_manifest(
-            selector.clone(),
-            ResourceManifestFormat::Json,
-            SpecViewMode::Encrypted,
-        )
-        .await
-        .unwrap()
-        .manifest;
-    let remote_json = remote
-        .render_manifest(
-            selector.clone(),
-            ResourceManifestFormat::Json,
-            SpecViewMode::Encrypted,
-        )
-        .await
-        .unwrap()
-        .manifest;
+    let local_json = assert_single_batch_success(
+        local
+            .render_manifests(
+                vec![selector.clone()],
+                ResourceManifestFormat::Json,
+                SpecViewOpts::ENCRYPTED,
+            )
+            .await
+            .unwrap(),
+    )
+    .manifest;
+    let remote_json = assert_single_batch_success(
+        remote
+            .render_manifests(
+                vec![selector.clone()],
+                ResourceManifestFormat::Json,
+                SpecViewOpts::ENCRYPTED,
+            )
+            .await
+            .unwrap(),
+    )
+    .manifest;
     let local_json_val: serde_json::Value = serde_json::from_str(&local_json).unwrap();
     let remote_json_val: serde_json::Value = serde_json::from_str(&remote_json).unwrap();
     assert_eq!(
@@ -215,24 +240,28 @@ pub async fn test_render_manifest_equivalence(h: &impl FacadeContractHarness) {
     );
 
     // YAML equivalence — re-parse via serde_yaml and compare as JSON values
-    let local_yaml = local
-        .render_manifest(
-            selector.clone(),
-            ResourceManifestFormat::Yaml,
-            SpecViewMode::Encrypted,
-        )
-        .await
-        .unwrap()
-        .manifest;
-    let remote_yaml = remote
-        .render_manifest(
-            selector.clone(),
-            ResourceManifestFormat::Yaml,
-            SpecViewMode::Encrypted,
-        )
-        .await
-        .unwrap()
-        .manifest;
+    let local_yaml = assert_single_batch_success(
+        local
+            .render_manifests(
+                vec![selector.clone()],
+                ResourceManifestFormat::Yaml,
+                SpecViewOpts::ENCRYPTED,
+            )
+            .await
+            .unwrap(),
+    )
+    .manifest;
+    let remote_yaml = assert_single_batch_success(
+        remote
+            .render_manifests(
+                vec![selector.clone()],
+                ResourceManifestFormat::Yaml,
+                SpecViewOpts::ENCRYPTED,
+            )
+            .await
+            .unwrap(),
+    )
+    .manifest;
     let local_yaml_val: serde_json::Value = serde_yaml::from_str(&local_yaml).unwrap();
     let remote_yaml_val: serde_json::Value = serde_yaml::from_str(&remote_yaml).unwrap();
     assert_eq!(
@@ -268,23 +297,52 @@ pub async fn test_batch_equivalence(h: &impl FacadeContractHarness) {
     };
     let absent_uid = kamu_resources::ResourceID::new(uuid::Uuid::new_v4());
 
-    let batch_selector = ResourceBatchSelector {
-        account: None,
-        resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-        resource_refs: vec![
-            ResourceRef::ByName("cross-batch-a".parse().unwrap()), // idx 0 — exists
-            ResourceRef::ByName("cross-batch-missing".parse().unwrap()), // idx 1 — missing name
-            ResourceRef::ById(absent_uid),                         // idx 2 — missing id
-        ],
-    };
+    let batch_selector = vec![
+        ResourceRef {
+            account: None,
+            r#type: Some(
+                VARIABLE_SET_CANONICAL_SELECTOR
+                    .parse::<TypeName>()
+                    .unwrap()
+                    .into(),
+            ),
+            id: None,
+            did: None,
+            name: Some("cross-batch-a".parse().unwrap()),
+        }, // idx 0 — exists
+        ResourceRef {
+            account: None,
+            r#type: Some(
+                VARIABLE_SET_CANONICAL_SELECTOR
+                    .parse::<TypeName>()
+                    .unwrap()
+                    .into(),
+            ),
+            id: None,
+            did: None,
+            name: Some("cross-batch-missing".parse().unwrap()),
+        }, /* idx 1 — missing name */
+        ResourceRef {
+            account: None,
+            r#type: Some(
+                VARIABLE_SET_CANONICAL_SELECTOR
+                    .parse::<TypeName>()
+                    .unwrap()
+                    .into(),
+            ),
+            id: Some(absent_uid),
+            did: None,
+            name: None,
+        }, // idx 2 — missing id
+    ];
 
-    // get_many: both facades must return the same structure
+    // get: both facades must return the same structure
     let local_get = local
-        .get_many(batch_selector.clone(), SpecViewMode::Encrypted)
+        .get(batch_selector.clone(), SpecViewOpts::ENCRYPTED)
         .await
         .unwrap();
     let remote_get = remote
-        .get_many(batch_selector.clone(), SpecViewMode::Encrypted)
+        .get(batch_selector.clone(), SpecViewOpts::ENCRYPTED)
         .await
         .unwrap();
     assert_batch_indexes(&local_get, &[0], &[1, 2]);
@@ -342,7 +400,7 @@ pub async fn test_batch_equivalence(h: &impl FacadeContractHarness) {
         .render_manifests(
             batch_selector.clone(),
             ResourceManifestFormat::Json,
-            SpecViewMode::Encrypted,
+            SpecViewOpts::ENCRYPTED,
         )
         .await
         .unwrap();
@@ -350,7 +408,7 @@ pub async fn test_batch_equivalence(h: &impl FacadeContractHarness) {
         .render_manifests(
             batch_selector.clone(),
             ResourceManifestFormat::Json,
-            SpecViewMode::Encrypted,
+            SpecViewOpts::ENCRYPTED,
         )
         .await
         .unwrap();

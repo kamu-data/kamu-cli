@@ -19,7 +19,8 @@ use crate::{
     ApplyManifestError,
     BatchResourceError,
     ParseResourceManifestError,
-    ResolveManifestAccountError,
+    ResourceAccountResolutionError,
+    ResourceAccountResolutionProblemCode,
     ResourceHeadersValidationProblemCode,
     ResourceInvalidHeadersError,
 };
@@ -115,8 +116,9 @@ enum ApplyManifestItemOutcomeSummary {
     UnsupportedDescriptor {
         schema: domain::TypeUri,
     },
-    BadAccount {
-        error: ApplyManifestBadAccountSummary,
+    AccountResolution {
+        code: ResourceAccountResolutionProblemCode,
+        message: String,
     },
     InvalidHeaders {
         code: ResourceHeadersValidationProblemCode,
@@ -135,29 +137,6 @@ enum ApplyManifestItemOutcomeSummary {
         actual_schema: domain::TypeUri,
     },
     ConcurrentModification,
-    Failed {
-        message: String,
-    },
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(tag = "kind")]
-enum ApplyManifestBadAccountSummary {
-    AnonymousSubject,
-    EmptySelector,
-    AccountNotFoundById {
-        account_id: odf::AccountID,
-    },
-    AccountNotFoundByName {
-        account_name: odf::AccountName,
-    },
-    SelectorMismatch {
-        did: odf::AccountID,
-        actual_name: odf::AccountName,
-        expected_resource_id: Option<odf::ResourceID>,
-        expected_did: Option<odf::AccountID>,
-        expected_name: Option<odf::AccountName>,
-    },
     Failed {
         message: String,
     },
@@ -243,9 +222,9 @@ fn rollback_outcome(
                 domain::UnsupportedResourceDescriptorError::NotFound { schema },
             ))
         }
-        ApplyManifestItemOutcomeSummary::BadAccount { error } => {
-            Err(ApplyManifestError::BadAccount(error.into_error()))
-        }
+        ApplyManifestItemOutcomeSummary::AccountResolution { code, message } => Err(
+            ApplyManifestError::AccountResolution(ResourceAccountResolutionError { code, message }),
+        ),
         ApplyManifestItemOutcomeSummary::InvalidHeaders { code, message } => Err(
             ApplyManifestError::InvalidHeaders(ResourceInvalidHeadersError { code, message }),
         ),
@@ -269,41 +248,6 @@ fn rollback_outcome(
         }
         ApplyManifestItemOutcomeSummary::Failed { message } => {
             Err(ApplyManifestError::Internal(InternalError::new(message)))
-        }
-    }
-}
-
-impl ApplyManifestBadAccountSummary {
-    fn into_error(self) -> ResolveManifestAccountError {
-        match self {
-            Self::AnonymousSubject => ResolveManifestAccountError::AnonymousSubject,
-            Self::EmptySelector => ResolveManifestAccountError::EmptySelector,
-            Self::AccountNotFoundById { account_id } => {
-                ResolveManifestAccountError::AccountNotFoundById(
-                    kamu_accounts::AccountNotFoundByIdError { account_id },
-                )
-            }
-            Self::AccountNotFoundByName { account_name } => {
-                ResolveManifestAccountError::AccountNotFoundByName(
-                    kamu_accounts::AccountNotFoundByNameError { account_name },
-                )
-            }
-            Self::SelectorMismatch {
-                did,
-                actual_name,
-                expected_resource_id,
-                expected_did,
-                expected_name,
-            } => ResolveManifestAccountError::SelectorMismatch {
-                did,
-                actual_name,
-                expected_resource_id,
-                expected_did,
-                expected_name,
-            },
-            Self::Failed { message } => {
-                ResolveManifestAccountError::Internal(InternalError::new(message))
-            }
         }
     }
 }

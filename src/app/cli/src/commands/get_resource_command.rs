@@ -17,12 +17,10 @@ use internal_error::ResultIntoInternal;
 use kamu_resources::TypeUri;
 use kamu_resources_facade::{
     BatchResourceProblem,
-    RenderResourceManifestError,
-    ResourceBatchSelector,
+    GetResourceError,
     ResourceFacade,
     ResourceLookupProblem,
     ResourceManifestFormat as FacadeResourceManifestFormat,
-    ResourceRef,
 };
 
 use super::{CLIError, Command, common};
@@ -90,11 +88,9 @@ impl GetResourceCommand {
         })
     }
 
-    fn spec_view_mode(&self) -> kamu_resources_facade::SpecViewMode {
-        if self.revealed {
-            kamu_resources_facade::SpecViewMode::Revealed
-        } else {
-            kamu_resources_facade::SpecViewMode::Encrypted
+    fn spec_view(&self) -> kamu_resources_facade::SpecViewOpts {
+        kamu_resources_facade::SpecViewOpts {
+            revealed: self.revealed,
         }
     }
 
@@ -200,7 +196,8 @@ impl GetResourceCommand {
 
     fn print_shadowed_selector_warning(selector_input: &str) {
         eprintln!(
-            "Warning: selector `{selector_input}` ignored because `all` selects the same scope"
+            "Warning: selector `{selector_input}` ignored because a broader selector already \
+             covers it"
         );
     }
 
@@ -221,28 +218,10 @@ impl GetResourceCommand {
         for (_schema, entries) in Self::group_targets_by_schema(targets) {
             for chunk in entries.chunks(Self::MATERIALIZATION_BATCH_SIZE) {
                 let result = resource_facade
-                    .render_manifests(
-                        ResourceBatchSelector {
-                            account: None,
-                            resource_type: chunk
-                                .first()
-                                .map(|(_, target)| {
-                                    kamu_resources::ResourceTypeSelectorRaw::from(
-                                        &target.canonical_selector,
-                                    )
-                                })
-                                .expect("non-empty chunk"),
-                            resource_refs: chunk
-                                .iter()
-                                .map(|(_, target)| ResourceRef::ById(target.id))
-                                .collect(),
-                        },
-                        format,
-                        self.spec_view_mode(),
-                    )
+                    .render_manifests(Self::chunk_resource_refs(chunk), format, self.spec_view())
                     .await?;
 
-                self.handle_render_manifest_problems(result.problems)?;
+                self.handle_lookup_problems(result.problems)?;
 
                 for success in result.successes {
                     let (original_index, _) = chunk[success.request_index];
@@ -265,25 +244,10 @@ impl GetResourceCommand {
         for (_schema, entries) in Self::group_targets_by_schema(targets) {
             for chunk in entries.chunks(Self::MATERIALIZATION_BATCH_SIZE) {
                 let result = resource_facade
-                    .get_many(
-                        ResourceBatchSelector {
-                            account: None,
-                            resource_type: kamu_resources::ResourceTypeSelectorRaw::new_unchecked(
-                                chunk
-                                    .first()
-                                    .map(|(_, target)| target.canonical_selector.to_string())
-                                    .unwrap_or_default(),
-                            ),
-                            resource_refs: chunk
-                                .iter()
-                                .map(|(_, target)| ResourceRef::ById(target.id))
-                                .collect(),
-                        },
-                        self.spec_view_mode(),
-                    )
+                    .get(Self::chunk_resource_refs(chunk), self.spec_view())
                     .await?;
 
-                self.handle_get_resource_problems(result.problems)?;
+                self.handle_lookup_problems(result.problems)?;
 
                 for success in result.successes {
                     let (original_index, _) = chunk[success.request_index];
@@ -294,6 +258,24 @@ impl GetResourceCommand {
         }
 
         Ok(rendered_items.into_iter().flatten().collect())
+    }
+
+    /// Builds one ref per already-resolved target.
+    ///
+    /// Targets carry their resolved schema, so the ref names the type by URI
+    /// rather than by the selector the user typed — no second resolution, and
+    /// no dependence on the chunk being single-type.
+    fn chunk_resource_refs(chunk: &[(usize, &ResourceTarget)]) -> Vec<kamu_resources::ResourceRef> {
+        chunk
+            .iter()
+            .map(|(_, target)| kamu_resources::ResourceRef {
+                account: None,
+                r#type: Some(target.schema.clone().into()),
+                id: Some(target.id),
+                did: None,
+                name: None,
+            })
+            .collect()
     }
 
     fn group_targets_by_schema(
@@ -309,7 +291,11 @@ impl GetResourceCommand {
         groups
     }
 
-    fn handle_get_resource_problems(
+    /// Fails on the first problem that `--ignore-not-found` does not excuse.
+    ///
+    /// Shared by the view and render paths: both address resources the same
+    /// way, so a ref that fails one fails the other identically.
+    fn handle_lookup_problems(
         &self,
         problems: Vec<BatchResourceProblem<ResourceLookupProblem>>,
     ) -> Result<(), CLIError> {
@@ -317,26 +303,7 @@ impl GetResourceCommand {
             match problem.error {
                 ResourceLookupProblem::NameNotFound(_) | ResourceLookupProblem::IDNotFound(_)
                     if self.ignore_not_found => {}
-                error => {
-                    return Err(
-                        kamu_resources_facade::GetResourceError::LookupProblem(error).into(),
-                    );
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    fn handle_render_manifest_problems(
-        &self,
-        problems: Vec<BatchResourceProblem<ResourceLookupProblem>>,
-    ) -> Result<(), CLIError> {
-        for problem in problems {
-            match problem.error {
-                ResourceLookupProblem::NameNotFound(_) | ResourceLookupProblem::IDNotFound(_)
-                    if self.ignore_not_found => {}
-                error => return Err(RenderResourceManifestError::LookupProblem(error).into()),
+                error => return Err(GetResourceError::LookupProblem(error).into()),
             }
         }
 

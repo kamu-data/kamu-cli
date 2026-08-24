@@ -89,11 +89,6 @@ impl RemoteGraphqlFacadeHarness {
         url::Url::parse(&format!("http://{}", self.server_addr)).unwrap()
     }
 
-    #[expect(dead_code)]
-    pub fn base_catalog(&self) -> &dill::Catalog {
-        self.local.base_catalog()
-    }
-
     pub async fn execute_raw_graphql(
         &self,
         account: TestAccount,

@@ -43,11 +43,11 @@ impl ResourceManifestExecutionService for ResourceManifestExecutionServiceImpl {
 
         if dry_run {
             let decision = resource_facade.plan_apply_manifest(request).await?;
-            return Ok(decision.into());
+            return Ok(decision.try_into()?);
         }
 
         let decision = resource_facade.apply_manifest(request).await?;
-        Ok(decision.into())
+        Ok(decision.try_into()?)
     }
 }
 

@@ -24,12 +24,9 @@ use kamu_datasets::{
 use kamu_resources_facade::{
     ApplyManifestError,
     BatchResourceError,
-    DeleteResourceError,
     GetResourceError,
-    ListAllResourcesError,
     ListResourcesError,
     ListSupportedResourceTypesError,
-    RenderResourceManifestError,
     ResourceLookupProblem,
     ResourcesSummaryError,
 };
@@ -267,7 +264,7 @@ impl From<ResourcesSummaryError> for CLIError {
     fn from(e: ResourcesSummaryError) -> Self {
         use ResourcesSummaryError as E;
         match e {
-            e @ E::BadAccount(_) => Self::failure(e),
+            e @ (E::AccountResolution(_) | E::AccountAccess(_)) => Self::failure(e),
             E::RemoteRequest(err) => Self::from(err),
             E::Internal(err) => Self::critical(err),
         }
@@ -288,21 +285,12 @@ impl From<ListResourcesError> for CLIError {
         use ListResourcesError as E;
 
         match e {
-            e @ (E::UnsupportedSelector(_) | E::BadAccount(_) | E::InvalidLabelFilter(_)) => {
-                Self::failure(e)
-            }
-            E::RemoteRequest(err) => Self::from(err),
-            E::Internal(err) => Self::critical(err),
-        }
-    }
-}
-
-impl From<ListAllResourcesError> for CLIError {
-    fn from(e: ListAllResourcesError) -> Self {
-        use ListAllResourcesError as E;
-
-        match e {
-            e @ (E::BadAccount(_) | E::InvalidLabelFilter(_)) => Self::failure(e),
+            e @ (E::UnsupportedSelector(_)
+            | E::AccountResolution(_)
+            | E::AccountAccess(_)
+            | E::InvalidLabelFilter(_)
+            | E::UnrepresentableScope(_)
+            | E::UnsupportedSelectorField(_)) => Self::failure(e),
             E::RemoteRequest(err) => Self::from(err),
             E::Internal(err) => Self::critical(err),
         }
@@ -314,22 +302,10 @@ impl From<BatchResourceError> for CLIError {
         use BatchResourceError as E;
 
         match e {
-            e @ (E::UnsupportedSelector(_) | E::BadAccount(_) | E::InvalidLabelFilter(_)) => {
-                Self::failure(e)
-            }
-            E::RemoteRequest(err) => Self::from(err),
-            E::Internal(err) => Self::critical(err),
-        }
-    }
-}
-
-impl From<DeleteResourceError> for CLIError {
-    fn from(e: DeleteResourceError) -> Self {
-        use DeleteResourceError as E;
-
-        match e {
-            E::LookupProblem(problem) => Self::failure(ResourceLookupCliError::from(problem)),
-            e @ (E::UnsupportedSelector(_) | E::BadAccount(_)) => Self::failure(e),
+            e @ (E::UnsupportedSelector(_)
+            | E::AccountResolution(_)
+            | E::AccountAccess(_)
+            | E::InvalidLabelFilter(_)) => Self::failure(e),
             E::RemoteRequest(err) => Self::from(err),
             E::Internal(err) => Self::critical(err),
         }
@@ -338,27 +314,8 @@ impl From<DeleteResourceError> for CLIError {
 
 impl From<GetResourceError> for CLIError {
     fn from(e: GetResourceError) -> Self {
-        use GetResourceError as E;
-
-        match e {
-            E::LookupProblem(problem) => Self::failure(ResourceLookupCliError::from(problem)),
-            e @ (E::UnsupportedSelector(_) | E::BadAccount(_)) => Self::failure(e),
-            E::RemoteRequest(err) => Self::from(err),
-            E::Internal(err) => Self::critical(err),
-        }
-    }
-}
-
-impl From<RenderResourceManifestError> for CLIError {
-    fn from(e: RenderResourceManifestError) -> Self {
-        use RenderResourceManifestError as E;
-
-        match e {
-            E::LookupProblem(problem) => Self::failure(ResourceLookupCliError::from(problem)),
-            e @ (E::UnsupportedSelector(_) | E::BadAccount(_)) => Self::failure(e),
-            E::RemoteRequest(err) => Self::from(err),
-            E::Internal(err) => Self::critical(err),
-        }
+        let GetResourceError::LookupProblem(problem) = e;
+        Self::failure(ResourceLookupCliError::from(problem))
     }
 }
 
@@ -368,7 +325,8 @@ impl From<ApplyManifestError> for CLIError {
         match e {
             e @ (E::ParseManifest(_)
             | E::UnsupportedDescriptor(_)
-            | E::BadAccount(_)
+            | E::AccountResolution(_)
+            | E::AccountAccess(_)
             | E::InvalidHeaders(_)
             | E::InvalidSpec(_)
             | E::IDNotFound(_)
@@ -443,18 +401,47 @@ pub struct MultiTenantRefUnexpectedError {
 pub struct CommandInterpretationFailed;
 
 #[derive(Debug, Error)]
-enum ResourceLookupCliError {
+pub enum ResourceLookupCliError {
     #[error("Resource with id {0} was not found")]
     IDNotFound(kamu_resources::ResourceID),
 
     #[error("Resource '{name}' of type '{resource_type}' was not found")]
     NameNotFound { resource_type: String, name: String },
 
+    /// The `%/<name>` form: an exact name searched across every type. No single
+    /// type can be named in the message, because every one was tried.
+    #[error("Resource '{name}' was not found in any resource type")]
+    AnyTypeNameNotFound { name: kamu_resources::ResourceName },
+
+    /// The `%/<name>` form again, but the name exists in several types. A
+    /// reference names exactly one resource, so the caller has to disambiguate
+    /// rather than the CLI picking a winner.
+    #[error("Resource '{name}' is ambiguous: it exists in types {}. Specify a type to disambiguate", type_names.join(", "))]
+    AmbiguousType {
+        name: kamu_resources::ResourceName,
+        type_names: Vec<String>,
+    },
+
     #[error("Resource id {id} refers to schema '{actual_schema}', expected '{expected_schema}'")]
     SchemaMismatch {
         id: kamu_resources::ResourceID,
         expected_schema: String,
         actual_schema: String,
+    },
+
+    /// Unreachable from the CLI, which always spells exactly one of the two,
+    /// but representable on the wire.
+    #[error("Resource reference specified neither an id nor a name")]
+    EmptyRef,
+
+    /// Also unreachable from the CLI for the same reason: a reference naming
+    /// both an id and a name asserts they agree, and only the wire can spell
+    /// that pair.
+    #[error("Resource {id} is named '{actual_name}', not '{expected_name}'")]
+    NameMismatch {
+        id: kamu_resources::ResourceID,
+        expected_name: String,
+        actual_name: String,
     },
 }
 
@@ -466,11 +453,24 @@ impl From<ResourceLookupProblem> for ResourceLookupCliError {
                 resource_type: err.type_name.to_string(),
                 name: err.name.to_string(),
             },
+            ResourceLookupProblem::AnyTypeNameNotFound(err) => {
+                Self::AnyTypeNameNotFound { name: err.name }
+            }
+            ResourceLookupProblem::AmbiguousType(err) => Self::AmbiguousType {
+                name: err.name,
+                type_names: err.type_names.iter().map(ToString::to_string).collect(),
+            },
             ResourceLookupProblem::SchemaMismatch(err) => Self::SchemaMismatch {
                 id: err.id,
                 expected_schema: err.expected_schema.to_string(),
                 actual_schema: err.actual_schema.to_string(),
             },
+            ResourceLookupProblem::NameMismatch(err) => Self::NameMismatch {
+                id: err.id,
+                expected_name: err.expected_name.to_string(),
+                actual_name: err.actual_name.to_string(),
+            },
+            ResourceLookupProblem::EmptyRef => Self::EmptyRef,
         }
     }
 }

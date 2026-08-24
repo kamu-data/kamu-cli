@@ -16,26 +16,20 @@ use crate::queries::{
     BatchResourceHandlesOutcome,
     BatchResourceManifestsOutcome,
     BatchResourcesOutcome,
-    Resource,
-    ResourceBadAccountProblem,
-    ResourceBatchSelectorInput,
+    ResourceAccountResolutionProblem,
     ResourceConnection,
     ResourceHandle,
     ResourceHandleConnection,
     ResourceInvalidLabelFilterProblem,
-    ResourceLabelFilterInput,
     ResourceManifestFormat,
-    ResourceRenderManifestResult,
-    ResourceSelectorInput,
-    ResourceSelectorProblem,
-    ResourceSelectorProblemResult,
+    ResourceRefInput,
     ResourceSummary,
     ResourceTypeDescriptor,
-    ResourceTypeSelectorInput,
     ResourceUnsupportedSelectorProblem,
     ResourcesSummary,
-    SearchResourceHandlesInput,
-    into_facade_filter,
+    SearchResourcesInput,
+    SpecViewOptsInput,
+    into_resource_refs,
     map_unsupported_selector_problem,
 };
 
@@ -94,9 +88,12 @@ impl Resources {
             .await
         {
             Ok(summary) => Ok(ResourcesSummaryOutcome::Success(summary.into())),
-            Err(kamu_resources_facade::ResourcesSummaryError::BadAccount(error)) => Ok(
-                ResourcesSummaryOutcome::BadAccount(map_bad_account_problem(error)?),
-            ),
+            Err(kamu_resources_facade::ResourcesSummaryError::AccountResolution(error)) => {
+                Ok(ResourcesSummaryOutcome::AccountResolution(error.into()))
+            }
+            Err(kamu_resources_facade::ResourcesSummaryError::AccountAccess(error)) => {
+                Err(map_account_access_error(error))
+            }
             Err(kamu_resources_facade::ResourcesSummaryError::RemoteRequest(error)) => {
                 Err(error.int_err().into())
             }
@@ -104,124 +101,70 @@ impl Resources {
         }
     }
 
-    /// Returns a resource by selector, if found
-    #[tracing::instrument(level = "info", name = Resources_resource, skip_all, fields(?selector))]
+    /// Returns resources by refs
+    #[tracing::instrument(level = "info", name = Resources_by_refs, skip_all, fields(selector_count = resource_refs.len()))]
     #[graphql(guard = "LoggedInGuard::new()")]
-    async fn resource(
+    async fn by_refs(
         &self,
         ctx: &Context<'_>,
-        selector: ResourceSelectorInput,
-        #[graphql(default)] revealed: bool,
-    ) -> Result<ResourceGetOutcome> {
-        let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
-
-        let spec_view_mode = Self::spec_view_mode_from_revealed(revealed);
-
-        match resource_facade.get(selector.into(), spec_view_mode).await {
-            Ok(resource) => Ok(ResourceGetOutcome::Success(resource.into())),
-            Err(kamu_resources_facade::GetResourceError::LookupProblem(problem)) => {
-                Ok(ResourceGetOutcome::Problem(problem.into()))
-            }
-            Err(kamu_resources_facade::GetResourceError::UnsupportedSelector(error)) => {
-                Ok(ResourceGetOutcome::Problem(error.try_into()?))
-            }
-            Err(kamu_resources_facade::GetResourceError::BadAccount(error)) => {
-                Ok(ResourceGetOutcome::Problem(ResourceSelectorProblemResult {
-                    problem: ResourceSelectorProblem::BadAccount(map_bad_account_problem(error)?),
-                }))
-            }
-            Err(error) => Err(map_get_resource_non_lookup_error(error)),
-        }
-    }
-
-    /// Returns resources by selectors
-    #[tracing::instrument(level = "info", name = Resources_resources, skip_all, fields(selector_count = selector.resource_refs.len()))]
-    #[graphql(guard = "LoggedInGuard::new()")]
-    async fn resources(
-        &self,
-        ctx: &Context<'_>,
-        selector: ResourceBatchSelectorInput,
-        #[graphql(default)] revealed: bool,
+        resource_refs: Vec<ResourceRefInput>,
+        #[graphql(default)] opts: SpecViewOptsInput,
     ) -> Result<BatchResourcesOutcome> {
         let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
 
-        let spec_view_mode = Self::spec_view_mode_from_revealed(revealed);
-
         match resource_facade
-            .get_many(selector.try_into()?, spec_view_mode)
+            .get(
+                into_resource_refs(resource_refs)?,
+                opts.into_spec_view_opts(),
+            )
             .await
         {
             Ok(response) => Ok(BatchResourcesOutcome::Success(response.into())),
             Err(kamu_resources_facade::BatchResourceError::UnsupportedSelector(e)) => Ok(
                 BatchResourcesOutcome::UnsupportedSelector(map_unsupported_selector_problem(e)),
             ),
-            Err(kamu_resources_facade::BatchResourceError::BadAccount(e)) => Ok(
-                BatchResourcesOutcome::BadAccount(map_bad_account_problem(e)?),
-            ),
+            Err(kamu_resources_facade::BatchResourceError::AccountResolution(e)) => {
+                Ok(BatchResourcesOutcome::AccountResolution(e.into()))
+            }
             Err(e) => Err(map_batch_resource_error(e)),
         }
     }
 
-    /// Returns resource handle by selector, if found
-    #[tracing::instrument(level = "info", name = Resources_resource_handle, skip_all, fields(?selector))]
+    /// Returns resource handles by refs
+    #[tracing::instrument(level = "info", name = Resources_handles_by_refs, skip_all, fields(selector_count = resource_refs.len()))]
     #[graphql(guard = "LoggedInGuard::new()")]
-    async fn resource_handle(
+    async fn handles_by_refs(
         &self,
         ctx: &Context<'_>,
-        selector: ResourceSelectorInput,
-    ) -> Result<ResourceGetHandleOutcome> {
-        let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
-
-        match resource_facade.get_handle(selector.into()).await {
-            Ok(handle) => Ok(ResourceGetHandleOutcome::Success(handle.into())),
-            Err(kamu_resources_facade::GetResourceError::LookupProblem(problem)) => {
-                Ok(ResourceGetHandleOutcome::Problem(problem.into()))
-            }
-            Err(kamu_resources_facade::GetResourceError::UnsupportedSelector(error)) => {
-                Ok(ResourceGetHandleOutcome::Problem(error.try_into()?))
-            }
-            Err(kamu_resources_facade::GetResourceError::BadAccount(error)) => Ok(
-                ResourceGetHandleOutcome::Problem(ResourceSelectorProblemResult {
-                    problem: ResourceSelectorProblem::BadAccount(map_bad_account_problem(error)?),
-                }),
-            ),
-            Err(error) => Err(map_get_resource_non_lookup_error(error)),
-        }
-    }
-
-    /// Returns resource handles by selectors
-    #[tracing::instrument(level = "info", name = Resources_resource_handles, skip_all, fields(selector_count = selector.resource_refs.len()))]
-    #[graphql(guard = "LoggedInGuard::new()")]
-    async fn resource_handles(
-        &self,
-        ctx: &Context<'_>,
-        selector: ResourceBatchSelectorInput,
+        resource_refs: Vec<ResourceRefInput>,
     ) -> Result<BatchResourceHandlesOutcome> {
         let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
 
-        match resource_facade.get_handles(selector.try_into()?).await {
+        match resource_facade
+            .get_handles(into_resource_refs(resource_refs)?)
+            .await
+        {
             Ok(response) => Ok(BatchResourceHandlesOutcome::Success(response.into())),
             Err(kamu_resources_facade::BatchResourceError::UnsupportedSelector(e)) => {
                 Ok(BatchResourceHandlesOutcome::UnsupportedSelector(
                     map_unsupported_selector_problem(e),
                 ))
             }
-            Err(kamu_resources_facade::BatchResourceError::BadAccount(e)) => Ok(
-                BatchResourceHandlesOutcome::BadAccount(map_bad_account_problem(e)?),
-            ),
+            Err(kamu_resources_facade::BatchResourceError::AccountResolution(e)) => {
+                Ok(BatchResourceHandlesOutcome::AccountResolution(e.into()))
+            }
             Err(e) => Err(map_batch_resource_error(e)),
         }
     }
 
-    /// Returns resources of the specified resource type
-    #[tracing::instrument(level = "info", name = Resources_list_by_resource_type, skip_all, fields(?resource_type, ?page, ?per_page))]
+    /// Returns resources matching the given selectors, which act as a logical
+    /// OR and may span several resource types and accounts
+    #[tracing::instrument(level = "info", name = Resources_by_selectors, skip_all, fields(?page, ?per_page))]
     #[graphql(guard = "LoggedInGuard::new()")]
-    async fn list_by_resource_type(
+    async fn by_selectors(
         &self,
         ctx: &Context<'_>,
-        resource_type: ResourceTypeSelectorInput,
-        account: Option<AccountRefInput>,
-        label_filter: Option<ResourceLabelFilterInput>,
+        query: SearchResourcesInput,
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<ResourceListOutcome> {
@@ -230,17 +173,16 @@ impl Resources {
         let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
 
         match resource_facade
-            .list(kamu_resources_facade::ListResourcesRequest {
-                raw_type_selector: resource_type.into_resource_type_selector(),
-                account: account.map(AccountRefInput::into_manifest_account),
-                pagination: PaginationOpts::from_page(page, per_page),
-                label_filter: into_facade_filter(label_filter)?,
-            })
+            .search(query.into_facade_request(PaginationOpts::from_page(page, per_page))?)
             .await
         {
-            Ok(items) => {
-                let total_count = items.len();
-                let items = items.into_iter().map(ResourceSummary::from).collect();
+            Ok(response) => {
+                let total_count = response.total_count;
+                let items = response
+                    .items
+                    .into_iter()
+                    .map(ResourceSummary::from)
+                    .collect();
                 Ok(ResourceListOutcome::Success(ResourceConnection::new(
                     items,
                     page,
@@ -251,9 +193,9 @@ impl Resources {
             Err(kamu_resources_facade::ListResourcesError::UnsupportedSelector(error)) => Ok(
                 ResourceListOutcome::UnsupportedSelector(map_unsupported_selector_problem(error)),
             ),
-            Err(kamu_resources_facade::ListResourcesError::BadAccount(error)) => Ok(
-                ResourceListOutcome::BadAccount(map_bad_account_problem(error)?),
-            ),
+            Err(kamu_resources_facade::ListResourcesError::AccountResolution(error)) => {
+                Ok(ResourceListOutcome::AccountResolution(error.into()))
+            }
             Err(kamu_resources_facade::ListResourcesError::InvalidLabelFilter(error)) => {
                 Ok(ResourceListOutcome::InvalidLabelFilter(error.into()))
             }
@@ -261,60 +203,13 @@ impl Resources {
         }
     }
 
-    /// Returns resource handles of the specified resource type
-    #[tracing::instrument(level = "info", name = Resources_list_handles_by_resource_type, skip_all, fields(?resource_type, ?page, ?per_page))]
+    /// Returns resource handles matching the given selectors
+    #[tracing::instrument(level = "info", name = Resources_handles_by_selectors, skip_all, fields(?page, ?per_page))]
     #[graphql(guard = "LoggedInGuard::new()")]
-    async fn list_handles_by_resource_type(
+    async fn handles_by_selectors(
         &self,
         ctx: &Context<'_>,
-        resource_type: ResourceTypeSelectorInput,
-        account: Option<AccountRefInput>,
-        label_filter: Option<ResourceLabelFilterInput>,
-        page: Option<usize>,
-        per_page: Option<usize>,
-    ) -> Result<ResourceHandleListOutcome> {
-        let page = page.unwrap_or(0);
-        let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
-        let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
-
-        match resource_facade
-            .list_handles(kamu_resources_facade::ListResourceHandlesRequest {
-                raw_type_selector: resource_type.into_resource_type_selector(),
-                account: account.map(AccountRefInput::into_manifest_account),
-                label_filter: into_facade_filter(label_filter)?,
-                pagination: PaginationOpts::from_page(page, per_page),
-            })
-            .await
-        {
-            Ok(items) => {
-                let total_count = items.len();
-                let items = items.into_iter().map(ResourceHandle::from).collect();
-                Ok(ResourceHandleListOutcome::Success(
-                    ResourceHandleConnection::new(items, page, per_page, total_count),
-                ))
-            }
-            Err(kamu_resources_facade::ListResourcesError::UnsupportedSelector(error)) => {
-                Ok(ResourceHandleListOutcome::UnsupportedSelector(
-                    map_unsupported_selector_problem(error),
-                ))
-            }
-            Err(kamu_resources_facade::ListResourcesError::BadAccount(error)) => Ok(
-                ResourceHandleListOutcome::BadAccount(map_bad_account_problem(error)?),
-            ),
-            Err(kamu_resources_facade::ListResourcesError::InvalidLabelFilter(error)) => {
-                Ok(ResourceHandleListOutcome::InvalidLabelFilter(error.into()))
-            }
-            Err(error) => Err(map_list_resources_error(error)),
-        }
-    }
-
-    /// Searches resource handles across the specified exact resource types
-    #[tracing::instrument(level = "info", name = Resources_search_handles, skip_all, fields(?page, ?per_page))]
-    #[graphql(guard = "LoggedInGuard::new()")]
-    async fn search_handles(
-        &self,
-        ctx: &Context<'_>,
-        query: SearchResourceHandlesInput,
+        query: SearchResourcesInput,
         page: Option<usize>,
         per_page: Option<usize>,
     ) -> Result<ResourceHandleListOutcome> {
@@ -342,9 +237,9 @@ impl Resources {
                     map_unsupported_selector_problem(error),
                 ))
             }
-            Err(kamu_resources_facade::ListResourcesError::BadAccount(error)) => Ok(
-                ResourceHandleListOutcome::BadAccount(map_bad_account_problem(error)?),
-            ),
+            Err(kamu_resources_facade::ListResourcesError::AccountResolution(error)) => {
+                Ok(ResourceHandleListOutcome::AccountResolution(error.into()))
+            }
             Err(kamu_resources_facade::ListResourcesError::InvalidLabelFilter(error)) => {
                 Ok(ResourceHandleListOutcome::InvalidLabelFilter(error.into()))
             }
@@ -352,144 +247,24 @@ impl Resources {
         }
     }
 
-    /// Returns resources across all resource types
-    #[tracing::instrument(level = "info", name = Resources_list_all, skip_all, fields(?page, ?per_page))]
-    #[graphql(guard = "LoggedInGuard::new()")]
-    async fn list_all(
-        &self,
-        ctx: &Context<'_>,
-        account: Option<AccountRefInput>,
-        label_filter: Option<ResourceLabelFilterInput>,
-        page: Option<usize>,
-        per_page: Option<usize>,
-    ) -> Result<ResourceListAllOutcome> {
-        let page = page.unwrap_or(0);
-        let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
-        let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
-
-        match resource_facade
-            .list_all(kamu_resources_facade::ListAllResourcesRequest {
-                label_filter: into_facade_filter(label_filter)?,
-                account: account.map(AccountRefInput::into_manifest_account),
-                pagination: PaginationOpts::from_page(page, per_page),
-            })
-            .await
-        {
-            Ok(items) => {
-                let total_count = items.len();
-                let items = items.into_iter().map(ResourceSummary::from).collect();
-                Ok(ResourceListAllOutcome::Success(ResourceConnection::new(
-                    items,
-                    page,
-                    per_page,
-                    total_count,
-                )))
-            }
-            Err(kamu_resources_facade::ListAllResourcesError::BadAccount(error)) => Ok(
-                ResourceListAllOutcome::BadAccount(map_bad_account_problem(error)?),
-            ),
-            Err(kamu_resources_facade::ListAllResourcesError::InvalidLabelFilter(error)) => {
-                Ok(ResourceListAllOutcome::InvalidLabelFilter(error.into()))
-            }
-            Err(error) => Err(map_list_all_resources_error(error)),
-        }
-    }
-
-    /// Returns resource handles across all resource types
-    #[tracing::instrument(level = "info", name = Resources_list_all_handles, skip_all, fields(?page, ?per_page))]
-    #[graphql(guard = "LoggedInGuard::new()")]
-    async fn list_all_handles(
-        &self,
-        ctx: &Context<'_>,
-        account: Option<AccountRefInput>,
-        label_filter: Option<ResourceLabelFilterInput>,
-        page: Option<usize>,
-        per_page: Option<usize>,
-    ) -> Result<ResourceHandleListAllOutcome> {
-        let page = page.unwrap_or(0);
-        let per_page = per_page.unwrap_or(Self::DEFAULT_PER_PAGE);
-        let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
-
-        match resource_facade
-            .list_all_handles(kamu_resources_facade::ListAllResourceHandlesRequest {
-                label_filter: into_facade_filter(label_filter)?,
-                account: account.map(AccountRefInput::into_manifest_account),
-                pagination: PaginationOpts::from_page(page, per_page),
-            })
-            .await
-        {
-            Ok(items) => {
-                let total_count = items.len();
-                let items = items.into_iter().map(ResourceHandle::from).collect();
-                Ok(ResourceHandleListAllOutcome::Success(
-                    ResourceHandleConnection::new(items, page, per_page, total_count),
-                ))
-            }
-            Err(kamu_resources_facade::ListAllResourcesError::BadAccount(error)) => Ok(
-                ResourceHandleListAllOutcome::BadAccount(map_bad_account_problem(error)?),
-            ),
-            Err(kamu_resources_facade::ListAllResourcesError::InvalidLabelFilter(error)) => Ok(
-                ResourceHandleListAllOutcome::InvalidLabelFilter(error.into()),
-            ),
-            Err(error) => Err(map_list_all_resources_error(error)),
-        }
-    }
-
-    /// Renders a canonical manifest representation from a stored resource
-    #[tracing::instrument(level = "info", name = Resources_render_manifest, skip_all)]
-    #[graphql(guard = "LoggedInGuard::new()")]
-    async fn render_manifest(
-        &self,
-        ctx: &Context<'_>,
-        selector: ResourceSelectorInput,
-        format: ResourceManifestFormat,
-        #[graphql(default)] revealed: bool,
-    ) -> Result<ResourceRenderManifestOutcome> {
-        let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
-
-        let spec_view_mode = Self::spec_view_mode_from_revealed(revealed);
-
-        match resource_facade
-            .render_manifest(selector.into(), format.into(), spec_view_mode)
-            .await
-        {
-            Ok(rendered) => Ok(ResourceRenderManifestOutcome::Success(
-                ResourceRenderManifestResult {
-                    manifest: rendered.manifest,
-                    format: rendered.format.into(),
-                },
-            )),
-            Err(kamu_resources_facade::RenderResourceManifestError::LookupProblem(problem)) => {
-                Ok(ResourceRenderManifestOutcome::Problem(problem.into()))
-            }
-            Err(kamu_resources_facade::RenderResourceManifestError::UnsupportedSelector(error)) => {
-                Ok(ResourceRenderManifestOutcome::Problem(error.try_into()?))
-            }
-            Err(kamu_resources_facade::RenderResourceManifestError::BadAccount(error)) => Ok(
-                ResourceRenderManifestOutcome::Problem(ResourceSelectorProblemResult {
-                    problem: ResourceSelectorProblem::BadAccount(map_bad_account_problem(error)?),
-                }),
-            ),
-            Err(error) => Err(map_render_resource_manifest_error(error)),
-        }
-    }
-
     /// Renders canonical manifest representations from stored resources
-    #[tracing::instrument(level = "info", name = Resources_render_manifests, skip_all, fields(selector_count = selector.resource_refs.len()))]
+    #[tracing::instrument(level = "info", name = Resources_render_manifests, skip_all, fields(selector_count = resource_refs.len()))]
     #[graphql(guard = "LoggedInGuard::new()")]
     async fn render_manifests(
         &self,
         ctx: &Context<'_>,
-        selector: ResourceBatchSelectorInput,
+        resource_refs: Vec<ResourceRefInput>,
         format: ResourceManifestFormat,
-        #[graphql(default)] revealed: bool,
+        #[graphql(default)] opts: SpecViewOptsInput,
     ) -> Result<BatchResourceManifestsOutcome> {
         let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
 
-        let spec_view_mode = Self::spec_view_mode_from_revealed(revealed);
-
         match resource_facade
-            .render_manifests(selector.try_into()?, format.into(), spec_view_mode)
+            .render_manifests(
+                into_resource_refs(resource_refs)?,
+                format.into(),
+                opts.into_spec_view_opts(),
+            )
             .await
         {
             Ok(response) => Ok(BatchResourceManifestsOutcome::Success(response.into())),
@@ -498,37 +273,11 @@ impl Resources {
                     map_unsupported_selector_problem(e),
                 ))
             }
-            Err(kamu_resources_facade::BatchResourceError::BadAccount(e)) => Ok(
-                BatchResourceManifestsOutcome::BadAccount(map_bad_account_problem(e)?),
-            ),
+            Err(kamu_resources_facade::BatchResourceError::AccountResolution(e)) => {
+                Ok(BatchResourceManifestsOutcome::AccountResolution(e.into()))
+            }
             Err(e) => Err(map_batch_resource_error(e)),
         }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-impl Resources {
-    fn spec_view_mode_from_revealed(revealed: bool) -> kamu_resources_facade::SpecViewMode {
-        if revealed {
-            kamu_resources_facade::SpecViewMode::Revealed
-        } else {
-            kamu_resources_facade::SpecViewMode::Encrypted
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-fn map_get_resource_non_lookup_error(error: kamu_resources_facade::GetResourceError) -> GqlError {
-    use kamu_resources_facade::GetResourceError as E;
-
-    match error {
-        E::LookupProblem(_) | E::UnsupportedSelector(_) | E::BadAccount(_) => {
-            unreachable!("handled as union arm")
-        }
-        E::RemoteRequest(error) => error.int_err().into(),
-        E::Internal(error) => error.into(),
     }
 }
 
@@ -537,7 +286,7 @@ fn map_get_resource_non_lookup_error(error: kamu_resources_facade::GetResourceEr
 #[derive(Union, Debug, Clone)]
 pub enum ResourcesSummaryOutcome {
     Success(ResourcesSummary),
-    BadAccount(ResourceBadAccountProblem),
+    AccountResolution(ResourceAccountResolutionProblem),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -546,7 +295,7 @@ pub enum ResourcesSummaryOutcome {
 pub enum ResourceListOutcome {
     Success(ResourceConnection),
     UnsupportedSelector(ResourceUnsupportedSelectorProblem),
-    BadAccount(ResourceBadAccountProblem),
+    AccountResolution(ResourceAccountResolutionProblem),
     InvalidLabelFilter(ResourceInvalidLabelFilterProblem),
 }
 
@@ -556,66 +305,8 @@ pub enum ResourceListOutcome {
 pub enum ResourceHandleListOutcome {
     Success(ResourceHandleConnection),
     UnsupportedSelector(ResourceUnsupportedSelectorProblem),
-    BadAccount(ResourceBadAccountProblem),
+    AccountResolution(ResourceAccountResolutionProblem),
     InvalidLabelFilter(ResourceInvalidLabelFilterProblem),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Union)]
-pub enum ResourceListAllOutcome {
-    Success(ResourceConnection),
-    BadAccount(ResourceBadAccountProblem),
-    InvalidLabelFilter(ResourceInvalidLabelFilterProblem),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Union)]
-pub enum ResourceHandleListAllOutcome {
-    Success(ResourceHandleConnection),
-    BadAccount(ResourceBadAccountProblem),
-    InvalidLabelFilter(ResourceInvalidLabelFilterProblem),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Union, Debug, Clone)]
-pub enum ResourceGetOutcome {
-    Success(Resource),
-    Problem(ResourceSelectorProblemResult),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Union, Debug, Clone)]
-pub enum ResourceGetHandleOutcome {
-    Success(ResourceHandle),
-    Problem(ResourceSelectorProblemResult),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-fn map_render_resource_manifest_error(
-    error: kamu_resources_facade::RenderResourceManifestError,
-) -> GqlError {
-    use kamu_resources_facade::RenderResourceManifestError as E;
-
-    match error {
-        E::UnsupportedSelector(_) | E::BadAccount(_) | E::LookupProblem(_) => {
-            unreachable!("handled as union arm")
-        }
-        E::RemoteRequest(error) => error.int_err().into(),
-        E::Internal(error) => error.into(),
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Union, Debug, Clone)]
-pub enum ResourceRenderManifestOutcome {
-    Success(ResourceRenderManifestResult),
-    Problem(ResourceSelectorProblemResult),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -625,7 +316,8 @@ fn map_batch_resource_error(error: kamu_resources_facade::BatchResourceError) ->
 
     match error {
         E::UnsupportedSelector(_) => GqlError::gql("Unsupported resource type selector"),
-        E::BadAccount(error) => map_resolve_manifest_account_error(error),
+        E::AccountResolution(error) => GqlError::gql(error.to_string()),
+        E::AccountAccess(error) => map_account_access_error(error),
         E::InvalidLabelFilter(error) => GqlError::gql(error.to_string()),
         E::RemoteRequest(error) => error.int_err().into(),
         E::Internal(error) => error.into(),
@@ -639,8 +331,11 @@ fn map_list_resources_error(error: kamu_resources_facade::ListResourcesError) ->
 
     match error {
         E::UnsupportedSelector(_) => GqlError::gql("Unsupported resource type selector"),
-        E::BadAccount(error) => map_resolve_manifest_account_error(error),
+        E::AccountResolution(error) => GqlError::gql(error.to_string()),
+        E::AccountAccess(error) => map_account_access_error(error),
         E::InvalidLabelFilter(error) => GqlError::gql(error.to_string()),
+        E::UnrepresentableScope(error) => GqlError::gql(error.to_string()),
+        E::UnsupportedSelectorField(error) => GqlError::gql(error.to_string()),
         E::RemoteRequest(error) => error.int_err().into(),
         E::Internal(error) => error.into(),
     }
@@ -648,52 +343,20 @@ fn map_list_resources_error(error: kamu_resources_facade::ListResourcesError) ->
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn map_list_all_resources_error(error: kamu_resources_facade::ListAllResourcesError) -> GqlError {
-    use kamu_resources_facade::ListAllResourcesError as E;
-
-    match error {
-        E::BadAccount(error) => map_resolve_manifest_account_error(error),
-        E::InvalidLabelFilter(error) => GqlError::gql(error.to_string()),
-        E::RemoteRequest(error) => error.int_err().into(),
-        E::Internal(error) => error.into(),
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) fn map_resolve_manifest_account_error(
-    error: kamu_resources_facade::ResolveManifestAccountError,
+/// Renders an account-access failure as an ordinary GraphQL error.
+///
+/// Authorization outcomes never become typed problems — see
+/// [`ResourceAccountResolutionProblem`] for the input-validation counterpart.
+pub(crate) fn map_account_access_error(
+    error: kamu_resources_facade::ResourceAccountAccessError,
 ) -> GqlError {
-    use kamu_resources_facade::ResolveManifestAccountError as E;
+    use kamu_resources_facade::ResourceAccountAccessError as E;
 
     match error {
         E::AnonymousSubject => GqlError::Access(odf::AccessError::Unauthenticated(
             "Anonymous subject cannot resolve a target account".into(),
         )),
-        E::EmptySelector
-        | E::SelectorMismatch { .. }
-        | E::AccountNotFoundById(_)
-        | E::AccountNotFoundByName(_) => GqlError::gql(error.to_string()),
         E::Access(error) => error.into(),
-        E::Internal(error) => error.into(),
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub(crate) fn map_bad_account_problem(
-    error: kamu_resources_facade::ResolveManifestAccountError,
-) -> Result<ResourceBadAccountProblem> {
-    use kamu_resources_facade::ResolveManifestAccountError as E;
-
-    match error {
-        E::EmptySelector
-        | E::SelectorMismatch { .. }
-        | E::AccountNotFoundById(_)
-        | E::AccountNotFoundByName(_) => Ok(error.into()),
-        E::AnonymousSubject | E::Access(_) | E::Internal(_) => {
-            Err(map_resolve_manifest_account_error(error))
-        }
     }
 }
 

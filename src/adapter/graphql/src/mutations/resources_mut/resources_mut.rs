@@ -10,17 +10,13 @@
 use crate::mutations::{ResourceApplyOutcome, ResourceApplyParseManifestProblem};
 use crate::prelude::*;
 use crate::queries::{
-    AccountRefInput,
     BatchResourceProblem,
-    ResourceBadAccountProblem,
-    ResourceBatchSelectorInput,
+    ResourceAccountResolutionProblem,
     ResourceManifestFormat,
-    ResourceSelectorInput,
-    ResourceSelectorProblem,
-    ResourceSelectorProblemResult,
+    ResourceRefInput,
     ResourceUnsupportedSelectorProblem,
-    map_bad_account_problem,
-    map_resolve_manifest_account_error,
+    into_resource_refs,
+    map_account_access_error,
     map_unsupported_descriptor_problem,
     map_unsupported_selector_problem,
 };
@@ -69,16 +65,16 @@ impl ResourcesMut {
             resource_facade
                 .plan_apply_manifest(request)
                 .await
-                .map(ResourceApplyOutcome::from)
+                .map(ResourceApplyOutcome::try_from)
         } else {
             resource_facade
                 .apply_manifest(request)
                 .await
-                .map(ResourceApplyOutcome::from)
+                .map(ResourceApplyOutcome::try_from)
         };
 
         match outcome_result {
-            Ok(outcome) => Ok(outcome),
+            Ok(outcome) => Ok(outcome?),
             Err(err) => map_apply_resource_error(err),
         }
     }
@@ -135,97 +131,29 @@ impl ResourcesMut {
         }
     }
 
-    #[tracing::instrument(level = "info", name = ResourcesMut_delete, skip_all, fields(?selector))]
+    #[tracing::instrument(level = "info", name = ResourcesMut_delete, skip_all, fields(selector_count = resource_refs.len()))]
     #[graphql(guard = "LoggedInGuard::new()")]
     async fn delete(
         &self,
         ctx: &Context<'_>,
-        selector: ResourceSelectorInput,
+        resource_refs: Vec<ResourceRefInput>,
     ) -> Result<ResourceDeleteOutcome> {
         let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
 
-        let ResourceSelectorInput {
-            resource_type,
-            resource_ref,
-            account,
-        } = selector;
-        let resource_type = resource_type.selector.into();
-
         match resource_facade
-            .delete(kamu_resources_facade::ResourceSelector {
-                resource_type,
-                account: account.map(AccountRefInput::into_manifest_account),
-                resource_ref: resource_ref.into(),
-            })
+            .delete(into_resource_refs(resource_refs)?)
             .await
         {
-            Ok(resource_id) => Ok(ResourceDeleteOutcome::Success(ResourceDeleteSuccess {
-                resource_id: resource_id.into(),
-            })),
-            Err(kamu_resources_facade::DeleteResourceError::LookupProblem(problem)) => {
-                Ok(ResourceDeleteOutcome::Problem(problem.into()))
-            }
-            Err(kamu_resources_facade::DeleteResourceError::UnsupportedSelector(e)) => {
-                Ok(ResourceDeleteOutcome::Problem(e.try_into()?))
-            }
-            Err(kamu_resources_facade::DeleteResourceError::BadAccount(e)) => Ok(
-                ResourceDeleteOutcome::Problem(ResourceSelectorProblemResult {
-                    problem: ResourceSelectorProblem::BadAccount(map_bad_account_problem(e)?),
-                }),
-            ),
-            Err(error) => Err(map_delete_resource_error(error)),
-        }
-    }
-
-    #[tracing::instrument(level = "info", name = ResourcesMut_delete_many, skip_all, fields(selector_count = selector.resource_refs.len()))]
-    #[graphql(guard = "LoggedInGuard::new()")]
-    async fn delete_many(
-        &self,
-        ctx: &Context<'_>,
-        selector: ResourceBatchSelectorInput,
-    ) -> Result<ResourceDeleteManyOutcome> {
-        let resource_facade = from_catalog_n!(ctx, dyn kamu_resources_facade::ResourceFacade);
-
-        let ResourceBatchSelectorInput {
-            resource_type,
-            resource_refs,
-            account,
-        } = selector;
-        let resource_type_selector = resource_type.into_resource_type_selector();
-
-        match resource_facade
-            .delete_many(kamu_resources_facade::ResourceBatchSelector {
-                account: account.map(AccountRefInput::into_manifest_account),
-                resource_type: resource_type_selector,
-                resource_refs: resource_refs.into_iter().map(Into::into).collect(),
-            })
-            .await
-        {
-            Ok(response) => Ok(ResourceDeleteManyOutcome::Success(response.into())),
+            Ok(response) => Ok(ResourceDeleteOutcome::Success(response.into())),
             Err(kamu_resources_facade::BatchResourceError::UnsupportedSelector(e)) => Ok(
-                ResourceDeleteManyOutcome::UnsupportedSelector(map_unsupported_selector_problem(e)),
+                ResourceDeleteOutcome::UnsupportedSelector(map_unsupported_selector_problem(e)),
             ),
-            Err(kamu_resources_facade::BatchResourceError::BadAccount(e)) => Ok(
-                ResourceDeleteManyOutcome::BadAccount(map_bad_account_problem(e)?),
-            ),
+            Err(kamu_resources_facade::BatchResourceError::AccountResolution(e)) => {
+                Ok(ResourceDeleteOutcome::AccountResolution(e.into()))
+            }
             Err(e) => Err(map_batch_delete_resource_error(e)),
         }
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Union, Debug, Clone)]
-pub enum ResourceDeleteOutcome {
-    Success(ResourceDeleteSuccess),
-    Problem(ResourceSelectorProblemResult),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(SimpleObject, Debug, Clone)]
-pub struct ResourceDeleteSuccess {
-    pub resource_id: ResourceID<'static>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -291,8 +219,9 @@ pub(crate) enum ApplyManifestItemOutcomeSummary {
     UnsupportedDescriptor {
         schema: kamu_resources::TypeUri,
     },
-    BadAccount {
-        error: ApplyManifestBadAccountSummary,
+    AccountResolution {
+        code: kamu_resources_facade::ResourceAccountResolutionProblemCode,
+        message: String,
     },
     InvalidHeaders {
         code: kamu_resources_facade::ResourceHeadersValidationProblemCode,
@@ -311,29 +240,6 @@ pub(crate) enum ApplyManifestItemOutcomeSummary {
         actual_schema: kamu_resources::TypeUri,
     },
     ConcurrentModification,
-    Failed {
-        message: String,
-    },
-}
-
-#[derive(Debug, Clone, serde::Serialize)]
-#[serde(tag = "kind")]
-pub(crate) enum ApplyManifestBadAccountSummary {
-    AnonymousSubject,
-    EmptySelector,
-    AccountNotFoundById {
-        account_id: odf::AccountID,
-    },
-    AccountNotFoundByName {
-        account_name: odf::AccountName,
-    },
-    SelectorMismatch {
-        did: odf::AccountID,
-        actual_name: odf::AccountName,
-        expected_resource_id: Option<odf::ResourceID>,
-        expected_did: Option<odf::AccountID>,
-        expected_name: Option<odf::AccountName>,
-    },
     Failed {
         message: String,
     },
@@ -359,8 +265,9 @@ fn summarize_apply_error(
                 }
             }
         },
-        E::BadAccount(error) => ApplyManifestItemOutcomeSummary::BadAccount {
-            error: summarize_bad_account_error(error),
+        E::AccountResolution(error) => ApplyManifestItemOutcomeSummary::AccountResolution {
+            code: error.code,
+            message: error.message.clone(),
         },
         E::InvalidHeaders(error) => ApplyManifestItemOutcomeSummary::InvalidHeaders {
             code: error.code,
@@ -377,42 +284,13 @@ fn summarize_apply_error(
             actual_schema: error.actual_schema.clone(),
         },
         E::ConcurrentModification(_) => ApplyManifestItemOutcomeSummary::ConcurrentModification,
-        E::RemoteRequest(_) | E::Internal(_) => ApplyManifestItemOutcomeSummary::Failed {
-            message: error.to_string(),
-        },
-    }
-}
-
-fn summarize_bad_account_error(
-    error: &kamu_resources_facade::ResolveManifestAccountError,
-) -> ApplyManifestBadAccountSummary {
-    use kamu_resources_facade::ResolveManifestAccountError as E;
-
-    match error {
-        E::AnonymousSubject => ApplyManifestBadAccountSummary::AnonymousSubject,
-        E::EmptySelector => ApplyManifestBadAccountSummary::EmptySelector,
-        E::AccountNotFoundById(error) => ApplyManifestBadAccountSummary::AccountNotFoundById {
-            account_id: error.account_id.clone(),
-        },
-        E::AccountNotFoundByName(error) => ApplyManifestBadAccountSummary::AccountNotFoundByName {
-            account_name: error.account_name.clone(),
-        },
-        E::SelectorMismatch {
-            did,
-            actual_name,
-            expected_resource_id,
-            expected_did,
-            expected_name,
-        } => ApplyManifestBadAccountSummary::SelectorMismatch {
-            did: did.clone(),
-            actual_name: actual_name.clone(),
-            expected_resource_id: *expected_resource_id,
-            expected_did: expected_did.clone(),
-            expected_name: expected_name.clone(),
-        },
-        E::Access(_) | E::Internal(_) => ApplyManifestBadAccountSummary::Failed {
-            message: error.to_string(),
-        },
+        // Account-access denials join the opaque failures here: the rollback
+        // summary carries codes only for the user-facing problems.
+        E::AccountAccess(_) | E::RemoteRequest(_) | E::Internal(_) => {
+            ApplyManifestItemOutcomeSummary::Failed {
+                message: error.to_string(),
+            }
+        }
     }
 }
 
@@ -485,13 +363,13 @@ fn build_apply_manifests_data<D>(
     items: Vec<kamu_resources_facade::ApplyManifestBatchItemResult<D>>,
 ) -> Result<ResourceApplyManifestsResult, GqlError>
 where
-    ResourceApplyOutcome: From<D>,
+    ResourceApplyOutcome: TryFrom<D, Error = InternalError>,
 {
     let items = items
         .into_iter()
         .map(|item| {
             let outcome = match item.outcome {
-                Ok(decision) => ResourceApplyOutcome::from(decision),
+                Ok(decision) => ResourceApplyOutcome::try_from(decision)?,
                 Err(err) => map_apply_resource_error(err)?,
             };
             Ok(ResourceApplyManifestItemResult {
@@ -507,15 +385,15 @@ where
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Union, Debug, Clone)]
-pub enum ResourceDeleteManyOutcome {
-    Success(ResourceDeleteManyResult),
+pub enum ResourceDeleteOutcome {
+    Success(ResourceDeleteResult),
     UnsupportedSelector(ResourceUnsupportedSelectorProblem),
-    BadAccount(ResourceBadAccountProblem),
+    AccountResolution(ResourceAccountResolutionProblem),
 }
 
 #[derive(SimpleObject, Debug, Clone)]
-pub struct ResourceDeleteManyResult {
-    pub resources: Vec<ResourceDeleteManySuccess>,
+pub struct ResourceDeleteResult {
+    pub resources: Vec<ResourceDeleteSuccess>,
     pub problems: Vec<BatchResourceProblem>,
 }
 
@@ -524,13 +402,13 @@ type BatchDeleteResourcesResponse = kamu_resources_facade::BatchResourceResponse
     kamu_resources_facade::ResourceLookupProblem,
 >;
 
-impl From<BatchDeleteResourcesResponse> for ResourceDeleteManyResult {
+impl From<BatchDeleteResourcesResponse> for ResourceDeleteResult {
     fn from(value: BatchDeleteResourcesResponse) -> Self {
         Self {
             resources: value
                 .successes
                 .into_iter()
-                .map(|success| ResourceDeleteManySuccess {
+                .map(|success| ResourceDeleteSuccess {
                     request_index: success.request_index,
                     resource_id: success.item.into(),
                 })
@@ -543,7 +421,7 @@ impl From<BatchDeleteResourcesResponse> for ResourceDeleteManyResult {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(SimpleObject, Debug, Clone)]
-pub struct ResourceDeleteManySuccess {
+pub struct ResourceDeleteSuccess {
     pub request_index: usize,
     pub resource_id: ResourceID<'static>,
 }
@@ -564,7 +442,8 @@ fn map_apply_resource_error(
         E::UnsupportedDescriptor(e) => Ok(ResourceApplyOutcome::UnsupportedDescriptor(
             map_unsupported_descriptor_problem(e),
         )),
-        E::BadAccount(e) => map_bad_account_problem(e).map(ResourceApplyOutcome::BadAccount),
+        E::AccountResolution(e) => Ok(ResourceApplyOutcome::AccountResolution(e.into())),
+        E::AccountAccess(e) => Err(map_account_access_error(e)),
         E::InvalidHeaders(e) => Ok(ResourceApplyOutcome::InvalidHeader(e.into())),
         E::InvalidSpec(e) => Ok(ResourceApplyOutcome::InvalidSpec(e.into())),
         E::IDNotFound(error) => Err(GqlError::gql(error.to_string())),
@@ -585,7 +464,8 @@ fn map_batch_delete_resource_error(error: kamu_resources_facade::BatchResourceEr
 
     match error {
         E::UnsupportedSelector(_) => GqlError::gql("Unsupported resource type selector"),
-        E::BadAccount(error) => map_resolve_manifest_account_error(error),
+        E::AccountResolution(error) => GqlError::gql(error.to_string()),
+        E::AccountAccess(error) => map_account_access_error(error),
         E::InvalidLabelFilter(error) => GqlError::gql(error.to_string()),
         E::RemoteRequest(error) => error.int_err().into(),
         E::Internal(error) => error.into(),
@@ -599,24 +479,9 @@ fn map_batch_apply_resource_error(error: kamu_resources_facade::BatchResourceErr
 
     match error {
         E::UnsupportedSelector(_) => GqlError::gql("Unsupported resource type selector"),
-        E::BadAccount(error) => map_resolve_manifest_account_error(error),
+        E::AccountResolution(error) => GqlError::gql(error.to_string()),
+        E::AccountAccess(error) => map_account_access_error(error),
         E::InvalidLabelFilter(error) => GqlError::gql(error.to_string()),
-        E::RemoteRequest(error) => error.int_err().into(),
-        E::Internal(error) => error.into(),
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-fn map_delete_resource_error(error: kamu_resources_facade::DeleteResourceError) -> GqlError {
-    use kamu_resources_facade::DeleteResourceError as E;
-
-    match error {
-        E::UnsupportedSelector(_) => {
-            unreachable!("UnsupportedSelector is handled as a union arm")
-        }
-        E::BadAccount(_) => unreachable!("BadAccount is handled as a union arm"),
-        E::LookupProblem(_) => unreachable!("LookupProblem is handled as a union arm"),
         E::RemoteRequest(error) => error.int_err().into(),
         E::Internal(error) => error.into(),
     }

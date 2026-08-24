@@ -9,6 +9,7 @@
 
 mod test_resources_api_resources;
 mod test_resources_apply_batch;
+mod test_resources_apply_diff;
 mod test_resources_apply_input_modes;
 mod test_resources_baseline;
 mod test_resources_context_management;
@@ -21,6 +22,7 @@ mod test_resources_get_selectors;
 mod test_resources_golden_view;
 mod test_resources_id_lookup;
 mod test_resources_label_filters;
+mod test_resources_list_selectors;
 mod test_resources_multitenant_isolation;
 mod test_resources_output_formats;
 mod test_resources_secretset;

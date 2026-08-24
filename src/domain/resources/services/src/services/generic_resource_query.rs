@@ -17,18 +17,16 @@ use crate::domain::{
     FindOwnedResourceError,
     FindOwnedSnapshotsOutcome,
     GenericResourceQueryService,
-    ResolvedResourceLabelFilter,
     ResourceHandleRow,
     ResourceID,
     ResourceName,
     ResourceNotOwnedByAccountError,
     ResourceRawEventQuery,
     ResourceRepository,
-    ResourceSearchQuery,
+    ResourceScope,
     ResourceSnapshot,
     ResourceSummaryRow,
     ResourceTypeMismatchError,
-    ResourceTypeScope,
     TypeUri,
 };
 
@@ -83,25 +81,21 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
     async fn search_resource_handles(
         &self,
         account_id: &odf::AccountID,
-        scope: &ResourceTypeScope,
-        query: &ResourceSearchQuery,
-        label_filter: &ResolvedResourceLabelFilter,
+        scope: &ResourceScope,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceHandleRow>, InternalError> {
         self.resource_repository
-            .search_resource_handles(account_id, scope, query, label_filter, pagination)
+            .search_resource_handles(account_id, scope, pagination)
             .await
     }
 
     async fn count_search_resource_handles(
         &self,
         account_id: &odf::AccountID,
-        scope: &ResourceTypeScope,
-        query: &ResourceSearchQuery,
-        label_filter: &ResolvedResourceLabelFilter,
+        scope: &ResourceScope,
     ) -> Result<usize, InternalError> {
         self.resource_repository
-            .count_search_resource_handles(account_id, scope, query, label_filter)
+            .count_search_resource_handles(account_id, scope)
             .await
     }
 
@@ -219,38 +213,15 @@ impl GenericResourceQueryService for GenericResourceQueryServiceImpl {
             .await
     }
 
-    async fn list_snapshots_by_schema(
+    async fn list_snapshots(
         &self,
-        account_id: odf::AccountID,
-        schema: &TypeUri,
-        label_filter: &ResolvedResourceLabelFilter,
+        account_id: &odf::AccountID,
+        scope: &ResourceScope,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceSnapshot>, InternalError> {
         let mut resource_snapshots_stream = self
             .resource_repository
-            .list_resource_snapshots_by_schema(account_id, schema, pagination, label_filter);
-
-        use tokio_stream::StreamExt;
-
-        let mut resource_snapshots = Vec::new();
-        while let Some(resource_snapshot) = resource_snapshots_stream.next().await {
-            resource_snapshots.push(resource_snapshot?);
-        }
-
-        Ok(resource_snapshots)
-    }
-
-    async fn list_all_snapshots(
-        &self,
-        account_id: odf::AccountID,
-        label_filter: &ResolvedResourceLabelFilter,
-        pagination: PaginationOpts,
-    ) -> Result<Vec<ResourceSnapshot>, InternalError> {
-        let mut resource_snapshots_stream = self.resource_repository.list_all_resource_snapshots(
-            account_id,
-            label_filter,
-            pagination,
-        );
+            .list_resource_snapshots(account_id, scope, pagination);
 
         use tokio_stream::StreamExt;
 

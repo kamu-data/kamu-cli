@@ -9,6 +9,7 @@
 
 use graphql_http::GraphqlHttpClient;
 use kamu_resources as domain;
+use kamu_resources::ResourceRef;
 use url::Url;
 
 use crate::facade::graphql::{cynic_api, outcome_mapper};
@@ -19,27 +20,19 @@ use crate::{
     ApplyManifestRequest,
     BatchResourceError,
     BatchResourceResponse,
-    DeleteResourceError,
-    GetResourceError,
-    ListAllResourceHandlesRequest,
-    ListAllResourcesError,
-    ListAllResourcesRequest,
-    ListResourceHandlesRequest,
     ListResourcesError,
-    ListResourcesRequest,
     ListSupportedResourceTypesError,
-    RenderResourceManifestError,
     RenderResourceManifestResult,
-    ResourceBatchSelector,
     ResourceFacade,
     ResourceLookupProblem,
     ResourceManifestFormat,
-    ResourceSelector,
     ResourcesSummaryError,
     ResourcesSummaryRequest,
-    SearchResourceHandlesRequest,
     SearchResourceHandlesResponse,
-    SpecViewMode,
+    SearchResourcesRequest,
+    SearchResourcesResponse,
+    SpecViewOpts,
+    validate_selector,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -99,65 +92,32 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
 
     async fn get(
         &self,
-        selector: ResourceSelector,
-        spec_view_mode: SpecViewMode,
-    ) -> Result<domain::Resource, GetResourceError> {
-        use cynic_api::operations::get_resource as Operation;
-
-        let variables = Operation::ResourceSelectorVariables::new(&selector, spec_view_mode)?;
-
-        let response: Operation::GetResourceQuery = self
-            .graphql_client
-            .execute_operation(Operation::build_operation(variables))
-            .await?;
-
-        outcome_mapper::map_get_resource_outcome(response.resources.resource)
-    }
-
-    async fn get_many(
-        &self,
-        selector: ResourceBatchSelector,
-        spec_view_mode: SpecViewMode,
+        resource_refs: Vec<ResourceRef>,
+        spec_view: SpecViewOpts,
     ) -> Result<BatchResourceResponse<domain::Resource, ResourceLookupProblem>, BatchResourceError>
     {
-        use cynic_api::operations::get_resources as Operation;
+        use cynic_api::operations::get as Operation;
 
-        let variables = Operation::ResourceBatchSelectorVariables::new(&selector, spec_view_mode)?;
+        let variables = Operation::ResourceRefsVariables::new(&resource_refs, spec_view);
 
         let response: Operation::GetResourcesQuery = self
             .graphql_client
             .execute_operation(Operation::build_operation(variables))
             .await?;
 
-        outcome_mapper::map_batch_get_resources_outcome(response.resources.resources, &selector)
-    }
-
-    async fn get_handle(
-        &self,
-        selector: ResourceSelector,
-    ) -> Result<domain::ResourceHandle, GetResourceError> {
-        use cynic_api::operations::handle as Operation;
-
-        let variables = Operation::ResourceHandleSelectorVariables::new(&selector)?;
-
-        let response: Operation::GetResourceHandleQuery = self
-            .graphql_client
-            .execute_operation(Operation::build_handle_operation(variables))
-            .await?;
-
-        outcome_mapper::map_get_handle_outcome(response.resources.resource_handle)
+        outcome_mapper::map_batch_get_resources_outcome(response.resources.by_refs, &resource_refs)
     }
 
     async fn get_handles(
         &self,
-        selector: ResourceBatchSelector,
+        resource_refs: Vec<ResourceRef>,
     ) -> Result<
         BatchResourceResponse<domain::ResourceHandle, ResourceLookupProblem>,
         BatchResourceError,
     > {
         use cynic_api::operations::handle as Operation;
 
-        let variables = Operation::ResourceHandleBatchSelectorVariables::new(&selector)?;
+        let variables = Operation::ResourceHandleRefsVariables::new(&resource_refs);
 
         let response: Operation::GetResourceHandlesQuery = self
             .graphql_client
@@ -165,36 +125,16 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
             .await?;
 
         outcome_mapper::map_batch_get_handles_outcome(
-            response.resources.resource_handles,
-            &selector,
+            response.resources.handles_by_refs,
+            &resource_refs,
         )
-    }
-
-    async fn render_manifest(
-        &self,
-        selector: ResourceSelector,
-        format: ResourceManifestFormat,
-        spec_view_mode: SpecViewMode,
-    ) -> Result<RenderResourceManifestResult, RenderResourceManifestError> {
-        use cynic_api::operations::render_manifest as Operation;
-
-        let variables =
-            Operation::RenderResourceManifestVariables::new(&selector, format, spec_view_mode)
-                .map_err(RenderResourceManifestError::Internal)?;
-
-        let response: Operation::RenderManifestQuery = self
-            .graphql_client
-            .execute_operation(Operation::build_manifest_operation(variables))
-            .await?;
-
-        outcome_mapper::map_render_manifest_outcome(response.resources.render_manifest)
     }
 
     async fn render_manifests(
         &self,
-        selector: ResourceBatchSelector,
+        resource_refs: Vec<ResourceRef>,
         format: ResourceManifestFormat,
-        spec_view_mode: SpecViewMode,
+        spec_view: SpecViewOpts,
     ) -> Result<
         BatchResourceResponse<RenderResourceManifestResult, ResourceLookupProblem>,
         BatchResourceError,
@@ -202,8 +142,7 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
         use cynic_api::operations::render_manifest as Operation;
 
         let variables =
-            Operation::RenderResourceManifestsVariables::new(&selector, format, spec_view_mode)
-                .map_err(BatchResourceError::Internal)?;
+            Operation::RenderResourceManifestsVariables::new(&resource_refs, format, spec_view);
 
         let response: Operation::RenderManifestsQuery = self
             .graphql_client
@@ -212,61 +151,43 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
 
         outcome_mapper::map_batch_render_manifests_outcome(
             response.resources.render_manifests,
-            &selector,
+            &resource_refs,
         )
     }
 
-    async fn list(
+    async fn search(
         &self,
-        request: ListResourcesRequest,
-    ) -> Result<Vec<domain::ResourceSummaryView>, ListResourcesError> {
-        use cynic_api::operations::list as Operation;
+        request: SearchResourcesRequest,
+    ) -> Result<SearchResourcesResponse, ListResourcesError> {
+        use cynic_api::operations::search_summaries as Operation;
 
-        let variables = cynic_api::variables::ListByResourceTypeVariables::new(
-            &request.raw_type_selector,
-            request.account.as_ref(),
-            request.label_filter.as_ref(),
-            request.pagination,
-        )
-        .map_err(ListResourcesError::Internal)?;
+        // `did` has no wire representation, so it would be dropped. Rejecting
+        // here keeps the remote surface agreeing with the local one. Labels do
+        // travel now, per selector.
+        for selector in &request.selectors {
+            validate_selector(selector)?;
+        }
 
-        let response: Operation::ListByResourceTypeQuery = self
+        let variables =
+            Operation::SearchVariables::new(&request).map_err(ListResourcesError::Internal)?;
+
+        let response: Operation::SearchQuery = self
             .graphql_client
-            .execute_operation(Operation::build_list_by_resource_type_operation(variables))
+            .execute_operation(Operation::build_operation(variables))
             .await?;
 
-        outcome_mapper::map_list_outcome(response.resources.list_by_resource_type)
-    }
-
-    async fn list_handles(
-        &self,
-        request: ListResourceHandlesRequest,
-    ) -> Result<Vec<domain::ResourceHandle>, ListResourcesError> {
-        use cynic_api::operations::list as Operation;
-
-        let variables = cynic_api::variables::ListByResourceTypeVariables::new(
-            &request.raw_type_selector,
-            request.account.as_ref(),
-            request.label_filter.as_ref(),
-            request.pagination,
-        )
-        .map_err(ListResourcesError::Internal)?;
-
-        let response: Operation::ListHandlesByResourceTypeQuery = self
-            .graphql_client
-            .execute_operation(Operation::build_list_handles_by_resource_type_operation(
-                variables,
-            ))
-            .await?;
-
-        outcome_mapper::map_list_handles_outcome(response.resources.list_handles_by_resource_type)
+        outcome_mapper::map_search_outcome(response.resources.by_selectors)
     }
 
     async fn search_handles(
         &self,
-        request: SearchResourceHandlesRequest,
+        request: SearchResourcesRequest,
     ) -> Result<SearchResourceHandlesResponse, ListResourcesError> {
         use cynic_api::operations::search as SearchOperation;
+
+        for selector in &request.selectors {
+            validate_selector(selector)?;
+        }
 
         let variables = SearchOperation::SearchHandlesVariables::new(&request)
             .map_err(ListResourcesError::Internal)?;
@@ -276,49 +197,7 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
             .execute_operation(SearchOperation::build_operation(variables))
             .await?;
 
-        outcome_mapper::map_search_handles_outcome(response.resources.search_handles)
-    }
-
-    async fn list_all(
-        &self,
-        request: ListAllResourcesRequest,
-    ) -> Result<Vec<domain::ResourceSummaryView>, ListAllResourcesError> {
-        use cynic_api::operations::list as Operation;
-
-        let variables = cynic_api::variables::ListAllVariables::new(
-            request.account.as_ref(),
-            request.label_filter.as_ref(),
-            request.pagination,
-        )
-        .map_err(ListAllResourcesError::Internal)?;
-
-        let response: Operation::ListAllQuery = self
-            .graphql_client
-            .execute_operation(Operation::build_list_all_operation(variables))
-            .await?;
-
-        outcome_mapper::map_list_all_outcome(response.resources.list_all)
-    }
-
-    async fn list_all_handles(
-        &self,
-        request: ListAllResourceHandlesRequest,
-    ) -> Result<Vec<domain::ResourceHandle>, ListAllResourcesError> {
-        use cynic_api::operations::list as Operation;
-
-        let variables = cynic_api::variables::ListAllVariables::new(
-            request.account.as_ref(),
-            request.label_filter.as_ref(),
-            request.pagination,
-        )
-        .map_err(ListAllResourcesError::Internal)?;
-
-        let response: Operation::ListAllHandlesQuery = self
-            .graphql_client
-            .execute_operation(Operation::build_list_all_handles_operation(variables))
-            .await?;
-
-        outcome_mapper::map_list_all_handles_outcome(response.resources.list_all_handles)
+        outcome_mapper::map_search_handles_outcome(response.resources.handles_by_selectors)
     }
 
     async fn plan_apply_manifest(
@@ -405,14 +284,13 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
 
     async fn delete(
         &self,
-        selector: ResourceSelector,
-    ) -> Result<domain::ResourceID, DeleteResourceError> {
+        resource_refs: Vec<ResourceRef>,
+    ) -> Result<BatchResourceResponse<domain::ResourceID, ResourceLookupProblem>, BatchResourceError>
+    {
         use cynic_api::operations::delete as Operation;
 
         let variables = Operation::DeleteVariables {
-            selector: (&selector)
-                .try_into()
-                .map_err(DeleteResourceError::Internal)?,
+            resource_refs: cynic_api::inputs::resource_ref_inputs(&resource_refs),
         };
 
         let response: Operation::DeleteMutation = self
@@ -420,28 +298,7 @@ impl ResourceFacade for RemoteGraphqlResourceFacadeImpl {
             .execute_operation(Operation::build_delete_operation(variables))
             .await?;
 
-        outcome_mapper::map_delete_outcome(response.resources.delete)
-    }
-
-    async fn delete_many(
-        &self,
-        selector: ResourceBatchSelector,
-    ) -> Result<BatchResourceResponse<domain::ResourceID, ResourceLookupProblem>, BatchResourceError>
-    {
-        use cynic_api::operations::delete as Operation;
-
-        let variables = Operation::DeleteManyVariables {
-            selector: (&selector)
-                .try_into()
-                .map_err(BatchResourceError::Internal)?,
-        };
-
-        let response: Operation::DeleteManyMutation = self
-            .graphql_client
-            .execute_operation(Operation::build_delete_many_operation(variables))
-            .await?;
-
-        outcome_mapper::map_batch_delete_many_outcome(response.resources.delete_many, &selector)
+        outcome_mapper::map_batch_delete_outcome(response.resources.delete, &resource_refs)
     }
 }
 

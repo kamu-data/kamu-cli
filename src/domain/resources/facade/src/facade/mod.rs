@@ -12,9 +12,11 @@ mod local;
 mod resource_account_resolver;
 mod resource_facade;
 mod resource_facade_errors;
+mod resource_selectors;
 
 pub use graphql::*;
 pub use local::*;
 pub use resource_account_resolver::*;
 pub use resource_facade::*;
 pub use resource_facade_errors::*;
+pub use resource_selectors::*;

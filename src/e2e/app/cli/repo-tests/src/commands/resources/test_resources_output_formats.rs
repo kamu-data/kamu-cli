@@ -66,7 +66,7 @@ pub async fn test_resources_output_formats(ctx: ResourceCtx) {
     );
 
     // `list all -o json`: parseable records array with a row for our resource.
-    let list_json = ctx.stdout_json(["list", "all", "-o", "json"]).await;
+    let list_json = ctx.stdout_json(["list", "%", "-o", "json"]).await;
     resources::assert_record_row(
         &list_json,
         "list all -o json",
@@ -76,7 +76,7 @@ pub async fn test_resources_output_formats(ctx: ResourceCtx) {
 
     // `list all -o csv`: header + row are present. We do not parse full CSV
     // because values asserted here are simple and unquoted.
-    let list_csv = ctx.stdout(["list", "all", "-o", "csv"]).await;
+    let list_csv = ctx.stdout(["list", "%", "-o", "csv"]).await;
     assert_csv_contains_resource(
         &list_csv,
         "list all -o csv",

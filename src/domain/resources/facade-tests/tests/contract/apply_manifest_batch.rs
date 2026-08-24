@@ -14,18 +14,19 @@ use kamu_resources::{
     ApplyManifestRejection,
     ApplyResourceOutcome,
     ApplyResourceRejectionCategory,
+    ResourceRef,
     ResourceSchemaProvider,
+    TypeName,
 };
 use kamu_resources_facade::{
     ApplyManifestBatchRequest,
     ApplyManifestBatchResponse,
     ApplyManifestError,
     ApplyManifestRequest,
-    GetResourceError,
+    ResourceAccountResolutionProblemCode,
+    ResourceLookupProblem,
     ResourceManifestFormat,
-    ResourceRef,
-    ResourceSelector,
-    SpecViewMode,
+    SpecViewOpts,
 };
 use pretty_assertions::{assert_eq, assert_matches};
 
@@ -36,6 +37,8 @@ use crate::helpers::{
     VARIABLE_SET_CANONICAL_SELECTOR,
     VARIABLE_SET_SCHEMA_STR,
     assert_resource_view_fields,
+    assert_single_batch_problem,
+    assert_single_batch_success,
     secret_set_manifest_json,
     variable_set_manifest_json,
 };
@@ -73,6 +76,24 @@ fn malformed_manifest() -> String {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+fn variable_set_manifest_json_with_unknown_account(name: &str) -> String {
+    serde_json::json!({
+        "$schema": VARIABLE_SET_SCHEMA_STR,
+        "headers": {
+            "name": name,
+            "account": {"name": "unknown-resource-contract-account"}
+        },
+        "spec": {
+            "variables": {
+                "K": {"value": "v"}
+            }
+        }
+    })
+    .to_string()
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 fn variable_set_manifest_json_with_id(id: kamu_resources::ResourceID, name: &str) -> String {
     serde_json::json!({
         "$schema": VARIABLE_SET_SCHEMA_STR,
@@ -91,11 +112,18 @@ fn variable_set_manifest_json_with_id(id: kamu_resources::ResourceID, name: &str
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn by_name(name: &str) -> ResourceSelector {
-    ResourceSelector {
+fn by_name(name: &str) -> ResourceRef {
+    ResourceRef {
         account: None,
-        resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-        resource_ref: ResourceRef::ByName(name.parse().unwrap()),
+        r#type: Some(
+            VARIABLE_SET_CANONICAL_SELECTOR
+                .parse::<TypeName>()
+                .unwrap()
+                .into(),
+        ),
+        id: None,
+        did: None,
+        name: Some(name.parse().unwrap()),
     }
 }
 
@@ -104,12 +132,14 @@ fn by_name(name: &str) -> ResourceSelector {
 async fn assert_absent(h: &impl FacadeContractHarness, name: &str) {
     let result = h
         .facade_for(TestAccount::Alice)
-        .get(by_name(name), SpecViewMode::Encrypted)
-        .await;
+        .get(vec![by_name(name)], SpecViewOpts::ENCRYPTED)
+        .await
+        .unwrap();
 
-    assert!(
-        matches!(result, Err(GetResourceError::LookupProblem(_))),
-        "resource '{name}' must not exist, got: {result:?}"
+    assert_matches!(
+        assert_single_batch_problem(result),
+        ResourceLookupProblem::NameNotFound(_) | ResourceLookupProblem::AnyTypeNameNotFound(_),
+        "resource '{name}' must not exist"
     );
 }
 
@@ -263,10 +293,12 @@ pub async fn test_batch_apply_all_successes_preserves_order(h: &impl FacadeContr
         "batch-contract-b",
     );
 
-    let fetched = facade
-        .get(by_name("batch-contract-b"), SpecViewMode::Encrypted)
-        .await
-        .unwrap();
+    let fetched = assert_single_batch_success(
+        facade
+            .get(vec![by_name("batch-contract-b")], SpecViewOpts::ENCRYPTED)
+            .await
+            .unwrap(),
+    );
     assert_resource_view_fields(&fetched, VariableSetResource::schema(), "batch-contract-b");
 }
 
@@ -366,6 +398,52 @@ pub async fn test_batch_apply_rollback_reconstructs_id_not_found(h: &impl Facade
         );
     }
     assert_absent(h, "batch-id-not-found-after").await;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// RF-178
+// The rollback summary is a hand-maintained serde contract carried through
+// GraphQL error extensions, with no compile-time link between the server that
+// serializes it and the remote facade that decodes it — and a decode failure
+// degrades silently to an opaque transport error. This pins the
+// account-resolution arm of that contract so a drift between the two sides
+// fails here rather than going unnoticed.
+contract_test!(
+    batch_apply_rollback_reconstructs_account_resolution,
+    super::test_batch_apply_rollback_reconstructs_account_resolution
+);
+
+pub async fn test_batch_apply_rollback_reconstructs_account_resolution(
+    h: &impl FacadeContractHarness,
+) {
+    let response = h
+        .facade_for(TestAccount::Alice)
+        .apply_manifests(batch_request(vec![
+            variable_set_manifest_json("batch-acct-resolution-before", None, &[("K", "1")]),
+            variable_set_manifest_json_with_unknown_account("batch-acct-resolution-unknown"),
+            variable_set_manifest_json("batch-acct-resolution-after", None, &[("K", "2")]),
+        ]))
+        .await
+        .unwrap();
+
+    let failed_outcome = if response.rolled_back_successes.is_empty() {
+        assert_batch_indexes(&response, &[0, 1], &[]);
+        assert!(response.items[0].outcome.is_ok());
+        &response.items[1].outcome
+    } else {
+        assert_batch_indexes(&response, &[1], &[0]);
+        &response.items[0].outcome
+    };
+
+    assert_matches!(
+        failed_outcome,
+        Err(ApplyManifestError::AccountResolution(err))
+            if err.code == ResourceAccountResolutionProblemCode::AccountNotFoundByName,
+        "unknown account in a batch must survive the rollback round-trip as a typed \
+         AccountResolution error, got: {failed_outcome:?}"
+    );
+    assert_absent(h, "batch-acct-resolution-after").await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

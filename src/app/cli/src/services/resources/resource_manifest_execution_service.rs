@@ -7,9 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
+use internal_error::InternalError;
 use kamu_resources::{
     ApplyManifestApplicationDecision,
-    ApplyManifestChange,
+    ApplyManifestDocuments,
     ApplyManifestPlanningDecision,
     ApplyManifestRejection,
     ApplyManifestResult,
@@ -35,37 +36,53 @@ pub trait ResourceManifestExecutionService: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<ApplyManifestPlanningDecision> for ExecuteResourceManifestOutcome {
-    fn from(decision: ApplyManifestPlanningDecision) -> Self {
-        match decision {
+// Fallible because canonicalizing the apply documents can fail; a failure is an
+// internal error rather than an apply outcome to display.
+impl TryFrom<ApplyManifestPlanningDecision> for ExecuteResourceManifestOutcome {
+    type Error = InternalError;
+
+    fn try_from(decision: ApplyManifestPlanningDecision) -> Result<Self, Self::Error> {
+        Ok(match decision {
             ApplyManifestPlanningDecision::Planned(plan) => {
+                let documents = plan.documents()?;
+
                 Self::Accepted(ExecutedResourceManifestResult {
                     outcome: plan.outcome,
                     resource: plan.resource,
                     warnings: plan.warnings,
-                    changes: plan.changes,
+                    documents,
                 })
             }
             ApplyManifestPlanningDecision::Rejected(rejection) => Self::Rejected(rejection),
-        }
+        })
     }
 }
 
-impl From<ApplyManifestApplicationDecision> for ExecuteResourceManifestOutcome {
-    fn from(decision: ApplyManifestApplicationDecision) -> Self {
-        match decision {
-            ApplyManifestApplicationDecision::Applied(ApplyManifestResult {
-                resource,
-                outcome,
-                warnings,
-            }) => Self::Accepted(ExecutedResourceManifestResult {
-                outcome,
-                resource,
-                warnings,
-                changes: Vec::new(),
-            }),
+impl TryFrom<ApplyManifestApplicationDecision> for ExecuteResourceManifestOutcome {
+    type Error = InternalError;
+
+    fn try_from(decision: ApplyManifestApplicationDecision) -> Result<Self, Self::Error> {
+        Ok(match decision {
+            ApplyManifestApplicationDecision::Applied(result) => {
+                // Unlike before, a live apply carries the same canonical
+                // documents a dry run does, so both render the same diff.
+                let documents = result.documents()?;
+                let ApplyManifestResult {
+                    resource,
+                    outcome,
+                    warnings,
+                    ..
+                } = result;
+
+                Self::Accepted(ExecutedResourceManifestResult {
+                    outcome,
+                    resource,
+                    warnings,
+                    documents,
+                })
+            }
             ApplyManifestApplicationDecision::Rejected(rejection) => Self::Rejected(rejection),
-        }
+        })
     }
 }
 
@@ -84,7 +101,7 @@ pub struct ExecutedResourceManifestResult {
     pub outcome: ApplyResourceOutcome,
     pub resource: Resource,
     pub warnings: Vec<ResourceWarning>,
-    pub changes: Vec<ApplyManifestChange>,
+    pub documents: ApplyManifestDocuments,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -96,6 +113,9 @@ pub enum ExecuteResourceManifestError {
 
     #[error("Failed to read manifest")]
     ReadManifest(#[source] std::io::Error),
+
+    #[error(transparent)]
+    Internal(#[from] InternalError),
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

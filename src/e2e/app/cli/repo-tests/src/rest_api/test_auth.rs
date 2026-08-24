@@ -7,8 +7,6 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::assert_matches;
-
 use kamu_cli_e2e_common::{
     GraphQLResponseExt,
     KamuApiServerClient,
@@ -16,6 +14,7 @@ use kamu_cli_e2e_common::{
     LoginError,
     TokenValidateError,
 };
+use pretty_assertions::{assert_eq, assert_matches};
 use serde_json::json;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -69,7 +68,7 @@ pub async fn test_login_enabled_providers_st(kamu_api_server_client: KamuApiServ
             "#,
         )))
         .await;
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         async_graphql::value!({
             "auth": {
                 "enabledProviders": [
@@ -96,7 +95,7 @@ pub async fn test_login_enabled_providers_mt(kamu_api_server_client: KamuApiServ
             "#,
         )))
         .await;
-    pretty_assertions::assert_eq!(
+    assert_eq!(
         async_graphql::value!({
             "auth": {
                 "enabledProviders": [
@@ -130,13 +129,16 @@ pub async fn test_login_dummy_github(kamu_api_server_client: KamuApiServerClient
                 }
                 "#,
             ),
+            // NOTE: We have two e2e-user accounts: one is predefined (provider: password),
+            //       and the other is created during authorization (provider: oauth_github, DummyOAuthGithub variant).
+            //       For this reason, the name has a suffix
             Ok(indoc::indoc!(
                 r#"
                 {
                   "auth": {
                     "login": {
                       "account": {
-                        "accountName": "e2e-user"
+                        "accountName": "e2e-user-oauth-github"
                       }
                     }
                   }
@@ -153,7 +155,7 @@ pub async fn test_login_dummy_github(kamu_api_server_client: KamuApiServerClient
                 r#"
                 query {
                   accounts {
-                    byName(name: "e2e-user") {
+                    byName(name: "e2e-user-oauth-github") {
                       accountName
                     }
                   }
@@ -165,7 +167,7 @@ pub async fn test_login_dummy_github(kamu_api_server_client: KamuApiServerClient
                 {
                   "accounts": {
                     "byName": {
-                      "accountName": "e2e-user"
+                      "accountName": "e2e-user-oauth-github"
                     }
                   }
                 }
@@ -180,8 +182,8 @@ pub async fn test_login_dummy_github(kamu_api_server_client: KamuApiServerClient
 pub async fn test_kamu_access_token_middleware(mut kamu_api_server_client: KamuApiServerClient) {
     // 1. Grub a JWT
     let login_response = kamu_api_server_client
-     .graphql_api_call(
-      indoc::indoc!(
+        .graphql_api_call(
+            indoc::indoc!(
           r#"
           mutation {
               auth {
@@ -195,9 +197,9 @@ pub async fn test_kamu_access_token_middleware(mut kamu_api_server_client: KamuA
           }
           "#,
          ),
-         None)
-     .await
-     .data();
+            None)
+        .await
+        .data();
 
     let access_token = login_response["auth"]["login"]["accessToken"]
         .as_str()

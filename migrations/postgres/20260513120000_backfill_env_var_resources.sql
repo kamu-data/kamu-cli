@@ -1,5 +1,6 @@
 -- Backfill: promote legacy dataset_env_vars rows into managed VariableSet / SecretSet
--- resources so the new DatasetEnvVarResolver can serve them through bindings.
+-- resources so the new DatasetEnvVarResolver can serve them through the
+-- `legacy-config-target-dataset` label.
 --
 -- Each dataset that has at least one plaintext env var gets exactly one VariableSet
 -- resource named  "legacy-vars-<dataset_id>" owned by the dataset owner.
@@ -8,7 +9,8 @@
 --
 -- For both resource types we also create:
 --   * A generation-1 projection entry row per variable / secret.
---   * A binding row connecting the dataset to the resource at order 0.
+--   * A `legacy-config-target-dataset` label carrying the dataset DID, which
+--     is what associates the resource with its dataset.
 --
 -- The migration is idempotent: ON CONFLICT DO NOTHING guards every INSERT.
 
@@ -36,7 +38,10 @@ SELECT
     de.owner_id                                                                 AS account_id,
     'https://opendatafabric.org/schemas/config/v1alpha1/VariableSet'                 AS resource_schema,
     'legacy-vars-' || substring(dev.dataset_id, 9)                              AS resource_name,
-    '{}'::jsonb                                                                 AS labels,
+    jsonb_build_object(
+        'https://kamu.dev/schemas/resource/v1alpha1/labels/LegacyConfigTargetDataset',
+        dev.dataset_id
+    )                                                                           AS labels,
     '{}'::jsonb                                                                 AS annotations,
     jsonb_build_object(
         'variables',
@@ -114,26 +119,6 @@ WHERE dev.secret_nonce IS NULL
 ON CONFLICT (resource_id, resource_generation, variable_key) DO NOTHING;
 
 /* ------------------------------ */
-
-INSERT INTO config_dataset_variable_set_bindings (
-    dataset_id,
-    resource_id,
-    binding_order
-)
-SELECT DISTINCT
-    dev.dataset_id,
-    r.resource_id,
-    0                                                                           AS binding_order
-FROM dataset_env_vars dev
-JOIN dataset_entries de ON de.dataset_id = dev.dataset_id
-JOIN resources r
-    ON r.account_id = de.owner_id
-   AND r.resource_schema = 'https://opendatafabric.org/schemas/config/v1alpha1/VariableSet'
-   AND r.resource_name = 'legacy-vars-' || substring(dev.dataset_id, 9)
-WHERE dev.secret_nonce IS NULL
-ON CONFLICT DO NOTHING;
-
-/* ------------------------------ */
 /* SecretSet resources            */
 /* ------------------------------ */
 
@@ -157,7 +142,10 @@ SELECT
     de.owner_id                                                                 AS account_id,
     'https://opendatafabric.org/schemas/config/v1alpha1/SecretSet'                   AS resource_schema,
     'legacy-secrets-' || substring(dev.dataset_id, 9)                           AS resource_name,
-    '{}'::jsonb                                                                 AS labels,
+    jsonb_build_object(
+        'https://kamu.dev/schemas/resource/v1alpha1/labels/LegacyConfigTargetDataset',
+        dev.dataset_id
+    )                                                                           AS labels,
     '{}'::jsonb                                                                 AS annotations,
     jsonb_build_object(
         'secrets',
@@ -247,162 +235,93 @@ WHERE dev.secret_nonce IS NOT NULL
 ON CONFLICT (resource_id, resource_generation, secret_key) DO NOTHING;
 
 /* ------------------------------ */
+/* Resource events                */
+/* ------------------------------ */
 
-INSERT INTO config_dataset_secret_set_bindings (
-    dataset_id,
-    resource_id,
-    binding_order
-)
-SELECT DISTINCT
-    dev.dataset_id,
+/*
+ * The three lifecycle events per resource must receive `event_id`s in causal
+ * order: the event store replays strictly `ORDER BY event_id`, and the state
+ * projection can only be initialized from `Created`. If `ReconciliationSucceeded`
+ * lands on a lower id, loading the resource fails with
+ * "Cannot initialize ... from event ReconciliationSucceeded", making every
+ * backfilled resource unreadable and unwritable.
+ *
+ * An earlier version emitted the three events from sibling data-modifying CTEs.
+ * Postgres does not guarantee the execution order of such CTEs, so `nextval` was
+ * free to number them in any order -- and in practice numbered them backwards.
+ * They are emitted here as a single INSERT whose ORDER BY fixes the sequence
+ * assignment explicitly, which is both deterministic and cheaper than three
+ * separate statements.
+ */
+
+INSERT INTO resource_events (resource_id, resource_schema, event_time, event_type, event_payload)
+SELECT
     r.resource_id,
-    0                                                                           AS binding_order
-FROM dataset_env_vars dev
-JOIN dataset_entries de ON de.dataset_id = dev.dataset_id
-JOIN resources r
-    ON r.account_id = de.owner_id
-   AND r.resource_schema = 'https://opendatafabric.org/schemas/config/v1alpha1/SecretSet'
-   AND r.resource_name = 'legacy-secrets-' || substring(dev.dataset_id, 9)
-WHERE dev.secret_nonce IS NOT NULL
-ON CONFLICT DO NOTHING;
-
-/* ------------------------------ */
-/* Resource events: VariableSet   */
-/* ------------------------------ */
-
-WITH
-var_resources AS (
-    SELECT resource_id, resource_schema, account_id, resource_name, created_at, spec, status
-    FROM resources
-    WHERE resource_schema = 'https://opendatafabric.org/schemas/config/v1alpha1/VariableSet'
-      AND resource_name LIKE 'legacy-vars-%'
-      AND last_event_id IS NULL
-),
-ins_created AS (
-    INSERT INTO resource_events (resource_id, resource_schema, event_time, event_type, event_payload)
-    SELECT
-        r.resource_id,
-        r.resource_schema,
-        r.created_at,
-        'Created',
-        jsonb_build_object('Created', jsonb_build_object(
+    r.resource_schema,
+    r.created_at,
+    e.event_type,
+    CASE e.ord
+        WHEN 1 THEN jsonb_build_object('Created', jsonb_build_object(
             'event_time', r.created_at,
             'id',         r.resource_id::text,
             'headers',    jsonb_build_object(
-                               'account',     r.account_id,
+                               -- `AccountRef` is an object, not a bare DID. A
+                               -- string here deserializes into a ref carrying
+                               -- only `did`, and applying a manifest over such
+                               -- a resource then fails to load it. Mirror what
+                               -- the runtime writes: id (account resource UUID),
+                               -- did and name.
+                               'account',     jsonb_build_object(
+                                                  'id',   acc.resource_id::text,
+                                                  'did',  acc.id,
+                                                  'name', acc.account_name
+                                              ),
                                'name',        r.resource_name,
-                               'labels',      '{}'::jsonb,
+                               'labels',      r.labels,
                                'annotations', '{}'::jsonb
                            ),
-            'spec',        r.spec
+            'spec',       r.spec
         ))
-    FROM var_resources r
-    RETURNING resource_id, event_id
-),
-ins_started AS (
-    INSERT INTO resource_events (resource_id, resource_schema, event_time, event_type, event_payload)
-    SELECT
-        r.resource_id,
-        r.resource_schema,
-        r.created_at,
-        'ReconciliationStarted',
-        jsonb_build_object('ReconciliationStarted', jsonb_build_object(
-            'event_time', r.created_at,
-            'id',        r.resource_id::text,
-            'generation', 1
-        ))
-    FROM var_resources r
-    RETURNING resource_id, event_id
-),
-ins_succeeded AS (
-    INSERT INTO resource_events (resource_id, resource_schema, event_time, event_type, event_payload)
-    SELECT
-        r.resource_id,
-        r.resource_schema,
-        r.created_at,
-        'ReconciliationSucceeded',
-        jsonb_build_object('ReconciliationSucceeded', jsonb_build_object(
-            'event_time', r.created_at,
-            'id',        r.resource_id::text,
-            'generation', 1,
-            'success',    jsonb_build_object()
-        ))
-    FROM var_resources r
-    RETURNING resource_id, event_id
-)
-UPDATE resources
-SET last_event_id = ins_succeeded.event_id
-FROM ins_succeeded
-WHERE resources.resource_id = ins_succeeded.resource_id;
-
-/* ------------------------------ */
-/* Resource events: SecretSet     */
-/* ------------------------------ */
-
-WITH
-secret_resources AS (
-    SELECT resource_id, resource_schema, account_id, resource_name, created_at, spec, status
-    FROM resources
-    WHERE resource_schema = 'https://opendatafabric.org/schemas/config/v1alpha1/SecretSet'
-      AND resource_name LIKE 'legacy-secrets-%'
-      AND last_event_id IS NULL
-),
-ins_created AS (
-    INSERT INTO resource_events (resource_id, resource_schema, event_time, event_type, event_payload)
-    SELECT
-        r.resource_id,
-        r.resource_schema,
-        r.created_at,
-        'Created',
-        jsonb_build_object('Created', jsonb_build_object(
+        WHEN 2 THEN jsonb_build_object('ReconciliationStarted', jsonb_build_object(
             'event_time', r.created_at,
             'id',         r.resource_id::text,
-            'headers',    jsonb_build_object(
-                               'account',     r.account_id,
-                               'name',        r.resource_name,
-                               'labels',      '{}'::jsonb,
-                               'annotations', '{}'::jsonb
-                           ),
-            'spec',        r.spec
-        ))
-    FROM secret_resources r
-    RETURNING resource_id, event_id
-),
-ins_started AS (
-    INSERT INTO resource_events (resource_id, resource_schema, event_time, event_type, event_payload)
-    SELECT
-        r.resource_id,
-        r.resource_schema,
-        r.created_at,
-        'ReconciliationStarted',
-        jsonb_build_object('ReconciliationStarted', jsonb_build_object(
-            'event_time', r.created_at,
-            'id',        r.resource_id::text,
             'generation', 1
         ))
-    FROM secret_resources r
-    RETURNING resource_id, event_id
-),
-ins_succeeded AS (
-    INSERT INTO resource_events (resource_id, resource_schema, event_time, event_type, event_payload)
-    SELECT
-        r.resource_id,
-        r.resource_schema,
-        r.created_at,
-        'ReconciliationSucceeded',
-        jsonb_build_object('ReconciliationSucceeded', jsonb_build_object(
+        ELSE jsonb_build_object('ReconciliationSucceeded', jsonb_build_object(
             'event_time', r.created_at,
-            'id',        r.resource_id::text,
+            'id',         r.resource_id::text,
             'generation', 1,
             'success',    jsonb_build_object()
         ))
-    FROM secret_resources r
-    RETURNING resource_id, event_id
-)
+    END
+FROM resources r
+JOIN accounts acc ON acc.id = r.account_id
+CROSS JOIN (VALUES
+    (1, 'Created'),
+    (2, 'ReconciliationStarted'),
+    (3, 'ReconciliationSucceeded')
+) AS e(ord, event_type)
+WHERE r.resource_schema IN (
+        'https://opendatafabric.org/schemas/config/v1alpha1/VariableSet',
+        'https://opendatafabric.org/schemas/config/v1alpha1/SecretSet')
+  AND (r.resource_name LIKE 'legacy-vars-%' OR r.resource_name LIKE 'legacy-secrets-%')
+  AND r.last_event_id IS NULL
+ORDER BY r.resource_id, e.ord;
+
+/* ------------------------------ */
+
+/* Point each resource at its terminal (ReconciliationSucceeded) event. */
 UPDATE resources
-SET last_event_id = ins_succeeded.event_id
-FROM ins_succeeded
-WHERE resources.resource_id = ins_succeeded.resource_id;
+SET last_event_id = last_events.event_id
+FROM (
+    SELECT resource_id, MAX(event_id) AS event_id
+    FROM resource_events
+    GROUP BY resource_id
+) AS last_events
+WHERE resources.resource_id = last_events.resource_id
+  AND resources.last_event_id IS NULL
+  AND (resources.resource_name LIKE 'legacy-vars-%'
+    OR resources.resource_name LIKE 'legacy-secrets-%');
 
 /* ------------------------------ */
 

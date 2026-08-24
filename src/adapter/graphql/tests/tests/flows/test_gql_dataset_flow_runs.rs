@@ -11,7 +11,7 @@ use async_graphql::value;
 use chrono::{DateTime, Duration, DurationRound, Utc};
 use futures::TryStreamExt;
 use indoc::indoc;
-use kamu_accounts::{DEFAULT_ACCOUNT_ID, DEFAULT_ACCOUNT_NAME_STR};
+use kamu_accounts::DEFAULT_ACCOUNT_NAME_STR;
 use kamu_adapter_flow_dataset::{
     DATASET_RESOURCE_TYPE,
     DatasetResourceUpdateDetails,
@@ -1823,7 +1823,7 @@ async fn test_list_flows_with_filters_and_pagination() {
             ),
             async_graphql::Variables::from_json(serde_json::json!({
                 "datasetId": create_result.dataset_handle.id.to_string(),
-                "accountIds": [DEFAULT_ACCOUNT_ID.to_string()],
+                "accountIds": [harness.logged_account_id().to_string()],
             })),
         )
         .execute(&schema, &harness.catalog_authorized)

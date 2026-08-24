@@ -30,8 +30,8 @@ use crate::resources::{ResourceCtx, fixtures};
 // Covers:
 //   - Three equivalent selector forms for one resource
 //   - Multi-name same-type, mixed ref-form
-//   - Name pattern, type pattern, type+name pattern, `%sets`
-//   - `--max-results` truncation, `--unbounded`, and `%sets all`
+//   - Name pattern, `%` any-type forms, and rejected type wildcards
+//   - `--max-results` truncation, `--unbounded`, and the broad `%/%` forms
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Identity constants — kept terse so assertions read as "which resources came
@@ -104,33 +104,39 @@ pub async fn test_resources_get_selectors(ctx: ResourceCtx) {
     assert_eq!(view.ident(), (fixtures::VARIABLE_SET_SCHEMA, "app-vars"));
     assert_eq!(view.variable("MESSAGE"), Some(app_vars_value));
 
-    // ── 5. Type pattern + exact name: `get s%/db-creds` ───────────────────────
+    // ── 5. Any-type + exact name: `get %/db-creds` ────────────────────────────
     //
-    // Case-insensitive type prefix `s%` matches SecretSet only; `db-creds`
-    // selects exactly the SecretSet (not the VariableSet of the same name).
+    // `%` spans every type; `db-creds` exists as both a VariableSet and a
+    // SecretSet → exactly those two.
 
-    let view = ctx.get_one(["get", "s%/db-creds"]).await;
-    assert_eq!(view.ident(), (fixtures::SECRET_SET_SCHEMA, "db-creds"));
-    assert!(
-        view.has_secret("API_TOKEN"),
-        "ss/db-creds should expose its API_TOKEN secret key:\n{}",
-        view.as_json()
-    );
-
-    // ── 6. Type + name pattern: `get s%/db-%` ─────────────────────────────────
-    //
-    // Type starts `s`, name starts `db-` → only ss/db-creds.
-
-    let view = ctx.get_one(["get", "s%/db-%"]).await;
-    assert_eq!(view.ident(), (fixtures::SECRET_SET_SCHEMA, "db-creds"));
-
-    // ── 7. Type pattern spanning types: `get %sets db-creds` ──────────────────
-    //
-    // `%sets` matches both variablesets and secretsets; name `db-creds` exists
-    // in both → exactly those two.
-
-    let idents = ctx.get_idents(["get", "%sets", "db-creds"]).await;
+    let idents = ctx.get_idents(["get", "%/db-creds"]).await;
     assert_eq!(idents, [ss("db-creds"), vs("db-creds")]);
+
+    // Same selection via the positional form.
+    let idents = ctx.get_idents(["get", "%", "db-creds"]).await;
+    assert_eq!(idents, [ss("db-creds"), vs("db-creds")]);
+
+    // ── 6. Any-type + name pattern: `get %/db-%` ──────────────────────────────
+    //
+    // Every type, names starting `db-` → both `db-creds` resources.
+
+    let idents = ctx.get_idents(["get", "%/db-%"]).await;
+    assert_eq!(idents, [ss("db-creds"), vs("db-creds")]);
+
+    // ── 7. Type wildcards are rejected ────────────────────────────────────────
+    //
+    // Only `%` alone is accepted in the type position: matching type names by
+    // pattern is hard to read back and dangerous on `delete`.
+
+    for type_wildcard in ["s%/db-creds", "%sets/db-creds", "s%/%"] {
+        ctx.assert_failure(["get", type_wildcard], Some(&["Unsupported get target"]))
+            .await;
+    }
+    ctx.assert_failure(
+        ["get", "%sets", "db-creds"],
+        Some(&["Unsupported get target"]),
+    )
+    .await;
 
     // ── 8. `--max-results 1`: wildcard expansion truncated ────────────────────
     //
@@ -144,35 +150,128 @@ pub async fn test_resources_get_selectors(ctx: ResourceCtx) {
     assert_eq!(view.ident(), (fixtures::VARIABLE_SET_SCHEMA, "db-creds"));
     assert_eq!(view.variable("MESSAGE"), Some(db_creds_value));
 
-    // ── 9. `--unbounded`: every resource ──────────────────────────────────────
+    // ── 9. Broad forms select every resource ──────────────────────────────────
     //
-    // `get all --unbounded` returns all four seeded resources and only those.
+    // `%/%` is the all-resources form; `% %` is the equivalent positional
+    // spelling. Both are bounded by `--max-results` unless `--unbounded`.
 
-    let idents = ctx.get_idents(["get", "all", "--unbounded"]).await;
-    assert_eq!(
-        idents,
-        [
-            ss("app-secrets"),
-            ss("db-creds"),
-            vs("app-vars"),
-            vs("db-creds"),
-        ]
-    );
+    for form in [
+        vec!["get", "%/%", "--unbounded"],
+        vec!["get", "%", "%", "--unbounded"],
+    ] {
+        let idents = ctx.get_idents(form.clone()).await;
+        assert_eq!(
+            idents,
+            [
+                ss("app-secrets"),
+                ss("db-creds"),
+                vs("app-vars"),
+                vs("db-creds"),
+            ],
+            "`{}` should select every resource",
+            form.join(" ")
+        );
+    }
 
-    // ── 10. Type pattern + `all` name selector: `get %sets all` ───────────────
+    // ── 10. `all` is an ordinary name ─────────────────────────────────────────
     //
-    // Equivalent to `%sets/%`: every VariableSet and SecretSet.
+    // It carries no special meaning, so it resolves like any other name — and
+    // matches nothing here, since no seeded resource is called `all`.
 
-    let idents = ctx.get_idents(["get", "%sets", "all"]).await;
-    assert_eq!(
-        idents,
-        [
-            ss("app-secrets"),
-            ss("db-creds"),
-            vs("app-vars"),
-            vs("db-creds"),
-        ]
-    );
+    ctx.assert_failure(
+        ["get", "vs", "all"],
+        Some(&[r#"Resource 'all' of type 'VariableSet' was not found"#]),
+    )
+    .await;
+
+    // ── 11. A miss reports not-found or no-match, by what was asked ───────────
+    //
+    // An *exact* reference names one resource, so a miss is "was not found" —
+    // whether or not a type was named. A *pattern* names none, so a miss is
+    // "did not match any". The type-less forms are the easy ones to get wrong,
+    // since `%/db-creds` looks like a pattern but is an exact ref.
+
+    // Exact name, no type: not-found, with no type named because every type was
+    // searched.
+    ctx.assert_failure(
+        ["get", "%/missing-resource"],
+        Some(&[r#"Resource 'missing-resource' was not found in any resource type"#]),
+    )
+    .await;
+
+    // Exact name, typed: not-found, naming the type.
+    ctx.assert_failure(
+        ["get", "vs/missing-resource"],
+        Some(&[r#"Resource 'missing-resource' of type 'VariableSet' was not found"#]),
+    )
+    .await;
+
+    // Pattern, typed: no-match.
+    ctx.assert_failure(
+        ["get", "vs/missing-%"],
+        Some(&[r"Pattern `missing-%` did not match any VariableSet"]),
+    )
+    .await;
+
+    // Pattern, no type: no-match across every type.
+    ctx.assert_failure(
+        ["get", "%/missing-%"],
+        Some(&[r"Pattern `missing-%` did not match any resource of any type"]),
+    )
+    .await;
+
+    // ── 12. Malformed selectors report the offending column ───────────────────
+    //
+    // The selector grammar shares its scanner with `--label`, so failures echo
+    // the argument and point a caret at the character that broke it. These pin
+    // the rendering end-to-end: the caret is produced deep in the scanner and
+    // could regress to a bare message without any unit test noticing.
+    //
+    // Regexes match in output order, so the input line precedes the caret line.
+
+    // A bare type is rejected here — `get` requires a name half. The message
+    // names the fix, since this is the most common way to reach it.
+    //
+    // The caret line is anchored with `^…$` so its indentation is part of the
+    // assertion: an unanchored regex would still match if the column drifted.
+    ctx.assert_failure(
+        ["get", "vs"],
+        Some(&[
+            r"Invalid resource reference:",
+            r"(?m)^  vs$",
+            r"(?m)^    \^$",
+            r"expected `/` after the resource type",
+            r"write `vs/%` to select every one",
+        ]),
+    )
+    .await;
+
+    // A second `/` makes the argument ambiguous; the caret sits on it, not at
+    // the end of the input.
+    ctx.assert_failure(
+        ["get", "vs/foo/extra"],
+        Some(&[
+            r"Invalid resource reference:",
+            r"(?m)^  vs/foo/extra$",
+            r"(?m)^        \^$",
+            r"unexpected second `/`",
+        ]),
+    )
+    .await;
+
+    // An empty name half.
+    ctx.assert_failure(
+        ["get", "vs/"],
+        Some(&[r"Invalid resource reference:", r"expected a resource name"]),
+    )
+    .await;
+
+    // An empty type half.
+    ctx.assert_failure(
+        ["get", "/my-vars"],
+        Some(&[r"Invalid resource reference:", r"expected a resource type"]),
+    )
+    .await;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

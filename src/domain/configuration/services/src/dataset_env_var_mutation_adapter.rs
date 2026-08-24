@@ -15,8 +15,7 @@ use crypto_utils::{AesGcmEncryptor, Encryptor};
 use internal_error::{ErrorIntoInternal, InternalError, ResultIntoInternal};
 use kamu_accounts::AccountService;
 use kamu_configuration::{
-    DatasetSecretSetBindingRepository,
-    DatasetVariableSetBindingRepository,
+    RESOURCE_LABEL_LEGACY_CONFIG_TARGET_DATASET_SCHEMA_URI,
     Secret,
     SecretSetProjectionRepository,
     SecretSetResource,
@@ -28,6 +27,7 @@ use kamu_configuration::{
     VariableSetSpecInput,
 };
 use kamu_datasets::{
+    DatasetEntry,
     DatasetEntryRepository,
     DatasetEnvVar,
     DatasetEnvVarMutationAdapter,
@@ -50,40 +50,22 @@ use kamu_resources::{
     ResourceName,
     ResourceSchemaProvider,
     ResourceSpecFromInput,
-    UnsupportedResourceDescriptorError,
+    TypeUri,
 };
-use kamu_resources_services::get_resource_crud_dispatcher;
+use kamu_resources_services::ResourceDispatcherFactory;
 use secrecy::ExposeSecret;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, thiserror::Error)]
-enum GetDispatcherError {
-    #[error(transparent)]
-    Unsupported(#[from] UnsupportedResourceDescriptorError),
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
-
-impl From<GetDispatcherError> for InternalError {
-    fn from(e: GetDispatcherError) -> Self {
-        e.int_err()
-    }
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[dill::component(pub)]
 #[dill::interface(dyn DatasetEnvVarMutationAdapter)]
 pub struct DatasetEnvVarMutationAdapterImpl {
-    catalog: dill::Catalog,
+    dispatcher_factory: Arc<ResourceDispatcherFactory>,
     dataset_entry_repository: Arc<dyn DatasetEntryRepository>,
     account_service: Arc<dyn AccountService>,
     generic_resource_query_service: Arc<dyn GenericResourceQueryService>,
     variable_set_projection_repo: Arc<dyn VariableSetProjectionRepository>,
     secret_set_projection_repo: Arc<dyn SecretSetProjectionRepository>,
-    variable_set_binding_repo: Arc<dyn DatasetVariableSetBindingRepository>,
-    secret_set_binding_repo: Arc<dyn DatasetSecretSetBindingRepository>,
     secrets_encryption_config: Arc<SecretsEncryptionConfig>,
 }
 
@@ -97,14 +79,7 @@ impl DatasetEnvVarMutationAdapter for DatasetEnvVarMutationAdapterImpl {
         key: &str,
         value: &DatasetEnvVarValue,
     ) -> Result<DatasetEnvVarUpsertResult, InternalError> {
-        let dataset_entry = self
-            .dataset_entry_repository
-            .get_dataset_entry(dataset_id)
-            .await
-            .map_err(|e| match e {
-                GetDatasetEntryError::NotFound(nf) => nf.int_err(),
-                GetDatasetEntryError::Internal(e) => e,
-            })?;
+        let dataset_entry = self.get_dataset_entry(dataset_id).await?;
 
         match value {
             DatasetEnvVarValue::Regular(plaintext) => {
@@ -135,9 +110,14 @@ impl DatasetEnvVarMutationAdapter for DatasetEnvVarMutationAdapterImpl {
         dataset_id: &odf::DatasetID,
         dataset_env_var_key: &str,
     ) -> Result<(), DeleteDatasetEnvVarError> {
+        // Resolved once and threaded down: every lookup below is scoped to the
+        // dataset owner, and re-fetching the entry per lookup would query the
+        // same row up to three times in one call.
+        let owner_id = self.get_dataset_entry(dataset_id).await?.owner_id;
+
         // Try deleting as a variable
         let was_variable = self
-            .delete_if_variable(dataset_id, dataset_env_var_key)
+            .delete_if_variable(dataset_id, &owner_id, dataset_env_var_key)
             .await?;
         if was_variable {
             return Ok(());
@@ -145,7 +125,7 @@ impl DatasetEnvVarMutationAdapter for DatasetEnvVarMutationAdapterImpl {
 
         // Maybe it's a secret then?
         let was_secret = self
-            .delete_if_secret(dataset_id, dataset_env_var_key)
+            .delete_if_secret(dataset_id, &owner_id, dataset_env_var_key)
             .await?;
         if was_secret {
             return Ok(());
@@ -170,13 +150,15 @@ impl DatasetEnvVarMutationAdapterImpl {
         ResourceName::new_unchecked(&format!("legacy-secrets-{}", dataset_id.as_multibase()))
     }
 
-    fn get_dispatcher<E>(&self, schema: &str) -> Result<Arc<dyn ResourceCrudDispatcher>, E>
-    where
-        E: From<InternalError>,
-    {
-        get_resource_crud_dispatcher::<GetDispatcherError>(&self.catalog, schema)
-            .map_err(InternalError::from)
-            .map_err(E::from)
+    fn get_dispatcher(
+        &self,
+        schema: &str,
+    ) -> Result<Arc<dyn ResourceCrudDispatcher>, InternalError> {
+        // Only the two built-in legacy schemas are ever passed here, so an
+        // unsupported schema is an internal wiring error, not a user error.
+        self.dispatcher_factory
+            .crud_dispatcher(schema)
+            .map_err(ErrorIntoInternal::int_err)
     }
 
     async fn apply_and_handle_rejection<E>(
@@ -216,7 +198,7 @@ impl DatasetEnvVarMutationAdapterImpl {
         // If key is new to variables, it may be a class conversion from secret →
         // variable
         let existed_as_secret = if !exists_as_variable {
-            self.delete_if_secret(dataset_id, key).await?
+            self.delete_if_secret(dataset_id, account_did, key).await?
         } else {
             false
         };
@@ -237,27 +219,26 @@ impl DatasetEnvVarMutationAdapterImpl {
         ))
         .int_err()?;
         let headers = self
-            .make_headers(account_did.clone(), account_name.clone(), resource_name)
-            .await?;
-
-        let dispatcher = self.get_dispatcher::<InternalError>(VariableSetResource::SCHEMA_STR)?;
-
-        let resource_id = self
-            .apply_and_handle_rejection::<InternalError>(
-                &dispatcher,
-                ResourceCrudDispatcherApplyRequest {
-                    id: existing_id,
-                    headers,
-                    spec: new_spec,
-                },
-                "VariableSet",
+            .make_headers(
+                account_did.clone(),
+                account_name.clone(),
+                resource_name,
+                dataset_id,
             )
             .await?;
 
-        self.variable_set_binding_repo
-            .replace_bindings(dataset_id, &[resource_id])
-            .await
-            .int_err()?;
+        let dispatcher = self.get_dispatcher(VariableSetResource::SCHEMA_STR)?;
+
+        self.apply_and_handle_rejection::<InternalError>(
+            &dispatcher,
+            ResourceCrudDispatcherApplyRequest {
+                id: existing_id,
+                headers,
+                spec: new_spec,
+            },
+            "VariableSet",
+        )
+        .await?;
 
         let status = if is_new_key {
             UpsertDatasetEnvVarStatus::Created
@@ -295,7 +276,8 @@ impl DatasetEnvVarMutationAdapterImpl {
 
         // If key is new to secrets, it may be a class conversion from variable → secret
         let existed_as_variable = if !exists_as_secret {
-            self.delete_if_variable(dataset_id, key).await?
+            self.delete_if_variable(dataset_id, account_did, key)
+                .await?
         } else {
             false
         };
@@ -316,27 +298,26 @@ impl DatasetEnvVarMutationAdapterImpl {
         ))
         .int_err()?;
         let headers = self
-            .make_headers(account_did.clone(), account_name.clone(), resource_name)
-            .await?;
-
-        let dispatcher = self.get_dispatcher::<InternalError>(SecretSetResource::SCHEMA_STR)?;
-
-        let resource_id = self
-            .apply_and_handle_rejection::<InternalError>(
-                &dispatcher,
-                ResourceCrudDispatcherApplyRequest {
-                    id: existing_id,
-                    headers,
-                    spec: new_spec,
-                },
-                "SecretSet",
+            .make_headers(
+                account_did.clone(),
+                account_name.clone(),
+                resource_name,
+                dataset_id,
             )
             .await?;
 
-        self.secret_set_binding_repo
-            .replace_bindings(dataset_id, &[resource_id])
-            .await
-            .int_err()?;
+        let dispatcher = self.get_dispatcher(SecretSetResource::SCHEMA_STR)?;
+
+        self.apply_and_handle_rejection::<InternalError>(
+            &dispatcher,
+            ResourceCrudDispatcherApplyRequest {
+                id: existing_id,
+                headers,
+                spec: new_spec,
+            },
+            "SecretSet",
+        )
+        .await?;
 
         let encryption_key = self
             .secrets_encryption_config
@@ -366,7 +347,6 @@ impl DatasetEnvVarMutationAdapterImpl {
 
     async fn delete_variable(
         &self,
-        dataset_id: &odf::DatasetID,
         resource_id: ResourceID,
         key: &str,
     ) -> Result<(), DeleteDatasetEnvVarError> {
@@ -395,11 +375,6 @@ impl DatasetEnvVarMutationAdapterImpl {
                     account_id: snapshot.headers.account.did.clone(),
                     ids: vec![resource_id],
                 })
-                .await
-                .int_err()?;
-            // Remove the binding now that the managed resource is gone
-            self.variable_set_binding_repo
-                .replace_bindings(dataset_id, &[])
                 .await
                 .int_err()?;
         } else {
@@ -432,7 +407,6 @@ impl DatasetEnvVarMutationAdapterImpl {
 
     async fn delete_secret(
         &self,
-        dataset_id: &odf::DatasetID,
         resource_id: ResourceID,
         key: &str,
     ) -> Result<(), DeleteDatasetEnvVarError> {
@@ -461,11 +435,6 @@ impl DatasetEnvVarMutationAdapterImpl {
                     account_id: snapshot.headers.account.did.clone(),
                     ids: vec![resource_id],
                 })
-                .await
-                .int_err()?;
-            // Remove the binding now that the managed resource is gone
-            self.secret_set_binding_repo
-                .replace_bindings(dataset_id, &[])
                 .await
                 .int_err()?;
         } else {
@@ -517,11 +486,12 @@ impl DatasetEnvVarMutationAdapterImpl {
     async fn delete_if_secret(
         &self,
         dataset_id: &odf::DatasetID,
+        owner_id: &odf::AccountID,
         key: &str,
     ) -> Result<bool, InternalError> {
-        match self.find_secret(dataset_id, key).await? {
+        match self.find_secret(dataset_id, owner_id, key).await? {
             Some((resource_id, key)) => self
-                .delete_secret(dataset_id, resource_id, &key)
+                .delete_secret(resource_id, &key)
                 .await
                 .map_err(|e| match e {
                     DeleteDatasetEnvVarError::NotFound(e) => e.int_err(),
@@ -537,11 +507,12 @@ impl DatasetEnvVarMutationAdapterImpl {
     async fn delete_if_variable(
         &self,
         dataset_id: &odf::DatasetID,
+        owner_id: &odf::AccountID,
         key: &str,
     ) -> Result<bool, InternalError> {
-        match self.find_variable(dataset_id, key).await? {
+        match self.find_variable(dataset_id, owner_id, key).await? {
             Some((resource_id, key)) => self
-                .delete_variable(dataset_id, resource_id, &key)
+                .delete_variable(resource_id, &key)
                 .await
                 .map_err(|e| match e {
                     DeleteDatasetEnvVarError::NotFound(e) => e.int_err(),
@@ -555,34 +526,27 @@ impl DatasetEnvVarMutationAdapterImpl {
     async fn find_secret(
         &self,
         dataset_id: &odf::DatasetID,
+        owner_id: &odf::AccountID,
         key: &str,
     ) -> Result<Option<(ResourceID, String)>, InternalError> {
-        let bindings = self
-            .secret_set_binding_repo
-            .list_bindings(dataset_id)
-            .await?;
-
-        match bindings.len() {
-            0 => return Ok(None),
-            1 => {} // expected case, continue with lookup
-            _ => {
-                return Err(format!(
-                    "Multiple SecretSet bindings found for dataset {dataset_id}: {bindings:?}. \
-                     This does not qualify for legacy env var resolution",
-                )
-                .int_err());
-            }
-        }
-
-        let the_binding = &bindings[0];
+        let Some(resource_id) = self
+            .find_legacy_resource_id(
+                owner_id,
+                SecretSetResource::schema(),
+                &Self::legacy_secret_set_resource_name(dataset_id),
+            )
+            .await?
+        else {
+            return Ok(None);
+        };
 
         let entries = self
             .secret_set_projection_repo
-            .get_latest_entries(&the_binding.resource_id)
+            .get_latest_entries(&resource_id)
             .await?;
 
         if entries.iter().any(|e| e.key == key) {
-            return Ok(Some((the_binding.resource_id, key.to_string())));
+            return Ok(Some((resource_id, key.to_string())));
         }
 
         Ok(None)
@@ -591,37 +555,64 @@ impl DatasetEnvVarMutationAdapterImpl {
     async fn find_variable(
         &self,
         dataset_id: &odf::DatasetID,
+        owner_id: &odf::AccountID,
         key: &str,
     ) -> Result<Option<(ResourceID, String)>, InternalError> {
-        let bindings = self
-            .variable_set_binding_repo
-            .list_bindings(dataset_id)
-            .await?;
-
-        match bindings.len() {
-            0 => return Ok(None),
-            1 => {} // expected case, continue with lookup
-            _ => {
-                return Err(format!(
-                    "Multiple VariableSet bindings found for dataset {dataset_id}: {bindings:?}. \
-                     This does not qualify for legacy env var resolution",
-                )
-                .int_err());
-            }
-        }
-
-        let the_binding = &bindings[0];
+        let Some(resource_id) = self
+            .find_legacy_resource_id(
+                owner_id,
+                VariableSetResource::schema(),
+                &Self::legacy_variable_set_resource_name(dataset_id),
+            )
+            .await?
+        else {
+            return Ok(None);
+        };
 
         let entries = self
             .variable_set_projection_repo
-            .get_latest_entries(&the_binding.resource_id)
+            .get_latest_entries(&resource_id)
             .await?;
 
         if entries.iter().any(|e| e.key == key) {
-            return Ok(Some((the_binding.resource_id, key.to_string())));
+            return Ok(Some((resource_id, key.to_string())));
         }
 
         Ok(None)
+    }
+
+    /// Loads the dataset entry, whose `owner_id` scopes every resource lookup
+    /// this adapter makes. Resolved once per public entry point and threaded
+    /// down, rather than re-fetched by each lookup.
+    async fn get_dataset_entry(
+        &self,
+        dataset_id: &odf::DatasetID,
+    ) -> Result<DatasetEntry, InternalError> {
+        self.dataset_entry_repository
+            .get_dataset_entry(dataset_id)
+            .await
+            .map_err(|e| match e {
+                GetDatasetEntryError::NotFound(nf) => nf.int_err(),
+                GetDatasetEntryError::Internal(e) => e,
+            })
+    }
+
+    /// Locates the single auto-managed legacy resource for a dataset, among
+    /// `owner_id`'s resources.
+    ///
+    /// Deliberately by well-known name rather than by the target label: the
+    /// legacy read-modify-write path owns exactly one resource per dataset per
+    /// kind, whereas the label may legitimately match several user-authored
+    /// sets that this path must not touch.
+    async fn find_legacy_resource_id(
+        &self,
+        owner_id: &odf::AccountID,
+        schema: &TypeUri,
+        resource_name: &ResourceName,
+    ) -> Result<Option<ResourceID>, InternalError> {
+        self.generic_resource_query_service
+            .find_resource_id_by_name(owner_id, schema, resource_name)
+            .await
     }
 
     // Returns (existing_id, variables_map, existing_entry_id_for_key)
@@ -709,11 +700,16 @@ impl DatasetEnvVarMutationAdapterImpl {
         Ok(decrypted)
     }
 
+    /// Builds headers for an auto-managed legacy resource, stamped with the
+    /// `legacy-config-target-dataset` label that associates it with its
+    /// dataset. The label is what the resolver reads; without it the resource
+    /// exists but never resolves.
     async fn make_headers(
         &self,
         account_did: odf::AccountID,
         account_name: odf::AccountName,
         resource_name: ResourceName,
+        dataset_id: &odf::DatasetID,
     ) -> Result<ResourceHeadersInput, InternalError> {
         let account = self.account_service.get_account_by_id(&account_did).await;
         let account_resource_id = match account {
@@ -730,7 +726,14 @@ impl DatasetEnvVarMutationAdapterImpl {
             }),
             name: resource_name,
             labels: Some(kamu_resources::ResourceLabels {
-                entries: BTreeMap::new(),
+                entries: [(
+                    RESOURCE_LABEL_LEGACY_CONFIG_TARGET_DATASET_SCHEMA_URI
+                        .parse()
+                        .int_err()?,
+                    serde_json::Value::String(dataset_id.as_did_str().to_string()),
+                )]
+                .into_iter()
+                .collect(),
             }),
             annotations: Some(kamu_resources::ResourceAnnotations {
                 entries: BTreeMap::new(),

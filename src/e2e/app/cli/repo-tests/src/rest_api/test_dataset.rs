@@ -9,7 +9,7 @@
 
 use std::assert_matches;
 
-use kamu_adapter_http::general::{DatasetInfoResponse, DatasetOwnerInfo};
+use kamu_adapter_http::general::{AccountResponse, DatasetInfoResponse, DatasetOwnerInfo};
 use kamu_cli_e2e_common::{
     CreateDatasetResponse,
     DatasetByIdError,
@@ -45,9 +45,14 @@ pub async fn test_datasets_by_id(mut kamu_api_server_client: KamuApiServerClient
         .create_player_scores_dataset()
         .await;
 
-    let expected_owner = DatasetOwnerInfo {
-        account_name: odf::AccountName::new_unchecked("kamu"),
-        account_id: Some(odf::AccountID::new_seeded_ed25519(b"kamu")),
+    let expected_owner = {
+        let AccountResponse { id, account_name } =
+            kamu_api_server_client.account().me().await.unwrap();
+
+        DatasetOwnerInfo {
+            account_name,
+            account_id: Some(id),
+        }
     };
 
     assert_matches!(

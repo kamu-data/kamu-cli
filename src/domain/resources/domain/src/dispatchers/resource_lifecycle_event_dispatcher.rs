@@ -7,12 +7,9 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::sync::Arc;
-
-use dill::Catalog;
 use internal_error::InternalError;
 
-use crate::{ResourceSnapshot, TypeUri, get_resource_dispatcher_from_catalog};
+use crate::ResourceSnapshot;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -31,15 +28,6 @@ pub trait ResourceLifecycleEventDispatcher: Send + Sync {
     ) -> Result<(), InternalError>;
 
     async fn handle_deleted(&self, resource: &ResourceSnapshot) -> Result<(), InternalError>;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-pub fn get_resource_lifecycle_dispatcher_from_catalog(
-    target_catalog: &Catalog,
-    schema: &TypeUri,
-) -> Result<Arc<dyn ResourceLifecycleEventDispatcher>, InternalError> {
-    get_resource_dispatcher_from_catalog(target_catalog, schema, "resource lifecycle dispatcher")
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

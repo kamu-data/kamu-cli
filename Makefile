@@ -20,6 +20,7 @@ POSTGRES_CRATES := \
 MYSQL_CRATES := \
 	./src/e2e/app/cli/mysql \
 	./src/infra/accounts/mysql \
+	./src/infra/datasets/mysql
 
 SQLITE_CRATES := \
 	./src/e2e/app/cli/sqlite \
@@ -55,7 +56,7 @@ lint-rustfmt:
 
 .PHONY: lint-repo
 lint-repo:
-	cargo test -p kamu-repo-tools
+	cargo nextest run -p kamu-repo-tools
 
 
 .PHONY: lint-deps

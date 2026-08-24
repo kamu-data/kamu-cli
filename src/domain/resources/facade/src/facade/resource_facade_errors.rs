@@ -13,13 +13,15 @@ use internal_error::{ErrorIntoInternal, InternalError};
 use kamu_resources::{
     ApplyResourceCrudDispatcherError,
     DeleteResourcesCrudDispatcherError,
-    GetResourceCrudDispatcherError,
+    ResourceAmbiguousTypeError,
+    ResourceAnyTypeNameNotFoundError,
     ResourceExtensionResolutionError,
     ResourceHeadersValidationError,
     ResourceID,
     ResourceIDNotFoundError,
     ResourceInvalidSpecError,
     ResourceLabelFilterExprParseError,
+    ResourceName,
     ResourceNameNotFoundError,
     TypeRef,
     TypeUri,
@@ -27,6 +29,8 @@ use kamu_resources::{
     UnsupportedResourceSelectorError,
 };
 use thiserror::Error;
+
+use crate::UnsupportedSelectorFieldError;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -140,7 +144,68 @@ impl From<ResourceLabelFilterExprParseError> for ResourceInvalidLabelFilterError
     }
 }
 
-use crate::ResolveManifestAccountError;
+use crate::{ResolveManifestAccountError, ResourceAccountAccessError, UnrepresentableScopeError};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum ResourceAccountResolutionProblemCode {
+    EmptySelector,
+    AccountNotFoundById,
+    AccountNotFoundByName,
+    SelectorMismatch,
+}
+
+/// The account selector supplied for an operation could not be resolved to a
+/// concrete account. This is an input-validation problem, not an authorization
+/// outcome — a caller denied access to another account's resources is reported
+/// through [`odf::AccessError`], never through this type.
+///
+/// Carries a stable `code` plus a rendered `message` rather than the resolver's
+/// own field-carrying variants: the code is what lets the remote facade rebuild
+/// the same error the local facade raises, which is what makes the
+/// `contract_test!` local/remote pairs assert identical behavior on both
+/// transports. Matches [`ResourceInvalidHeadersError`] and
+/// [`ResourceInvalidLabelFilterError`] in shape.
+#[derive(Debug, Error)]
+#[error("{message}")]
+pub struct ResourceAccountResolutionError {
+    pub code: ResourceAccountResolutionProblemCode,
+    pub message: String,
+}
+
+/// Routes a [`ResolveManifestAccountError`] into one of the facade error enums.
+///
+/// The user-facing/infrastructure split is already structural — see
+/// [`ResolveManifestAccountError::Resolution`] — so this just forwards each
+/// case to its counterpart, keeping authorization denials out of
+/// `AccountResolution`.
+///
+/// One macro rather than four hand-written impls, so the routing cannot drift
+/// between the operations that share it.
+macro_rules! impl_from_resolve_manifest_account_error {
+    ($($error_type:ty),+ $(,)?) => {
+        $(
+            impl From<ResolveManifestAccountError> for $error_type {
+                fn from(err: ResolveManifestAccountError) -> Self {
+                    use ResolveManifestAccountError as E;
+                    match err {
+                        E::Resolution(problem) => Self::AccountResolution(problem),
+                        E::AccountAccess(err) => Self::AccountAccess(err),
+                        E::Internal(err) => Self::Internal(err),
+                    }
+                }
+            }
+        )+
+    };
+}
+
+impl_from_resolve_manifest_account_error!(
+    BatchResourceError,
+    ListResourcesError,
+    ResourcesSummaryError,
+    ApplyManifestError,
+);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -155,39 +220,19 @@ pub enum ListSupportedResourceTypesError {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// A single ref failed to resolve.
+///
+/// Not produced by [`ResourceFacade`] itself: the ref-keyed operations are
+/// batch-only and report per-item failures as [`ResourceLookupProblem`] inside
+/// a `BatchResourceResponse`. This is the CLI-side currency for "one ref, one
+/// outcome", built by callers that resolved a single name out of a batch — so
+/// the only failure it can carry is that ref's lookup problem.
+///
+/// [`ResourceFacade`]: crate::ResourceFacade
 #[derive(Debug, Error)]
 pub enum GetResourceError {
     #[error(transparent)]
-    UnsupportedSelector(#[from] UnsupportedResourceSelectorError),
-
-    #[error(transparent)]
-    BadAccount(#[from] ResolveManifestAccountError),
-
-    #[error(transparent)]
     LookupProblem(#[from] ResourceLookupProblem),
-
-    #[error(transparent)]
-    RemoteRequest(#[from] GraphqlHttpRequestError),
-
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
-
-impl From<GetResourceCrudDispatcherError> for GetResourceError {
-    fn from(err: GetResourceCrudDispatcherError) -> Self {
-        use GetResourceCrudDispatcherError as E;
-        match err {
-            E::NotFound(err) => Self::LookupProblem(ResourceLookupProblem::IDNotFound(err)),
-            E::TypeMismatch(err) => Self::LookupProblem(ResourceLookupProblem::SchemaMismatch(
-                ResourceSchemaMismatchError {
-                    id: err.id,
-                    expected_schema: err.expected_schema,
-                    actual_schema: err.actual_schema,
-                },
-            )),
-            E::Internal(err) => Self::Internal(err),
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -200,8 +245,30 @@ pub enum ResourceLookupProblem {
     #[error(transparent)]
     NameNotFound(#[from] ResourceNameNotFoundError),
 
+    /// A type-less ref whose name matched nothing in any registered type. Its
+    /// own variant rather than a `NameNotFound`, which would have to name a
+    /// single type that was never searched in isolation.
+    #[error(transparent)]
+    AnyTypeNameNotFound(#[from] ResourceAnyTypeNameNotFoundError),
+
+    /// A type-less ref whose name matched in several types. A ref names exactly
+    /// one resource, so this is an addressing failure, not a multi-match.
+    #[error(transparent)]
+    AmbiguousType(#[from] ResourceAmbiguousTypeError),
+
     #[error(transparent)]
     SchemaMismatch(#[from] ResourceSchemaMismatchError),
+
+    /// A reference supplied both an id and a name, and they name different
+    /// resources. Its own variant rather than a `NameNotFound`: the named
+    /// resource may well exist — it simply is not the one the id addresses.
+    #[error(transparent)]
+    NameMismatch(#[from] ResourceNameMismatchError),
+
+    /// A reference naming neither an id nor a name. Its own variant rather than
+    /// a `NameNotFound`, which would wrongly claim a lookup was attempted.
+    #[error("Resource reference must specify at least one of `id` or `name`")]
+    EmptyRef,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -212,7 +279,13 @@ pub enum BatchResourceError {
     UnsupportedSelector(#[from] UnsupportedResourceSelectorError),
 
     #[error(transparent)]
-    BadAccount(#[from] ResolveManifestAccountError),
+    AccountResolution(ResourceAccountResolutionError),
+
+    /// The caller is not authenticated, or is denied access to the target
+    /// account. Its own variant rather than an `AccountResolution`: an
+    /// authorization denial must not be reported to clients as bad input.
+    #[error(transparent)]
+    AccountAccess(ResourceAccountAccessError),
 
     #[error(transparent)]
     InvalidLabelFilter(#[from] ResourceInvalidLabelFilterError),
@@ -222,43 +295,6 @@ pub enum BatchResourceError {
 
     #[error(transparent)]
     Internal(#[from] InternalError),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Error)]
-pub enum RenderResourceManifestError {
-    #[error(transparent)]
-    UnsupportedSelector(#[from] UnsupportedResourceSelectorError),
-
-    #[error(transparent)]
-    BadAccount(#[from] ResolveManifestAccountError),
-
-    #[error(transparent)]
-    LookupProblem(#[from] ResourceLookupProblem),
-
-    #[error(transparent)]
-    RemoteRequest(#[from] GraphqlHttpRequestError),
-
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
-
-impl From<GetResourceCrudDispatcherError> for RenderResourceManifestError {
-    fn from(err: GetResourceCrudDispatcherError) -> Self {
-        use GetResourceCrudDispatcherError as E;
-        match err {
-            E::NotFound(err) => Self::LookupProblem(ResourceLookupProblem::IDNotFound(err)),
-            E::TypeMismatch(err) => Self::LookupProblem(ResourceLookupProblem::SchemaMismatch(
-                ResourceSchemaMismatchError {
-                    id: err.id,
-                    expected_schema: err.expected_schema,
-                    actual_schema: err.actual_schema,
-                },
-            )),
-            E::Internal(err) => Self::Internal(err),
-        }
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -269,27 +305,25 @@ pub enum ListResourcesError {
     UnsupportedSelector(#[from] UnsupportedResourceSelectorError),
 
     #[error(transparent)]
-    BadAccount(#[from] ResolveManifestAccountError),
+    AccountResolution(ResourceAccountResolutionError),
+
+    /// The caller is not authenticated, or is denied access to the target
+    /// account. Its own variant rather than an `AccountResolution`: an
+    /// authorization denial must not be reported to clients as bad input.
+    #[error(transparent)]
+    AccountAccess(ResourceAccountAccessError),
 
     #[error(transparent)]
     InvalidLabelFilter(#[from] ResourceInvalidLabelFilterError),
 
     #[error(transparent)]
-    RemoteRequest(#[from] GraphqlHttpRequestError),
+    UnrepresentableScope(#[from] UnrepresentableScopeError),
 
+    /// A selector set an ODF field the facade cannot honour. Rejected rather
+    /// than ignored: a dropped narrowing constraint widens the result set
+    /// without the caller being able to tell.
     #[error(transparent)]
-    Internal(#[from] InternalError),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Error)]
-pub enum ListAllResourcesError {
-    #[error(transparent)]
-    BadAccount(#[from] ResolveManifestAccountError),
-
-    #[error(transparent)]
-    InvalidLabelFilter(#[from] ResourceInvalidLabelFilterError),
+    UnsupportedSelectorField(#[from] UnsupportedSelectorFieldError),
 
     #[error(transparent)]
     RemoteRequest(#[from] GraphqlHttpRequestError),
@@ -303,7 +337,13 @@ pub enum ListAllResourcesError {
 #[derive(Debug, Error)]
 pub enum ResourcesSummaryError {
     #[error(transparent)]
-    BadAccount(#[from] ResolveManifestAccountError),
+    AccountResolution(ResourceAccountResolutionError),
+
+    /// The caller is not authenticated, or is denied access to the target
+    /// account. Its own variant rather than an `AccountResolution`: an
+    /// authorization denial must not be reported to clients as bad input.
+    #[error(transparent)]
+    AccountAccess(ResourceAccountAccessError),
 
     #[error(transparent)]
     RemoteRequest(#[from] GraphqlHttpRequestError),
@@ -313,49 +353,6 @@ pub enum ResourcesSummaryError {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Error)]
-pub enum DeleteResourceError {
-    #[error(transparent)]
-    UnsupportedSelector(#[from] UnsupportedResourceSelectorError),
-
-    #[error(transparent)]
-    BadAccount(#[from] ResolveManifestAccountError),
-
-    #[error(transparent)]
-    LookupProblem(#[from] ResourceLookupProblem),
-
-    #[error(transparent)]
-    RemoteRequest(#[from] GraphqlHttpRequestError),
-
-    #[error(transparent)]
-    Internal(#[from] InternalError),
-}
-
-impl From<DeleteResourcesCrudDispatcherError> for DeleteResourceError {
-    fn from(err: DeleteResourcesCrudDispatcherError) -> Self {
-        use DeleteResourcesCrudDispatcherError as E;
-        match err {
-            E::Access(err) => Self::Internal(err.int_err()),
-            E::ConcurrentModification(err) => Self::Internal(err.int_err()),
-            E::Internal(err) => Self::Internal(err),
-        }
-    }
-}
-
-impl From<BatchResourceError> for DeleteResourceError {
-    fn from(err: BatchResourceError) -> Self {
-        match err {
-            BatchResourceError::UnsupportedSelector(err) => Self::UnsupportedSelector(err),
-            BatchResourceError::BadAccount(err) => Self::BadAccount(err),
-            // `delete` resolves a single pre-selected ref, so it never carries
-            // a label filter for this to surface from.
-            BatchResourceError::InvalidLabelFilter(err) => Self::Internal(err.int_err()),
-            BatchResourceError::RemoteRequest(err) => Self::RemoteRequest(err),
-            BatchResourceError::Internal(err) => Self::Internal(err),
-        }
-    }
-}
 
 impl From<DeleteResourcesCrudDispatcherError> for BatchResourceError {
     fn from(err: DeleteResourcesCrudDispatcherError) -> Self {
@@ -379,7 +376,13 @@ pub enum ApplyManifestError {
     UnsupportedDescriptor(#[from] UnsupportedResourceDescriptorError),
 
     #[error(transparent)]
-    BadAccount(#[from] ResolveManifestAccountError),
+    AccountResolution(ResourceAccountResolutionError),
+
+    /// The caller is not authenticated, or is denied access to the target
+    /// account. Its own variant rather than an `AccountResolution`: an
+    /// authorization denial must not be reported to clients as bad input.
+    #[error(transparent)]
+    AccountAccess(ResourceAccountAccessError),
 
     #[error(transparent)]
     InvalidHeaders(#[from] ResourceInvalidHeadersError),
@@ -401,6 +404,16 @@ pub enum ApplyManifestError {
 
     #[error(transparent)]
     Internal(#[from] InternalError),
+}
+
+impl From<kamu_resources_services::GetResourceCrudDispatcherError> for ApplyManifestError {
+    fn from(err: kamu_resources_services::GetResourceCrudDispatcherError) -> Self {
+        use kamu_resources_services::GetResourceCrudDispatcherError as E;
+        match err {
+            E::Unsupported(e) => Self::UnsupportedDescriptor(e),
+            E::Internal(e) => Self::Internal(e),
+        }
+    }
 }
 
 impl From<ResourceHeadersValidationError> for ApplyManifestError {
@@ -444,6 +457,16 @@ pub struct ResourceSchemaMismatchError {
     pub id: ResourceID,
     pub expected_schema: TypeUri,
     pub actual_schema: TypeUri,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Debug, Error)]
+#[error("Resource id {id} is named '{actual_name}', not '{expected_name}'")]
+pub struct ResourceNameMismatchError {
+    pub id: ResourceID,
+    pub expected_name: ResourceName,
+    pub actual_name: ResourceName,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

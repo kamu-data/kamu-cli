@@ -10,9 +10,10 @@
 use email_utils::Email;
 use internal_error::InternalError;
 use thiserror::Error;
+use url::Url;
 
 use super::{InvalidCredentialsError, NoPrimaryEmailError, RejectedCredentialsError};
-use crate::{AccountDisplayName, AccountType};
+use crate::AccountDisplayName;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -30,12 +31,11 @@ pub trait AuthenticationProvider: Sync + Send {
 
 #[derive(Debug)]
 pub struct ProviderLoginResponse {
-    pub account_id: odf::AccountID,
+    pub account_id: Option<odf::AccountID>,
     pub account_name: odf::AccountName,
     pub email: Email,
     pub display_name: AccountDisplayName,
-    pub account_type: AccountType,
-    pub avatar_url: Option<String>,
+    pub avatar_url: Option<Url>,
     pub provider_identity_key: String,
 }
 

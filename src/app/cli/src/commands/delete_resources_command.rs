@@ -12,13 +12,7 @@ use std::sync::Arc;
 
 use internal_error::{BoxedError, InternalError};
 use kamu_resources::{ResourceID, TypeUri};
-use kamu_resources_facade::{
-    BatchResourceError,
-    ResourceBatchSelector,
-    ResourceFacade,
-    ResourceLookupProblem,
-    ResourceRef,
-};
+use kamu_resources_facade::{BatchResourceError, ResourceFacade, ResourceLookupProblem};
 
 use super::{BatchError, CLIError, Command};
 use crate::Interact;
@@ -220,29 +214,15 @@ impl DeleteResourcesCommand {
         }
 
         // The facade batches by descriptor, so cross-type selections are split into one
-        // `delete_many(...)` call per resolved schema.
+        // `delete(...)` call per resolved schema.
         for (_schema, entries) in Self::group_targets_by_schema(targets) {
             match self
                 .resource_facade
-                .delete_many(ResourceBatchSelector {
-                    account: None,
-                    resource_type: entries
-                        .first()
-                        .map(|(_, target)| {
-                            kamu_resources::ResourceTypeSelectorRaw::from(
-                                &target.canonical_selector,
-                            )
-                        })
-                        .expect("non-empty entries"),
-                    resource_refs: entries
-                        .iter()
-                        .map(|(_, target)| ResourceRef::ById(target.id))
-                        .collect(),
-                })
+                .delete(Self::entry_resource_refs(&entries))
                 .await
             {
                 Ok(response) => {
-                    self.handle_delete_many_result(
+                    self.handle_delete_result(
                         &entries,
                         response,
                         summary,
@@ -251,7 +231,7 @@ impl DeleteResourcesCommand {
                     );
                 }
                 Err(error) => {
-                    Self::record_delete_many_batch_error(
+                    Self::record_delete_batch_error(
                         &entries,
                         &error,
                         summary,
@@ -265,6 +245,23 @@ impl DeleteResourcesCommand {
                 break;
             }
         }
+    }
+
+    /// Builds one ref per already-resolved target, naming the type by its
+    /// resolved schema rather than by the selector the user typed.
+    fn entry_resource_refs(
+        entries: &[(usize, DeleteResourceTarget)],
+    ) -> Vec<kamu_resources::ResourceRef> {
+        entries
+            .iter()
+            .map(|(_, target)| kamu_resources::ResourceRef {
+                account: None,
+                r#type: Some(target.schema.clone().into()),
+                id: Some(target.id),
+                did: None,
+                name: None,
+            })
+            .collect()
     }
 
     fn group_targets_by_schema(
@@ -282,7 +279,7 @@ impl DeleteResourcesCommand {
         groups
     }
 
-    fn handle_delete_many_result(
+    fn handle_delete_result(
         &self,
         entries: &[(usize, DeleteResourceTarget)],
         response: kamu_resources_facade::BatchResourceResponse<ResourceID, ResourceLookupProblem>,
@@ -325,7 +322,7 @@ impl DeleteResourcesCommand {
         }
     }
 
-    fn record_delete_many_batch_error(
+    fn record_delete_batch_error(
         entries: &[(usize, DeleteResourceTarget)],
         error: &BatchResourceError,
         summary: &mut DeleteResourcesSummary,

@@ -10,14 +10,14 @@
 use cynic::QueryBuilder;
 use internal_error::InternalError;
 
-use crate::SearchResourceHandlesRequest;
+use crate::SearchResourcesRequest;
 use crate::facade::graphql::cynic_api::fragments::{
-    ResourceBadAccountProblem,
+    ResourceAccountResolutionProblem,
     ResourceHandleConnection,
     ResourceInvalidLabelFilterProblem,
     ResourceUnsupportedSelectorProblem,
 };
-use crate::facade::graphql::cynic_api::inputs::SearchResourceHandlesInput;
+use crate::facade::graphql::cynic_api::inputs::SearchResourcesInput;
 use crate::facade::graphql::cynic_api::schema;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -32,7 +32,7 @@ pub(crate) struct SearchHandlesQuery {
 #[cynic(graphql_type = "Resources", variables = "SearchHandlesVariables")]
 pub(crate) struct SearchHandlesResources {
     #[arguments(query: $query, page: $page, perPage: $per_page)]
-    pub search_handles: ResourceHandleListOutcome,
+    pub handles_by_selectors: ResourceHandleListOutcome,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -41,7 +41,7 @@ pub(crate) struct SearchHandlesResources {
 pub(crate) enum ResourceHandleListOutcome {
     ResourceHandleConnection(ResourceHandleConnection),
     ResourceUnsupportedSelectorProblem(ResourceUnsupportedSelectorProblem),
-    ResourceBadAccountProblem(ResourceBadAccountProblem),
+    ResourceAccountResolutionProblem(ResourceAccountResolutionProblem),
     ResourceInvalidLabelFilterProblem(ResourceInvalidLabelFilterProblem),
     #[cynic(fallback)]
     Unknown,
@@ -51,13 +51,13 @@ pub(crate) enum ResourceHandleListOutcome {
 
 #[derive(cynic::QueryVariables, Debug, Clone)]
 pub(crate) struct SearchHandlesVariables {
-    pub query: SearchResourceHandlesInput,
+    pub query: SearchResourcesInput,
     pub page: i32,
     pub per_page: i32,
 }
 
 impl SearchHandlesVariables {
-    pub(crate) fn new(request: &SearchResourceHandlesRequest) -> Result<Self, InternalError> {
+    pub(crate) fn new(request: &SearchResourcesRequest) -> Result<Self, InternalError> {
         let (page, per_page) = request.pagination.as_page_params(Self::DEFAULT_PAGE_SIZE)?;
         Ok(Self {
             query: request.try_into()?,

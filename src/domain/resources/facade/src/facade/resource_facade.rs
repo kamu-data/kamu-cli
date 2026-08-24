@@ -15,12 +15,10 @@ use domain::{
     ResourceAccountRef,
     ResourceHandle,
     ResourceID,
-    ResourceLabelFilterInput,
-    ResourceName,
-    ResourceSearchQuery,
+    ResourceRef,
+    ResourceSelector,
     ResourceSummaryView,
     ResourceTypeDescriptor,
-    ResourceTypeSelectorRaw,
     ResourcesSummary,
 };
 use kamu_resources as domain;
@@ -28,18 +26,29 @@ use kamu_resources as domain;
 use crate::{
     ApplyManifestError,
     BatchResourceError,
-    DeleteResourceError,
-    GetResourceError,
-    ListAllResourcesError,
     ListResourcesError,
     ListSupportedResourceTypesError,
-    RenderResourceManifestError,
     ResourceLookupProblem,
     ResourcesSummaryError,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// The two families here are deliberately asymmetric about which form is the
+/// primitive.
+///
+/// Ref-keyed reads and deletes (`get`, `get_handles`,
+/// `render_manifests`, `delete`) exist *only* in batch form: the batch
+/// pipeline — group refs by `(account, schema)`, resolve ids per group, merge
+/// back by `request_index` — is the primitive, and a single-resource call is
+/// simply a one-element batch. A scalar form would be a second implementation
+/// of the same contract, kept honest only by tests.
+///
+/// Apply keeps its scalar form because there the scalar *is* the primitive:
+/// `plan_apply_manifests`/`apply_manifests` are loops over
+/// `plan_apply_manifest`/`apply_manifest`, and the per-item transaction
+/// boundary belongs to the caller (the CLI's `--continue-on-error` path opens
+/// one transaction per manifest), not to the facade.
 #[cfg_attr(feature = "testing", mockall::automock)]
 #[async_trait::async_trait]
 pub trait ResourceFacade: Send + Sync {
@@ -54,67 +63,43 @@ pub trait ResourceFacade: Send + Sync {
 
     async fn get(
         &self,
-        selector: ResourceSelector,
-        spec_view_mode: SpecViewMode,
-    ) -> Result<Resource, GetResourceError>;
-
-    async fn get_many(
-        &self,
-        selector: ResourceBatchSelector,
-        spec_view_mode: SpecViewMode,
+        resource_refs: Vec<ResourceRef>,
+        spec_view: SpecViewOpts,
     ) -> Result<BatchResourceResponse<Resource, ResourceLookupProblem>, BatchResourceError>;
-
-    async fn get_handle(
-        &self,
-        selector: ResourceSelector,
-    ) -> Result<ResourceHandle, GetResourceError>;
 
     async fn get_handles(
         &self,
-        selector: ResourceBatchSelector,
+        resource_refs: Vec<ResourceRef>,
     ) -> Result<BatchResourceResponse<ResourceHandle, ResourceLookupProblem>, BatchResourceError>;
-
-    async fn render_manifest(
-        &self,
-        selector: ResourceSelector,
-        format: ResourceManifestFormat,
-        spec_view_mode: SpecViewMode,
-    ) -> Result<RenderResourceManifestResult, RenderResourceManifestError>;
 
     async fn render_manifests(
         &self,
-        selector: ResourceBatchSelector,
+        resource_refs: Vec<ResourceRef>,
         format: ResourceManifestFormat,
-        spec_view_mode: SpecViewMode,
+        spec_view: SpecViewOpts,
     ) -> Result<
         BatchResourceResponse<RenderResourceManifestResult, ResourceLookupProblem>,
         BatchResourceError,
     >;
 
-    async fn list(
+    /// Lists resources matching the selectors, with typed columns rendered.
+    /// Spans several resource types *and* renders columns for every result.
+    ///
+    /// Unlike the ref-keyed operations above, this is not a batch form of
+    /// anything: [`ResourceFacade::search_handles`] answers the same request
+    /// with a cheaper response, it is not a scalar counterpart.
+    async fn search(
         &self,
-        request: ListResourcesRequest,
-    ) -> Result<Vec<ResourceSummaryView>, ListResourcesError>;
+        request: SearchResourcesRequest,
+    ) -> Result<SearchResourcesResponse, ListResourcesError>;
 
-    async fn list_handles(
-        &self,
-        request: ListResourceHandlesRequest,
-    ) -> Result<Vec<ResourceHandle>, ListResourcesError>;
-
+    /// The handle-only form of [`ResourceFacade::search`], for callers that
+    /// need identity rather than presentation. Takes the same request — only
+    /// the response shape differs.
     async fn search_handles(
         &self,
-        request: SearchResourceHandlesRequest,
+        request: SearchResourcesRequest,
     ) -> Result<SearchResourceHandlesResponse, ListResourcesError>;
-
-    async fn list_all(
-        &self,
-        request: ListAllResourcesRequest,
-    ) -> Result<Vec<ResourceSummaryView>, ListAllResourcesError>;
-
-    async fn list_all_handles(
-        &self,
-        request: ListAllResourceHandlesRequest,
-    ) -> Result<Vec<ResourceHandle>, ListAllResourcesError>;
 
     async fn plan_apply_manifest(
         &self,
@@ -136,30 +121,10 @@ pub trait ResourceFacade: Send + Sync {
         request: ApplyManifestBatchRequest,
     ) -> Result<ApplyManifestBatchResponse<ApplyManifestApplicationDecision>, BatchResourceError>;
 
-    async fn delete(&self, selector: ResourceSelector) -> Result<ResourceID, DeleteResourceError>;
-
-    async fn delete_many(
+    async fn delete(
         &self,
-        selector: ResourceBatchSelector,
+        resource_refs: Vec<ResourceRef>,
     ) -> Result<BatchResourceResponse<ResourceID, ResourceLookupProblem>, BatchResourceError>;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone)]
-pub struct ResourceSelector {
-    pub account: Option<ResourceAccountRef>,
-    pub resource_type: ResourceTypeSelectorRaw,
-    pub resource_ref: ResourceRef,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone)]
-pub struct ResourceBatchSelector {
-    pub account: Option<ResourceAccountRef>,
-    pub resource_type: ResourceTypeSelectorRaw,
-    pub resource_refs: Vec<ResourceRef>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -235,52 +200,31 @@ pub enum ResourceManifestFormat {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// What to search for, shared by [`ResourceFacade::search`] and
+/// [`ResourceFacade::search_handles`] — only the response shape differs.
 #[derive(Debug, Clone)]
-pub enum ResourceRef {
-    ById(ResourceID),
-    ByName(ResourceName),
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone)]
-pub struct ListResourcesRequest {
-    pub raw_type_selector: ResourceTypeSelectorRaw,
+pub struct SearchResourcesRequest {
+    /// Which resources to span. Several selectors act as a logical OR; an empty
+    /// list matches nothing, and a single type-less unnarrowed selector spans
+    /// every type.
+    ///
+    /// Label filtering rides here too: each selector carries its own `labels`,
+    /// so one call may filter differently per type. There is deliberately no
+    /// call-level filter — one uniform filter is the special case where every
+    /// selector carries the same labels.
+    pub selectors: Vec<ResourceSelector>,
+    /// The account rows fall back to when a selector names none.
     pub account: Option<ResourceAccountRef>,
     pub pagination: PaginationOpts,
-    pub label_filter: Option<ResourceLabelFilterInput>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone)]
-pub struct ListResourceHandlesRequest {
-    pub raw_type_selector: ResourceTypeSelectorRaw,
-    pub account: Option<ResourceAccountRef>,
-    pub label_filter: Option<ResourceLabelFilterInput>,
-    pub pagination: PaginationOpts,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone)]
-pub struct SearchResourceHandlesRequest {
-    pub type_scope: SearchResourceTypeScope,
-    pub query: ResourceSearchQuery,
-    pub account: Option<ResourceAccountRef>,
-    pub label_filter: Option<ResourceLabelFilterInput>,
-    pub pagination: PaginationOpts,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/// Which resource types a [`SearchResourceHandlesRequest`] is scoped to.
-#[derive(Debug, Clone)]
-pub enum SearchResourceTypeScope {
-    /// No type filter — matches every registered resource type.
-    AnyType,
-    /// Non-empty by construction: use `AnyType` instead of an empty list.
-    Types(Vec<ResourceTypeSelectorRaw>),
+pub struct SearchResourcesResponse {
+    pub items: Vec<ResourceSummaryView>,
+    /// Total matching the selectors, ignoring pagination.
+    pub total_count: usize,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -289,26 +233,6 @@ pub enum SearchResourceTypeScope {
 pub struct SearchResourceHandlesResponse {
     pub items: Vec<ResourceHandle>,
     pub total_count: usize,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone)]
-pub struct ListAllResourcesRequest {
-    pub account: Option<ResourceAccountRef>,
-    /// Resolved against every registered schema.
-    pub label_filter: Option<ResourceLabelFilterInput>,
-    pub pagination: PaginationOpts,
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-#[derive(Debug, Clone)]
-pub struct ListAllResourceHandlesRequest {
-    pub account: Option<ResourceAccountRef>,
-    /// See [`ListAllResourcesRequest::label_filter`].
-    pub label_filter: Option<ResourceLabelFilterInput>,
-    pub pagination: PaginationOpts,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -329,10 +253,13 @@ pub struct RenderResourceManifestResult {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum SpecViewMode {
-    #[default]
-    Encrypted,
-    Revealed,
+pub struct SpecViewOpts {
+    pub revealed: bool,
+}
+
+impl SpecViewOpts {
+    pub const ENCRYPTED: Self = Self { revealed: false };
+    pub const REVEALED: Self = Self { revealed: true };
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

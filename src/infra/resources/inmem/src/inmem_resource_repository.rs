@@ -14,28 +14,26 @@ use database_common::PaginationOpts;
 use dill::*;
 use event_sourcing::EventID;
 use futures::StreamExt;
-use internal_error::{InternalError, ResultIntoInternal};
+use internal_error::InternalError;
 use kamu_accounts::AccountRepository;
 use kamu_resources::{
     CreateResourceError,
-    ResolvedResourceLabelFilter,
     ResourceDuplicateError,
     ResourceHandleRow,
     ResourceID,
     ResourceIDStream,
-    ResourceLabelFilterPredicate,
+    ResourceLabelPair,
     ResourceName,
     ResourcePhase,
     ResourcePhaseCounts,
+    ResourceQuery,
     ResourceRawEventQuery,
     ResourceRepository,
-    ResourceSearchQuery,
+    ResourceScope,
     ResourceSnapshot,
     ResourceSnapshotStream,
     ResourceSnapshotUpdate,
     ResourceSummaryRow,
-    ResourceTypeScope,
-    TypeRef,
     TypeUri,
     UpdateResourceError,
     deleted_account_name_sentinel,
@@ -60,18 +58,33 @@ struct State {
 
 pub struct InMemoryResourceRepository {
     state: Arc<Mutex<State>>,
-    account_repository: Arc<dyn AccountRepository>,
+    // Resolved lazily per call rather than injected: this repository is a
+    // singleton, while `AccountRepository` may be a transaction-scoped
+    // component (it is under the MySQL prototype, where only the accounts
+    // domain has a real backend and the rest fall back to in-memory). Holding
+    // an `Arc` to it here would pin a transaction reference for the lifetime
+    // of the process and trip the leaked-transaction guard.
+    catalog: CatalogWeakRef,
 }
 
 #[component(pub)]
 #[interface(dyn ResourceRepository)]
 #[scope(Singleton)]
 impl InMemoryResourceRepository {
-    pub fn new(account_repository: Arc<dyn AccountRepository>) -> Self {
+    pub fn new(catalog: CatalogWeakRef) -> Self {
         Self {
             state: Arc::new(Mutex::new(State::default())),
-            account_repository,
+            catalog,
         }
+    }
+
+    /// Resolves the account repository from the current (possibly
+    /// transaction-scoped) catalog. See the note on [`Self::catalog`].
+    fn account_repository(&self) -> Option<Arc<dyn AccountRepository>> {
+        self.catalog
+            .upgrade()
+            .get_one::<dyn AccountRepository>()
+            .ok()
     }
 
     /// Re-resolves the owning account's current resource id + name, live on
@@ -108,17 +121,20 @@ impl InMemoryResourceRepository {
             .map(|snapshot| &snapshot.headers.account.did)
             .collect();
 
-        let identity_by_did: HashMap<odf::AccountID, (odf::ResourceID, odf::AccountName)> = self
-            .account_repository
-            .get_accounts_by_ids(&account_ids)
-            .await
-            .map(|accounts| {
-                accounts
-                    .into_iter()
-                    .map(|account| (account.id, (account.resource_id, account.account_name)))
-                    .collect()
-            })
-            .unwrap_or_default();
+        let accounts = match self.account_repository() {
+            Some(account_repository) => account_repository.get_accounts_by_ids(&account_ids).await,
+            None => Ok(Vec::new()),
+        };
+
+        let identity_by_did: HashMap<odf::AccountID, (odf::ResourceID, odf::AccountName)> =
+            accounts
+                .map(|accounts| {
+                    accounts
+                        .into_iter()
+                        .map(|account| (account.id, (account.resource_id, account.account_name)))
+                        .collect()
+                })
+                .unwrap_or_default();
 
         snapshots
             .into_iter()
@@ -147,11 +163,16 @@ impl InMemoryResourceRepository {
         &self,
         account_did: &odf::AccountID,
     ) -> (odf::ResourceID, odf::AccountName) {
-        self.account_repository
-            .get_account_by_id(account_did)
-            .await
+        let account = match self.account_repository() {
+            Some(account_repository) => {
+                account_repository.get_account_by_id(account_did).await.ok()
+            }
+            None => None,
+        };
+
+        account
             .map(|account| (account.resource_id, account.account_name))
-            .unwrap_or_else(|_| {
+            .unwrap_or_else(|| {
                 (
                     deleted_account_resource_id_sentinel(),
                     deleted_account_name_sentinel(),
@@ -346,23 +367,16 @@ impl ResourceRepository for InMemoryResourceRepository {
     async fn search_resource_handles(
         &self,
         account_id: &odf::AccountID,
-        scope: &ResourceTypeScope,
-        query: &ResourceSearchQuery,
-        label_filter: &ResolvedResourceLabelFilter,
+        scope: &ResourceScope,
         pagination: PaginationOpts,
     ) -> Result<Vec<ResourceHandleRow>, InternalError> {
-        if matches!(scope, ResourceTypeScope::Types(schemas) if schemas.is_empty())
-            || query.is_vacuous()
-        {
+        if scope.is_vacuous() {
             return Ok(Vec::new());
         }
 
-        let label_pairs =
-            ResourceLabelFilterPredicate::flatten_conjunction(label_filter).int_err()?;
-
         let mut snapshots = {
             let guard = self.state.lock().unwrap();
-            filter_search_snapshots(&guard, account_id, scope, query, &label_pairs)
+            filter_scoped_snapshots(&guard, account_id, scope)
                 .into_iter()
                 .cloned()
                 .collect::<Vec<_>>()
@@ -393,22 +407,15 @@ impl ResourceRepository for InMemoryResourceRepository {
     async fn count_search_resource_handles(
         &self,
         account_id: &odf::AccountID,
-        scope: &ResourceTypeScope,
-        query: &ResourceSearchQuery,
-        label_filter: &ResolvedResourceLabelFilter,
+        scope: &ResourceScope,
     ) -> Result<usize, InternalError> {
-        if matches!(scope, ResourceTypeScope::Types(schemas) if schemas.is_empty())
-            || query.is_vacuous()
-        {
+        if scope.is_vacuous() {
             return Ok(0);
         }
 
-        let label_pairs =
-            ResourceLabelFilterPredicate::flatten_conjunction(label_filter).int_err()?;
-
         let guard = self.state.lock().unwrap();
 
-        Ok(filter_search_snapshots(&guard, account_id, scope, query, &label_pairs).len())
+        Ok(filter_scoped_snapshots(&guard, account_id, scope).len())
     }
 
     async fn find_resource_snapshot(
@@ -429,6 +436,37 @@ impl ResourceRepository for InMemoryResourceRepository {
             Some(snapshot) => Ok(Some(self.resolve_snapshot(snapshot).await)),
             None => Ok(None),
         }
+    }
+
+    async fn find_resource_ids_by_schema_and_label(
+        &self,
+        account_id: &odf::AccountID,
+        schema: &TypeUri,
+        label_key: &str,
+        label_value: &str,
+    ) -> Result<Vec<ResourceID>, InternalError> {
+        let guard = self.state.lock().unwrap();
+
+        let mut matched = guard
+            .snapshots_by_id
+            .values()
+            .filter(|snapshot| snapshot.headers.account.did == *account_id)
+            .filter(|snapshot| snapshot.schema == *schema)
+            .filter(|snapshot| snapshot.headers.deleted_at.is_none())
+            .filter(|snapshot| {
+                // Reads labels off the snapshot rather than a projection, the
+                // same way `snapshot_matches_label_pairs` does, so the two
+                // cannot disagree about what is indexed.
+                string_label_entries(&snapshot.headers.labels)
+                    .iter()
+                    .any(|(key, value)| key == label_key && value == label_value)
+            })
+            .map(|snapshot| (snapshot.headers.created_at, snapshot.headers.id))
+            .collect::<Vec<_>>();
+
+        matched.sort();
+
+        Ok(matched.into_iter().map(|(_, id)| id).collect())
     }
 
     async fn find_resource_snapshots_by_schema_and_ids(
@@ -525,82 +563,20 @@ impl ResourceRepository for InMemoryResourceRepository {
         Box::pin(futures::stream::iter(resource_ids_page))
     }
 
-    fn list_resource_snapshots_by_schema(
+    fn list_resource_snapshots(
         &self,
-        account_id: odf::AccountID,
-        schema: &TypeUri,
-        pagination: PaginationOpts,
-        label_filter: &ResolvedResourceLabelFilter,
-    ) -> ResourceSnapshotStream<'_> {
-        let schema = schema.clone();
-        let label_filter = label_filter.clone();
-
-        let stream = futures::stream::once(async move {
-            let label_pairs =
-                ResourceLabelFilterPredicate::flatten_conjunction(&label_filter).int_err()?;
-
-            let mut snapshots_page: Vec<_> = {
-                let guard = self.state.lock().unwrap();
-                guard
-                    .snapshots_by_id
-                    .values()
-                    .filter(|snapshot| {
-                        snapshot.headers.account.did == account_id
-                            && snapshot.schema == schema
-                            && snapshot.headers.deleted_at.is_none()
-                    })
-                    .filter(|snapshot| snapshot_matches_label_pairs(snapshot, &label_pairs))
-                    .cloned()
-                    .collect()
-            };
-
-            snapshots_page.sort_by(|lhs, rhs| {
-                rhs.headers
-                    .updated_at
-                    .cmp(&lhs.headers.updated_at)
-                    .then_with(|| rhs.id.cmp(&lhs.id))
-            });
-
-            let snapshots_page: Vec<_> = snapshots_page
-                .into_iter()
-                .skip(pagination.offset)
-                .take(pagination.limit)
-                .collect();
-
-            Ok(self.resolve_snapshots(snapshots_page).await)
-        })
-        .flat_map(|snapshots: Result<Vec<_>, InternalError>| match snapshots {
-            Ok(snapshots) => {
-                futures::stream::iter(snapshots.into_iter().map(Ok).collect::<Vec<_>>())
-            }
-            Err(err) => futures::stream::iter(vec![Err(err)]),
-        });
-
-        Box::pin(stream)
-    }
-
-    fn list_all_resource_snapshots(
-        &self,
-        account_id: odf::AccountID,
-        label_filter: &ResolvedResourceLabelFilter,
+        account_id: &odf::AccountID,
+        scope: &ResourceScope,
         pagination: PaginationOpts,
     ) -> ResourceSnapshotStream<'_> {
-        let label_filter = label_filter.clone();
+        let account_id = account_id.clone();
+        let scope = scope.clone();
 
         let stream = futures::stream::once(async move {
-            let label_pairs =
-                ResourceLabelFilterPredicate::flatten_conjunction(&label_filter).int_err()?;
-
             let mut snapshots_page: Vec<_> = {
                 let guard = self.state.lock().unwrap();
-                guard
-                    .snapshots_by_id
-                    .values()
-                    .filter(|snapshot| {
-                        snapshot.headers.account.did == account_id
-                            && snapshot.headers.deleted_at.is_none()
-                    })
-                    .filter(|snapshot| snapshot_matches_label_pairs(snapshot, &label_pairs))
+                filter_scoped_snapshots(&guard, &account_id, &scope)
+                    .into_iter()
                     .cloned()
                     .collect()
             };
@@ -686,6 +662,55 @@ impl ResourceRepository for InMemoryResourceRepository {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// The single place query semantics are decided, so `list` and `search` cannot
+/// drift apart.
+fn snapshot_matches_query(snapshot: &ResourceSnapshot, query: &ResourceQuery) -> bool {
+    match query {
+        ResourceQuery::ExactNames(names) => names.contains(&snapshot.headers.name),
+        ResourceQuery::ExactIds(ids) => ids.contains(&snapshot.id),
+        ResourceQuery::NamePattern(pattern) => {
+            resource_name_matches_pattern(&snapshot.headers.name, pattern)
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A snapshot passes when its schema is in scope *and* that schema's own query
+/// matches — each type carries its own query, so the checks cannot be split.
+/// Mirrors the SQL backends: the account is matched *inside* the scope, per
+/// row, so a row naming its own account is checked against that one and every
+/// other row against the call-level default.
+/// Mirrors the SQL backends: the label pairs are evaluated *inside* each scope
+/// row, so rows carrying different pairs filter independently and the whole is
+/// still a disjunction over rows.
+fn snapshot_matches_scope(
+    snapshot: &ResourceSnapshot,
+    scope: &ResourceScope,
+    default_account_id: &odf::AccountID,
+) -> bool {
+    match scope {
+        ResourceScope::AnyType(query, label_pairs) => {
+            snapshot.headers.account.did == *default_account_id
+                && query
+                    .as_ref()
+                    .is_none_or(|query| snapshot_matches_query(snapshot, query))
+                && snapshot_matches_label_pairs(snapshot, label_pairs)
+        }
+        ResourceScope::Types(types) => types.iter().any(|entry| {
+            snapshot.schema == entry.schema
+                && snapshot.headers.account.did == *entry.effective_account_id(default_account_id)
+                && entry
+                    .query
+                    .as_ref()
+                    .is_none_or(|query| snapshot_matches_query(snapshot, query))
+                && snapshot_matches_label_pairs(snapshot, &entry.label_pairs)
+        }),
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 fn resource_name_matches_pattern(name: &str, pattern: &str) -> bool {
     // Resource names are compared case-insensitively, so we fold both sides to
     // lowercase before matching to mirror Postgres ILIKE / SQLite
@@ -730,30 +755,19 @@ fn resource_name_matches_pattern(name: &str, pattern: &str) -> bool {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn filter_search_snapshots<'a>(
+fn filter_scoped_snapshots<'a>(
     guard: &'a State,
     account_id: &odf::AccountID,
-    scope: &ResourceTypeScope,
-    query: &ResourceSearchQuery,
-    label_pairs: &[(&TypeRef, &str)],
+    scope: &ResourceScope,
 ) -> Vec<&'a ResourceSnapshot> {
     guard
         .snapshots_by_id
         .values()
-        .filter(|snapshot| snapshot.headers.account.did == *account_id)
-        .filter(|snapshot| match scope {
-            ResourceTypeScope::AnyType => true,
-            ResourceTypeScope::Types(schemas) => schemas.contains(&snapshot.schema),
-        })
         .filter(|snapshot| snapshot.headers.deleted_at.is_none())
-        .filter(|snapshot| match query {
-            ResourceSearchQuery::ExactNames(names) => names.contains(&snapshot.headers.name),
-            ResourceSearchQuery::ExactIds(ids) => ids.contains(&snapshot.id),
-            ResourceSearchQuery::NamePattern(pattern) => {
-                resource_name_matches_pattern(&snapshot.headers.name, pattern)
-            }
-        })
-        .filter(|snapshot| snapshot_matches_label_pairs(snapshot, label_pairs))
+        // Account and labels are both matched inside the scope, not here: a row
+        // may name its own account and carry its own label pairs, and
+        // `account_id` is only the default for rows that do not.
+        .filter(|snapshot| snapshot_matches_scope(snapshot, scope, account_id))
         .collect()
 }
 
@@ -769,7 +783,7 @@ fn filter_search_snapshots<'a>(
 /// maintains that index, so the two cannot disagree.
 fn snapshot_matches_label_pairs(
     snapshot: &ResourceSnapshot,
-    label_pairs: &[(&TypeRef, &str)],
+    label_pairs: &[ResourceLabelPair],
 ) -> bool {
     if label_pairs.is_empty() {
         return true;

@@ -10,58 +10,57 @@
 use kamu_resources::{
     ApplyManifestApplicationDecision,
     ApplyManifestPlanningDecision,
-    ApplyResourceOutcome,
+    ResourceRef,
+    TypeName,
 };
 use kamu_resources_facade::{
     ApplyManifestRequest,
-    RenderResourceManifestError,
     ResourceLookupProblem,
     ResourceManifestFormat,
-    ResourceRef,
-    ResourceSelector,
-    SpecViewMode,
+    SpecViewOpts,
 };
-use pretty_assertions::assert_eq;
+use pretty_assertions::{assert_eq, assert_matches};
 
 use crate::contract_test;
 use crate::harness::{FacadeContractHarness, TestAccount};
 use crate::helpers::{
     VARIABLE_SET_CANONICAL_SELECTOR,
     VARIABLE_SET_SCHEMA_STR,
-    assert_applied_outcome,
-    variable_set_manifest_json,
+    assert_single_batch_problem,
+    assert_single_batch_success,
+    create_variable_set,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn by_name(name: &str) -> ResourceSelector {
-    ResourceSelector {
+fn by_name(name: &str) -> ResourceRef {
+    ResourceRef {
         account: None,
-        resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-        resource_ref: ResourceRef::ByName(name.parse().unwrap()),
+        r#type: Some(
+            VARIABLE_SET_CANONICAL_SELECTOR
+                .parse::<TypeName>()
+                .unwrap()
+                .into(),
+        ),
+        id: None,
+        did: None,
+        name: Some(name.parse().unwrap()),
     }
 }
 
-fn by_id(id: &kamu_resources::ResourceID) -> ResourceSelector {
-    ResourceSelector {
+fn by_id(id: &kamu_resources::ResourceID) -> ResourceRef {
+    ResourceRef {
         account: None,
-        resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-        resource_ref: ResourceRef::ById(*id),
+        r#type: Some(
+            VARIABLE_SET_CANONICAL_SELECTOR
+                .parse::<TypeName>()
+                .unwrap()
+                .into(),
+        ),
+        id: Some(*id),
+        did: None,
+        name: None,
     }
-}
-
-async fn create_resource(h: &impl FacadeContractHarness, name: &str) -> kamu_resources::ResourceID {
-    let facade = h.facade_for(TestAccount::Alice);
-    let manifest = variable_set_manifest_json(name, None, &[("K", "v")]);
-    let decision = facade
-        .apply_manifest(ApplyManifestRequest {
-            format: ResourceManifestFormat::Json,
-            manifest,
-        })
-        .await
-        .unwrap();
-    let result = assert_applied_outcome(&decision, ApplyResourceOutcome::Created);
-    result.headers.id
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -70,17 +69,19 @@ async fn create_resource(h: &impl FacadeContractHarness, name: &str) -> kamu_res
 contract_test!(render_json_by_name, super::test_render_json_by_name);
 
 pub async fn test_render_json_by_name(h: &impl FacadeContractHarness) {
-    create_resource(h, "render-json-name").await;
+    create_variable_set(h, TestAccount::Alice, "render-json-name").await;
     let facade = h.facade_for(TestAccount::Alice);
 
-    let result = facade
-        .render_manifest(
-            by_name("render-json-name"),
-            ResourceManifestFormat::Json,
-            SpecViewMode::Encrypted,
-        )
-        .await
-        .unwrap();
+    let result = assert_single_batch_success(
+        facade
+            .render_manifests(
+                vec![by_name("render-json-name")],
+                ResourceManifestFormat::Json,
+                SpecViewOpts::ENCRYPTED,
+            )
+            .await
+            .unwrap(),
+    );
 
     assert_eq!(result.format, ResourceManifestFormat::Json);
     let parsed: serde_json::Value =
@@ -111,17 +112,19 @@ pub async fn test_render_json_by_name(h: &impl FacadeContractHarness) {
 contract_test!(render_yaml_by_uid, super::test_render_yaml_by_uid);
 
 pub async fn test_render_yaml_by_uid(h: &impl FacadeContractHarness) {
-    let id = create_resource(h, "render-yaml-id").await;
+    let id = create_variable_set(h, TestAccount::Alice, "render-yaml-id").await;
     let facade = h.facade_for(TestAccount::Alice);
 
-    let result = facade
-        .render_manifest(
-            by_id(&id),
-            ResourceManifestFormat::Yaml,
-            SpecViewMode::Encrypted,
-        )
-        .await
-        .unwrap();
+    let result = assert_single_batch_success(
+        facade
+            .render_manifests(
+                vec![by_id(&id)],
+                ResourceManifestFormat::Yaml,
+                SpecViewOpts::ENCRYPTED,
+            )
+            .await
+            .unwrap(),
+    );
 
     assert_eq!(result.format, ResourceManifestFormat::Yaml);
     let yaml: serde_yaml::Value =
@@ -148,17 +151,19 @@ contract_test!(
 );
 
 pub async fn test_rendered_manifest_can_be_reapplied(h: &impl FacadeContractHarness) {
-    let id = create_resource(h, "render-reapply").await;
+    let id = create_variable_set(h, TestAccount::Alice, "render-reapply").await;
     let facade = h.facade_for(TestAccount::Alice);
 
-    let rendered = facade
-        .render_manifest(
-            by_id(&id),
-            ResourceManifestFormat::Json,
-            SpecViewMode::Encrypted,
-        )
-        .await
-        .unwrap();
+    let rendered = assert_single_batch_success(
+        facade
+            .render_manifests(
+                vec![by_id(&id)],
+                ResourceManifestFormat::Json,
+                SpecViewOpts::ENCRYPTED,
+            )
+            .await
+            .unwrap(),
+    );
 
     // Plan with the rendered manifest — must be Untouched
     let plan = facade
@@ -208,37 +213,31 @@ pub async fn test_render_missing_resource_returns_not_found(h: &impl FacadeContr
     let absent_uid = kamu_resources::ResourceID::new(uuid::Uuid::new_v4());
 
     let by_name_result = facade
-        .render_manifest(
-            by_name("render-no-such"),
+        .render_manifests(
+            vec![by_name("render-no-such")],
             ResourceManifestFormat::Json,
-            SpecViewMode::Encrypted,
+            SpecViewOpts::ENCRYPTED,
         )
-        .await;
-    assert!(
-        matches!(
-            by_name_result,
-            Err(RenderResourceManifestError::LookupProblem(
-                ResourceLookupProblem::NameNotFound(_)
-            ))
-        ),
-        "expected NameNotFound, got: {by_name_result:?}"
+        .await
+        .unwrap();
+    assert_matches!(
+        assert_single_batch_problem(by_name_result),
+        ResourceLookupProblem::NameNotFound(_),
+        "expected NameNotFound"
     );
 
     let by_uid_result = facade
-        .render_manifest(
-            by_id(&absent_uid),
+        .render_manifests(
+            vec![by_id(&absent_uid)],
             ResourceManifestFormat::Json,
-            SpecViewMode::Encrypted,
+            SpecViewOpts::ENCRYPTED,
         )
-        .await;
-    assert!(
-        matches!(
-            by_uid_result,
-            Err(RenderResourceManifestError::LookupProblem(
-                ResourceLookupProblem::IDNotFound(_)
-            ))
-        ),
-        "expected IDNotFound, got: {by_uid_result:?}"
+        .await
+        .unwrap();
+    assert_matches!(
+        assert_single_batch_problem(by_uid_result),
+        ResourceLookupProblem::IDNotFound(_),
+        "expected IDNotFound"
     );
 }
 
@@ -253,51 +252,59 @@ contract_test!(
 pub async fn test_render_wrong_schema_returns_mismatch(h: &impl FacadeContractHarness) {
     use crate::helpers::SECRET_SET_CANONICAL_SELECTOR;
 
-    let id = create_resource(h, "render-mismatch").await;
+    let id = create_variable_set(h, TestAccount::Alice, "render-mismatch").await;
     let facade = h.facade_for(TestAccount::Alice);
 
-    let wrong_schema_selector = ResourceSelector {
+    let wrong_schema_selector = ResourceRef {
         account: None,
-        resource_type: SECRET_SET_CANONICAL_SELECTOR.parse().unwrap(),
-        resource_ref: ResourceRef::ById(id),
+        r#type: Some(
+            SECRET_SET_CANONICAL_SELECTOR
+                .parse::<TypeName>()
+                .unwrap()
+                .into(),
+        ),
+        id: Some(id),
+        did: None,
+        name: None,
     };
     let result = facade
-        .render_manifest(
-            wrong_schema_selector,
+        .render_manifests(
+            vec![wrong_schema_selector],
             ResourceManifestFormat::Json,
-            SpecViewMode::Encrypted,
+            SpecViewOpts::ENCRYPTED,
         )
-        .await;
-    assert!(
-        matches!(
-            result,
-            Err(RenderResourceManifestError::LookupProblem(
-                ResourceLookupProblem::SchemaMismatch(_)
-            ))
-        ),
-        "expected SchemaMismatch, got: {result:?}"
+        .await
+        .unwrap();
+    assert_matches!(
+        assert_single_batch_problem(result),
+        ResourceLookupProblem::SchemaMismatch(_),
+        "expected SchemaMismatch"
     );
 
-    let wrong_kind = ResourceSelector {
+    let wrong_kind = ResourceRef {
         account: None,
-        resource_type: SECRET_SET_CANONICAL_SELECTOR.parse().unwrap(),
-        resource_ref: ResourceRef::ById(id),
+        r#type: Some(
+            SECRET_SET_CANONICAL_SELECTOR
+                .parse::<TypeName>()
+                .unwrap()
+                .into(),
+        ),
+        id: Some(id),
+        did: None,
+        name: None,
     };
     let result = facade
-        .render_manifest(
-            wrong_kind,
+        .render_manifests(
+            vec![wrong_kind],
             ResourceManifestFormat::Json,
-            SpecViewMode::Encrypted,
+            SpecViewOpts::ENCRYPTED,
         )
-        .await;
-    assert!(
-        matches!(
-            result,
-            Err(RenderResourceManifestError::LookupProblem(
-                ResourceLookupProblem::SchemaMismatch(_)
-            ))
-        ),
-        "expected SchemaMismatch, got: {result:?}"
+        .await
+        .unwrap();
+    assert_matches!(
+        assert_single_batch_problem(result),
+        ResourceLookupProblem::SchemaMismatch(_),
+        "expected SchemaMismatch"
     );
 }
 

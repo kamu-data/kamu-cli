@@ -250,18 +250,29 @@ fully-qualified path so wiring files need no extra `use`.
 
 ## Running the tests
 
-Always export `SQLX_OFFLINE=true` for any cargo build/test/clippy (Postgres
-crates need the offline SQLx cache):
-
 ```bash
-SQLX_OFFLINE=true cargo nextest run -E 'test(test_my_command_)'  # filter by name
-SQLX_OFFLINE=true cargo build -p kamu-cli-e2e-repo-tests          # compile shared bodies
-SQLX_OFFLINE=true make clippy
+cargo nextest run -E 'test(test_my_command_)'  # filter by name
+cargo build                                    # compile shared bodies
+make clippy
 ```
+
+Do not pass `SQLX_OFFLINE=true` on the command line and do not scope builds with
+`-p <crate>` — build the whole workspace. SQLx mode is already configured by
+`.env` files (see the `kamu-sqlx-database-work` skill); overriding it forces
+query checking against the stale offline cache instead of the live schema.
 
 SQLite e2e tests run without a DB container. Postgres/MySQL tests are tagged
 `#[test_group::group(e2e, database, postgres|mysql, …)]` and require the
 corresponding DB available per repo convention.
+
+### Instant failures that pass in isolation
+
+Failures that take near-zero time (`FAIL [ 0.003s]`), vary between runs, and pass
+when run alone are almost never your change — the container runtime has run out of
+capacity. Check with
+`podman ps -a --format '{{.Status}}' | awk '{print $1}' | sort | uniq -c` and clear
+leftovers via `podman rm $(podman ps -aq --filter status=created)` before
+investigating further. See DEVELOPER.md for details.
 
 ---
 

@@ -666,7 +666,7 @@ Delete datasets or resources
 
 **Arguments:**
 
-* `<TARGET>` — Target to delete: `datasets`, `all`, or a resource selector such as `variablesets`, `vs`, `secretsets`, `ss`, `storages`, or `st`
+* `<TARGET>` — Target to delete: `datasets`, `%` (all resource types), or a resource selector such as `variablesets`, `vs`, `secretsets`, `ss`, `storages`, or `st`
 * `<ARGS>` — Dataset selector(s) in dataset mode, or a single resource selector in resource mode
 
 **Options:**
@@ -714,23 +714,23 @@ Delete all resources of a type:
 
 Delete all resources across types:
 
-    kamu delete all
+    kamu delete '%/%'
 
 Delete resources using slash selectors:
 
     kamu delete vs/my-vars ss/my-secrets
 
-Delete the same exact name across a matched type pattern:
+Delete the same exact name across every resource type:
 
-    kamu delete s% db-creds
+    kamu delete % db-creds
 
-Delete matched resources across a type pattern and name pattern:
+Delete resources matching a name pattern across every resource type:
 
-    kamu delete s%/db-%
+    kamu delete %/db-%
 
 Delete all resources of a type using a slash selector:
 
-    kamu delete storages/all
+    kamu delete 'storages/%'
 
 Delete a dataset and a resource in one command:
 
@@ -844,13 +844,17 @@ Get multiple resources by slash-separated ref form:
 
     kamu get vs/vars-a ss/db-creds
 
-Get the same exact name across a matched type pattern:
+Get the same exact name across every resource type:
 
-    kamu get s% db-creds
+    kamu get % db-creds
 
-Get matched resources across a type pattern and name pattern:
+Get resources matching a name pattern across every resource type:
 
-    kamu get s%/db-%
+    kamu get %/db-%
+
+Get every resource of every type:
+
+    kamu get '%/%'
 
 Get a resource by UUID:
 
@@ -1038,11 +1042,11 @@ Show physical schema of the underlying Parquet files:
 
 List datasets or resources
 
-**Usage:** `kamu list [OPTIONS] [TARGET]`
+**Usage:** `kamu list [OPTIONS] [TARGETS]...`
 
 **Arguments:**
 
-* `<TARGET>` — Target to list: `datasets`, `all`, or a resource selector such as `variablesets`, `vs`, `secretsets`, `ss`, `storages`, or `st`
+* `<TARGETS>` — Targets to list: `datasets`, `%` (all resource types), a resource selector such as `variablesets`, `vs`, `secretsets`, `ss`, `storages`, or `st`, optionally narrowed as `type/name`, `type/pattern-%` or `type/<id>`. Several resource selectors may be given at once
 
 **Options:**
 
@@ -1082,11 +1086,24 @@ To list datasets explicitly:
 
 To list all resources across all types:
 
-    kamu list all
+    kamu list '%'
 
 To list variable sets:
 
     kamu list variablesets
+
+To list variable sets whose name matches a pattern:
+
+    kamu list 'vs/my-%'
+
+To list one resource by name or ID:
+
+    kamu list 'vs/my-vars'
+    kamu list 3d8d6d1c-6f7c-4c62-9f4e-7d8295e8fb69
+
+To list several resource types at once:
+
+    kamu list 'vs/app-%' 'ss/app-%'
 
 To list storages from a specific context:
 
@@ -1106,7 +1123,7 @@ To require several labels at once:
 
 To get a machine-readable list of all resources:
 
-    kamu list all -o csv
+    kamu list '%' -o csv
 
 To get a machine-readable list of datasets:
 

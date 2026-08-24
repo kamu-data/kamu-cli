@@ -9,26 +9,25 @@
 
 use database_common::PaginationOpts;
 use kamu_configuration::VariableSetResource;
-use kamu_resources::{ResourceAccountRef, ResourceID, ResourceSchemaProvider, ResourceSearchQuery};
+use kamu_resources::{
+    ResourceAccountRef,
+    ResourceID,
+    ResourceRef,
+    ResourceSchemaProvider,
+    ResourceSelector,
+    TypeName,
+};
 use kamu_resources_facade::{
     ApplyManifestError,
     ApplyManifestRequest,
-    GetResourceError,
-    ListAllResourceHandlesRequest,
-    ListAllResourcesError,
-    ListAllResourcesRequest,
-    ListResourceHandlesRequest,
+    BatchResourceError,
     ListResourcesError,
-    ListResourcesRequest,
-    ResolveManifestAccountError,
-    ResourceBatchSelector,
+    ResourceAccountResolutionError,
+    ResourceAccountResolutionProblemCode,
     ResourceManifestFormat,
-    ResourceRef,
-    ResourceSelector,
     ResourcesSummaryRequest,
-    SearchResourceHandlesRequest,
-    SearchResourceTypeScope,
-    SpecViewMode,
+    SearchResourcesRequest,
+    SpecViewOpts,
 };
 use pretty_assertions::{assert_eq, assert_matches};
 
@@ -38,25 +37,13 @@ use crate::helpers::{
     VARIABLE_SET_CANONICAL_SELECTOR,
     VARIABLE_SET_SCHEMA_STR,
     apply_manifest_and_get_id,
+    assert_single_batch_success,
+    create_variable_set,
     sorted_handle_names,
     total_schema_count,
-    variable_set_manifest_json,
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-async fn create_default_account_resource(
-    h: &impl FacadeContractHarness,
-    account: TestAccount,
-    name: &str,
-) -> ResourceID {
-    apply_manifest_and_get_id(
-        h,
-        account,
-        variable_set_manifest_json(name, None, &[("K", "v")]),
-    )
-    .await
-}
 
 async fn create_with_account_selector(
     h: &impl FacadeContractHarness,
@@ -140,23 +127,23 @@ fn unknown_account_by_id() -> ResourceAccountRef {
     }
 }
 
-fn selector_by_name(name: &str, account: Option<ResourceAccountRef>) -> ResourceSelector {
-    ResourceSelector {
+fn selector_by_name(name: &str, account: Option<ResourceAccountRef>) -> ResourceRef {
+    ResourceRef {
         account,
-        resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-        resource_ref: ResourceRef::ByName(name.parse().unwrap()),
+        r#type: Some(
+            VARIABLE_SET_CANONICAL_SELECTOR
+                .parse::<TypeName>()
+                .unwrap()
+                .into(),
+        ),
+        id: None,
+        did: None,
+        name: Some(name.parse().unwrap()),
     }
 }
 
-fn batch_selector_by_name(
-    name: &str,
-    account: Option<ResourceAccountRef>,
-) -> ResourceBatchSelector {
-    ResourceBatchSelector {
-        account,
-        resource_type: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-        resource_refs: vec![ResourceRef::ByName(name.parse().unwrap())],
-    }
+fn batch_selector_by_name(name: &str, account: Option<ResourceAccountRef>) -> Vec<ResourceRef> {
+    vec![selector_by_name(name, account)]
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -170,16 +157,17 @@ contract_test!(
 pub async fn test_default_account_selector_resolves_current_account(
     h: &impl FacadeContractHarness,
 ) {
-    create_default_account_resource(h, TestAccount::Alice, "acct-default").await;
+    create_variable_set(h, TestAccount::Alice, "acct-default").await;
 
-    let view = h
-        .facade_for(TestAccount::Alice)
-        .get(
-            selector_by_name("acct-default", None),
-            SpecViewMode::Encrypted,
-        )
-        .await
-        .unwrap();
+    let view = assert_single_batch_success(
+        h.facade_for(TestAccount::Alice)
+            .get(
+                vec![selector_by_name("acct-default", None)],
+                SpecViewOpts::ENCRYPTED,
+            )
+            .await
+            .unwrap(),
+    );
 
     assert_eq!(view.headers.account.did, h.account_id(TestAccount::Alice));
     assert_eq!(
@@ -204,19 +192,20 @@ pub async fn test_account_by_name_resolves_correctly(h: &impl FacadeContractHarn
         account_by_name(&h.account_name(TestAccount::Alice)),
     )
     .await;
-    create_default_account_resource(h, TestAccount::Bob, "acct-by-name").await;
+    create_variable_set(h, TestAccount::Bob, "acct-by-name").await;
 
-    let view = h
-        .facade_for(TestAccount::Alice)
-        .get(
-            selector_by_name(
-                "acct-by-name",
-                Some(account_by_name(&h.account_name(TestAccount::Alice))),
-            ),
-            SpecViewMode::Encrypted,
-        )
-        .await
-        .unwrap();
+    let view = assert_single_batch_success(
+        h.facade_for(TestAccount::Alice)
+            .get(
+                vec![selector_by_name(
+                    "acct-by-name",
+                    Some(account_by_name(&h.account_name(TestAccount::Alice))),
+                )],
+                SpecViewOpts::ENCRYPTED,
+            )
+            .await
+            .unwrap(),
+    );
 
     assert_eq!(view.headers.account.did, h.account_id(TestAccount::Alice));
 }
@@ -238,17 +227,18 @@ pub async fn test_account_by_id_resolves_correctly(h: &impl FacadeContractHarnes
     )
     .await;
 
-    let view = h
-        .facade_for(TestAccount::Alice)
-        .get(
-            selector_by_name(
-                "acct-by-id",
-                Some(account_by_id(h.account_id(TestAccount::Alice))),
-            ),
-            SpecViewMode::Encrypted,
-        )
-        .await
-        .unwrap();
+    let view = assert_single_batch_success(
+        h.facade_for(TestAccount::Alice)
+            .get(
+                vec![selector_by_name(
+                    "acct-by-id",
+                    Some(account_by_id(h.account_id(TestAccount::Alice))),
+                )],
+                SpecViewOpts::ENCRYPTED,
+            )
+            .await
+            .unwrap(),
+    );
 
     assert_eq!(view.headers.account.did, h.account_id(TestAccount::Alice));
 }
@@ -269,14 +259,15 @@ pub async fn test_account_by_name_and_id_agree_resolves_correctly(h: &impl Facad
 
     create_with_account_selector(h, TestAccount::Alice, "acct-both-agree", agreeing.clone()).await;
 
-    let view = h
-        .facade_for(TestAccount::Alice)
-        .get(
-            selector_by_name("acct-both-agree", Some(agreeing)),
-            SpecViewMode::Encrypted,
-        )
-        .await
-        .unwrap();
+    let view = assert_single_batch_success(
+        h.facade_for(TestAccount::Alice)
+            .get(
+                vec![selector_by_name("acct-both-agree", Some(agreeing))],
+                SpecViewOpts::ENCRYPTED,
+            )
+            .await
+            .unwrap(),
+    );
 
     assert_eq!(view.headers.account.did, h.account_id(TestAccount::Alice));
 }
@@ -304,32 +295,35 @@ pub async fn test_account_name_id_mismatch_is_rejected(h: &impl FacadeContractHa
         })
         .await;
     assert!(
-        matches!(apply_result, Err(ApplyManifestError::BadAccount(_))),
-        "mismatched account must be rejected with BadAccount, got: {apply_result:?}"
+        matches!(apply_result, Err(ApplyManifestError::AccountResolution(_))),
+        "mismatched account must be rejected with AccountResolution, got: {apply_result:?}"
     );
 
     let get_result = h
         .facade_for(TestAccount::Alice)
         .get(
-            selector_by_name("acct-mismatch", Some(mismatch)),
-            SpecViewMode::Encrypted,
+            vec![selector_by_name("acct-mismatch", Some(mismatch))],
+            SpecViewOpts::ENCRYPTED,
         )
         .await;
-    assert!(
-        matches!(get_result, Err(GetResourceError::BadAccount(_))),
-        "mismatched account selector must be rejected, got: {get_result:?}"
+    assert_matches!(
+        get_result,
+        Err(BatchResourceError::AccountResolution(_)),
+        "mismatched account selector must be rejected"
     );
 
     let list = h
         .facade_for(TestAccount::Alice)
-        .list(ListResourcesRequest {
-            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+        .search(SearchResourcesRequest {
+            selectors: vec![ResourceSelector::of_type(
+                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            )],
             account: None,
             pagination: PaginationOpts::from_max_results(1000),
-            label_filter: None,
         })
         .await
-        .unwrap();
+        .unwrap()
+        .items;
     assert!(list.iter().all(|item| item.name != "acct-mismatch"));
 }
 
@@ -345,28 +339,29 @@ pub async fn test_unknown_account_is_rejected(h: &impl FacadeContractHarness) {
     let facade = h.facade_for(TestAccount::Alice);
 
     let by_name = facade
-        .list(ListResourcesRequest {
-            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+        .search(SearchResourcesRequest {
+            selectors: vec![ResourceSelector::of_type(
+                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            )],
             account: Some(unknown_account_by_name()),
             pagination: PaginationOpts::from_max_results(1000),
-            label_filter: None,
         })
         .await;
     let by_id = facade
-        .list_all(ListAllResourcesRequest {
+        .search(SearchResourcesRequest {
             account: Some(unknown_account_by_id()),
-            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
+            selectors: vec![ResourceSelector::default()],
         })
         .await;
 
     assert!(
-        matches!(by_name, Err(ListResourcesError::BadAccount(_))),
-        "unknown account name must be rejected with BadAccount, got: {by_name:?}"
+        matches!(by_name, Err(ListResourcesError::AccountResolution(_))),
+        "unknown account name must be rejected with AccountResolution, got: {by_name:?}"
     );
     assert!(
-        matches!(by_id, Err(ListAllResourcesError::BadAccount(_))),
-        "unknown account id must be rejected with BadAccount, got: {by_id:?}"
+        matches!(by_id, Err(ListResourcesError::AccountResolution(_))),
+        "unknown account id must be rejected with AccountResolution, got: {by_id:?}"
     );
 }
 
@@ -379,39 +374,45 @@ contract_test!(
 );
 
 pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarness) {
-    let alice_id = create_default_account_resource(h, TestAccount::Alice, "acct-isolated").await;
-    let bob_id = create_default_account_resource(h, TestAccount::Bob, "acct-isolated").await;
-    create_default_account_resource(h, TestAccount::Alice, "acct-alice-only").await;
-    create_default_account_resource(h, TestAccount::Bob, "acct-bob-only").await;
+    let alice_id = create_variable_set(h, TestAccount::Alice, "acct-isolated").await;
+    let bob_id = create_variable_set(h, TestAccount::Bob, "acct-isolated").await;
+    create_variable_set(h, TestAccount::Alice, "acct-alice-only").await;
+    create_variable_set(h, TestAccount::Bob, "acct-bob-only").await;
 
     let alice = h.facade_for(TestAccount::Alice);
     let bob = h.facade_for(TestAccount::Bob);
 
-    let alice_view = alice
-        .get(
-            selector_by_name("acct-isolated", None),
-            SpecViewMode::Encrypted,
+    let alice_view = assert_single_batch_success(
+        alice
+            .get(
+                vec![selector_by_name("acct-isolated", None)],
+                SpecViewOpts::ENCRYPTED,
+            )
+            .await
+            .unwrap(),
+    );
+    let bob_view = assert_single_batch_success(
+        bob.get(
+            vec![selector_by_name("acct-isolated", None)],
+            SpecViewOpts::ENCRYPTED,
         )
         .await
-        .unwrap();
-    let bob_view = bob
-        .get(
-            selector_by_name("acct-isolated", None),
-            SpecViewMode::Encrypted,
-        )
-        .await
-        .unwrap();
+        .unwrap(),
+    );
     assert_eq!(alice_view.headers.id, alice_id);
     assert_eq!(bob_view.headers.id, bob_id);
 
-    let alice_handle = alice
-        .get_handle(selector_by_name("acct-isolated", None))
-        .await
-        .unwrap();
-    let bob_handle = bob
-        .get_handle(selector_by_name("acct-isolated", None))
-        .await
-        .unwrap();
+    let alice_handle = assert_single_batch_success(
+        alice
+            .get_handles(vec![selector_by_name("acct-isolated", None)])
+            .await
+            .unwrap(),
+    );
+    let bob_handle = assert_single_batch_success(
+        bob.get_handles(vec![selector_by_name("acct-isolated", None)])
+            .await
+            .unwrap(),
+    );
     assert_eq!(alice_handle.id, alice_id);
     assert_eq!(bob_handle.id, bob_id);
 
@@ -420,9 +421,9 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
         .await
         .unwrap();
     let bob_batch = bob
-        .get_many(
+        .get(
             batch_selector_by_name("acct-isolated", None),
-            SpecViewMode::Encrypted,
+            SpecViewOpts::ENCRYPTED,
         )
         .await
         .unwrap();
@@ -430,23 +431,27 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
     assert_eq!(bob_batch.successes[0].item.headers.id, bob_id);
 
     let alice_list = alice
-        .list_handles(ListResourceHandlesRequest {
-            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+        .search_handles(SearchResourcesRequest {
+            selectors: vec![ResourceSelector::of_type(
+                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            )],
             account: None,
-            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
-        .unwrap();
+        .unwrap()
+        .items;
     let bob_list = bob
-        .list_handles(ListResourceHandlesRequest {
-            raw_type_selector: VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+        .search_handles(SearchResourcesRequest {
+            selectors: vec![ResourceSelector::of_type(
+                VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
+            )],
             account: None,
-            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
-        .unwrap();
+        .unwrap()
+        .items;
     assert_eq!(
         sorted_handle_names(alice_list),
         vec!["acct-alice-only", "acct-isolated"]
@@ -457,54 +462,57 @@ pub async fn test_account_isolation_across_read_apis(h: &impl FacadeContractHarn
     );
 
     let alice_search = alice
-        .search_handles(SearchResourceHandlesRequest {
-            type_scope: SearchResourceTypeScope::Types(vec![
+        .search_handles(SearchResourcesRequest {
+            selectors: vec![ResourceSelector::name_pattern(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-            ]),
-            query: ResourceSearchQuery::NamePattern("acct-%".to_string()),
+                "acct-%".to_string(),
+            )],
             account: None,
-            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
-        .unwrap();
+        .unwrap()
+        .items;
     let bob_search = bob
-        .search_handles(SearchResourceHandlesRequest {
-            type_scope: SearchResourceTypeScope::Types(vec![
+        .search_handles(SearchResourcesRequest {
+            selectors: vec![ResourceSelector::name_pattern(
                 VARIABLE_SET_CANONICAL_SELECTOR.parse().unwrap(),
-            ]),
-            query: ResourceSearchQuery::NamePattern("acct-%".to_string()),
+                "acct-%".to_string(),
+            )],
             account: None,
-            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
-        .unwrap();
+        .unwrap()
+        .items;
     assert_eq!(
-        sorted_handle_names(alice_search.items),
+        sorted_handle_names(alice_search),
         vec!["acct-alice-only", "acct-isolated"]
     );
     assert_eq!(
-        sorted_handle_names(bob_search.items),
+        sorted_handle_names(bob_search),
         vec!["acct-bob-only", "acct-isolated"]
     );
 
     let alice_all = alice
-        .list_all_handles(ListAllResourceHandlesRequest {
+        .search_handles(SearchResourcesRequest {
+            // A default selector narrows by nothing, so it spans every type.
+            selectors: vec![ResourceSelector::default()],
             account: None,
-            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
         })
         .await
-        .unwrap();
+        .unwrap()
+        .items;
     let bob_all = bob
-        .list_all(ListAllResourcesRequest {
+        .search(SearchResourcesRequest {
             account: None,
-            label_filter: None,
             pagination: PaginationOpts::from_max_results(1000),
+            selectors: vec![ResourceSelector::default()],
         })
         .await
-        .unwrap();
+        .unwrap()
+        .items;
     assert_eq!(
         sorted_handle_names(alice_all),
         vec!["acct-alice-only", "acct-isolated"]
@@ -578,8 +586,11 @@ pub async fn test_empty_account_selector_is_rejected(h: &impl FacadeContractHarn
 
     assert_matches!(
         result,
-        Err(ApplyManifestError::BadAccount(
-            ResolveManifestAccountError::EmptySelector
+        Err(ApplyManifestError::AccountResolution(
+            ResourceAccountResolutionError {
+                code: ResourceAccountResolutionProblemCode::EmptySelector,
+                ..
+            }
         )),
         "an empty account selector `{{}}` must be rejected during account resolution, got: \
          {result:?}"
