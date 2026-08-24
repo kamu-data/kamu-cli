@@ -36,29 +36,14 @@ kamu_cli_execute_command_e2e_test!(
 
 kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_complete_resource_type_for_get
+    fixture = kamu_cli_e2e_repo_tests::commands::test_complete_resource_type
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_complete_resource_type_for_list
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-kamu_cli_execute_command_e2e_test!(
-    storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_complete_resource_type_for_delete
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-kamu_cli_execute_command_e2e_test!(
-    storage = sqlite,
-    fixture =
-        kamu_cli_e2e_repo_tests::commands::test_complete_resource_type_only_for_first_get_token
+    fixture = kamu_cli_e2e_repo_tests::commands::test_complete_resource_type_extra_targets
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -72,121 +57,15 @@ kamu_cli_execute_command_e2e_test!(
 
 kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
-    fixture =
-        kamu_cli_e2e_repo_tests::commands::test_complete_pull_as_does_not_suggest_context_names
+    fixture = kamu_cli_e2e_repo_tests::commands::test_complete_context_option_value
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 kamu_cli_execute_command_e2e_test!(
     storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_complete_resource_type_for_get_after_flag
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-kamu_cli_execute_command_e2e_test!(
-    storage = sqlite,
-    fixture =
-        kamu_cli_e2e_repo_tests::commands::test_complete_resource_type_only_for_first_delete_token
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-kamu_cli_execute_command_e2e_test!(
-    storage = sqlite,
-    fixture =
-        kamu_cli_e2e_repo_tests::commands::test_complete_resource_type_honors_explicit_context
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-kamu_cli_execute_command_e2e_test!(
-    storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_complete_context_add_does_not_suggest_names
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-kamu_cli_execute_command_e2e_test!(
-    storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_complete_context_use_suggests_names
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-kamu_cli_execute_command_e2e_test!(
-    storage = sqlite,
-    fixture =
-        kamu_cli_e2e_repo_tests::commands::test_complete_rename_new_name_does_not_suggest_context_names
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-kamu_cli_execute_command_e2e_test!(
-    storage = sqlite,
-    fixture =
-        kamu_cli_e2e_repo_tests::commands::test_complete_repo_add_name_does_not_suggest_context_names
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-kamu_cli_execute_command_e2e_test!(
-    storage = sqlite,
-    fixture =
-        kamu_cli_e2e_repo_tests::commands::test_complete_new_dataset_does_not_suggest_context_names
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-kamu_cli_execute_command_e2e_test!(
-    storage = sqlite,
-    fixture =
-        kamu_cli_e2e_repo_tests::commands::test_complete_resource_type_for_get_after_global_flag
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-kamu_cli_execute_command_e2e_test!(
-    storage = sqlite,
-    fixture =
-        kamu_cli_e2e_repo_tests::commands::test_complete_resource_type_honors_attached_explicit_context
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-kamu_cli_execute_command_e2e_test!(
-    storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_complete_context_name_for_short_flag
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-kamu_cli_execute_command_e2e_test!(
-    storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_complete_out_of_range_cursor_does_not_panic
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-kamu_cli_execute_command_e2e_test!(
-    storage = sqlite,
-    fixture =
-        kamu_cli_e2e_repo_tests::commands::test_complete_resource_type_honors_clustered_short_context
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-kamu_cli_execute_command_e2e_test!(
-    storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_complete_context_name_for_attached_short_flag
-);
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-kamu_cli_execute_command_e2e_test!(
-    storage = sqlite,
-    fixture = kamu_cli_e2e_repo_tests::commands::test_complete_context_name_for_split_long_flag
+    fixture = kamu_cli_e2e_repo_tests::commands::test_complete_outside_workspace_does_not_crash,
+    options = Options::default().with_no_workspace()
 );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

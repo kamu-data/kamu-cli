@@ -19,6 +19,21 @@ use winnow::{ModalResult, Parser};
 /// in the name position it is an ordinary `%` pattern matching every name.
 pub const ANY_SELECTOR: &str = "%";
 
+/// The pseudo-target selecting datasets rather than a managed resource type,
+/// accepted alongside the real type selectors.
+pub const DATASETS_TARGET: &str = "datasets";
+
+/// Singular spelling of [`DATASETS_TARGET`]; both are accepted everywhere a
+/// dataset pseudo-target may appear.
+pub const DATASET_TARGET: &str = "dataset";
+
+/// Whether a type half names the dataset pseudo-target, in either spelling.
+/// Routing every check through here keeps `list` and `delete` in step.
+pub fn is_dataset_target(type_half: &str) -> bool {
+    type_half.eq_ignore_ascii_case(DATASET_TARGET)
+        || type_half.eq_ignore_ascii_case(DATASETS_TARGET)
+}
+
 pub const TYPE_NAME_SEPARATOR: char = '/';
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

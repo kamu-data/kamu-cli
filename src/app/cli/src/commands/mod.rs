@@ -15,6 +15,7 @@ mod apply_command;
 mod common;
 mod compact_command;
 mod complete_command;
+mod complete_command_plan;
 mod completions_command;
 mod config_command;
 mod context_add_command;

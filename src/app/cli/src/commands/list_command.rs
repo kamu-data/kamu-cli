@@ -21,18 +21,16 @@ use crate::resource_context::{ResourceContextReporter, ResourceContextResolver};
 use crate::resources::{
     ANY_SELECTOR,
     BareTypePolicy,
+    DATASETS_TARGET,
     ResourceFacadeFactory,
     ResourceLabelSelectorParser,
     ResourceSelectionScanner,
     ResourceTypeLookupErrorOptions,
     ResourceTypeLookupService,
+    is_dataset_target,
     is_resource_id,
     usage_error_at,
 };
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-const DATASETS_TARGET: &str = "datasets";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -91,7 +89,7 @@ impl ListCommand {
 
         if targets
             .iter()
-            .any(|target| Self::type_half(target).eq_ignore_ascii_case(DATASETS_TARGET))
+            .any(|target| is_dataset_target(Self::type_half(target)))
         {
             if targets.len() > 1 {
                 return Err(CLIError::usage_error(
