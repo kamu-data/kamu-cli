@@ -18,6 +18,7 @@ use database_common::{
 use email_utils::Email;
 use internal_error::{ErrorIntoInternal, ResultIntoInternal};
 use sqlx::error::DatabaseError;
+use url::Url;
 
 use crate::domain::*;
 
@@ -63,25 +64,29 @@ impl AccountRepository for SqliteAccountRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        let account_id = account.id.to_string();
+        use odf::metadata::AsStackString;
+
+        let account_id_stack = account.id.as_stack_string();
+        let account_id_str = account_id_stack.as_str();
         let resource_id = account.resource_id.as_ref();
         let account_name = account.account_name.as_str();
         let email = account.email.as_ref().to_ascii_lowercase();
-        let provider = account.provider.clone();
-        let provider_identity_key = account.provider_identity_key.clone();
+        let avatar_url_as_str = account.avatar_url.as_ref().map(Url::as_str);
+        let provider = account.provider.as_str();
+        let provider_identity_key = account.provider_identity_key.as_str();
 
         sqlx::query!(
             r#"
             INSERT INTO accounts (id, resource_id, account_name, email, display_name, account_type, avatar_url, registered_at, provider, provider_identity_key)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             "#,
-            account_id,
+            account_id_str,
             resource_id,
             account_name,
             email,
             account.display_name,
             account.account_type,
-            account.avatar_url,
+            avatar_url_as_str,
             account.registered_at,
             provider,
             provider_identity_key
@@ -107,11 +112,15 @@ impl AccountRepository for SqliteAccountRepository {
 
         let connection_mut = tr.connection_mut().await?;
 
-        let account_id = updated_account.id.to_string();
+        use odf::metadata::AsStackString;
+
+        let account_id_stack = updated_account.id.as_stack_string();
+        let account_id_str = account_id_stack.as_str();
         let account_name = updated_account.account_name.as_str();
         let email = updated_account.email.as_ref().to_ascii_lowercase();
-        let provider = updated_account.provider.clone();
-        let provider_identity_key = updated_account.provider_identity_key.clone();
+        let avatar_url_as_str = updated_account.avatar_url.as_ref().map(Url::as_str);
+        let provider = updated_account.provider.as_str();
+        let provider_identity_key = updated_account.provider_identity_key.as_str();
 
         let update_result = sqlx::query!(
             r#"
@@ -126,12 +135,12 @@ impl AccountRepository for SqliteAccountRepository {
                 provider_identity_key = $9
             WHERE id = $1
             "#,
-            account_id,
+            account_id_str,
             account_name,
             email,
             updated_account.display_name,
             updated_account.account_type,
-            updated_account.avatar_url,
+            avatar_url_as_str,
             updated_account.registered_at,
             provider,
             provider_identity_key
@@ -343,6 +352,7 @@ impl AccountRepository for SqliteAccountRepository {
 
     async fn find_account_id_by_provider_identity_key(
         &self,
+        provider: &str,
         provider_identity_key: &str,
     ) -> Result<Option<odf::AccountID>, FindAccountIdByProviderIdentityKeyError> {
         let mut tr = self.transaction.lock().await;
@@ -353,8 +363,10 @@ impl AccountRepository for SqliteAccountRepository {
             r#"
             SELECT id as "id: odf::AccountID"
             FROM accounts
-            WHERE provider_identity_key = $1
+            WHERE provider = $1
+              AND provider_identity_key = $2
             "#,
+            provider,
             provider_identity_key
         )
         .fetch_optional(connection_mut)
@@ -412,6 +424,40 @@ impl AccountRepository for SqliteAccountRepository {
         .int_err()?;
 
         Ok(maybe_account_row.map(|account_row| account_row.id))
+    }
+
+    async fn find_account_ids_by_unique_fields(
+        &self,
+        provider: &str,
+        account_name: &odf::AccountName,
+        email: &Email,
+        provider_identity_key: &str,
+    ) -> Result<Vec<odf::AccountID>, FindAccountIdsByUniqueFieldsError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        let account_name_str = account_name.as_str();
+        let email_str = email.as_ref();
+
+        let account_rows = sqlx::query!(
+            r#"
+            SELECT DISTINCT id AS "id: odf::AccountID"
+            FROM accounts
+            WHERE lower(account_name) = lower($1)
+               OR lower(email) = lower($2)
+               OR (provider = $3 AND provider_identity_key = $4)
+            "#,
+            account_name_str,
+            email_str,
+            provider,
+            provider_identity_key
+        )
+        .fetch_all(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(account_rows.into_iter().map(|row| row.id).collect())
     }
 
     async fn get_accounts_by_names(
@@ -710,6 +756,34 @@ impl PasswordHashRepository for SqliteAccountRepository {
             WHERE lower(account_name) = lower($1)
             "#,
             account_name,
+        )
+        .fetch_optional(connection_mut)
+        .await
+        .int_err()?;
+
+        Ok(maybe_password_row.map(|password_row| password_row.password_hash))
+    }
+
+    async fn find_password_hash_by_account_id(
+        &self,
+        account_id: &odf::AccountID,
+    ) -> Result<Option<String>, FindPasswordHashError> {
+        let mut tr = self.transaction.lock().await;
+
+        let connection_mut = tr.connection_mut().await?;
+
+        use odf::metadata::AsStackString;
+
+        let account_id_stack = account_id.as_stack_string();
+        let account_id_str = account_id_stack.as_str();
+
+        let maybe_password_row = sqlx::query!(
+            r#"
+            SELECT password_hash
+            FROM accounts_passwords
+            WHERE account_id = $1
+            "#,
+            account_id_str,
         )
         .fetch_optional(connection_mut)
         .await

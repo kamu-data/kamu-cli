@@ -9,9 +9,10 @@
 
 use std::sync::Arc;
 
-use dill::{Catalog, CatalogBuilder};
 use kamu_accounts::{
     Account,
+    AccountConfig,
+    AccountResourceIdSource,
     AccountService,
     CreateAccountUseCase,
     CurrentAccountSubject,
@@ -36,7 +37,7 @@ use time_source::{SystemTimeSource, SystemTimeSourceProvider};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct AccountBaseUseCaseHarness {
-    intermediate_catalog: Catalog,
+    intermediate_catalog: dill::Catalog,
     system_time_source: Arc<dyn SystemTimeSource>,
     account_service: Arc<dyn AccountService>,
 }
@@ -47,9 +48,9 @@ impl AccountBaseUseCaseHarness {
     pub fn new(opts: AccountBaseUseCaseHarnessOpts<'_>) -> Self {
         let intermediate_catalog = {
             let mut b = if let Some(base_catalog) = opts.maybe_base_catalog {
-                CatalogBuilder::new_chained(base_catalog)
+                dill::CatalogBuilder::new_chained(base_catalog)
             } else {
-                CatalogBuilder::new()
+                dill::CatalogBuilder::new()
             };
 
             b.add::<InMemoryAccountRepository>()
@@ -86,7 +87,7 @@ impl AccountBaseUseCaseHarness {
     }
 
     #[inline]
-    pub fn intermediate_catalog(&self) -> &Catalog {
+    pub fn intermediate_catalog(&self) -> &dill::Catalog {
         &self.intermediate_catalog
     }
 
@@ -95,20 +96,23 @@ impl AccountBaseUseCaseHarness {
         self.account_service.as_ref()
     }
 
-    pub async fn create_account(&self, catalog: &Catalog, account_name: &str) -> Account {
-        let account = Account {
-            registered_at: self.system_time_source.now(),
-            ..Account::test(Self::account_id_from_name(account_name), account_name)
+    pub async fn create_account(&self, catalog: &dill::Catalog, account_name: &str) -> Account {
+        let account_config = AccountConfig {
+            registered_at: Some(self.system_time_source.now()),
+            password: TEST_PASSWORD.clone(),
+            ..AccountConfig::test_config_from_name_with_id(odf::AccountName::new_unchecked(
+                account_name,
+            ))
         };
 
         let create_account_uc = catalog.get_one::<dyn CreateAccountUseCase>().unwrap();
         create_account_uc
-            .execute(&account, &TEST_PASSWORD, false /* quiet */)
+            .execute(&account_config, AccountResourceIdSource::SeededFromName)
             .await
             .unwrap()
     }
 
-    pub async fn rename_account(&self, catalog: &Catalog, old_name: &str, new_name: &str) {
+    pub async fn rename_account(&self, catalog: &dill::Catalog, old_name: &str, new_name: &str) {
         // Locate account
         let account_svc = catalog.get_one::<dyn AccountService>().unwrap();
         let account = account_svc
@@ -124,7 +128,7 @@ impl AccountBaseUseCaseHarness {
 
         // Execute update on user's behalf in authenticated context
         {
-            let mut b = CatalogBuilder::new_chained(catalog);
+            let mut b = dill::CatalogBuilder::new_chained(catalog);
             b.add_value(CurrentAccountSubject::logged(
                 account.resource_id,
                 account.id.clone(),
@@ -139,7 +143,7 @@ impl AccountBaseUseCaseHarness {
         }
     }
 
-    pub async fn delete_account(&self, catalog: &Catalog, account_name: &str) {
+    pub async fn delete_account(&self, catalog: &dill::Catalog, account_name: &str) {
         // Locate account
         let account_svc = catalog.get_one::<dyn AccountService>().unwrap();
         let account = account_svc
@@ -166,7 +170,7 @@ impl AccountBaseUseCaseHarness {
     }
 
     pub fn account_id_from_name(account_name: &str) -> odf::AccountID {
-        odf::AccountID::new_seeded_ed25519(account_name.as_bytes())
+        odf::metadata::testing::account_id(&account_name)
     }
 
     pub async fn get_account_by_id(&self, account_id: &odf::AccountID) -> Account {

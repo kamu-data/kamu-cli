@@ -327,7 +327,7 @@ async fn test_dataset_by_account_id() {
                 }
                 "#
             )
-            .replace("<accountId>", DEFAULT_ACCOUNT_ID.to_string().as_str()),
+            .replace("<accountId>", TEST_ACCOUNT_ID.to_string().as_str()),
         )
         .await;
 

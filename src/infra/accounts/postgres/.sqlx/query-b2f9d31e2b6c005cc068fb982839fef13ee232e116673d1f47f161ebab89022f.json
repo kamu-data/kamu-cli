@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT id as \"id: odf::AccountID\"\n            FROM accounts\n            WHERE provider_identity_key = $1\n            ",
+  "query": "\n            SELECT id as \"id: odf::AccountID\"\n            FROM accounts\n            WHERE provider = $1\n              AND provider_identity_key = $2\n            ",
   "describe": {
     "columns": [
       {
@@ -11,6 +11,7 @@
     ],
     "parameters": {
       "Left": [
+        "Text",
         "Text"
       ]
     },
@@ -18,5 +19,5 @@
       false
     ]
   },
-  "hash": "f80678ef6fc4ed882db7dedb55172d92ef14800efd08c5e21f43e1edecfbad78"
+  "hash": "b2f9d31e2b6c005cc068fb982839fef13ee232e116673d1f47f161ebab89022f"
 }

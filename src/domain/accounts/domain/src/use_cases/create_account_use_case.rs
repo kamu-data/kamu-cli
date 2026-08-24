@@ -12,8 +12,9 @@ use std::collections::HashSet;
 use email_utils::Email;
 use internal_error::InternalError;
 use odf::metadata::DidPkh;
+use url::Url;
 
-use crate::{Account, CreateAccountError, Password};
+use crate::{Account, AccountConfig, CreateAccountError, Password};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -21,16 +22,15 @@ use crate::{Account, CreateAccountError, Password};
 pub trait CreateAccountUseCase: Send + Sync {
     async fn execute(
         &self,
-        account: &Account,
-        password: &Password,
-        quiet: bool,
+        account_config: &AccountConfig,
+        resource_id_source: AccountResourceIdSource,
     ) -> Result<Account, CreateAccountError>;
 
     async fn execute_derived(
         &self,
         creator_account: &Account,
         account_name: &odf::AccountName,
-        options: CreateAccountUseCaseOptions,
+        options: CreateDerivedAccountUseCaseOptions,
     ) -> Result<Account, CreateAccountError>;
 
     async fn execute_multi_wallet_accounts(
@@ -41,12 +41,31 @@ pub trait CreateAccountUseCase: Send + Sync {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/// Chooses how a new account's *resource* id is minted.
+///
+/// TODO: interim measure -- goes away once account resources are reconciled by
+/// the resources framework rather than allocated during account creation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AccountResourceIdSource {
+    /// Deterministically seeded from the account name. Used for predefined /
+    /// config-driven accounts, whose resource id must stay stable across
+    /// restarts and re-registration (the CLI derives the same id for its
+    /// pre-workspace subject).
+    SeededFromName,
+    /// Freshly minted at random. Used for accounts created at runtime, e.g. via
+    /// OAuth/Web3 login, where the account name may have been auto-renamed on
+    /// collision and carries no identity guarantee.
+    Generated,
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #[derive(bon::Builder, Default)]
-pub struct CreateAccountUseCaseOptions {
+pub struct CreateDerivedAccountUseCaseOptions {
     pub email: Option<Email>,
     pub password: Option<Password>,
     pub display_name: Option<String>,
-    pub avatar_url: Option<String>,
+    pub avatar_url: Option<Url>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

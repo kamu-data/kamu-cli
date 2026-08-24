@@ -7,9 +7,10 @@
 // the Business Source License, use of this software will be governed
 // by the Apache License, Version 2.0.
 
-use std::assert_matches;
+use std::sync::Arc;
 
 use database_common::{DatabaseTransactionRunner, NoOpDatabasePlugin};
+use email_utils::Email;
 use kamu_accounts::*;
 use kamu_accounts_inmem::{
     InMemoryAccessTokenRepository,
@@ -21,81 +22,246 @@ use kamu_accounts_services::{
     AccessTokenServiceImpl,
     AccountServiceImpl,
     AuthenticationServiceImpl,
+    CreateAccountUseCaseImpl,
     OAuthDeviceCodeGeneratorDefault,
     OAuthDeviceCodeServiceImpl,
 };
 use messaging_outbox::{MockOutbox, Outbox};
-use mockall::predicate::str;
+use pretty_assertions::{assert_eq, assert_matches};
 use time_source::{SystemTimeSource, SystemTimeSourceStub};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+macro_rules! dummy_auth_provider {
+    ($letter:ident, $name:literal) => {
+        paste::paste! {
+            #[dill::component(pub)]
+            #[dill::interface(dyn AuthenticationProvider)]
+            struct [<DummyAuthenticationProvider $letter>] {}
+
+            #[async_trait::async_trait]
+            impl AuthenticationProvider for [<DummyAuthenticationProvider $letter>] {
+                fn provider_name(&self) -> &'static str {
+                    concat!("method_", stringify!([<$letter:lower>]))
+                }
+
+                async fn login(
+                    &self,
+                    _login_credentials_json: String,
+                ) -> Result<ProviderLoginResponse, ProviderLoginError> {
+                    let letter = stringify!([<$letter:lower>]);
+                    Ok(ProviderLoginResponse {
+                        account_id: None,
+                        account_name: odf::AccountName::new_unchecked($name),
+                        email: Email::parse(&format!("method-{letter}@example.com")).unwrap(),
+                        display_name: String::from($name),
+                        avatar_url: None,
+                        provider_identity_key: format!("method-{letter}-identity"),
+                    })
+                }
+            }
+        }
+    };
+}
+
+dummy_auth_provider!(A, "kamu");
+dummy_auth_provider!(B, "kamu");
+dummy_auth_provider!(C, "kamu-method-d");
+dummy_auth_provider!(D, "kamu");
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_enabled_login_providers() {
-    let catalog_opts = CatalogOpts {
-        mock_outbox: MockOutbox::new(),
-        auth_config_maybe: None,
-    };
+    let harness = AuthenticationServiceHarness::builder().build();
 
-    let catalog = make_catalog(catalog_opts);
-    let authentication_service = catalog.get_one::<dyn AuthenticationService>().unwrap();
-
-    let mut supported_login_methods = authentication_service.supported_login_methods();
+    let mut supported_login_methods = harness.authentication_service().supported_login_methods();
     supported_login_methods.sort_unstable();
-    assert_eq!(supported_login_methods, vec!["method-a", "method-b"]);
+
+    assert_eq!(
+        [
+            DummyAuthenticationProviderA {}.provider_name(),
+            DummyAuthenticationProviderB {}.provider_name(),
+            DummyAuthenticationProviderC {}.provider_name(),
+            DummyAuthenticationProviderD {}.provider_name(),
+        ],
+        *supported_login_methods
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
-async fn test_login() {
+async fn test_login_generate_busy_account_name() {
     let mut mock_outbox = MockOutbox::new();
-    expect_outbox_account_created(&mut mock_outbox);
-    let catalog_opts = CatalogOpts {
-        mock_outbox,
-        auth_config_maybe: None,
-    };
+    kamu_accounts::testing::expect_outbox_account_created()
+        .mock_outbox(&mut mock_outbox)
+        .expected_times(4)
+        .call();
 
-    let catalog = make_catalog(catalog_opts);
-    let authentication_service = catalog.get_one::<dyn AuthenticationService>().unwrap();
+    let harness = AuthenticationServiceHarness::builder()
+        .mock_outbox(mock_outbox)
+        .build();
 
-    let response_a = authentication_service
-        .login("method-A", "dummy".to_string(), None)
-        .await;
+    // 1. Used vacant account name
+    {
+        let expected_first_account_name = odf::AccountName::new_unchecked("kamu");
 
-    let response_b = authentication_service
-        .login("method-B", "dummy".to_string(), None)
-        .await;
+        assert_matches!(
+             harness.authentication_service
+                .login(DummyAuthenticationProviderA {}.provider_name(), "dummy".to_string(), None)
+                .await,
+            Ok(LoginResponse {
+                ref account_name,
+                ..
+            }) if *account_name == expected_first_account_name
+        );
+        // Re-login when the first account is created
+        assert_matches!(
+            harness
+                .authentication_service
+                .login(
+                    DummyAuthenticationProviderA {}.provider_name(),
+                    "dummy".to_string(),
+                    None
+                )
+                .await,
+            Ok(LoginResponse {
+                ref account_name,
+                ..
+            }) if *account_name == expected_first_account_name
+        );
+    }
 
-    let response_bad = authentication_service
-        .login("method-bad", "dummy".to_string(), None)
-        .await;
+    // 2. Used account name + provider
+    {
+        let expected_second_account_name = odf::AccountName::new_unchecked("kamu-method-b");
 
-    assert_matches!(response_a, Ok(_));
-    assert_matches!(response_b, Ok(_));
-    assert_matches!(response_bad, Err(LoginError::UnsupportedMethod(_)));
+        assert_matches!(
+            harness.authentication_service
+                .login(
+                    DummyAuthenticationProviderB {}.provider_name(),
+                    "dummy".to_string(),
+                    None
+                )
+                .await,
+            Ok(LoginResponse {
+                ref account_name,
+                ..
+            }) if *account_name == expected_second_account_name
+        );
+        // Re-login when the second account is created
+        assert_matches!(
+            harness
+                .authentication_service
+                .login(
+                    DummyAuthenticationProviderB {}.provider_name(),
+                    "dummy".to_string(),
+                    None
+                )
+                .await,
+            Ok(LoginResponse {
+                ref account_name,
+                ..
+            }) if *account_name == expected_second_account_name
+        );
+    }
+
+    // 3. Used account name + provider + random letters
+    {
+        // DummyAuthenticationProviderC takes the name (/w the provider one)
+        // of DummyAuthenticationProviderD:
+        assert_matches!(
+            harness.authentication_service
+                .login(
+                    DummyAuthenticationProviderC {}.provider_name(),
+                    "dummy".to_string(),
+                    None
+                )
+                .await,
+            Ok(LoginResponse {
+                ref account_name,
+                ..
+            }) if *account_name == odf::AccountName::new_unchecked("kamu-method-d")
+        );
+
+        // NOTE: сlippy doesn't recognize value assignments within assert_matches!()
+        #[expect(unused_assignments)]
+        let mut expected_third_account_name = None;
+
+        assert_matches!(
+            harness.authentication_service
+                .login(
+                    DummyAuthenticationProviderD {}.provider_name(),
+                    "dummy".to_string(),
+                    None
+                )
+                .await,
+            Ok(LoginResponse {
+                ref account_name,
+                ..
+            }) if {
+                expected_third_account_name = Some(account_name.clone());
+
+                // Account name isn't known yet, but the format is it
+                let re = regex::Regex::new(r"^kamu-method-d-[A-Za-z0-9]{4}$").unwrap();
+                re.is_match(account_name.as_str())
+            }
+        );
+        // Re-login when the third account is created
+        assert_matches!(
+            harness.authentication_service
+                .login(
+                    DummyAuthenticationProviderD {}.provider_name(),
+                    "dummy".to_string(),
+                    None
+                )
+                .await,
+            Ok(LoginResponse {
+                ref account_name,
+                ..
+            }) if expected_third_account_name == Some(account_name.clone())
+        );
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[test_log::test(tokio::test)]
+async fn test_try_login_with_wrong_provider() {
+    let harness = AuthenticationServiceHarness::builder().build();
+
+    assert_matches!(
+        harness
+            .authentication_service
+            .login("method-bad", "dummy".to_string(), None)
+            .await,
+        Err(LoginError::UnsupportedMethod(_))
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[test_log::test(tokio::test)]
 async fn test_account_not_created_in_restrict_anonymous_mode() {
-    let catalog_opts = CatalogOpts {
-        mock_outbox: MockOutbox::new(),
-        auth_config_maybe: Some(AuthConfig {
+    let harness = AuthenticationServiceHarness::builder()
+        .auth_config(AuthConfig {
             allow_anonymous: false,
             ..AuthConfig::default()
-        }),
-    };
+        })
+        .build();
 
-    let catalog = make_catalog(catalog_opts);
-    let authentication_service = catalog.get_one::<dyn AuthenticationService>().unwrap();
-
-    let response_a = authentication_service
-        .login("method-A", "dummy".to_string(), None)
-        .await;
-
-    assert_matches!(response_a, Err(LoginError::RestrictedLogin));
+    assert_matches!(
+        harness
+            .authentication_service
+            .login(
+                DummyAuthenticationProviderA {}.provider_name(),
+                "dummy".to_string(),
+                None,
+            )
+            .await,
+        Err(LoginError::RestrictedLogin)
+    );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -103,24 +269,31 @@ async fn test_account_not_created_in_restrict_anonymous_mode() {
 #[test_log::test(tokio::test)]
 async fn test_use_good_access_token() {
     let mut mock_outbox = MockOutbox::new();
-    expect_outbox_account_created(&mut mock_outbox);
-    let catalog_opts = CatalogOpts {
-        mock_outbox,
-        auth_config_maybe: None,
-    };
+    kamu_accounts::testing::expect_outbox_account_created()
+        .mock_outbox(&mut mock_outbox)
+        .expected_times(1)
+        .call();
 
-    let catalog = make_catalog(catalog_opts);
-    let authentication_service = catalog.get_one::<dyn AuthenticationService>().unwrap();
+    let harness = AuthenticationServiceHarness::builder()
+        .mock_outbox(mock_outbox)
+        .build();
 
-    let login_response = authentication_service
-        .login("method-A", "dummy".to_string(), None)
+    let login_response = harness
+        .authentication_service
+        .login(
+            DummyAuthenticationProviderA {}.provider_name(),
+            "dummy".to_string(),
+            None,
+        )
         .await
         .unwrap();
 
-    let resolved_account_info = authentication_service
+    let resolved_account_info = harness
+        .authentication_service
         .account_by_token(login_response.access_token)
         .await
         .unwrap();
+
     assert_eq!(login_response.account_id, resolved_account_info.id);
     assert_eq!(
         login_response.account_name,
@@ -132,16 +305,11 @@ async fn test_use_good_access_token() {
 
 #[test_log::test(tokio::test)]
 async fn test_use_bad_access_token() {
-    let catalog_opts = CatalogOpts {
-        mock_outbox: MockOutbox::new(),
-        auth_config_maybe: None,
-    };
-
-    let catalog = make_catalog(catalog_opts);
-    let authentication_service = catalog.get_one::<dyn AuthenticationService>().unwrap();
+    let harness = AuthenticationServiceHarness::builder().build();
 
     assert_matches!(
-        authentication_service
+        harness
+            .authentication_service
             .account_by_token("bad-token".to_string())
             .await,
         Err(GetAccountInfoError::AccessToken(AccessTokenError::Invalid(
@@ -151,128 +319,58 @@ async fn test_use_bad_access_token() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-struct CatalogOpts {
-    mock_outbox: MockOutbox,
-    auth_config_maybe: Option<AuthConfig>,
-}
-
+// Harness
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-fn make_catalog(catalog_opts: CatalogOpts) -> dill::Catalog {
-    let mut b = dill::CatalogBuilder::new();
-
-    let auth_config = catalog_opts
-        .auth_config_maybe
-        .unwrap_or_else(AuthConfig::sample);
-
-    b.add::<DummyAuthenticationProviderA>()
-        .add::<DummyAuthenticationProviderB>()
-        .add::<AuthenticationServiceImpl>()
-        .add::<InMemoryAccountRepository>()
-        .add::<AccountServiceImpl>()
-        .add::<InMemoryDidSecretKeyRepository>()
-        .add::<AccessTokenServiceImpl>()
-        .add::<InMemoryAccessTokenRepository>()
-        .add_value(DidSecretEncryptionConfig::default())
-        .add_value(PredefinedAccountsConfig::single_tenant())
-        .add_value(SystemTimeSourceStub::new())
-        .bind::<dyn SystemTimeSource, SystemTimeSourceStub>()
-        .add_value(JwtAuthenticationConfig::default())
-        .add::<DatabaseTransactionRunner>()
-        .add_value(catalog_opts.mock_outbox)
-        .bind::<dyn Outbox, MockOutbox>()
-        .add::<OAuthDeviceCodeServiceImpl>()
-        .add::<OAuthDeviceCodeGeneratorDefault>()
-        .add_value(auth_config)
-        .add::<InMemoryOAuthDeviceCodeRepository>();
-
-    NoOpDatabasePlugin::init_database_components(&mut b);
-
-    b.build()
+pub struct AuthenticationServiceHarness {
+    _catalog: dill::Catalog,
+    authentication_service: Arc<dyn AuthenticationService>,
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#[bon::bon]
+impl AuthenticationServiceHarness {
+    #[builder]
+    pub fn new(mock_outbox: Option<MockOutbox>, auth_config: Option<AuthConfig>) -> Self {
+        let mock_outbox = mock_outbox.unwrap_or_default();
+        let auth_config = auth_config.unwrap_or_else(AuthConfig::sample);
 
-fn expect_outbox_account_created(mock_outbox: &mut MockOutbox) {
-    use mockall::predicate::{always, eq, function};
-    mock_outbox
-        .expect_post_message_as_json()
-        .with(
-            eq(MESSAGE_PRODUCER_KAMU_ACCOUNTS_SERVICE),
-            function(|message_as_json: &serde_json::Value| {
-                matches!(
-                    serde_json::from_value::<AccountLifecycleMessage>(message_as_json.clone()),
-                    Ok(AccountLifecycleMessage::Created(_))
-                )
-            }),
-            always(),
-        )
-        .returning(|_, _, _| Ok(()));
-}
+        let mut b = dill::CatalogBuilder::new();
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        b.add::<DummyAuthenticationProviderA>();
+        b.add::<DummyAuthenticationProviderB>();
+        b.add::<DummyAuthenticationProviderC>();
+        b.add::<DummyAuthenticationProviderD>();
+        b.add::<AuthenticationServiceImpl>();
+        b.add::<CreateAccountUseCaseImpl>();
+        b.add::<InMemoryAccountRepository>();
+        b.add::<AccountServiceImpl>();
+        b.add::<InMemoryDidSecretKeyRepository>();
+        b.add::<AccessTokenServiceImpl>();
+        b.add::<InMemoryAccessTokenRepository>();
+        b.add_value(DidSecretEncryptionConfig::default());
+        b.add_value(PredefinedAccountsConfig::single_tenant());
+        b.add_value(SystemTimeSourceStub::new())
+            .bind::<dyn SystemTimeSource, SystemTimeSourceStub>();
+        b.add_value(JwtAuthenticationConfig::default());
+        b.add::<DatabaseTransactionRunner>();
+        b.add_value(mock_outbox).bind::<dyn Outbox, MockOutbox>();
+        b.add::<OAuthDeviceCodeServiceImpl>();
+        b.add::<OAuthDeviceCodeGeneratorDefault>();
+        b.add_value(auth_config);
+        b.add::<InMemoryOAuthDeviceCodeRepository>();
 
-struct DummyAuthenticationProviderA {}
-struct DummyAuthenticationProviderB {}
+        NoOpDatabasePlugin::init_database_components(&mut b);
 
-#[dill::component(pub)]
-#[dill::interface(dyn AuthenticationProvider)]
-impl DummyAuthenticationProviderA {
-    fn new() -> Self {
-        Self {}
-    }
-}
+        let catalog = b.build();
 
-#[dill::component(pub)]
-#[dill::interface(dyn AuthenticationProvider)]
-impl DummyAuthenticationProviderB {
-    fn new() -> Self {
-        Self {}
-    }
-}
-
-#[async_trait::async_trait]
-impl AuthenticationProvider for DummyAuthenticationProviderA {
-    fn provider_name(&self) -> &'static str {
-        "method-A"
+        Self {
+            authentication_service: catalog.get_one().unwrap(),
+            _catalog: catalog,
+        }
     }
 
-    async fn login(
-        &self,
-        _login_credentials_json: String,
-    ) -> Result<ProviderLoginResponse, ProviderLoginError> {
-        Ok(ProviderLoginResponse {
-            account_id: DEFAULT_ACCOUNT_ID.clone(),
-            account_name: DEFAULT_ACCOUNT_NAME.clone(),
-            email: DUMMY_EMAIL_ADDRESS.clone(),
-            display_name: String::from(DEFAULT_ACCOUNT_NAME_STR),
-            account_type: AccountType::User,
-            avatar_url: None,
-            provider_identity_key: String::from(DEFAULT_ACCOUNT_NAME_STR),
-        })
-    }
-}
-
-#[async_trait::async_trait]
-impl AuthenticationProvider for DummyAuthenticationProviderB {
-    fn provider_name(&self) -> &'static str {
-        "method-B"
-    }
-
-    async fn login(
-        &self,
-        _login_credentials_json: String,
-    ) -> Result<ProviderLoginResponse, ProviderLoginError> {
-        Ok(ProviderLoginResponse {
-            account_id: DEFAULT_ACCOUNT_ID.clone(),
-            account_name: DEFAULT_ACCOUNT_NAME.clone(),
-            email: DUMMY_EMAIL_ADDRESS.clone(),
-            display_name: String::from(DEFAULT_ACCOUNT_NAME_STR),
-            account_type: AccountType::User,
-            avatar_url: None,
-            provider_identity_key: String::from(DEFAULT_ACCOUNT_NAME_STR),
-        })
+    pub fn authentication_service(&self) -> &dyn AuthenticationService {
+        self.authentication_service.as_ref()
     }
 }
 

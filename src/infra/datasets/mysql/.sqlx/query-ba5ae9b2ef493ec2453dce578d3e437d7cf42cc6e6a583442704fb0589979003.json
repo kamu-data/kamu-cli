@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "\n                DELETE\n                FROM dataset_entries\n                WHERE dataset_id = ?\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "ba5ae9b2ef493ec2453dce578d3e437d7cf42cc6e6a583442704fb0589979003"
+}

@@ -11,15 +11,8 @@ use std::assert_matches;
 use std::sync::Arc;
 
 use chrono::{SubsecRound, Utc};
-use dill::Catalog;
 use email_utils::Email;
-use kamu_accounts::{
-    Account,
-    AccountRepository,
-    AccountType,
-    DEFAULT_ACCOUNT_ID,
-    DEFAULT_ACCOUNT_NAME,
-};
+use kamu_accounts::{Account, AccountRepository, AccountType};
 use kamu_datasets::{DatasetBlock, DatasetEntry, DatasetEntryRepository};
 use odf::metadata::testing::MetadataFactory;
 
@@ -39,7 +32,7 @@ pub(crate) async fn new_account_with_name(
         display_name: String::new(),
         account_type: AccountType::User,
         avatar_url: None,
-        registered_at: Default::default(),
+        registered_at: Utc::now().round_subsecs(6),
         provider: "unit-test-provider".to_string(),
         provider_identity_key: account_name.to_string(),
     };
@@ -84,17 +77,22 @@ pub(crate) fn new_dataset_entry(owner: &Account, dataset_kind: odf::DatasetKind)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) async fn init_test_account(catalog: &Catalog) -> (odf::AccountID, odf::AccountName) {
+pub(crate) async fn init_test_account(
+    catalog: &dill::Catalog,
+) -> (odf::AccountID, odf::AccountName) {
     let account_repo = catalog.get_one::<dyn AccountRepository>().unwrap();
-    account_repo.save_account(&Account::dummy()).await.unwrap();
 
-    (DEFAULT_ACCOUNT_ID.clone(), DEFAULT_ACCOUNT_NAME.clone())
+    let account = Account::dummy();
+
+    account_repo.save_account(&account).await.unwrap();
+
+    (account.id, account.account_name)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub(crate) async fn init_dataset_entry(
-    catalog: &Catalog,
+    catalog: &dill::Catalog,
     account_id: &odf::AccountID,
     account_name: &odf::AccountName,
     dataset_id: &odf::DatasetID,
@@ -117,7 +115,7 @@ pub(crate) async fn init_dataset_entry(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub(crate) async fn remove_dataset_entry(catalog: &Catalog, dataset_id: &odf::DatasetID) {
+pub(crate) async fn remove_dataset_entry(catalog: &dill::Catalog, dataset_id: &odf::DatasetID) {
     let dataset_entry_repo = catalog.get_one::<dyn DatasetEntryRepository>().unwrap();
     dataset_entry_repo
         .delete_dataset_entry(dataset_id)

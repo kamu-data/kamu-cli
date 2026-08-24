@@ -12,7 +12,6 @@ use kamu::domain::TenancyConfig;
 use kamu_accounts::CurrentAccountSubject;
 
 use crate::accounts::CurrentAccountIndication;
-use crate::cli::SystemApiServerSubCommand;
 use crate::commands::*;
 use crate::config::ConfigScope;
 use crate::{WorkspaceService, accounts, cli, odf_server, resource_context};
@@ -571,7 +570,7 @@ pub fn command_needs_transaction(args: &cli::Cli) -> bool {
             cli::SystemSubCommand::ApiServer(sas) => {
                 matches!(
                     &sas.subcommand,
-                    Some(SystemApiServerSubCommand::GqlQuery(_))
+                    Some(cli::SystemApiServerSubCommand::GqlQuery(_))
                 )
             }
             _ => true,
@@ -599,8 +598,8 @@ pub fn command_needs_outbox_processing(args: &cli::Cli) -> bool {
             | cli::SystemSubCommand::GenerateToken(_)
             | cli::SystemSubCommand::Gc(_) => false,
             cli::SystemSubCommand::ApiServer(a) => match &a.subcommand {
-                None | Some(SystemApiServerSubCommand::GqlQuery(_)) => true,
-                Some(SystemApiServerSubCommand::GqlSchema(_)) => false,
+                None | Some(cli::SystemApiServerSubCommand::GqlQuery(_)) => true,
+                Some(cli::SystemApiServerSubCommand::GqlSchema(_)) => false,
             },
             _ => true,
         },
@@ -630,8 +629,8 @@ pub fn command_needs_workspace(args: &cli::Cli) -> bool {
 
         cli::Command::System(s) => match &s.subcommand {
             cli::SystemSubCommand::ApiServer(a) => match &a.subcommand {
-                None | Some(SystemApiServerSubCommand::GqlQuery(_)) => true,
-                Some(SystemApiServerSubCommand::GqlSchema(_)) => false,
+                None | Some(cli::SystemApiServerSubCommand::GqlQuery(_)) => true,
+                Some(cli::SystemApiServerSubCommand::GqlSchema(_)) => false,
             },
             cli::SystemSubCommand::DebugToken(_)
             | cli::SystemSubCommand::Decode(_)

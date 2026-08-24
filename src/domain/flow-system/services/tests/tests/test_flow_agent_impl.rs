@@ -6812,16 +6812,8 @@ async fn test_list_all_flow_initiators() {
     let foo = AccountConfig::test_config_from_name(odf::AccountName::new_unchecked("foo"));
     let bar = AccountConfig::test_config_from_name(odf::AccountName::new_unchecked("bar"));
 
-    let subject_foo = CurrentAccountSubject::logged(
-        kamu_accounts::Account::seed_resource_id_from_name(foo.account_name.as_str()),
-        foo.get_id(),
-        foo.account_name.clone(),
-    );
-    let subject_bar = CurrentAccountSubject::logged(
-        kamu_accounts::Account::seed_resource_id_from_name(bar.account_name.as_str()),
-        bar.get_id(),
-        bar.account_name.clone(),
-    );
+    let subject_foo = CurrentAccountSubject::new_test_with(&foo.account_name);
+    let subject_bar = CurrentAccountSubject::new_test_with(&bar.account_name);
 
     let harness = FlowHarness::new();
 
@@ -6961,16 +6953,8 @@ async fn test_list_all_datasets_with_flow() {
     let foo = AccountConfig::test_config_from_name(odf::AccountName::new_unchecked("foo"));
     let bar = AccountConfig::test_config_from_name(odf::AccountName::new_unchecked("bar"));
 
-    let subject_foo = CurrentAccountSubject::logged(
-        kamu_accounts::Account::seed_resource_id_from_name(foo.account_name.as_str()),
-        foo.get_id(),
-        foo.account_name.clone(),
-    );
-    let subject_bar = CurrentAccountSubject::logged(
-        kamu_accounts::Account::seed_resource_id_from_name(bar.account_name.as_str()),
-        bar.get_id(),
-        bar.account_name.clone(),
-    );
+    let subject_foo = CurrentAccountSubject::new_test_with(&foo.account_name);
+    let subject_bar = CurrentAccountSubject::new_test_with(&bar.account_name);
 
     let harness = FlowHarness::new();
 
@@ -6991,8 +6975,8 @@ async fn test_list_all_datasets_with_flow() {
         )
         .await;
 
-    let foo_account_id = odf::AccountID::new_seeded_ed25519(subject_foo.account_name().as_bytes());
-    let bar_account_id = odf::AccountID::new_seeded_ed25519(subject_bar.account_name().as_bytes());
+    let foo_account_id = odf::metadata::testing::account_id(subject_foo.account_name());
+    let bar_account_id = odf::metadata::testing::account_id(subject_bar.account_name());
 
     let bar_id = harness
         .create_root_dataset(odf::DatasetAlias {

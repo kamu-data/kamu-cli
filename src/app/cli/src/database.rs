@@ -158,7 +158,7 @@ pub fn configure_database_components(
             b.add::<kamu_accounts_inmem::InMemoryDidSecretKeyRepository>();
             b.add::<kamu_accounts_inmem::InMemoryAccountQuotaEventStore>();
 
-            b.add::<kamu_datasets_inmem::InMemoryDatasetEntryRepository>();
+            b.add::<kamu_datasets_mysql::MySqlDatasetEntryRepository>();
             b.add::<kamu_datasets_inmem::InMemoryDatasetDependencyRepository>();
             b.add::<kamu_datasets_inmem::InMemoryDatasetReferenceRepository>();
             b.add::<kamu_datasets_inmem::InMemoryDatasetStatisticsRepository>();

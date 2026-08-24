@@ -15,14 +15,17 @@ use odf::metadata::DidPkh;
 
 use crate::{
     Account,
+    AccountNotFoundByIdError,
     AccountNotFoundByNameError,
     AccountPageStream,
     CreateAccountError,
     FindAccountIdByProviderIdentityKeyError,
+    FindAccountIdsByUniqueFieldsError,
     GetAccountByIdError,
     GetAccountByNameError,
     ModifyAccountPasswordError,
     Password,
+    ProviderIdentityKey,
     SearchAccountsByNamePatternFilters,
     UpdateAccountError,
 };
@@ -66,6 +69,22 @@ pub trait AccountService: Sync + Send {
         account_name: &odf::AccountName,
     ) -> Result<Option<odf::AccountID>, InternalError>;
 
+    async fn find_account_id_by_provider_identity_key(
+        &self,
+        provider: &str,
+        provider_identity_key: &str,
+    ) -> Result<Option<odf::AccountID>, FindAccountIdByProviderIdentityKeyError>;
+
+    // TODO: PERF: vectorize?
+    //             Input: Vec<(account_name, email, provider_identity_key)>
+    async fn find_account_ids_by_one_of_unique_fields(
+        &self,
+        provider: &str,
+        account_name: &odf::AccountName,
+        email: &email_utils::Email,
+        provider_identity_key: &ProviderIdentityKey,
+    ) -> Result<Vec<odf::AccountID>, FindAccountIdsByUniqueFieldsError>;
+
     async fn find_account_name_by_id(
         &self,
         account_id: &odf::AccountID,
@@ -86,13 +105,19 @@ pub trait AccountService: Sync + Send {
     //       https://github.com/kamu-data/kamu-cli/issues/1270
     async fn save_account_password(
         &self,
-        account: &Account,
+        account_id: &odf::AccountID,
         password: &Password,
     ) -> Result<(), InternalError>;
 
-    async fn verify_account_password(
+    async fn verify_account_password_by_name(
         &self,
         account_name: &odf::AccountName,
+        password: &Password,
+    ) -> Result<(), VerifyPasswordError>;
+
+    async fn verify_account_password_by_id(
+        &self,
+        account_id: &odf::AccountID,
         password: &Password,
     ) -> Result<(), VerifyPasswordError>;
 
@@ -105,11 +130,6 @@ pub trait AccountService: Sync + Send {
     async fn save_account(&self, account: &Account) -> Result<(), CreateAccountError>;
 
     async fn update_account(&self, updated_account: &Account) -> Result<(), UpdateAccountError>;
-
-    async fn find_account_id_by_provider_identity_key(
-        &self,
-        provider_identity_key: &str,
-    ) -> Result<Option<odf::AccountID>, FindAccountIdByProviderIdentityKeyError>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -149,7 +169,10 @@ pub enum GetAccountMapError {
 #[derive(thiserror::Error, Debug)]
 pub enum VerifyPasswordError {
     #[error(transparent)]
-    AccountNotFound(#[from] AccountNotFoundByNameError),
+    AccountNotFoundByName(#[from] AccountNotFoundByNameError),
+
+    #[error(transparent)]
+    AccountNotFoundById(#[from] AccountNotFoundByIdError),
 
     #[error(transparent)]
     IncorrectPassword(#[from] IncorrectPasswordError),

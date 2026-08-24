@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "\n            INSERT INTO dataset_entries(dataset_id, owner_id, owner_name, dataset_name, created_at, kind)\n                VALUES (?, ?, ?, ?, ?, ?)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": []
+  },
+  "hash": "f2969c571da24c1d7eff9b2e947008cf5a4a11a0dc4eb34b22d2a4fc4bbc0f5f"
+}

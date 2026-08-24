@@ -97,6 +97,14 @@ database_transactional_test!(
 
 database_transactional_test!(
     storage = sqlite,
+    fixture = kamu_accounts_repo_tests::test_same_provider_identity_key_different_providers_allowed,
+    harness = SqliteAccountRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
     fixture = kamu_accounts_repo_tests::test_duplicate_github_account_email,
     harness = SqliteAccountRepositoryHarness
 );
@@ -194,6 +202,14 @@ database_transactional_test!(
 database_transactional_test!(
     storage = sqlite,
     fixture = kamu_accounts_repo_tests::test_delete_account,
+    harness = SqliteAccountRepositoryHarness
+);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+database_transactional_test!(
+    storage = sqlite,
+    fixture = kamu_accounts_repo_tests::test_find_account_ids_by_unique_fields,
     harness = SqliteAccountRepositoryHarness
 );
 

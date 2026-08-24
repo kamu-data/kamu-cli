@@ -11,7 +11,6 @@ use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 
 use database_common::PaginationOpts;
-use dill::*;
 use email_utils::Email;
 use internal_error::ErrorIntoInternal;
 
@@ -30,7 +29,7 @@ struct State {
     accounts_by_id: HashMap<odf::AccountID, Account>,
     // NOTE: Name hash is case-insensitive
     accounts_by_name: HashMap<odf::AccountName, Account>,
-    account_id_by_provider_identity_key: HashMap<String, odf::AccountID>,
+    account_id_by_provider_identity_key: HashMap<(String, String), odf::AccountID>,
     password_hash_by_account_id: HashMap<odf::AccountID, String>,
 }
 
@@ -59,11 +58,12 @@ impl State {
 
     fn check_unique_provider_identity_key(
         &self,
-        provider_identity_key: &String,
+        provider: &str,
+        provider_identity_key: &str,
     ) -> Result<(), AccountErrorDuplicate> {
         if self
             .account_id_by_provider_identity_key
-            .contains_key(provider_identity_key)
+            .contains_key(&(provider.to_string(), provider_identity_key.to_string()))
         {
             return Err(AccountErrorDuplicate {
                 account_field: AccountDuplicateField::ProviderIdentityKey,
@@ -92,11 +92,11 @@ impl State {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#[component(pub)]
-#[interface(dyn AccountRepository)]
-#[interface(dyn ExpensiveAccountRepository)]
-#[interface(dyn PasswordHashRepository)]
-#[scope(Singleton)]
+#[dill::component(pub)]
+#[dill::interface(dyn AccountRepository)]
+#[dill::interface(dyn ExpensiveAccountRepository)]
+#[dill::interface(dyn PasswordHashRepository)]
+#[dill::scope(dill::Singleton)]
 impl InMemoryAccountRepository {
     pub fn new() -> Self {
         Self {
@@ -121,7 +121,7 @@ impl AccountRepository for InMemoryAccountRepository {
             .check_unique_name(&account.account_name)
             .map_err(CreateAccountError::Duplicate)?;
         guard
-            .check_unique_provider_identity_key(&account.provider_identity_key)
+            .check_unique_provider_identity_key(&account.provider, &account.provider_identity_key)
             .map_err(CreateAccountError::Duplicate)?;
         guard
             .check_unique_email(&account.email)
@@ -133,9 +133,13 @@ impl AccountRepository for InMemoryAccountRepository {
         guard
             .accounts_by_name
             .insert(account.account_name.clone(), account.clone());
-        guard
-            .account_id_by_provider_identity_key
-            .insert(account.provider_identity_key.clone(), account.id.clone());
+        guard.account_id_by_provider_identity_key.insert(
+            (
+                account.provider.clone(),
+                account.provider_identity_key.clone(),
+            ),
+            account.id.clone(),
+        );
 
         Ok(())
     }
@@ -157,9 +161,14 @@ impl AccountRepository for InMemoryAccountRepository {
                 .check_unique_name(&updated_account.account_name)
                 .map_err(UpdateAccountError::Duplicate)?;
         }
-        if updated_account.provider_identity_key != account.provider_identity_key {
+        if updated_account.provider != account.provider
+            || updated_account.provider_identity_key != account.provider_identity_key
+        {
             guard
-                .check_unique_provider_identity_key(&updated_account.provider_identity_key)
+                .check_unique_provider_identity_key(
+                    &updated_account.provider,
+                    &updated_account.provider_identity_key,
+                )
                 .map_err(UpdateAccountError::Duplicate)?;
         }
         if updated_account.email != account.email {
@@ -180,13 +189,19 @@ impl AccountRepository for InMemoryAccountRepository {
             updated_account.clone(),
         );
 
-        if updated_account.provider_identity_key != account.provider_identity_key {
-            guard
-                .account_id_by_provider_identity_key
-                .remove(&account.provider_identity_key);
+        if updated_account.provider != account.provider
+            || updated_account.provider_identity_key != account.provider_identity_key
+        {
+            guard.account_id_by_provider_identity_key.remove(&(
+                account.provider.clone(),
+                account.provider_identity_key.clone(),
+            ));
         }
         guard.account_id_by_provider_identity_key.insert(
-            updated_account.provider_identity_key.clone(),
+            (
+                updated_account.provider.clone(),
+                updated_account.provider_identity_key.clone(),
+            ),
             updated_account.id.clone(),
         );
 
@@ -280,12 +295,13 @@ impl AccountRepository for InMemoryAccountRepository {
 
     async fn find_account_id_by_provider_identity_key(
         &self,
+        provider: &str,
         provider_identity_key: &str,
     ) -> Result<Option<odf::AccountID>, FindAccountIdByProviderIdentityKeyError> {
         let guard = self.state.lock().unwrap();
         let maybe_account_id = guard
             .account_id_by_provider_identity_key
-            .get(provider_identity_key);
+            .get(&(provider.to_string(), provider_identity_key.to_string()));
         Ok(maybe_account_id.cloned())
     }
 
@@ -309,6 +325,36 @@ impl AccountRepository for InMemoryAccountRepository {
         let guard = self.state.lock().unwrap();
         let maybe_account = guard.accounts_by_name.get(account_name);
         Ok(maybe_account.map(|a| a.id.clone()))
+    }
+
+    async fn find_account_ids_by_unique_fields(
+        &self,
+        provider: &str,
+        account_name: &odf::AccountName,
+        email: &Email,
+        provider_identity_key: &str,
+    ) -> Result<Vec<odf::AccountID>, FindAccountIdsByUniqueFieldsError> {
+        let guard = self.state.lock().unwrap();
+        let mut account_ids = Vec::new();
+
+        for account in guard.accounts_by_id.values() {
+            let matches_name = account
+                .account_name
+                .as_str()
+                .eq_ignore_ascii_case(account_name.as_ref());
+            let matches_email = account.email.as_ref().eq_ignore_ascii_case(email.as_ref());
+            let matches_provider_identity_key = provider == account.provider
+                && account.provider_identity_key == provider_identity_key;
+
+            if matches_name || matches_email || matches_provider_identity_key {
+                account_ids.push(account.id.clone());
+            }
+        }
+
+        account_ids.sort();
+        account_ids.dedup();
+
+        Ok(account_ids)
     }
 
     fn search_accounts_by_name_pattern(
@@ -372,9 +418,10 @@ impl AccountRepository for InMemoryAccountRepository {
 
         if let Some(deleted_account) = maybe_deleted_account {
             guard.accounts_by_name.remove(&deleted_account.account_name);
-            guard
-                .account_id_by_provider_identity_key
-                .remove(&deleted_account.provider_identity_key);
+            guard.account_id_by_provider_identity_key.remove(&(
+                deleted_account.provider.clone(),
+                deleted_account.provider_identity_key.clone(),
+            ));
             guard
                 .password_hash_by_account_id
                 .remove(&deleted_account.id);
@@ -498,6 +545,17 @@ impl PasswordHashRepository for InMemoryAccountRepository {
             .get(&existing_account.id)
             .cloned();
         Ok(maybe_hash_as_string)
+    }
+
+    async fn find_password_hash_by_account_id(
+        &self,
+        account_id: &odf::AccountID,
+    ) -> Result<Option<String>, FindPasswordHashError> {
+        let guard = self.state.lock().unwrap();
+
+        let maybe_password_hash = guard.password_hash_by_account_id.get(account_id).cloned();
+
+        Ok(maybe_password_hash)
     }
 }
 

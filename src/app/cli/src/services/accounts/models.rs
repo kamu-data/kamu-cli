@@ -10,15 +10,7 @@
 use std::sync::Arc;
 
 use internal_error::InternalError;
-use kamu::domain::TenancyConfig;
-use kamu_accounts::{
-    Account,
-    AccountService,
-    CurrentAccountSubject,
-    DEFAULT_ACCOUNT_ID,
-    DEFAULT_ACCOUNT_NAME,
-    DEFAULT_ACCOUNT_RESOURCE_ID,
-};
+use kamu_accounts::{Account, AccountService, CurrentAccountSubject};
 use thiserror::Error;
 
 use crate::WorkspaceStatus;
@@ -81,46 +73,31 @@ impl CurrentAccountIndication {
 
     pub async fn to_current_account_subject(
         &self,
-        tenancy_config: TenancyConfig,
         workspace_status: WorkspaceStatus,
         account_service: Arc<dyn AccountService>,
     ) -> Result<CurrentAccountSubject, ToCurrentAccountSubjectError> {
-        match tenancy_config {
-            TenancyConfig::SingleTenant => {
-                // NOTE: At this stage, we don't care whether the argument applies
-                //       in the case of multi-tenant workspace -- this will be checked later.
-                Ok(CurrentAccountSubject::logged(
-                    *DEFAULT_ACCOUNT_RESOURCE_ID,
-                    DEFAULT_ACCOUNT_ID.clone(),
-                    DEFAULT_ACCOUNT_NAME.clone(),
-                ))
+        match workspace_status {
+            WorkspaceStatus::NoWorkspace | WorkspaceStatus::AboutToBeCreated(_) => {
+                // NOTE: At this stage, real accounts do not exist yet.
+                let dummy_subject = CurrentAccountSubject::logged(
+                    Account::seed_resource_id_from_name(self.account_name.as_str()),
+                    odf::AccountID::new_seeded_ed25519(self.account_name.as_bytes()),
+                    self.account_name.clone(),
+                );
+
+                Ok(dummy_subject)
             }
-            TenancyConfig::MultiTenant => {
-                match workspace_status {
-                    WorkspaceStatus::NoWorkspace | WorkspaceStatus::AboutToBeCreated(_) => {
-                        // NOTE: At this stage, real accounts do not exist yet.
-                        let dummy_subject = CurrentAccountSubject::logged(
-                            Account::seed_resource_id_from_name(self.account_name.as_str()),
-                            odf::AccountID::new_seeded_ed25519(self.account_name.as_bytes()),
-                            self.account_name.clone(),
-                        );
+            WorkspaceStatus::Created(_) => {
+                let maybe_account = account_service.account_by_name(&self.account_name).await?;
+                let Some(account) = maybe_account else {
+                    return Err(ToCurrentAccountSubjectError::NotRegisteredAccount {
+                        account: self.account_name.clone(),
+                    });
+                };
 
-                        Ok(dummy_subject)
-                    }
-                    WorkspaceStatus::Created(_) => {
-                        let maybe_account =
-                            account_service.account_by_name(&self.account_name).await?;
-                        let Some(account) = maybe_account else {
-                            return Err(ToCurrentAccountSubjectError::NotRegisteredAccount {
-                                account: self.account_name.clone(),
-                            });
-                        };
+                let subject = CurrentAccountSubject::logged_from_account(&account);
 
-                        let subject = CurrentAccountSubject::logged_from_account(&account);
-
-                        Ok(subject)
-                    }
-                }
+                Ok(subject)
             }
         }
     }

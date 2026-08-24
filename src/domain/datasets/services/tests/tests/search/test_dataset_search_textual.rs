@@ -758,9 +758,9 @@ async fn test_dataset_search_visibility(ctx: Arc<ElasticsearchTestContext>) {
         .create_mt_datasets(&[("alice", "alpha"), ("bob", "beta")])
         .await;
 
-    let alice_id = odf::AccountID::new_seeded_ed25519("alice".as_bytes());
-    let bob_id = odf::AccountID::new_seeded_ed25519("bob".as_bytes());
-    let charlie_id = odf::AccountID::new_seeded_ed25519("charlie".as_bytes());
+    let alice_id = odf::metadata::testing::account_id(&"alice");
+    let bob_id = odf::metadata::testing::account_id(&"bob");
+    let charlie_id = odf::metadata::testing::account_id(&"charlie");
 
     ////////////////////////////////////////////////////////////////////////
     // 1) Initial searching - only owners can see their datasets

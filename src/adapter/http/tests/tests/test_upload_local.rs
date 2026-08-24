@@ -25,11 +25,11 @@ use kamu::domain::{CacheDir, ServerUrlConfig};
 use kamu_accounts::{
     AccountConfig,
     AuthConfig,
-    DEFAULT_ACCOUNT_ID,
     DidSecretEncryptionConfig,
     JwtAuthenticationConfig,
     JwtTokenIssuer,
     PredefinedAccountsConfig,
+    TEST_ACCOUNT_ID,
 };
 use kamu_accounts_inmem::{
     InMemoryAccessTokenRepository,
@@ -64,144 +64,9 @@ use crate::harness::{TestAPIServer, await_client_server_flow};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-struct Harness {
-    _tempdir: tempfile::TempDir,
-    cache_dir: PathBuf,
-    api_server: TestAPIServer,
-    authentication_service: Arc<AuthenticationServiceImpl>,
-    another_account_id: odf::AccountID,
-}
-
-impl Harness {
-    async fn new() -> Self {
-        let addr = SocketAddr::from(([127, 0, 0, 1], 0));
-        let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-        let api_server_address =
-            format!("http://localhost:{}", listener.local_addr().unwrap().port());
-
-        let tempdir = tempfile::tempdir().unwrap();
-        let cache_dir = tempdir.path().join("cache");
-
-        const ANOTHER_ACCOUNT_NAME: &str = "another-account";
-
-        let catalog = {
-            let mut b = dill::CatalogBuilder::new();
-
-            let mut predefined_account_configs = PredefinedAccountsConfig::single_tenant();
-            predefined_account_configs
-                .predefined
-                .push(AccountConfig::test_config_from_name(
-                    odf::AccountName::new_unchecked(ANOTHER_ACCOUNT_NAME),
-                ));
-
-            b.add_value(CacheDir::new(cache_dir.clone()))
-                .add_value(predefined_account_configs)
-                .add::<AuthenticationServiceImpl>()
-                .add::<InMemoryAccountRepository>()
-                .add::<AccessTokenServiceImpl>()
-                .add::<InMemoryAccessTokenRepository>()
-                .add::<SystemTimeSourceDefault>()
-                .add::<LoginPasswordAuthProvider>()
-                .add::<AccountServiceImpl>()
-                .add::<InMemoryDidSecretKeyRepository>()
-                .add_value(DidSecretEncryptionConfig::sample())
-                .add_value(JwtAuthenticationConfig::default())
-                .add_value(AuthConfig::sample())
-                .add_value(ServerUrlConfig::new_test(Some(&api_server_address)))
-                .add_value(FileUploadLimitConfig::new_in_bytes(100))
-                .add::<UploadServiceLocal>()
-                .add::<PredefinedAccountsRegistrator>()
-                .add::<RebacServiceImpl>()
-                .add::<InMemoryRebacRepository>()
-                .add::<UpdateAccountUseCaseImpl>()
-                .add::<CreateAccountUseCaseImpl>()
-                .add_value(DefaultAccountProperties::default())
-                .add_value(DefaultDatasetProperties::default())
-                .add::<DummyOutboxImpl>()
-                .add::<OAuthDeviceCodeServiceImpl>()
-                .add::<OAuthDeviceCodeGeneratorDefault>()
-                .add::<InMemoryOAuthDeviceCodeRepository>();
-
-            NoOpDatabasePlugin::init_database_components(&mut b);
-
-            b.build()
-        };
-
-        init_on_startup::run_startup_jobs(&catalog).await.unwrap();
-
-        let authentication_service = catalog.get_one::<AuthenticationServiceImpl>().unwrap();
-
-        let api_server = TestAPIServer::new(catalog, listener, TenancyConfig::MultiTenant);
-
-        Self {
-            _tempdir: tempdir,
-            cache_dir,
-            api_server,
-            authentication_service,
-            another_account_id: odf::AccountID::new_seeded_ed25519(ANOTHER_ACCOUNT_NAME.as_bytes()),
-        }
-    }
-
-    fn api_server_addr(&self) -> String {
-        self.api_server.local_addr().to_string()
-    }
-
-    fn make_access_token(&self, account_id: &odf::AccountID) -> String {
-        self.authentication_service
-            .make_access_token_from_account_id(account_id, 60)
-            .unwrap()
-            .into_inner()
-    }
-
-    fn mock_upload_token(&self) -> UploadTokenBase64Json {
-        UploadTokenBase64Json(UploadToken {
-            upload_id: "123".to_string(),
-            file_name: "someFile.json".to_string(),
-            owner_account_id: DEFAULT_ACCOUNT_ID.as_id_without_did_prefix().to_string(),
-            content_length: 123,
-            content_type: Some(MediaType::JSON.to_owned()),
-        })
-    }
-
-    fn upload_prepare_url(&self, file_name: &str, content_type: &str, file_size: usize) -> String {
-        format!(
-            "http://{}/platform/file/upload/prepare?fileName={file_name}&contentType={content_type}&contentLength={file_size}",
-            self.api_server_addr(),
-        )
-    }
-
-    fn upload_main_url(&self) -> String {
-        format!("http://{}/platform/file/upload", self.api_server_addr())
-    }
-
-    fn target_path_from_upload_url(cache_dir: &Path, upload_url: &str) -> PathBuf {
-        const PATTERN: &str = "platform/file/upload/";
-        let pos = upload_url
-            .find(PATTERN)
-            .expect("pattern not found in upload url")
-            .add(PATTERN.len());
-
-        let url_suffix = &upload_url[pos..];
-        let upload_token: UploadTokenBase64Json = url_suffix.parse().unwrap();
-        let upload_token = upload_token.0;
-
-        cache_dir
-            .join("uploads")
-            .join(DEFAULT_ACCOUNT_ID.as_id_without_did_prefix().to_string())
-            .join(upload_token.upload_id)
-            .join(upload_token.file_name)
-    }
-
-    async fn api_server_run(self) -> Result<(), InternalError> {
-        self.api_server.run().await.int_err()
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #[test_log::test(tokio::test)]
 async fn test_attempt_upload_file_unauthorized() {
-    let harness = Harness::new().await;
+    let harness = UploadLocalHarness::new().await;
     let upload_prepare_url = harness.upload_prepare_url("test.txt", "text/plain", 100);
     let upload_main_url = harness.upload_main_url();
     let upload_token = harness.mock_upload_token();
@@ -268,9 +133,9 @@ async fn test_attempt_upload_file_unauthorized() {
 async fn test_attempt_upload_file_authorized() {
     const FILE_BODY: &str = "a-test-file-body";
 
-    let harness = Harness::new().await;
+    let harness = UploadLocalHarness::new().await;
     let upload_prepare_url = harness.upload_prepare_url("test.txt", "text/plain", FILE_BODY.len());
-    let access_token = harness.make_access_token(&DEFAULT_ACCOUNT_ID);
+    let access_token = harness.make_access_token(&TEST_ACCOUNT_ID);
     let cache_dir = harness.cache_dir.clone();
 
     let client = async move {
@@ -284,6 +149,7 @@ async fn test_attempt_upload_file_authorized() {
             .unwrap();
 
         pretty_assertions::assert_eq!(http::StatusCode::OK, upload_prepare_response.status());
+
         let upload_context = upload_prepare_response
             .json::<UploadContext>()
             .await
@@ -313,7 +179,7 @@ async fn test_attempt_upload_file_authorized() {
         pretty_assertions::assert_eq!(http::StatusCode::OK, upload_main_response.status());
 
         let expected_upload_path =
-            Harness::target_path_from_upload_url(&cache_dir, &upload_main_url);
+            UploadLocalHarness::target_path_from_upload_url(&cache_dir, &upload_main_url);
         let file_body = std::fs::read_to_string(expected_upload_path).unwrap();
         pretty_assertions::assert_eq!(FILE_BODY, file_body);
     };
@@ -327,9 +193,9 @@ async fn test_attempt_upload_file_authorized() {
 async fn test_attempt_upload_file_by_different_user() {
     const FILE_BODY: &str = "a-test-file-body";
 
-    let harness = Harness::new().await;
+    let harness = UploadLocalHarness::new().await;
     let upload_prepare_url = harness.upload_prepare_url("test.txt", "text/plain", FILE_BODY.len());
-    let access_token = harness.make_access_token(&DEFAULT_ACCOUNT_ID);
+    let access_token = harness.make_access_token(&TEST_ACCOUNT_ID);
     let different_access_token = harness.make_access_token(&harness.another_account_id);
 
     let client = async move {
@@ -388,10 +254,10 @@ async fn test_attempt_upload_file_that_is_too_large() {
          Letraset sheets containing Lorem Ipsum passages, and more recently with desktop \
          publishing software like Aldus PageMaker including versions of Lorem Ipsum.";
 
-    let harness = Harness::new().await;
+    let harness = UploadLocalHarness::new().await;
     let upload_prepare_url = harness.upload_prepare_url("test.txt", "text/plain", FILE_BODY.len());
     let upload_main_url = harness.upload_main_url();
-    let access_token = harness.make_access_token(&DEFAULT_ACCOUNT_ID);
+    let access_token = harness.make_access_token(&TEST_ACCOUNT_ID);
     let upload_token = harness.mock_upload_token();
 
     let client = async move {
@@ -455,9 +321,9 @@ async fn test_attempt_upload_file_that_is_too_large() {
 async fn test_attempt_upload_file_that_has_different_length_than_declared() {
     const FILE_BODY: &str = "Some text";
 
-    let harness = Harness::new().await;
+    let harness = UploadLocalHarness::new().await;
     let upload_prepare_url = harness.upload_prepare_url("test.txt", "text/plain", FILE_BODY.len());
-    let access_token = harness.make_access_token(&DEFAULT_ACCOUNT_ID);
+    let access_token = harness.make_access_token(&TEST_ACCOUNT_ID);
 
     let client = async move {
         let client = reqwest::Client::new();
@@ -514,9 +380,9 @@ async fn test_attempt_upload_file_that_has_different_length_than_declared() {
 async fn test_upload_then_read_file() {
     const FILE_BODY: &str = "a-test-file-body";
 
-    let harness = Harness::new().await;
+    let harness = UploadLocalHarness::new().await;
     let upload_prepare_url = harness.upload_prepare_url("test.txt", "text/plain", FILE_BODY.len());
-    let access_token = harness.make_access_token(&DEFAULT_ACCOUNT_ID);
+    let access_token = harness.make_access_token(&TEST_ACCOUNT_ID);
     let different_access_token = harness.make_access_token(&harness.another_account_id);
 
     let client = async move {
@@ -586,6 +452,144 @@ async fn test_upload_then_read_file() {
     };
 
     await_client_server_flow!(harness.api_server_run(), client);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Harness
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct UploadLocalHarness {
+    _tempdir: tempfile::TempDir,
+    cache_dir: PathBuf,
+    api_server: TestAPIServer,
+    authentication_service: Arc<AuthenticationServiceImpl>,
+    another_account_id: odf::AccountID,
+}
+
+impl UploadLocalHarness {
+    async fn new() -> Self {
+        let addr = SocketAddr::from(([127, 0, 0, 1], 0));
+        let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+        let api_server_address =
+            format!("http://localhost:{}", listener.local_addr().unwrap().port());
+
+        let tempdir = tempfile::tempdir().unwrap();
+        let cache_dir = tempdir.path().join("cache");
+
+        const ANOTHER_ACCOUNT_NAME: &str = "another-account";
+
+        let catalog = {
+            let mut b = dill::CatalogBuilder::new();
+
+            let mut predefined_account_configs =
+                PredefinedAccountsConfig::test_single_tenant_with_id();
+            predefined_account_configs.predefined.push(
+                AccountConfig::test_config_from_name_with_id(odf::AccountName::new_unchecked(
+                    ANOTHER_ACCOUNT_NAME,
+                )),
+            );
+
+            b.add_value(CacheDir::new(cache_dir.clone()))
+                .add_value(predefined_account_configs)
+                .add::<AuthenticationServiceImpl>()
+                .add::<InMemoryAccountRepository>()
+                .add::<AccessTokenServiceImpl>()
+                .add::<InMemoryAccessTokenRepository>()
+                .add::<SystemTimeSourceDefault>()
+                .add::<LoginPasswordAuthProvider>()
+                .add::<AccountServiceImpl>()
+                .add::<InMemoryDidSecretKeyRepository>()
+                .add_value(DidSecretEncryptionConfig::sample())
+                .add_value(JwtAuthenticationConfig::default())
+                .add_value(AuthConfig::sample())
+                .add_value(ServerUrlConfig::new_test(Some(&api_server_address)))
+                .add_value(FileUploadLimitConfig::new_in_bytes(100))
+                .add::<UploadServiceLocal>()
+                .add::<PredefinedAccountsRegistrator>()
+                .add::<RebacServiceImpl>()
+                .add::<InMemoryRebacRepository>()
+                .add::<UpdateAccountUseCaseImpl>()
+                .add::<CreateAccountUseCaseImpl>()
+                .add_value(DefaultAccountProperties::default())
+                .add_value(DefaultDatasetProperties::default())
+                .add::<DummyOutboxImpl>()
+                .add::<OAuthDeviceCodeServiceImpl>()
+                .add::<OAuthDeviceCodeGeneratorDefault>()
+                .add::<InMemoryOAuthDeviceCodeRepository>();
+
+            NoOpDatabasePlugin::init_database_components(&mut b);
+
+            b.build()
+        };
+
+        init_on_startup::run_startup_jobs(&catalog).await.unwrap();
+
+        let authentication_service = catalog.get_one::<AuthenticationServiceImpl>().unwrap();
+
+        let api_server = TestAPIServer::new(catalog, listener, TenancyConfig::MultiTenant);
+
+        Self {
+            _tempdir: tempdir,
+            cache_dir,
+            api_server,
+            authentication_service,
+            another_account_id: odf::metadata::testing::account_id(&ANOTHER_ACCOUNT_NAME),
+        }
+    }
+
+    fn api_server_addr(&self) -> String {
+        self.api_server.local_addr().to_string()
+    }
+
+    fn make_access_token(&self, account_id: &odf::AccountID) -> String {
+        self.authentication_service
+            .make_access_token_from_account_id(account_id, 60)
+            .unwrap()
+            .into_inner()
+    }
+
+    fn mock_upload_token(&self) -> UploadTokenBase64Json {
+        UploadTokenBase64Json(UploadToken {
+            upload_id: "123".to_string(),
+            file_name: "someFile.json".to_string(),
+            owner_account_id: TEST_ACCOUNT_ID.as_id_without_did_prefix().to_string(),
+            content_length: 123,
+            content_type: Some(MediaType::JSON.to_owned()),
+        })
+    }
+
+    fn upload_prepare_url(&self, file_name: &str, content_type: &str, file_size: usize) -> String {
+        format!(
+            "http://{}/platform/file/upload/prepare?fileName={file_name}&contentType={content_type}&contentLength={file_size}",
+            self.api_server_addr(),
+        )
+    }
+
+    fn upload_main_url(&self) -> String {
+        format!("http://{}/platform/file/upload", self.api_server_addr())
+    }
+
+    fn target_path_from_upload_url(cache_dir: &Path, upload_url: &str) -> PathBuf {
+        const PATTERN: &str = "platform/file/upload/";
+        let pos = upload_url
+            .find(PATTERN)
+            .expect("pattern not found in upload url")
+            .add(PATTERN.len());
+
+        let url_suffix = &upload_url[pos..];
+        let upload_token: UploadTokenBase64Json = url_suffix.parse().unwrap();
+        let upload_token = upload_token.0;
+
+        cache_dir
+            .join("uploads")
+            .join(TEST_ACCOUNT_ID.as_id_without_did_prefix().to_string())
+            .join(upload_token.upload_id)
+            .join(upload_token.file_name)
+    }
+
+    async fn api_server_run(self) -> Result<(), InternalError> {
+        self.api_server.run().await.int_err()
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

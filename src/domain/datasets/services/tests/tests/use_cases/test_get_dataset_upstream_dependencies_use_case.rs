@@ -144,17 +144,17 @@ async fn test_all_upstream_dependencies_are_accessible() {
         [
             DatasetDependency::resolved(
                 alice_root_2_dataset_handle,
-                odf::AccountID::new_seeded_ed25519(alice.as_bytes()),
+                odf::metadata::testing::account_id(&alice),
                 alice.clone(),
             ),
             DatasetDependency::resolved(
                 bob_root_3_dataset_handle,
-                odf::AccountID::new_seeded_ed25519(bob.as_bytes()),
+                odf::metadata::testing::account_id(&bob),
                 bob.clone(),
             ),
             DatasetDependency::resolved(
                 bob_root_4_dataset_handle,
-                odf::AccountID::new_seeded_ed25519(bob.as_bytes()),
+                odf::metadata::testing::account_id(&bob),
                 bob.clone(),
             ),
         ],
@@ -263,7 +263,7 @@ async fn test_inaccessible_upstream_dependencies_present() {
         [
             DatasetDependency::resolved(
                 alice_public_root_2_dataset_handle,
-                odf::AccountID::new_seeded_ed25519(alice.as_bytes()),
+                odf::metadata::testing::account_id(&alice),
                 alice.clone(),
             ),
             DatasetDependency::Unresolved(bob_private_root_4_dataset_handle.id),

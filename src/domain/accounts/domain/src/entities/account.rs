@@ -14,29 +14,24 @@ use chrono::TimeZone;
 use chrono::{DateTime, Utc};
 use email_utils::Email;
 use serde::{Deserialize, Serialize};
+use url::Url;
 
-use crate::{AccountConfig, Password};
+use crate::Password;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // TODO: have some length restrictions (0 < .. < limit)
 pub type AccountDisplayName = String;
+// TODO: have some length restrictions (0 < .. < limit)
+pub type ProviderIdentityKey = String;
 
 pub const DEFAULT_ACCOUNT_NAME_STR: &str = "kamu";
 pub const DEFAULT_PASSWORD_STR: &str = "kamu.dev";
 
 pub static DEFAULT_ACCOUNT_NAME: LazyLock<odf::AccountName> =
     LazyLock::new(|| odf::AccountName::new_unchecked(DEFAULT_ACCOUNT_NAME_STR));
-pub static DEFAULT_ACCOUNT_ID: LazyLock<odf::AccountID> =
-    LazyLock::new(|| odf::AccountID::new_seeded_ed25519(DEFAULT_ACCOUNT_NAME_STR.as_bytes()));
 pub static DEFAULT_ACCOUNT_RESOURCE_ID: LazyLock<odf::ResourceID> =
     LazyLock::new(|| Account::seed_resource_id_from_name(DEFAULT_ACCOUNT_NAME_STR));
-pub static DEFAULT_ACCOUNT_HANDLE: LazyLock<odf::AccountHandle> =
-    LazyLock::new(|| odf::AccountHandle {
-        id: *DEFAULT_ACCOUNT_RESOURCE_ID,
-        did: DEFAULT_ACCOUNT_ID.clone(),
-        name: DEFAULT_ACCOUNT_NAME.clone(),
-    });
 pub static DEFAULT_ACCOUNT_PASSWORD: LazyLock<Password> =
     LazyLock::new(|| Password::try_new(DEFAULT_PASSWORD_STR).unwrap());
 pub static DUMMY_EMAIL_ADDRESS: LazyLock<Email> =
@@ -45,8 +40,26 @@ pub static DUMMY_EMAIL_ADDRESS: LazyLock<Email> =
 static DUMMY_REGISTRATION_TIME: LazyLock<DateTime<Utc>> =
     LazyLock::new(|| Utc.with_ymd_and_hms(2024, 4, 1, 12, 0, 0).unwrap());
 
+#[cfg(any(feature = "testing", test))]
+pub static TEST_ACCOUNT_ID: LazyLock<odf::AccountID> =
+    LazyLock::new(|| odf::metadata::testing::account_id(&DEFAULT_ACCOUNT_NAME_STR));
+
+#[cfg(any(feature = "testing", test))]
+pub static DEFAULT_ACCOUNT_HANDLE: LazyLock<odf::AccountHandle> =
+    LazyLock::new(|| odf::AccountHandle {
+        id: *DEFAULT_ACCOUNT_RESOURCE_ID,
+        did: TEST_ACCOUNT_ID.clone(),
+        name: DEFAULT_ACCOUNT_NAME.clone(),
+    });
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// TODO: Concerns: Provider mechanism is meant to be as a plug-in extension
+//                 point, so there shouldn't be an enum listing
+//                 all implementations because some of them can be not
+//                 owned by us. This is why Account::provider is a string
+//                 and not an enum after all
+//                 (c) https://github.com/kamu-data/kamu-cli/pull/1674#discussion_r3746118759
 #[derive(strum::EnumString, strum::Display, strum::IntoStaticStr, Copy, Clone)]
 pub enum AccountProvider {
     #[strum(serialize = "password")]
@@ -55,6 +68,12 @@ pub enum AccountProvider {
     OAuthGitHub,
     #[strum(serialize = "web3_wallet")]
     Web3Wallet,
+}
+
+impl AccountProvider {
+    pub fn is_password(provider: &str) -> bool {
+        provider == <&'static str>::from(AccountProvider::Password)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -70,10 +89,10 @@ pub struct Account {
     pub email: Email,
     pub display_name: AccountDisplayName,
     pub account_type: AccountType,
-    pub avatar_url: Option<String>,
+    pub avatar_url: Option<Url>,
     pub registered_at: DateTime<Utc>,
     pub provider: String,
-    pub provider_identity_key: String,
+    pub provider_identity_key: ProviderIdentityKey,
 }
 
 impl Account {
@@ -92,7 +111,7 @@ impl Account {
 
     /// Derives a deterministic account-resource id from an account name. Used
     /// for accounts whose identity is config-driven rather than minted at
-    /// runtime — predefined accounts (`From<&AccountConfig>`), the default
+    /// runtime — predefined accounts, the default
     /// account, and dummy pre-workspace subjects — so the same name always
     /// resolves to the same `resource_id` across restarts/re-registration and
     /// test runs. Runtime-created accounts get a random id via
@@ -122,30 +141,6 @@ impl From<&Account> for odf::AccountHandle {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl From<&AccountConfig> for Account {
-    fn from(account_config: &AccountConfig) -> Self {
-        Account {
-            id: account_config.get_id(),
-            // Predefined accounts are config-driven, not "genuinely new" in the
-            // sense `generate_resource_id` is meant for — seed deterministically
-            // so re-registering the same config (e.g. across test runs, or a
-            // server restart re-processing predefined accounts) yields the same
-            // resource_id instead of a fresh random one each time.
-            resource_id: Account::seed_resource_id_from_name(account_config.account_name.as_str()),
-            account_name: account_config.account_name.clone(),
-            email: account_config.email.clone(),
-            display_name: account_config.get_display_name(),
-            account_type: account_config.account_type,
-            avatar_url: account_config.avatar_url.clone(),
-            registered_at: account_config.registered_at.unwrap_or_else(Utc::now),
-            provider: account_config.provider.clone(),
-            provider_identity_key: account_config.account_name.to_string(),
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[cfg_attr(
     feature = "sqlx",
@@ -162,7 +157,7 @@ pub enum AccountType {
 #[cfg(any(feature = "testing", test))]
 impl Account {
     pub fn dummy() -> Self {
-        Self::test(DEFAULT_ACCOUNT_ID.clone(), DEFAULT_ACCOUNT_NAME_STR)
+        Self::test(TEST_ACCOUNT_ID.clone(), DEFAULT_ACCOUNT_NAME_STR)
     }
 
     pub fn test(id: odf::AccountID, name: &str) -> Self {
@@ -216,7 +211,7 @@ impl From<AccountRowModel> for Account {
             email: Email::parse(&value.email).unwrap(),
             display_name: value.display_name,
             account_type: value.account_type,
-            avatar_url: value.avatar_url,
+            avatar_url: value.avatar_url.map(|url| Url::parse(&url).unwrap()),
             registered_at: value.registered_at,
             provider: value.provider,
             provider_identity_key: value.provider_identity_key,
@@ -234,7 +229,7 @@ impl From<AccountWithTokenRowModel> for Account {
             email: Email::parse(&value.email).unwrap(),
             display_name: value.display_name,
             account_type: value.account_type,
-            avatar_url: value.avatar_url,
+            avatar_url: value.avatar_url.map(|url| Url::parse(&url).unwrap()),
             registered_at: value.registered_at,
             provider: value.provider,
             provider_identity_key: value.provider_identity_key,

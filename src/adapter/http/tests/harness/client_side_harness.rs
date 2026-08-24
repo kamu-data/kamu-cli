@@ -103,21 +103,21 @@ impl ClientSideHarness {
         match options.tenancy_config {
             TenancyConfig::SingleTenant => {
                 b.add_value(CurrentAccountSubject::new_test());
-                b.add_value(PredefinedAccountsConfig::single_tenant());
+                b.add_value(PredefinedAccountsConfig::test_single_tenant_with_id());
             }
             TenancyConfig::MultiTenant => {
                 b.add_value(CurrentAccountSubject::logged(
                     kamu_accounts::Account::seed_resource_id_from_name(CLIENT_ACCOUNT_NAME),
-                    odf::AccountID::new_seeded_ed25519(CLIENT_ACCOUNT_NAME.as_bytes()),
+                    odf::metadata::testing::account_id(&CLIENT_ACCOUNT_NAME),
                     odf::AccountName::new_unchecked(CLIENT_ACCOUNT_NAME),
                 ));
 
                 let mut predefined_accounts_config = PredefinedAccountsConfig::new();
-                predefined_accounts_config
-                    .predefined
-                    .push(AccountConfig::test_config_from_name(
-                        odf::AccountName::new_unchecked(CLIENT_ACCOUNT_NAME),
-                    ));
+                predefined_accounts_config.predefined.push(
+                    AccountConfig::test_config_from_name_with_id(odf::AccountName::new_unchecked(
+                        CLIENT_ACCOUNT_NAME,
+                    )),
+                );
                 b.add_value(predefined_accounts_config);
             }
         }
@@ -139,8 +139,8 @@ impl ClientSideHarness {
         b.add_builder(odf::dataset::DatasetStorageUnitLocalFs::builder(
             datasets_dir,
         ));
-        b.add::<kamu_datasets_services::DatasetLfsBuilderDatabaseBackedImpl>();
-        b.add_value(kamu_datasets_services::MetadataChainDbBackedConfig::default());
+        b.add::<DatasetLfsBuilderDatabaseBackedImpl>();
+        b.add_value(MetadataChainDbBackedConfig::default());
 
         b.add::<RemoteRepositoryRegistryImpl>();
 

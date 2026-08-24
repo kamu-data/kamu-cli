@@ -21,9 +21,7 @@ use crate::utils::{PredefinedAccountOpts, authentication_catalogs};
 
 #[test_log::test(tokio::test)]
 async fn test_account_by_id() {
-    let invalid_account_id = odf::AccountID::new_seeded_ed25519(b"I don't exist");
-
-    let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts::default()).await;
+    let harness = GraphQLAccountsHarness::builder().build().await;
 
     let res = harness
         .execute_anonymous_query(async_graphql::Request::new(format!(
@@ -36,7 +34,7 @@ async fn test_account_by_id() {
                 }}
             }}
             "#,
-            *DEFAULT_ACCOUNT_ID
+            *TEST_ACCOUNT_ID
         )))
         .await;
 
@@ -52,12 +50,13 @@ async fn test_account_by_id() {
         })
     );
 
+    let not_found_account_id = odf::AccountID::new_seeded_ed25519(b"I don't exist");
     let res = harness
         .execute_anonymous_query(async_graphql::Request::new(format!(
             r#"
             query {{
                 accounts {{
-                    byId (accountId: "{invalid_account_id}") {{
+                    byId (accountId: "{not_found_account_id}") {{
                         accountName
                     }}
                 }}
@@ -81,7 +80,7 @@ async fn test_account_by_id() {
 
 #[test_log::test(tokio::test)]
 async fn test_account_by_name() {
-    let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts::default()).await;
+    let harness = GraphQLAccountsHarness::builder().build().await;
 
     let res = harness
         .execute_anonymous_query(async_graphql::Request::new(format!(
@@ -166,7 +165,7 @@ async fn test_account_by_name() {
 
 #[test_log::test(tokio::test)]
 async fn test_account_attributes() {
-    let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts::default()).await;
+    let harness = GraphQLAccountsHarness::builder().build().await;
 
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(format!(
@@ -185,7 +184,7 @@ async fn test_account_attributes() {
                 }}
             }}
             "#,
-            *DEFAULT_ACCOUNT_ID
+            *TEST_ACCOUNT_ID
         )))
         .await;
 
@@ -195,7 +194,7 @@ async fn test_account_attributes() {
         value!({
             "accounts": {
                 "byId": {
-                    "id": DEFAULT_ACCOUNT_ID.to_string(),
+                    "id": TEST_ACCOUNT_ID.to_string(),
                     "accountName": DEFAULT_ACCOUNT_NAME_STR,
                     "displayName": DEFAULT_ACCOUNT_NAME_STR,
                     "accountType": "USER",
@@ -223,7 +222,7 @@ async fn test_account_attributes() {
                 }}
             }}
             "#,
-            *DEFAULT_ACCOUNT_ID
+            *TEST_ACCOUNT_ID
         )))
         .await;
 
@@ -233,7 +232,7 @@ async fn test_account_attributes() {
         value!({
             "accounts": {
                 "byId": {
-                    "id": DEFAULT_ACCOUNT_ID.to_string(),
+                    "id": TEST_ACCOUNT_ID.to_string(),
                     "accountName": DEFAULT_ACCOUNT_NAME_STR,
                     "displayName": DEFAULT_ACCOUNT_NAME_STR,
                     "accountType": "USER",
@@ -255,7 +254,7 @@ async fn test_account_attributes() {
                 }}
             }}
             "#,
-            *DEFAULT_ACCOUNT_ID
+            *TEST_ACCOUNT_ID
         )))
         .await;
 
@@ -268,7 +267,7 @@ async fn test_account_attributes() {
 
 #[test_log::test(tokio::test)]
 async fn test_update_email_success() {
-    let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts::default()).await;
+    let harness = GraphQLAccountsHarness::builder().build().await;
 
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(format!(
@@ -286,7 +285,7 @@ async fn test_update_email_success() {
                 }}
             }}
             "#,
-            *DEFAULT_ACCOUNT_ID, "wasya@example.com"
+            *TEST_ACCOUNT_ID, "wasya@example.com"
         )))
         .await;
 
@@ -310,7 +309,7 @@ async fn test_update_email_success() {
 
 #[test_log::test(tokio::test)]
 async fn test_update_email_bad_email() {
-    let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts::default()).await;
+    let harness = GraphQLAccountsHarness::builder().build().await;
 
     let res = harness
         .execute_authorized_query(async_graphql::Request::new(format!(
@@ -325,7 +324,7 @@ async fn test_update_email_bad_email() {
                 }}
             }}
             "#,
-            *DEFAULT_ACCOUNT_ID, "wasya#example.com"
+            *TEST_ACCOUNT_ID, "wasya#example.com"
         )))
         .await;
 
@@ -340,11 +339,13 @@ async fn test_update_email_bad_email() {
 
 #[test_log::test(tokio::test)]
 async fn test_update_email_unauthorized() {
-    let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts {
-        is_admin: false,
-        can_provision_accounts: true,
-    })
-    .await;
+    let harness = GraphQLAccountsHarness::builder()
+        .predefined_account_opts(PredefinedAccountOpts {
+            is_admin: false,
+            can_provision_accounts: true,
+        })
+        .build()
+        .await;
 
     // Create an account
     let res = harness
@@ -381,11 +382,13 @@ async fn test_update_email_unauthorized() {
 
 #[test_log::test(tokio::test)]
 async fn test_create_account() {
-    let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts {
-        is_admin: false,
-        can_provision_accounts: true,
-    })
-    .await;
+    let harness = GraphQLAccountsHarness::builder()
+        .predefined_account_opts(PredefinedAccountOpts {
+            is_admin: false,
+            can_provision_accounts: true,
+        })
+        .build()
+        .await;
 
     let res = harness
         .execute_authorized_query(create_account_request("foo"))
@@ -430,7 +433,7 @@ async fn test_create_account() {
 
 #[test_log::test(tokio::test)]
 async fn test_create_account_without_permissions() {
-    let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts::default()).await;
+    let harness = GraphQLAccountsHarness::builder().build().await;
 
     let res = harness
         .execute_authorized_query(create_account_request("foo"))
@@ -460,11 +463,13 @@ async fn test_create_wallet_accounts() {
 
     // -----
 
-    let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts {
-        is_admin: false,
-        can_provision_accounts: true,
-    })
-    .await;
+    let harness = GraphQLAccountsHarness::builder()
+        .predefined_account_opts(PredefinedAccountOpts {
+            is_admin: false,
+            can_provision_accounts: true,
+        })
+        .build()
+        .await;
 
     let wallet_accounts = [
         "did:pkh:eip155:1:0xbf9a00755BB7d2E904b5F569095220c54E742E07",
@@ -524,11 +529,13 @@ async fn test_create_wallet_accounts() {
 
 #[test_log::test(tokio::test)]
 async fn test_create_wallet_accounts_without_permissions() {
-    let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts {
-        is_admin: false,
-        can_provision_accounts: false,
-    })
-    .await;
+    let harness = GraphQLAccountsHarness::builder()
+        .predefined_account_opts(PredefinedAccountOpts {
+            is_admin: false,
+            can_provision_accounts: false,
+        })
+        .build()
+        .await;
 
     let wallet_accounts = [
         "did:pkh:eip155:1:0xbf9a00755BB7d2E904b5F569095220c54E742E07",
@@ -551,11 +558,13 @@ async fn test_create_wallet_accounts_without_permissions() {
 
 #[test_log::test(tokio::test)]
 async fn test_modify_password() {
-    let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts {
-        can_provision_accounts: true,
-        is_admin: true,
-    })
-    .await;
+    let harness = GraphQLAccountsHarness::builder()
+        .predefined_account_opts(PredefinedAccountOpts {
+            is_admin: true,
+            can_provision_accounts: true,
+        })
+        .build()
+        .await;
 
     // Create an account
     let res = harness
@@ -586,11 +595,13 @@ async fn test_modify_password() {
 
 #[test_log::test(tokio::test)]
 async fn test_modify_password_errors() {
-    let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts {
-        can_provision_accounts: true,
-        is_admin: true,
-    })
-    .await;
+    let harness = GraphQLAccountsHarness::builder()
+        .predefined_account_opts(PredefinedAccountOpts {
+            is_admin: true,
+            can_provision_accounts: true,
+        })
+        .build()
+        .await;
 
     // Create an account
     let res = harness
@@ -638,11 +649,13 @@ async fn test_modify_password_errors() {
 
 #[test_log::test(tokio::test)]
 async fn test_modify_password_non_admin() {
-    let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts {
-        can_provision_accounts: true,
-        is_admin: false,
-    })
-    .await;
+    let harness = GraphQLAccountsHarness::builder()
+        .predefined_account_opts(PredefinedAccountOpts {
+            is_admin: false,
+            can_provision_accounts: true,
+        })
+        .build()
+        .await;
 
     // Create an account
     let res = harness
@@ -680,11 +693,13 @@ async fn test_modify_password_non_admin() {
 
 #[test_log::test(tokio::test)]
 async fn test_delete_own_account() {
-    let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts {
-        is_admin: false,
-        can_provision_accounts: true,
-    })
-    .await;
+    let harness = GraphQLAccountsHarness::builder()
+        .predefined_account_opts(PredefinedAccountOpts {
+            is_admin: false,
+            can_provision_accounts: true,
+        })
+        .build()
+        .await;
 
     let default_test_account = CurrentAccountSubject::new_test();
 
@@ -724,11 +739,13 @@ async fn test_delete_own_account() {
 
 #[test_log::test(tokio::test)]
 async fn test_admin_delete_other_account() {
-    let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts {
-        can_provision_accounts: true,
-        is_admin: true,
-    })
-    .await;
+    let harness = GraphQLAccountsHarness::builder()
+        .predefined_account_opts(PredefinedAccountOpts {
+            is_admin: true,
+            can_provision_accounts: true,
+        })
+        .build()
+        .await;
 
     let another_account_username = "another-user";
 
@@ -773,7 +790,7 @@ async fn test_admin_delete_other_account() {
 
 #[test_log::test(tokio::test)]
 async fn test_anonymous_try_to_delete_account() {
-    let harness = GraphQLAccountsHarness::new(Default::default()).await;
+    let harness = GraphQLAccountsHarness::builder().build().await;
 
     let default_test_account = CurrentAccountSubject::new_test();
 
@@ -787,11 +804,13 @@ async fn test_anonymous_try_to_delete_account() {
 
 #[test_log::test(tokio::test)]
 async fn test_non_admin_try_to_delete_other_account() {
-    let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts {
-        is_admin: false,
-        can_provision_accounts: true,
-    })
-    .await;
+    let harness = GraphQLAccountsHarness::builder()
+        .predefined_account_opts(PredefinedAccountOpts {
+            is_admin: false,
+            can_provision_accounts: true,
+        })
+        .build()
+        .await;
 
     let another_account_username = "another-user";
 
@@ -811,11 +830,13 @@ async fn test_non_admin_try_to_delete_other_account() {
 
 #[test_log::test(tokio::test)]
 async fn test_rename_own_account() {
-    let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts {
-        is_admin: false,
-        can_provision_accounts: true,
-    })
-    .await;
+    let harness = GraphQLAccountsHarness::builder()
+        .predefined_account_opts(PredefinedAccountOpts {
+            is_admin: false,
+            can_provision_accounts: true,
+        })
+        .build()
+        .await;
 
     let default_test_account = CurrentAccountSubject::new_test();
     let default_password = AccountConfig::generate_password(default_test_account.account_name());
@@ -915,11 +936,13 @@ async fn test_rename_own_account() {
 
 #[test_log::test(tokio::test)]
 async fn test_rename_own_account_taken_name() {
-    let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts {
-        is_admin: false,
-        can_provision_accounts: true,
-    })
-    .await;
+    let harness = GraphQLAccountsHarness::builder()
+        .predefined_account_opts(PredefinedAccountOpts {
+            is_admin: false,
+            can_provision_accounts: true,
+        })
+        .build()
+        .await;
 
     let default_test_account = CurrentAccountSubject::new_test();
     const TAKEN_ACCOUNT_NAME: &str = "taken-account-name";
@@ -979,11 +1002,13 @@ async fn test_rename_own_account_taken_name() {
 
 #[test_log::test(tokio::test)]
 async fn test_admin_renames_other_account() {
-    let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts {
-        can_provision_accounts: true,
-        is_admin: true,
-    })
-    .await;
+    let harness = GraphQLAccountsHarness::builder()
+        .predefined_account_opts(PredefinedAccountOpts {
+            is_admin: true,
+            can_provision_accounts: true,
+        })
+        .build()
+        .await;
 
     const ANOTHER_ACCOUNT_NAME: &str = "another-user";
     const RENAMED_ANOTHER_ACCOUNT_NAME: &str = "renamed-another-user";
@@ -1047,7 +1072,7 @@ async fn test_admin_renames_other_account() {
 
 #[test_log::test(tokio::test)]
 async fn test_anonymous_try_to_rename_account() {
-    let harness = GraphQLAccountsHarness::new(Default::default()).await;
+    let harness = GraphQLAccountsHarness::builder().build().await;
 
     let default_test_account = CurrentAccountSubject::new_test();
 
@@ -1064,11 +1089,13 @@ async fn test_anonymous_try_to_rename_account() {
 
 #[test_log::test(tokio::test)]
 async fn test_non_admin_try_to_rename_other_account() {
-    let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts {
-        is_admin: false,
-        can_provision_accounts: true,
-    })
-    .await;
+    let harness = GraphQLAccountsHarness::builder()
+        .predefined_account_opts(PredefinedAccountOpts {
+            is_admin: false,
+            can_provision_accounts: true,
+        })
+        .build()
+        .await;
 
     const ANOTHER_ACCOUNT_NAME: &str = "another-user";
     const RENAMED_ANOTHER_ACCOUNT_NAME: &str = "renamed-another-user";
@@ -1092,9 +1119,9 @@ async fn test_non_admin_try_to_rename_other_account() {
 
 #[test_log::test(tokio::test)]
 async fn test_create_and_get_access_token() {
-    let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts::default()).await;
+    let harness = GraphQLAccountsHarness::builder().build().await;
 
-    let mutation_request = create_access_token_request(&DEFAULT_ACCOUNT_ID.to_string(), "foo");
+    let mutation_request = create_access_token_request(&TEST_ACCOUNT_ID.to_string(), "foo");
 
     let res = harness.execute_authorized_query(mutation_request).await;
 
@@ -1106,7 +1133,7 @@ async fn test_create_and_get_access_token() {
     let created_token_id =
         json["accounts"]["byId"]["accessTokens"]["createAccessToken"]["token"]["id"].clone();
 
-    let query_request = get_access_tokens_request(&DEFAULT_ACCOUNT_ID.to_string());
+    let query_request = get_access_tokens_request(&TEST_ACCOUNT_ID.to_string());
     let res = harness.execute_authorized_query(query_request).await;
 
     assert_eq!(
@@ -1128,7 +1155,7 @@ async fn test_create_and_get_access_token() {
         })
     );
 
-    let mutation_request = create_access_token_request(&DEFAULT_ACCOUNT_ID.to_string(), "foo");
+    let mutation_request = create_access_token_request(&TEST_ACCOUNT_ID.to_string(), "foo");
 
     let res = harness.execute_authorized_query(mutation_request).await;
 
@@ -1153,9 +1180,9 @@ async fn test_create_and_get_access_token() {
 
 #[test_log::test(tokio::test)]
 async fn test_revoke_access_token() {
-    let harness = GraphQLAccountsHarness::new(PredefinedAccountOpts::default()).await;
+    let harness = GraphQLAccountsHarness::builder().build().await;
 
-    let mutation_request = create_access_token_request(&DEFAULT_ACCOUNT_ID.to_string(), "foo");
+    let mutation_request = create_access_token_request(&TEST_ACCOUNT_ID.to_string(), "foo");
 
     let res = harness.execute_authorized_query(mutation_request).await;
 
@@ -1167,10 +1194,8 @@ async fn test_revoke_access_token() {
     let created_token_id =
         json["accounts"]["byId"]["accessTokens"]["createAccessToken"]["token"]["id"].clone();
 
-    let mutation_request = revoke_access_token_request(
-        &DEFAULT_ACCOUNT_ID.to_string(),
-        &created_token_id.to_string(),
-    );
+    let mutation_request =
+        revoke_access_token_request(&TEST_ACCOUNT_ID.to_string(), &created_token_id.to_string());
 
     let res = harness.execute_anonymous_query(mutation_request).await;
 
@@ -1181,10 +1206,8 @@ async fn test_revoke_access_token() {
         "Access token access error".to_string()
     );
 
-    let mutation_request = revoke_access_token_request(
-        &DEFAULT_ACCOUNT_ID.to_string(),
-        &created_token_id.to_string(),
-    );
+    let mutation_request =
+        revoke_access_token_request(&TEST_ACCOUNT_ID.to_string(), &created_token_id.to_string());
 
     let res = harness.execute_authorized_query(mutation_request).await;
 
@@ -1205,10 +1228,8 @@ async fn test_revoke_access_token() {
         })
     );
 
-    let mutation_request = revoke_access_token_request(
-        &DEFAULT_ACCOUNT_ID.to_string(),
-        &created_token_id.to_string(),
-    );
+    let mutation_request =
+        revoke_access_token_request(&TEST_ACCOUNT_ID.to_string(), &created_token_id.to_string());
 
     let res = harness.execute_authorized_query(mutation_request).await;
 
@@ -1237,38 +1258,44 @@ struct GraphQLAccountsHarness {
     catalog_authorized: dill::Catalog,
 }
 
+#[bon::bon]
 impl GraphQLAccountsHarness {
-    pub async fn new(predefined_account_opts: PredefinedAccountOpts) -> Self {
+    #[builder]
+    pub async fn new(predefined_account_opts: Option<PredefinedAccountOpts>) -> Self {
         let mut b = dill::CatalogBuilder::new();
         database_common::NoOpDatabasePlugin::init_database_components(&mut b);
 
         let base_catalog = b.build();
-        let catalog = dill::CatalogBuilder::new_chained(&base_catalog)
-            .add_value(kamu_core::TenancyConfig::MultiTenant)
-            .add::<kamu_accounts_inmem::InMemoryAccessTokenRepository>()
-            .add::<kamu_accounts_inmem::InMemoryDidSecretKeyRepository>()
-            .add::<kamu_accounts_inmem::InMemoryOAuthDeviceCodeRepository>()
-            .add::<kamu_accounts_services::AccessTokenServiceImpl>()
-            .add::<kamu_accounts_services::AuthenticationServiceImpl>()
-            .add::<kamu_accounts_services::CreateAccountUseCaseImpl>()
-            .add::<kamu_accounts_services::ModifyAccountPasswordUseCaseImpl>()
-            .add::<kamu_accounts_services::DeleteAccountUseCaseImpl>()
-            .add::<kamu_accounts_services::UpdateAccountUseCaseImpl>()
-            .add::<kamu_accounts_services::OAuthDeviceCodeGeneratorDefault>()
-            .add::<kamu_accounts_services::OAuthDeviceCodeServiceImpl>()
-            .add::<kamu_accounts_services::utils::AccountAuthorizationHelperImpl>()
-            .add::<kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl>()
-            .add::<time_source::SystemTimeSourceDefault>()
-            .add_value(JwtAuthenticationConfig::default())
-            .add_value(AuthConfig::sample())
-            .add_builder(messaging_outbox::OutboxImmediateImpl::builder(
-                messaging_outbox::ConsumerFilter::AllConsumers,
-            ))
-            .bind::<dyn messaging_outbox::Outbox, messaging_outbox::OutboxImmediateImpl>()
-            .build();
+        let catalog = {
+            let mut b = dill::CatalogBuilder::new_chained(&base_catalog);
+
+            b.add_value(kamu_core::TenancyConfig::MultiTenant)
+                .add::<kamu_accounts_inmem::InMemoryAccessTokenRepository>()
+                .add::<kamu_accounts_inmem::InMemoryDidSecretKeyRepository>()
+                .add::<kamu_accounts_inmem::InMemoryOAuthDeviceCodeRepository>()
+                .add::<kamu_accounts_services::AccessTokenServiceImpl>()
+                .add::<kamu_accounts_services::AuthenticationServiceImpl>()
+                .add::<kamu_accounts_services::CreateAccountUseCaseImpl>()
+                .add::<kamu_accounts_services::ModifyAccountPasswordUseCaseImpl>()
+                .add::<kamu_accounts_services::DeleteAccountUseCaseImpl>()
+                .add::<kamu_accounts_services::UpdateAccountUseCaseImpl>()
+                .add::<kamu_accounts_services::OAuthDeviceCodeGeneratorDefault>()
+                .add::<kamu_accounts_services::OAuthDeviceCodeServiceImpl>()
+                .add::<kamu_accounts_services::utils::AccountAuthorizationHelperImpl>()
+                .add::<kamu_auth_rebac_services::RebacDatasetRegistryFacadeImpl>()
+                .add::<time_source::SystemTimeSourceDefault>()
+                .add_value(JwtAuthenticationConfig::default())
+                .add_value(AuthConfig::sample())
+                .add_builder(messaging_outbox::OutboxImmediateImpl::builder(
+                    messaging_outbox::ConsumerFilter::AllConsumers,
+                ))
+                .bind::<dyn messaging_outbox::Outbox, messaging_outbox::OutboxImmediateImpl>();
+
+            b.build()
+        };
 
         let (catalog_anonymous, catalog_authorized) =
-            authentication_catalogs(&catalog, predefined_account_opts).await;
+            authentication_catalogs(&catalog, predefined_account_opts.unwrap_or_default()).await;
 
         Self {
             schema: kamu_adapter_graphql::schema_quiet(),

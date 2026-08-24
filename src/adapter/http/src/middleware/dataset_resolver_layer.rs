@@ -175,7 +175,9 @@ where
                     Ok(CheckResult::CheckedDataset(hdl)) => {
                         request.extensions_mut().insert(hdl);
                     }
-                    Ok(CheckResult::ErrorResponse(r)) => return Ok(r),
+                    Ok(CheckResult::ErrorResponse(r)) => {
+                        return Ok(r);
+                    }
                     Err(err) => {
                         tracing::error!(error=?err, error_msg=%err, "DatasetResolverLayer failed");
                         return Ok(internal_server_error_response());

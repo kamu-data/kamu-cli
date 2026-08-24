@@ -99,22 +99,22 @@ ignore = [
     # rsa crate vulnerability (used by sqlx), no fix available yet
     # https://rustsec.org/advisories/RUSTSEC-2023-0071.html
     "RUSTSEC-2023-0071",
-    # Unmaintained (proc-macro-error)
+    # Unmaintained: proc-macro-error
     # https://rustsec.org/advisories/RUSTSEC-2024-0370.html
     "RUSTSEC-2024-0370",
-    # Unmaintained (paste)
+    # Unmaintained: paste
     # https://rustsec.org/advisories/RUSTSEC-2024-0436
     "RUSTSEC-2024-0436",
-    # Unmaintained (backoff)
+    # Unmaintained: backoff
     # https://rustsec.org/advisories/RUSTSEC-2025-0012
     "RUSTSEC-2025-0012",
-    # Unmaintained (instant)
+    # Unmaintained: instant
     # https://rustsec.org/advisories/RUSTSEC-2024-0384
     "RUSTSEC-2024-0384",
-    # Unmaintained (custom_derive)
+    # Unmaintained: custom_derive
     # https://rustsec.org/advisories/RUSTSEC-2025-0058
     "RUSTSEC-2025-0058",
-    # Unmaintained (rustls-pemfile)
+    # Unmaintained: rustls-pemfile
     # https://rustsec.org/advisories/RUSTSEC-2025-0134
     "RUSTSEC-2025-0134",
     # rustls-webpki: transitive dependency; there are currently no updates for higher-order dependencies
@@ -131,17 +131,22 @@ ignore = [
     # https://rustsec.org/advisories/RUSTSEC-2026-0195
     "RUSTSEC-2026-0194",
     "RUSTSEC-2026-0195",
-    # Unmaintained (smallstr)
+    # Unmaintained: smallstr
     # Waiting for upstream crates to migrate to other implementation
     # https://rustsec.org/advisories/RUSTSEC-2026-0215
     "RUSTSEC-2026-0215",
-    # Unmaintained (bitmaps, im, sized-chunks)
-    # Transitive via linked-data -> im; no safe upgrade available, waiting for
-    # upstream to migrate to the imbl fork
-    # https://rustsec.org/advisories/RUSTSEC-2026-0247
+    # Unmaintained: im
     # https://rustsec.org/advisories/RUSTSEC-2026-0248
-    # https://rustsec.org/advisories/RUSTSEC-2026-0251
-    "RUSTSEC-2026-0247",
     "RUSTSEC-2026-0248",
+    # Unmaintained: bitmaps
+    # Dependency of the unmaintained `im` crate
+    # https://rustsec.org/advisories/RUSTSEC-2026-0247
+    "RUSTSEC-2026-0247",
+    # Unmaintained: sized-chunks
+    # Dependency of the unmaintained `im` crate
+    # https://rustsec.org/advisories/RUSTSEC-2026-0251
     "RUSTSEC-2026-0251",
+    # h2 (0.3.27): unbounded empty DATA frames
+    # https://rustsec.org/advisories/RUSTSEC-2026-0258
+    "RUSTSEC-2026-0258",
 ]

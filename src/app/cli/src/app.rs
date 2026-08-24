@@ -15,7 +15,6 @@ use chrono::{DateTime, Duration, Utc};
 use container_runtime::{ContainerRuntime, ContainerRuntimeConfig};
 use crypto_utils::AesGcmEncryptor;
 use database_common::DatabaseTransactionRunner;
-use dill::*;
 use init_on_startup::{JobSelector, RunStartupJobsOptions};
 use internal_error::*;
 use kamu::domain::*;
@@ -39,7 +38,6 @@ use tracing::{Instrument, warn};
 
 use crate::accounts::AccountService;
 use crate::cli::Command;
-use crate::config::CLIConfig;
 use crate::error::*;
 use crate::output::*;
 use crate::{
@@ -214,11 +212,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
             .transactional_with(
                 |account_service: Arc<dyn kamu_accounts::AccountService>| async move {
                     current_account_indication
-                        .to_current_account_subject(
-                            tenancy_config,
-                            workspace_status,
-                            account_service,
-                        )
+                        .to_current_account_subject(workspace_status, account_service)
                         .await
                         .int_err()
                 },
@@ -302,7 +296,7 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
         tx_runner
             .maybe_transactional(
                 is_transactional,
-                |maybe_transactional_cli_catalog: Catalog| async move {
+                |maybe_transactional_cli_catalog: dill::Catalog| async move {
                     let command_builder = cli_commands::get_command(
                         work_catalog,
                         &maybe_transactional_cli_catalog,
@@ -400,12 +394,12 @@ pub async fn run(workspace_layout: WorkspaceLayout, args: cli::Cli) -> Result<()
 pub fn configure_base_catalog(
     workspace_layout: &WorkspaceLayout,
     workspace_status: WorkspaceStatus,
-    cli_config: &CLIConfig,
+    cli_config: &config::CLIConfig,
     tenancy_config: TenancyConfig,
     system_time: Option<DateTime<Utc>>,
     is_e2e_testing: bool,
-) -> CatalogBuilder {
-    let mut b = CatalogBuilder::new();
+) -> dill::CatalogBuilder {
+    let mut b = dill::CatalogBuilder::new();
 
     b.add_value(observability::build_info::BuildInfo {
         app_version: env!("CARGO_PKG_VERSION"),
@@ -636,10 +630,12 @@ pub fn configure_base_catalog(
 
 // Public only for tests
 pub fn configure_cli_catalog(
-    base_catalog: &Catalog,
+    base_catalog: &dill::Catalog,
     tenancy_config: TenancyConfig,
-) -> CatalogBuilder {
-    let mut b = CatalogBuilder::new_chained(base_catalog);
+) -> dill::CatalogBuilder {
+    use dill::Component;
+
+    let mut b = dill::CatalogBuilder::new_chained(base_catalog);
 
     b.add::<config::ConfigService>();
     b.add::<GcService>();
@@ -655,11 +651,11 @@ pub fn configure_cli_catalog(
 }
 
 fn build_cli_catalog(
-    base_catalog: &Catalog,
-    maybe_server_catalog: Option<&Catalog>,
+    base_catalog: &dill::Catalog,
+    maybe_server_catalog: Option<&dill::Catalog>,
     cli_account_subject: CurrentAccountSubject,
     tenancy_config: TenancyConfig,
-) -> Catalog {
+) -> dill::Catalog {
     let cli_base_catalog = maybe_server_catalog.unwrap_or(base_catalog);
 
     configure_cli_catalog(cli_base_catalog, tenancy_config)
@@ -669,10 +665,10 @@ fn build_cli_catalog(
 
 // Public only for tests
 pub fn configure_server_catalog(
-    base_catalog: &Catalog,
+    base_catalog: &dill::Catalog,
     tenancy_config: TenancyConfig,
-) -> CatalogBuilder {
-    let mut b = CatalogBuilder::new_chained(base_catalog);
+) -> dill::CatalogBuilder {
+    let mut b = dill::CatalogBuilder::new_chained(base_catalog);
 
     kamu_adapter_flow_dataset::register_dependencies(&mut b, Default::default());
     kamu_adapter_flow_webhook::register_dependencies(&mut b);
@@ -729,7 +725,7 @@ pub fn configure_server_catalog(
 }
 
 async fn run_startup_initializations(
-    catalog: &Catalog,
+    catalog: &dill::Catalog,
     job_selector: JobSelector,
 ) -> Result<(), CLIError> {
     let init_result = init_on_startup::run_startup_jobs_ex(
@@ -767,7 +763,7 @@ fn load_config(workspace_layout: &WorkspaceLayout) -> Result<config::CLIConfig, 
 
 pub fn register_config_in_catalog(
     config: &config::CLIConfig,
-    catalog_builder: &mut CatalogBuilder,
+    catalog_builder: &mut dill::CatalogBuilder,
     workspace_status: WorkspaceStatus,
     password_hashing_mode: Option<cli::PasswordHashingMode>,
     is_e2e_testing: bool,

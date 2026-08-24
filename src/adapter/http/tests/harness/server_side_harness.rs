@@ -13,15 +13,7 @@ use std::sync::Arc;
 use chrono::Utc;
 use email_utils::Email;
 use internal_error::InternalError;
-use kamu_accounts::{
-    Account,
-    AccountProvider,
-    AccountType,
-    CurrentAccountSubject,
-    DEFAULT_ACCOUNT_ID,
-    DEFAULT_ACCOUNT_NAME,
-    DEFAULT_ACCOUNT_RESOURCE_ID,
-};
+use kamu_accounts::{Account, AccountProvider, AccountType, CurrentAccountSubject};
 use kamu_core::{CompactionExecutor, CompactionPlanner, TenancyConfig};
 use kamu_datasets::{
     AlwaysHappyDatasetActionAuthorizer,
@@ -102,7 +94,7 @@ pub(crate) struct ServerSideHarnessOptions {
 pub(crate) fn make_server_account(tenancy_config: TenancyConfig) -> Account {
     match tenancy_config {
         TenancyConfig::MultiTenant => Account {
-            id: odf::AccountID::new_seeded_ed25519(SERVER_ACCOUNT_NAME.as_bytes()),
+            id: odf::metadata::testing::account_id(&SERVER_ACCOUNT_NAME),
             resource_id: Account::seed_resource_id_from_name(SERVER_ACCOUNT_NAME),
             account_name: odf::AccountName::new_unchecked(SERVER_ACCOUNT_NAME),
             account_type: AccountType::User,
@@ -124,14 +116,10 @@ pub(crate) fn create_cli_user_catalog(
     tenancy_config: TenancyConfig,
 ) -> dill::Catalog {
     let current_account_subject = match tenancy_config {
-        TenancyConfig::SingleTenant => CurrentAccountSubject::logged(
-            *DEFAULT_ACCOUNT_RESOURCE_ID,
-            DEFAULT_ACCOUNT_ID.clone(),
-            DEFAULT_ACCOUNT_NAME.clone(),
-        ),
+        TenancyConfig::SingleTenant => CurrentAccountSubject::new_test(),
         TenancyConfig::MultiTenant => CurrentAccountSubject::logged(
             kamu_accounts::Account::seed_resource_id_from_name(SERVER_ACCOUNT_NAME),
-            odf::AccountID::new_seeded_ed25519(SERVER_ACCOUNT_NAME.as_bytes()),
+            odf::metadata::testing::account_id(&SERVER_ACCOUNT_NAME),
             odf::AccountName::new_unchecked(SERVER_ACCOUNT_NAME),
         ),
     };
